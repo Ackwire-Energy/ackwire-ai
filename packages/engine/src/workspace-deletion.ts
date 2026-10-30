@@ -1,0 +1,639 @@
+import { ACCOUNTS_PROTOCOL, type MailAdapters, type PubSub } from "@agenteschat/adapters";
+import {
+  and,
+  type Database,
+  desc,
+  type Executor,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+  ne,
+  schema,
+  sql,
+} from "@agenteschat/db";
+import { recordAudit } from "./audit";
+import { caches } from "./cache";
+import { stopOrgWork } from "./cancel";
+import { type ConnectorDeps, revokeAtProvider } from "./connectors/connections";
+import { emailLocale, queueEmail } from "./email";
+import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
+import { type OrgDeletingEvent, publishOrgEvent } from "./events";
+import { forgetInstallationTokens } from "./git/github-app";
+import { announceReleasedAccounts, type ReleasedAccounts, releaseOrgAccounts } from "./machine-accounts";
+import type { MachineHub } from "./machine-hub";
+import { MACHINE_CONTROL_TOPIC, machineOnline } from "./machines";
+import { forgetAtComposio } from "./mail/accounts";
+import { recordOperatorEvent } from "./operator-events";
+import { getMembership, getOrganization, lockOrgMembers, type Membership, queueOrgFilesPurge } from "./organizations";
+import { enqueue } from "./outbox";
+import {
+  closedRefusal,
+  heldOrg,
+  OrgDeletingError,
+  OrgPausedError,
+  type OrgStanding,
+  refusesNewWorkspace,
+  STANDING_COLUMNS,
+  waitsForPlan,
+} from "./standing";
+
+const {
+  organizations,
+  organizationMembers,
+  organizationSettings,
+  users,
+  machineProvisioning,
+  machines,
+  machineAccounts,
+  messageReactions,
+  routingDecisions,
+  threadReflections,
+  usageRecords,
+  wikiLinks,
+  contextUsage,
+  agentRuns,
+  mailAccounts,
+  mailWatches,
+  connectorConnections,
+  githubAppInstallations,
+  auditLog,
+} = schema;
+
+/*
+ * Deleting a workspace: an owner asks, with proof that it's them (the route checks it), and the workspace closes to
+ * everyone at once, like a suspended one (`closedRefusal`). Any owner may restore it until its date. At the date the
+ * `org.delete` job deletes it for good: its computers' AI sign-ins first, then the grants it holds at Composio and
+ * GitHub, then its rows in one transaction. The date is the point of no return, by the database's clock: restoring
+ * works only before it and the purge only after it, so neither can undo the other.
+ */
+
+/** Days a deleted workspace stays closed, and restorable by any owner, before it goes for good. */
+export const WORKSPACE_DELETION_DAYS = 7;
+/** The job that deletes a workspace at its date (`purgeWorkspace`). */
+export const ORG_DELETE_JOB = "org.delete";
+/** How recent a sign-in proves the person is there: to delete, or to add a password that would prove it later. */
+export const DELETION_PROOF_FRESH_MS = 10 * 60_000;
+/**
+ * Tables holding a workspace's rows that nothing cascades to from it (no foreign key to it, or only through a nullable
+ * column): the purge deletes them itself.
+ */
+export const PURGED_BY_HAND = [
+  "message_reactions",
+  "routing_decisions",
+  "thread_reflections",
+  "usage_records",
+  "wiki_links",
+  "context_usage",
+] as const;
+/** How long the purge waits for a workspace's online computers to sign its AI accounts out. */
+const ACCOUNTS_WAIT_MS = 60_000;
+
+/** Who asked: an owner, or the account of its only member, which went with it. */
+export type DeletionVia = "owner" | "account";
+
+/**
+ * A deletion past its date still waits while the workspace is suspended, on a hold that isn't billing's, or under the
+ * operator's deletion hold (a legal hold), so evidence outlives a deletion. It never refuses one: the workspace closes
+ * at once either way.
+ */
+export const keptFromDeletion = (
+  org: Pick<OrgStanding, "state" | "reason" | "notice"> & { deletionHoldAt: Date | null },
+) => refusesNewWorkspace(org) || org.deletionHoldAt !== null;
+/** `keptFromDeletion` in SQL. */
+const keptOrg = sql<boolean>`(${heldOrg} or ${organizations.deletionHoldAt} is not null)`;
+/** Its date passed, by the database's clock. */
+const pastDue = sql<boolean>`${organizations.deletionDueAt} <= now()`;
+
+export interface DeletionDeps {
+  db: Database;
+  pubsub?: PubSub;
+  /** Stops its agents' tasks and desktops on its computers (absent: the tasks are only marked canceled). */
+  hub?: Pick<MachineHub, "call">;
+  /** This server sends email: the members are told, with links to this address. Absent: nobody is. */
+  emails?: { publicUrl: string } | null;
+}
+
+/** A deletion written in a transaction, for what follows its commit (`afterClosing`). */
+export interface Closed {
+  orgId: string;
+  dueAt: Date;
+  by: { id: string; name: string };
+}
+
+const workspaceUrl = (publicUrl: string, orgId: string) => `${publicUrl.replace(/\/$/, "")}/org/${orgId}`;
+
+/**
+ * An owner's membership, before deleting or restoring the workspace: refused for anyone else and while it is suspended
+ * (`org.suspended`, its owners can act on nothing then), and a 404 once it is gone. Being deleted is no refusal here.
+ */
+export async function requireOwnerToDelete(db: Database, userId: string, orgId: string): Promise<Membership> {
+  const membership = await getMembership(db, userId, orgId);
+  if (!membership) {
+    if (!(await getOrganization(db, orgId))) throw new NotFoundError("This workspace no longer exists");
+    throw new ForbiddenError("You are not a member of this organization");
+  }
+  const refusal = closedRefusal(membership.standing);
+  if (refusal instanceof OrgPausedError) throw refusal;
+  if (membership.role !== "owner") throw new ForbiddenError("Only an owner can delete or restore the workspace");
+  return membership;
+}
+
+/**
+ * Deletes a workspace after `WORKSPACE_DELETION_DAYS` (`org.delete` then): it closes to everyone now, and its work
+ * stops. `owner`: an owner asked (read again under the lock), refused while it is suspended, and its members are
+ * emailed. `account`: its only member deleted their account, whatever its standing. Already being deleted, it keeps
+ * its date (`scheduled` false) and nobody is told again.
+ */
+export async function scheduleDeletion(deps: DeletionDeps, actorId: string, orgId: string, via: DeletionVia) {
+  const { dueAt, closed } = await deps.db.transaction(async (tx) => {
+    await lockOrgMembers(tx, orgId);
+    if (via === "owner") {
+      const [me] = await tx
+        .select({ role: organizationMembers.role, standing: STANDING_COLUMNS })
+        .from(organizationMembers)
+        .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
+        .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, actorId)));
+      if (me?.role !== "owner") throw new ForbiddenError("Only an owner can delete the workspace");
+      const refusal = closedRefusal(me.standing);
+      if (refusal instanceof OrgPausedError) throw refusal;
+    }
+    return closeForDeletion(tx, { actorId, orgId, via, emails: deps.emails });
+  });
+  if (closed) await afterClosing(deps, closed);
+  return { dueAt, scheduled: closed !== null };
+}
+
+/**
+ * Closes a workspace for deletion in the caller's transaction, which holds its `lockOrgMembers`: its date
+ * `WORKSPACE_DELETION_DAYS` out, who asked, the audit row, the operator's event and `org.delete` at the date. A computer
+ * it still waits for is awaited no more, as for a hold. With `emails` and an owner's deletion, every member is told in
+ * their language and time zone. The jobs carry no org_id, so the workspace's cascade leaves them. `closed` is null when
+ * it already was being deleted: it keeps its date.
+ */
+export async function closeForDeletion(
+  tx: Executor,
+  input: { actorId: string; orgId: string; via: DeletionVia; emails?: { publicUrl: string } | null },
+): Promise<{ dueAt: Date; closed: Closed | null }> {
+  const { actorId, orgId, via } = input;
+  const [org] = await tx
+    .select({ dueAt: organizations.deletionDueAt, name: organizations.name })
+    .from(organizations)
+    .where(eq(organizations.id, orgId));
+  if (!org) throw new NotFoundError("This workspace no longer exists");
+  if (org.dueAt) return { dueAt: org.dueAt, closed: null };
+  const [row] = await tx
+    .update(organizations)
+    .set({
+      deletionDueAt: sql`now() + make_interval(days => ${WORKSPACE_DELETION_DAYS})`,
+      deletionRequestedAt: sql`now()`,
+      deletionRequestedBy: actorId,
+    })
+    .where(eq(organizations.id, orgId))
+    .returning({ dueAt: organizations.deletionDueAt });
+  const dueAt = row?.dueAt;
+  if (!dueAt) throw new NotFoundError("This workspace no longer exists");
+  await tx
+    .delete(machineProvisioning)
+    .where(and(eq(machineProvisioning.orgId, orgId), ne(machineProvisioning.state, "ready")));
+  const due = dueAt.toISOString();
+  await recordAudit(tx, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: "organization.deletion_scheduled",
+    target: { type: "organization", id: orgId },
+    details: { dueAt: due, via },
+  });
+  await recordOperatorEvent(tx, {
+    type: "organization.deletion_requested",
+    orgId,
+    userId: actorId,
+    data: { dueAt: due, via },
+  });
+  const by = { id: actorId, name: await nameOf(tx, actorId) };
+  if (input.emails && via === "owner") {
+    const url = workspaceUrl(input.emails.publicUrl, orgId);
+    for (const member of await membersToTell(tx, orgId)) {
+      await queueEmail(tx, {
+        orgId: null,
+        key: `workspace-deleting:${orgId}:${dueAt.getTime()}:${member.id}`,
+        to: [member.email],
+        template: {
+          kind: "workspace_deleting",
+          locale: emailLocale(member.locale),
+          orgName: org.name,
+          byName: by.name,
+          dueAt: due,
+          timeZone: member.timeZone,
+          owner: member.role === "owner",
+          url,
+        },
+      });
+    }
+  }
+  await enqueue(tx, {
+    orgId: null,
+    kind: ORG_DELETE_JOB,
+    payload: { orgId },
+    runAt: dueAt,
+    dedupeKey: `${ORG_DELETE_JOB}:${orgId}:${dueAt.getTime()}`,
+  });
+  return { dueAt, closed: { orgId, dueAt, by } };
+}
+
+/** What follows a deletion's commit: the cached standing goes, its people's apps hear it and close, and its work stops. */
+export async function afterClosing(deps: DeletionDeps, closed: Closed) {
+  caches.standing.delete(`${closed.orgId}:`);
+  const event: OrgDeletingEvent = {
+    type: "org.deleting",
+    orgId: closed.orgId,
+    dueAt: closed.dueAt.toISOString(),
+    by: closed.by,
+  };
+  await publishOrgEvent(deps.pubsub, { type: "org.broadcast", orgId: closed.orgId, event });
+  await stopOrgWork(deps, closed.orgId, new OrgDeletingError(null).message, "org_deleting");
+}
+
+/**
+ * Restores a workspace being deleted: an owner, with no proof, since it destroys nothing. Only before its date
+ * (`org.not_restorable` after), never while suspended. One waiting for its first plan comes back only while its owner
+ * waits on no other (`org.create_unpaid`). The operator's deletion hold stays as it is. Its members are told. What
+ * stopped while it was closed stays stopped, and its routines fire again at their next time.
+ */
+export async function restoreWorkspace(deps: DeletionDeps, actorId: string, orgId: string) {
+  await deps.db.transaction(async (tx) => {
+    // `createOrganization`'s lock: the plan rule below can't race a new workspace of theirs.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-create:${actorId}`}))`);
+    await lockOrgMembers(tx, orgId);
+    const [org] = await tx
+      .select({
+        name: organizations.name,
+        standing: STANDING_COLUMNS,
+        restorable: sql<boolean>`${organizations.deletionDueAt} > now()`,
+        role: organizationMembers.role,
+      })
+      .from(organizations)
+      .leftJoin(
+        organizationMembers,
+        and(eq(organizationMembers.orgId, organizations.id), eq(organizationMembers.userId, actorId)),
+      )
+      .where(eq(organizations.id, orgId));
+    if (!org) throw new NotFoundError("This workspace no longer exists");
+    if (org.role !== "owner") throw new ForbiddenError("Only an owner can restore the workspace");
+    const refusal = closedRefusal(org.standing);
+    if (refusal instanceof OrgPausedError) throw refusal;
+    const dueAt = org.standing.deletionDueAt;
+    if (!dueAt || !org.restorable) {
+      throw new ConflictError("This workspace can't be restored anymore", "org.not_restorable");
+    }
+    if (waitsForPlan({ ...org.standing, deletionDueAt: null })) {
+      const theirs = await tx
+        .select({ id: organizations.id, standing: STANDING_COLUMNS })
+        .from(organizationMembers)
+        .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
+        .where(
+          and(
+            eq(organizationMembers.userId, actorId),
+            eq(organizationMembers.role, "owner"),
+            ne(organizations.id, orgId),
+          ),
+        );
+      const other = theirs.find((o) => waitsForPlan(o.standing));
+      if (other) {
+        throw new ForbiddenError("You already have a workspace waiting for a plan", "org.create_unpaid", {
+          orgId: other.id,
+        });
+      }
+    }
+    await tx
+      .update(organizations)
+      .set({ deletionDueAt: null, deletionRequestedAt: null, deletionRequestedBy: null })
+      .where(eq(organizations.id, orgId));
+    await recordAudit(tx, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "organization.deletion_canceled",
+      target: { type: "organization", id: orgId },
+      details: { dueAt: dueAt.toISOString() },
+    });
+    await recordOperatorEvent(tx, { type: "organization.deletion_canceled", orgId, userId: actorId });
+    if (!deps.emails) return;
+    const url = workspaceUrl(deps.emails.publicUrl, orgId);
+    const byName = await nameOf(tx, actorId);
+    for (const member of await membersToTell(tx, orgId)) {
+      await queueEmail(tx, {
+        orgId: null,
+        key: `workspace-restored:${orgId}:${dueAt.getTime()}:${member.id}`,
+        to: [member.email],
+        template: {
+          kind: "workspace_restored",
+          locale: emailLocale(member.locale),
+          orgName: org.name,
+          byName,
+          url,
+        },
+      });
+    }
+  });
+  caches.standing.delete(`${orgId}:`);
+}
+
+const nameOf = async (tx: Executor, userId: string) =>
+  (await tx.select({ name: users.name }).from(users).where(eq(users.id, userId)))[0]?.name ?? "";
+
+/** Who is told about a workspace: its members, blocked accounts aside, with their language and time zone. */
+function membersToTell(tx: Executor, orgId: string) {
+  return tx
+    .select({
+      id: users.id,
+      email: users.email,
+      locale: users.locale,
+      role: organizationMembers.role,
+      timeZone: sql<string>`coalesce(${organizationMembers.timezone}, ${organizationSettings.timezone}, 'UTC')`,
+    })
+    .from(organizationMembers)
+    .innerJoin(users, eq(users.id, organizationMembers.userId))
+    .leftJoin(organizationSettings, eq(organizationSettings.orgId, organizationMembers.orgId))
+    .where(and(eq(organizationMembers.orgId, orgId), isNull(users.blockedAt)));
+}
+
+export interface PurgeDeps {
+  db: Database;
+  pubsub?: PubSub;
+  /** Revokes its GitHub OAuth grants at GitHub (absent, or without the GitHub app: none can be). */
+  connectors?: ConnectorDeps;
+  /** Has Composio forget its mailboxes (absent, or without Composio: none can be). */
+  mail?: MailAdapters | null;
+  log?: {
+    info(message: string, data?: Record<string, unknown>): void;
+    warn(message: string, data?: Record<string, unknown>): void;
+  };
+}
+
+/**
+ * The `org.delete` job: deletes a workspace past its date that nothing keeps, else does nothing (restored, kept or
+ * gone; the hourly `enqueueOverdueDeletions` comes back once a hold lifts). First its AI accounts leave its online
+ * computers (an offline one keeps them, and its token dies with the workspace). Then its outside grants are revoked
+ * while their sealed copies exist: a failure fails the job, which retries, and its final attempt goes on and logs the
+ * ids it couldn't revoke. Then one transaction, which checks again under the row's lock (a hold that committed first
+ * wins), deletes it with everything that cascades and what doesn't (`PURGED_BY_HAND`), and queues its files' purge.
+ * Its computers are told they were removed. Returns whether it was deleted.
+ */
+export async function purgeWorkspace(deps: PurgeDeps, orgId: string, options: { finalAttempt?: boolean } = {}) {
+  const { db } = deps;
+  const dueColumns = { ...STANDING_COLUMNS, deletionHoldAt: organizations.deletionHoldAt };
+  const [org] = await db
+    .select(dueColumns)
+    .from(organizations)
+    .where(and(eq(organizations.id, orgId), pastDue));
+  if (!org || keptFromDeletion(org)) return false;
+
+  const released = await db.transaction((tx) => releaseOrgAccounts(tx, orgId));
+  await announceReleasedAccounts(deps.pubsub, released);
+  await accountsSignedOut(db, orgId, released);
+
+  const left = await revokeGrants(deps, orgId);
+  if (left.length > 0) {
+    if (!options.finalAttempt) throw new Error(`Grants not revoked yet: ${left.join(", ")}`);
+    deps.log?.warn("workspace deletion went on with grants not revoked", { orgId, ids: left });
+  }
+
+  const gone = await db.transaction(async (tx) => {
+    await lockOrgMembers(tx, orgId);
+    const [row] = await tx
+      .select({
+        ...dueColumns,
+        requestedAt: organizations.deletionRequestedAt,
+        requestedBy: organizations.deletionRequestedBy,
+      })
+      .from(organizations)
+      .where(and(eq(organizations.id, orgId), pastDue))
+      .for("update");
+    if (!row || keptFromDeletion(row)) return null;
+    await tx.delete(messageReactions).where(eq(messageReactions.orgId, orgId));
+    await tx.delete(routingDecisions).where(eq(routingDecisions.orgId, orgId));
+    await tx.delete(threadReflections).where(eq(threadReflections.orgId, orgId));
+    await tx.delete(usageRecords).where(eq(usageRecords.orgId, orgId));
+    await tx.delete(wikiLinks).where(eq(wikiLinks.orgId, orgId));
+    // No index on its org_id: through the workspace's runs, the first column of its primary key.
+    await tx
+      .delete(contextUsage)
+      .where(
+        inArray(contextUsage.runId, tx.select({ id: agentRuns.id }).from(agentRuns).where(eq(agentRuns.orgId, orgId))),
+      );
+    const via = await requestedVia(tx, orgId);
+    await recordOperatorEvent(tx, {
+      type: "organization.deleted",
+      orgId,
+      userId: row.requestedBy,
+      data: { requestedAt: row.requestedAt?.toISOString() ?? null, via },
+    });
+    await queueOrgFilesPurge(tx, orgId);
+    const computers = await tx
+      .select({ id: machines.id })
+      .from(machines)
+      .where(and(eq(machines.orgId, orgId), isNull(machines.deletedAt)));
+    const installs = await tx
+      .select({ id: githubAppInstallations.installationId })
+      .from(githubAppInstallations)
+      .where(eq(githubAppInstallations.orgId, orgId));
+    await tx.delete(organizations).where(eq(organizations.id, orgId));
+    return { computers, installs, requestedBy: row.requestedBy, via };
+  });
+  if (!gone) return false;
+  for (const computer of gone.computers) {
+    await deps.pubsub
+      ?.publish(MACHINE_CONTROL_TOPIC, { type: "machine.revoke", machineId: computer.id })
+      .catch(() => undefined);
+  }
+  for (const install of gone.installs) forgetInstallationTokens(install.id);
+  caches.standing.delete(`${orgId}:`);
+  // On a server without the operator API, the only trace it leaves.
+  deps.log?.info("workspace deleted", { orgId, requestedBy: gone.requestedBy, via: gone.via });
+  return true;
+}
+
+/** How its deletion was asked for, as its own audit log recorded it. */
+async function requestedVia(tx: Executor, orgId: string): Promise<DeletionVia> {
+  const [scheduled] = await tx
+    .select({ via: sql<string | null>`${auditLog.details}->>'via'` })
+    .from(auditLog)
+    .where(and(eq(auditLog.orgId, orgId), eq(auditLog.action, "organization.deletion_scheduled")))
+    .orderBy(desc(auditLog.id))
+    .limit(1);
+  return scheduled?.via === "account" ? "account" : "owner";
+}
+
+/** Waits, at most `ACCOUNTS_WAIT_MS`, until its online computers that remove accounts hold none of its tombstones. */
+async function accountsSignedOut(db: Database, orgId: string, released: ReleasedAccounts) {
+  const ids = released.machines.map((m) => m.machineId);
+  if (ids.length === 0) return;
+  const rows = await db
+    .select({
+      id: machines.id,
+      online: machines.online,
+      lastSeenAt: machines.lastSeenAt,
+      deletedAt: machines.deletedAt,
+      protocol: machines.protocol,
+    })
+    .from(machines)
+    .where(inArray(machines.id, ids));
+  const waiting = rows.filter((m) => machineOnline(m) && m.protocol >= ACCOUNTS_PROTOCOL).map((m) => m.id);
+  const until = Date.now() + ACCOUNTS_WAIT_MS;
+  while (waiting.length > 0 && Date.now() < until) {
+    const [left] = await db
+      .select({ id: machineAccounts.id })
+      .from(machineAccounts)
+      .where(
+        and(
+          eq(machineAccounts.orgId, orgId),
+          eq(machineAccounts.status, "removing"),
+          inArray(machineAccounts.machineId, waiting),
+        ),
+      )
+      .limit(1);
+    if (!left) return;
+    await Bun.sleep(250);
+  }
+}
+
+/**
+ * Revokes the grants a workspace holds outside: Composio forgets its mailboxes (their triggers, and the accounts, which
+ * revokes them at Google or Microsoft) and GitHub its OAuth grants. Each is marked as it goes, so a retry skips it.
+ * Returns the ids of the mailboxes and connections that failed; never a token.
+ */
+async function revokeGrants(deps: PurgeDeps, orgId: string): Promise<string[]> {
+  const { db } = deps;
+  const left: string[] = [];
+  const composio = deps.mail?.composio;
+  if (composio) {
+    const boxes = await db
+      .select({ id: mailAccounts.id, externalAccountId: mailAccounts.externalAccountId })
+      .from(mailAccounts)
+      .where(and(eq(mailAccounts.orgId, orgId), eq(mailAccounts.via, "composio")));
+    const watches = await db
+      .select({ accountId: mailWatches.accountId, triggerId: mailWatches.externalTriggerId })
+      .from(mailWatches)
+      .where(and(eq(mailWatches.orgId, orgId), isNotNull(mailWatches.externalTriggerId)));
+    for (const box of boxes) {
+      const triggers = watches.flatMap((w) => (w.accountId === box.id && w.triggerId ? [w.triggerId] : []));
+      if (!box.externalAccountId && triggers.length === 0) continue;
+      try {
+        await forgetAtComposio(composio.client, box.externalAccountId, triggers);
+      } catch {
+        left.push(box.id);
+        continue;
+      }
+      const now = new Date();
+      await db.transaction(async (tx) => {
+        await tx
+          .update(mailAccounts)
+          .set({ externalAccountId: null, revokedAt: sql`coalesce(${mailAccounts.revokedAt}, now())`, updatedAt: now })
+          .where(eq(mailAccounts.id, box.id));
+        await tx
+          .update(mailWatches)
+          .set({ externalTriggerId: null, updatedAt: now })
+          .where(eq(mailWatches.accountId, box.id));
+      });
+    }
+  }
+  const connectors = deps.connectors;
+  if (connectors?.oauthApps?.github) {
+    const grants = await db
+      .select({ id: connectorConnections.id })
+      .from(connectorConnections)
+      .where(
+        and(
+          eq(connectorConnections.orgId, orgId),
+          eq(connectorConnections.connector, "github"),
+          eq(connectorConnections.authType, "oauth"),
+          isNull(connectorConnections.revokedAt),
+        ),
+      );
+    for (const grant of grants) {
+      if (!(await revokeAtProvider(connectors, orgId, grant.id).catch(() => false))) {
+        left.push(grant.id);
+        continue;
+      }
+      await db.update(connectorConnections).set({ revokedAt: new Date() }).where(eq(connectorConnections.id, grant.id));
+    }
+  }
+  return left;
+}
+
+/**
+ * Queues `org.delete` for every workspace past its date that nothing keeps, at most once an hour each: for a hold that
+ * lifted after the date, a job that failed for good, or one a deploy lost. Returns how many are due.
+ */
+export async function enqueueOverdueDeletions(db: Database, now = new Date()) {
+  const due = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(and(lte(organizations.deletionDueAt, now), sql`not ${keptOrg}`));
+  const hour = now.toISOString().slice(0, 13);
+  for (const { id } of due) {
+    await enqueue(db, {
+      orgId: null,
+      kind: ORG_DELETE_JOB,
+      payload: { orgId: id },
+      dedupeKey: `${ORG_DELETE_JOB}:${id}:${hour}`,
+    });
+  }
+  return due.length;
+}
+
+/**
+ * The operator's deletion hold (a legal hold), or letting it go: while held, a deletion past its date waits. It refuses
+ * nothing and the workspace is told nothing, no audit row and no notice. Restoring never lifts it. Null when there is
+ * no such workspace.
+ */
+export async function setDeletionHold(db: Database, orgId: string, change: { held: boolean; reason: string | null }) {
+  const [row] = await db
+    .update(organizations)
+    .set(
+      change.held
+        ? { deletionHoldAt: sql`coalesce(${organizations.deletionHoldAt}, now())`, deletionHoldReason: change.reason }
+        : { deletionHoldAt: null, deletionHoldReason: null },
+    )
+    .where(eq(organizations.id, orgId))
+    .returning({ heldAt: organizations.deletionHoldAt, reason: organizations.deletionHoldReason });
+  return row ?? null;
+}
+
+/**
+ * The deletions of these workspaces, by id, for their people: when each goes for good, when it was asked, and by whom
+ * (null once their account is gone). Only the ones being deleted.
+ */
+export async function workspaceDeletions(db: Executor, orgIds: string[]) {
+  const rows =
+    orgIds.length === 0
+      ? []
+      : await db
+          .select({
+            orgId: organizations.id,
+            dueAt: organizations.deletionDueAt,
+            requestedAt: organizations.deletionRequestedAt,
+            byId: users.id,
+            byName: users.name,
+          })
+          .from(organizations)
+          .leftJoin(users, eq(users.id, organizations.deletionRequestedBy))
+          .where(and(inArray(organizations.id, orgIds), isNotNull(organizations.deletionDueAt)));
+  return new Map(
+    rows.flatMap((r) =>
+      r.dueAt
+        ? [
+            [
+              r.orgId,
+              {
+                dueAt: r.dueAt,
+                requestedAt: r.requestedAt,
+                requestedBy: r.byId ? { id: r.byId, name: r.byName ?? "" } : null,
+              },
+            ] as const,
+          ]
+        : [],
+    ),
+  );
+}

@@ -1,5 +1,6 @@
 import type {
   EmailSender,
+  MailAdapters,
   Presence,
   PushSender,
   SearchIndexResolver,
@@ -10,6 +11,7 @@ import { and, count, eq, inArray, queryTrace, schema } from "@agenteschat/db";
 import { aiConnectIntent, type ConnectIntent } from "./ai-intent";
 import { orgHasAi } from "./ai-status";
 import type { ArtifactDeps } from "./artifacts";
+import type { ConnectorDeps } from "./connectors/connections";
 import { getChannelCached } from "./context";
 import { consolidateOrg } from "./context/consolidate";
 import { applyReactionFeedback } from "./context/feedback";
@@ -63,6 +65,7 @@ import { purgeOrgFiles, runMigration, type StorageDeps } from "./storage";
 import { isAgentesCloud } from "./telemetry";
 import { assessThread } from "./thread-assess";
 import { saveWaitlistContact } from "./waitlist";
+import { ORG_DELETE_JOB, purgeWorkspace } from "./workspace-deletion";
 
 /** A thread that grew by another `everyMessages` gets reflected on (capture), within the per-thread cap. */
 async function maybeEnqueueReflection(deps: JobDeps, orgId: string, threadId: string) {
@@ -97,6 +100,15 @@ export interface JobDeps extends RunExecutorDeps {
   presence?: Presence | null;
   /** Org storage (job `storage.migrate`). */
   storage?: StorageDeps;
+  /** Connectors: job `org.delete` revokes a workspace's GitHub OAuth grants at GitHub before its rows go. */
+  connectors?: ConnectorDeps;
+  /** People's mailboxes: job `org.delete` has Composio forget a workspace's mailboxes before its rows go. */
+  mail?: MailAdapters | null;
+  /** What a deleted workspace leaves in the server's log (job `org.delete`). */
+  log?: {
+    info(message: string, data?: Record<string, unknown>): void;
+    warn(message: string, data?: Record<string, unknown>): void;
+  };
   /** Drive (job `forum.advance` saves the forum synthesis). */
   artifacts?: ArtifactDeps;
   /** Agents' computers: the hub and public URL missions use. */
@@ -485,6 +497,14 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         dedupeKey: `${ORG_FILES_PURGE_JOB}:${job.id}`,
         maxAttempts: ORG_FILES_PURGE_ATTEMPTS,
       });
+    },
+    // A workspace whose deletion's date came (`purgeWorkspace`): a no-op once restored, kept or gone.
+    [ORG_DELETE_JOB]: async (job, ctx) => {
+      await purgeWorkspace(
+        { db: deps.db, pubsub: deps.pubsub, connectors: deps.connectors, mail: deps.mail, log: deps.log },
+        String(job.payload.orgId),
+        { finalAttempt: ctx.finalAttempt },
+      );
     },
     "email.send": async (job, ctx) => {
       try {

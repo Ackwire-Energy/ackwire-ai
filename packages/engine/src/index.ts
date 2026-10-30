@@ -208,5 +208,6 @@ export * from "./wiki";
 export * from "./wiki-links";
 export * from "./wiki-tools";
 export * from "./working";
+export * from "./workspace-deletion";
 export * from "./workspace-tools";
 export * from "./zip";

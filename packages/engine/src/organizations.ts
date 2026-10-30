@@ -33,12 +33,12 @@ import {
   closedOrg,
   closedRefusal,
   cloudNotice,
-  isBillingHold,
   isUserBlocked,
   openOrg,
   refusesNewWorkspace,
   STANDING_COLUMNS,
   type WorkspaceStanding,
+  waitsForPlan,
   workRefusal,
 } from "./standing";
 
@@ -224,10 +224,7 @@ export async function createOrganization(
       const [open] = await unfinishedWorkspaces(tx, userId);
       if (open) return { ...open, existing: true };
     }
-    const unpaid = theirs.find(
-      (o) =>
-        o.role === "owner" && isBillingHold(o.standing) && o.standing.reason === PAYMENT && !o.standing.deletionDueAt,
-    );
+    const unpaid = theirs.find((o) => o.role === "owner" && waitsForPlan(o.standing));
     if (unpaid)
       throw new ForbiddenError("You already have a workspace waiting for a plan", "org.create_unpaid", {
         orgId: unpaid.id,
@@ -720,6 +717,13 @@ async function ownerCount(db: Pick<Database, "select">, orgId: string) {
   return row?.n ?? 0;
 }
 
+/**
+ * The lock on who is in a workspace: role changes, joins, removals, account deletions, and a workspace's deletion,
+ * restore and purge take it, so each sees the others' commits.
+ */
+export const lockOrgMembers = (tx: Executor, orgId: string) =>
+  tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-members:${orgId}`}))`);
+
 /** Someone joined or left, or a role changed: the members' open apps read the people and the counts again. */
 export const announceMembers = (pubsub: PubSub | undefined, orgId: string) =>
   publishOrgEvent(pubsub, { type: "org.broadcast", orgId, event: { type: "org.members" } });
@@ -762,7 +766,7 @@ export async function changeMemberRole(
     throw new ForbiddenError("Only owners can grant or revoke ownership");
   }
   await db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-members:${orgId}`}))`);
+    await lockOrgMembers(tx, orgId);
     if (target.role === "owner" && role !== "owner" && (await ownerCount(tx, orgId)) <= 1) {
       throw new ConflictError("An organization needs at least one owner");
     }
@@ -796,7 +800,7 @@ export async function removeMember(
   // Loaded here: the accounts module builds on this one.
   const { announceReleasedAccounts, releaseMemberAccounts } = await import("./machine-accounts");
   const released = await db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-members:${orgId}`}))`);
+    await lockOrgMembers(tx, orgId);
     if (target.role === "owner" && (await ownerCount(tx, orgId)) <= 1) {
       throw new ConflictError("An organization needs at least one owner. Transfer ownership first.");
     }
@@ -828,6 +832,18 @@ export const ORG_FILES_PURGE_JOB = "org.files.purge";
 export const ORG_FILES_PURGE_ATTEMPTS = 240;
 
 /**
+ * Queues the purge of a workspace's files, in the transaction that deletes it. No org_id on the job: the outbox row
+ * would be deleted with the workspace (cascade). A second pass a day later takes files that work under way stored after
+ * the first (an agent's upload stores its file, then its row is refused).
+ */
+export async function queueOrgFilesPurge(tx: Executor, orgId: string) {
+  const purge = { orgId: null, kind: ORG_FILES_PURGE_JOB, payload: { orgId }, maxAttempts: ORG_FILES_PURGE_ATTEMPTS };
+  await enqueue(tx, purge);
+  const late = { runAt: new Date(Date.now() + 86_400_000), dedupeKey: `${ORG_FILES_PURGE_JOB}:${orgId}:late` };
+  await enqueue(tx, { ...purge, ...late });
+}
+
+/**
  * Deletes a person's account (App Store 5.1.1(v), ADR 0035). Refused while
  * they are the only owner of an organization that has other members
  * (`sole_owner`, with the organizations' names: make someone else an owner
@@ -857,7 +873,7 @@ export async function deleteAccount(
       .where(eq(organizationMembers.userId, userId))
       .orderBy(asc(organizations.id));
     // Same lock as role changes and removals, in a fixed order.
-    for (const m of mine) await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-members:${m.orgId}`}))`);
+    for (const m of mine) await lockOrgMembers(tx, m.orgId);
     const alone: string[] = [];
     const leaving: string[] = [];
     const blocking: string[] = [];
@@ -885,20 +901,7 @@ export async function deleteAccount(
     // Before the user row: `created_by` would turn null, and a null owner is nobody's.
     const released = await releaseMemberAccounts(tx, userId, null);
     if (alone.length > 0) await tx.delete(organizations).where(inArray(organizations.id, alone));
-    // No org_id on the job: the outbox row would be deleted with the workspace (cascade). A second pass a day
-    // later takes files that work under way stored after the first (an agent's upload stores its file, then its
-    // row is refused).
-    for (const orgId of alone) {
-      const purge = {
-        orgId: null,
-        kind: ORG_FILES_PURGE_JOB,
-        payload: { orgId },
-        maxAttempts: ORG_FILES_PURGE_ATTEMPTS,
-      };
-      await enqueue(tx, purge);
-      const late = { runAt: new Date(Date.now() + 86_400_000), dedupeKey: `${ORG_FILES_PURGE_JOB}:${orgId}:late` };
-      await enqueue(tx, { ...purge, ...late });
-    }
+    for (const orgId of alone) await queueOrgFilesPurge(tx, orgId);
     await tx.delete(users).where(eq(users.id, userId));
     // The owner's own TypeSafe account would go on getting, and paying for, every workspace's Jev calls.
     if (userId === owner) await deleteJevKey(tx, { type: "system", id: null });
@@ -1286,7 +1289,7 @@ export async function acceptInvitation(
  * and nobody gets in once a deletion committed.
  */
 export async function joinOrganization(tx: Executor, orgId: string, userId: string, role: MemberRole) {
-  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-members:${orgId}`}))`);
+  await lockOrgMembers(tx, orgId);
   // The row as it is now: a check before the lock may have read a cached standing.
   const [org] = await tx.select(STANDING_COLUMNS).from(organizations).where(eq(organizations.id, orgId));
   const closed = closedRefusal(org);

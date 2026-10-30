@@ -1,5 +1,6 @@
 import { isIP } from "node:net";
 import {
+  type ComposioClient,
   type KeyWrapper,
   type MailAccountRef,
   type MailAdapters,
@@ -622,6 +623,22 @@ export async function updateMailAccount(
 }
 
 /**
+ * Composio forgets a mailbox: its triggers, then its connected account, which also revokes the grant at Google or
+ * Microsoft. A 404 counts as done. Every call is tried, and the first failure is thrown after them.
+ */
+export async function forgetAtComposio(
+  client: Pick<ComposioClient, "deleteTrigger" | "deleteConnectedAccount">,
+  externalAccountId: string | null,
+  triggerIds: string[],
+) {
+  const failures: unknown[] = [];
+  for (const id of triggerIds) await client.deleteTrigger(id).catch((error: unknown) => failures.push(error));
+  if (externalAccountId)
+    await client.deleteConnectedAccount(externalAccountId).catch((error: unknown) => failures.push(error));
+  if (failures.length > 0) throw failures[0];
+}
+
+/**
  * Disconnects a mailbox (admins): Composio forgets the account and its
  * triggers; agents lose their mail scopes on it; routines watching it stop.
  */
@@ -631,10 +648,8 @@ export async function revokeMailAccount(deps: MailDeps, actorId: string, orgId: 
   const watches = await deps.db.select().from(mailWatches).where(eq(mailWatches.accountId, row.id));
   const composio = composioOf(deps);
   if (row.via === "composio" && composio) {
-    for (const w of watches) {
-      if (w.externalTriggerId) await composio.client.deleteTrigger(w.externalTriggerId).catch(() => {});
-    }
-    if (row.externalAccountId) await composio.client.deleteConnectedAccount(row.externalAccountId).catch(() => {});
+    const triggers = watches.flatMap((w) => (w.externalTriggerId ? [w.externalTriggerId] : []));
+    await forgetAtComposio(composio.client, row.externalAccountId, triggers).catch(() => {});
   }
   const now = new Date();
   await deps.db.transaction(async (tx) => {

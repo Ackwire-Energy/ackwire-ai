@@ -206,8 +206,21 @@ export const openOrg = sql<boolean>`(${organizations.standing} = 'active' and ${
 export const closesWorkspace = (event: { type: string; state?: unknown }) =>
   event.type === "org.deleting" || (event.type === "org.standing" && event.state === "suspended");
 
-/** A suspension, or a hold that isn't billing's: its people don't carry on in a new workspace. */
-export const refusesNewWorkspace = (s: WorkspaceStanding) => s.state !== "active" && !isBillingHold(s);
+/**
+ * A suspension, or a hold that isn't billing's: its people don't carry on in a new workspace, and its deletion waits
+ * past its date until it lifts.
+ */
+export const refusesNewWorkspace = (s: Pick<OrgStanding, "state" | "reason" | "notice">) =>
+  s.state !== "active" && !isBillingHold(s);
+/** `refusesNewWorkspace` in SQL, for queries over `organizations`. */
+export const heldOrg = sql<boolean>`(${organizations.standing} = 'suspended' or (${organizations.standing} = 'hold'
+  and not coalesce(${organizations.standingNotice} = 'shown' and ${organizations.standingReason} in (${sql.join(
+    BILLING_HOLDS.map((hold) => sql`${hold}`),
+    sql`, `,
+  )}), false)))`;
+
+/** A workspace that waits for its first plan: a person owns one at a time (ADR 0079 §2). */
+export const waitsForPlan = (s: WorkspaceStanding) => isBillingHold(s) && s.reason === "payment" && !s.deletionDueAt;
 
 /** A workspace's standing, cached 5 s per process. An unknown id reads as active: what needs the row fails on its own. */
 export async function orgStanding(db: Executor, orgId: string): Promise<WorkspaceStanding> {

@@ -1188,6 +1188,28 @@ export async function releaseMemberAccounts(
   return out;
 }
 
+/**
+ * A workspace is about to be deleted: every account on its computers becomes a tombstone (ADR 0059 §1), and the
+ * machines are every one holding a tombstone of it, older ones included. Runs in the caller's transaction;
+ * `announceReleasedAccounts` afterwards.
+ */
+export async function releaseOrgAccounts(db: Executor, orgId: string): Promise<ReleasedAccounts> {
+  const live = await db
+    .select({ id: machineAccounts.id })
+    .from(machineAccounts)
+    .where(and(eq(machineAccounts.orgId, orgId), ne(machineAccounts.status, "removing")));
+  const agentIds = await tombstone(
+    db,
+    orgId,
+    live.map((r) => r.id),
+  );
+  const held = await db
+    .selectDistinct({ machineId: machineAccounts.machineId })
+    .from(machineAccounts)
+    .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.status, "removing")));
+  return { machines: held.map((m) => ({ orgId, machineId: m.machineId })), agents: [{ orgId, agentIds }] };
+}
+
 /** After `releaseMemberAccounts`: pages refetch, and the replica holding each machine's runner removes them. */
 export async function announceReleasedAccounts(pubsub: PubSub | undefined, released: ReleasedAccounts) {
   for (const a of released.agents) forgetAgents(a.orgId, a.agentIds);

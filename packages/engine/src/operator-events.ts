@@ -23,6 +23,8 @@ export type OperatorEventType =
   | "session.created"
   | "user.deleted"
   | "organization.created"
+  | "organization.deletion_requested"
+  | "organization.deletion_canceled"
   | "organization.deleted"
   | "invitation.created"
   | "agent.created"

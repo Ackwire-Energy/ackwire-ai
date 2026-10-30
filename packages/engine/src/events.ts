@@ -538,6 +538,17 @@ export type OrgEvent =
   /** Something every member of the org may see (org-wide issues, calendar): forwarded as `scope: "org"`. */
   | { type: "org.broadcast"; orgId: string; event: { type: string; [key: string]: unknown } };
 
+/**
+ * An org broadcast: an owner (`by`) deleted the workspace. It is closed now, so its people's sockets close after this
+ * event, and it goes for good at `dueAt` unless an owner restores it first.
+ */
+export type OrgDeletingEvent = {
+  type: "org.deleting";
+  orgId: string;
+  dueAt: string;
+  by: { id: string; name: string };
+};
+
 export async function publishOrgEvent(pubsub: PubSub | undefined, event: OrgEvent): Promise<void> {
   if (!pubsub) return;
   try {

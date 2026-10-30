@@ -81,16 +81,22 @@ export async function operatorListOrgs(db: Database, query: OperatorOrgQuery) {
 }
 
 /**
- * One workspace: its owners and admins, how much is in it, and its limits (ADR 0079) with what it uses of them.
- * Null when there is none with that id.
+ * One workspace: its owners and admins, how much is in it, its limits (ADR 0079) with what it uses of them, and its
+ * deletion and the operator's deletion hold, each null when there is none. Null when there is none with that id.
  */
 export async function operatorOrg(db: Database, orgId: string) {
-  const [org] = await db
+  const [row] = await db
     .select({
       id: organizations.id,
       name: organizations.name,
       createdAt: organizations.createdAt,
       standing: OPERATOR_STANDING_COLUMNS,
+      deletion: {
+        dueAt: organizations.deletionDueAt,
+        requestedAt: organizations.deletionRequestedAt,
+        requestedBy: organizations.deletionRequestedBy,
+      },
+      deletionHold: { heldAt: organizations.deletionHoldAt, reason: organizations.deletionHoldReason },
       counts: {
         members: memberCount,
         agents: agentCount,
@@ -107,7 +113,8 @@ export async function operatorOrg(db: Database, orgId: string) {
     })
     .from(organizations)
     .where(eq(organizations.id, orgId));
-  if (!org) return null;
+  if (!row) return null;
+  const { deletion, deletionHold, ...org } = row;
   const [admins, limits, meters] = await Promise.all([
     db
       .select({
@@ -125,7 +132,14 @@ export async function operatorOrg(db: Database, orgId: string) {
     getOrgLimits(db, orgId),
     orgMeters(db, orgId),
   ]);
-  return { ...org, admins, limits, meters };
+  return {
+    ...org,
+    deletion: deletion.dueAt ? { ...deletion, dueAt: deletion.dueAt } : null,
+    deletionHold: deletionHold.heldAt ? { ...deletionHold, heldAt: deletionHold.heldAt } : null,
+    admins,
+    limits,
+    meters,
+  };
 }
 
 /** One account: its workspaces and its newest sessions on record. Null when there is none with that id. */

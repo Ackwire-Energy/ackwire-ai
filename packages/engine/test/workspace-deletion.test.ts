@@ -1,7 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { orgTopic, STREAM_CLOSE } from "@agenteschat/adapters";
-import { eq, schema } from "@agenteschat/db";
+import {
+  type ComposioClient,
+  createFakeComposioClient,
+  createFakeMailConnector,
+  MailError,
+  orgTopic,
+  type ServerFrame,
+  STREAM_CLOSE,
+} from "@agenteschat/adapters";
+import { and, eq, rowsOf, schema, sql } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
 import { Glob } from "bun";
 import {
@@ -9,13 +17,20 @@ import {
   assertCanWork,
   assertInviting,
   authorizeStream,
+  type ConnectorDeps,
   canViewCost,
+  completeOAuth,
   consolidateItem,
   createContextToolSource,
   createInvitation,
+  createJobHandlers,
+  createMachineHub,
   createOrganization,
+  type DeletionDeps,
   drainOutbox,
+  enableOperatorEvents,
   enqueue,
+  enqueueOverdueDeletions,
   getDeviceCode,
   getMembership,
   insertMessage,
@@ -24,32 +39,47 @@ import {
   joinOrganization,
   listMachineRequests,
   listMemberships,
+  MACHINE_CONTROL_TOPIC,
+  type MachineHub,
+  ORG_DELETE_JOB,
+  ORG_FILES_PURGE_JOB,
   OrgDeletingError,
   onManagedMachineHello,
   onUserCreated,
+  orgStanding,
+  PURGED_BY_HAND,
   postPersonMessage,
   previewInvitation,
+  purgeWorkspace,
   removeMember,
   requireBrowserAccess,
   requireChannelAccess,
   requirePermission,
+  restoreWorkspace,
   revokeManagedMachine,
   runErrorDetail,
+  scheduleDeletion,
+  setBillingHold,
+  setDeletionHold,
   setOrgStanding,
   setProvisioning,
   signupAdmission,
   standingRefusal,
   startDeviceCode,
+  startOAuth,
   stopOrgWork,
   type ToolContext,
   unfinishedWorkspaces,
 } from "../src";
 import { addMember, addUser, type Fixture, SECRET, setup } from "./fixtures";
-import { pairMachine } from "./machine-fixtures";
+import { pairMachine, RUNNER } from "./machine-fixtures";
 import { agentRunRow, channelRoutine, fire, routineRunRow } from "./routine-fixtures";
 
 let f: Fixture;
+const hubs: MachineHub[] = [];
 afterEach(async () => {
+  enableOperatorEvents(false);
+  for (const hub of hubs.splice(0)) await hub.stop();
   const current = f;
   f = undefined as unknown as Fixture;
   await current?.close();
@@ -369,6 +399,517 @@ describe("a workspace being deleted is closed", () => {
       const zoe = await addUser(db, "zoe");
       await onUserCreated(db, zoe.id);
       expect((await listMemberships(db, zoe.id)).map((m) => m.orgName)).toEqual(["Kept"]);
+    } finally {
+      await close();
+    }
+  });
+});
+
+const PUBLIC_URL = "https://chat.example.com";
+/** What the routes give scheduling and restoring here: the fixture's database and pub/sub, on a server that emails. */
+const deletionDeps = (): DeletionDeps => ({ db: f.db, pubsub: f.pubsub, emails: { publicUrl: PUBLIC_URL } });
+const orgRow = async (orgId = f.org.id) =>
+  (await f.db.select().from(schema.organizations).where(eq(schema.organizations.id, orgId)))[0] ?? null;
+const jobs = (kind: string) => f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, kind));
+const auditOf = (action: string) => f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, action));
+const feedOf = (type: string) => f.db.select().from(schema.operatorEvents).where(eq(schema.operatorEvents.type, type));
+/** The emails queued, by recipient: their outbox row's org and their template. */
+const emailsOf = async (kind: string) =>
+  Object.fromEntries(
+    (await jobs("email.send")).flatMap((job) => {
+      const { to, template } = job.payload as { to: string[]; template: { kind: string } };
+      return template.kind === kind ? [[to[0], { orgId: job.orgId, ...template }]] : [];
+    }),
+  );
+/** The database wrote the date: a test moves it back to make the purge due. */
+const pastItsDate = (orgId = f.org.id) =>
+  f.db
+    .update(schema.organizations)
+    .set({ deletionDueAt: new Date(Date.now() - 60_000) })
+    .where(eq(schema.organizations.id, orgId));
+/** The events broadcast to a workspace's people from now on. */
+function heard(orgId = f.org.id) {
+  const events: Record<string, unknown>[] = [];
+  f.pubsub.subscribe(orgTopic(orgId), (e) => {
+    const event = (e as { event?: Record<string, unknown> }).event;
+    if (event) events.push(event);
+  });
+  return events;
+}
+/** The code a call was refused with, or null when it went through. */
+const refused = (call: Promise<unknown>) =>
+  call.then(
+    () => null,
+    (error: { code?: string }) => error.code ?? String(error),
+  );
+
+describe("deleting a workspace", () => {
+  test("an owner's deletion: closed and stopped now, its date 7 days out, the audit row, the feed, one email per member, and the job at the date", async () => {
+    f = await setup();
+    enableOperatorEvents();
+    const bia = await addMember(f.db, f.org.id, "admin", "bia");
+    const caio = await addMember(f.db, f.org.id, "member", "caio");
+    await f.db.update(schema.users).set({ locale: "en" }).where(eq(schema.users.id, bia.id));
+    await f.db.insert(schema.organizationSettings).values({ orgId: f.org.id, timezone: "America/Sao_Paulo" });
+    await f.db
+      .update(schema.organizationMembers)
+      .set({ timezone: "Europe/Lisbon" })
+      .where(and(eq(schema.organizationMembers.orgId, f.org.id), eq(schema.organizationMembers.userId, bia.id)));
+    await setProvisioning({ db: f.db, pubsub: f.pubsub }, f.org.id, { state: "waiting", reason: "capacity" });
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev check the build",
+    });
+    const events = heard();
+
+    expect(await refused(scheduleDeletion(deletionDeps(), bia.id, f.org.id, "owner"))).toBe("forbidden");
+    const { dueAt, scheduled } = await scheduleDeletion(deletionDeps(), f.owner.id, f.org.id, "owner");
+    expect(scheduled).toBe(true);
+    const row = await orgRow();
+    expect(row).toMatchObject({ deletionDueAt: dueAt, deletionRequestedBy: f.owner.id, deletionHoldAt: null });
+    expect(dueAt.getTime() - (row?.deletionRequestedAt?.getTime() ?? 0)).toBe(7 * DAY);
+    expect(await refused(requirePermission(f.db, caio.id, f.org.id, "read"))).toBe("org.deleting");
+
+    const due = dueAt.toISOString();
+    expect(await auditOf("organization.deletion_scheduled")).toMatchObject([
+      { orgId: f.org.id, actorId: f.owner.id, details: { dueAt: due, via: "owner" } },
+    ]);
+    expect(await feedOf("organization.deletion_requested")).toMatchObject([
+      { orgId: f.org.id, userId: f.owner.id, data: { dueAt: due, via: "owner" } },
+    ]);
+    const told = { orgId: null, kind: "workspace_deleting", orgName: "Acme", byName: "ana", dueAt: due };
+    const url = `${PUBLIC_URL}/org/${f.org.id}`;
+    expect(await emailsOf("workspace_deleting")).toEqual({
+      [f.owner.email]: { ...told, locale: "pt-BR", timeZone: "America/Sao_Paulo", owner: true, url },
+      [bia.email]: { ...told, locale: "en", timeZone: "Europe/Lisbon", owner: false, url },
+      [caio.email]: { ...told, locale: "pt-BR", timeZone: "America/Sao_Paulo", owner: false, url },
+    });
+    expect(await jobs(ORG_DELETE_JOB)).toMatchObject([
+      {
+        orgId: null,
+        payload: { orgId: f.org.id },
+        nextAttemptAt: dueAt,
+        dedupeKey: `${ORG_DELETE_JOB}:${f.org.id}:${dueAt.getTime()}`,
+      },
+    ]);
+    expect(events).toContainEqual({
+      type: "org.deleting",
+      orgId: f.org.id,
+      dueAt: due,
+      by: { id: f.owner.id, name: "ana" },
+    });
+    expect(await runs()).toMatchObject([{ status: "canceled", error: "This workspace is being deleted." }]);
+    expect(await f.db.select().from(schema.machineProvisioning)).toEqual([]);
+  });
+
+  test("deleting it again keeps its date, and nobody is told or queued twice", async () => {
+    f = await setup();
+    const first = await scheduleDeletion(deletionDeps(), f.owner.id, f.org.id, "owner");
+    const outbox = await f.db.select().from(schema.outbox);
+    const events = heard();
+    expect(await scheduleDeletion(deletionDeps(), f.owner.id, f.org.id, "owner")).toEqual({
+      dueAt: first.dueAt,
+      scheduled: false,
+    });
+    expect(await f.db.select().from(schema.outbox)).toEqual(outbox);
+    expect(await auditOf("organization.deletion_scheduled")).toHaveLength(1);
+    expect(events).toEqual([]);
+  });
+
+  test("holds refuse no deletion: a trust hold and the operator's deletion hold make the purge wait, billing holds don't; a suspension refuses its owners", async () => {
+    f = await setup();
+    const deps = deletionDeps();
+    await setOrgStanding({ db: f.db }, f.org.id, { state: "hold", reason: "review", notice: "silent" });
+    expect((await scheduleDeletion(deps, f.owner.id, f.org.id, "owner")).scheduled).toBe(true);
+    await pastItsDate();
+    expect(await purgeWorkspace({ db: f.db }, f.org.id)).toBe(false);
+    expect(await orgRow()).not.toBeNull();
+    await setOrgStanding({ db: f.db }, f.org.id, { state: "active", reason: null, notice: "shown" });
+    expect(await purgeWorkspace({ db: f.db }, f.org.id)).toBe(true);
+    expect(await orgRow()).toBeNull();
+
+    const bia = await addUser(f.db, "bia");
+    for (const hold of ["payment", "unpaid", "ended"] as const) {
+      const orgId = (await createOrganization(f.db, bia.id, { name: hold })).organization.id;
+      await setBillingHold({ db: f.db }, orgId, hold);
+      await scheduleDeletion(deps, bia.id, orgId, "owner");
+      await pastItsDate(orgId);
+      expect({ hold, purged: await purgeWorkspace({ db: f.db }, orgId) }).toEqual({ hold, purged: true });
+    }
+
+    // The operator's deletion hold: the purge waits, and nothing the workspace reads changes.
+    const held = (await createOrganization(f.db, bia.id, { name: "Held" })).organization.id;
+    await scheduleDeletion(deps, bia.id, held, "owner");
+    const events = heard(held);
+    const seen = async () => ({
+      standing: await orgStanding(f.db, held),
+      memberships: await listMemberships(f.db, bia.id),
+      audit: await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.orgId, held)),
+      notifications: await f.db.select().from(schema.notifications),
+    });
+    const before = await seen();
+    expect(await setDeletionHold(f.db, held, { held: true, reason: "legal_hold" })).toEqual({
+      heldAt: expect.any(Date),
+      reason: "legal_hold",
+    });
+    expect(await seen()).toEqual(before);
+    expect(events).toEqual([]);
+    await pastItsDate(held);
+    expect(await purgeWorkspace({ db: f.db }, held)).toBe(false);
+    await setDeletionHold(f.db, held, { held: false, reason: null });
+    expect(await purgeWorkspace({ db: f.db }, held)).toBe(true);
+
+    const cy = await addUser(f.db, "cy");
+    const suspended = (await createOrganization(f.db, cy.id, { name: "Suspended" })).organization.id;
+    await setOrgStanding({ db: f.db }, suspended, { state: "suspended", reason: "abuse", notice: "shown" });
+    expect(await refused(scheduleDeletion(deps, cy.id, suspended, "owner"))).toBe("org.suspended");
+    expect((await orgRow(suspended))?.deletionDueAt).toBeNull();
+  });
+});
+
+describe("restoring a workspace", () => {
+  test("another owner restores it before its date: it opens again, everyone is told, and the deletion hold stays", async () => {
+    f = await setup();
+    const dora = await addMember(f.db, f.org.id, "owner", "dora");
+    const bia = await addMember(f.db, f.org.id, "admin", "bia");
+    const { dueAt } = await scheduleDeletion(deletionDeps(), f.owner.id, f.org.id, "owner");
+    await setDeletionHold(f.db, f.org.id, { held: true, reason: "legal_hold" });
+    enableOperatorEvents();
+
+    expect(await refused(restoreWorkspace(deletionDeps(), bia.id, f.org.id))).toBe("forbidden");
+    await restoreWorkspace(deletionDeps(), dora.id, f.org.id);
+    expect(await orgRow()).toMatchObject({
+      deletionDueAt: null,
+      deletionRequestedAt: null,
+      deletionRequestedBy: null,
+      deletionHoldAt: expect.any(Date),
+      deletionHoldReason: "legal_hold",
+    });
+    expect(await standingRefusal(f.db, f.org.id)).toBeNull();
+    expect(await auditOf("organization.deletion_canceled")).toMatchObject([
+      { orgId: f.org.id, actorId: dora.id, details: { dueAt: dueAt.toISOString() } },
+    ]);
+    expect(await feedOf("organization.deletion_canceled")).toMatchObject([{ orgId: f.org.id, userId: dora.id }]);
+    const told = { orgId: null, kind: "workspace_restored", orgName: "Acme", byName: "dora", locale: "pt-BR" };
+    const url = `${PUBLIC_URL}/org/${f.org.id}`;
+    expect(await emailsOf("workspace_restored")).toEqual({
+      [f.owner.email]: { ...told, url },
+      [dora.email]: { ...told, url },
+      [bia.email]: { ...told, url },
+    });
+
+    // Deleted again, it still waits for the hold.
+    await scheduleDeletion(deletionDeps(), dora.id, f.org.id, "owner");
+    await pastItsDate();
+    expect(await purgeWorkspace({ db: f.db }, f.org.id)).toBe(false);
+  });
+
+  test("refused past its date, when it isn't being deleted, while suspended, and for a second workspace waiting for its first plan", async () => {
+    f = await setup();
+    await scheduleDeletion(deletionDeps(), f.owner.id, f.org.id, "owner");
+    await pastItsDate();
+    expect(await refused(restoreWorkspace(deletionDeps(), f.owner.id, f.org.id))).toBe("org.not_restorable");
+
+    const bia = await addUser(f.db, "bia");
+    const open = (await createOrganization(f.db, bia.id, { name: "Open" })).organization.id;
+    expect(await refused(restoreWorkspace(deletionDeps(), bia.id, open))).toBe("org.not_restorable");
+    await scheduleDeletion(deletionDeps(), bia.id, open, "owner");
+    await setOrgStanding({ db: f.db }, open, { state: "suspended", reason: "abuse", notice: "shown" });
+    expect(await refused(restoreWorkspace(deletionDeps(), bia.id, open))).toBe("org.suspended");
+
+    const cy = await addUser(f.db, "cy");
+    const first = (await createOrganization(f.db, cy.id, { name: "First" }, { holdForPayment: true })).organization.id;
+    await scheduleDeletion(deletionDeps(), cy.id, first, "owner");
+    const second = (await createOrganization(f.db, cy.id, { name: "Second" }, { holdForPayment: true })).organization
+      .id;
+    await expect(restoreWorkspace(deletionDeps(), cy.id, first)).rejects.toMatchObject({
+      code: "org.create_unpaid",
+      params: { orgId: second },
+    });
+  });
+});
+
+/** A row in each table the purge deletes by hand, all of the fixture's workspace. */
+async function rowsPurgedByHand() {
+  const orgId = f.org.id;
+  const message = await insertMessage(f.db, {
+    orgId,
+    channelId: f.general.id,
+    author: { type: "person", userId: f.owner.id },
+    body: "ship it",
+  });
+  const [run] = await f.db
+    .insert(schema.agentRuns)
+    .values({
+      orgId,
+      agentId: f.agent.id,
+      channelId: f.general.id,
+      threadRootId: message.id,
+      triggerMessageId: message.id,
+      trigger: "mention",
+      hop: 1,
+    })
+    .returning();
+  if (!run) throw new Error("no run");
+  await f.db
+    .insert(schema.messageReactions)
+    .values({ orgId, messageId: message.id, userId: f.owner.id, reaction: "+1" });
+  await f.db
+    .insert(schema.routingDecisions)
+    .values({ orgId, channelId: f.general.id, messageId: message.id, strategy: "none", candidates: [] });
+  await f.db.insert(schema.threadReflections).values({ orgId, threadRootId: message.id, channelId: f.general.id });
+  await f.db.insert(schema.usageRecords).values({
+    orgId,
+    kind: "router",
+    provider: "anthropic",
+    model: "claude-haiku-5-5",
+    requestedModel: "claude-haiku-5-5",
+    inputTokens: 1,
+    outputTokens: 1,
+    costNanoUsd: 1,
+  });
+  await f.db.insert(schema.wikiLinks).values({ orgId, fromType: "message", fromId: message.id, toSlug: "launch" });
+  await f.db.insert(schema.contextUsage).values({ orgId, runId: run.id, itemId: crypto.randomUUID() });
+}
+
+const countOf = async (table: string) =>
+  rowsOf<{ n: number }>(await f.db.execute(sql`select count(*)::int as n from ${sql.identifier(table)}`))[0]?.n;
+
+/** A GitHub connection over OAuth, on a fake GitHub that records calls and drops the grant. */
+async function githubGrant() {
+  const calls: { url: string; method: string }[] = [];
+  const http = (async (url: string, init: RequestInit = {}) => {
+    calls.push({ url, method: init.method ?? "GET" });
+    if (url.startsWith("https://github.com/login/oauth/access_token")) {
+      return Response.json({ access_token: "gho_token_1", token_type: "bearer", scope: "repo" });
+    }
+    if (url.includes("/applications/gh-client/grant")) return new Response(null, { status: 204 });
+    return new Response("not found", { status: 404 });
+  }) as unknown as typeof fetch;
+  const deps: ConnectorDeps = {
+    db: f.db,
+    keyWrappers: [f.keyWrapper],
+    publicUrl: "https://app.example.com",
+    oauthApps: { github: { clientId: "gh-client", clientSecret: "gh-secret" } },
+    http,
+  };
+  const { state } = await startOAuth(deps, f.owner.id, f.org.id, "github");
+  await completeOAuth(deps, { id: f.owner.id }, { state, code: "good-code" });
+  return { deps, revoked: () => calls.filter((c) => c.method === "DELETE").map((c) => c.url) };
+}
+
+const ACCOUNT_ID = "0193dddd-0000-4000-8000-000000000001";
+
+/** A runner on `hub` that holds its answer to removing an AI account until `release()`; it answers the rest at once. */
+function holdingRunner(hub: MachineHub, token: string) {
+  const removals: string[] = [];
+  let release = () => {};
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const conn = hub.open({
+    send(text: string) {
+      const frame = JSON.parse(text) as ServerFrame;
+      if (frame.type !== "request") return;
+      const answer = () => hub.message(conn, JSON.stringify({ type: "result", id: frame.id, ok: true, data: {} }));
+      if (frame.op !== "account" || frame.action !== "remove") return void setTimeout(answer, 1);
+      removals.push(frame.accountId);
+      void released.then(answer);
+    },
+    close() {},
+  });
+  const hello = () => hub.message(conn, JSON.stringify({ type: "hello", token, ...RUNNER, exec: true, accounts: [] }));
+  return { removals, release: () => release(), hello };
+}
+
+describe("the purge", () => {
+  test("before its date it waits; at its date the workspace goes with every row, its grants, files and computers", async () => {
+    f = await setup();
+    enableOperatorEvents();
+    const computer = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "MacBook" });
+    const revoked: unknown[] = [];
+    f.pubsub.subscribe(MACHINE_CONTROL_TOPIC, (e) => {
+      if (e.type === "machine.revoke") revoked.push(e.machineId);
+    });
+    await rowsPurgedByHand();
+    const github = await githubGrant();
+    const deps = { db: f.db, pubsub: f.pubsub, connectors: github.deps };
+    await scheduleDeletion(deletionDeps(), f.owner.id, f.org.id, "owner");
+    const requestedAt = (await orgRow())?.deletionRequestedAt;
+    expect(await purgeWorkspace(deps, f.org.id)).toBe(false);
+    expect(await orgRow()).not.toBeNull();
+    expect(github.revoked()).toEqual([]);
+
+    await pastItsDate();
+    expect(await purgeWorkspace(deps, f.org.id)).toBe(true);
+    expect(await orgRow()).toBeNull();
+    expect(await f.db.select().from(schema.channels)).toEqual([]);
+    for (const table of PURGED_BY_HAND) expect({ table, rows: await countOf(table) }).toEqual({ table, rows: 0 });
+    expect(github.revoked()).toEqual(["https://api.github.com/applications/gh-client/grant"]);
+    expect(await feedOf("organization.deleted")).toMatchObject([
+      { orgId: f.org.id, userId: f.owner.id, data: { requestedAt: requestedAt?.toISOString(), via: "owner" } },
+    ]);
+    expect((await jobs(ORG_FILES_PURGE_JOB)).map((j) => [j.orgId, j.payload, j.dedupeKey])).toEqual([
+      [null, { orgId: f.org.id }, null],
+      [null, { orgId: f.org.id }, `${ORG_FILES_PURGE_JOB}:${f.org.id}:late`],
+    ]);
+    expect(Object.keys(await emailsOf("workspace_deleting"))).toEqual([f.owner.email]);
+    expect(revoked).toEqual([computer.machineId]);
+    // Again, or from the sweep: nothing left to do.
+    expect(await purgeWorkspace(deps, f.org.id)).toBe(false);
+  });
+
+  test("its AI accounts leave its online computers first: the purge waits for the runner to sign them out", async () => {
+    f = await setup();
+    const hub = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-a" });
+    hubs.push(hub);
+    const { machineId, token } = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, {
+      name: "mac",
+      ...RUNNER,
+      exec: true,
+    });
+    const runner = holdingRunner(hub, token);
+    await runner.hello();
+    await f.db.insert(schema.machineAccounts).values({
+      id: ACCOUNT_ID,
+      orgId: f.org.id,
+      machineId,
+      kind: "claude_code",
+      label: "Claude Max",
+      status: "active",
+      createdBy: f.owner.id,
+    });
+    await scheduleDeletion({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, "owner");
+    await pastItsDate();
+
+    const purging = purgeWorkspace({ db: f.db, pubsub: f.pubsub }, f.org.id);
+    for (let i = 0; i < 200 && runner.removals.length === 0; i++) await Bun.sleep(10);
+    expect(runner.removals).toEqual([ACCOUNT_ID]);
+    await Bun.sleep(400);
+    expect(await orgRow()).not.toBeNull();
+    runner.release();
+    expect(await purging).toBe(true);
+    expect(await orgRow()).toBeNull();
+  });
+
+  test("a grant it can't revoke fails the job and keeps the workspace; the last attempt deletes it and logs the ids", async () => {
+    f = await setup();
+    const [box] = await f.db
+      .insert(schema.mailAccounts)
+      .values({
+        orgId: f.org.id,
+        provider: "gmail",
+        via: "composio",
+        address: "team@example.com",
+        status: "active",
+        externalAccountId: "ca_1",
+      })
+      .returning();
+    if (!box) throw new Error("no mailbox");
+    const composio = createFakeComposioClient();
+    const client: ComposioClient = {
+      ...composio.client,
+      deleteConnectedAccount: async () => {
+        throw new MailError("Composio answered 503", true);
+      },
+    };
+    const warned: Record<string, unknown>[] = [];
+    const handlers = createJobHandlers({
+      ...f.jobDeps,
+      mail: { composio: { client, connector: createFakeMailConnector().connector }, imap: null },
+      log: { info: () => {}, warn: (message, data) => warned.push({ message, ...data }) },
+    });
+    await scheduleDeletion({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, "owner");
+    await pastItsDate();
+    const due = () =>
+      f.db.update(schema.outbox).set({ nextAttemptAt: new Date() }).where(eq(schema.outbox.kind, ORG_DELETE_JOB));
+    await f.db.update(schema.outbox).set({ maxAttempts: 2 }).where(eq(schema.outbox.kind, ORG_DELETE_JOB));
+
+    await due();
+    await drainOutbox(f.db, handlers, { maxBatches: 1 });
+    expect(await orgRow()).not.toBeNull();
+    expect(await jobs(ORG_DELETE_JOB)).toMatchObject([
+      { status: "pending", attempts: 1, lastError: `Grants not revoked yet: ${box.id}` },
+    ]);
+
+    await due();
+    await drainOutbox(f.db, handlers, { maxBatches: 1 });
+    expect(await orgRow()).toBeNull();
+    expect(await jobs(ORG_DELETE_JOB)).toMatchObject([{ status: "done" }]);
+    expect(warned).toEqual([
+      { message: "workspace deletion went on with grants not revoked", orgId: f.org.id, ids: [box.id] },
+    ]);
+  });
+});
+
+describe("the hourly sweep", () => {
+  test("queues the purge of the workspaces past their date that nothing keeps, once an hour", async () => {
+    f = await setup();
+    const bia = await addUser(f.db, "bia");
+    const make = async (name: string) => (await createOrganization(f.db, bia.id, { name })).organization.id;
+    const [due, billing, reviewed, held, later] = [
+      await make("Due"),
+      await make("Billing"),
+      await make("Reviewed"),
+      await make("Held"),
+      await make("Later"),
+    ];
+    for (const orgId of [due, billing, reviewed, held, later]) {
+      await scheduleDeletion({ db: f.db }, bia.id, orgId, "owner");
+      if (orgId !== later) await pastItsDate(orgId);
+    }
+    await setBillingHold({ db: f.db }, billing, "unpaid");
+    await setOrgStanding({ db: f.db }, reviewed, { state: "hold", reason: "review", notice: "silent" });
+    await setDeletionHold(f.db, held, { held: true, reason: "legal_hold" });
+    const swept = async () =>
+      (await jobs(ORG_DELETE_JOB))
+        .filter((job) => /:\d{4}-\d\d-\d\dT\d\d$/.test(job.dedupeKey ?? ""))
+        .map((job) => (job.payload as { orgId: string }).orgId)
+        .sort();
+
+    const now = new Date();
+    expect(await enqueueOverdueDeletions(f.db, now)).toBe(2);
+    expect(await enqueueOverdueDeletions(f.db, now)).toBe(2);
+    expect(await swept()).toEqual([due, billing].sort());
+    await enqueueOverdueDeletions(f.db, new Date(now.getTime() + 3600_000));
+    expect(await swept()).toEqual([due, due, billing, billing].sort());
+  });
+});
+
+describe("no orphans", () => {
+  test("every table with org_id goes with its workspace: a cascade on it, a chain of them on columns never null, or by hand", async () => {
+    const { db, close } = await createTestDatabase();
+    try {
+      const tables = rowsOf<{ name: string }>(
+        await db.execute(sql`
+          select c.relname as name from pg_class c
+          join pg_namespace n on n.oid = c.relnamespace
+          join pg_attribute a on a.attrelid = c.oid and a.attname = 'org_id' and not a.attisdropped
+          where n.nspname = 'public' and c.relkind in ('r', 'p') and not c.relispartition`),
+      ).map((t) => t.name);
+      const keys = rowsOf<{ child: string; parent: string; columns: string; required: boolean }>(
+        await db.execute(sql`
+          select k.conrelid::regclass::text as child, k.confrelid::regclass::text as parent,
+            string_agg(a.attname, ',' order by a.attname) as columns, bool_and(a.attnotnull) as required
+          from pg_constraint k
+          join pg_class c on c.oid = k.conrelid
+          join pg_attribute a on a.attrelid = k.conrelid and a.attnum = any (k.conkey)
+          where k.contype = 'f' and k.confdeltype = 'c' and not c.relispartition
+          group by k.oid, k.conrelid, k.confrelid`),
+      );
+      const gone = new Set(["organizations"]);
+      for (const key of keys) if (key.parent === "organizations" && key.columns === "org_id") gone.add(key.child);
+      for (let more = true; more; ) {
+        more = false;
+        for (const key of keys) {
+          if (key.required && gone.has(key.parent) && !gone.has(key.child)) {
+            gone.add(key.child);
+            more = true;
+          }
+        }
+      }
+      // Kept on purpose: the operator's feed (ADR 0056 §5), and the join codes' counts, gone after a day (ADR 0072).
+      const kept = ["operator_events", "organization_join_code_events"];
+      expect(tables.filter((t) => !gone.has(t)).sort()).toEqual([...PURGED_BY_HAND, ...kept].sort());
     } finally {
       await close();
     }
