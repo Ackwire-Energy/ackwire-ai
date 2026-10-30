@@ -25,7 +25,7 @@ import {
   publishMachineAgentsChanged,
   sha256Hex,
 } from "./machines";
-import { can, installOwner, type MemberRole, requirePermission } from "./organizations";
+import { can, type MemberRole, pinnedOwner, requirePermission } from "./organizations";
 
 const { agents, channels, machines, organizationMembers, organizations } = schema;
 
@@ -110,7 +110,7 @@ const revoke = (pubsub: PubSub | undefined, machineId: string) =>
 export async function syncHostComputer(deps: HostDeps, input: HostSyncInput): Promise<{ orgs: HostSyncOrg[] }> {
   const { db } = deps;
   const now = deps.now?.() ?? new Date();
-  const ownerId = await installOwner(db);
+  const ownerId = await pinnedOwner(db);
   const served = ownerId ? await servedOrgs(db, ownerId) : [];
   const ids = served.map((o) => o.id);
   const dropped = await db
@@ -254,7 +254,7 @@ async function joined(deps: HostDeps, row: MachineRow, now: Date) {
  * onboarding can offer it; its token comes with the runner's next sync.
  */
 export async function addHostComputer(db: Database, orgId: string) {
-  const ownerId = await installOwner(db);
+  const ownerId = await pinnedOwner(db);
   if (!ownerId || (await servedOrgs(db, ownerId, orgId)).length === 0) return;
   const [same] = await db
     .select({
@@ -276,7 +276,7 @@ export async function addHostComputer(db: Database, orgId: string) {
 
 /** The organization's row of the server's computer, removed or not; null when the server doesn't serve it. */
 async function servedRow(db: Database, orgId: string): Promise<MachineRow | null> {
-  const ownerId = await installOwner(db);
+  const ownerId = await pinnedOwner(db);
   if (!ownerId || (await servedOrgs(db, ownerId, orgId)).length === 0) return null;
   const [row] = await db
     .select()
