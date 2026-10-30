@@ -143,7 +143,7 @@ interface Created {
 
 /**
  * "Criar agente": the steps on a rail, a live preview of the agent on the right. With `proposalId` (an agent's
- * proposal card, ADR 0080) it opens filled in with the draft, on its last step, while the proposal is open.
+ * proposal card, ADR 0081) it opens filled in with the draft, on its last step, while the proposal is open.
  */
 export function NewAgentPage({ proposalId = null }: { proposalId?: string | null }) {
   const { t } = useTranslation();

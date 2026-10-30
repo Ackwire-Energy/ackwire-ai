@@ -18,7 +18,7 @@ import { useToast } from "@/lib/toast";
  * An agent's action card (ADR 0061, `meta.actionCard`) in place of its text: what needs a person's
  * credentials or consent, one click away. "Conectar uma IA" opens the Connect dialog at the card's step for
  * the agents it names (the dialog says what each person may do), and reads "Conectado" once they can think.
- * A proposal of a new agent (ADR 0080) is its own card.
+ * A proposal of a new agent (ADR 0081) is its own card.
  */
 export function ActionCard({ message }: { message: Message }) {
   const { t } = useTranslation();

@@ -159,7 +159,7 @@ const AgentProposal = z
   })
   .openapi("AgentProposal", {
     description:
-      "An agent's proposal of a new agent (`meta.actionCard` of its card, ADR 0080): the draft, the AI it suggests and what was decided.",
+      "An agent's proposal of a new agent (`meta.actionCard` of its card, ADR 0081): the draft, the AI it suggests and what was decided.",
   });
 
 /** Provider credentials, agents, usage and the model catalog. */
@@ -426,7 +426,7 @@ export function agentRoutes(deps: AppDeps) {
           AgentFields.extend({
             handle: z.string().min(2).max(32),
             proposal: z.uuid().optional().openapi({
-              description: "The card of an agent's proposal it comes from (ADR 0080): it is marked created.",
+              description: "The card of an agent's proposal it comes from (ADR 0081): it is marked created.",
             }),
           }),
         ),

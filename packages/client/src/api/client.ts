@@ -327,7 +327,7 @@ export interface ApiClient {
     /** The agents as a team: grouped by person, with who consulted whom in the last day. */
     team(orgId: string): Promise<Team>;
     create(orgId: string, input: AgentInput): Promise<Agent>;
-    /** An agent's proposal of a new agent, by its card's message (ADR 0080). */
+    /** An agent's proposal of a new agent, by its card's message (ADR 0081). */
     proposal(orgId: string, messageId: string): Promise<AgentProposal>;
     /** Says no to it (who may create agents): the card stays, marked denied. */
     denyProposal(orgId: string, messageId: string): Promise<AgentProposal>;

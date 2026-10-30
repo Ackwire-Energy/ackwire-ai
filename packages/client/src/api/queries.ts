@@ -309,7 +309,7 @@ export function useCreateAgent(orgId: string) {
   });
 }
 
-/** An agent's proposal of a new agent (ADR 0080), by its card's message; `null` id: none. */
+/** An agent's proposal of a new agent (ADR 0081), by its card's message; `null` id: none. */
 export function useAgentProposal(orgId: string, messageId: string | null) {
   const api = useApi();
   return useQuery({
@@ -646,7 +646,7 @@ export function cacheForumSuggestion(
 }
 
 /**
- * An agent's proposal of a new agent was decided (ADR 0080): the decision on its card in the chat, which already
+ * An agent's proposal of a new agent was decided (ADR 0081): the decision on its card in the chat, which already
  * holds the draft, and its own query again.
  */
 export function cacheAgentProposal(

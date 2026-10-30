@@ -389,12 +389,12 @@ export interface AgentInput {
   monthlyBudgetUsd?: number | null;
   audience?: AgentAudience;
   appearance?: AgentLookInput;
-  /** Created from an agent's proposal (its card's message id, ADR 0080): the card is marked created. */
+  /** Created from an agent's proposal (its card's message id, ADR 0081): the card is marked created. */
   proposal?: string;
 }
 
 /**
- * The AI a proposed agent starts with (ADR 0080): an account of the person it was proposed for that thinks for
+ * The AI a proposed agent starts with (ADR 0081): an account of the person it was proposed for that thinks for
  * no agent, else the workspace's model (it has a key), else none (connected after it is created).
  */
 export type SuggestedAi =
@@ -416,7 +416,7 @@ export interface AgentDraft {
   ai: SuggestedAi;
 }
 
-/** An agent's proposal of a new agent (`meta.actionCard` of its card, ADR 0080). A person creates it or says no. */
+/** An agent's proposal of a new agent (`meta.actionCard` of its card, ADR 0081). A person creates it or says no. */
 export interface AgentProposalCard {
   kind: "agent_proposal";
   /** The person behind the run that proposed it. */
@@ -733,7 +733,7 @@ export type ChannelEvent =
       messageId: string;
       suggestion: ForumSuggestion;
     }
-  /** An agent's proposal of a new agent was decided (ADR 0080): the decision on its card (`meta.actionCard`). */
+  /** An agent's proposal of a new agent was decided (ADR 0081): the decision on its card (`meta.actionCard`). */
   | ({
       type: "agent.proposal.updated";
       channelId: string;

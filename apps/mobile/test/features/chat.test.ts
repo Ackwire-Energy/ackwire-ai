@@ -400,7 +400,7 @@ describe("an agent's question (ask_user)", () => {
     });
     expect(hidesBody(asked)).toBe(true);
     expect(hidesBody({ ...asked, body: "Antes, uma pergunta." })).toBe(false);
-    // An agent's proposal of a new agent is its card (ADR 0080); a Connect card, with no card here, keeps its text.
+    // An agent's proposal of a new agent is its card (ADR 0081); a Connect card, with no card here, keeps its text.
     const draft = { name: "Nina", handle: "nina", role: "", instructions: "x", appearance: null, channelIds: [] };
     const proposal = {
       kind: "agent_proposal",

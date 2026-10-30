@@ -1,4 +1,4 @@
-# 0080. Agents propose agents; a person creates them
+# 0081. Agents propose agents; a person creates them
 
 - Status: Accepted
 - Date: 2026-10-30

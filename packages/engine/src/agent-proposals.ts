@@ -30,7 +30,7 @@ const {
 export const AGENT_PROPOSAL_CARD = "agent_proposal";
 
 /**
- * The AI a proposed agent starts with (ADR 0080): an account of the person it is for that thinks for no agent,
+ * The AI a proposed agent starts with (ADR 0081): an account of the person it is for that thinks for no agent,
  * else the workspace's model when it has a key, else none (connected after it is created).
  */
 export type SuggestedAi =
@@ -56,7 +56,7 @@ export interface AgentDraft {
 export type AgentProposalState = "pending" | "creating" | "created" | "denied";
 
 /**
- * `meta.actionCard` of an agent's proposal of a new agent (ADR 0080). Unlike the Connect card it keeps its
+ * `meta.actionCard` of an agent's proposal of a new agent (ADR 0081). Unlike the Connect card it keeps its
  * state: what a person decided can't come from live data. Only the decision routes write it, each from the
  * state it expects (`creating` holds it while the agent is made).
  */
@@ -203,7 +203,7 @@ export async function checkAgentDraft(
 }
 
 /**
- * The AI the draft suggests (ADR 0080): the first account of `userId`'s that thinks for no agent (an active
+ * The AI the draft suggests (ADR 0081): the first account of `userId`'s that thinks for no agent (an active
  * sign-in on a computer still there), else the workspace's model when a new agent on it would have a key, else
  * none. A plan thinks only for its owner's agents (ADR 0059 §3), so an account is suggested only to someone who
  * may create the agent and own it.

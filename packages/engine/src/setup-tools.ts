@@ -107,7 +107,7 @@ const aiWords = (ai: SuggestedAi) =>
  *   whose button opens the app's own dialog, filled in. The agent never holds a key or a sign-in.
  * - `create_channel`: internal and reversible, so it acts right away for the person who asked, with
  *   their rights, and the reply carries a receipt with Undo (archive).
- * - `propose_agent` (ADR 0080): a new agent is a card a person reviews, edits and creates (or says no to)
+ * - `propose_agent` (ADR 0081): a new agent is a card a person reviews, edits and creates (or says no to)
  *   with their own right to create agents. The tool creates nothing.
  */
 export function createSetupToolSource(deps: {

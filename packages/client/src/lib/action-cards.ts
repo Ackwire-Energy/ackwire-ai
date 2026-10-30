@@ -29,7 +29,7 @@ const STEPS: ReadonlySet<string> = new Set<ConnectAiStep>(["claude", "chatgpt", 
 
 export type ActionCard = ConnectAiCard | AgentProposalCard;
 
-/** An agent's proposal of a new agent (ADR 0080), or null. Unlike the Connect card, it keeps its state. */
+/** An agent's proposal of a new agent (ADR 0081), or null. Unlike the Connect card, it keeps its state. */
 export function agentProposalOf(meta: Record<string, unknown> | null | undefined): AgentProposalCard | null {
   const raw = meta?.actionCard as Partial<AgentProposalCard> | undefined;
   return raw?.kind === "agent_proposal" && raw.params?.draft && typeof raw.expiresAt === "string"

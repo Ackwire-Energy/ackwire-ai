@@ -11,7 +11,7 @@ import { useDirectory } from "../shared/hooks";
 import { fullLook } from "./edit";
 
 /**
- * The web's card for an agent's proposal of a new agent (ADR 0080): the draft at a glance, Revisar opens
+ * The web's card for an agent's proposal of a new agent (ADR 0081): the draft at a glance, Revisar opens
  * "Criar agente" filled in with it and Recusar says no, for who may create agents while it is open; then
  * what was decided, and the new agent's page once created.
  */

@@ -53,7 +53,7 @@ import { firstBlockedStep, NEW_AGENT_PHONE_STEPS, type PhoneStep, stepBlocked } 
  * and the channels it joins, from the role). Model, budget and who it answers start at the workspace's
  * defaults and change on its page. Created, it opens the direct conversation with it. `initialWhat`
  * (an example in the empty Conversas) starts from scratch with that text. `proposalId` (an agent's
- * proposal card, ADR 0080) starts on Revisar, filled in with the draft, while the proposal is open.
+ * proposal card, ADR 0081) starts on Revisar, filled in with the draft, while the proposal is open.
  */
 export function NewAgentScreen({
   initialWhat = "",
