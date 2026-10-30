@@ -189,6 +189,15 @@ export function agentAi(agent: Pick<Agent, "brain"> | undefined, state: AiState 
   return state === undefined || state === "no_ai" ? null : "key";
 }
 
+/**
+ * The plan a card's Sign in again opens on: the agent's own, where the card says its sign-in ended and the agent
+ * still thinks with a plan; null otherwise (Connect an AI, at the card's step).
+ */
+export function signInAgainPlan(card: Pick<NoAiCard, "signedOut">, agent: Pick<Agent, "brain"> | undefined) {
+  const ai = card.signedOut ? agentAi(agent, undefined) : null;
+  return ai === "key" ? null : ai;
+}
+
 /** The "For" select's choice that signs a plan in for every agent of `allAgents`. */
 export const ALL_AGENTS = "all";
 

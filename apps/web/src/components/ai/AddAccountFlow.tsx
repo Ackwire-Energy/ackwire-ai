@@ -1,6 +1,6 @@
 import type { AccountLoginStart, AccountLoginStatus, MachineAccount, MachineAccountKind } from "@agenteschat/client";
 import { keys, useAccountLogin, useApi } from "@agenteschat/client";
-import { beginLogin, freeDuplicate, isSignInCode } from "@agenteschat/client/lib/machines";
+import { beginLogin, freeDuplicate, isSignInCode, otherThanHint } from "@agenteschat/client/lib/machines";
 import { type PlanId, planKeyFits, planOf } from "@agenteschat/client/lib/plans";
 import { accountCodeAad, sealSecret } from "@agenteschat/client/lib/secret-box";
 import { Button, cx, Icon, InfoHint, Input, ProviderLogo, SettingNote } from "@agenteschat/ui";
@@ -265,8 +265,7 @@ function AddAccountFlow({
     running.current = running.current.filter((r) => r.loginId !== login.loginId);
     if (result.state === "done" && result.account && !reported.current) {
       reported.current = true;
-      const got = result.account.email;
-      if (hint && got && got.toLowerCase() !== hint.toLowerCase()) setOther(result.account);
+      if (otherThanHint(hint, result.account)) setOther(result.account);
       else onAdded(result.account);
     }
   }, [result, login, hint, onAdded]);
@@ -332,6 +331,7 @@ function AddAccountFlow({
   const take = (text: string) => {
     setCode(text);
     setSendFailed(false);
+    setPasteFailed(false);
     if (!plan && login && isSignInCode(text, login.url)) void send(text);
   };
 

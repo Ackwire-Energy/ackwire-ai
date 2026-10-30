@@ -349,6 +349,39 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     expect(brainCalls(state).at(-1)).not.toHaveProperty("moveAccount");
   });
 
+  test("her own login signed out, an account another agent uses: a new login of that account, never hers again", async () => {
+    const theo: MachineAccount = {
+      ...work,
+      id: "acct_theo",
+      label: "Pessoal",
+      email: "walt@pessoal.com",
+      plan: "Max",
+      usedBy: ["Theo"],
+    };
+    const { state } = await onMac({
+      account: "acct_work",
+      accounts: [{ ...work, status: "signed_out", usedBy: ["Ada"] }, theo],
+    });
+    const d = await brainDialog();
+    await pick(d, "Conta do Claude", /^Pessoal · Max/);
+    await settle(4);
+    const block = within(d).getByRole("region", { name: "Adicionar conta do Claude" });
+    const realOpen = window.open;
+    window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
+    try {
+      await click(within(block).getByRole("button", { name: "Entrar com Claude" }));
+      await settle(8);
+    } finally {
+      window.open = realOpen;
+    }
+    expect(state.calls.find((c) => c.method === "machines.beginAccountLogin")?.args).toEqual([
+      ORG_ID,
+      "machine_1",
+      "claude_code",
+      { email: "walt@pessoal.com" },
+    ]);
+  });
+
   test("ChatGPT stays one agent per account: another agent's moves here", async () => {
     const theo: MachineAccount = {
       ...work,
@@ -620,6 +653,26 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     expect(JSON.stringify(state.calls)).not.toContain("c0de-from-claude");
     expect(shownText(block)).toContain("Código enviado. O MacBook está terminando de entrar.");
     expect(shownText(block)).not.toContain("Isso não parece o código do Claude.");
+  });
+
+  test("Colar refused by the browser, then ⌘V: the code goes, and the refusal's line with it", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        readText: async () => {
+          throw new Error("denied");
+        },
+        writeText: async () => {},
+      },
+    });
+    const { block, paste, sealed } = await codeField();
+    await click(within(block).getByRole("button", { name: "Colar" }));
+    await settle(4);
+    expect(shownText(block)).toContain("O navegador não deixou colar.");
+    await paste("c0de-from-claude#st4te");
+    expect(sealed()).not.toBeNull();
+    expect(shownText(block)).toContain("Código enviado. O MacBook está terminando de entrar.");
+    expect(shownText(block)).not.toContain("O navegador não deixou colar.");
   });
 
   test("a code that isn't this sign-in's waits for Enviar, the one action, with a line under it", async () => {

@@ -11,6 +11,7 @@ import {
   type ImportInput,
   type InvitationPreview,
   keys,
+  type MachineAccount,
   type SignInOptions,
 } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
@@ -1448,6 +1449,52 @@ describe("Onboarding", () => {
     expect(agent().textContent).toContain("Ada");
     await click(button("Conectar depois"), 8);
     expect(calls(state, "agents.setBrain")).toHaveLength(0);
+  });
+
+  test("Claude for both, one sign-in each: another tile and back goes on from Ada, never signing Theo in twice", async () => {
+    const { state, api } = await start();
+    fakeMachinesOf.get(api)?.pair({ name: "srv-1", kind: "host" });
+    const max = (id: string): MachineAccount => ({
+      id,
+      kind: "claude_code",
+      label: "Claude Max",
+      email: "walter@acme.com.br",
+      plan: "max",
+      status: "active",
+      ownerId: "u-walter",
+      ownerName: "Walter",
+      mine: true,
+      usedBy: [],
+      usage: null,
+      provider: null,
+      keyHint: null,
+    });
+    // The computer finishes each sign-in as soon as the page asks.
+    fakeMachinesOf.get(api)?.endLogin("login_1", { state: "done", account: max("acct_theo") });
+    fakeMachinesOf.get(api)?.endLogin("login_2", { state: "done", account: max("acct_ada") });
+    await toComputer(state);
+    await next();
+    const idOf = (name: string) => state.agents.find((a) => a.name === name)?.id;
+    const panel = () => screen().getByRole("region", { name: "Seu plano do Claude" });
+    const realOpen = window.open;
+    window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
+    try {
+      await click(within(panel()).getByRole("button", { name: "Fazer login para o Theo" }), 8);
+      expect(calls(state, "agents.setBrain").map((c) => c.args[1])).toEqual([idOf("Theo")]);
+      expect(within(panel()).getByRole("button", { name: "Fazer login para a Ada" })).toBeTruthy();
+      // Another plan's tile and back: Theo thinks with his login already, so Ada's sign-in is the one left.
+      await click(option(/^ChatGPT$/), 6);
+      await click(option(/^Claude$/), 6);
+      expect(within(panel()).queryByRole("button", { name: "Fazer login para o Theo" })).toBeNull();
+      await click(within(panel()).getByRole("button", { name: "Fazer login para a Ada" }), 8);
+    } finally {
+      window.open = realOpen;
+    }
+    expect(calls(state, "machines.beginAccountLogin")).toHaveLength(2);
+    expect(calls(state, "agents.setBrain").map((c) => c.args[1])).toEqual([idOf("Theo"), idOf("Ada")]);
+    // Both think with it: nobody left without an AI, and the step can be done.
+    expect(screen().queryByRole("region", { name: "Quem pensa" })).toBeNull();
+    expect(button("Continuar").hasAttribute("disabled")).toBe(false);
   });
 
   test("a plan for Ada, who asks: she thinks with it once signed in; Who thinks shows the others, and one key covers them", async () => {

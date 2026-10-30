@@ -1,6 +1,6 @@
 import { type ConnectIntent, keys, useAiStatus, useApi } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { aiStateOf, choiceOfIntent } from "@agenteschat/client/lib/no-ai";
+import { aiStateOf, choiceOfIntent, PLAN_CHOICES } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { keyLooksValid, type ProviderId, providerGuess, providerOf } from "@agenteschat/client/lib/providers";
 import { useQueryClient } from "@tanstack/react-query";
@@ -58,10 +58,11 @@ export function useConnectKey(orgId: string, asked?: string) {
 export type ConnectKey = ReturnType<typeof useConnectKey>;
 
 /**
- * "Conectar uma IA" as a sheet (`/connect-ai?from=<messageId>&intent=<step>&provider=<id>&agentId=<id>&ready=1`):
- * the plans first, each signing in on the agent's computer, then the workspace's API key (ConnectAiFlow); a message
- * that asked for one of them opens on its page. Once connected from a message, the agent answers it by itself.
- * `ready`: opened because the workspace's computer just got ready (its notification): a plan's page says so.
+ * "Conectar uma IA" as a sheet (`/connect-ai?from=<messageId>&intent=<step>&provider=<id>&agentId=<id>&plan=<plan>
+ * &email=<address>&ready=1`): the plans first, each signing in on the agent's computer, then the workspace's API key
+ * (ConnectAiFlow); a message that asked for one of them opens on its page, and `plan` on that plan's (Sign in again).
+ * Once connected from a message, the agent answers it by itself. `email`: one more login of the account other agents
+ * use. `ready`: opened because the workspace's computer just got ready (its notification): a plan's page says so.
  */
 export function ConnectAiSheet() {
   const { t } = useTranslation();
@@ -76,6 +77,8 @@ export function ConnectAiSheet() {
     provider?: string;
     agentId?: string;
     intent?: string;
+    plan?: string;
+    email?: string;
     ready?: string;
   }>();
   // An API key is the organization's (admins); a plan thinks only for its owner's agents (ADR 0059 §3).
@@ -86,7 +89,9 @@ export function ConnectAiSheet() {
   // The agents a plan was connected for here: they think with it before the AI status says so.
   const [linked, setLinked] = useState<string[]>([]);
   const hasAi = (id: string) => linked.includes(id) || (aiStateOf(status.data, id) ?? "no_ai") !== "no_ai";
-  const [view, setView] = useState<FlowView>(() => viewOf(choiceOfIntent(params.intent as ConnectIntent | undefined)));
+  const [view, setView] = useState<FlowView>(() =>
+    viewOf(PLAN_CHOICES.find((c) => c === params.plan) ?? choiceOfIntent(params.intent as ConnectIntent | undefined)),
+  );
   const form = useConnectKey(orgId, params.provider);
   const [keySaved, setKeySaved] = useState(false);
   const answer = () => {
@@ -120,6 +125,7 @@ export function ConnectAiSheet() {
           agents={agents}
           hasAi={hasAi}
           {...(params.agentId ? { startAgentId: params.agentId } : {})}
+          {...(params.email ? { email: params.email } : {})}
           locked={locked}
           justReady={params.ready === "1"}
           mayAddKey={mayAddKey}

@@ -21,6 +21,7 @@ import {
   type PlanChoice,
   type PlanGate,
   planGate,
+  signInAgainPlan,
   signsInPerAgent,
 } from "../src/lib/no-ai";
 import { LOGIN_PER_AGENT } from "../src/lib/plans";
@@ -365,5 +366,18 @@ describe("a card whose plan's sign-in ended", () => {
     const t = ((key: string) => key) as unknown as TFunction;
     expect(serverBody(t, "…", meta("not_signed_in"))).toBe("chat.body.no_ai_signed_out");
     expect(serverBody(t, "…", meta("cli_missing"))).toBe("chat.body.no_ai");
+  });
+
+  test("Sign in again opens on the agent's own plan; with no plan left to sign in to, Connect at the card's step", () => {
+    const out = { signedOut: true };
+    const on = (kind: "claude_code" | "codex" | "model", provider?: string): Pick<Agent, "brain"> => ({
+      brain: { kind, model: null, ...(provider ? { provider } : {}) },
+    });
+    expect(signInAgainPlan(out, on("claude_code"))).toBe("claude");
+    expect(signInAgainPlan(out, on("codex"))).toBe("chatgpt");
+    expect(signInAgainPlan(out, on("claude_code", "zai"))).toBe("zai");
+    expect(signInAgainPlan(out, on("model"))).toBeNull();
+    expect(signInAgainPlan(out, undefined)).toBeNull();
+    expect(signInAgainPlan({}, on("codex"))).toBeNull();
   });
 });

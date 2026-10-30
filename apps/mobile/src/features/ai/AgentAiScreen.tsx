@@ -90,10 +90,14 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
   };
   const accounts = view && kind ? agentAccounts(view, kind) : [];
   const current = view ? accounts.find((a) => a.id === view.account) : undefined;
-  // Another account, or one more login of `a`: Connect an AI on that plan's page (a coding plan's key, on its first
-  // page).
-  const connect = (a: MachineAccount | undefined) =>
-    openConnectAi({ agentId, ...(kind && !planOf(a?.provider) ? { intent: PLAN_INTENT[kind] } : {}) });
+  // Another account, or one more login of `a` other agents use (`also`, its email Claude's hint): Connect an AI on that
+  // plan's page (a coding plan's key, on its first page).
+  const connect = (a: MachineAccount | undefined, also = false) =>
+    openConnectAi({
+      agentId,
+      ...(kind && !planOf(a?.provider) ? { intent: PLAN_INTENT[kind] } : {}),
+      ...(also && a?.email ? { email: a.email } : {}),
+    });
   const computer = view?.computer?.name ?? "";
   const mayPick = view?.canUsePlans === true && !busy;
   const choose = (a: MachineAccount | null) => {
@@ -180,7 +184,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                         {...(about ? { sub: about } : {})}
                         checked={a.id === view.account}
                         disabled={!mayPick || !a.mine}
-                        onPress={() => (also ? connect(a) : choose(a))}
+                        onPress={() => (also ? connect(a, true) : choose(a))}
                       />
                     );
                   })}

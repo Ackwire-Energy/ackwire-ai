@@ -6,8 +6,8 @@ function oneLine(text: string, max = 200): string {
 
 /**
  * What a last-message preview needs to show a server-written body in the reader's language (the same
- * `meta` keys the chat reads: `bodyCode`/`bodyParams`, a cut-off run's notes, memory lines), or null
- * for a plain message. Long texts are cut: a preview is one line.
+ * `meta` keys the chat reads: `bodyCode`/`bodyParams`, a cut-off run's notes, memory lines, why an
+ * agent has no AI), or null for a plain message. Long texts are cut: a preview is one line.
  */
 export interface PreviewMeta {
   bodyCode?: string;
@@ -15,6 +15,7 @@ export interface PreviewMeta {
   interrupted?: { text: string };
   brainInterrupted?: { brain?: string; text: string; tools?: string[] };
   memoryUpdates?: { action: string; text: string }[];
+  noAi?: { reason: string };
 }
 
 export function previewMeta(meta: Record<string, unknown> | null | undefined): PreviewMeta | null {
@@ -24,6 +25,8 @@ export function previewMeta(meta: Record<string, unknown> | null | undefined): P
   if (meta.bodyParams && typeof meta.bodyParams === "object") {
     out.bodyParams = meta.bodyParams as Record<string, unknown>;
   }
+  const reason = (meta.noAi as { reason?: unknown } | undefined)?.reason;
+  if (out.bodyCode === "no_ai" && typeof reason === "string") out.noAi = { reason };
   const cut = (v: unknown) => (typeof v === "string" ? oneLine(v) : null);
   const interrupted = meta.interrupted as { text?: unknown } | undefined;
   const iText = interrupted && typeof interrupted === "object" ? cut(interrupted.text) : null;

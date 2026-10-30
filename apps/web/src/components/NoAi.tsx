@@ -2,7 +2,7 @@ import type { Message } from "@agenteschat/client";
 import { useAiStatus } from "@agenteschat/client";
 import { withoutApiKeys } from "@agenteschat/client/lib/api-key-text";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { aiStateOf, NO_AI, noAiCardOf, opensByItself } from "@agenteschat/client/lib/no-ai";
+import { aiStateOf, NO_AI, noAiCardOf, opensByItself, signInAgainPlan } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Button, Chip, Dialog, DialogFooter, Icon, InfoHint } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -83,6 +83,7 @@ export function NoAiCard({ message }: { message: Message }) {
   if (!card) return null;
   const agent = dir.agentById.get(card.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
+  const again = signInAgainPlan(card, agent);
   const answer = connect?.answered[message.id];
   const answering = answer === "answering";
   const state = aiStateOf(status.data, card.agentId);
@@ -108,10 +109,16 @@ export function NoAiCard({ message }: { message: Message }) {
       <Button
         size="sm"
         onClick={() =>
-          connect.open({ intent: card.intent, provider: card.provider, agentId: card.agentId, from: message.id })
+          connect.open({
+            intent: card.intent,
+            provider: card.provider,
+            agentId: card.agentId,
+            from: message.id,
+            ...(again ? { plan: again } : {}),
+          })
         }
       >
-        {t(card.signedOut ? "agentPage.work.brain.signInAgain" : "noAi.action")}
+        {t(again ? "agentPage.work.brain.signInAgain" : "noAi.action")}
       </Button>
     );
   return (

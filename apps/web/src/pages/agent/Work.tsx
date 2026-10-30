@@ -933,6 +933,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     </BrainField>
   );
   const also = typeof adding === "object" ? adding : undefined;
+  // A sign-in for one more login of the account picked (`also`), else for this agent's own signed-out one again.
+  const again = !also && signedOut ? current : null;
+  const signingIn = also ?? again;
   const planRows = (
     <>
       <BrainField label={t("agentPage.work.brain.planModel")}>
@@ -1086,13 +1089,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                     machineId={view.computer.machineId}
                     kind={accountKind}
                     computer={computerName}
-                    again={signedOut ? current?.id : undefined}
-                    {...(signedOut && isPlanId(current?.provider)
-                      ? { provider: current.provider }
-                      : isPlanId(also?.provider)
-                        ? { provider: also.provider }
-                        : {})}
-                    email={signedOut ? current?.email : also?.email}
+                    again={again?.id}
+                    {...(isPlanId(signingIn?.provider) ? { provider: signingIn.provider } : {})}
+                    email={signingIn?.email}
                     local={view.ownSignIn}
                     onBack={() => setAdding(false)}
                     onAdded={(a) => {

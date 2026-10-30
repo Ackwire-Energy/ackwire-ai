@@ -215,6 +215,12 @@ export interface PlanPanelProps {
   /** These agents think with the plan now: the account they signed in (null: the computer's own sign-in). */
   onDone: (agentIds: string[], account: MachineAccount | null) => void;
   /**
+   * One agent thinks with the account it signed in, the others of "All agents" maybe still to go: kept by a caller
+   * that knows only what `onDone` says (the setup), so the panel shown again (another tile and back) goes on from the
+   * next agent, never signing this one in twice.
+   */
+  onAssigned?: (agentId: string, account: MachineAccount) => void;
+  /**
    * A key or a code went to the computer, or an agent is being moved onto the plan: whom the panel is for, and whose
    * computer it reads, must hold from here, though the agents it moves get an AI meanwhile.
    */
@@ -308,6 +314,7 @@ function PlanSteps({
   onKey,
   onComputer,
   onDone,
+  onAssigned,
   onStart,
 }: PlanPanelProps & {
   forWhom: PlanSetAgent[];
@@ -380,6 +387,7 @@ function PlanSteps({
     try {
       await api.agents.setBrain(org.id, agentId, { brain: a.kind, account: a.id, ...toEveryone });
       setAssigned((x) => ({ ...x, [agentId]: a }));
+      onAssigned?.(agentId, a);
       refresh([agentId]);
     } catch {
       setFailed({ agentId, account: a });
