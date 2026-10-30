@@ -601,7 +601,7 @@ function NewAgentFlow() {
                       <span className="newag__check" aria-hidden="true">
                         <Icon name="check" size={14} />
                       </span>
-                      <span className="newag__role-top ac-faceline">
+                      <span className="ac-faceline">
                         <AgentAvatar
                           name={t(`newAgent.roles.${id}.agent`)}
                           appearance={preset.look}
@@ -1233,102 +1233,104 @@ function NewAgentFlow() {
             </Button>
           </div>
         </main>
-        <aside className="newag__aside" aria-label={t("newAgent.preview.label")}>
-          <div className="newag__cap">
-            <span className="onb__eyebrow">{t("newAgent.preview.title")}</span>
-          </div>
-          <div className="newag__pv" data-big={step === "identity" || undefined} data-open={previewOpen || undefined}>
-            <div className="newag__pv-cover" ref={preview}>
-              <AgentPreviewSky
-                color={look.color as AgentColor}
-                clear={() => [...(preview.current?.querySelectorAll(".newag__pv-state, .newag__pv-agent") ?? [])]}
-              />
-              <span className="newag__pv-state">
-                <Icon name="edit" size={14} />
-                {t("newAgent.preview.draft")}
-              </span>
-              <AgentAvatar
-                name={previewName}
-                appearance={look}
-                size="xl"
-                className="newag__pv-agent"
-                state={mood.typing ? "writing" : undefined}
-                expression={mood.face}
-              />
+        {role && (
+          <aside className="newag__aside" data-step={step} aria-label={t("newAgent.preview.label")}>
+            <div className="newag__cap">
+              <span className="onb__eyebrow">{t("newAgent.preview.title")}</span>
             </div>
-            <div className="newag__pv-body">
-              <div className="newag__pv-head">
-                <div className="newag__pv-name">
-                  <b data-placeholder={!name.trim() || undefined}>{previewName}</b>
-                  <span>
-                    {handle ? `@${handle}` : "@…"}
-                    {roleName && <span className="newag__pv-role"> · {roleName}</span>}
-                  </span>
-                </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  iconOnly
-                  icon={previewOpen ? "close" : "chevronDown"}
-                  className="newag__pv-toggle"
-                  aria-expanded={previewOpen}
-                  aria-label={previewOpen ? t("newAgent.preview.hide") : t("newAgent.preview.show")}
-                  onClick={() => setPreviewOpen((o) => !o)}
+            <div className="newag__pv" data-big={step === "identity" || undefined} data-open={previewOpen || undefined}>
+              <div className="newag__pv-cover" ref={preview}>
+                <AgentPreviewSky
+                  color={look.color as AgentColor}
+                  clear={() => [...(preview.current?.querySelectorAll(".newag__pv-state, .newag__pv-agent") ?? [])]}
+                />
+                <span className="newag__pv-state">
+                  <Icon name="edit" size={14} />
+                  {t("newAgent.preview.draft")}
+                </span>
+                <AgentAvatar
+                  name={previewName}
+                  appearance={look}
+                  size="xl"
+                  className="newag__pv-agent"
+                  state={mood.typing ? "writing" : undefined}
+                  expression={mood.face}
                 />
               </div>
-              {roleName && rolePreset && (
-                <span className="newag__chips newag__pv-wide">{chip(rolePreset.icon, roleName)}</span>
-              )}
-              {instructions.trim() && <p className="newag__pv-instr">{instructions.trim().split("\n")[0]}</p>}
-              <PreviewSection label={t("newAgent.preview.uses")}>
-                {granted.length || grantedMail.length || skills.length ? (
-                  <>
-                    <span className="newag__chips">
-                      {granted.map(connectorChip)}
-                      {grantedMail.map(mailChip)}
-                      {skills.map((s) => chip("book", s.name, s.id))}
+              <div className="newag__pv-body">
+                <div className="newag__pv-head">
+                  <div className="newag__pv-name">
+                    <b data-placeholder={!name.trim() || undefined}>{previewName}</b>
+                    <span>
+                      {handle ? `@${handle}` : "@…"}
+                      {roleName && <span className="newag__pv-role"> · {roleName}</span>}
                     </span>
-                    {(() => {
-                      const asks = [
-                        ...granted.filter((i) => levels[i.id] === "write").flatMap(asksOf),
-                        ...(grantedMail.some((a) => mailLevels[a.id] === "write") ? mailAsks : []),
-                      ];
-                      return asks.length ? (
-                        <span className="newag__asks">
-                          <Icon name="lock" size={14} />
-                          {t("toolReview.asks", { count: new Set(asks).size })}
-                        </span>
-                      ) : null;
-                    })()}
-                  </>
-                ) : (
-                  <span className="newag__empty">{t("newAgent.preview.onlyTalks")}</span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    iconOnly
+                    icon={previewOpen ? "close" : "chevronDown"}
+                    className="newag__pv-toggle"
+                    aria-expanded={previewOpen}
+                    aria-label={previewOpen ? t("newAgent.preview.hide") : t("newAgent.preview.show")}
+                    onClick={() => setPreviewOpen((o) => !o)}
+                  />
+                </div>
+                {roleName && rolePreset && (
+                  <span className="newag__chips newag__pv-wide">{chip(rolePreset.icon, roleName)}</span>
                 )}
-              </PreviewSection>
-              <PreviewSection label={t("newAgent.preview.worksIn")}>
-                {joined.length ? (
-                  <span className="newag__chips">{joined.map((c) => chip("channel", c.name, c.id))}</span>
-                ) : (
-                  <span className="newag__empty">{t("newAgent.noChannelsYet")}</span>
-                )}
-              </PreviewSection>
-              <PreviewSection label={t("newAgent.owner")}>
-                <span className="newag__chips">{chip("person", ownerFirst ?? t("newAgent.noOwnerOption"))}</span>
-              </PreviewSection>
-              <PreviewSection label={t("audience.section")}>
-                <span className="newag__chips">{chip("message", audienceText())}</span>
-              </PreviewSection>
-              <PreviewSection label={t("newAgent.modelAndCost")}>
-                <span className="newag__chips">
-                  {modelLabel && chip("bolt", modelLabel, "model")}
-                  {budgetShown !== undefined &&
-                    !budgetInvalid &&
-                    chip("wallet", t("newAgent.upTo", { amount: usd(t, locale, budgetShown) }), "budget")}
-                </span>
-              </PreviewSection>
+                {instructions.trim() && <p className="newag__pv-instr">{instructions.trim().split("\n")[0]}</p>}
+                <PreviewSection label={t("newAgent.preview.uses")}>
+                  {granted.length || grantedMail.length || skills.length ? (
+                    <>
+                      <span className="newag__chips">
+                        {granted.map(connectorChip)}
+                        {grantedMail.map(mailChip)}
+                        {skills.map((s) => chip("book", s.name, s.id))}
+                      </span>
+                      {(() => {
+                        const asks = [
+                          ...granted.filter((i) => levels[i.id] === "write").flatMap(asksOf),
+                          ...(grantedMail.some((a) => mailLevels[a.id] === "write") ? mailAsks : []),
+                        ];
+                        return asks.length ? (
+                          <span className="newag__asks">
+                            <Icon name="lock" size={14} />
+                            {t("toolReview.asks", { count: new Set(asks).size })}
+                          </span>
+                        ) : null;
+                      })()}
+                    </>
+                  ) : (
+                    <span className="newag__empty">{t("newAgent.preview.onlyTalks")}</span>
+                  )}
+                </PreviewSection>
+                <PreviewSection label={t("newAgent.preview.worksIn")}>
+                  {joined.length ? (
+                    <span className="newag__chips">{joined.map((c) => chip("channel", c.name, c.id))}</span>
+                  ) : (
+                    <span className="newag__empty">{t("newAgent.noChannelsYet")}</span>
+                  )}
+                </PreviewSection>
+                <PreviewSection label={t("newAgent.owner")}>
+                  <span className="newag__chips">{chip("person", ownerFirst ?? t("newAgent.noOwnerOption"))}</span>
+                </PreviewSection>
+                <PreviewSection label={t("audience.section")}>
+                  <span className="newag__chips">{chip("message", audienceText())}</span>
+                </PreviewSection>
+                <PreviewSection label={t("newAgent.modelAndCost")}>
+                  <span className="newag__chips">
+                    {modelLabel && chip("bolt", modelLabel, "model")}
+                    {budgetShown !== undefined &&
+                      !budgetInvalid &&
+                      chip("wallet", t("newAgent.upTo", { amount: usd(t, locale, budgetShown) }), "budget")}
+                  </span>
+                </PreviewSection>
+              </div>
             </div>
-          </div>
-        </aside>
+          </aside>
+        )}
       </div>
     </div>
   );

@@ -7191,12 +7191,14 @@ a.machine-row__name:hover {
 .newag__role-groups > .newag__role--blank {
   margin-top: 22px;
 }
-/* Pressable cards: the role presets, the models, the look options. */
+/* Two across while a card holds its longest name ("Atendimento", 150px) beside the face and clear of the check, one per
+   row below that. */
 .newag__roles {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 276px), 1fr));
   gap: 12px;
 }
+/* Pressable cards: the role presets, the models, the look options. */
 .newag__role,
 .newag__model,
 .newag__tip {
@@ -7204,7 +7206,7 @@ a.machine-row__name:hover {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 16px 16px 14px;
+  padding: 16px;
   border: 0;
   border-radius: 20px;
   background: var(--raised);
@@ -7238,11 +7240,6 @@ a.machine-row__name:hover {
 .newag__addrow:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
-}
-/* An `.ac-faceline` with room above it for the face's hat: the name's capitals at the face's top. */
-.newag__role-top {
-  min-height: 58px;
-  padding-top: 18px;
 }
 .newag__role-name {
   display: flex;
