@@ -165,8 +165,9 @@ export const ReceiptMark = memo(function ReceiptMark({
     agent: (id) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent"),
     person: (id) => dir.nameOf({ type: "person", id }) || t("mobile.chat.someone"),
   });
+  // The agents' sheet when there are agents to list (none yet while the author's plan picks), else the words.
   const say = () =>
-    view.kind === "agents"
+    view.kind === "agents" && receiptRows(receipt).length > 0
       ? sheet.open(<ReceiptsSheet receipt={receipt} action={null} onAction={() => sheet.close()} />)
       : toast({ title: label, ...(view.kind === "steer" ? { agentId: view.agentId } : {}) });
   return (

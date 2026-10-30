@@ -13,8 +13,12 @@ import { useLive } from "@/realtime/context";
 import { CallAgentMenu, useChannelActions } from "./channel-actions";
 import { useOrg } from "./org-context";
 
-/** Which icon the receipt shows: one check (seen), two (answered), clock (answering/waiting), alert (failed). */
+/**
+ * Which icon the receipt shows: one check (seen), two (answered), clock (the author's plan picking, answering,
+ * waiting), alert (failed).
+ */
 export function receiptIcon(view: ReceiptView): IconName {
+  if (view.picking) return "waiting";
   const kind = view.status?.kind;
   if (kind === "failed" || kind === "no_ai") return "alert";
   if (kind === "claimed" || kind === "waiting" || kind === "asking") return "waiting";
@@ -56,10 +60,11 @@ function SteerMark({ steer, name, size }: { steer: SteerState; name: string; siz
 /**
  * A person's message's receipt: a small muted mark at the end of its first line (`part="check"`), never a line of its
  * own, so it never changes the message's height or the room before the next one. Clicking or focusing it opens a
- * popover with each agent and its status, and who picked them. A message sent into a task at work wears what became
- * of it there instead of the check ("Ada leu" is Ada's face), the words said to screen readers as they change. Words
- * only for what you can act on ("Nenhum agente vai responder", a failure, no AI connected), and while the author's own
- * plan picks: then the whole receipt is a line under the message (`part="line"`), so the text still follows the name.
+ * popover with each agent and its status, and who picked them. While the author's own plan picks, the mark is the
+ * clock, and "Chamar um agente" is in its popover. A message sent into a task at work wears what became of it there
+ * instead of the check ("Ada leu" is Ada's face), the words said to screen readers as they change. Words only for what
+ * you can act on ("Nenhum agente vai responder", a failure, no AI connected): then the whole receipt is a line under
+ * the message (`part="line"`), so the text still follows the name.
  */
 export function MessageReceipts({ message, part }: { message: Message; part: "check" | "line" }) {
   const { t } = useTranslation();
@@ -83,27 +88,14 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
       </ReceiptAction>
     ) : null;
   const worded =
-    view.picking === true ||
     status?.kind === "nobody" ||
     status?.kind === "no_ai" ||
     status?.kind === "platform_cap" ||
     (status?.kind === "failed" && actions !== null);
   // The mark stays where a line says the rest (a failure, nobody): what became of it in the task is its own news.
   if (part === "line" ? !worded : worded && !steered) return null;
-  if (view.picking && part === "line") {
-    return (
-      <div className="ac-receipt">
-        <span className="ac-receipt__clock">
-          <Icon name="waiting" />
-        </span>
-        <span className="ac-receipt__words">
-          <span>{t("receipts.picking")}</span>
-          {callAgent}
-        </span>
-      </div>
-    );
-  }
-  if (view.seen.length === 0 && !steered && status?.kind !== "no_ai" && status?.kind !== "platform_cap") return null;
+  const marked = view.seen.length > 0 || view.picking === true || steered !== null;
+  if (!marked && status?.kind !== "no_ai" && status?.kind !== "platform_cap") return null;
 
   const name = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
   const names = (ids: string[]) => joinNames(ids.map(name), t("newAgent.and"));
@@ -118,7 +110,11 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
           : status.kind === "platform_cap"
             ? t("receipts.platformCap")
             : t(`receipts.${status.kind}`, { count: status.agents.length, names: names(status.agents) });
-  const label = [view.seen.length > 0 && t("receipts.seenBy", { names: names(view.seen) }), statusText]
+  const label = [
+    view.picking && t("receipts.picking"),
+    view.seen.length > 0 && t("receipts.seenBy", { names: names(view.seen) }),
+    statusText,
+  ]
     .filter(Boolean)
     .join(". ");
   const phases = new Map<string, ReceiptPhase>(receipt?.agents ?? []);
@@ -136,7 +132,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
     model: modelLabel,
   });
 
-  const check = (view.seen.length > 0 || steered) && (
+  const check = marked && (
     <Popover
       label={t("receipts.popoverTitle")}
       trigger={
@@ -165,6 +161,15 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
           <span className="ac-popover__row-status">{phaseText(id)}</span>
         </div>
       ))}
+      {view.picking && (
+        <div className="who-by ac-iconline">
+          <Icon name="waiting" size={14} />
+          <span className="ac-receipt__words">
+            <span>{t("receipts.picking")}</span>
+            {callAgent}
+          </span>
+        </div>
+      )}
       {steered && (
         <div className="who-by ac-iconline">
           <SteerMark steer={steered.steer} name={steered.name} size={14} />
@@ -262,21 +267,36 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
 }
 
 /**
- * "Visto" in a DM between people, in the receipt's place at the end of my latest message's first line: the face of
- * who read it. The words are said to screen readers as it shows, and on hover.
+ * "Visto" in a DM between people, in the receipt's place at the end of the first line of each of my messages: a slot
+ * the size of the check that every one of them keeps, so the face of who read my latest message comes and goes
+ * without rewrapping a line. The face is a button whose popover says who read it, and the slot is a live region, so
+ * screen readers hear it as it shows.
  */
-export function SeenMark({ personId }: { personId: string }) {
+export function SeenMark({ personId }: { personId?: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
-  const name = dir.memberById.get(personId)?.name ?? t("channel.unknownPerson");
+  const name = personId ? (dir.memberById.get(personId)?.name ?? t("channel.unknownPerson")) : "";
   const words = t("receipts.seenBy", { names: name });
+  const face = personId ? <ActorAvatar actor={{ type: "person", id: personId }} name={name} size="xs" /> : null;
   return (
-    <span className="ac-receipt__seen" title={words}>
-      <ActorAvatar actor={{ type: "person", id: personId }} name={name} size="xs" />
-      <span className="ac-visually-hidden" aria-live="polite">
-        {words}
-      </span>
+    <span className="ac-receipt__seen" aria-live="polite">
+      {face && (
+        <Popover
+          label={words}
+          trigger={
+            <button type="button" className="ac-receipt__check">
+              {face}
+              <span className="ac-visually-hidden">{words}</span>
+            </button>
+          }
+        >
+          <div className="ac-popover__row">
+            {face}
+            <span>{words}</span>
+          </div>
+        </Popover>
+      )}
     </span>
   );
 }

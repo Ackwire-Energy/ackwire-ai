@@ -80,7 +80,28 @@ describe("a receipt never changes a message's height", () => {
     expect(document.querySelector(".msg-steer")).toBeNull();
   });
 
-  test("in a DM between people, who read my latest message is their face where its check goes", async () => {
+  test("while the author's plan picks who answers: the clock where the check goes, nothing under the text", async () => {
+    const state = seedState();
+    state.messages = [said("k1", "Revisa o PR?", 2)];
+    const { sockets } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(8);
+    const socket = sockets.last();
+    await act(async () => socket.open());
+    await act(async () =>
+      socket.push({
+        type: "event",
+        channelId: ENG_ID,
+        event: { channelId: ENG_ID, type: "message.routing", messageId: "k1", step: "plan" },
+      }),
+    );
+    await settle(2);
+    const clock = row("k1").querySelector(".ac-msg__head .ac-msg__aside .ac-receipt__check") as HTMLElement;
+    expect(clock.getAttribute("aria-label")).toBe("Escolhendo quem responde");
+    expect(clock.querySelector("path")?.getAttribute("d")).toBe("M10 6v4l2.6 1.8");
+    expect(row("k1").querySelector(".ac-msg__foot")?.childNodes.length).toBe(0);
+  });
+
+  test("in a DM between people, who read my latest message is their face where its check goes, in a slot each of my messages keeps", async () => {
     const state = seedState();
     state.dms = [{ channelId: DM_ID, with: { type: "person", id: "u-joao", name: "João", handle: null } }];
     state.channelMembers[DM_ID] = [
@@ -88,6 +109,7 @@ describe("a receipt never changes a message's height", () => {
       { type: "person", id: "u-joao" },
     ];
     state.messages = [
+      said("j1", "Me manda o relatório?", 4, { channelId: DM_ID, author: { type: "person", id: "u-joao" } }),
       said("d1", "Oi, João.", 3, { channelId: DM_ID }),
       said("d2", "Viu o relatório?", 2.5, { channelId: DM_ID }),
       said("d3", "Está no Drive.", 2, { channelId: DM_ID }),
@@ -97,12 +119,41 @@ describe("a receipt never changes a message's height", () => {
     await renderApp(`/org/${ORG_ID}/dm/person/u-joao`, { api });
     await settle(8);
     const seen = row("d3").querySelector(".ac-msg__aside--floating .ac-receipt__seen");
-    expect(seen?.querySelector(".ac-avatar")).not.toBeNull();
-    expect(row("d2").querySelector(".ac-receipt__seen")).toBeNull();
+    expect(seen).not.toBeNull();
+    expect((seen as HTMLElement).querySelector(".ac-avatar")).not.toBeNull();
+    // My other messages keep the same slot, empty, so the face moving on to a newer one never rewraps a line.
+    expect(row("d2").className).toContain("ac-msg--grouped");
+    for (const [id, where] of [
+      ["d1", ".ac-msg__head .ac-msg__aside"],
+      ["d2", ".ac-msg__aside--floating"],
+    ] as const) {
+      const slot = row(id).querySelector(`${where} .ac-receipt__seen`);
+      expect(slot).not.toBeNull();
+      expect((slot as HTMLElement).childNodes.length).toBe(0);
+    }
+    // Not on João's: no face ever comes there.
+    expect(row("j1").querySelector(".ac-receipt__seen")).toBeNull();
     // No line after it: the row ends the list as the one before it ends its own.
     expect(parts("d3")).toEqual(parts("d2"));
     expect(screen().queryByText("Visto")).toBeNull();
     expect(document.querySelector(".channel__seen")).toBeNull();
+    // I write again: the face leaves until João reads it, its slot stays, and the new message has one while it sends.
+    let release = () => {};
+    state.holdPosts = new Promise<void>((r) => {
+      release = r;
+    });
+    const composer = screen().getByRole("combobox", { name: /Mensagem para/ });
+    await act(async () => fireEvent.change(composer, { target: { value: "Mais uma coisa." } }));
+    await act(async () => fireEvent.keyDown(composer, { key: "Enter" }));
+    await settle(2);
+    expect(row("d3").querySelector(".ac-msg__aside--floating .ac-receipt__seen")?.childNodes.length).toBe(0);
+    const sending = screen()
+      .getAllByRole("article")
+      .find((a) => a.textContent?.includes("Mais uma coisa.")) as HTMLElement;
+    expect(sending.className).toContain("ac-msg--pending");
+    expect(sending.querySelector(".ac-msg__head .ac-msg__aside .ac-receipt__seen")).not.toBeNull();
+    await act(async () => release());
+    await settle(2);
   });
 
   test("the face keeps the check's width and the name's line, and no stylesheet gives a receipt a line", () => {
@@ -123,13 +174,14 @@ describe("a receipt never changes a message's height", () => {
     ).toBe(`calc(var(--msg-inline) + ${check + 8}px)`);
     // The reader's face (18px) with 1px each side: the same 20px, and no taller than the name's line.
     const face = px(value(kit, ".ac-avatar--xs", "width"));
-    for (const selector of [".ac-receipt__check:has(> .ac-avatar)", ".ac-receipt__seen"]) {
-      expect(value(app, selector, "padding")).toBe("0 1px");
-    }
+    expect(value(app, ".ac-receipt__check:has(> .ac-avatar)", "padding")).toBe("0 1px");
     expect(face + 2 * 1).toBe(check);
     expect(px(value(kit, ".ac-avatar--xs", "height"))).toBeLessThanOrEqual(
       px(value(kit, ".ac-msg__head", "line-height")),
     );
+    // A DM's face slot is that box, with or without the face in it.
+    expect(px(value(app, ".ac-receipt__seen", "width"))).toBe(check);
+    expect(px(value(app, ".ac-receipt__seen", "height"))).toBe(px(value(kit, ".ac-avatar--xs", "height")));
     // The mark ends the first line: in the name's line, or floated on a grouped message's text.
     expect(value(kit, ".ac-msg__head > .ac-msg__aside", "align-self")).toBe("center");
     expect(value(kit, ".ac-msg__aside--floating", "float")).toBe("right");
@@ -190,7 +242,7 @@ describe("its words stay reachable", () => {
     expect(popover.querySelector(".who-by")?.textContent).toBe("Ada leu");
   });
 
-  test("in a DM, who read it is said to screen readers and on hover", async () => {
+  test("in a DM, who read it is a button that says it, from the keyboard or a tap, and to screen readers as it shows", async () => {
     const state = seedState();
     state.dms = [{ channelId: DM_ID, with: { type: "person", id: "u-joao", name: "João", handle: null } }];
     state.channelMembers[DM_ID] = [
@@ -202,9 +254,14 @@ describe("its words stay reachable", () => {
     api.dms.reads = async () => [{ userId: "u-joao", lastReadAt: NOW.toISOString() }];
     await renderApp(`/org/${ORG_ID}/dm/person/u-joao`, { api });
     await settle(8);
+    // The slot is a polite live region that is there before the face, so the face coming in is said.
     const seen = row("d1").querySelector(".ac-msg__head .ac-msg__aside .ac-receipt__seen") as HTMLElement;
-    expect(seen.getAttribute("title")).toBe("Vista por João");
-    expect(seen.querySelector(".ac-visually-hidden[aria-live='polite']")?.textContent).toBe("Vista por João");
-    expect(seen.querySelector(".ac-avatar")?.getAttribute("aria-hidden")).toBe("true");
+    expect(seen.getAttribute("aria-live")).toBe("polite");
+    const face = within(seen).getByRole("button", { name: "Vista por João" });
+    expect(face.querySelector(".ac-avatar")?.getAttribute("aria-hidden")).toBe("true");
+    await act(async () => fireEvent.click(face));
+    await settle(2);
+    const popover = screen().getByRole("dialog", { name: "Vista por João" });
+    expect(within(popover).getByText("Vista por João")).toBeTruthy();
   });
 });

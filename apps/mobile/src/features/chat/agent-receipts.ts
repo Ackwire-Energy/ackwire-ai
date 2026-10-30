@@ -15,9 +15,8 @@ import type { TFunction } from "i18next";
  * with a check and a popover). Faces of the agents it is about, a small mark, and words: who saw it, a wait, a
  * failure, nobody or no AI, and while the author's own plan picks who answers. A receipt never takes a line of its
  * own: it is a mark beside the message (`markOf`), its words its label, except what asks something of you (send it
- * again, connect an AI, nobody will answer, the plan picking), which keeps its line under the message, as on the
- * web. Pure, so it is tested; the state itself is the shared `receipts.ts` (seeded from the lists, moved by the
- * channel's events).
+ * again, connect an AI, nobody will answer), which keeps its line under the message, as on the web. Pure, so it is
+ * tested; the state itself is the shared `receipts.ts` (seeded from the lists, moved by the channel's events).
  */
 
 /** The small mark before the words: a check (seen, answered), the orbit (on it), paused, a question, the clock, none. */
@@ -105,7 +104,7 @@ export function receiptLine(receipt: MessageReceipt | undefined): ReceiptLine | 
 }
 
 /** What keeps its line of words under the message: a receipt with no small mark of its own asks something of you. */
-export const keepsLine = (line: ReceiptLine) => line.mark === "none" || line.mark === "picking";
+export const keepsLine = (line: ReceiptLine) => line.mark === "none";
 
 /**
  * The line under the message, for what keeps one. It gives way to the steer mark ("Theo leu", "lê na próxima

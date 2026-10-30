@@ -300,7 +300,7 @@ export interface ChannelChrome {
   composerTarget?: string;
   /** A DM with this agent: it answers every message (optimistic "pensando…" is allowed). */
   dmAgentId?: string;
-  /** A DM with this person: "Visto" under my latest message once they read it. */
+  /** A DM with this person: their face on my latest message once they read it. */
   dmPersonId?: string;
   /** The agent won't answer me: the composer is off and says why ("O Theo só responde a Walter."). */
   locked?: string;
@@ -1720,9 +1720,8 @@ function ChannelView({
                         divider={divider}
                         channelId={channel.id}
                         runVisible={runVisible}
-                        seen={
-                          thread || !seenId || !chrome?.dmPersonId ? null : { messageId: seenId, by: chrome.dmPersonId }
-                        }
+                        dmPersonId={thread ? undefined : chrome?.dmPersonId}
+                        seenId={thread ? null : seenId}
                       />
                       {!thread && (
                         <ArchivedThreadsNote channelId={channel.id} count={archivedThreads.data?.threads.length ?? 0} />
@@ -1964,7 +1963,8 @@ const Timeline = memo(function Timeline({
   divider,
   channelId,
   runVisible,
-  seen = null,
+  dmPersonId,
+  seenId = null,
 }: {
   items: ReturnType<typeof buildTimeline>;
   /** The first page loaded: rows from then on slide in. */
@@ -1978,8 +1978,10 @@ const Timeline = memo(function Timeline({
   /** This conversation's channel, and which runs' threads it shows (a held browser card's place). */
   channelId: string;
   runVisible: { current: (r: { threadId: string | null; provisional?: boolean }) => boolean };
-  /** A DM with a person: my message they read last, and who (their face is its receipt). */
-  seen?: { messageId: string; by: string } | null;
+  /** A DM with this person: my rows keep the slot of their face (`SeenMark`). */
+  dmPersonId?: string;
+  /** My message they read last: their face is its receipt. */
+  seenId?: string | null;
 }) {
   const { t, i18n } = useTranslation();
   const models = useModels();
@@ -2114,7 +2116,8 @@ const Timeline = memo(function Timeline({
           contextMark={threadsView?.marks.has(m.id)}
           replyContext={item.context}
           lastOfRun={Boolean(m.agentRunId && lastByRun.get(m.agentRunId) === item.key)}
-          seenBy={m.id === seen?.messageId ? seen.by : undefined}
+          dmPersonId={dmPersonId}
+          seen={m.id === seenId}
         />
       ),
     );
@@ -2701,7 +2704,8 @@ export const TimelineMessage = memo(function TimelineMessage({
   live = null,
   seenLive,
   lastOfRun = false,
-  seenBy,
+  dmPersonId,
+  seen = false,
 }: {
   message: MessageType;
   grouped: boolean;
@@ -2717,8 +2721,10 @@ export const TimelineMessage = memo(function TimelineMessage({
   seenLive?: LiveRun;
   /** The last message of its run here: it carries the run's browser card while a take over holds it. */
   lastOfRun?: boolean;
-  /** My latest message in a DM with a person who read it: who (`SeenMark`). */
-  seenBy?: string;
+  /** A DM with this person: my row keeps the slot of their face (`SeenMark`). */
+  dmPersonId?: string;
+  /** My latest message, which they read: their face in that slot. */
+  seen?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
@@ -2747,6 +2753,9 @@ export const TimelineMessage = memo(function TimelineMessage({
   const [active, setActive] = useState(false);
   const agent = m.author.type === "agent" ? dir.agentById.get(m.author.id ?? "") : undefined;
   const person = m.author.type === "person" ? dir.memberById.get(m.author.id ?? "") : undefined;
+  const receipted = m.author.type === "person" && !m.local;
+  // Mine in a DM between people: the slot of their face, from the moment it is sent, so it never rewraps a line.
+  const seenSlot = dmPersonId !== undefined && m.author.type === "person" && m.author.id === me.user.id;
   const name = dir.authorName(m.author);
   // What a routine found, told by its agent (`meta.routine`): a tag that opens the routine, and the report
   // it answers on demand (that report's own line folds into this message).
@@ -3008,14 +3017,14 @@ export const TimelineMessage = memo(function TimelineMessage({
             : undefined
       }
       aside={
-        m.author.type === "person" && !m.local ? (
+        receipted || seenSlot ? (
           <>
-            <MessageReceipts message={m} part="check" />
-            {seenBy && <SeenMark personId={seenBy} />}
+            {receipted && <MessageReceipts message={m} part="check" />}
+            {seenSlot && <SeenMark personId={seen ? dmPersonId : undefined} />}
           </>
         ) : undefined
       }
-      foot={m.author.type === "person" && !m.local ? <MessageReceipts message={m} part="line" /> : undefined}
+      foot={receipted ? <MessageReceipts message={m} part="line" /> : undefined}
       menu={
         barred && menu.touch.length > 0
           ? { label: t("channel.actions", { name }), items: <MenuEntries entries={menu.touch} /> }

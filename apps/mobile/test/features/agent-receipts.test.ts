@@ -199,11 +199,14 @@ describe("the agents' receipt line under a person's message", () => {
 
   test("a receipt is a mark beside the message, never a line, unless it asks something of you", () => {
     const answered = handled(routed({}), "ada", "done").m1;
+    const plan = picking(seedReceipt({}, message({ id: "m1" }))).m1;
     const marks = {
       seen: { routed: false, agents: [["ada", "seen"]] as [string, "seen"][] },
       answering: routed({}).m1,
       answered,
       approval: handled(routed({}), "ada", "waiting_approval").m1,
+      // It lasts as long as the plan's call: a line would come and go under the message.
+      picking: plan,
     };
     for (const receipt of Object.values(marks)) {
       expect(receiptShows(receiptLine(receipt), false)).toBe(false);
@@ -215,13 +218,20 @@ describe("the agents' receipt line under a person's message", () => {
       mark: "done",
       label: { key: "receipts.handled", agents: ["ada"] },
     });
+    // No agent yet: the clock alone, and a tap says its words (no sheet of agents to list).
+    expect(markOf(null, null, plan)).toEqual({
+      kind: "agents",
+      agentId: null,
+      mark: "picking",
+      label: { key: "receipts.picking", agents: [] },
+    });
+    expect(receiptRows(plan)).toEqual([]);
     const lines = {
       failed: handled(routed({}), "ada", "failed").m1,
       nobody: routed({}, { pickedBy: [] }).m1,
       mentionNeeded: routed({}, { pickedBy: [], reason: "mention_needed" }).m1,
       noAi: routed({}, { seenBy: [], pickedBy: [], reason: "no_ai" }).m1,
       platformCap: routed({}, { seenBy: [], pickedBy: [], reason: "platform_cap" }).m1,
-      picking: picking(seedReceipt({}, message({ id: "m1" }))).m1,
     };
     for (const receipt of Object.values(lines)) {
       expect(receiptShows(receiptLine(receipt), false)).toBe(true);
@@ -254,6 +264,9 @@ describe("the agents' receipt line under a person's message", () => {
     expect(markLabel(en, markOf(null, null, two) as ReceiptMarkView, names)).toBe("Ada and Theo answered");
     const approval = markOf(null, null, handled(routed({}), "ada", "waiting_approval").m1) as ReceiptMarkView;
     expect(markLabel(pt, approval, names)).toBe("Ada está esperando aprovação");
+    const plan = markOf(null, null, picking(seedReceipt({}, message({ id: "m1" }))).m1) as ReceiptMarkView;
+    expect(markLabel(en, plan, names)).toBe("Picking who answers");
+    expect(markLabel(pt, plan, names)).toBe("Escolhendo quem responde");
   });
 
   test("someone else's mark goes at the end of their turn's name line: a grouped row has none", () => {
