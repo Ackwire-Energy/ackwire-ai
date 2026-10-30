@@ -93,9 +93,17 @@ async function agentOwner(deps: Pick<NotificationDeps, "db">, agentId: string) {
 // ── Chat: mentions, thread replies, DMs ───────────────────────────────────────
 
 /**
+ * One open `agent_reply` per conversation (a channel's top level, a thread, a DM): an agent's later answers there
+ * merge into it until it's read. Reading the conversation resolves it (`markChannelRead`).
+ */
+export const agentReplyGroup = (channelId: string, threadId: string | null) =>
+  `agent_reply:${channelId}:${threadId ?? "top"}`;
+
+/**
  * Job `notifications.message` (enqueued in the message's own statement):
- * people mentioned (`mention`), the other person of a DM (`dm`), and the
- * people in a thread (`thread_reply`, merged per thread). Cards of the
+ * people mentioned (`mention`), the other person of a DM (`dm`), the person
+ * an agent answers (`agent_reply`, merged per conversation, ADR 0071), and
+ * the people in a thread (`thread_reply`, merged per thread). Cards of the
  * agent's own flows (questions, approvals, secret requests) notify through
  * those flows instead; the forum notifies through its turns.
  */
@@ -125,8 +133,33 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
   };
   const done = new Set<string>(authorUser ? [authorUser] : []);
 
+  // An agent's answer: the person behind its run hears it (ADR 0071), once per conversation until read, so they
+  // can close the tab while it works. Not a routine's (its creator hears `routine_finished`), not a run that
+  // person stopped, not when they're mentioned in it (the mention says it).
+  const asker =
+    message.authorType === "agent" && message.agentRunId && !meta.viaRoutine && !meta.canceled && !meta.agentDm
+      ? await humanBehindRun(deps, orgId, message.agentRunId)
+      : null;
+  if (
+    asker &&
+    !message.mentionedUserIds.includes(asker) &&
+    (await inChannel(deps, message.channelId, [asker])).length > 0
+  ) {
+    await notify(deps, {
+      orgId,
+      userIds: [asker],
+      kind: "agent_reply",
+      groupKey: agentReplyGroup(message.channelId, message.threadId),
+      actor,
+      source: { ...where, ...(label ? { label } : {}) },
+      latest: { text },
+    });
+    done.add(asker);
+  }
+
   // A DM from a person: the other person hears it (an agent's replies in a DM are the conversation itself,
-  // except a message the agent started there on someone's behalf, `send_dm`).
+  // answered above for the person behind them, except a message the agent started there on someone's behalf,
+  // `send_dm`).
   if (channel.kind === "dm") {
     if (message.authorType !== "person" && !meta.agentDm) return;
     const others = await db

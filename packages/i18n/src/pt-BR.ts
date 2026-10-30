@@ -696,6 +696,7 @@ export const ptBR = {
   desktopNotice: {
     mention: "Mencionaram você",
     dm: "Mensagem direta nova",
+    agent_reply: "Um agente respondeu",
     agent_question: "Uma pergunta para você",
     approval: "Uma aprovação espera por você",
     forum_turn: "Sua vez de opinar",
@@ -737,6 +738,48 @@ export const ptBR = {
       terms: "Este servidor não tem página de termos",
       privacy: "Este servidor não tem página de privacidade",
     },
+  },
+  noticePrefs: {
+    whereTitle: "Onde chegam",
+    whatTitle: "O que avisa",
+    browser: "Este navegador",
+    phone: "Celular",
+    phoneOn: "No app do celular, com o aparelho bloqueado também",
+    phoneOff: "Ative no app do celular, em Você › Notificações",
+    mac: "App do Mac",
+    macHelp: "Enquanto o app estiver aberto, mesmo em segundo plano",
+    on: "Ligado",
+    off: "Desligado",
+    failed: "Não deu para salvar. Tente de novo.",
+    loadFailed: "Não deu para carregar suas escolhas agora.",
+    category: {
+      waiting: {
+        title: "Esperando você",
+        help: "Aprovações, perguntas dos agentes, sua vez no fórum, pedidos de ajuda no navegador",
+      },
+      replies: { title: "Respostas dos agentes", help: "Quando um agente responde o que você pediu" },
+      mentions: { title: "Menções e mensagens diretas", help: "Quando chamam você ou mandam mensagem" },
+      threads: { title: "Threads que você segue", help: "Respostas nas threads em que você escreveu ou que segue" },
+      tasks: { title: "Tarefas", help: "Tarefa para você, comentários e quando muda de etapa" },
+      routines: { title: "Rotinas e missões", help: "Quando param, falham ou esperam o computador" },
+      computers: { title: "Computadores", help: "Um computador novo entrou ou o do workspace ficou pronto" },
+      reactions: { title: "Reações", help: "Quando reagem a uma mensagem sua" },
+    },
+  },
+  webPushAsk: {
+    title: "Saiba quando um agente precisar de você",
+    text: "Eles trabalham enquanto você faz outra coisa. Mesmo com a aba fechada, avisamos quando pedem seu ok, terminam o que você pediu ou chamam você.",
+    on: "Ativar avisos",
+    later: "Agora não",
+    done: "Avisos ativados neste navegador",
+    failed: "Não deu para ativar os avisos. Tente de novo no menu da sua conta.",
+    someone: "Um agente",
+    examples: "Exemplos de avisos",
+    now: "agora",
+    minutes: "{{n}} min",
+    approval: { title: "{{name}} pede seu ok", body: "Posso seguir com o que você pediu?" },
+    finished: { title: "{{name}} terminou", body: "Está pronto o que você pediu." },
+    mention: { title: "{{name}} chamou você", body: "Dá uma olhada quando puder?" },
   },
   shell: {
     // The Mac app's own title bar (ADR 0036).
@@ -817,6 +860,8 @@ export const ptBR = {
     browserNoticesBlocked:
       "O navegador bloqueou os avisos. Para permitir, clique no ícone ao lado do endereço do site e ligue as notificações.",
     browserNoticesFailed: "Não deu para ligar os avisos agora. Tente de novo.",
+    browserNoticesUnanswered:
+      "O navegador guardou o pedido sem mostrar. Clique no sininho ao lado do endereço do site e escolha Permitir.",
     languageCurrent: "Idioma: {{name}}",
     orgSettings: "Configurações do workspace",
     switchOrg: "Trocar de workspace",
@@ -1585,6 +1630,8 @@ export const ptBR = {
       replied_other: "<b>{{names}}</b> responderam em <b>{{label}}</b>",
       repliedThread_one: "<b>{{names}}</b> respondeu numa thread",
       repliedThread_other: "<b>{{names}}</b> responderam numa thread",
+      answered: "<b>{{name}}</b> respondeu",
+      answeredIn: "<b>{{name}}</b> respondeu em <b>{{label}}</b>",
       dm: "<b>{{name}}</b> mandou uma mensagem",
       question: "<b>{{name}}</b> fez uma pergunta",
       issueAssigned: "<b>{{name}}</b> atribuiu uma tarefa a você",
@@ -7566,11 +7613,13 @@ export const ptBR = {
   settings: {
     nav: "Seções das configurações",
     group: {
+      you: "Você",
       org: "Workspace",
       agents: "Agentes",
       costs: "Custos e dados",
     },
     section: {
+      notifications: "Notificações",
       general: "Geral",
       members: "Membros e convites",
       access: "Agentes e acesso",
@@ -7585,6 +7634,7 @@ export const ptBR = {
       billing: "Plano e cobrança",
     },
     sectionText: {
+      notifications: "A caixa de notificações guarda tudo. Aqui você escolhe o que chega como aviso, neste workspace.",
       general: "Nome, fuso e o que todo agente sabe do workspace.",
       members: "Quem está no workspace e os convites.",
       access: "O que cada agente pode usar: um nível por conector.",

@@ -675,11 +675,18 @@ function ChannelView({
   const status = useConnectionStatus();
 
   const api = useApi();
-  // Reading the channel marks it read: the sidebar's badges (channel and DM) clear at once.
+  // Reading the channel marks it read: the sidebar's badges (channel and DM) clear at once. Only while the tab is
+  // in view: an answer arriving in a tab left in the background is unread, and its notification pushes (ADR 0071).
   const markChannelRead = useMarkChannelRead(org.id).mutate;
   const lastId = channelMessages.data?.at(-1)?.id;
   useEffect(() => {
-    if (isMember && lastId && !lastId.startsWith("local-")) markChannelRead(channel.id);
+    if (!isMember || !lastId || lastId.startsWith("local-")) return;
+    const mark = () => {
+      if (document.visibilityState === "visible") markChannelRead(channel.id);
+    };
+    mark();
+    document.addEventListener("visibilitychange", mark);
+    return () => document.removeEventListener("visibilitychange", mark);
   }, [markChannelRead, channel.id, isMember, lastId]);
 
   // The skeleton was on screen: the real messages fade in (once).

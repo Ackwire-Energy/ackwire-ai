@@ -135,6 +135,7 @@ export const keys = {
   notifications: (orgId: string) => ["org", orgId, "notifications"] as const,
   notificationList: (orgId: string, filter: string) => ["org", orgId, "notifications", "list", filter] as const,
   notificationCount: (orgId: string) => ["org", orgId, "notifications", "count"] as const,
+  noticePrefs: (orgId: string) => ["org", orgId, "notice-prefs"] as const,
   forum: (orgId: string) => ["org", orgId, "forum"] as const,
   forumTopic: (orgId: string, topicId: string) => ["org", orgId, "forum", topicId] as const,
   wiki: (orgId: string) => ["org", orgId, "wiki"] as const,

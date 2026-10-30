@@ -3961,6 +3961,7 @@ export type NotificationKind =
   | "mention"
   | "thread_reply"
   | "dm"
+  | "agent_reply"
   | "agent_question"
   | "issue_assigned"
   | "issue_comment"
@@ -4139,6 +4140,27 @@ export interface NotificationPage {
 }
 
 /** The sidebar badge (`GET …/notifications/count`, `notification.counts`). */
+/**
+ * What reaches my devices as a notification, by category (ADR 0071 §8): the phone's and the browser's pushes and
+ * the desktop app's banners. The inbox keeps everything either way.
+ */
+export type NoticeCategory =
+  | "waiting"
+  | "replies"
+  | "mentions"
+  | "threads"
+  | "tasks"
+  | "routines"
+  | "computers"
+  | "reactions";
+
+export interface NoticePrefs {
+  /** Every category, in the order the settings show them. */
+  categories: { id: NoticeCategory; on: boolean }[];
+  /** My phones that get pushes (the phone app). */
+  phones: number;
+}
+
 export interface NotificationCount {
   unread: number;
   waiting: number;
@@ -4146,7 +4168,12 @@ export interface NotificationCount {
 
 /** Per person (user scope): created or merged, auto-resolved, and the new counts. */
 export type NotificationEvent =
-  | { type: "notification.upserted"; notification: AppNotification }
+  | {
+      type: "notification.upserted";
+      notification: AppNotification;
+      /** Whether it reaches my devices as a notification, by my choices (ADR 0071 §8); absent from older servers. */
+      alert?: boolean;
+    }
   | { type: "notification.removed"; id: string }
   | ({ type: "notification.counts" } & NotificationCount);
 
