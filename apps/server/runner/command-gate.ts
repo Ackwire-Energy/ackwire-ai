@@ -165,12 +165,15 @@ export async function commandApproval(
 }
 
 /** git options that run another program or read another config: such a push is never let through by the computer alone. */
-const RUNS_PROGRAM = /^(-c|--config-env|--receive-pack|--exec)(=|$)/;
+const RUNS_PROGRAM = /^(-c|--config-env|--receive-pack|--exec|--exec-path)(=|$)/;
 
-/** A command that is one push and nothing else (no option that runs a program), as written; null otherwise. */
+/**
+ * A command that is one push and nothing else, as written: `git` itself first (no wrapper, whose variables can
+ * name a program, and no shell, which runs more than the push), no option that runs a program; null otherwise.
+ */
 export function lonePush(command: string): GitPush | null {
   const cmds = simpleCommands(command);
-  if (cmds?.length !== 1 || cmds[0]?.argv.some((w) => RUNS_PROGRAM.test(w))) return null;
+  if (cmds?.length !== 1 || cmds[0]?.argv[0] !== "git" || cmds[0].argv.some((w) => RUNS_PROGRAM.test(w))) return null;
   const pushes = gitPushes(command);
   return pushes?.length === 1 ? (pushes[0] ?? null) : null;
 }

@@ -92,12 +92,50 @@ test.skipIf(!hasGit)(
   },
 );
 
+test.skipIf(!hasGit)(
+  "spellings git reads its own way reach the default branch too: they wait, and what can't be read waits",
+  async () => {
+    const { work } = gitRepo(dirs);
+    for (const command of [
+      "git push origin heads/develop",
+      "git push origin HEAD:heads/develop",
+      "sh -c 'git push origin develop'",
+    ]) {
+      expect([command, await gate(command, work)]).toEqual([
+        command,
+        expect.stringContaining("default branch develop"),
+      ]);
+    }
+    expect(await gate("git push origin :", work)).toContain("This push updates every branch, the default one too");
+    for (const command of [
+      "git push --del origin cursor/pap-582-fix",
+      "git push --dry-run --no-dry-run --mir origin",
+      "git --some-new-option push origin develop",
+      "git -c alias.p=push p origin develop",
+      "echo develop | xargs git push origin",
+      // git reads the branch checked out before the command changes it.
+      "git checkout -q develop && git push",
+    ]) {
+      expect([command, await gate(command, work)]).toEqual([
+        command,
+        expect.stringContaining("This runs git push in a way the computer can't read"),
+      ]);
+    }
+    // The pull request's own branch through a shell is still ordinary work.
+    expect(await gate("bash -c 'git push origin HEAD'", work)).toBeNull();
+  },
+);
+
 test("a push alone, and whether every ref it names is the agent's own", () => {
   const alone = (command: string) => lonePush(command);
   expect(alone("git push origin agentes/dev/fix")).not.toBeNull();
   expect(alone("npm test && git push origin agentes/dev/fix")).toBeNull();
   // An option that runs a program is never let through by the computer alone.
   expect(alone("git -c core.sshCommand=x push origin agentes/dev/fix")).toBeNull();
+  expect(alone("git --exec-path=/tmp/x push origin agentes/dev/fix")).toBeNull();
+  // Only git itself: no wrapper (an env variable can name a program), no shell around it.
+  expect(alone("env GIT_SSH_COMMAND=x git push origin agentes/dev/fix")).toBeNull();
+  expect(alone("sh -c 'git push origin agentes/dev/fix; rm -rf ~'")).toBeNull();
   const mine = (command: string) => {
     const push = lonePush(command);
     return push !== null && pushesOwnBranches(push, own);

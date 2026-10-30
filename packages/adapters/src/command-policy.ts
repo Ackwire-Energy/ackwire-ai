@@ -175,6 +175,8 @@ interface Simple {
   writes: string[];
   /** Files read by `<`. */
   reads: string[];
+  /** Its input is the output of the command before it (`… | sh`). */
+  piped?: true;
 }
 
 /** The simple commands of a line (pipelines and lists split), or null when it can't be followed. */
@@ -188,7 +190,7 @@ export function simpleCommands(line: string): Simple[] | null {
     if (w.op === "pipe" || w.op === "list") {
       if (cur.argv.length === 0) return null;
       out.push(cur);
-      cur = { argv: [], writes: [], reads: [] };
+      cur = { argv: [], writes: [], reads: [], ...(w.op === "pipe" ? { piped: true as const } : {}) };
       continue;
     }
     if (w.op === "redirect" || w.op === "input") {
@@ -880,14 +882,16 @@ const TOKEN_RULES: readonly string[] = [
 export const MISSION_DENY_RULES: readonly string[] = [...SENSITIVE_KINDS.flatMap((k) => k.rules), ...TOKEN_RULES];
 
 /**
- * Every push, for Claude Code's `ask` rules, which outrank allow rules (the owner's own too): a push always
- * reaches our prompt tool, where the computer reads where it goes.
+ * Every push, for Claude Code's `ask` rules, which outrank allow rules (the owner's own and a project's too): a
+ * push reaches our prompt tool, where the computer reads where it goes, also with global options, a path to git,
+ * a wrapper or a shell around it (`git --no-pager push`, `/usr/bin/git push`, `env git push`, `sh -c 'git push'`).
+ * A command that only mentions one (`grep 'git push'`) asks too, and the prompt tool allows it if it only reads.
  */
 export const PUSH_ASK_RULES: readonly string[] = [
   "Bash(git push)",
   "Bash(git push *)",
-  "Bash(git -C * push*)",
-  "Bash(git -c * push*)",
+  "Bash(*git push*)",
+  "Bash(*git -* push*)",
 ];
 
 /**
@@ -957,9 +961,12 @@ const GIT_GLOBAL_VALUE = new Set([
   "--namespace",
   "--exec-path",
   "--config-env",
+  "--attr-source",
 ]);
+/** The same options glued to their value (`--git-dir=<path>`). */
+const GIT_GLOBAL_GLUED = /^--(git-dir|work-tree|namespace|exec-path|config-env|attr-source)=/;
 const GIT_GLOBAL_FLAG =
-  /^(--no-pager|-p|--paginate|-P|--bare|--no-replace-objects|--literal-pathspecs|--glob-pathspecs|--noglob-pathspecs|--icase-pathspecs|--no-optional-locks|--no-advice)$/;
+  /^(--no-pager|-p|--paginate|-P|--bare|--no-replace-objects|--literal-pathspecs|--glob-pathspecs|--noglob-pathspecs|--icase-pathspecs|--no-optional-locks|--no-advice|--no-lazy-fetch)$/;
 /** gh options that pick another repository or host, anywhere in the command. */
 const GH_VALUE = new Set(["-R", "--repo", "--hostname"]);
 /** Wrappers that run the next word as the command (`nice -n 5 git push …`, `env -u X git push …`). */
@@ -998,7 +1005,7 @@ export function normalizedCommand(words: string[]): string {
     for (; i < rest.length; i++) {
       const a = rest[i] as string;
       if (GIT_GLOBAL_VALUE.has(a)) i++;
-      else if (/^--(git-dir|work-tree|namespace|exec-path|config-env)=/.test(a) || GIT_GLOBAL_FLAG.test(a)) continue;
+      else if (GIT_GLOBAL_GLUED.test(a) || GIT_GLOBAL_FLAG.test(a)) continue;
       else break;
     }
     out.push(...rest.slice(i).map((a) => a.replace(/^(\+?)refs\/heads\//, "$1").replace(/:refs\/heads\//, ":")));
@@ -1082,15 +1089,92 @@ function cdTo(dir: string | null, to: string | undefined) {
 function pushDestination(dst: string): string | null | "skip" {
   if (dst === "HEAD" || dst === "@") return "HEAD";
   if (dst === "") return null;
-  if (dst.startsWith("refs/heads/")) return dst.slice("refs/heads/".length) || null;
+  // `heads/<branch>` is git's short form of `refs/heads/<branch>`.
+  const head = /^(refs\/)?heads\//.exec(dst)?.[0];
+  if (head) return dst.slice(head.length) || null;
   if (dst.startsWith("refs/")) return "skip";
   return dst;
 }
 
-/** `git … push …` from its `git` word: where it goes as written; null when it isn't a push or is a dry run. */
-function parsePush(argv: readonly string[], dir: string | null): GitPush | null {
+/** A push written in a way git may read differently from this: where it goes is unknown. */
+const UNREADABLE = "unreadable";
+/** A git command that changes the branch checked out: a later bare push or `HEAD` can't be read from git before it runs. */
+const MOVES_HEAD = "moves-head";
+
+const movesHead = (sub: string, rest: readonly string[]) =>
+  sub === "switch" ||
+  // `git checkout -- <file>` only restores files.
+  (sub === "checkout" && !rest.includes("--")) ||
+  (sub === "branch" && rest.some((a) => /^(-m|-M|--move)$/.test(a))) ||
+  (sub === "symbolic-ref" && rest.filter((a) => !a.startsWith("-")).length >= 2);
+
+type PushFlag = "force" | "lease" | "delete" | "dry" | "every" | "mirror" | "prune" | "tags";
+/**
+ * `git push`'s options (git 2.50) and what each sets here: `repo`, `value` (takes one, the next word unless
+ * glued with `=`), `none` (nothing that changes where it goes). Any other spelling, an abbreviation
+ * included, is one git may read as anything.
+ */
+const PUSH_LONG = new Map<string, PushFlag | "repo" | "value" | "none">([
+  ["force", "force"],
+  ["force-with-lease", "lease"],
+  ["delete", "delete"],
+  ["dry-run", "dry"],
+  // Prints its usage: pushes nothing.
+  ["help", "dry"],
+  ["all", "every"],
+  ["branches", "every"],
+  ["mirror", "mirror"],
+  ["prune", "prune"],
+  ["tags", "tags"],
+  ["repo", "repo"],
+  ["push-option", "value"],
+  ["receive-pack", "value"],
+  ["exec", "value"],
+  ["recurse-submodules", "value"],
+  ...[
+    "force-if-includes",
+    "set-upstream",
+    "follow-tags",
+    "atomic",
+    "porcelain",
+    "progress",
+    "thin",
+    "verbose",
+    "quiet",
+    "verify",
+    "no-verify",
+    "signed",
+    "ipv4",
+    "ipv6",
+  ].map((o): [string, "none"] => [o, "none"]),
+]);
+const PUSH_SHORT = new Map<string, PushFlag | "value" | "none">([
+  ["f", "force"],
+  ["d", "delete"],
+  ["n", "dry"],
+  ["h", "dry"],
+  ["o", "value"],
+  ...["u", "v", "q", "4", "6"].map((o): [string, "none"] => [o, "none"]),
+]);
+
+/** Inline config that changes where a push goes (`push.default`, `remote.<name>.push`, `url.<base>.pushInsteadOf`). */
+const PUSH_CONFIG = /^(push|remote|branch|url)\./;
+/** git subcommands that run other commands (`git submodule foreach 'git push …'`, `rebase --exec`, `bisect run`). */
+const GIT_RUNS_COMMANDS = new Set(["submodule", "rebase", "bisect"]);
+
+/**
+ * `git … push …` from its `git` word: where it goes as written; null when it isn't a push or is a dry run;
+ * `UNREADABLE` when git may read it otherwise (an option this doesn't know, inline config or an alias);
+ * `MOVES_HEAD` for a command that changes the branch checked out.
+ */
+function parsePush(
+  argv: readonly string[],
+  dir: string | null,
+): GitPush | null | typeof UNREADABLE | typeof MOVES_HEAD {
   let i = 1;
   let where = dir;
+  let redirected = false;
+  const aliases: string[] = [];
   for (; i < argv.length; i++) {
     const a = argv[i] as string;
     if (a === "-C") where = cdTo(where, argv[++i]);
@@ -1098,53 +1182,83 @@ function parsePush(argv: readonly string[], dir: string | null): GitPush | null 
       i++;
       where = null;
     } else if (/^--(git-dir|work-tree)=/.test(a)) where = null;
-    else if (GIT_GLOBAL_VALUE.has(a)) i++;
-    else if (/^--(namespace|exec-path|config-env)=/.test(a) || GIT_GLOBAL_FLAG.test(a)) continue;
+    else if (a === "-c" || a === "--config-env" || a.startsWith("--config-env=")) {
+      const setting = a.startsWith("--config-env=") ? a.slice("--config-env=".length) : (argv[++i] ?? "");
+      const key = (setting.split("=")[0] ?? "").toLowerCase();
+      // An include can set anything, an alias too.
+      if (/^include(if)?\./.test(key)) return UNREADABLE;
+      if (key.startsWith("alias.")) aliases.push(key.slice("alias.".length));
+      else if (PUSH_CONFIG.test(key)) redirected = true;
+    } else if (GIT_GLOBAL_VALUE.has(a)) i++;
+    else if (GIT_GLOBAL_GLUED.test(a) || GIT_GLOBAL_FLAG.test(a)) continue;
+    // A global option this doesn't know may take the next word: what follows can't be read.
+    else if (a.startsWith("-")) return argv.includes("push") ? UNREADABLE : null;
     else break;
   }
-  if (argv[i] !== "push") return null;
-  const push: GitPush = { dir: where, remote: null, refs: [], every: false, mirror: false, prune: false };
-  let force = false;
-  let removes = false;
-  let tagsOnly = false;
+  const sub = argv[i];
+  if (sub === undefined) return null;
+  if (aliases.includes(sub.toLowerCase())) return UNREADABLE;
+  if (GIT_RUNS_COMMANDS.has(sub)) return PUSH_MENTION.test(argv.slice(i + 1).join(" ")) ? UNREADABLE : null;
+  if (movesHead(sub, argv.slice(i + 1))) return MOVES_HEAD;
+  if (sub !== "push") return null;
+  if (redirected) return UNREADABLE;
+  const set: Record<PushFlag, boolean> = {
+    force: false,
+    lease: false,
+    delete: false,
+    dry: false,
+    every: false,
+    mirror: false,
+    prune: false,
+    tags: false,
+  };
+  let repo: string | null = null;
   const words: string[] = [];
+  // Every option is read, the last one winning as in git (`--dry-run --no-dry-run` pushes).
   for (let j = i + 1; j < argv.length; j++) {
     const a = argv[j] as string;
-    if (a === "--") {
+    if (a === "--" || a === "--end-of-options") {
       words.push(...argv.slice(j + 1));
       break;
     }
     if (a.startsWith("--")) {
       const eq = a.indexOf("=");
       const name = eq < 0 ? a.slice(2) : a.slice(2, eq);
-      if (name === "force" || name === "force-with-lease") force = true;
-      else if (name === "delete") removes = true;
-      else if (name === "all" || name === "branches") push.every = true;
-      else if (name === "mirror") push.every = push.mirror = true;
-      else if (name === "prune") push.prune = true;
-      else if (name === "tags") tagsOnly = true;
-      else if (name === "dry-run") return null;
-      else if (name === "repo") push.remote = eq < 0 ? (argv[++j] ?? null) : a.slice(eq + 1);
-      else if (eq < 0 && (name === "push-option" || name === "receive-pack" || name === "exec")) j++;
+      // `--no-<option>` undoes it (`--no-verify` is an option of its own).
+      const negated = !PUSH_LONG.has(name) && name.startsWith("no-");
+      const what = PUSH_LONG.get(negated ? name.slice(3) : name);
+      if (what === undefined) return UNREADABLE;
+      if (what === "repo" || what === "value") {
+        const value = negated ? null : eq < 0 ? (argv[++j] ?? null) : a.slice(eq + 1);
+        if (what === "repo") repo = value;
+      } else if (what !== "none") set[what] = !negated;
       continue;
     }
     if (a.startsWith("-") && a.length > 1) {
       for (let k = 1; k < a.length; k++) {
-        const c = a[k];
-        if (c === "f") force = true;
-        else if (c === "d") removes = true;
-        else if (c === "n") return null;
-        else if (c === "o") {
+        const what = PUSH_SHORT.get(a[k] as string);
+        if (what === undefined) return UNREADABLE;
+        if (what === "value") {
           if (k === a.length - 1) j++;
           break;
         }
+        if (what !== "none") set[what] = true;
       }
       continue;
     }
     words.push(a);
   }
-  const [remote, ...specs] = words;
-  if (remote !== undefined) push.remote = remote;
+  if (set.dry) return null;
+  const [remote = repo, ...specs] = words;
+  const force = set.force || set.lease || set.mirror;
+  const push: GitPush = {
+    dir: where,
+    remote,
+    refs: [],
+    every: set.every || set.mirror,
+    mirror: set.mirror,
+    prune: set.prune,
+  };
   for (let k = 0; k < specs.length; k++) {
     const spec = specs[k] as string;
     if (spec === "tag") {
@@ -1155,46 +1269,95 @@ function parsePush(argv: readonly string[], dir: string | null): GitPush | null 
     const bare = plus ? spec.slice(1) : spec;
     const colon = bare.indexOf(":");
     const dst = colon < 0 ? bare : bare.slice(colon + 1);
-    if (dst.includes("*")) {
+    // A wildcard, or `:` alone: every branch (both sides have), the default one too.
+    if (dst.includes("*") || bare === ":") {
       push.every = true;
       continue;
     }
     const branch = pushDestination(dst);
     if (branch === "skip") continue;
-    push.refs.push({ branch, force: force || plus, delete: removes || (colon === 0 && dst !== "") });
+    push.refs.push({ branch, force: force || plus, delete: set.delete || (colon === 0 && dst !== "") });
   }
   // No refspec: the branch's own push target (`--tags` alone pushes tags only).
-  if (specs.length === 0 && !push.every && !tagsOnly) push.refs.push({ branch: null, force, delete: removes });
+  if (specs.length === 0 && !push.every && !set.tags) push.refs.push({ branch: null, force, delete: set.delete });
   return push;
 }
 
+/** Shells whose `-c` script is read like lines of its own (`bash -lc 'cd app && git push origin fix'`). */
+const SHELL_NAMES = /^(sh|bash|zsh|dash|ksh)$/;
+/** Shell keywords and programs that run the rest of their words as a command, as written: a `git` word among them starts it. */
+const PASS_THROUGH = new Set([
+  "if",
+  "then",
+  "else",
+  "elif",
+  "do",
+  "while",
+  "until",
+  "!",
+  "exec",
+  "timeout",
+  "sudo",
+  "doas",
+]);
+/** Programs that only read or print: words naming git push there run nothing. */
+const printsOnly = (cmd: string) => READ_ANY.has(cmd) || READ_WITH_FLAGS.has(cmd) || cmd === "gh";
+/** A command that runs text its words don't show: piped into an interpreter (`… | sh`), or built by `xargs`. */
+const runsText = (cmd: string, words: readonly string[], piped: boolean) =>
+  cmd === "xargs" ||
+  (piped &&
+    /^(sh|bash|zsh|dash|ksh|fish|python[\d.]*|node|bun|deno|ruby|perl|php)$/.test(cmd) &&
+    words.slice(1).every((w) => w.startsWith("-")));
+
 /**
- * The pushes a command or a shell script makes, line by line (`cd` and `git -C` followed, wrappers and
- * keywords in front skipped: any `git` word starts one); null when a line that pushes can't be read plainly
- * (`$(…)`, variables, heredocs): where it goes is unknown.
+ * The pushes a command or a shell script makes, line by line (`cd` and `git -C` followed, wrappers skipped, a
+ * shell's `-c` script read too); null when a push can't be read plainly (`$(…)`, variables, heredocs, an
+ * option git may read otherwise, another program that runs it: `xargs`, `eval`, `sudo sh -c`, `… | sh`; a
+ * bare push or `HEAD` after a checkout in the same command): where it goes is unknown.
  */
 export function gitPushes(script: string): GitPush[] | null {
-  const out: GitPush[] = [];
-  let dir: string | null = "";
+  const read = { pushes: [] as GitPush[], moved: false };
+  return readPushes(script, "", read) ? read.pushes : null;
+}
+
+/** `gitPushes` for a script that starts in `from`, into `read` (a shell's `-c` script shares it); false: unreadable. */
+function readPushes(script: string, from: string | null, read: { pushes: GitPush[]; moved: boolean }): boolean {
+  let dir = from;
   for (const line of script.split("\n")) {
     if (/^\s*#/.test(line)) continue;
     const cmds = simpleCommands(line);
     if (!cmds) {
-      if (PUSH_MENTION.test(line)) return null;
+      if (PUSH_MENTION.test(line)) return false;
       continue;
     }
-    for (const { argv } of cmds) {
+    for (const { argv, piped } of cmds) {
       const words = unwrapped(argv);
-      if (baseName(words[0] ?? "") === "cd") {
+      const cmd = baseName(words[0] ?? "");
+      if (cmd === "cd") {
         dir = cdTo(dir, words[1]);
         continue;
       }
-      const at = argv.findIndex((w) => baseName(w) === "git");
-      const push = at < 0 ? null : parsePush(argv.slice(at), dir);
-      if (push && (push.refs.length > 0 || push.every || push.prune)) out.push(push);
+      if (SHELL_NAMES.test(cmd) && /^-[a-z]*c[a-z]*$/.test(words[1] ?? "") && words[2] !== undefined) {
+        if (!readPushes(words[2], dir, read)) return false;
+        continue;
+      }
+      const at = cmd === "git" ? 0 : PASS_THROUGH.has(cmd) ? words.findIndex((w) => baseName(w) === "git") : -1;
+      if (at >= 0) {
+        const push = parsePush(words.slice(at), dir);
+        if (push === UNREADABLE) return false;
+        if (push === MOVES_HEAD) read.moved = true;
+        else if (push && (push.refs.length > 0 || push.every || push.prune)) {
+          if (read.moved && push.refs.some((r) => r.branch === null || r.branch === "HEAD")) return false;
+          read.pushes.push(push);
+        }
+        continue;
+      }
+      if (!PUSH_MENTION.test(line)) continue;
+      if (runsText(cmd, words, piped === true) || (!printsOnly(cmd) && PUSH_MENTION.test(words.join(" "))))
+        return false;
     }
   }
-  return out;
+  return true;
 }
 
 /** What git says about the repository a push runs in; each read only when a decision needs it. */

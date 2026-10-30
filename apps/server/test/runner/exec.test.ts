@@ -119,6 +119,7 @@ test.skipIf(!posix || !hasGit)(
     mkdirSync(path.join(work, ".agentes"));
     writeFileSync(path.join(work, ".agentes", "run-1.sh"), "git push origin develop\n");
     writeFileSync(path.join(work, ".agentes", "run-2.sh"), "git push origin HEAD\n");
+    writeFileSync(path.join(work, ".agentes", "run-3.sh"), `sh -c "git push origin develop"\n`);
     const ctx = { workspaceReal: work, exec: true, token: "agm_x" };
     const scope = { signal: new AbortController().signal, output: () => {} };
     const exec = (command: string, approved?: boolean) =>
@@ -138,6 +139,10 @@ test.skipIf(!posix || !hasGit)(
     expect((await exec("bash .agentes/run-2.sh")).exitCode).toBe(0);
     expect(git("rev-parse", "origin/cursor/pap-582-fix")).toBe(git("rev-parse", "HEAD"));
     expect(await errorCode(() => exec("git push --force origin cursor/pap-582-fix"))).toBe("approval_needed");
+    // A push behind a nested shell, on the command line or in the script, waits the same.
+    expect(await errorCode(() => exec("sh -c 'git push origin develop'"))).toBe("approval_needed");
+    expect(await errorCode(() => exec("bash .agentes/run-3.sh"))).toBe("approval_needed");
+    expect(await errorCode(() => exec("git push origin HEAD:heads/develop"))).toBe("approval_needed");
   },
   30_000,
 );

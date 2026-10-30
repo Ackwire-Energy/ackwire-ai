@@ -44,7 +44,7 @@ describe("shell parsing", () => {
     expect(shellWords("ls 'a b' \"c d\" e\\ f")?.map((w) => w.text)).toEqual(["ls", "a b", "c d", "e f"]);
     expect(simpleCommands("git status 2>&1 | head -3")).toEqual([
       { argv: ["git", "status"], writes: [], reads: [] },
-      { argv: ["head", "-3"], writes: [], reads: [] },
+      { argv: ["head", "-3"], writes: [], reads: [], piped: true },
     ]);
     expect(simpleCommands("ls > out.txt 2>/dev/null")?.[0]?.writes).toEqual(["out.txt"]);
     for (const line of [
@@ -290,6 +290,8 @@ describe("the deny list reads normalized arguments", () => {
       "gh --hostname ghe.acme.dev pr merge 1",
       "git --no-pager merge feature",
       "git -c x=y -C /w merge feature",
+      "git --no-lazy-fetch --attr-source HEAD merge feature",
+      "git --attr-source=HEAD merge feature",
       "nice -n 5 gh pr merge 1",
       "npm test && /usr/bin/gh pr merge 1",
       // Printing the person's GitHub token.
@@ -621,10 +623,22 @@ describe("the deny list names the kind it refuses", () => {
       "git -C /w push origin main",
       "git -c x=y push origin main",
       "npm test && git push",
+      // Global options, a path to git, wrappers and shells too: an allow rule (a project's own) can't skip the prompt.
+      "git --no-pager push origin main",
+      "git -P push origin main",
+      "git --git-dir=.git push origin main",
+      "/usr/bin/git push origin main",
+      "env git push origin main",
+      "command git push origin main",
+      "nice -n 5 git push origin main",
+      "timeout 60 /usr/bin/git -C /w push origin main",
+      "sh -c 'git push origin main'",
+      "echo main | xargs git push origin",
     ]) {
       expect([command, asks(command)]).toEqual([command, true]);
     }
     expect(asks("git commit -m 'push fix'")).toBe(false);
+    expect(asks("git status")).toBe(false);
     expect(MISSION_DENY_RULES.some((r) => r.includes("push") && r.startsWith("Bash(git"))).toBe(false);
   });
 });
@@ -754,6 +768,93 @@ describe("whether a push waits for a person", () => {
     expect(await held("git push --prune origin fix")).toBe(
       "This push deletes the remote branches that aren't here (--prune)",
     );
+  });
+
+  /** Why a command waits, without how to ask (null: it runs). */
+  const reason = async (command: string, f = facts()) =>
+    (await approvalNeeded(command, ASK_AGAIN, { own, facts: () => f }))?.split(": a person approves it first.")[0] ??
+    null;
+  const unread = "This runs git push in a way the computer can't read, so where it goes is unknown";
+  const develop = "This push goes to the default branch develop";
+
+  test("short ref names, the matching refspec and every option read the way git reads them; what it can't read waits", async () => {
+    // `heads/<branch>` is git's short `refs/heads/<branch>`, alone or after a colon.
+    expect(await reason("git push origin heads/develop")).toBe(develop);
+    expect(await reason("git push origin HEAD:heads/develop")).toBe(develop);
+    expect(await reason("git push origin HEAD:heads/cursor/pap-582-fix")).toBeNull();
+    // `:` and `+:` push every branch both sides have, the default one too.
+    expect(await reason("git push origin :")).toBe("This push updates every branch, the default one too");
+    expect(await reason("git push origin +:")).toBe("This push updates every branch, the default one too");
+    // Options are read to the end and the last one wins, as in git: a dry run undone is a push.
+    expect(await reason("git push --dry-run --no-dry-run origin develop")).toBe(develop);
+    expect(await reason("git push -n --no-dry-run origin develop")).toBe(develop);
+    expect(await reason("git push --no-dry-run --dry-run origin develop")).toBeNull();
+    expect(await reason("git push --tags --no-tags", facts({ target: { remote: null, branch: "develop" } }))).toBe(
+      develop,
+    );
+    expect(await reason("git --no-lazy-fetch --attr-source=HEAD push origin develop")).toBe(develop);
+    // An abbreviated or unknown option, inline config that can change where a push goes, an inline alias.
+    for (const command of [
+      "git push --del origin fix",
+      "git push --mir origin",
+      "git push --al origin",
+      "git push -X origin fix",
+      "git --some-new-option push origin fix",
+      "git -c push.default=matching push",
+      "git -c remote.origin.push=refs/heads/fix:refs/heads/develop push origin fix",
+      "git --config-env=remote.origin.mirror=MIRROR push",
+      "git -c alias.p=push p origin develop",
+    ]) {
+      expect([command, await reason(command)]).toEqual([command, unread]);
+    }
+    expect(await reason("git -c core.quotePath=false push origin fix")).toBeNull();
+    expect(await reason("git --some-new-option status")).toBeNull();
+  });
+
+  test("a push another program runs: a shell's own script is read, anything else that runs one waits", async () => {
+    expect(await reason("sh -c 'git push origin develop'")).toBe(develop);
+    expect(await reason("bash -lc 'cd app && git push origin fix'")).toBeNull();
+    for (const command of [
+      "bash -o pipefail -c 'git push origin develop'",
+      "sudo sh -c 'git push origin develop'",
+      "echo 'git push origin develop' | sh",
+      "echo develop | xargs git push origin",
+      "eval 'git push origin develop'",
+      "env -S 'git push origin develop'",
+      `python3 -c 'import os; os.system("git push origin develop")'`,
+      "git submodule foreach 'git push origin develop'",
+      "git rebase --exec 'git push origin develop' HEAD~2",
+    ]) {
+      expect([command, await reason(command)]).toEqual([command, unread]);
+    }
+    // Reading or printing the words pushes nothing.
+    for (const command of [
+      "grep -rn 'git push' .github",
+      "echo 'git push origin develop'",
+      "gh pr create --title fix --body 'Run git push origin develop after'",
+      "git commit -m 'Explain git push origin develop'",
+      "bash scripts/check.sh && git push origin fix",
+      "node --version && git push origin fix",
+      "timeout 60 git push origin fix",
+    ]) {
+      expect([command, await reason(command)]).toEqual([command, null]);
+    }
+  });
+
+  test("after a checkout in the same command, git can't tell from here where a bare push or HEAD goes: it waits", async () => {
+    for (const command of [
+      "git checkout develop && git push",
+      "git switch develop && git push origin HEAD",
+      "git checkout -b x origin/develop; git push -u origin HEAD",
+      "git branch -M develop && git push origin HEAD",
+      "sh -c 'git checkout develop' && git push",
+    ]) {
+      expect([command, await reason(command)]).toEqual([command, unread]);
+    }
+    // A branch named, a push before the checkout, files restored: read as before.
+    expect(await reason("git checkout develop && git push origin fix")).toBeNull();
+    expect(await reason("git push && git checkout develop")).toBeNull();
+    expect(await reason("git checkout -- README.md && git push")).toBeNull();
   });
 
   test("branches the repository marks protected wait like the default one", async () => {

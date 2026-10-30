@@ -513,6 +513,11 @@ test.skipIf(!posix || !hasGit)(
     expect(await start(31, "git push --force origin cursor/pap-582-fix").catch((err: Error) => err.message)).toContain(
       "This is a force push to cursor/pap-582-fix, a branch others may share",
     );
+    // Behind a nested shell, or a spelling git reads its own way, it waits the same.
+    expect(await start(34, "bash -c 'git push origin develop'").catch((err: Error) => err.message)).toStartWith(
+      "This push goes to the default branch develop",
+    );
+    expect(await errorCode(() => start(35, "git push origin :"))).toBe("approval_needed");
     // Nothing ran: no task was started for them.
     expect(tasks.list()).toEqual([]);
     // The pull request's own branch is ordinary work; a person's approval lets the held one through.
