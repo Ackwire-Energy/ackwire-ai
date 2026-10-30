@@ -587,15 +587,27 @@ describe("Members › Invite people", () => {
   });
 });
 
-describe("Members › Invite people, self-hosted", () => {
-  test("no email to send invitations with: the link is the only way in, without the hairline over it", async () => {
-    const state = seedState({ joinRequests: [], edition: "selfhost" });
+describe("Members › Invite people, by email when the server sends it", () => {
+  const inviteCard = async (state: ReturnType<typeof seedState>) => {
     await renderApp(`/org/${ORG_ID}/settings/members`, { api: createFakeApi(state) });
     await settle(6);
-    const invite = screen().getByRole("region", { name: "Convidar pessoas" });
+    return screen().getByRole("region", { name: "Convidar pessoas" });
+  };
+
+  test("no email to send invitations with: the link is the only way in, without the hairline over it", async () => {
+    const invite = await inviteCard(seedState({ joinRequests: [], authConfig: { passwordReset: false } }));
     expect(within(invite).queryByLabelText("E-mails, separados por vírgula")).toBeNull();
     expect(within(invite).queryByRole("button", { name: "Convidar" })).toBeNull();
     expect(invite.querySelector(".jr-link--alone")).toBeTruthy();
+  });
+
+  test("a self-hosted server that sends email invites by email too, the link under it", async () => {
+    const invite = await inviteCard(
+      seedState({ joinRequests: [], edition: "selfhost", authConfig: { passwordReset: true } }),
+    );
+    expect(within(invite).getByLabelText("E-mails, separados por vírgula")).toBeTruthy();
+    expect(within(invite).getByRole("button", { name: "Convidar" })).toBeTruthy();
+    expect(invite.querySelector(".jr-link:not(.jr-link--alone)")).toBeTruthy();
   });
 });
 
