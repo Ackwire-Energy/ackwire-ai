@@ -707,10 +707,13 @@ export function requestLocale(acceptLanguage: string | null | undefined): UserLo
   return appLocale(tags.map((l) => l.tag));
 }
 
-/** Whether the person opened the link that confirms their email, read here: a session's cached copy can lag. */
-export async function isEmailVerified(db: Database, userId: string) {
+/**
+ * Whether the person opened the link that confirms their email, read here: a session's cached copy can lag. Null when
+ * the account is gone, which a cached session cookie outlives for minutes.
+ */
+export async function isEmailVerified(db: Database, userId: string): Promise<boolean | null> {
   const [row] = await db.select({ verified: users.emailVerified }).from(users).where(eq(users.id, userId));
-  return row?.verified === true;
+  return row ? row.verified === true : null;
 }
 
 async function ownerCount(db: Pick<Database, "select">, orgId: string) {

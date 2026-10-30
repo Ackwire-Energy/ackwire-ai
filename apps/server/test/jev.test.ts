@@ -158,7 +158,9 @@ test("once the first account deletes itself, its key goes with it and nobody inh
   const { t, owner, other } = await server();
   const beta = await org(other, "Beta");
   expect((await owner("/api/app/jev", { method: "PUT", json: { apiKey: SECRET_KEY } })).status).toBe(200);
-  expect((await owner("/api/app/account", { method: "DELETE" })).status).toBe(204);
+  expect(
+    (await owner("/api/app/account", { method: "DELETE", json: { password: "correct horse battery" } })).status,
+  ).toBe(204);
   expect(await t.db.select().from(schema.instanceSecrets)).toEqual([]);
   const gone = await t.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "jev.key_removed"));
   expect(gone).toMatchObject([{ orgId: beta, actorType: "system", details: { hint: "9f2c" } }]);
@@ -171,7 +173,9 @@ test("once no account is left, the next first account has it", async () => {
   const first = browser(t);
   await signUp(first, "first@example.com");
   expect((await first("/api/app/jev")).status).toBe(200);
-  expect((await first("/api/app/account", { method: "DELETE" })).status).toBe(204);
+  expect(
+    (await first("/api/app/account", { method: "DELETE", json: { password: "correct horse battery" } })).status,
+  ).toBe(204);
   const next = browser(t);
   await signUp(next, "next@example.com");
   expect((await next("/api/app/jev")).status).toBe(200);

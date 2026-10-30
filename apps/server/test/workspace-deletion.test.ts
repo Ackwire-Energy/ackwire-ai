@@ -11,6 +11,7 @@ import {
   joinByInvitation,
   listen,
   ORIGIN,
+  pairComputer,
   seedOrg,
   signUp,
   type TestServer,
@@ -201,5 +202,125 @@ describe("deleting and restoring a workspace", () => {
       statuses.push((await owner(`/api/app/organizations/${orgId}`)).status);
     }
     expect(statuses).toEqual([202, 204, 200, 202, 204, 200, 202, 204, 200, 429, 409, 200]);
+  });
+});
+
+/** A workspace `b` makes and finishes setting up, so their next one is a new one. */
+async function workspace(b: Browser, name: string) {
+  const made = (await (await b("/api/app/organizations", { json: { name } })).json()) as {
+    organization: { id: string };
+  };
+  await b(`/api/app/organizations/${made.organization.id}/onboarding`, { method: "PATCH", json: { finished: true } });
+  return made.organization.id;
+}
+const deleteAccount = (b: Browser, json?: Record<string, unknown>) =>
+  b("/api/app/account", { method: "DELETE", ...(json ? { json } : {}) });
+
+describe("deleting an account", () => {
+  test("the preflight lists what stops it, what closes, what they leave, the computers that go and what stays behind", async () => {
+    const owner = browser(t);
+    await signUp(owner, "owner@example.com");
+    const { orgId } = await seedOrg(owner);
+    const bia = await joinByInvitation(t, owner, orgId, "bia@example.com", { role: "admin" });
+    const inAcme = (path: string, init?: Parameters<Browser>[1]) => bia(`/api/app/organizations/${orgId}${path}`, init);
+    const key = { provider: "anthropic", label: "Bia's key", apiKey: "sk-ant-api-fake-1234" };
+    expect((await inAcme("/credentials", { json: key })).status).toBe(201);
+    const runner = { os: "linux", arch: "x64", hostname: "box", version: "0.1.0" };
+    const laptop = await pairComputer(t, inAcme, runner, { name: "Bia's laptop" });
+    const solo = await workspace(bia, "Solo");
+    const team = await workspace(bia, "Team");
+    await joinByInvitation(t, bia, team, "owner@example.com", { as: owner });
+
+    const plan = await (await bia("/api/app/account/deletion")).json();
+    expect(plan).toEqual({
+      password: true,
+      freshUntil: expect.any(String),
+      closes: [{ id: solo, name: "Solo" }],
+      leaves: [
+        { id: orgId, name: "Acme", role: "admin" },
+        { id: team, name: "Team", role: "owner" },
+      ],
+      soleOwner: [{ id: team, name: "Team" }],
+      computers: [{ orgId, id: laptop.machineId, name: "Bia's laptop" }],
+      staysBehind: [{ orgId, kind: "key", name: "Bia's key" }],
+      serverOwner: false,
+    });
+    expect(((await (await owner("/api/app/account/deletion")).json()) as { serverOwner: boolean }).serverOwner).toBe(
+      true,
+    );
+    await signedInAnHourAgo((await meOf(bia)).user.id);
+    expect(((await (await bia("/api/app/account/deletion")).json()) as { freshUntil: unknown }).freshUntil).toBeNull();
+  });
+
+  test("the password proves it's you, as a fresh sign-in does; an old session without it signs in again; a workspace's only owner hears that first", async () => {
+    const revoked: unknown[] = [];
+    await t.close();
+    t = await createTestServer({
+      appleRevoke: async (token) => {
+        revoked.push(token);
+      },
+    });
+    const owner = browser(t);
+    await signUp(owner, "owner@example.com");
+    const { orgId } = await seedOrg(owner);
+    const bia = await joinByInvitation(t, owner, orgId, "bia@example.com");
+    const biaId = (await meOf(bia)).user.id;
+    await t.db.insert(schema.accounts).values({
+      id: "apple-bia",
+      accountId: "apple-sub-bia",
+      providerId: "apple",
+      userId: biaId,
+      refreshToken: "refresh-bia",
+    });
+    await signedInAnHourAgo((await meOf(owner)).user.id);
+    await signedInAnHourAgo(biaId);
+
+    const refused = await deleteAccount(owner);
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toMatchObject({
+      error: { code: "sole_owner", params: { organizations: ["Acme"], orgIds: [orgId] } },
+    });
+    expect(await answer(await deleteAccount(bia))).toEqual([403, "reauth.sign_in"]);
+    expect(await answer(await deleteAccount(bia, { password: "not my password" }))).toEqual([403, "reauth.password"]);
+    expect(revoked).toEqual([]);
+    const deleted = await deleteAccount(bia, { password: "correct horse battery" });
+    expect(deleted.status).toBe(204);
+    expect(deleted.headers.getSetCookie().some((c) => c.startsWith("better-auth.session_token=;"))).toBe(true);
+    expect(revoked).toEqual([{ value: "refresh-bia", hint: "refresh_token" }]);
+    expect(await t.db.select().from(schema.users).where(eq(schema.users.id, biaId))).toEqual([]);
+
+    // No body, signed in just now: how the phone's older builds delete.
+    const cy = await joinByInvitation(t, owner, orgId, "cy@example.com");
+    expect((await deleteAccount(cy)).status).toBe(204);
+  });
+
+  test("its other sessions: GET /me answers 401 and expires the cookies, and no workspace is made with them", async () => {
+    const owner = browser(t);
+    await signUp(owner, "owner@example.com");
+    const other = browser(t);
+    const signIn = { email: "owner@example.com", password: "correct horse battery" };
+    expect((await other("/api/auth/sign-in/email", { json: signIn })).status).toBe(200);
+    expect((await other("/api/app/me")).status).toBe(200);
+    const cached = other.cookie();
+
+    expect((await deleteAccount(owner, signIn)).status).toBe(204);
+    const me = await other("/api/app/me");
+    expect(me.status).toBe(401);
+    expect(me.headers.getSetCookie().some((c) => c.startsWith("better-auth.session_data=;"))).toBe(true);
+    const made = await t.app.request("/api/app/organizations", {
+      method: "POST",
+      headers: { cookie: cached, origin: ORIGIN, "content-type": "application/json" },
+      body: JSON.stringify({ name: "Late" }),
+    });
+    expect(await answer(made)).toEqual([401, "unauthorized"]);
+  });
+
+  test("a person makes at most 10 workspaces a day", async () => {
+    const owner = browser(t);
+    await signUp(owner, "owner@example.com");
+    const statuses: number[] = [];
+    for (let i = 0; i < 11; i++)
+      statuses.push((await owner("/api/app/organizations", { json: { name: `W${i}` } })).status);
+    expect(statuses).toEqual([201, ...Array(9).fill(200), 429]);
   });
 });

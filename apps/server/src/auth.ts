@@ -335,14 +335,20 @@ export async function sessionUser(auth: Auth, headers: Headers): Promise<Session
 }
 
 /**
- * Whether this request's session signed in, as `userId`, within `DELETION_PROOF_FRESH_MS`. Read from the database: a
- * cached cookie can't vouch for it. A session minted from another keeps that one's sign-in time.
+ * Until when this request's session, as `userId`, proves it's them by its sign-in (`DELETION_PROOF_FRESH_MS` after
+ * it), or null once it doesn't. Read from the database: a cached cookie can't vouch for it. A session minted from
+ * another keeps that one's sign-in time.
  */
-export async function signedInLately(auth: Auth, headers: Headers, userId: string) {
+export async function signInFreshUntil(auth: Auth, headers: Headers, userId: string) {
   const current = await auth.api.getSession({ headers, query: { disableCookieCache: true } });
-  if (current?.user.id !== userId) return false;
-  return Date.now() - new Date(current.session.createdAt).getTime() < DELETION_PROOF_FRESH_MS;
+  if (current?.user.id !== userId) return null;
+  const until = new Date(new Date(current.session.createdAt).getTime() + DELETION_PROOF_FRESH_MS);
+  return until.getTime() > Date.now() ? until : null;
 }
+
+/** Whether this request's session signed in, as `userId`, lately enough to prove it's them (`signInFreshUntil`). */
+export const signedInLately = async (auth: Auth, headers: Headers, userId: string) =>
+  (await signInFreshUntil(auth, headers, userId)) !== null;
 
 /** Passwords an account may try in 15 minutes to prove it's them. */
 const PROOF_TRIES = { limit: 5, windowMs: 15 * 60_000 };

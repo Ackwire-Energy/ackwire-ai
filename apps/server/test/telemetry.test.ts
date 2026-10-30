@@ -318,7 +318,9 @@ describe("the switch in Settings", () => {
 
   test("once the first account deletes itself, nobody inherits the switch", async () => {
     const { owner, other } = await server();
-    expect((await owner("/api/app/account", { method: "DELETE" })).status).toBe(204);
+    expect(
+      (await owner("/api/app/account", { method: "DELETE", json: { password: "correct horse battery" } })).status,
+    ).toBe(204);
     expect((await other("/api/app/telemetry")).status).toBe(404);
     expect((await other("/api/app/telemetry", { method: "PUT", json: { enabled: false } })).status).toBe(404);
   });
@@ -328,7 +330,9 @@ describe("the switch in Settings", () => {
     const first = browser(t);
     await signUp(first, "first@example.com");
     expect((await first("/api/app/telemetry")).status).toBe(200);
-    expect((await first("/api/app/account", { method: "DELETE" })).status).toBe(204);
+    expect(
+      (await first("/api/app/account", { method: "DELETE", json: { password: "correct horse battery" } })).status,
+    ).toBe(204);
     const next = browser(t);
     await signUp(next, "next@example.com");
     expect((await next("/api/app/telemetry")).status).toBe(200);

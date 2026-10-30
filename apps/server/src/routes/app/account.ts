@@ -1,5 +1,6 @@
 import {
   acceptInvitation,
+  accountDeletionPlan,
   addHostComputer,
   announceMembers,
   appleSignInTokens,
@@ -23,6 +24,7 @@ import {
   needsWorkspaceAllowance,
   ONBOARDING_STEPS,
   orgLogoFile,
+  pinnedOwner,
   previewInvitation,
   queueInvitationEmail,
   removeAvatar,
@@ -39,6 +41,7 @@ import {
   setOrgLogo,
   settleJoinRequests,
   signInOptions,
+  soleOwnerRefusal,
   toldReason,
   USER_LOCALES,
   unfinishedWorkspaces,
@@ -53,6 +56,7 @@ import {
   mintPhoneSignIn,
   sessionUser,
   signedInLately,
+  signInFreshUntil,
   signupOpen,
   signupPolicy,
   workspacePolicy,
@@ -79,6 +83,8 @@ const tags = ["Account"];
 const SIGN_IN_OPTIONS_PER_IP = { limit: 30, windowMs: 10 * 60_000 };
 /** A workspace's deletions in a day: deleting and restoring it over and over can't email its people all day. */
 const DELETIONS_PER_DAY = { limit: 3, windowMs: 86_400_000 };
+/** Workspaces a person makes in a day: making and deleting them over and over can't churn the Cloud's computers. */
+const WORKSPACES_PER_DAY = { limit: 10, windowMs: 86_400_000 };
 const Name = z.string().trim().min(1).max(100);
 const Context = z.string().max(20_000).openapi({ description: "Shared with every agent of the organization." });
 
@@ -91,13 +97,14 @@ export function accountRoutes(deps: AppDeps) {
     db,
     pubsub: deps.adapters.pubsub,
     hub: deps.extras?.sandbox?.machines?.hub,
-    emails: deps.adapters.email.delivers ? { publicUrl: config.PUBLIC_URL } : null,
+    emails: deps.adapters.email.delivers ? { publicUrl: config.PUBLIC_URL, support: config.SUPPORT_EMAIL } : null,
   };
   for (const path of [
     "/me",
     "/me/password",
     "/phone-sign-in",
     "/account",
+    "/account/*",
     "/avatars/*",
     "/org-logos/*",
     "/organizations",
@@ -307,6 +314,8 @@ export function accountRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "The signed-in person and their organizations",
+      description:
+        "401 with the session cookies expired once the account is deleted: a cached session cookie outlives it for minutes.",
       responses: {
         200: json(
           z.object({
@@ -342,6 +351,11 @@ export function accountRoutes(deps: AppDeps) {
         canCreateWorkspace(db, user.id, workspacePolicy(config)),
         unfinishedWorkspaces(db, user.id),
       ]);
+      // A deleted account's session lives on in a cached cookie for minutes: its other tabs and devices learn it here.
+      if (verified === null) {
+        for (const cookie of expiredSessionCookies()) c.header("set-cookie", cookie, { append: true });
+        return apiError(c, 401, "unauthorized", "Sign in to continue");
+      }
       const onboardingOf = (orgId: string) => unfinished.find((u) => u.organization.id === orgId);
       const deletions = await workspaceDeletions(
         db,
@@ -474,25 +488,107 @@ export function accountRoutes(deps: AppDeps) {
 
   app.openapi(
     createRoute({
+      method: "get",
+      path: "/account/deletion",
+      tags,
+      security,
+      summary: "What deleting your account would do",
+      description:
+        "Everything `DELETE /account` would refuse, close, leave and remove, so the page can show it before anyone confirms.",
+      responses: {
+        200: json(
+          z.object({
+            password: z
+              .boolean()
+              .openapi({ description: "The account signs in with a password, which proves it's them." }),
+            freshUntil: z.string().nullable().openapi({
+              description:
+                "Until when this session's own sign-in proves it's them, with no password. Null: sign in again, or give the password.",
+            }),
+            closes: z.array(z.object({ id: z.uuid(), name: z.string() })).openapi({
+              description: "Workspaces only they are in: they close now and are deleted for good 7 days later.",
+            }),
+            leaves: z
+              .array(z.object({ id: z.uuid(), name: z.string(), role: Role }))
+              .openapi({ description: "Workspaces with others in them, which they leave." }),
+            soleOwner: z.array(z.object({ id: z.uuid(), name: z.string() })).openapi({
+              description:
+                "Workspaces they are the only owner of, with others in them and not being deleted: make someone else an owner, or delete the workspace, first (`sole_owner`).",
+            }),
+            computers: z.array(z.object({ orgId: z.uuid(), id: z.uuid(), name: z.string() })).openapi({
+              description:
+                "Computers they connected in the workspaces they leave, not in system mode: removed with the account.",
+            }),
+            staysBehind: z
+              .array(z.object({ orgId: z.uuid(), kind: z.enum(["key", "connection", "mailbox"]), name: z.string() }))
+              .openapi({
+                description:
+                  "Keys, connections and mailboxes they added to the workspaces they leave: the workspace's, so they stay. Disconnect one first if it's theirs.",
+              }),
+            serverOwner: z.boolean().openapi({
+              description:
+                "They set up this server: its own settings will have no owner here, only in its environment (ADR 0073).",
+            }),
+          }),
+        ),
+        401: errors[401],
+      },
+    }),
+    async (c) => {
+      const user = c.get("user");
+      const [plan, password, freshUntil, owner] = await Promise.all([
+        accountDeletionPlan(db, user.id),
+        hasPassword(db, user.id),
+        signInFreshUntil(deps.auth, c.req.raw.headers, user.id),
+        pinnedOwner(db),
+      ]);
+      return c.json(
+        {
+          password,
+          freshUntil: iso(freshUntil),
+          ...plan,
+          serverOwner: owner === user.id,
+        },
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
       method: "delete",
       path: "/account",
       tags,
       security,
       summary: "Delete your account",
       description:
-        "Deletes the signed-in person, their sessions, phones and memberships, and the organizations where they are the only member. Messages they wrote stay without an author. Refused with `sole_owner` (params: `organizations`, their names) while they are the only owner of an organization that has other members.",
+        "Deletes the signed-in person at once: their sessions, phones and memberships. Workspaces only they are in close now and are deleted for good 7 days later. They leave the others, and the computers they connected there are removed (not in system mode). Messages they wrote stay without an author. What it would do: `GET /account/deletion`. Refused with `sole_owner` (params: `organizations`, their names, and `orgIds`) while they are the only owner of a workspace that has others in it and isn't being deleted. Proof that it's you: a sign-in in the last 10 minutes, else `password` (403 `reauth.sign_in` without one, `reauth.password` for a wrong one, 429 after 5 in 15 minutes). The body is optional.",
+      request: { body: { ...body(z.object({ password: z.string().min(1).max(128).optional() })), required: false } },
       responses: {
         204: { description: "Deleted; the session cookies are cleared" },
         401: errors[401],
-        409: errorResponse("Only owner of an organization with other members (`sole_owner`)"),
+        403: errorResponse("Blocked, or no proof that it's you (`reauth.sign_in`, `reauth.password`)"),
+        409: errorResponse("Only owner of a workspace with others in it (`sole_owner`)"),
+        429: errorResponse("Too many password tries (`rate_limited`)"),
       },
     }),
     async (c) => {
       const user = c.get("user");
+      // Before the proof: signing in again would be for nothing while a workspace still needs its owner.
+      const refusal = soleOwnerRefusal(await accountDeletionPlan(db, user.id));
+      if (refusal) throw refusal;
+      await deletionProof(
+        deps.auth,
+        deps.adapters.rateLimiter,
+        c.req.raw.headers,
+        user.id,
+        c.req.valid("json").password,
+      );
       // Read before the account goes (its sign-in rows are deleted with it).
       const revoke = deps.extras?.appleRevoke;
       const appleTokens = revoke ? await appleSignInTokens(db, user.id) : [];
-      await deleteAccount(db, user.id, { pubsub: deps.adapters.pubsub });
+      await deleteAccount(db, user.id, deletion);
+      deps.wakeWorkers?.();
       // Apple wants its tokens revoked when the account is deleted (best effort: the account is already gone).
       if (revoke) await Promise.all(appleTokens.map((token) => revoke(token).catch(() => undefined)));
       // Their photo files (best effort: the account is already gone).
@@ -659,7 +755,7 @@ export function accountRoutes(deps: AppDeps) {
       security,
       summary: "Create an organization (you become its owner)",
       description:
-        "Its owner sets it up in the onboarding, already past its first step (`onboarding` in `GET /me` until `PATCH …/onboarding` says it's finished). While they have one they haven't finished, that one comes back (200) instead of a new one, so a stale tab or a second press makes no other, even one waiting for its first plan. 403 `org.create_refused` while your account is blocked or you are in a workspace suspended or on a hold the billing service didn't set; 403 `org.create_unpaid` (`params.orgId`) while you own a workspace waiting for its first plan; 403 `org.create_invite_only` on agentes.chat Cloud while sign-up is by invitation, unless early access allowed the person's account and its address is confirmed (ADR 0078). With BILLING_HOLD_NEW_WORKSPACES it starts on the `payment` hold (ADR 0079).",
+        "Its owner sets it up in the onboarding, already past its first step (`onboarding` in `GET /me` until `PATCH …/onboarding` says it's finished). While they have one they haven't finished, that one comes back (200) instead of a new one, so a stale tab or a second press makes no other, even one waiting for its first plan. 403 `org.create_refused` while your account is blocked or you are in a workspace suspended or on a hold the billing service didn't set; 403 `org.create_unpaid` (`params.orgId`) while you own a workspace waiting for its first plan; 403 `org.create_invite_only` on agentes.chat Cloud while sign-up is by invitation, unless early access allowed the person's account and its address is confirmed (ADR 0078). With BILLING_HOLD_NEW_WORKSPACES it starts on the `payment` hold (ADR 0079). 429 after 10 tries in a day; 401 once your account is deleted.",
       request: {
         body: body(
           z.object({
@@ -677,11 +773,15 @@ export function accountRoutes(deps: AppDeps) {
           "The workspace they are still setting up, as it is",
         ),
         ...errors,
+        429: errorResponse("More than 10 in a day (`rate_limited`)"),
       },
     }),
     async (c) => {
       const { teamSize, timezone, ...input } = c.req.valid("json");
       const userId = c.get("user").id;
+      if (!(await deps.adapters.rateLimiter.consume(`new-workspace:${userId}`, WORKSPACES_PER_DAY)).allowed) {
+        return apiError(c, 429, "rate_limited", "Too many new workspaces today. Try again tomorrow.");
+      }
       const { organization, general, existing } = await createOrganization(db, userId, input, {
         holdForPayment: config.BILLING_HOLD_NEW_WORKSPACES,
         needsAllowance: await needsWorkspaceAllowance(db, userId, workspacePolicy(config)),
