@@ -815,9 +815,9 @@ textarea.ac-input {
   flex: 1;
 }
 /*
- * Name and time on a 20px line whose capitals start at the face's top, as `.ac-captop` places them (the line's height
- * is known here, so no lh unit); turns are told apart by space, name and face only. The name's size is the head's, so
- * the rise is measured in its type.
+ * Name and time on a 20px line whose box starts at the face's top: capitals flush with the face's edge read as a face
+ * hanging under the name, so the name sits a little in, as the text beside a picture does. Turns are told apart by
+ * space, name and face only.
  */
 .ac-msg__head {
   display: flex;
@@ -826,7 +826,6 @@ textarea.ac-input {
   gap: var(--space-2);
   font-size: 14.5px;
   line-height: 20px;
-  margin-block-start: calc(var(--cap-top) - 10px);
 }
 .ac-msg__author {
   font-weight: 650;
@@ -4463,8 +4462,8 @@ a.ac-list__row:focus-visible {
  * above, still in view at the top of a scrolled list, and clear of a receipt's line under the text.
  */
 .ac-msg__actions {
-  /* The name's capitals start at the row's 6px padding (`.ac-msg__head`). */
-  top: calc(6px + var(--cap-top) - var(--cap-mid));
+  /* The name's 20px line starts at the row's 6px padding (`.ac-msg__head`): its capitals' middle. */
+  top: calc(16px - var(--cap-mid));
   right: 10px;
   z-index: var(--z-sticky);
   padding: 3px;
