@@ -244,29 +244,33 @@ async function storeFiles(deps: SkillDeps, s: { id: string; orgId: string }, ver
   if (files.length > SKILL_LIMITS.maxFiles) throw new ValidationError(`Too many files (max ${SKILL_LIMITS.maxFiles})`);
   const total = files.reduce((n, f) => n + f.data.byteLength, 0);
   if (total > SKILL_LIMITS.maxBytes) throw new ValidationError("The skill is too large (max 2 MB)");
+  // Two entries that normalize to the same path would share one blob key: the second's bytes overwrite
+  // the first on disk while its row insert is dropped on the unique key, so the stored size stops matching disk.
+  const normalized = files.map((f) => ({ path: safePath(f.path), data: f.data }));
+  const seen = new Set<string>();
+  for (const { path } of normalized) {
+    if (seen.has(path)) throw new ValidationError(`Two files share the path ${path}`, "skill.duplicate_path");
+    seen.add(path);
+  }
   const location = await deps.blobs.forOrg(s.orgId);
-  for (const f of files) {
-    const path = safePath(f.path);
+  for (const { path, data } of normalized) {
     const { mime, status } = classifyFile(path);
     let blobKey: string | null = null;
     if (status !== "ignored") {
       blobKey = `${location.prefix}skills/${s.id}/v${version}/${path}`;
-      await location.store.put(blobKey, f.data, { contentType: mime });
+      await location.store.put(blobKey, data, { contentType: mime });
     }
-    await deps.db
-      .insert(skillFiles)
-      .values({
-        orgId: s.orgId,
-        skillId: s.id,
-        version,
-        path,
-        size: f.data.byteLength,
-        mime,
-        status,
-        storageConfigId: status !== "ignored" ? location.storageConfigId : null,
-        blobKey,
-      })
-      .onConflictDoNothing();
+    await deps.db.insert(skillFiles).values({
+      orgId: s.orgId,
+      skillId: s.id,
+      version,
+      path,
+      size: data.byteLength,
+      mime,
+      status,
+      storageConfigId: status !== "ignored" ? location.storageConfigId : null,
+      blobKey,
+    });
   }
 }
 
@@ -302,7 +306,8 @@ export async function saveSkill(
         metadata: input.metadata,
         source: input.source,
         sourceUrl: input.sourceUrl ?? existing.sourceUrl,
-        version: existing.version + 1,
+        // Incremented in SQL (not from the value read above) so two concurrent saves take distinct versions.
+        version: sql`${skills.version} + 1`,
         ...(input.defaultForNewAgents !== undefined ? { defaultForNewAgents: input.defaultForNewAgents } : {}),
         deletedAt: null,
         updatedAt: new Date(),
