@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, asc, type Database, eq, type Executor, inArray, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, type Executor, eq, inArray, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import {
@@ -50,7 +50,10 @@ export interface RoleView {
   people: number;
   /** Whether the person asking may change it: they manage roles and stand above it. */
   editable: boolean;
-  /** Whether they may give it to people (invitations, requests to join, a person's roles): a role below theirs. */
+  /**
+   * Whether they may give it to people (invitations, requests to join, a person's roles): a role below theirs whose
+   * keys they all hold.
+   */
   givable: boolean;
 }
 
@@ -73,6 +76,16 @@ const byOrder = <T extends { kind: string; position: number; name: string }>(a: 
   (a.kind === "everyone" ? 1 : 0) - (b.kind === "everyone" ? 1 : 0) ||
   a.position - b.position ||
   a.name.localeCompare(b.name);
+
+/**
+ * Whether an actor holds every key of a role (an owner holds them all): giving it to anyone, themselves included,
+ * then hands out nothing they can't already do.
+ */
+function holdsAll(actor: Membership, keys: readonly string[]) {
+  if (actor.role === "owner") return true;
+  const mine = roleGrants(actor.permissions as ReadonlySet<string>);
+  return keys.every((k) => !isRolePermission(k) || mine.has(k));
+}
 
 /** Whether `actor` may change `role`: hold `manage_roles` (or own the workspace) and stand above it. */
 function mayEdit(actor: Membership, role: { kind: string; position: number }) {
@@ -108,7 +121,7 @@ export async function listRoles(db: Database, actorId: string, orgId: string) {
     ...r,
     permissions: r.permissions.filter(isRolePermission),
     editable: mayEdit(actor, r),
-    givable: r.kind === "custom" && outranks(actor, r.position),
+    givable: r.kind === "custom" && outranks(actor, r.position) && holdsAll(actor, r.permissions),
   }));
   return { roles, areas: PERMISSION_AREAS, colors: ROLE_COLORS, icons: ROLE_ICONS };
 }
@@ -331,20 +344,33 @@ export async function reorderRoles(
 }
 
 /**
- * The roles in `ids` the actor may give (or take): custom roles of this workspace below them. Unknown or base ids
- * refuse the whole call; the result keeps the ids in the workspace.
+ * The roles in `ids` the actor may give (or take): custom roles of this workspace below them whose keys they all
+ * hold, so nobody hands themselves or anyone else more than they can do. Unknown or base ids refuse the whole call;
+ * the result keeps the ids in the workspace.
  */
 export async function givableRoleIds(db: Executor, actor: Membership, orgId: string, ids: readonly string[]) {
   const wanted = [...new Set(ids)];
   if (wanted.length === 0) return [];
   const rows = await db
-    .select({ id: orgRoles.id, kind: orgRoles.kind, position: orgRoles.position })
+    .select({ id: orgRoles.id, kind: orgRoles.kind, position: orgRoles.position, permissions: orgRoles.permissions })
     .from(orgRoles)
     .where(and(eq(orgRoles.orgId, orgId), inArray(orgRoles.id, wanted)));
   if (rows.length !== wanted.length || rows.some((r) => r.kind !== "custom"))
     throw new ValidationError("Unknown role", "role.unknown");
   if (rows.some((r) => !outranks(actor, r.position)))
     throw new ForbiddenError("You can only give roles below your own", "role.above_you");
+  if (rows.some((r) => !holdsAll(actor, r.permissions)))
+    throw new ForbiddenError("You can only give roles whose permissions you hold", "role.grant_forbidden");
+  return rows.map((r) => r.id);
+}
+
+/** The ids among `ids` that are still custom roles of the workspace. */
+export async function rolesStillThere(db: Executor, orgId: string, ids: readonly string[]) {
+  if (ids.length === 0) return [];
+  const rows = await db
+    .select({ id: orgRoles.id })
+    .from(orgRoles)
+    .where(and(eq(orgRoles.orgId, orgId), eq(orgRoles.kind, "custom"), inArray(orgRoles.id, [...new Set(ids)])));
   return rows.map((r) => r.id);
 }
 
@@ -391,14 +417,15 @@ export async function setMemberRoles(
     throw new ForbiddenError("Only owners change an owner's roles", "role.above_you");
   if (actorId !== targetUserId && !outranks(actor, target.rank))
     throw new ForbiddenError("Only someone above them changes their roles", "role.above_you");
-  const before = await memberRoleIds(db, orgId, targetUserId);
   const next = [...new Set(roleIds)];
-  const added = next.filter((id) => !before.includes(id));
-  const removed = before.filter((id) => !next.includes(id));
-  await givableRoleIds(db, actor, orgId, [...added, ...removed]);
-  if (added.length === 0 && removed.length === 0) return before;
-  await db.transaction(async (tx) => {
+  // Read and checked under the lock: two people changing the same person's roles at once never undo each other.
+  const changed = await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-members:${orgId}`}))`);
+    const before = await memberRoleIds(tx, orgId, targetUserId);
+    const added = next.filter((id) => !before.includes(id));
+    const removed = before.filter((id) => !next.includes(id));
+    await givableRoleIds(tx, actor, orgId, [...added, ...removed]);
+    if (added.length === 0 && removed.length === 0) return false;
     if (removed.length > 0)
       await tx
         .delete(organizationMemberRoles)
@@ -423,8 +450,9 @@ export async function setMemberRoles(
       target: { type: "person", id: targetUserId },
       details: { added: added.map(nameOf), removed: removed.map(nameOf) },
     });
+    return true;
   });
-  await announceMembers(options.pubsub, orgId);
+  if (changed) await announceMembers(options.pubsub, orgId);
   return next;
 }
 

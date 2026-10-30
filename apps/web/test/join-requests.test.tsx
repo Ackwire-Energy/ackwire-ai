@@ -479,11 +479,7 @@ describe("Members › Requests to join", () => {
     expect(roles.textContent).toContain("Admin");
     await click(within(ana).getByRole("button", { name: "Aprovar" }));
     await settle(4);
-    expect(state.calls.find((c) => c.method === "joinRequests.approve")?.args).toEqual([
-      ORG_ID,
-      "r1",
-      [ADMIN_ROLE_ID],
-    ]);
+    expect(state.calls.find((c) => c.method === "joinRequests.approve")?.args).toEqual([ORG_ID, "r1", [ADMIN_ROLE_ID]]);
     expect(text()).toContain("Ana Souza entrou.");
     // She counts in the workspace's line too, without a reload.
     expect(sidebarCount()).toBe("3 membros · 2 agentes");

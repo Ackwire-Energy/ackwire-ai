@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { and, eq, schema } from "@agenteschat/db";
 import {
-  acceptInvitation,
   AREA_PERMISSIONS,
+  acceptInvitation,
   can,
   createInvitation,
   createRole,
@@ -16,7 +16,7 @@ import {
   setMemberRoles,
   updateRole,
 } from "../src";
-import { adminRoleId, addMember, type Fixture, makeAdmin, setup } from "./fixtures";
+import { addMember, adminRoleId, type Fixture, makeAdmin, setup } from "./fixtures";
 
 let f: Fixture;
 beforeEach(async () => {
@@ -125,6 +125,22 @@ describe("hierarchy", () => {
     );
   });
 
+  test("nobody hands themselves a role with keys they don't hold", async () => {
+    const lead = await addMember(f.db, f.org.id, "member", "lead");
+    const leads = await createRole(f.db, f.owner.id, f.org.id, { name: "Leads", permissions: ["manage_members"] });
+    const finance = await createRole(f.db, f.owner.id, f.org.id, { name: "Finance", permissions: ["view_usage"] });
+    const helpers = await createRole(f.db, f.owner.id, f.org.id, { name: "Helpers", permissions: ["post"] });
+    await setMemberRoles(f.db, f.owner.id, f.org.id, lead.id, [leads.id]);
+    await expect(setMemberRoles(f.db, lead.id, f.org.id, lead.id, [leads.id, finance.id])).rejects.toMatchObject({
+      code: "role.grant_forbidden",
+    });
+    // A role whose keys they hold is fine, and it shows as one they may give.
+    await setMemberRoles(f.db, lead.id, f.org.id, lead.id, [leads.id, helpers.id]);
+    const { roles } = await listRoles(f.db, lead.id, f.org.id);
+    expect(roles.find((r) => r.id === finance.id)?.givable).toBe(false);
+    expect(roles.find((r) => r.id === helpers.id)?.givable).toBe(true);
+  });
+
   test("an owner's roles only owners change", async () => {
     const boss = await addMember(f.db, f.org.id, "admin", "boss");
     await expect(setMemberRoles(f.db, boss.id, f.org.id, f.owner.id, [])).rejects.toBeInstanceOf(ForbiddenError);
@@ -193,7 +209,10 @@ describe("where the keys land", () => {
   test("approving actions follows the key, not a role's name", async () => {
     const ana = await addMember(f.db, f.org.id, "member", "ana");
     await expect(requirePermission(f.db, ana.id, f.org.id, "approve_actions")).rejects.toBeInstanceOf(ForbiddenError);
-    const approvers = await createRole(f.db, f.owner.id, f.org.id, { name: "Approvers", permissions: ["approve_actions"] });
+    const approvers = await createRole(f.db, f.owner.id, f.org.id, {
+      name: "Approvers",
+      permissions: ["approve_actions"],
+    });
     await setMemberRoles(f.db, f.owner.id, f.org.id, ana.id, [approvers.id]);
     await requirePermission(f.db, ana.id, f.org.id, "approve_actions");
   });

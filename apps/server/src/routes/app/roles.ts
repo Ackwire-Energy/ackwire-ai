@@ -36,18 +36,21 @@ const OrgRole = z
     mentionable: z.boolean(),
     hoist: z.boolean().openapi({ description: "Its people are listed apart." }),
     people: z.number().int(),
-    editable: z.boolean().openapi({ description: "Whether you may change it: you manage roles and it is below your own." }),
-    givable: z
+    editable: z
       .boolean()
-      .openapi({ description: "Whether you may give it to people (invitations, requests, a person's roles): it is below your own." }),
+      .openapi({ description: "Whether you may change it: you manage roles and it is below your own." }),
+    givable: z.boolean().openapi({
+      description:
+        "Whether you may give it to people (invitations, requests, a person's roles): it is below your own and you hold every key it has.",
+    }),
   })
   .openapi("OrgRole");
 
 const PermissionArea = z
   .object({
     id: z.string(),
-    use: z.array(z.string()).openapi({ description: "The keys of the area's \"use\" level." }),
-    keys: z.array(z.string()).openapi({ description: "Every key of the area: its \"manage\" level." }),
+    use: z.array(z.string()).openapi({ description: 'The keys of the area\'s "use" level.' }),
+    keys: z.array(z.string()).openapi({ description: 'Every key of the area: its "manage" level.' }),
   })
   .openapi("PermissionArea");
 

@@ -123,8 +123,15 @@ export const forgetTeam = (orgId: string) => caches.agents.delete(`${orgId}:team
  * exists even in a DM. Details stay behind `find_agent`. Agents already
  * described in "Where you are" (channel members) are left out.
  */
-export function teamPrompt(team: Teammate[], selfId: string, requester: string | null, skip: Set<string>) {
-  const others = team.filter((a) => a.id !== selfId && !skip.has(a.id) && canTalkTo(a, requester));
+export function teamPrompt(
+  team: Teammate[],
+  selfId: string,
+  requester: string | null,
+  skip: Set<string>,
+  /** Whether the requester's roles let them talk to agents (`talksToAgents`). */
+  talks = true,
+) {
+  const others = team.filter((a) => a.id !== selfId && !skip.has(a.id) && canTalkTo(a, requester, talks));
   if (others.length === 0) return "";
   const lines =
     others.length > TEAM_IN_PROMPT

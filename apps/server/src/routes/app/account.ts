@@ -783,7 +783,8 @@ export function accountRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Make a member an owner, or not (owners)",
-      description: "Only an owner does it; the last owner stays one. What anyone may do is their roles (`PUT …/roles`).",
+      description:
+        "Only an owner does it; the last owner stays one. What anyone may do is their roles (`PUT …/roles`).",
       request: { params: MemberParams, body: body(z.object({ role: Role })) },
       responses: { 204: noContent[204], ...errors },
     }),

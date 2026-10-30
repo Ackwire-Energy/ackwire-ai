@@ -18,12 +18,7 @@ import {
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatMonth, formatPercent, formatShortDate, relativeTime, timeLeft } from "@agenteschat/client/lib/format";
-import {
-  approvalNews,
-  askedLabel,
-  JOIN_REASON_MAX,
-  sendsEmail,
-} from "@agenteschat/client/lib/join-requests";
+import { approvalNews, askedLabel, JOIN_REASON_MAX, sendsEmail } from "@agenteschat/client/lib/join-requests";
 import { membersFull } from "@agenteschat/client/lib/limits";
 import { can } from "@agenteschat/client/lib/permissions";
 import { rolesOf } from "@agenteschat/client/lib/roles";
@@ -147,11 +142,13 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
   // The filter's values: `owner`, or a role's id.
   const people = (peopleQuery.data ?? []).filter(
     (m) =>
-      roles.length === 0 ||
-      roles.some((r) => (r === "owner" ? m.role === "owner" : (m.roleIds ?? []).includes(r))),
+      roles.length === 0 || roles.some((r) => (r === "owner" ? m.role === "owner" : (m.roleIds ?? []).includes(r))),
   );
   const roleNames = (ids: readonly string[] = []) =>
-    orgRoles.filter((r) => ids.includes(r.id)).map((r) => r.name).join(", ");
+    orgRoles
+      .filter((r) => ids.includes(r.id))
+      .map((r) => r.name)
+      .join(", ");
   const pending = invitations.data ?? [];
 
   return (
@@ -237,9 +234,7 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
               <div key={inv.id} className="ac-list__row">
                 <span style={{ flex: "1 1 220px", minWidth: 0, overflowWrap: "anywhere" }}>{inv.email}</span>
                 <span className="small muted" style={{ flex: "0 1 160px", minWidth: 0 }}>
-                  {inv.role === "owner"
-                    ? t("roles.owner")
-                    : roleNames(inv.roleIds) || t("members.onlyEveryone")}
+                  {inv.role === "owner" ? t("roles.owner") : roleNames(inv.roleIds) || t("members.onlyEveryone")}
                 </span>
                 <span className="small muted" style={{ flex: "0 0 auto", whiteSpace: "nowrap" }}>
                   {resent[inv.email] ? t("members.resentNow") : invitationStatus(t, i18n.language, inv)}

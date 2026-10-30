@@ -180,16 +180,36 @@ export const en: Translations = {
       short: "everything",
       say: "can do everything but what only the owner does",
     },
-    post: { title: "Send messages", desc: "Write and react in the channels they're in.", short: "send messages", say: "sends messages" },
-    create_channels: { title: "Create channels", desc: "Open or private.", short: "create channels", say: "creates channels" },
+    post: {
+      title: "Send messages",
+      desc: "Write and react in the channels they're in.",
+      short: "send messages",
+      say: "sends messages",
+    },
+    create_channels: {
+      title: "Create channels",
+      desc: "Open or private.",
+      short: "create channels",
+      say: "creates channels",
+    },
     manage_channels: {
       title: "Arrange channels",
       desc: "Rename, archive, change who's in, and arrange categories.",
       short: "arrange channels",
       say: "arranges channels",
     },
-    talk_to_agents: { title: "Talk to agents", desc: "Call them by name and message them directly.", short: "talk", say: "talks to the agents" },
-    assign_work: { title: "Give agents missions", desc: "Ask for long work that carries on by itself.", short: "give missions", say: "gives agents missions" },
+    talk_to_agents: {
+      title: "Talk to agents",
+      desc: "Call them by name and message them directly.",
+      short: "talk",
+      say: "talks to the agents",
+    },
+    assign_work: {
+      title: "Give agents missions",
+      desc: "Ask for long work that carries on by itself.",
+      short: "give missions",
+      say: "gives agents missions",
+    },
     manage_routines: {
       title: "Create routines",
       desc: "Work the agent does on its own at set times.",
@@ -202,7 +222,12 @@ export const en: Translations = {
       short: "approve actions",
       say: "approves agents' actions",
     },
-    create_agents: { title: "Create agents", desc: "Whoever creates one is responsible for it.", short: "create agents", say: "creates agents" },
+    create_agents: {
+      title: "Create agents",
+      desc: "Whoever creates one is responsible for it.",
+      short: "create agents",
+      say: "creates agents",
+    },
     manage_agents: {
       title: "Edit any agent",
       desc: "Instructions, brain, budget and what each one uses.",
@@ -233,8 +258,18 @@ export const en: Translations = {
       short: "AI keys",
       say: "looks after AI keys",
     },
-    edit_wiki: { title: "Edit the wiki", desc: "Create and change pages.", short: "edit the wiki", say: "edits the wiki" },
-    upload_files: { title: "Upload files to the Drive", desc: "And delete the ones they uploaded.", short: "upload files", say: "uploads files" },
+    edit_wiki: {
+      title: "Edit the wiki",
+      desc: "Create and change pages.",
+      short: "edit the wiki",
+      say: "edits the wiki",
+    },
+    upload_files: {
+      title: "Upload files to the Drive",
+      desc: "And delete the ones they uploaded.",
+      short: "upload files",
+      say: "uploads files",
+    },
     review_memory: {
       title: "Review what agents learn",
       desc: "Accept or refuse what becomes memory.",
@@ -253,7 +288,12 @@ export const en: Translations = {
       short: "see costs",
       say: "sees costs",
     },
-    view_audit: { title: "See the audit log", desc: "Everything people and agents did, dated.", short: "audit log", say: "sees the audit log" },
+    view_audit: {
+      title: "See the audit log",
+      desc: "Everything people and agents did, dated.",
+      short: "audit log",
+      say: "sees the audit log",
+    },
     configure: {
       title: "Change name, logo and context",
       desc: "What every agent knows about the workspace.",
@@ -272,7 +312,12 @@ export const en: Translations = {
       short: "manage roles",
       say: "manages roles",
     },
-    manage_billing: { title: "Plan and billing", desc: "The plan, the card and the invoices.", short: "billing", say: "looks after billing" },
+    manage_billing: {
+      title: "Plan and billing",
+      desc: "The plan, the card and the invoices.",
+      short: "billing",
+      say: "looks after billing",
+    },
   },
   auth: {
     email: "Email",

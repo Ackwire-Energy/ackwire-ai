@@ -153,19 +153,7 @@ export function CommandMenu() {
       });
     }
     return list;
-  }, [
-    channels.data,
-    topics.data,
-    wiki.data,
-    dir.agents,
-    dir.members,
-    me.user.id,
-    org,
-    server,
-    navigate,
-    t,
-    goTo,
-  ]);
+  }, [channels.data, topics.data, wiki.data, dir.agents, dir.members, me.user.id, org, server, navigate, t, goTo]);
 
   // "Pedir a um agente": the agents I can talk to, with what was typed.
   const askable = useMemo(() => dir.agents.filter((a) => canTalk(a)), [dir.agents]);

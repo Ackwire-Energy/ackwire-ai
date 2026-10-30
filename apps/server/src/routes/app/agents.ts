@@ -37,6 +37,7 @@ import {
   setAgentAppearance,
   setAgentAudience,
   setAgentBrain,
+  talksToAgents,
   updateAgent,
   updateAgentGroup,
   usageSummary,
@@ -80,6 +81,8 @@ const toAgent = (
   seesCost: boolean,
   budgetUsedPercent?: number,
   brain?: AgentBrainSummary,
+  /** Whether the viewer's roles let them talk to agents (`talksToAgents`, ADR 0084). */
+  talks = true,
 ) => {
   const v = agentView(a);
   const { monthlyBudgetNanoUsd, ...rest } = v;
@@ -93,7 +96,7 @@ const toAgent = (
     createdAt: v.createdAt.toISOString(),
     audience: audienceOf(a),
     audienceMode: a.audienceMode,
-    canTalk: canTalkTo(a, viewerId),
+    canTalk: canTalkTo(a, viewerId, talks),
   };
 };
 
@@ -309,16 +312,20 @@ export function agentRoutes(deps: AppDeps) {
       const { orgId } = c.req.valid("param");
       const actor = c.get("user").id;
       const list = await listAgents(db, actor, orgId);
-      const [seesCost, budgets, brains] = await Promise.all([
+      const [seesCost, budgets, brains, talks] = await Promise.all([
         canViewCost(db, actor, orgId),
         agentBudgetsThisMonth(db, orgId),
         agentBrainSummaries(db, actor, orgId, list),
+        talksToAgents(db, orgId, actor),
       ]);
       const percent = (id: string) => {
         const b = budgets.get(id);
         return b ? budgetPercent(b.spentNanoUsd, b.budgetNanoUsd) : 0;
       };
-      return c.json({ agents: list.map((a) => toAgent(a, actor, seesCost, percent(a.id), brains.get(a.id))) }, 200);
+      return c.json(
+        { agents: list.map((a) => toAgent(a, actor, seesCost, percent(a.id), brains.get(a.id), talks)) },
+        200,
+      );
     },
   );
 
@@ -559,11 +566,12 @@ export function agentRoutes(deps: AppDeps) {
       ) {
         await publishMachineAgentsChanged(adapters.pubsub, orgId);
       }
-      const [seesCost, brains] = await Promise.all([
+      const [seesCost, brains, talks] = await Promise.all([
         canViewCost(db, actor, orgId),
         agentBrainSummaries(db, actor, orgId, [agent]),
+        talksToAgents(db, orgId, actor),
       ]);
-      return c.json(toAgent(agent, actor, seesCost, undefined, brains.get(agent.id)), 200);
+      return c.json(toAgent(agent, actor, seesCost, undefined, brains.get(agent.id), talks), 200);
     },
   );
 

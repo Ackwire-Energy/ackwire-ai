@@ -941,7 +941,9 @@ export async function requestNewInvitation(db: Database, publicUrl: string, toke
   const inviterId = invitation.invitedByUserId;
   const inviter = inviterId ? await getMembership(db, inviterId, invitation.orgId) : null;
   const recipientIds =
-    inviter && inviterId && can(inviter, "invite_people") ? [inviterId] : await adminIds(db, invitation.orgId, "invite_people");
+    inviter && inviterId && can(inviter, "invite_people")
+      ? [inviterId]
+      : await adminIds(db, invitation.orgId, "invite_people");
   const [org] = await db
     .select({ name: organizations.name })
     .from(organizations)

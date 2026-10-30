@@ -2,7 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, gt, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { aiConnectIntent, type ConnectIntent } from "./ai-intent";
 import { type AiStatusDeps, agentAiState, type NoAiReason, orgHasAi } from "./ai-status";
-import { audienceError, canTalkTo } from "./audience";
+import { audienceError, canTalkTo, talksToAgents } from "./audience";
 import { recordAudit } from "./audit";
 import { runRequester } from "./cancel";
 import { requireChannelAccess } from "./channels";
@@ -267,7 +267,11 @@ export async function answerNow(
     // Who the agent answers may have narrowed since (an agent moved onto a plan answers only its owner until they
     // turn on Atende outras pessoas, ADR 0059 §5):
     // a run starts again only for someone it still answers.
-    const heard = ready.filter((r) => canTalkTo(r.agent, r.requester));
+    // …and whose roles still let them talk to agents (`talk_to_agents`, ADR 0084).
+    const talks = new Map<string | null, boolean>();
+    for (const r of ready)
+      if (!talks.has(r.requester)) talks.set(r.requester, await talksToAgents(deps.db, orgId, r.requester));
+    const heard = ready.filter((r) => canTalkTo(r.agent, r.requester, talks.get(r.requester) ?? false));
     const [first] = ready;
     if (heard.length === 0 && first) throw await audienceError(deps.db, first.agent);
     const runs: Answering = [];

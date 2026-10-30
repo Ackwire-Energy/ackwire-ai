@@ -109,6 +109,30 @@ export function summaryKeys(role: OrgRole, everyone: OrgRole | undefined): RoleP
   return SUMMARY_ORDER.filter((k) => own.has(k) && !base.has(k));
 }
 
+/** A person's rank: their highest role's position (an owner above all, `Infinity` with none). */
+export function rankOf(person: Pick<Person, "role" | "roleIds">, roles: readonly OrgRole[]) {
+  if (person.role === "owner") return -1;
+  const mine = roles.filter((r) => !isEveryone(r) && (person.roleIds ?? []).includes(r.id));
+  return mine.length ? Math.min(...mine.map((r) => r.position)) : Number.POSITIVE_INFINITY;
+}
+
+/** Whether the viewer may touch this person's roles (the server checks it again): someone below them, or themselves. */
+export const isBelow = (
+  viewer: { role: string; rank?: number | null; userId: string },
+  person: Pick<Person, "userId" | "role" | "roleIds">,
+  roles: readonly OrgRole[],
+) =>
+  viewer.role === "owner" ||
+  (person.role !== "owner" &&
+    (person.userId === viewer.userId || rankOf(person, roles) > (viewer.rank ?? Number.POSITIVE_INFINITY)));
+
+/** Whether the viewer holds every key of a role (an owner all): only then may they copy it or give it. */
+export function holdsAll(viewer: { role: string; permissions?: readonly string[] }, keys: readonly string[]) {
+  if (viewer.role === "owner") return true;
+  const mine = grants(viewer.permissions ?? []);
+  return keys.every((k) => mine.has(k));
+}
+
 /** A person's roles, top first. */
 export const rolesOf = (person: Pick<Person, "roleIds">, roles: readonly OrgRole[]) =>
   sortRoles(roles.filter((r) => !isEveryone(r) && (person.roleIds ?? []).includes(r.id)));

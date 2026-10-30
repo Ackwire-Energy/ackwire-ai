@@ -30,7 +30,15 @@ export const PERMISSION_AREAS = [
   {
     id: "org",
     use: ["invite_people"],
-    keys: ["invite_people", "view_usage", "view_audit", "configure", "manage_members", "manage_roles", "manage_billing"],
+    keys: [
+      "invite_people",
+      "view_usage",
+      "view_audit",
+      "configure",
+      "manage_members",
+      "manage_roles",
+      "manage_billing",
+    ],
   },
 ] as const;
 

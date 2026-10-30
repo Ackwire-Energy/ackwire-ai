@@ -745,10 +745,7 @@ export async function adminIds(db: Database, orgId: string, permission: RolePerm
     .select({ userId: schema.organizationMembers.userId })
     .from(schema.organizationMembers)
     .where(
-      and(
-        eq(schema.organizationMembers.orgId, orgId),
-        maySql(orgId, schema.organizationMembers.userId, permission),
-      ),
+      and(eq(schema.organizationMembers.orgId, orgId), maySql(orgId, schema.organizationMembers.userId, permission)),
     );
   return rows.map((r) => r.userId);
 }

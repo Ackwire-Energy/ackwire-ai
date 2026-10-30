@@ -573,38 +573,38 @@ function WikiEmpty({ onNew, onImport, onNav }: { onNew: () => void; onImport: ()
         title={t("wiki.emptyTitle")}
         actions={
           can(org, "edit_wiki") && (
-          <div className="wiki-empty__acts">
-            <Button variant="primary" onClick={onImport}>
-              <ObsidianMark size={16} />
-              {t("wiki.import.cta")}
-            </Button>
-            <Button
-              loading={busy}
-              disabled={busy}
-              onClick={async () => {
-                setBusy(true);
-                try {
-                  // Straight to the API: the empty state goes away as soon as the first page exists.
-                  for (const p of starterPages(t)) {
-                    await api.wiki.create(org.id, { title: p.title, folder: p.folder, body: p.body });
+            <div className="wiki-empty__acts">
+              <Button variant="primary" onClick={onImport}>
+                <ObsidianMark size={16} />
+                {t("wiki.import.cta")}
+              </Button>
+              <Button
+                loading={busy}
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    // Straight to the API: the empty state goes away as soon as the first page exists.
+                    for (const p of starterPages(t)) {
+                      await api.wiki.create(org.id, { title: p.title, folder: p.folder, body: p.body });
+                    }
+                    void qc.invalidateQueries({ queryKey: keys.wiki(org.id) });
+                    toast.show(t("wiki.starterCreated"));
+                    void navigate({
+                      to: "/org/$orgId/wiki/$slug",
+                      params: { orgId: org.id, slug: wikiSlug(t("wiki.starterPages.overview")) },
+                    });
+                  } finally {
+                    setBusy(false);
                   }
-                  void qc.invalidateQueries({ queryKey: keys.wiki(org.id) });
-                  toast.show(t("wiki.starterCreated"));
-                  void navigate({
-                    to: "/org/$orgId/wiki/$slug",
-                    params: { orgId: org.id, slug: wikiSlug(t("wiki.starterPages.overview")) },
-                  });
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              {t("wiki.useStarter")}
-            </Button>
-            <Button variant="ghost" icon="plus" onClick={onNew}>
-              {t("wiki.blankPage")}
-            </Button>
-          </div>
+                }}
+              >
+                {t("wiki.useStarter")}
+              </Button>
+              <Button variant="ghost" icon="plus" onClick={onNew}>
+                {t("wiki.blankPage")}
+              </Button>
+            </div>
           )
         }
       >

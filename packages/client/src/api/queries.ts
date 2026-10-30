@@ -308,7 +308,9 @@ export function useReorderRoles(orgId: string) {
           ...before,
           roles: [...before.roles]
             .map((r) => (at.has(r.id) ? { ...r, position: at.get(r.id) ?? r.position } : r))
-            .sort((a, b) => (a.kind === "everyone" ? 1 : 0) - (b.kind === "everyone" ? 1 : 0) || a.position - b.position),
+            .sort(
+              (a, b) => (a.kind === "everyone" ? 1 : 0) - (b.kind === "everyone" ? 1 : 0) || a.position - b.position,
+            ),
         });
       }
       return { before };

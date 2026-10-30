@@ -25,10 +25,10 @@ import { deleteJevKey } from "./jev-key";
 import { assertMemberRoom } from "./limits";
 import { followWorkspaceName } from "./machine-provisioning";
 import { addressDomain } from "./mail/text";
-import { addMemberRolesInTx, createDefaultRoles, givableRoleIds } from "./roles";
 import { type OperatorEvent, recordOperatorEvent } from "./operator-events";
 import { enqueue } from "./outbox";
 import { memberKeysSql, memberRankSql, type Permission, resolvePermissions } from "./permissions";
+import { addMemberRolesInTx, createDefaultRoles, givableRoleIds, rolesStillThere } from "./roles";
 import {
   assertCanWork,
   type BillingHold,
@@ -777,7 +777,8 @@ export async function removeMember(
   if (!target) return;
   if (actorId !== targetUserId) {
     const actor = await requirePermission(db, actorId, orgId, "manage_members");
-    if (target.role === "owner" && !can(actor, "manage_owners")) throw new ForbiddenError("Only owners can remove owners");
+    if (target.role === "owner" && !can(actor, "manage_owners"))
+      throw new ForbiddenError("Only owners can remove owners");
     // Only someone above them (ADR 0084): their highest role below the actor's.
     if (!outranks(actor, target.rank)) throw new ForbiddenError("Only someone above them can remove them");
   }
@@ -1446,10 +1447,13 @@ export async function resendInvitation(
     .where(and(eq(organizationInvitations.id, invitationId), eq(organizationInvitations.orgId, orgId)));
   if (!existing || existing.acceptedAt) throw new ConflictError("This invitation can't be resent");
   await assertMemberRoom(db, orgId);
+  // Its roles go again, expired or not: the ones still there, when the sender may give them (ADR 0084).
+  const roleIds = await givableRoleIds(db, actor, orgId, await rolesStillThere(db, orgId, existing.roleIds));
   return sendInvitation(db, {
     orgId,
     email: existing.email,
     role: existing.role,
+    roleIds,
     invitedBy: actorId,
     ownersOk: can(actor, "manage_owners"),
     now,

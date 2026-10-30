@@ -974,7 +974,6 @@ const ACTIVE_RUN = sql`('queued', 'running', 'waiting_approval', 'waiting_input'
 async function queryThreads(
   db: Database,
   userId: string,
-  isAdmin: boolean,
   input: ListThreadsInput & { rootId?: string; anyState?: boolean },
 ): Promise<{ rows: ThreadSqlRow[]; nextCursor: string | null }> {
   const limit = Math.min(Math.max(input.limit ?? 30, 1), 100);
@@ -1208,7 +1207,7 @@ export async function listThreads(
   // A channel's list: the same check as reading the channel (403 for non-members).
   if (input.channelId) await requireChannelAccess(db, actorId, input.orgId, input.channelId);
   const isAdmin = can(membership, "manage_channels");
-  const { rows, nextCursor } = await queryThreads(db, actorId, isAdmin, input);
+  const { rows, nextCursor } = await queryThreads(db, actorId, input);
   const extras = await threadExtras(db, input.orgId, rows);
   return { threads: rows.map((r) => toView(r, extras, actorId, isAdmin)), nextCursor };
 }
@@ -1218,7 +1217,7 @@ export async function getThread(db: Database, actorId: string, orgId: string, ro
   if (!UUID.test(rootId)) throw new NotFoundError("Thread not found");
   const { channel, membership } = await requireThread(db, actorId, orgId, rootId);
   const isAdmin = can(membership, "manage_channels");
-  const { rows } = await queryThreads(db, actorId, isAdmin, {
+  const { rows } = await queryThreads(db, actorId, {
     orgId,
     channelId: channel.id,
     rootId,

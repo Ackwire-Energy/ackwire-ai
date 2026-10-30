@@ -15,6 +15,8 @@ import {
   type AreaLevel,
   everyoneOf,
   grants,
+  holdsAll,
+  isBelow,
   isEveryone,
   levelOf,
   levelOptions,
@@ -81,7 +83,9 @@ export function roleSummary(t: TFunction, locale: string, role: OrgRole, everyon
   const words = keys.slice(0, 3).map((k) => t(`permissions.${k}.say`));
   if (keys.length > 3) words.push(t("rolesPage.summary.more", { count: keys.length - 3 }));
   if (isEveryone(role))
-    return keys.length ? t("rolesPage.summary.everyone", { list: listFormat(locale, words) }) : t("rolesPage.summary.everyoneNone");
+    return keys.length
+      ? t("rolesPage.summary.everyone", { list: listFormat(locale, words) })
+      : t("rolesPage.summary.everyoneNone");
   return keys.length ? t("rolesPage.summary.extra", { list: listFormat(locale, words) }) : t("rolesPage.summary.none");
 }
 
@@ -293,12 +297,17 @@ function RolePage({
   const area = (a: PermissionArea) => {
     const level = levelOf(role, a, everyone);
     const options = levelOptions(role, a, everyone);
-    const reach = admin ? [] : a.keys.filter((k) => grants(role.permissions).has(k) || (!base && grants(everyone?.permissions ?? []).has(k)));
+    const reach = admin
+      ? []
+      : a.keys.filter((k) => grants(role.permissions).has(k) || (!base && grants(everyone?.permissions ?? []).has(k)));
     const expanded = open.has(a.id);
     const line = admin
       ? t("rolesPage.viaAdmin")
       : reach.length
-        ? listFormat(i18n.language, reach.map((k) => t(`permissions.${k as RolePermission}.short`)))
+        ? listFormat(
+            i18n.language,
+            reach.map((k) => t(`permissions.${k as RolePermission}.short`)),
+          )
         : t("rolesPage.nothing");
     const label = t(`permissions.areas.${a.id as PermissionAreaId}`);
     return (
@@ -368,7 +377,7 @@ function RolePage({
           <h2 className="roles-id__name">{name}</h2>
           <span className="roles-id__handle">{t("rolesPage.people", { count: holders.length })}</span>
         </div>
-        {!base && role.editable && (
+        {!base && role.editable && holdsAll(org, role.permissions) && (
           <Menu
             align="end"
             label={t("rolesPage.more")}
@@ -518,6 +527,8 @@ function RolePeople({ role, roles, people }: { role: OrgRole; roles: OrgRole[]; 
   const holders = peopleWith(role, people);
   const name = roleName(t, role);
   const gives = !isEveryone(role) && role.givable && can(org, "manage_members");
+  const viewer = { role: org.role, rank: org.rank, userId: me.user.id };
+  const below = (p: Person) => isBelow(viewer, p, roles);
   const others = (p: Person) =>
     sortRoles(roles.filter((r) => r.id !== role.id && !isEveryone(r) && (p.roleIds ?? []).includes(r.id)));
   return (
@@ -555,7 +566,7 @@ function RolePeople({ role, roles, people }: { role: OrgRole; roles: OrgRole[]; 
                   <RoleChip key={r.id} role={r} />
                 ))}
               </span>
-              {gives && (
+              {gives && below(p) && (
                 <Button
                   size="sm"
                   variant="ghost"
@@ -578,15 +589,25 @@ function RolePeople({ role, roles, people }: { role: OrgRole; roles: OrgRole[]; 
         open={adding}
         onOpenChange={setAdding}
         title={t("rolesPage.addTitle", { name })}
-        candidates={people.filter((p) => !(p.roleIds ?? []).includes(role.id))}
+        candidates={people.filter((p) => !(p.roleIds ?? []).includes(role.id) && below(p))}
         roles={roles}
         emptyText={t("rolesPage.noOneLeft", { name })}
         onAdd={async (ids) => {
+          // One by one, on past a refusal: whoever got it counts, the first refusal says why.
+          let added = 0;
+          let failed: unknown = null;
           for (const id of ids) {
             const p = people.find((x) => x.userId === id);
-            if (p) await set.mutateAsync({ userId: id, roleIds: [...(p.roleIds ?? []), role.id] });
+            if (!p) continue;
+            try {
+              await set.mutateAsync({ userId: id, roleIds: [...(p.roleIds ?? []), role.id] });
+              added++;
+            } catch (e) {
+              failed ??= e;
+            }
           }
-          toast.show(t("rolesPage.added", { count: ids.length, name }));
+          if (added > 0) toast.show(t("rolesPage.added", { count: added, name }));
+          if (failed) toast.show(errorText(t, failed), "error");
         }}
       />
     </Card>
@@ -642,6 +663,7 @@ function RoleLook({ role, data, lock }: { role: OrgRole; data: OrgRoles; lock: b
           </span>
           <div className="roles-colors" role="radiogroup" aria-label={t("rolesPage.color")}>
             {data.colors.map((c) => (
+              // biome-ignore lint/a11y/useSemanticElements: a swatch button in a radio group
               <button
                 key={c}
                 type="button"
@@ -664,6 +686,7 @@ function RoleLook({ role, data, lock }: { role: OrgRole; data: OrgRoles; lock: b
             </span>
             <div className="roles-icons" role="radiogroup" aria-label={t("rolesPage.icon")}>
               {data.icons.map((n) => (
+                // biome-ignore lint/a11y/useSemanticElements: an icon button in a radio group
                 <button
                   key={n}
                   type="button"
@@ -714,7 +737,12 @@ function OwnerPage({ people, onBack }: { people: Person[]; onBack: () => void })
         </div>
       </header>
       <Card aria-labelledby="owner-only">
-        <CardHeader id="owner-only" icon="lock" title={t("rolesPage.owner.title")} subtitle={t("rolesPage.owner.sub")} />
+        <CardHeader
+          id="owner-only"
+          icon="lock"
+          title={t("rolesPage.owner.title")}
+          subtitle={t("rolesPage.owner.sub")}
+        />
         {items.map((i) => (
           <div key={i.title} className="roles-area">
             <div className="roles-area__top">
@@ -865,11 +893,9 @@ function AddPeopleDialog({
                       <span>{p.email}</span>
                     </span>
                     <span className="roles-chips">
-                      {sortRoles(roles.filter((r) => !isEveryone(r) && (p.roleIds ?? []).includes(r.id))).map(
-                        (r) => (
-                          <RoleChip key={r.id} role={r} />
-                        ),
-                      )}
+                      {sortRoles(roles.filter((r) => !isEveryone(r) && (p.roleIds ?? []).includes(r.id))).map((r) => (
+                        <RoleChip key={r.id} role={r} />
+                      ))}
                     </span>
                   </button>
                 </li>
@@ -934,7 +960,7 @@ function NewRoleDialog({
   const create = useCreateRole(org.id);
   const [name, setName] = useState("");
   const [from, setFrom] = useState("blank");
-  const copies = roles.filter((r) => !r.permissions.includes("administrator"));
+  const copies = roles.filter((r) => holdsAll(org, r.permissions));
   const choices = [
     ...TEMPLATES.map((x) => ({
       id: x.id,
@@ -997,6 +1023,7 @@ function NewRoleDialog({
           {t("rolesPage.startFrom")}
           <div className="roles-templates" role="radiogroup" aria-label={t("rolesPage.startFrom")}>
             {choices.map((c) => (
+              // biome-ignore lint/a11y/useSemanticElements: a choice button in a radio group
               <button
                 key={c.id}
                 type="button"

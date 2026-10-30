@@ -848,8 +848,7 @@ export async function agentBrainSummaries(
   ]);
   const live = new Map(machines.filter((m) => !m.deletedAt).map((m) => [m.id, m]));
   const accountById = new Map(accounts.map((r) => [r.id, r]));
-  const manages =
-    membership !== null && membership.standing?.state !== "suspended" && can(membership, "manage_agents");
+  const manages = membership !== null && membership.standing?.state !== "suspended" && can(membership, "manage_agents");
   for (const a of agents) {
     const kind = brainOf(a.brain);
     const machine = a.machineId ? live.get(a.machineId) : undefined;

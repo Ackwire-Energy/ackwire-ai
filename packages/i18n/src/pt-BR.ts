@@ -187,7 +187,12 @@ export const ptBR = {
       short: "tudo",
       say: "pode tudo, menos o que é só do dono",
     },
-    post: { title: "Mandar mensagens", desc: "Escrever e reagir nos canais em que está.", short: "mandar mensagens", say: "manda mensagens" },
+    post: {
+      title: "Mandar mensagens",
+      desc: "Escrever e reagir nos canais em que está.",
+      short: "mandar mensagens",
+      say: "manda mensagens",
+    },
     create_channels: { title: "Criar canais", desc: "Abertos ou fechados.", short: "criar canais", say: "cria canais" },
     manage_channels: {
       title: "Organizar canais",
@@ -195,8 +200,18 @@ export const ptBR = {
       short: "organizar canais",
       say: "organiza canais",
     },
-    talk_to_agents: { title: "Conversar com agentes", desc: "Chamar pelo nome e mandar mensagem direta.", short: "conversar", say: "conversa com os agentes" },
-    assign_work: { title: "Dar missões aos agentes", desc: "Pedir trabalho longo, que segue sozinho.", short: "dar missões", say: "dá missões aos agentes" },
+    talk_to_agents: {
+      title: "Conversar com agentes",
+      desc: "Chamar pelo nome e mandar mensagem direta.",
+      short: "conversar",
+      say: "conversa com os agentes",
+    },
+    assign_work: {
+      title: "Dar missões aos agentes",
+      desc: "Pedir trabalho longo, que segue sozinho.",
+      short: "dar missões",
+      say: "dá missões aos agentes",
+    },
     manage_routines: {
       title: "Criar rotinas",
       desc: "Trabalho que o agente faz sozinho na hora marcada.",
@@ -209,7 +224,12 @@ export const ptBR = {
       short: "aprovar ações",
       say: "aprova ações dos agentes",
     },
-    create_agents: { title: "Criar agentes", desc: "Quem cria vira o responsável e cuida do seu.", short: "criar agentes", say: "cria agentes" },
+    create_agents: {
+      title: "Criar agentes",
+      desc: "Quem cria vira o responsável e cuida do seu.",
+      short: "criar agentes",
+      say: "cria agentes",
+    },
     manage_agents: {
       title: "Editar qualquer agente",
       desc: "Instruções, cérebro, orçamento e o que cada um usa.",
@@ -241,7 +261,12 @@ export const ptBR = {
       say: "cuida das chaves de IA",
     },
     edit_wiki: { title: "Editar a wiki", desc: "Criar e mudar páginas.", short: "editar a wiki", say: "edita a wiki" },
-    upload_files: { title: "Subir arquivos no Drive", desc: "E apagar os que subiu.", short: "subir arquivos", say: "sobe arquivos" },
+    upload_files: {
+      title: "Subir arquivos no Drive",
+      desc: "E apagar os que subiu.",
+      short: "subir arquivos",
+      say: "sobe arquivos",
+    },
     review_memory: {
       title: "Revisar o que os agentes aprendem",
       desc: "Aceitar ou recusar o que vira memória.",
@@ -260,7 +285,12 @@ export const ptBR = {
       short: "ver custos",
       say: "vê os custos",
     },
-    view_audit: { title: "Ver a auditoria", desc: "Tudo que pessoas e agentes fizeram, com data.", short: "auditoria", say: "vê a auditoria" },
+    view_audit: {
+      title: "Ver a auditoria",
+      desc: "Tudo que pessoas e agentes fizeram, com data.",
+      short: "auditoria",
+      say: "vê a auditoria",
+    },
     configure: {
       title: "Mudar nome, logo e contexto",
       desc: "O que todo agente sabe do workspace.",
@@ -279,7 +309,12 @@ export const ptBR = {
       short: "gerenciar papéis",
       say: "gerencia papéis",
     },
-    manage_billing: { title: "Plano e cobrança", desc: "O plano, o cartão e as faturas.", short: "cobrança", say: "cuida da cobrança" },
+    manage_billing: {
+      title: "Plano e cobrança",
+      desc: "O plano, o cartão e as faturas.",
+      short: "cobrança",
+      say: "cuida da cobrança",
+    },
   },
   auth: {
     email: "E-mail",

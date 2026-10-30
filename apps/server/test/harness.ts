@@ -299,7 +299,10 @@ export async function joinByInvitation(
   if (options.role === "admin") {
     const res = await admin(`/api/app/organizations/${orgId}/roles`);
     const { roles } = (await res.json()) as { roles: { id: string; permissions: string[] }[] };
-    roleIds = roles.filter((r) => r.permissions.includes("administrator")).map((r) => r.id).slice(0, 1);
+    roleIds = roles
+      .filter((r) => r.permissions.includes("administrator"))
+      .map((r) => r.id)
+      .slice(0, 1);
   }
   const invited = await admin(`/api/app/organizations/${orgId}/invitations`, {
     json: { email, roleIds },
