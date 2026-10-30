@@ -34,12 +34,7 @@ export function Spans({ inline }: { inline: Inline[] }) {
           case "link":
             // Opens in the in-app browser; a press on a link wins over the row's long press.
             return (
-              <RNText
-                key={key}
-                accessibilityRole="link"
-                onPress={() => openPage(s.href)}
-                style={styles.link}
-              >
+              <RNText key={key} accessibilityRole="link" onPress={() => openPage(s.href)} style={styles.link}>
                 {s.text}
               </RNText>
             );
