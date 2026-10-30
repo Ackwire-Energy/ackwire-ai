@@ -194,6 +194,35 @@ describe("org storage", () => {
     expect(await getMigration(f.db, f.owner.id, f.org.id)).toMatchObject({ status: "done", copied: 0, total: 0 });
   });
 
+  test("the migration deletes the source copy and skips trashed artifacts", async () => {
+    f = await setup();
+    const keep = await createArtifact(f.artifactDeps, person(f.owner.id), f.org.id, doc("Fica"));
+    const trash = await createArtifact(f.artifactDeps, person(f.owner.id), f.org.id, doc("Lixo"));
+    await deleteArtifact(f.artifactDeps, f.owner.id, f.org.id, trash.id);
+    await testStorage(f.storage, f.owner.id, f.org.id, bucket());
+    await saveStorage(f.storage, f.owner.id, f.org.id, { kind: "s3", s3: bucket() });
+
+    const [before] = await f.db
+      .select()
+      .from(schema.artifactVersions)
+      .where(eq(schema.artifactVersions.artifactId, keep.id));
+    if (!before) throw new Error("no version row");
+    const sourceKey = before.blobKey;
+    expect(f.platformBlobs.objects.has(sourceKey)).toBe(true);
+
+    // Only the live artifact counts; without the live-only filter this would be 2.
+    expect(await startMigration(f.storage, f.owner.id, f.org.id)).toMatchObject({ status: "running", total: 1 });
+    await drainOutbox(f.db, f.handlers);
+    expect(await getMigration(f.db, f.owner.id, f.org.id)).toMatchObject({ status: "done", copied: 1 });
+
+    // The live file moved to the bucket and its source copy was deleted (no pile-up when cycling storages).
+    expect(f.s3.buckets.get("acme-files")?.size).toBe(1);
+    expect(f.platformBlobs.objects.has(sourceKey)).toBe(false);
+    expect((await getArtifact(f.artifactDeps, person(f.owner.id), f.org.id, keep.id)).content).toEqual(
+      doc("Fica").content,
+    );
+  });
+
   test("credentials never leak: hints only, sealed at rest, not in the audit log", async () => {
     f = await setup();
     await testStorage(f.storage, f.owner.id, f.org.id, bucket());
