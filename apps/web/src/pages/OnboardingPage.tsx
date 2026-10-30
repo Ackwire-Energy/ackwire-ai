@@ -1619,17 +1619,19 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
                 // The workspace exists: its panels read it like any of its pages.
                 <OrgProvider org={orgSummary} me={me.data}>
                   <AiPicker
-                    choice={choice}
+                    choice={aiLogin ? null : choice}
                     onPick={pickAi}
-                    have={
+                    // Kept while a row's sign-in is open: its panel, under that row, says when it's done.
+                    have={(held) =>
                       readerAgent &&
-                      !hasAi(readerAgent.id) && (
+                      (aiLogin || !hasAi(readerAgent.id)) && (
                         <ExistingRows
                           gates={gates}
                           agent={readerAgent}
                           credentials={[]}
                           named
                           signIn={aiLogin}
+                          panel={held}
                           toEveryone={replyAll}
                           onSignIn={(next) => {
                             setAiLogin(next);

@@ -191,7 +191,9 @@ export function ConnectAiFlow(props: ConnectAiFlowProps) {
   const forAgent = agents.find((a) => a.id === agentId) ?? theirs;
   const [polls, setPolls] = useState(false);
   const gates = usePlanGates(orgId, forAgent?.id, polls ? PLAN_POLL_MS : false);
-  const credentials = useCredentials(orgId, mayAddKey && forAgent !== undefined);
+  // The workspace's keys are offered in Connect an AI (a sheet) only, as on the web: in the first run (inline) the key
+  // saved there already serves every agent with no plan.
+  const credentials = useCredentials(orgId, mayAddKey && forAgent !== undefined && sheetTitle !== undefined);
   const agentRows = useAgents(orgId);
   const models = useModels();
   const [login, setLogin] = useState<ExistingSignIn | null>(null);

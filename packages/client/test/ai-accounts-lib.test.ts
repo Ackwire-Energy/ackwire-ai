@@ -105,8 +105,9 @@ describe("accountChoices: an agent's account choice, one entry per account", () 
     // Every login another agent's: Claude signs in once more for this one, its agents named.
     expect(choice([theo, claude("l", { usedBy: ["Lia"] })], [null])).toEqual([["t", ["Theo", "Lia"], true]]);
     expect(choice([theo, claude("a", { usedBy: ["Ada"] })], ["a"])).toEqual([["a", ["Theo", "Ada"], false]]);
-    // A login that thinks for nobody comes before a new one.
+    // A login that thinks for nobody comes before a new one, a signed-in one before one signed out.
     expect(choice([theo, claude("f")], [null])).toEqual([["f", ["Theo"], false]]);
+    expect(choice([claude("o", { status: "signed_out" }), claude("n")], [null])).toEqual([["n", [], false]]);
     // ChatGPT stays one agent per account, and someone else's is never one to sign in to.
     expect(choice([claude("c", { kind: "codex", usedBy: ["Theo"] })], [null])).toEqual([["c", ["Theo"], false]]);
     expect(choice([claude("x", { mine: false, ownerId: "u_bia", email: null, usedBy: ["Theo"] })], [null])).toEqual([

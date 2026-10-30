@@ -172,6 +172,8 @@ function ConnectAiDialog({
   const [linked, setLinked] = useState<Record<string, AiChoice>>({});
   const aiOf = (id: string): AgentAi => linked[id] ?? agentAi(dir.agentById.get(id), aiStateOf(status.data, id));
   const hasAi = (id: string) => aiOf(id) !== null;
+  // By the AI status, as its "Sem IA" chip: an agent on a plan whose sign-in is gone has none either.
+  const noAi = (id: string) => !linked[id] && (aiStateOf(status.data, id) ?? "no_ai") === "no_ai";
   const machineOf = (id: string) => machines.data?.find((m) => m.agents.some((a) => a.id === id))?.id;
   const setOf = (c: AiChoice) => (c === "key" ? [] : allAgents({ choice: c, agents, aiOf, machineOf }));
   // Only a pick is kept; else whom it's for is worked out on each render (a link opens this before the agents load).
@@ -260,16 +262,18 @@ function ConnectAiDialog({
           <ExistingThinks agent={forAgent} used={used} />
         ) : (
           <AiPicker
-            choice={choice}
-            have={
+            choice={login ? null : choice}
+            // Kept while a row's sign-in is open: its panel, under that row, says when it's done.
+            have={(held) =>
               forAgent &&
-              !hasAi(forAgent.id) && (
+              (login || noAi(forAgent.id)) && (
                 <ExistingRows
                   gates={gates}
                   agent={forAgent}
                   credentials={credentials.data ?? []}
                   named={!one}
                   signIn={login}
+                  panel={held}
                   onSignIn={(next) => {
                     setLogin(next);
                     setPicked(next.choice);
@@ -323,7 +327,10 @@ function ConnectAiDialog({
                   }}
                   locked={locked}
                   {...(login?.choice === choice ? { login } : {})}
-                  onKey={() => setPicked("key")}
+                  onKey={() => {
+                    setPicked("key");
+                    setLogin(null);
+                  }}
                   onComputer={() => {
                     onClose();
                     void navigate({

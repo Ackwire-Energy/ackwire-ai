@@ -58,16 +58,19 @@ export interface AccountChoice<A extends MachineAccount> {
 
 /**
  * An agent's account choice, one entry per account (`groupPlans`): the first of `ids` it has a login of (the one
- * chosen, then the one the agent thinks with), else a login of the viewer's that thinks for nobody, else its first.
+ * chosen, then the one the agent thinks with), else a login of the viewer's that thinks for nobody (a signed-in one
+ * first: a new sign-in of Claude can sign the account's other logins out), else its first.
  */
 export function accountChoices<A extends MachineAccount & { machineId?: string }>(
   accounts: readonly A[],
   ids: readonly (string | null | undefined)[],
 ): AccountChoice<A>[] {
   return groupPlans(accounts).flatMap(({ logins, usedBy }) => {
+    const free = logins.filter((l) => l.mine && l.usedBy.length === 0);
     const own =
       ids.map((id) => logins.find((l) => l.id === id)).find(Boolean) ??
-      logins.find((l) => l.mine && l.usedBy.length === 0);
+      free.find((l) => l.status === "active") ??
+      free[0];
     const login = own ?? logins[0];
     if (!login) return [];
     return [{ login, usedBy, also: !own && login.mine && loginPerAgent(login.kind, login.provider) }];

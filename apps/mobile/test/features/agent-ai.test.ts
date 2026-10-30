@@ -259,6 +259,9 @@ describe("the agent's AI", () => {
     expect(home.indexOf('t("connectAi.have.title")')).toBeLessThan(home.indexOf('t("mobile.ai.yourPlan")'));
     expect(home).toContain("<AiRow");
     expect(connect).toContain("existingRows(t, gates.view, credentials.data ?? [], forAgent.name)");
+    // The workspace's keys only in Connect an AI (a sheet), as on the web: the first run's saved key already serves
+    // every agent with no plan.
+    expect(connect).toContain("useCredentials(orgId, mayAddKey && forAgent !== undefined && sheetTitle !== undefined)");
   });
 
   test("a card whose plan's sign-in ended: the agent says so, and Entrar de novo opens on its own plan", async () => {

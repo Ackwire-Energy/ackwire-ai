@@ -74,7 +74,7 @@ import {
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
-import { type ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
+import { Fragment, type ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
@@ -144,7 +144,7 @@ export type PlanGates = ReturnType<typeof usePlanGates>;
 /**
  * The six plans as tiles (one dims where it can't sign in; it still opens its panel), then the API key row, with the
  * chosen option's `panel` right under it: nothing comes between an option and its steps. `have`: what the person
- * already has (`ExistingRows`), before them.
+ * already has (`ExistingRows`), before them; with `choice` null one of its rows is chosen, and it gets the panel.
  */
 export function AiPicker({
   choice,
@@ -153,25 +153,25 @@ export function AiPicker({
   panel,
   have,
 }: {
-  choice: AiChoice;
+  choice: AiChoice | null;
   onPick: (choice: AiChoice) => void;
   dims?: (choice: PlanChoice) => boolean;
   panel: ReactNode;
-  have?: ReactNode;
+  have?: (panel: ReactNode) => ReactNode;
 }) {
   const { t } = useTranslation();
   return (
     <>
       {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
       <div className="grid-options grid-options--plans" role="group" aria-label={t("onboarding.keyStep.title")}>
-        {have}
+        {have?.(choice === null && panel)}
         {PLAN_CHOICES.map((c) => (
           <OptionCard key={c} pressed={choice === c} onClick={() => onPick(c)}>
             <ProviderLogo id={planMark(c)} size="sm" off={dims?.(c)} />
             <span className="ac-option__title">{planLabel(t, c)}</span>
           </OptionCard>
         ))}
-        {choice !== "key" && panel}
+        {choice !== null && choice !== "key" && panel}
         <p className="ai-picker__or">{t("connectAi.orPayGo")}</p>
         <OptionCard pressed={choice === "key"} onClick={() => onPick("key")} className="ai-picker__key ac-iconline">
           <ProviderStack ids={KEY_MARKS} />
@@ -213,9 +213,9 @@ export interface ExistingUsed {
 /**
  * What the person already has for one agent with no AI (`existingAi`), as the picker's first rows, under a line that
  * says so: an account on its computer used in one click, no sign-in (taken from the agent on it where it may think
- * for one agent only), or signed in once more for this agent in its plan's panel (`onSignIn`); a workspace key in one
- * click on the workspace's model, with the budget line; someone else's account shown, locked. A plan that can't run
- * on that computer dims its rows, as its tile.
+ * for one agent only), or signed in once more for this agent in its plan's panel (`onSignIn`, the panel right under
+ * its row); a workspace key in one click on the workspace's model, with the budget line; someone else's account shown,
+ * locked. A plan that can't run on that computer dims its rows, as its tile.
  */
 export function ExistingRows({
   gates,
@@ -223,6 +223,7 @@ export function ExistingRows({
   credentials,
   named = false,
   signIn,
+  panel,
   toEveryone = false,
   onSignIn,
   onUsed,
@@ -235,6 +236,8 @@ export function ExistingRows({
   /** The line says for whom (the title doesn't). */
   named?: boolean;
   signIn?: ExistingSignIn | null;
+  /** That sign-in's plan panel, from `AiPicker`. */
+  panel?: ReactNode;
   /** A plan picked here lets everyone talk to it ("Responde a todos" on where the caller keeps it). */
   toEveryone?: boolean;
   onSignIn: (signIn: ExistingSignIn) => void;
@@ -251,7 +254,7 @@ export function ExistingRows({
   const view = gates.view;
   if (!view || view.agentId !== agent.id) return null;
   const rows = existingAi(view, credentials);
-  if (rows.length === 0) return null;
+  if (rows.length === 0 && !panel) return null;
   const save = async (run: () => Promise<ExistingUsed>) => {
     setBusy(true);
     try {
@@ -289,55 +292,62 @@ export function ExistingRows({
       return { label: key.label, choice: "key", onlyOwner: false };
     });
   const g = agentGrammar(t, agent.name);
+  const items = rows.map((r) => {
+    if (r.kind === "key") {
+      const k = r.key;
+      return (
+        <OptionCard
+          key={k.id}
+          pressed={false}
+          disabled={busy}
+          onClick={() => void pickKey(k)}
+          className="ai-picker__key ac-iconline"
+        >
+          <ProviderLogo id={k.provider} size="sm" />
+          <span className="ac-option__text">
+            <span className="ac-option__title">{k.label}</span>
+            <span className="ac-option__desc">
+              {t("newAgent.otherKeyDesc", { provider: providerLabel(k.provider), hint: k.keyHint })}
+            </span>
+            <span className="ac-option__desc">{t("agentPage.work.brain.modelText", g)}</span>
+          </span>
+        </OptionCard>
+      );
+    }
+    const a = r.choice.login;
+    const option = accountOption(t, i18n.language, r.choice, agent.name);
+    const choice = planOfAccount(a);
+    const pick = () => {
+      if (r.act === "use" || r.act === "move") void pickAccount(a, r.act === "move");
+      else if (r.act === "also") onSignIn({ choice, from: a.id, email: a.email });
+      else if (r.act === "again") onSignIn({ choice, from: a.id, again: a.id, email: a.email });
+    };
+    return (
+      <OptionCard
+        key={a.id}
+        pressed={signIn?.from === a.id}
+        disabled={option.disabled || busy || gateDims(gates.gateOf(choice))}
+        onClick={pick}
+        className="ai-picker__key ac-iconline"
+      >
+        {option.leading}
+        <span className="ac-option__text">
+          <span className="ac-option__title">{option.label}</span>
+          {option.description && <span className="ac-option__desc">{option.description}</span>}
+        </span>
+      </OptionCard>
+    );
+  });
+  // The panel under its row, keyed among the rows so it stays mounted as they change: once the sign-in makes that login
+  // this agent's, the row leaves the list, and the panel, saying it's done, stays after the others.
+  if (panel) {
+    const at = rows.findIndex((r) => r.kind === "account" && r.choice.login.id === signIn?.from);
+    items.splice(at < 0 ? items.length : at + 1, 0, <Fragment key="panel">{panel}</Fragment>);
+  }
   return (
     <>
       <p className="ai-picker__or">{named ? t("connectAi.have.titleFor", g) : t("connectAi.have.title")}</p>
-      {rows.map((r) => {
-        if (r.kind === "key") {
-          const k = r.key;
-          return (
-            <OptionCard
-              key={k.id}
-              pressed={false}
-              disabled={busy}
-              onClick={() => void pickKey(k)}
-              className="ai-picker__key ac-iconline"
-            >
-              <ProviderLogo id={k.provider} size="sm" />
-              <span className="ac-option__text">
-                <span className="ac-option__title">{k.label}</span>
-                <span className="ac-option__desc">
-                  {t("newAgent.otherKeyDesc", { provider: providerLabel(k.provider), hint: k.keyHint })}
-                </span>
-                <span className="ac-option__desc">{t("agentPage.work.brain.modelText", g)}</span>
-              </span>
-            </OptionCard>
-          );
-        }
-        const a = r.choice.login;
-        const option = accountOption(t, i18n.language, r.choice, agent.name);
-        const choice = planOfAccount(a);
-        const pick = () => {
-          if (r.act === "use" || r.act === "move") void pickAccount(a, r.act === "move");
-          else if (r.act === "also") onSignIn({ choice, from: a.id, email: a.email });
-          else if (r.act === "again") onSignIn({ choice, from: a.id, again: a.id, email: a.email });
-        };
-        return (
-          <OptionCard
-            key={a.id}
-            pressed={signIn?.from === a.id}
-            disabled={option.disabled || busy || gateDims(gates.gateOf(choice))}
-            onClick={pick}
-            className="ai-picker__key ac-iconline"
-          >
-            {option.leading}
-            <span className="ac-option__text">
-              <span className="ac-option__title">{option.label}</span>
-              {option.description && <span className="ac-option__desc">{option.description}</span>}
-            </span>
-          </OptionCard>
-        );
-      })}
+      {items}
       <p className="ai-picker__or">{t("connectAi.have.other")}</p>
     </>
   );
