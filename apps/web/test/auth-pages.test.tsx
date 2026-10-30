@@ -1811,19 +1811,16 @@ describe("Onboarding", () => {
     await throughImport(state);
     const org = state.me?.organizations.at(-1);
     // Each step passed is saved, a skipped one too; making the workspace passed the first.
-    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args[1])).toEqual([
-      { step: "import" },
-      { step: "computer" },
-    ]);
-    expect(org?.onboarding?.step).toBe("computer");
+    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args[1])).toEqual([{ step: "import" }, { step: "agents" }]);
+    expect(org?.onboarding?.step).toBe("agents");
 
     // Not the workspace: its onboarding, at that step.
     for (const path of ["/", `/org/${org?.id}/drive`, "/onboarding"]) {
       cleanup();
       const { router } = await renderApp(path, { api });
       expect(router.state.location.pathname).toBe("/onboarding");
-      expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
-      expect(progress()).toBe("Faltam 3 etapas");
+      expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
+      expect(progress()).toBe("Faltam 4 etapas");
     }
     // With what was saved: the context, and the workspace's name, which Continue keeps on the same workspace.
     await click(button("Voltar"), 4);
@@ -1843,7 +1840,7 @@ describe("Onboarding", () => {
     await throughContext(state);
     const org = state.me?.organizations.at(-1);
     const orgId = org?.id ?? "";
-    // In another tab: the import and the computer skipped, the team kept (Theo and Ada).
+    // In another tab: the import skipped, the team made on the agents step (Theo and Ada).
     for (const p of [
       { name: "Theo", handle: "theo", appearance: { color: "indigo", eyes: "round", accessory: "cap" } },
       { name: "Ada", handle: "ada", appearance: { color: "green", eyes: "wide", accessory: "headphones" } },
@@ -1858,7 +1855,7 @@ describe("Onboarding", () => {
     expect(button(/Theo · PM/).getAttribute("aria-pressed")).toBe("true");
     expect(button(/Lia · Pesquisa/).getAttribute("aria-pressed")).toBe("false");
     await next();
-    expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
+    expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
     expect(calls(state, "agents.create")).toHaveLength(2);
 
     await api.orgs.saveOnboarding(orgId, { finished: true });
@@ -1944,7 +1941,6 @@ describe("Onboarding", () => {
   test("keeping the team again after a try cut short: the agents made stay, all in #general, none made twice", async () => {
     const { state, api } = await start();
     await throughImport(state);
-    await skip();
     // The first try stops after making Theo, before #general; the second after making Ada, before her look.
     let addFails = true;
     const addMember = api.chat.addMember;
@@ -1969,7 +1965,7 @@ describe("Onboarding", () => {
       return create(orgId, input);
     };
     for (let i = 0; i < 3; i++) await click(button(/^Criar \d+ agentes?$/), 8);
-    expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
+    expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
     expect(calls(state, "agents.create").map((c) => (c.args[1] as { handle: string }).handle)).toEqual([
       "theo",
       "ada",
@@ -2488,10 +2484,9 @@ describe("Onboarding", () => {
     expect(screen().queryByRole("link", { name: /Abrir Conectores/ })).toBeNull();
     await click(screen().getByRole("checkbox", { name: "Trazer Quill" }), 1);
     await next();
-    await skip();
     // Picked, not in yet: a reload comes back to the import step, where the file is read again.
     const saved = () => calls(state, "orgs.saveOnboarding").map((c) => c.args[1]);
-    expect(saved()).toEqual([{ step: "import" }, { step: "import" }, { step: "import" }]);
+    expect(saved()).toEqual([{ step: "import" }, { step: "import" }]);
     await keepOnly();
     await keyAndCreate(/Criar 2 agentes/);
     expect(saved().at(-1)).toEqual({ step: "team" });

@@ -83,8 +83,8 @@ test("a resume opens the workspace where the server has it, with the team made t
     ids: { theo: "t", ada: "a" },
     handles: { theo: "theo", ada: "ada" },
     chosen: new Set(["ada", "theo"]),
-    // The web's computer step: the phone has none, so its agents.
-    reached: 3,
+    // The web's computer step (after its agents): the phone has none, so its agents.
+    reached: 4,
     step: "agents",
   });
   // No team yet: the picks stay as they are.

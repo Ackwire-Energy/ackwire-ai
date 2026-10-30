@@ -31,7 +31,9 @@ export const Route = createFileRoute("/org/$orgId")({
   beforeLoad: async ({ context, location, params }) => {
     const me = await requireUserIn(context, location.href, params.orgId);
     const membership = membershipIn(me, params.orgId);
-    if (membership && settingUp(membership)) throw redirect({ to: "/onboarding" });
+    // Back from its plan (`org.$orgId.onboarding.tsx`, ADR 0079) goes on to the onboarding with what it brings back.
+    if (membership && settingUp(membership) && location.pathname !== `/org/${params.orgId}/onboarding`)
+      throw redirect({ to: "/onboarding" });
     return { me, membership };
   },
   component: OrgLayout,

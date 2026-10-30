@@ -11,7 +11,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { COMPACT_QUERY } from "@/components/NavDrawer";
 import { setNavigateAway } from "@/lib/navigate";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, fakeMachinesOf, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
@@ -104,6 +104,13 @@ async function readyWorkspace(path: string, patch: Partial<Machine> = {}) {
 }
 
 /** The app at `path` where the workspace gets its own computer (`setup`), or where people pair theirs (null). */
+/** A workspace still in its onboarding, as `me` says it: saved at the computer step, the one its plan comes back from. */
+function beingSetUp(state: ReturnType<typeof seedState>) {
+  const org = state.me?.organizations[0];
+  if (org) org.onboarding = { step: "computer", generalChannelId: GENERAL_ID };
+  return state;
+}
+
 async function open(
   path: string,
   setup: Partial<ComputerSetup> | null,
@@ -1000,7 +1007,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
     const r = await open(
       `/org/${ORG_ID}/onboarding`,
       { state: "preparing", step: "starting", secondsLeft: 420, specs: SPECS, notifyByEmail: true },
-      state,
+      beingSetUp(state),
     );
     expect(r.router.state.location.pathname).toBe("/onboarding");
     expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
@@ -1028,7 +1035,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
     unpaid.authConfig = { workspaceComputer: true };
     const org = unpaid.me?.organizations[0];
     if (org) org.standing = { state: "hold", reason: "payment" };
-    await open(`/org/${ORG_ID}/onboarding`, { state: null }, unpaid);
+    await open(`/org/${ORG_ID}/onboarding`, { state: null }, beingSetUp(unpaid));
     expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
     expect(document.querySelector(".onb__paid")).toBeNull();
     cleanup();
@@ -1044,7 +1051,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
   });
 
   test("back from paying before the billing service lifts the hold: the payment received, asked again every 5 s until it does", async () => {
-    const state = seedState({ context: "Clínicas." });
+    const state = beingSetUp(seedState({ context: "Clínicas." }));
     state.authConfig = { workspaceComputer: true };
     const me = state.me;
     if (!me) throw new Error("no me");
@@ -1082,7 +1089,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
     );
     sessionStorage.setItem(`agentes.onboarding.imports.${ORG_ID}`, JSON.stringify([[ATLAS_ID, "claude-sonnet-5-5"]]));
     try {
-      await open(`/org/${ORG_ID}/onboarding`, { state: null }, state);
+      await open(`/org/${ORG_ID}/onboarding`, { state: null }, beingSetUp(state));
       const rail = screen().getByRole("navigation", { name: "Passos para começar" });
       expect(within(rail).getByRole("button", { name: /^Trazer seus agentes/ }).textContent).toContain("Atlas");
       expect(within(rail).getByRole("button", { name: /^Agentes/ }).textContent).toContain("Ada e Atlas");
@@ -1141,7 +1148,6 @@ describe("the onboarding where the workspace gets its own computer", () => {
         notifyByEmail: true,
         expectedReadyAt: new Date(Date.now() + 600_000).toISOString(),
       },
-      undefined,
       ["Theo · PM"],
     );
     // Every step keeps asking about it while it's on its way.
@@ -1273,10 +1279,9 @@ describe("the onboarding where the workspace gets its own computer", () => {
 
   test("the AI step as it turns ready, the agent's view and the accounts still on their way: ready, its sign-in loading, never a wait", async () => {
     for (const plan of ["Claude", "GLM Coding"] as const) {
-      const r = await toComputerStep(
-        { state: "preparing", step: "installing", secondsLeft: 600, specs: SPECS },
-        ["Theo · PM"],
-      );
+      const r = await toComputerStep({ state: "preparing", step: "installing", secondsLeft: 600, specs: SPECS }, [
+        "Theo · PM",
+      ]);
       await click(screen().getByRole("button", { name: "Continuar" }));
       if (plan !== "Claude") {
         const picker = screen().getByRole("group", { name: "Qual IA eles vão usar?" });

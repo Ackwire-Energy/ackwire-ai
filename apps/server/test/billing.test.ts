@@ -53,7 +53,7 @@ describe("the billing link", () => {
     expect((await link(owner, "anywhere")).status).toBe(400);
   });
 
-  test("with the hold on new workspaces: a new one waits for its plan, and its owner makes no other meanwhile", async () => {
+  test("with the hold on new workspaces: a new one waits for its plan, and its owner makes no other meanwhile, its onboarding getting the same one back", async () => {
     t = await createTestServer({
       env: { ...BILLING, BILLING_HOLD_NEW_WORKSPACES: "true", OPERATOR_API_TOKEN: "o".repeat(40) },
     });
@@ -68,9 +68,19 @@ describe("the billing link", () => {
     expect((await owner(`/api/app/organizations/${orgId}/billing-link`, { json: { from: "onboarding" } })).status).toBe(
       200,
     );
+    // Still in its onboarding, a create gives the same one back, so a reload before paying lands on it again.
     const again = await owner("/api/app/organizations", { json: { name: "Beta" } });
-    expect(again.status).toBe(403);
-    expect(await again.json()).toMatchObject({ error: { code: "org.create_unpaid", params: { orgId } } });
+    expect(again.status).toBe(200);
+    expect(await again.json()).toMatchObject({ organization: { id: orgId } });
+    // Once it is set up, another one waits for this one's plan.
+    const finished = await owner(`/api/app/organizations/${orgId}/onboarding`, {
+      method: "PATCH",
+      json: { finished: true },
+    });
+    expect(finished.status).toBe(200);
+    const another = await owner("/api/app/organizations", { json: { name: "Gama" } });
+    expect(another.status).toBe(403);
+    expect(await another.json()).toMatchObject({ error: { code: "org.create_unpaid", params: { orgId } } });
   });
 });
 
