@@ -839,6 +839,32 @@ describe("the purge", () => {
       { message: "workspace deletion went on with grants not revoked", orgId: f.org.id, ids: [box.id] },
     ]);
   });
+  test("a hold that commits while the purge revokes grants wins: the workspace stays, its grants revoked", async () => {
+    f = await setup();
+    await f.db.insert(schema.mailAccounts).values({
+      orgId: f.org.id,
+      provider: "gmail",
+      via: "composio",
+      address: "team@example.com",
+      status: "active",
+      externalAccountId: "ca_1",
+    });
+    const composio = createFakeComposioClient();
+    const client: ComposioClient = {
+      ...composio.client,
+      deleteConnectedAccount: async (id) => {
+        // Meanwhile, an operator puts a legal hold on it.
+        await setDeletionHold(f.db, f.org.id, { held: true, reason: "legal_hold" });
+        await composio.client.deleteConnectedAccount(id);
+      },
+    };
+    await scheduleDeletion({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, "owner");
+    await pastItsDate();
+    const mail = { composio: { client, connector: createFakeMailConnector().connector }, imap: null };
+    expect(await purgeWorkspace({ db: f.db, mail }, f.org.id)).toBe(false);
+    expect(await orgRow()).toMatchObject({ deletionHoldReason: "legal_hold" });
+    expect(composio.state.deletedAccounts).toEqual(["ca_1"]);
+  });
 });
 
 describe("the hourly sweep", () => {

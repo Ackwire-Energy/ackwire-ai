@@ -177,12 +177,6 @@ export async function closeForDeletion(
   input: { actorId: string; orgId: string; via: DeletionVia; emails?: { publicUrl: string } | null },
 ): Promise<{ dueAt: Date; closed: Closed | null }> {
   const { actorId, orgId, via } = input;
-  const [org] = await tx
-    .select({ dueAt: organizations.deletionDueAt, name: organizations.name })
-    .from(organizations)
-    .where(eq(organizations.id, orgId));
-  if (!org) throw new NotFoundError("This workspace no longer exists");
-  if (org.dueAt) return { dueAt: org.dueAt, closed: null };
   const [row] = await tx
     .update(organizations)
     .set({
@@ -190,10 +184,17 @@ export async function closeForDeletion(
       deletionRequestedAt: sql`now()`,
       deletionRequestedBy: actorId,
     })
-    .where(eq(organizations.id, orgId))
-    .returning({ dueAt: organizations.deletionDueAt });
+    .where(and(eq(organizations.id, orgId), isNull(organizations.deletionDueAt)))
+    .returning({ dueAt: organizations.deletionDueAt, name: organizations.name });
   const dueAt = row?.dueAt;
-  if (!dueAt) throw new NotFoundError("This workspace no longer exists");
+  if (!row || !dueAt) {
+    const [org] = await tx
+      .select({ dueAt: organizations.deletionDueAt })
+      .from(organizations)
+      .where(eq(organizations.id, orgId));
+    if (!org?.dueAt) throw new NotFoundError("This workspace no longer exists");
+    return { dueAt: org.dueAt, closed: null };
+  }
   await tx
     .delete(machineProvisioning)
     .where(and(eq(machineProvisioning.orgId, orgId), ne(machineProvisioning.state, "ready")));
@@ -222,7 +223,7 @@ export async function closeForDeletion(
         template: {
           kind: "workspace_deleting",
           locale: emailLocale(member.locale),
-          orgName: org.name,
+          orgName: row.name,
           byName: by.name,
           dueAt: due,
           timeZone: member.timeZone,
@@ -438,6 +439,7 @@ export async function purgeWorkspace(deps: PurgeDeps, orgId: string, options: { 
       .select({ id: githubAppInstallations.installationId })
       .from(githubAppInstallations)
       .where(eq(githubAppInstallations.orgId, orgId));
+    // ponytail: one cascading delete; batch it by table if a workspace's delete ever outlives the job's renewed lease.
     await tx.delete(organizations).where(eq(organizations.id, orgId));
     return { computers, installs, requestedBy: row.requestedBy, via };
   });
