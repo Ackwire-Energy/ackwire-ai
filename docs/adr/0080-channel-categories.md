@@ -6,7 +6,7 @@
 
 ## Context
 
-With a dozen channels, one alphabetical "Canais" list mixes every team's channels. People asked to group them the way Discord does: named sections in the sidebar that open and close.
+With a dozen channels, one alphabetical "Canais" list mixes every team's channels. People asked to group them: named sections in the sidebar that open and close.
 
 ## Decision
 
