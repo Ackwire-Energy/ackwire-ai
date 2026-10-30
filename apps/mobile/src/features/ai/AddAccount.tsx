@@ -1,6 +1,6 @@
 import type { AccountLoginStart, MachineAccount, MachineAccountKind } from "@agenteschat/client";
 import { keys, useAccountLogin, useApi } from "@agenteschat/client";
-import { beginLogin, freeDuplicate, isSignInCode } from "@agenteschat/client/lib/machines";
+import { beginLogin, freeDuplicate, isSignInCode, otherThanHint } from "@agenteschat/client/lib/machines";
 import { type PlanId, planKeyFits, planOf } from "@agenteschat/client/lib/plans";
 import { accountCodeAad } from "@agenteschat/client/lib/secret-box";
 import { useQueryClient } from "@tanstack/react-query";
@@ -16,8 +16,9 @@ import { Note, OpenPage, openPage, PasteField, Step, StepsCard, StepText, Waitin
 /*
  * "Adicionar conta" as on the web (ADR 0041 §2, ADR 0059): the computer starts the provider's own sign-in and its
  * page opens here, in the in-app browser: the account chosen there is the one connected. Claude: the code Claude
- * shows comes back by "Colar" (sent by itself only when it is this sign-in's) or by hand, sealed on the phone to
- * the computer's key (ADR 0027). ChatGPT: device code sign-in allowed in its settings first, then
+ * shows goes to the computer by itself as soon as it lands in the field ("Colar", a paste or typed) when it is this
+ * sign-in's; anything else waits for "Enviar", with a line under it. Either way it is sealed on the phone to the
+ * computer's key (ADR 0027). ChatGPT: device code sign-in allowed in its settings first, then
  * the device page and the one-time code to type there. A coding plan: its own key page, then the key, sealed the
  * same way; it never reaches our server. Every start is a tap; leaving stops the sign-in on the computer.
  */
@@ -33,7 +34,10 @@ export interface AddAccountProps {
   provider?: PlanId;
   /** Sign in again to this account (signed out): same account, same agents. */
   again?: string;
-  /** Claude's login hint, never asked: the email of the account signing in again. */
+  /**
+   * Claude's login hint, never asked: the email of the account signing in again, or of the one other agents use. A
+   * sign-in that comes back as another account says so instead of thinking with it.
+   */
   email?: string | null;
   /** The computer is one the person connected: its own browser may open the page itself. */
   local?: boolean;
@@ -84,6 +88,8 @@ function AddAccountFlow({
   const [sent, setSent] = useState(false);
   const [sendFailed, setSendFailed] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Signed in, but not as the account it was for (the hint): theirs to use or not.
+  const [other, setOther] = useState<MachineAccount | null>(null);
   // The sign-in still running and the computer it started on, stopped when this block goes away.
   const running = useRef<{ machineId: string; loginId: string } | null>(null);
   const gone = useRef(false);
@@ -132,11 +138,13 @@ function AddAccountFlow({
     running.current = null;
     if (result.state === "done" && result.account && !reported.current) {
       reported.current = true;
-      onAdded(result.account);
+      if (otherThanHint(hint, result.account)) setOther(result.account);
+      else onAdded(result.account);
     }
-  }, [result, onAdded]);
+  }, [result, hint, onAdded]);
 
-  const ended = startFailed || status.isError || result?.state === "failed" || result?.state === "expired";
+  const ended =
+    other !== null || startFailed || status.isError || result?.state === "failed" || result?.state === "expired";
   // For the agent in view: the account that came back, one the person already connected there and free.
   const reuse = plan || !onUse ? null : freeDuplicate(result);
 
@@ -161,7 +169,8 @@ function AddAccountFlow({
     }
   };
 
-  const pasted = (text: string) => {
+  /** What the field holds now, however it got there: a code of this sign-in goes to the computer by itself. */
+  const take = (text: string) => {
     setCode(text);
     setSendFailed(false);
     if (!plan && login && isSignInCode(text, login.url)) void send(text);
@@ -178,11 +187,8 @@ function AddAccountFlow({
     <>
       <PasteField
         value={code}
-        onChangeText={(v) => {
-          setCode(v);
-          setSendFailed(false);
-        }}
-        onPasted={pasted}
+        onChangeText={take}
+        onPasted={take}
         label={label}
         placeholder={placeholder}
         secret={secret}
@@ -209,21 +215,22 @@ function AddAccountFlow({
     </>
   );
 
-  // Signing in again came back as another account: the server keeps this one signed out and says which came back.
-  const why =
-    hint && result?.signedInAs
-      ? t(`connectAi.otherAccount.${kind}`, { email: result.signedInAs, account: hint })
-      : startFailed
-        ? t("agentPage.work.brain.add.startFailed", { computer })
-        : result?.state === "expired"
-          ? t("agentPage.work.brain.add.expired")
-          : result?.duplicate
-            ? plan
-              ? t("aiAccounts.add.duplicateKey", { account: result.duplicate.label })
-              : t(`agentPage.work.brain.add.duplicate.${kind}`, {
-                  account: result.duplicate.account?.email ?? result.duplicate.label,
-                })
-            : t("agentPage.work.brain.add.failed");
+  // Not the account it was for: a new login that came back as another (`other`), or signing in again as another,
+  // which the server keeps signed out, saying which came back.
+  const otherEmail = other?.email ?? (hint ? result?.signedInAs : undefined);
+  const why = otherEmail
+    ? t(`connectAi.otherAccount.${kind}`, { email: otherEmail, account: hint })
+    : startFailed
+      ? t("agentPage.work.brain.add.startFailed", { computer })
+      : result?.state === "expired"
+        ? t("agentPage.work.brain.add.expired")
+        : result?.duplicate
+          ? plan
+            ? t("aiAccounts.add.duplicateKey", { account: result.duplicate.label })
+            : t(`agentPage.work.brain.add.duplicate.${kind}`, {
+                account: result.duplicate.account?.email ?? result.duplicate.label,
+              })
+          : t("agentPage.work.brain.add.failed");
 
   const key = code.trim();
   const keyOk = plan ? planKeyFits(plan, key) : key.length > 0;
@@ -341,6 +348,9 @@ function AddAccountFlow({
               false,
               key.length > 0,
             )}
+            {key && !isSignInCode(key, login.url) ? (
+              <Note icon="x">{t("agentPage.work.brain.add.notCode")}</Note>
+            ) : null}
             {sent || local ? (
               <StepText>
                 {sent
@@ -361,8 +371,25 @@ function AddAccountFlow({
           <Note icon="x" live>
             {why}
           </Note>
-          <Button size="sm" variant="secondary" icon="undo" label={t("common.retry")} onPress={onRetry} />
-          {reuse && onUse ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            icon="undo"
+            label={t("common.retry")}
+            onPress={() => {
+              // A new login that came back as another account goes; one signed in again stays the person's account.
+              if (other && !again) void api.machines.removeAccount(orgId, machineId, other.id).catch(() => undefined);
+              onRetry();
+            }}
+          />
+          {other ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              label={t("connectAi.useAnyway", { email: other.email ?? other.label })}
+              onPress={() => onAdded(other)}
+            />
+          ) : reuse && onUse ? (
             <Button
               size="sm"
               variant="secondary"

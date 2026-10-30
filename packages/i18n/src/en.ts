@@ -1055,6 +1055,7 @@ export const en: Translations = {
       orgAction: "Connect an AI",
     },
     agent: "{{name}} won't reply because {{she}} has no AI\u00a0connected.",
+    signedOut: "{{name}} won't reply because {{hers}} AI is signed\u00a0out.",
     card: {
       connected: "Done: {{name}} has an AI now.",
       answerNow: "Answer now",
@@ -1109,6 +1110,7 @@ export const en: Translations = {
     own: {
       shared: "The account your agents share",
       one: "An account just for {{name}}",
+      each: "An account just for them",
     },
     chatgptCode: {
       title: "Allow sign-in with a code in ChatGPT",
@@ -1920,6 +1922,7 @@ export const en: Translations = {
           openAgain: "Open again",
           stepTwo: "Paste the code Claude shows",
           codeLabel: "Claude code",
+          notCode: "That doesn't look like Claude's code.",
           send: "Send to {{computer}}",
           sent: "Code sent. Finishing the sign-in on {{computer}}.",
           local: "On {{computer}} itself? If its browser opened by itself, just authorize there.",
@@ -8001,6 +8004,7 @@ export const en: Translations = {
       brain_busy: "My computer is busy with other tasks right now. I'll answer as soon as it's free.",
       brain_interrupted: "{{brain}} stopped before finishing. Already done, not repeated: {{tools}}.",
       no_ai: "I can't answer yet: I have no AI connected.",
+      no_ai_signed_out: "I can't answer yet: my AI is signed out.",
       action_connect_ai: "Connect an AI",
       approval_request: "Approval request: {{title}}",
       secret_request: "Secret request: {{name}}",

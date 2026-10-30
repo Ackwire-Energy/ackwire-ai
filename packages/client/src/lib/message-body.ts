@@ -42,9 +42,11 @@ export function serverBody(t: TFunction, body: string, meta: Meta): string {
   }
   const params =
     m.bodyParams && typeof m.bodyParams === "object" ? (m.bodyParams as Record<string, unknown>) : ({} as const);
-  // Waiting for room on a busy computer, not for one that went away.
+  // Waiting for room on a busy computer, not for one that went away; no AI because its sign-in ended, not none at all.
   const busy = code === "brain_unavailable" && (m.brainUnavailable as { code?: unknown } | undefined)?.code === "busy";
-  return t(`chat.body.${busy ? "brain_busy" : code}`, { ...params, defaultValue: body });
+  const signedOut = code === "no_ai" && (m.noAi as { reason?: unknown } | undefined)?.reason === "not_signed_in";
+  const shown = busy ? "brain_busy" : signedOut ? "no_ai_signed_out" : code;
+  return t(`chat.body.${shown}`, { ...params, defaultValue: body });
 }
 
 /**

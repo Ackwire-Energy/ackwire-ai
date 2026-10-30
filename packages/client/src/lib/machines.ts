@@ -217,3 +217,10 @@ export function freeDuplicate(status: AccountLoginStatus | undefined): MachineAc
   const account = status?.duplicate?.account;
   return account?.status === "active" && account.usedBy.length === 0 ? account : null;
 }
+
+/**
+ * A new sign-in came back as another account than its hint (Claude's login hint only steers Claude's page): the
+ * person's to use or not, never thought with on its own.
+ */
+export const otherThanHint = (hint: string | null | undefined, account: Pick<MachineAccount, "email">): boolean =>
+  Boolean(hint && account.email && account.email.toLowerCase() !== hint.toLowerCase());

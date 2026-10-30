@@ -216,8 +216,8 @@ export function OpenPage({
 }
 
 /**
- * A step's field with "Colar" in it (a code, a plan's key, an API key), sunken inside the steps' white card.
- * `onPasted`: what the clipboard had, trimmed (nothing when it was empty).
+ * A step's field with "Colar" in it while it is empty (a code, a plan's key, an API key), sunken inside the steps'
+ * white card. `onPasted`: what the clipboard had, trimmed (nothing when it was empty).
  */
 export function PasteField({
   value,
@@ -244,8 +244,9 @@ export function PasteField({
 }) {
   const { t } = useTranslation();
   const c = useColors();
+  const empty = !value.trim();
   return (
-    <View style={[styles.inset, { backgroundColor: c.sunken, borderColor: c.line }]}>
+    <View style={[styles.inset, !empty && styles.insetFull, { backgroundColor: c.sunken, borderColor: c.line }]}>
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -265,22 +266,24 @@ export function PasteField({
         style={[styles.insetInput, { color: c.ink }]}
       />
       {/* A button sits at its row's top (`alignSelf: flex-start`); this box keeps it on the field's middle. */}
-      <View style={styles.insetAction}>
-        <Button
-          size="sm"
-          variant="secondary"
-          icon="copy"
-          label={t("aiAccounts.add.paste")}
-          disabled={disabled}
-          onPress={() =>
-            void Clipboard.getStringAsync()
-              .catch(() => "")
-              .then((v) => {
-                if (v.trim()) onPasted(v.trim());
-              })
-          }
-        />
-      </View>
+      {empty ? (
+        <View style={styles.insetAction}>
+          <Button
+            size="sm"
+            variant="secondary"
+            icon="copy"
+            label={t("aiAccounts.add.paste")}
+            disabled={disabled}
+            onPress={() =>
+              void Clipboard.getStringAsync()
+                .catch(() => "")
+                .then((v) => {
+                  if (v.trim()) onPasted(v.trim());
+                })
+            }
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -323,6 +326,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
   },
+  // Without "Colar" beside it, the text keeps the same edge on both sides.
+  insetFull: { paddingRight: 12 },
   insetInput: { flex: 1, minWidth: 0, paddingVertical: 8, ...fieldText("callout") },
   insetAction: { alignSelf: "center" },
 });

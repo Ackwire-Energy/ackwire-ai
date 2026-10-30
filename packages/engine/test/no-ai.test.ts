@@ -17,6 +17,7 @@ import {
   type MachineStatus,
   messageRouter,
   postPersonMessage,
+  previewMeta,
   type RouterStrategy,
   runAuthorityById,
 } from "../src";
@@ -197,7 +198,12 @@ test("a computer brain signed out with nothing to fall back on: the card, not a 
   await post("@dev oi");
   await drainOutbox(f.db, handlers);
   expect(await runs()).toMatchObject([{ status: "failed", error: "no_ai" }]);
-  expect((await cards())[0]?.meta.noAi).toMatchObject({ reason: "not_signed_in", intent: "task" });
+  const [card] = await cards();
+  expect(card?.meta.noAi).toMatchObject({ reason: "not_signed_in", intent: "task" });
+  // It says its sign-in ended, not that nothing is connected, and so does the conversation list's preview of it.
+  expect(card?.body).toBe("I can't answer yet: my AI is signed out.");
+  expect(previewMeta(card?.meta)).toMatchObject({ bodyCode: "no_ai", noAi: { reason: "not_signed_in" } });
+  expect(previewMeta(card?.meta)?.noAi).toEqual({ reason: "not_signed_in" });
 });
 
 test("Responder agora: 409 while there's no AI; then the person's own message is answered, once", async () => {
