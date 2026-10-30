@@ -929,7 +929,9 @@ function ownSignIns(
   const usage: OwnPlanUsage = executors?.ownUsage ?? {};
   const out: Partial<Record<AccountKind, OwnSignIn>> = {};
   const claude = executors?.claude;
-  if (can("claude_code") && (claude?.loggedIn === true || usage.claude_code))
+  // A usage read stays after a sign-out (`ownUsage` is never cleared): `claude auth status` saying signed out wins,
+  // as it does for the turns (`claudeCodeAvailability`).
+  if (can("claude_code") && (claude?.loggedIn === true || (claude?.loggedIn !== false && usage.claude_code)))
     out.claude_code = {
       ...(claude?.plan ? { plan: claude.plan } : {}),
       ...(usage.claude_code ? { usage: usage.claude_code } : {}),

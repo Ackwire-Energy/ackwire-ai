@@ -46,7 +46,7 @@ The fallback is setting `LOGIN_PER_AGENT.claude_code` back to false: a new sign-
 
 A personal plan thinks only for agents owned by the plan's owner. This is checked when an account is chosen, when an agent changes owner (the plan is cleared), when an account goes away (the agent goes back to the API, or waits with no AI), and at run time (`plan_not_owner`, which also covers an owner who left). Runs never slip onto someone else's plan.
 
-*Amended 2026-10-30:* on a computer nobody connected (the Cloud's, a server's own) the computer's own sign-in is nobody's plan, so it never thinks for an agent there. Such an agent's run reads it as not signed in (`not_logged_in`, ADR 0041 §1) instead of `plan_not_owner`: it fails at once with no AI and Connect, rather than waiting for a computer whose coming back would change nothing.
+*Amended 2026-10-30:* on a computer nobody connected (the Cloud workspace's; the server's own computer is its owner's) the computer's own sign-in is nobody's plan, so it never thinks for an agent there. Such an agent's run reads it as not signed in (`not_logged_in`, ADR 0041 §1) instead of `plan_not_owner`: it fails at once with no AI and Connect, rather than waiting for a computer whose coming back would change nothing.
 
 ### 4. Labels people recognize
 

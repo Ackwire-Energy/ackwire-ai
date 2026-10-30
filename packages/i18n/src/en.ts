@@ -8059,6 +8059,7 @@ export const en: Translations = {
       brain_interrupted: "{{brain}} stopped before finishing. Already done, not repeated: {{tools}}.",
       no_ai: "I can't answer yet: I have no AI connected.",
       no_ai_signed_out: "I can't answer yet: my AI is signed out.",
+      no_ai_not_signed_in: "I can't answer yet: {{brain}} isn't signed in on my computer.",
       action_connect_ai: "Connect an AI",
       approval_request: "Approval request: {{title}}",
       secret_request: "Secret request: {{name}}",

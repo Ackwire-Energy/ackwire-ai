@@ -1,6 +1,7 @@
 import type { Agent, AgentAudience } from "@agenteschat/client";
 import {
   useAgents,
+  useAiAccounts,
   useBrainMachines,
   useChannels,
   useCreateAgent,
@@ -14,10 +15,12 @@ import {
   useSkills,
 } from "@agenteschat/client";
 import { LEVELS, type Level, saveLevels } from "@agenteschat/client/lib/access-levels";
+import { ownSignInReady } from "@agenteschat/client/lib/ai-accounts";
 import { type ConnectedItem, itemName } from "@agenteschat/client/lib/connected";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { choiceOf, defaultPolicy, MAIL_ACTIONS, toMailLevel } from "@agenteschat/client/lib/mail";
+import { planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { AUTO, isAuto, modelChoices } from "@agenteschat/client/lib/providers";
 import { scopeText } from "@agenteschat/client/lib/scopes";
@@ -63,6 +66,7 @@ import {
   type PlanChoice,
   usd,
 } from "@/components/AgentFields";
+import { useConnectAi } from "@/components/ConnectAi";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { MailIcon } from "@/components/MailConnect";
 import { useMediaQuery } from "@/components/NavDrawer";
@@ -168,6 +172,8 @@ function NewAgentFlow() {
   const dms = useDms(org.id);
   const platform = usePlatformKey(org.id);
   const brainMachines = useBrainMachines(org.id);
+  const aiAccounts = useAiAccounts(org.id);
+  const connect = useConnectAi();
   const toast = useToast();
   const settings = useSettings(org.id);
   const library = useSkills(org.id);
@@ -350,10 +356,16 @@ function NewAgentFlow() {
     });
     // A plan thinks on its computer: the agent goes there, then thinks with it (an automatic model stays automatic).
     // The agent exists either way: if the plan can't be saved now it stays on the API, and its page says so.
+    let signIn = false;
     if (plan) {
       try {
         await api.sandbox.setTarget(org.id, agent.id, plan.machineId);
         await api.agents.setBrain(org.id, agent.id, { brain: plan.kind });
+        // Saved with no account, it thinks with that computer's own sign-in, which thinks only for agents of whoever
+        // connected it, where that CLI is signed in (never on the workspace's computer). Else, for an agent of the
+        // person's own, its plan's sign-in opens once it's created: only the owner signs a plan in for it.
+        const row = aiAccounts.data?.computers.find((c) => c.machineId === plan.machineId);
+        signIn = ownerId === me.user.id && !ownSignInReady({ ownSignIn: row?.mine === true }, row, plan.kind);
       } catch {
         toast.show(t("newAgent.planNotSaved", { ...g, brain: t(`brain.card.${plan.kind}`) }), "error");
       }
@@ -396,6 +408,7 @@ function NewAgentFlow() {
     });
     mood.react("happy", 2200);
     scrollTop();
+    if (plan && signIn) connect?.open({ agentId: agent.id, plan: planOfKind(plan.kind) });
   };
   const next = () => {
     if (created || create.isPending) return;

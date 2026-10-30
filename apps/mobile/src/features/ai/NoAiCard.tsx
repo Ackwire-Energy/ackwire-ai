@@ -7,7 +7,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, Icon, Text, useTheme } from "@/ui";
+import { Button, LineIcon, Text, useTheme } from "@/ui";
 import { useDirectory, useMeId } from "../shared/hooks";
 
 type Answer = "pending" | "answering" | "still_missing";
@@ -75,7 +75,7 @@ export function NoAiCard({ message: m }: { message: Message }) {
   return (
     <View style={[styles.card, { backgroundColor: colors.sunken }]}>
       <View style={styles.top}>
-        <Icon name={ready || answering ? "check" : "bolt"} size={16} color={colors.ink2} />
+        <LineIcon name={ready || answering ? "check" : "bolt"} variant="subhead" size={16} color={colors.ink2} />
         <Text variant="subhead" style={styles.title}>
           {title}
         </Text>
@@ -112,6 +112,6 @@ export function NoAiCard({ message: m }: { message: Message }) {
 
 const styles = StyleSheet.create({
   card: { marginTop: 10, borderRadius: 14, padding: 12, gap: 8, alignItems: "flex-start" },
-  top: { flexDirection: "row", alignItems: "center", gap: 8 },
+  top: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   title: { flex: 1, fontWeight: "600" },
 });

@@ -19,9 +19,14 @@ import { withWikiLinks } from "./wiki-links";
 
 const { agentRunSteps, agentRuns, agents, messages, routingDecisions } = schema;
 
-/** The card's English body (the apps show `chat.body.no_ai`, or `no_ai_signed_out` for a sign-in that ended). */
+/**
+ * The card's English body (the apps show `chat.body.no_ai`, `no_ai_signed_out` for a sign-in that ended, or
+ * `no_ai_not_signed_in` for the computer's own sign-in that isn't there).
+ */
 export const NO_AI_TEXT = "I can't answer yet: I have no AI connected.";
 const NO_AI_SIGNED_OUT_TEXT = "I can't answer yet: my AI is signed out.";
+const noAiNotSignedInText = (own: NonNullable<AgentAi["own"]>) =>
+  `I can't answer yet: ${own === "codex" ? "Codex" : "Claude Code"} isn't signed in on my computer.`;
 
 /** A conversation gets the card again only after this long (per agent; once while the organization has no AI). */
 export const NO_AI_CARD_EVERY_MS = 6 * 3600_000;
@@ -103,7 +108,7 @@ export async function postNoAiCard(
       channelId: run.channelId,
       threadId,
       author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
-      body: reason === "not_signed_in" ? NO_AI_SIGNED_OUT_TEXT : NO_AI_TEXT,
+      body: own ? noAiNotSignedInText(own) : reason === "not_signed_in" ? NO_AI_SIGNED_OUT_TEXT : NO_AI_TEXT,
       meta: { ...bodyCode(NO_AI), noAi },
     });
   });

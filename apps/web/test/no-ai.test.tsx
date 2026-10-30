@@ -235,6 +235,22 @@ describe("no AI connected: above the composer", () => {
     await open(seedState({ aiStatus: aiStatus(true, ATLAS_ID) }), `agents/${ADA_ID}`);
     expect(screen().getByRole("region", { name: "Como trabalha" }).textContent).toContain("o modelo do workspace");
   });
+
+  test("the agent's page, for an agent on Codex: Connect opens on ChatGPT, its plan, from 'Sem IA' and the cell", async () => {
+    const state = walters(seedState({ aiStatus: aiStatus(true, ADA_ID) }), ADA_ID);
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.brain = { kind: "codex", model: null };
+    await open(state, `agents/${ADA_ID}`);
+    await click(screen().getByRole("button", { name: "Sem IA" }), 6);
+    const chip = dialog("Conectar uma IA para a Ada") as HTMLElement;
+    expect(option(chip, /^ChatGPT$/).getAttribute("aria-pressed")).toBe("true");
+    expect(option(chip, /^Claude$/).getAttribute("aria-pressed")).toBe("false");
+    await click(within(chip).getByRole("button", { name: "Fechar" }));
+    const work = screen().getByRole("region", { name: "Como trabalha" });
+    await click(within(work).getByRole("button", { name: "Conectar uma IA" }), 6);
+    const cell = dialog("Conectar uma IA para a Ada") as HTMLElement;
+    expect(option(cell, /^ChatGPT$/).getAttribute("aria-pressed")).toBe("true");
+  });
 });
 
 describe("the agent's no-AI card", () => {
@@ -429,6 +445,14 @@ describe("the agent's no-AI card", () => {
     // Nothing of that computer's to share: ChatGPT's own sign-in, from here.
     expect(within(plan).queryByRole("button", { name: /^A conta que os seus agentes dividem/ })).toBeNull();
     expect(within(plan).getByRole("button", { name: "Entrar com ChatGPT" })).toBeTruthy();
+  });
+
+  test("Conectar asks the computers for their own sign-ins again: ChatGPT's is known by the usage read with it", async () => {
+    const { state } = await open(walters(withCard({ intent: "chatgpt" }), ADA_ID));
+    expect(calls(state, "machines.refreshAccountUsage")).toEqual([]);
+    await click(within(cardRow()).getByRole("button", { name: "Conectar" }), 8);
+    expect(dialog("Conectar uma IA para a Ada")).not.toBeNull();
+    expect(calls(state, "machines.refreshAccountUsage").map((c) => c.args)).toEqual([[ORG_ID]]);
   });
 
   test("a plan while the workspace's computer is on its way: it waits, for the time left; a key meanwhile", async () => {

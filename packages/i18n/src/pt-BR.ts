@@ -8112,6 +8112,8 @@ export const ptBR = {
       brain_interrupted: "O {{brain}} parou antes de terminar. Já feito, sem repetir: {{tools}}.",
       no_ai: "Ainda não consigo responder: não tenho uma IA conectada.",
       no_ai_signed_out: "Ainda não consigo responder: minha IA saiu da conta.",
+      /** The computer's own sign-in of that CLI isn't there (`meta.noAi.own`); `brain`: Codex or Claude Code. */
+      no_ai_not_signed_in: "Ainda não consigo responder: o {{brain}} está sem login no meu computador.",
       action_connect_ai: "Conectar uma IA",
       approval_request: "Pedido de aprovação: {{title}}",
       secret_request: "Pedido de segredo: {{name}}",

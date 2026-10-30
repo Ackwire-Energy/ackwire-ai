@@ -118,7 +118,7 @@ export const ownSignInName = (t: TFunction, mine: boolean, computer: string) =>
 /**
  * The computer's own sign-in of `kind` can think for the agent (ADR 0041, ADR 0059 §3): whoever connected that
  * computer owns the agent, and its runner reported that CLI signed in there (`own`, the computer's `/ai-accounts`
- * row). On a computer nobody connected (the workspace's, a server's own) it never can.
+ * row). On a computer nobody connected (the workspace's own) it never can.
  */
 export const ownSignInReady = (
   brain: Pick<AgentBrain, "ownSignIn"> | undefined,

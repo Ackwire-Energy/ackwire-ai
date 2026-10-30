@@ -188,7 +188,8 @@ describe("the agent's AI", () => {
       read("ConnectAiSteps.tsx"),
     ]);
     // One row per account (the web's choice), and "Também usada por" signs this agent in on Connect an AI.
-    expect(screen).toContain("accountChoices(accounts, [view.account]).map(({ login: a, usedBy, also })");
+    expect(screen).toContain("const choices = view ? accountChoices(accounts, [view.account]) : [];");
+    expect(screen).toContain("{choices.map(({ login: a, usedBy, also }) => {");
     expect(screen).toMatch(
       /also\s*\?\s*t\("agentPage\.work\.brain\.accountAlso", \{ agents: joinNames\(usedBy, t\("newAgent\.and"\)\) \}\)/,
     );
@@ -225,7 +226,8 @@ describe("the agent's AI", () => {
       read("ConnectAiSteps.tsx"),
     ]);
     // Its row only where the client tests say (`ownSignInListed`): never on the workspace's computer, nobody's.
-    expect(screen).toContain("{ownSignInListed(view, row, kind) ? (");
+    expect(screen).toContain("const ownRow = view !== undefined && kind !== null && ownSignInListed(view, row, kind);");
+    expect(screen).toContain("{ownRow ? (");
     expect(screen).not.toContain("hereNotYours");
     // A plan's page waits for the computer's row for ChatGPT too, not only Claude (`ownSignInFor`).
     expect(connect).toContain("brain: view && (ai.data || !(isPlanId(choice) || view.ownSignIn)) ? view : undefined,");
@@ -242,6 +244,42 @@ describe("the agent's AI", () => {
     );
     expect(en("noAi.notSignedIn.claude_code", { name: "Ada" })).toBe(
       "Claude Code isn't signed in on this computer. Connect a Claude account on Ada's page.",
+    );
+  });
+
+  test("nothing to pick on someone else's computer says who adds sign-ins there; Conectar opens on the agent's plan", async () => {
+    const read = (path: string) => Bun.file(new URL(`../../src/${path}`, import.meta.url).pathname).text();
+    const [screen, grouped, card, connect, profile] = await Promise.all([
+      read("features/ai/AgentAiScreen.tsx"),
+      read("ui/Grouped.tsx"),
+      read("features/ai/NoAiCard.tsx"),
+      read("features/ai/ConnectAiSteps.tsx"),
+      read("features/agents/AgentProfileScreen.tsx"),
+    ]);
+    // No own row, no account of the owner's, no Adicionar conta: who adds sign-ins there, and no empty card.
+    expect(screen).toContain(
+      "const lockedHere = view !== undefined && kind !== null && !ownRow && choices.length === 0 && !adds;",
+    );
+    expect(screen).toMatch(/\{lockedHere \? \(\s*<Note icon="lock">\s*\{t\("connectAi\.accountsLocked", \{/);
+    expect(grouped).toContain("if (items.length === 0) return null;");
+    // The card's mark sits on the first line of its title, which wraps to two or three on a phone.
+    expect(card).toContain('<LineIcon name={ready || answering ? "check" : "bolt"} variant="subhead" size={16}');
+    expect(card).toContain('top: { flexDirection: "row", alignItems: "flex-start", gap: 8 },');
+    // "Ada's page": its Conectar opens on the plan she thinks with (`agentPlan`), ChatGPT for Codex.
+    expect(profile).toContain("openConnectAi({ agentId: id, plan: agentPlan(agent) ?? undefined })");
+    // A plan's page asks the computers for their own sign-ins again: Codex's is known by a usage read with it.
+    expect(connect).toContain("if (asks) void api.machines.refreshAccountUsage(orgId).catch(() => undefined);");
+    const pt = await translator("pt-BR");
+    expect(pt("connectAi.accountsLocked", { name: "Theo", computer: "MacBook" })).toBe(
+      "Só Theo conecta um plano no MacBook.",
+    );
+    // The line above the card, and the conversation lists' preview: never "saiu da conta" where nobody signed in.
+    expect(pt("chat.body.no_ai_not_signed_in", { brain: "Codex" })).toBe(
+      "Ainda não consigo responder: o Codex está sem login no meu computador.",
+    );
+    const en = await translator("en");
+    expect(en("chat.body.no_ai_not_signed_in", { brain: "Claude Code" })).toBe(
+      "I can't answer yet: Claude Code isn't signed in on my computer.",
     );
   });
 

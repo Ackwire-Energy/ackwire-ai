@@ -158,23 +158,26 @@ export const choiceOfIntent = (intent: ConnectIntent | undefined): AiChoice | nu
 
 /**
  * The option chosen when the picker opens: what was asked for; the API key for someone who owns no agent but may
- * add keys, or where Claude can't sign in at all (self-host with no computer); else Claude.
+ * add keys, or where Claude can't sign in at all (self-host with no computer); else the plan the agent it's for
+ * thinks with (`plan`, `agentPlan`), else Claude.
  */
 export function defaultChoice({
   intent,
   ownsAgents,
   mayAddKey,
   claudeGate,
+  plan,
 }: {
   intent?: ConnectIntent;
   ownsAgents: boolean;
   mayAddKey: boolean;
   claudeGate: PlanGate;
+  plan?: PlanChoice | null;
 }): AiChoice {
   const asked = choiceOfIntent(intent);
   if (asked) return asked;
   if (!ownsAgents && mayAddKey) return "key";
-  return claudeGate.state === "missing" ? "key" : "claude";
+  return claudeGate.state === "missing" ? "key" : (plan ?? "claude");
 }
 
 /** "For which agent": the one asked for, else the first with no AI, else the first. */
@@ -198,14 +201,18 @@ export function agentAi(agent: Pick<Agent, "brain"> | undefined, state: AiState 
   return state === undefined || state === "no_ai" ? null : "key";
 }
 
+/** The plan an agent's computer brain signs in with, where its Connect opens; null on the model brain. */
+export function agentPlan(agent: Pick<Agent, "brain"> | undefined): PlanChoice | null {
+  const ai = agentAi(agent, undefined);
+  return ai === "key" ? null : ai;
+}
+
 /**
  * The plan a card's Sign in again opens on: the agent's own, where the card says its sign-in ended and the agent
  * still thinks with a plan; null otherwise (Connect an AI, at the card's step).
  */
-export function signInAgainPlan(card: Pick<NoAiCard, "signedOut">, agent: Pick<Agent, "brain"> | undefined) {
-  const ai = card.signedOut ? agentAi(agent, undefined) : null;
-  return ai === "key" ? null : ai;
-}
+export const signInAgainPlan = (card: Pick<NoAiCard, "signedOut">, agent: Pick<Agent, "brain"> | undefined) =>
+  card.signedOut ? agentPlan(agent) : null;
 
 /** The "For" select's choice that signs a plan in for every agent of `allAgents`. */
 export const ALL_AGENTS = "all";

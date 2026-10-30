@@ -131,7 +131,7 @@ export interface MachineStatus {
   name: string;
   /** `managed`: the workspace's own computer (ADR 0056 §10), always on. */
   kind?: string;
-  /** Who connected it; null: nobody did (the workspace's or a server's own computer). */
+  /** Who connected it; null: nobody did (the workspace's own computer). */
   pairedByUserId?: string | null;
   online: boolean;
   execAllowed: boolean;

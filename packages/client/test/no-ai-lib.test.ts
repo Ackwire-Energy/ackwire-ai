@@ -8,6 +8,7 @@ import {
   type AiChoice,
   ALL_AGENTS,
   agentAi,
+  agentPlan,
   allAgents,
   defaultChoice,
   defaultTarget,
@@ -208,6 +209,25 @@ describe("defaultChoice: what the picker opens on", () => {
       defaultChoice({ ownsAgents: true, mayAddKey: true, claudeGate: { state: "preparing", view: setup() } }),
     ).toBe("claude");
   });
+
+  test("for one agent on a plan brain, its own plan (`agentPlan`) instead of Claude; what was asked still wins", () => {
+    const on = (kind: "claude_code" | "codex" | "model", provider?: string): Pick<Agent, "brain"> => ({
+      brain: { kind, model: null, ...(provider ? { provider } : {}) },
+    });
+    expect([on("codex"), on("claude_code"), on("claude_code", "kimi"), on("model"), undefined].map(agentPlan)).toEqual([
+      "chatgpt",
+      "claude",
+      "kimi",
+      null,
+      null,
+    ]);
+    const plan = agentPlan(on("codex"));
+    expect(defaultChoice({ ownsAgents: true, mayAddKey: true, claudeGate: ready, plan })).toBe("chatgpt");
+    expect(defaultChoice({ intent: "api_key", ownsAgents: true, mayAddKey: true, claudeGate: ready, plan })).toBe(
+      "key",
+    );
+    expect(defaultChoice({ ownsAgents: true, mayAddKey: true, claudeGate: { state: "missing" }, plan })).toBe("key");
+  });
 });
 
 describe("the agent a plan starts on, and the order of the plans", () => {
@@ -397,5 +417,13 @@ describe("a card whose plan's sign-in ended", () => {
     // Only with `not_signed_in`, and only a CLI it knows: anything else stays the card it was.
     expect(noAiCardOf(own("gemini"))).toMatchObject({ signedOut: true });
     expect(noAiCardOf({ ...meta("no_key"), noAi: { ...meta("no_key").noAi, own: "codex" } })?.own).toBeUndefined();
+    // Its line, above the card and in the lists' previews (`previewMeta` keeps `own`): that CLI isn't signed in
+    // there, never that a sign-in ended.
+    const t = ((key: string, o?: { brain?: string }) => `${key}:${o?.brain ?? ""}`) as unknown as TFunction;
+    expect(serverBody(t, "…", own("codex"))).toBe("chat.body.no_ai_not_signed_in:Codex");
+    expect(serverBody(t, "…", { bodyCode: "no_ai", noAi: { reason: "not_signed_in", own: "claude_code" } })).toBe(
+      "chat.body.no_ai_not_signed_in:Claude Code",
+    );
+    expect(serverBody(t, "…", own("gemini"))).toBe("chat.body.no_ai_signed_out:");
   });
 });

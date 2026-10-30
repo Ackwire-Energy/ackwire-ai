@@ -905,31 +905,41 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       ),
     },
   ];
-  // The account says why only when it must: signed out, or only the agent's owner changes it.
+  const shownAccounts = view.canManageAccounts ? accountOptions : accountOptions.filter((o) => o.value !== ADD);
+  // On someone else's computer only whoever connected it adds a sign-in: with nothing of the owner's there, the account
+  // says so in place of an empty list.
+  const lockedHere = view.canUsePlans && shownAccounts.length === 0;
+  const pairer = work.machines.data?.find((m) => m.id === view.computer?.machineId)?.pairedBy?.name.split(" ")[0];
+  // The account says why only when it must: signed out, only the agent's owner changes it, or only whoever connected
+  // the computer adds one there.
   const accountNote = signedOut
     ? t("agentPage.work.brain.accountSignedOut")
     : !view.canUsePlans && ownerFirst
       ? t("agentPage.work.brain.accountLocked", { name: ownerFirst })
-      : null;
+      : lockedHere
+        ? t("connectAi.accountsLocked", { name: pairer ?? "", computer: computerName })
+        : null;
   const accountField = accountsOn && accountKind && (
     <BrainField>
-      <Select
-        className="agp-brainsel"
-        aria-label={t(`agentPage.work.brain.account.${accountKind}`)}
-        // Nothing chosen yet, where the computer's own sign-in can't think: it starts at "Adicionar conta".
-        value={account ?? (ownListed ? HERE : "")}
-        placeholder={view.canManageAccounts ? t("agentPage.work.brain.addAccount") : undefined}
-        disabled={!view.canUsePlans}
-        onValueChange={(v) => {
-          if (v === ADD) return setAdding(true);
-          const also = v.startsWith(ALSO) ? accounts.find((a) => `${ALSO}${a.id}` === v) : undefined;
-          if (also) return setAdding(also);
-          setArrived(null);
-          setAccount(v === HERE ? null : v);
-        }}
-        options={view.canManageAccounts ? accountOptions : accountOptions.filter((o) => o.value !== ADD)}
-        renderValue={pickerValue}
-      />
+      {!lockedHere && (
+        <Select
+          className="agp-brainsel"
+          aria-label={t(`agentPage.work.brain.account.${accountKind}`)}
+          // Nothing chosen yet, where the computer's own sign-in can't think: it starts at "Adicionar conta".
+          value={account ?? (ownListed ? HERE : "")}
+          placeholder={view.canManageAccounts ? t("agentPage.work.brain.addAccount") : undefined}
+          disabled={!view.canUsePlans}
+          onValueChange={(v) => {
+            if (v === ADD) return setAdding(true);
+            const also = v.startsWith(ALSO) ? accounts.find((a) => `${ALSO}${a.id}` === v) : undefined;
+            if (also) return setAdding(also);
+            setArrived(null);
+            setAccount(v === HERE ? null : v);
+          }}
+          options={shownAccounts}
+          renderValue={pickerValue}
+        />
+      )}
       {accountNote && <SettingNote icon={signedOut ? "alert" : "lock"}>{accountNote}</SettingNote>}
       {usage && <PlanMeter usage={usage} text={meterText} />}
       {limited && view.canUsePlans && (offers.length > 0 || view.canManageAccounts) && (

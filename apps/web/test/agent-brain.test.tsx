@@ -648,6 +648,30 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     expect(within(d).getByRole("region", { name: "Adicionar conta do ChatGPT" })).toBeTruthy();
   });
 
+  test("a computer someone else connected, with no account of hers there: it says who signs a plan in, no empty list", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    fakeMachinesOf.get(api)?.pair({
+      id: "machine_1",
+      name: "MacBook",
+      os: "darwin",
+      access: { folders: [], tools: { claude: true, codex: true, commands: true, browser: true } },
+      browser: { available: true, version: "1", chrome: null, reason: null },
+      pairedBy: { id: "u-theo", name: "Theo Lima" },
+    });
+    await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
+    // Ada is Walter's: her plan would be his, and only Theo adds sign-ins on his MacBook.
+    api.agents.brain = async () => fakeAgentBrain(ADA_ID, { ownSignIn: false, canManageAccounts: false });
+    await open(state, api);
+    const d = await brainDialog();
+    await click(card(d, /^Codex/));
+    expect(within(d).queryByRole("combobox", { name: "Conta do ChatGPT" })).toBeNull();
+    expect(d.textContent).toContain("Só Theo conecta um plano no MacBook.");
+    expect((within(d).getByRole("button", { name: "Usar meu plano do ChatGPT" }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+  });
+
   test("choosing a plan brain starts on what can think there: the computer's own sign-in, a free account, or the sign-in", async () => {
     const plus: MachineAccount = { ...work, id: "acct_plus", kind: "codex", label: "Pessoal", plan: "Plus" };
     const usage = { windows: [], source: "probe" as const, at: NOW.toISOString() };
