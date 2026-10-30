@@ -2,10 +2,10 @@ import type { AgentBrainInput, MachineAccount } from "@agenteschat/client";
 import { keys, useAgentBrain, useAiAccounts, useApi } from "@agenteschat/client";
 import { accountChoices, ownSignInName, signInPlan } from "@agenteschat/client/lib/ai-accounts";
 import { brainLine } from "@agenteschat/client/lib/brain";
-import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
+import { lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
-import { planName, planOf } from "@agenteschat/client/lib/plans";
+import { planOf } from "@agenteschat/client/lib/plans";
 import { limitOffers, planState } from "@agenteschat/ui/plan-state";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -18,9 +18,9 @@ import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, ProviderLogo, Te
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { PushedHeader } from "../shared/parts";
 import { PlanMeter } from "../usage/parts";
-import { accountKindOf, agentAccounts, takenFrom, thinkingUsage } from "./logic";
+import { accountKindOf, accountRow, agentAccounts, takenFrom, thinkingUsage } from "./logic";
 import { openConnectAi } from "./NoAiCard";
-import { Note, PlanReplies, PlanRepliesOf } from "./parts";
+import { AiRow, Note, PlanReplies, PlanRepliesOf } from "./parts";
 
 /*
  * An agent's AI on the phone (the web's "Quem pensa" for a plan, ADR 0059), from "Pensa com" on its profile: the
@@ -163,31 +163,15 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                     disabled={!mayPick || (!view.ownSignIn && view.account !== null)}
                     onPress={() => choose(null)}
                   />
-                  {accountChoices(accounts, [view.account]).map(({ login: a, usedBy, also }) => {
-                    const others = takenFrom(a, name);
-                    const about = !a.mine
-                      ? t("agentPage.work.brain.accountOf", { name: a.ownerName?.split(" ")[0] ?? "" })
-                      : also
-                        ? t("agentPage.work.brain.accountAlso", { agents: joinNames(usedBy, t("newAgent.and")) })
-                        : a.status === "signed_out"
-                          ? t("agentPage.work.brain.accountSignedOut")
-                          : others.length
-                            ? t("agentPage.work.brain.accountMove", { agents: others.join(", ") })
-                            : a.keyHint
-                              ? t("aiAccounts.page.keyEnds", { hint: a.keyHint })
-                              : (a.email ?? undefined);
-                    return (
-                      <GroupedRow
-                        key={a.id}
-                        leading={<ProviderLogo id={a.provider ?? a.kind} size="sm" off={a.status === "signed_out"} />}
-                        label={a.plan ? `${a.label} · ${planName(a.plan)}` : a.label}
-                        {...(about ? { sub: about } : {})}
-                        checked={a.id === view.account}
-                        disabled={!mayPick || !a.mine}
-                        onPress={() => (also ? connect(a, true) : choose(a))}
-                      />
-                    );
-                  })}
+                  {accountChoices(accounts, [view.account]).map((c) => (
+                    <AiRow
+                      key={c.login.id}
+                      row={accountRow(t, c, name)}
+                      checked={c.login.id === view.account}
+                      disabled={!mayPick || !c.login.mine}
+                      onPress={() => (c.also ? connect(c.login, true) : choose(c.login))}
+                    />
+                  ))}
                   {view.canUsePlans && view.canManageAccounts ? (
                     <GroupedRow
                       icon="plus"

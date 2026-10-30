@@ -1,6 +1,7 @@
 import type { TFunction } from "i18next";
-import type { AiAccounts, AiComputer, MachineAccount, MachineAccountKind, PlanUsage } from "../api/types";
-import { loginPerAgent } from "./plans";
+import type { AiAccounts, AiComputer, Credential, MachineAccount, MachineAccountKind, PlanUsage } from "../api/types";
+import { joinNames } from "./format";
+import { loginPerAgent, planName } from "./plans";
 
 /** One account as a row shows it: its logins, one per agent where its plan allows it (`LOGIN_PER_AGENT`). */
 export interface PlanAccount<A extends MachineAccount> {
@@ -57,20 +58,89 @@ export interface AccountChoice<A extends MachineAccount> {
 
 /**
  * An agent's account choice, one entry per account (`groupPlans`): the first of `ids` it has a login of (the one
- * chosen, then the one the agent thinks with), else a login of the viewer's that thinks for nobody, else its first.
+ * chosen, then the one the agent thinks with), else a login of the viewer's that thinks for nobody (a signed-in one
+ * first: a new sign-in of Claude can sign the account's other logins out), else its first.
  */
 export function accountChoices<A extends MachineAccount & { machineId?: string }>(
   accounts: readonly A[],
   ids: readonly (string | null | undefined)[],
 ): AccountChoice<A>[] {
   return groupPlans(accounts).flatMap(({ logins, usedBy }) => {
+    const free = logins.filter((l) => l.mine && l.usedBy.length === 0);
     const own =
       ids.map((id) => logins.find((l) => l.id === id)).find(Boolean) ??
-      logins.find((l) => l.mine && l.usedBy.length === 0);
+      free.find((l) => l.status === "active") ??
+      free[0];
     const login = own ?? logins[0];
     if (!login) return [];
     return [{ login, usedBy, also: !own && login.mine && loginPerAgent(login.kind, login.provider) }];
   });
+}
+
+/** An account in an agent's account choice: its name, with its plan where the CLI said it ("Claude Team · Team"). */
+export const accountTitle = (a: Pick<MachineAccount, "label" | "plan">) =>
+  a.plan ? `${a.label} · ${planName(a.plan)}` : a.label;
+
+/**
+ * The line under an account in an agent's account choice (Quem pensa and Connect an AI, web and phone): whose it is
+ * when it isn't the viewer's, the agents on it where choosing it signs this agent in to it too, signed out, the
+ * agents it would be taken from, else its key's end or its email.
+ */
+export function accountAbout(
+  t: TFunction,
+  { login: a, usedBy, also }: AccountChoice<MachineAccount>,
+  agentName: string,
+): string | undefined {
+  if (!a.mine) return t("agentPage.work.brain.accountOf", { name: a.ownerName?.split(" ")[0] ?? "" });
+  if (also) return t("agentPage.work.brain.accountAlso", { agents: joinNames(usedBy, t("newAgent.and")) });
+  if (a.status === "signed_out") return t("agentPage.work.brain.accountSignedOut");
+  const others = a.usedBy.filter((n) => n !== agentName);
+  if (others.length) return t("agentPage.work.brain.accountMove", { agents: others.join(", ") });
+  return a.keyHint ? t("aiAccounts.page.keyEnds", { hint: a.keyHint }) : (a.email ?? undefined);
+}
+
+/**
+ * What a row of what the person already has does for the agent: `use` it at once; `also` signs the agent in to that
+ * account once more (one login per agent); `again` signs a free login of it back in; `move` takes it from the agent
+ * on it; `locked`: someone else's, which only its owner picks (ADR 0041 §4, ADR 0059).
+ */
+export type ExistingAct = "use" | "also" | "again" | "move" | "locked";
+
+export type ExistingAi<A extends MachineAccount = MachineAccount> =
+  | { kind: "account"; choice: AccountChoice<A>; act: ExistingAct }
+  | { kind: "key"; key: Credential };
+
+const EXISTING_RANK: Record<ExistingAct | "key", number> = { use: 0, also: 1, again: 1, move: 1, key: 2, locked: 3 };
+
+/** What an account's row does (`ExistingAct`); null for a signed-out login another agent thinks with. */
+function existingAct({ login: a, also }: AccountChoice<MachineAccount>): ExistingAct | null {
+  if (!a.mine) return "locked";
+  if (also) return "also";
+  const used = a.usedBy.length > 0;
+  if (a.status === "signed_out") return used ? null : "again";
+  return used ? "move" : "use";
+}
+
+/**
+ * What a person already has for an agent with no AI (Connect an AI, before its new sign-ins): the accounts on the
+ * agent's computer but the one it thinks with now, one row per account (`accountChoices`), the workspace's API keys
+ * the person may use (`keys`: none for someone who may not), then someone else's accounts. The free ones first. A
+ * signed-out login another agent thinks with stays out: it thinks for nobody until its owner signs it in again.
+ */
+export function existingAi<A extends MachineAccount>(
+  view: { accounts: readonly A[]; account: string | null },
+  keys: readonly Credential[],
+): ExistingAi<A>[] {
+  const accounts = accountChoices(
+    view.accounts.filter((a) => a.id !== view.account),
+    [],
+  ).flatMap((choice): ExistingAi<A>[] => {
+    const act = existingAct(choice);
+    return act ? [{ kind: "account", choice, act }] : [];
+  });
+  const live = keys.filter((k) => !k.revokedAt).map((key): ExistingAi<A> => ({ kind: "key", key }));
+  const rank = (r: ExistingAi<A>) => EXISTING_RANK[r.kind === "key" ? "key" : r.act];
+  return [...accounts, ...live].sort((x, y) => rank(x) - rank(y));
 }
 
 /** A computer's own sign-in as "Seus planos" lists it ("Conta deste computador"). */
