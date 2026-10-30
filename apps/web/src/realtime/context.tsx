@@ -478,6 +478,11 @@ export function RealtimeProvider({
         void qc.invalidateQueries({ queryKey: keys.members(orgId) });
         void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
       }
+      // Someone arranged the sidebar's channel categories (ADR 0080): channels and categories refetch.
+      if (event.type === "channels.layout") {
+        void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
+        void qc.invalidateQueries({ queryKey: keys.channelCategories(orgId) });
+      }
       // Someone changed the calendar: the open ranges refetch.
       if (event.type === "calendar.event_updated" || event.type === "calendar.event_deleted") {
         void qc.invalidateQueries({ queryKey: keys.calendar(orgId) });

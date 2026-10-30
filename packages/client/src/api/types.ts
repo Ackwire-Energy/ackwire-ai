@@ -413,6 +413,12 @@ export interface Channel {
   visibility: "public" | "private";
   isMember: boolean;
   createdAt: string;
+  /** Who created it: may change it and its members, like admins. */
+  createdByUserId?: string | null;
+  /** Its sidebar category (ADR 0080); null or absent: on top, with none. */
+  categoryId?: string | null;
+  /** Order inside its category, from 0. */
+  position?: number;
   /**
    * Channel list only (`chat.channels`): messages since you last read it
    * (since you joined, if never), not yours; a thread reply counts only in a
@@ -421,6 +427,14 @@ export interface Channel {
   unreadCount?: number;
   /** Channel list only: the latest top-level message; null when empty or not a member. */
   lastMessage?: ChannelLastMessage | null;
+}
+
+/** A named group of channels in the sidebar, the same for everyone in the organization (ADR 0080). */
+export interface ChannelCategory {
+  id: string;
+  name: string;
+  /** Order in the sidebar, from 0. */
+  position: number;
 }
 
 /** A channel's latest top-level message, for the conversation list. */
