@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { schema } from "@agenteschat/db";
+import { eq, schema } from "@agenteschat/db";
 import { browser, createTestServer, joinByInvitation, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
@@ -101,16 +101,47 @@ test("the logo on an invitation's page: through its link or invitation only, whi
     expect(served.headers.get("x-content-type-options")).toBe("nosniff");
     expect(served.headers.get("content-security-policy")).toBe("sandbox");
     expect(served.headers.get("cache-control")).toBe("private, max-age=31536000, immutable");
+    // No session guards it: only this server's own pages may show it.
+    expect(served.headers.get("cross-origin-resource-policy")).toBe("same-origin");
   }
   // Only the workspace's current file, only through a token that works.
   expect((await anon(`/api/app/invitations/${tokens.link}/logo/0123456789abcdef.jpg`)).status).toBe(404);
   expect((await anon(`/api/app/invitations/not-a-token/logo/${file}`)).status).toBe(404);
+  // A paused workspace takes no one in: neither token shows or serves its logo until it is active again.
+  const standing = (to: "active" | "hold" | "suspended") =>
+    t.db.update(schema.organizations).set({ standing: to }).where(eq(schema.organizations.id, orgId));
+  for (const paused of ["hold", "suspended"] as const) {
+    await standing(paused);
+    expect(await preview(tokens.email)).not.toHaveProperty("logo");
+    for (const token of [tokens.link, tokens.email])
+      expect((await anon(`/api/app/invitations/${token}/logo/${file}`)).status).toBe(404);
+  }
+  await standing("active");
+  expect((await anon(`/api/app/invitations/${tokens.email}/logo/${file}`)).status).toBe(200);
   await t.db.update(schema.organizationInvitations).set({ expiresAt: new Date(Date.now() - 1000) });
   expect((await anon(`/api/app/invitations/${tokens.email}/logo/${file}`)).status).toBe(404);
   const off = await owner(`/api/app/organizations/${orgId}/invite-links/${link.id}`, { method: "DELETE" });
   expect(off.status).toBe(204);
   expect((await anon(`/api/app/invitations/${tokens.link}/logo/${file}`)).status).toBe(404);
   expect(await preview(tokens.link)).not.toHaveProperty("logo");
+});
+
+test("the logo on an invitation's page is limited per address: 60 a minute, then 429", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const link = (await (await owner(`/api/app/organizations/${orgId}/invite-links`, { json: {} })).json()) as {
+    url: string;
+  };
+  const put = await owner(`/api/app/organizations/${orgId}/logo`, { method: "PUT", json: image });
+  const file = ((await put.json()) as { logo: string }).logo.split("/").pop();
+  const logo = `/api/app/invitations/${link.url.split("/invite/")[1]}/logo/${file}`;
+  const from = (ip: string) => browser(t)(logo, { headers: { "x-forwarded-for": ip } });
+  for (let i = 0; i < 60; i++) expect((await from("203.0.113.1")).status).toBe(200);
+  const limited = await from("203.0.113.1");
+  expect(limited.status).toBe(429);
+  expect(((await limited.json()) as { error: { code: string } }).error.code).toBe("rate_limited");
+  expect((await from("203.0.113.2")).status).toBe(200);
 });
 
 test("the logo for a connected computer: machine token, ETag/304, 404 without one, 401 once removed", async () => {

@@ -1185,6 +1185,7 @@ export async function previewInvitation(db: Database, token: string, now = new D
       orgId: organizationInvitations.orgId,
       orgName: organizations.name,
       orgLogo: organizations.logo,
+      standing: organizations.standing,
       email: organizationInvitations.email,
       role: organizationInvitations.role,
       expiresAt: organizationInvitations.expiresAt,
@@ -1229,22 +1230,31 @@ export async function previewInvitation(db: Database, token: string, now = new D
     role: row.role,
     kind: "email" as const,
     invitedBy: row.invitedBy ?? null,
-    ...inviteLogo(token, row.orgLogo),
+    // Only while it can be accepted, as `invitedOrgId` serves it.
+    ...(row.standing === "active" ? inviteLogo(token, row.orgLogo) : {}),
     ...(await inviteAgents(db, row.orgId)),
   };
 }
 
-/** The workspace a token opens while it works (an invitation neither accepted nor expired, an open link), else null. */
+/**
+ * The workspace a token opens while it works, else null: an invitation neither accepted nor expired into an active
+ * workspace (`acceptInvitation` refuses any other), or an open link.
+ */
 export async function invitedOrgId(db: Executor, token: string, now = new Date()): Promise<string | null> {
   const [invitation] = await db
     .select({
       orgId: organizationInvitations.orgId,
       acceptedAt: organizationInvitations.acceptedAt,
       expiresAt: organizationInvitations.expiresAt,
+      standing: organizations.standing,
     })
     .from(organizationInvitations)
+    .innerJoin(organizations, eq(organizations.id, organizationInvitations.orgId))
     .where(eq(organizationInvitations.tokenHash, sha256(token)));
-  if (invitation) return !invitation.acceptedAt && invitation.expiresAt > now ? invitation.orgId : null;
+  if (invitation) {
+    const works = !invitation.acceptedAt && invitation.expiresAt > now && invitation.standing === "active";
+    return works ? invitation.orgId : null;
+  }
   const link = await findInviteLink(db, token);
   return link && inviteLinkOpen(link, now) ? link.link.orgId : null;
 }
