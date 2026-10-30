@@ -7,7 +7,7 @@ import { availabilityOf, lowerFirst, personLine } from "./logic";
 import { openStatus } from "./StatusScreen";
 
 /**
- * Your status at the top of Você (ADR 0081), right under you: your badge, "Definir status" (online with no line)
+ * Your status at the top of Você (ADR 0084), right under you: your badge, "Definir status" (online with no line)
  * or how you appear, and your line with when it clears; a tap pushes Status.
  */
 export function MyStatusRow() {

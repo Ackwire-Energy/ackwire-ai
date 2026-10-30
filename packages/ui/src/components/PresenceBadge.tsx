@@ -20,7 +20,7 @@ const TONES: readonly BadgeTone[] = ["ring", "base", "light", "deep", "mark"];
 const CELL = { sm: 1, lg: 1.5 } as const;
 
 /**
- * The presence badge (ADR 0081): the 9×9 pixel shape from `badgeCells` (the agents' body with its cut corner), in
+ * The presence badge (ADR 0084): the 9×9 pixel shape from `badgeCells` (the agents' body with its cut corner), in
  * their two-tone dither, with a white mark (busy: a bar, away: a clock), an empty outline for offline and a dotted one
  * for hidden. One path per tone; the colors come from the stylesheet (`.ac-presence`), so it follows the theme. Hidden
  * from screen readers: words beside it say the presence.

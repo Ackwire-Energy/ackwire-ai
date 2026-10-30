@@ -35,7 +35,7 @@ describe("channel header: who's here", () => {
     await settle(4);
     const people = screen().getByRole("region", { name: "Pessoas" });
     expect(people.textContent).toContain("Walter · você");
-    // No line written: how each appears (ADR 0081), and when someone offline was last seen.
+    // No line written: how each appears (ADR 0084), and when someone offline was last seen.
     expect(people.textContent).toContain("Online");
     expect(people.textContent).toContain("Offline · visto");
     const agents = screen().getByRole("region", { name: "Agentes" });

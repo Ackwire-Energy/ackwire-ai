@@ -16,7 +16,7 @@ import { useCallback } from "react";
 import { useOrg } from "@/components/org-context";
 
 /*
- * Presence and written status (ADR 0081) for one person or one agent, read from the lists every screen shares
+ * Presence and written status (ADR 0084) for one person or one agent, read from the lists every screen shares
  * (`…/people`, `…/agent-status`, `…/ai-status`). Each face picks its own row (`select`), so a change elsewhere
  * redraws only the faces it touches. Only the sidebar polls the agents' list (`useAgentStatuses`): every face doing it
  * would fetch it once per face.
@@ -63,7 +63,7 @@ export interface AgentShown {
   line: AgentStatusLine | null;
   /** Its last run's end (now while one is going); null = it never worked. */
   activeAt: string | null;
-  /** No AI to think with: drawn offline (ADR 0081 §3). */
+  /** No AI to think with: drawn offline (ADR 0084 §3). */
   noAi: boolean;
 }
 

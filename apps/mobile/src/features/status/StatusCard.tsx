@@ -5,7 +5,7 @@ import { Text, useTheme } from "@/ui";
 import { usePresenceOf } from "./hooks";
 
 /**
- * A status in full (ADR 0081), on a profile: its emoji, the line, and under it who wrote it or when it clears. A
+ * A status in full (ADR 0084), on a profile: its emoji, the line, and under it who wrote it or when it clears. A
  * raised card with one corner cut, like a word said.
  */
 export function StatusCard({ emoji, text, note }: { emoji: string | null; text: string; note?: string | undefined }) {

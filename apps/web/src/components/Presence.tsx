@@ -4,7 +4,7 @@ import { agentLine, personLine, useAgentPresence, usePersonPresence } from "@/ho
 import "./presence.css";
 
 /*
- * How a written status shows (ADR 0081): its emoji beside a name, with its words on hover, or emoji and words on a
+ * How a written status shows (ADR 0084): its emoji beside a name, with its words on hover, or emoji and words on a
  * muted line of their own. The data comes from `hooks/usePresence.ts`; the badge is `Avatar`'s `presence`.
  */
 

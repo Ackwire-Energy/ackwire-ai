@@ -11,9 +11,11 @@ import {
   useUsage,
 } from "@agenteschat/client";
 import { brainLine } from "@agenteschat/client/lib/brain";
+import { formatPercent } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
+import { usageShown } from "@agenteschat/client/lib/plan-usage";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { type ReactNode, useState } from "react";
@@ -26,6 +28,7 @@ import {
   AgentAvatar,
   Button,
   Card,
+  EmptyState,
   Icon,
   type IconName,
   PixelOrbit,
@@ -55,6 +58,7 @@ import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { TextArea } from "../shared/TextArea";
 import { useAgentProfileStatus } from "../status/hooks";
 import { StatusCard } from "../status/StatusCard";
+import { PlanMeter } from "../usage/parts";
 import { openAgentUsage } from "../usage/UsageScreen";
 import { openAgentEdit } from "./AgentEditScreen";
 import {
@@ -92,12 +96,24 @@ const AREA_ICON: Record<string, IconName> = {
 
 /**
  * An agent's profile as a teammate: its sky and living body (with its presence badge), its
- * role in one plain sentence, who answers for it, its presence and status line (ADR 0081), what it is on now (or
+ * role in one plain sentence, who answers for it, its presence and status line (ADR 0084), what it is on now (or
  * what waits on you), one button
  * (Conversar), then what it did for you, what it knows about you (tap to correct or forget, for its owner and
  * admins), what it can use in plain levels and the approval rule, and its month last.
  */
 export function AgentProfileScreen({ id }: { id: string }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const agent = useDirectory().anyAgent(id);
+  // No longer in the team (archived or deleted): its messages name it, it has no profile.
+  if (agent?.former) {
+    return (
+      <View style={[styles.screen, { backgroundColor: c.bg }]}>
+        <PushedHeader title={agent.name} solid={false} />
+        <EmptyState icon="agent" title={t("profile.former")} />
+      </View>
+    );
+  }
   return (
     <SheetHostProvider>
       <Profile id={id} />
@@ -143,7 +159,7 @@ function Profile({ id }: { id: string }) {
   const plain = plainRole(agent?.instructions || detail.data?.instructions);
   const busy = work.length > 0;
   const editable = canEditMemories(agent, { id: meId, role });
-  // Its presence and line (ADR 0081): the badge, "Ocupado · Num trabalho pesado", the card with what it does.
+  // Its presence and line (ADR 0084): the badge, "Ocupado · Num trabalho pesado", the card with what it does.
   const status = useAgentProfileStatus(id, name);
   const decides = mine || can(role, "manage_agents");
   const did = didLines(forYou.data?.items);
@@ -160,6 +176,8 @@ function Profile({ id }: { id: string }) {
         usage: usage.data?.find((u) => u.agentId === id) ?? null,
       })
     : null;
+  // On a plan, its limits first and the budget only once it spent through the API (ADR 0063 §5).
+  const shown = usageShown(agent?.brain, detail.data?.budgetUsedPercent ?? 0);
   const money = (v: number) =>
     new Intl.NumberFormat(i18n.language || "pt-BR", { style: "currency", currency: "USD" }).format(v);
   const date = (iso: string) =>
@@ -493,7 +511,20 @@ function Profile({ id }: { id: string }) {
 
         <Section title={t("mobile.agent.month")}>
           <View style={styles.monthCards}>
-            {spend ? (
+            {shown.plan ? (
+              <Card>
+                <View style={styles.spend}>
+                  <PlanMeter compact usage={shown.plan.usage} label={shown.plan.account} />
+                  {spend && shown.budget ? (
+                    <Text variant="caption" tone="muted">
+                      {spend.kind === "money"
+                        ? `${money(spend.spentUsd)} ${t("mobile.agent.ofBudget", { budget: money(spend.budgetUsd) })}`
+                        : `${formatPercent(i18n.language, spend.percent)} ${t("mobile.agent.ofMonthBudget")}`}
+                    </Text>
+                  ) : null}
+                </View>
+              </Card>
+            ) : spend && shown.budget ? (
               <Card>
                 <View style={styles.spend}>
                   <View style={styles.spendHead}>
@@ -509,10 +540,10 @@ function Profile({ id }: { id: string }) {
                     ) : (
                       <>
                         <Text variant="body" tone="ink2">
-                          {t("mobile.agent.percent", { percent: spend.percent })}
+                          {formatPercent(i18n.language, spend.percent)}
                         </Text>
                         <Text variant="small" tone="muted">
-                          {t("mobile.agent.ofLimit")}
+                          {t("mobile.agent.ofMonthBudget")}
                         </Text>
                       </>
                     )}

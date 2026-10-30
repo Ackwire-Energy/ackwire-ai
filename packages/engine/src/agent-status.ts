@@ -10,7 +10,7 @@ const { agents, agentRuns, channels, issues, messages, missions } = schema;
 type AgentRunRow = typeof agentRuns.$inferSelect;
 
 /**
- * An agent's presence, from its work (ADR 0081): nobody sets it by hand.
+ * An agent's presence, from its work (ADR 0084): nobody sets it by hand.
  * - `busy`: on heavy work (a routine, a task, a run going for a while, or one Jev rated heavy), or it said so.
  * - `online`: answering someone, waiting on an answer, or active recently.
  * - `away`: idle for a while.
@@ -19,7 +19,7 @@ type AgentRunRow = typeof agentRuns.$inferSelect;
  */
 export type AgentPresence = "online" | "busy" | "away" | "offline";
 
-/** What a line the server picked says (ADR 0081 §8); the apps word it in their language. */
+/** What a line the server picked says (ADR 0084 §8); the apps word it in their language. */
 export type AgentStatusKind =
   | "task"
   | "routine"
@@ -246,7 +246,7 @@ export async function announceAgentStatus(pubsub: PubSub | undefined, orgId: str
   await publishOrgEvent(pubsub, { type: "org.broadcast", orgId, event: { type: "agent.status", orgId, agentId } });
 }
 
-// ── The line picked for a run (ADR 0081 §8–10) ─────────────────────────────
+// ── The line picked for a run (ADR 0084 §8–10) ─────────────────────────────
 
 /** A line the run could show: what it says (`kind`, `subject`) and, for Jev, the same in plain English. */
 export interface StatusCandidate {
@@ -550,7 +550,7 @@ export const SET_STATUS_TOOL = "set_status";
  * The built-in `set_status`: the agent says what it is doing ("Revisando o PR #12"), shown next to its
  * name everywhere, and may ask not to be interrupted (`busy`). It clears when the run ends, or at
  * `minutes` from now. Every agent has it; it changes nothing but its own line. Optional: without it, the
- * run gets a line picked for it (ADR 0081 §8).
+ * run gets a line picked for it (ADR 0084 §8).
  */
 export function createSetStatusToolSource(deps: { pubsub?: PubSub } = {}): ToolSource {
   const tool: ToolDefinition = {

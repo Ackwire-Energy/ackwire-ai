@@ -1,5 +1,5 @@
 /**
- * The presence badge in pixels (ADR 0081): a 9×9 shape in the agents' body (the cut corner bottom left), two tones
+ * The presence badge in pixels (ADR 0084): a 9×9 shape in the agents' body (the cut corner bottom left), two tones
  * of dither like their bodies, a white mark (busy: a bar; away: a clock), an empty outline for offline and a dotted
  * one for hidden, and a one-cell ring in the surface's color around it. Pure data: the web draws it as SVG
  * (`PresenceBadge`), the phone with react-native-svg.

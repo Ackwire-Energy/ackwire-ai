@@ -4,7 +4,13 @@ import { routineReplyOf } from "./routines";
 type Meta = Record<string, unknown> | undefined;
 
 /** What reached the agent's conversation (packages/engine/src/notices.ts). */
-export type NoticeKind = "routine_handoff" | "consult_reply" | "agent_note" | "wait_result" | "talker_reply";
+export type NoticeKind =
+  | "routine_handoff"
+  | "consult_reply"
+  | "agent_note"
+  | "wait_result"
+  | "talker_reply"
+  | "proposal_result";
 
 /**
  * An event an agent's conversation got (`meta.notice`): its routine's report,

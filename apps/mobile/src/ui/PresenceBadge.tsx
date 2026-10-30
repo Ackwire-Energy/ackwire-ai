@@ -25,7 +25,7 @@ export interface PresenceBadgeProps {
 }
 
 /**
- * Presence in pixels (ADR 0081): a 9×9 cell badge in the agents' body shape, green online, red busy (a bar),
+ * Presence in pixels (ADR 0084): a 9×9 cell badge in the agents' body shape, green online, red busy (a bar),
  * amber away (a clock), an empty outline offline and a dotted one hidden, ringed in the surface behind it.
  * Decorative: the row or the face around it says the presence in words.
  */

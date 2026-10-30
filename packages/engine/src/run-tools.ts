@@ -329,7 +329,7 @@ export async function takeBridgeEffects(db: Database, runId: string): Promise<To
 
 /** What `invokeWithChip` needs: the run's tool context, where its events go and the tools of this turn. */
 export interface RunToolScope {
-  /** `judge`: checks an agent's own status line against its step (ADR 0081 §10); none, no check. */
+  /** `judge`: checks an agent's own status line against its step (ADR 0084 §10); none, no check. */
   deps: { db: Database; pubsub?: PubSub; judge?: Judge | null };
   tools: ToolGateway;
   ctx: ToolContext;
@@ -380,7 +380,7 @@ export async function invokeWithChip(
         (await artifactToolDetail(deps.db, ctx.orgId, ctx.channelId, use.name, input).catch(() => undefined)))
       : undefined;
   const code = builtIn ? toolCode(use.name, input) : undefined;
-  // The agent's line follows what it does now (ADR 0081 §10); never in the call's way.
+  // The agent's line follows what it does now (ADR 0084 §10); never in the call's way.
   if (def) await followWork(deps, ctx, def).catch(() => {});
   await publishChannelEvent(deps.pubsub, {
     type: "agent.tool",

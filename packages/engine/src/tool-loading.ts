@@ -32,7 +32,7 @@ export interface ToolGroupChoice {
   source: "judge" | "timeout" | "error" | "none";
   /** Groups loaded without asking (`keptToolGroups`). */
   kept: string[];
-  /** The agent's line and how heavy the work is (ADR 0081 §8–9): with `status` candidates, once Jev answered. */
+  /** The agent's line and how heavy the work is (ADR 0084 §8–9): with `status` candidates, once Jev answered. */
   status?: StatusPick;
 }
 
@@ -109,7 +109,7 @@ export async function chooseToolGroups(
           message: input.message.slice(0, 2000),
           recent: input.recent.map((m) => m.slice(0, 400)).join("\n"),
         },
-        // Same state, one call: the line and the weight ride on the request a run makes anyway (ADR 0081 §8).
+        // Same state, one call: the line and the weight ride on the request a run makes anyway (ADR 0084 §8).
         questions: { ...groupQuestions, ...(asksStatus ? statusQuestions(input.status ?? []) : {}) },
       }),
       timeout,

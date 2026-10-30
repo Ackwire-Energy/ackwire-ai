@@ -16,10 +16,12 @@ import type {
   AgentDatabaseInput,
   AgentDetail,
   AgentForYou,
+  AgentGroup,
   AgentInput,
   AgentMailbox,
   AgentMailboxInput,
   AgentPlanUsage,
+  AgentProposal,
   AgentQuestion,
   AgentSecret,
   AgentSkill,
@@ -69,6 +71,7 @@ import type {
   DirectMessage,
   DmRead,
   DmTarget,
+  FormerAgent,
   ForumParticipantsInput,
   ForumPost,
   ForumPostInput,
@@ -82,6 +85,7 @@ import type {
   GitHubRepositories,
   Health,
   HostComputer,
+  ImportedSource,
   ImportInput,
   ImportPlan,
   Instance,
@@ -281,7 +285,7 @@ export interface ApiClient {
     update(orgId: string, input: { name?: string; context?: string }): Promise<void>;
     /** My handle and time zone in this organization (`timezone: null` = the organization's). */
     updateMe(orgId: string, input: { handle?: string; timezone?: string | null }): Promise<Person>;
-    /** Your availability (auto, busy, hidden) and what you are doing (ADR 0081). */
+    /** Your availability (auto, busy, hidden) and what you are doing (ADR 0084). */
     setStatus(orgId: string, input: StatusInput): Promise<Person>;
     /** My profile photo: a square image (JSON only: base64), already cropped. */
     setAvatar(orgId: string, input: { imageBase64: string; contentType: string }): Promise<{ avatarUrl: string }>;
@@ -322,6 +326,18 @@ export interface ApiClient {
     /** The audit log, newest first (admins): agents' tool calls and people's changes. `before`: `next`. */
     audit(orgId: string, query?: AuditQuery & { before?: string; limit?: number }): Promise<AuditPage>;
   };
+  /** Groups of agents (ADR 0083): everyone reads them, owners and admins change them; each change answers with all. */
+  agentGroups: {
+    list(orgId: string): Promise<AgentGroup[]>;
+    /** After the other groups, with `agentIds` in it in that order (out of any group they were in). */
+    create(orgId: string, input: { name: string; agentIds?: string[] }): Promise<AgentGroup[]>;
+    /** Renames it, or moves it among the groups (`index`). */
+    update(orgId: string, groupId: string, patch: { name?: string; index?: number }): Promise<AgentGroup[]>;
+    /** Its agents go back to no group. */
+    remove(orgId: string, groupId: string): Promise<AgentGroup[]>;
+    /** Into a group at `index` among its agents (the end without one), or out of any (`groupId` null). */
+    move(orgId: string, agentId: string, input: { groupId: string | null; index?: number }): Promise<AgentGroup[]>;
+  };
   agents: {
     list(orgId: string): Promise<Agent[]>;
     /** Its month by account and day, and the account it thinks with now (ADR 0063). */
@@ -329,8 +345,16 @@ export interface ApiClient {
     /** The agents as a team: grouped by person, with who consulted whom in the last day. */
     team(orgId: string): Promise<Team>;
     create(orgId: string, input: AgentInput): Promise<Agent>;
+    /** An agent's proposal of a new agent, by its card's message (ADR 0081). */
+    proposal(orgId: string, messageId: string): Promise<AgentProposal>;
+    /** Says no to it (who may create agents): the card stays, marked denied. */
+    denyProposal(orgId: string, messageId: string): Promise<AgentProposal>;
     update(orgId: string, agentId: string, input: Partial<Omit<AgentInput, "handle">>): Promise<Agent>;
     archive(orgId: string, agentId: string): Promise<void>;
+    /** Deletes it for good (ADR 0082): owners and admins, archived or not. */
+    purge(orgId: string, agentId: string): Promise<void>;
+    /** Agents no longer in the team (archived or deleted), for the names and faces of what they left. */
+    former(orgId: string): Promise<FormerAgent[]>;
     models(): Promise<{ models: Model[]; defaultModel: string }>;
     credentials(orgId: string): Promise<Credential[]>;
     addCredential(
@@ -358,7 +382,7 @@ export interface ApiClient {
     platformKeyAvailable(orgId: string): Promise<boolean>;
     /** Whether each agent has an AI to think with, and whether the organization has any (ADR 0061). */
     aiStatus(orgId: string): Promise<AiStatus>;
-    /** Each agent's presence and what it says it is doing (ADR 0081). */
+    /** Each agent's presence and what it says it is doing (ADR 0084). */
     statuses(orgId: string): Promise<AgentStatus[]>;
     /** The team file / agent definitions behind a GitHub link, read by the backend (onboarding import; nothing saved). */
     importFromGithub(
@@ -403,6 +427,8 @@ export interface ApiClient {
   imports: {
     /** The plan of a bundle (`dryRun`), or the picked items applied: either way every item with its action. */
     apply(orgId: string, input: ImportInput): Promise<ImportPlan>;
+    /** What this workspace brought from other apps, by source package (admins). */
+    sources(orgId: string): Promise<ImportedSource[]>;
     /** Same-origin URL that downloads this workspace as a bundle (`.json`). */
     exportUrl(orgId: string): string;
   };

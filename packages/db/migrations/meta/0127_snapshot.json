@@ -1,9 +1,91 @@
 {
-  "id": "e48c1931-3397-45d5-927b-2e142e9a0c1c",
-  "prevId": "e4156184-c871-468f-88c0-0e42d2f4821f",
+  "id": "0006027f-dd2d-45b7-99cf-0100306b650a",
+  "prevId": "03059b75-ee2c-4dc7-85a9-90ef3c7c5f65",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.agent_groups": {
+      "name": "agent_groups",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "org_id": {
+          "name": "org_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "agent_groups_org_id_position_index": {
+          "name": "agent_groups_org_id_position_index",
+          "columns": [
+            {
+              "expression": "org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "position",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agent_groups_org_id_organizations_id_fk": {
+          "name": "agent_groups_org_id_organizations_id_fk",
+          "tableFrom": "agent_groups",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "org_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.agents": {
       "name": "agents",
       "schema": "",
@@ -159,60 +241,18 @@
           "primaryKey": false,
           "notNull": false
         },
-        "status_text": {
-          "name": "status_text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status_emoji": {
-          "name": "status_emoji",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status_busy": {
-          "name": "status_busy",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "status_run_id": {
-          "name": "status_run_id",
+        "group_id": {
+          "name": "group_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
-        "status_until": {
-          "name": "status_until",
-          "type": "timestamp with time zone",
+        "group_position": {
+          "name": "group_position",
+          "type": "integer",
           "primaryKey": false,
-          "notNull": false
-        },
-        "status_source": {
-          "name": "status_source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status_kind": {
-          "name": "status_kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status_subject": {
-          "name": "status_subject",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status_at": {
-          "name": "status_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": 0
         },
         "created_at": {
           "name": "created_at",
@@ -230,6 +270,12 @@
         },
         "archived_at": {
           "name": "archived_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -292,6 +338,19 @@
           "tableTo": "users",
           "columnsFrom": [
             "owner_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "agents_group_id_agent_groups_id_fk": {
+          "name": "agents_group_id_agent_groups_id_fk",
+          "tableFrom": "agents",
+          "tableTo": "agent_groups",
+          "columnsFrom": [
+            "group_id"
           ],
           "columnsTo": [
             "id"
@@ -15344,31 +15403,6 @@
         "timezone": {
           "name": "timezone",
           "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "availability": {
-          "name": "availability",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'auto'"
-        },
-        "status_text": {
-          "name": "status_text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status_emoji": {
-          "name": "status_emoji",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status_until": {
-          "name": "status_until",
-          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },

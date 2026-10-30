@@ -160,12 +160,13 @@ describe("what comes", () => {
     expect(blockedItems(b, ours, pick).has("routine:r-ops")).toBe(false);
   });
 
-  test("a chunk carries only its items, never the to-dos or what stays behind", () => {
+  test("a chunk carries its items and every agent, never the to-dos or what stays behind", () => {
     const sliced = sliceBundle(
       { ...b, todo: [{ kind: "app", label: "Gmail", agents: [] }], leftOut: [{ kind: "file", label: "x" }] },
       new Set(["agent:bia", "note:n-org"]),
     );
-    expect(sliced.agents.map((a) => a.key)).toEqual(["bia"]);
+    // The handle a new agent gets depends on the bundle's other agents, picked or not.
+    expect(sliced.agents.map((a) => a.key)).toEqual(["ana", "bia", "cid"]);
     expect(sliced.notes.map((n) => n.key)).toEqual(["n-org"]);
     expect([sliced.channels, sliced.routines, sliced.todo, sliced.leftOut]).toEqual([[], [], [], []]);
     expect(sliced.source).toEqual(b.source);

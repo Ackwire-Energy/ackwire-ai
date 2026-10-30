@@ -10,7 +10,7 @@ import type {
 } from "../api/types";
 
 /**
- * Presence and written status (ADR 0081), platform-neutral: what you pick, the suggestions, when a status
+ * Presence and written status (ADR 0084), platform-neutral: what you pick, the suggestions, when a status
  * clears, and how an agent's line reads. Web and phone draw it their own way.
  */
 
@@ -112,6 +112,6 @@ export function agentStatusText(t: TFunction, line: AgentStatusLine): { emoji: s
   };
 }
 
-/** An agent's presence as the apps draw it: no AI to think with reads as offline (ADR 0081 §3). */
+/** An agent's presence as the apps draw it: no AI to think with reads as offline (ADR 0084 §3). */
 export const agentPresenceShown = (status: AgentStatus | undefined, hasAi: boolean): AgentPresence =>
   !hasAi ? "offline" : (status?.presence ?? "away");

@@ -8,7 +8,7 @@ import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
-/* Presence and written status (ADR 0081): the "Definir status" dialog, and where a status shows. */
+/* Presence and written status (ADR 0084): the "Definir status" dialog, and where a status shows. */
 
 afterEach(() => cleanup());
 

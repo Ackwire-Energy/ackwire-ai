@@ -19,8 +19,10 @@ import type {
   AgentDatabase,
   AgentDetail,
   AgentForYou,
+  AgentGroup,
   AgentMailbox,
   AgentPlanUsage,
+  AgentProposal,
   AgentQuestion,
   AgentSecret,
   AgentSkill,
@@ -59,6 +61,7 @@ import type {
   DeviceRequest,
   DirectMessage,
   DmRead,
+  FormerAgent,
   ForumPost,
   ForumSuggestion,
   ForumTopic,
@@ -67,6 +70,7 @@ import type {
   GitHubRepositories,
   Health,
   HostComputer,
+  ImportedSource,
   ImportPlan,
   Instance,
   Invitation,
@@ -413,14 +417,42 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           },
         }),
     },
+    agentGroups: {
+      list: async (orgId) => (await request<{ groups: AgentGroup[] }>(`${org(orgId)}/agent-groups`)).groups,
+      create: async (orgId, input) =>
+        (await request<{ groups: AgentGroup[] }>(`${org(orgId)}/agent-groups`, { json: input })).groups,
+      update: async (orgId, groupId, patch) =>
+        (
+          await request<{ groups: AgentGroup[] }>(`${org(orgId)}/agent-groups/${enc(groupId)}`, {
+            method: "PATCH",
+            json: patch,
+          })
+        ).groups,
+      remove: async (orgId, groupId) =>
+        (await request<{ groups: AgentGroup[] }>(`${org(orgId)}/agent-groups/${enc(groupId)}`, { method: "DELETE" }))
+          .groups,
+      move: async (orgId, agentId, input) =>
+        (
+          await request<{ groups: AgentGroup[] }>(`${org(orgId)}/agents/${enc(agentId)}/group`, {
+            method: "PUT",
+            json: input,
+          })
+        ).groups,
+    },
     agents: {
       list: async (orgId) => (await request<{ agents: Agent[] }>(`${org(orgId)}/agents`)).agents,
       planUsage: (orgId, agentId) => request<AgentPlanUsage>(`${org(orgId)}/agents/${enc(agentId)}/usage`),
       team: (orgId) => request<Team>(`${org(orgId)}/team`),
       create: (orgId, input) => request<Agent>(`${org(orgId)}/agents`, { json: input }),
+      proposal: (orgId, messageId) => request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}`),
+      denyProposal: (orgId, messageId) =>
+        request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}/deny`, { json: {} }),
       update: (orgId, agentId, input) =>
         request<Agent>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "PATCH", json: input }),
       archive: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "DELETE" }),
+      purge: (orgId, agentId) =>
+        request<void>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "DELETE", query: { purge: "true" } }),
+      former: async (orgId) => (await request<{ agents: FormerAgent[] }>(`${org(orgId)}/former-agents`)).agents,
       models: () => request<{ models: Model[]; defaultModel: string }>("/api/app/models"),
       credentials: async (orgId) =>
         (await request<{ credentials: Credential[] }>(`${org(orgId)}/credentials`)).credentials,
@@ -481,6 +513,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     },
     imports: {
       apply: (orgId, input) => request<ImportPlan>(`${org(orgId)}/imports`, { json: input }),
+      sources: async (orgId) => (await request<{ sources: ImportedSource[] }>(`${org(orgId)}/imports`)).sources,
       exportUrl: (orgId) => `${base}${org(orgId)}/export`,
     },
     chat: {

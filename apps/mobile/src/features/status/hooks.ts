@@ -16,7 +16,7 @@ import { useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { agentWhyKey, lineText, lowerFirst, personLine } from "./logic";
 
 /**
- * Who is how (ADR 0081): people's presence and line (`GET …/people`) and agents' (`GET …/agent-status`, an agent
+ * Who is how (ADR 0084): people's presence and line (`GET …/people`) and agents' (`GET …/agent-status`, an agent
  * with no AI drawn offline). The lists refetch on `member.status` / `agent.status` (`applyWorkspaceEvent`); the
  * agents' also every 30 seconds while something shows them.
  */
@@ -71,7 +71,7 @@ export function useMyPerson(): Person | undefined {
 }
 
 /**
- * The quiet line of a DM's pill (ADR 0081): an agent's presence and what it does (its line, else `doing` from its
+ * The quiet line of a DM's pill (ADR 0084): an agent's presence and what it does (its line, else `doing` from its
  * live run, else `rest`: its role); a person's line with when it clears, else their presence. Undefined while
  * their presence is unknown (`rest` then, for an agent).
  */
@@ -102,7 +102,7 @@ export interface AgentProfileStatus {
 }
 
 /**
- * An agent's presence on its profile (ADR 0081): the badge's presence, a line with why ("Ocupado · Num trabalho
+ * An agent's presence on its profile (ADR 0084): the badge's presence, a line with why ("Ocupado · Num trabalho
  * pesado", "Ausente · Parado desde 09:21") and its status for the card: the line, and who wrote it (its own, with
  * when it clears) or that it is what it does now. Null while the statuses load.
  */

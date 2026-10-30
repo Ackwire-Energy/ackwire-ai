@@ -9,7 +9,7 @@ import { usePersonPhoto } from "./photo";
 
 /**
  * A person's or an agent's face. Agents are living bodies; long lists pass
- * `live={false}` (a still frame). `presence`: its badge on the corner (ADR 0081), ringed in `ring` (the surface
+ * `live={false}` (a still frame). `presence`: its badge on the corner (ADR 0084), ringed in `ring` (the surface
  * behind; default the page's color).
  */
 export function Face({
@@ -33,7 +33,7 @@ export function Face({
   const dir = useDirectory();
   const member = who?.type !== "agent" && who?.id ? dir.memberById.get(who.id) : undefined;
   const photo = usePersonPhoto(member ? (member.avatarUrl ?? member.image) : null);
-  const look = who?.type === "agent" ? agentLook(who.id ? dir.agentById.get(who.id) : undefined) : null;
+  const look = who?.type === "agent" ? agentLook(who.id ? dir.anyAgent(who.id) : undefined) : null;
   const face = look ? (
     <AgentAvatar agent={look} size={size} mode={mode} live={live} framed={framed} />
   ) : (
@@ -68,13 +68,13 @@ export function AgentFace({
   live?: boolean;
   /** The sky tile (default by size, see AgentAvatar). */
   framed?: boolean;
-  /** Its presence badge on the corner (ADR 0081). */
+  /** Its presence badge on the corner (ADR 0084). */
   presence?: boolean;
   /** The surface behind the badge (default the page's color). */
   ring?: string;
 }) {
   const dir = useDirectory();
-  const look = agentLook(agentId ? dir.agentById.get(agentId) : undefined);
+  const look = agentLook(agentId ? dir.anyAgent(agentId) : undefined);
   const face = <AgentAvatar agent={look} size={size} mode={mode} live={live} framed={framed} />;
   if (!presence || !agentId) return face;
   return (

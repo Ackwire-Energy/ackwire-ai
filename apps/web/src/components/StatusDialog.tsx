@@ -50,7 +50,7 @@ const draftOf = (mine: PersonPresence | null): Draft => ({
 });
 
 /**
- * "Definir status" (ADR 0081): how the others see you on top, the line (an emoji key, the words, ✕ to wipe them),
+ * "Definir status" (ADR 0084): how the others see you on top, the line (an emoji key, the words, ✕ to wipe them),
  * suggestions that fill the line, its end and how you appear, when the line clears, and how you appear (online, away,
  * busy or hidden). Saving shows at once (`useSetMyStatus` is optimistic); the server's answer follows.
  */

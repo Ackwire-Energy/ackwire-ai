@@ -226,7 +226,7 @@ test("end to end: a subscriber sees the message, the streamed deltas and the age
     "run.finished",
     "message.handled",
   ]);
-  // The agent's presence moved with its run, for the whole workspace (ADR 0081 §11).
+  // The agent's presence moved with its run, for the whole workspace (ADR 0084 §11).
   const org = c.frames.filter((f) => f.type === "event" && f.scope === "org").map((f) => f.event);
   expect(org).toContainEqual(expect.objectContaining({ type: "agent.status", agentId }));
   expect(

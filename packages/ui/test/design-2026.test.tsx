@@ -174,6 +174,31 @@ describe("segmented control", () => {
     expect(within(group).getByRole("radio", { name: "Escrevendo" }).getAttribute("aria-checked")).toBe("true");
     await act(async () => fireEvent.keyDown(group, { key: "ArrowRight" }));
     expect(within(group).getByRole("radio", { name: "Disponível" }).getAttribute("aria-checked")).toBe("true");
+    expect(group.querySelector(".ac-seg__pill")).not.toBeNull();
+  });
+
+  test("a value no option has (agents at different levels): nothing chosen, no pill, Tab reaches the first", () => {
+    render(
+      <Segmented
+        label="Nível de todos os agentes"
+        value=""
+        onValueChange={() => {}}
+        options={[
+          { value: "read", label: "Ler" },
+          { value: "write", label: "Ler e escrever" },
+        ]}
+      />,
+    );
+    const group = body().getByRole("radiogroup", { name: "Nível de todos os agentes" });
+    expect(
+      within(group)
+        .getAllByRole("radio")
+        .map((r) => [r.getAttribute("aria-checked"), r.tabIndex]),
+    ).toEqual([
+      ["false", 0],
+      ["false", -1],
+    ]);
+    expect(group.querySelector(".ac-seg__pill")).toBeNull();
   });
 });
 
@@ -332,7 +357,7 @@ describe("the living agent symbol", () => {
   });
 });
 
-describe("the presence badge (ADR 0081)", () => {
+describe("the presence badge (ADR 0084)", () => {
   const badge = (el: Element | null | undefined) => el?.querySelector("svg.ac-presence");
   const tones = (svg: Element | null | undefined) =>
     Array.from(svg?.querySelectorAll("path") ?? []).map((p) => p.getAttribute("class"));

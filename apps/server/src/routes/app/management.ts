@@ -65,7 +65,7 @@ const Settings = z
   })
   .openapi("OrgSettings");
 
-/** A member as `viewerId` sees them: a hidden person is offline to everyone else (ADR 0081). */
+/** A member as `viewerId` sees them: a hidden person is offline to everyone else (ADR 0084). */
 const personView = (
   { availability, statusText, statusEmoji, statusUntil, ...m }: Awaited<ReturnType<typeof listMembers>>[number],
   online: Set<string>,

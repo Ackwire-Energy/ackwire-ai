@@ -27,7 +27,7 @@ const AVATAR = LIST_AVATAR;
  * add a faint line with what and where ("Missão · #canal"): a mission shows its agent, its state
  * and items ("Esperando você · 4 de 9 itens") and what waits on you in it; a thread shows the face and the
  * line of its last reply. `live`: the agent moves (the first rows only). A DM's face carries the presence badge
- * (ADR 0081; no status emoji in the list); an agent with a line says it in place of its last message.
+ * (ADR 0084; no status emoji in the list); an agent with a line says it in place of its last message.
  */
 export const ConversationRowView = memo(function ConversationRowView({
   row: r,
@@ -72,7 +72,7 @@ export const ConversationRowView = memo(function ConversationRowView({
         : t("mobile.chat.intent.noIntro");
   };
   const agentState = agentDm ? (agent ?? null) : null;
-  // Presence and line (ADR 0081): the agent's from its work, the person's as they set it.
+  // Presence and line (ADR 0084): the agent's from its work, the person's as they set it.
   const agentShown = r.kind === "dm" && agentDm ? presenceOf.agent(r.with.id) : null;
   const personShown = r.kind === "dm" && !agentDm ? presenceOf.person(r.with.id) : null;
   const agentLine = agentShown?.line ?? null;

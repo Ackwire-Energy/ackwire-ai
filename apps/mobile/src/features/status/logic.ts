@@ -3,7 +3,7 @@ import { clearsText, type UntilChoice, untilFor } from "@agenteschat/client/lib/
 import type { TFunction } from "i18next";
 
 /**
- * The phone's Status screen and the lines that show a status (ADR 0081), pure: the draft the screen edits, what
+ * The phone's Status screen and the lines that show a status (ADR 0084), pure: the draft the screen edits, what
  * it saves, and how a person's or an agent's line reads in a row, a pill and a profile.
  */
 

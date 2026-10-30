@@ -903,7 +903,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     const verb = activityVerb(t, entry.activity);
     return verb.charAt(0).toUpperCase() + verb.slice(1);
   }, [dmAgentId, isThread, runs, consults, dir.agentById, t]);
-  // A DM's pill says how the other side is (ADR 0081): an agent's presence and what it does, a person's line.
+  // A DM's pill says how the other side is (ADR 0084): an agent's presence and what it does, a person's line.
   const dmLine = useDmStatusLine(
     dm && !isThread ? { type: dm.with.type, id: dm.with.id } : null,
     dmDoing,

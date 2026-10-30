@@ -1,5 +1,5 @@
 {
-  "id": "e4156184-c871-468f-88c0-0e42d2f4821f",
+  "id": "03059b75-ee2c-4dc7-85a9-90ef3c7c5f65",
   "prevId": "9c26299d-2854-47aa-a098-14825dbbf347",
   "version": "7",
   "dialect": "postgresql",
@@ -159,37 +159,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "status_text": {
-          "name": "status_text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status_emoji": {
-          "name": "status_emoji",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status_busy": {
-          "name": "status_busy",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "status_run_id": {
-          "name": "status_run_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status_until": {
-          "name": "status_until",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -206,6 +175,12 @@
         },
         "archived_at": {
           "name": "archived_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -15320,31 +15295,6 @@
         "timezone": {
           "name": "timezone",
           "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "availability": {
-          "name": "availability",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'auto'"
-        },
-        "status_text": {
-          "name": "status_text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status_emoji": {
-          "name": "status_emoji",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status_until": {
-          "name": "status_until",
-          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },

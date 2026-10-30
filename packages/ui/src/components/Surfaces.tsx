@@ -208,6 +208,7 @@ export function OptionCard({
   onClick,
   agent,
   stacked,
+  disabled,
   children,
   className,
 }: {
@@ -216,6 +217,8 @@ export function OptionCard({
   /** Cut corner: the option creates an agent. */
   agent?: boolean;
   stacked?: boolean;
+  /** Shown but not choosable now (its words say why). */
+  disabled?: boolean;
   children: ReactNode;
   className?: string;
 }) {
@@ -224,6 +227,8 @@ export function OptionCard({
       type="button"
       aria-pressed={pressed}
       onClick={onClick}
+      disabled={disabled}
+      data-disabled={disabled || undefined}
       className={cx("ac-option", agent && "ac-option--agent", stacked && "ac-option--stacked", className)}
     >
       {children}

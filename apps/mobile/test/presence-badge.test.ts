@@ -19,7 +19,7 @@ const cellsOf = (presence: Parameters<typeof badgeCells>[0], ring: boolean, tone
     .map((c) => `${c.x},${c.y}`)
     .sort();
 
-describe("the presence badge on the phone (ADR 0081)", () => {
+describe("the presence badge on the phone (ADR 0084)", () => {
   test("the ring lies under the whole badge, the base under every cell of its shape", () => {
     const { size, paths } = badgePaths("online", true);
     expect(size).toBe(11);

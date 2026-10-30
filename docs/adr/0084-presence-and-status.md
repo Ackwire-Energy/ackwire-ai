@@ -1,4 +1,4 @@
-# 0081. Presence and written status, for people and agents
+# 0084. Presence and written status, for people and agents
 
 - Status: Accepted (built: the server, the shared client, §7–§11, the web and the phone app)
 - Date: 2026-10-30

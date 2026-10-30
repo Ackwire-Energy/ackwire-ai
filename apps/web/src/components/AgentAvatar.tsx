@@ -28,7 +28,7 @@ type AgentAvatarProps = Omit<AvatarProps, "kind" | "running" | "state" | "appear
   /** Shows the "running" halo (a preview without a live run). */
   running?: boolean;
   /**
-   * Its presence badge (ADR 0081): `true` reads it live (from its work, offline with no AI), a value draws that one.
+   * Its presence badge (ADR 0084): `true` reads it live (from its work, offline with no AI), a value draws that one.
    * Only where presence matters (the sidebar, member lists, profile cards, messages), never on the tiny receipts.
    */
   presence?: boolean | AgentPresence | null;
@@ -83,7 +83,7 @@ function LiveAgentAvatar({
   const live = useStreams((s) => agentStateIn(s, agentId, channelId));
   const { org } = useOrg();
   const dir = useDirectory(org.id);
-  const known = dir.agentById.get(agentId);
+  const known = dir.anyAgent(agentId);
   return (
     <Avatar
       kind="agent"
@@ -125,7 +125,7 @@ export function ActorAvatar({
   ...rest
 }: Omit<AvatarProps, "kind" | "running" | "state" | "imageUrl" | "appearance" | "presence"> & {
   actor: { type: "agent" | "person"; id: string };
-  /** The live presence badge (ADR 0081). */
+  /** The live presence badge (ADR 0084). */
   presence?: boolean;
 }) {
   if (actor.type === "agent") return <AgentAvatar agentId={actor.id} name={name} {...rest} />;
@@ -134,7 +134,7 @@ export function ActorAvatar({
 
 type PersonAvatarProps = Omit<AvatarProps, "kind" | "imageUrl" | "presence"> & {
   id: string;
-  /** The live presence badge (ADR 0081): as others see them (a hidden person reads offline), yours as you chose. */
+  /** The live presence badge (ADR 0084): as others see them (a hidden person reads offline), yours as you chose. */
   presence?: boolean;
 };
 

@@ -37,7 +37,7 @@ export function MemoryChangeCard({ update, agentId }: { update: MemoryUpdate; ag
     },
   });
   if (update.action === "proposed") return update.proposalId ? <InlineProposal proposalId={update.proposalId} /> : null;
-  const name = dir.agentById.get(agentId)?.name ?? t("channel.unknownAgent");
+  const name = dir.anyAgent(agentId)?.name ?? t("channel.unknownAgent");
   const g = agentGrammar(t, name);
 
   return (
@@ -87,11 +87,11 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
   const [draft, setDraft] = useState<string | null>(null);
   const p = proposals.data?.find((x) => x.id === proposalId);
   if (!p) return null;
-  const name = dir.agentById.get(p.agentId)?.name ?? t("channel.unknownAgent");
+  const name = dir.anyAgent(p.agentId)?.name ?? t("channel.unknownAgent");
   const target =
     p.target.type === "org_context"
       ? t("proposals.targetContext", { org: org.name })
-      : t("proposals.targetInstructions", agentGrammar(t, dir.agentById.get(p.target.agentId)?.name ?? name));
+      : t("proposals.targetInstructions", agentGrammar(t, dir.anyAgent(p.target.agentId)?.name ?? name));
   const text = draft ?? p.after;
   const pending = p.status === "pending" && !p.stale;
   const onError = (e: unknown) =>
@@ -195,7 +195,7 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
     onError: (err) =>
       setError((err as { status?: number }).status === 409 ? t("question.alreadyAnswered") : t("question.failed")),
   });
-  const agent = dir.agentById.get(question.agentId);
+  const agent = dir.anyAgent(question.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
   const done = current.status === "answered";
   const who = current.answeredByUserId === me.user.id ? null : dir.memberById.get(current.answeredByUserId ?? "")?.name;
@@ -270,7 +270,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
   const current = useLive((s) => s.secrets[request.id]) ?? request;
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const agent = dir.agentById.get(request.agentId);
+  const agent = dir.anyAgent(request.agentId);
   const agentName = agent?.name ?? t("channel.unknownAgent");
   const mine = current.requestedForUserId === me.user.id;
   const person = dir.memberById.get(current.requestedForUserId)?.name ?? t("channel.unknownPerson");

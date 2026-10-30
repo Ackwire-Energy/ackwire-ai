@@ -7,7 +7,7 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { clearsText } from "@agenteschat/client/lib/presence";
 import { isAuto } from "@agenteschat/client/lib/providers";
 import { timezoneName } from "@agenteschat/client/lib/routines";
-import { Avatar, Button, hoverPointer, Meter, Popover, ProviderLogo } from "@agenteschat/ui";
+import { Avatar, Button, hoverPointer, Meter, PlanMeter, Popover, ProviderLogo } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type ReactNode, useEffect, useRef, useState } from "react";
@@ -18,6 +18,7 @@ import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { agentLine, type AgentShown, personLine, useAgentPresence, usePersonPresence } from "@/hooks/usePresence";
+import { planMeterText, usageShown } from "@/lib/plan-usage";
 
 /** Hover delay before the card opens (mouse and pen only; touch opens on tap). */
 export const HOVER_OPEN_MS = 400;
@@ -113,7 +114,7 @@ function PersonCard({ userId }: { userId: string }) {
   const settings = useSettings(org.id);
   const dir = useDirectory(org.id);
   const person = people.data?.find((p) => p.userId === userId);
-  // Presence and line as the others see them (ADR 0081): a hidden person reads offline, to themselves hidden.
+  // Presence and line as the others see them (ADR 0084): a hidden person reads offline, to themselves hidden.
   const shown = usePersonPresence(userId);
   const line = shown?.status ? personLine(shown.status) : null;
   const seen = person?.lastSeenAt
@@ -202,8 +203,22 @@ function AgentCard({ agentId, onDone }: { agentId: string; onDone: () => void })
   const { t } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
-  const agent = dir.agentById.get(agentId);
+  const agent = dir.anyAgent(agentId);
   if (!agent) return <p className="small muted">{t("channel.unknownAgent")}</p>;
+  // No longer in the team (archived or deleted): who it was, nothing to do with it.
+  if (agent.former) {
+    return (
+      <div className="profile-card__body">
+        <div className="profile-card__head">
+          <AgentAvatar agentId={agent.id} size="lg" name={agent.name} />
+          <div className="list-col">
+            <span className="profile-card__name">{agent.name}</span>
+            <span className="small muted">{t("profile.former")}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
   return <AgentCardBody agent={agent} onDone={onDone} />;
 }
 
@@ -220,7 +235,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
     : (models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model);
   const thinks =
     agent.brain && agent.brain.kind !== "model" ? brainLine(t, agent.brain, model, owner?.split(" ")[0]) : null;
-  // Its presence from its work and its line (ADR 0081): its own words or what it is doing now.
+  // Its presence from its work and its line (ADR 0084): its own words or what it is doing now.
   const shown = useAgentPresence(agent.id);
   const line = agentLine(t, shown?.line ?? null);
   return (
@@ -331,12 +346,20 @@ function Spend({ agent, locale }: { agent: Agent; locale: string }) {
   const { org } = useOrg();
   const detail = useAgentDetail(org.id, agent.id);
   if (!detail.data) return null;
-  // A percentage of its budget, never money (owners who aren't admins see this too).
+  // A percentage of its budget, never money (owners who aren't admins see this too); on a plan, its limits first
+  // and the budget only once it spent through the API (ADR 0063 §5).
   const used = detail.data.budgetUsedPercent;
+  const shown = usageShown(agent.brain, used);
+  if (!shown.plan && !shown.budget) return null;
   return (
     <div className="stack-4" style={{ gap: 4 }}>
-      <span className="small">{t("profile.budgetUsed", { percent: formatPercent(locale, used) })}</span>
-      <Meter value={Math.min(100, used)} max={100} label={t("profile.spendLabel")} />
+      {shown.plan && (
+        <PlanMeter compact usage={shown.plan.usage} text={planMeterText(t, locale)} label={shown.plan.account} />
+      )}
+      {shown.budget && (
+        <span className="small">{t("profile.budgetUsed", { percent: formatPercent(locale, used) })}</span>
+      )}
+      {shown.budget && !shown.plan && <Meter value={Math.min(100, used)} max={100} label={t("profile.spendLabel")} />}
     </div>
   );
 }

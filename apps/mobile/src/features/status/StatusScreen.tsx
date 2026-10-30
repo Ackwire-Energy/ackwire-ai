@@ -38,7 +38,7 @@ const TEXT_MAX = 100;
 export const openStatus = () => router.push("/me/status");
 
 /**
- * Status (ADR 0081), pushed from Você on the grouped gray, "Salvar" in the bar: how people see you (a preview that
+ * Status (ADR 0084), pushed from Você on the grouped gray, "Salvar" in the bar: how people see you (a preview that
  * follows the draft), the line with its emoji key and ✕, the suggestions (each fills the line, its emoji, when it
  * clears and how you appear), "Limpar depois de" (with a line), "Aparecer como" (Online, Ausente, Ocupado, Oculto)
  * and "Limpar status" when one is saved. The emoji and the end are picked in short sheets.

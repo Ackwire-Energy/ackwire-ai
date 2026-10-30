@@ -507,7 +507,7 @@ export function ChannelOptions({
   leading: ReactNode;
   /** An agent's DM: "Perfil". */
   agentId?: string | null;
-  /** Under the title: a person's status in a DM with them (ADR 0081). */
+  /** Under the title: a person's status in a DM with them (ADR 0084). */
   about?: ReactNode;
   onPins: () => void;
   /** A channel: who is in it (and, for admins, adding and removing). */

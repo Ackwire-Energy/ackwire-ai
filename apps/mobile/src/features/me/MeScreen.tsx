@@ -28,7 +28,7 @@ const open = (href: string) => router.push(href as never);
 /**
  * Você, a page pushed from the avatar, in Conversas' language: the workspace's sky with your photo, name, @ and role
  * (the native bar clear over it, the sky lagging behind the scroll), "Editar perfil" and "Trocar workspace"; your
- * status right under you (ADR 0081, pushing Status); your agents, alive; what they think with (the plans, the
+ * status right under you (ADR 0084, pushing Status); your agents, alive; what they think with (the plans, the
  * computers' own sign-ins, each with its usage in pixels);
  * "Do workspace" (the workspace itself first, opening its settings: `app/(app)/settings/*`) and the preferences
  * as loose rows; Sair and the version. Each row pushes its screen (Conta, Workspaces, Membros, Notificações, Sons,
@@ -59,7 +59,7 @@ export function MeScreen() {
   const push = usePushSwitch().on;
 
   const mine = meId ? dir.memberById.get(meId) : undefined;
-  // How you appear (to yourself: hidden stays hidden), on your photo's corner (ADR 0081).
+  // How you appear (to yourself: hidden stays hidden), on your photo's corner (ADR 0084).
   const myPresence = useMyPerson()?.presence;
   const name = me.data?.user.name ?? "";
   const photo = usePersonPhoto(mine?.avatarUrl ?? mine?.image ?? me.data?.user.image);

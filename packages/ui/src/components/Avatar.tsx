@@ -31,7 +31,7 @@ export interface AvatarProps extends HTMLAttributes<HTMLSpanElement> {
   /** The agent's look: color, eyes and an accessory (agents only). */
   appearance?: AgentAppearance;
   /**
-   * The presence badge on the corner (ADR 0081): a person's (online, away, busy, hidden to themselves, offline) or
+   * The presence badge on the corner (ADR 0084): a person's (online, away, busy, hidden to themselves, offline) or
    * an agent's, from its work. Null or left out: none.
    */
   presence?: BadgePresence | null;

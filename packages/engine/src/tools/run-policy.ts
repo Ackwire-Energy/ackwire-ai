@@ -36,7 +36,7 @@ export type ToolKind =
   | { kind: "hand_off" }
   /** `pass`: ends the run without a message. */
   | { kind: "pass" }
-  /** `set_status`: the agent's own line next to its name (ADR 0081), nothing else. */
+  /** `set_status`: the agent's own line next to its name (ADR 0084), nothing else. */
   | { kind: "self" }
   /** Speaks in the run's own conversation (a reaction, a question, a card people act on). */
   | { kind: "here" }
@@ -97,6 +97,7 @@ const HERE = new Set([
   "desktop_ask_person",
   "update_thread",
   "offer_connect_ai",
+  "propose_agent",
 ]);
 
 /** Reads under a scope that also writes, by name. */

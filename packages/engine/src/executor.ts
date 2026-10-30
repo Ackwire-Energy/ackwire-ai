@@ -42,6 +42,7 @@ import {
   UNAVAILABLE_CODES,
 } from "./brains/select";
 import type { Brain, BrainIO, BrainKind, BrainTool, BrainTurn, ToolResult } from "./brains/types";
+import { BROWSER_SCOPE } from "./browser/types";
 import {
   canceledBy,
   isShutdown,
@@ -135,7 +136,7 @@ import { FIND_AGENT_TOOL } from "./team";
 import { linkRunChecks, runChecksForReply } from "./team-actions";
 import { carriesCredential, maskCredentials } from "./tool-detail";
 import { chooseToolGroups, keptToolGroups, recentForJudge, type ToolGroupChoice } from "./tool-loading";
-import { presentTools } from "./tools/directory";
+import { presentTools, toolGroupKey } from "./tools/directory";
 import { type Approval, type InvokeResult, isSensitive, type ToolGateway } from "./tools/gateway";
 import type { ToolContext, ToolDefinition } from "./tools/types";
 import { recordWikiReads, retrieveWikiForRun } from "./wiki";
@@ -202,6 +203,11 @@ export interface EngineDeps {
    * `find_tools` / `use_tool`. Off: every granted tool is listed (tests).
    */
   toolsOnDemand?: boolean;
+  /**
+   * Starts the agent's browser while the run thinks, once the judge listed the browser's tools for it (ADR 0040
+   * §11): its first command then skips Chrome's start. Never waited on.
+   */
+  warmBrowser?(at: { orgId: string; agentId: string; threadRootId: string }): void;
 }
 
 /**
@@ -604,7 +610,7 @@ async function executeRunInner(
       status,
       ...(error ? { error, ...runErrorDetail(error) } : {}),
     });
-    // Its line ends with the run (checked on read); the apps refresh now (ADR 0081 §11).
+    // Its line ends with the run (checked on read); the apps refresh now (ADR 0084 §11).
     await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
     await publishChannelEvent(deps.pubsub, {
       type: "message.handled",
@@ -766,7 +772,7 @@ async function executeRunInner(
       .catch(() => fallbackChoice("error"));
   };
   const autoAsked = needsContext && autoWanted(agent) ? askAuto() : null;
-  // What the agent shows it is doing (ADR 0081 §8): lines from facts everyone may see, picked by Jev below.
+  // What the agent shows it is doing (ADR 0084 §8): lines from facts everyone may see, picked by Jev below.
   const statusLines = needsContext ? await statusCandidates(db, run, granted).catch(() => [] as StatusCandidate[]) : [];
   if (needsContext && deps.toolsOnDemand && judge && granted.length > 0) {
     const [recent, keep] = await Promise.all([
@@ -786,6 +792,9 @@ async function executeRunInner(
     });
     ctx.loadedGroups = toolChoice.groups;
     tools = presentTools(granted, isSensitive, ctx.loadedGroups);
+    if (toolChoice.groups.includes(toolGroupKey({ scope: BROWSER_SCOPE }))) {
+      deps.warmBrowser?.({ orgId: run.orgId, agentId: agent.id, threadRootId: run.threadRootId });
+    }
   }
   if (needsContext) {
     await startRunStatus({ db, pubsub: deps.pubsub }, run, statusLines, toolChoice?.status ?? null).catch(() => {});

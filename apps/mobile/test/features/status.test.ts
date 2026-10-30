@@ -16,7 +16,7 @@ import { translator } from "./fixtures";
 
 const NOW = new Date(2026, 9, 30, 10, 0);
 
-describe("the Status screen's draft (ADR 0081)", () => {
+describe("the Status screen's draft (ADR 0084)", () => {
   test("what you picked, read back from how you appear to yourself", () => {
     expect(availabilityOf("online")).toBe("auto");
     expect(availabilityOf("offline")).toBe("auto");
