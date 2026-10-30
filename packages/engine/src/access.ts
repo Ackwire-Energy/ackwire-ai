@@ -439,7 +439,7 @@ export async function setAgentAccess(
   for (const ref of input.tools?.deny ?? []) rows.push(toolRow(ref, true));
   const unique = new Map(rows.map((r) => [grantKey(r.connectionId, r.scope), r]));
   if (!admin && widens(await grantsOf(db, orgId, agentId), unique)) {
-    throw new ForbiddenError("Only an admin can give an agent new access; its owner can only take access away");
+    throw new ForbiddenError("Only an admin can give an agent new access. Its owner can only take access away");
   }
   await db.transaction(async (tx) => {
     // Mailbox grants are managed by the mail API (ADR 0038): kept as they are.
