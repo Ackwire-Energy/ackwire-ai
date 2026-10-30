@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { BlobStore } from "@agenteschat/adapters";
-import { and, type Database, eq, schema } from "@agenteschat/db";
+import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
 import { sniffImage, stripImageMetadata } from "../avatars";
 import { caches } from "../cache";
 import { NotFoundError } from "../errors";
@@ -230,19 +230,32 @@ export async function refreshServerIcon(deps: ServerIconDeps, c: ConnectorConnec
   }
   if (!next && listed.length > 0) return;
   const before = c.icon ? ICON_PATH.exec(c.icon)?.[1] : undefined;
+  const file = next ? `${createHash("sha256").update(next.body).digest("hex").slice(0, 16)}.${EXT[next.type]}` : null;
+  if (next && file === before) return;
   let icon: string | null = null;
-  if (next) {
-    const file = `${createHash("sha256").update(next.body).digest("hex").slice(0, 16)}.${EXT[next.type]}`;
-    if (file === before) return;
+  if (next && file) {
     await blobs.put(blobKey(c.orgId, c.id, file), next.body, { contentType: next.type });
     icon = `/api/app/connector-icons/${encodeURIComponent(c.orgId)}/${encodeURIComponent(c.id)}/${file}`;
   } else if (!c.icon) {
     return;
   }
-  await deps.db
+  // Replace only the icon this refresh read: a concurrent refresh that already changed it wins, and we drop the
+  // blob we just wrote instead of leaving it orphaned. Each refresh deletes exactly its own old or losing copy.
+  const [updated] = await deps.db
     .update(connectorConnections)
     .set({ icon })
-    .where(and(eq(connectorConnections.id, c.id), eq(connectorConnections.orgId, c.orgId)));
+    .where(
+      and(
+        eq(connectorConnections.id, c.id),
+        eq(connectorConnections.orgId, c.orgId),
+        c.icon ? eq(connectorConnections.icon, c.icon) : isNull(connectorConnections.icon),
+      ),
+    )
+    .returning({ id: connectorConnections.id });
+  if (!updated) {
+    if (file) await blobs.delete(blobKey(c.orgId, c.id, file)).catch(() => undefined);
+    return;
+  }
   caches.connections.delete(`${c.orgId}:active`);
   if (before) await blobs.delete(blobKey(c.orgId, c.id, before)).catch(() => undefined);
 }

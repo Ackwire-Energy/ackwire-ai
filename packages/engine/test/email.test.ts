@@ -263,8 +263,8 @@ describe("the look", () => {
   });
 
   test("without EMAIL_FROM, the sender is agentes.chat at this server's host", () => {
-    expect(defaultEmailFrom("https://agentes.chat")).toBe("agentes.chat <ola@agentes.chat>");
-    expect(defaultEmailFrom("https://chat.acme.com:8443/")).toBe("agentes.chat <ola@chat.acme.com>");
+    expect(defaultEmailFrom("https://agentes.chat")).toBe("agentes.chat <ping@agentes.chat>");
+    expect(defaultEmailFrom("https://chat.acme.com:8443/")).toBe("agentes.chat <ping@chat.acme.com>");
   });
 
   test("the footer says who sent it: agentes.chat, or a self-hosted server by its host", () => {
