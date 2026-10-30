@@ -7586,6 +7586,11 @@ a.machine-row__name:hover {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
+/* The line under the plan cards ("No plano, … só a você"): the steps have no gap, so it sits as far below them as
+   an error line or a note does. */
+.newag__models + .small {
+  margin-top: 12px;
+}
 .newag__model {
   gap: 6px;
   padding: 14px 16px;
