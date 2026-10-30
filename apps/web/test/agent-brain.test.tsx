@@ -556,15 +556,17 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
       );
       const login = fakeMachinesOf.get(api)?.lastLogin();
       expect(login?.kind).toBe("claude_code");
-      // Something else on the clipboard (a password) waits for a tap.
+      // Something else on the clipboard (a password) waits for Send, with a line; Colar goes while the field holds it.
       clip = "hunter2-password";
       await click(within(block).getByRole("button", { name: "Colar" }));
       await settle(4);
       expect(fakeMachinesOf.get(api)?.lastLogin()?.box).toBeNull();
-      expect((within(block).getByRole("textbox", { name: "Código do Claude" }) as HTMLInputElement).value).toBe(
-        "hunter2-password",
-      );
-      // This sign-in's code (`…#<state>`) goes at once, sealed: the raw code is in no call.
+      const field = within(block).getByRole("textbox", { name: "Código do Claude" }) as HTMLInputElement;
+      expect(field.value).toBe("hunter2-password");
+      expect(shownText(block)).toContain("Isso não parece o código do Claude.");
+      expect(within(block).queryByRole("button", { name: "Colar" })).toBeNull();
+      // Emptied, Colar is back; this sign-in's code (`…#<state>`) goes at once, sealed: the raw code is in no call.
+      await act(async () => fireEvent.change(field, { target: { value: "" } }));
       clip = "c0de-from-claude#st4te";
       await click(within(block).getByRole("button", { name: "Colar" }));
       await settle(6);
@@ -582,6 +584,56 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     } finally {
       window.open = realOpen;
     }
+  });
+
+  /** Claude's sign-in started from Adicionar conta, its code field showing; the sign-in window is a stand-in. */
+  async function codeField() {
+    const { state, api } = await onMac();
+    const d = await brainDialog();
+    await pick(d, "Conta do Claude", /^Adicionar conta/);
+    await settle(6);
+    const block = within(d).getByRole("region", { name: "Adicionar conta do Claude" });
+    const realOpen = window.open;
+    window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
+    try {
+      await click(within(block).getByRole("button", { name: "Entrar com Claude" }));
+      await settle(6);
+    } finally {
+      window.open = realOpen;
+    }
+    const field = within(block).getByRole("textbox", { name: "Código do Claude" });
+    // ⌘V: the paste lands in the field as its new value.
+    const paste = async (text: string) => {
+      await act(async () => {
+        fireEvent.paste(field, { clipboardData: { getData: () => text } });
+        fireEvent.change(field, { target: { value: text } });
+      });
+      await settle(6);
+    };
+    return { state, block, paste, sealed: () => fakeMachinesOf.get(api)?.lastLogin()?.box ?? null };
+  }
+
+  test("Claude's code pasted into its field with ⌘V goes to the computer by itself, no click", async () => {
+    const { state, block, paste, sealed } = await codeField();
+    await paste("c0de-from-claude#st4te");
+    expect(sealed()).not.toBeNull();
+    expect(JSON.stringify(state.calls)).not.toContain("c0de-from-claude");
+    expect(shownText(block)).toContain("Código enviado. O MacBook está terminando de entrar.");
+    expect(shownText(block)).not.toContain("Isso não parece o código do Claude.");
+  });
+
+  test("a code that isn't this sign-in's waits for Enviar, the one action, with a line under it", async () => {
+    const { block, paste, sealed } = await codeField();
+    await paste("c0de-from-claude#another-state");
+    expect(sealed()).toBeNull();
+    expect(shownText(block)).toContain("Isso não parece o código do Claude.");
+    expect(within(block).queryByRole("button", { name: "Colar" })).toBeNull();
+    const send = within(block).getByRole("button", { name: "Enviar ao MacBook" }) as HTMLButtonElement;
+    expect(send.disabled).toBe(false);
+    await click(send);
+    await settle(6);
+    expect(sealed()).not.toBeNull();
+    expect(shownText(block)).toContain("Código enviado. O MacBook está terminando de entrar.");
   });
 
   test("Adicionar conta (ChatGPT): its settings first, then the sign-in on its button; the account is chosen", async () => {

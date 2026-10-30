@@ -1945,6 +1945,8 @@ export const ptBR = {
           openAgain: "Abrir de novo",
           stepTwo: "Cole o código que o Claude mostrar",
           codeLabel: "Código do Claude",
+          /** Under the field while what it holds isn't a code of this sign-in (it waits for Enviar). */
+          notCode: "Isso não parece o código do Claude.",
           send: "Enviar ao {{computer}}",
           sent: "Código enviado. O {{computer}} está terminando de entrar.",
           local: "Está no próprio {{computer}}? Se o navegador dele abriu sozinho, é só autorizar lá.",

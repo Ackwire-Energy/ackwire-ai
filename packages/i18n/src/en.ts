@@ -1922,6 +1922,7 @@ export const en: Translations = {
           openAgain: "Open again",
           stepTwo: "Paste the code Claude shows",
           codeLabel: "Claude code",
+          notCode: "That doesn't look like Claude's code.",
           send: "Send to {{computer}}",
           sent: "Code sent. Finishing the sign-in on {{computer}}.",
           local: "On {{computer}} itself? If its browser opened by itself, just authorize there.",

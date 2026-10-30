@@ -1297,12 +1297,13 @@ describe("the onboarding where the workspace gets its own computer", () => {
     } finally {
       window.open = realOpen;
     }
+    expect(within(panel).getByRole("button", { name: "Enviar ao computador" })).toBeTruthy();
+    // The sign-in's own code goes by itself as it lands in the field.
     await act(async () =>
       fireEvent.change(within(panel).getByRole("textbox", { name: "Código do Claude" }), {
         target: { value: "c0de#st4te" },
       }),
     );
-    await click(within(panel).getByRole("button", { name: "Enviar ao computador" }));
     await settle(4);
     expect(r.state.calls.filter((c) => c.method === "machines.sendAccountCode")).toHaveLength(1);
     expect(shownText(panel)).toContain("Código enviado. O computador está terminando de entrar.");

@@ -152,6 +152,27 @@ describe("the agent's AI", () => {
     expect(settings).not.toContain("onUse=");
   });
 
+  test("Claude's code goes by itself however it lands in the field; anything else waits for Enviar, with a line", async () => {
+    // The flow and its field are components the tests can't render: what they wire in, as text.
+    const read = (file: string) => Bun.file(new URL(`../../src/features/ai/${file}`, import.meta.url).pathname).text();
+    const [flow, parts] = await Promise.all([read("AddAccount.tsx"), read("parts.tsx")]);
+    // Typed, pasted with the keyboard or by Colar: one path, and only this sign-in's code sends with no tap.
+    expect(flow).toMatch(
+      /const take = \(text: string\) => \{[^}]*if \(!plan && login && isSignInCode\(text, login\.url\)\) void send\(text\);/,
+    );
+    expect(flow).toContain("onChangeText={take}");
+    expect(flow).toContain("onPasted={take}");
+    expect(flow).toMatch(
+      /key && !isSignInCode\(key, login\.url\) \? \(\s*<Note icon="x">\{t\("agentPage\.work\.brain\.add\.notCode"\)\}<\/Note>/,
+    );
+    // Colar only while the field is empty, the text's edge then the same on both sides.
+    expect(parts).toMatch(/const empty = !value\.trim\(\);/);
+    expect(parts).toMatch(/\{empty \? \(\s*<View style=\{styles\.insetAction\}>/);
+    expect(parts).toContain("!empty && styles.insetFull");
+    const t = await translator("pt-BR");
+    expect(t("agentPage.work.brain.add.notCode")).toBe("Isso não parece o código do Claude.");
+  });
+
   test("an account other agents think with, where it may have a login per agent: one row, signed in again for this one", async () => {
     const screen = await Bun.file(new URL("../../src/features/ai/AgentAiScreen.tsx", import.meta.url).pathname).text();
     // One row per account (the web's choice), and "Também usada por" signs this agent in on Connect an AI.

@@ -16,8 +16,9 @@ import { Note, OpenPage, openPage, PasteField, Step, StepsCard, StepText, Waitin
 /*
  * "Adicionar conta" as on the web (ADR 0041 §2, ADR 0059): the computer starts the provider's own sign-in and its
  * page opens here, in the in-app browser: the account chosen there is the one connected. Claude: the code Claude
- * shows comes back by "Colar" (sent by itself only when it is this sign-in's) or by hand, sealed on the phone to
- * the computer's key (ADR 0027). ChatGPT: device code sign-in allowed in its settings first, then
+ * shows goes to the computer by itself as soon as it lands in the field ("Colar", a paste or typed) when it is this
+ * sign-in's; anything else waits for "Enviar", with a line under it. Either way it is sealed on the phone to the
+ * computer's key (ADR 0027). ChatGPT: device code sign-in allowed in its settings first, then
  * the device page and the one-time code to type there. A coding plan: its own key page, then the key, sealed the
  * same way; it never reaches our server. Every start is a tap; leaving stops the sign-in on the computer.
  */
@@ -161,7 +162,8 @@ function AddAccountFlow({
     }
   };
 
-  const pasted = (text: string) => {
+  /** What the field holds now, however it got there: a code of this sign-in goes to the computer by itself. */
+  const take = (text: string) => {
     setCode(text);
     setSendFailed(false);
     if (!plan && login && isSignInCode(text, login.url)) void send(text);
@@ -178,11 +180,8 @@ function AddAccountFlow({
     <>
       <PasteField
         value={code}
-        onChangeText={(v) => {
-          setCode(v);
-          setSendFailed(false);
-        }}
-        onPasted={pasted}
+        onChangeText={take}
+        onPasted={take}
         label={label}
         placeholder={placeholder}
         secret={secret}
@@ -341,6 +340,9 @@ function AddAccountFlow({
               false,
               key.length > 0,
             )}
+            {key && !isSignInCode(key, login.url) ? (
+              <Note icon="x">{t("agentPage.work.brain.add.notCode")}</Note>
+            ) : null}
             {sent || local ? (
               <StepText>
                 {sent
