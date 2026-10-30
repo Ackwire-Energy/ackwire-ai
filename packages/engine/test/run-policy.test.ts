@@ -14,9 +14,9 @@ import {
   type ToolDefinition,
   type ToolSource,
 } from "../src";
+import { exposedToolName } from "../src/connectors/mcp";
 import { carriesCredential, maskCredentials } from "../src/tool-detail";
 import { CREDENTIAL_REFUSAL } from "../src/tools/gateway";
-import { exposedToolName } from "../src/connectors/mcp";
 import { REFUSALS, takeWhy, toolKind, toolPolicy, WHY_MIN_CHARS, WHY_REFUSAL, withWhy } from "../src/tools/run-policy";
 import { type Fixture, setup } from "./fixtures";
 
@@ -304,25 +304,29 @@ describe("the gateway applies the run policy", () => {
     const { ctx } = await runAs("person");
     const custom: ToolSource = {
       name: "custom",
-      tools: async () => [{
-        name: "permission_prompt",
-        description: "External prompt",
-        inputSchema: { type: "object" },
-        scope: "custom:conn_1:write",
-        connectionId: CONNECTION,
-        execute: async () => ({ content: "external" }),
-      }],
+      tools: async () => [
+        {
+          name: "permission_prompt",
+          description: "External prompt",
+          inputSchema: { type: "object" },
+          scope: "custom:conn_1:write",
+          connectionId: CONNECTION,
+          execute: async () => ({ content: "external" }),
+        },
+      ],
     };
     const builtin: ToolSource = {
       name: "computer",
-      tools: async () => [{
-        name: "permission_prompt",
-        description: "Computer permission prompt",
-        inputSchema: { type: "object" },
-        scope: "",
-        connectionId: null,
-        execute: async () => ({ content: "computer" }),
-      }],
+      tools: async () => [
+        {
+          name: "permission_prompt",
+          description: "Computer permission prompt",
+          inputSchema: { type: "object" },
+          scope: "",
+          connectionId: null,
+          execute: async () => ({ content: "computer" }),
+        },
+      ],
     };
     const gateway = createToolGateway({ sources: [custom, builtin] });
     expect((await gateway.list(ctx)).find((t) => t.name === "permission_prompt")?.description).toBe(
@@ -335,28 +339,30 @@ describe("the gateway applies the run policy", () => {
     const { ctx } = await runAs("person");
     const custom: ToolSource = {
       name: "connectors",
-      tools: async () => ["git_clone", "open_pull_request"].map((name) => ({
-        name,
-        description: `External ${name}`,
-        inputSchema: { type: "object" },
-        scope: "custom:conn_1:write",
-        connectionId: CONNECTION,
-        execute: async () => ({ content: "external" }),
-      })),
+      tools: async () =>
+        ["git_clone", "open_pull_request"].map((name) => ({
+          name,
+          description: `External ${name}`,
+          inputSchema: { type: "object" },
+          scope: "custom:conn_1:write",
+          connectionId: CONNECTION,
+          execute: async () => ({ content: "external" }),
+        })),
     };
     const serverGit: ToolSource = {
       name: "git",
-      tools: async () => [
-        { name: "git_clone", scope: "github:git.read" },
-        { name: "open_pull_request", scope: "github:pr.write" },
-      ].map(({ name, scope }) => ({
-        name,
-        description: `Server ${name}`,
-        inputSchema: { type: "object" },
-        scope,
-        connectionId: CONNECTION,
-        execute: async () => ({ content: "server" }),
-      })),
+      tools: async () =>
+        [
+          { name: "git_clone", scope: "github:git.read" },
+          { name: "open_pull_request", scope: "github:pr.write" },
+        ].map(({ name, scope }) => ({
+          name,
+          description: `Server ${name}`,
+          inputSchema: { type: "object" },
+          scope,
+          connectionId: CONNECTION,
+          execute: async () => ({ content: "server" }),
+        })),
     };
     const gateway = createToolGateway({ sources: [custom, serverGit] });
     const names = new Map((await gateway.list(ctx)).map((tool) => [tool.name, tool.description]));

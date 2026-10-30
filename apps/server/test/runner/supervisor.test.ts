@@ -24,10 +24,11 @@ import { RunnerError } from "../../runner/errors";
 import { type HandlerContext, handleRequest, type RequestScope } from "../../runner/handlers";
 import { readLines } from "../../runner/lines";
 import type { FetchLike } from "../../runner/push";
-import { RelayCount } from "../../runner/streams";
 import { agentSecrets } from "../../runner/secrets";
+import { RelayCount } from "../../runner/streams";
 import {
   BROWSER_LEASE_MS,
+  retireLegacyPending,
   Supervisor,
   type SupervisorOptions,
   WORKER_TASKS_FILE,
@@ -36,7 +37,6 @@ import {
   type WorkerState,
   workerCommand,
   workerHome,
-  retireLegacyPending,
 } from "../../runner/supervisor";
 import { runWorker, WorkerLink } from "../../runner/worker";
 import { errorCode, removeDirs, tempDir, waitFor } from "./helpers";
@@ -250,21 +250,27 @@ const BROWSER_REFUSED = "No browser command of this agent on its desktop is runn
 
 test("system boot guards ports and prepares every persisted UID before restoring a worker", () => {
   const home = newHome();
-  writeFileSync(path.join(home, WORKER_TASKS_FILE), JSON.stringify({
-    "task-ana-0001": { agentId: ANA.id, startedAt: new Date().toISOString() },
-  }));
+  writeFileSync(
+    path.join(home, WORKER_TASKS_FILE),
+    JSON.stringify({
+      "task-ana-0001": { agentId: ANA.id, startedAt: new Date().toISOString() },
+    }),
+  );
   const order: string[] = [];
-  const t = setup({
-    guard: { start: () => order.push("guard"), stop: () => {} },
-    prepareExisting: (users) => {
-      expect(users.map((u) => u.uid)).toEqual([21000, 21001]);
-      order.push("policy");
+  const t = setup(
+    {
+      guard: { start: () => order.push("guard"), stop: () => {} },
+      prepareExisting: (users) => {
+        expect(users.map((u) => u.uid)).toEqual([21000, 21001]);
+        order.push("policy");
+      },
+      start: (user) => {
+        order.push("worker");
+        return new FakeWorker(user);
+      },
     },
-    start: (user) => {
-      order.push("worker");
-      return new FakeWorker(user);
-    },
-  }, home);
+    home,
+  );
   t.sup.boot();
   expect(order).toEqual(["guard", "policy", "worker"]);
 });
@@ -1947,43 +1953,67 @@ test.if(posix)("a worker's home: its agent's own, in a folder nobody else can li
   expect(workerHome(base, me)).toBe(dir);
 });
 
-test.if(posix)("system broker keeps pending material out of the worker and installs only after activation", async () => {
-  const t = realWorkers();
-  t.sup.boot();
-  t.sup.attach();
-  const requestId = "broker-0001-aaaa";
-  const name = "BROKER_TEST_KEY";
-  const target = { kind: "env" as const };
-  const value = "broker-secret-value";
-  const key = await t.sup.secret({ op: "secret", agent: ANA, action: "keypair", requestId }, scope().scope);
-  const aad = secretAad({ requestId, orgId: "org-1", name, target });
-  const box = await sealSecret(key.publicKey!, value, aad);
-  expect(await t.sup.secret({ op: "secret", agent: ANA, action: "deliver", requestId, name, target, aad, box }, scope().scope))
-    .toEqual({ size: value.length });
-  expect(existsSync(path.join(t.home, "secret-broker", "a1b2c3d4", "keys", requestId))).toBe(true);
-  expect(existsSync(path.join(t.ownHome, "secrets", "a1b2c3d4", "keys", requestId))).toBe(false);
-  expect(await agentSecrets(path.join(t.ownHome, "secrets"), ANA)).toBeNull();
-  const order = `2026-10-29T00:00:00.000Z|${requestId}`;
-  expect(await t.sup.secret({ op: "secret", agent: ANA, action: "activate", requestId, order }, scope().scope))
-    .toEqual({ size: value.length });
-  expect((await agentSecrets(path.join(t.ownHome, "secrets"), ANA))?.env[name]).toBe(value);
-  expect(await agentSecrets(path.join(t.ownHome, "secrets"), BIA)).toBeNull();
-  expect(existsSync(path.join(t.home, "secret-broker", "a1b2c3d4", "keys", requestId))).toBe(false);
+test.if(posix)(
+  "system broker keeps pending material out of the worker and installs only after activation",
+  async () => {
+    const t = realWorkers();
+    t.sup.boot();
+    t.sup.attach();
+    const requestId = "broker-0001-aaaa";
+    const name = "BROKER_TEST_KEY";
+    const target = { kind: "env" as const };
+    const value = "broker-secret-value";
+    const key = await t.sup.secret({ op: "secret", agent: ANA, action: "keypair", requestId }, scope().scope);
+    const aad = secretAad({ requestId, orgId: "org-1", name, target });
+    const box = await sealSecret(key.publicKey as string, value, aad);
+    expect(
+      await t.sup.secret(
+        { op: "secret", agent: ANA, action: "deliver", requestId, name, target, aad, box },
+        scope().scope,
+      ),
+    ).toEqual({ size: value.length });
+    expect(existsSync(path.join(t.home, "secret-broker", "a1b2c3d4", "keys", requestId))).toBe(true);
+    expect(existsSync(path.join(t.ownHome, "secrets", "a1b2c3d4", "keys", requestId))).toBe(false);
+    expect(await agentSecrets(path.join(t.ownHome, "secrets"), ANA)).toBeNull();
+    const order = `2026-10-29T00:00:00.000Z|${requestId}`;
+    expect(
+      await t.sup.secret({ op: "secret", agent: ANA, action: "activate", requestId, order }, scope().scope),
+    ).toEqual({ size: value.length });
+    expect((await agentSecrets(path.join(t.ownHome, "secrets"), ANA))?.env[name]).toBe(value);
+    expect(await agentSecrets(path.join(t.ownHome, "secrets"), BIA)).toBeNull();
+    expect(existsSync(path.join(t.home, "secret-broker", "a1b2c3d4", "keys", requestId))).toBe(false);
 
-  const declined = "broker-0002-bbbb";
-  const declinedKey = await t.sup.secret({ op: "secret", agent: ANA, action: "keypair", requestId: declined }, scope().scope);
-  const declinedAad = secretAad({ requestId: declined, orgId: "org-1", name: "OTHER_KEY", target });
-  const declinedBox = await sealSecret(declinedKey.publicKey!, "never-installed", declinedAad);
-  await t.sup.secret({ op: "secret", agent: ANA, action: "deliver", requestId: declined, name: "OTHER_KEY", target, aad: declinedAad, box: declinedBox }, scope().scope);
-  // A failed DB transaction or a decline sends discard rather than activate.
-  await t.sup.secret({ op: "secret", agent: ANA, action: "discard", requestId: declined }, scope().scope);
-  expect((await agentSecrets(path.join(t.ownHome, "secrets"), ANA))?.env.OTHER_KEY).toBeUndefined();
-  await t.sup.secret({ op: "secret", agent: ANA, action: "remove", name, throughOrder: order }, scope().scope);
-  expect((await agentSecrets(path.join(t.ownHome, "secrets"), ANA))?.env[name]).toBeUndefined();
-  expect((await agentSecrets(path.join(t.home, "secret-broker"), ANA))?.env[name]).toBeUndefined();
-  expect(await errorCode(() => t.sup.secret({ op: "secret", agent: ANA, action: "remove", name }, scope().scope)))
-    .toBe("bad_request");
-});
+    const declined = "broker-0002-bbbb";
+    const declinedKey = await t.sup.secret(
+      { op: "secret", agent: ANA, action: "keypair", requestId: declined },
+      scope().scope,
+    );
+    const declinedAad = secretAad({ requestId: declined, orgId: "org-1", name: "OTHER_KEY", target });
+    const declinedBox = await sealSecret(declinedKey.publicKey as string, "never-installed", declinedAad);
+    await t.sup.secret(
+      {
+        op: "secret",
+        agent: ANA,
+        action: "deliver",
+        requestId: declined,
+        name: "OTHER_KEY",
+        target,
+        aad: declinedAad,
+        box: declinedBox,
+      },
+      scope().scope,
+    );
+    // A failed DB transaction or a decline sends discard rather than activate.
+    await t.sup.secret({ op: "secret", agent: ANA, action: "discard", requestId: declined }, scope().scope);
+    expect((await agentSecrets(path.join(t.ownHome, "secrets"), ANA))?.env.OTHER_KEY).toBeUndefined();
+    await t.sup.secret({ op: "secret", agent: ANA, action: "remove", name, throughOrder: order }, scope().scope);
+    expect((await agentSecrets(path.join(t.ownHome, "secrets"), ANA))?.env[name]).toBeUndefined();
+    expect((await agentSecrets(path.join(t.home, "secret-broker"), ANA))?.env[name]).toBeUndefined();
+    expect(
+      await errorCode(() => t.sup.secret({ op: "secret", agent: ANA, action: "remove", name }, scope().scope)),
+    ).toBe("bad_request");
+  },
+);
 
 test.if(posix && process.platform === "linux" && process.getuid?.() === 0)(
   "upgrade retires old pending keys and boxes without following agent symlinks or losing active values",
@@ -2008,20 +2038,32 @@ test.if(posix && process.platform === "linux" && process.getuid?.() === 0)(
     expect(readFileSync(path.join(own, "store.json"), "utf8")).toBe('{"secrets":[]}');
     expect(readFileSync(path.join(outside, "keep"), "utf8")).toBe("untouched");
     const broker = setup();
-    expect(await errorCode(() => broker.sup.secret({
-      op: "secret", agent: ANA, action: "activate", requestId: "legacy-0001",
-      order: "2026-10-29T00:00:00.000Z|legacy-0001",
-    }, scope().scope))).toBe("not_found");
+    expect(
+      await errorCode(() =>
+        broker.sup.secret(
+          {
+            op: "secret",
+            agent: ANA,
+            action: "activate",
+            requestId: "legacy-0001",
+            order: "2026-10-29T00:00:00.000Z|legacy-0001",
+          },
+          scope().scope,
+        ),
+      ),
+    ).toBe("not_found");
     symlinkSync(outside, path.join(own, "keys"));
     expect(() => retireLegacyPending(base, home, me)).toThrow();
     expect(readFileSync(path.join(outside, "keep"), "utf8")).toBe("untouched");
     mkdirSync(path.join(own, "keys"));
     writeFileSync(path.join(own, "keys", "replanted"), "old-key");
-    expect(() => retireLegacyPending(base, home, me, (name) => {
-      if (name !== "keys") return;
-      mkdirSync(path.join(own, "keys"));
-      writeFileSync(path.join(own, "keys", "replanted"), "old-key");
-    })).toThrow("recreated");
+    expect(() =>
+      retireLegacyPending(base, home, me, (name) => {
+        if (name !== "keys") return;
+        mkdirSync(path.join(own, "keys"));
+        writeFileSync(path.join(own, "keys", "replanted"), "old-key");
+      }),
+    ).toThrow("recreated");
   },
 );
 

@@ -886,7 +886,7 @@ function ChannelView({
     stick.current = false;
     autoScrollUntil.current = 0;
   };
-  // Long answers open at their start: agent rows (`data-read-id`, the run's
+  // Long answers open at their start: rows by someone else (`data-read-id`; an agent's is the run's
   // id, shared by the live row and its final message) that already landed, and whether one is held
   // with its first line at the top ("Fim da resposta" shows until the person reaches the end).
   const landed = useRef(new Set<string>());
@@ -2991,8 +2991,17 @@ export const TimelineMessage = memo(function TimelineMessage({
       data-message-id={live ? undefined : m.id}
       data-run-id={live?.runId}
       data-live={live?.status}
-      // An agent's answer: lands at its start when long (same id as its live block, so only once).
-      data-read-id={m.author.type === "agent" && !m.local ? (m.agentRunId ?? m.id) : undefined}
+      // What someone else wrote (an agent's answer, a teammate's message): lands at its start when long, read
+      // from the top (an answer shares its live block's id, so only once). Never your own message.
+      data-read-id={
+        m.local
+          ? undefined
+          : m.author.type === "agent"
+            ? (m.agentRunId ?? m.id)
+            : m.author.type === "person" && m.author.id !== me.user.id
+              ? m.id
+              : undefined
+      }
       grouped={grouped}
       entering={entering && !replacesLive}
       streaming={Boolean(live) && !liveFailed && !liveWaiting && !liveStopped}
@@ -3097,13 +3106,15 @@ export const TimelineMessage = memo(function TimelineMessage({
                 accent={colorOf(agent)}
               />
             </MessageText>
-          ) : (opening.said || opening.opener !== null) && (
-            <MessageText>
-              <MessageBody
-                body={opening.said ?? t(OPENER_KEYS[opening.opener ?? 0] ?? "run.opener0")}
-                resolveMention={dir.mentionName}
-              />
-            </MessageText>
+          ) : (
+            (opening.said || opening.opener !== null) && (
+              <MessageText>
+                <MessageBody
+                  body={opening.said ?? t(OPENER_KEYS[opening.opener ?? 0] ?? "run.opener0")}
+                  resolveMention={dir.mentionName}
+                />
+              </MessageText>
+            )
           )}
           {/* Its tools in one line (what it does now), opening into each call; the messages it read under it. */}
           <LiveTools

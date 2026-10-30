@@ -1096,7 +1096,7 @@ export async function listDeletedArtifacts(
   userId: string,
   orgId: string,
 ): Promise<TrashedArtifactView[]> {
-  const membership = await requireActiveMembership(db, userId, orgId);
+  await requireActiveMembership(db, userId, orgId);
   const since = new Date(Date.now() - ARTIFACT_TRASH_DAYS * 86_400_000);
   const rows = await db
     .select()

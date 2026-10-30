@@ -228,10 +228,15 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
                         </Button>
                       </div>
                     )}
-                    {/* "Ver": the agent's browser here, in its card (no page of its own). */}
+                    {/* "Ver": the agent's browser here, in its card (no page of its own); folding it puts it away. */}
                     {seeing === agent.id && (
                       <div className="brw-use__card">
-                        <BrowserCard agentId={agent.id} name={agent.name} handoff={open ?? null} defaultOpen />
+                        <BrowserCard
+                          agentId={agent.id}
+                          name={agent.name}
+                          handoff={open ?? null}
+                          onFold={() => setSeeing(null)}
+                        />
                       </div>
                     )}
                   </div>

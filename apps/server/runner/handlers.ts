@@ -340,7 +340,7 @@ async function doWrite(
   // A repository's git dir is the runner's own git's settings (`git.sync`, `mission.worktree` run
   // without the "commands" switch): never written by a file op (`git-guard.ts`).
   const gitInternal = () =>
-    new RunnerError("bad_request", `${requested} is inside a .git folder; files there can't be written this way`);
+    new RunnerError("bad_request", `${requested} is inside a .git folder. Files there can't be written this way.`);
   if (isGitInternalPath(requested)) throw gitInternal();
   const first = await resolvePath(ctx, requested);
   if (first.rel === "") throw new RunnerError("bad_request", "Can't write over the workspace folder");

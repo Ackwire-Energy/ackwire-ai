@@ -8426,7 +8426,6 @@ export const en: Translations = {
       noSite: "Before opening a page",
     },
     inCard: {
-      expandHint: "Click to expand",
       scrollHint: "Scrolling the page · Esc to leave",
       targetMarked: "Marked field",
       targetNone: "Click a field",
@@ -8447,7 +8446,6 @@ export const en: Translations = {
       subOther: "{{person}} is in control · you're watching",
       subReconnect: "Reconnecting… {{name}} waits 2 min",
       reconnectHelp: "If you leave, {{name}} waits 2 min.",
-      expand: "Watch live",
       collapse: "Collapse",
       takeover: "Take over",
       stop: "Stop",

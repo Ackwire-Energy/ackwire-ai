@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { type HeaderAction, PersonAvatar } from "@/ui";
-import { useColors } from "./hooks";
+import { useColors, useDirectory, useMeId } from "./hooks";
 import { OrgAvatar } from "./OrgAvatar";
 import { usePersonPhoto } from "./photo";
 
@@ -24,7 +24,12 @@ export function useTabHeader(): { left: ReactNode; actions: HeaderAction[] } {
   const me = useMe();
   const { org } = useOrg();
   const c = useColors();
-  const photo = usePersonPhoto(me.data?.user.image);
+  // Your photo as the directory has it (as Você shows it): `me` comes from the session, which the server
+  // caches for minutes, so a new photo only reached the bar later.
+  const meId = useMeId();
+  const dir = useDirectory();
+  const mine = meId ? dir.memberById.get(meId) : undefined;
+  const photo = usePersonPhoto(mine?.avatarUrl ?? mine?.image ?? me.data?.user.image);
   const actions: HeaderAction[] = [
     { icon: "plus", sf: "plus", label: t("mobile.new.title"), onPress: () => router.push("/new") },
   ];

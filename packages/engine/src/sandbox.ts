@@ -199,7 +199,8 @@ export async function withConnectedMachine<T>(
   }
   if (!status.online) throw new MachineOfflineError(status.name);
   // Paused by its owner (ADR 0036 §6): nothing new starts there; the agent relays why and until when.
-  if (status.paused && !options.allowPaused) throw new MachinePausedError(status.name, status.paused.until, status.paused.timezone);
+  if (status.paused && !options.allowPaused)
+    throw new MachinePausedError(status.name, status.paused.until, status.paused.timezone);
   // An old runner would ignore `agent` and put every agent in the same folder.
   if (status.protocol < AGENT_FOLDERS_PROTOCOL) {
     throw new SandboxUnavailableError(

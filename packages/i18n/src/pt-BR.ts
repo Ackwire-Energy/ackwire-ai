@@ -8476,7 +8476,6 @@ export const ptBR = {
       noSite: "Antes de abrir uma página",
     },
     inCard: {
-      expandHint: "Clique para expandir",
       scrollHint: "Rolando a página · Esc para sair",
       targetMarked: "Campo marcado",
       targetNone: "Clique num campo",
@@ -8497,7 +8496,6 @@ export const ptBR = {
       subOther: "{{person}} no controle · você só assiste",
       subReconnect: "Reconectando… {{article}} {{name}} espera 2 min",
       reconnectHelp: "Se você sair, {{article}} {{name}} espera 2 min.",
-      expand: "Ver ao vivo",
       collapse: "Recolher",
       takeover: "Assumir",
       stop: "Parar",

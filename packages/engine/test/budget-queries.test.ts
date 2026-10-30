@@ -43,6 +43,7 @@ test("claim → model request stays within 12 statements; a whole mention run wi
   expect(beforeModel).toBeLessThanOrEqual(12);
   expect(profile).not.toBeNull();
   const p = profile as unknown as { stages: StageTiming[]; total: { queries: number } };
-  expect(p.total.queries).toBeLessThanOrEqual(21);
+  // 22 since the reply carries how many tool calls the run made, so the apps leave "Ver o que ele fez" out at 0.
+  expect(p.total.queries).toBeLessThanOrEqual(22);
   expect(p.stages.map((s) => s.stage)).toEqual(["claim", "context", "model#1", "persist", "events"]);
 });

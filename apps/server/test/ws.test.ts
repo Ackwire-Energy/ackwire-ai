@@ -1,7 +1,17 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { orgTopic } from "@agenteschat/adapters";
 import { authorizeSubscription, currentSubscriptions, parseClientFrame } from "../src/realtime/ws";
-import { browser, createTestServer, joinByInvitation, listen, ORIGIN, seedOrg, signUp, type TestServer, upgradeStatus } from "./harness";
+import {
+  browser,
+  createTestServer,
+  joinByInvitation,
+  listen,
+  ORIGIN,
+  seedOrg,
+  signUp,
+  type TestServer,
+  upgradeStatus,
+} from "./harness";
 
 describe("parseClientFrame", () => {
   test("accepts subscribe/unsubscribe with a uuid and ping; rejects the rest", () => {
@@ -269,9 +279,13 @@ test("a missed revocation event is reconciled from durable membership", async ()
   await a.next((f) => f.type === "subscribed" && f.channelId === channelId);
   expect((await currentSubscriptions(t.db, anaId, orgId, [channelId]))?.has(channelId)).toBe(true);
 
-  expect((await owner(`/api/app/organizations/${orgId}/channels/${channelId}/members/people/${anaId}`, {
-    method: "DELETE",
-  })).status).toBe(204);
+  expect(
+    (
+      await owner(`/api/app/organizations/${orgId}/channels/${channelId}/members/people/${anaId}`, {
+        method: "DELETE",
+      })
+    ).status,
+  ).toBe(204);
   expect((await currentSubscriptions(t.db, anaId, orgId, [channelId]))?.has(channelId)).toBe(false);
   expect(await a.next((f) => f.type === "unsubscribed" && f.channelId === channelId, 20_000)).toMatchObject({
     reason: "revoked",
