@@ -128,7 +128,7 @@ function Row({
 }) {
   return (
     <div className="settings-row">
-      <span className="ac-card__key notice-prefs__icon" aria-hidden="true">
+      <span className="notice-prefs__icon" aria-hidden="true">
         <Icon name={icon} size={16} />
       </span>
       <div className="settings-row__text">
