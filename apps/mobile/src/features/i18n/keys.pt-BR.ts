@@ -1145,6 +1145,7 @@ export const featureKeysPtBR = {
         forum: "Fórum",
         sandbox: "Computador próprio",
         browser: "Navegador",
+        setup: "Configurar o workspace",
         desktop: "Tela do computador",
       },
       asksYou: "Merge e publicar sempre pedem sua aprovação, em qualquer nível.",

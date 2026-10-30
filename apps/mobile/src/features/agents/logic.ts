@@ -446,6 +446,8 @@ export interface UseLine {
   key: string;
   /** An app's own name (GitHub), or a built-in area to say in the app's words (drive, issues…). */
   label: { text: string } | { area: string };
+  /** The app's connection, for its mark (`ConnectorIcon`); null for built-in areas. */
+  connectionId: string | null;
   level: "read" | "write" | "some";
 }
 
@@ -460,6 +462,7 @@ export function usesOf(access: AgentAccess | null | undefined): { lines: UseLine
     lines.push({
       key: r.id,
       label: r.kind === "connector" || !r.area ? { text: r.label } : { area: r.area },
+      connectionId: r.connectionId,
       level: level === "custom" ? "some" : level,
     });
   }

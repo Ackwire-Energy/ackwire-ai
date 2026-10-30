@@ -1140,6 +1140,7 @@ export const featureKeysEn: FeatureTranslations = {
         forum: "Forum",
         sandbox: "Own computer",
         browser: "Browser",
+        setup: "Workspace setup",
         desktop: "Computer screen",
       },
       asksYou: "Merging and publishing always ask for your approval, at any level.",
