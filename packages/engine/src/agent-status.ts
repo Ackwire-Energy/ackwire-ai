@@ -7,6 +7,7 @@ import { toolGroupKey } from "./tools/directory";
 import type { ToolContext, ToolDefinition, ToolSource } from "./tools/types";
 
 const { agents, agentRuns, channels, issues, messages, missions } = schema;
+type AgentRunRow = typeof agentRuns.$inferSelect;
 
 /**
  * An agent's presence, from its work (ADR 0081): nobody sets it by hand.
@@ -135,7 +136,8 @@ export async function loadAgentStatuses(db: Database, orgId: string, now = new D
   return list.map((a) => {
     const runs = alive.filter((r) => r.agentId === a.id);
     const working = runs.filter((r) => (ACTIVE as readonly string[]).includes(r.status));
-    const long = (r: (typeof runs)[number]) => r.startedAt !== null && ms - r.startedAt.getTime() >= AGENT_HEAVY_AFTER_MS;
+    const long = (r: (typeof runs)[number]) =>
+      r.startedAt !== null && ms - r.startedAt.getTime() >= AGENT_HEAVY_AFTER_MS;
     const stored = storedLine(a, runById, now);
     const isWorking = (r: (typeof runs)[number]) => (ACTIVE as readonly string[]).includes(r.status);
     const lineRun = a.statusRunId ? runById.get(a.statusRunId) : undefined;
@@ -244,7 +246,7 @@ export async function announceAgentStatus(pubsub: PubSub | undefined, orgId: str
   await publishOrgEvent(pubsub, { type: "org.broadcast", orgId, event: { type: "agent.status", orgId, agentId } });
 }
 
-// ── The line picked for a run (ADR 0081 §8–10) ──────────────────────────────
+// ── The line picked for a run (ADR 0081 §8–10) ─────────────────────────────
 
 /** A line the run could show: what it says (`kind`, `subject`) and, for Jev, the same in plain English. */
 export interface StatusCandidate {
@@ -286,7 +288,10 @@ const STICKY: ReadonlySet<string> = new Set(["task", "routine", "mission"]);
  */
 export async function statusCandidates(
   db: Database,
-  run: { orgId: string; agentId: string; channelId: string; threadRootId: string; triggerMessageId: string; issueId: string | null; background: boolean },
+  run: Pick<
+    AgentRunRow,
+    "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId" | "issueId" | "background"
+  >,
   tools: ToolDefinition[],
 ): Promise<StatusCandidate[]> {
   const [issue, mission, trigger, channel] = await Promise.all([
@@ -395,7 +400,9 @@ async function writeAutoLine(
   line: Pick<StatusCandidate, "kind" | "subject"> | null,
   options: { busy?: boolean; now: Date; keepOwn: boolean },
 ) {
-  const own = sql`${agents.statusSource} = 'self' and (${agents.statusUntil} > ${options.now.toISOString()}::timestamptz or exists (select 1 from ${agentRuns} where ${agentRuns.id} = ${agents.statusRunId} and ${agentRuns.status} in ('queued', 'running', 'waiting_approval', 'waiting_input')))`;
+  // The agent's own words hold: their end hasn't come, or the run that wrote them is still on.
+  const liveRun = sql`exists (select 1 from ${agentRuns} where ${agentRuns.id} = ${agents.statusRunId} and ${agentRuns.status} in ('queued', 'running', 'waiting_approval', 'waiting_input'))`;
+  const own = sql`${agents.statusSource} = 'self' and (${agents.statusUntil} > ${options.now.toISOString()}::timestamptz or ${liveRun})`;
   const [row] = await deps.db
     .update(agents)
     .set({
@@ -473,7 +480,12 @@ export async function followWork(
 }
 
 /** Jev: does the agent's own line still describe the step it is on? (P of yes; calibrated, so Jev only.) */
-async function stillFits(judge: Judge, ctx: Pick<ToolContext, "orgId" | "agentId" | "runId">, line: string, step: string) {
+async function stillFits(
+  judge: Judge,
+  ctx: Pick<ToolContext, "orgId" | "agentId" | "runId">,
+  line: string,
+  step: string,
+) {
   const answers = await judge.ask({
     orgId: ctx.orgId,
     agentId: ctx.agentId,

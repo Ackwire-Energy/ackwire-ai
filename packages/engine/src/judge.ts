@@ -208,7 +208,10 @@ export function createLlmJudge(deps: {
           q.type === "choice"
             ? { type: "string", enum: Object.keys(q.criteria) }
             : q.type === "score"
-              ? { type: "integer", description: `The level that fits, 0 to ${q.criteria.length - 1} (criteria in order).` }
+              ? {
+                  type: "integer",
+                  description: `The level that fits, 0 to ${q.criteria.length - 1} (criteria in order).`,
+                }
               : { type: "number", description: "Probability that the `true` criterion holds, 0 to 1." };
       }
       const outputSchema = { type: "object", properties, required: ids, additionalProperties: false };

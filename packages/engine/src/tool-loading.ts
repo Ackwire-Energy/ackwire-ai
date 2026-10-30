@@ -32,7 +32,7 @@ export interface ToolGroupChoice {
   source: "judge" | "timeout" | "error" | "none";
   /** Groups loaded without asking (`keptToolGroups`). */
   kept: string[];
-  /** The agent's line and how heavy the work is (ADR 0081 §8–9), when `status` candidates were given and Jev answered. */
+  /** The agent's line and how heavy the work is (ADR 0081 §8–9): with `status` candidates, once Jev answered. */
   status?: StatusPick;
 }
 
@@ -127,7 +127,8 @@ export async function chooseToolGroups(
     const status = asksStatus
       ? { line: line && line !== "none" ? line : null, heavy: (weight["2"] ?? 0) + (weight["3"] ?? 0) }
       : undefined;
-    return { groups: chosen, scores, source: groups.length > 0 ? "judge" : "none", kept, ...(status ? { status } : {}) };
+    const source = groups.length > 0 ? "judge" : "none";
+    return { groups: chosen, scores, source, kept, ...(status ? { status } : {}) };
   } catch {
     return none("error");
   } finally {
