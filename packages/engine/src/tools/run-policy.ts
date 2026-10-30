@@ -95,6 +95,8 @@ const HERE = new Set([
   "desktop_ask_person",
   "update_thread",
   "offer_connect_ai",
+  "follow_up",
+  "cancel_follow_up",
 ]);
 
 /** Reads under a scope that also writes, by name. */

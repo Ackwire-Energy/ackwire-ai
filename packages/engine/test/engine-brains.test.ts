@@ -359,6 +359,167 @@ test("a gated call through the bridge leaves the run waiting; the decision resum
   expect(seen[1]?.trigger).toContain("github_merge_pr ok: acme/app#42");
 });
 
+/** A connector call that asks a person every time, answering like a remote workbench that gave only a preview. */
+function workbench() {
+  const ran: Record<string, unknown>[] = [];
+  const source: ToolSource = {
+    name: "fake-workbench",
+    tools: async () => [
+      {
+        name: "ci_workbench",
+        description: "Runs code against the CI provider (fake)",
+        scope: "ci:run",
+        sensitive: true,
+        inputSchema: {
+          type: "object",
+          properties: { run: { type: "integer" } },
+          required: ["run"],
+          additionalProperties: false,
+        },
+        async execute(input) {
+          ran.push(input);
+          return { content: "Response schema: {jobs: [...]} Data Preview: (2 rows hidden)" };
+        },
+      },
+    ],
+  };
+  return { source, ran };
+}
+
+const WORKBENCH_WHY = "The CI run is slow and its per-job times answer the question: this call reads them.";
+
+test("approved, it ran, and the brain ended its turn without a word: one more turn with the result, then the answer", async () => {
+  const bench = workbench();
+  f = await setup({ toolSources: [bench.source] });
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "ci:run" }]);
+  const machineId = await computerAgent(f);
+  const promised =
+    "The card above fetches how long each job took and what's left. When you approve, I'll give you the numbers.";
+  const { brain, seen } = scriptedComputerBrain(async function* (n, turn) {
+    if (n === 0) {
+      yield { type: "text_delta", text: promised };
+      const result = await executeToolForRun(
+        f.jobDeps,
+        { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId },
+        { id: "wb-1", name: "ci_workbench", input: { run: 42, why: WORKBENCH_WHY } },
+      );
+      yield { type: "tool_call", id: "wb-1", name: "ci_workbench", input: {}, executed: result };
+      yield { type: "done", text: promised };
+      return;
+    }
+    // What production saw: the result came back and the turn ended with nothing.
+    if (n === 1) return yield { type: "done", text: "" };
+    yield { type: "done", text: "The preview hid the rows, so I read them again: tests took 9 min, lint 2." };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev o ci demora tanto assim?");
+  await drainOutbox(f.db, handlers);
+  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("waiting_approval");
+
+  const [approval] = await listApprovals(f.db, f.owner.id, f.org.id, { status: "pending" });
+  await decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, approval?.id ?? "", {
+    decision: "approve",
+  });
+  await drainOutbox(f.db, handlers);
+
+  expect(bench.ran).toEqual([{ run: 42 }]);
+  expect(seen.length).toBe(3);
+  expect(seen[1]?.trigger).toContain("ci_workbench: Response schema");
+  // Told what was decided and what came back, and to finish what it said it would do.
+  expect(seen[2]?.trigger).toContain("ended your turn without telling them anything");
+  expect(seen[2]?.trigger).toContain("Data Preview");
+  const [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("done");
+  const fromAgent = (await timeline(f)).filter((m) => m.author.type === "agent" && !m.meta.approvalId);
+  expect(fromAgent.map((m) => m.body)).toEqual([
+    promised,
+    "The preview hid the rows, so I read them again: tests took 9 min, lint 2.",
+  ]);
+  const steps = await f.db
+    .select()
+    .from(schema.agentRunSteps)
+    .where(eq(schema.agentRunSteps.runId, run?.id ?? ""));
+  expect(steps.filter((s) => s.data.nudged === "decision").length).toBe(1);
+});
+
+test("told once after a decision: a second silent turn ends the run, never a loop", async () => {
+  const bench = workbench();
+  f = await setup({ toolSources: [bench.source] });
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "ci:run" }]);
+  const machineId = await computerAgent(f);
+  const { brain, seen } = scriptedComputerBrain(async function* (n, turn) {
+    if (n === 0) {
+      const result = await executeToolForRun(
+        f.jobDeps,
+        { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId },
+        { id: "wb-1", name: "ci_workbench", input: { run: 7, why: WORKBENCH_WHY } },
+      );
+      yield { type: "tool_call", id: "wb-1", name: "ci_workbench", input: {}, executed: result };
+      return yield { type: "done", text: "Asked for the CI numbers." };
+    }
+    yield { type: "done", text: "" };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev quanto tempo levou o CI?");
+  await drainOutbox(f.db, handlers);
+  const [approval] = await listApprovals(f.db, f.owner.id, f.org.id, { status: "pending" });
+  await decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, approval?.id ?? "", {
+    decision: "approve",
+  });
+  await drainOutbox(f.db, handlers);
+  expect(seen.length).toBe(3);
+  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("done");
+});
+
+test("decided while the turn that asked still runs: the run goes on once that turn ends, never two turns at once", async () => {
+  const bench = workbench();
+  f = await setup({ toolSources: [bench.source] });
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "ci:run" }]);
+  const machineId = await computerAgent(f);
+  let turnsWhileFirstRan = -1;
+  const { brain, seen } = scriptedComputerBrain(async function* (n, turn) {
+    if (n > 0) return yield { type: "done", text: "Tests took 9 min, lint 2." };
+    const result = await executeToolForRun(
+      f.jobDeps,
+      { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId },
+      { id: "wb-1", name: "ci_workbench", input: { run: 42, why: WORKBENCH_WHY } },
+    );
+    // The person approves seven seconds later, before this turn has ended: the decision's job runs now.
+    const [approval] = await listApprovals(f.db, f.owner.id, f.org.id, { status: "pending" });
+    await decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, approval?.id ?? "", {
+      decision: "approve",
+    });
+    await drainOutbox(f.db, handlers);
+    turnsWhileFirstRan = seen.length;
+    yield { type: "tool_call", id: "wb-1", name: "ci_workbench", input: {}, executed: result };
+    yield { type: "done", text: "When you approve, I'll give you the numbers." };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev o ci demora tanto assim?");
+  await drainOutbox(f.db, handlers);
+
+  expect(turnsWhileFirstRan).toBe(1);
+  expect(seen.length).toBe(2);
+  expect(seen[1]?.session?.id).toBe(seen[0]?.session?.id);
+  expect(seen[1]?.trigger).toContain("ci_workbench: Response schema");
+  expect(bench.ran).toEqual([{ run: 42 }]);
+  const [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("done");
+  expect((await timeline(f)).at(-1)?.body).toBe("Tests took 9 min, lint 2.");
+});
+
 test("a question asked through the bridge: the text written before it comes first, what follows isn't posted", async () => {
   f = await setup({ askUser: true });
   const machineId = await computerAgent(f);

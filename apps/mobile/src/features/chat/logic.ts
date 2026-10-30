@@ -11,6 +11,7 @@ import { type ActivityEntry, barEntries } from "@agenteschat/client/lib/activity
 import { type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
 import {
   answeredNotices,
+  followUpLine,
   isAnsweredNotice,
   isEventLine,
   isTalkerReply,
@@ -131,11 +132,14 @@ const NOTICE_ICON: Record<string, EventLineView["icon"]> = {
   consult_reply: "agent",
   agent_note: "chat",
   wait_result: "check",
+  follow_up: "clock",
 };
 
 export function eventLineOf(
   m: Pick<Message, "body" | "meta">,
   names: { author: string; agentByHandle: (handle: string) => string | null },
+  /** A follow-up's time for the reader ("18:30"). */
+  time: (iso: string) => string = (iso) => iso,
 ): EventLineView | null {
   const notice = noticeOf(m.meta);
   if (!notice) return null;
@@ -161,6 +165,10 @@ export function eventLineOf(
       return from ? line("chat.notice.agentNote", { from }) : line("chat.notice.agentNoteAnon");
     case "wait_result":
       return line("chat.notice.waitResult", { name: names.author });
+    case "follow_up": {
+      const followUp = followUpLine(notice, names.author, time);
+      return followUp ? line(followUp.key, followUp.values) : null;
+    }
     default:
       return line("chat.notice.other", { name: names.author });
   }

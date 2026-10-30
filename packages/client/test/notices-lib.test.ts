@@ -3,6 +3,7 @@ import type { Message } from "../src/index";
 import {
   answeredNotices,
   consultationOfNotice,
+  followUpLine,
   isTalkerReply,
   noticeAgentHandle,
   noticeOf,
@@ -106,6 +107,34 @@ describe("notices in a conversation", () => {
     // A person's message never answers a report (only the agent's, with `meta.routine`).
     const byPerson = msg("p", 3, walter, { routine: { id: "rt", name: "x", noticeId: "notice" } });
     expect(answeredNotices([byPerson]).size).toBe(0);
+  });
+
+  test("a follow-up's line: cancelable while it waits, canceled, and the one that woke the agent", () => {
+    const at = "2026-10-30T21:30:00.000Z";
+    const time = (iso: string) => (iso === at ? "18:30" : "?");
+    const line = (refs: Record<string, string>) => {
+      const notice = noticeOf({ notice: { kind: "follow_up", text: "Check CI run 42", refs } });
+      return notice ? followUpLine(notice, "Ari", time) : null;
+    };
+    expect(line({ runId: "r1", at, about: "ver o CI", state: "pending" })).toEqual({
+      key: "chat.notice.followUp",
+      values: { name: "Ari", about: "ver o CI", time: "18:30" },
+      pending: true,
+    });
+    expect(line({ runId: "r1", at, about: "ver o CI", state: "done" })).toMatchObject({
+      key: "chat.notice.followUp",
+      pending: false,
+    });
+    expect(line({ runId: "r1", at, about: "ver o CI", state: "canceled" })).toMatchObject({
+      key: "chat.notice.followUpCanceled",
+      pending: false,
+    });
+    expect(line({ runId: "r1", at, about: "ver o CI", wake: "1", followUpId: "m1" })).toMatchObject({
+      key: "chat.notice.followUpWake",
+      pending: false,
+    });
+    const report = noticeOf({ notice: { kind: "routine_handoff", text: "x", refs: {} } });
+    expect(report && followUpLine(report, "Ari", time)).toBeNull();
   });
 });
 

@@ -25,6 +25,7 @@ import {
   createDesktopControl,
   createDesktopToolSource,
   createFindAgentToolSource,
+  createFollowUpToolSource,
   createForumToolSource,
   createGitToolSource,
   createHandOffToolSource,
@@ -260,6 +261,8 @@ export function buildEngine(o: EngineOptions) {
       createAskAgentToolSource({ pubsub: adapters.pubsub, ai: { gateway, machines: machineHub } }),
       createFindAgentToolSource({ machines: machineHub }),
       createReactToolSource({ pubsub: adapters.pubsub }),
+      // An agent comes back to a conversation by itself (a CI run, a deploy), instead of promising to.
+      createFollowUpToolSource({ pubsub: adapters.pubsub }),
       // Background runs (routines) speak only through it.
       createHandOffToolSource({ pubsub: adapters.pubsub }),
       // Runs nobody called by name may stay quiet (reply-policy.ts): listed only for them.

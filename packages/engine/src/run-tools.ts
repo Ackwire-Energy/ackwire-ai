@@ -826,6 +826,8 @@ export async function suspendRunForTool(
       name: call.name,
       // Its tool_use lives in the computer brain's session, not in the transcript: resumed as text.
       bridged: true,
+      // Asked in a turn still running: a decision before it ends resumes the run only once it ends.
+      inTurn: true,
       ...(gated.type === "approval" ? { approvalId: gated.approval.id } : {}),
       ...(questionId ? { questionId, askedAt: Date.now() } : {}),
       ...(gated.type === "secret" ? { secretRequestId: gated.requestId } : {}),

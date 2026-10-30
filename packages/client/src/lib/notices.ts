@@ -4,7 +4,13 @@ import { routineReplyOf } from "./routines";
 type Meta = Record<string, unknown> | undefined;
 
 /** What reached the agent's conversation (packages/engine/src/notices.ts). */
-export type NoticeKind = "routine_handoff" | "consult_reply" | "agent_note" | "wait_result" | "talker_reply";
+export type NoticeKind =
+  | "routine_handoff"
+  | "consult_reply"
+  | "agent_note"
+  | "wait_result"
+  | "talker_reply"
+  | "follow_up";
 
 /**
  * An event an agent's conversation got (`meta.notice`): its routine's report,
@@ -56,6 +62,20 @@ export function noticeAgentHandle(notice: MessageNotice): string | null {
 
 /** An automatic line in the conversation (a notice): nothing groups with it. */
 export const isEventLine = (meta: Meta) => noticeOf(meta) !== null;
+
+/**
+ * An agent's follow-up (`follow_up`), as its line reads: the one it set ("Ari volta às 18:30 para ver o CI",
+ * `pending` while it can still be canceled), the same once canceled, or at its time the one that woke it
+ * ("Ari voltou para ver o CI"). `key`/`values` are the shared i18n; `time` formats its time for the reader.
+ */
+export function followUpLine(notice: MessageNotice, name: string, time: (iso: string) => string) {
+  if (notice.kind !== "follow_up") return null;
+  const { at = "", about = "", state, wake } = notice.refs;
+  const values = { name, about, time: at ? time(at) : "" };
+  if (wake) return { key: "chat.notice.followUpWake" as const, values, pending: false };
+  if (state === "canceled") return { key: "chat.notice.followUpCanceled" as const, values, pending: false };
+  return { key: "chat.notice.followUp" as const, values, pending: state === "pending" };
+}
 
 const CONSULTATION_STATUSES: ReadonlySet<string> = new Set<ConsultationStatus>(["answered", "expired", "failed"]);
 

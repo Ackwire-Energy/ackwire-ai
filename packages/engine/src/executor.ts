@@ -1,5 +1,18 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, count, type Database, desc, type Executor, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  count,
+  type Database,
+  desc,
+  type Executor,
+  eq,
+  inArray,
+  isNull,
+  ne,
+  or,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import {
   type ContentBlock,
   isAutoModel,
@@ -70,6 +83,14 @@ import { fitContextWindow } from "./context-budget";
 import { isAgentOnlyDm } from "./dms";
 import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationError } from "./errors";
 import { type ChannelEvent, type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
+import {
+  decisionNudge,
+  FOLLOW_UP_TOOL,
+  followThroughNudge,
+  followThroughVerdict,
+  promiseIn,
+  runHasFollowUp,
+} from "./follow-through";
 import { onForumRunFinished } from "./forum";
 import type { ModelGateway } from "./gateway";
 import { agentRepositoryList, repositoriesPrompt } from "./git/repos";
@@ -154,6 +175,8 @@ const {
 } = schema;
 /** A bridged call can land a moment after the text the brain streamed before it: its text up to this much later counts as before. */
 const ASKED_GRACE_MS = 250;
+/** How much of each decided call's result a run is reminded of when it ended its turn on the decision. */
+const DECIDED_LINE_MAX = 2000;
 
 /**
  * What the agent engine needs (ADR 0032). The engine is this file: it owns the
@@ -252,6 +275,15 @@ export interface Transcript {
   /** It was told once to answer after a reply that was only the silence word (or nothing). */
   nudged?: boolean;
   /**
+   * What a person decided on the calls it waited on and what came back ("name: result" per line), from the
+   * resume until its next final answer: ending that answer without a word gets one more turn (`decisionNudge`).
+   */
+  decided?: string;
+  /** It was told once to go on after a decision it ended its turn on (`decisionNudge`). */
+  decisionNudged?: boolean;
+  /** Its last message was checked once for a promise nothing keeps (`followThroughVerdict`). */
+  followThroughChecked?: boolean;
+  /**
    * A person decided or answered what it waited on (an approval, a question), or wrote to it while it
    * worked (ADR 0053 §10): it owes them an answer and can't pass anymore.
    */
@@ -306,6 +338,8 @@ export interface Transcript {
       secretRequestId?: string;
       /** Made by a computer brain through the runner bridge (`suspendRunForTool`): resumed as text. */
       bridged?: boolean;
+      /** Bridged during a turn not over yet: that turn's job resumes the run once it ends (`suspendedByBridge`). */
+      inTurn?: boolean;
       /** A bridged question: when it was asked (ms), to post only the text the brain wrote before it. */
       askedAt?: number;
       /** A mission tool's own wait (a blocking decision, a review): its id; the answer comes as `result`. */
@@ -482,6 +516,8 @@ async function executeRunInner(
     run = loaded;
     if (isTerminal(run.status) || run.status === "queued") return;
     if (run.status === "running") {
+      // Another job runs it right now (a second resume of the same pause): one run never thinks twice at once.
+      if (await runJobElsewhere(db, run.id, options.jobId)) return;
       // Picked up again (handed back at a shutdown, or recovered) with its old beat: a fresh one first, so a
       // recovery sweep can't take it from this worker. A sweep that took it first ended this job.
       await db
@@ -491,43 +527,12 @@ async function executeRunInner(
       if (options.owned && !(await options.owned())) return;
     }
     if (run.status === "waiting_approval" || run.status === "waiting_input") {
-      const [stillPending, stillOpen, stillSecret] = await Promise.all([
-        db
-          .select({ id: approvals.id })
-          .from(approvals)
-          .where(and(eq(approvals.runId, run.id), eq(approvals.status, "pending"))),
-        db
-          .select({ id: agentQuestions.id })
-          .from(agentQuestions)
-          .where(and(eq(agentQuestions.runId, run.id), eq(agentQuestions.status, "open"))),
-        db
-          .select({ id: secretRequests.id })
-          .from(secretRequests)
-          .leftJoin(
-            schema.outbox,
-            eq(
-              schema.outbox.dedupeKey,
-              sql<string>`concat('agent_run.execute:', ${secretRequests.runId}, ':secret:', ${secretRequests.id})`,
-            ),
-          )
-          .where(
-            and(
-              eq(secretRequests.runId, run.id),
-              or(
-                eq(secretRequests.status, "pending"),
-                // Delivery is committed before activation. Another wake-up
-                // must not tell the agent it has a secret until activation
-                // inserted the corresponding resume job.
-                and(eq(secretRequests.status, "delivered"), isNull(secretRequests.removedAt), isNull(schema.outbox.id)),
-              ),
-            ),
-          ),
-      ]);
-      // Resumes when the last decision or answer comes in.
-      if (stillPending.length > 0 || stillOpen.length > 0 || stillSecret.length > 0) return;
-      // A mission's own wait (a blocking decision, a review) resumes with its answer (`resumeRunWithResult`).
       const stored = run.transcript as unknown as Transcript | null;
-      if (stored?.pending?.calls.some((c) => c.waitId && !c.result)) return;
+      // Resumes when the last decision or answer comes in.
+      if (await pauseOpen(db, run.id, stored)) return;
+      // Decided while the computer turn that asked still runs: its job resumes the run when that turn ends
+      // (`suspendedByBridge`), so the brain's session never takes two turns at once.
+      if (stored?.pending?.calls.some((c) => c.inTurn) && (await runJobElsewhere(db, run.id, options.jobId))) return;
       const resumed = await transitionRun(db, run.id, run.status, "running");
       if (!resumed) return;
       run = resumed;
@@ -883,6 +888,7 @@ async function executeRunInner(
         toolsAvailable: tools.length > 0,
         askUser: tools.some((t) => t.name === ASK_USER_TOOL),
         react: tools.some((t) => t.name === REACT_TOOL),
+        followUp: tools.some((t) => t.name === FOLLOW_UP_TOOL),
         capabilities: [describeCapabilities(tools, pending), repositories].filter(Boolean).join("\n\n"),
         skills: skillList,
         team: tools.some((t) => t.name === FIND_AGENT_TOOL),
@@ -983,6 +989,7 @@ async function executeRunInner(
   if (transcript.pending) {
     const blocks: ContentBlock[] = [];
     const bridgedLines: string[] = [];
+    const decided: string[] = [];
     for (const call of transcript.pending.calls) {
       let result = call.result;
       if (!result && call.secretRequestId) {
@@ -1015,10 +1022,12 @@ async function executeRunInner(
           if (ran) await publishApproval({ db, pubsub: deps.pubsub }, ran, "approval.decided").catch(() => {});
         } else result = toolResultFor(approval);
       }
+      const line = `${call.name}${result?.isError ? " (not done)" : ""}: ${result?.content ?? ""}`;
+      decided.push(line.slice(0, DECIDED_LINE_MAX));
       // A computer brain's call (through the bridge): its tool_use is in the brain's session, so the
       // result goes back as text in the resumed session.
       if (call.bridged) {
-        bridgedLines.push(`${call.name}${result?.isError ? " (not done)" : ""}: ${result?.content ?? ""}`);
+        bridgedLines.push(line);
         continue;
       }
       blocks.push({
@@ -1035,6 +1044,7 @@ async function executeRunInner(
     }
     // Someone decided or answered what it waited on: it answers them now, it can't pass anymore.
     transcript.answerOwed = true;
+    transcript.decided = decided.join("\n");
     delete transcript.pending;
     await saveTranscript(db, transcript);
   }
@@ -1534,7 +1544,8 @@ async function executeRunInner(
     const [row] = await db.select({ transcript: agentRuns.transcript }).from(agentRuns).where(eq(agentRuns.id, run.id));
     const stored = row?.transcript as unknown as Transcript | null;
     const t = transcript as Transcript;
-    if (stored?.pending) t.pending = stored.pending;
+    // The turn that asked is over: from now on a decision resumes the run by itself.
+    if (stored?.pending) t.pending = { calls: stored.pending.calls.map(({ inTurn: _, ...call }) => call) };
     t.postedCount = Math.max(t.postedCount, stored?.postedCount ?? 0);
     // A question the brain asked mid-turn is already posted. Only what it wrote before asking leads to it
     // (posted just before the card, so it reads first); what it wrote after only repeats the question.
@@ -1559,6 +1570,16 @@ async function executeRunInner(
       if (view) await publishMessageCreated(deps.pubsub, view);
     }
     await finished(status);
+    // Decided while the turn still ran (the decision's job left the run to this turn): it goes on now.
+    if (t.pending && !(await pauseOpen(db, run.id, t))) {
+      await enqueue(db, {
+        orgId: run.orgId,
+        kind: "agent_run.execute",
+        payload: { runId: run.id },
+        dedupeKey: `agent_run.execute:${run.id}:decided:${t.pending.calls.map((c) => c.toolUseId).join(",")}`,
+        maxAttempts: 4,
+      });
+    }
   };
 
   /**
@@ -2169,6 +2190,26 @@ async function executeRunInner(
               : text === DONE_TEXT
                 ? bodyCode("done")
                 : undefined;
+      // A person decided what it waited on and it ended without a word about what came of it: one more turn,
+      // with the decision and the result, to finish what it set out to do (once per run).
+      const decided = transcript.decided;
+      delete transcript.decided;
+      if (
+        decided &&
+        !silent &&
+        !said &&
+        !closingSummary(transcript, true) &&
+        !transcript.decisionNudged &&
+        run.turns + 1 < maxTurns
+      ) {
+        transcript.decisionNudged = true;
+        const note = decisionNudge(decided);
+        appendUserText(transcript, note);
+        if (plan.kind !== "model") nextPrompt = note;
+        await saveTranscript(db, transcript);
+        later(() => addRunStep(db, run, "context", { nudged: "decision" }));
+        continue;
+      }
       // Addressed directly, it wrote only the silence word (or nothing): one more turn, told to answer.
       if (!silent && !viaRoutine && !transcript.nudged && (sentinelOnly || (!text && !anythingPosted))) {
         transcript.nudged = true;
@@ -2180,12 +2221,36 @@ async function executeRunInner(
       }
       if (!text && !anythingPosted && !silent) return fail("empty_reply");
       const t = transcript;
+      // Its last words promise more ("I'll send the numbers", "vou checar de novo"): one judge call, once per run,
+      // says whether that promise is left with nothing to keep it. Then this answer is posted and the run goes on,
+      // told to keep it now or come back with a follow-up.
+      const promise =
+        judge && said && !silent && !t.followThroughChecked && run.turns + 1 < maxTurns ? promiseIn(said) : null;
+      let keep: string | null = null;
+      if (judge && promise) {
+        t.followThroughChecked = true;
+        const verdict = (await runHasFollowUp(db, run).catch(() => false))
+          ? "waiting"
+          : await followThroughVerdict(judge, {
+              orgId: run.orgId,
+              agentId: run.agentId,
+              runId: run.id,
+              request: triggerMessage?.body ?? triggerText,
+              reply: said,
+            }).catch(() => "done" as const);
+        if (verdict === "unkept") {
+          keep = followThroughNudge(promise);
+          appendUserText(t, keep);
+          if (plan.kind !== "model") nextPrompt = keep;
+          later(() => addRunStep(db, run, "context", { nudged: "promise", promise }));
+        }
+      }
       // Someone wrote while it answered: post this answer, then read the new message(s) and go on.
       const [still] = await db
         .select({ pending: agentRuns.pendingMessageIds })
         .from(agentRuns)
         .where(eq(agentRuns.id, run.id));
-      if ((still?.pending.length ?? 0) > 0) {
+      if ((still?.pending.length ?? 0) > 0 || keep) {
         const posted = text
           ? await db.transaction(async (tx) => {
               const m = await post(tx, replyThreadId, text, withFallback(t, withCode(takeMemoryUpdates(t), code)));
@@ -2897,6 +2962,71 @@ async function markAnswerOwed(db: Executor, runId: string, t: Pick<Transcript, "
     .update(agentRuns)
     .set({ transcript: sql`coalesce(${agentRuns.transcript}, '{}'::jsonb) || ${patch}::jsonb` })
     .where(eq(agentRuns.id, runId));
+}
+
+/**
+ * Whether a paused run still waits on something: an approval, a question, a secret (until activation queued
+ * its resume job), or a mission's own wait without its answer.
+ */
+async function pauseOpen(db: Executor, runId: string, t: Pick<Transcript, "pending"> | null): Promise<boolean> {
+  if (t?.pending?.calls.some((c) => c.waitId && !c.result)) return true;
+  const [stillPending, stillOpen, stillSecret] = await Promise.all([
+    db
+      .select({ id: approvals.id })
+      .from(approvals)
+      .where(and(eq(approvals.runId, runId), eq(approvals.status, "pending")))
+      .limit(1),
+    db
+      .select({ id: agentQuestions.id })
+      .from(agentQuestions)
+      .where(and(eq(agentQuestions.runId, runId), eq(agentQuestions.status, "open")))
+      .limit(1),
+    db
+      .select({ id: secretRequests.id })
+      .from(secretRequests)
+      .leftJoin(
+        schema.outbox,
+        eq(
+          schema.outbox.dedupeKey,
+          sql<string>`concat('agent_run.execute:', ${secretRequests.runId}, ':secret:', ${secretRequests.id})`,
+        ),
+      )
+      .where(
+        and(
+          eq(secretRequests.runId, runId),
+          or(
+            eq(secretRequests.status, "pending"),
+            // Delivery is committed before activation. Another wake-up must not tell the agent it has a
+            // secret until activation inserted the corresponding resume job.
+            and(eq(secretRequests.status, "delivered"), isNull(secretRequests.removedAt), isNull(schema.outbox.id)),
+          ),
+        ),
+      )
+      .limit(1),
+  ]);
+  return stillPending.length > 0 || stillOpen.length > 0 || stillSecret.length > 0;
+}
+
+/**
+ * Another `agent_run.execute` job holds this run now (claimed, its lease live). Only a job can tell: a caller
+ * without one (`jobId`) never defers.
+ */
+async function runJobElsewhere(db: Executor, runId: string, jobId: string | undefined): Promise<boolean> {
+  if (!jobId) return false;
+  const [other] = await db
+    .select({ id: outbox.id })
+    .from(outbox)
+    .where(
+      and(
+        eq(outbox.kind, "agent_run.execute"),
+        sql`${outbox.payload}->>'runId' = ${runId}`,
+        eq(outbox.status, "processing"),
+        sql`${outbox.lockedUntil} > now()`,
+        ne(outbox.id, jobId),
+      ),
+    )
+    .limit(1);
+  return Boolean(other);
 }
 
 /** Whether the run changed something people haven't seen yet: receipts not on any message (ADR 0037). */

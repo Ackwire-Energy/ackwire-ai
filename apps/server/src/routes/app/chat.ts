@@ -2,6 +2,7 @@ import {
   activeRunsIn,
   addChannelMember,
   answerNow,
+  cancelFollowUp,
   createChannel,
   joinChannel,
   listChannelMembers,
@@ -430,6 +431,25 @@ export function chatRoutes(deps: AppDeps) {
       );
       deps.wakeWorkers?.();
       return c.json(result, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/messages/{messageId}/cancel-follow-up",
+      tags,
+      security,
+      summary: "Cancel an agent's follow-up from its line",
+      description:
+        "The id is the follow-up's line (`meta.notice.kind` `follow_up`). Anyone who can read the conversation. The line changes in place (`message.created` with the same id); at its time the agent isn't woken. 409 `follow_up.not_pending` once it came or was canceled.",
+      request: { params: OrgParams.extend({ messageId: z.uuid() }) },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, messageId } = c.req.valid("param");
+      await cancelFollowUp({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, messageId);
+      return c.body(null, 204);
     },
   );
 
