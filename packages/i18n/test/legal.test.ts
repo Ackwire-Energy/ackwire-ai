@@ -18,6 +18,18 @@ describe("legal pages", () => {
   }
 });
 
+describe("the privacy policy names Cloudflare where Workspace Content goes and where it is handled", () => {
+  // agentes.chat Cloud is behind Cloudflare, which decrypts its traffic at the data center nearest to each device:
+  // the list of where Workspace Content leaves our servers ("and only in them") and the countries of §9 must say so.
+  for (const [locale, doc] of Object.entries(legalDocuments.privacy)) {
+    test(locale, () => {
+      const section = (id: string) => JSON.stringify(doc.sections.find((s) => s.id === id)?.blocks);
+      expect(section("agents")).toContain("Cloudflare");
+      expect(section("transfers")).toContain("Cloudflare");
+    });
+  }
+});
+
 describe("agentes.chat Cloud's restriction lines cite the Terms this server serves", () => {
   // The section each line rests on, by its id: when the Terms are renumbered, this fails until the lines follow.
   const RESTS_ON = {

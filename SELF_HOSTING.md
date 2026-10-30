@@ -727,6 +727,7 @@ agents, machine sizes, AI tokens used and how much data the agents' browsers sen
 messages, files, names or sites. The first goes about an hour after the server first starts, then one a
 day at that time, restarts or not (one that came due while the server was off goes about 10 minutes
 after it starts again), as JSON in a POST to `TELEMETRY_URL` (`https://telemetry.agentes.chat/v1/report`).
+It passes through Cloudflare, which sits in front of agentes.chat and decrypts it on the way.
 A send that fails is tried again three times within about 2.5 hours, then dropped: the next day's
 report replaces it. These are all its fields:
 
