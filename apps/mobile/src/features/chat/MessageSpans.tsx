@@ -1,10 +1,11 @@
 import { Text as RNText, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "@/ui";
+import { openPage } from "../ai/parts";
 import { useColors } from "../shared/hooks";
 import { MONO } from "../shared/parts";
 import type { Block, Inline } from "./logic";
 
-/** Inline marks of a message (bold, italic, `code`, @mentions), inside a Text. */
+/** Inline marks of a message (bold, italic, `code`, links, @mentions), inside a Text. */
 export function Spans({ inline }: { inline: Inline[] }) {
   const c = useColors();
   return (
@@ -27,6 +28,18 @@ export function Spans({ inline }: { inline: Inline[] }) {
           case "code":
             return (
               <RNText key={key} style={[styles.inlineCode, { backgroundColor: c.sunken, color: c.ink2 }]}>
+                {s.text}
+              </RNText>
+            );
+          case "link":
+            // Opens in the in-app browser; a press on a link wins over the row's long press.
+            return (
+              <RNText
+                key={key}
+                accessibilityRole="link"
+                onPress={() => openPage(s.href)}
+                style={styles.link}
+              >
                 {s.text}
               </RNText>
             );
@@ -98,5 +111,6 @@ const styles = StyleSheet.create({
   cellText: { fontVariant: ["tabular-nums"] },
   bold: { fontWeight: "700" },
   italic: { fontStyle: "italic" },
+  link: { textDecorationLine: "underline" },
   inlineCode: { fontFamily: MONO, fontSize: 15 },
 });
