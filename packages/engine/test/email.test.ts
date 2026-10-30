@@ -45,6 +45,7 @@ const TYPED = [
   "name",
   "approverName",
   "reason",
+  "byName",
 ];
 const SENTINEL = "Zq9 evil.com";
 const withoutUrls = (s: string) => s.replace(/https?:\/\/\S+/g, "");
@@ -119,6 +120,8 @@ describe("every email, in both languages", () => {
       join_request: true,
       join_answer: true,
       join_code: true,
+      workspace_deleting: true,
+      workspace_restored: true,
     };
     expect(new Set<string>(Object.values(EMAIL_SAMPLES).map((t) => t.kind))).toEqual(new Set(Object.keys(kinds)));
   });

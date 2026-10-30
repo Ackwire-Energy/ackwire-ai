@@ -235,4 +235,33 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     reason: "Só aceitamos pessoas do time de design por enquanto.",
   },
   "join_code.en": { kind: "join_code", locale: "en", orgName: "Souza Bakery", code: "482913", url: APP },
+  /** To an owner: a button to restore it. */
+  "workspace_deleting-owner.en": {
+    kind: "workspace_deleting",
+    locale: "en",
+    orgName: "Souza Bakery",
+    byName: "Ana Souza",
+    dueAt: "2026-11-06T18:42:00.000Z",
+    timeZone: "America/New_York",
+    owner: true,
+    url: `${APP}/org/${ORG}`,
+  },
+  /** To a member: only an owner can restore it. */
+  "workspace_deleting-member.pt-BR": {
+    kind: "workspace_deleting",
+    locale: "pt-BR",
+    orgName: "Padaria Souza",
+    byName: "Ana Souza",
+    dueAt: "2026-11-06T18:42:00.000Z",
+    timeZone: "America/Sao_Paulo",
+    owner: false,
+    url: `${APP}/org/${ORG}`,
+  },
+  "workspace_restored.en": {
+    kind: "workspace_restored",
+    locale: "en",
+    orgName: "Souza Bakery",
+    byName: "Ana Souza",
+    url: `${APP}/org/${ORG}`,
+  },
 };

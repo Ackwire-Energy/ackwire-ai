@@ -27,6 +27,7 @@ const en = {
   fallback: "Button not working? Copy this address into your browser:",
   role: { owner: "an owner", admin: "an admin", member: "a member" } as Record<string, string>,
   anAgent: "An agent",
+  someone: "Someone",
   verify: {
     subject: "Confirm your email for agentes.chat",
     preheader: "One click to confirm this address. The link works for an hour.",
@@ -233,6 +234,29 @@ const en = {
     why: (org: string) =>
       `You got this email because someone typed this address to ask to join ${org} on agentes.chat.`,
   },
+  deleting: {
+    subject: (day: string) => `A workspace you're in will be deleted on ${day}`,
+    preheader: "It's closed now. An owner can still restore it until then.",
+    headline: "A workspace is being deleted",
+    body: (by: string, org: string, day: string, time: string): Text => [
+      { b: by },
+      " deleted the workspace ",
+      { b: org },
+      `. It's closed now and goes for good on ${day} at ${time}.`,
+    ],
+    owner: "Changed your mind? Restore it before then.",
+    button: "Restore the workspace",
+    member: "If it's a mistake, ask an owner to restore it." as Text,
+    why: (org: string) => `You got this email because you're in ${org} on agentes.chat.`,
+  },
+  restored: {
+    subject: "A workspace you're in is back",
+    preheader: "An owner restored it. It works again.",
+    headline: "The workspace is back",
+    body: (by: string, org: string): Text => [{ b: by }, " restored ", { b: org }, ". It works again."],
+    button: "Open the workspace",
+    why: (org: string) => `You got this email because you're in ${org} on agentes.chat.`,
+  },
 };
 
 type Words = typeof en;
@@ -242,6 +266,7 @@ const ptBR: Words = {
   fallback: "O botão não funcionou? Copie e cole este endereço no navegador:",
   role: { owner: "dono", admin: "admin", member: "membro" },
   anAgent: "Um agente",
+  someone: "Alguém",
   verify: {
     subject: "Confirme seu e-mail no agentes.chat",
     preheader: "Um clique para confirmar este endereço. O link vale por uma hora.",
@@ -440,6 +465,29 @@ const ptBR: Words = {
     small: ["Vale por 10 minutos. Se não foi você, ", { nobr: "ignore este e-mail." }],
     why: (org) =>
       `Você recebeu este e-mail porque alguém digitou este endereço para pedir para entrar na ${org} no agentes.chat.`,
+  },
+  deleting: {
+    subject: (day) => `Um workspace em que você está vai ser apagado em ${day}`,
+    preheader: "Ele está fechado agora. Um dono ainda pode restaurar até lá.",
+    headline: "Um workspace está sendo apagado",
+    body: (by, org, day, time) => [
+      { b: by },
+      " apagou o workspace ",
+      { b: org },
+      `. Ele está fechado agora e some de vez em ${day} às ${time}.`,
+    ],
+    owner: "Mudou de ideia? Restaure antes disso.",
+    button: "Restaurar o workspace",
+    member: "Se foi um engano, peça para um dono restaurar.",
+    why: (org) => `Você recebeu este e-mail porque está na ${org} no agentes.chat.`,
+  },
+  restored: {
+    subject: "Um workspace em que você está voltou",
+    preheader: "Um dono restaurou. Ele voltou a funcionar.",
+    headline: "O workspace voltou",
+    body: (by, org) => [{ b: by }, " restaurou ", { b: org }, ". Ele voltou a funcionar."],
+    button: "Abrir o workspace",
+    why: (org) => `Você recebeu este e-mail porque está na ${org} no agentes.chat.`,
   },
 };
 

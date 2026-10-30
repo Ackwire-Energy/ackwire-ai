@@ -8,6 +8,7 @@ import { approverIds } from "./approvals";
 import { inertText } from "./email/inert";
 import { type Block, EMAIL_PICTURES, type EmailArt, type EmailDoc, type EmailLocale, renderDoc } from "./email/layout";
 import { WORDS } from "./email/words";
+import { dayAndTime } from "./format";
 import { adminIds } from "./gateway";
 import { publicHostAddress, type ResolveHost, resolveHostDns } from "./net-guard";
 import { enqueue, PermanentJobError } from "./outbox";
@@ -137,6 +138,23 @@ export type EmailTemplate =
       /** `APPROVAL_REMINDER_HOURS` when it was queued: the footer says how often it comes. */
       afterHours?: number;
     }
+  /**
+   * An owner deleted a workspace the reader is in, one email per member: it's closed now and goes for good at `dueAt`
+   * (ISO), shown in the reader's `timeZone`. Owners get a button to restore it. `url`: the workspace in the app.
+   */
+  | {
+      kind: "workspace_deleting";
+      locale: EmailLocale;
+      orgName: string;
+      /** Who deleted it. Empty: "Someone" in the email's language. */
+      byName: string;
+      dueAt: string;
+      timeZone: string;
+      owner: boolean;
+      url: string;
+    }
+  /** An owner restored a workspace that was being deleted, one email per member. */
+  | { kind: "workspace_restored"; locale: EmailLocale; orgName: string; byName: string; url: string }
   /** The workspace's own computer is ready after a long wait (ADR 0056 §10): what it is, and what to do next. */
   | {
       kind: "computer_ready";
@@ -474,6 +492,32 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
         c.preheader,
         c.headline,
         [{ p: c.body(org) }, { code: t.code }, { small: c.small }],
+        c.why(org),
+      );
+    }
+    case "workspace_deleting": {
+      const c = w.deleting;
+      const org = inertText(t.orgName);
+      const { day, time } = dayAndTime(new Date(t.dueAt), t.timeZone, lang);
+      return doc(
+        c.subject(day),
+        c.preheader,
+        c.headline,
+        [
+          { p: c.body(inertText(t.byName) || w.someone, org, day, time) },
+          ...(t.owner ? [{ p: c.owner }, { button: c.button, url: t.url }] : [{ small: c.member }]),
+        ],
+        c.why(org),
+      );
+    }
+    case "workspace_restored": {
+      const c = w.restored;
+      const org = inertText(t.orgName);
+      return doc(
+        c.subject,
+        c.preheader,
+        c.headline,
+        [{ p: c.body(inertText(t.byName) || w.someone, org) }, { button: c.button, url: t.url }],
         c.why(org),
       );
     }
