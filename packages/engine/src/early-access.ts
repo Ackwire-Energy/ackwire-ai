@@ -5,6 +5,7 @@ import {
   desc,
   type Executor,
   eq,
+  gt,
   inArray,
   isNull,
   lte,
@@ -101,8 +102,9 @@ export async function earlyAccessLink(db: Executor, access: string | null | unde
 }
 
 /**
- * An account made with the link's token uses its invitation: once, and only for the address it was sent to. The
- * token goes, so the link signs nobody else up. Returns whether it was used.
+ * An account made with the link's token, before it expires, uses its invitation: once, and only for the address it
+ * was sent to. The token goes, so the link signs nobody else up. An expired link uses nothing, even when the account
+ * got in another way (open mode, a workspace's invitation). Returns whether it was used.
  */
 export async function useEarlyAccess(
   db: Executor,
@@ -119,6 +121,7 @@ export async function useEarlyAccess(
         eq(invitations.email, input.email.trim().toLowerCase()),
         isNull(invitations.usedAt),
         isNull(invitations.revokedAt),
+        gt(invitations.expiresAt, now),
       ),
     )
     .returning({ id: invitations.id });

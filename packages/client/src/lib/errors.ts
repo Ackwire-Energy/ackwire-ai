@@ -92,6 +92,8 @@ const KNOWN = {
   "org.create_invite_only": "errors.org.createInviteOnly",
   EARLY_ACCESS_OTHER_EMAIL: "auth.earlyAccess.otherEmail",
   EARLY_ACCESS_EMAIL_UNVERIFIED: "auth.earlyAccess.unverified",
+  // A provider's sign-up on a closed server comes back to /login with this code.
+  SIGNUP_CLOSED: "auth.flow.closedLead",
   human_check: "errors.humanCheck",
   human_check_blocked: "errors.humanCheckBlocked",
   // TypeSafe refused the key pasted for Jev: said under its field, nothing kept.

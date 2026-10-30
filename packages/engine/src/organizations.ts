@@ -294,6 +294,13 @@ export interface SignupPolicy {
   allowSignup: boolean;
   /** An owner link (`OWNER_CLAIM_SHA256`) or the desktop app's owner key (`OWNER_KEY_SHA256`) makes the first account (ADR 0060 §6). */
   ownerByLink: boolean;
+  /** `HOST_COMPUTER_TOKEN`: agents run on this server's own machine, so the live mode never opens sign-up. */
+  hostComputer?: boolean;
+}
+
+/** Anyone may sign up once the first account exists: `ALLOW_SIGNUP`, or the live mode `open` (ADR 0078). */
+export async function signupOpenToAll(db: Database, policy: SignupPolicy) {
+  return policy.allowSignup || (!policy.hostComputer && (await signupMode(db)).mode === "open");
 }
 
 /** Why a sign-up may go ahead (`signupAdmission`). */
@@ -302,10 +309,10 @@ export type SignupAdmission = "open" | "first" | "invitation" | "early_access";
 /**
  * Who may create an account (ADR 0006, ADR 0078): the first account may always register (there is no other way
  * in), unless the installation waits for its owner's link or key, which make it on their own path. After that,
- * anyone with `ALLOW_SIGNUP` or while the sign-up mode is `open`; else only a pending workspace invitation for that
- * email, or an early-access link (`access`) sent to it. An invitation link never opens it (ADR 0068): whoever holds
- * one asks to join without an account. Open sign-up on a reachable server would let anyone create organizations
- * (and spend model credits) on it. Null: refused.
+ * anyone with `ALLOW_SIGNUP` or while the sign-up mode is `open` (`signupOpenToAll`); else only a pending workspace
+ * invitation for that email, or an early-access link (`access`) sent to it. An invitation link never opens it
+ * (ADR 0068): whoever holds one asks to join without an account. Open sign-up on a reachable server would let
+ * anyone create organizations (and spend model credits) on it. Null: refused.
  */
 export async function signupAdmission(
   db: Database,
@@ -317,7 +324,7 @@ export async function signupAdmission(
   const stored = email.trim().toLowerCase();
   if (policy.allowSignup && !policy.ownerByLink) return "open";
   if ((await countUsers(db)) === 0) return policy.ownerByLink ? null : "first";
-  if (policy.allowSignup || (await signupMode(db)).mode === "open") return "open";
+  if (await signupOpenToAll(db, policy)) return "open";
   const [invite] = await db
     .select({ id: organizationInvitations.id })
     .from(organizationInvitations)
@@ -340,18 +347,18 @@ export async function isSignupAllowed(db: Database, email: string, policy: Signu
 
 /** What decides whether a new workspace takes an early-access invitation (`needsWorkspaceAllowance`). */
 export interface WorkspacePolicy {
-  /** `MACHINE_PROVISIONING=external`: every workspace gets a computer someone pays for. */
-  externalMachines: boolean;
+  /** agentes.chat Cloud, whose provisioner gives every workspace a computer that costs money (ADR 0056 §10). */
+  paidMachines: boolean;
   /** `ALLOW_SIGNUP`. */
   allowSignup: boolean;
 }
 
 /**
- * Whether making a workspace takes an early-access invitation (ADR 0078 §4): where every workspace gets a paid
- * computer, while sign-up is by invitation only, for everyone but the installation's owner.
+ * Whether making a workspace takes an early-access invitation (ADR 0078 §4): on agentes.chat Cloud, where every
+ * workspace gets a paid computer, while sign-up is by invitation only, for everyone but the installation's owner.
  */
 export async function needsWorkspaceAllowance(db: Database, userId: string, policy: WorkspacePolicy) {
-  if (!policy.externalMachines || policy.allowSignup) return false;
+  if (!policy.paidMachines || policy.allowSignup) return false;
   if ((await signupMode(db)).mode === "open") return false;
   return userId !== (await pinnedOwner(db));
 }

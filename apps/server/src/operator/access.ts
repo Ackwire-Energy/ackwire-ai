@@ -35,7 +35,8 @@ const Count = z.number().int().min(0);
 const Signup = z
   .object({
     mode: z.enum(SIGNUP_MODES).openapi({
-      description: "`invite`: only people with an invitation sign up (a workspace's, or early access). `open`: anyone.",
+      description:
+        "`invite`: only people with an invitation sign up (a workspace's, or early access). `open`: anyone. Always `invite` while this server is its agents' computer (`HOST_COMPUTER_TOKEN`).",
     }),
     forcedOpen: z
       .boolean()
@@ -101,7 +102,13 @@ const invitationJson = (i: EarlyAccessInvitation) => ({
 export function registerOperatorAccess(api: OpenAPIHono, { db, config, emails }: OperatorDeps) {
   const signupJson = async () => {
     const { mode, changedAt } = await signupMode(db);
-    return { mode, forcedOpen: config.ALLOW_SIGNUP, changedAt: iso(changedAt), emails: emails === true };
+    return {
+      // A mode saved as `open` before the server became its agents' computer opens nothing (`signupOpenToAll`).
+      mode: config.HOST_COMPUTER_TOKEN ? ("invite" as const) : mode,
+      forcedOpen: config.ALLOW_SIGNUP,
+      changedAt: iso(changedAt),
+      emails: emails === true,
+    };
   };
 
   api.openapi(

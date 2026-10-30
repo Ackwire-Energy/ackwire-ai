@@ -7,7 +7,7 @@
 
 ## Context
 
-Who may sign up was decided by `ALLOW_SIGNUP`, an environment variable, so opening or closing sign-up meant a restart. After the first account, everyone else needed a workspace invitation, which puts a person in someone else's workspace and never gives a newcomer one of their own. The waiting list (about 1,500 addresses, kept in the old deployment and as contacts at the email provider) had an `invited_at` column that nothing set.
+Who may sign up was decided by `ALLOW_SIGNUP`, an environment variable, so opening or closing sign-up meant a restart. After the first account, everyone else needed a workspace invitation, which puts a person in someone else's workspace and never gives a newcomer one of their own. The waiting list, whose addresses are also contacts at the email provider, had an `invited_at` column that nothing set.
 
 On agentes.chat Cloud every workspace gets a computer someone pays for (ADR 0056 §10), and nothing bills yet. Letting a person in costs money, so it has to be deliberate, in batches the people who run the Cloud choose, and visible as it happens.
 
@@ -15,7 +15,7 @@ On agentes.chat Cloud every workspace gets a computer someone pays for (ADR 0056
 
 ### 1. A live sign-up mode
 
-`signup_settings` (one row for the installation, no `org_id`) holds `invite` or `open`; no row reads as `invite`. The operator API changes it with no restart. `ALLOW_SIGNUP=true` still forces sign-up open whatever the mode says, and a server that is its agents' computer (`HOST_COMPUTER_TOKEN`) refuses `open` (409 `signup.host_computer`). Self-hosted servers see no change: without the operator API the mode stays `invite`.
+`signup_settings` (one row for the installation, no `org_id`) holds `invite` or `open`; no row reads as `invite`. The operator API changes it with no restart. `ALLOW_SIGNUP=true` still forces sign-up open whatever the mode says, and a server that is its agents' computer (`HOST_COMPUTER_TOKEN`) refuses `open` (409 `signup.host_computer`); a mode saved as `open` before the token was set opens nothing there, and `GET /signup` shows `invite`. Self-hosted servers see no change: without the operator API the mode stays `invite`.
 
 `signupAdmission` decides a sign-up, in this order: `ALLOW_SIGNUP` with no owner link or key waiting; the first account (unless an owner link or key makes it); `ALLOW_SIGNUP`; the mode `open`; a pending workspace invitation for the address; an early-access link for the address. `isSignupAllowed` is `signupAdmission(…) !== null`. `auth-config.signupOpen` and `/api/instance` `signup` read the mode live.
 
@@ -36,13 +36,13 @@ The token travels as `access` on `POST /api/app/sign-in-options`, as the `x-earl
 
 An invitation is looked up only by its token's hash, never by address. Without a token no query reads the table, so an invited address answers, and takes the same time, like any other. `sign-in-options` says `accessExpired` only for the link's own address.
 
-The refusals: a link for another address is 403 `EARLY_ACCESS_OTHER_EMAIL` (naming no address); a provider that hasn't verified the address is 403 `EARLY_ACCESS_EMAIL_UNVERIFIED` (Google's and Apple's `email_verified`, GitHub's verified primary address); anything else is the same closed answer as before. A provider's refusal comes back to `/login?error=<code>`.
+The refusals: a link for another address is 403 `EARLY_ACCESS_OTHER_EMAIL` (naming no address); a provider that hasn't verified the address is 403 `EARLY_ACCESS_EMAIL_UNVERIFIED` (Google's and Apple's `email_verified`, GitHub's verified primary address); anything else is 403 `SIGNUP_CLOSED`, the same answer for an invited address without its link as for any other. A provider's refusal comes back to `/login?error=<code>`, which it does only for a refusal with a code.
 
-After the account is committed, a sign-up that carried the token uses the invitation: `used_at`, `user_id`, and the token is cleared, for the invited address only, and never for a provider's unverified address. A failure is logged and never fails the sign-up. An account made without the token (open mode, a workspace invitation) never uses one. Deleting the account keeps `used_at` and nulls `user_id`, so neither the link nor the allowance comes back.
+After the account is committed, a sign-up that carried the token uses the invitation while its link hasn't expired: `used_at`, `user_id`, and the token is cleared, for the invited address only, and never for a provider's unverified address. An account let in another way (open mode, a workspace invitation) with an expired link takes nothing from it. A failure is logged and never fails the sign-up. An account made without the token (open mode, a workspace invitation) never uses one. Deleting the account keeps `used_at` and nulls `user_id`, so neither the link nor the allowance comes back.
 
 ### 4. One workspace per invitation on agentes.chat Cloud
 
-While sign-up is by invitation on a server that gives every workspace a paid computer (`MACHINE_PROVISIONING=external`, no `ALLOW_SIGNUP`, the mode `invite`), a new workspace takes the creator's invitation that hasn't made one, except for the installation's pinned owner (ADR 0073). `createOrganization` claims it in the workspace's own transaction with a row lock, so two creations at once make one; with none to take it refuses with 403 `org.create_invite_only` and nothing is left behind. Everywhere else the claim still runs, so the console sees which workspace an invitation made. `/api/app/me` says `user.canCreateWorkspace`; the web hides New workspace and the onboarding says why when it is false. Someone who joined another person's workspace keeps it, and makes their own once sign-up opens.
+On agentes.chat Cloud, where every workspace gets a paid computer (`MACHINE_PROVISIONING=external` at an agentes.chat `PUBLIC_URL`), while sign-up is by invitation (no `ALLOW_SIGNUP`, the mode `invite`), a new workspace takes the creator's invitation that hasn't made one, except for the installation's pinned owner (ADR 0073). `createOrganization` claims it in the workspace's own transaction with a row lock, so two creations at once make one; with none to take it refuses with 403 `org.create_invite_only` and nothing is left behind. Everywhere else the claim still runs, so the console sees which workspace an invitation made. `/api/app/me` says `user.canCreateWorkspace`; the web hides New workspace and the onboarding says why when it is false. Someone who joined another person's workspace keeps it, and makes their own once sign-up opens. A self-hosted server with a provisioner of its own isn't held to it.
 
 ### 5. The waiting list
 
@@ -56,4 +56,5 @@ Under `/api/operator/v1`, behind `OPERATOR_API_TOKEN` like the rest (ADR 0056): 
 
 - Opening sign-up on agentes.chat Cloud is a switch in the console, and invitation-only bounds new computers: each invitation makes at most one workspace.
 - The waiting list moves to production as a CSV, without touching its contacts.
+- On a new database whoever signs up first is the installation's owner, exempt from §4: set `OWNER_CLAIM_SHA256`, or sign up before the address is public.
 - A member who needs their own workspace before sign-up opens has no path yet (their address `has_account`). Early-access sign-up in the phone and Mac apps, and treating plus or dot variants as one person, are left out until they are needed.

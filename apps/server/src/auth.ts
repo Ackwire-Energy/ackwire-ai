@@ -10,6 +10,7 @@ import {
   EARLY_ACCESS_TOKEN,
   earlyAccessLink,
   emailLocale,
+  isAgentesCloud,
   onUserCreated,
   queueEmail,
   recordSession,
@@ -18,7 +19,7 @@ import {
   type SignupPolicy,
   sha256,
   signupAdmission,
-  signupMode,
+  signupOpenToAll,
   useEarlyAccess,
   type WorkspacePolicy,
 } from "@agenteschat/engine";
@@ -85,6 +86,7 @@ export function createAuth(deps: {
       });
     }
     throw new APIError("FORBIDDEN", {
+      code: SIGNUP_CLOSED,
       message: "Sign-up is closed on this server. If you were invited, open the link in the invitation email.",
     });
   };
@@ -394,6 +396,11 @@ const EMAILS_PER_ADDRESS = { limit: 3, windowMs: 3600_000 };
 
 /** `APIError` code of a sign-up refused because the first account waits for its owner's link or key. */
 export const OWNER_CLAIM_REQUIRED = "OWNER_CLAIM_REQUIRED";
+/**
+ * `APIError` code of a sign-up refused because sign-up is closed, the same for an address invited to early access
+ * that came without its link. A provider's callback sends a refusal to `/login?error=` only when it has a code.
+ */
+export const SIGNUP_CLOSED = "SIGNUP_CLOSED";
 /** An early-access link used to sign up another address than the one it was sent to (ADR 0078). */
 export const EARLY_ACCESS_OTHER_EMAIL = "EARLY_ACCESS_OTHER_EMAIL";
 /** An early-access sign-up through a provider that hasn't confirmed the address (ADR 0078). */
@@ -431,6 +438,7 @@ export function signupPolicy(config: Config): SignupPolicy {
   return {
     allowSignup: config.ALLOW_SIGNUP,
     ownerByLink: Boolean(config.OWNER_CLAIM_SHA256 || config.OWNER_KEY_SHA256),
+    hostComputer: Boolean(config.HOST_COMPUTER_TOKEN),
   };
 }
 
@@ -439,13 +447,13 @@ export function signupPolicy(config: Config): SignupPolicy {
  * makes it, then `ALLOW_SIGNUP` or the operator's live mode (ADR 0078).
  */
 export async function signupOpen(db: Database, config: Config, users: number) {
-  if (users === 0) return !signupPolicy(config).ownerByLink;
-  return config.ALLOW_SIGNUP || (await signupMode(db)).mode === "open";
+  const policy = signupPolicy(config);
+  return users === 0 ? !policy.ownerByLink : signupOpenToAll(db, policy);
 }
 
-/** Whether new workspaces take an early-access invitation here (ADR 0078 §4). */
+/** Whether new workspaces take an early-access invitation here (ADR 0078 §4): only on agentes.chat Cloud. */
 export const workspacePolicy = (config: Config): WorkspacePolicy => ({
-  externalMachines: config.MACHINE_PROVISIONING === "external",
+  paidMachines: config.MACHINE_PROVISIONING === "external" && isAgentesCloud(config.PUBLIC_URL),
   allowSignup: config.ALLOW_SIGNUP,
 });
 

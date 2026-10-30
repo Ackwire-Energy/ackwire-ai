@@ -602,7 +602,7 @@
           "mode": {
             "type": "string",
             "enum": ["invite", "open"],
-            "description": "`invite`: only people with an invitation sign up (a workspace's, or early access). `open`: anyone."
+            "description": "`invite`: only people with an invitation sign up (a workspace's, or early access). `open`: anyone. Always `invite` while this server is its agents' computer (`HOST_COMPUTER_TOKEN`)."
           },
           "forcedOpen": {
             "type": "boolean",

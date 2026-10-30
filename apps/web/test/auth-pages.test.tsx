@@ -451,6 +451,11 @@ describe("Acesso antecipado (o link do convite)", () => {
       "Seu provedor de login não confirmou este endereço. Confirme lá, ou cadastre-se com uma senha.",
     );
     cleanup();
+    await renderApp("/login?error=SIGNUP_CLOSED&error_description=x", { api, auth: createFakeAuth().auth });
+    expect(screen().getByRole("alert").textContent).toBe(
+      "O cadastro está fechado. Peça um convite a quem administra a sua organização.",
+    );
+    cleanup();
     await renderApp("/login?error=state_mismatch", { api, auth: createFakeAuth().auth });
     expect(screen().queryByRole("alert")).toBeNull();
   });

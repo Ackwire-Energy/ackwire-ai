@@ -43,16 +43,20 @@ beforeEach(async () => {
 afterEach(() => close());
 
 const CLOSED: SignupPolicy = { allowSignup: false, ownerByLink: false };
-const CLOUD = { externalMachines: true, allowSignup: false };
+const CLOUD = { paidMachines: true, allowSignup: false };
 const APP = "https://app.test";
 const T0 = new Date("2026-11-02T12:00:00.000Z");
 const MIN = 60_000;
 const DAY = 86_400_000;
 const at = (ms: number) => new Date(T0.getTime() + ms);
 
+let accounts = 0;
+// A millisecond apart, in order: made back to back they could share `created_at`, and the installation's owner (the
+// earliest) would then be picked by a random id.
 async function account(email: string) {
   const id = `user_${crypto.randomUUID().slice(0, 8)}`;
-  await db.insert(schema.users).values({ id, name: email.split("@")[0] ?? "x", email });
+  const createdAt = new Date(T0.getTime() - DAY + accounts++);
+  await db.insert(schema.users).values({ id, name: email.split("@")[0] ?? "x", email, createdAt });
   return id;
 }
 
@@ -124,6 +128,8 @@ describe("who may sign up", () => {
     await setSignupMode(db, "open");
     expect(await signupAdmission(db, "ana@acme.com", CLOSED)).toBe("open");
     expect(await isSignupAllowed(db, "ana@acme.com", CLOSED)).toBe(true);
+    // Never on a server that is its agents' computer.
+    expect(await signupAdmission(db, "ana@acme.com", { ...CLOSED, hostComputer: true })).toBeNull();
     await setSignupMode(db, "invite");
     expect(await isSignupAllowed(db, "ana@acme.com", CLOSED)).toBe(false);
     // A pending workspace invitation, as before.
@@ -409,6 +415,14 @@ describe("revoking and expiry", () => {
     expect(await list(at(30 * DAY))).toBe("signed_up");
     expect(await canCreateWorkspace(db, ana, CLOUD)).toBe(true);
     await createOrganization(db, ana, { name: "Ana" }, { needsAllowance: true });
+
+    // An account let in another way (open mode, a workspace's invitation) with an expired link takes nothing from it.
+    await invite("bia@acme.com", T0);
+    const bia = await account("bia@acme.com");
+    const late = { access: await tokenOf("bia@acme.com"), email: "bia@acme.com", userId: bia };
+    expect(await useEarlyAccess(db, late, at(14 * DAY))).toBe(false);
+    expect(await row("bia@acme.com")).toMatchObject({ usedAt: null, userId: null });
+    expect(await canCreateWorkspace(db, bia, CLOUD)).toBe(false);
   });
 });
 
@@ -451,8 +465,8 @@ describe("one workspace per invitation (by invitation only, every workspace with
     const bia = await account("bia@acme.com");
     expect(await needsWorkspaceAllowance(db, owner, CLOUD)).toBe(false);
     expect(await canCreateWorkspace(db, owner, CLOUD)).toBe(true);
-    expect(await canCreateWorkspace(db, bia, { externalMachines: false, allowSignup: false })).toBe(true);
-    expect(await canCreateWorkspace(db, bia, { externalMachines: true, allowSignup: true })).toBe(true);
+    expect(await canCreateWorkspace(db, bia, { paidMachines: false, allowSignup: false })).toBe(true);
+    expect(await canCreateWorkspace(db, bia, { paidMachines: true, allowSignup: true })).toBe(true);
     await setSignupMode(db, "open");
     expect(await canCreateWorkspace(db, bia, CLOUD)).toBe(true);
   });
