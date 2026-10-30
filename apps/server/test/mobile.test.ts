@@ -19,6 +19,8 @@ afterEach(async () => {
 });
 
 const MOBILE = { "x-agentes-client": "mobile" };
+/** The account's password, which the app sends to prove it's them (`DELETE /account`). */
+const PROOF = { password: "correct horse battery" };
 const TOKEN = "ExponentPushToken[phone-of-owner-01]";
 
 /** A request the way the app sends it: no Origin, the app header, the stored cookie. */
@@ -247,11 +249,13 @@ describe("account deletion", () => {
     const bia = await addPerson(owner, orgId, "bia@example.com");
     await fromApp(bia, "/api/app/push/devices", { json: { token: TOKEN, platform: "ios", locale: "en" } });
 
-    const refused = await fromApp(owner, "/api/app/account", { method: "DELETE" });
+    const refused = await fromApp(owner, "/api/app/account", { method: "DELETE", json: PROOF });
     expect(refused.status).toBe(409);
-    expect(await refused.json()).toMatchObject({ error: { code: "sole_owner", params: { organizations: ["Acme"] } } });
+    expect(await refused.json()).toMatchObject({
+      error: { code: "sole_owner", params: { organizations: ["Acme"], orgIds: [orgId] } },
+    });
 
-    const deleted = await fromApp(bia, "/api/app/account", { method: "DELETE" });
+    const deleted = await fromApp(bia, "/api/app/account", { method: "DELETE", json: PROOF });
     expect(deleted.status).toBe(204);
     expect(deleted.headers.getSetCookie().some((c) => c.startsWith("better-auth.session_token=;"))).toBe(true);
     expect(await t.db.select().from(schema.users).where(eq(schema.users.email, "bia@example.com"))).toEqual([]);
@@ -262,9 +266,11 @@ describe("account deletion", () => {
     };
     expect(members.members).toHaveLength(1);
 
-    // Alone in their org: the owner can go now, and the org goes with them.
-    expect((await fromApp(owner, "/api/app/account", { method: "DELETE" })).status).toBe(204);
-    expect(await t.db.select().from(schema.organizations)).toEqual([]);
+    // Alone in their org: the owner can go now, and the org closes with them, to go for good later.
+    expect((await fromApp(owner, "/api/app/account", { method: "DELETE", json: PROOF })).status).toBe(204);
+    expect(await t.db.select().from(schema.organizations)).toMatchObject([
+      { id: orgId, deletionDueAt: expect.any(Date) },
+    ]);
   });
 
   test("needs a session", async () => {

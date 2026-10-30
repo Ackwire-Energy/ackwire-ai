@@ -1,6 +1,7 @@
 import { ACCOUNTS_PROTOCOL, type MailAdapters, type PubSub } from "@agenteschat/adapters";
 import {
   and,
+  asc,
   type Database,
   desc,
   type Executor,
@@ -23,10 +24,17 @@ import { type OrgDeletingEvent, publishOrgEvent } from "./events";
 import { forgetInstallationTokens } from "./git/github-app";
 import { announceReleasedAccounts, type ReleasedAccounts, releaseOrgAccounts } from "./machine-accounts";
 import type { MachineHub } from "./machine-hub";
-import { MACHINE_CONTROL_TOPIC, machineOnline } from "./machines";
+import { MACHINE_CONTROL_TOPIC, machineOnline, personalMachines } from "./machines";
 import { forgetAtComposio } from "./mail/accounts";
 import { recordOperatorEvent } from "./operator-events";
-import { getMembership, getOrganization, lockOrgMembers, type Membership, queueOrgFilesPurge } from "./organizations";
+import {
+  getMembership,
+  getOrganization,
+  lockOrgMembers,
+  type MemberRole,
+  type Membership,
+  queueOrgFilesPurge,
+} from "./organizations";
 import { enqueue } from "./outbox";
 import {
   closedRefusal,
@@ -59,6 +67,8 @@ const {
   connectorConnections,
   githubAppInstallations,
   auditLog,
+  providerCredentials,
+  dbConnections,
 } = schema;
 
 /*
@@ -111,8 +121,11 @@ export interface DeletionDeps {
   pubsub?: PubSub;
   /** Stops its agents' tasks and desktops on its computers (absent: the tasks are only marked canceled). */
   hub?: Pick<MachineHub, "call">;
-  /** This server sends email: the members are told, with links to this address. Absent: nobody is. */
-  emails?: { publicUrl: string } | null;
+  /**
+   * This server sends email: the members are told, with links to this address, and a deleted account is told whom to
+   * write to (`support`, `SUPPORT_EMAIL`). Absent: nobody is.
+   */
+  emails?: { publicUrl: string; support?: string | null } | null;
 }
 
 /** A deletion written in a transaction, for what follows its commit (`afterClosing`). */
@@ -638,4 +651,170 @@ export async function workspaceDeletions(db: Executor, orgIds: string[]) {
         : [],
     ),
   );
+}
+
+// ── Deleting an account ─────────────────────────────────────────────────────
+
+/** What deleting an account does, workspace by workspace (`accountDeletionPlan`). */
+export interface AccountDeletionPlan {
+  /** Only they are in it: it closes with the account (one being deleted keeps its date) and goes later. */
+  closes: { id: string; name: string }[];
+  /** Others are in it: they leave it. */
+  leaves: { id: string; name: string; role: MemberRole }[];
+  /** They are its only owner, others are in it, and it isn't being deleted: the account can't go yet. */
+  soleOwner: { id: string; name: string }[];
+  /** The computers they connected in the workspaces they leave (`personalMachines`): they go with the account. */
+  computers: { orgId: string; id: string; name: string }[];
+  /** Keys, connections and mailboxes they added to the workspaces they leave: those are the workspace's, and stay. */
+  staysBehind: { orgId: string; kind: "key" | "connection" | "mailbox"; name: string }[];
+}
+
+/**
+ * What deleting `userId`'s account does: its preflight shows it (`GET /account/deletion`), and `deleteAccount` acts on
+ * it under its locks.
+ */
+export async function accountDeletionPlan(db: Executor, userId: string): Promise<AccountDeletionPlan> {
+  const plan: AccountDeletionPlan = { closes: [], leaves: [], soleOwner: [], computers: [], staysBehind: [] };
+  const mine = await db
+    .select({
+      id: organizations.id,
+      name: organizations.name,
+      role: organizationMembers.role,
+      dueAt: organizations.deletionDueAt,
+    })
+    .from(organizationMembers)
+    .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
+    .where(eq(organizationMembers.userId, userId))
+    .orderBy(asc(organizations.createdAt));
+  if (mine.length === 0) return plan;
+  const counts = await db
+    .select({
+      orgId: organizationMembers.orgId,
+      members: sql<number>`count(*)::int`,
+      owners: sql<number>`(count(*) filter (where ${organizationMembers.role} = 'owner'))::int`,
+    })
+    .from(organizationMembers)
+    .where(
+      inArray(
+        organizationMembers.orgId,
+        mine.map((o) => o.id),
+      ),
+    )
+    .groupBy(organizationMembers.orgId);
+  for (const org of mine) {
+    const count = counts.find((c) => c.orgId === org.id);
+    if (Number(count?.members ?? 0) <= 1) {
+      plan.closes.push({ id: org.id, name: org.name });
+      continue;
+    }
+    plan.leaves.push({ id: org.id, name: org.name, role: org.role });
+    if (org.role === "owner" && Number(count?.owners ?? 0) <= 1 && org.dueAt === null) {
+      plan.soleOwner.push({ id: org.id, name: org.name });
+    }
+  }
+  const left = plan.leaves.map((o) => o.id);
+  if (left.length === 0) return plan;
+  plan.computers = (await personalMachines(db, userId, left)).map(({ orgId, id, name }) => ({ orgId, id, name }));
+  const keys = await db
+    .select({ orgId: providerCredentials.orgId, name: providerCredentials.label })
+    .from(providerCredentials)
+    .where(
+      and(
+        inArray(providerCredentials.orgId, left),
+        eq(providerCredentials.createdByUserId, userId),
+        isNull(providerCredentials.revokedAt),
+      ),
+    );
+  const connectors = await db
+    .select({ orgId: connectorConnections.orgId, name: connectorConnections.label })
+    .from(connectorConnections)
+    .where(
+      and(
+        inArray(connectorConnections.orgId, left),
+        eq(connectorConnections.createdByUserId, userId),
+        isNull(connectorConnections.revokedAt),
+      ),
+    );
+  const databases = await db
+    .select({ orgId: dbConnections.orgId, name: dbConnections.label })
+    .from(dbConnections)
+    .where(
+      and(
+        inArray(dbConnections.orgId, left),
+        eq(dbConnections.createdByUserId, userId),
+        isNull(dbConnections.revokedAt),
+      ),
+    );
+  const mailboxes = await db
+    .select({
+      orgId: mailAccounts.orgId,
+      name: sql<string>`coalesce(nullif(${mailAccounts.address}, ''), ${mailAccounts.label})`,
+    })
+    .from(mailAccounts)
+    .where(
+      and(inArray(mailAccounts.orgId, left), eq(mailAccounts.createdByUserId, userId), isNull(mailAccounts.revokedAt)),
+    );
+  plan.staysBehind = [
+    ...keys.map((k) => ({ ...k, kind: "key" as const })),
+    ...[...connectors, ...databases].map((c) => ({ ...c, kind: "connection" as const })),
+    ...mailboxes.map((m) => ({ ...m, kind: "mailbox" as const })),
+  ];
+  return plan;
+}
+
+/** `sole_owner`, with the names and ids of the workspaces that keep the account from going; null when none does. */
+export function soleOwnerRefusal(plan: Pick<AccountDeletionPlan, "soleOwner">) {
+  if (plan.soleOwner.length === 0) return null;
+  return new ConflictError(
+    "You are the only owner of a workspace that has other members. Make someone else an owner, or delete the workspace, first.",
+    "sole_owner",
+    { organizations: plan.soleOwner.map((o) => o.name), orgIds: plan.soleOwner.map((o) => o.id) },
+  );
+}
+
+/**
+ * The `account_deleted` email, in the transaction that deletes the account and before its row goes: the workspaces
+ * that closed with it (`closed`, all with the transaction's date), the date in their time zone there, and whom to write
+ * to if it wasn't them.
+ */
+export async function queueAccountDeletedEmail(
+  tx: Executor,
+  userId: string,
+  closed: Closed[],
+  emails: NonNullable<DeletionDeps["emails"]>,
+) {
+  const [person] = await tx
+    .select({ email: users.email, locale: users.locale })
+    .from(users)
+    .where(eq(users.id, userId));
+  if (!person) return;
+  const first = closed[0];
+  const named = first
+    ? await tx
+        .select({ name: organizations.name })
+        .from(organizations)
+        .where(
+          inArray(
+            organizations.id,
+            closed.map((c) => c.orgId),
+          ),
+        )
+        .orderBy(asc(organizations.createdAt))
+    : [];
+  const timeZone = first && (await membersToTell(tx, first.orgId)).find((m) => m.id === userId)?.timeZone;
+  await queueEmail(tx, {
+    orgId: null,
+    key: `account-deleted:${userId}`,
+    to: [person.email],
+    template: {
+      kind: "account_deleted",
+      locale: emailLocale(person.locale),
+      email: person.email,
+      orgNames: named.map((o) => o.name),
+      dueAt: first?.dueAt.toISOString() ?? null,
+      timeZone: timeZone || "UTC",
+      support: emails.support ?? null,
+      url: emails.publicUrl,
+    },
+  });
 }

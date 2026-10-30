@@ -17,7 +17,6 @@ import {
   checkPushReceipts,
   createJobHandlers,
   createLocalKeyWrapper,
-  deleteAccount,
   deliverPush,
   drainOutbox,
   listMembers,
@@ -352,41 +351,6 @@ describe("push devices", () => {
     expect(tokens).toHaveLength(10);
     expect(tokens).not.toContain("ExponentPushToken[device-0000]");
     expect(tokens).not.toContain("ExponentPushToken[device-0001]");
-  });
-});
-
-describe("account deletion", () => {
-  test("refused for the only owner of an organization with other members", async () => {
-    f = await setup();
-    await addMember(f.db, f.org.id, "member", "bia");
-    await expect(deleteAccount(f.db, f.owner.id)).rejects.toMatchObject({
-      code: "sole_owner",
-      params: { organizations: ["Acme"] },
-    });
-    const [still] = await f.db.select().from(schema.users).where(eq(schema.users.id, f.owner.id));
-    expect(still).toBeDefined();
-  });
-
-  test("a member leaves: memberships and phones go, messages stay without an author", async () => {
-    f = await setup();
-    const { bia } = await withPhone();
-    const m = await postPersonMessage(deps(), bia.id, f.org.id, f.general.id, { body: "bye" });
-    expect(await deleteAccount(f.db, bia.id)).toEqual({ deletedOrgIds: [] });
-    expect(await f.db.select().from(schema.users).where(eq(schema.users.id, bia.id))).toEqual([]);
-    expect(await f.db.select().from(schema.pushDevices)).toEqual([]);
-    const members = await f.db
-      .select()
-      .from(schema.organizationMembers)
-      .where(eq(schema.organizationMembers.userId, bia.id));
-    expect(members).toEqual([]);
-    const [kept] = await f.db.select().from(schema.messages).where(eq(schema.messages.id, m.id));
-    expect(kept).toMatchObject({ body: "bye", authorType: "person", authorUserId: null });
-  });
-
-  test("an organization where they are alone goes with them", async () => {
-    f = await setup();
-    expect(await deleteAccount(f.db, f.owner.id)).toEqual({ deletedOrgIds: [f.org.id] });
-    expect(await f.db.select().from(schema.organizations).where(eq(schema.organizations.id, f.org.id))).toEqual([]);
   });
 });
 

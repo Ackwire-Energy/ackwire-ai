@@ -43,7 +43,7 @@ import { afterMachineTaskEnded, afterMissionRunEnded, startQueuedMissionTasks } 
 import { type MissionDeps, missionOfThread, missionRole, reactivateMission } from "./missions";
 import type { MissionEngine } from "./missions-engine";
 import { notifyMessage } from "./notification-producers";
-import { ORG_FILES_PURGE_ATTEMPTS, ORG_FILES_PURGE_JOB } from "./organizations";
+import { ORG_FILES_PURGE_ATTEMPTS, ORG_FILES_PURGE_JOB, USER_FILES_PURGE_JOB } from "./organizations";
 import { enqueue, type JobHandlers, type OutboxJob, PermanentJobError } from "./outbox";
 import { checkPushReceipts, deliverPush, pushTicketsOf } from "./push";
 import {
@@ -61,7 +61,7 @@ import { type AgentRun, NO_AI } from "./runs";
 import type { SandboxDeps } from "./sandbox";
 import { indexSource, reindexOrg } from "./search";
 import { activateDeliveredSecret, discardClosedSecret } from "./secrets";
-import { purgeOrgFiles, runMigration, type StorageDeps } from "./storage";
+import { purgeOrgFiles, purgeUserFiles, runMigration, type StorageDeps } from "./storage";
 import { isAgentesCloud } from "./telemetry";
 import { assessThread } from "./thread-assess";
 import { saveWaitlistContact } from "./waitlist";
@@ -497,6 +497,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         dedupeKey: `${ORG_FILES_PURGE_JOB}:${job.id}`,
         maxAttempts: ORG_FILES_PURGE_ATTEMPTS,
       });
+    },
+    [USER_FILES_PURGE_JOB]: async (job) => {
+      if (!deps.storage) throw new PermanentJobError("no storage configured");
+      await purgeUserFiles(deps.storage, String(job.payload.userId));
     },
     // A workspace whose deletion's date came (`purgeWorkspace`): a no-op once restored, kept or gone.
     [ORG_DELETE_JOB]: async (job, ctx) => {

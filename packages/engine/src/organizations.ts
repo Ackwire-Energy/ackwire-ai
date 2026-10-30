@@ -19,13 +19,13 @@ import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { inviteLinkToken, randomToken, sha256 } from "./crypto";
 import { earlyAccessLink, hasWorkspaceAllowance, recordFirstWorkspace, signupMode } from "./early-access";
-import { ConflictError, ForbiddenError, ValidationError } from "./errors";
+import { ConflictError, ForbiddenError, UnauthorizedError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
 import { deleteJevKey } from "./jev-key";
 import { assertMemberRoom } from "./limits";
 import { followWorkspaceName } from "./machine-provisioning";
 import { addressDomain } from "./mail/text";
-import { type OperatorEvent, recordOperatorEvent } from "./operator-events";
+import { recordOperatorEvent } from "./operator-events";
 import { enqueue } from "./outbox";
 import {
   assertCanWork,
@@ -41,6 +41,7 @@ import {
   waitsForPlan,
   workRefusal,
 } from "./standing";
+import type { Closed, DeletionDeps } from "./workspace-deletion";
 
 const {
   organizations,
@@ -197,7 +198,7 @@ export function assertInviting(membership: Membership) {
  * `holdForPayment`: the workspace starts on the `payment` hold (ADR 0079), with no audit row or notification.
  * With `onboarding` (the app's), its owner sets it up in the onboarding, already past its first step; while they
  * have one they haven't finished, that one comes back (`existing`) instead of a new one, even one waiting for its
- * first plan.
+ * first plan. `UnauthorizedError` once their account is gone.
  */
 export async function createOrganization(
   db: Database,
@@ -208,6 +209,10 @@ export async function createOrganization(
   return db.transaction(async (tx) => {
     // One create at a time per person, checked after the lock: two at once would both start waiting for a plan.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-create:${userId}`}))`);
+    // Their row, locked: a deletion of the account waits for this workspace, or this finds the account gone (a cached
+    // session cookie outlives it).
+    const [me] = await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for("update");
+    if (!me) throw new UnauthorizedError();
     const theirs = await tx
       .select({ id: organizations.id, role: organizationMembers.role, standing: STANDING_COLUMNS })
       .from(organizationMembers)
@@ -219,8 +224,7 @@ export async function createOrganization(
     if (options.needsAllowance && !(await hasWorkspaceAllowance(tx, userId)))
       throw new ForbiddenError("New workspaces need an invitation for now", "org.create_invite_only");
     if (options.onboarding) {
-      // Locked first, so a second create at the same time (a double submit, another tab) waits and finds this one.
-      await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for("update");
+      // A second create at the same time (a double submit, another tab) waited on the lock and finds this one.
       const [open] = await unfinishedWorkspaces(tx, userId);
       if (open) return { ...open, existing: true };
     }
@@ -842,6 +846,8 @@ export async function removeMember(
 export const ORG_FILES_PURGE_JOB = "org.files.purge";
 /** The backoff tops out at 3 h: a purge keeps trying through a storage outage for about 30 days. */
 export const ORG_FILES_PURGE_ATTEMPTS = 240;
+/** A deleted account's photos leave platform storage (`purgeUserFiles`). */
+export const USER_FILES_PURGE_JOB = "user.files.purge";
 
 /**
  * Queues the purge of a workspace's files, in the transaction that deletes it. No org_id on the job: the outbox row
@@ -856,83 +862,78 @@ export async function queueOrgFilesPurge(tx: Executor, orgId: string) {
 }
 
 /**
- * Deletes a person's account (App Store 5.1.1(v), ADR 0035). Refused while
- * they are the only owner of an organization that has other members
- * (`sole_owner`, with the organizations' names: make someone else an owner
- * first). Organizations where they are the only member go with them, with
- * everything in them (their files on platform storage through the job
- * `org.files.purge`, ADR 0019). Their AI accounts on computers are signed
- * out and removed, never inherited (ADR 0059 §1). The rest follows the foreign keys:
- * sessions, sign-in methods, memberships, channel memberships, notifications
- * and phones are deleted; messages and records they authored stay without an
- * author (the same as any deleted user). Not for a blocked account: it can't
- * act, and its workspaces would go with it.
+ * Deletes a person's account at once (App Store 5.1.1(v), ADR 0035), as `accountDeletionPlan` reads it under the
+ * `org-members` locks. Refused for a blocked account (it can't act) and with `sole_owner` (`soleOwnerRefusal`).
+ * Workspaces only they are in close and go later, as any deletion, whatever their standing (`closeForDeletion`,
+ * `via: "account"`): a hold makes their purge wait, never the account. They leave the others, and the computers they
+ * connected there go (`personalMachines`); what they added there stays. Their AI accounts on computers are signed out
+ * and removed, never inherited (ADR 0059 §1). The rest follows the foreign keys: sessions, sign-in methods,
+ * memberships, channel memberships, notifications and phones are deleted; messages and records they authored stay
+ * without an author. With `emails` they are told (`account_deleted`). Their photos leave platform storage
+ * (`user.files.purge`). The caller checks that it's them.
  */
-export async function deleteAccount(
-  db: Database,
-  userId: string,
-  options: { pubsub?: PubSub } = {},
-): Promise<{ deletedOrgIds: string[] }> {
+export async function deleteAccount(db: Database, userId: string, options: Omit<DeletionDeps, "db"> = {}) {
   if (await isUserBlocked(db, userId)) throw new ForbiddenError();
   // Before any account goes: the first one stays the owner even once it is gone.
   const owner = await pinnedOwner(db);
+  // Loaded here: these modules build on this one.
   const { announceReleasedAccounts, releaseMemberAccounts } = await import("./machine-accounts");
-  const { left, deleted, released } = await db.transaction(async (tx) => {
+  const { announceRemovedMachine, detachMachine } = await import("./machines");
+  const { accountDeletionPlan, afterClosing, closeForDeletion, queueAccountDeletedEmail, soleOwnerRefusal } =
+    await import("./workspace-deletion");
+  const { plan, closed, released, removed } = await db.transaction(async (tx) => {
     const mine = await tx
-      .select({ orgId: organizations.id, orgName: organizations.name, role: organizationMembers.role })
+      .select({ orgId: organizationMembers.orgId })
       .from(organizationMembers)
-      .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
       .where(eq(organizationMembers.userId, userId))
-      .orderBy(asc(organizations.id));
-    // Same lock as role changes and removals, in a fixed order.
+      .orderBy(asc(organizationMembers.orgId));
+    // The lock of role changes, removals and a workspace's deletion, in a fixed order. Every workspace row is written
+    // before the user row, as the purge writes them.
     for (const m of mine) await lockOrgMembers(tx, m.orgId);
-    const alone: string[] = [];
-    const leaving: string[] = [];
-    const blocking: string[] = [];
-    for (const m of mine) {
-      const [row] = await tx
-        .select({
-          members: sql<number>`count(*)::int`,
-          owners: sql<number>`(count(*) filter (where ${organizationMembers.role} = 'owner'))::int`,
-        })
-        .from(organizationMembers)
-        .where(eq(organizationMembers.orgId, m.orgId));
-      if (Number(row?.members ?? 0) <= 1) alone.push(m.orgId);
-      else {
-        if (m.role === "owner" && Number(row?.owners ?? 0) <= 1) blocking.push(m.orgName);
-        leaving.push(m.orgId);
-      }
-    }
-    if (blocking.length > 0) {
-      throw new ConflictError(
-        "You are the only owner of an organization that has other members. Make someone else an owner first.",
-        "sole_owner",
-        { organizations: blocking },
-      );
+    const plan = await accountDeletionPlan(tx, userId);
+    const refusal = soleOwnerRefusal(plan);
+    if (refusal) throw refusal;
+    const closed: Closed[] = [];
+    for (const org of plan.closes) {
+      // One already being deleted keeps its date, and is no news.
+      const scheduled = await closeForDeletion(tx, { actorId: userId, orgId: org.id, via: "account" });
+      if (scheduled.closed) closed.push(scheduled.closed);
     }
     // Before the user row: `created_by` would turn null, and a null owner is nobody's.
     const released = await releaseMemberAccounts(tx, userId, null);
-    if (alone.length > 0) await tx.delete(organizations).where(inArray(organizations.id, alone));
-    for (const orgId of alone) await queueOrgFilesPurge(tx, orgId);
+    for (const org of plan.leaves) {
+      await auditMember(tx, org.id, userId, "member.left", userId, { role: org.role, accountDeleted: true });
+    }
+    const removed = [];
+    for (const computer of plan.computers) {
+      removed.push({ computer, freed: await detachMachine(tx, { ...computer, kind: "connected" }) });
+    }
+    if (options.emails) await queueAccountDeletedEmail(tx, userId, closed, options.emails);
     await tx.delete(users).where(eq(users.id, userId));
     // The owner's own TypeSafe account would go on getting, and paying for, every workspace's Jev calls.
     if (userId === owner) await deleteJevKey(tx, { type: "system", id: null });
     // With nobody left, the next first account owns the server again.
     await tx.update(instanceTelemetry).set({ ownerUserId: null }).where(sql`not exists (select 1 from ${users})`);
-    const gone = alone.map((orgId): OperatorEvent => ({ type: "organization.deleted", orgId, userId }));
-    await recordOperatorEvent(tx, ...gone, { type: "user.deleted", userId });
-    return { left: leaving, deleted: alone, released };
+    await recordOperatorEvent(tx, { type: "user.deleted", userId });
+    // No org_id: the job outlives every workspace.
+    await enqueue(tx, {
+      orgId: null,
+      kind: USER_FILES_PURGE_JOB,
+      payload: { userId },
+      maxAttempts: ORG_FILES_PURGE_ATTEMPTS,
+    });
+    return { plan, closed, released, removed };
   });
-  await announceReleasedAccounts(options.pubsub, {
-    machines: released.machines.filter((m) => left.includes(m.orgId)),
-    agents: released.agents.filter((a) => left.includes(a.orgId)),
-  });
-  // Their open WebSocket connections lose every subscription now.
-  for (const orgId of left) {
-    await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId });
-    await announceMembers(options.pubsub, orgId);
+  await announceReleasedAccounts(options.pubsub, released);
+  for (const { computer, freed } of removed) {
+    await announceRemovedMachine({ db, pubsub: options.pubsub }, computer, { type: "person", id: userId }, freed);
   }
-  return { deletedOrgIds: deleted };
+  // Their open WebSocket connections lose every subscription now.
+  for (const org of [...plan.closes, ...plan.leaves]) {
+    await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId: org.id, userId });
+  }
+  for (const org of plan.leaves) await announceMembers(options.pubsub, org.id);
+  for (const one of closed) await afterClosing({ ...options, db }, one);
 }
 
 /**

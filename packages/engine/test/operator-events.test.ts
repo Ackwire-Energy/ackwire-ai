@@ -166,7 +166,12 @@ test("each emitter writes one row, metadata only", async () => {
       userId: solo.id,
       data: { ip: "198.51.100.7", userAgent: "Mozilla/5.0" },
     },
-    { type: "organization.deleted", orgId: soloOrg.id, userId: solo.id, data: {} },
+    {
+      type: "organization.deletion_requested",
+      orgId: soloOrg.id,
+      userId: solo.id,
+      data: { dueAt: expect.any(String), via: "account" },
+    },
     { type: "user.deleted", orgId: null, userId: solo.id, data: {} },
   ]);
   // The rows outlive what they name.
