@@ -1,8 +1,8 @@
 import { useMe } from "@agenteschat/client";
-import { membershipIn } from "@agenteschat/client/lib/guards";
+import { membershipIn, settingUp } from "@agenteschat/client/lib/guards";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Button, EmptyState } from "@agenteschat/ui";
-import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, redirect, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { requireUserIn } from "@/app/guards";
@@ -30,7 +30,9 @@ import { RealtimeProvider } from "@/realtime/context";
 export const Route = createFileRoute("/org/$orgId")({
   beforeLoad: async ({ context, location, params }) => {
     const me = await requireUserIn(context, location.href, params.orgId);
-    return { me, membership: membershipIn(me, params.orgId) };
+    const membership = membershipIn(me, params.orgId);
+    if (membership && settingUp(membership)) throw redirect({ to: "/onboarding" });
+    return { me, membership };
   },
   component: OrgLayout,
   // Opening the workspace takes a moment (the session check): the sky rises meanwhile.

@@ -1,5 +1,7 @@
 /** Types of the private web-app API (`/api/app/*`, apps/server/src/routes/app). */
 
+import type { OnboardingStepId } from "../lib/onboarding";
+
 export type Role = "owner" | "admin" | "member";
 export type Edition = "selfhost" | "cloud";
 
@@ -155,6 +157,19 @@ export interface OrgSummary {
   logo?: string | null;
   /** From `GET /me`; absent from older servers (active). Changes come as `org.standing` events. */
   standing?: OrgStanding;
+  /**
+   * From `GET /me`, to its owner only, while they haven't finished setting it up: the apps open its onboarding,
+   * which resumes it, instead of the workspace. Absent: finished, not theirs to set up, or an older server.
+   */
+  onboarding?: OrgOnboarding;
+}
+
+/** Where a workspace's onboarding stands. */
+export interface OrgOnboarding {
+  /** The furthest step reached: where it resumes. */
+  step: OnboardingStepId;
+  /** #general, where the onboarding puts the agents and posts the first message. */
+  generalChannelId: string;
 }
 
 export interface Me {

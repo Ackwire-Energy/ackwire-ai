@@ -98,6 +98,35 @@
   outline: none;
   box-shadow: var(--focus-ring);
 }
+/* Sair, quiet under the steps; at phone width at the end of the step bar. */
+.onb__signout {
+  align-self: flex-start;
+  flex: none;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--faint);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: normal;
+  cursor: pointer;
+}
+.onb__signout:hover {
+  background: var(--plate);
+  color: var(--ink);
+}
+.onb__signout:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+@media (max-width: 760px) {
+  .onb__signout {
+    align-self: center;
+  }
+}
 /* The host's face and its bubble start at one top, the bubble's small corner pointing at the face. */
 .onb__ask {
   display: flex;

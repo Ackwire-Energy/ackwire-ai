@@ -1,5 +1,5 @@
 {
-  "id": "4904fbd7-e250-4a64-8e2d-ca9726152af0",
+  "id": "97c72db1-32ea-4b48-851f-85177fcb469a",
   "prevId": "82c10c65-6af8-4c17-9fec-84a88b00972c",
   "version": "7",
   "dialect": "postgresql",
@@ -15320,47 +15320,19 @@
           "primaryKey": false,
           "notNull": false
         },
-        "limit_members": {
-          "name": "limit_members",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "limit_storage_bytes": {
-          "name": "limit_storage_bytes",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "limit_upload_bytes_per_day": {
-          "name": "limit_upload_bytes_per_day",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "limit_platform_nano_usd": {
-          "name": "limit_platform_nano_usd",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "limits_updated_at": {
-          "name": "limits_updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "platform_alert_month": {
-          "name": "platform_alert_month",
+        "onboarding_step": {
+          "name": "onboarding_step",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": "'done'"
         },
-        "platform_alert_percent": {
-          "name": "platform_alert_percent",
-          "type": "smallint",
+        "onboarded_at": {
+          "name": "onboarded_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": "now()"
         },
         "created_at": {
           "name": "created_at",

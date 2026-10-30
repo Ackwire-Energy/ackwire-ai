@@ -66,11 +66,20 @@ export function signInFor(
   return url.searchParams.get("connect") === "ai" ? { connect: "ai" } : null;
 }
 
-/** Where `/` sends a signed-in person: last organization, the first one, or onboarding. */
+/**
+ * A workspace this person made and hasn't finished setting up: the apps open its onboarding, which resumes it,
+ * instead of the workspace. Never one they were invited into.
+ */
+export const settingUp = (org: OrgSummary) => org.role === "owner" && org.onboarding !== undefined;
+
+/**
+ * Where `/` sends a signed-in person: the last organization, or the first one, of those set up; with none, the
+ * onboarding (which resumes the one they are setting up).
+ */
 export function landingFor(me: Me, lastOrgId: string | null): { to: "/onboarding" } | { orgId: string } {
-  if (me.organizations.length === 0) return { to: "/onboarding" };
-  const org = me.organizations.find((o) => o.id === lastOrgId) ?? (me.organizations[0] as OrgSummary);
-  return { orgId: org.id };
+  const ready = me.organizations.filter((o) => !settingUp(o));
+  const org = ready.find((o) => o.id === lastOrgId) ?? ready[0];
+  return org ? { orgId: org.id } : { to: "/onboarding" };
 }
 
 /** The membership for an org route, or null when the person isn't a member. */

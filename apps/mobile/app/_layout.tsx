@@ -113,7 +113,8 @@ function Gate() {
           </Stack.Protected>
         </Stack>
       </View>
-      {/* No workspace yet: the first run, over the navigator (a waiting invitation is accepted instead). */}
+      {/* No workspace to open yet (none, or one still being set up): the first run, over the navigator (a waiting
+          invitation is accepted instead). */}
       {firstRun ? (
         <View style={onInvite ? { display: "none" } : StyleSheet.absoluteFill}>
           <OnboardingFlow />

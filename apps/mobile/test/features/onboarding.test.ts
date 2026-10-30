@@ -18,14 +18,21 @@ import {
   nextStep,
   noComputerOf,
   OPTIONAL,
+  PRESET_LOOK,
   PRESET_ROWS,
   PRESETS,
   type Preset,
+  phoneStepOf,
+  presetsMade,
   prevStep,
   progressAt,
+  resumeOf,
   STEPS,
+  serverStepOf,
+  setUpElsewhere,
   stepFailedText,
   stepText,
+  stepToSave,
   zoneCity,
   zoneLabel,
 } from "../../src/features/onboarding/logic";
@@ -43,6 +50,58 @@ test("the phone's steps: no computer step; import, the AI and people are optiona
   expect(prevStep("workspace")).toBeNull();
   expect(prevStep("done")).toBeNull();
   expect(prevStep("context")).toBe("workspace");
+});
+
+test("the server keeps the web's steps: the phone's AI is part of its agents, and the web's computer resumes there", () => {
+  expect(STEPS.map(serverStepOf)).toEqual(["workspace", "context", "import", "agents", "agents", "team", "done"]);
+  expect(phoneStepOf("computer")).toBe("agents");
+  for (const step of ["workspace", "context", "import", "agents", "team", "done"] as const)
+    expect(phoneStepOf(step)).toBe(step);
+});
+
+test("each step reached is saved, as the server counts them; one no further than it has saves nothing", () => {
+  // Creating the workspace passed the first step: the context step is where it is.
+  expect(stepToSave("import", 1)).toBe("import");
+  // The phone's AI step is the server's agents: reached with the agents, nothing more to save.
+  expect(stepToSave("agents", 2)).toBe("agents");
+  expect(stepToSave("ai", 4)).toBeNull();
+  expect(stepToSave("team", 4)).toBe("team");
+  expect(stepToSave("done", 5)).toBe("done");
+  // Back and on again: already saved.
+  expect(stepToSave("context", 4)).toBeNull();
+});
+
+test("a resume opens the workspace where the server has it, with the team made there, never the first step", async () => {
+  const t = await translator("pt-BR");
+  const saved = { orgId: "o", generalChannelId: "g", step: "computer" as const };
+  const theo = { id: "t", name: "Theo", handle: "theo", appearance: PRESET_LOOK.theo };
+  const ada = { id: "a", name: "Ada", handle: "ada", appearance: PRESET_LOOK.ada };
+  // Made on the web, Theo and Ada; an imported agent isn't a preset.
+  const r = resumeOf(t, saved, [theo, ada, { id: "m", name: "Morgan", handle: "lead" }]);
+  expect(r).toEqual({
+    created: { orgId: "o", generalChannelId: "g" },
+    ids: { theo: "t", ada: "a" },
+    handles: { theo: "theo", ada: "ada" },
+    chosen: new Set(["ada", "theo"]),
+    // The web's computer step: the phone has none, so its agents.
+    reached: 3,
+    step: "agents",
+  });
+  // No team yet: the picks stay as they are.
+  expect(resumeOf(t, { ...saved, step: "import" }, []).chosen).toBeNull();
+  // A create cut short before the look was saved: still Ada, not made again.
+  expect(presetsMade(t, [{ id: "x", name: "Ada", handle: "ada", appearance: null }]).ids).toEqual({ ada: "x" });
+});
+
+test("a create that gives back the workspace being set up on the web: past its first steps, nothing is written over it", () => {
+  const org = (step: "context" | "agents") => [
+    { id: "o", name: "Acme", role: "owner" as const, onboarding: { step, generalChannelId: "g" } },
+  ];
+  expect(setUpElsewhere(org("agents"), "o")).toBe(true);
+  // New (or still at its first step): the phone's time zone and logo go to it.
+  expect(setUpElsewhere(org("context"), "o")).toBe(false);
+  expect(setUpElsewhere([], "o")).toBe(false);
+  expect(setUpElsewhere(undefined, "o")).toBe(false);
 });
 
 test("each host says hi only the first time it appears", () => {

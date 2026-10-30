@@ -1,5 +1,5 @@
 import { ACCOUNT_KINDS, BRAIN_EFFORTS } from "@agenteschat/adapters";
-import { STANDING_STATES } from "@agenteschat/engine";
+import { ONBOARDING_STEPS, STANDING_STATES } from "@agenteschat/engine";
 import { PROVIDER_IDS } from "@agenteschat/providers";
 import { z } from "@hono/zod-openapi";
 
@@ -35,6 +35,18 @@ export const Organization = z
       })
       .optional()
       .openapi({ description: "In `GET /me` (ADR 0056 §8). Changes come as `org.standing` org events." }),
+    onboarding: z
+      .object({
+        step: z.enum(ONBOARDING_STEPS).openapi({ description: "The furthest step reached: where it resumes." }),
+        generalChannelId: z
+          .uuid()
+          .openapi({ description: "#general, where the onboarding puts the agents and posts the first message." }),
+      })
+      .optional()
+      .openapi({
+        description:
+          "In `GET /me`, to its owner only, while the workspace's onboarding isn't finished: the apps open the onboarding, which resumes it, instead of the workspace (`PATCH …/onboarding` saves it). Absent: finished, or not theirs to set up.",
+      }),
   })
   .openapi("Organization");
 

@@ -188,12 +188,15 @@ export function assertInviting(membership: Membership) {
  * With `needsAllowance` (`needsWorkspaceAllowance`) early access must have allowed the account, else
  * `org.create_invite_only` and nothing is made. An allowed account's first workspace is recorded on its invitation.
  * `holdForPayment`: the workspace starts on the `payment` hold (ADR 0079), with no audit row or notification.
+ * With `onboarding` (the app's), its owner sets it up in the onboarding, already past its first step; while they
+ * have one they haven't finished, that one comes back (`existing`) instead of a new one, even one waiting for its
+ * first plan.
  */
 export async function createOrganization(
   db: Database,
   userId: string,
   input: { name: string; context?: string },
-  options: { holdForPayment?: boolean; needsAllowance?: boolean } = {},
+  options: { holdForPayment?: boolean; needsAllowance?: boolean; onboarding?: boolean } = {},
 ) {
   return db.transaction(async (tx) => {
     // One create at a time per person, checked after the lock: two at once would both start waiting for a plan.
@@ -206,18 +209,25 @@ export async function createOrganization(
       .orderBy(asc(organizations.createdAt));
     if (held.some((o) => !isBillingHold(o.standing)) || (await isUserBlocked(tx, userId)))
       throw new ForbiddenError("You can't create a workspace right now", "org.create_refused", cloudNotice());
+    if (options.needsAllowance && !(await hasWorkspaceAllowance(tx, userId)))
+      throw new ForbiddenError("New workspaces need an invitation for now", "org.create_invite_only");
+    if (options.onboarding) {
+      // Locked first, so a second create at the same time (a double submit, another tab) waits and finds this one.
+      await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for("update");
+      const [open] = await unfinishedWorkspaces(tx, userId);
+      if (open) return { ...open, existing: true };
+    }
     const unpaid = held.find((o) => o.role === "owner" && o.standing.reason === PAYMENT);
     if (unpaid)
       throw new ForbiddenError("You already have a workspace waiting for a plan", "org.create_unpaid", {
         orgId: unpaid.id,
       });
-    if (options.needsAllowance && !(await hasWorkspaceAllowance(tx, userId)))
-      throw new ForbiddenError("New workspaces need an invitation for now", "org.create_invite_only");
     const [organization] = await tx
       .insert(organizations)
       .values({
         name: input.name,
         context: input.context ?? "",
+        ...(options.onboarding ? { onboardingStep: "context" as const, onboardedAt: null } : {}),
         ...(options.holdForPayment
           ? ({
               standing: "hold",
@@ -244,8 +254,63 @@ export async function createOrganization(
       userId,
       data: { name: organization.name },
     });
-    return { organization, general };
+    return { organization, general, existing: false };
   });
+}
+
+/** The onboarding's steps, in order: a workspace's only moves forward through them. */
+export const ONBOARDING_STEPS = schema.ONBOARDING_STEPS;
+
+/**
+ * The workspaces `userId` owns whose onboarding isn't finished, oldest first, each with its #general (where the
+ * onboarding puts the agents and posts the first message). A suspended one isn't among them: it shows as suspended.
+ */
+export async function unfinishedWorkspaces(db: Executor, userId: string) {
+  return db
+    .select({ organization: organizations, general: channels })
+    .from(organizationMembers)
+    .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
+    .innerJoin(channels, and(eq(channels.orgId, organizations.id), eq(channels.name, "general")))
+    .where(
+      and(
+        eq(organizationMembers.userId, userId),
+        eq(organizationMembers.role, "owner"),
+        isNull(organizations.onboardedAt),
+        ne(organizations.standing, "suspended"),
+      ),
+    )
+    .orderBy(asc(organizations.createdAt));
+}
+
+/**
+ * Saves how far a workspace's owner got in its onboarding: `step`, the furthest one reached, only moves forward;
+ * `finished` ends it, for good. Anyone else is refused. Returns where it stands.
+ */
+export async function saveOnboarding(
+  db: Database,
+  userId: string,
+  orgId: string,
+  input: { step?: schema.OnboardingStep; finished?: boolean },
+) {
+  const membership = await requireActiveMembership(db, userId, orgId);
+  if (membership.role !== "owner") throw new ForbiddenError("Only the workspace's owner sets it up");
+  const open = and(eq(organizations.id, orgId), isNull(organizations.onboardedAt));
+  if (input.finished) {
+    await db.update(organizations).set({ onboardingStep: "done", onboardedAt: new Date() }).where(open);
+  } else if (input.step) {
+    // The steps before it, in the statement itself: two tabs saving at once never take it back.
+    const before = ONBOARDING_STEPS.slice(0, ONBOARDING_STEPS.indexOf(input.step));
+    if (before.length > 0)
+      await db
+        .update(organizations)
+        .set({ onboardingStep: input.step })
+        .where(and(open, inArray(organizations.onboardingStep, before)));
+  }
+  const [row] = await db
+    .select({ step: organizations.onboardingStep, onboardedAt: organizations.onboardedAt })
+    .from(organizations)
+    .where(eq(organizations.id, orgId));
+  return { step: row?.step ?? "done", finished: Boolean(row?.onboardedAt) };
 }
 
 export async function updateOrganization(

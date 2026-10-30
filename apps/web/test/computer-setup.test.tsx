@@ -800,14 +800,10 @@ describe("the onboarding where the workspace gets its own computer", () => {
    * or Ada and `keep`). Its agents get the workspace's computer once it's ready (`computer.ready`), as the server
    * gives it to them; nobody connected it.
    */
-  const toComputerStep = async (
-    setup: Partial<ComputerSetup>,
-    prepare?: (state: ReturnType<typeof seedState>) => void,
-    keep?: string[],
-  ) => {
-    const state = seedState();
+  const toComputerStep = async (setup: Partial<ComputerSetup>, keep?: string[]) => {
+    // A new workspace: no agents until the onboarding makes them.
+    const state = seedState({ agents: [] });
     if (state.me) state.me.organizations = [];
-    prepare?.(state);
     // The server says every workspace gets its own: never "opcional", from the first step on.
     state.authConfig = { workspaceComputer: true };
     const api = createFakeApi(state);
@@ -983,7 +979,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
   });
 
   test("Ada alone waiting for the plan: her row agrees with her name", async () => {
-    const r = await toComputerStep({ state: null }, undefined, []);
+    const r = await toComputerStep({ state: null }, []);
     const me = r.state.me;
     if (!me) throw new Error("no me");
     r.state.me = {
@@ -1279,7 +1275,6 @@ describe("the onboarding where the workspace gets its own computer", () => {
     for (const plan of ["Claude", "GLM Coding"] as const) {
       const r = await toComputerStep(
         { state: "preparing", step: "installing", secondsLeft: 600, specs: SPECS },
-        undefined,
         ["Theo · PM"],
       );
       await click(screen().getByRole("button", { name: "Continuar" }));
@@ -1373,10 +1368,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
   });
 
   test("a coding plan thinks for all of them at once by default; then the Team step says nobody else gets an answer", async () => {
-    // Only this workspace's agents.
-    const r = await toComputerStep({ state: "ready", machineId: "m-1", specs: SPECS }, (state) => {
-      state.agents = [];
-    });
+    const r = await toComputerStep({ state: "ready", machineId: "m-1", specs: SPECS });
     // Whoever creates an agent owns it, as the server makes them.
     for (const a of r.state.agents) a.ownerUserId = "u-walter";
     await click(screen().getByRole("button", { name: "Continuar" }));

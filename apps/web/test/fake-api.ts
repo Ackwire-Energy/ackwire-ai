@@ -51,6 +51,7 @@ import type {
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { answersOthers, audienceOf } from "@agenteschat/client/lib/audience";
+import { stepIndex } from "@agenteschat/client/lib/onboarding";
 import { createFakeAccess } from "./fakes/access";
 import { createMockArtifacts } from "./fakes/artifacts";
 import { createFakeBrowser, type FakeBrowser } from "./fakes/browser";
@@ -870,7 +871,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const me = requireMe();
         const orgId = id("org");
         const general = id("chan");
-        me.organizations.push({ id: orgId, name: input.name, role: "owner" });
+        // As the server makes it: its owner sets it up in the onboarding, already past its first step.
+        me.organizations.push({
+          id: orgId,
+          name: input.name,
+          role: "owner",
+          onboarding: { step: "context", generalChannelId: general },
+        });
         state.channels.push({
           id: general,
           name: "general",
@@ -883,6 +890,23 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           organization: { id: orgId, name: input.name, role: "owner", context: input.context },
           generalChannelId: general,
         };
+      },
+      saveOnboarding: async (orgId, input) => {
+        log("orgs.saveOnboarding", orgId, input);
+        const me = requireMe();
+        const at = me.organizations.find((o) => o.id === orgId)?.onboarding;
+        if (!at) return { step: "done", finished: true };
+        const onboarding =
+          "finished" in input
+            ? undefined
+            : stepIndex(input.step) > stepIndex(at.step)
+              ? { ...at, step: input.step }
+              : at;
+        state.me = {
+          ...me,
+          organizations: me.organizations.map((o) => (o.id === orgId ? { ...o, onboarding } : o)),
+        };
+        return { step: onboarding?.step ?? "done", finished: onboarding === undefined };
       },
       get: async (orgId) => ({ id: orgId, name: "Acme", role: "owner", context: "" }),
       update: async (orgId, input) => log("orgs.update", orgId, input),
@@ -957,8 +981,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("orgs.acceptInvitation", token);
         return { orgId: ORG_ID };
       },
-      settings: async () => ({
-        name: "Acme",
+      settings: async (orgId) => ({
+        name: state.me?.organizations.find((o) => o.id === orgId)?.name ?? "Acme",
         context: state.context ?? "",
         defaultCredentialId: state.defaultCredentialId ?? null,
         routerModel: null,
@@ -1169,6 +1193,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           monthlyBudgetUsd: input.monthlyBudgetUsd ?? null,
           createdAt: NOW.toISOString(),
           audience: input.audience ?? { mode: "everyone", userIds: [] },
+          ...(input.appearance ? { appearance: input.appearance } : {}),
         };
         state.agents.push(agent);
         return agent;
