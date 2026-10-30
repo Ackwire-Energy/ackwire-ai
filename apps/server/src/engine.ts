@@ -303,6 +303,7 @@ export function buildEngine(o: EngineOptions) {
         pubsub: adapters.pubsub,
         judge: context.judge,
         vision,
+        publicUrl: config.PUBLIC_URL,
       }),
       // The agent's own desktop (ADR 0062): `desktop:use` with Run code, when its computer serves desktop use.
       createDesktopToolSource({
@@ -310,6 +311,7 @@ export function buildEngine(o: EngineOptions) {
         pubsub: adapters.pubsub,
         judge: context.judge,
         vision,
+        publicUrl: config.PUBLIC_URL,
       }),
       // Git through our proxy (ADR 0024): connected machines clone and push through the runner's `git.sync`
       // (only our credential reaches the machine; nothing global changes there).
