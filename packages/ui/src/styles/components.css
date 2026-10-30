@@ -730,18 +730,48 @@ textarea.ac-input {
   height: 56px;
   font-size: 20px;
 }
-.ac-avatar__presence {
-  position: absolute;
-  right: -2px;
-  bottom: -2px;
-  width: 10px;
-  height: 10px;
-  border-radius: var(--radius-full);
-  background: var(--success);
-  box-shadow: 0 0 0 2px var(--surface);
+/*
+ * The presence badge (ADR 0081, `PresenceBadge`): pixels in the agents' two-tone dither (light top left, deep bottom
+ * right) with a white mark, and a one-pixel ring in the color of the surface behind (`--presence-ring`, set where a
+ * face sits on something other than a raised card) that cuts it from the face. Offline and hidden are outlines.
+ */
+.ac-presence {
+  --presence: var(--faint);
+  display: block;
+  flex: none;
+  shape-rendering: crispEdges;
 }
-.ac-avatar--agent .ac-avatar__presence {
-  background: var(--agent);
+.ac-presence[data-presence="online"] {
+  --presence: var(--ok);
+}
+.ac-presence[data-presence="busy"] {
+  --presence: var(--danger);
+}
+.ac-presence[data-presence="away"] {
+  --presence: var(--warn);
+}
+.ac-presence__base {
+  fill: var(--presence);
+}
+.ac-presence__light {
+  fill: color-mix(in srgb, var(--presence) 60%, #ffffff);
+}
+.ac-presence__deep {
+  fill: color-mix(in srgb, var(--presence) 75%, #000000);
+}
+.ac-presence__mark {
+  fill: #ffffff;
+}
+.ac-presence__ring {
+  fill: var(--presence-ring, var(--raised));
+}
+/* On the face's corner, a little past it. */
+.ac-avatar__badge {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  z-index: var(--z-lifted);
+  line-height: 0;
 }
 .ac-avatar--running::after {
   content: "";
@@ -4349,19 +4379,12 @@ a.ac-list__row:focus-visible {
   background: var(--ink);
 }
 
-/* People: the tile (a rounded square, radius 30% of the side) in a neutral gradient with initials or a photo; presence dot on the corner */
+/* People: the tile (a rounded square, radius 30% of the side) in a neutral gradient with initials or a photo; presence badge on the corner */
 .ac-avatar {
   background: linear-gradient(160deg, var(--person-a), var(--person-b));
   color: var(--person-ink);
   font-weight: 650;
   border-radius: 30%;
-}
-.ac-avatar__presence {
-  right: -1px;
-  bottom: -1px;
-  z-index: var(--z-lifted);
-  background: var(--ok);
-  box-shadow: 0 0 0 2px var(--raised);
 }
 /* Agents: the living symbol, drawn by the agent engine on a canvas (Avatar); the box only holds its place. */
 .ac-avatar--agent {

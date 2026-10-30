@@ -68,8 +68,10 @@ export {
 } from "./navigation";
 export { OptionTile } from "./OptionTile";
 export { PillButton } from "./PillButton";
+export { PresenceBadge, type PresenceBadgeProps, WithPresence } from "./PresenceBadge";
 export { PressScale, type PressScaleProps } from "./PressScale";
 export { ProviderLogo, type ProviderLogoProps, ProviderQuad, ProviderStack } from "./ProviderLogo";
+export { type BadgePresence, badgeCell } from "./presence-badge";
 export { Row, type RowProps } from "./Row";
 export { SearchField, type SearchFieldProps } from "./SearchField";
 export { Section, type SectionProps } from "./Section";

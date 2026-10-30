@@ -1451,6 +1451,8 @@ export const en: Translations = {
     hidden: "Invisible",
     offline: "Offline",
     setStatus: "Set status",
+    setStatusHint: "Busy, invisible, or what you're up to",
+    seen: "seen {{when}}",
     title: "Set status",
     howOthersSee: "How people see you",
     hiddenPreview: "To others you're offline",

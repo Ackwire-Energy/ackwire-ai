@@ -11,6 +11,7 @@ import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { Tile } from "../shared/parts";
+import { usePresenceOf } from "../status/hooks";
 import { type ConversationRow, type LastLine, threadRowLines } from "./logic";
 import type { AgentRowState } from "./now";
 
@@ -25,7 +26,8 @@ const AVATAR = LIST_AVATAR;
  * (dozing, "Esperando o MacBook Air"), or what it is doing with the pixel orbit. Unread: bold name, darker time and preview, the count. Threads and missions
  * add a faint line with what and where ("Missão · #canal"): a mission shows its agent, its state
  * and items ("Esperando você · 4 de 9 itens") and what waits on you in it; a thread shows the face and the
- * line of its last reply. `live`: the agent moves (the first rows only).
+ * line of its last reply. `live`: the agent moves (the first rows only). A DM's face carries the presence badge
+ * and its name the status emoji (ADR 0081); an agent with a line of its own says it in place of its last message.
  */
 export const ConversationRowView = memo(function ConversationRowView({
   row: r,
@@ -50,6 +52,7 @@ export const ConversationRowView = memo(function ConversationRowView({
   const dir = useDirectory();
   const c = useColors();
   const when = useWhen();
+  const presenceOf = usePresenceOf();
   const lastText = (last: LastLine | null) => {
     if (!last) return { who: "", text: "" };
     const who = last.name || (last.author ? dir.nameOf(last.author) : "");
@@ -69,15 +72,30 @@ export const ConversationRowView = memo(function ConversationRowView({
         : t("mobile.chat.intent.noIntro");
   };
   const agentState = agentDm ? (agent ?? null) : null;
+  // Presence and line (ADR 0081): the agent's from its work, the person's as they set it.
+  const agentShown = r.kind === "dm" && agentDm ? presenceOf.agent(r.with.id) : null;
+  const personShown = r.kind === "dm" && !agentDm ? presenceOf.person(r.with.id) : null;
+  const agentLine = agentShown?.line ?? null;
+  const presenceWord = agentShown
+    ? t(`presence.${agentShown.presence}`)
+    : personShown
+      ? t(`presence.${personShown.presence}`)
+      : null;
   // Waiting for its offline computer: dozing, no working orbit (its run only waits).
   const away = agentState?.kind === "computer";
   const working = r.kind === "channel" || away ? false : r.working || agentState?.kind === "working";
   const leading =
     r.kind === "dm" ? (
       agentDm ? (
-        <AgentFace agentId={r.with.id} size={AVATAR - 2} mode={away ? "rest" : working ? "run" : "idle"} live={live} />
+        <AgentFace
+          agentId={r.with.id}
+          size={AVATAR - 2}
+          mode={away ? "rest" : working ? "run" : "idle"}
+          live={live}
+          presence
+        />
       ) : (
-        <Face who={{ type: r.with.type, id: r.with.id }} size={AVATAR} live={false} />
+        <Face who={{ type: r.with.type, id: r.with.id }} size={AVATAR} live={false} presence />
       )
     ) : r.kind === "mission" && r.mission ? (
       <AgentFace agentId={r.mission.agentId} size={AVATAR - 2} mode={working ? "run" : "idle"} live={live} />
@@ -87,6 +105,8 @@ export const ConversationRowView = memo(function ConversationRowView({
       <Tile icon="hash" size={AVATAR} />
     );
   const name = r.kind === "channel" ? r.name : r.kind === "dm" ? r.with.name : r.title;
+  // The status emoji after a DM's name: the agent's line's, the person's.
+  const nameEmoji = agentLine?.emoji ?? personShown?.status?.emoji ?? null;
   // Whose orbit: the DM's agent, or the mission's.
   const orbitAgent = r.kind === "dm" ? r.with.id : r.kind === "mission" ? r.mission?.agentId : null;
   const orbitColor = agentLook(orbitAgent ? dir.agentById.get(orbitAgent) : undefined).color;
@@ -148,6 +168,17 @@ export const ConversationRowView = memo(function ConversationRowView({
         </Text>
       </View>
     );
+  } else if (agentLine) {
+    // Its own line, or the one picked for its run, in place of the last message while it works.
+    label = agentLine.text;
+    line = (
+      <View style={styles.work}>
+        {working ? <PixelOrbit color={orbitColor} size={13} /> : null}
+        <Text variant="small" tone="ink2" numberOfLines={1} style={[LIST_PREVIEW, styles.em, styles.shrink]}>
+          {agentLine.text}
+        </Text>
+      </View>
+    );
   } else if (working && r.kind !== "mission") {
     const doing = agentState?.kind === "working" ? workTitle(t, agentState.work) : "";
     label = doing ? t("mobile.homeNow.doingLabel", { what: doing }) : t("mobile.chats.working");
@@ -183,6 +214,8 @@ export const ConversationRowView = memo(function ConversationRowView({
     router.push(chatHref(r.channelId, r.kind === "thread" || r.kind === "mission" ? r.threadId : null));
   const a11y = [
     name,
+    presenceWord,
+    personShown?.status?.text ?? null,
     placeLine,
     label,
     r.at ? when.short(r.at) : null,
@@ -212,7 +245,7 @@ export const ConversationRowView = memo(function ConversationRowView({
       divider={divider}
       unread={r.unread > 0}
       leading={leading}
-      title={name}
+      title={nameEmoji ? `${name} ${nameEmoji}` : name}
       time={r.at ? when.short(r.at) : null}
       over={
         placeLine ? (

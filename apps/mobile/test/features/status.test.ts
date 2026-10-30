@@ -1,0 +1,92 @@
+import { describe, expect, test } from "bun:test";
+import { STATUS_SUGGESTIONS } from "@agenteschat/client/lib/presence";
+import {
+  agentWhyKey,
+  availabilityOf,
+  draftOf,
+  inputOf,
+  isSuggestion,
+  lineText,
+  lowerFirst,
+  personLine,
+  STATUS_EMOJIS,
+  untilOf,
+} from "../../src/features/status/logic";
+import { translator } from "./fixtures";
+
+const NOW = new Date(2026, 9, 30, 10, 0);
+
+describe("the Status screen's draft (ADR 0081)", () => {
+  test("what you picked, read back from how you appear to yourself", () => {
+    expect(availabilityOf("online")).toBe("auto");
+    expect(availabilityOf("offline")).toBe("auto");
+    expect(availabilityOf(undefined)).toBe("auto");
+    expect(availabilityOf("away")).toBe("away");
+    expect(availabilityOf("busy")).toBe("busy");
+    expect(availabilityOf("hidden")).toBe("hidden");
+  });
+
+  test("it starts from your saved line, keeping its end", () => {
+    expect(draftOf(undefined)).toEqual({ availability: "auto", emoji: null, text: "", until: { at: null } });
+    const until = new Date(NOW.getTime() + 3600_000).toISOString();
+    expect(draftOf({ presence: "busy", status: { text: "Em reunião", emoji: "📅", until } })).toEqual({
+      availability: "busy",
+      emoji: "📅",
+      text: "Em reunião",
+      until: { at: until },
+    });
+  });
+
+  test("Salvar: the line trimmed with its end; an empty line clears it", () => {
+    const draft = {
+      availability: "away" as const,
+      emoji: "🍽️",
+      text: "  Almoçando ",
+      until: { choice: "m30" as const },
+    };
+    expect(inputOf(draft, NOW)).toEqual({
+      availability: "away",
+      status: { text: "Almoçando", emoji: "🍽️", until: new Date(NOW.getTime() + 30 * 60_000).toISOString() },
+    });
+    expect(inputOf({ ...draft, text: "   " }, NOW)).toEqual({ availability: "away", status: null });
+    const kept = "2026-10-30T18:00:00.000Z";
+    expect(untilOf({ at: kept }, NOW)).toBe(kept);
+    expect(untilOf({ choice: "never" }, NOW)).toBeNull();
+  });
+
+  test("a suggestion shows chosen only as it was picked", () => {
+    const draft = { availability: "busy" as const, emoji: "📅", text: "Em reunião", until: { choice: "h1" as const } };
+    expect(isSuggestion(draft, "Em reunião", "📅")).toBe(true);
+    expect(isSuggestion({ ...draft, emoji: "🎧" }, "Em reunião", "📅")).toBe(false);
+    expect(isSuggestion({ ...draft, text: "Em reunião com o time" }, "Em reunião", "📅")).toBe(false);
+  });
+
+  test("the emoji key offers the suggestions' emojis, each once", () => {
+    expect(new Set(STATUS_EMOJIS).size).toBe(STATUS_EMOJIS.length);
+    expect(STATUS_EMOJIS.every((e) => e.length > 0)).toBe(true);
+    for (const s of STATUS_SUGGESTIONS) expect(STATUS_EMOJIS).toContain(s.emoji);
+  });
+});
+
+describe("how a status reads in a row, a pill and a profile", () => {
+  test("a person's line, with when it clears", async () => {
+    const t = await translator("pt-BR");
+    expect(lineText({ emoji: "📅", text: "Em reunião" })).toBe("📅 Em reunião");
+    expect(lineText({ emoji: null, text: "Focado" })).toBe("Focado");
+    expect(personLine(t, "pt-BR", { text: "Focado", emoji: null, until: null }, NOW)).toBe("Focado");
+    const at3 = new Date(2026, 9, 30, 15, 0).toISOString();
+    const line = personLine(t, "pt-BR", { text: "Em reunião", emoji: "📅", until: at3 }, NOW);
+    expect(line.startsWith("📅 Em reunião · some às ")).toBe(true);
+    expect(lowerFirst("Some às 15:00")).toBe("some às 15:00");
+    expect(lowerFirst("")).toBe("");
+  });
+
+  test("why an agent appears as it does", () => {
+    expect(agentWhyKey("busy", "2026-10-30T10:00:00Z", false)).toBe("busy");
+    expect(agentWhyKey("online", null, false)).toBe("online");
+    expect(agentWhyKey("away", "2026-10-30T09:00:00Z", false)).toBe("away");
+    expect(agentWhyKey("away", null, false)).toBe("awayNever");
+    expect(agentWhyKey("offline", null, false)).toBe("offline");
+    expect(agentWhyKey("away", null, true)).toBe("noAi");
+  });
+});

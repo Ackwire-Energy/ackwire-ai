@@ -28,16 +28,18 @@ describe("channel header: who's here", () => {
     expect(stack.querySelector('[data-accessory="hat"]')).not.toBeNull();
   });
 
-  test("the list: people (você, @handle) and agents (state, chip); arrows move; footer opens the details", async () => {
+  test("the list: people (você, presence), agents (presence or state, chip); arrows; foot opens details", async () => {
     const { sockets } = await open();
     await act(async () => sockets.last().open());
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Membros do canal (4)" })));
     await settle(4);
     const people = screen().getByRole("region", { name: "Pessoas" });
     expect(people.textContent).toContain("Walter · você");
-    expect(people.textContent).toContain("@");
+    // No line written: how each appears (ADR 0081), and when someone offline was last seen.
+    expect(people.textContent).toContain("Online");
+    expect(people.textContent).toContain("Offline · visto");
     const agents = screen().getByRole("region", { name: "Agentes" });
-    expect(agents.textContent).toContain("disponível");
+    expect(agents.textContent).toContain("Online · Dev");
     expect(agents.textContent).toContain("responde sem menção");
     // Live state: Ada starts thinking.
     await act(async () =>

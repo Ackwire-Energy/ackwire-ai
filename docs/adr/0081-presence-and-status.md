@@ -1,8 +1,8 @@
 # 0081. Presence and written status, for people and agents
 
-- Status: Proposed (built: the server, the shared client and §7–§11; the web and phone screens in the same change)
+- Status: Accepted (built: the server, the shared client, §7–§11, the web and the phone app)
 - Date: 2026-10-30
-- Code: `packages/engine/src/member-status.ts`, `packages/engine/src/agent-status.ts` (`set_status`, `loadAgentStatuses`), `packages/engine/src/team.ts` (`find_agent`), `packages/engine/src/tools/run-policy.ts` (kind `self`), `packages/db/src/schema/tenancy.ts` (`organization_members.availability`, `status_*`), `packages/db/src/schema/agents.ts` (`agents.status_*`), `apps/server/src/routes/app/management.ts` (`/people`, `PUT …/me/status`), `apps/server/src/routes/app/agents.ts` (`GET …/agent-status`), `apps/server/src/realtime/ws.ts`, `packages/client/src/api/queries.ts` (`useSetMyStatus`, `useAgentStatuses`)
+- Code: `packages/engine/src/member-status.ts`, `packages/engine/src/agent-status.ts` (`loadAgentStatuses`, `statusCandidates`, `statusQuestions`, `startRunStatus`, `followWork`, `set_status`), `packages/engine/src/tool-loading.ts` (the two questions ride on `chooseToolGroups`), `packages/engine/src/judge.ts` (`score`), `packages/engine/src/team.ts` (`find_agent`), `packages/engine/src/tools/run-policy.ts` (kind `self`), `packages/db/src/schema/tenancy.ts` (`organization_members.availability`, `status_*`), `packages/db/src/schema/agents.ts` (`agents.status_*`), `apps/server/src/routes/app/management.ts` (`/people`, `PUT …/me/status`), `apps/server/src/routes/app/agents.ts` (`GET …/agent-status`), `apps/server/src/realtime/ws.ts`; shared: `packages/client/src/lib/presence.ts`, `packages/ui/src/presence/badge.ts`; web: `packages/ui` `PresenceBadge` (Avatar `presence`), `apps/web/src/components/StatusDialog.tsx`, `Presence.tsx`, `hooks/usePresence.ts`; phone: `apps/mobile/src/ui/PresenceBadge.tsx`, `src/features/status/*` (route `/me/status`)
 
 ## Context
 

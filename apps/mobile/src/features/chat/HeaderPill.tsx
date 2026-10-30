@@ -10,8 +10,9 @@ import { Glass, haptics, PressScale, Text, useTheme } from "@/ui";
  * The conversation's title as a glass pill in the header: who
  * or where on the left, the name and a quiet line under it. An agent's pill carries a little of its sky at
  * the right end; while it works, a pixel sweep in its color crosses the pill (the sidebar's trail) and the
- * quiet line says what it is doing. A channel shows who is in on the right. Held (`onHold`), it opens the
- * conversation switcher.
+ * quiet line says what it is doing. In a DM the face wears its presence badge and the quiet line says how the
+ * other side is: an agent's presence and line, a person's status (ADR 0081). A channel shows who is in on the
+ * right. Held (`onHold`), it opens the conversation switcher.
  */
 export function HeaderPill({
   lead,

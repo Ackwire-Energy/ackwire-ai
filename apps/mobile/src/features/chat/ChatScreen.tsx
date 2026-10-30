@@ -82,6 +82,8 @@ import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/h
 import { agentLook } from "../shared/logic";
 import { FocusLive, PushedHeader, Tile } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
+import { useDmStatusLine, usePresenceWord } from "../status/hooks";
+import { PersonStatusCard } from "../status/StatusCard";
 import { AgentReceiptLine } from "./AgentReceipts";
 import { receiptMessageId } from "./agent-receipts";
 import { ChannelMembersSheet } from "./ChannelMembers";
@@ -901,6 +903,15 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     const verb = activityVerb(t, entry.activity);
     return verb.charAt(0).toUpperCase() + verb.slice(1);
   }, [dmAgentId, isThread, runs, consults, dir.agentById, t]);
+  // A DM's pill says how the other side is (ADR 0081): an agent's presence and what it does, a person's line.
+  const dmLine = useDmStatusLine(
+    dm && !isThread ? { type: dm.with.type, id: dm.with.id } : null,
+    dmDoing,
+    dmAgentId ? subtitle : undefined,
+  );
+  // The ⋯ of a DM with a person says how they appear, their line in a card under it.
+  const personDm = dm && !dmAgentId && !isThread ? dm.with.id : null;
+  const optionsLine = usePresenceWord(personDm ? { type: "person", id: personDm } : null) ?? subtitle;
   // ── Keeping the place ──
   // Something opening over the conversation must not move it: on iOS it jumped when a header button opened a sheet
   // or the agent's computer. Where the person was (the end, or a row on screen) is taken before it opens, and given
@@ -1004,11 +1015,12 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
           <ChannelOptions
             channelId={channelId}
             title={title}
-            {...(subtitle ? { subtitle } : {})}
+            {...(optionsLine ? { subtitle: optionsLine } : {})}
             leading={
               dm ? <Face who={{ type: dm.with.type, id: dm.with.id }} size={36} live={false} /> : <Tile icon="hash" />
             }
             agentId={dmAgentId}
+            about={personDm ? <PersonStatusCard userId={personDm} /> : undefined}
             onPins={openPins}
             onMembers={channel && !dm ? openMembers : undefined}
           />,
@@ -1052,13 +1064,20 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       <HeaderPill
         lead={
           dmAgentId ? (
-            <AgentFace agentId={dmAgentId} size={26} framed={false} mode={dmDoing ? "run" : "idle"} />
+            <AgentFace
+              agentId={dmAgentId}
+              size={26}
+              framed={false}
+              mode={dmDoing ? "run" : "idle"}
+              presence
+              ring={c.glassSolid}
+            />
           ) : (
-            <Face who={{ type: dm.with.type, id: dm.with.id }} size={26} live={false} />
+            <Face who={{ type: dm.with.type, id: dm.with.id }} size={26} live={false} presence ring={c.glassSolid} />
           )
         }
         title={dm.with.name}
-        subtitle={dmDoing ?? subtitle}
+        subtitle={dmLine ?? dmDoing ?? subtitle}
         color={dmAgentId ? agentLook(dmAgent).color : undefined}
         working={Boolean(dmDoing)}
         extraActions={dmAgentId ? 1 : 0}
@@ -1066,8 +1085,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         {...hold}
         label={
           dmAgentId
-            ? t("mobile.chat.headerAgent", { who: who(dm.with.name, dmDoing ?? subtitle ?? "") })
-            : t("mobile.chat.headerChannel", { who: who(dm.with.name, "") })
+            ? t("mobile.chat.headerAgent", { who: who(dm.with.name, dmLine ?? dmDoing ?? subtitle ?? "") })
+            : t("mobile.chat.headerChannel", { who: who(dm.with.name, dmLine ?? "") })
         }
       />
     ) : channel ? (

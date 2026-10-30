@@ -4,6 +4,7 @@ import { addLiveAgent, drawLive, type LiveAgent } from "../agent/live";
 import { cx } from "../cx";
 import { initialsOf } from "../names";
 import { type AgentAppearance, appearanceStyle } from "./AgentLook";
+import { type BadgePresence, PresenceBadge } from "./PresenceBadge";
 
 export type AvatarKind = "person" | "agent";
 
@@ -29,8 +30,13 @@ export interface AvatarProps extends HTMLAttributes<HTMLSpanElement> {
   state?: AgentState;
   /** The agent's look: color, eyes and an accessory (agents only). */
   appearance?: AgentAppearance;
-  /** Online (person) / available (agent) dot. */
-  presence?: boolean;
+  /**
+   * The presence badge on the corner (ADR 0081): a person's (online, away, busy, hidden to themselves, offline) or
+   * an agent's, from its work. Null or left out: none.
+   */
+  presence?: BadgePresence | null;
+  /** The presence in words, on hover over the badge ("Ocupado"). */
+  presenceLabel?: string;
   /** Set when no visible name is next to the avatar: exposes `name` to screen readers. */
   labelled?: boolean;
   /** A held expression (agents only), e.g. "happy" for a moment of joy. */
@@ -109,7 +115,7 @@ function AgentBody({
 /**
  * One tile for everyone: a rounded square (radius 30% of the side) with a
  * hairline and a faint top highlight. People show their photo or initials in
- * it, with an optional presence dot on the corner. Agents are the living
+ * it, with an optional presence badge on the corner. Agents are the living
  * symbol from the agent engine standing in their own pixel sky: the dithered
  * body with the cut corner, white eyes and a pixel accessory, turning its
  * head, blinking and now and then making a face (see `state` and
@@ -125,6 +131,7 @@ export function Avatar({
   state,
   appearance,
   presence,
+  presenceLabel,
   labelled,
   expression,
   reactionKey,
@@ -172,7 +179,12 @@ export function Avatar({
       ) : (
         (initials ?? initialsOf(name))
       )}
-      {presence && <span className="ac-avatar__presence" />}
+      {presence && (
+        // Pixels of 1 px on the small faces, 1.5 px from the profile cards' 56 px up.
+        <span className="ac-avatar__badge" title={presenceLabel}>
+          <PresenceBadge presence={presence} size={size === "lg" || size === "xl" ? "lg" : "sm"} />
+        </span>
+      )}
     </span>
   );
 }

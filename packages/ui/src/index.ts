@@ -205,6 +205,7 @@ export {
   planWindows,
 } from "./components/PlanMeter";
 export { Popover } from "./components/Popover";
+export { type BadgePresence, PresenceBadge, type PresenceBadgeProps } from "./components/PresenceBadge";
 export {
   ProviderLogo,
   type ProviderLogoProps,

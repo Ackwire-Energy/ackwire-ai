@@ -14,6 +14,8 @@ import { agentLook } from "../shared/logic";
 import { Tile } from "../shared/parts";
 import { useWaitingApprovals, useWorkingNow } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
+import { usePresenceOf } from "../status/hooks";
+import { lineText } from "../status/logic";
 import { agoOf, plainRole, type TeamLine, teamLines } from "./logic";
 import { agoText, workTitle } from "./work";
 
@@ -93,8 +95,9 @@ export function AgentsScreen() {
 }
 
 /**
- * One agent (`.arow`): its body, the name and role, then what it needs from you (the exact request), what it is
- * on (since when), or its role in plain words (when you last talked).
+ * One agent (`.arow`): its body with its presence badge, the name and role, then what it needs from you (the exact
+ * request), what it is on (its own line when it wrote one, ADR 0081; since when), or its role in plain words (when
+ * you last talked).
  */
 function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean; live: boolean }) {
   const { t } = useTranslation();
@@ -106,13 +109,16 @@ function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean
   // An agent with nothing to think with says so where its role would be (the web's "Sem IA").
   const noAi = !approval && !w && computer === undefined && aiStateOf(ai.data, a.id) === "no_ai";
   const busy = Boolean(approval || w);
+  const line = usePresenceOf().agent(a.id)?.line ?? null;
   const time = l.at ? (busy ? agoText(t, agoOf(l.at, now)) : when.short(l.at)) : null;
   const sub = approval
     ? l.waitingCount > 1
       ? t("mobile.intentAgents.waitingMore", { title: approval.title, count: l.waitingCount - 1 })
       : t("mobile.intentAgents.waitingLine", { title: approval.title })
     : w
-      ? workTitle(t, w)
+      ? line
+        ? lineText(line)
+        : workTitle(t, w)
       : computer !== undefined
         ? t("mobile.outage.rowWaiting", { computer })
         : noAi
@@ -138,7 +144,13 @@ function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean
         .join(", ")}
       divider={divider}
       leading={
-        <AgentFace agentId={a.id} size={50} mode={w ? "run" : computer !== undefined ? "rest" : "idle"} live={live} />
+        <AgentFace
+          agentId={a.id}
+          size={50}
+          mode={w ? "run" : computer !== undefined ? "rest" : "idle"}
+          live={live}
+          presence
+        />
       }
       title={
         <View style={styles.l1}>

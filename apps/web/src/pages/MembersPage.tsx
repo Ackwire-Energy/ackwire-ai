@@ -287,7 +287,13 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
             const editable = manage && !isMe && (m.role !== "owner" || can(org.role, "manage_owners"));
             return (
               <div key={m.userId} className="ac-list__row">
-                <Avatar size="sm" name={m.name} imageUrl={m.image} />
+                <Avatar
+                  size="sm"
+                  name={m.name}
+                  imageUrl={m.image}
+                  presence={m.presence}
+                  presenceLabel={t(`presence.${m.presence}`)}
+                />
                 <span className="list-col">
                   <span style={{ fontWeight: 600 }}>
                     {m.name}

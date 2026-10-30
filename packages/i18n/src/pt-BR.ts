@@ -1472,6 +1472,8 @@ export const ptBR = {
     hidden: "Oculto",
     offline: "Offline",
     setStatus: "Definir status",
+    setStatusHint: "Ocupado, oculto ou o que você está fazendo",
+    seen: "visto {{when}}",
     title: "Definir status",
     howOthersSee: "Como as pessoas te veem",
     hiddenPreview: "Para os outros você está offline",

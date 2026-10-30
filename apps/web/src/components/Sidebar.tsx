@@ -1,8 +1,9 @@
-import type { Agent, Channel, ChannelCategory } from "@agenteschat/client";
+import type { Agent, Channel, ChannelCategory, Member } from "@agenteschat/client";
 import {
   agentStateIn,
   keys,
   runningAgents,
+  useAgentStatuses,
   useChannelCategories,
   useChannels,
   useConnections,
@@ -24,6 +25,7 @@ import { formatPercent } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { waitingAgents } from "@agenteschat/client/lib/outages";
 import { can } from "@agenteschat/client/lib/permissions";
+import { clearsText } from "@agenteschat/client/lib/presence";
 import { browserTimezone, timezoneName, zoneDisplayName } from "@agenteschat/client/lib/routines";
 import {
   AffixInput,
@@ -77,6 +79,7 @@ import { useApi } from "@/api/context";
 import { useAuth } from "@/auth/context";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useDirectory } from "@/hooks/useDirectory";
+import { agentLine, personLine, useAgentPresence, usePersonPresence } from "@/hooks/usePresence";
 import { type LocaleCode, locales, setLocale } from "@/i18n";
 import { requestChannelDetails } from "@/lib/channel-details";
 import {
@@ -104,8 +107,10 @@ import { COMPACT_QUERY, useMediaQuery, useNavDrawer } from "./NavDrawer";
 import { NewChannelDialog } from "./NewChannelDialog";
 import { OpenOnPhoneDialog } from "./OpenOnPhone";
 import { useOrg } from "./org-context";
+import { StatusEmoji, StatusLine } from "./Presence";
 import { OrgMark, ProfilePhotoDialog } from "./ProfilePhoto";
 import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon, WorkspaceSky } from "./Sky";
+import { SetStatusDialog } from "./StatusDialog";
 import { isStoppable, useStopRun } from "./StopRun";
 import { BrowserNoticesRow } from "./WebPush";
 
@@ -204,6 +209,8 @@ export function Sidebar() {
   const outages = useMachineOutages(orgId);
   const waitingFor = useMemo(() => waitingAgents(outages.data), [outages.data]);
   const budgetUsed = overview.data ? overview.data.budgetUsedPercent : null;
+  // The agents' presence and lines (ADR 0081): the one place that polls them; every face reads the same list.
+  useAgentStatuses(orgId);
   const dms = useDms(orgId);
   const dmChannels = new Set((dms.data ?? []).map((d) => d.channelId));
   // Unread per DM partner (agents show it on their "Agentes" row; people under "Mensagens diretas").
@@ -424,26 +431,15 @@ export function Sidebar() {
             sections={sections}
             summary={peopleUnread > 0 && <UnreadCount count={peopleUnread} />}
           >
-            {people.map((m) => {
-              const unread = unreadWith.get(m.userId) ?? 0;
-              return (
-                <Link
-                  key={m.userId}
-                  to="/org/$orgId/dm/person/$userId"
-                  params={{ orgId, userId: m.userId }}
-                  className="sidebar__item"
-                  title={m.name}
-                  data-unread={unread > 0}
-                  onMouseEnter={() => prefetchDm(m.userId)}
-                  onFocus={() => prefetchDm(m.userId)}
-                  onClick={() => markOpen(dmWith.get(m.userId) ?? m.userId)}
-                >
-                  <Avatar name={m.name} size="sm" imageUrl={m.image} />
-                  <span className="sidebar__item-label">{m.name}</span>
-                  {unread > 0 && <UnreadCount count={unread} />}
-                </Link>
-              );
-            })}
+            {people.map((m) => (
+              <PersonRow
+                key={m.userId}
+                member={m}
+                unread={unreadWith.get(m.userId) ?? 0}
+                onPrefetch={() => prefetchDm(m.userId)}
+                onOpen={() => markOpen(dmWith.get(m.userId) ?? m.userId)}
+              />
+            ))}
           </SidebarSection>
         )}
       </div>
@@ -1052,6 +1048,10 @@ function AgentRow({
   const busy = state !== "idle" && !waitingFor;
   const color = colorOf(a);
   const chip = audienceChip(t, a);
+  // Its presence from its work and its line (ADR 0081): the badge, the line's emoji, both in the row's title.
+  const shown = useAgentPresence(a.id);
+  const word = shown ? t(`presence.${shown.presence}`) : null;
+  const line = agentLine(t, shown?.line ?? null);
   const dir = useDirectory(org.id);
   const navigate = useNavigate();
   const live = useLiveStore();
@@ -1104,12 +1104,13 @@ function AgentRow({
       to="/org/$orgId/dm/agent/$agentId"
       params={{ orgId: org.id, agentId: a.id }}
       className="sidebar__item"
-      title={a.role ? `${a.name} · ${a.role}` : a.name}
+      title={[a.name, a.role, word, line?.text].filter(Boolean).join(" · ")}
       onMouseEnter={onPrefetch}
       onFocus={onPrefetch}
       onClick={onOpen}
       data-unread={unread > 0}
       data-busy={busy}
+      data-presence={shown?.presence}
       style={selectionSky(color)}
     >
       {busy && <AgentTrail color={color} />}
@@ -1118,9 +1119,12 @@ function AgentRow({
         agentId={a.id}
         name={a.name}
         size="sm"
+        presence={shown?.presence ?? null}
+        presenceLabel={word ?? undefined}
         {...(waitingFor ? { state: "idle" as const, expression: "closed" as const } : {})}
       />
       <span className="sidebar__item-label">{a.name}</span>
+      {line && <StatusEmoji emoji={line.emoji} text={line.text} className="sidebar__item-status" />}
       {unread > 0 ? (
         <UnreadCount count={unread} />
       ) : waitingFor ? (
@@ -1152,6 +1156,49 @@ function AgentRow({
   );
 }
 
+/** A person under "Mensagens diretas": their face with its presence badge, the name, their line's emoji (ADR 0081). */
+function PersonRow({
+  member: m,
+  unread,
+  onPrefetch,
+  onOpen,
+}: {
+  member: Member;
+  unread: number;
+  onPrefetch: () => void;
+  onOpen: () => void;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const shown = usePersonPresence(m.userId);
+  const word = shown ? t(`presence.${shown.presence}`) : null;
+  const line = shown?.status ? personLine(shown.status) : null;
+  return (
+    <Link
+      to="/org/$orgId/dm/person/$userId"
+      params={{ orgId: org.id, userId: m.userId }}
+      className="sidebar__item"
+      title={[m.name, word, line?.text].filter(Boolean).join(" · ")}
+      data-unread={unread > 0}
+      data-presence={shown?.presence}
+      onMouseEnter={onPrefetch}
+      onFocus={onPrefetch}
+      onClick={onOpen}
+    >
+      <Avatar
+        name={m.name}
+        size="sm"
+        imageUrl={m.image}
+        presence={shown?.presence ?? null}
+        presenceLabel={word ?? undefined}
+      />
+      <span className="sidebar__item-label">{m.name}</span>
+      {line && <StatusEmoji emoji={line.emoji} text={line.text} className="sidebar__item-status" />}
+      {unread > 0 && <UnreadCount count={unread} />}
+    </Link>
+  );
+}
+
 /** Unread count: neutral (attention is for what waits on a person, not for unread chat). */
 function UnreadCount({ count }: { count: number }) {
   const { t } = useTranslation();
@@ -1163,10 +1210,10 @@ function UnreadCount({ count }: { count: number }) {
 }
 
 /**
- * The account button; under the name, the workspace's budget use this month
- * (a percentage, never money). It opens the account's full-screen menu:
- * profile, time zone, opening the phone app, theme, language, sounds, the budget and
- * signing out.
+ * The account button: your face with your presence badge; under the name, your line (or how you appear, or
+ * "Definir status") and the workspace's budget use this month (a percentage, never money). It opens the account's
+ * full-screen menu: your status (ADR 0081), profile, time zone, opening the phone app, theme, language, sounds, the
+ * budget and signing out.
  */
 function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const { t, i18n } = useTranslation();
@@ -1183,6 +1230,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const [profile, setProfile] = useState<"handle" | "timezone" | null>(null);
   const [phone, setPhone] = useState(false);
   const [addPassword, setAddPassword] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
   // The app's "Show QR code" for this server (Preferences › Servers).
   useEffect(() => {
     if (takePhoneAsk()) setPhone(true);
@@ -1194,6 +1242,14 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const mine = dir.memberById.get(me.user.id);
   const photo = mine?.image ?? me.user.image;
   const zone = mine?.timezone || browserTimezone() || "UTC";
+  // How you appear to yourself (hidden stays hidden) and your line.
+  const shown = usePersonPresence(me.user.id);
+  const presence = shown?.presence ?? null;
+  const presenceWord = presence ? t(`presence.${presence}`) : undefined;
+  const line = shown?.status ? personLine(shown.status) : null;
+  // No line: away, busy or hidden say so; online offers to set one.
+  const chosen = presence === "away" || presence === "busy" || presence === "hidden" ? presenceWord : undefined;
+  const who = [me.user.name, line?.text ?? chosen].filter(Boolean).join(" · ");
   // Closes the menu first, then does what was picked (a dialog opens over the app, not over the menu).
   const pick = (run: () => void) => () => {
     setOpen(false);
@@ -1211,20 +1267,25 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
       <button
         ref={trigger}
         type="button"
-        // With the budget under the name the face stands beside two lines: the name's capitals at its top.
-        className={cx("sidebar__user", budgetUsed !== null && "ac-faceline")}
+        // The face stands beside the lines under it (your status, the budget): the name's capitals at its top.
+        className="sidebar__user ac-faceline"
         aria-haspopup="dialog"
         aria-label={
           budgetUsed === null
-            ? `${t("shell.account")}: ${me.user.name}`
-            : `${t("shell.account")}: ${me.user.name}. ${t("shell.budgetUsed", { percent: formatPercent(i18n.language, budgetUsed) })}`
+            ? `${t("shell.account")}: ${who}`
+            : `${t("shell.account")}: ${who}. ${t("shell.budgetUsed", { percent: formatPercent(i18n.language, budgetUsed) })}`
         }
-        title={me.user.name}
+        title={who}
         onClick={() => setOpen(true)}
       >
-        <Avatar name={me.user.name} size="sm" imageUrl={photo} />
+        <Avatar name={me.user.name} size="sm" imageUrl={photo} presence={presence} presenceLabel={presenceWord} />
         <span className="sidebar__user-text">
-          <span className={cx("sidebar__user-name", budgetUsed !== null && "ac-captop")}>{me.user.name}</span>
+          <span className="sidebar__user-name ac-captop">{me.user.name}</span>
+          {line ? (
+            <StatusLine emoji={line.emoji} text={line.text} className="sidebar__user-line" />
+          ) : (
+            <StatusLine text={chosen ?? t("presence.setStatus")} empty={!chosen} className="sidebar__user-line" />
+          )}
           {budgetUsed !== null && <BudgetBar percent={budgetUsed} label={t("shell.budget")} />}
         </span>
       </button>
@@ -1233,11 +1294,25 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
         onOpenChange={setOpen}
         anchor={trigger}
         closeLabel={t("common.close")}
-        mark={<Avatar name={me.user.name} size="xl" imageUrl={photo} />}
+        mark={
+          <Avatar name={me.user.name} size="xl" imageUrl={photo} presence={presence} presenceLabel={presenceWord} />
+        }
         title={me.user.name}
         meta={[mine?.handle ? `@${mine.handle}` : null, me.user.email].filter(Boolean).join(" · ")}
       >
         <MenuOverlayGroup label={t("shell.account")}>
+          {/* Your status first (ADR 0081): your line or "Definir status", when it clears, how you appear. */}
+          <MenuOverlayItem
+            icon="smile"
+            shortcut="0"
+            description={
+              line && shown?.status ? clearsText(t, i18n.language, shown.status.until) : t("presence.setStatusHint")
+            }
+            hint={presenceWord}
+            onSelect={pick(() => setStatusOpen(true))}
+          >
+            {line ? `${line.emoji} ${line.text}` : t("presence.setStatus")}
+          </MenuOverlayItem>
           <MenuOverlayItem
             icon="person"
             shortcut="1"
@@ -1356,6 +1431,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
         </MenuOverlayGroup>
       </MenuOverlay>
       <ProfileDialog focus={profile} onClose={() => setProfile(null)} />
+      <SetStatusDialog open={statusOpen} onClose={() => setStatusOpen(false)} />
       <OpenOnPhoneDialog open={phone} onClose={() => setPhone(false)} />
       <AddPasswordDialog open={addPassword} onClose={() => setAddPassword(false)} />
     </>

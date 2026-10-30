@@ -8,7 +8,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { signOut } from "@/features/account";
 import { useSoundChoice } from "@/lib/sounds";
 import { useOrg } from "@/providers/org";
-import { Button, Icon, type IconName, PersonAvatar, ProviderLogo, Text, useTheme } from "@/ui";
+import { Button, Icon, type IconName, PersonAvatar, ProviderLogo, Text, useTheme, WithPresence } from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
 import { CoverPage, PageRow, PageSection, TILE } from "../shared/CoverPage";
 import { AgentFace } from "../shared/Face";
@@ -16,6 +16,8 @@ import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { OrgAvatar } from "../shared/OrgAvatar";
 import { goBack, Tile } from "../shared/parts";
 import { usePersonPhoto } from "../shared/photo";
+import { useMyPerson } from "../status/hooks";
+import { MyStatusRow } from "../status/MyStatusRow";
 import { PlanMeter } from "../usage/parts";
 import { openIssuesWithMe } from "./logic";
 import { usePushSwitch, useSoundLabel } from "./PreferencePages";
@@ -26,7 +28,8 @@ const open = (href: string) => router.push(href as never);
 /**
  * Você, a page pushed from the avatar, in Conversas' language: the workspace's sky with your photo, name, @ and role
  * (the native bar clear over it, the sky lagging behind the scroll), "Editar perfil" and "Trocar workspace"; your
- * agents, alive; what they think with (the plans, the computers' own sign-ins, each with its usage in pixels);
+ * status right under you (ADR 0081, pushing Status); your agents, alive; what they think with (the plans, the
+ * computers' own sign-ins, each with its usage in pixels);
  * "Do workspace" (the workspace itself first, opening its settings: `app/(app)/settings/*`) and the preferences
  * as loose rows; Sair and the version. Each row pushes its screen (Conta, Workspaces, Membros, Notificações, Sons,
  * Aparência, Idioma: `app/(app)/me/*`) or one of the app's.
@@ -56,6 +59,8 @@ export function MeScreen() {
   const push = usePushSwitch().on;
 
   const mine = meId ? dir.memberById.get(meId) : undefined;
+  // How you appear (to yourself: hidden stays hidden), on your photo's corner (ADR 0081).
+  const myPresence = useMyPerson()?.presence;
   const name = me.data?.user.name ?? "";
   const photo = usePersonPhoto(mine?.avatarUrl ?? mine?.image ?? me.data?.user.image);
   const role = org.org ? t(`mobile.me.role.${org.org.role}`) : "";
@@ -134,10 +139,12 @@ export function MeScreen() {
     // The page is white like Conversas; its screens sit on the grouped gray, as settings do.
     <CoverPage
       face={
-        // A ring in the page's color lifts the photo off the sky.
-        <View style={[styles.ring, { borderColor: c.bg }]}>
-          <PersonAvatar name={name || "?"} size={68} photo={photo} />
-        </View>
+        // A ring in the page's color lifts the photo off the sky; the badge sits on it, ringed the same.
+        <WithPresence size={74} presence={myPresence} ring={c.bg}>
+          <View style={[styles.ring, { borderColor: c.bg }]}>
+            <PersonAvatar name={name || "?"} size={68} photo={photo} />
+          </View>
+        </WithPresence>
       }
       title={name}
       headline={headline}
@@ -161,6 +168,9 @@ export function MeScreen() {
         </>
       }
     >
+      {/* Your status, right under you: it pushes Status. */}
+      <MyStatusRow />
+
       {myAgents.length > 0 ? (
         <>
           <PageSection title={t("mobile.me.yourAgents")} count={myAgents.length} />
@@ -173,7 +183,7 @@ export function MeScreen() {
                 accessibilityLabel={a.name}
                 style={styles.crewItem}
               >
-                <AgentFace agentId={a.id} size={52} />
+                <AgentFace agentId={a.id} size={52} presence />
                 <Text variant="caption" tone="ink2" numberOfLines={1}>
                   {a.name}
                 </Text>
