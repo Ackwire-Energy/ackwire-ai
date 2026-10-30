@@ -160,7 +160,9 @@ const ImportPlan = z
             description: "Why it is skipped; on a create or update, a note (default model, channel joined).",
           }),
         trimmed: z.array(z.string()).optional().openapi({ description: "Fields cut to fit our limits." }),
-        renamedTo: z.string().optional().openapi({ description: "The free @handle an agent got." }),
+        renamedTo: z.string().optional().openapi({
+          description: "The @handle an agent gets when it isn't the bundle's: that one was taken, or is an id.",
+        }),
         targetId: z.string().optional(),
       }),
     ),

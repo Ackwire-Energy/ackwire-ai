@@ -345,7 +345,8 @@ describe("Configurações → Importar e exportar", () => {
     expect(applied).toHaveLength(1);
     expect(applied[0]?.pick).toEqual(["skill:review", "agent:cto", "note:COMPANY.md"]);
     expect(applied[0]?.enableSkills).toEqual(["skill:review"]);
-    expect(applied[0]?.bundle.agents.map((a) => a.key)).toEqual(["cto"]);
+    // Every agent goes along, so the handles new ones get don't depend on the pick; only the picked one comes.
+    expect(applied[0]?.bundle.agents.map((a) => a.key)).toEqual(["ceo", "cto"]);
 
     // The report: what came, with links, and focus on it.
     expect(document.activeElement).toBe(screen().getByRole("heading", { name: "Chegou tudo" }));
@@ -435,6 +436,44 @@ describe("Configurações → Importar e exportar", () => {
       "research-brief",
     ]);
     expect(button("Importar 8 itens")).toBeTruthy();
+  });
+
+  test("an OpenBot.run export whose agents are ids: each row shows the @ the agent gets, never the id", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    // The server names an agent whose handle is an id after the agent.
+    const named = ["otavioofertas", "newagent"];
+    withPlan(api, state, (input) =>
+      input.bundle.agents.map((a, i) => ({
+        kind: "agent",
+        key: a.key,
+        label: a.name,
+        action: "create",
+        renamedTo: named[i],
+      })),
+    );
+    await go(state, api);
+    const file = {
+      format: "openbot-agent-import",
+      version: 1,
+      source: { app: "grok-bot" },
+      agents: [
+        { key: "agent-e9665a97-c8d5-423f-ae59-257f9ab85263", name: "Otávio Ofertas", title: "Vendas" },
+        { key: "agent-925ca021-21e4-4053-9e0a-230b9e8c127a", name: "New agent" },
+      ],
+    };
+    await pick("Arquivos para importar", [new File([JSON.stringify(file)], "openbot-import.json")]);
+
+    expect(row("Otávio Ofertas · Vendas").textContent).toContain("@otavioofertas");
+    expect(row("New agent").textContent).toContain("@newagent");
+    expect(text()).not.toContain("@agent-");
+    // Not a rename: the id was never a handle here.
+    expect(text()).not.toContain("já existe aqui");
+    // The bundle keeps the ids, so a file imported before still matches what it made.
+    expect(applies(state)[0]?.bundle.agents.map((a) => a.handle)).toEqual([
+      "agent-e9665a97-c8d5-423f-ae59-25",
+      "agent-925ca021-21e4-4053-9e0a-23",
+    ]);
   });
 
   test("nothing new, or nothing that can come: it says so instead of offering Importar", async () => {

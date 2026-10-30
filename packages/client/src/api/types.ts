@@ -3058,7 +3058,7 @@ export interface ImportItemResult {
   reason?: ImportSkipReason;
   /** Fields cut to fit our limits. */
   trimmed?: string[];
-  /** An agent whose handle was taken gets the next free one. */
+  /** The @handle an agent gets (or got) when it isn't the bundle's: that one was taken, or is an id. */
   renamedTo?: string;
   /** The row created or updated (after an apply). */
   targetId?: string;

@@ -131,6 +131,7 @@ import {
   Icon,
   type IconName,
   Input,
+  isIdHandle,
   Kbd,
   Mention,
   Menu,
@@ -641,6 +642,8 @@ function ChannelView({
         .filter((a): a is Agent => Boolean(a)),
     [members.data, dir.agentById],
   );
+  // What the channel suggests goes to an agent people can read: one whose handle is an id only when every agent's is.
+  const suggestedAgent = channelAgents.find((a) => !isIdHandle(a.handle)) ?? channelAgents[0];
   const channelPeople = useMemo(
     () =>
       (members.data ?? [])
@@ -1140,8 +1143,8 @@ function ChannelView({
         ))}
       </>
     ) : undefined;
-  // "/" commands, for the DM agent or the channel's first agent.
-  const commandAgent = dmAgent ?? channelAgents[0];
+  // "/" commands, for the DM agent or the channel's suggested agent.
+  const commandAgent = dmAgent ?? suggestedAgent;
   const navigateTo = useNavigate();
   const commandPrefix = dmAgent || !commandAgent ? "" : `@${commandAgent.handle} `;
   const cg = agentGrammar(t, commandAgent?.name ?? "");
@@ -1461,10 +1464,13 @@ function ChannelView({
     openUnseen();
   }, [unseenFrom]);
   const emptySuggestions = useMemo(() => {
-    if (chrome?.suggestions) return chrome.suggestions;
-    const first = channelAgents[0];
-    return first ? greetingSuggestions(t, first.role).map((s) => `@${first.handle} ${s}`) : [];
-  }, [chrome?.suggestions, channelAgents, t]);
+    if (chrome?.suggestions) return chrome.suggestions.map((text) => ({ label: text, text }));
+    const a = suggestedAgent;
+    // The chip names the agent as a sent message shows its mention; the text keeps the handle.
+    return a
+      ? greetingSuggestions(t, a.role).map((s) => ({ label: `@${a.name} ${s}`, text: `@${a.handle} ${s}` }))
+      : [];
+  }, [chrome?.suggestions, suggestedAgent, t]);
 
   // "Ajustar trecho": the channel's messages that can be in the range (and the moved ones, back in
   // their place), with the selection band in place of the timeline and its bar in place of the composer.
@@ -1706,14 +1712,14 @@ function ChannelView({
                               <legend className="ac-visually-hidden">{t("chat.suggestions")}</legend>
                               {emptySuggestions.map((s) => (
                                 <Button
-                                  key={s}
+                                  key={s.text}
                                   size="sm"
                                   onClick={() => {
-                                    setDraft(s);
+                                    setDraft(s.text);
                                     composer.current?.focus();
                                   }}
                                 >
-                                  {s}
+                                  {s.label}
                                 </Button>
                               ))}
                             </fieldset>
@@ -1932,7 +1938,7 @@ function ChannelView({
                 onOpenChange={(o) => !o && setMissionDraft(null)}
                 initialGoal={missionDraft}
                 initialChannelId={chrome?.dmAgentId ? undefined : channel.id}
-                initialAgentId={channelAgents[0]?.id}
+                initialAgentId={suggestedAgent?.id}
               />
             )}
           </Tag>
