@@ -51,6 +51,7 @@ import {
   type FakeScheduleAnswers,
   localDateTimeOf,
   type MemberRole,
+  type RunExecutorDeps,
   type SandboxDeps,
   type StorageDeps,
   type ToolSource,
@@ -158,6 +159,8 @@ export async function setup(
     schedules?: FakeScheduleAnswers;
     /** Tools on demand (ADR 0043): the judge picks the tool groups each run lists. */
     toolsOnDemand?: boolean;
+    /** The agent's browser started ahead when a run's judge chose it (ADR 0040 §11). */
+    warmBrowser?: RunExecutorDeps["warmBrowser"];
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -296,6 +299,7 @@ export async function setup(
     artifacts: artifactDeps,
     sandbox: sandboxDeps,
     toolsOnDemand: options.toolsOnDemand ?? false,
+    ...(options.warmBrowser ? { warmBrowser: options.warmBrowser } : {}),
   };
   const handlers = createJobHandlers(jobDeps);
 

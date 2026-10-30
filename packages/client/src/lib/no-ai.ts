@@ -7,6 +7,7 @@ import type {
   BrainUnavailable,
   ConnectIntent,
   Edition,
+  MachineAccount,
   MachineAccountKind,
 } from "../api/types";
 import { answersOthers, audienceOf } from "./audience";
@@ -77,6 +78,20 @@ export const PLAN_CHOICES: readonly PlanChoice[] = ["claude", "chatgpt", ...PLAN
 /** The account a plan signs in as: ChatGPT's through Codex; Claude's and every coding plan's through Claude Code. */
 export const kindOf = (choice: PlanChoice): MachineAccountKind =>
   choice === "chatgpt" ? PLAN_BRAIN.chatgpt : PLAN_BRAIN.claude;
+/** The plan an account signs in with: a coding plan's key, ChatGPT's through Codex, else Claude's. */
+export const planOfAccount = (a: Pick<MachineAccount, "kind" | "provider">): PlanChoice =>
+  isPlanId(a.provider) ? a.provider : a.kind === "codex" ? "chatgpt" : "claude";
+/**
+ * The sign-in a row of what the person already has asks for (`existingAi`), in its plan's panel: one more login of
+ * that account for the agent (`email`, Claude's hint), or a free login of it signed back in (`again`). `from`: the
+ * row's login.
+ */
+export interface ExistingSignIn {
+  choice: PlanChoice;
+  from: string;
+  again?: string;
+  email?: string | null;
+}
 /** A plan's maker mark (a `ProviderLogo` id): ChatGPT's is OpenAI's. */
 export const planMark = (choice: PlanChoice) => (choice === "chatgpt" ? "openai" : choice);
 /** A plan's short name, as its tile and its accounts say it: "Claude", "ChatGPT", "GLM Coding"… */

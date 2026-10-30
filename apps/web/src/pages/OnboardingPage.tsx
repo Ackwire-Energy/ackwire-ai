@@ -43,11 +43,13 @@ import {
   allAgents,
   defaultChoice,
   defaultTarget,
+  type ExistingSignIn,
   gateDims,
   kindOf,
   ownSignInFor,
   type PlanChoice,
   planLabel,
+  planOfAccount,
 } from "@agenteschat/client/lib/no-ai";
 import {
   addInvites,
@@ -103,6 +105,7 @@ import { OnlyYouNote } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import {
   AiPicker,
+  ExistingRows,
   type KeyDraft,
   KeyPanel,
   PlanPanel,
@@ -372,13 +375,15 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
   // far (by agent).
   const [aiPicked, setAiPicked] = useState<AiChoice | null>(null);
   const [aiTarget, setAiTarget] = useState<string | undefined>(undefined);
+  // An account already on the computer, signed in once more for an agent from its row (its plan's panel).
+  const [aiLogin, setAiLogin] = useState<ExistingSignIn | null>(null);
   const [planned, setPlanned] = useState<Record<string, { label: string; mark: string; choice: PlanChoice }>>({});
   // Agents a plan's panel moved onto it one at a time ("All agents"), until it says done: shown again (another tile and
   // back, another step and back), it goes on from the next one.
   const [signedIn, setSignedIn] = useState<typeof planned>({});
   // A computer the person connected: its own sign-in thinks for every agent, unless they pick another account.
   const [own, setOwn] = useState(true);
-  // "Responde a todos" for the agents on a plan: off, each replies only to the person (ADR 0059 §5).
+  // "Atende outras pessoas" for the agents on a plan: off, each answers only the person (ADR 0059 §5).
   const [replyAll, setReplyAll] = useState(false);
   // The workspace key: a provider's key, or the platform key where the server offers one.
   const [draft, setDraft] = useState<KeyDraft>({ provider: "anthropic", apiKey: "" });
@@ -751,10 +756,13 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
     c === "key" ? [] : allAgents({ choice: c, agents: crewAgents, aiOf, machineOf: () => null });
   // The step's host asks which AI they use: the plan is for it first, as its face, the "For" select and the foot say.
   const aimed = { agents: crewAgents, hasAi, picked: aiTarget, host: agentIds[HOST.ai] };
-  // With no set, the agent whose computer the panel reads, "All agents" too.
+  // With no set, the agent whose computer the panel reads, "All agents" too. What the person already has there comes
+  // first for that agent.
+  const reader = aiOpen ? defaultTarget({ ...aimed, set: [] }) : undefined;
+  const readerAgent = crewAgents.find((a) => a.id === reader);
   const gates = usePlanGates(
     created?.orgId ?? "",
-    aiOpen ? defaultTarget({ ...aimed, set: [] }) : undefined,
+    reader,
     aiOpen && Object.keys(planned).length === 0 && !keySaved ? COMPUTER_POLL_MS : false,
   );
   const choice =
@@ -773,6 +781,7 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
   const target = defaultTarget({ ...aimed, set: aiAll });
   const pickAi = (next: AiChoice) => {
     setAiPicked(next);
+    setAiLogin(null);
     // Another plan moves on to whoever still has no AI once a plan thinks for someone.
     if (next !== "key" && next !== choice && Object.keys(planned).length > 0)
       setAiTarget(defaultTarget({ agents: crewAgents, hasAi, host: aimed.host, set: setOf(next) }));
@@ -1610,8 +1619,31 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
                 // The workspace exists: its panels read it like any of its pages.
                 <OrgProvider org={orgSummary} me={me.data}>
                   <AiPicker
-                    choice={choice}
+                    choice={aiLogin ? null : choice}
                     onPick={pickAi}
+                    // Kept while a row's sign-in is open: its panel, under that row, says when it's done.
+                    have={(held) =>
+                      readerAgent &&
+                      (aiLogin || !hasAi(readerAgent.id)) && (
+                        <ExistingRows
+                          gates={gates}
+                          agent={readerAgent}
+                          credentials={[]}
+                          named
+                          signIn={aiLogin}
+                          panel={held}
+                          toEveryone={replyAll}
+                          onSignIn={(next) => {
+                            setAiLogin(next);
+                            setAiPicked(next.choice);
+                            setAiTarget(readerAgent.id);
+                          }}
+                          onUsed={(id, { account }) => {
+                            if (account) setPlanned((p) => ({ ...p, [id]: thinksOf(account, planOfAccount(account)) }));
+                          }}
+                        />
+                      )
+                    }
                     dims={(c) => noComputer || gateDims(gates.gateOf(c))}
                     panel={
                       choice === "key" ? (
@@ -1627,6 +1659,7 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
                           onTarget={setAiTarget}
                           own={{ chosen: own, onChoose: setOwn }}
                           replies={{ on: replyAll, onChange: setReplyAll }}
+                          {...(aiLogin?.choice === choice ? { login: aiLogin } : {})}
                           hostConnecting={computer === "host"}
                           said={railSaysComputer}
                           onKey={() => pickAi("key")}

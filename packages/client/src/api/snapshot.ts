@@ -36,7 +36,7 @@ interface Snapshot {
 }
 
 /** `["org", orgId, <list>]`: the lists the shell and the chat need right away. */
-const ORG_LISTS = new Set(["channels", "dms", "agents", "members", "team", "detail"]);
+const ORG_LISTS = new Set(["channels", "channel-categories", "dms", "agents", "members", "team", "detail"]);
 /** `["org", orgId, "channel", channelId, <part>]`: kept for the chats in the snapshot. */
 const CHAT_PARTS = new Set(["messages", "roster", "members"]);
 const ME_HASH = hashKey(["me"]);

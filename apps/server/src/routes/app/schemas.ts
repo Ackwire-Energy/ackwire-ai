@@ -155,6 +155,15 @@ export const Agent = z
   })
   .openapi("Agent");
 
+/** A named group of channels in the sidebar, the same for everyone in the organization. */
+export const ChannelCategory = z
+  .object({
+    id: z.uuid(),
+    name: z.string(),
+    position: z.number().int().openapi({ description: "Order in the sidebar, from 0." }),
+  })
+  .openapi("ChannelCategory");
+
 export const Channel = z
   .object({
     id: z.uuid(),
@@ -168,6 +177,12 @@ export const Channel = z
       .optional()
       .openapi({ description: "The channel's creator: may manage its members, like admins." }),
     createdAt: z.string(),
+    categoryId: z
+      .uuid()
+      .nullable()
+      .optional()
+      .openapi({ description: "Its sidebar category; null: on top, with none." }),
+    position: z.number().int().optional().openapi({ description: "Order inside its category, from 0." }),
     unreadCount: z.number().int().optional().openapi({
       description:
         "Channel list only: messages since you last read it (since you joined, if never), not yours; a thread reply counts only in a thread you follow. At most 100; 0 when you're not a member.",
@@ -512,7 +527,7 @@ export const AgentBrain = z
         "The caller may add an account there for this agent: its owner, on a computer where they add accounts.",
     }),
     accountsSupported: z.boolean().openapi({ description: "The computer's runner knows accounts (protocol 13)." }),
-    onlyOwner: z.boolean().openapi({ description: '"Responde a todos" off: nobody but its owner talks to it.' }),
+    onlyOwner: z.boolean().openapi({ description: '"Atende outras pessoas" off: nobody but its owner talks to it.' }),
     canUsePlans: z.boolean().openapi({
       description: "The caller owns the agent: only they choose its plan and let other people talk to it on a plan.",
     }),

@@ -88,6 +88,61 @@ describe("connections", () => {
     expect(active.map((c) => c.id)).toEqual([second.id]);
   });
 
+  test("a new connection is every agent's at Ler e escrever, each in the audit log; reconnecting keeps what people chose", async () => {
+    f = await setup();
+    const [ops, gone] = await f.db
+      .insert(schema.agents)
+      .values([
+        { orgId: f.org.id, name: "Ops", handle: "ops", model: "claude-sonnet-5-5" },
+        { orgId: f.org.id, name: "Old", handle: "old", model: "claude-sonnet-5-5", archivedAt: new Date() },
+      ])
+      .returning();
+    const who = (agentId: string | null) => (agentId === f.agent.id ? "dev" : agentId === ops?.id ? "ops" : "old");
+    const grantsOn = async (connectionId: string) =>
+      (await f.db.select().from(schema.agentScopes).where(eq(schema.agentScopes.connectionId, connectionId)))
+        .map((g) => [who(g.agentId), g.scope, g.grantedByUserId])
+        .sort();
+    const audited = async () =>
+      (await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "agent.access_changed")))
+        .map((a) => [who(a.targetId), a.actorId, a.details])
+        .sort();
+
+    const first = await createApiKeyConnection(depsOf(f), f.owner.id, f.org.id, {
+      connector: "github",
+      apiKey: "ghp_secret_123456",
+    });
+    // The whole connection (`connector:*`), sensitive tools included: they still ask a person on every call.
+    expect(await grantsOn(first.id)).toEqual([
+      ["dev", "connector:*", f.owner.id],
+      ["ops", "connector:*", f.owner.id],
+    ]);
+    expect(gone?.archivedAt).not.toBeNull();
+    const details = { connectionId: first.id, label: "GitHub", level: "write" };
+    expect(await audited()).toEqual([
+      ["dev", f.owner.id, details],
+      ["ops", f.owner.id, details],
+    ]);
+
+    // Someone narrows Dev to reading pull requests; a new key for the same connector keeps that and grants nothing.
+    await setAgentScopes(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      f.agent.id,
+      [{ connectionId: first.id, scope: "github:pr.read" }],
+      connectorGrantValidator,
+    );
+    const second = await createApiKeyConnection(depsOf(f), f.owner.id, f.org.id, {
+      connector: "github",
+      apiKey: "ghp_rotated_654321",
+    });
+    expect(await grantsOn(second.id)).toEqual([
+      ["dev", "github:pr.read", f.owner.id],
+      ["ops", "connector:*", f.owner.id],
+    ]);
+    expect(await audited()).toHaveLength(2);
+  });
+
   test("grants must name a scope of the connection's catalog, in this org", async () => {
     f = await setup();
     const c = await createApiKeyConnection(depsOf(f), f.owner.id, f.org.id, {
@@ -139,7 +194,12 @@ describe("MCP tools through the Tool Gateway", () => {
     });
 
     const gateway = createToolGateway({ sources: [source] });
-    expect(await gateway.list(ctx)).toEqual([]);
+    // A new connection is every agent's, whole (the merge still asks a person, below).
+    expect((await gateway.list(ctx)).map((t) => t.name).sort()).toEqual([
+      "github_get_issue",
+      "github_get_pull_request",
+      "github_merge_pull_request",
+    ]);
     await setAgentScopes(
       f.db,
       f.owner.id,
