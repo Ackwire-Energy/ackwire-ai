@@ -625,7 +625,7 @@ export async function removeAgentSecret(
 }
 
 /**
- * An agent being deleted (ADR 0080 §4): every secret people delivered to it leaves the computer it was delivered
+ * An agent being deleted (ADR 0082 §4): every secret people delivered to it leaves the computer it was delivered
  * to, as `removeAgentSecret` does. One whose computer doesn't answer now (offline) keeps its value there and its
  * row open.
  */

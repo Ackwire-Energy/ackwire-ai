@@ -139,7 +139,7 @@ export const agents = pgTable(
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     archivedAt: timestamp({ withTimezone: true }),
     /**
-     * Deleted for good (ADR 0080): a tombstone, archived too, keeping only its name, role and look for what it
+     * Deleted for good (ADR 0082): a tombstone, archived too, keeping only its name, role and look for what it
      * left behind (messages, usage, audit). Its handle becomes `deleted-<id>`, longer than any handle people
      * pick, so the old one is free again.
      */

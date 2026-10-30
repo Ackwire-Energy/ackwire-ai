@@ -11,7 +11,7 @@ import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
 
 /**
- * Deleting an agent for good (ADR 0080), from its page or, archived, from Equipe: what goes and what stays, then
+ * Deleting an agent for good (ADR 0082), from its page or, archived, from Equipe: what goes and what stays, then
  * its name typed to confirm. `onDeleted` runs after the toast, before the dialog closes.
  */
 export function DeleteAgentDialog({

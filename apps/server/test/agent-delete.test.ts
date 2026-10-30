@@ -4,7 +4,7 @@ import { browser, createTestServer, joinByInvitation, seedOrg, signUp, type Test
 let t: TestServer;
 afterEach(() => t.close());
 
-test("deleting an agent for good (ADR 0080): owners and admins; it leaves the team, its name stays for what it left", async () => {
+test("deleting an agent for good (ADR 0082): owners and admins; it leaves the team, its name stays for what it left", async () => {
   t = await createTestServer();
   const owner = browser(t);
   await signUp(owner, "owner@example.com");

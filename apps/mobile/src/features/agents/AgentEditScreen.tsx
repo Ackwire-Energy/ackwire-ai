@@ -190,7 +190,7 @@ export function AgentEditScreen({ id }: { id: string }) {
           ) : null}
         </View>
 
-        {/* Deleting for good asks for its name on a screen of its own (ADR 0080). */}
+        {/* Deleting for good asks for its name on a screen of its own (ADR 0082). */}
         {admin ? (
           <View style={styles.section}>
             <GroupedList>

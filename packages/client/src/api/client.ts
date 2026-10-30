@@ -334,7 +334,7 @@ export interface ApiClient {
     denyProposal(orgId: string, messageId: string): Promise<AgentProposal>;
     update(orgId: string, agentId: string, input: Partial<Omit<AgentInput, "handle">>): Promise<Agent>;
     archive(orgId: string, agentId: string): Promise<void>;
-    /** Deletes it for good (ADR 0080): owners and admins, archived or not. */
+    /** Deletes it for good (ADR 0082): owners and admins, archived or not. */
     purge(orgId: string, agentId: string): Promise<void>;
     /** Agents no longer in the team (archived or deleted), for the names and faces of what they left. */
     former(orgId: string): Promise<FormerAgent[]>;

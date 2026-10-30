@@ -17,7 +17,7 @@ import { TextArea } from "../shared/TextArea";
 export const openAgentDelete = (id: string) => router.push({ pathname: "/agent-delete", params: { id } });
 
 /**
- * Deleting an agent for good (ADR 0080), as the web's Configurações › Zona de perigo: what goes and what stays,
+ * Deleting an agent for good (ADR 0082), as the web's Configurações › Zona de perigo: what goes and what stays,
  * its name typed to confirm, then the row that deletes it. Admins reach it from "Editar agente", and an archived
  * agent's (it has no profile) from Agentes › Arquivados.
  */

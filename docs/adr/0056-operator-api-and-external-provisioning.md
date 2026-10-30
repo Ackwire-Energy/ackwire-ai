@@ -1,6 +1,6 @@
 # 0056. Operator API and external provisioning
 
-- Status: Accepted (2026-10-24). Amended 2026-10-25 by ADR 0065 (§10: the ready time and when the wait began, the ready email, no pairing with external provisioning, no approval step), 2026-10-26 (§10: a workspace on hold or suspended waits for no computer), 2026-10-27 by ADR 0079 (§4: limits and meters; §5: `platform_ai.threshold`; §8: billing holds, limits and the create refusal) and ADR 0076 (§5, §6: screened sessions), 2026-10-29 by ADR 0078 (the sign-up mode, the waiting list and early-access invitations), and 2026-10-30 by ADR 0080 (§5: `agent.deleted`)
+- Status: Accepted (2026-10-24). Amended 2026-10-25 by ADR 0065 (§10: the ready time and when the wait began, the ready email, no pairing with external provisioning, no approval step), 2026-10-26 (§10: a workspace on hold or suspended waits for no computer), 2026-10-27 by ADR 0079 (§4: limits and meters; §5: `platform_ai.threshold`; §8: billing holds, limits and the create refusal) and ADR 0076 (§5, §6: screened sessions), 2026-10-29 by ADR 0078 (the sign-up mode, the waiting list and early-access invitations), and 2026-10-30 by ADR 0082 (§5: `agent.deleted`)
 - Date: 2026-10-24
 - Extends: ADR 0002 (nothing private runs in the server process), ADR 0004 (configuration), ADR 0025 (connected computers)
 
@@ -54,7 +54,7 @@ The reads live in `packages/engine/src/operator.ts` and pick every field by name
 | `organization.deleted` | a workspace goes with its last member's account | none |
 | `invitation.created` | an invitation is sent or resent, or an invite link is made | `emailDomain`, `role`, `resent: true` when resent; `link: true` for a link |
 | `agent.created` | an agent is created | `agentId` |
-| `agent.deleted` | an agent is deleted for good (ADR 0080) | `agentId` |
+| `agent.deleted` | an agent is deleted for good (ADR 0082) | `agentId` |
 | `mail.sent` | an agent sends, replies to or forwards an email | `agentId`, `runId`, `kind`, `recipients` (how many), `domains` |
 | `run.finished` | an agent's run ends (done, failed or canceled) | `runId`, `agentId`, `brain`, `status`, `toolCalls` |
 | `task.finished` | a task on a computer ends (done, failed, canceled, or interrupted for good) | `taskId`, `agentId`, `executor`, `status` |

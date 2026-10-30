@@ -1217,7 +1217,7 @@ export async function deleteRoutine(deps: RoutineDeps, actorId: string, orgId: s
   await dropRoutine(deps, actorId, current);
 }
 
-/** A deleted agent's routines are deleted with it (ADR 0080), each as `deleteRoutine` does. */
+/** A deleted agent's routines are deleted with it (ADR 0082), each as `deleteRoutine` does. */
 export async function deleteAgentRoutines(deps: RoutineDeps, actorId: string, orgId: string, agentId: string) {
   const rows = await deps.db
     .select()

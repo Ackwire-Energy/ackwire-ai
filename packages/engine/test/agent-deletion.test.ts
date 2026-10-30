@@ -31,7 +31,7 @@ import {
 import { addMember, type Fixture, setup } from "./fixtures";
 import { fakeRunner, pairMachine, RUNNER } from "./machine-fixtures";
 
-/** ADR 0080: deleting an agent for good, leaving a tombstone that names what it left behind. */
+/** ADR 0082: deleting an agent for good, leaving a tombstone that names what it left behind. */
 
 let f: Fixture;
 afterEach(async () => {

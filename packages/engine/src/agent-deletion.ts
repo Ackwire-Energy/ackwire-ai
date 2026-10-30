@@ -38,7 +38,7 @@ const {
 export type AgentDeletionDeps = MissionDeps & Pick<RoutineDeps, "pubsub" | "mail">;
 
 /**
- * Deletes an agent for good (ADR 0080): owners and admins, archived or not. It is archived first, so nothing new
+ * Deletes an agent for good (ADR 0082): owners and admins, archived or not. It is archived first, so nothing new
  * starts while its missions close, its routines go and its work stops; then, in one transaction, what it had goes
  * and its row stays as a tombstone (name, role and look; its handle freed) for its messages, runs, usage and audit.
  */

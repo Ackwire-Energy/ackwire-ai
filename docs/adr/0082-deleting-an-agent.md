@@ -1,4 +1,4 @@
-# 0080. Deleting an agent: a tombstone that names what it left
+# 0082. Deleting an agent: a tombstone that names what it left
 
 - Status: Accepted (built: the server, the shared client, the web and desktop agent page, the phone)
 - Date: 2026-10-30

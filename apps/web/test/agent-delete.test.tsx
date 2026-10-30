@@ -21,7 +21,7 @@ const click = async (el: Element) => {
 };
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
 
-/** Ada was deleted: out of the team, named only by what she left (ADR 0080). */
+/** Ada was deleted: out of the team, named only by what she left (ADR 0082). */
 const adaDeleted = () => {
   const state = seedState();
   state.agents = state.agents.filter((a) => a.id !== ADA_ID);
@@ -29,7 +29,7 @@ const adaDeleted = () => {
   return state;
 };
 
-describe("deleting an agent (ADR 0080)", () => {
+describe("deleting an agent (ADR 0082)", () => {
   test("Zona de perigo: what goes and what stays, the name typed to confirm, then the workspace", async () => {
     const { state, router } = await go(`agents/${ADA_ID}?tab=settings&sec=danger`);
     await click(screen().getByRole("button", { name: "Apagar" }));

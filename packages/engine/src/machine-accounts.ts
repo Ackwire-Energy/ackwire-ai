@@ -1191,7 +1191,7 @@ export async function releaseMemberAccounts(
 }
 
 /**
- * An agent is being deleted (ADR 0080): its login (the account it thinks with, which serves only it) becomes a
+ * An agent is being deleted (ADR 0082): its login (the account it thinks with, which serves only it) becomes a
  * tombstone like one a person removes; the account's other logins stay with their agents. Runs in the caller's
  * transaction; `announceReleasedAccounts` afterwards.
  */

@@ -132,7 +132,7 @@ export const PlanUsage = z
     description: "A plan's usage limits, as the CLI on the computer said them (no token is ever read).",
   });
 
-/** An agent no longer in the team (archived or deleted, ADR 0080): what its messages and reports still show. */
+/** An agent no longer in the team (archived or deleted, ADR 0082): what its messages and reports still show. */
 export const FormerAgent = z
   .object({
     id: z.uuid(),

@@ -570,7 +570,7 @@ export function agentRoutes(deps: AppDeps) {
       security,
       summary: "Archive an agent (or delete it for good with ?purge=true)",
       description:
-        "Deleting (ADR 0080) is permanent and works on archived agents too: its instructions, memory, routines, grants, budget, channels and login on its computer go, its work stops and its DMs close; its messages, usage and audit rows stay, named by a tombstone that frees its handle. Owners and admins.",
+        "Deleting (ADR 0082) is permanent and works on archived agents too: its instructions, memory, routines, grants, budget, channels and login on its computer go, its work stops and its DMs close; its messages, usage and audit rows stay, named by a tombstone that frees its handle. Owners and admins.",
       request: { params: AgentParams, query: z.object({ purge: z.stringbool().optional() }) },
       responses: { 204: noContent[204], ...errors },
     }),

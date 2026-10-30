@@ -50,7 +50,7 @@ export function AgentsScreen() {
     Promise.allSettled([runs.refetch(), dms.refetch(), approvals.refetch(), outages.refetch()]),
   );
   const total = dir.agents.length;
-  // Archived agents have no profile: admins delete them for good from here (ADR 0080).
+  // Archived agents have no profile: admins delete them for good from here (ADR 0082).
   const admin = can(useOrg().org?.role, "manage_agents");
   const archived = (useFormerAgents(orgId).data ?? []).filter((a) => admin && !a.deleted);
   return (
