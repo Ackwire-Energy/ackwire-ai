@@ -188,7 +188,7 @@ export const ownSignInName = (t: TFunction, mine: boolean, computer: string) =>
 /**
  * The plan an agent's sign-in is on, as the CLI said it (`team`, `max`…): its account's, or with none (`account`
  * null) its computer's own sign-in's, from that computer's row of `GET …/ai-accounts`. A seat has its own words
- * under "Responde a todos".
+ * under "Atende outras pessoas".
  */
 export function signInPlan(
   view: { account: string | null; accounts: readonly Pick<MachineAccount, "id" | "plan">[] },

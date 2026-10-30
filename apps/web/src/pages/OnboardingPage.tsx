@@ -383,7 +383,7 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
   const [signedIn, setSignedIn] = useState<typeof planned>({});
   // A computer the person connected: its own sign-in thinks for every agent, unless they pick another account.
   const [own, setOwn] = useState(true);
-  // "Responde a todos" for the agents on a plan: off, each replies only to the person (ADR 0059 §5).
+  // "Atende outras pessoas" for the agents on a plan: off, each answers only the person (ADR 0059 §5).
   const [replyAll, setReplyAll] = useState(false);
   // The workspace key: a provider's key, or the platform key where the server offers one.
   const [draft, setDraft] = useState<KeyDraft>({ provider: "anthropic", apiKey: "" });

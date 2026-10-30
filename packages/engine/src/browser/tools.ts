@@ -1,7 +1,10 @@
 import {
   type AgentScope,
   BROWSER_FAST_PROTOCOL,
+  BROWSER_WARM_PROTOCOL,
   type BrowserBatchCommand,
+  type BrowserSetup,
+  browserSetupOf,
   type MachineReplies,
   type PubSub,
 } from "@agenteschat/adapters";
@@ -38,7 +41,15 @@ import type { JsonSchema } from "../tools/json-schema";
 import { grantedScopeKeys, isAllowed, toolAccess } from "../tools/scopes";
 import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
 import { SHARE_HINT, SHARE_INPUT, shareSavedFile } from "../uploads";
-import { browserOnDesktop, handedBackSince, markPageRead, requirePageRead, waitIfPersonInControl } from "./handoff";
+import {
+  agentUsesScreen,
+  browserOnDesktop,
+  handedBackSince,
+  markPageRead,
+  openHandoffOn,
+  requirePageRead,
+  waitIfPersonInControl,
+} from "./handoff";
 import { type AgentBrowserStatus, agentBrowserStatus, browserUnavailableText } from "./status";
 import {
   type BrowserLink,
@@ -72,6 +83,48 @@ export async function rememberBrowserMachine(db: Database, orgId: string, agentI
         sql`${agents.browserMachineId} is distinct from ${machineId}`,
       ),
     );
+}
+
+/** The agent as its browser requests name it. */
+const scopeOf = (agentId: string, agent: Awaited<ReturnType<typeof getAgentCached>>): AgentScope => ({
+  id: agentId,
+  handle: agent?.handle ?? "agent",
+  ...(agent?.name ? { name: agent.name } : {}),
+});
+
+/**
+ * Starts the agent's Chrome before its next browser command, on the computer that command goes to (protocol 27,
+ * ADR 0040 §11): while a run whose judge chose the browser thinks, or while a person opens the agent's computer.
+ * Only for an agent that may use its browser, on a computer online that serves it, with nobody in control of that
+ * window or asked to take it; on its desktop where its Chrome belongs there. The hub refuses it like any new work
+ * (a paused computer, a held agent or workspace). True when the runner started it.
+ */
+export async function warmAgentBrowser(
+  db: Database,
+  hub: MachineCaller,
+  at: {
+    orgId: string;
+    agentId: string;
+    /** The run's thread: a mission's computer there. */
+    threadRootId?: string;
+    /** The computer, when the caller knows it. */
+    machineId?: string;
+  },
+): Promise<boolean> {
+  const { orgId, agentId, threadRootId } = at;
+  if (!(await agentUsesScreen(db, orgId, agentId))) return false;
+  const mission = !at.machineId && threadRootId ? await missionOfRun({ db, orgId, agentId, threadRootId }) : null;
+  const status = await agentBrowserStatus(db, hub, orgId, agentId, at.machineId ?? mission?.machineId ?? null);
+  if (!status.available || !status.online || status.protocol < BROWSER_WARM_PROTOCOL) return false;
+  if (await openHandoffOn(db, orgId, agentId, "browser")) return false;
+  const agent = await getAgentCached(db, orgId, agentId);
+  const desktop = await browserOnDesktop(db, orgId, agentId, status.machineId);
+  const reply = await hub.call<"browser.warm">(status.machineId, {
+    op: "browser.warm",
+    agent: scopeOf(agentId, agent),
+    ...(desktop ? { desktop: true } : {}),
+  });
+  return reply.started === true;
 }
 
 /**
@@ -377,11 +430,14 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     return agentBrowserStatus(ctx.db, hub, ctx.orgId, ctx.agentId, mission?.machineId ?? null);
   }
 
-  /** The agent's browser for this call: its computer, the agent, its sites (or why it can't be used). */
+  /**
+   * The agent's browser for this call: its computer, the agent, its sites (or why it can't be used), and what the
+   * runner's answers say their commands waited on, summed (`setup`, protocol 27).
+   */
   async function linkFor(
     ctx: ToolContext,
   ): Promise<
-    | { ok: true; link: BrowserLink; status: Extract<AgentBrowserStatus, { available: true }> }
+    | { ok: true; link: BrowserLink; status: Extract<AgentBrowserStatus, { available: true }>; setup: BrowserSetup }
     | { ok: false; text: string }
   > {
     const status = await machineOf(ctx);
@@ -389,10 +445,11 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     if (!hub) return { ok: false, text: "Connected computers are not available on this server." };
     const caller = hub;
     const agent = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
-    const scope: AgentScope = {
-      id: ctx.agentId,
-      handle: agent?.handle ?? "agent",
-      ...(agent?.name ? { name: agent.name } : {}),
+    const scope = scopeOf(ctx.agentId, agent);
+    const setup: BrowserSetup = {};
+    const addSetup = (reply: { setup?: unknown }) => {
+      const s = browserSetupOf(reply.setup) ?? {};
+      for (const key of Object.keys(s) as (keyof BrowserSetup)[]) setup[key] = (setup[key] ?? 0) + (s[key] ?? 0);
     };
     const domains = agent?.browserAllowedDomains ?? null;
     const desktop = await browserOnDesktop(ctx.db, ctx.orgId, ctx.agentId, status.machineId);
@@ -426,6 +483,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
       } catch (error) {
         return { ok: false, text: explain(error, status.machineName) };
       }
+      addSetup(reply);
       await reachedOnce();
       return reply.success ? { ok: true, data: reply.data } : failed(reply.error);
     };
@@ -456,6 +514,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
         } catch (error) {
           return [{ ok: false, text: explain(error, status.machineName) }];
         }
+        addSetup(reply);
         await reachedOnce();
         return reply.answers.map((a) => (a.success ? { ok: true, data: a.data } : failed(a.error)));
       },
@@ -473,7 +532,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
         }
       },
     };
-    return { ok: true, link, status };
+    return { ok: true, link, status, setup };
   }
 
   /** Runs one `agent-browser` command and answers with `done(data)`, or the failure as an error result. */
@@ -556,7 +615,11 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     const f = formatPlanReport(report);
     const content = f.screen ? `${f.summary}\n${wrapPage(f.screen)}` : f.summary;
     const url = report.after?.url ?? null;
-    const timing = { ms: report.ms, steps: report.steps.map((s) => s.ms) };
+    const timing = {
+      ms: report.ms,
+      steps: report.steps.map((s) => s.ms),
+      ...(Object.keys(linked.setup).length > 0 ? { setup: linked.setup } : {}),
+    };
     const data: Record<string, unknown> = {
       ...(url ? { url } : {}),
       ...(options.trail ? { browserTrail: trailOf(report) } : {}),
@@ -1050,9 +1113,10 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     name: "browser",
     async tools(ctx) {
       if (!hub) return [];
-      // Most agents have no browser: the cached grants decide before any machine lookup.
+      // Most agents have no browser: the cached grants decide before any machine lookup. Without them the
+      // gateway keeps these from the agent, and `find_tools` names them as not allowed yet.
       const granted = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
-      if (!definitions.some((t) => isAllowed(toolAccess(granted, t)))) return [];
+      if (!definitions.some((t) => isAllowed(toolAccess(granted, t)))) return definitions;
       const status = await machineOf(ctx);
       if (!status.available) return [];
       // A browser password needs `request_secret`: the computer's tools offer it when the agent may run code

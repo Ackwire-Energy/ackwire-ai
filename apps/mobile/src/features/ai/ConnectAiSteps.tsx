@@ -475,9 +475,9 @@ function InfoCard({
 }
 
 /**
- * "Responde a todos" for the agent a plan's page is for (ADR 0059 §5): on this plan's brain it is the agent's own,
- * changed at once; before the move it waits, and the move carries it (`move`), else the agent starts on its owner
- * alone. `plan`: the plan of the sign-in it thinks with there, an account's or the computer's own.
+ * "Atende outras pessoas" for the agent a plan's page is for (ADR 0059 §5): on this plan's brain it is the agent's
+ * own, changed at once; before the move it waits, and the move carries it (`move`), else the agent starts on its
+ * owner alone. `plan`: the plan of the sign-in it thinks with there, an account's or the computer's own.
  */
 function useReplies(gates: PlanGates, agentId: string | undefined, kind: MachineAccountKind) {
   const { t } = useTranslation();
@@ -527,11 +527,12 @@ function PlanPage(
   const replies = useReplies(gates, agentId, kind);
   const repliesRow = (
     <PlanReplies
+      agent={done?.agent ?? agent?.name ?? ""}
       on={replies.on}
       onChange={(on) => void replies.change(on)}
       brain={kind}
       plan={replies.plan}
-      maker={planOf(choice)?.maker}
+      coding={planOf(choice)}
       disabled={replies.busy}
     />
   );
@@ -631,9 +632,9 @@ function PlanSteps({
   agentId: string;
   agentName: string;
   justReady?: boolean;
-  /** "Responde a todos" switched on before the move: the move says so. */
+  /** "Atende outras pessoas" switched on before the move: the move says so. */
   move: { onlyOwner?: boolean };
-  /** Who the agent replies to, under its steps (`PlanReplies`). */
+  /** Who the agent answers, under its steps (`PlanReplies`). */
   repliesRow: ReactNode;
   /** One more login of the account with this email (`ConnectAiFlowProps.email`). */
   email?: string;

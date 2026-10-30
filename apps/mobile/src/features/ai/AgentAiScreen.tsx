@@ -25,10 +25,10 @@ import { AiRow, Note, PlanReplies, PlanRepliesOf } from "./parts";
 /*
  * An agent's AI on the phone (the web's "Quem pensa" for a plan, ADR 0059), from "Pensa com" on its profile: the
  * account it thinks with on its computer (one of its owner's, or that computer's own sign-in), one row per account,
- * that plan's usage with, at its limit, the owner's other accounts that could think instead, and "Responde a todos".
- * Each choice saves at once. Another AI, or one more login of an account other agents think with where it may have
- * one per agent ("Também usada por Theo"), goes through Connect an AI. Its owner and admins open it; only its owner
- * picks an account or lets other people talk to it on the plan (`canUsePlans`).
+ * that plan's usage with, at its limit, the owner's other accounts that could think instead, and "Atende outras
+ * pessoas". Each choice saves at once. Another AI, or one more login of an account other agents think with where it
+ * may have one per agent ("Também usada por Theo"), goes through Connect an AI. Its owner and admins open it; only its
+ * owner picks an account or lets other people talk to it on the plan (`canUsePlans`).
  */
 
 /** The plan's page Connect an AI opens on for another account of that kind. */
@@ -218,11 +218,12 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                 <GroupedHeader>{t("mobile.ai.audience", g)}</GroupedHeader>
                 {view.canUsePlans ? (
                   <PlanReplies
+                    agent={name}
                     on={!view.onlyOwner}
                     onChange={replyToEveryone}
                     brain={kind}
                     plan={signInPlan(view, row, kind)}
-                    maker={planOf(current?.provider)?.maker}
+                    coding={planOf(current?.provider)}
                     disabled={busy}
                   />
                 ) : (

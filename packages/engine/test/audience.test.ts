@@ -310,7 +310,7 @@ describe("who can talk to the agent", () => {
       code: "audience.only",
     });
 
-    // "Responde a todos": its owner turns it on, nothing to accept, on whatever server.
+    // "Atende outras pessoas": its owner turns it on, nothing to accept, on whatever server.
     expect((await setAgentBrain({ db: f.db }, f.owner.id, f.org.id, f.agent.id, { onlyOwner: false })).onlyOwner).toBe(
       false,
     );

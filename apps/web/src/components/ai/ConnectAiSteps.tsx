@@ -453,7 +453,10 @@ export interface PlanPanelProps {
    * `SetupProgress`'s `said`.
    */
   said?: boolean;
-  /** "Responde a todos" kept by the caller, which saves the computer's own sign-in for every agent itself (the setup). */
+  /**
+   * "Atende outras pessoas" kept by the caller, which saves the computer's own sign-in for every agent itself (the
+   * setup).
+   */
   replies?: { on: boolean; onChange: (on: boolean) => void };
   /** A row of what the person already has signs in here, for the one agent: that sign-in, never the agent's own. */
   login?: ExistingSignIn;
@@ -596,8 +599,8 @@ function PlanSteps({
   const [other, setOther] = useState(false);
   const [ownSaved, setOwnSaved] = useState(false);
   const dir = useDirectory(org.id);
-  // "Responde a todos" (ADR 0059 §5) for whom the panel is: an agent already on this brain shows its own and changes
-  // it at once, one moved onto it starts on its owner alone unless this is on (the move says so).
+  // "Atende outras pessoas" (ADR 0059 §5) for whom the panel is: an agent already on this brain shows its own and
+  // changes it at once, one moved onto it starts on its owner alone unless this is on (the move says so).
   const onBrain = (id: string) => ownSaved || id in assigned || dir.agentById.get(id)?.brain?.kind === kind;
   const repliesNow = (id: string) => {
     const row = dir.agentById.get(id);
@@ -693,17 +696,17 @@ function PlanSteps({
   );
   // The sign-in in play: one just made, the computer's own chosen here, or what the agent already thinks with.
   const signIn = own?.chosen || ownSaved ? OWN_SIGN_IN : view?.brain === kind ? view : undefined;
-  // Who the agents reply to, once for the plan, as its foot: its icon says it, its switch changes it.
+  // Who the agents answer, once for the plan, as its foot: its icon says it, its switch changes it.
   const foot = (
     <div className="ac-card__foot ac-iconline ai-panel__replies">
       <Icon name={replyAll ? "audienceEveryone" : "audienceOwner"} size={14} />
       <PlanReplies
-        all={everyone || everyAgent}
+        agent={everyone || everyAgent ? null : agent.name}
         on={replyAll}
         onChange={(on) => void replyToEveryone(on)}
         brain={kind}
         plan={account?.plan ?? (signIn ? signInPlan(signIn, gates.row, kind) : null)}
-        maker={planOf(choice)?.maker}
+        coding={planOf(choice)}
         disabled={replying}
       />
     </div>

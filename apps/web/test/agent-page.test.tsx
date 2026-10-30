@@ -344,6 +344,50 @@ describe("agent page: inline editing and the save bar", () => {
     expect(saveBar()).toBeNull();
   });
 
+  test("Conectores: 'Ler e escrever' gives every connector full access in one click, saved in one write", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    // A server Ada only reads, beside GitHub, which she doesn't use.
+    const res = await api.customConnectors.connect(ORG_ID, {
+      serverUrl: "https://oauth.suporte.example.com",
+      label: "Suporte",
+      returnTo: "/",
+    });
+    if (res.status !== "connected") throw new Error("expected connected");
+    const server = res.server.id;
+    await api.customConnectors.saveTools(ORG_ID, server, {
+      label: "Suporte",
+      tools: res.server.tools.map((x) => ({ name: x.name, access: x.sensitive ? "approval" : "read", label: x.name })),
+    });
+    await api.access.set(ORG_ID, ADA_ID, {
+      all: false,
+      connectors: {},
+      scopes: [
+        { connectionId: null, scope: "memory:write" },
+        { connectionId: server, scope: `custom:${server}:read` },
+      ],
+      tools: { allow: [], deny: [] },
+    });
+    state.calls.length = 0;
+    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=access`, { api });
+    await settle(8);
+    const level = (name: string) =>
+      within(screen().getByRole("radiogroup", { name: `Nível em ${name}` }))
+        .getAllByRole("radio")
+        .find((r) => r.getAttribute("aria-checked") === "true")?.textContent;
+    expect([level("GitHub"), level("Suporte")]).toEqual(["Sem acesso", "Ler"]);
+    await click(screen().getByRole("button", { name: "Ler e escrever" }));
+    expect([level("GitHub"), level("Suporte")]).toEqual(["Ler e escrever", "Ler e escrever"]);
+    expect(saveBar()?.textContent).toContain("2 alterações");
+    await click(within(saveBar() as HTMLElement).getByRole("button", { name: /^Salvar/ }));
+    await settle(8);
+    const writes = state.calls.filter((c) => c.method === "access.set");
+    expect(writes).toHaveLength(1);
+    const input = writes[0]?.args[2] as { connectors: Record<string, boolean>; scopes: { scope: string }[] };
+    expect(input.connectors).toEqual({ "conn-gh": true, [server]: true });
+    expect(input.scopes.map((g) => g.scope)).toEqual(["memory:write"]);
+  });
+
   test("⌘S saves; an invalid budget blocks it and says why", async () => {
     const { state } = await go("?tab=settings&sec=budget");
     const budget = screen().getByRole("textbox", { name: /^Orçamento mensal/ });

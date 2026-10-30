@@ -19,6 +19,8 @@ export interface SegmentedOption<V extends string> {
 /**
  * A segmented control: one choice of a few, a raised pill slides (spring)
  * under the chosen one. Radio semantics (`radiogroup` / `radio`), arrows move.
+ * A value no option has (several things that differ) shows no choice, and Tab
+ * reaches the first option.
  */
 export function Segmented<V extends string>({
   value,
@@ -37,10 +39,8 @@ export function Segmented<V extends string>({
 }) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const [pill, setPill] = useState<{ x: number; w: number } | null>(null);
-  const index = Math.max(
-    0,
-    options.findIndex((o) => o.value === value),
-  );
+  const chosen = options.findIndex((o) => o.value === value);
+  const index = Math.max(0, chosen);
   // Measured after every render (labels and counts change the width; same values keep the state),
   // and again when the chosen item resizes (fonts loading, a count arriving).
   useLayoutEffect(() => {
@@ -77,7 +77,7 @@ export function Segmented<V extends string>({
         }
       }}
     >
-      {pill && (
+      {pill && chosen >= 0 && (
         <span
           className="ac-seg__pill"
           aria-hidden="true"
@@ -94,7 +94,7 @@ export function Segmented<V extends string>({
           type="button"
           role="radio"
           aria-checked={o.value === value}
-          tabIndex={o.value === value ? 0 : -1}
+          tabIndex={i === index ? 0 : -1}
           className="ac-seg__item"
           data-on={o.value === value || undefined}
           title={o.title}

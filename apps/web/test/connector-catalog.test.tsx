@@ -29,6 +29,17 @@ const filterNames = (cats: HTMLElement) =>
     .getAllByRole("radio")
     .map((b) => b.firstChild?.textContent);
 const pressEsc = (el: Element) => act(async () => fireEvent.keyDown(el, { key: "Escape" }));
+/** A level's radio in the radiogroup named `group`. */
+const levelIn = (inside: HTMLElement, group: string, level: string) =>
+  within(within(inside).getByRole("radiogroup", { name: group })).getByRole("radio", { name: level });
+/** The level checked in each radiogroup named in `groups` (null when none is). */
+const levels = (inside: HTMLElement, groups: string[]) =>
+  groups.map(
+    (group) =>
+      within(within(inside).getByRole("radiogroup", { name: group }))
+        .queryAllByRole("radio")
+        .find((r) => r.getAttribute("aria-checked") === "true")?.textContent ?? null,
+  );
 
 describe("Adicionar conector: one catalog", () => {
   test("even tiles with no tags; suggestions on top; categories with counts and search", async () => {
@@ -100,7 +111,7 @@ describe("Adicionar conector: one catalog", () => {
     expect(notion.textContent).toContain("Buscar e ler páginas");
     expect(notion.textContent).toContain("Um clique: você autoriza na página do serviço");
     // What connecting changes, as one line under what it can do (no heading of its own).
-    expect(notion.textContent).toContain("Nenhum agente usa até você escolher.");
+    expect(notion.textContent).toContain("Ao conectar, todos os agentes podem usar. Você muda isso depois.");
     expect(within(notion).queryByRole("heading", { level: 4, name: "Depois de conectar" })).toBeNull();
     // × goes back to the catalog; another tile opens its own.
     await click(within(notion).getByRole("button", { name: "Fechar detalhe" }));
@@ -180,6 +191,53 @@ describe("Adicionar conector: one catalog", () => {
     expect(names(dialog)).toEqual(["GitHub", "Zapier", "Não achou?"]);
   });
 
+  test("what connecting does to who uses it: a new service is everyone's, again keeps it, a database starts with none", async () => {
+    const api = createFakeApi(seedState());
+    await api.customConnectors.connect(ORG_ID, {
+      serverUrl: "https://oauth.zapier.example/mcp/",
+      label: "Zapier",
+      returnTo: "/",
+    });
+    await renderApp(`/org/${ORG_ID}/settings/connectors`, { api });
+    await settle(8);
+    const catalog = async () => {
+      await click(screen().getByRole("button", { name: "Adicionar conector" }));
+      return screen().getByRole("dialog", { name: "Adicionar conector" });
+    };
+    let dialog = await catalog();
+    const detail = async (tile: string, name: string) => {
+      await click(within(dialog).getByRole("button", { name: tile }));
+      const text = service(name).textContent;
+      await pressEsc(service(name));
+      return text;
+    };
+    const everyone = "Ao conectar, todos os agentes podem usar. Você muda isso depois.";
+    const keeps = "Os agentes mantêm o acesso que já têm. Você muda isso depois.";
+    expect(await detail("Notion", "Notion")).toContain(everyone);
+    expect(await detail("GitHub, conectado", "GitHub")).toContain(keeps);
+    expect(await detail("Zapier, conectado", "Zapier")).toContain(keeps);
+    const database = await detail("Banco de dados", "Banco de dados");
+    expect(database).toContain("Nenhum agente usa até você escolher.");
+    expect(database).not.toContain(everyone);
+
+    // Connecting another account: step 1 says the agents keep what they have.
+    const flow = () => screen().getAllByRole("dialog").at(-1) as HTMLElement;
+    await click(within(dialog).getByRole("button", { name: "GitHub, conectado" }));
+    await click(within(service("GitHub")).getByRole("button", { name: "Conectar GitHub de novo" }));
+    expect(screen().getByRole("dialog", { name: "Conectar GitHub" })).toBe(flow());
+    expect(flow().textContent).toContain("Os agentes mantêm o acesso que já têm. Você muda isso no passo 3.");
+    expect(flow().textContent).not.toContain("todos os agentes podem usar");
+    await click(within(flow()).getByRole("button", { name: "Cancelar" }));
+
+    // By address: the note follows the address typed (a server already connected is connected again).
+    dialog = await catalog();
+    await click(within(dialog).getByRole("button", { name: /Não achou/ }));
+    await click(within(service("Outro serviço")).getByRole("button", { name: "Conectar pelo endereço" }));
+    expect(flow().textContent).toContain("Ao conectar, todos os agentes podem usar. Você muda isso no passo 3.");
+    await type(within(flow()).getByLabelText("Endereço do servidor MCP"), "https://oauth.zapier.example/mcp");
+    expect(flow().textContent).toContain("Os agentes mantêm o acesso que já têm. Você muda isso no passo 3.");
+  });
+
   test("rules: how it connects, search", () => {
     const byId = (id: string) => CATALOG.connectors.find((d) => d.id === id);
     const kind = (id: string) => {
@@ -213,7 +271,7 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     expect(flow().textContent).toContain("Conectar Linear");
     const steps = within(flow()).getByRole("list", { name: "Passos" });
     expect(within(steps).getAllByRole("listitem")[0]?.getAttribute("aria-current")).toBe("step");
-    expect(flow().textContent).toContain("Nada fica disponível para os agentes até o passo 3.");
+    expect(flow().textContent).toContain("Ao conectar, todos os agentes podem usar. Você muda isso no passo 3.");
 
     await click(within(flow()).getByRole("button", { name: "Continuar no Linear" }));
     await settle(4);
@@ -276,22 +334,23 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     });
     expect(saved.tools.every((x) => x.confirmed)).toBe(true);
 
-    // Step 3: one level per agent, with shortcuts for everyone.
+    // Step 3: everyone starts at "Ler e escrever" (the server gave it to every agent); then a level each.
     expect(screen().getByRole("dialog", { name: "Quem pode usar Linear" })).toBeTruthy();
-    await click(within(flow()).getByRole("button", { name: "Todos: Ler" }));
-    await click(
-      within(within(flow()).getByRole("radiogroup", { name: "Nível de Ada" })).getByRole("radio", {
-        name: "Ler e escrever",
-      }),
-    );
+    expect(levels(flow(), ["Nível de todos os agentes", "Nível de Ada", "Nível de Atlas"])).toEqual([
+      "Ler e escrever",
+      "Ler e escrever",
+      "Ler e escrever",
+    ]);
+    await click(levelIn(flow(), "Nível de todos os agentes", "Ler"));
+    await click(levelIn(flow(), "Nível de Ada", "Sem acesso"));
     expect(flow().textContent).toContain("1 ação sempre pede aprovação no chat.");
     await click(within(flow()).getByRole("button", { name: "Liberar" }));
     await settle(8);
     const serverId = state.calls.find((c) => c.method === "customConnectors.saveTools")?.args[1] as string;
     const put = (agentId: string) =>
       state.calls.find((c) => c.method === "access.set" && c.args[1] === agentId)?.args[2] as AccessInput;
-    // "Ler e escrever": the whole connection (sensitive tools still ask).
-    expect(put(ADA_ID).connectors[serverId]).toBe(true);
+    // "Sem acesso": nothing of the server is left.
+    expect(put(ADA_ID).connectors[serverId]).toBeUndefined();
     expect(put(ADA_ID).scopes.some((s) => s.connectionId === serverId)).toBe(false);
     // "Ler": its read scope, nothing else; the agent's other grants stay.
     expect(put(ATLAS_ID).connectors[serverId]).toBeUndefined();
@@ -305,7 +364,68 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     expect(section.textContent).toContain("Ativo");
     expect(section.textContent).toContain("Conectado como mcp.linear.app");
     expect(section.textContent).toContain("4 ferramentas");
-    expect(section.textContent).toContain("2 de 2 agentes");
+    expect(section.textContent).toContain("1 de 2 agentes");
+  });
+
+  test("'Todos os agentes' is a row like an agent's, on top and raised: it sets every agent, and shows none when they differ", async () => {
+    const state = seedState();
+    await renderApp(`/org/${ORG_ID}/settings/connectors`, { api: createFakeApi(state) });
+    await settle(8);
+    await click(screen().getByRole("button", { name: "Quem usa GitHub" }));
+    await settle(4);
+    const flow = screen().getByRole("dialog", { name: "Quem pode usar GitHub" });
+    const everyone = "Nível de todos os agentes";
+    const groups = [everyone, "Nível de Ada", "Nível de Atlas"];
+    // Connected before, and nobody uses it yet.
+    expect(levels(flow, groups)).toEqual(["Sem acesso", "Sem acesso", "Sem acesso"]);
+    const all = within(flow).getByRole("radiogroup", { name: everyone }).closest(".cflow-agent") as HTMLElement;
+    expect(all.classList.contains("cflow-agent--all")).toBe(true);
+    expect(all.textContent).toContain("Todos os agentes");
+    expect(all.textContent).toContain("2 agentes");
+    const ada = within(flow).getByRole("radiogroup", { name: "Nível de Ada" });
+    expect(all.compareDocumentPosition(ada) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(all.contains(ada)).toBe(false);
+
+    await click(levelIn(flow, everyone, "Ler e escrever"));
+    expect(levels(flow, groups)).toEqual(["Ler e escrever", "Ler e escrever", "Ler e escrever"]);
+    await click(levelIn(flow, "Nível de Atlas", "Ler"));
+    expect(levels(flow, groups)).toEqual([null, "Ler e escrever", "Ler"]);
+    await click(within(flow).getByRole("button", { name: "Liberar" }));
+    await settle(8);
+    const put = (agentId: string) =>
+      state.calls.find((c) => c.method === "access.set" && c.args[1] === agentId)?.args[2] as AccessInput;
+    // "Ler e escrever": the whole connection (sensitive tools still ask).
+    expect(put(ADA_ID).connectors["conn-gh"]).toBe(true);
+    expect(put(ATLAS_ID).connectors["conn-gh"]).toBeUndefined();
+    expect(put(ATLAS_ID).scopes.filter((g) => g.connectionId === "conn-gh")).toEqual([
+      { connectionId: "conn-gh", scope: "github:repo.read" },
+    ]);
+  });
+
+  test("a new connection: every agent at 'Ler e escrever', read fresh after connecting, so Liberar only confirms", async () => {
+    // GitHub is connected: the page already read every agent's access, from before the new server.
+    const { state, dialog } = await open(seedState());
+    await click(within(dialog).getByRole("button", { name: /Não achou/ }));
+    await click(within(service("Outro serviço")).getByRole("button", { name: "Conectar pelo endereço" }));
+    const flow = () => screen().getAllByRole("dialog").at(-1) as HTMLElement;
+    await type(within(flow()).getByLabelText("Endereço do servidor MCP"), "https://oauth.suporte.example.com");
+    await type(within(flow()).getByLabelText("Nome"), "Suporte");
+    await click(within(flow()).getByRole("button", { name: "Conectar" }));
+    await settle(4);
+    await click(within(flow()).getByRole("button", { name: "Continuar" }));
+    await settle(4);
+    expect(screen().getByRole("dialog", { name: "Quem pode usar Suporte" })).toBeTruthy();
+    expect(levels(flow(), ["Nível de todos os agentes", "Nível de Ada", "Nível de Atlas"])).toEqual([
+      "Ler e escrever",
+      "Ler e escrever",
+      "Ler e escrever",
+    ]);
+    // Sensitive actions still ask, and the dialog says so.
+    expect(flow().textContent).toContain("1 ação sempre pede aprovação no chat.");
+    await click(within(flow()).getByRole("button", { name: "Liberar" }));
+    await settle(8);
+    expect(state.calls.filter((c) => c.method === "access.set")).toEqual([]);
+    expect(document.body.textContent).toContain("Suporte: 2 agentes podem usar.");
   });
 
   test("ours with an OAuth app: 'Continuar no GitHub' leaves for GitHub and comes back to Conectores", async () => {
@@ -416,7 +536,8 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
 
     await click(within(section()).getByRole("button", { name: "Desconectar Suporte" }));
     const confirm = screen().getByRole("dialog", { name: "Desconectar Suporte?" });
-    expect(confirm.textContent).toContain("Nenhum agente usa agora.");
+    // Connected, it was every agent's.
+    expect(confirm.textContent).toContain("2 agentes perdem o acesso na hora.");
     await click(within(confirm).getByRole("button", { name: "Desconectar" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "customConnectors.disconnect")?.args).toEqual([ORG_ID, res.server.id]);
