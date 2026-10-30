@@ -2695,7 +2695,7 @@ export const ptBR = {
     plans: "Pelo plano, num computador",
     plansHelp: "Claude Code ou Codex com a assinatura de quem conectou o computador. Não usa chave.",
     planOnlyOwner:
-      "No plano, {{article}} {{name}} começa respondendo só a {{owner}}. Dá para liberar para mais gente na página {{of}} {{name}}.",
+      "No plano, {{article}} {{name}} começa atendendo só {{owner}}. Na página {{of}} {{name}}, {{owner}} pode escolher se {{she}} atende outras pessoas.",
     planNotSaved:
       "{{The}} {{name}} já existe, mas não deu para usar o {{brain}} agora. Escolha de novo em Quem pensa, na página {{of}} {{name}}.",
     autoCost: "O custo acompanha cada tarefa",
@@ -2758,8 +2758,8 @@ export const ptBR = {
   },
   members: {
     /** Before inviting, while every agent with an AI answers only the person. */
-    agentsOnlyYou: "Seus agentes só respondem a você.",
-    agentsOnlyYouHint: "Num plano, você pode deixar cada um responder a todos na página dele.",
+    agentsOnlyYou: "Seus agentes só atendem você.",
+    agentsOnlyYouHint: "Num plano, você pode deixar cada um atender outras pessoas na página dele.",
     filters: "Filtrar pessoas",
     roleFilter: "Papel",
     rolesCount_one: "{{count}} papel",
@@ -4673,33 +4673,46 @@ export const ptBR = {
   },
   aiAccounts: {
     share: {
-      /** Off by default: the agent replies only to its owner while it thinks with their plan. */
-      switch: "Responde a todos",
+      /** Off by default: the agent answers only its owner while it thinks with their plan. */
+      switch: "Atende outras pessoas",
       /** The same switch for every agent a plan's panel connects. */
-      switchAll: "Respondem a todos",
+      switchAll: "Atendem outras pessoas",
       /** Off, as someone who isn't the plan's owner sees it. */
-      switchOther: "Só responde a {{name}}",
-      /** Who decides, for someone who isn't the plan's owner. */
-      onOther: "Usa o plano de {{owner}}: só {{owner}} libera para outras pessoas.",
-      /** The line under the switch, and its ⓘ: the plan's terms, in its maker's words, a seat's or a personal plan's. */
-      terms: {
-        line: "Zona cinzenta nos termos do {{provider}}",
-        linePlan: "Zona cinzenta nos termos do plano",
-        own: "Os termos do {{provider}} dizem que o seu plano é para uso próprio. Usar o plano para responder outras pessoas pode ir contra eles.",
-        seat: "Os termos do {{provider}} dizem que cada assento é de uma pessoa. Usar o seu para responder outras pessoas pode ir contra eles.",
-        other:
-          "{{maker}} diz que o plano é só de quem assina. Usar o seu para responder outras pessoas pode ir contra os termos.",
+      switchOther: "Só atende {{owner}}",
+      /** Who decides, for someone who isn't the plan's owner: under the switch, and in "Quem pode falar". */
+      onOther:
+        "{{The}} {{name}} pensa com o plano de {{owner}}. Só {{owner}} pode deixar outras pessoas falarem com {{pronoun}}.",
+      /** Under the switch, by its state: whom the agent answers and on which plan. `*All`: every agent of a panel. */
+      line: {
+        off: "{{The}} {{name}} só atende você, pelo seu {{plan}}.",
+        on: "{{The}} {{name}} atende quem pode falar com {{pronoun}}, pelo seu {{plan}}.",
+        offAll: "Só atendem você, pelo seu {{plan}}.",
+        onAll: "Atendem quem pode falar com eles, pelo seu {{plan}}.",
       },
-      savedEveryone: "Agora {{article}} {{name}} responde a todos.",
-      savedOwner: "{{The}} {{name}} agora só responde a você.",
-      backOnApi: "{{The}} {{name}} voltou a pensar pela API e ainda só responde a você.",
-      letEveryone: "Liberar para todos",
-      letPeople: "Liberar de novo",
-      ownerOnly: "{{The}} {{name}} pensa com o plano de {{owner}}: só {{owner}} libera para mais gente.",
+      /** The line's plan, after "pelo seu": a personal plan, a seat (Team, Enterprise) or a coding plan by its name. */
+      plan: {
+        own: "plano do {{provider}}",
+        seat: "assento do {{provider}}",
+        coding: "plano {{label}}",
+      },
+      /** The line's ⓘ (`about` names it): the plan's terms, in its maker's words, a seat's or a personal plan's. */
+      terms: {
+        about: "os termos do plano",
+        own: "Os planos do {{provider}} são para uso pessoal. Deixar outras pessoas usarem o seu é uma zona cinzenta nos termos do {{provider}}.",
+        seat: "Cada assento do {{provider}} é de uma pessoa só. Deixar outras pessoas usarem o seu é uma zona cinzenta nos termos do {{provider}}.",
+        other:
+          "{{maker}} diz que o plano é só de quem assina. Deixar outras pessoas usarem o seu é uma zona cinzenta nos termos do plano.",
+      },
+      savedEveryone: "Agora {{article}} {{name}} atende outras pessoas.",
+      savedOwner: "{{The}} {{name}} agora só atende você.",
+      backOnApi: "{{The}} {{name}} voltou a pensar pela API e ainda só atende você.",
+      letEveryone: "Deixar {{article}} {{name}} atender todos",
+      letPeople: "Deixar {{article}} {{name}} atender outras pessoas",
       hereNotYours: "Só para agentes de quem conectou o {{computer}}",
     },
     errors: {
-      planOwnerOnly: "Só o responsável por {{agentName}} libera para mais gente: é o plano dessa pessoa que responde.",
+      planOwnerOnly:
+        "Só o responsável por {{agentName}} libera para mais gente: {{agentName}} atende pelo plano dessa pessoa.",
     },
     add: {
       paste: "Colar",

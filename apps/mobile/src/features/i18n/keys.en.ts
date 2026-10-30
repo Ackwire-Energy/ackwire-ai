@@ -1497,7 +1497,7 @@ export const featureKeysEn: FeatureTranslations = {
     taskNoAi: "{{name}} has no AI yet: the task waits until one is connected.",
     connect: "Connect an AI",
     moveHere: "Move it here",
-    audience: "Who {{she}} replies to",
+    audience: "Who {{she}} answers",
     another: "Another AI",
   },
   crash: {

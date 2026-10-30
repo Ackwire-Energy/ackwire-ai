@@ -3544,7 +3544,7 @@ export interface AgentBrain {
   canManageAccounts: boolean;
   /** False while the app on the computer is too old for accounts (nothing about them shows). */
   accountsSupported: boolean;
-  /** Nobody but the agent's owner talks to it ("Responde a todos" off). */
+  /** Nobody but the agent's owner talks to it ("Atende outras pessoas" off). */
   onlyOwner: boolean;
   /** The viewer owns the agent: only they choose its plan and let other people talk to it on one. */
   canUsePlans: boolean;
@@ -3633,7 +3633,9 @@ export interface AgentBrainInput {
   brain?: BrainKind;
   model?: string | null;
   fallback?: boolean;
-  /** "Responde a todos" turned off: false lets in whoever its "who can talk" list allows (everyone with no list). */
+  /**
+   * "Atende outras pessoas" turned off: false lets in whoever its "who can talk" list allows (everyone with no list).
+   */
   onlyOwner?: boolean;
   /** One of the viewer's own accounts; null = "Conta deste computador". */
   account?: string | null;
