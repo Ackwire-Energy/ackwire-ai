@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { artifactRefs } from "../lib/artifacts";
 import { newerSetup } from "../lib/computer";
 import { sendWaits } from "../lib/errors";
+import { LoginReadError, loginReadPasses } from "../lib/machines";
 import {
   allItems,
   matchesFilter,
@@ -2110,13 +2111,28 @@ export const useAiAccounts = (orgId: string, enabled = true, pollMs: number | fa
   });
 };
 
-/** ADR 0041 §2: a sign-in on the computer, asked every 2 s until it ends (done, failed or expired). */
+/**
+ * ADR 0041 §2: a sign-in on the computer, asked every 2 s until it ends (done, failed or expired), through failed
+ * reads too (`loginRead` says how long they may last).
+ */
 export const useAccountLogin = (orgId: string, machineId: string, loginId: string | null) => {
   const api = useApi();
   return useQuery({
     queryKey: keys.accountLogin(orgId, machineId, loginId ?? ""),
-    queryFn: () => api.machines.accountLogin(orgId, machineId, loginId ?? ""),
+    queryFn: async ({ client, queryKey }) => {
+      try {
+        return await api.machines.accountLogin(orgId, machineId, loginId ?? "");
+      } catch (error) {
+        if (!loginReadPasses(error)) throw error;
+        // The read before this one failed too: the run goes on from its first.
+        const before = client.getQueryState(queryKey)?.error;
+        throw new LoginReadError(error, before instanceof LoginReadError ? before.since : Date.now());
+      }
+    },
     enabled: loginId !== null,
+    // Waiting from its start. With data, a read keeps the last error until an answer clears it, so a run of failed
+    // reads adds up, and the block never drops back to loading meanwhile.
+    initialData: loginId === null ? undefined : { state: "waiting" },
     retry: false,
     refetchInterval: (q) => (q.state.data && q.state.data.state !== "waiting" ? false : 2000),
     // The person is on Claude's page in another tab meanwhile.

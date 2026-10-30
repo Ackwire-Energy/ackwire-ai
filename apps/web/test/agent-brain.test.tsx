@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import type { AgentBrain, BrowserUnavailableReason, Machine, MachineAccount, PlanUsage } from "@agenteschat/client";
+import { ApiError, keys } from "@agenteschat/client";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -10,7 +11,10 @@ import { ADA_ID, createFakeApi, fakeAgentBrain, fakeBrowserOf, fakeMachinesOf, O
 import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  setSystemTime();
+});
 
 const click = async (el: Element) => {
   await act(async () => fireEvent.click(el));
@@ -22,9 +26,9 @@ const callOrder = (state: ReturnType<typeof seedState>) =>
   state.calls.map((c) => c.method).filter((m) => m === "sandbox.setTarget" || m === "agents.setBrain");
 
 async function open(state = seedState(), api = createFakeApi(state)) {
-  await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}`, { api });
+  const { services } = await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}`, { api });
   await settle(8);
-  return { state, api };
+  return { state, api, services };
 }
 /** "Como trabalha" under the name: where, who thinks, the browser. */
 const sentence = () => screen().getByRole("region", { name: "Como trabalha" });
@@ -250,8 +254,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
     api.agents.brain = async () =>
       fakeAgentBrain(ADA_ID, { brain: "claude_code", effectiveModel: "sonnet", accounts: [work], ...patch });
-    await open(state, api);
-    return { state, api };
+    return open(state, api);
   }
 
   test("the cell names the account when the computer has more than one; Usar saves the account and the effort", async () => {
@@ -721,6 +724,54 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
     expect(brainCalls(state).at(-1)).toEqual({ brain: "codex", model: null, fallback: true, account: "acct_codex" });
+  });
+
+  test("Adicionar conta (ChatGPT) while the server restarts: Reconectando, never a failure, then the account, one sign-in", async () => {
+    const codex: MachineAccount = { ...work, id: "acct_codex", kind: "codex", label: "Pessoal", plan: "Plus" };
+    const start = Date.now();
+    setSystemTime(new Date(start));
+    const { state, api, services } = await onMac({ brain: "codex", effectiveModel: "gpt-6-sol", accounts: [] });
+    const d = await brainDialog();
+    await pick(d, "Conta do ChatGPT", /^Adicionar conta/);
+    await settle(8);
+    const block = within(d).getByRole("region", { name: "Adicionar conta do ChatGPT" });
+    const realOpen = window.open;
+    window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
+    try {
+      await click(within(block).getByRole("button", { name: "Entrar com ChatGPT" }));
+      await settle(8);
+    } finally {
+      window.open = realOpen;
+    }
+    const read = api.machines.accountLogin;
+    const ask = async (after: number, error?: Error) => {
+      setSystemTime(new Date(start + after));
+      api.machines.accountLogin = error
+        ? async () => {
+            throw error;
+          }
+        : read;
+      const poll = keys.accountLogin(ORG_ID, "machine_1", "login_1");
+      await act(() => services.queryClient.invalidateQueries({ queryKey: poll }));
+      await settle(6);
+    };
+    // No answer, then only the proxy's, then the computer still reconnecting, for 20 s.
+    for (const [after, error] of [
+      [3_000, new TypeError("Failed to fetch")],
+      [10_000, new ApiError(502, "http_502", "Bad Gateway")],
+      [20_000, new ApiError(409, "machine.offline", "The computer MacBook is offline.")],
+    ] as const) {
+      await ask(after, error);
+      expect(shownText(block)).toContain("Reconectando…");
+      expect(d.textContent).not.toMatch(/Não deu para entrar|não respondeu/);
+    }
+    // The sign-in went on there meanwhile.
+    fakeMachinesOf.get(api)?.endLogin("login_1", { state: "done", account: codex });
+    await ask(22_000);
+    expect(d.textContent).toContain("A conta Pessoal entrou no MacBook. Clique em Usar para salvar.");
+    expect(d.textContent).not.toMatch(/Não deu para entrar|não respondeu/);
+    expect(state.calls.filter((c) => c.method === "machines.beginAccountLogin")).toHaveLength(1);
+    expect(state.calls.some((c) => c.method === "machines.cancelAccountLogin")).toBe(false);
   });
 });
 

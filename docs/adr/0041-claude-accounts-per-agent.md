@@ -1,6 +1,6 @@
 # 0041. Claude and Codex accounts on a connected computer, chosen per agent; effort per agent
 
-- Status: Accepted (2026-10-20). Superseded in part by ADR 0059 (§2 who adds accounts, §4 who decides, §7 removing)
+- Status: Accepted (2026-10-20). Superseded in part by ADR 0059 (§2 who adds accounts, §4 who decides, §7 removing). Amended 2026-10-30: §2.7 (a sign-in through a restart of the server or a reconnect of its computer)
 - Date: 2026-10-20
 - Extends: ADR 0025 (connected computers), ADR 0027 (secrets, end to end), ADR 0032 (Claude Code and Codex as brains), ADR 0036 (desktop app)
 - Out of scope for now: cloud computers, switching accounts by itself when a plan runs out
@@ -44,6 +44,7 @@ What the CLIs do (checked 2026-10-20, Claude Code 2.1.304, Codex 0.163.0):
 4. The runner watches the CLI. When it exits signed in, it runs the status command in that folder and answers with metadata only: email and plan. The server stores the account and tells the page (realtime), which picks it.
 5. A sign-in expires in 15 minutes; the process is killed and the folder removed.
 6. **Entrar de novo** on a signed-out account signs in again to that same account (`begin` with `again`): same id and folder, the agents keep it, and a failed retry leaves the folder as it was.
+7. *Amended 2026-10-30:* the page asks for the sign-in's status every 2 s. A read can fail while our server restarts or the computer's runner reconnects (no answer, the proxy's 502 to 504 or 520 to 524, `machine.offline`, `machine.timeout`), yet the sign-in goes on: the runner keeps its logins across a reconnect, and the server keeps the `signing_in` row. Such a read shows **Reconectando…** where the steps wait, and the page keeps asking. Only after 60 s of failed reads in a row, counted from the first (`LOGIN_RECONNECT_MS`; after a drop the runner dials again 1, 2, 4, 8 and 16 s apart, ±20 %, so after a restart of up to 25 s it is back within 37 s), does the sign-in fail, saying the computer didn't answer, with Tentar de novo. Counting from the first failure, not the last answer, keeps a page back from the background (a phone, an idle tab) from failing for the time it spent there. Any other failed read, and what the computer reports (the CLI exited without signing in, the code was wrong, the time ran out), shows at once, and an answer after the failure picks the same sign-in up again. A place that hides the steps while their computer is offline (Connect an AI, the setup's AI step) keeps them while a sign-in is under way, so the same login is watched again when the computer is back: none is restarted or started twice. Web and phone share it (`loginRead` and `useAccountLogin` in `@agenteschat/client`).
 
 From the desktop app the same op runs locally: the CLI opens the computer's browser and finishes by itself.
 

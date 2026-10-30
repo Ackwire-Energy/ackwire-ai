@@ -1977,6 +1977,7 @@ export const en: Translations = {
           deviceCodeText: "Type this code on the page that opens.",
           starting: "Asking {{computer}}…",
           waiting: "Waiting",
+          reconnecting: "Reconnecting…",
           failed: "Couldn't sign in to that account. Try again.",
           expired: "The time to sign in ran out. Try again.",
           duplicate: {

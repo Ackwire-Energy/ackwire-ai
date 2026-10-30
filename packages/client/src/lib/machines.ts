@@ -8,7 +8,7 @@ import type {
   MachineFolderGrant,
   MachineToolName,
 } from "../api/types";
-import { errorCode } from "./errors";
+import { errorCode, sendWaits } from "./errors";
 
 /**
  * Connected computers (ADR 0025, ADR 0036): the device code, the commands the
@@ -224,3 +224,44 @@ export function freeDuplicate(status: AccountLoginStatus | undefined): MachineAc
  */
 export const otherThanHint = (hint: string | null | undefined, account: Pick<MachineAccount, "email">): boolean =>
   Boolean(hint && account.email && account.email.toLowerCase() !== hint.toLowerCase());
+
+/**
+ * How long a sign-in's status reads may keep failing before it fails: a server restart and the runner's reconnect,
+ * which dials again 1, 2, 4, 8 and 16 s apart (`backoffDelay` in the runner, ±20 %), so after a restart of up to 25 s
+ * it is back within 37 s.
+ */
+export const LOGIN_RECONNECT_MS = 60_000;
+
+/** A read of a sign-in's status that failed while the server restarts or the computer reconnects. */
+export const loginReadPasses = (error: unknown) => {
+  const code = errorCode(error);
+  return sendWaits(error) || code === "machine.offline" || code === "machine.timeout";
+};
+
+/**
+ * A read that failed in a way that passes (`loginReadPasses`), and when this run of failed reads began: counted from
+ * its first failure, so a page back from the background isn't failed by the time it spent there.
+ */
+export class LoginReadError extends Error {
+  constructor(
+    cause: unknown,
+    readonly since: number,
+  ) {
+    super("The sign-in can't be read for now", { cause });
+    this.name = "LoginReadError";
+  }
+}
+
+/** Where reading a sign-in's status stands (`loginRead`); null while it reads. */
+export type LoginRead = "reconnecting" | "noAnswer" | "failed" | null;
+
+/**
+ * `reconnecting` while the reads fail in a way that passes, up to `LOGIN_RECONNECT_MS` from the first of them;
+ * `noAnswer` past that; `failed` at once on any other error. The sign-in goes on on the computer meanwhile, and the
+ * next answer picks it up.
+ */
+export function loginRead(status: { isError: boolean; error: unknown; errorUpdatedAt: number }): LoginRead {
+  if (!status.isError) return null;
+  if (!(status.error instanceof LoginReadError)) return "failed";
+  return status.errorUpdatedAt - status.error.since < LOGIN_RECONNECT_MS ? "reconnecting" : "noAnswer";
+}

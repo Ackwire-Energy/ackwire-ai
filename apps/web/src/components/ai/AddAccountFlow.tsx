@@ -1,6 +1,13 @@
 import type { AccountLoginStart, AccountLoginStatus, MachineAccount, MachineAccountKind } from "@agenteschat/client";
 import { keys, useAccountLogin, useApi } from "@agenteschat/client";
-import { beginLogin, freeDuplicate, isSignInCode, otherThanHint } from "@agenteschat/client/lib/machines";
+import {
+  beginLogin,
+  freeDuplicate,
+  isSignInCode,
+  type LoginRead,
+  loginRead,
+  otherThanHint,
+} from "@agenteschat/client/lib/machines";
 import { type PlanId, planKeyFits, planOf } from "@agenteschat/client/lib/plans";
 import { accountCodeAad, sealSecret } from "@agenteschat/client/lib/secret-box";
 import { Button, cx, Icon, InfoHint, Input, ProviderLogo, SettingNote } from "@agenteschat/ui";
@@ -22,8 +29,10 @@ import { openPopup, sendPopup } from "@/lib/popup";
  * its own key page, then the key, sealed the same way; it never reaches our
  * server. "Colar" shows only while the field is empty. Every start is a click,
  * never the block showing. The page asks every 2 s; Voltar or closing stops
- * the sign-in on the computer. One key can go to several logins at once
- * (`fanOut`): each is begun, sealed to and watched on its own.
+ * the sign-in on the computer. Reads that fail while the server restarts or
+ * the computer reconnects say Reconnecting, and the same sign-in goes on
+ * (`loginRead`). One key can go to several logins at once (`fanOut`): each is
+ * begun, sealed to and watched on its own.
  */
 
 /** Where ChatGPT allows signing in with a code (Settings › Security): Codex's device sign-in needs it. */
@@ -68,6 +77,11 @@ export interface AddAccountProps {
   onSent?: () => void;
   /** A `fanOut` target's login ended without signing in (failed or expired). */
   onFailed?: (target: string) => void;
+  /**
+   * Whether a sign-in begun here may still finish on the computer: a place that hides this block while its computer
+   * is offline keeps it meanwhile, so the same sign-in goes on once it's back.
+   */
+  onSigningIn?: (on: boolean) => void;
 }
 
 export function AddAccount(props: AddAccountProps) {
@@ -181,6 +195,7 @@ function AddAccountFlow({
   onUse,
   onSent,
   onFailed,
+  onSigningIn,
   onRetry,
 }: AddAccountProps & { onRetry: () => void }) {
   const { t } = useTranslation();
@@ -204,6 +219,9 @@ function AddAccountFlow({
   // The logins a key went to (`fanOut`), and the first of them that didn't end signed in.
   const [fan, setFan] = useState<{ id: string; loginId: string }[]>([]);
   const [fanFailed, setFanFailed] = useState<AccountLoginStatus | null>(null);
+  // Of those, the ones whose reads fail for now, and whether one went unanswered past waiting for it (`loginRead`).
+  const [fanAway, setFanAway] = useState<string[]>([]);
+  const [fanSilent, setFanSilent] = useState(false);
   const fanned = useRef<{ id: string; loginId: string }[]>([]);
   const fanEnded = useRef(new Set<string>());
   // The sign-ins still running and the computer each started on, where they're stopped when this block goes away:
@@ -220,6 +238,7 @@ function AddAccountFlow({
   }, [headed]);
   const status = useAccountLogin(org.id, machineId, login?.loginId ?? null);
   const result = status.data;
+  const read = loginRead(status);
 
   const begin = async (popup?: Window | null): Promise<AccountLoginStart | null> => {
     setStarting(true);
@@ -259,6 +278,12 @@ function AddAccountFlow({
     };
   }, []);
 
+  const begun = login !== null || fan.length > 0;
+  useEffect(() => {
+    onSigningIn?.(begun);
+    return () => onSigningIn?.(false);
+  }, [begun, onSigningIn]);
+
   useEffect(() => {
     if (!result || result.state === "waiting" || !login) return;
     // Ended on the computer: nothing left to stop.
@@ -270,11 +295,13 @@ function AddAccountFlow({
     }
   }, [result, login, hint, onAdded]);
 
-  /** One login a key went to (`fanOut`) ended on the computer. */
-  const fanEnd = (loginId: string, end: AccountLoginStatus) => {
+  /** One login a key went to (`fanOut`) ended on the computer, or its reads failed (`read`). */
+  const fanEnd = (loginId: string, end: AccountLoginStatus, read?: LoginRead) => {
     if (fanEnded.current.has(loginId)) return;
     fanEnded.current.add(loginId);
-    running.current = running.current.filter((r) => r.loginId !== loginId);
+    // Ended there: nothing left to stop. Unread, it may still run there, so leaving or "Tentar de novo" stops it.
+    if (!read) running.current = running.current.filter((r) => r.loginId !== loginId);
+    if (read === "noAnswer") setFanSilent(true);
     const target = fanned.current.find((f) => f.loginId === loginId)?.id;
     if (end.state === "done" && end.account) onAdded(end.account, target);
     else {
@@ -283,8 +310,19 @@ function AddAccountFlow({
     }
   };
 
+  /** What a `fanOut` login's reads say: its end on the computer, reads failing for now, or for good. */
+  const fanRead = (loginId: string, end: AccountLoginStatus | undefined, read: LoginRead) => {
+    const away = read === "reconnecting";
+    setFanAway((ids) =>
+      ids.includes(loginId) === away ? ids : away ? [...ids, loginId] : ids.filter((id) => id !== loginId),
+    );
+    if (end && end.state !== "waiting") fanEnd(loginId, end);
+    else if (read === "noAnswer" || read === "failed") fanEnd(loginId, { state: "failed" }, read);
+  };
+
   const shown = fanFailed ?? result;
-  const ended = startFailed || status.isError || shown?.state === "failed" || shown?.state === "expired";
+  const noAnswer = startFailed || read === "noAnswer" || fanSilent;
+  const ended = noAnswer || read === "failed" || shown?.state === "failed" || shown?.state === "expired";
 
   /** The code or the plan's key, sealed here to the computer's key for a sign-in. */
   const seal = async (l: AccountLoginStart | null, text: string) => {
@@ -360,7 +398,9 @@ function AddAccountFlow({
   const waiting = (
     <span className="agp-addacct__wait" role="status">
       <Icon name="spinner" size={14} />
-      {t("agentPage.work.brain.add.waiting")}
+      {read === "reconnecting" || fanAway.length > 0
+        ? t("agentPage.work.brain.add.reconnecting")
+        : t("agentPage.work.brain.add.waiting")}
     </span>
   );
   const keyHintId = `${codeId}-hint`;
@@ -413,7 +453,7 @@ function AddAccountFlow({
   const otherEmail = other?.email ?? (hint ? shown?.signedInAs : undefined);
   const why = otherEmail
     ? t(`connectAi.otherAccount.${kind}`, { email: otherEmail, account: hint })
-    : startFailed
+    : noAnswer
       ? t("agentPage.work.brain.add.startFailed", { computer })
       : shown?.state === "expired"
         ? t("agentPage.work.brain.add.expired")
@@ -625,26 +665,26 @@ function AddAccountFlow({
         steps
       )}
       {fan.map((f) => (
-        <LoginWatch key={f.loginId} machineId={machineId} loginId={f.loginId} onEnd={fanEnd} />
+        <LoginWatch key={f.loginId} machineId={machineId} loginId={f.loginId} onRead={fanRead} />
       ))}
     </section>
   );
 }
 
-/** One login a key went to, asked about every 2 s until it ends on the computer. */
+/** One login a key went to, asked about every 2 s until it ends on the computer or its reads fail for good. */
 function LoginWatch({
   machineId,
   loginId,
-  onEnd,
+  onRead,
 }: {
   machineId: string;
   loginId: string;
-  onEnd: (loginId: string, end: AccountLoginStatus) => void;
+  onRead: (loginId: string, end: AccountLoginStatus | undefined, read: LoginRead) => void;
 }) {
   const { org } = useOrg();
-  const end = useAccountLogin(org.id, machineId, loginId).data;
-  useEffect(() => {
-    if (end && end.state !== "waiting") onEnd(loginId, end);
-  }, [end, loginId, onEnd]);
+  const status = useAccountLogin(org.id, machineId, loginId);
+  const end = status.data;
+  const read = loginRead(status);
+  useEffect(() => onRead(loginId, end, read), [end, read, loginId, onRead]);
   return null;
 }
