@@ -27,6 +27,8 @@ export function useAgentsAccess(agents: Agent[], enabled = true) {
   return {
     byAgent,
     loading: queries.some((q) => q.isLoading),
+    /** Some tree is being read again (cached ones may be from before a change on the server). */
+    fetching: queries.some((q) => q.isFetching),
     /** The server has no access API (404). */
     unavailable: queries.some((q) => (q.error as { status?: number } | null)?.status === 404),
   };

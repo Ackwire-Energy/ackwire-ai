@@ -1,5 +1,6 @@
 import type { Agent, Member, Message } from "@agenteschat/client";
-import { useAgents, useMembers } from "@agenteschat/client";
+import { useAgents, useFormerAgents, useMembers } from "@agenteschat/client";
+import { formerById } from "@agenteschat/client/lib/directory";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -7,9 +8,13 @@ import { useTranslation } from "react-i18next";
 export function useDirectory(orgId: string) {
   const { t } = useTranslation();
   const agents = useAgents(orgId);
+  const former = useFormerAgents(orgId);
   const members = useMembers(orgId);
   return useMemo(() => {
     const agentById = new Map<string, Agent>((agents.data ?? []).map((a) => [a.id, a]));
+    const gone = formerById(former.data);
+    /** The team's agent, or one no longer in it (archived or deleted): what it left still names it. */
+    const anyAgent = (id: string) => agentById.get(id) ?? gone.get(id);
     const agentByHandle = new Map<string, Agent>((agents.data ?? []).map((a) => [a.handle.toLowerCase(), a]));
     // The uploaded photo wins over the sign-in image (`image` is what every avatar reads).
     const people = (members.data ?? []).map((m) => (m.avatarUrl ? { ...m, image: m.avatarUrl } : m));
@@ -19,7 +24,7 @@ export function useDirectory(orgId: string) {
     );
     const authorName = (author: Message["author"]) =>
       author.type === "agent"
-        ? (agentById.get(author.id ?? "")?.name ?? t("channel.unknownAgent"))
+        ? (anyAgent(author.id ?? "")?.name ?? t("channel.unknownAgent"))
         : (memberById.get(author.id ?? "")?.name ?? t("channel.unknownPerson"));
     // Agents sharing a first letter get two (Ada "A", Atlas "At").
     const initials = new Map<string, string>();
@@ -38,6 +43,7 @@ export function useDirectory(orgId: string) {
       agents: agents.data ?? [],
       members: people,
       agentById,
+      anyAgent,
       agentByHandle,
       memberById,
       memberByHandle,
@@ -46,5 +52,5 @@ export function useDirectory(orgId: string) {
       agentInitials,
       loading: agents.isPending || members.isPending,
     };
-  }, [agents.data, members.data, agents.isPending, members.isPending, t]);
+  }, [agents.data, former.data, members.data, agents.isPending, members.isPending, t]);
 }

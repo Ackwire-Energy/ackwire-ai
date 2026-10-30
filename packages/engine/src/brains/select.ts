@@ -85,9 +85,9 @@ export interface BrainUnavailability {
 }
 
 /**
- * Why a computer brain can't take the turn now (null: it can): no computer,
- * someone else's plan, offline, paused by its owner, commands off, a runner older than protocol 8,
- * the CLI missing or not logged in (`hello.executors`), or over the plan limit.
+ * Why a computer brain can't take the turn now (null: it can): no computer, the computer's own sign-in on a
+ * computer nobody connected, someone else's plan, offline, paused by its owner, commands off, a runner older
+ * than protocol 8, the CLI missing or not logged in (`hello.executors`), or over the plan limit.
  */
 export function computerBrainUnavailable(
   kind: BrainKind,
@@ -102,6 +102,15 @@ export function computerBrainUnavailable(
   if (kind === "model") return null;
   const name = kind === "codex" ? "Codex" : "Claude Code";
   if (!machineId) return { code: "no_computer", message: `The agent has no computer for ${name}.` };
+  // The computer's own sign-in thinks only for agents of whoever connected the computer (ADR 0059 §3): on one
+  // nobody connected, no person signs in at its terminal, so for its agents it isn't signed in.
+  if (!account && status?.pairedByUserId === null) {
+    const plan = kind === "codex" ? "ChatGPT" : "Claude";
+    return {
+      code: "not_logged_in",
+      message: `${name} isn't signed in on ${status.name}. Connect a ${plan} account on the agent's page.`,
+    };
+  }
   if (!ownersPlan) {
     return {
       code: "plan_not_owner",

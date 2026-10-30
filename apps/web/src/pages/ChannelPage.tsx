@@ -18,6 +18,7 @@ import type {
   ThreadInfo,
 } from "@agenteschat/client";
 import {
+  ApiError,
   agentStateOfRun,
   browserHandoffOf,
   browserTrailOf,
@@ -40,6 +41,8 @@ import {
   useAiStatus,
   useApproval,
   useApprovals,
+  useArchiveChannel,
+  useChannelCategories,
   useChannelMembers,
   useChannels,
   useChannelThreads,
@@ -51,6 +54,7 @@ import {
   useMessages,
   useMissionControl,
   useModels,
+  usePlaceChannel,
   usePostMessage,
   useRoster,
   usesBrowser,
@@ -105,6 +109,7 @@ import { contextMarks, hiddenByThreads, rangeCandidates, threadStartOf } from "@
 import { buildTimeline, groupsWith, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
 import { splitCanceled } from "@agenteschat/client/lib/work";
 import {
+  AffixInput,
   Avatar,
   Button,
   Composer,
@@ -114,13 +119,17 @@ import {
   cx,
   DayDivider,
   Dialog,
+  DialogBody,
   DialogFooter,
   DialogSearchList,
   EmptyState,
+  Field,
   FORMAT_KINDS,
   type FormatKind,
   Icon,
   type IconName,
+  Input,
+  isIdHandle,
   Kbd,
   Mention,
   Menu,
@@ -182,6 +191,7 @@ import { HeldBrowserCard, RunBrowserCard, useHeldTakeover } from "@/components/b
 import { BrowserHandoffCard } from "@/components/browser/BrowserHandoffCard";
 import { BrowserTrailCard } from "@/components/browser/BrowserTrailCard";
 import { requestBrowserCard } from "@/components/browser/open";
+import { CategorySelect } from "@/components/ChannelCategoryDialogs";
 import { ChannelDetailsButton, ChannelMembersStack } from "@/components/ChannelMembers";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
 import { NoticeLine, RoutineReport, RoutineTag } from "@/components/ChatNotices";
@@ -220,6 +230,7 @@ import {
 import { MissionCommandCard } from "@/components/missions/MissionCommandCard";
 import { NewMissionDialog } from "@/components/missions/MissionDialogs";
 import { NavToggle } from "@/components/NavDrawer";
+import { CHANNEL_NAME, toChannelName } from "@/components/NewChannelDialog";
 import { KeyGuardDialog, NoAiBanner, NoAiCard, useNoAiAutoOpen } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
 import { ProfileTrigger } from "@/components/ProfileCard";
@@ -244,6 +255,7 @@ import { BarPhrase, ConsultClock, WorkingStack } from "@/components/WorkingLine"
 import { useDirectory } from "@/hooks/useDirectory";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
+import { onChannelDetails, takeChannelDetails } from "@/lib/channel-details";
 import { useDocumentTitle } from "@/lib/desktop";
 import { reportPainted } from "@/lib/perf";
 import { useToast } from "@/lib/toast";
@@ -594,6 +606,15 @@ function ChannelView({
     if (draftKey) clearDraft(draftKey);
   }, [draftKey]);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  // "Editar canal" from the sidebar's right click: the details open once this channel shows.
+  useEffect(() => {
+    if (chrome?.header) return;
+    const open = () => {
+      if (takeChannelDetails(channel.id)) setDetailsOpen(true);
+    };
+    open();
+    return onChannelDetails(open);
+  }, [channel.id, chrome?.header]);
   // An agent mentioned from outside the channel: offer to add it.
   const [offer, setOffer] = useState<string | null>(null);
   const mentionSearch = useMentionSearch(members.data);
@@ -619,6 +640,8 @@ function ChannelView({
         .filter((a): a is Agent => Boolean(a)),
     [members.data, dir.agentById],
   );
+  // What the channel suggests goes to an agent people can read: one whose handle is an id only when every agent's is.
+  const suggestedAgent = channelAgents.find((a) => !isIdHandle(a.handle)) ?? channelAgents[0];
   const channelPeople = useMemo(
     () =>
       (members.data ?? [])
@@ -1118,8 +1141,8 @@ function ChannelView({
         ))}
       </>
     ) : undefined;
-  // "/" commands, for the DM agent or the channel's first agent.
-  const commandAgent = dmAgent ?? channelAgents[0];
+  // "/" commands, for the DM agent or the channel's suggested agent.
+  const commandAgent = dmAgent ?? suggestedAgent;
   const navigateTo = useNavigate();
   const commandPrefix = dmAgent || !commandAgent ? "" : `@${commandAgent.handle} `;
   const cg = agentGrammar(t, commandAgent?.name ?? "");
@@ -1439,10 +1462,13 @@ function ChannelView({
     openUnseen();
   }, [unseenFrom]);
   const emptySuggestions = useMemo(() => {
-    if (chrome?.suggestions) return chrome.suggestions;
-    const first = channelAgents[0];
-    return first ? greetingSuggestions(t, first.role).map((s) => `@${first.handle} ${s}`) : [];
-  }, [chrome?.suggestions, channelAgents, t]);
+    if (chrome?.suggestions) return chrome.suggestions.map((text) => ({ label: text, text }));
+    const a = suggestedAgent;
+    // The chip names the agent as a sent message shows its mention; the text keeps the handle.
+    return a
+      ? greetingSuggestions(t, a.role).map((s) => ({ label: `@${a.name} ${s}`, text: `@${a.handle} ${s}` }))
+      : [];
+  }, [chrome?.suggestions, suggestedAgent, t]);
 
   // "Ajustar trecho": the channel's messages that can be in the range (and the moved ones, back in
   // their place), with the selection band in place of the timeline and its bar in place of the composer.
@@ -1684,14 +1710,14 @@ function ChannelView({
                               <legend className="ac-visually-hidden">{t("chat.suggestions")}</legend>
                               {emptySuggestions.map((s) => (
                                 <Button
-                                  key={s}
+                                  key={s.text}
                                   size="sm"
                                   onClick={() => {
-                                    setDraft(s);
+                                    setDraft(s.text);
                                     composer.current?.focus();
                                   }}
                                 >
-                                  {s}
+                                  {s.label}
                                 </Button>
                               ))}
                             </fieldset>
@@ -1911,7 +1937,7 @@ function ChannelView({
                 onOpenChange={(o) => !o && setMissionDraft(null)}
                 initialGoal={missionDraft}
                 initialChannelId={chrome?.dmAgentId ? undefined : channel.id}
-                initialAgentId={channelAgents[0]?.id}
+                initialAgentId={suggestedAgent?.id}
               />
             )}
           </Tag>
@@ -2943,11 +2969,11 @@ export const TimelineMessage = memo(function TimelineMessage({
       avatar={
         m.author.id ? (
           <ProfileTrigger actor={{ type: m.author.type, id: m.author.id }} label={t("profile.of", { name })} decorative>
-            {agent ? (
-              // At work: thinking, then writing; a saved message: the agent at rest.
+            {m.author.type === "agent" ? (
+              // At work: thinking, then writing; a saved message: the agent at rest (one no longer in the team too).
               // A person's 👍/👎 on this message plays a face on it (`applyReactions`).
               <AgentAvatar
-                agentId={agent.id}
+                agentId={m.author.id}
                 name={name}
                 state={live ? agentStateOfRun(live) : "idle"}
                 reactionKey={live ? undefined : m.id}
@@ -3353,6 +3379,16 @@ function ChannelDetails({
   const update = useUpdateChannel(org.id, channel.id);
   // The channel's creator may too, but the API doesn't say who created it yet: admins only.
   const editable = can(org.role, "configure");
+  const navigate = useNavigate();
+  const toast = useToast();
+  const categories = useChannelCategories(org.id);
+  const place = usePlaceChannel(org.id);
+  const archive = useArchiveChannel(org.id);
+  // Name: saved on blur or Enter, like the description.
+  const [name, setName] = useState(channel.name);
+  const [nameError, setNameError] = useState<string | undefined>();
+  const categoryName =
+    categories.data?.find((c) => c.id === channel.categoryId)?.name ?? t("channelCategories.noCategory");
   const [q, setQ] = useState("");
   const [topic, setTopic] = useState(channel.topic);
   const [saved, setSaved] = useState(false);
@@ -3361,6 +3397,11 @@ function ChannelDetails({
   const [removing, setRemoving] = useState<{ kind: "person" | "agent"; id: string; name: string } | null>(null);
   // The last description sent: blur and close both save, and closing with the X does both.
   const sentTopic = useRef<string | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    setName(channel.name);
+    setNameError(undefined);
+  }, [open, channel.name]);
   useEffect(() => {
     if (!open) return;
     setTopic(channel.topic);
@@ -3385,6 +3426,54 @@ function ChannelDetails({
       },
     );
   };
+  const saveName = () => {
+    if (!editable || name === channel.name) return;
+    if (!name) {
+      setName(channel.name);
+      return;
+    }
+    if (!CHANNEL_NAME.test(name)) {
+      setNameError(t("newChannel.nameInvalid"));
+      return;
+    }
+    update.mutate(
+      { name },
+      {
+        onSuccess: () => {
+          setNameError(undefined);
+          setSaved(true);
+        },
+        onError: (e) =>
+          setNameError(
+            e instanceof ApiError && e.status === 409 ? t("channel.nameTaken", { name }) : (e as Error).message,
+          ),
+      },
+    );
+  };
+  const moveTo = (categoryId: string | null) =>
+    place.mutate(
+      { channelId: channel.id, categoryId },
+      {
+        onSuccess: () => setSaved(true),
+        onError: (e) => toast.show((e as Error).message, "error"),
+      },
+    );
+  const archiveIt = () =>
+    archive.mutate(channel.id, {
+      onSuccess: () => {
+        onOpenChange(false);
+        void navigate({ to: "/org/$orgId", params: { orgId: org.id } });
+        toast.show(t("channel.archived", { channel: channel.name }), "info", {
+          label: t("channelCategories.undo"),
+          run: () =>
+            void api.chat.unarchive(org.id, channel.id).then(async () => {
+              await qc.invalidateQueries({ queryKey: keys.channels(org.id) });
+              await navigate({ to: "/org/$orgId/c/$channelId", params: { orgId: org.id, channelId: channel.id } });
+            }),
+        });
+      },
+      onError: (e) => toast.show((e as Error).message, "error"),
+    });
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: keys.roster(org.id, channel.id) });
     void qc.invalidateQueries({ queryKey: keys.channelMembers(org.id, channel.id) });
@@ -3437,9 +3526,16 @@ function ChannelDetails({
       <Dialog
         open={open && !adding && !removing}
         onOpenChange={(o) => {
-          if (!o) saveTopic();
+          if (!o) {
+            saveTopic();
+            saveName();
+          }
           onOpenChange(o);
         }}
+        subtitle={t("channel.detailsSub", {
+          category: categoryName,
+          visibility: channel.visibility === "private" ? t("channel.visibilityPrivate") : t("channel.visibilityPublic"),
+        })}
         title={
           <>
             {t("channel.detailsTitle", { channel: channel.name })}
@@ -3459,20 +3555,45 @@ function ChannelDetails({
         closeLabel={t("common.close")}
       >
         {editable && (
-          <div className="channel-topic">
-            <input
-              className="channel-topic__input"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              onBlur={saveTopic}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") e.currentTarget.blur();
-              }}
-              placeholder={t("channel.topicPlaceholder")}
-              aria-label={t("channel.topicLabel")}
-              maxLength={250}
-            />
-          </div>
+          // Name, description and category on top of the members, each saved on its own (ADR 0080).
+          <DialogBody className="channel-category__fields">
+            <Field
+              label={t("channel.nameLabel")}
+              id="channel-edit-name"
+              help={channel.name === "general" ? t("channel.generalName") : t("channel.nameHelp")}
+              error={nameError}
+            >
+              <AffixInput
+                prefix="#"
+                value={name}
+                disabled={channel.name === "general"}
+                onChange={(e) => {
+                  setName(toChannelName(e.target.value));
+                  setNameError(undefined);
+                }}
+                onBlur={saveName}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                }}
+                autoComplete="off"
+              />
+            </Field>
+            <Field label={t("newChannel.topic")} id="channel-edit-topic">
+              <Input
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                onBlur={saveTopic}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                }}
+                placeholder={t("channel.topicPlaceholder")}
+                maxLength={250}
+              />
+            </Field>
+            <Field label={t("channelCategories.category")} id="channel-edit-category">
+              <CategorySelect value={channel.categoryId ?? null} onChange={moveTo} canCreate={editable} />
+            </Field>
+          </DialogBody>
         )}
         <DialogSearchList
           query={q}
@@ -3593,7 +3714,21 @@ function ChannelDetails({
             </button>
           )}
         </DialogSearchList>
-        <DialogFooter note={editable ? undefined : t("channelMembers.readOnly")} />
+        {editable && channel.name !== "general" ? (
+          <DialogFooter bar>
+            <Button
+              variant="ghost"
+              icon="archive"
+              className="channel-details__archive"
+              loading={archive.isPending}
+              onClick={archiveIt}
+            >
+              {t("channel.archive")}
+            </Button>
+          </DialogFooter>
+        ) : (
+          <DialogFooter note={editable ? undefined : t("channelMembers.readOnly")} />
+        )}
       </Dialog>
       <Dialog
         open={open && Boolean(removing)}

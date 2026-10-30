@@ -1,6 +1,6 @@
 import { useAgentSkills } from "@agenteschat/client";
 import { type AccessResource, asksAt, type Level } from "@agenteschat/client/lib/access-levels";
-import { Button, Card, CheckboxPill, Chip, Icon, SearchField, Segmented, Toolbar } from "@agenteschat/ui";
+import { Button, Card, Chip, Icon, SearchField, Segmented, Toolbar } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -14,6 +14,7 @@ import {
 } from "@/components/AccessLevels";
 import { LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { SkillPicker } from "@/components/Skills";
 import { CardHead, ChangedTag, useAgentEdit, WasLine } from "./context";
 import { DatabaseAccessCard } from "./DatabaseAccess";
 import { MailAccessCard } from "./MailAccess";
@@ -120,6 +121,9 @@ export function AccessTab() {
             <Button size="sm" variant="ghost" onClick={() => allConnectors("read")}>
               {t("agentPage.access.onlyRead")}
             </Button>
+            <Button size="sm" variant="ghost" onClick={() => allConnectors("write")}>
+              {t("access.level.write")}
+            </Button>
           </span>
         )}
       </Toolbar>
@@ -214,23 +218,12 @@ export function AccessTab() {
             ) : library.length === 0 ? (
               <span className="small muted">{t("skills.empty")}</span>
             ) : skillsEditable ? (
-              <div className="newag__pills">
-                {library.map((s) => (
-                  <CheckboxPill
-                    key={s.id}
-                    id={`agp-skill-${s.id}`}
-                    checked={enabled.has(s.id)}
-                    onCheckedChange={(on) => {
-                      const next = new Set(enabled);
-                      if (on) next.add(s.id);
-                      else next.delete(s.id);
-                      set("skills", [...next].sort());
-                    }}
-                  >
-                    {s.name}
-                  </CheckboxPill>
-                ))}
-              </div>
+              <SkillPicker
+                skills={library}
+                selected={enabled}
+                onChange={(next) => set("skills", [...next].sort())}
+                idPrefix="agp-skill"
+              />
             ) : enabled.size > 0 ? (
               <span className="agp-chips">
                 {library

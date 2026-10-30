@@ -8,6 +8,7 @@ import {
   type AiChoice,
   ALL_AGENTS,
   agentAi,
+  agentPlan,
   allAgents,
   defaultChoice,
   defaultTarget,
@@ -21,6 +22,7 @@ import {
   type PlanChoice,
   type PlanGate,
   planGate,
+  planOfKind,
   signInAgainPlan,
   signsInPerAgent,
 } from "../src/lib/no-ai";
@@ -161,18 +163,22 @@ describe("planGate: what a plan's panel can do now", () => {
     expect(lit.map(gateDims)).toEqual([false, false, false, false, false]);
   });
 
-  test("the computer's own sign-in, to share: the person connected that computer, and Claude is signed in there", () => {
+  test("the computer's own sign-in, to share: the person connected that computer, and its CLI is signed in there", () => {
     const signedIn: AiComputer = { ...MAC, own: { claude_code: { plan: "max" } } };
     const own = brain({ ownSignIn: true });
     expect(ownSignInFor("claude", own, signedIn)).toBe(true);
     // Claude Code isn't signed in there (or the row isn't in yet): no account to share.
     expect(ownSignInFor("claude", own, MAC)).toBe(false);
     expect(ownSignInFor("claude", own, undefined)).toBe(false);
-    // ChatGPT's own sign-in isn't reported: taken as there.
-    expect(ownSignInFor("chatgpt", own, MAC)).toBe(true);
-    // A coding plan signs in with its key; someone else's computer's sign-in is never the person's.
+    // ChatGPT's alike: only once the computer reports Codex's own sign-in (the usage it read with it).
+    expect(ownSignInFor("chatgpt", own, signedIn)).toBe(false);
+    const codex: AiComputer = { ...MAC, own: { codex: { usage: { windows: [], source: "probe", at: "2026-10-30" } } } };
+    expect(ownSignInFor("chatgpt", own, codex)).toBe(true);
+    // A coding plan signs in with its key; someone else's computer's sign-in is never the person's, nor is the
+    // sign-in of a computer nobody connected (the workspace's), whatever it reports.
     expect(ownSignInFor("zai", own, signedIn)).toBe(false);
     expect(ownSignInFor("claude", brain({ ownSignIn: false }), signedIn)).toBe(false);
+    expect(ownSignInFor("chatgpt", brain({ ownSignIn: false }), codex)).toBe(false);
     expect(ownSignInFor("claude", undefined, signedIn)).toBe(false);
   });
 });
@@ -202,6 +208,25 @@ describe("defaultChoice: what the picker opens on", () => {
     expect(
       defaultChoice({ ownsAgents: true, mayAddKey: true, claudeGate: { state: "preparing", view: setup() } }),
     ).toBe("claude");
+  });
+
+  test("for one agent on a plan brain, its own plan (`agentPlan`) instead of Claude; what was asked still wins", () => {
+    const on = (kind: "claude_code" | "codex" | "model", provider?: string): Pick<Agent, "brain"> => ({
+      brain: { kind, model: null, ...(provider ? { provider } : {}) },
+    });
+    expect([on("codex"), on("claude_code"), on("claude_code", "kimi"), on("model"), undefined].map(agentPlan)).toEqual([
+      "chatgpt",
+      "claude",
+      "kimi",
+      null,
+      null,
+    ]);
+    const plan = agentPlan(on("codex"));
+    expect(defaultChoice({ ownsAgents: true, mayAddKey: true, claudeGate: ready, plan })).toBe("chatgpt");
+    expect(defaultChoice({ intent: "api_key", ownsAgents: true, mayAddKey: true, claudeGate: ready, plan })).toBe(
+      "key",
+    );
+    expect(defaultChoice({ ownsAgents: true, mayAddKey: true, claudeGate: { state: "missing" }, plan })).toBe("key");
   });
 });
 
@@ -379,5 +404,26 @@ describe("a card whose plan's sign-in ended", () => {
     expect(signInAgainPlan(out, on("model"))).toBeNull();
     expect(signInAgainPlan(out, undefined)).toBeNull();
     expect(signInAgainPlan({}, on("codex"))).toBeNull();
+  });
+
+  test("the computer's own sign-in isn't there: its own card, Connect on that CLI's plan, never Sign in again", () => {
+    const own = (cli: string) => ({ ...meta("not_signed_in"), noAi: { ...meta("not_signed_in").noAi, own: cli } });
+    const card = noAiCardOf(own("codex"));
+    expect(card?.own).toBe("codex");
+    expect(card?.signedOut).toBeUndefined();
+    expect(signInAgainPlan(card ?? {}, { brain: { kind: "codex", model: null } })).toBeNull();
+    expect(noAiCardOf(own("claude_code"))?.own).toBe("claude_code");
+    expect([planOfKind("codex"), planOfKind("claude_code")]).toEqual(["chatgpt", "claude"]);
+    // Only with `not_signed_in`, and only a CLI it knows: anything else stays the card it was.
+    expect(noAiCardOf(own("gemini"))).toMatchObject({ signedOut: true });
+    expect(noAiCardOf({ ...meta("no_key"), noAi: { ...meta("no_key").noAi, own: "codex" } })?.own).toBeUndefined();
+    // Its line, above the card and in the lists' previews (`previewMeta` keeps `own`): that CLI isn't signed in
+    // there, never that a sign-in ended.
+    const t = ((key: string, o?: { brain?: string }) => `${key}:${o?.brain ?? ""}`) as unknown as TFunction;
+    expect(serverBody(t, "…", own("codex"))).toBe("chat.body.no_ai_not_signed_in:Codex");
+    expect(serverBody(t, "…", { bodyCode: "no_ai", noAi: { reason: "not_signed_in", own: "claude_code" } })).toBe(
+      "chat.body.no_ai_not_signed_in:Claude Code",
+    );
+    expect(serverBody(t, "…", own("gemini"))).toBe("chat.body.no_ai_signed_out:");
   });
 });

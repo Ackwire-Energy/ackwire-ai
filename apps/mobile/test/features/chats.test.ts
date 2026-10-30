@@ -328,6 +328,15 @@ describe("the home by kind", () => {
     expect(toggleCollapsed(["people"], "agents")).toEqual(["agents", "people"]);
     expect(toggleCollapsed(["agents", "people"], "agents")).toEqual(["people"]);
   });
+
+  test("collapsed groups of agents take any ids: one workspace's stay when another's change", () => {
+    // Workspace A collapses its group a1, then workspace B its b1, on the one remembered list.
+    let raw = JSON.stringify(toggleCollapsed(parseCollapsed(null, null), "a1", null));
+    raw = JSON.stringify(toggleCollapsed(parseCollapsed(raw, null), "b1", null));
+    expect(parseCollapsed(raw, null)).toEqual(["a1", "b1"]);
+    expect(toggleCollapsed(parseCollapsed(raw, null), "b1", null)).toEqual(["a1"]);
+    expect(parseCollapsed('["a1",2,null]', null)).toEqual(["a1"]);
+  });
 });
 
 describe("the Esperando você strip", () => {

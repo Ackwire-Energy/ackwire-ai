@@ -46,6 +46,11 @@ test("connectors API: catalog, API-key connection (masked), agent scopes, OAuth 
   const listed = await (await owner(`/api/app/organizations/${orgId}/connectors`)).text();
   expect(listed).toContain(sentry.id);
   expect(listed).not.toContain("sntrys_secret_value");
+  // Connected without the web's dialog (the API, the phone): every agent has it whole, as the dialog starts.
+  const access = (await (await owner(`/api/app/organizations/${orgId}/agents/${agentId}/access`)).json()) as {
+    connectors: { connectionId: string; state: string }[];
+  };
+  expect(access.connectors.find((c) => c.connectionId === sentry.id)?.state).toBe("granted");
 
   const put = await owner(`/api/app/organizations/${orgId}/agents/${agentId}/scopes`, {
     method: "PUT",

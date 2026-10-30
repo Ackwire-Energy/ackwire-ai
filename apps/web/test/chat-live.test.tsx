@@ -557,6 +557,44 @@ describe("empty conversations", () => {
     expect(dm.querySelector(".ac-empty__title")?.textContent).toBe("Diga oi para João");
     expect(dm.querySelector(".ac-empty__text")).toBeNull();
   });
+
+  test("a channel's suggestions go to the first agent with a handle someone chose, by name; with none, to the first agent", async () => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (!ada) throw new Error("no Ada");
+    const imported = "00000000-0000-4000-8000-0000000000a9";
+    const alsoImported = "00000000-0000-4000-8000-0000000000aa";
+    state.agents.push(
+      { ...ada, id: imported, name: "New agent", handle: "agent-e9665a97-c8d5-423f-ae59-25", role: "" },
+      { ...ada, id: alsoImported, name: "Rita Revisão", handle: "agent-925ca021-21e4-4053-9e0a-23", role: "" },
+    );
+    state.channelMembers[GENERAL_ID] = [
+      { type: "person", id: "u-walter" },
+      { type: "agent", id: imported },
+      { type: "agent", id: ADA_ID },
+    ];
+    await open(state, `c/${GENERAL_ID}`);
+    await settle(4);
+    const suggestion = screen().getByRole("button", { name: "@Ada O que quebrou desde o último deploy?" });
+    expect(document.querySelector(".channel__suggestions")?.textContent).not.toContain("agent-");
+    await act(async () => fireEvent.click(suggestion));
+    expect((composer() as HTMLTextAreaElement).value).toBe("@ada O que quebrou desde o último deploy?");
+    cleanup();
+
+    state.channelMembers[GENERAL_ID] = [
+      { type: "person", id: "u-walter" },
+      { type: "agent", id: imported },
+      { type: "agent", id: alsoImported },
+    ];
+    await open(state, `c/${GENERAL_ID}`);
+    await settle(4);
+    await act(async () =>
+      fireEvent.click(screen().getByRole("button", { name: "@New agent Oi, o que você sabe fazer?" })),
+    );
+    expect((composer() as HTMLTextAreaElement).value).toBe(
+      "@agent-e9665a97-c8d5-423f-ae59-25 Oi, o que você sabe fazer?",
+    );
+  });
 });
 
 test("a DM's head: the name with a line under it rises to the face's top, a person's as an agent's", async () => {
