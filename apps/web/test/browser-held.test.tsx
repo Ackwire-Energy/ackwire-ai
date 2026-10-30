@@ -6,11 +6,13 @@ setupDom();
 import { ApiError, type BrowserHandoff, heldRowsIn, resetHeldPlaces } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, ENG_ID, fakeBrowserOf, ORG_ID, seedState } from "./fake-api";
-import { renderApp, settle } from "./render";
+import { onScreen, renderApp, settle } from "./render";
 
+let offScreen = () => {};
 afterEach(() => {
   cleanup();
   resetHeldPlaces();
+  offScreen();
 });
 
 const cards = () => [...document.querySelectorAll(".brw-ac")] as HTMLElement[];
@@ -41,8 +43,10 @@ describe("Assumir: the card stays the control while the agent waits", () => {
     const call = state.calls.find((c) => c.method === "browser.takeover");
     expect(call?.args).toEqual([ORG_ID, ADA_ID, "r-held"]);
     expect(cards()).toHaveLength(1);
+    // In control the frame turns graphite and Devolver sits in its top.
     expect(cards()[0]?.classList.contains("is-control")).toBe(true);
-    expect(cards()[0]?.querySelector(".brw-ac__tx small")?.textContent).toContain("Você no controle");
+    const top = cards()[0]?.querySelector(".brw-mf__top") as HTMLElement;
+    expect(within(top).getByRole("button", { name: "Devolver" })).toBeTruthy();
 
     // The agent pauses (waiting for the hand back) and says so: the live row goes, its message lands.
     await ev({ type: "agent.run", ...run, status: "waiting_input" });
@@ -114,17 +118,35 @@ describe("Assumir: the card stays the control while the agent waits", () => {
     expect(document.body.textContent).toContain("Outra pessoa já está ajudando.");
   });
 
+  test("Devolver while the agent still works: its page stays in view, with Assumir again", async () => {
+    const state = seedState();
+    const { ev } = await browsing(createFakeApi(state));
+    const run = { threadId: null, runId: "r-back", agentId: ADA_ID };
+    await ev({ type: "agent.thinking", ...run });
+    await ev({ type: "agent.tool", ...run, tool: "browser_open" });
+    await settle();
+    const card = cards()[0] as HTMLElement;
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Assumir" })));
+    await settle(3);
+    // Devolver opens the optional note, whose own Devolver hands back.
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Devolver" })));
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Devolver" })));
+    await settle(3);
+    expect(state.calls.some((c) => c.method === "browser.done")).toBe(true);
+    expect(cards()).toEqual([card]);
+    expect(card.classList.contains("is-control")).toBe(false);
+    expect(card.classList.contains("is-open")).toBe(true);
+    expect(within(card).getByRole("button", { name: "Assumir" })).toBeTruthy();
+  });
+
   test("Parar by someone else reaches every viewer: the card says who stopped it", async () => {
+    // Watching it (on screen): the live view hears the stop.
+    offScreen = onScreen(".brw-ac");
     const state = seedState();
     const { ev, socket } = await browsing(createFakeApi(state));
     const run = { threadId: null, runId: "r-stop", agentId: ADA_ID };
     await ev({ type: "agent.thinking", ...run });
     await ev({ type: "agent.tool", ...run, tool: "browser_open" });
-    await settle();
-    // Watching it (open): the live view hears the stop.
-    await act(async () =>
-      fireEvent.click(within(cards()[0] as HTMLElement).getByRole("button", { name: "Ver ao vivo" })),
-    );
     await settle(2);
     await act(async () =>
       socket.push({

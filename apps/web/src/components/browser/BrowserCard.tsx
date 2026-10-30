@@ -360,10 +360,11 @@ export function BrowserCard({
     anchor.current = root.current?.getBoundingClientRect().top ?? null;
     setOpenState(next);
   };
+  // In the conversation the card never closes (its page stays in view): folding there only leaves full screen.
   const fold = () => {
     if (surface) return;
     if (onFold) onFold();
-    else setOpen(false);
+    else setFull(false);
   };
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs after each open/close to restore the card's place
   useLayoutEffect(() => {
@@ -920,7 +921,11 @@ export function BrowserCard({
           </span>
           <span className="brw-grow" />
           {inControl ? (
-            <span className="brw-mf__acts">{controlActs}</span>
+            // The page takes the person's clicks: full screen sits here, not over it.
+            <span className="brw-mf__acts">
+              {controlActs}
+              {!blocker && <FullScreenButton full={full} onToggle={() => setFull(true)} />}
+            </span>
           ) : (
             // Focusable so the steps also open from the keyboard.
             <span className="brw-mf__now" tabIndex={steps.length > 0 ? 0 : -1}>
