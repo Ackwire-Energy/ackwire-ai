@@ -107,7 +107,7 @@ import { COMPACT_QUERY, useMediaQuery, useNavDrawer } from "./NavDrawer";
 import { NewChannelDialog } from "./NewChannelDialog";
 import { OpenOnPhoneDialog } from "./OpenOnPhone";
 import { useOrg } from "./org-context";
-import { StatusEmoji, StatusLine } from "./Presence";
+import { StatusLine } from "./Presence";
 import { OrgMark, ProfilePhotoDialog } from "./ProfilePhoto";
 import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon, WorkspaceSky } from "./Sky";
 import { SetStatusDialog } from "./StatusDialog";
@@ -1048,7 +1048,8 @@ function AgentRow({
   const busy = state !== "idle" && !waitingFor;
   const color = colorOf(a);
   const chip = audienceChip(t, a);
-  // Its presence from its work and its line (ADR 0081): the badge, the line's emoji, both in the row's title.
+  // Its presence from its work and its line (ADR 0081): the badge on its face, both in the row's title (no emoji in
+  // the list: the line shows where the agent is opened).
   const shown = useAgentPresence(a.id);
   const word = shown ? t(`presence.${shown.presence}`) : null;
   const line = agentLine(t, shown?.line ?? null);
@@ -1124,7 +1125,6 @@ function AgentRow({
         {...(waitingFor ? { state: "idle" as const, expression: "closed" as const } : {})}
       />
       <span className="sidebar__item-label">{a.name}</span>
-      {line && <StatusEmoji emoji={line.emoji} text={line.text} className="sidebar__item-status" />}
       {unread > 0 ? (
         <UnreadCount count={unread} />
       ) : waitingFor ? (
@@ -1156,7 +1156,7 @@ function AgentRow({
   );
 }
 
-/** A person under "Mensagens diretas": their face with its presence badge, the name, their line's emoji (ADR 0081). */
+/** A person under "Mensagens diretas": their face with its presence badge, the name; their line in the title (ADR 0081). */
 function PersonRow({
   member: m,
   unread,
@@ -1193,7 +1193,6 @@ function PersonRow({
         presenceLabel={word ?? undefined}
       />
       <span className="sidebar__item-label">{m.name}</span>
-      {line && <StatusEmoji emoji={line.emoji} text={line.text} className="sidebar__item-status" />}
       {unread > 0 && <UnreadCount count={unread} />}
     </Link>
   );

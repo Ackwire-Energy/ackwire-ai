@@ -221,43 +221,55 @@ test("a waiting run says what it waits on, and keeps the agent online, not busy"
   expect(await presenceOf(f)).toMatchObject({ presence: "online", status: { by: "wait", kind: "waiting_approval" } });
 });
 
-test("the run's line: public channels by name, private ones never; the task's title first", async () => {
+test("the run's line: public channels by name, nothing for a private conversation", async () => {
   f = await setup();
   const run = await runOf(f);
   const lines = await statusCandidates(f.db, run, []);
   expect(lines.map((l) => [l.kind, l.subject])).toEqual([["channel", f.general.name]]);
-  const dm = await statusCandidates(f.db, { ...run, channelId: crypto.randomUUID() }, []);
-  expect(dm.map((l) => l.kind)).toEqual(["private"]);
-  expect(JSON.stringify(dm)).not.toContain(f.general.name);
+  expect(await statusCandidates(f.db, { ...run, channelId: crypto.randomUUID() }, [])).toEqual([]);
 });
 
-test("Jev's pick and weight set the line and busy from the start; the agent's own words are kept", async () => {
+test("Jev's pick shows only when worth it; its weight sets busy; without Jev only a task line; own words kept", async () => {
   f = await setup();
   const run = await runOf(f);
   const candidates = [
     { key: "c0", kind: "channel" as const, subject: "general", text: "Answering in #general" },
     { key: "c1", kind: "coding" as const, subject: null, text: "Coding" },
   ];
-  await startRunStatus({ db: f.db }, run, candidates, { line: "c1", heavy: 0.8 });
+  await startRunStatus({ db: f.db }, run, candidates, { line: "c1", heavy: 0.8, worth: 0.9 });
   expect(await presenceOf(f)).toMatchObject({ presence: "busy", status: { by: "auto", kind: "coding" } });
 
-  // No pick (no Jev): the first fact, not busy.
+  // A quick reply: not worth a line.
+  await startRunStatus({ db: f.db }, run, candidates, { line: "c0", heavy: 0.1, worth: 0.2 });
+  expect(await presenceOf(f)).toMatchObject({ presence: "online", status: null });
+
+  // No Jev: only what the work is for.
   await startRunStatus({ db: f.db }, run, candidates, null);
-  expect(await presenceOf(f)).toMatchObject({ presence: "online", status: { kind: "channel", subject: "general" } });
+  expect((await presenceOf(f))?.status).toBeNull();
+  await startRunStatus({ db: f.db }, run, [...candidates, { key: "c2", kind: "task", subject: "Login", text: "x" }], null);
+  expect((await presenceOf(f))?.status).toMatchObject({ kind: "task", subject: "Login" });
 
   const [tool] = await createSetStatusToolSource().tools({} as ToolContext);
   await tool?.execute({ text: "Revisando o PR #12" }, ctxOf(f, run.id));
-  await startRunStatus({ db: f.db }, run, candidates, { line: "c1", heavy: 0 });
+  await startRunStatus({ db: f.db }, run, candidates, { line: "c1", heavy: 0, worth: 1 });
   expect((await presenceOf(f))?.status).toMatchObject({ by: "self", text: "Revisando o PR #12" });
 });
 
-test("the line follows the work (at most every 30 s, a task stays), and Jev replaces own words that no longer fit", async () => {
+test("the line follows real work (heavy or long, at most every 30 s, a task stays); Jev replaces stale own words", async () => {
   f = await setup();
-  const run = await runOf(f);
-  const ctx = { orgId: f.org.id, agentId: f.agent.id, runId: run.id };
+  const t0 = new Date();
+  const quick = await runOf(f);
   const browser = { name: "browser_do", scope: "browser:use" };
   const code = { name: "run_code", scope: "sandbox:run" };
-  const t0 = new Date();
+  // A quick reply that opens a page: no line.
+  await startRunStatus({ db: f.db }, quick, [], null, t0);
+  await followWork({ db: f.db }, { orgId: f.org.id, agentId: f.agent.id, runId: quick.id }, browser, t0);
+  expect((await presenceOf(f))?.status).toBeNull();
+  await finish(f, quick.id);
+
+  // Going for 3 minutes: real work.
+  const run = await runOf(f, { startedAt: new Date(t0.getTime() - 3 * 60_000), heartbeatAt: t0 });
+  const ctx = { orgId: f.org.id, agentId: f.agent.id, runId: run.id };
   await startRunStatus({ db: f.db }, run, [{ key: "c0", kind: "channel", subject: "general", text: "x" }], null, t0);
   await followWork({ db: f.db }, ctx, browser, new Date(t0.getTime() + AGENT_LINE_EVERY_MS + 1));
   expect((await presenceOf(f))?.status).toMatchObject({ by: "auto", kind: "browsing" });
@@ -280,7 +292,13 @@ test("the line follows the work (at most every 30 s, a task stays), and Jev repl
 test("the tool-group request also asks for the line and the weight, in the same call", async () => {
   f = await setup();
   const judge = createFakeJudge((kind, id) =>
-    id === "status_line" ? "c0" : id === "status_weight" ? { score: 2.4, probabilities: { "2": 0.5, "3": 0.3 } } : 0,
+    id === "status_line"
+      ? "c0"
+      : id === "status_weight"
+        ? { score: 2.4, probabilities: { "2": 0.5, "3": 0.3 } }
+        : id === "status_worth_c0"
+          ? 0.7
+          : 0,
   );
   const choice = await chooseToolGroups(judge, {
     orgId: f.org.id,
@@ -293,4 +311,5 @@ test("the tool-group request also asks for the line and the weight, in the same 
   expect(judge.calls).toHaveLength(1);
   expect(choice.status?.line).toBe("c0");
   expect(choice.status?.heavy).toBeCloseTo(0.8);
+  expect(choice.status?.worth).toBeCloseTo(0.7);
 });

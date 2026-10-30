@@ -88,7 +88,6 @@ export const AGENT_KIND_EMOJI: Record<AgentStatusKind, string> = {
   routine: "🔁",
   mission: "🚀",
   channel: "💬",
-  private: "💬",
   browsing: "🌐",
   coding: "💻",
   files: "📁",

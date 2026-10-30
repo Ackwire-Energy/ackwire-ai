@@ -15,7 +15,6 @@ import { Tile } from "../shared/parts";
 import { useWaitingApprovals, useWorkingNow } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
 import { usePresenceOf } from "../status/hooks";
-import { lineText } from "../status/logic";
 import { agoOf, plainRole, type TeamLine, teamLines } from "./logic";
 import { agoText, workTitle } from "./work";
 
@@ -117,7 +116,7 @@ function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean
       : t("mobile.intentAgents.waitingLine", { title: approval.title })
     : w
       ? line
-        ? lineText(line)
+        ? line.text
         : workTitle(t, w)
       : computer !== undefined
         ? t("mobile.outage.rowWaiting", { computer })

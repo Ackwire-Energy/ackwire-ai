@@ -1494,7 +1494,6 @@ export const en: Translations = {
       routine: "Routine: {{subject}}",
       mission: "Mission: {{subject}}",
       channel: "Answering in #{{subject}}",
-      private: "In a private conversation",
       browsing: "Browsing the web",
       coding: "Coding",
       files: "Working on files",

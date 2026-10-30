@@ -342,7 +342,6 @@ export function agentRoutes(deps: AppDeps) {
                         "routine",
                         "mission",
                         "channel",
-                        "private",
                         "browsing",
                         "coding",
                         "files",

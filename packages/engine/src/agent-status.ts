@@ -25,7 +25,6 @@ export type AgentStatusKind =
   | "routine"
   | "mission"
   | "channel"
-  | "private"
   | "browsing"
   | "coding"
   | "files"
@@ -69,6 +68,8 @@ export const AGENT_WAIT_LINE_MS = 24 * 3600_000;
 export const AGENT_LINE_EVERY_MS = 30_000;
 /** Jev's rating of the work at or above which the run is busy from the start (§9): P(minutes or long) ≥ this. */
 export const AGENT_HEAVY_PROBABILITY = 0.6;
+/** An automatic line shows only when Jev rates it worth showing at least this much (§8): a quick reply says nothing. */
+export const AGENT_LINE_WORTH = 0.5;
 /** An agent's own line is replaced when Jev says it still fits the step under this (§10). */
 export const AGENT_LINE_STALE_BELOW = 0.3;
 
@@ -224,7 +225,6 @@ export function lineInEnglish(line: AgentStatusLine): string | null {
     routine: `running the routine "${s}"`,
     mission: `working on the mission "${s}"`,
     channel: `answering in #${s}`,
-    private: "in a private conversation",
     browsing: "browsing the web",
     coding: "coding",
     files: "working on files",
@@ -329,10 +329,9 @@ export async function statusCandidates(
   if (typeof routine?.name === "string" && routine.name) {
     out.push({ kind: "routine", subject: routine.name, text: `Running the routine "${routine.name}"` });
   }
-  if (!run.background) {
-    if (channel?.kind === "channel" && channel.visibility === "public") {
-      out.push({ kind: "channel", subject: channel.name, text: `Answering in #${channel.name}` });
-    } else out.push({ kind: "private", subject: null, text: "In a private conversation" });
+  // Where it answers, only a public channel by name; a DM or a private channel says nothing worth a line.
+  if (!run.background && channel?.kind === "channel" && channel.visibility === "public") {
+    out.push({ kind: "channel", subject: channel.name, text: `Answering in #${channel.name}` });
   }
   const seen = new Set(out.map((c) => `${c.kind}:${c.subject}`));
   for (const tool of tools) {
@@ -341,12 +340,31 @@ export async function statusCandidates(
     seen.add(`${act.kind}:${act.subject}`);
     out.push(act);
   }
-  return out.slice(0, 12).map((c, i) => ({ ...c, key: `c${i}` }));
+  // Jev rates each one (§8): a few, the most telling first.
+  return out.slice(0, 8).map((c, i) => ({ ...c, key: `c${i}` }));
 }
 
-/** Jev's two questions for the start of a run (§8–9), asked in the tool-group request (`chooseToolGroups`). */
+/**
+ * Jev's questions for the start of a run (§8–9), asked in the tool-group request (`chooseToolGroups`): which line,
+ * how heavy the work is, and, for each line, whether it is worth showing at all (they run in parallel, so every
+ * candidate gets its own; code reads the chosen one's).
+ */
 export function statusQuestions(candidates: StatusCandidate[]) {
+  const worth = Object.fromEntries(
+    candidates.map((c) => [
+      `status_worth_${c.key}`,
+      {
+        type: "noul" as const,
+        instructions: `An AI agent of a team (\`agent\`) is starting to work on \`message\`. Next to its name, the whole team would read: "${c.text}". Is that worth showing as its status?`,
+        criteria: {
+          true: "Yes: it tells the team something useful about what the agent is busy with (real work that takes a while, a task, a routine, something people may want to know before interrupting).",
+          false: "No: a quick reply, small talk or something nobody needs to know (it would only be noise next to its name).",
+        },
+      },
+    ]),
+  );
   return {
+    ...worth,
     status_line: {
       type: "choice" as const,
       instructions:
@@ -369,15 +387,17 @@ export function statusQuestions(candidates: StatusCandidate[]) {
   };
 }
 
-/** What Jev picked: the line's key (null = none or no answer) and P(several minutes or long work). */
+/** What Jev picked: the line's key (null = none), P(several minutes or long work), and P(the line is worth showing). */
 export interface StatusPick {
   line: string | null;
   heavy: number;
+  worth: number | null;
 }
 
 /**
- * The run's line and whether it is busy, as it starts (§8–9): Jev's pick, else the first fact (task, mission,
- * routine, where it answers). Never replaces the agent's own words while they hold.
+ * The run's line and whether it is busy, as it starts (§8–9): Jev's pick when it rated it worth showing, else no
+ * line; without Jev, only what the work is for (task, mission, routine). Never replaces the agent's own words while
+ * they hold.
  */
 export async function startRunStatus(
   deps: { db: Database; pubsub?: PubSub },
@@ -386,9 +406,11 @@ export async function startRunStatus(
   pick: StatusPick | null,
   now = new Date(),
 ): Promise<void> {
-  const chosen =
-    (pick?.line ? candidates.find((c) => c.key === pick.line) : undefined) ??
-    candidates.find((c) => ["task", "mission", "routine", "channel", "private"].includes(c.kind));
+  const chosen = pick
+    ? (pick.worth ?? 0) >= AGENT_LINE_WORTH
+      ? candidates.find((c) => c.key === pick.line)
+      : undefined
+    : candidates.find((c) => STICKY.has(c.kind));
   const busy = (pick?.heavy ?? 0) >= AGENT_HEAVY_PROBABILITY;
   await writeAutoLine(deps, run, chosen ?? null, { busy, now, keepOwn: true });
 }
@@ -443,20 +465,27 @@ export async function followWork(
   if (!ctx.runId) return;
   const act = activityOf(tool);
   if (!act) return;
-  const [a] = await deps.db
-    .select({
-      source: agents.statusSource,
-      kind: agents.statusKind,
-      subject: agents.statusSubject,
-      text: agents.statusText,
-      runId: agents.statusRunId,
-      at: agents.statusAt,
-      until: agents.statusUntil,
-    })
-    .from(agents)
-    .where(and(eq(agents.orgId, ctx.orgId), eq(agents.id, ctx.agentId)));
+  const [[a], [run]] = await Promise.all([
+    deps.db
+      .select({
+        source: agents.statusSource,
+        kind: agents.statusKind,
+        subject: agents.statusSubject,
+        text: agents.statusText,
+        runId: agents.statusRunId,
+        at: agents.statusAt,
+        until: agents.statusUntil,
+        busy: agents.statusBusy,
+      })
+      .from(agents)
+      .where(and(eq(agents.orgId, ctx.orgId), eq(agents.id, ctx.agentId))),
+    deps.db
+      .select({ startedAt: agentRuns.startedAt, background: agentRuns.background })
+      .from(agentRuns)
+      .where(and(eq(agentRuns.orgId, ctx.orgId), eq(agentRuns.id, ctx.runId))),
+  ]);
   if (!a) return;
-  const run = { id: ctx.runId, orgId: ctx.orgId, agentId: ctx.agentId };
+  const target = { id: ctx.runId, orgId: ctx.orgId, agentId: ctx.agentId };
   if (a.source === "self") {
     // Another run's own words, or a line with its own end: the agent chose them, leave them.
     if (a.runId !== ctx.runId || a.until || a.kind === act.kind) return;
@@ -468,15 +497,22 @@ export async function followWork(
     if (!deps.judge || !a.text) return;
     const still = await stillFits(deps.judge, ctx, a.text, act.text).catch(() => null);
     if (still !== null && still < AGENT_LINE_STALE_BELOW) {
-      await writeAutoLine(deps, run, act, { now, keepOwn: false });
+      await writeAutoLine(deps, target, act, { now, keepOwn: false });
     }
     return;
   }
   const mine = a.runId === ctx.runId;
+  // Only real work earns a line (§8): rated heavy at the start, a routine, or going for a while; a quick reply
+  // that opens a page says nothing.
+  const heavy =
+    (mine && a.busy) ||
+    run?.background === true ||
+    (run?.startedAt != null && now.getTime() - run.startedAt.getTime() >= AGENT_HEAVY_AFTER_MS);
+  if (!heavy) return;
   if (mine && a.kind && STICKY.has(a.kind)) return;
   if (mine && a.kind === act.kind && a.subject === act.subject) return;
   if (a.at && now.getTime() - a.at.getTime() < AGENT_LINE_EVERY_MS) return;
-  await writeAutoLine(deps, run, act, { now, keepOwn: true });
+  await writeAutoLine(deps, target, act, { now, keepOwn: true });
 }
 
 /** Jev: does the agent's own line still describe the step it is on? (P of yes; calibrated, so Jev only.) */

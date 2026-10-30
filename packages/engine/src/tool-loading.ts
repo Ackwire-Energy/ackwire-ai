@@ -124,8 +124,13 @@ export async function chooseToolGroups(
     });
     const line = answers.status_line?.choice;
     const weight = answers.status_weight?.probabilities ?? {};
+    const picked = line && line !== "none" ? line : null;
     const status = asksStatus
-      ? { line: line && line !== "none" ? line : null, heavy: (weight["2"] ?? 0) + (weight["3"] ?? 0) }
+      ? {
+          line: picked,
+          heavy: (weight["2"] ?? 0) + (weight["3"] ?? 0),
+          worth: picked ? (answers[`status_worth_${picked}`]?.noul ?? null) : null,
+        }
       : undefined;
     const source = groups.length > 0 ? "judge" : "none";
     return { groups: chosen, scores, source, kept, ...(status ? { status } : {}) };

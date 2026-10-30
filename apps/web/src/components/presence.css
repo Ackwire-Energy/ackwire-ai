@@ -54,13 +54,7 @@
   font-size: 12px;
   line-height: 16px;
 }
-/* A sidebar row: the line's emoji after the name; someone offline is quieter. */
-.sidebar__item-status {
-  font-size: 13px;
-}
-.sidebar[data-rail="true"] .sidebar__item-status {
-  display: none;
-}
+/* A sidebar row: someone offline is quieter. */
 .sidebar__item[data-presence="offline"] .sidebar__item-label {
   color: var(--muted);
 }

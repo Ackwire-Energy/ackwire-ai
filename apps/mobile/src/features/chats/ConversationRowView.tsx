@@ -27,7 +27,7 @@ const AVATAR = LIST_AVATAR;
  * add a faint line with what and where ("Missão · #canal"): a mission shows its agent, its state
  * and items ("Esperando você · 4 de 9 itens") and what waits on you in it; a thread shows the face and the
  * line of its last reply. `live`: the agent moves (the first rows only). A DM's face carries the presence badge
- * and its name the status emoji (ADR 0081); an agent with a line of its own says it in place of its last message.
+ * (ADR 0081; no status emoji in the list); an agent with a line says it in place of its last message.
  */
 export const ConversationRowView = memo(function ConversationRowView({
   row: r,
@@ -105,8 +105,6 @@ export const ConversationRowView = memo(function ConversationRowView({
       <Tile icon="hash" size={AVATAR} />
     );
   const name = r.kind === "channel" ? r.name : r.kind === "dm" ? r.with.name : r.title;
-  // The status emoji after a DM's name: the agent's line's, the person's.
-  const nameEmoji = agentLine?.emoji ?? personShown?.status?.emoji ?? null;
   // Whose orbit: the DM's agent, or the mission's.
   const orbitAgent = r.kind === "dm" ? r.with.id : r.kind === "mission" ? r.mission?.agentId : null;
   const orbitColor = agentLook(orbitAgent ? dir.agentById.get(orbitAgent) : undefined).color;
@@ -245,7 +243,7 @@ export const ConversationRowView = memo(function ConversationRowView({
       divider={divider}
       unread={r.unread > 0}
       leading={leading}
-      title={nameEmoji ? `${name} ${nameEmoji}` : name}
+      title={name}
       time={r.at ? when.short(r.at) : null}
       over={
         placeLine ? (

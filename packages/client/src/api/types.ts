@@ -1169,7 +1169,6 @@ export type AgentStatusKind =
   | "routine"
   | "mission"
   | "channel"
-  | "private"
   | "browsing"
   | "coding"
   | "files"

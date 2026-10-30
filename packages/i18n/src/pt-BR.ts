@@ -1515,7 +1515,6 @@ export const ptBR = {
       routine: "Rotina: {{subject}}",
       mission: "Missão: {{subject}}",
       channel: "Respondendo no #{{subject}}",
-      private: "Numa conversa privada",
       browsing: "Navegando na web",
       coding: "Programando",
       files: "Mexendo nos arquivos",
