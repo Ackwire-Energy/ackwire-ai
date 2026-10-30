@@ -19,7 +19,7 @@ import { PushOpens } from "@/components/NotificationOpen";
 import { OrgProvider } from "@/components/org-context";
 import { Sidebar } from "@/components/Sidebar";
 import { BootSplash } from "@/components/Sky";
-import { HoldBanner, SuspendedScreen } from "@/components/Standing";
+import { DeletingScreen, HoldBanner, SuspendedScreen } from "@/components/Standing";
 import { useWebPushClear, useWebPushRefresh } from "@/components/WebPush";
 import { ComputerSetupNotice } from "@/components/WorkspaceComputer";
 import { inDesktopApp } from "@/lib/desktop";
@@ -89,6 +89,10 @@ function OrgLayout() {
       </OrgProvider>
     );
   }
+
+  // Being deleted: its own screen, after the suspension, the stronger fact. Its socket is refused, so the screen asks
+  // `GET /me` again instead.
+  if (membership.deletion) return <DeletingScreen org={membership} me={me} />;
 
   return (
     <OrgProvider org={membership} me={me}>

@@ -1,4 +1,5 @@
 import type {
+  ApiClient,
   BundleTodo,
   ImportItemKind,
   ImportItemResult,
@@ -1254,6 +1255,10 @@ export function ImportReport({
   );
 }
 
+/** Downloads the workspace as a file: its agents, skills, routines and shared memory, never conversations or files. */
+export const saveExport = (api: ApiClient, orgId: string) =>
+  fileSaver.save(api.imports.exportUrl(orgId), `agentes-chat-${new Date().toISOString().slice(0, 10)}.json`);
+
 /**
  * Configurações → Importar e exportar (admins): the import flow, and this workspace as a file, with what it never
  * carries (whoever shares the file needs that); the full list is on the help page.
@@ -1264,8 +1269,7 @@ export function ImportExportSection() {
   const api = useApi();
   const flow = useImportFlow(org.id);
   if (!can(org.role, "manage_agents")) return null;
-  const download = () =>
-    fileSaver.save(api.imports.exportUrl(org.id), `agentes-chat-${new Date().toISOString().slice(0, 10)}.json`);
+  const download = () => saveExport(api, org.id);
   return (
     <>
       <Card aria-labelledby="imp-import-title">

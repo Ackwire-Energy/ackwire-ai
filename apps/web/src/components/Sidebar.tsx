@@ -76,6 +76,7 @@ import {
   setMenuLook,
 } from "@/lib/context-menu";
 import { inDesktopApp, onPhoneAsk, takePhoneAsk } from "@/lib/desktop";
+import { useOpenParam } from "@/lib/open-param";
 import { markOpen } from "@/lib/perf";
 import { onSoundChoiceChange, type SoundChoice, setSoundChoice, soundChoice } from "@/lib/sounds";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
@@ -86,6 +87,7 @@ import { useLiveStore, useStreams } from "@/realtime/context";
 import { AddPasswordDialog } from "./AddPassword";
 import { AgentAvatar } from "./AgentAvatar";
 import { openPalette } from "./CommandMenu";
+import { DeleteAccountDialog } from "./DeleteAccount";
 import { COMPACT_QUERY, useMediaQuery, useNavDrawer } from "./NavDrawer";
 import { NewChannelDialog } from "./NewChannelDialog";
 import { OpenOnPhoneDialog } from "./OpenOnPhone";
@@ -773,8 +775,9 @@ function UnreadCount({ count }: { count: number }) {
 /**
  * The account button; under the name, the workspace's budget use this month
  * (a percentage, never money). It opens the account's full-screen menu:
- * profile, time zone, opening the phone app, theme, language, sounds, the budget and
- * signing out.
+ * profile, time zone, opening the phone app, theme, language, sounds, the budget,
+ * deleting the account (its dialog kept in the address, `?account=delete`, so a sign-in again comes back to it)
+ * and signing out.
  */
 function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const { t, i18n } = useTranslation();
@@ -791,6 +794,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const [profile, setProfile] = useState<"handle" | "timezone" | null>(null);
   const [phone, setPhone] = useState(false);
   const [addPassword, setAddPassword] = useState(false);
+  const [account, setAccount] = useOpenParam("account");
   // The app's "Show QR code" for this server (Preferences › Servers).
   useEffect(() => {
     if (takePhoneAsk()) setPhone(true);
@@ -958,6 +962,9 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
             </MenuOverlayItem>
           )}
           <MenuOverlaySeparator />
+          <MenuOverlayItem icon="trash" danger onSelect={pick(() => setAccount("delete"))}>
+            {t("deleteAccount.menu")}
+          </MenuOverlayItem>
           <MenuOverlayItem icon="arrowRight" danger onSelect={pick(() => void signOut())}>
             {t("auth.signOut")}
           </MenuOverlayItem>
@@ -966,6 +973,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
       <ProfileDialog focus={profile} onClose={() => setProfile(null)} />
       <OpenOnPhoneDialog open={phone} onClose={() => setPhone(false)} />
       <AddPasswordDialog open={addPassword} onClose={() => setAddPassword(false)} />
+      <DeleteAccountDialog open={account === "delete"} onClose={() => setAccount(null)} />
     </>
   );
 }
