@@ -311,23 +311,35 @@ test("reconnect(): drops the welcomed socket and dials again without backoff; wh
   expect((await done).reason).toBe("stopped");
 });
 
-test("a browser command is logged when it ends, with how long it took", async () => {
+test("a browser command is logged when it ends, with how long it took and what it waited on first", async () => {
   const lines: string[] = [];
   const ws = tempDir();
   dirs.push(ws);
+  const setup = { launch: 1400, worker: 1200, install: 28_140, bogus: 7 };
   const runner = new RequestRunner(
     { workspaceReal: ws, exec: true, token: "agm_x" },
     () => {},
     (l) => lines.push(l),
-    async (_ctx, req) => (req.op === "browser.act" && req.command === "click" ? { success: false } : { success: true }),
+    async (_ctx, req) => {
+      if (req.op === "browser.warm") return { started: true, setup: { desktop: 2300, launch: 1400 } };
+      if (req.op === "browser.batch") return { answers: [], setup };
+      return req.op === "browser.act" && req.command === "click" ? { success: false, setup } : { success: true };
+    },
   );
   const agent = { id: "01a142cb-489d-7000-87a3-efb5adb382ca", handle: "dev" };
   await runner.start("a", { op: "browser.act", agent, command: "snapshot", args: [], timeoutSeconds: 30 });
   await runner.start("b", { op: "browser.act", agent, command: "click", args: ["@e1"], timeoutSeconds: 30 });
   await runner.start("c", { op: "list", path: "", depth: 1 });
+  const open = { command: "open", args: ["https://a.example/"], timeoutSeconds: 60 };
+  await runner.start("d", { op: "browser.batch", agent, commands: [open] });
+  await runner.start("e", { op: "browser.warm", agent, desktop: true });
   expect(lines[0]).toMatch(/^\[dev\] browser\.act snapshot \d+ms$/);
-  expect(lines[1]).toMatch(/^\[dev\] browser\.act click \d+ms \(failed\)$/);
+  expect(lines[1]).toMatch(
+    /^\[dev\] browser\.act click \d+ms \(failed, worker 1\.2 s, install 28\.1 s, launch 1\.4 s\)$/,
+  );
   expect(lines[2]).toBe("list .");
+  expect(lines[3]).toMatch(/^\[dev\] browser\.batch open \d+ms \(worker 1\.2 s, install 28\.1 s, launch 1\.4 s\)$/);
+  expect(lines[4]).toMatch(/^\[dev\] browser\.warm \(desktop\) \d+ms \(desktop 2\.3 s, launch 1\.4 s\)$/);
 });
 
 test("requests run concurrently up to the ceiling; beyond it the runner answers busy (never to a person's view); cancel aborts", async () => {
