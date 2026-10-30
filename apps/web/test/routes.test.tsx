@@ -32,6 +32,24 @@ describe("route guards", () => {
     expect(screen().getByRole("heading", { name: "Como se chama o seu workspace?" })).toBeTruthy();
   });
 
+  test("a workspace still being set up is its owner's onboarding, from / and from its pages; never for someone invited", async () => {
+    const as = (role: "owner" | "member") => {
+      const state = seedState();
+      const onboarding = { step: "agents" as const, generalChannelId: GENERAL_ID };
+      if (state.me) state.me.organizations = [{ id: ORG_ID, name: "Acme", role, onboarding }];
+      return createFakeApi(state);
+    };
+    for (const path of ["/", `/org/${ORG_ID}`, `/org/${ORG_ID}/drive`]) {
+      const { router } = await renderApp(path, { api: as("owner") });
+      expect(router.state.location.pathname).toBe("/onboarding");
+      // Resumed at its step: never the form that would make another workspace.
+      expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
+      cleanup();
+    }
+    const { router } = await renderApp(`/org/${ORG_ID}/drive`, { api: as("member") });
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/drive`);
+  });
+
   test("signed in: / → the organization → #general", async () => {
     const { router } = await renderApp("/", { api: createFakeApi() });
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);

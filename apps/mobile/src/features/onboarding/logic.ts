@@ -1,7 +1,7 @@
 import type { AiStatus, Edition } from "@agenteschat/client";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
-import { firstAskOrder } from "@agenteschat/client/lib/onboarding";
+import { firstAskOrder, type OnboardingStepId } from "@agenteschat/client/lib/onboarding";
 import { platformZoneName } from "@agenteschat/client/lib/routines";
 import { isEmail } from "@agenteschat/client/lib/text";
 import type { AgentColorName, EyeStyle } from "@agenteschat/ui/agent/engine";
@@ -18,6 +18,12 @@ export type StepId = (typeof STEPS)[number];
 
 /** Steps that can be skipped. */
 export const OPTIONAL: ReadonlySet<StepId> = new Set(["import", "ai", "team"]);
+
+/** The step the server keeps (the web's, `ONBOARDING_STEPS`) for a phone step: its "ai" is part of "agents". */
+export const serverStepOf = (step: StepId): OnboardingStepId => (step === "ai" ? "agents" : step);
+
+/** Where the phone resumes a step the server keeps: with no computer step, at the agents. */
+export const phoneStepOf = (step: OnboardingStepId): StepId => (step === "computer" ? "agents" : step);
 
 /** The presets of the web's onboarding, in its order (the order they are created in), with the same looks and roles. */
 export const PRESETS = ["theo", "ada", "lia", "atlas"] as const;

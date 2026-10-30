@@ -20,9 +20,11 @@ import {
   PRESET_ROWS,
   PRESETS,
   type Preset,
+  phoneStepOf,
   prevStep,
   progressAt,
   STEPS,
+  serverStepOf,
   stepFailedText,
   stepText,
   zoneCity,
@@ -42,6 +44,13 @@ test("the phone's steps: no computer step; import, the AI and people are optiona
   expect(prevStep("workspace")).toBeNull();
   expect(prevStep("done")).toBeNull();
   expect(prevStep("context")).toBe("workspace");
+});
+
+test("the server keeps the web's steps: the phone's AI is part of its agents, and the web's computer resumes there", () => {
+  expect(STEPS.map(serverStepOf)).toEqual(["workspace", "context", "import", "agents", "agents", "team", "done"]);
+  expect(phoneStepOf("computer")).toBe("agents");
+  for (const step of ["workspace", "context", "import", "agents", "team", "done"] as const)
+    expect(phoneStepOf(step)).toBe(step);
 });
 
 test("each host says hi only the first time it appears", () => {

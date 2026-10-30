@@ -5,7 +5,7 @@ setupDom();
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { ApiError, type ImportInput, type InvitationPreview, type SignInOptions } from "@agenteschat/client";
+import { ApiError, type ImportInput, type InvitationPreview, keys, type SignInOptions } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { rememberSignIn } from "@/components/SocialButtons";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
@@ -1712,6 +1712,67 @@ describe("Onboarding", () => {
     await click(button("Abrir o #general sem enviar"), 8);
     expect(calls(state, "chat.post")).toHaveLength(0);
     expect(sessionStorage.getItem("agentes.confirmation.sent")).toBeNull();
+  });
+
+  test("opened again (a reload, its address in a new tab): the onboarding where the server has it, never a second workspace", async () => {
+    const { state, api } = await start();
+    await throughImport(state);
+    const org = state.me?.organizations.at(-1);
+    // Each step passed is saved, a skipped one too; making the workspace passed the first.
+    expect(calls(state, "orgs.saveOnboarding").map((c) => c.args[1])).toEqual([
+      { step: "import" },
+      { step: "computer" },
+    ]);
+    expect(org?.onboarding?.step).toBe("computer");
+
+    // Not the workspace: its onboarding, at that step.
+    for (const path of ["/", `/org/${org?.id}/drive`, "/onboarding"]) {
+      cleanup();
+      const { router } = await renderApp(path, { api });
+      expect(router.state.location.pathname).toBe("/onboarding");
+      expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
+      expect(progress()).toBe("Faltam 3 etapas");
+    }
+    // With what was saved: the context, and the workspace's name, which Continue keeps on the same workspace.
+    await click(button("Voltar"), 4);
+    await click(button("Voltar"), 4);
+    expect((screen().getByLabelText("Contexto") as HTMLTextAreaElement).value).toBe(
+      "A Acme Saúde faz um app para clínicas.",
+    );
+    await click(button("Voltar"), 4);
+    expect((screen().getByLabelText("Nome") as HTMLInputElement).value).toBe("Acme Saúde");
+    await next();
+    expect(screen().getByRole("heading", { name: "O que a empresa faz?" })).toBeTruthy();
+    expect(calls(state, "orgs.create")).toHaveLength(1);
+  });
+
+  test("a tab left open follows the one that got further, with the team it made; once that one finishes, the workspace opens", async () => {
+    const { state, api, services, router } = await start();
+    await throughContext(state);
+    const org = state.me?.organizations.at(-1);
+    const orgId = org?.id ?? "";
+    // In another tab: the import and the computer skipped, the team kept (Theo and Ada).
+    for (const p of [
+      { name: "Theo", handle: "theo", appearance: { color: "indigo", eyes: "round", accessory: "cap" } },
+      { name: "Ada", handle: "ada", appearance: { color: "green", eyes: "wide", accessory: "headphones" } },
+    ])
+      await api.agents.create(orgId, p);
+    await api.orgs.saveOnboarding(orgId, { step: "agents" });
+
+    // Back here, the server is asked again (the tab's focus): its step, its team.
+    await act(() => services.queryClient.invalidateQueries({ queryKey: keys.me }));
+    await settle(8);
+    expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
+    expect(button(/Theo · PM/).getAttribute("aria-pressed")).toBe("true");
+    expect(button(/Lia · Pesquisa/).getAttribute("aria-pressed")).toBe("false");
+    await next();
+    expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
+    expect(calls(state, "agents.create")).toHaveLength(2);
+
+    await api.orgs.saveOnboarding(orgId, { finished: true });
+    await act(() => services.queryClient.invalidateQueries({ queryKey: keys.me }));
+    await settle(8);
+    expect(router.state.location.pathname).toBe(`/org/${orgId}/c/${org?.onboarding?.generalChannelId}`);
   });
 
   test("Done: with no computer to browse on, Theo offers the first message, having read the context; Send posts it once and opens #general", async () => {

@@ -1,3 +1,4 @@
+import type { OnboardingStepId } from "../lib/onboarding";
 import type {
   AccessInput,
   AccountLoginStart,
@@ -261,6 +262,14 @@ export interface ApiClient {
       name: string;
       context?: string;
     }): Promise<{ organization: Organization; generalChannelId: string }>;
+    /**
+     * Its owner's progress in setting it up: the furthest step reached (it only moves forward), or `finished`. Null
+     * from a server that doesn't keep it.
+     */
+    saveOnboarding(
+      orgId: string,
+      input: { step: OnboardingStepId } | { finished: true },
+    ): Promise<{ step: OnboardingStepId; finished: boolean } | null>;
     get(orgId: string): Promise<Organization>;
     update(orgId: string, input: { name?: string; context?: string }): Promise<void>;
     /** My handle and time zone in this organization (`timezone: null` = the organization's). */

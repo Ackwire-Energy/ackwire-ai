@@ -13,12 +13,14 @@ import {
   whenAt,
 } from "@agenteschat/client/lib/format";
 import { agentGrammar, isFeminineName, providerGrammar, runErrorGrammar } from "@agenteschat/client/lib/grammar";
-import { landingFor, membershipIn, safeRedirect, webUrl } from "@agenteschat/client/lib/guards";
+import { landingFor, membershipIn, safeRedirect, settingUp, webUrl } from "@agenteschat/client/lib/guards";
 import {
   addInvites,
+  crewOf,
   firstAskOrder,
   ONBOARDING_STEPS,
   splitEmails,
+  stepIndex,
   validInvites,
 } from "@agenteschat/client/lib/onboarding";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -282,6 +284,36 @@ describe("guards and permissions", () => {
     expect(landingFor({ ...me, organizations: [] }, null)).toEqual({ to: "/onboarding" });
     expect(membershipIn(me, "b")?.role).toBe("member");
     expect(membershipIn(me, "c")).toBeNull();
+  });
+  test("landing: a workspace its owner hasn't finished setting up is the onboarding, never a place to land", () => {
+    const onboarding = { step: "agents" as const, generalChannelId: "g" };
+    const mine = { id: "n", name: "N", role: "owner" as const, onboarding };
+    expect(settingUp(mine)).toBe(true);
+    expect(landingFor({ ...me, organizations: [mine] }, "n")).toEqual({ to: "/onboarding" });
+    // Another of theirs is set up: that one opens, last visited or not.
+    expect(landingFor({ ...me, organizations: [mine, ...me.organizations] }, "n")).toEqual({ orgId: "a" });
+    // Invited into one being set up, or finished: no onboarding of theirs.
+    expect(settingUp({ ...mine, role: "admin" })).toBe(false);
+    expect(landingFor({ ...me, organizations: [{ ...mine, role: "member" }] }, null)).toEqual({ orgId: "n" });
+    expect(settingUp({ id: "n", name: "N", role: "owner" })).toBe(false);
+  });
+  test("a resumed onboarding knows its ready-made agents by name and look; the rest are imported", () => {
+    const look = { color: "indigo", eyes: "round", accessory: "cap" };
+    const mark = (p: "theo" | "lia") =>
+      p === "theo" ? { name: "Theo", ...look } : { name: "Lia", color: "rose", eyes: "dots", accessory: "flower" };
+    const agents = [
+      { id: "1", name: "Theo", appearance: look },
+      { id: "2", name: "Theo", appearance: { ...look, color: "green" } },
+      { id: "3", name: "Lia", appearance: { color: "rose", eyes: "dots", accessory: "flower" } },
+      { id: "4", name: "Theo", appearance: look },
+      { id: "5", name: "Dev" },
+    ];
+    const crew = crewOf(agents, ["theo", "lia"] as const, mark);
+    expect(Object.keys(crew.presets)).toEqual(["theo", "lia"]);
+    expect([crew.presets.theo?.id, crew.presets.lia?.id]).toEqual(["1", "3"]);
+    expect(crew.others.map((a) => a.id)).toEqual(["2", "4", "5"]);
+    expect(stepIndex("context")).toBe(1);
+    expect(stepIndex("done")).toBe(ONBOARDING_STEPS.length - 1);
   });
   test("role table mirrors the backend", () => {
     expect(can("member", "post")).toBe(true);

@@ -9,12 +9,14 @@ import {
   useMe,
 } from "@agenteschat/client";
 import { computerEdition, computerName } from "@agenteschat/client/lib/computer";
+import { settingUp } from "@agenteschat/client/lib/guards";
 import { sendsEmail } from "@agenteschat/client/lib/join-requests";
 import { firstMentioned } from "@agenteschat/client/lib/markdown";
 import { type AiChoice, aiStateOf } from "@agenteschat/client/lib/no-ai";
+import { crewOf, stepIndex } from "@agenteschat/client/lib/onboarding";
 import { AUTO } from "@agenteschat/client/lib/providers";
 import { handleFrom } from "@agenteschat/client/lib/text";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
@@ -68,19 +70,21 @@ import {
   PRESET_ROWS,
   PRESETS,
   type Preset,
+  phoneStepOf,
   phoneTimezone,
   prevStep,
   progressAt,
   STEPS,
   type StepId,
+  serverStepOf,
   stepFailedText,
   stepText,
   zoneLabel,
 } from "./logic";
 
 /**
- * The first run on the phone: signed in with no workspace yet, one
- * question per full screen, hosted by an agent of the team, the progress a strip of sky with a small agent
+ * The first run on the phone: signed in with no workspace to open yet (none, or one still being set up, which it
+ * resumes), one question per full screen, hosted by an agent of the team, the progress a strip of sky with a small agent
  * walking at its front. Workspace (logo optional, time zone from the phone) → Contexto → Trazer agentes
  * (optional; brought from the web) → Agentes → IA (optional: an AI plan or an API key, skipped when the agents
  * already think with one) → Pessoas (optional: type e-mails or share a link) → Pronto: the team's welcome and the
@@ -94,6 +98,8 @@ export function OnboardingFlow() {
   const me = useMe();
   const { colors: c } = useTheme();
   const [step, setStep] = useState<StepId>("workspace");
+  // The furthest step reached here, as the server counts them (`stepIndex`).
+  const [reached, setReached] = useState(0);
   const [created, setCreated] = useState<{ orgId: string; generalChannelId: string } | null>(null);
   const [name, setName] = useState("");
   const [logo, setLogo] = useState<{ base64: string; type: "image/jpeg" | "image/png" | "image/webp" } | null>(null);
@@ -171,18 +177,28 @@ export function OnboardingFlow() {
     setFirstAsk(offer ? { team, ...offer, clientId: newClientId() } : null);
   }, [step, team]);
 
+  // Each step reached is saved, so the web, or the app opened again, resumes there (creating the workspace passed the
+  // first one).
+  const reach = async (next: StepId) => {
+    const at = stepIndex(serverStepOf(next));
+    if (created && at > reached) await api.orgs.saveOnboarding(created.orgId, { step: serverStepOf(next) });
+    setReached((r) => Math.max(r, at));
+    setStep(next);
+  };
+
   const run = async (work: () => Promise<void>, then: StepId | (() => StepId)) => {
     setPending(true);
     setError(null);
     try {
       await work();
-      setStep(typeof then === "function" ? then() : then);
+      await reach(typeof then === "function" ? then() : then);
     } catch (e) {
       setError({ at: step, text: stepFailedText(t, e) });
     } finally {
       setPending(false);
     }
   };
+  const skipTo = (next: StepId) => void run(async () => {}, next);
 
   const saveWorkspace = () =>
     run(async () => {
@@ -250,7 +266,7 @@ export function OnboardingFlow() {
     setError(null);
     if (await ai.save()) {
       setAiSaved(true);
-      setStep("team");
+      skipTo("team");
     }
   };
 
@@ -264,7 +280,7 @@ export function OnboardingFlow() {
     setInvited((n) => n + emails.length - failed.length);
     setEmails(failed);
     if (failed.length) setError({ at: "team", text: t("mobile.onb.invitesFailed") });
-    else setStep("done");
+    else skipTo("done");
   };
 
   const shareLink = async () => {
@@ -307,6 +323,7 @@ export function OnboardingFlow() {
     setError(null);
     try {
       if (message) await api.chat.post(created.orgId, created.generalChannelId, message);
+      await api.orgs.saveOnboarding(created.orgId, { finished: true });
     } catch {
       setPending(false);
       setError({ at: "done", text: t("mobile.app.failed") });
@@ -321,6 +338,45 @@ export function OnboardingFlow() {
     setPending(false);
     router.push(chatHref(created.generalChannelId));
   };
+
+  // The workspace being set up, as the server keeps it (made here or on the web): opened at the furthest step
+  // reached with what was saved, and followed when the web gets further.
+  const mine = created
+    ? me.data?.organizations.find((o) => o.id === created.orgId)
+    : me.data?.organizations.find(settingUp);
+  const saved = mine?.onboarding ? { orgId: mine.id, ...mine.onboarding } : null;
+  const behind = saved !== null && stepIndex(saved.step) > reached;
+  const resume = useQuery({
+    queryKey: ["onboarding", "resume", saved?.orgId, saved?.step],
+    enabled: behind,
+    gcTime: 0,
+    queryFn: async () => {
+      if (!saved) return null;
+      const [settings, agents] = await Promise.all([api.orgs.settings(saved.orgId), api.agents.list(saved.orgId)]);
+      const mark = (p: Preset) => ({ name: t(`onboarding.presets.${p}.name`), ...PRESET_LOOK[p] });
+      return { saved, settings, made: crewOf(agents, PRESETS, mark).presets };
+    },
+  });
+  useEffect(() => {
+    const r = resume.data;
+    if (!r || pending || stepIndex(r.saved.step) <= reached) return;
+    setCreated({ orgId: r.saved.orgId, generalChannelId: r.saved.generalChannelId });
+    setName(r.settings.name);
+    setContext(r.settings.context);
+    setSavedContext(r.settings.context);
+    const ids: Partial<Record<Preset, string>> = {};
+    const named: Partial<Record<Preset, string>> = {};
+    for (const p of Object.keys(r.made) as Preset[]) {
+      ids[p] = r.made[p]?.id;
+      named[p] = r.made[p]?.handle;
+    }
+    setAgentIds(ids);
+    setHandles(named);
+    // The team was kept already: those it has (the guide always) stay picked, and no other.
+    if (Object.keys(ids).length > 0) setChosen(new Set([GUIDE, ...(Object.keys(ids) as Preset[])]));
+    setReached(stepIndex(r.saved.step));
+    setStep(phoneStepOf(r.saved.step));
+  }, [resume.data, pending, reached]);
 
   const host = HOST[step];
   const count = joiningLeft(chosen, agentIds);
@@ -348,7 +404,7 @@ export function OnboardingFlow() {
           },
         }
       : planned.length > 0
-        ? { ai: { label: t("onboarding.actions.continue"), onPress: () => setStep("team"), ready: true } }
+        ? { ai: { label: t("onboarding.actions.continue"), onPress: () => skipTo("team"), ready: true } }
         : {}),
     // With no e-mails the step has no main action: "Agora não" is the quiet way on, below.
     ...(emails.length
@@ -372,6 +428,9 @@ export function OnboardingFlow() {
   };
   const action = primary[step];
   const back = prevStep(step);
+
+  // Never the form that would make another workspace while one is being set up.
+  if (created === null && behind) return <View style={[styles.screen, { backgroundColor: c.bg }]} />;
 
   return (
     <StepFrame
@@ -397,13 +456,13 @@ export function OnboardingFlow() {
             />
           ) : null}
           {step === "import" ? (
-            <Button variant="ghost" wide label={t("mobile.onb.importSkip")} onPress={() => setStep("agents")} />
+            <Button variant="ghost" wide label={t("mobile.onb.importSkip")} onPress={() => skipTo("agents")} />
           ) : null}
           {step === "ai" ? (
-            <Button variant="ghost" wide label={t("connectAi.later")} onPress={() => setStep("team")} />
+            <Button variant="ghost" wide label={t("connectAi.later")} onPress={() => skipTo("team")} />
           ) : null}
           {step === "team" ? (
-            <Button variant="ghost" wide label={t("mobile.onb.later")} onPress={() => setStep("done")} />
+            <Button variant="ghost" wide label={t("mobile.onb.later")} onPress={() => skipTo("done")} />
           ) : null}
           {/* On Done the quiet way opens #general without the first message, while there is one. */}
           {step === "done" && asking ? (

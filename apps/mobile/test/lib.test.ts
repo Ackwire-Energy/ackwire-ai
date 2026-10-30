@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readDeleteResponse } from "../src/features/account/result";
-import { chooseOrg, firstRunMounted, serverDownOf } from "../src/lib/org-choice";
+import { chooseOrg, firstRunMounted, openOrgs, serverDownOf } from "../src/lib/org-choice";
 import { photoSource } from "../src/lib/photo";
 import { createHolder, deviceBody, devicePath, quietWhileOpen, readPushData } from "../src/lib/push-payload";
 import { connectPlan, currentServer, savedServer } from "../src/lib/server-choice";
@@ -95,6 +95,23 @@ test("organization choice: remembered if still a member, else the first", () => 
   expect(chooseOrg(orgs, "b")).toBe("b");
   expect(chooseOrg(orgs, "gone")).toBe("a");
   expect(chooseOrg([], "a")).toBeNull();
+});
+
+test("a workspace its owner is still setting up isn't opened: the first run resumes it, alone or not", () => {
+  const onboarding = { step: "agents" as const, generalChannelId: "g" };
+  const mine = { id: "n", name: "N", role: "owner" as const, onboarding };
+  const joined = { id: "a", name: "A", role: "member" as const };
+  // Only that one: no workspace to open, so the first run shows.
+  expect(openOrgs([mine])).toEqual([]);
+  // Another to open: that one, even when the one being set up was the last chosen.
+  expect(chooseOrg(openOrgs([mine, joined]), "n")).toBe("a");
+  // Someone invited into one still being set up, or one finished: it opens.
+  expect(
+    openOrgs([
+      { ...mine, role: "admin" as const },
+      { id: "f", name: "F", role: "owner" as const },
+    ]),
+  ).toHaveLength(2);
 });
 
 test("the first run: kept, hidden, under an invitation's screen once mounted; never first mounted under one", () => {
