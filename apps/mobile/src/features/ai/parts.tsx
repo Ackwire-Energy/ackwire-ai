@@ -86,7 +86,11 @@ export function PlanReplies({
         />
       </GroupedList>
       <View style={styles.foot}>
-        <InfoHint name={says.about} text={says.text} variant="footnote">
+        <InfoHint
+          name={t("common.about", { label: t("aiAccounts.share.terms.about") })}
+          text={says.text}
+          variant="footnote"
+        >
           <Text variant="footnote" tone="faint">
             {says.line}
           </Text>
