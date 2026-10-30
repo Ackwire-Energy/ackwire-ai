@@ -781,7 +781,10 @@ export async function changeMemberRole(
   await announceMembers(options.pubsub, orgId);
 }
 
-/** Removes a member (or lets a member leave). The last owner can't leave. */
+/**
+ * Removes a member (or lets a member leave). The last owner can't leave. The computers they connected here go with
+ * them (`personalMachines`).
+ */
 export async function removeMember(
   db: Database,
   actorId: string,
@@ -797,9 +800,10 @@ export async function removeMember(
     if (target.role === "owner" && !can(actor.role, "manage_owners"))
       throw new ForbiddenError("Only owners can remove owners");
   }
-  // Loaded here: the accounts module builds on this one.
+  // Loaded here: these modules build on this one.
   const { announceReleasedAccounts, releaseMemberAccounts } = await import("./machine-accounts");
-  const released = await db.transaction(async (tx) => {
+  const { announceRemovedMachine, detachMachine, personalMachines } = await import("./machines");
+  const { released, removed } = await db.transaction(async (tx) => {
     await lockOrgMembers(tx, orgId);
     if (target.role === "owner" && (await ownerCount(tx, orgId)) <= 1) {
       throw new ConflictError("An organization needs at least one owner. Transfer ownership first.");
@@ -814,9 +818,17 @@ export async function removeMember(
     const action = actorId === targetUserId ? "member.left" : "member.removed";
     await auditMember(tx, orgId, actorId, action, targetUserId, { role: target.role });
     // Their AI accounts on the organization's computers are signed out and removed (ADR 0059 §1).
-    return releaseMemberAccounts(tx, targetUserId, orgId);
+    const released = await releaseMemberAccounts(tx, targetUserId, orgId);
+    const removed = [];
+    for (const computer of await personalMachines(tx, targetUserId, [orgId])) {
+      removed.push({ computer, freed: await detachMachine(tx, computer) });
+    }
+    return { released, removed };
   });
   await announceReleasedAccounts(options.pubsub, released);
+  for (const { computer, freed } of removed) {
+    await announceRemovedMachine({ db, pubsub: options.pubsub }, computer, { type: "person", id: actorId }, freed);
+  }
   // Their open WebSocket connections lose every subscription now, not on reconnect.
   await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId: targetUserId });
   await announceMembers(options.pubsub, orgId);

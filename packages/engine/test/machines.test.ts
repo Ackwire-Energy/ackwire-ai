@@ -18,6 +18,7 @@ import {
   grantScopes,
   listAgentSecrets,
   listMachines,
+  MACHINE_CONTROL_TOPIC,
   MachineDroppedError,
   type MachineHub,
   MachineOfflineError,
@@ -26,6 +27,7 @@ import {
   postPersonMessage,
   receiveMachineUpload,
   removeAgentSecret,
+  removeMember,
   renameMachine,
   SERVER_STOP_TASK_GRACE_MS,
   type SecretRequestView,
@@ -547,6 +549,57 @@ describe("machines and targets", () => {
     const [agent] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, f.agent.id));
     expect(agent?.machineId).toBeNull();
     await expect(deleteMachine(deps(), f.owner.id, f.org.id, mine.machineId)).rejects.toThrow(NotFoundError);
+  });
+
+  test("whoever leaves or is removed takes the computers they connected; a system-mode one stays, and their AI accounts leave it", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "admin", "bia");
+    const cy = await addMember(f.db, f.org.id, "member", "cy");
+    const laptop = (await pair(bia.id, "Bia's laptop")).machineId;
+    const server = (await pair(bia.id, "Team server")).machineId;
+    await f.db
+      .update(schema.machines)
+      .set({ executors: { mode: "system" } })
+      .where(eq(schema.machines.id, server));
+    const cyLaptop = (await pair(cy.id, "Cy's laptop")).machineId;
+    await f.db.insert(schema.machineAccounts).values({
+      id: crypto.randomUUID(),
+      orgId: f.org.id,
+      machineId: server,
+      kind: "claude_code",
+      label: "Claude Max",
+      status: "active",
+      createdBy: bia.id,
+    });
+    await f.db.update(schema.agents).set({ machineId: laptop }).where(eq(schema.agents.id, f.agent.id));
+    const signals: unknown[] = [];
+    f.pubsub.subscribe(MACHINE_CONTROL_TOPIC, (e) => signals.push(e));
+
+    await removeMember(f.db, bia.id, f.org.id, bia.id, { pubsub: f.pubsub });
+    await removeMember(f.db, f.owner.id, f.org.id, cy.id, { pubsub: f.pubsub });
+    const rows = await f.db.select().from(schema.machines).orderBy(schema.machines.createdAt);
+    expect(rows.map((m) => [m.name, m.deletedAt !== null])).toEqual([
+      ["Bia's laptop", true],
+      ["Team server", false],
+      ["Cy's laptop", true],
+    ]);
+    expect(signals).toEqual(
+      expect.arrayContaining([
+        { type: "machine.accounts", machineId: server },
+        { type: "machine.revoke", machineId: laptop },
+        { type: "machine.revoke", machineId: cyLaptop },
+      ]),
+    );
+    expect(signals).not.toContainEqual({ type: "machine.revoke", machineId: server });
+    const [agent] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, f.agent.id));
+    expect(agent?.machineId).toBeNull();
+    const audit = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "machine.deleted"));
+    expect(audit.map((a) => [a.targetId, a.actorId])).toEqual([
+      [laptop, bia.id],
+      [cyLaptop, f.owner.id],
+    ]);
+    const accounts = await f.db.select().from(schema.machineAccounts);
+    expect(accounts).toMatchObject([{ machineId: server, status: "removing" }]);
   });
 
   test("target: admins, or the agent's owner with a machine they paired; announced as agent.computer", async () => {

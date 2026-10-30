@@ -227,6 +227,33 @@ export function drivesComputer(
   return machine.pairedByUserId === person.userId;
 }
 
+/**
+ * The computers a person connected in these workspaces that are theirs alone (`drivesComputer`: not in system mode,
+ * where a computer is the team's). Every agent on one runs as their OS user, so it leaves the workspace with them.
+ */
+export async function personalMachines(db: Executor, userId: string, orgIds: string[]) {
+  if (orgIds.length === 0) return [];
+  const rows = await db
+    .select({
+      id: machines.id,
+      orgId: machines.orgId,
+      name: machines.name,
+      kind: machines.kind,
+      executors: machines.executors,
+    })
+    .from(machines)
+    .where(
+      and(
+        inArray(machines.orgId, orgIds),
+        eq(machines.pairedByUserId, userId),
+        eq(machines.kind, "connected"),
+        isNull(machines.deletedAt),
+      ),
+    )
+    .orderBy(machines.createdAt);
+  return rows.filter((m) => m.executors?.mode !== "system").map(({ executors: _, ...m }) => m);
+}
+
 /** The computer of an agent that the person may drive (`drivesComputer`); refused otherwise. */
 export async function requireComputerDriver(
   db: Database,
@@ -502,34 +529,50 @@ export async function removeMachine(
   actor: AuditEntry["actor"],
   also?: (tx: Executor) => Promise<unknown>,
 ) {
-  const orgId = machine.orgId;
-  const now = new Date();
   const freed = await deps.db.transaction(async (tx) => {
-    const rows = await tx
-      .update(agents)
-      // Its accounts (ADR 0041) stay with it: the agents leave them.
-      .set({ machineId: null, brainAccountId: null, updatedAt: now })
-      .where(and(eq(agents.orgId, orgId), eq(agents.machineId, machine.id)))
-      .returning({ id: agents.id });
-    const ids = rows.map((r) => r.id);
-    // Remembered so reconnecting this computer gives them back (`confirmDeviceCode`). A connected
-    // computer's token hash stays too: a removed row never authenticates (`authenticateMachine`), and
-    // the token is how that computer proves it is this machine when it asks to come back
-    // (`startDeviceCode`, ADR 0036 §5). The workspace's own computers lose it.
-    await tx
-      .update(machines)
-      .set({
-        deletedAt: now,
-        ...(machine.kind === "connected" ? {} : { tokenHash: null }),
-        online: false,
-        connectedReplica: null,
-        previousAgentIds: ids,
-        updatedAt: now,
-      })
-      .where(eq(machines.id, machine.id));
+    const ids = await detachMachine(tx, machine);
     await also?.(tx);
     return ids;
   });
+  await announceRemovedMachine(deps, machine, actor, freed);
+}
+
+/** `removeMachine`'s writes, in the caller's transaction: the agents it leaves with no computer. */
+export async function detachMachine(tx: Executor, machine: Pick<MachineRow, "id" | "orgId" | "kind">) {
+  const now = new Date();
+  const rows = await tx
+    .update(agents)
+    // Its accounts (ADR 0041) stay with it: the agents leave them.
+    .set({ machineId: null, brainAccountId: null, updatedAt: now })
+    .where(and(eq(agents.orgId, machine.orgId), eq(agents.machineId, machine.id)))
+    .returning({ id: agents.id });
+  const ids = rows.map((r) => r.id);
+  // Remembered so reconnecting this computer gives them back (`confirmDeviceCode`). A connected
+  // computer's token hash stays too: a removed row never authenticates (`authenticateMachine`), and
+  // the token is how that computer proves it is this machine when it asks to come back
+  // (`startDeviceCode`, ADR 0036 §5). The workspace's own computers lose it.
+  await tx
+    .update(machines)
+    .set({
+      deletedAt: now,
+      ...(machine.kind === "connected" ? {} : { tokenHash: null }),
+      online: false,
+      connectedReplica: null,
+      previousAgentIds: ids,
+      updatedAt: now,
+    })
+    .where(eq(machines.id, machine.id));
+  return ids;
+}
+
+/** After `detachMachine` commits: the audit row, its socket closed wherever it is, and the apps told. */
+export async function announceRemovedMachine(
+  deps: Pick<MachineDeps, "db" | "pubsub">,
+  machine: Pick<MachineRow, "id" | "orgId" | "name">,
+  actor: AuditEntry["actor"],
+  freed: string[],
+) {
+  const orgId = machine.orgId;
   for (const agentId of freed) caches.agents.delete(`${orgId}:${agentId}`);
   await recordAudit(deps.db, {
     orgId,
