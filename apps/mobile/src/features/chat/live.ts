@@ -7,6 +7,7 @@ import {
   applyReceiptEvent,
   type ChannelEvent,
   type ConsultsState,
+  cacheAgentProposal,
   cacheApproval,
   cacheDmRead,
   cacheMessage,
@@ -241,6 +242,10 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
     case "question.asked":
     case "question.answered":
       cacheQuestion(qc, orgId, channelId, event.question);
+      break;
+    case "agent.proposal.updated":
+      // An agent's proposal of a new agent was created or denied (by anyone): its card.
+      cacheAgentProposal(qc, orgId, event, event);
       break;
     case "browser.handoff.updated":
       // An agent's browser request changed (ADR 0040): its card, the live view, the agent's open request.

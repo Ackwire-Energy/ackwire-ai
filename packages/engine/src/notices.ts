@@ -5,7 +5,8 @@ import { untrustedBlock } from "./untrusted";
  * looking: a routine's report (`routine_handoff`), another agent's answer
  * (`consult_reply`) or note (`agent_note`), the late result of a wait it
  * stopped waiting on (`wait_result`), a fast reply it gave while it worked
- * (`talker_reply`). Stored on the notice message as `meta.notice`; the
+ * (`talker_reply`), what a person decided on its proposal of a new agent
+ * (`proposal_result`). Stored on the notice message as `meta.notice`; the
  * agent's context reads it as an event, never as a person's words.
  *
  * A notice is written as the agent it is for (its message's author). It reads
@@ -13,7 +14,13 @@ import { untrustedBlock } from "./untrusted";
  * other agents in the conversation read a neutral line or nothing
  * (`noticeForOthers`), so nobody takes another agent's report or note as theirs.
  */
-export type NoticeKind = "routine_handoff" | "consult_reply" | "agent_note" | "wait_result" | "talker_reply";
+export type NoticeKind =
+  | "routine_handoff"
+  | "consult_reply"
+  | "agent_note"
+  | "wait_result"
+  | "talker_reply"
+  | "proposal_result";
 
 export interface Notice {
   kind: NoticeKind;

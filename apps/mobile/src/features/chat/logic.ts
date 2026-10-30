@@ -7,6 +7,7 @@ import type {
   MessagePin,
   ReactionCount,
 } from "@agenteschat/client";
+import { agentProposalOf } from "@agenteschat/client/lib/action-cards";
 import { type ActivityEntry, barEntries } from "@agenteschat/client/lib/activity";
 import { type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
 import {
@@ -267,6 +268,7 @@ export function questionOf(meta: Message["meta"]): AgentQuestion | null {
 export const hidesBody = (m: Message) =>
   Boolean(
     approvalIdOf(m.meta) ||
+      agentProposalOf(m.meta) ||
       m.meta?.missionStart ||
       m.meta?.threadStart ||
       m.meta?.issueWork ||

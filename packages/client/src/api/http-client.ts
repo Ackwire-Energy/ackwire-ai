@@ -21,6 +21,7 @@ import type {
   AgentForYou,
   AgentMailbox,
   AgentPlanUsage,
+  AgentProposal,
   AgentQuestion,
   AgentSecret,
   AgentSkill,
@@ -417,6 +418,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       planUsage: (orgId, agentId) => request<AgentPlanUsage>(`${org(orgId)}/agents/${enc(agentId)}/usage`),
       team: (orgId) => request<Team>(`${org(orgId)}/team`),
       create: (orgId, input) => request<Agent>(`${org(orgId)}/agents`, { json: input }),
+      proposal: (orgId, messageId) => request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}`),
+      denyProposal: (orgId, messageId) =>
+        request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}/deny`, { json: {} }),
       update: (orgId, agentId, input) =>
         request<Agent>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "PATCH", json: input }),
       archive: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "DELETE" }),
