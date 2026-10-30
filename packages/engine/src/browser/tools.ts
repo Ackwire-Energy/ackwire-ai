@@ -1000,7 +1000,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
         properties: {
           path: {
             type: "string",
-            description: "Where in your folder (default `screenshots/<time>.png`).",
+            description: "Where in your folder (a .png; default `screenshots/<time>.png`).",
             maxLength: 1000,
           },
           full_page: { type: "boolean", description: "The whole page, not only what fits the window." },
@@ -1010,10 +1010,13 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
       },
       async (input, ctx) => {
         const given = str(input.path);
-        const path = given
+        const chosen = given
           ? agentFolderPath(given)
           : `screenshots/${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
-        if (!path) return { content: "Give a path inside your own folder (relative, without `..`).", isError: true };
+        if (!chosen) return { content: "Give a path inside your own folder (relative, without `..`).", isError: true };
+        // The image is a PNG, whatever the name asked for; and agent-browser's `screenshot [selector] [path]` reads a
+        // lone name without a slash or an image extension (`notes.txt`, `code`) as a selector, not where to save it.
+        const path = /\.png$/i.test(chosen) ? chosen : `${chosen.replace(/\.[^./]*$/, "")}.png`;
         const linked = await linkFor(ctx);
         if (!linked.ok) return { content: linked.text, isError: true };
         const r = await linked.link.act({

@@ -776,3 +776,29 @@ test("browser_screenshot with share but without Write files: saved, and the answ
   expect(b.calls.filter((c) => c.op === "push")).toEqual([]);
   expect(await f.db.select().from(schema.artifactUploads)).toEqual([]);
 });
+
+test("browser_screenshot names its file a .png, so the browser writes the image where share sends it from", async () => {
+  const b = await browserSetup();
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  const folder = new Map<string, Uint8Array>([["notes.txt", new TextEncoder().encode("a note")]]);
+  b.s.respond = (r) => {
+    if (r.op === "push") return pushFromFolder(f, b.machineId, folder, r);
+    if (r.op === "browser.act" && r.command === "screenshot") {
+      // agent-browser's `screenshot [selector] [path]`: a lone argument without a slash or an image extension is a selector.
+      const arg = String(r.args[0]);
+      folder.set(/[/\\]|\.(png|jpe?g|webp)$/i.test(arg) ? arg : "screenshots/generated.png", PNG);
+    }
+    return ok();
+  };
+
+  const out = await b.call("browser_screenshot", { path: "notes.txt", share: true });
+  const [a] = await f.db.select().from(schema.artifacts);
+  expect(out.content).toBe(
+    `Saved notes.png in your folder. It is shown in this conversation: its card goes with your reply ("notes.png" in the Drive, 8 bytes, artifact ${a?.id}).`,
+  );
+  const kept = await b.call("browser_screenshot", { path: "code" });
+  expect(kept.content).toStartWith("Saved code.png in your folder.");
+  const shots = b.calls.filter((c): c is Act => c.op === "browser.act" && c.command === "screenshot");
+  expect(shots.map((c) => c.args[0])).toEqual(["notes.png", "code.png"]);
+  expect(b.calls.filter((c) => c.op === "push").map((c) => c.path)).toEqual(["notes.png"]);
+});
