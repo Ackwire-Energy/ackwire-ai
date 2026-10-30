@@ -8,7 +8,7 @@ import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { titleKind } from "@/components/browser/BrowserCard";
 import { ADA_ID, createFakeApi, ENG_ID, fakeBrowserOf, ORG_ID, seedState } from "./fake-api";
-import { renderApp, settle } from "./render";
+import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
 
@@ -222,6 +222,31 @@ describe("the card in the message", () => {
     // Esc gives the wheel back to the conversation.
     await act(async () => fireEvent.keyDown(page, { key: "Escape" }));
     expect(card.querySelector(".brw-ac__capture")).toBeNull();
+  });
+
+  test("its Chrome on the agent's desktop: Ver a tela inteira over the page, and in the frame's top in control", async () => {
+    const api = createFakeApi(seedState());
+    fakeBrowserOf.get(api)?.desktops.set(ADA_ID, { available: true, running: true });
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(5);
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
+    const run = { channelId: ENG_ID, threadId: null, runId: "r-desktop", agentId: ADA_ID };
+    await act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { type: "agent.thinking", ...run } }));
+    await act(async () =>
+      socket.push({ type: "event", channelId: ENG_ID, event: { type: "agent.tool", tool: "browser_open", ...run } }),
+    );
+    await settle(3);
+    const card = document.querySelector(".brw-ac") as HTMLElement;
+    const over = card.querySelector(".brw-mf__over") as HTMLElement;
+    expect(within(over).getByRole("button", { name: "Ver a tela inteira" })).toBeTruthy();
+
+    await act(async () => fireEvent.click(within(over).getByRole("button", { name: "Assumir" })));
+    await settle(3);
+    const top = card.querySelector(".brw-mf__top") as HTMLElement;
+    await act(async () => fireEvent.click(within(top).getByRole("button", { name: "Ver a tela inteira" })));
+    await settle(6);
+    expect(screen().getByRole("dialog", { name: "Computador da Ada" })).toBeTruthy();
   });
 });
 

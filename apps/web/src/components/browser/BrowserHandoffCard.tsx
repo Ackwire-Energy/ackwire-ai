@@ -218,13 +218,7 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
         {waiting && <ExpiryFuse left={handoffFuse(current)} color={colorOf(agent)} />}
       </div>
       {showBrowser && (
-        <BrowserCard
-          agentId={current.agentId}
-          name={name}
-          handoff={current}
-          defaultOpen
-          onSettled={() => setHere(false)}
-        />
+        <BrowserCard agentId={current.agentId} name={name} handoff={current} onSettled={() => setHere(false)} />
       )}
     </>
   );
