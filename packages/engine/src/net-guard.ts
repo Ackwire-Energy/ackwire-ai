@@ -11,12 +11,50 @@ function ipv4Parts(ip: string) {
   return ip.split(".").map((p) => Number(p));
 }
 
+/**
+ * The eight 16-bit groups of a valid IPv6 literal, in any notation: compressed
+ * (`::`), full, or with an embedded dotted IPv4 tail. Classifying the groups (not
+ * a prefix string) is what keeps the range checks from being fooled by an
+ * alternate spelling of the same address, such as a hex IPv4-mapped form.
+ */
+type Ipv6Groups = [number, number, number, number, number, number, number, number];
+
+function ipv6Groups(ip: string): Ipv6Groups | null {
+  let s = ip;
+  const dotted = /:(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(s);
+  if (dotted) {
+    const [b0 = 0, b1 = 0, b2 = 0, b3 = 0] = dotted.slice(1, 5).map(Number);
+    if ([b0, b1, b2, b3].some((n) => n > 255)) return null;
+    s = `${s.slice(0, dotted.index + 1)}${((b0 << 8) | b1).toString(16)}:${((b2 << 8) | b3).toString(16)}`;
+  }
+  const halves = s.split("::");
+  if (halves.length > 2) return null;
+  const parse = (part: string) => (part === "" ? [] : part.split(":").map((x) => Number.parseInt(x, 16)));
+  const head = parse(halves[0] ?? "");
+  const tail = halves.length === 2 ? parse(halves[1] ?? "") : [];
+  const groups = halves.length === 2 ? [...head, ...new Array(8 - head.length - tail.length).fill(0), ...tail] : head;
+  if (groups.length !== 8 || groups.some((n) => Number.isNaN(n) || n < 0 || n > 0xffff)) return null;
+  return groups as Ipv6Groups;
+}
+
 /** Private, loopback, link-local (cloud metadata), CGNAT, multicast and reserved addresses. */
 export function isBlockedAddress(address: string): boolean {
   let ip = address.toLowerCase();
   if (ip.startsWith("[") && ip.endsWith("]")) ip = ip.slice(1, -1);
-  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(ip);
-  if (mapped?.[1]) ip = mapped[1];
+  if (isIP(ip) === 6) {
+    const g = ipv6Groups(ip);
+    if (!g) return true; // can't be classified → treat as internal
+    // IPv4-mapped (::ffff:a.b.c.d) and IPv4-compatible (::a.b.c.d), in any notation,
+    // carry an IPv4 address the socket connects to: check it under the IPv4 rules.
+    // This also catches ::1 and :: (as 0.0.0.1 and 0.0.0.0, both blocked below).
+    if (g[0] === 0 && g[1] === 0 && g[2] === 0 && g[3] === 0 && g[4] === 0 && (g[5] === 0 || g[5] === 0xffff)) {
+      return isBlockedAddress(`${g[6] >> 8}.${g[6] & 0xff}.${g[7] >> 8}.${g[7] & 0xff}`);
+    }
+    if ((g[0] & 0xfe00) === 0xfc00) return true; // unique local fc00::/7 (incl. fd00:ec2::254)
+    if ((g[0] & 0xffc0) === 0xfe80) return true; // link-local fe80::/10
+    if ((g[0] & 0xff00) === 0xff00) return true; // multicast ff00::/8
+    return false;
+  }
   if (isIP(ip) === 4) {
     const [a = 0, b = 0] = ipv4Parts(ip);
     if (a === 0 || a === 10 || a === 127) return true;
@@ -27,13 +65,6 @@ export function isBlockedAddress(address: string): boolean {
     if (a === 192 && b === 0) return true;
     if (a === 198 && (b === 18 || b === 19)) return true;
     return a >= 224; // multicast and reserved
-  }
-  if (isIP(ip) === 6) {
-    if (ip === "::" || ip === "::1") return true;
-    if (/^f[cd]/.test(ip)) return true; // unique local fc00::/7
-    if (/^fe[89ab]/.test(ip)) return true; // link-local fe80::/10
-    if (ip.startsWith("ff")) return true; // multicast
-    return ip === "fd00:ec2::254"; // AWS metadata over IPv6
   }
   return true; // not an IP at all
 }
