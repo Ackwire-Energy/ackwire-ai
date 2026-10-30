@@ -312,9 +312,10 @@ function whyText(t: TFunction, kind: ImportItemKind, reason: ImportSkipReason) {
 
 /**
  * The whole flow: the source cards and the drop zone, the plan to pick from,
- * then the report. `standalone` (Configurações) has its own Importar button;
- * onboarding applies when its agents step continues. `level` is the
- * flow's top heading level.
+ * then the report. `standalone` (Configurações) has its own Importar button and
+ * links to the workspace's pages; onboarding applies when its agents step
+ * continues, and links nowhere (until it's finished, every page of the workspace
+ * leads back to it). `level` is the flow's top heading level.
  */
 export function ImportFlow({
   flow,
@@ -328,7 +329,7 @@ export function ImportFlow({
   level?: 2 | 3;
 }) {
   if (flow.planned && flow.report)
-    return <ImportReport flow={flow} orgId={orgId} level={level} onAnother={flow.reset} />;
+    return <ImportReport flow={flow} orgId={orgId} level={level} onAnother={flow.reset} linked={standalone} />;
   if (flow.planned) return <Preview flow={flow} orgId={orgId} standalone={standalone} level={level} />;
   return <Picker flow={flow} />;
 }
@@ -682,7 +683,9 @@ function Preview({
         })}
       </fieldset>
 
-      {bundle.todo.length > 0 && <Todos todo={bundle.todo} nameOf={index.nameOf} level={sub} orgId={orgId} newTab />}
+      {bundle.todo.length > 0 && (
+        <Todos todo={bundle.todo} nameOf={index.nameOf} level={sub} orgId={orgId} newTab linked={standalone} />
+      )}
 
       {(left.length > 0 || skipped.length > 0) && (
         <section className="imp-block" aria-labelledby="imp-left-title">
@@ -1036,12 +1039,15 @@ function Todos({
   level,
   orgId,
   newTab = false,
+  linked = true,
 }: {
   todo: BundleTodo[];
   nameOf: (key: string) => string;
   level: 3 | 4;
   orgId: string;
   newTab?: boolean;
+  /** Where each one is done, as a link. */
+  linked?: boolean;
 }) {
   const { t } = useTranslation();
   return (
@@ -1061,7 +1067,7 @@ function Todos({
                 </span>
               )}
             </span>
-            <TodoLink kind={x.kind} orgId={orgId} newTab={newTab} />
+            {linked && <TodoLink kind={x.kind} orgId={orgId} newTab={newTab} />}
           </li>
         ))}
       </ul>
@@ -1077,12 +1083,15 @@ export function ImportReport({
   flow,
   orgId,
   level = 2,
+  linked = true,
   onRetry,
   onAnother,
 }: {
   flow: ImportFlowState;
   orgId: string;
   level?: 2 | 3;
+  /** Links to what came, and to where each to-do is done. */
+  linked?: boolean;
   /** Default: apply again. */
   onRetry?: () => Promise<unknown>;
   onAnother?: () => void;
@@ -1105,6 +1114,7 @@ export function ImportReport({
   const sub = (level + 1) as 3 | 4;
 
   const links = (kind: ImportItemKind, list: ImportItemResult[]): ReactNode => {
+    if (!linked) return null;
     if (kind === "agent") {
       return list.map((i) => {
         const a = index.agents.get(i.key);
@@ -1229,7 +1239,9 @@ export function ImportReport({
         </section>
       )}
 
-      {bundle.todo.length > 0 && <Todos todo={bundle.todo} nameOf={index.nameOf} level={sub} orgId={orgId} />}
+      {bundle.todo.length > 0 && (
+        <Todos todo={bundle.todo} nameOf={index.nameOf} level={sub} orgId={orgId} linked={linked} />
+      )}
 
       {onAnother && (
         <div>

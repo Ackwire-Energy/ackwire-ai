@@ -855,6 +855,13 @@
       "when": 1793344946668,
       "tag": "0121_early_access",
       "breakpoints": true
+    },
+    {
+      "idx": 122,
+      "version": "7",
+      "when": 1793362432312,
+      "tag": "0122_onboarding",
+      "breakpoints": true
     }
   ]
 }

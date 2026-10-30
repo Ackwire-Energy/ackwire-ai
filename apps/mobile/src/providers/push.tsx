@@ -1,4 +1,4 @@
-import { type AiStatus, keys, useApi } from "@agenteschat/client";
+import { type AiStatus, keys, type Me, useApi } from "@agenteschat/client";
 import { useQueryClient } from "@tanstack/react-query";
 import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
@@ -6,6 +6,7 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useM
 import { useTranslation } from "react-i18next";
 import { AppState } from "react-native";
 import { hrefForPush } from "@/features/links/logic";
+import { pushOpens } from "@/lib/org-choice";
 import {
   configureForegroundPush,
   ensureAndroidChannel,
@@ -110,6 +111,7 @@ export function PushProvider({ children }: { children: ReactNode }) {
       opened.add(id);
       const data = readPushData(response.notification.request.content.data);
       const orgId = data.orgId;
+      if (orgId && !pushOpens(qc.getQueryData<Me | null>(keys.me)?.organizations ?? [], orgId)) return;
       if (orgId) setOrgRef.current?.(orgId);
       // The computer being ready opens Connect an AI while no agent has one: its AI status is asked first.
       const ai: Promise<AiStatus | undefined> =

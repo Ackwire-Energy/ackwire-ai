@@ -1,4 +1,5 @@
 import { humanCheckHeaders } from "../lib/human-check";
+import type { OnboardingStepId } from "../lib/onboarding";
 import { CLOUD_SERVER } from "../lib/server";
 import { consultSeeds } from "../realtime/consults";
 import { steerStore } from "../realtime/steer";
@@ -351,6 +352,13 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     orgs: {
       create: (input) =>
         request<{ organization: Organization; generalChannelId: string }>("/api/app/organizations", { json: input }),
+      saveOnboarding: (orgId, input) =>
+        nullOn(404, () =>
+          request<{ step: OnboardingStepId; finished: boolean }>(`${org(orgId)}/onboarding`, {
+            method: "PATCH",
+            json: input,
+          }),
+        ),
       get: (orgId) => request<Organization>(org(orgId)),
       setAvatar: (orgId, input) =>
         request<{ avatarUrl: string }>(`${org(orgId)}/me/avatar`, { method: "PUT", json: input }),

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { eq, schema } from "@agenteschat/db";
+import { eq, schema, sql } from "@agenteschat/db";
+import { runMigration } from "@agenteschat/db/testing";
 import {
   acceptInvitation,
   ConflictError,
@@ -14,6 +15,7 @@ import {
   removeMember,
   requirePermission,
   sha256,
+  unfinishedWorkspaces,
   updateOrganization,
 } from "../src";
 import { addMember, addUser, type Fixture, setup } from "./fixtures";
@@ -68,6 +70,19 @@ describe("permissions", () => {
       .from(schema.channelMembers)
       .where(eq(schema.channelMembers.channelId, f.general.id));
     expect(members.map((m) => m.userId)).toContain(f.owner.id);
+  });
+});
+
+describe("onboarding", () => {
+  test("workspaces from before it was kept count as set up, as do ones made outside the app", async () => {
+    // The table as it was before the migration, with a workspace in it.
+    await f.db.execute(sql`alter table organizations drop column onboarding_step, drop column onboarded_at`);
+    await f.db.execute(sql`insert into organizations (name) values ('Old')`);
+    await runMigration(f.db, "onboarding");
+    const [old] = await f.db.select().from(schema.organizations).where(eq(schema.organizations.name, "Old"));
+    expect(old?.onboardingStep).toBe("done");
+    expect(old?.onboardedAt).toBeInstanceOf(Date);
+    expect(await unfinishedWorkspaces(f.db, f.owner.id)).toEqual([]);
   });
 });
 

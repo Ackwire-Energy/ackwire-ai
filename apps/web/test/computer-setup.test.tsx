@@ -727,13 +727,10 @@ describe("the onboarding where the workspace gets its own computer", () => {
    * A new person's onboarding up to the computer step, the import skipped. Its agents get the workspace's computer
    * once it's ready (`computer.ready`), as the server gives it to them; nobody connected it.
    */
-  const toComputerStep = async (
-    setup: Partial<ComputerSetup>,
-    prepare?: (state: ReturnType<typeof seedState>) => void,
-  ) => {
-    const state = seedState();
+  const toComputerStep = async (setup: Partial<ComputerSetup>) => {
+    // A new workspace: no agents until the onboarding makes them.
+    const state = seedState({ agents: [] });
     if (state.me) state.me.organizations = [];
-    prepare?.(state);
     // The server says every workspace gets its own: never "opcional", from the first step on.
     state.authConfig = { workspaceComputer: true };
     const api = createFakeApi(state);
@@ -1113,10 +1110,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
   });
 
   test("a coding plan thinks for all of them at once by default; then the Team step says nobody else gets an answer", async () => {
-    // Only this workspace's agents.
-    const r = await toComputerStep({ state: "ready", machineId: "m-1", specs: SPECS }, (state) => {
-      state.agents = [];
-    });
+    const r = await toComputerStep({ state: "ready", machineId: "m-1", specs: SPECS });
     await click(screen().getByRole("button", { name: "Continuar" }));
     await click(screen().getByRole("button", { name: "Criar 3 agentes" }));
     // Whoever creates an agent owns it, as the server makes them.

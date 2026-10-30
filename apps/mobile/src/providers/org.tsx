@@ -1,6 +1,6 @@
 import { type OrgSummary, useMe } from "@agenteschat/client";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { chooseOrg } from "@/lib/org-choice";
+import { chooseOrg, openOrgs } from "@/lib/org-choice";
 import { readValue, STORED, writeValue } from "@/lib/storage";
 import { useSession } from "./session";
 
@@ -15,7 +15,7 @@ export interface OrgState {
 interface OrgGate {
   /** Loading `me` or the remembered choice. */
   loading: boolean;
-  /** Signed in but in no organization yet. */
+  /** Signed in with no workspace to open yet: none, or only one they are still setting up (`openOrgs`). */
   none: boolean;
   /**
    * `me` failed and nothing is cached (the server is down or out of reach): not "no organization", which would
@@ -86,7 +86,7 @@ export function OrgProvider({ children }: { children: ReactNode }) {
     void writeValue(STORED.org, orgId);
   }, []);
 
-  const orgs = me.data?.organizations ?? [];
+  const orgs = useMemo(() => openOrgs(me.data?.organizations ?? []), [me.data]);
   const orgId = remembered === undefined ? null : chooseOrg(orgs, remembered);
   const unreachable = me.isError && me.data === undefined;
   const retry = me.refetch;
