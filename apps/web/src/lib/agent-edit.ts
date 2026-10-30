@@ -49,7 +49,7 @@ export interface Saved {
   machine?: string;
   /** Who thinks (owner and admins only; absent until loaded). */
   brain?: BrainChoice;
-  /** Its group (ADR 0080): `NO_GROUP` or a group id; absent until the groups load. */
+  /** Its group (ADR 0083): `NO_GROUP` or a group id; absent until the groups load. */
   group?: string;
 }
 

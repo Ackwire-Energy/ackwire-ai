@@ -1116,7 +1116,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         })),
       }),
     },
-    // Groups of agents (ADR 0080), with the server's order rules; every change answers with all of them.
+    // Groups of agents (ADR 0083), with the server's order rules; every change answers with all of them.
     agentGroups: {
       list: async () => structuredClone(state.agentGroups ?? []),
       create: async (orgId, input) => {

@@ -360,7 +360,7 @@ export function useAddCredential(orgId: string) {
   });
 }
 
-// ── Agent groups (ADR 0080) ─────────────────────────────────────────────────
+// ── Agent groups (ADR 0083) ─────────────────────────────────────────────────
 
 export const useAgentGroups = (orgId: string) => {
   const api = useApi();

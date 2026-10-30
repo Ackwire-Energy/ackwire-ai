@@ -221,7 +221,7 @@ export function SettingsTab({
                   </div>
                 )}
                 <span className="small muted">{t("agent.identityHelp", { handle: agent.handle })}</span>
-                {/* Only once the workspace has groups (ADR 0080); they are made in the sidebar. */}
+                {/* Only once the workspace has groups (ADR 0083); they are made in the sidebar. */}
                 {groups.length > 0 && can("group") ? (
                   <div className="agp-field">
                     <Field label={t("agentPage.fields.group")} id="agp-group">

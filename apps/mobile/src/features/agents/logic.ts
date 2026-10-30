@@ -196,7 +196,7 @@ export function teamLines(
 }
 
 /**
- * Livres by the workspace's groups of agents (ADR 0080), as the web sidebar shows them: the agents in no group
+ * Livres by the workspace's groups of agents (ADR 0083), as the web sidebar shows them: the agents in no group
  * first (`group` null), in Livres' order, then each group with its free agents in the group's order. Empty ones are
  * left out, so with no groups this is Livres alone.
  */

@@ -6,7 +6,7 @@ import { requirePermission } from "./organizations";
 
 const { agentGroups, agents } = schema;
 
-/** A group of agents as every app reads it (ADR 0080): the groups in the workspace's order, each with its agents in theirs. */
+/** A group of agents as every app reads it (ADR 0083): the groups in the workspace's order, each with its agents in theirs. */
 export interface AgentGroupView {
   id: string;
   name: string;

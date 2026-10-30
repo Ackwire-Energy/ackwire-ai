@@ -339,7 +339,7 @@ export interface FormerAgent {
 }
 
 /**
- * A named group of the workspace's agents (ADR 0080), shared by everyone in it: the sidebar's sections. The list
+ * A named group of the workspace's agents (ADR 0083), shared by everyone in it: the sidebar's sections. The list
  * comes in the workspace's order; `agentIds` in the group's. An agent is in one group at most.
  */
 export interface AgentGroup {

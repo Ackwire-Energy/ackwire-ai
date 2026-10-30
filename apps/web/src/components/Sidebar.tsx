@@ -231,7 +231,7 @@ export function Sidebar() {
   const unreadOf = (agents: Agent[]) => agents.reduce((n, a) => n + (unreadWith.get(a.id) ?? 0), 0);
   const peopleUnread = people.reduce((n, m) => n + (unreadWith.get(m.userId) ?? 0), 0);
   const sections = useSidebarSections();
-  // The workspace's groups of agents (ADR 0080): the agents in none stay under "Agentes", each group is a category.
+  // The workspace's groups of agents (ADR 0083): the agents in none stay under "Agentes", each group is a category.
   const groups = useAgentGroups(orgId).data ?? [];
   const byGroup = agentSections(dir.agents, groups, (a) => a.id);
   const drag = useAgentDrag(groups);
@@ -561,7 +561,10 @@ export function Sidebar() {
   );
 }
 
-/** The fixed sections, a channel category as `category:<id>` (ADR 0080) and a group of agents as `group:<id>`. */
+/**
+ * The fixed sections, a channel category as `category:<id>` (ADR 0080) and a group of agents as `group:<id>`
+ * (ADR 0083).
+ */
 type SectionId = "channels" | "agents" | "people" | `category:${string}` | `group:${string}`;
 
 /** Which sidebar categories are closed, remembered per browser. */

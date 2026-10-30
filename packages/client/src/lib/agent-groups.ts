@@ -8,7 +8,7 @@ export const groupOf = (groups: readonly AgentGroup[] | undefined, agentId: stri
   groups?.find((g) => g.agentIds.includes(agentId));
 
 /**
- * `items` (agents, or rows that carry one) by group (ADR 0080): each group in the workspace's order with its items in
+ * `items` (agents, or rows that carry one) by group (ADR 0083): each group in the workspace's order with its items in
  * the group's, and the items in no group as they came. A group's agents missing from `items` are skipped.
  */
 export function agentSections<T>(

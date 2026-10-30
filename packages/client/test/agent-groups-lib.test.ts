@@ -16,7 +16,7 @@ const groups: AgentGroup[] = [
 const agents = ["a", "b", "c", "d"].map((id) => ({ id }));
 const ids = (list: { id: string }[]) => list.map((a) => a.id);
 
-describe("agent groups (ADR 0080)", () => {
+describe("agent groups (ADR 0083)", () => {
   test("sections: each group in order with its agents in the group's order; the rest as they came", () => {
     const s = agentSections(agents, groups, (a) => a.id);
     expect(ids(s.ungrouped)).toEqual(["b", "d"]);

@@ -1,4 +1,4 @@
-# 0080. Groups of agents
+# 0083. Groups of agents
 
 - Status: Accepted
 - Date: 2026-10-30

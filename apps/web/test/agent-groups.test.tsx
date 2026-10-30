@@ -59,7 +59,7 @@ const openMenu = async (name: string) => {
 const calls = (state: ReturnType<typeof seedState>, method: string) =>
   state.calls.filter((c) => c.method === method).map((c) => c.args.slice(1));
 
-describe("groups of agents in the sidebar (ADR 0080)", () => {
+describe("groups of agents in the sidebar (ADR 0083)", () => {
   test("no groups: the sidebar is as it was, one Agentes with everyone and nothing else to read", async () => {
     await go();
     expect(categories()).toEqual(["Canais", "Agentes", "Mensagens diretas"]);

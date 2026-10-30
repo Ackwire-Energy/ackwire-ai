@@ -322,7 +322,7 @@ export interface ApiClient {
     /** The audit log, newest first (admins): agents' tool calls and people's changes. `before`: `next`. */
     audit(orgId: string, query?: AuditQuery & { before?: string; limit?: number }): Promise<AuditPage>;
   };
-  /** Groups of agents (ADR 0080): everyone reads them, owners and admins change them; each change answers with all. */
+  /** Groups of agents (ADR 0083): everyone reads them, owners and admins change them; each change answers with all. */
   agentGroups: {
     list(orgId: string): Promise<AgentGroup[]>;
     /** After the other groups, with `agentIds` in it in that order (out of any group they were in). */

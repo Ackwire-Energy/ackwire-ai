@@ -593,7 +593,7 @@ export function agentRoutes(deps: AppDeps) {
     },
   );
 
-  // ── Agent groups (ADR 0080) ───────────────────────────────────────────────
+  // ── Agent groups (ADR 0083) ───────────────────────────────────────────────
   // Every write answers with every group and tells the workspace's open apps (`agent.groups`).
   const groups = { db, pubsub: adapters.pubsub };
   const Groups = z.object({
