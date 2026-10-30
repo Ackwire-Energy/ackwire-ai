@@ -209,7 +209,7 @@ async function handleSecretLocked(
         if (errnoCode(err) === "ENOENT")
           throw new RunnerError(
             "not_found",
-            "This request's key is gone (it expired or predates the secure broker); ask the owner to reissue it",
+            "This request's key is gone (it expired or predates the secure broker). Ask the owner to reissue it.",
           );
         throw err;
       }
@@ -270,7 +270,7 @@ async function handleSecretLocked(
           return { superseded: true };
         }
         if (own && current?.requestId === req.requestId) return { size: Buffer.byteLength(own.value) };
-        throw new RunnerError("not_found", "This request has no staged secret; ask the owner to reissue it");
+        throw new RunnerError("not_found", "This request has no staged secret. Ask the owner to reissue it.");
       }
       if (delivery.action !== "deliver" || delivery.requestId !== req.requestId)
         throw new RunnerError("bad_request", "Invalid staged secret");
