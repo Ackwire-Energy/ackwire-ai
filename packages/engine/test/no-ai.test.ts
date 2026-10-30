@@ -197,7 +197,10 @@ test("a computer brain signed out with nothing to fall back on: the card, not a 
   await post("@dev oi");
   await drainOutbox(f.db, handlers);
   expect(await runs()).toMatchObject([{ status: "failed", error: "no_ai" }]);
-  expect((await cards())[0]?.meta.noAi).toMatchObject({ reason: "not_signed_in", intent: "task" });
+  const [card] = await cards();
+  expect(card?.meta.noAi).toMatchObject({ reason: "not_signed_in", intent: "task" });
+  // It says its sign-in ended, not that nothing is connected.
+  expect(card?.body).toBe("I can't answer yet: my AI is signed out.");
 });
 
 test("Responder agora: 409 while there's no AI; then the person's own message is answered, once", async () => {

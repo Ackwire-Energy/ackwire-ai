@@ -1070,6 +1070,8 @@ export const ptBR = {
       orgAction: "Conectar uma IA",
     },
     agent: "{{name}} não vai responder porque não tem uma IA\u00a0conectada.",
+    /** Its plan's sign-in ended (`reason: not_signed_in`). */
+    signedOut: "{{name}} não vai responder porque a IA {{hers}} saiu da\u00a0conta.",
     card: {
       connected: "Pronto: {{name}} já tem uma IA.",
       answerNow: "Responder agora",
@@ -1125,6 +1127,8 @@ export const ptBR = {
     own: {
       shared: "A conta que os seus agentes dividem",
       one: "Uma conta só {{for}} {{name}}",
+      /** For "Todos os agentes": one sign-in each, with the same account. */
+      each: "Uma conta só para eles",
     },
     chatgptCode: {
       title: "Permita o login com código no ChatGPT",
@@ -8050,6 +8054,7 @@ export const ptBR = {
       brain_busy: "Meu computador está ocupado com outras tarefas agora. Respondo assim que ele estiver livre.",
       brain_interrupted: "O {{brain}} parou antes de terminar. Já feito, sem repetir: {{tools}}.",
       no_ai: "Ainda não consigo responder: não tenho uma IA conectada.",
+      no_ai_signed_out: "Ainda não consigo responder: minha IA saiu da conta.",
       action_connect_ai: "Conectar uma IA",
       approval_request: "Pedido de aprovação: {{title}}",
       secret_request: "Pedido de segredo: {{name}}",

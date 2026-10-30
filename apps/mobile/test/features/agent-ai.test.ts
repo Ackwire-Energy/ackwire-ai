@@ -152,6 +152,28 @@ describe("the agent's AI", () => {
     expect(settings).not.toContain("onUse=");
   });
 
+  test("an account other agents think with, where it may have a login per agent: one row, signed in again for this one", async () => {
+    const screen = await Bun.file(new URL("../../src/features/ai/AgentAiScreen.tsx", import.meta.url).pathname).text();
+    // One row per account (the web's choice), and "Também usada por" signs this agent in on Connect an AI.
+    expect(screen).toContain("accountChoices(accounts, [view.account]).map(({ login: a, usedBy, also })");
+    expect(screen).toMatch(
+      /also\s*\?\s*t\("agentPage\.work\.brain\.accountAlso", \{ agents: joinNames\(usedBy, t\("newAgent\.and"\)\) \}\)/,
+    );
+    expect(screen).toContain("onPress={() => (also ? connect(a) : choose(a))}");
+    const t = await translator("pt-BR");
+    expect(t("agentPage.work.brain.accountAlso", { agents: "Theo e Lia" })).toBe("Também usada por Theo e Lia");
+  });
+
+  test("a card whose plan's sign-in ended: the agent says so, and Entrar de novo", async () => {
+    const card = await Bun.file(new URL("../../src/features/ai/NoAiCard.tsx", import.meta.url).pathname).text();
+    expect(card).toContain('t(card.signedOut ? "noAi.signedOut" : "noAi.agent", agentGrammar(t, name))');
+    expect(card).toContain('t(card.signedOut ? "agentPage.work.brain.signInAgain" : "noAi.action")');
+    const t = await translator("pt-BR");
+    expect(t("noAi.signedOut", { name: "Ada", hers: "dela" })).toBe(
+      "Ada não vai responder porque a IA dela saiu da\u00a0conta.",
+    );
+  });
+
   test("on the Cloud the account's sign-in says the computer, never its name; its being ready is a card of its own", async () => {
     const connect = await Bun.file(
       new URL("../../src/features/ai/ConnectAiSteps.tsx", import.meta.url).pathname,

@@ -289,7 +289,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     });
   });
 
-  test("one agent per account, each person's own: another agent's moves here, someone else's only shows while it's this one's", async () => {
+  test("each person's own: a Claude account another agent thinks with signs in again for this one; someone else's only shows while it's this one's", async () => {
     const theo: MachineAccount = {
       ...work,
       id: "acct_theo",
@@ -309,7 +309,9 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
       usedBy: ["Ada"],
     };
     const other: MachineAccount = { ...hers, id: "acct_ana2", label: "Claude Team 3", usedBy: [] };
-    const { state } = await onMac({ account: "acct_ana", accounts: [work, theo, hers, other] });
+    const { state, api } = await onMac({ account: "acct_ana", accounts: [work, theo, hers, other] });
+    // Ada's own login of Pessoal, once Claude's page signs her in.
+    fakeMachinesOf.get(api)?.endLogin("login_1", { state: "done", account: { ...theo, id: "acct_ada", usedBy: [] } });
     const d = await brainDialog();
     const account = within(d).getByRole("combobox", { name: "Conta do Claude" });
     account.focus();
@@ -318,11 +320,54 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     expect(options.map((o) => [o.textContent, o.getAttribute("aria-disabled") === "true"])).toEqual([
       ["A conta que os seus agentes dividem", false],
       ["Trabalho · Teamwalt@acme.com", false],
-      ["Pessoal · MaxEm uso por Theo · Mover para cá", false],
+      ["Pessoal · MaxTambém usada por Theo", false],
       ["Claude Team 2 · TeamDe Ana", true],
       ["Adicionar conta", false],
     ]);
     await click(screen().getByRole("option", { name: /^Pessoal · Max/ }));
+    await settle(4);
+    const block = within(d).getByRole("region", { name: "Adicionar conta do Claude" });
+    const realOpen = window.open;
+    window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
+    try {
+      await click(within(block).getByRole("button", { name: "Entrar com Claude" }));
+      await settle(8);
+    } finally {
+      window.open = realOpen;
+    }
+    // A sign-in of Ada's own, Theo's account named to Claude's page unseen; nothing taken from Theo.
+    expect(state.calls.find((c) => c.method === "machines.beginAccountLogin")?.args).toEqual([
+      ORG_ID,
+      "machine_1",
+      "claude_code",
+      { email: "walt@pessoal.com" },
+    ]);
+    expect(d.textContent).toContain("A conta Pessoal entrou no MacBook. Clique em Usar para salvar.");
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toMatchObject({ account: "acct_ada" });
+    expect(brainCalls(state).at(-1)).not.toHaveProperty("moveAccount");
+  });
+
+  test("ChatGPT stays one agent per account: another agent's moves here", async () => {
+    const theo: MachineAccount = {
+      ...work,
+      id: "acct_theo",
+      kind: "codex",
+      label: "Pessoal",
+      email: "walt@pessoal.com",
+      plan: "Plus",
+      usedBy: ["Theo"],
+    };
+    const { state } = await onMac({ brain: "codex", effectiveModel: "gpt-6-sol", accounts: [theo] });
+    const d = await brainDialog();
+    const account = within(d).getByRole("combobox", { name: "Conta do ChatGPT" });
+    account.focus();
+    await act(async () => fireEvent.keyDown(account, { key: "Enter" }));
+    expect(screen().getByRole("option", { name: /^Pessoal · Plus/ }).textContent).toBe(
+      "Pessoal · PlusEm uso por Theo · Mover para cá",
+    );
+    await click(screen().getByRole("option", { name: /^Pessoal · Plus/ }));
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
     expect(brainCalls(state).at(-1)).toMatchObject({ account: "acct_theo", moveAccount: true });

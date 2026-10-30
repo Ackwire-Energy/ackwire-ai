@@ -50,9 +50,10 @@ import {
  *   `codex login status`) in that folder decides: `done` with the email and
  *   plan, or `failed` (folder removed). After `ACCOUNT_LOGIN_TTL_MS` the sign-in
  *   is killed and its folder removed (`expired`).
- * - `list` asks each account's CLI (cached for `ACCOUNTS_TTL_MS`), `remove` signs
- *   out (best effort) and deletes the folder, `accountDir` is what a brain turn
- *   runs with.
+ * - `list` asks each account's CLI (cached for `ACCOUNTS_TTL_MS`), but one a
+ *   turn's endpoint refused reads as signed out until it signs in again
+ *   (`refused`); `remove` signs out (best effort) and deletes the folder,
+ *   `accountDir` is what a brain turn runs with.
  * - Usage (protocol 19, `plan-usage.ts`): what the turns say comes in through
  *   `noteRateLimit` / `noteCodexRateLimits`, and `probeUsage` looks it up on
  *   demand; the list carries it, and the computer's own sign-ins' is `ownUsage`.
@@ -795,6 +796,8 @@ export class AccountManager {
     if (login.state !== "waiting") return;
     void (async () => {
       if (code === 0) {
+        // Signed in anew: a turn refused before (`refused`) says nothing about this sign-in.
+        await rm(this.marker(login.kind, login.id, "invalid"), { force: true }).catch(() => undefined);
         const info = await this.lookUp(login.kind, login.id);
         if (login.state !== "waiting") return;
         if (info.loggedIn) {
@@ -854,15 +857,16 @@ export class AccountManager {
   // ── Accounts ───────────────────────────────────────────────────────────────
 
   /**
-   * One account's status (never throws: unknown is signed out). A key account is signed in until its key is
-   * refused; a folder an agent's user had, as its turns last said; any other, as its CLI says.
+   * One account's status (never throws: unknown is signed out). Refused in a turn since it last signed in
+   * (`refused`), it is signed out whatever its CLI says. Otherwise a key account is signed in; a folder an agent's
+   * user had, as its turns last said; any other, as its CLI says.
    */
   private async lookUp(kind: AccountKind, id: string): Promise<RunnerAccountInfo> {
     const dir = this.dirOf(kind, id);
     const refused = existsSync(this.marker(kind, id, "invalid"));
     const plan = kind === "claude_code" ? await planKeyOf(dir) : null;
     if (plan) return { id, kind, loggedIn: !refused, provider: plan.provider, keyHint: plan.key.slice(-4) };
-    if (this.lentTo(kind, id) !== null) return { id, kind, loggedIn: !refused };
+    if (refused || this.lentTo(kind, id) !== null) return { id, kind, loggedIn: !refused };
     const env = this.env(kind, dir);
     const r = await runCli(this.command(kind), STATUS_ARGS[kind], env, STATUS_TIMEOUT_MS);
     // Codex says it on stderr.
@@ -992,13 +996,13 @@ export class AccountManager {
   }
 
   /**
-   * A turn in this account was refused by its endpoint (`not_logged_in`): a key its maker refused, or a
-   * sign-in root can't ask the CLI about (system mode), reads as signed out until a new key or sign-in.
+   * A turn in this account was refused by its endpoint (`not_logged_in`): it reads as signed out until a new key or
+   * sign-in. The endpoint decides, not the CLI's status: a CLI may judge by the credentials it keeps, which can still
+   * look signed in after the provider ended that sign-in (another login of the same account, ADR 0059 §2), and root
+   * never asks one about a folder an agent's user had (system mode).
    */
   async refused(kind: AccountKind, id: string) {
     if (!isAccountKind(kind) || !isAccountId(id) || !existsSync(this.dirOf(kind, id))) return;
-    const key = kind === "claude_code" && (await planKeyOf(this.dirOf(kind, id)));
-    if (!key && this.lentTo(kind, id) === null) return;
     await writeFile(this.marker(kind, id, "invalid"), "", { mode: 0o600 }).catch(() => undefined);
   }
 

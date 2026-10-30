@@ -30,6 +30,8 @@ export interface NoAiCard {
   /** With `api_key`: the provider the message named. */
   provider?: string;
   autoOpen?: boolean;
+  /** Its plan's sign-in ended (`reason: not_signed_in`): the agent says so, and signing in again is the way back. */
+  signedOut?: boolean;
 }
 
 const INTENTS: ReadonlySet<string> = new Set<ConnectIntent>(["claude", "chatgpt", "api_key", "any", "task"]);
@@ -46,6 +48,7 @@ export function noAiCardOf(meta: Record<string, unknown> | null | undefined): No
     intent: isIntent(o.intent) ? o.intent : "task",
     ...(typeof o.provider === "string" ? { provider: o.provider } : {}),
     ...(o.autoOpen === true ? { autoOpen: true } : {}),
+    ...(o.reason === "not_signed_in" ? { signedOut: true } : {}),
   };
 }
 

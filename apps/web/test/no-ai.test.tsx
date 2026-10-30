@@ -324,6 +324,54 @@ describe("the agent's no-AI card", () => {
     expect(dialog("Conectar uma IA para a Ada")).toBeNull();
   });
 
+  test("her login signed out: she says so, and Entrar de novo signs that login in once more, its own email unseen", async () => {
+    const out: MachineAccount = {
+      id: "acct_ada",
+      kind: "claude_code",
+      label: "Claude Max",
+      email: "walter@acme.com.br",
+      plan: "max",
+      status: "signed_out",
+      ownerId: "u-walter",
+      ownerName: "Walter",
+      mine: true,
+      usedBy: ["Ada"],
+      usage: null,
+      provider: null,
+      keyHint: null,
+    };
+    const state = walters(withCard({ reason: "not_signed_in" }), ADA_ID);
+    const api = createFakeApi(state);
+    const brain = api.agents.brain;
+    api.agents.brain = async (orgId, agentId) => ({
+      ...(await brain(orgId, agentId)),
+      ownSignIn: false,
+      ...(agentId === ADA_ID ? { brain: "claude_code" as const, account: out.id, accounts: [out] } : {}),
+    });
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(5);
+    const row = cardRow();
+    expect(row.textContent).toContain("Ada não vai responder porque a IA dela saiu da conta.");
+    expect(row.textContent).not.toContain("não tem uma IA");
+    await click(within(row).getByRole("button", { name: "Entrar de novo" }), 8);
+    const plan = dialog("Conectar uma IA para a Ada") as HTMLElement;
+    expect(option(plan, /^Claude$/).getAttribute("aria-pressed")).toBe("true");
+    const realOpen = window.open;
+    window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
+    try {
+      await click(within(plan).getByRole("button", { name: "Entrar com Claude" }), 8);
+    } finally {
+      window.open = realOpen;
+    }
+    expect(calls(state, "machines.beginAccountLogin")[0]?.args).toEqual([
+      ORG_ID,
+      "machine_1",
+      "claude_code",
+      { accountId: "acct_ada", email: "walter@acme.com.br" },
+    ]);
+    expect(shownText(plan)).not.toContain("walter@acme.com.br");
+  });
+
   test("a plan while the workspace's computer is on its way: it waits, for the time left; a key meanwhile", async () => {
     const state = walters(withCard({ intent: "claude" }), ADA_ID);
     const api = createFakeApi(state);

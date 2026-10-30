@@ -684,8 +684,8 @@ function PlanSteps({
       {retry}
       {ownable && (
         // Who shares the sign-in: the computer's own, which any of its pairer's agents there thinks with, or a sign-in
-        // for this agent alone (ADR 0059 §2). Small columns: indented to the panel's text column, the two still fit
-        // side by side in the setup's column.
+        // for this agent alone, each agent's own for All agents (ADR 0059 §2). Small columns: indented to the panel's
+        // text column, the two still fit side by side in the setup's column.
         // biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset
         <div className="grid-options grid-options--sm" role="group" aria-label={planTitle(t, choice)}>
           <OptionCard pressed={own?.chosen ?? false} onClick={() => (own ? own.onChoose(true) : void saveOwn())}>
@@ -696,7 +696,9 @@ function PlanSteps({
           </OptionCard>
           <OptionCard pressed={otherChosen} onClick={() => (own ? own.onChoose(false) : setOther(true))}>
             <span className="ac-option__text">
-              <span className="ac-option__title">{t("connectAi.own.one", agentGrammar(t, agent.name))}</span>
+              <span className="ac-option__title">
+                {everyone ? t("connectAi.own.each") : t("connectAi.own.one", agentGrammar(t, agent.name))}
+              </span>
             </span>
           </OptionCard>
         </div>

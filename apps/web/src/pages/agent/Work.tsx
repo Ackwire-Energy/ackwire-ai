@@ -27,7 +27,7 @@ import {
   useUpdateAgentBrowserSettings,
 } from "@agenteschat/client";
 import { saveLevels } from "@agenteschat/client/lib/access-levels";
-import { groupPlans, ownSignInName, signInPlan } from "@agenteschat/client/lib/ai-accounts";
+import { accountChoices, ownSignInName, signInPlan } from "@agenteschat/client/lib/ai-accounts";
 import { setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
 import { providerGrammar } from "@agenteschat/client/lib/grammar";
@@ -44,7 +44,6 @@ import { can as canDo } from "@agenteschat/client/lib/permissions";
 import {
   accountPlan,
   isPlanId,
-  loginPerAgent,
   planAliases,
   planModel as planModelOf,
   planModelOptions,
@@ -846,14 +845,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     },
     // One option per account: the login of it this agent has, or a free one. Else, where its plan allows a login
     // per agent, one more for this agent ("Also used by Ada"); else another agent's, moved here.
-    ...groupPlans(accounts).flatMap(({ logins, usedBy }) => {
-      const own =
-        logins.find((l) => l.id === account) ??
-        logins.find((l) => l.id === view.account) ??
-        logins.find((l) => l.mine && l.usedBy.length === 0);
-      const a = own ?? logins[0];
-      if (!a) return [];
-      const also = !own && a.mine && loginPerAgent(a.kind, a.provider);
+    ...accountChoices(accounts, [account, view.account]).map(({ login: a, usedBy, also }) => {
       // One login thinks for one agent.
       const others = a.usedBy.filter((n) => n !== agent.name).join(", ");
       const about = !a.mine
@@ -867,15 +859,13 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
               : a.keyHint
                 ? t("aiAccounts.page.keyEnds", { hint: a.keyHint })
                 : a.email;
-      return [
-        {
-          value: also ? `${ALSO}${a.id}` : a.id,
-          label: a.plan ? `${a.label} · ${planName(a.plan)}` : a.label,
-          disabled: !a.mine,
-          description: [about, planWord(t, i18n.language, a.usage)].filter(Boolean).join(" · ") || undefined,
-          leading: a.provider ? <ProviderLogo id={a.provider} size="sm" /> : accountIcon,
-        },
-      ];
+      return {
+        value: also ? `${ALSO}${a.id}` : a.id,
+        label: a.plan ? `${a.label} · ${planName(a.plan)}` : a.label,
+        disabled: !a.mine,
+        description: [about, planWord(t, i18n.language, a.usage)].filter(Boolean).join(" · ") || undefined,
+        leading: a.provider ? <ProviderLogo id={a.provider} size="sm" /> : accountIcon,
+      };
     }),
     {
       value: ADD,

@@ -1,8 +1,8 @@
 import type { AgentBrainInput, MachineAccount } from "@agenteschat/client";
 import { keys, useAgentBrain, useAiAccounts, useApi } from "@agenteschat/client";
-import { ownSignInName, signInPlan } from "@agenteschat/client/lib/ai-accounts";
+import { accountChoices, ownSignInName, signInPlan } from "@agenteschat/client/lib/ai-accounts";
 import { brainLine } from "@agenteschat/client/lib/brain";
-import { lowerFirst } from "@agenteschat/client/lib/format";
+import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { planName, planOf } from "@agenteschat/client/lib/plans";
@@ -24,10 +24,11 @@ import { Note, PlanReplies, PlanRepliesOf } from "./parts";
 
 /*
  * An agent's AI on the phone (the web's "Quem pensa" for a plan, ADR 0059), from "Pensa com" on its profile: the
- * account it thinks with on its computer (one of its owner's, or that computer's own sign-in), that plan's usage
- * with, at its limit, the owner's other accounts that could think instead, and "Responde a todos". Each choice saves
- * at once. Another AI goes through Connect an AI. Its owner and admins open it; only its owner picks an account or
- * lets other people talk to it on the plan (`canUsePlans`).
+ * account it thinks with on its computer (one of its owner's, or that computer's own sign-in), one row per account,
+ * that plan's usage with, at its limit, the owner's other accounts that could think instead, and "Responde a todos".
+ * Each choice saves at once. Another AI, or one more login of an account other agents think with where it may have
+ * one per agent ("Também usada por Theo"), goes through Connect an AI. Its owner and admins open it; only its owner
+ * picks an account or lets other people talk to it on the plan (`canUsePlans`).
  */
 
 /** The plan's page Connect an AI opens on for another account of that kind. */
@@ -89,9 +90,10 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
   };
   const accounts = view && kind ? agentAccounts(view, kind) : [];
   const current = view ? accounts.find((a) => a.id === view.account) : undefined;
-  // Another account: Connect an AI on that plan's page (a coding plan's key, on its first page).
-  const connect = () =>
-    openConnectAi({ agentId, ...(kind && !planOf(current?.provider) ? { intent: PLAN_INTENT[kind] } : {}) });
+  // Another account, or one more login of `a`: Connect an AI on that plan's page (a coding plan's key, on its first
+  // page).
+  const connect = (a: MachineAccount | undefined) =>
+    openConnectAi({ agentId, ...(kind && !planOf(a?.provider) ? { intent: PLAN_INTENT[kind] } : {}) });
   const computer = view?.computer?.name ?? "";
   const mayPick = view?.canUsePlans === true && !busy;
   const choose = (a: MachineAccount | null) => {
@@ -157,17 +159,19 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                     disabled={!mayPick || (!view.ownSignIn && view.account !== null)}
                     onPress={() => choose(null)}
                   />
-                  {accounts.map((a) => {
+                  {accountChoices(accounts, [view.account]).map(({ login: a, usedBy, also }) => {
                     const others = takenFrom(a, name);
                     const about = !a.mine
                       ? t("agentPage.work.brain.accountOf", { name: a.ownerName?.split(" ")[0] ?? "" })
-                      : a.status === "signed_out"
-                        ? t("agentPage.work.brain.accountSignedOut")
-                        : others.length
-                          ? t("agentPage.work.brain.accountMove", { agents: others.join(", ") })
-                          : a.keyHint
-                            ? t("aiAccounts.page.keyEnds", { hint: a.keyHint })
-                            : (a.email ?? undefined);
+                      : also
+                        ? t("agentPage.work.brain.accountAlso", { agents: joinNames(usedBy, t("newAgent.and")) })
+                        : a.status === "signed_out"
+                          ? t("agentPage.work.brain.accountSignedOut")
+                          : others.length
+                            ? t("agentPage.work.brain.accountMove", { agents: others.join(", ") })
+                            : a.keyHint
+                              ? t("aiAccounts.page.keyEnds", { hint: a.keyHint })
+                              : (a.email ?? undefined);
                     return (
                       <GroupedRow
                         key={a.id}
@@ -176,7 +180,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                         {...(about ? { sub: about } : {})}
                         checked={a.id === view.account}
                         disabled={!mayPick || !a.mine}
-                        onPress={() => choose(a)}
+                        onPress={() => (also ? connect(a) : choose(a))}
                       />
                     );
                   })}
@@ -184,7 +188,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                     <GroupedRow
                       icon="plus"
                       label={signedOut ? t("agentPage.work.brain.signInAgain") : t("agentPage.work.brain.addAccount")}
-                      onPress={connect}
+                      onPress={() => connect(current)}
                     />
                   ) : null}
                 </GroupedList>
@@ -212,7 +216,11 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                     />
                   ))}
                   {limited && view.canUsePlans && view.canManageAccounts ? (
-                    <GroupedRow icon="plus" label={t("aiAccounts.usage.offer.connect")} onPress={connect} />
+                    <GroupedRow
+                      icon="plus"
+                      label={t("aiAccounts.usage.offer.connect")}
+                      onPress={() => connect(current)}
+                    />
                   ) : null}
                 </GroupedList>
               </>

@@ -54,7 +54,7 @@ export function NoAiCard({ message: m }: { message: Message }) {
       ? t("noAi.card.connected", { name })
       : answer === "still_missing"
         ? t("noAi.card.stillMissing", { name })
-        : t("noAi.agent", agentGrammar(t, name));
+        : t(card.signedOut ? "noAi.signedOut" : "noAi.agent", agentGrammar(t, name));
   const answerNow = async () => {
     setAnswer("pending");
     try {
@@ -87,7 +87,7 @@ export function NoAiCard({ message: m }: { message: Message }) {
         <Button
           variant="secondary"
           size="sm"
-          label={t("noAi.action")}
+          label={t(card.signedOut ? "agentPage.work.brain.signInAgain" : "noAi.action")}
           onPress={() =>
             openConnectAi({ from: m.id, intent: card.intent, provider: card.provider, agentId: card.agentId })
           }

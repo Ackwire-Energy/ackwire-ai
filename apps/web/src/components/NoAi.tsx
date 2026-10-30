@@ -96,7 +96,7 @@ export function NoAiCard({ message }: { message: Message }) {
       ? t("noAi.card.connected", { name })
       : answer === "still_missing"
         ? t("noAi.card.stillMissing", { name })
-        : t("noAi.agent", agentGrammar(t, name));
+        : t(card.signedOut ? "noAi.signedOut" : "noAi.agent", agentGrammar(t, name));
   const action =
     !connect || answering ? null : ready || answer === "pending" ? (
       mayAnswer && (
@@ -111,7 +111,7 @@ export function NoAiCard({ message }: { message: Message }) {
           connect.open({ intent: card.intent, provider: card.provider, agentId: card.agentId, from: message.id })
         }
       >
-        {t("noAi.action")}
+        {t(card.signedOut ? "agentPage.work.brain.signInAgain" : "noAi.action")}
       </Button>
     );
   return (
