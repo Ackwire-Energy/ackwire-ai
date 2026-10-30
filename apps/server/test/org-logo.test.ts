@@ -118,6 +118,16 @@ test("the logo on an invitation's page: through its link or invitation only, whi
   }
   await standing("active");
   expect((await anon(`/api/app/invitations/${tokens.email}/logo/${file}`)).status).toBe(200);
+  // Nor one being deleted, until it is restored.
+  const deleting = (dueAt: Date | null) =>
+    t.db.update(schema.organizations).set({ deletionDueAt: dueAt }).where(eq(schema.organizations.id, orgId));
+  await deleting(new Date(Date.now() + 86_400_000));
+  for (const token of [tokens.link, tokens.email]) {
+    expect(await preview(token)).not.toHaveProperty("logo");
+    expect((await anon(`/api/app/invitations/${token}/logo/${file}`)).status).toBe(404);
+  }
+  await deleting(null);
+  expect((await anon(`/api/app/invitations/${tokens.email}/logo/${file}`)).status).toBe(200);
   await t.db.update(schema.organizationInvitations).set({ expiresAt: new Date(Date.now() - 1000) });
   expect((await anon(`/api/app/invitations/${tokens.email}/logo/${file}`)).status).toBe(404);
   const off = await owner(`/api/app/organizations/${orgId}/invite-links/${link.id}`, { method: "DELETE" });
