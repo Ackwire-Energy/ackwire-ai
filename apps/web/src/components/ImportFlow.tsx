@@ -22,6 +22,7 @@ import {
   type IconName,
   InfoHint,
   Input,
+  isIdHandle,
   normalizeAppearance,
   OptionCard,
   Spinner,
@@ -878,7 +879,10 @@ function Row({
     if (a) {
       title = a.role ? `${item.label} · ${a.role}` : item.label;
       lead = <AgentAvatar name={a.name} appearance={normalizeAppearance(a.appearance)} size="sm" />;
-      if (!item.renamedTo) lines.push(`@${a.handle}`);
+      // An id another app gave the agent is no handle: only the one it gets shows, and that is no rename.
+      if (isIdHandle(a.handle)) {
+        if (item.renamedTo) lines.push(`@${item.renamedTo}`);
+      } else if (!item.renamedTo) lines.push(`@${a.handle}`);
     }
   } else if (item.kind === "skill") {
     const s = index.skills.get(item.key);
@@ -937,7 +941,7 @@ function Row({
   }
   if (item.renamedTo && !reason) {
     const wanted = index.agents.get(item.key)?.handle ?? item.key;
-    notes.push(t("onboarding.import.renamed", { handle: item.renamedTo, wanted }));
+    if (!isIdHandle(wanted)) notes.push(t("onboarding.import.renamed", { handle: item.renamedTo, wanted }));
   }
   if (item.trimmed?.length && !reason) {
     const fields = item.trimmed.map((f) =>

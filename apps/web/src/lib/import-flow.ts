@@ -154,8 +154,10 @@ export function picksOf(
 }
 
 /**
- * The bundle with only these items. What earlier chunks made, the server
- * already knows by its provenance, so a chunk doesn't carry the whole bundle.
+ * The bundle with only these items, and every agent: the server gives a new
+ * agent its handle looking at all of them, picked or not, so the handle each
+ * row showed is the one it gets. What earlier chunks made, the server already
+ * knows by its provenance, so a chunk doesn't carry the whole bundle.
  */
 export function sliceBundle(bundle: MigrationBundle, pick: ReadonlySet<string>): MigrationBundle {
   const has =
@@ -164,7 +166,6 @@ export function sliceBundle(bundle: MigrationBundle, pick: ReadonlySet<string>):
       pick.has(`${kind}:${key}`);
   return {
     ...bundle,
-    agents: bundle.agents.filter(has("agent")),
     skills: bundle.skills.filter(has("skill")),
     channels: bundle.channels.filter(has("channel")),
     routines: bundle.routines.filter(has("routine")),
