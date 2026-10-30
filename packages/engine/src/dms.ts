@@ -6,6 +6,7 @@ import { caches } from "./cache";
 import { sha256 } from "./crypto";
 import { NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
+import { resolveNotifications } from "./notifications";
 import { type PreviewMeta, previewMeta } from "./message-preview";
 import { getMembership, requirePermission } from "./organizations";
 
@@ -296,7 +297,8 @@ export async function listDms(db: Database, actorId: string, orgId: string): Pro
 
 /**
  * Marks a channel (or DM) read up to now for me. In a DM between people the other one hears it
- * (`channel.read`): their app says "Visto" under the last message I read.
+ * (`channel.read`): their app says "Visto" under the last message I read. An agent's answers there
+ * (`agent_reply`) are seen, so they leave the inbox and never push (ADR 0071).
  */
 export async function markChannelRead(
   db: Database,
@@ -318,6 +320,11 @@ export async function markChannelRead(
     .insert(channelReads)
     .values({ orgId, channelId, userId: actorId, lastReadAt: at })
     .onConflictDoUpdate({ target: [channelReads.channelId, channelReads.userId], set: { lastReadAt: at } });
+  await resolveNotifications({ db, pubsub }, orgId, {
+    groupKeyPrefix: `agent_reply:${channelId}:`,
+    userIds: [actorId],
+    kind: "agent_reply",
+  });
   if (member.kind === "dm")
     await publishChannelEvent(pubsub, {
       type: "channel.read",

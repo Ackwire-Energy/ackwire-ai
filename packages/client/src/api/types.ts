@@ -3959,6 +3959,7 @@ export type NotificationKind =
   | "mention"
   | "thread_reply"
   | "dm"
+  | "agent_reply"
   | "agent_question"
   | "issue_assigned"
   | "issue_comment"

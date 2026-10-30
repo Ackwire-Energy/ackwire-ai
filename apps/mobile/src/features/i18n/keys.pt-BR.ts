@@ -693,6 +693,8 @@ export const featureKeysPtBR = {
       mention_other: "{{names}} mencionaram você",
       thread_reply_one: "{{names}} respondeu na thread",
       thread_reply_other: "{{names}} responderam na thread",
+      agent_reply_one: "{{names}} respondeu",
+      agent_reply_other: "{{names}} responderam",
       dm_one: "{{names}} mandou mensagem",
       dm_other: "{{names}} mandaram mensagem",
       agent_question_one: "{{names}} pergunta",

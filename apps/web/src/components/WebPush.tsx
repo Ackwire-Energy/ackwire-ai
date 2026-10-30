@@ -148,7 +148,7 @@ export function useWebPushClear() {
 /** The examples, top to bottom, as the phone's sheet shows them: fading a little as they stack. */
 const EXAMPLES = [
   { key: "approval", minutes: 0, opacity: 1 },
-  { key: "question", minutes: 2, opacity: 0.92 },
+  { key: "finished", minutes: 2, opacity: 0.92 },
   { key: "mention", minutes: 9, opacity: 0.8 },
 ] as const;
 

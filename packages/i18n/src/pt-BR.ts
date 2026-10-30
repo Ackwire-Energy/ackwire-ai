@@ -696,6 +696,7 @@ export const ptBR = {
   desktopNotice: {
     mention: "Mencionaram você",
     dm: "Mensagem direta nova",
+    agent_reply: "Um agente respondeu",
     agent_question: "Uma pergunta para você",
     approval: "Uma aprovação espera por você",
     forum_turn: "Sua vez de opinar",
@@ -740,7 +741,8 @@ export const ptBR = {
   },
   webPushAsk: {
     title: "Saiba quando um agente precisar de você",
-    text: "Mesmo com a aba fechada, avisamos quando pedem seu ok, têm uma pergunta ou chamam você.",
+    text:
+      "Eles trabalham enquanto você faz outra coisa. Mesmo com a aba fechada, avisamos quando pedem seu ok, terminam o que você pediu ou chamam você.",
     on: "Ativar avisos",
     later: "Agora não",
     done: "Avisos ativados neste navegador",
@@ -750,7 +752,7 @@ export const ptBR = {
     now: "agora",
     minutes: "{{n}} min",
     approval: { title: "{{name}} pede seu ok", body: "Posso seguir com o que você pediu?" },
-    question: { title: "{{name}} tem uma pergunta", body: "Qual planilha devo usar?" },
+    finished: { title: "{{name}} terminou", body: "Está pronto o que você pediu." },
     mention: { title: "{{name}} chamou você", body: "Dá uma olhada quando puder?" },
   },
   shell: {
@@ -1598,6 +1600,8 @@ export const ptBR = {
       replied_other: "<b>{{names}}</b> responderam em <b>{{label}}</b>",
       repliedThread_one: "<b>{{names}}</b> respondeu numa thread",
       repliedThread_other: "<b>{{names}}</b> responderam numa thread",
+      answered: "<b>{{name}}</b> respondeu",
+      answeredIn: "<b>{{name}}</b> respondeu em <b>{{label}}</b>",
       dm: "<b>{{name}}</b> mandou uma mensagem",
       question: "<b>{{name}}</b> fez uma pergunta",
       issueAssigned: "<b>{{name}}</b> atribuiu uma tarefa a você",

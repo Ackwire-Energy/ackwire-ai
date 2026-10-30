@@ -685,6 +685,7 @@ export const en: Translations = {
   desktopNotice: {
     mention: "You were mentioned",
     dm: "New direct message",
+    agent_reply: "An agent replied",
     agent_question: "A question for you",
     approval: "An approval is waiting for you",
     forum_turn: "Your turn to weigh in",
@@ -729,7 +730,8 @@ export const en: Translations = {
   },
   webPushAsk: {
     title: "Know when an agent needs you",
-    text: "Even with the tab closed, we'll tell you when they need your ok, have a question or call you.",
+    text:
+      "They work while you do something else. Even with the tab closed, we'll tell you when they need your ok, finish what you asked or call you.",
     on: "Turn on notifications",
     later: "Not now",
     done: "Notifications on in this browser",
@@ -739,7 +741,7 @@ export const en: Translations = {
     now: "now",
     minutes: "{{n}} min",
     approval: { title: "{{name}} needs your ok", body: "Can I go ahead with what you asked?" },
-    question: { title: "{{name}} has a question", body: "Which spreadsheet should I use?" },
+    finished: { title: "{{name}} is done", body: "What you asked for is ready." },
     mention: { title: "{{name}} called you", body: "Can you take a look when you have a minute?" },
   },
   shell: {
@@ -1579,6 +1581,8 @@ export const en: Translations = {
       replied_other: "<b>{{names}}</b> replied in <b>{{label}}</b>",
       repliedThread_one: "<b>{{names}}</b> replied in a thread",
       repliedThread_other: "<b>{{names}}</b> replied in a thread",
+      answered: "<b>{{name}}</b> replied",
+      answeredIn: "<b>{{name}}</b> replied in <b>{{label}}</b>",
       dm: "<b>{{name}}</b> sent you a message",
       question: "<b>{{name}}</b> asked a question",
       issueAssigned: "<b>{{name}}</b> assigned you a task",

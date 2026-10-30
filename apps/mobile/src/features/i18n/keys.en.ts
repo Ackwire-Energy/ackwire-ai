@@ -688,6 +688,8 @@ export const featureKeysEn: FeatureTranslations = {
       mention_other: "{{names}} mentioned you",
       thread_reply_one: "{{names}} replied in the thread",
       thread_reply_other: "{{names}} replied in the thread",
+      agent_reply_one: "{{names}} replied",
+      agent_reply_other: "{{names}} replied",
       dm_one: "{{names}} sent you a message",
       dm_other: "{{names}} sent you messages",
       agent_question_one: "{{names}} asks",

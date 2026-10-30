@@ -43,6 +43,11 @@ export const NOTIFICATION_KINDS = [
   "mention",
   "thread_reply",
   "dm",
+  /**
+   * An agent answered the person behind its run (ADR 0071): merged per conversation (`agentReplyGroup`), resolved
+   * when they read it there. So someone can close the tab while an agent works and still hear when it's done.
+   */
+  "agent_reply",
   "agent_question",
   "issue_assigned",
   "issue_comment",
@@ -175,9 +180,15 @@ export interface NotificationDeps {
 type Row = typeof notifications.$inferSelect;
 
 /** Kinds whose events merge into one open row of their group. */
-const MERGING: ReadonlySet<NotificationKind> = new Set(["thread_reply", "issue_comment", "reaction", "join_request"]);
+const MERGING: ReadonlySet<NotificationKind> = new Set([
+  "thread_reply",
+  "agent_reply",
+  "issue_comment",
+  "reaction",
+  "join_request",
+]);
 /** "Menções" in the inbox: what was said to me. */
-const MENTION_KINDS: NotificationKind[] = ["mention", "dm", "agent_question"];
+const MENTION_KINDS: NotificationKind[] = ["mention", "dm", "agent_reply", "agent_question"];
 /** A read reaction row still takes new reactions for this long (the "9 min" span on the card). */
 export const REACTION_MERGE_MS = 30 * 60_000;
 export const MAX_ACTORS = 10;

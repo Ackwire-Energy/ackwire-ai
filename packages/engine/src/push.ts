@@ -35,6 +35,7 @@ export const PUSH_KINDS: ReadonlySet<string> = new Set([
   "forum_turn",
   "mention",
   "dm",
+  "agent_reply",
   "mission_stopped",
   "routine_failed",
   "routine_paused",
