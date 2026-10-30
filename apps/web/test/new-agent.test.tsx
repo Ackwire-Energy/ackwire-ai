@@ -202,6 +202,12 @@ describe("Criar agente: steps", () => {
     expect(names("Clientes")).toEqual(["Atendimento", "Vendas", "Marketing", "Conteúdo"]);
     expect(names("Operação")).toEqual(["Dados", "Financeiro", "Pessoas", "Pesquisa", "Assistente"]);
     expect(within(step).getAllByRole("button").at(-1)?.textContent).toContain("Do zero");
+    // A preset's first row under the card's padding is the shared face line alone: no class of its own to add room
+    // above the face.
+    const firstRows = [...step.querySelectorAll(".newag__role:not(.newag__role--blank)")].map(
+      (card) => [...card.children].find((c) => !c.classList.contains("newag__check"))?.className,
+    );
+    expect(firstRows).toEqual(ROLE_IDS.filter((id) => id !== "custom").map(() => "ac-faceline"));
 
     // A role outside engineering fills the rest the same way.
     await click(within(step).getByRole("button", { name: /^Atendimento/ }));
