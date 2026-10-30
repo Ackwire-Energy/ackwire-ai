@@ -115,6 +115,24 @@ describe("the block's lines", () => {
     expect(toolApps(items)).toEqual([{ kind: "consulting", app: "GitHub" }, { kind: "creatingIssue" }]);
   });
 
+  test("a reaction shows on the message, never in the block: alone there is no call; with others, only they count", () => {
+    expect(toolItemsLive([call("1", "react")])).toEqual([]);
+    const items = toolItemsLive([call("1", "mcp__agentes__react"), call("2", "create_issue")]);
+    expect(items.map((i) => (i.kind === "call" ? `${i.line.kind}×${i.line.count}` : i.kind))).toEqual([
+      "creatingIssue×1",
+    ]);
+    expect(toolCalls(items)).toBe(1);
+    const at = (s: number) => new Date(Date.UTC(2026, 9, 30, 10, 0, s)).toISOString();
+    const saved = workFromSteps([
+      { seq: 1, kind: "tool_call", data: { toolUseId: "t1", name: "react", input: { emoji: "🙌" } }, createdAt: at(0) },
+      { seq: 2, kind: "tool_result", data: { toolUseId: "t1", content: "Reaction added." }, createdAt: at(1) },
+      { seq: 3, kind: "tool_call", data: { toolUseId: "t2", name: "create_issue", input: {} }, createdAt: at(2) },
+      { seq: 4, kind: "tool_result", data: { toolUseId: "t2", content: "ok" }, createdAt: at(3) },
+    ]);
+    expect(toolCalls(toolItemsSaved(saved))).toBe(1);
+    expect(saved.steps.map((s) => s.kind)).toEqual(["creatingIssue"]);
+  });
+
   test("looking up a tool on demand is ours, not an app called find", () => {
     const items = toolItemsLive([call("1", "find_tools"), call("2", "github_find_tools", { connector: "GitHub" })]);
     expect(items.map((i) => (i.kind === "call" ? `${i.line.kind}×${i.line.count}` : i.kind))).toEqual([

@@ -123,6 +123,11 @@ export interface ConnectAiFlowProps {
   hasAi: (agentId: string) => boolean;
   /** The agent to start on (a card that names one). */
   startAgentId?: string;
+  /**
+   * Claude's sign-in is one more login of the account with this email, one other agents use ("Também usada por"): its
+   * hint, checked when it comes back, never the agent's own signed-out login again.
+   */
+  email?: string;
   /** Why this person connects no plan here (someone else's agent, none of their own). */
   locked?: ReactNode;
   /** Only an admin adds an API key. */
@@ -439,6 +444,7 @@ function PlanPage(
             onKey={() => onView({ page: "key" })}
             move={replies.move}
             repliesRow={repliesRow}
+            {...(choice === "claude" && props.email ? { email: props.email } : {})}
             onDone={(account) => {
               // The flow stays on that agent; another plan moves on to the next one with no AI.
               onAgent(agent.id);
@@ -462,6 +468,7 @@ function PlanSteps({
   justReady,
   move,
   repliesRow,
+  email,
   onKey,
   onComputer,
   onDone,
@@ -475,6 +482,8 @@ function PlanSteps({
   move: { onlyOwner?: boolean };
   /** Who the agent replies to, under its steps (`PlanReplies`). */
   repliesRow: ReactNode;
+  /** One more login of the account with this email (`ConnectAiFlowProps.email`). */
+  email?: string;
   onKey: () => void;
   onComputer: () => void;
   onDone: (account: MachineAccount | null) => void;
@@ -627,7 +636,8 @@ function PlanSteps({
   const current = view?.accounts.find(
     (a) => a.id === view.account && a.kind === kind && (coding ? a.provider === choice : !a.provider),
   );
-  const signedOut = current?.status === "signed_out" ? current : undefined;
+  // Signed in again: the agent's own login, unless this sign-in is one more login of another account (`email`).
+  const signedOut = !email && current?.status === "signed_out" ? current : undefined;
   return (
     <View style={styles.gap}>
       {wait}
@@ -660,7 +670,7 @@ function PlanSteps({
           computer={edition === "cloud" ? t("connectAi.theComputer") : computer}
           {...(isPlanId(choice) ? { provider: choice } : {})}
           again={signedOut?.id}
-          email={signedOut?.email}
+          email={email ?? signedOut?.email}
           local={view?.ownSignIn}
           ready={ready}
           loading={gates.catching}

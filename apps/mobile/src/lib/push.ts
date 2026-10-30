@@ -9,7 +9,7 @@ import { readValue, STORED, writeValue } from "./storage";
 
 /**
  * Push notifications (ADR 0035 §4). The system's prompt comes only after our sheet on Conversas
- * (`features/push`, `lib/push-offer.ts`) or the switch in Você; the app registers the Expo push token with the
+ * (`features/push`, `@agenteschat/client/lib/push-offer`) or the switch in Você; the app registers the Expo push token with the
  * server, and removes it on sign-out.
  */
 

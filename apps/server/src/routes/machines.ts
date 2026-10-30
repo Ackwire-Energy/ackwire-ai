@@ -4,6 +4,7 @@ import {
   authenticateMachine,
   computerSetup,
   confirmDeviceCode,
+  currentOrgLogo,
   DeviceCodeLimitError,
   deleteMachine,
   denyDeviceCode,
@@ -12,7 +13,6 @@ import {
   hostKey,
   listMachineOutages,
   listMachines,
-  machineOrgLogo,
   moveAgentsFromMachine,
   NotFoundError,
   PROVISIONING_REASONS,
@@ -892,7 +892,7 @@ export function registerMachinePublicRoutes(api: OpenAPIHono, deps: AppDeps) {
     const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
     const machine = token ? await authenticateMachine(db, token) : null;
     if (!machine) return apiError(c, 401, "machine.unauthorized", "This computer's token is not valid");
-    const logo = await machineOrgLogo({ db, blobs: adapters.platformBlobs }, machine.orgId);
+    const logo = await currentOrgLogo({ db, blobs: adapters.platformBlobs }, machine.orgId);
     if (!logo) return apiError(c, 404, "org.logo_not_found", "The organization has no logo");
     const etag = `"${logo.file}"`;
     const headers = { etag, "cache-control": "private, max-age=300", "x-content-type-options": "nosniff" };

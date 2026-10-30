@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { LiveConsult, LiveRun, Message } from "@agenteschat/client";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
-import { toolCalls } from "@agenteschat/client/lib/work";
+import { toolCalls, toolNow } from "@agenteschat/client/lib/work";
 import {
   artifactsOf,
   buildRows,
@@ -477,6 +477,15 @@ describe("an agent's turn as one block", () => {
     expect(items[2]).toMatchObject({ kind: "steer", messageId: "m2", now: true });
     expect(items[3]).toMatchObject({ kind: "call", line: { state: "run" } });
     expect(toolCalls(items)).toBe(2);
+  });
+
+  test("a reaction already shows on the message: a turn that only reacted has no block, other tools count alone", () => {
+    expect(toolNow(turnItems(run({ runId: "r", status: "done", work: [call("1", "react", false)] })))).toBeNull();
+    const items = turnItems(
+      run({ runId: "r", work: [call("1", "mcp__agentes__react", false), call("2", "sentry_list_issues", false)] }),
+    );
+    expect(items.map((x) => (x.kind === "call" ? x.line.kind : x.kind))).toEqual(["consulting"]);
+    expect(toolCalls(items)).toBe(1);
   });
 
   test("the same call again, nothing said between: one line counting both", () => {

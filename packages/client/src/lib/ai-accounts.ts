@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next";
 import type { AiAccounts, AiComputer, MachineAccount, MachineAccountKind, PlanUsage } from "../api/types";
+import { loginPerAgent } from "./plans";
 
 /** One account as a row shows it: its logins, one per agent where its plan allows it (`LOGIN_PER_AGENT`). */
 export interface PlanAccount<A extends MachineAccount> {
@@ -41,6 +42,35 @@ export function groupPlans<A extends MachineAccount & { machineId?: string }>(
     usage: newest(logins.map((l) => l.usage)),
     signedOut: logins.filter((l) => l.status === "signed_out"),
   }));
+}
+
+/** One account in an agent's account choice: the login it offers, and the agents on any of its logins. */
+export interface AccountChoice<A extends MachineAccount> {
+  login: A;
+  usedBy: string[];
+  /**
+   * Every login of it thinks for another agent, and the account may have one per agent (`LOGIN_PER_AGENT`): choosing it
+   * signs this agent in to it again ("Also used by Ada") instead of taking a login from another agent.
+   */
+  also: boolean;
+}
+
+/**
+ * An agent's account choice, one entry per account (`groupPlans`): the first of `ids` it has a login of (the one
+ * chosen, then the one the agent thinks with), else a login of the viewer's that thinks for nobody, else its first.
+ */
+export function accountChoices<A extends MachineAccount & { machineId?: string }>(
+  accounts: readonly A[],
+  ids: readonly (string | null | undefined)[],
+): AccountChoice<A>[] {
+  return groupPlans(accounts).flatMap(({ logins, usedBy }) => {
+    const own =
+      ids.map((id) => logins.find((l) => l.id === id)).find(Boolean) ??
+      logins.find((l) => l.mine && l.usedBy.length === 0);
+    const login = own ?? logins[0];
+    if (!login) return [];
+    return [{ login, usedBy, also: !own && login.mine && loginPerAgent(login.kind, login.provider) }];
+  });
 }
 
 /** A computer's own sign-in as "Seus planos" lists it ("Conta deste computador"). */

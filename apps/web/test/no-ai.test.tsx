@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { AiStatus, MachineAccount, Message } from "@agenteschat/client";
+import type { AiStatus, MachineAccount, MachineAccountKind, Message } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, fakeMachinesOf, NOW, ORG_ID, seedState } from "./fake-api";
@@ -322,6 +322,85 @@ describe("the agent's no-AI card", () => {
     expect(calls(state, "chat.answerNow").map((c) => c.args)).toEqual([[ORG_ID, "m-noai"]]);
     await click(within(plan).getByRole("button", { name: "Pronto" }));
     expect(dialog("Conectar uma IA para a Ada")).toBeNull();
+  });
+
+  /** Ada thinks with her own login of this kind, signed out, and her card says so; the computer's own isn't Walter's. */
+  const signedOutCard = (kind: MachineAccountKind) => {
+    const out: MachineAccount = {
+      id: "acct_ada",
+      kind,
+      label: "Pessoal",
+      email: "walter@acme.com.br",
+      plan: "max",
+      status: "signed_out",
+      ownerId: "u-walter",
+      ownerName: "Walter",
+      mine: true,
+      usedBy: ["Ada"],
+      usage: null,
+      provider: null,
+      keyHint: null,
+    };
+    const state = walters(withCard({ reason: "not_signed_in" }), ADA_ID);
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.brain = { kind, model: null };
+    const api = createFakeApi(state);
+    const brain = api.agents.brain;
+    api.agents.brain = async (orgId, agentId) => ({
+      ...(await brain(orgId, agentId)),
+      ownSignIn: false,
+      ...(agentId === ADA_ID ? { brain: kind, account: out.id, accounts: [out] } : {}),
+    });
+    return { state, api };
+  };
+
+  test("her login signed out: she says so, and Entrar de novo signs that login in once more, its own email unseen", async () => {
+    const { state, api } = signedOutCard("claude_code");
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(5);
+    const row = cardRow();
+    expect(row.textContent).toContain("Ada não vai responder porque a IA dela saiu da conta.");
+    expect(row.textContent).not.toContain("não tem uma IA");
+    await click(within(row).getByRole("button", { name: "Entrar de novo" }), 8);
+    const plan = dialog("Conectar uma IA para a Ada") as HTMLElement;
+    expect(option(plan, /^Claude$/).getAttribute("aria-pressed")).toBe("true");
+    const realOpen = window.open;
+    window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
+    try {
+      await click(within(plan).getByRole("button", { name: "Entrar com Claude" }), 8);
+    } finally {
+      window.open = realOpen;
+    }
+    expect(calls(state, "machines.beginAccountLogin")[0]?.args).toEqual([
+      ORG_ID,
+      "machine_1",
+      "claude_code",
+      { accountId: "acct_ada", email: "walter@acme.com.br" },
+    ]);
+    expect(shownText(plan)).not.toContain("walter@acme.com.br");
+  });
+
+  test("her ChatGPT login signed out: Entrar de novo opens on ChatGPT and signs that login in again, never Claude", async () => {
+    const { state, api } = signedOutCard("codex");
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(5);
+    await click(within(cardRow()).getByRole("button", { name: "Entrar de novo" }), 8);
+    const plan = dialog("Conectar uma IA para a Ada") as HTMLElement;
+    expect(option(plan, /^ChatGPT$/).getAttribute("aria-pressed")).toBe("true");
+    expect(within(plan).queryByRole("button", { name: "Entrar com Claude" })).toBeNull();
+    const realOpen = window.open;
+    window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
+    try {
+      await click(within(plan).getByRole("button", { name: "Entrar com ChatGPT" }), 8);
+    } finally {
+      window.open = realOpen;
+    }
+    expect(calls(state, "machines.beginAccountLogin")[0]?.args).toEqual([
+      ORG_ID,
+      "machine_1",
+      "codex",
+      { accountId: "acct_ada" },
+    ]);
   });
 
   test("a plan while the workspace's computer is on its way: it waits, for the time left; a key meanwhile", async () => {

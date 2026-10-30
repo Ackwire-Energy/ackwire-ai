@@ -38,7 +38,7 @@ describe("menu paths", () => {
 describe("closing words", () => {
   test("the chat's no-AI lines end on two words held together, never on one alone", () => {
     for (const tree of [ptBR, en])
-      for (const s of [tree.noAi.agent, tree.noAi.banner.org, tree.noAi.card.stillMissing])
+      for (const s of [tree.noAi.agent, tree.noAi.signedOut, tree.noAi.banner.org, tree.noAi.card.stillMissing])
         expect({ s, together: /\u00a0\S+$/.test(s) }).toEqual({ s, together: true });
   });
 });

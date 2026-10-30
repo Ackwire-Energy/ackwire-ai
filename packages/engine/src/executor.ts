@@ -815,11 +815,18 @@ async function executeRunInner(
         : body;
     // Team actions (ADR 0064): what the run didn't repeat because the team already did it rides on its reply.
     const teamChecks = note ? [] : await runChecksForReply(tx, run.orgId, run.id);
-    // "Ver o que ele fez" under the reply: how many tool calls so far, so the apps leave it out at 0.
+    // "Ver o que ele fez" under the reply: how many tool calls so far, so the apps leave it out at 0. A reaction
+    // already shows on the message it reacts to: it isn't counted.
     const [calls] = await tx
       .select({ n: count() })
       .from(agentRunSteps)
-      .where(and(eq(agentRunSteps.runId, run.id), eq(agentRunSteps.kind, "tool_call")));
+      .where(
+        and(
+          eq(agentRunSteps.runId, run.id),
+          eq(agentRunSteps.kind, "tool_call"),
+          sql`${agentRunSteps.data}->>'name' is distinct from ${REACT_TOOL}`,
+        ),
+      );
     const work = { steps: calls?.n ?? 0, durationMs: Math.max(0, Date.now() - run.createdAt.getTime()) };
     const m = await postAgentMessage(
       tx,
@@ -882,6 +889,7 @@ async function executeRunInner(
         trigger,
         routine: Boolean(viaRoutine),
         mayPass: policy.mayPass,
+        machines: deps.machines,
       }),
       contextDeps
         ? retrieveForRun(contextDeps, {

@@ -39,6 +39,8 @@ import "./no-ai.css";
 export interface ConnectAiRequest {
   /** The step the message asked for (Jev); `any`, `task` or none: the first step. */
   intent?: ConnectIntent;
+  /** The plan it opens on, over `intent`: a card's Sign in again, on the agent's own plan (a coding plan's too). */
+  plan?: PlanChoice;
   /** With `api_key`: the provider it named. */
   provider?: string;
   /** The agent to connect: the dialog is for it alone. */
@@ -173,6 +175,7 @@ function ConnectAiDialog({
   const [picked, setPicked] = useState<AiChoice | null>(null);
   const choice =
     picked ??
+    request.plan ??
     defaultChoice({
       intent: request.intent,
       ownsAgents: agents.length > 0,

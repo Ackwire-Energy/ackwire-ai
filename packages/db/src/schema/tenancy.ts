@@ -3,6 +3,7 @@ import {
   bigint,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -104,6 +105,11 @@ export const organizationMembers = pgTable(
     handle: text(),
     /** The person's IANA time zone ("hora local"); null = the organization's. */
     timezone: text(),
+    /**
+     * What reaches this person's devices as a notification, by category (ADR 0071 §8): `{ "threads": true }`;
+     * a category not here keeps its default (`NOTICE_DEFAULTS` in packages/engine/src/notice-prefs.ts).
+     */
+    noticePrefs: jsonb().$type<Record<string, boolean>>().notNull().default({}),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

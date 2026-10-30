@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import type { TFunction } from "i18next";
 import type { Agent, AgentAudience, AgentBrain, AiComputer, ComputerSetup } from "../src/api/types";
 import { setupView } from "../src/lib/computer";
+import { serverBody } from "../src/lib/message-body";
 import {
   type AgentAi,
   type AiChoice,
@@ -12,12 +14,14 @@ import {
   firstAgent,
   gateDims,
   kindOf,
+  noAiCardOf,
   onlyOwnerReplies,
   ownSignInFor,
   PLAN_CHOICES,
   type PlanChoice,
   type PlanGate,
   planGate,
+  signInAgainPlan,
   signsInPerAgent,
 } from "../src/lib/no-ai";
 import { LOGIN_PER_AGENT } from "../src/lib/plans";
@@ -225,9 +229,9 @@ describe("the agent a plan starts on, and the order of the plans", () => {
 });
 
 describe("All agents: one login per agent, the key pasted once", () => {
-  test("the coding plans sign in once per agent; Claude and ChatGPT stay one agent per account", () => {
-    expect(LOGIN_PER_AGENT).toEqual({ claude_code: false, codex: false, key: true });
-    expect(PLAN_CHOICES.filter(signsInPerAgent)).toEqual(["zai", "kimi", "minimax", "opencode"]);
+  test("Claude and the coding plans sign in once per agent; ChatGPT stays one agent per account", () => {
+    expect(LOGIN_PER_AGENT).toEqual({ claude_code: true, codex: false, key: true });
+    expect(PLAN_CHOICES.filter(signsInPerAgent)).toEqual(["claude", "zai", "kimi", "minimax", "opencode"]);
   });
 
   /** Ada and Theo have no AI, Lia is on GLM Coding, Bo on the API key, Cy on Claude, Di on the other computer. */
@@ -248,8 +252,8 @@ describe("All agents: one login per agent, the key pasted once", () => {
     ).toEqual(["ada", "theo", "lia", "bo", "cy", "di"]);
   });
 
-  test("none for Claude or ChatGPT, and none for a single agent", () => {
-    expect(set("claude")).toEqual([]);
+  test("Claude's like a coding plan's; none for ChatGPT, and none for a single agent", () => {
+    expect(set("claude")).toEqual(["ada", "theo", "cy"]);
     expect(set("chatgpt")).toEqual([]);
     expect(set("zai", [{ id: "ada" }, { id: "bo" }])).toEqual([]);
   });
@@ -347,5 +351,33 @@ describe("the note before inviting: no agent would answer anyone else", () => {
   test("not while no agent has an AI", () => {
     expect(onlyOwnerReplies([agent("ada", ONLY_ME)], () => false, ME)).toBe(false);
     expect(onlyOwnerReplies([], () => true, ME)).toBe(false);
+  });
+});
+
+describe("a card whose plan's sign-in ended", () => {
+  const meta = (reason: string) => ({
+    bodyCode: "no_ai",
+    noAi: { agentId: "ada", forUserId: null, reason, intent: "task", runId: "r1" },
+  });
+
+  test("the agent says its AI is signed out, not that it has none", () => {
+    expect(noAiCardOf(meta("not_signed_in"))?.signedOut).toBe(true);
+    expect(noAiCardOf(meta("no_key"))?.signedOut).toBeUndefined();
+    const t = ((key: string) => key) as unknown as TFunction;
+    expect(serverBody(t, "…", meta("not_signed_in"))).toBe("chat.body.no_ai_signed_out");
+    expect(serverBody(t, "…", meta("cli_missing"))).toBe("chat.body.no_ai");
+  });
+
+  test("Sign in again opens on the agent's own plan; with no plan left to sign in to, Connect at the card's step", () => {
+    const out = { signedOut: true };
+    const on = (kind: "claude_code" | "codex" | "model", provider?: string): Pick<Agent, "brain"> => ({
+      brain: { kind, model: null, ...(provider ? { provider } : {}) },
+    });
+    expect(signInAgainPlan(out, on("claude_code"))).toBe("claude");
+    expect(signInAgainPlan(out, on("codex"))).toBe("chatgpt");
+    expect(signInAgainPlan(out, on("claude_code", "zai"))).toBe("zai");
+    expect(signInAgainPlan(out, on("model"))).toBeNull();
+    expect(signInAgainPlan(out, undefined)).toBeNull();
+    expect(signInAgainPlan({}, on("codex"))).toBeNull();
   });
 });

@@ -32,6 +32,7 @@ const BY_KIND: Partial<Record<NotificationKind, SoundName>> = {
   mention: "mention",
   dm: "reply",
   thread_reply: "reply",
+  agent_reply: "reply",
   mission_finished: "done",
   routine_finished: "done",
   mission_stopped: "error",

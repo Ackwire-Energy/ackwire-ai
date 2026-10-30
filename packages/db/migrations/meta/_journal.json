@@ -873,8 +873,15 @@
     {
       "idx": 124,
       "version": "7",
-      "when": 1793375270370,
-      "tag": "0124_workspace_deletion",
+      "when": 1793380843712,
+      "tag": "0124_notice_prefs",
+      "breakpoints": true
+    },
+    {
+      "idx": 125,
+      "version": "7",
+      "when": 1793386069347,
+      "tag": "0125_workspace_deletion",
       "breakpoints": true
     }
   ]

@@ -30,6 +30,8 @@ export interface NoAiCard {
   /** With `api_key`: the provider the message named. */
   provider?: string;
   autoOpen?: boolean;
+  /** Its plan's sign-in ended (`reason: not_signed_in`): the agent says so, and signing in again is the way back. */
+  signedOut?: boolean;
 }
 
 const INTENTS: ReadonlySet<string> = new Set<ConnectIntent>(["claude", "chatgpt", "api_key", "any", "task"]);
@@ -46,6 +48,7 @@ export function noAiCardOf(meta: Record<string, unknown> | null | undefined): No
     intent: isIntent(o.intent) ? o.intent : "task",
     ...(typeof o.provider === "string" ? { provider: o.provider } : {}),
     ...(o.autoOpen === true ? { autoOpen: true } : {}),
+    ...(o.reason === "not_signed_in" ? { signedOut: true } : {}),
   };
 }
 
@@ -184,6 +187,15 @@ export function agentAi(agent: Pick<Agent, "brain"> | undefined, state: AiState 
   if (brain?.kind === "codex") return "chatgpt";
   if (brain?.kind === "claude_code") return isPlanId(brain.provider) ? brain.provider : "claude";
   return state === undefined || state === "no_ai" ? null : "key";
+}
+
+/**
+ * The plan a card's Sign in again opens on: the agent's own, where the card says its sign-in ended and the agent
+ * still thinks with a plan; null otherwise (Connect an AI, at the card's step).
+ */
+export function signInAgainPlan(card: Pick<NoAiCard, "signedOut">, agent: Pick<Agent, "brain"> | undefined) {
+  const ai = card.signedOut ? agentAi(agent, undefined) : null;
+  return ai === "key" ? null : ai;
 }
 
 /** The "For" select's choice that signs a plan in for every agent of `allAgents`. */

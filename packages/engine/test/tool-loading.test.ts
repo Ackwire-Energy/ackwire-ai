@@ -66,6 +66,26 @@ test("tools on demand: core and loaded groups as they are, the rest behind find_
   ).toBe(false);
 });
 
+test("find_tools ranks the loaded tools too: those that match best come first, to call directly, then the rest", async () => {
+  const find = presentTools(tools(), undefined, ["issues"]).find((t) => t.name === "find_tools");
+  const text = (await find?.execute({ query: "list issues" }, {} as ToolContext))?.content ?? "";
+  expect(text).toStartWith(
+    'Already in your tool list for "list issues": call them directly, not through use_tool.\n- list_issues: list issues.\n- create_issue: create issue.',
+  );
+  expect(text).toContain('\n\nother tools for "list issues" (call one with use_tool):\n- sentry_search_issues');
+});
+
+test("find_tools never puts a loaded tool that matches less before a better match: it keeps its rank", async () => {
+  const find = presentTools(tools(), undefined, ["issues"]).find((t) => t.name === "find_tools");
+  const text = (await find?.execute({ query: "create a wiki page" }, {} as ToolContext))?.content ?? "";
+  expect(text).toStartWith(
+    'other tools for "create a wiki page" (call one with use_tool):\n- create_wiki_page: create',
+  );
+  expect(text).toContain(
+    "\n- read_wiki_page (already in your tool list: call it directly): read wiki page.\n- create_issue (already in your tool list: call it directly): create issue.",
+  );
+});
+
 test("the prompt names the loaded tools only by name and the on-demand groups in one line", () => {
   const text = describeCapabilities(presentTools(tools(), undefined, []));
   expect(text).toContain("- On demand: Organization wiki (writing) (1), Issues (2), Browser (1), Sentry (1).");

@@ -66,6 +66,7 @@ import { ImportExportSection } from "@/components/ImportFlow";
 import { BillingMeters } from "@/components/Limits";
 import { ErrorState, LoadingLine, LoadingList } from "@/components/Loading";
 import { MachinePage } from "@/components/Machines";
+import { NoticePrefsSection } from "@/components/NoticePrefs";
 import { useOrg } from "@/components/org-context";
 import { PlanUsageCards } from "@/components/PlanUsage";
 import { OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
@@ -166,6 +167,7 @@ export function SettingsPage({
             )}
           </header>
         )}
+        {current === "notifications" && <NoticePrefsSection />}
         {current === "general" && <GeneralSection />}
         {current === "members" && <MembersPage embedded />}
         {current === "audit" && <AuditSection />}
@@ -600,7 +602,10 @@ function SettingsTiles() {
         : undefined,
   };
   type Tile = (typeof SETTINGS_SECTIONS)[number] & { id: Exclude<SettingsSection, "general"> };
-  const tiles = SETTINGS_SECTIONS.filter((s): s is Tile => s.id !== "general" && s.allowed(role, server));
+  // The workspace's areas: "Você" is the person's own.
+  const tiles = SETTINGS_SECTIONS.filter(
+    (s): s is Tile => s.id !== "general" && s.group !== "you" && s.allowed(role, server),
+  );
   return (
     <section className="settings-tiles" aria-labelledby="sec-tiles">
       <h2 id="sec-tiles" className="settings-tiles__title">

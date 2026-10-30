@@ -686,6 +686,7 @@ export const en: Translations = {
   desktopNotice: {
     mention: "You were mentioned",
     dm: "New direct message",
+    agent_reply: "An agent replied",
     agent_question: "A question for you",
     approval: "An approval is waiting for you",
     forum_turn: "Your turn to weigh in",
@@ -727,6 +728,48 @@ export const en: Translations = {
       terms: "This server has no terms page",
       privacy: "This server has no privacy page",
     },
+  },
+  noticePrefs: {
+    whereTitle: "Where they arrive",
+    whatTitle: "What notifies you",
+    browser: "This browser",
+    phone: "Phone",
+    phoneOn: "In the phone app, even with the phone locked",
+    phoneOff: "Turn them on in the phone app, under You › Notifications",
+    mac: "Mac app",
+    macHelp: "While the app is open, even in the background",
+    on: "On",
+    off: "Off",
+    failed: "Couldn't save that. Try again.",
+    loadFailed: "Couldn't load your choices right now.",
+    category: {
+      waiting: {
+        title: "Waiting for you",
+        help: "Approvals, agents' questions, your turn in the forum, requests for help in the browser",
+      },
+      replies: { title: "Agents' replies", help: "When an agent answers what you asked" },
+      mentions: { title: "Mentions and direct messages", help: "When someone calls you or sends you a message" },
+      threads: { title: "Threads you follow", help: "Replies in threads you wrote in or follow" },
+      tasks: { title: "Tasks", help: "Tasks for you, comments and when one changes stage" },
+      routines: { title: "Routines and missions", help: "When they stop, fail or wait for their computer" },
+      computers: { title: "Computers", help: "A new computer joined or the workspace's one is ready" },
+      reactions: { title: "Reactions", help: "When someone reacts to a message of yours" },
+    },
+  },
+  webPushAsk: {
+    title: "Know when an agent needs you",
+    text: "They work while you do something else. Even with the tab closed, we'll tell you when they need your ok, finish what you asked or call you.",
+    on: "Turn on notifications",
+    later: "Not now",
+    done: "Notifications on in this browser",
+    failed: "Couldn't turn on notifications. Try again from your account menu.",
+    someone: "An agent",
+    examples: "Examples of notifications",
+    now: "now",
+    minutes: "{{n}} min",
+    approval: { title: "{{name}} needs your ok", body: "Can I go ahead with what you asked?" },
+    finished: { title: "{{name}} is done", body: "What you asked for is ready." },
+    mention: { title: "{{name}} called you", body: "Can you take a look when you have a minute?" },
   },
   shell: {
     // The Mac app's own title bar (ADR 0036).
@@ -808,6 +851,8 @@ export const en: Translations = {
     browserNoticesBlocked:
       "Your browser blocked them. To allow them, click the icon next to the site's address and turn notifications on.",
     browserNoticesFailed: "Couldn't turn notifications on right now. Try again.",
+    browserNoticesUnanswered:
+      "Your browser tucked the request away. Click the bell next to the site's address and choose Allow.",
     languageCurrent: "Language: {{name}}",
     orgSettings: "Workspace settings",
     switchOrg: "Switch workspace",
@@ -1057,6 +1102,7 @@ export const en: Translations = {
       orgAction: "Connect an AI",
     },
     agent: "{{name}} won't reply because {{she}} has no AI\u00a0connected.",
+    signedOut: "{{name}} won't reply because {{hers}} AI is signed\u00a0out.",
     card: {
       connected: "Done: {{name}} has an AI now.",
       answerNow: "Answer now",
@@ -1111,6 +1157,7 @@ export const en: Translations = {
     own: {
       shared: "The account your agents share",
       one: "An account just for {{name}}",
+      each: "An account just for them",
     },
     chatgptCode: {
       title: "Allow sign-in with a code in ChatGPT",
@@ -1564,6 +1611,8 @@ export const en: Translations = {
       replied_other: "<b>{{names}}</b> replied in <b>{{label}}</b>",
       repliedThread_one: "<b>{{names}}</b> replied in a thread",
       repliedThread_other: "<b>{{names}}</b> replied in a thread",
+      answered: "<b>{{name}}</b> replied",
+      answeredIn: "<b>{{name}}</b> replied in <b>{{label}}</b>",
       dm: "<b>{{name}}</b> sent you a message",
       question: "<b>{{name}}</b> asked a question",
       issueAssigned: "<b>{{name}}</b> assigned you a task",
@@ -1922,6 +1971,7 @@ export const en: Translations = {
           openAgain: "Open again",
           stepTwo: "Paste the code Claude shows",
           codeLabel: "Claude code",
+          notCode: "That doesn't look like Claude's code.",
           send: "Send to {{computer}}",
           sent: "Code sent. Finishing the sign-in on {{computer}}.",
           local: "On {{computer}} itself? If its browser opened by itself, just authorize there.",
@@ -7527,11 +7577,13 @@ export const en: Translations = {
   settings: {
     nav: "Settings sections",
     group: {
+      you: "You",
       org: "Workspace",
       agents: "Agents",
       costs: "Costs and data",
     },
     section: {
+      notifications: "Notifications",
       general: "General",
       members: "Members and invitations",
       access: "Agents and access",
@@ -7546,6 +7598,8 @@ export const en: Translations = {
       billing: "Plan and billing",
     },
     sectionText: {
+      notifications:
+        "The inbox keeps everything. Here you choose what reaches you as a notification, in this workspace.",
       general: "Name, time zone and what every agent knows about the workspace.",
       members: "Who is in the workspace, and invitations.",
       access: "What each agent can use: one level per connector.",
@@ -8011,6 +8065,7 @@ export const en: Translations = {
       brain_busy: "My computer is busy with other tasks right now. I'll answer as soon as it's free.",
       brain_interrupted: "{{brain}} stopped before finishing. Already done, not repeated: {{tools}}.",
       no_ai: "I can't answer yet: I have no AI connected.",
+      no_ai_signed_out: "I can't answer yet: my AI is signed out.",
       action_connect_ai: "Connect an AI",
       approval_request: "Approval request: {{title}}",
       secret_request: "Secret request: {{name}}",

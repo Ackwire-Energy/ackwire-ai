@@ -388,6 +388,31 @@ describe("an invitation link asks to join", () => {
       cleanup();
     }
   });
+
+  test("the workspace's logo in place of its initial, on a link and an invitation alike; the initial without one", async () => {
+    const mark = () => document.querySelector<HTMLImageElement>(".invite-card img.org-mark");
+    const initial = () => document.querySelector(".invite-card .org-badge");
+    const logo = "/api/app/invitations/lnk/logo/0123456789abcdef.png";
+    await openLink({ ...LINK, logo });
+    expect(mark()?.getAttribute("src")).toBe(logo);
+    expect(initial()).toBeNull();
+    cleanup();
+
+    const invitation: InvitationPreview = { orgName: "Acme", email: "ana@acme.com.br", role: "member", kind: "email" };
+    const state = seedState({
+      me: null,
+      previews: { inv: { ...invitation, logo: "/api/app/invitations/inv/logo/a.png" } },
+    });
+    await renderApp("/invite/inv", { api: createFakeApi(state) });
+    await settle(4);
+    expect(mark()?.getAttribute("src")).toBe("/api/app/invitations/inv/logo/a.png");
+    expect(initial()).toBeNull();
+    cleanup();
+
+    await openLink(LINK);
+    expect(mark()).toBeNull();
+    expect(initial()?.textContent).toBe("A");
+  });
 });
 
 /** Mid-day: a request made 2 h ago is still today, so it reads "há 2 h" and never "ontem". */
@@ -587,15 +612,27 @@ describe("Members › Invite people", () => {
   });
 });
 
-describe("Members › Invite people, self-hosted", () => {
-  test("no email to send invitations with: the link is the only way in, without the hairline over it", async () => {
-    const state = seedState({ joinRequests: [], edition: "selfhost" });
+describe("Members › Invite people, by email when the server sends it", () => {
+  const inviteCard = async (state: ReturnType<typeof seedState>) => {
     await renderApp(`/org/${ORG_ID}/settings/members`, { api: createFakeApi(state) });
     await settle(6);
-    const invite = screen().getByRole("region", { name: "Convidar pessoas" });
+    return screen().getByRole("region", { name: "Convidar pessoas" });
+  };
+
+  test("no email to send invitations with: the link is the only way in, without the hairline over it", async () => {
+    const invite = await inviteCard(seedState({ joinRequests: [], authConfig: { passwordReset: false } }));
     expect(within(invite).queryByLabelText("E-mails, separados por vírgula")).toBeNull();
     expect(within(invite).queryByRole("button", { name: "Convidar" })).toBeNull();
     expect(invite.querySelector(".jr-link--alone")).toBeTruthy();
+  });
+
+  test("a self-hosted server that sends email invites by email too, the link under it", async () => {
+    const invite = await inviteCard(
+      seedState({ joinRequests: [], edition: "selfhost", authConfig: { passwordReset: true } }),
+    );
+    expect(within(invite).getByLabelText("E-mails, separados por vírgula")).toBeTruthy();
+    expect(within(invite).getByRole("button", { name: "Convidar" })).toBeTruthy();
+    expect(invite.querySelector(".jr-link:not(.jr-link--alone)")).toBeTruthy();
   });
 });
 

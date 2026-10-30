@@ -129,7 +129,12 @@ describe("the agent's AI", () => {
     expect(flow).toContain('t("connectAi.useAnyway"');
     // "Usar" only where an agent is in view (`onUse`); signing in again as someone else says both addresses.
     expect(flow).toContain("onPress={() => onUse(reuse)}");
-    expect(flow).toMatch(/hint && result\?\.signedInAs\s*\?\s*t\(`connectAi\.otherAccount\.\$\{kind\}`/);
+    expect(flow).toContain("const otherEmail = other?.email ?? (hint ? result?.signedInAs : undefined);");
+    expect(flow).toMatch(/otherEmail\s*\?\s*t\(`connectAi\.otherAccount\.\$\{kind\}`/);
+    // A new login that comes back as another account than its hint never thinks by itself: Usar or Tentar de novo.
+    expect(flow).toMatch(/if \(otherThanHint\(hint, result\.account\)\) setOther\(result\.account\);\s+else onAdded/);
+    expect(flow).toContain("onPress={() => onAdded(other)}");
+    expect(flow).toMatch(/if \(other && !again\) void api\.machines\.removeAccount\(orgId, machineId, other\.id\)/);
     const t = await translator("pt-BR");
     expect(t("agentPage.work.brain.add.duplicate.claude_code", { account: "ana@acme.com" })).toBe(
       "O Claude entrou como ana@acme.com, uma conta que você já conectou. Para usar outra, saia na página do Claude e tente de novo.",
@@ -146,10 +151,69 @@ describe("the agent's AI", () => {
     const settings = await read("AiAccountsScreen.tsx");
     const connect = await read("ConnectAiSteps.tsx");
     expect(settings).toMatch(/again=\{again\.id\}\s+email=\{again\.email\}/);
-    expect(connect).toMatch(/again=\{signedOut\?\.id\}\s+email=\{signedOut\?\.email\}/);
+    expect(connect).toMatch(/again=\{signedOut\?\.id\}\s+email=\{email \?\? signedOut\?\.email\}/);
+    // One more login of another agent's account (`email`) is never the agent's own signed-out login again.
+    expect(connect).toContain('const signedOut = !email && current?.status === "signed_out" ? current : undefined;');
     // An account already connected thinks for an agent only where one is in view: Connect an AI, never Settings.
     expect(connect).toContain("onUse={(a) => void assign(a)}");
     expect(settings).not.toContain("onUse=");
+  });
+
+  test("Claude's code goes by itself however it lands in the field; anything else waits for Enviar, with a line", async () => {
+    // The flow and its field are components the tests can't render: what they wire in, as text.
+    const read = (file: string) => Bun.file(new URL(`../../src/features/ai/${file}`, import.meta.url).pathname).text();
+    const [flow, parts] = await Promise.all([read("AddAccount.tsx"), read("parts.tsx")]);
+    // Typed, pasted with the keyboard or by Colar: one path, and only this sign-in's code sends with no tap.
+    expect(flow).toMatch(
+      /const take = \(text: string\) => \{[^}]*if \(!plan && login && isSignInCode\(text, login\.url\)\) void send\(text\);/,
+    );
+    expect(flow).toContain("onChangeText={take}");
+    expect(flow).toContain("onPasted={take}");
+    expect(flow).toMatch(
+      /key && !isSignInCode\(key, login\.url\) \? \(\s*<Note icon="x">\{t\("agentPage\.work\.brain\.add\.notCode"\)\}<\/Note>/,
+    );
+    // Colar only while the field is empty, the text's edge then the same on both sides.
+    expect(parts).toMatch(/const empty = !value\.trim\(\);/);
+    expect(parts).toMatch(/\{empty \? \(\s*<View style=\{styles\.insetAction\}>/);
+    expect(parts).toContain("!empty && styles.insetFull");
+    const t = await translator("pt-BR");
+    expect(t("agentPage.work.brain.add.notCode")).toBe("Isso não parece o código do Claude.");
+  });
+
+  test("an account other agents think with, where it may have a login per agent: one row, signed in again for this one", async () => {
+    const read = (file: string) => Bun.file(new URL(`../../src/features/ai/${file}`, import.meta.url).pathname).text();
+    const [screen, sheet, connect] = await Promise.all([
+      read("AgentAiScreen.tsx"),
+      read("ConnectAi.tsx"),
+      read("ConnectAiSteps.tsx"),
+    ]);
+    // One row per account (the web's choice), and "Também usada por" signs this agent in on Connect an AI.
+    expect(screen).toContain("accountChoices(accounts, [view.account]).map(({ login: a, usedBy, also })");
+    expect(screen).toMatch(
+      /also\s*\?\s*t\("agentPage\.work\.brain\.accountAlso", \{ agents: joinNames\(usedBy, t\("newAgent\.and"\)\) \}\)/,
+    );
+    expect(screen).toContain("onPress={() => (also ? connect(a, true) : choose(a))}");
+    // That account's email goes along as Claude's hint, on Claude's page only, whatever the agent's own login is.
+    expect(screen).toContain("...(also && a?.email ? { email: a.email } : {}),");
+    expect(sheet).toContain("{...(params.email ? { email: params.email } : {})}");
+    expect(connect).toContain('{...(choice === "claude" && props.email ? { email: props.email } : {})}');
+    const t = await translator("pt-BR");
+    expect(t("agentPage.work.brain.accountAlso", { agents: "Theo e Lia" })).toBe("Também usada por Theo e Lia");
+  });
+
+  test("a card whose plan's sign-in ended: the agent says so, and Entrar de novo opens on its own plan", async () => {
+    const read = (file: string) => Bun.file(new URL(`../../src/features/ai/${file}`, import.meta.url).pathname).text();
+    const [card, sheet] = await Promise.all([read("NoAiCard.tsx"), read("ConnectAi.tsx")]);
+    expect(card).toContain('t(card.signedOut ? "noAi.signedOut" : "noAi.agent", agentGrammar(t, name))');
+    // The plan the client tests pin (`signInAgainPlan`): ChatGPT for a Codex agent, never Claude's page.
+    expect(card).toContain("const again = signInAgainPlan(card, agent);");
+    expect(card).toContain('t(again ? "agentPage.work.brain.signInAgain" : "noAi.action")');
+    expect(card).toContain("...(again ? { plan: again } : {}),");
+    expect(sheet).toContain("PLAN_CHOICES.find((c) => c === params.plan) ?? choiceOfIntent(");
+    const t = await translator("pt-BR");
+    expect(t("noAi.signedOut", { name: "Ada", hers: "dela" })).toBe(
+      "Ada não vai responder porque a IA dela saiu da\u00a0conta.",
+    );
   });
 
   test("on the Cloud the account's sign-in says the computer, never its name; its being ready is a card of its own", async () => {

@@ -138,6 +138,8 @@ import type {
   Model,
   MoveAgentsInput,
   MoveAgentsResult,
+  NoticeCategory,
+  NoticePrefs,
   NotificationCount,
   NotificationFilter,
   NotificationPage,
@@ -938,6 +940,9 @@ export interface ApiClient {
     snooze(orgId: string, id: string, until: string | null): Promise<AppNotification>;
     /** "Marcar tudo como lido": the ids it changed (undo marks them unread again). */
     readAll(orgId: string, filter?: NotificationFilter): Promise<{ ids: string[] }>;
+    /** What reaches my devices as a notification in this workspace (ADR 0071 §8). */
+    prefs(orgId: string): Promise<NoticePrefs>;
+    setPref(orgId: string, category: NoticeCategory, on: boolean): Promise<NoticePrefs>;
   };
   calendar: {
     /** Events, routine runs, issue deadlines and proposals between `from` and `to` (ISO). */

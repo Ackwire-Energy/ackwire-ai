@@ -259,8 +259,9 @@ export function buildEngine(o: EngineOptions) {
       createPermissionToolSource(),
       // The agent browser asks a person for help (ADR 0040 §6).
       createBrowserHandoffToolSource({ pubsub: adapters.pubsub, machines: { hub: machineHub } }),
-      createAskAgentToolSource({ pubsub: adapters.pubsub }),
-      createFindAgentToolSource(),
+      // An agent with no AI connected is refused at once: its answer would never come.
+      createAskAgentToolSource({ pubsub: adapters.pubsub, ai: { gateway, machines: machineHub } }),
+      createFindAgentToolSource({ machines: machineHub }),
       createReactToolSource({ pubsub: adapters.pubsub }),
       // Background runs (routines) speak only through it.
       createHandOffToolSource({ pubsub: adapters.pubsub }),
@@ -306,6 +307,7 @@ export function buildEngine(o: EngineOptions) {
         pubsub: adapters.pubsub,
         judge: context.judge,
         vision,
+        publicUrl: config.PUBLIC_URL,
       }),
       // The agent's own desktop (ADR 0062): `desktop:use` with Run code, when its computer serves desktop use.
       createDesktopToolSource({
@@ -313,6 +315,7 @@ export function buildEngine(o: EngineOptions) {
         pubsub: adapters.pubsub,
         judge: context.judge,
         vision,
+        publicUrl: config.PUBLIC_URL,
       }),
       // Git through our proxy (ADR 0024): connected machines clone and push through the runner's `git.sync`
       // (only our credential reaches the machine; nothing global changes there).

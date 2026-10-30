@@ -697,6 +697,7 @@ export const ptBR = {
   desktopNotice: {
     mention: "Mencionaram você",
     dm: "Mensagem direta nova",
+    agent_reply: "Um agente respondeu",
     agent_question: "Uma pergunta para você",
     approval: "Uma aprovação espera por você",
     forum_turn: "Sua vez de opinar",
@@ -738,6 +739,48 @@ export const ptBR = {
       terms: "Este servidor não tem página de termos",
       privacy: "Este servidor não tem página de privacidade",
     },
+  },
+  noticePrefs: {
+    whereTitle: "Onde chegam",
+    whatTitle: "O que avisa",
+    browser: "Este navegador",
+    phone: "Celular",
+    phoneOn: "No app do celular, com o aparelho bloqueado também",
+    phoneOff: "Ative no app do celular, em Você › Notificações",
+    mac: "App do Mac",
+    macHelp: "Enquanto o app estiver aberto, mesmo em segundo plano",
+    on: "Ligado",
+    off: "Desligado",
+    failed: "Não deu para salvar. Tente de novo.",
+    loadFailed: "Não deu para carregar suas escolhas agora.",
+    category: {
+      waiting: {
+        title: "Esperando você",
+        help: "Aprovações, perguntas dos agentes, sua vez no fórum, pedidos de ajuda no navegador",
+      },
+      replies: { title: "Respostas dos agentes", help: "Quando um agente responde o que você pediu" },
+      mentions: { title: "Menções e mensagens diretas", help: "Quando chamam você ou mandam mensagem" },
+      threads: { title: "Threads que você segue", help: "Respostas nas threads em que você escreveu ou que segue" },
+      tasks: { title: "Tarefas", help: "Tarefa para você, comentários e quando muda de etapa" },
+      routines: { title: "Rotinas e missões", help: "Quando param, falham ou esperam o computador" },
+      computers: { title: "Computadores", help: "Um computador novo entrou ou o do workspace ficou pronto" },
+      reactions: { title: "Reações", help: "Quando reagem a uma mensagem sua" },
+    },
+  },
+  webPushAsk: {
+    title: "Saiba quando um agente precisar de você",
+    text: "Eles trabalham enquanto você faz outra coisa. Mesmo com a aba fechada, avisamos quando pedem seu ok, terminam o que você pediu ou chamam você.",
+    on: "Ativar avisos",
+    later: "Agora não",
+    done: "Avisos ativados neste navegador",
+    failed: "Não deu para ativar os avisos. Tente de novo no menu da sua conta.",
+    someone: "Um agente",
+    examples: "Exemplos de avisos",
+    now: "agora",
+    minutes: "{{n}} min",
+    approval: { title: "{{name}} pede seu ok", body: "Posso seguir com o que você pediu?" },
+    finished: { title: "{{name}} terminou", body: "Está pronto o que você pediu." },
+    mention: { title: "{{name}} chamou você", body: "Dá uma olhada quando puder?" },
   },
   shell: {
     // The Mac app's own title bar (ADR 0036).
@@ -819,6 +862,8 @@ export const ptBR = {
     browserNoticesBlocked:
       "O navegador bloqueou os avisos. Para permitir, clique no ícone ao lado do endereço do site e ligue as notificações.",
     browserNoticesFailed: "Não deu para ligar os avisos agora. Tente de novo.",
+    browserNoticesUnanswered:
+      "O navegador guardou o pedido sem mostrar. Clique no sininho ao lado do endereço do site e escolha Permitir.",
     languageCurrent: "Idioma: {{name}}",
     orgSettings: "Configurações do workspace",
     switchOrg: "Trocar de workspace",
@@ -1072,6 +1117,8 @@ export const ptBR = {
       orgAction: "Conectar uma IA",
     },
     agent: "{{name}} não vai responder porque não tem uma IA\u00a0conectada.",
+    /** Its plan's sign-in ended (`reason: not_signed_in`). */
+    signedOut: "{{name}} não vai responder porque a IA {{hers}} saiu da\u00a0conta.",
     card: {
       connected: "Pronto: {{name}} já tem uma IA.",
       answerNow: "Responder agora",
@@ -1127,6 +1174,8 @@ export const ptBR = {
     own: {
       shared: "A conta que os seus agentes dividem",
       one: "Uma conta só {{for}} {{name}}",
+      /** For "Todos os agentes": one sign-in each, with the same account. */
+      each: "Uma conta só para eles",
     },
     chatgptCode: {
       title: "Permita o login com código no ChatGPT",
@@ -1583,6 +1632,8 @@ export const ptBR = {
       replied_other: "<b>{{names}}</b> responderam em <b>{{label}}</b>",
       repliedThread_one: "<b>{{names}}</b> respondeu numa thread",
       repliedThread_other: "<b>{{names}}</b> responderam numa thread",
+      answered: "<b>{{name}}</b> respondeu",
+      answeredIn: "<b>{{name}}</b> respondeu em <b>{{label}}</b>",
       dm: "<b>{{name}}</b> mandou uma mensagem",
       question: "<b>{{name}}</b> fez uma pergunta",
       issueAssigned: "<b>{{name}}</b> atribuiu uma tarefa a você",
@@ -1943,6 +1994,8 @@ export const ptBR = {
           openAgain: "Abrir de novo",
           stepTwo: "Cole o código que o Claude mostrar",
           codeLabel: "Código do Claude",
+          /** Under the field while what it holds isn't a code of this sign-in (it waits for Enviar). */
+          notCode: "Isso não parece o código do Claude.",
           send: "Enviar ao {{computer}}",
           sent: "Código enviado. O {{computer}} está terminando de entrar.",
           local: "Está no próprio {{computer}}? Se o navegador dele abriu sozinho, é só autorizar lá.",
@@ -7570,11 +7623,13 @@ export const ptBR = {
   settings: {
     nav: "Seções das configurações",
     group: {
+      you: "Você",
       org: "Workspace",
       agents: "Agentes",
       costs: "Custos e dados",
     },
     section: {
+      notifications: "Notificações",
       general: "Geral",
       members: "Membros e convites",
       access: "Agentes e acesso",
@@ -7589,6 +7644,7 @@ export const ptBR = {
       billing: "Plano e cobrança",
     },
     sectionText: {
+      notifications: "A caixa de notificações guarda tudo. Aqui você escolhe o que chega como aviso, neste workspace.",
       general: "Nome, fuso e o que todo agente sabe do workspace.",
       members: "Quem está no workspace e os convites.",
       access: "O que cada agente pode usar: um nível por conector.",
@@ -8060,6 +8116,7 @@ export const ptBR = {
       brain_busy: "Meu computador está ocupado com outras tarefas agora. Respondo assim que ele estiver livre.",
       brain_interrupted: "O {{brain}} parou antes de terminar. Já feito, sem repetir: {{tools}}.",
       no_ai: "Ainda não consigo responder: não tenho uma IA conectada.",
+      no_ai_signed_out: "Ainda não consigo responder: minha IA saiu da conta.",
       action_connect_ai: "Conectar uma IA",
       approval_request: "Pedido de aprovação: {{title}}",
       secret_request: "Pedido de segredo: {{name}}",
