@@ -25,16 +25,17 @@ export const stepIndex = (id: OnboardingStepId) => ONBOARDING_STEPS.findIndex((s
 
 /**
  * Where a resumed onboarding opens: the furthest step the server keeps, or further where the workspace shows the
- * person got there (an older app could have saved a step behind them). Its agents are made once the import and
- * agents steps are behind them, and a computer of its own (`ownComputer`) with no plan left to pay for (`unpaid`)
- * gives its step nothing to wait for.
+ * person got there (an older app could have saved a step behind them). The team is kept once its guide is made
+ * (`guide`) and, saved at the import, once that import came in (`imported`): a creation cut short opens where it was,
+ * where keeping the team again makes it whole. Past the team, a computer step with nothing to ask (`computerDone`: the
+ * workspace's own computer, nothing held over it) is behind them too.
  */
 export function resumeAt(
   saved: OnboardingStepId,
-  workspace: { agents: number; ownComputer: boolean; unpaid: boolean },
+  shows: { guide: boolean; imported: boolean; computerDone?: boolean },
 ) {
-  const shown = workspace.agents === 0 ? "workspace" : workspace.ownComputer && !workspace.unpaid ? "ai" : "computer";
-  return Math.max(stepIndex(saved), stepIndex(shown));
+  if (!shows.guide || (saved === "import" && !shows.imported)) return stepIndex(saved);
+  return Math.max(stepIndex(saved), stepIndex(shows.computerDone ? "ai" : "computer"));
 }
 
 /**

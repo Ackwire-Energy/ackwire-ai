@@ -12,7 +12,7 @@ import {
   useMachines,
   useSaveJevKey,
 } from "@agenteschat/client";
-import { billingHoldOf } from "@agenteschat/client/lib/billing";
+import { billingHoldOf, standingActive } from "@agenteschat/client/lib/billing";
 import {
   computerEdition,
   computerName,
@@ -257,12 +257,13 @@ export async function resumeOnboarding(api: ApiClient, orgId: string): Promise<R
       });
     }
   }
+  const importCame = saved === "import" && (await api.imports.sources(orgId).catch(() => [])).length > 0;
   return {
     at: saved
       ? resumeAt(saved, {
-          agents: agents.length,
-          ownComputer: config?.workspaceComputer === true,
-          unpaid: billingHoldOf(mine?.standing) === "payment",
+          guide: agentIds[GUIDE] !== undefined,
+          imported: importCame,
+          computerDone: config?.workspaceComputer === true && standingActive(mine?.standing),
         })
       : AI_STEP,
     created: { orgId, generalChannelId: general.id },
@@ -368,8 +369,12 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
   const flow = useImportFlow(created?.orgId ?? null);
   const [importedCrew, setImportedCrew] = useState<ImportedCrew[]>(resumed?.importedCrew ?? []);
   // Agents: who joins, created when that step is left. AI: what they think with, then (the server's owner, once an
-  // AI is connected) Jev's key, on a screen of its own (`jev`).
-  const [chosen, setChosen] = useState(() => new Set(resumed ? (Object.keys(resumed.agentIds) as Preset[]) : PRESETS));
+  // AI is connected) Jev's key, on a screen of its own (`jev`). A team kept already keeps those it has (the guide
+  // always), and no other.
+  const [chosen, setChosen] = useState(() => {
+    const kept = Object.keys(resumed?.agentIds ?? {}) as Preset[];
+    return new Set(kept.length > 0 ? [GUIDE, ...kept] : PRESETS);
+  });
   const [jev, setJev] = useState(false);
   const [agentIds, setAgentIds] = useState<Partial<Record<Preset, string>>>(resumed?.agentIds ?? {});
   const [handles, setHandles] = useState<Partial<Record<Preset, string>>>(resumed?.handles ?? {});
@@ -724,18 +729,27 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
   const hold = holdText(t, standing);
   // A new workspace waiting for its first plan (ADR 0079): its computer and its invitations come with the plan.
   const unpaid = billingHoldOf(standing) === "payment";
-  // Back on the step it opens at from the billing service, the plan says active once its hold is gone. Back from
-  // paying, the billing service lifts it seconds later: until then, for a minute at most, the same line says the
-  // payment is being confirmed, then the server's word stands (its offer again while it says unpaid).
+  // Back on the step it opens at from the billing service, the plan says active once nothing is held over the
+  // workspace. Back from paying, the billing service lifts its hold seconds later: until then, for a minute at most,
+  // the same line says the payment is being confirmed, there and on the computer step, whose offer waits; then the
+  // server's word stands (its offer again while it says unpaid).
   const [confirming, setConfirming] = useState(paid);
   useEffect(() => {
     if (!confirming) return;
     const timer = setTimeout(() => setConfirming(false), CONFIRMING_MS);
     return () => clearTimeout(timer);
   }, [confirming]);
-  const paidLine = !resumed || !me.data || index !== at ? null : !unpaid ? "paid" : confirming ? "confirming" : null;
+  const claimed = resumed != null && confirming && unpaid;
+  const paidLine =
+    !resumed || !me.data
+      ? null
+      : claimed && (index === at || step.id === "computer")
+        ? "confirming"
+        : index === at && standingActive(standing)
+          ? "paid"
+          : null;
   // Its computer step offers that plan, as the step's one action, unless it was just paid.
-  const computerOffer = step.id === "computer" && workspaceComputer !== null && unpaid && paidLine !== "confirming";
+  const computerOffer = step.id === "computer" && workspaceComputer !== null && unpaid && !claimed;
   // Creating another refused while one waits for its plan: the way to that one's plan.
   const refused = saveWorkspace.error;
   const unpaidElsewhere =
@@ -1050,12 +1064,14 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
     queryFn: async () => {
       if (!saved) return null;
       const { orgId } = saved;
-      const [settings, agents, machines, platformKey, config] = await Promise.all([
+      const fresh = created === null;
+      const [settings, agents, machines, platformKey, config, sources] = await Promise.all([
         api.orgs.settings(orgId),
         api.agents.list(orgId),
         api.machines.list(orgId).catch(() => [] as Machine[]),
         api.agents.platformKeyAvailable(orgId).catch(() => false),
         api.account.authConfig().catch(() => null),
+        fresh && saved.step === "import" ? api.imports.sources(orgId).catch(() => []) : [],
       ]);
       const crewNow = crewOf(agents, PRESETS, presetMark);
       const ids: Partial<Record<Preset, string>> = {};
@@ -1067,14 +1083,13 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
       return {
         // Opened afresh (a reload, another tab), what the workspace has says how far the person got, past a step saved
         // behind them; left open, the page follows the step another tab or device saved.
-        at:
-          created === null
-            ? resumeAt(saved.step, {
-                agents: agents.length,
-                ownComputer: config?.workspaceComputer === true,
-                unpaid: billingHoldOf(mine?.standing) === "payment",
-              })
-            : stepIndex(saved.step),
+        at: fresh
+          ? resumeAt(saved.step, {
+              guide: ids[GUIDE] !== undefined,
+              imported: sources.length > 0,
+              computerDone: config?.workspaceComputer === true && standingActive(mine?.standing),
+            })
+          : stepIndex(saved.step),
         created: { orgId, generalChannelId: saved.generalChannelId },
         settings,
         ids,

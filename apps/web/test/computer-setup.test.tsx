@@ -1247,10 +1247,10 @@ describe("the onboarding where the workspace gets its own computer", () => {
       minute.push(run);
       return 0;
     }) as unknown as typeof setTimeout);
+    const line = () => document.querySelector(".onb__paid");
     try {
       // The address says paid; the server says the workspace still waits for its plan.
       await open(`/org/${ORG_ID}/onboarding?paid=true`, { state: null }, partWay("computer", [], { unpaid: true }));
-      const line = () => document.querySelector(".onb__paid");
       expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
       expect(line()?.textContent).toBe("Confirmando o pagamento do plano do agentes.chat deste workspace.");
       expect(screen().queryByRole("button", { name: "Agora não" })).toBeNull();
@@ -1260,8 +1260,40 @@ describe("the onboarding where the workspace gets its own computer", () => {
       expect(line()).toBeNull();
       expect(screen().getByRole("button", { name: "Agora não" })).toBeTruthy();
       expect(document.querySelector(".onb__offer")).not.toBeNull();
+      cleanup();
+
+      // Paid from the computer step opened again from a later one: back at the furthest, the computer step holds its
+      // offer back for that minute too, then offers it again.
+      await open(`/org/${ORG_ID}/onboarding?paid=1`, { state: null }, partWay("team", [], { unpaid: true }));
+      expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
+      expect(line()?.getAttribute("data-state")).toBe("confirming");
+      await click(railStep(/^Computador/));
+      expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
+      expect(document.querySelector(".onb__offer")).toBeNull();
+      expect(screen().queryByRole("button", { name: "Agora não" })).toBeNull();
+      expect(line()?.getAttribute("data-state")).toBe("confirming");
+      await act(async () => minute.at(-1)?.());
+      await settle(4);
+      expect(line()).toBeNull();
+      expect(document.querySelector(".onb__offer")).not.toBeNull();
     } finally {
       timers.mockRestore();
+    }
+  });
+
+  test("back from the billing service on any other hold: the plan never said active, the computer step that shows it", async () => {
+    for (const standing of [
+      { state: "hold", reason: "unpaid" },
+      { state: "hold", reason: "ended" },
+      { state: "hold", reason: null },
+    ] as const) {
+      const state = partWay("computer", []);
+      const org = state.me?.organizations[0];
+      if (org) org.standing = standing;
+      await open(`/org/${ORG_ID}/onboarding?paid=1`, { state: null }, state);
+      expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
+      expect(document.querySelector(".onb__paid")).toBeNull();
+      cleanup();
     }
   });
 

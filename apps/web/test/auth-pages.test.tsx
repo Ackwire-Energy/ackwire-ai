@@ -1931,7 +1931,7 @@ describe("Onboarding", () => {
   });
 
   /** An owner whose workspace is being set up, at `step`, with these agents in it. */
-  const settingUpAt = (step: "agents" | "team" | "done", agents: Partial<Agent>[] = []) => {
+  const settingUpAt = (step: "import" | "agents" | "team" | "done", agents: Partial<Agent>[] = []) => {
     const base = seedState().agents[0] as Agent;
     const state = seedState({ agents: agents.map((a, i) => ({ ...base, id: `a${i}`, ...a })) });
     if (state.me)
@@ -1968,7 +1968,7 @@ describe("Onboarding", () => {
     expect(calls(state, "orgs.create")).toHaveLength(0);
   });
 
-  test("its saved state can't be read: the page says so, and Tentar de novo opens it where it was", async () => {
+  test("its saved state can't be read: the page says so, and Tentar de novo opens it at the first step still waiting", async () => {
     const { api } = settingUpAt("agents", [THEO, ADA]);
     let down = true;
     const list = api.agents.list;
@@ -1983,6 +1983,29 @@ describe("Onboarding", () => {
     // Its team made already: past the agents' step, at the computer's.
     expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
     expect(router.state.location.pathname).toBe("/onboarding");
+  });
+
+  test("a team creation cut short opens where it was: the guide made with the rest, an import never applied read again", async () => {
+    // Theo made, cut short before Ada: the agents step again, opened afresh or back from the billing service, where
+    // keeping the team makes her.
+    for (const path of ["/onboarding", `/org/${ORG_ID}/onboarding`]) {
+      const { state, api } = settingUpAt("agents", [THEO]);
+      await renderApp(path, { api });
+      expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
+      await next();
+      expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
+      expect(calls(state, "agents.create").map((c) => (c.args[1] as { handle: string }).handle)).toEqual(["ada"]);
+      cleanup();
+    }
+
+    // The team made, the import picked on its step never applied: that step again, its file read again.
+    const { api } = settingUpAt("import", [THEO, ADA]);
+    await renderApp("/onboarding", { api });
+    expect(screen().getByRole("heading", { name: "Já usa agentes em outro app?" })).toBeTruthy();
+    expect(document.querySelector(".onb__answer .imp-drop")).not.toBeNull();
+    // Only the workspace and its context done.
+    const rail = screen().getByRole("navigation", { name: "Passos para começar" });
+    expect(rail.querySelectorAll("li[data-done]")).toHaveLength(2);
   });
 
   test("finished on another device while this window is still on it: Continue opens the workspace, Send posts nothing again", async () => {

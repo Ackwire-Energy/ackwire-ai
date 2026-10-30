@@ -1,7 +1,14 @@
 import type { AgentLookInput, AiStatus, Edition, OrgOnboarding, OrgSummary } from "@agenteschat/client";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
-import { crewOf, firstAskOrder, type OnboardingStepId, stepIndex } from "@agenteschat/client/lib/onboarding";
+import {
+  crewOf,
+  firstAskOrder,
+  ONBOARDING_STEPS,
+  type OnboardingStepId,
+  resumeAt,
+  stepIndex,
+} from "@agenteschat/client/lib/onboarding";
 import { platformZoneName } from "@agenteschat/client/lib/routines";
 import { handleFrom, isEmail } from "@agenteschat/client/lib/text";
 import type { AgentColorName, EyeStyle } from "@agenteschat/ui/agent/engine";
@@ -96,19 +103,26 @@ export function presetsMade(t: TFunction, agents: readonly ListedAgent[]) {
 }
 
 /**
- * What a resume restores of the workspace being set up (`onboarding` in `me`, and its agents): where it got, on the
- * phone's steps; the team it has, which stays picked (the guide always, no other); the furthest step reached.
+ * What a resume restores of the workspace being set up (`onboarding` in `me`, its agents, and whether an import came
+ * in): where it got, on the phone's steps, never behind what the workspace shows was passed (`resumeAt`); the team it
+ * has, which stays picked (the guide always, no other); the furthest step reached.
  */
-export function resumeOf(t: TFunction, saved: OrgOnboarding & { orgId: string }, agents: readonly ListedAgent[]) {
+export function resumeOf(
+  t: TFunction,
+  saved: OrgOnboarding & { orgId: string },
+  agents: readonly ListedAgent[],
+  imported = false,
+) {
   const { ids, handles } = presetsMade(t, agents);
   const kept = PRESETS.filter((p) => ids[p]);
+  const reached = resumeAt(saved.step, { guide: ids[GUIDE] !== undefined, imported });
   return {
     created: { orgId: saved.orgId, generalChannelId: saved.generalChannelId },
     ids,
     handles,
     chosen: kept.length > 0 ? new Set<Preset>([GUIDE, ...kept]) : null,
-    reached: stepIndex(saved.step),
-    step: phoneStepOf(saved.step),
+    reached,
+    step: phoneStepOf(ONBOARDING_STEPS[reached]?.id ?? saved.step),
   };
 }
 

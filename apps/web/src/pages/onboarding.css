@@ -720,7 +720,7 @@ html:has(.onb) {
   .onb__crew {
     gap: 8px;
   }
-  /* Two agents a side around the computer from 360 px wide; the checklist names everyone. */
+  /* Two agents a side around the computer from 360 px wide; the checklist counts the rest. */
   .onb__scene {
     gap: 8px;
     height: 184px;
