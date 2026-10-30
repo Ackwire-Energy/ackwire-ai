@@ -24,8 +24,8 @@ const { users, organizations, agents, approvals } = schema;
  */
 const SENDER_NAME = "agentes.chat";
 
-/** The sender when `EMAIL_FROM` is unset, at this server's host (`loadConfig` sets the Cloud's: ola@agentes.chat). */
-export const defaultEmailFrom = (publicUrl: string) => `${SENDER_NAME} <ola@${new URL(publicUrl).hostname}>`;
+/** The sender when `EMAIL_FROM` is unset, at this server's host (`loadConfig` sets the Cloud's: ping@agentes.chat). */
+export const defaultEmailFrom = (publicUrl: string) => `${SENDER_NAME} <ping@${new URL(publicUrl).hostname}>`;
 
 /** A stored or chosen language as an email locale: "en…" is English, anything else (or none) pt-BR. */
 export const emailLocale = (value: unknown): EmailLocale =>

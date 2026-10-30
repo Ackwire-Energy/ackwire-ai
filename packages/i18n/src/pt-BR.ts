@@ -707,6 +707,11 @@ export const ptBR = {
     updated: "Atualizado em {{date}}",
     contents: "Nesta página",
     home: "Ir para o início",
+    /** `/terms` and `/privacy` on a server that has no page of its own for them. */
+    none: {
+      terms: "Este servidor não tem página de termos",
+      privacy: "Este servidor não tem página de privacidade",
+    },
   },
   shell: {
     // The Mac app's own title bar (ADR 0036).

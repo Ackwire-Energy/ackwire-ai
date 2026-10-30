@@ -115,9 +115,18 @@ describe("GET /api/instance", () => {
       // Nobody yet: the first account signs up.
       signup: "open",
       ownerClaim: false,
+      cloud: false,
     });
     await signUp(browser(t), "owner@example.com");
     const after = (await (await t.app.request("/api/instance")).json()) as { signup: string };
     expect(after.signup).toBe("invite");
+  });
+
+  test("agentes.chat's own servers say they are the Cloud", async () => {
+    t = await createTestServer({ env: { PUBLIC_URL: "https://app.agentes.chat" } });
+    expect(await (await t.app.request("/api/instance")).json()).toMatchObject({
+      url: "https://app.agentes.chat",
+      cloud: true,
+    });
   });
 });

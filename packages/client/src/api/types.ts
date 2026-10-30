@@ -87,6 +87,8 @@ export interface Instance {
   signup: "open" | "invite";
   /** No account yet, and the first one only through the owner link the setup printed (absent: false). */
   ownerClaim?: boolean;
+  /** One of agentes.chat's own servers: `/terms` and `/privacy` are agentes.chat Cloud's (absent: an older server). */
+  cloud?: boolean;
 }
 
 /** "Abrir no celular": a sign-in for the phone, single use, a few minutes long. */
