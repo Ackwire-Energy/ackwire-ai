@@ -960,6 +960,9 @@ test("drops caused by our own server stopping aren't the computer's: the turn re
   expect(run?.status).toBe("done");
   // One more cut than the limit allows the computer itself, and still the same session to the end.
   expect(seen.length).toBe(MAX_COMPUTER_DROPS + 2);
+  // Each turn sent again reads what cut it: our server, not the computer.
+  expect(seen[1]?.trigger).toContain("cut off because the server restarted");
+  expect(seen.at(-1)?.trigger).toContain("cut off because the server restarted");
   expect((await timeline(f)).at(-1)?.body).toBe("Pronto.");
   const drops = await f.db
     .select({ data: schema.agentRunSteps.data })

@@ -1565,7 +1565,8 @@ async function executeRunInner(
    * waits for that computer, saying nothing for a short while, and the turn is sent again when it is
    * back (`resumeRunsWaitingForMachine`, or right away when it already is). Still away after the grace:
    * the next attempt finds it unavailable and says so ("I'll answer when it's back"). A drop caused by
-   * our own server stopping (`serverStop`) isn't one of the computer's: it never counts toward the limit.
+   * our own server stopping (`serverStop`) isn't one of the computer's: it never counts toward the limit,
+   * and the turn sent again reads that the server restarted.
    */
   const waitForDroppedComputer = async (
     from: BrainKind,
@@ -1581,6 +1582,7 @@ async function executeRunInner(
       prompt: prev?.prompt ?? prompt,
       executed: [...new Set([...(prev?.executed ?? []), ...executed])],
       drops: (prev?.drops ?? 0) + (serverStop ? 0 : 1),
+      ...(serverStop ? { cause: "restart" as const } : {}),
     };
     const waitId = Bun.randomUUIDv7();
     t.waitingForBrain = { kind: from, machineId, code: "machine_dropped", waitId };
