@@ -1,9 +1,9 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { OutputBuffer, runCommand } from "../../runner/exec";
 import { handleRequest } from "../../runner/handlers";
-import { errorCode, removeDirs, tempDir } from "./helpers";
+import { errorCode, gitRepo, hasGit, removeDirs, tempDir } from "./helpers";
 
 const dirs: string[] = [];
 afterEach(() => removeDirs(dirs));
@@ -110,4 +110,34 @@ test.skipIf(!posix)(
     expect(Date.now() - started).toBeLessThan(4500);
   },
   10_000,
+);
+
+test.skipIf(!posix || !hasGit)(
+  "exec (run_code, skill scripts): a held push doesn't run, and says why; an approved one, or a push to a PR branch, runs",
+  async () => {
+    const { work, git } = gitRepo(dirs);
+    mkdirSync(path.join(work, ".agentes"));
+    writeFileSync(path.join(work, ".agentes", "run-1.sh"), "git push origin develop\n");
+    writeFileSync(path.join(work, ".agentes", "run-2.sh"), "git push origin HEAD\n");
+    const ctx = { workspaceReal: work, exec: true, token: "agm_x" };
+    const scope = { signal: new AbortController().signal, output: () => {} };
+    const exec = (command: string, approved?: boolean) =>
+      handleRequest(
+        ctx,
+        { op: "exec", command, timeoutSeconds: 30, stream: false, ...(approved ? { approved } : {}) },
+        scope,
+      ) as Promise<{ exitCode: number; stderr: string }>;
+    expect(await errorCode(() => exec("bash .agentes/run-1.sh"))).toBe("approval_needed");
+    const held = await exec("bash .agentes/run-1.sh").catch((err: Error) => err.message);
+    expect(held).toStartWith("This push goes to the default branch develop: a person approves it first.");
+    expect(held).toContain("make the same call again with why");
+    // A person approved this very command: it runs.
+    expect((await exec("bash .agentes/run-1.sh", true)).exitCode).toBe(0);
+    // The pull request's own branch is ordinary work: the new commit goes up.
+    git("commit", "-q", "--allow-empty", "-m", "fix");
+    expect((await exec("bash .agentes/run-2.sh")).exitCode).toBe(0);
+    expect(git("rev-parse", "origin/cursor/pap-582-fix")).toBe(git("rev-parse", "HEAD"));
+    expect(await errorCode(() => exec("git push --force origin cursor/pap-582-fix"))).toBe("approval_needed");
+  },
+  30_000,
 );

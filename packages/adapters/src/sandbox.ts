@@ -13,6 +13,8 @@ export interface ExecRequest {
   timeoutSeconds: number;
   /** Stops the command (killed when the provider can; else we stop waiting): the run was canceled. */
   signal?: AbortSignal;
+  /** A person approved this very command (an approval card): the computer runs it even when its command policy would hold it. */
+  approved?: boolean;
 }
 
 export interface ExecResult {

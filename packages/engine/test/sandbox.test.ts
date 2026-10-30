@@ -263,6 +263,61 @@ describe("Drive and skills", () => {
   });
 });
 
+describe("commands the computer holds for a person (ADR 0053 §3)", () => {
+  test("run_code and a skill script: held, they say why and how to ask; with why they ask in the chat, and the approved call runs", async () => {
+    f = await setup({ machines: true, skillTools: true, reply: () => ({ chunks: ["ok"] }) });
+    const HELD =
+      "This push goes to the default branch main: a person approves it first. To ask them, make the same call again with why set to your reason: it waits for their decision in the chat.";
+    // Like the runner: it holds every command a person hasn't approved.
+    const { runner } = await connectedComputer(f, {
+      exec: (req) =>
+        req.approved
+          ? { exitCode: 0, stdout: "pushed", stderr: "" }
+          : { fail: { code: "approval_needed", message: HELD } },
+    });
+    const ctx = await runCtx();
+    expect(await call(ctx, "run_code", { language: "bash", code: "git push origin main" })).toEqual({
+      content: `Not run: ${HELD}`,
+      isError: true,
+      data: { code: "command.approval_needed" },
+    });
+    // The same call with why: an approval card in the chat; nothing else reaches the computer.
+    const asked = await f.tools?.invoke(ctx, {
+      toolUseId: crypto.randomUUID(),
+      name: "run_code",
+      input: { language: "bash", code: "git push origin main", why: WHY },
+    });
+    if (asked?.type !== "approval") throw new Error(`expected an approval, got ${asked?.type}`);
+    expect(asked.approval).toMatchObject({ tool: "run_code", why: WHY, channelId: f.general.id });
+    const execs = () => runner.sent.filter((s) => s.type === "request" && s.op === "exec");
+    expect(execs()).toHaveLength(1);
+    expect(execs()[0]).not.toHaveProperty("approved");
+    // A person approved it: that exact call runs, and the computer is told a person approved it.
+    const ran = await f.tools?.executeApproved(ctx, { ...asked.approval, status: "approved" });
+    expect(ran?.content).toContain("pushed");
+    expect(execs()).toHaveLength(2);
+    expect(execs()[1]).toMatchObject({ approved: true });
+    // A skill's script the same way.
+    const md = "---\nname: entrega\ndescription: Publica.\n---\nRode scripts/ship.sh.";
+    const zip = await zipOf({ "SKILL.md": md, "scripts/ship.sh": "git push origin main" });
+    const skill = await importSkillZip({ db: f.db, blobs: f.artifactDeps.blobs }, f.owner.id, f.org.id, zip);
+    await setAgentSkills(f.db, f.owner.id, f.org.id, f.agent.id, [{ skillId: skill.id, enabled: true }]);
+    expect(await call(ctx, "run_skill_script", { skill: "entrega", path: "scripts/ship.sh" })).toMatchObject({
+      content: `Not run: ${HELD}`,
+      data: { code: "command.approval_needed" },
+    });
+    const script = await f.tools?.invoke(ctx, {
+      toolUseId: crypto.randomUUID(),
+      name: "run_skill_script",
+      input: { skill: "entrega", path: "scripts/ship.sh", why: WHY },
+    });
+    expect(script?.type).toBe("approval");
+    // A why too short to tell the person anything is refused, with nothing asked.
+    const short = await call(ctx, "run_code", { language: "bash", code: "git push origin main", why: "ship" });
+    expect(short).toMatchObject({ isError: true, data: { code: "tool.why_missing" } });
+  });
+});
+
 describe("the agent's computer API", () => {
   test("owner or admins only; other organizations see nothing", async () => {
     f = await setup();

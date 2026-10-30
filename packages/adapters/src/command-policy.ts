@@ -8,8 +8,17 @@ import { commandParts, ruleMatches } from "./machine-protocol";
  * `permission_prompt` all decide with these functions, so every brain follows
  * the same rules.
  *
- * - `deniedInMissions`: the deny list, matched on normalized arguments (`gh -R`,
- *   `git -C/-c`, `refs/heads/<default>`): refused at once, never asked.
+ * - `deniedInMissions` / `deniedMessage`: the deny list (merges, deploys,
+ *   rollbacks, publishing, `gh api`, printed tokens), matched on normalized
+ *   arguments (`gh -R`, `git -C/-c`): refused at once with the kind it is,
+ *   never asked.
+ * - `gitPushes` / `heldPush` / `approvalNeeded`: where each push goes, read
+ *   with git on the computer (the remote's default branch, the protected
+ *   ones, the agent's own): a push to the default branch, a force push to
+ *   someone else's branch or a deletion waits for a person; any other push is
+ *   ordinary work. Every path that runs a command on the computer (the
+ *   brain's own commands, `run_code`, skill scripts, background tasks) asks
+ *   `approvalNeeded` first.
  * - `secretRead`: a call that reads keys, tokens or env files, with any read
  *   tool (Read, Glob, Grep, a shell command): refused at once too. Only calls
  *   that reach a prompt are seen: Claude Code's own reads meet the same list
@@ -796,86 +805,89 @@ export function readOnlyCall(
 }
 
 /**
- * Never without a person's approval (`request_approval`): merges, pushes
- * elsewhere, force pushes, deploys, cluster/infra changes and package
- * publishes. Never promptable and never judged: Claude Code checks deny
- * before asking, the runner's prompt tool and the server refuse a match at once.
+ * What a person approves first, by kind, with the words a refusal names it by (ADR 0053 §3, amended
+ * 2026-10-30). Never judged and never run alone: Claude Code checks deny before asking, and the runner's
+ * prompt tool, its commands and background tasks, and the server refuse a match at once. Pushes aren't
+ * here: where one goes depends on the repository, so the computer reads it with git (`gitPushes`).
  */
-export const MISSION_DENY_RULES: readonly string[] = [
-  "Bash(git merge)",
-  "Bash(git merge *)",
-  "Bash(git -C * merge *)",
-  "Bash(git -C * push --force*)",
-  "Bash(git -C * push -f*)",
-  "Bash(git -C * push * --force*)",
-  "Bash(git -C * push * -f*)",
-  "Bash(git -C * push *+*)",
-  "Bash(git -C * push *:*)",
-  "Bash(git -C * push * main)",
-  "Bash(git -C * push * master)",
-  "Bash(git push * main *)",
-  "Bash(git push * master *)",
-  "Bash(git -C * push * main *)",
-  "Bash(git -C * push * master *)",
-  "Bash(git -C * push * --delete *)",
-  "Bash(git -C * push * -d *)",
-  "Bash(git -C * push * --all*)",
-  "Bash(git -C * push * --mirror*)",
-  "Bash(git push --force*)",
-  "Bash(git push -f*)",
-  "Bash(git push * --force*)",
-  "Bash(git push * -f*)",
-  "Bash(git push *+*)",
-  "Bash(git push *:*)",
-  "Bash(git push * main)",
-  "Bash(git push * master)",
-  "Bash(git push --delete *)",
-  "Bash(git push * --delete *)",
-  "Bash(git push * -d *)",
-  "Bash(git push --all*)",
-  "Bash(git push * --all*)",
-  "Bash(git push --mirror*)",
-  "Bash(git push * --mirror*)",
-  "Bash(gh pr merge *)",
-  "Bash(gh api *)",
-  "Bash(vercel deploy *)",
-  "Bash(vercel --prod*)",
-  "Bash(vercel * --prod*)",
-  "Bash(npx vercel *)",
-  "Bash(railway up*)",
-  "Bash(railway deploy*)",
-  "Bash(npx railway *)",
-  "Bash(fly deploy*)",
-  "Bash(flyctl deploy*)",
-  "Bash(netlify deploy *)",
-  "Bash(npx netlify *)",
-  "Bash(eas submit *)",
-  "Bash(eas update *)",
-  "Bash(npx eas *)",
-  "Bash(npx eas-cli *)",
-  "Bash(kubectl apply *)",
-  "Bash(kubectl rollout *)",
-  "Bash(kubectl delete *)",
-  "Bash(helm install *)",
-  "Bash(helm upgrade *)",
-  "Bash(helm uninstall *)",
-  "Bash(terraform apply *)",
-  "Bash(terraform destroy *)",
-  "Bash(docker push*)",
-  "Bash(gh release create*)",
-  // Publishing packages (`bun publish` and friends; `yarn npm publish` is Yarn 2+).
-  "Bash(npm publish*)",
-  "Bash(pnpm publish*)",
-  "Bash(yarn publish*)",
-  "Bash(yarn npm publish*)",
-  "Bash(bun publish*)",
-  "Bash(cargo publish*)",
-  "Bash(gem push*)",
-  "Bash(twine upload*)",
-  // The person's GitHub token, printed.
+const SENSITIVE_KINDS: ReadonlyArray<{ what: string; rules: readonly string[] }> = [
+  {
+    what: "This is a merge",
+    rules: ["Bash(git merge)", "Bash(git merge *)", "Bash(git -C * merge *)", "Bash(gh pr merge *)"],
+  },
+  {
+    what: "This is a deploy",
+    rules: [
+      "Bash(vercel deploy *)",
+      "Bash(vercel --prod*)",
+      "Bash(vercel * --prod*)",
+      "Bash(npx vercel *)",
+      "Bash(railway up*)",
+      "Bash(railway deploy*)",
+      "Bash(npx railway *)",
+      "Bash(fly deploy*)",
+      "Bash(flyctl deploy*)",
+      "Bash(netlify deploy *)",
+      "Bash(npx netlify *)",
+      "Bash(eas submit *)",
+      "Bash(eas update *)",
+      "Bash(npx eas *)",
+      "Bash(npx eas-cli *)",
+      "Bash(kubectl apply *)",
+      "Bash(helm install *)",
+      "Bash(helm upgrade *)",
+      "Bash(terraform apply *)",
+    ],
+  },
+  {
+    what: "This is a rollout or a rollback",
+    rules: ["Bash(kubectl rollout *)", "Bash(helm rollback *)", "Bash(vercel rollback*)"],
+  },
+  {
+    what: "This removes infrastructure",
+    rules: ["Bash(kubectl delete *)", "Bash(helm uninstall *)", "Bash(terraform destroy *)"],
+  },
+  {
+    what: "This publishes a package, an image or a release",
+    rules: [
+      "Bash(docker push*)",
+      "Bash(gh release create*)",
+      // `bun publish` and friends; `yarn npm publish` is Yarn 2+.
+      "Bash(npm publish*)",
+      "Bash(pnpm publish*)",
+      "Bash(yarn publish*)",
+      "Bash(yarn npm publish*)",
+      "Bash(bun publish*)",
+      "Bash(cargo publish*)",
+      "Bash(gem push*)",
+      "Bash(twine upload*)",
+    ],
+  },
+  {
+    what: "This calls the GitHub API directly, which can merge, delete or change settings",
+    rules: ["Bash(gh api *)"],
+  },
+];
+
+/** The person's GitHub token, printed: refused like any secret, never asked. */
+const TOKEN_RULES: readonly string[] = [
   "Bash(gh auth token*)",
   "Bash(gh auth status *--show-token*)",
   "Bash(gh auth status *-t*)",
+];
+
+/** The deny list as Claude Code reads it (`--settings`): every kind above and the token rules. */
+export const MISSION_DENY_RULES: readonly string[] = [...SENSITIVE_KINDS.flatMap((k) => k.rules), ...TOKEN_RULES];
+
+/**
+ * Every push, for Claude Code's `ask` rules, which outrank allow rules (the owner's own too): a push always
+ * reaches our prompt tool, where the computer reads where it goes.
+ */
+export const PUSH_ASK_RULES: readonly string[] = [
+  "Bash(git push)",
+  "Bash(git push *)",
+  "Bash(git -C * push*)",
+  "Bash(git -c * push*)",
 ];
 
 /**
@@ -1008,18 +1020,292 @@ function commandWords(command: string): string[][] {
 }
 
 /**
- * On the deny list: refused at once, never shown to anyone, never judged. The
- * rules match the command as written and each part normalized
+ * Why a call is on the deny list, as the refusal tells the agent (`how`: what it can do to ask a person);
+ * null when it isn't. The rules match the command as written and each part normalized
  * (`normalizedCommand`), so options in front can't slip past them.
  */
-export function deniedInMissions(toolName: string, input: Record<string, unknown> | null | undefined) {
-  if (MISSION_DENY_RULES.some((rule) => ruleMatches(rule, toolName, input))) return true;
-  if (toolName !== "Bash") return false;
+export function deniedMessage(
+  toolName: string,
+  input: Record<string, unknown> | null | undefined,
+  how: string = ASK_IN_CHAT,
+): string | null {
   const command = typeof input?.command === "string" ? input.command : "";
-  return commandWords(command).some((words) => {
-    const normalized = { command: normalizedCommand(words) };
-    return MISSION_DENY_RULES.some((rule) => ruleMatches(rule, "Bash", normalized));
+  const calls = [
+    input,
+    ...(toolName === "Bash" ? commandWords(command).map((words) => ({ command: normalizedCommand(words) })) : []),
+  ];
+  const hit = (rules: readonly string[]) => calls.some((c) => rules.some((rule) => ruleMatches(rule, toolName, c)));
+  if (hit(TOKEN_RULES)) return SECRET_MESSAGE;
+  const kind = SENSITIVE_KINDS.find((k) => hit(k.rules));
+  return kind ? approvalMessage(kind.what, how) : null;
+}
+
+/** On the deny list: refused at once, never shown to anyone, never judged. */
+export const deniedInMissions = (toolName: string, input: Record<string, unknown> | null | undefined) =>
+  deniedMessage(toolName, input) !== null;
+
+// ── Pushes: where each one goes, read with git on the computer ───────────────
+
+/** One ref a push updates: a branch, `HEAD` (the branch checked out), or null (a bare push: the branch's push target). */
+export interface PushRef {
+  branch: string | null;
+  force: boolean;
+  delete: boolean;
+}
+
+/** One `git push` of a command, as written. A dry run is none: it changes nothing. */
+export interface GitPush {
+  /** Where it runs, from the `cd` and `git -C` before it: relative to the command's folder, or absolute. Null: git can't tell (`--git-dir`, `cd ~`). */
+  dir: string | null;
+  /** The remote or URL it names; null: the branch's own push remote. */
+  remote: string | null;
+  refs: PushRef[];
+  /** `--all`, `--branches` or a wildcard refspec: every branch, the default one too. */
+  every: boolean;
+  /** `--mirror`: it also overwrites and deletes branches. */
+  mirror: boolean;
+  /** `--prune`: it deletes the remote branches that aren't here. */
+  prune: boolean;
+}
+
+/** A line that runs git push somehow, read or not. */
+const PUSH_MENTION = /\bgit\b.*\bpush\b/;
+
+/** `cd`'s folder from `dir` (null: git can't tell where that is from here). */
+function cdTo(dir: string | null, to: string | undefined) {
+  if (to === undefined || to === "-" || to.startsWith("~")) return null;
+  if (path.isAbsolute(to)) return to;
+  return dir === null ? null : path.join(dir, to);
+}
+
+/** A push refspec's destination: a branch, `HEAD`, null (git can't tell), or `skip` (a tag or another kind of ref). */
+function pushDestination(dst: string): string | null | "skip" {
+  if (dst === "HEAD" || dst === "@") return "HEAD";
+  if (dst === "") return null;
+  if (dst.startsWith("refs/heads/")) return dst.slice("refs/heads/".length) || null;
+  if (dst.startsWith("refs/")) return "skip";
+  return dst;
+}
+
+/** `git … push …` from its `git` word: where it goes as written; null when it isn't a push or is a dry run. */
+function parsePush(argv: readonly string[], dir: string | null): GitPush | null {
+  let i = 1;
+  let where = dir;
+  for (; i < argv.length; i++) {
+    const a = argv[i] as string;
+    if (a === "-C") where = cdTo(where, argv[++i]);
+    else if (a === "--git-dir" || a === "--work-tree") {
+      i++;
+      where = null;
+    } else if (/^--(git-dir|work-tree)=/.test(a)) where = null;
+    else if (GIT_GLOBAL_VALUE.has(a)) i++;
+    else if (/^--(namespace|exec-path|config-env)=/.test(a) || GIT_GLOBAL_FLAG.test(a)) continue;
+    else break;
+  }
+  if (argv[i] !== "push") return null;
+  const push: GitPush = { dir: where, remote: null, refs: [], every: false, mirror: false, prune: false };
+  let force = false;
+  let removes = false;
+  let tagsOnly = false;
+  const words: string[] = [];
+  for (let j = i + 1; j < argv.length; j++) {
+    const a = argv[j] as string;
+    if (a === "--") {
+      words.push(...argv.slice(j + 1));
+      break;
+    }
+    if (a.startsWith("--")) {
+      const eq = a.indexOf("=");
+      const name = eq < 0 ? a.slice(2) : a.slice(2, eq);
+      if (name === "force" || name === "force-with-lease") force = true;
+      else if (name === "delete") removes = true;
+      else if (name === "all" || name === "branches") push.every = true;
+      else if (name === "mirror") push.every = push.mirror = true;
+      else if (name === "prune") push.prune = true;
+      else if (name === "tags") tagsOnly = true;
+      else if (name === "dry-run") return null;
+      else if (name === "repo") push.remote = eq < 0 ? (argv[++j] ?? null) : a.slice(eq + 1);
+      else if (eq < 0 && (name === "push-option" || name === "receive-pack" || name === "exec")) j++;
+      continue;
+    }
+    if (a.startsWith("-") && a.length > 1) {
+      for (let k = 1; k < a.length; k++) {
+        const c = a[k];
+        if (c === "f") force = true;
+        else if (c === "d") removes = true;
+        else if (c === "n") return null;
+        else if (c === "o") {
+          if (k === a.length - 1) j++;
+          break;
+        }
+      }
+      continue;
+    }
+    words.push(a);
+  }
+  const [remote, ...specs] = words;
+  if (remote !== undefined) push.remote = remote;
+  for (let k = 0; k < specs.length; k++) {
+    const spec = specs[k] as string;
+    if (spec === "tag") {
+      k++;
+      continue;
+    }
+    const plus = spec.startsWith("+");
+    const bare = plus ? spec.slice(1) : spec;
+    const colon = bare.indexOf(":");
+    const dst = colon < 0 ? bare : bare.slice(colon + 1);
+    if (dst.includes("*")) {
+      push.every = true;
+      continue;
+    }
+    const branch = pushDestination(dst);
+    if (branch === "skip") continue;
+    push.refs.push({ branch, force: force || plus, delete: removes || (colon === 0 && dst !== "") });
+  }
+  // No refspec: the branch's own push target (`--tags` alone pushes tags only).
+  if (specs.length === 0 && !push.every && !tagsOnly) push.refs.push({ branch: null, force, delete: removes });
+  return push;
+}
+
+/**
+ * The pushes a command or a shell script makes, line by line (`cd` and `git -C` followed, wrappers and
+ * keywords in front skipped: any `git` word starts one); null when a line that pushes can't be read plainly
+ * (`$(…)`, variables, heredocs): where it goes is unknown.
+ */
+export function gitPushes(script: string): GitPush[] | null {
+  const out: GitPush[] = [];
+  let dir: string | null = "";
+  for (const line of script.split("\n")) {
+    if (/^\s*#/.test(line)) continue;
+    const cmds = simpleCommands(line);
+    if (!cmds) {
+      if (PUSH_MENTION.test(line)) return null;
+      continue;
+    }
+    for (const { argv } of cmds) {
+      const words = unwrapped(argv);
+      if (baseName(words[0] ?? "") === "cd") {
+        dir = cdTo(dir, words[1]);
+        continue;
+      }
+      const at = argv.findIndex((w) => baseName(w) === "git");
+      const push = at < 0 ? null : parsePush(argv.slice(at), dir);
+      if (push && (push.refs.length > 0 || push.every || push.prune)) out.push(push);
+    }
+  }
+  return out;
+}
+
+/** What git says about the repository a push runs in; each read only when a decision needs it. */
+export interface RepoFacts {
+  /** The branch checked out; null when detached or unknown. */
+  current(): Promise<string | null>;
+  /** Where a bare push goes (`@{push}`): its remote (null: the default one) and branch; null when git can't tell. */
+  pushTarget(): Promise<{ remote: string | null; branch: string | null } | null>;
+  /** The remote's default branch: `refs/remotes/<remote>/HEAD`, else the remote's own `HEAD`; null when unknown. */
+  defaultBranch(remote: string): Promise<string | null>;
+  /** The branches the repository marks protected (`git config agentes.protectedBranch`, `*` matches anything). */
+  protectedBranches(): Promise<readonly string[]>;
+}
+
+/** Why a command waits for a person, and what the agent can do instead. */
+export interface Held {
+  what: string;
+  instead?: string;
+}
+
+const globMatches = (pattern: string, s: string) =>
+  new RegExp(`^${pattern.split("*").map(escapeRe).join(".*")}$`).test(s);
+
+/**
+ * Whether one push waits for a person (ADR 0053 §3, amended 2026-10-30): a push to the agent's own branches
+ * (`own`, under its `agentes/<handle>/` prefix: nobody else's) or to any other branch but the default and
+ * the protected ones is ordinary work; a push to the default or a protected branch, a force push to a branch
+ * that isn't its own, deleting a remote branch, `--all`, `--mirror` and `--prune` wait. When git can't tell
+ * where a push goes or which branch is the default, it waits too.
+ */
+export async function heldPush(push: GitPush, facts: RepoFacts, own: readonly string[]): Promise<Held | null> {
+  const instead = `Or push to a branch of your own${own[0] ? ` (${own[0]}…)` : ""} and open a pull request.`;
+  if (push.mirror) return { what: "This is a mirror push: it can overwrite and delete any branch" };
+  if (push.every) return { what: "This push updates every branch, the default one too", instead };
+  if (push.prune) return { what: "This push deletes the remote branches that aren't here (--prune)" };
+  let remote = push.remote;
+  for (const ref of push.refs) {
+    let branch = ref.branch;
+    if (branch === "HEAD") branch = await facts.current();
+    else if (branch === null) {
+      const target = await facts.pushTarget();
+      branch = target?.branch ?? null;
+      remote ??= target?.remote ?? null;
+    }
+    if (branch === null) return { what: "git can't tell which branch this push goes to", instead };
+    if (ref.delete) return { what: `This deletes the remote branch ${branch}` };
+    if (own.some((prefix) => prefix && branch.startsWith(prefix))) continue;
+    if ((await facts.protectedBranches()).some((p) => globMatches(p, branch))) {
+      return { what: `This push goes to the protected branch ${branch}`, instead };
+    }
+    const main = await facts.defaultBranch(remote ?? "origin");
+    if (main === null) {
+      return { what: "git can't tell this repository's default branch, so this push may go to it", instead };
+    }
+    if (branch === main) return { what: `This push goes to the default branch ${main}`, instead };
+    if (ref.force) {
+      return {
+        what: `This is a force push to ${branch}, a branch others may share`,
+        instead: "Or push without force, after bringing in what changed there (git pull --rebase).",
+      };
+    }
+  }
+  return null;
+}
+
+/** The first word of each deny rule (`gh`, `vercel`, `kubectl`…): where a command starts inside code. */
+const COMMAND_HEADS = new Set(MISSION_DENY_RULES.map((r) => /^Bash\(([^\s*)]+)/.exec(r)?.[1] ?? "").filter(Boolean));
+
+/**
+ * The commands code in another language spells out (Python, Node), line by line: quotes, brackets and
+ * commas read as spaces, from each command's first word (`subprocess.run(["gh", "pr", "merge"])` reads
+ * `gh pr merge`).
+ */
+function commandsInCode(code: string): string[] {
+  return code.split("\n").flatMap((line) => {
+    const words = line
+      .replace(/["'`,()[\]{};]/g, " ")
+      .split(/\s+/)
+      .filter(Boolean);
+    return words.flatMap((w, k) => (COMMAND_HEADS.has(w) ? [words.slice(k).join(" ")] : []));
   });
+}
+
+/**
+ * Why a command, a shell script or code (`code`: another language) waits for a person, as the refusal
+ * tells the agent (`how`: what it can do to ask), or null: the deny list's kinds, then every push it makes
+ * (`heldPush`, with `facts` for the folder each runs in). A push the policy can't read waits.
+ */
+export async function approvalNeeded(
+  text: string,
+  how: string,
+  opts: { code?: boolean; own?: readonly string[]; facts: (dir: string | null) => RepoFacts },
+): Promise<string | null> {
+  const own = opts.own ?? [];
+  for (const command of opts.code ? commandsInCode(text) : [text]) {
+    const denied = deniedMessage("Bash", { command }, how);
+    if (denied) return denied;
+  }
+  const pushes = opts.code ? (PUSH_MENTION.test(text) ? null : []) : gitPushes(text);
+  if (pushes === null) {
+    return approvalMessage(
+      "This runs git push in a way the computer can't read, so where it goes is unknown",
+      how,
+      "Or run the push as a plain command of its own (git push origin <branch>).",
+    );
+  }
+  for (const push of pushes) {
+    const held = await heldPush(push, opts.facts(push.dir), own);
+    if (held) return approvalMessage(held.what, how, held.instead);
+  }
+  return null;
 }
 
 /** Interpreters and the options that run code given on the command line. */
@@ -1051,9 +1337,22 @@ export function inlineCode(argv: readonly string[]): boolean {
 export const inlineCodeCall = (toolName: string, input: Record<string, unknown> | null | undefined) =>
   toolName === "Bash" && commandWords(typeof input?.command === "string" ? input.command : "").some(inlineCode);
 
-/** Told to the agent when the deny list refuses a call. */
-export const DENIED_MESSAGE =
-  "This command is never allowed for agents (merges, pushes to the default branch, deploys, publishing, printing tokens): ask with request_approval and wait.";
+/**
+ * How an agent asks a person for a command it may not run alone: `run_code` with a `why` opens the approval
+ * card in the chat, and the command runs once they approve.
+ */
+export const ASK_IN_CHAT =
+  "To ask them, run the same command with run_code, with why set to your reason: it waits for their decision in the chat.";
+/** The same for a call of ours the computer held (`run_code`, `run_skill_script`, `start_task`). */
+export const ASK_AGAIN =
+  "To ask them, make the same call again with why set to your reason: it waits for their decision in the chat.";
+/** Inside a background task nobody is there to approve anything. */
+export const ASK_AFTER_TASK = "Nobody can approve it inside a background task: stop and say so in your result.";
+
+/** A refusal that names exactly why, what to do to ask a person, and what to do instead. */
+export const approvalMessage = (what: string, how: string, instead?: string) =>
+  `${what}: a person approves it first. ${how}${instead ? ` ${instead}` : ""}`;
+
 /** Told to the agent when a call reads a secret. */
 export const SECRET_MESSAGE =
   "Agents never read secrets (keys, tokens, credentials, .env files). Do the work without them; if a search pattern only looks like one, search another way.";
@@ -1071,18 +1370,22 @@ export const otherBranchPointer = (branches: readonly string[], handle: string) 
 
 /**
  * What the computer decides by itself, before anyone is asked: the deny list
- * and secrets are refused, plain reads allowed; in a `plan` turn everything
- * else is refused too. Null: the server decides (`permission_prompt`: a
- * mission's card, or code's rules for a run). The runner's prompt tool for
- * Claude Code and its answers to Codex's command approvals both start here.
+ * and secrets are refused (`how`: what the refusal says to do to ask a
+ * person), plain reads allowed; in a `plan` turn everything else is refused
+ * too. Null: the server decides (`permission_prompt`: a mission's card, or
+ * code's rules for a run). The runner's prompt tool for Claude Code and its
+ * answers to Codex's command approvals both start here; pushes come next
+ * there (`approvalNeeded`).
  */
 export function localVerdict(
   toolName: string,
   input: Record<string, unknown> | null | undefined,
   scope: CommandScope | undefined,
   profile: CommandProfile,
+  how: string = ASK_IN_CHAT,
 ): { behavior: "allow" } | { behavior: "deny"; message: string } | null {
-  if (deniedInMissions(toolName, input)) return { behavior: "deny", message: DENIED_MESSAGE };
+  const denied = deniedMessage(toolName, input, how);
+  if (denied) return { behavior: "deny", message: denied };
   if (secretRead(toolName, input, scope)) return { behavior: "deny", message: SECRET_MESSAGE };
   if (scope && readOnlyCall(toolName, input, scope, profile)) return { behavior: "allow" };
   if (profile === "plan") return { behavior: "deny", message: PLAN_MESSAGE };

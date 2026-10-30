@@ -62,6 +62,7 @@ import { requestSecretTool } from "./secret-request-tool";
 import { REQUEST_SECRET_TOOL, secretFilePaths } from "./secrets";
 import { agentSkillByName, type SkillDeps, skillFolderFiles } from "./skills";
 import { maskSecrets } from "./tool-detail";
+import { WHY_MAX_CHARS } from "./tools/run-policy";
 import { grantedScopeKeys, grantKey, isAllowed, toolAccess, toolAllowScope } from "./tools/scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import { uploadedFile, uploadFromComputer } from "./uploads";
@@ -147,6 +148,29 @@ const failed = (error: unknown): ToolOutput => ({
   content: `Failed: ${error instanceof Error ? error.message : String(error)}`,
   isError: true,
 });
+
+/**
+ * `why` on the tools that run commands on the computer: given only to ask a person first, when the computer
+ * held the command for them (`approval_needed`); the call then waits for their decision (ADR 0053 §3). Where
+ * every call asks anyway (the organization's setting), the gateway's own required `why` stands instead.
+ */
+const whyAsks = (requireApproval: boolean) =>
+  requireApproval
+    ? {}
+    : {
+        why: {
+          type: "string",
+          maxLength: WHY_MAX_CHARS,
+          description:
+            "Only when the computer answered that a person approves this first: your reason, for them (what you found and why it's needed). The call then waits for their decision in the chat.",
+        },
+      };
+
+/** The computer held the command for a person: nothing ran, and its message says why and how to ask them. */
+const heldForApproval = (error: unknown, verb: string): ToolOutput | null =>
+  error instanceof MachineRequestError && error.code === "approval_needed"
+    ? { content: `${verb}: ${error.message}`, isError: true, data: { code: "command.approval_needed" } }
+    : null;
 const quote = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
 
 const RUNNERS = {
@@ -447,12 +471,14 @@ export function createSandboxToolSource(
       description: `Run Python, Node.js or bash code. ${computerSentence(computerInfo)}${computerInfo.kind === "machine" && computerInfo.execAllowed && sessionId ? ` ${claudeCodeSentence(sessionId, tasksOn(computerInfo))}` : ""}${computerInfo.kind === "machine" && computerInfo.execAllowed && !tasksOn(computerInfo) ? " Its runner is too old for background tasks; long work needs it updated (`agentes-runner update`)." : ""} Returns exit code, stdout and stderr. Default timeout ${execTimeout} s, at most ${maxTimeout} s.`,
       scope: SANDBOX_SCOPE,
       sensitive: requireApproval,
+      whyAsks: true,
       inputSchema: {
         type: "object",
         properties: {
           language: { enum: Object.keys(RUNNERS) },
           code: { type: "string", minLength: 1, maxLength: SANDBOX_LIMITS.codeChars },
           timeout_seconds: { type: "integer", minimum: 1, maximum: maxTimeout },
+          ...whyAsks(requireApproval),
         },
         required: ["language", "code"],
         additionalProperties: false,
@@ -471,13 +497,14 @@ export function createSandboxToolSource(
             const r = await execLive(ctx, computer, {
               command: scriptCommand(runner.bin, file),
               timeoutSeconds: timeout,
+              ...(ctx.approved ? { approved: true } : {}),
             });
             await auditMachineExec(ctx, computer, `${lang}: ${str(input.code)}`, r);
             return r;
           });
           return execOutput(`run_code ${lang}`, result, Math.round((Date.now() - started) / 1000), timeout);
         } catch (error) {
-          return failed(error);
+          return heldForApproval(error, "Not run") ?? failed(error);
         }
       },
     },
@@ -740,6 +767,7 @@ export function createSandboxToolSource(
         "Run a script of one of your skills (listed as script by load_skill) on your computer: the skill's files are copied to .skills/{name}/ and the script runs from the workspace with the arguments you give.",
       scope: SANDBOX_SCOPE,
       sensitive: requireApproval,
+      whyAsks: true,
       inputSchema: {
         type: "object",
         properties: {
@@ -747,6 +775,7 @@ export function createSandboxToolSource(
           path: { type: "string", minLength: 1, maxLength: 300 },
           args: { type: "array", items: { type: "string", maxLength: 500 }, maxItems: 20 },
           timeout_seconds: { type: "integer", minimum: 1, maximum: maxTimeout },
+          ...whyAsks(requireApproval),
         },
         required: ["skill", "path"],
         additionalProperties: false,
@@ -776,6 +805,7 @@ export function createSandboxToolSource(
             const r = await execLive(ctx, computer, {
               command: scriptCommand(bin, `${base}/${target.path}`, args),
               timeoutSeconds: timeout,
+              ...(ctx.approved ? { approved: true } : {}),
             });
             await auditMachineExec(ctx, computer, `${skill.name}/${target.path} ${args}`.trim(), r);
             return r;
@@ -783,7 +813,7 @@ export function createSandboxToolSource(
           const seconds = Math.round((Date.now() - started) / 1000);
           return execOutput(`run_skill_script ${skill.name}/${target.path}`, result, seconds, timeout);
         } catch (error) {
-          return failed(error);
+          return heldForApproval(error, "Not run") ?? failed(error);
         }
       },
     },
@@ -806,6 +836,7 @@ export function createSandboxToolSource(
       description: `Start long work in the background on the connected computer "${info.name}" and return at once with its id. With executor "claude" (the default when you give a prompt) Claude Code works on \`prompt\` in your folder, in this conversation's session (it remembers earlier turns), editing files on its own; "codex" runs Codex the same way; "shell" runs \`command\`. With \`branch\` it works in its own git worktree on that new branch; when your folder isn't a git repository, claude and codex work in their own subfolder work/<branch>/ instead (no branch; shell needs a repository). It keeps running if the connection drops. If the computer itself restarts, a "claude" task resumes where it stopped once it's back (unless resuming is turned off on that computer); "codex" and "shell" tasks stop, and you are woken to tell the people. You are woken in this conversation when it finishes, with its result: don't poll it with task_status, don't wait; tell the people it started and end your turn. Use run_code for short commands.`,
       scope: SANDBOX_SCOPE,
       sensitive: requireApproval,
+      whyAsks: true,
       inputSchema: {
         type: "object",
         properties: {
@@ -814,6 +845,7 @@ export function createSandboxToolSource(
           command: { type: "string", minLength: 1, maxLength: 2000, description: "With executor shell: the command" },
           executor: { enum: [...TASK_EXECUTORS] },
           branch: { type: "string", minLength: 1, maxLength: 120, description: "Work on this new git branch" },
+          ...whyAsks(requireApproval),
         },
         required: ["title"],
         additionalProperties: false,
@@ -874,6 +906,7 @@ export function createSandboxToolSource(
                 branch: str(input.branch).trim() || null,
                 // In a mission's thread the task is the mission's (its end, pause, stop and close).
                 missionId: (await missionOfRun(ctx))?.id ?? null,
+                ...(ctx.approved ? { approved: true } : {}),
               },
             );
           });
@@ -904,6 +937,8 @@ export function createSandboxToolSource(
             data: { task: machineTaskView(row) },
           };
         } catch (error) {
+          const held = heldForApproval(error, "Not started");
+          if (held) return held;
           if (error instanceof MachineRequestError && error.code === "no_slot") {
             return { content: `Not started: ${error.message}.`, isError: true, data: { code: "task.no_slot" } };
           }

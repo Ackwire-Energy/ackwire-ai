@@ -930,6 +930,11 @@ export interface TaskStart {
   commit?: { message: string };
   /** Protocol 14: answer how many commits `branch` has beyond `sha` (`task.start` `baseBehind`). */
   baseCheck?: { branch: string; sha: string };
+  /**
+   * A person approved starting this very task (an approval card): a `shell` task's command runs even when the
+   * command policy would hold it (`approval_needed`).
+   */
+  approved?: boolean;
 }
 
 /** A coding CLI on the machine, as `hello` reports it (protocol 7). */
@@ -1281,6 +1286,8 @@ export type MachineRequest = (
       timeoutSeconds: number;
       /** Send `output` frames while it runs. */
       stream: boolean;
+      /** A person approved this very command (an approval card): it runs even when the command policy would hold it. */
+      approved?: boolean;
     }
   | { op: "read"; path: string; maxBytes: number }
   | { op: "write"; path: string; base64: string }
@@ -1599,6 +1606,11 @@ export type MachineErrorCode =
    * stopping): it may have stopped partway. Older servers read it like `internal`.
    */
   | "dropped"
+  /**
+   * `exec` and a `shell` task's `task.start`: the command policy holds the command for a person's approval (a
+   * push to the default branch, a deploy); the message says why and what the agent can do. Nothing ran.
+   */
+  | "approval_needed"
   | "bad_request"
   | "internal";
 

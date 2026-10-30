@@ -2,7 +2,7 @@ import {
   allowedBy,
   type CommandScope,
   commandOf,
-  deniedInMissions,
+  deniedMessage,
   forbiddenHint,
   forbiddenReason,
   inlineCodeCall,
@@ -49,8 +49,10 @@ const { missionEvents, machineTasks } = schema;
  * at once; otherwise the command card goes to the thread and the runner asks
  * again every few seconds until the owner or someone who decides answers
  * (Aprovar / Recusar / Aprovar sempre), or `PERMISSION_WAIT_MS` passes.
- * Deny-list commands (merges, pushes to the default branch, deploys) never
- * get here: Claude Code and the runner refuse them first (and so do we).
+ * Deny-list commands (merges, deploys, publishing) never get here: Claude
+ * Code and the runner refuse them first (and so do we). Pushes the runner
+ * reads with git first: one to the default branch or a force push to someone
+ * else's branch is refused there, so a push that gets here is ordinary work.
  * Everything is in the mission's feed: `command_prompt`, `command_decided`,
  * `command_rule`, `command_auto`, `command_approval`.
  *
@@ -78,9 +80,6 @@ export const COMMAND_PROMPTS_PER_TASK = 30;
 export const LOW_RISK_THRESHOLD = 0.85;
 /** The judge answers within this, or it is the card. */
 export const COMMAND_JUDGE_TIMEOUT_MS = 8000;
-
-const NEVER_MESSAGE =
-  "This command is never allowed in a mission (merges, pushes to the default branch, deploys): ask with request_approval and wait.";
 
 /** Where the task runs, from the runner (absolute paths only); without it code allows no writes. */
 function scopeOf(value: unknown): CommandScope | null {
@@ -313,8 +312,9 @@ export async function handlePermissionPrompt(
       : {};
   const command = commandOf(tool, input);
   if (!tool || !command) return deny("Unknown tool.");
-  // The deny list: refused, never shown, never judged.
-  if (deniedInMissions(tool, input)) return deny(NEVER_MESSAGE);
+  // The deny list: refused, never shown, never judged; the refusal names the kind and how to ask a person.
+  const denied = deniedMessage(tool, input);
+  if (denied) return deny(denied);
   const scope = scopeOf(args.scope);
   // Secrets, with any tool that reads: refused the same way (ADR 0053 §3).
   if (secretRead(tool, input, scope ?? undefined)) return deny(SECRET_MESSAGE);
@@ -540,9 +540,8 @@ export function runPermissionPrompt(args: Record<string, unknown>, opts: { canRu
       : {};
   const command = commandOf(tool, input);
   if (!tool || !command) return deny("Unknown tool.");
-  if (deniedInMissions(tool, input)) {
-    return deny("This command is never allowed for agents (merges, pushes to the default branch, deploys).");
-  }
+  const denied = deniedMessage(tool, input);
+  if (denied) return deny(denied);
   const scope = scopeOf(args.scope);
   if (secretRead(tool, input, scope ?? undefined)) return deny(SECRET_MESSAGE);
   if (scope && readOnlyCall(tool, input, scope)) return allow();

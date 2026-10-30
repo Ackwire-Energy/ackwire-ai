@@ -6,11 +6,14 @@ import os from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import {
+  ASK_AFTER_TASK,
+  ASK_IN_CHAT,
   type CommandProfile,
   type CommandScope,
   INLINE_CODE_DENY_RULES,
   localVerdict,
   MISSION_DENY_RULES,
+  PUSH_ASK_RULES,
   SECRET_BASH_DENY_RULES,
   SECRET_READ_DENY_RULES,
 } from "@agenteschat/adapters/command-policy";
@@ -27,6 +30,7 @@ import {
   type RunnerFrame,
   type ServerFrame,
 } from "@agenteschat/adapters/machine-protocol";
+import { commandApproval, lonePush, pushesOwnBranches } from "./command-gate";
 import { RUNNER_VERSION } from "./errors";
 
 /**
@@ -588,6 +592,8 @@ export async function handleMcpMessage(
   list?: ToolLister,
   /** The turn's permission profile (ADR 0053 §3): a `plan` turn's prompts are answered here, never asked. */
   profile: CommandProfile = "work",
+  /** Whose prompts these are: the agent's own branches, and whether a background task asks (`PromptContext`). */
+  context: PromptContext = {},
 ): Promise<Record<string, unknown> | null> {
   if (typeof message !== "object" || message === null || Array.isArray(message)) {
     return rpcError(null, -32600, "Invalid request");
@@ -609,9 +615,11 @@ export async function handleMcpMessage(
           protocolVersion: typeof params.protocolVersion === "string" ? params.protocolVersion : MCP_PROTOCOL_VERSION,
           capabilities: { tools: { listChanged: Boolean(list) } },
           serverInfo: { name: "agentes", version: RUNNER_VERSION },
-          instructions: list
-            ? "Tools of agentes.chat for this agent: its connectors, context, Drive and, in a mission, the mission tools (keep the plan with update_plan, report milestones, ask decisions with ask_decision, ask approval before any merge, deploy or rollback). When a tool says to stop and wait, end your turn."
-            : "Tools of agentes.chat for this mission: keep the plan with update_plan, report milestones, ask decisions with ask_decision, ask for a review when you have something to show, and ask approval before any merge, deploy or rollback.",
+          instructions: context.local
+            ? "Only the permission prompt Claude Code asks by itself: there are no tools of agentes.chat to call here."
+            : list
+              ? "Tools of agentes.chat for this agent: its connectors, context, Drive and, in a mission, the mission tools (keep the plan with update_plan, report milestones, ask decisions with ask_decision, ask approval before any merge, deploy or rollback). When a tool says to stop and wait, end your turn."
+              : "Tools of agentes.chat for this mission: keep the plan with update_plan, report milestones, ask decisions with ask_decision, ask for a review when you have something to show, and ask approval before any merge, deploy or rollback.",
         },
       };
     case "ping":
@@ -637,7 +645,7 @@ export async function handleMcpMessage(
           : {};
       // Claude Code's permission prompt: always an answer it understands (allow or deny JSON), never an error.
       if (name === PERMISSION_TOOL) {
-        const answer = await permissionPrompt(args, call, { ...(scope ? { scope } : {}), profile });
+        const answer = await permissionPrompt(args, call, { ...(scope ? { scope } : {}), profile, ...context });
         return { jsonrpc: "2.0", id, result: { content: [{ type: "text", text: JSON.stringify(answer) }] } };
       }
       const reply = await call(name, args);
@@ -660,23 +668,36 @@ export type PermissionAnswer =
   | { behavior: "allow"; updatedInput: Record<string, unknown> }
   | { behavior: "deny"; message: string };
 
+/** Whose prompts the tool answers, besides where they run (`AGENTES_MCP_BRANCHES`, `AGENTES_MCP_TASK`). */
+export interface PromptContext {
+  /** The agent's own branch prefixes (`agentes/<handle>/`, a mission's): a push there needs nobody. */
+  branches?: readonly string[];
+  /** A background task's executor asks: nobody can approve anything from inside it. */
+  task?: boolean;
+  /** Nobody answers beyond this computer (a background task outside a mission): an ordinary push goes through here. */
+  local?: boolean;
+}
+
 /**
  * Claude Code asks (`--permission-prompt-tool mcp__agentes__permission_prompt`)
- * when a command isn't on the task's allow list, and the runner asks the same
- * for each of Codex's command and file approvals (ADR 0053 §3): one decision
- * for both. First what the computer decides by itself (`localVerdict`):
- * deny-list commands and secrets are refused at once (never shown to anyone);
- * plain reads (`ls` of any folder, read-only git, a GET with curl in a work
- * turn) are allowed at once, with no card and nothing posted; in a `plan` turn
- * everything else is refused. The rest goes to the server, which allows it by
- * a mission rule or code's rules for a run, or posts the command card in the
- * thread. Then we ask the server every `pollMs` (short calls; no request stays
- * open) until someone answers or `waitMs` passes: then it is denied.
+ * when a command isn't on the task's allow list (every push does: `ask`), and
+ * the runner asks the same for each of Codex's command and file approvals (ADR
+ * 0053 §3): one decision for both. First what the computer decides by itself
+ * (`localVerdict`): deny-list commands and secrets are refused at once (never
+ * shown to anyone); plain reads (`ls` of any folder, read-only git, a GET with
+ * curl in a work turn) are allowed at once, with no card and nothing posted;
+ * in a `plan` turn everything else is refused. Then pushes, read with git
+ * (`commandApproval`): one that waits for a person is refused here with why
+ * and how to ask; one alone to the agent's own branches goes through. The
+ * rest goes to the server, which allows it by a mission rule or code's rules
+ * for a run, or posts the command card in the thread. Then we ask the server
+ * every `pollMs` (short calls; no request stays open) until someone answers
+ * or `waitMs` passes: then it is denied.
  */
 export async function permissionPrompt(
   args: Record<string, unknown>,
   call: ToolCaller,
-  opts: {
+  opts: PromptContext & {
     waitMs?: number;
     pollMs?: number;
     sleep?: (ms: number) => Promise<void>;
@@ -693,9 +714,17 @@ export async function permissionPrompt(
       ? (args.input as Record<string, unknown>)
       : {};
   if (!toolName) return { behavior: "deny", message: "Unknown tool." };
-  const verdict = localVerdict(toolName, input, opts.scope, opts.profile ?? "work");
+  const how = opts.task ? ASK_AFTER_TASK : ASK_IN_CHAT;
+  const verdict = localVerdict(toolName, input, opts.scope, opts.profile ?? "work", how);
   if (verdict?.behavior === "deny") return verdict;
   if (verdict?.behavior === "allow") return { behavior: "allow", updatedInput: input };
+  if (toolName === "Bash" && typeof input.command === "string") {
+    const own = opts.branches ?? [];
+    const held = await commandApproval(input.command, { cwd: opts.scope?.cwd ?? null, own, how, script: true });
+    if (held) return { behavior: "deny", message: held };
+    const push = lonePush(input.command);
+    if (push && (opts.local || pushesOwnBranches(push, own))) return { behavior: "allow", updatedInput: input };
+  }
   const now = opts.now ?? Date.now;
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const deadline = now() + (opts.waitMs ?? PERMISSION_WAIT_MS);
@@ -760,12 +789,16 @@ export async function runMcpServer(options: {
     })();
   const out = options.output ?? process.stdout;
   const write = (msg: unknown) => out.write(`${JSON.stringify(msg)}\n`);
-  const call: ToolCaller = (tool, args) => ipcCall(options.socketPath, { taskId: options.taskId, token, tool, args });
+  const context = mcpContextFromEnv(process.env);
+  // A background task outside a mission has no tools of ours: only the prompt, answered on this computer.
+  const call: ToolCaller = context.local
+    ? async () => ({ ok: false, error: NOBODY_TO_ASK })
+    : (tool, args) => ipcCall(options.socketPath, { taskId: options.taskId, token, tool, args });
   // The run's tools, asked from the server through the daemon (cached here: one process per task or run).
   const cache = new McpToolCache(() =>
     ipcCall(options.socketPath, { taskId: options.taskId, token, tool: "", args: {}, kind: "list" }),
   );
-  const list: ToolLister = () => cache.get();
+  const list: ToolLister = context.local ? async () => PROMPT_ONLY : () => cache.get();
   // A list that changed (a scope granted, a connector added, a mission thread): the executor re-reads it.
   const refresher = setInterval(() => {
     if (!cache.loaded) return;
@@ -787,7 +820,7 @@ export async function runMcpServer(options: {
       write(rpcError(null, -32700, "Parse error"));
       continue;
     }
-    const p = handleMcpMessage(message, call, scope, list, profile)
+    const p = handleMcpMessage(message, call, scope, list, profile, context)
       .then((res) => {
         if (res) write(res);
       })
@@ -841,6 +874,27 @@ export function mcpScopeFromEnv(env: NodeJS.ProcessEnv): CommandScope | undefine
 export const mcpProfileFromEnv = (env: NodeJS.ProcessEnv): CommandProfile =>
   env.AGENTES_MCP_PROFILE === "plan" ? "plan" : "work";
 
+/**
+ * Whose prompts our MCP process answers: the agent's own branch prefixes (`AGENTES_MCP_BRANCHES`, comma
+ * separated) and whether a background task's executor asks (`AGENTES_MCP_TASK`: `mission`, or `local` for
+ * one outside a mission, where nobody answers beyond this computer).
+ */
+export function mcpContextFromEnv(env: NodeJS.ProcessEnv): PromptContext {
+  const branches = (env.AGENTES_MCP_BRANCHES ?? "").split(",").filter((b) => /^[A-Za-z0-9/_.-]+\/$/.test(b));
+  const task = env.AGENTES_MCP_TASK;
+  return {
+    ...(branches.length ? { branches } : {}),
+    ...(task === "mission" || task === "local" ? { task: true } : {}),
+    ...(task === "local" ? { local: true } : {}),
+  };
+}
+
+/** What a background task outside a mission is told for a command this computer doesn't allow by itself. */
+const NOBODY_TO_ASK = "nobody can approve commands inside a background task";
+
+/** The tools of such a task's MCP process: the prompt alone. */
+const PROMPT_ONLY = MISSION_MCP_TOOLS.filter((t) => t.name === PERMISSION_TOOL);
+
 /** The MCP config Claude Code reads (`--mcp-config <file>`): our server, bound to the task. */
 export function claudeMcpConfig(input: {
   command: string[];
@@ -856,6 +910,10 @@ export function claudeMcpConfig(input: {
   profile?: CommandProfile;
   /** The runner's home: the MCP process finds the runner there and never lets it be read. */
   runnerHome?: string;
+  /** The agent's own branch prefixes: its pushes there need nobody. */
+  branches?: readonly string[];
+  /** A background task's executor: a mission's, or one outside a mission (`local`: only the prompt, answered here). */
+  task?: "mission" | "local";
 }) {
   const [command, ...args] = input.command;
   return {
@@ -872,6 +930,8 @@ export function claudeMcpConfig(input: {
           ...(input.folders?.length ? { AGENTES_MCP_FOLDERS: input.folders.join(path.delimiter) } : {}),
           ...(input.profile === "plan" ? { AGENTES_MCP_PROFILE: "plan" } : {}),
           ...(input.runnerHome ? { AGENTES_RUNNER_HOME: input.runnerHome } : {}),
+          ...(input.branches?.length ? { AGENTES_MCP_BRANCHES: input.branches.join(",") } : {}),
+          ...(input.task ? { AGENTES_MCP_TASK: input.task } : {}),
         },
       },
     },
@@ -952,17 +1012,6 @@ const gitC = (rules: string[]) =>
 export const DENY_RULES = MISSION_DENY_RULES;
 
 /**
- * The `--settings` file of a mission task's Claude Code (protocol 7): what
- * it may run without asking (`-p` can't ask: anything else is denied).
- * `plan`: read only: our tools, reading files and read-only shell commands
- * (`ls`, `cat`, `head`, `git status`, also `git -C <path> …`; Claude Code
- * checks each part of a pipeline). `work`: edits (`acceptEdits`), the same
- * read-only commands, plain file work, git on its own branches, pushes only
- * to branches under the mission's prefix, pull requests, tests and builds;
- * merges, other pushes and deploys are denied (they go through
- * `request_approval`). Deny rules win over allow rules.
- */
-/**
  * File rules for the mission folder (absolute; `//` is Claude Code's prefix
  * for an absolute path): an item in its own worktree or subfolder reads and
  * writes the mission's `.agentes/` and its shared inputs there, and nothing
@@ -990,9 +1039,19 @@ export const ALWAYS_DENY_RULES: readonly string[] = [
 /** What a `plan` turn never gets: edits and the web. */
 const PLAN_DENY = ["Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch"];
 
+/**
+ * The `--settings` file of a Claude Code turn or task (protocol 7): what it
+ * may run without asking (anything else reaches our prompt tool).
+ * `plan`: read only: our tools, reading files and read-only shell commands
+ * (`ls`, `cat`, `head`, `git status`, also `git -C <path> …`; Claude Code
+ * checks each part of a pipeline). `work`: edits (`acceptEdits`), the same
+ * read-only commands, plain file work, git work, pull requests, tests and
+ * builds. Merges, deploys and publishing are denied (deny rules win over
+ * allow rules); every push is `ask` (`PUSH_ASK_RULES`, which outranks allow
+ * rules), so the prompt tool reads where it goes.
+ */
 export function claudePermissionSettings(
   mode: "plan" | "work",
-  branchPrefix: string,
   missionAllow: string[] = [],
   /** An item's mission folder when it runs elsewhere (its worktree or subfolder). */
   missionFolder?: string,
@@ -1022,11 +1081,11 @@ export function claudePermissionSettings(
           ...(opts.promptReads ? [] : gitC(GIT_READ.flatMap((c) => [`Bash(git ${c})`, `Bash(git ${c} *)`]))),
           ...missionFolderRules(missionFolder, ["Read"]),
         ],
+        ask: [...PUSH_ASK_RULES],
         deny: [...PLAN_DENY, ...ALWAYS_DENY_RULES, ...homeDeny],
       },
     };
   }
-  const prefix = branchPrefix;
   return {
     permissions: {
       allow: [
@@ -1034,9 +1093,6 @@ export function claudePermissionSettings(
         ...shellReads,
         ...FILE_WORK.map((c) => `Bash(${c} *)`),
         ...gitC(GIT_WORK.flatMap((c) => [`Bash(git ${c})`, `Bash(git ${c} *)`])),
-        `Bash(git push origin ${prefix}*)`,
-        `Bash(git push -u origin ${prefix}*)`,
-        `Bash(git push --set-upstream origin ${prefix}*)`,
         "Bash(gh pr create *)",
         "Bash(gh pr view *)",
         "Bash(gh pr list *)",
@@ -1049,6 +1105,7 @@ export function claudePermissionSettings(
         // What a person allowed for the whole mission ("Aprovar sempre nesta missão").
         ...missionAllow.filter(isSafeRule).slice(0, 100),
       ],
+      ask: [...PUSH_ASK_RULES],
       deny: [...ALWAYS_DENY_RULES, ...homeDeny],
     },
   };

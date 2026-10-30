@@ -150,6 +150,10 @@ const isBuiltIn = (tool: Pick<ToolDefinition, "scope" | "connectionId">) => tool
 const asksPerson = (tool: ToolDefinition, decision: PolicyDecision) =>
   decision.action === "approve" || isSensitive(tool) || (tool.name === ASK_USER && isBuiltIn(tool));
 
+/** A call that asks a person's approval because it says why (`whyAsks`: a command the computer held). */
+const asksWithWhy = (tool: ToolDefinition, input: Record<string, unknown>) =>
+  tool.whyAsks === true && input.why !== undefined;
+
 /** A check that failed for any reason never stops the action (ADR 0064): it only misses a notice. */
 const UNCHECKED: TeamCheck = { proceed: true, reason: null };
 
@@ -229,11 +233,12 @@ export type InvokeResult =
  *    lets it run, or makes it ask a person;
  * 5. a call that asks a person (an approval, `ask_user`) must say why: the
  *    `why` is taken out of the input and kept on the approval or question;
- * 6. sensitive tools create an `approvals` row bound to the action hash and
- *    stop there, unless a rule someone approved for good covers the call
- *    ("Aprovar sempre", `approval_rules`); others run, with errors turned into
- *    error results. A tool that runs other actions (Composio's executor) is
- *    the connection's read when every action it runs only reads;
+ * 6. sensitive tools (and a `whyAsks` tool's call that says why) create an
+ *    `approvals` row bound to the action hash and stop there, unless a rule
+ *    someone approved for good covers the call ("Aprovar sempre",
+ *    `approval_rules`); others run, with errors turned into error results. A
+ *    tool that runs other actions (Composio's executor) is the connection's
+ *    read when every action it runs only reads;
  * 7. `tool_call` / `tool_result` / `approval` steps are recorded;
  * 8. an outside call (a connected app's write, a command that leaves the
  *    computer) is held once when the team already did it to the same target,
@@ -485,10 +490,10 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       // A call that asks a person says why (shown on its card); the tool itself never sees it. It is
       // asked for last: a call refused for any other reason (its input, a repository outside the agent's
       // list) gets that reason first.
-      let approves = decision.action === "approve" || isSensitive(tool);
+      let approves = decision.action === "approve" || isSensitive(tool) || asksWithWhy(tool, call.input);
       let why = "";
       let whyMissing = false;
-      if (asksPerson(tool, decision)) {
+      if (asksPerson(tool, decision) || asksWithWhy(tool, call.input)) {
         const taken = takeWhy(tool.inputSchema, call.input);
         why = taken.why ?? "";
         whyMissing = !taken.why;
@@ -690,7 +695,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
             .where(sql`${approvals.id} = ${approval.id}`);
           return ranBefore(row ?? approval);
         }
-        output = await run(tool, approval.params, { ...ctx, toolUseId: approval.toolUseId });
+        output = await run(tool, approval.params, { ...ctx, toolUseId: approval.toolUseId, approved: true });
         // Team actions (ADR 0064): what a person approved and went out is the team's too.
         if (isOutsideTool(tool) && !output.isError) {
           await recordTeamAction(ctx.db, {

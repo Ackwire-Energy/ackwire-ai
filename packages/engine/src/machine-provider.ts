@@ -55,6 +55,9 @@ function explain(error: unknown, name: string, path?: string): Error {
     case "timeout":
     case "canceled":
       return new Error(error.message);
+    // The command policy held it: its message says why and how to ask a person, and callers read its code.
+    case "approval_needed":
+      return error;
     default:
       return new Error(`The computer ${name} failed: ${error.message}`);
   }
@@ -91,6 +94,7 @@ export function createMachineSandboxProvider(hub: MachineCaller, agent: AgentSco
           ...(request.cwd ? { cwd: request.cwd } : {}),
           timeoutSeconds: request.timeoutSeconds,
           stream: Boolean(onOutput),
+          ...(request.approved ? { approved: true } : {}),
         },
         { signal: request.signal, onOutput },
       );

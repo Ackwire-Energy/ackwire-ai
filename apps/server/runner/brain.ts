@@ -32,6 +32,7 @@ import {
   planOf,
 } from "@agenteschat/providers/plans";
 import { ACCOUNT_MISSING_MESSAGE, accountEnv, planKeyOf, yieldRoute } from "./accounts";
+import { ownBranches } from "./command-gate";
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import { claudeMcpConfig, claudePermissionSettings, type McpTaskInfo, missionBranchPrefix, newMcpToken } from "./mcp";
@@ -1531,6 +1532,8 @@ export class BrainManager {
             // A plan turn's prompts are answered on the computer (reads only), never asked of anyone.
             profile: mode,
             ...(this.opts.runnerHome ? { runnerHome: this.opts.runnerHome } : {}),
+            // Its own branches: a push there needs nobody (ADR 0053 §3).
+            branches: ownBranches(ctx.agent, missionBranchPrefix(ctx.agent.id, req.permissions?.branchPrefix)),
           }),
         ),
         { mode: 0o600 },
@@ -1555,7 +1558,6 @@ export class BrainManager {
       JSON.stringify({
         ...claudePermissionSettings(
           mode,
-          missionBranchPrefix(ctx.agent.id, req.permissions?.branchPrefix),
           allow,
           undefined,
           // Every command reaches our prompt tool: plain reads pass there at once, secrets never.

@@ -1,6 +1,7 @@
 import type { Dirent } from "node:fs";
 import { lstat, mkdir, readdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { ASK_AGAIN } from "@agenteschat/adapters/command-policy";
 import {
   type AgentScope,
   browserSetupOf,
@@ -24,6 +25,7 @@ import { type CodexBrainEvent, type CodexBrainTurnRequest, handleCodexBrainTurn 
 import type { CodexAppServers } from "./brain-codex-app";
 import { routeWithPlan } from "./brain-route";
 import { type BrowserManager, browserSetupText } from "./browser";
+import { commandApproval, ownBranches } from "./command-gate";
 import type { DesktopManager } from "./desktop";
 import { type DesktopSessions, hostMemAvailable, MIN_FREE_BYTES } from "./desktop-session";
 import { RunnerError, toMachineError } from "./errors";
@@ -285,6 +287,12 @@ async function doExec(
     if (!resolved.exists) throw new RunnerError("not_found", `The folder ${req.cwd} doesn't exist`);
     if (!(await stat(resolved.abs)).isDirectory()) throw new RunnerError("bad_request", `${req.cwd} is not a folder`);
     cwd = resolved.abs;
+  }
+  // run_code and skill scripts: the command and the script it runs meet the command policy first, as the
+  // brain's own commands do (ADR 0053 §3). A person's approval of this very command lets it through.
+  if (req.approved !== true) {
+    const held = await commandApproval(command, { cwd, own: ownBranches(req.agent), how: ASK_AGAIN, script: true });
+    if (held) throw new RunnerError("approval_needed", held);
   }
   return runCommand({
     command,

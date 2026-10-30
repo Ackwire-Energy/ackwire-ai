@@ -2,7 +2,9 @@ import { afterEach, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { MISSION_DENY_RULES, PUSH_ASK_RULES } from "@agenteschat/adapters/command-policy";
 import {
+  PERMISSION_PROMPT_TOOL,
   parseRunnerFrame,
   parseServerFrame,
   type RunnerFrame,
@@ -17,7 +19,7 @@ import {
   TaskManager,
   type TaskManagerOptions,
 } from "../../runner/tasks";
-import { errorCode, removeDirs, tempDir, waitFor } from "./helpers";
+import { errorCode, gitRepo, hasGit, removeDirs, tempDir, waitFor } from "./helpers";
 
 const dirs: string[] = [];
 const managers: TaskManager[] = [];
@@ -384,8 +386,6 @@ test.skipIf(!posix)(
   20_000,
 );
 
-const hasGit = spawnSync("git", ["--version"]).status === 0;
-
 test.skipIf(!posix || !hasGit)(
   "a branch puts the task in its own git worktree",
   async () => {
@@ -492,6 +492,59 @@ test.skipIf(!posix)(
       truncated: false,
     });
     await expect(tasks.output({ id: "other", handle: "x" }, id(61), 10)).rejects.toMatchObject({ code: "not_found" });
+  },
+  15_000,
+);
+
+test.skipIf(!posix || !hasGit)(
+  "a background shell task meets the command policy: a push to the default branch or a force push waits, to a PR branch it runs",
+  async () => {
+    const { tasks, ws, send, done } = setup();
+    await tasks.init();
+    tasks.attach(send);
+    const folder = await agentWorkspace(ws, AGENT);
+    gitRepo(dirs, path.join(folder, "repo"));
+    const start = (n: number, command: string, extra: Record<string, unknown> = {}) =>
+      tasks.start(AGENT, { taskId: id(n), executor: "shell", command, cwd: "repo", ...extra });
+    expect(await errorCode(() => start(30, "git push origin develop"))).toBe("approval_needed");
+    const held = await start(30, "git push origin develop").catch((err: Error) => err.message);
+    expect(held).toStartWith("This push goes to the default branch develop: a person approves it first.");
+    expect(held).toContain("make the same call again with why");
+    expect(await start(31, "git push --force origin cursor/pap-582-fix").catch((err: Error) => err.message)).toContain(
+      "This is a force push to cursor/pap-582-fix, a branch others may share",
+    );
+    // Nothing ran: no task was started for them.
+    expect(tasks.list()).toEqual([]);
+    // The pull request's own branch is ordinary work; a person's approval lets the held one through.
+    await start(32, "git push origin HEAD");
+    await start(33, "git push origin develop", { approved: true });
+    await waitFor(() => Boolean(done(id(32)) && done(id(33))), 10_000);
+    expect(done(id(32))).toMatchObject({ exitCode: 0 });
+    expect(done(id(33))).toMatchObject({ exitCode: 0 });
+  },
+  30_000,
+);
+
+test.skipIf(!posix)(
+  "a Claude Code task outside a mission keeps the owner's settings plus the deny list, and every push asks our prompt tool",
+  async () => {
+    const { make, home } = setup();
+    const tasks = make({ mcp: { socketPath: path.join(home, "mcp.sock"), command: ["/opt/agentes-runner"] } });
+    await tasks.init();
+    const started = await tasks.start(AGENT, { taskId: id(34), executor: "claude", prompt: "Push the fix" });
+    expect(started.command).toContain(`--permission-prompt-tool ${PERMISSION_PROMPT_TOOL}`);
+    const dir = path.join(home, "tasks", id(34));
+    expect(started.command).toContain(`--settings '${path.join(dir, "settings.json")}'`);
+    const settings = JSON.parse(readFileSync(path.join(dir, "settings.json"), "utf8"));
+    expect(settings.permissions.ask).toEqual([...PUSH_ASK_RULES]);
+    expect(settings.permissions.deny).toEqual([...MISSION_DENY_RULES]);
+    // No allow list of ours: the owner's own settings decide the rest, as before.
+    expect(settings.permissions.allow).toBeUndefined();
+    const mcp = JSON.parse(readFileSync(path.join(dir, "mcp.json"), "utf8"));
+    expect(mcp.mcpServers.agentes.env).toMatchObject({
+      AGENTES_MCP_TASK: "local",
+      AGENTES_MCP_BRANCHES: "agentes/dev/",
+    });
   },
   15_000,
 );
