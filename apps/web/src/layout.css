@@ -8251,10 +8251,11 @@ a.machine-row__name:hover {
   font-weight: 600;
 }
 /*
- * "Responde a todos" (`PlanReplies`), under a plan's account and at the end of a plan's panel: its label with the
- * switch at the end of its line, the switch's middle on the label's capitals' middle as an `.ac-iconline` lead's is;
- * under them the plan's terms with their ⓘ, under the switch too, so the few words keep one line on a phone. The
- * label is in the type of the switches beside it (a plan's panel gives its own).
+ * "Atende outras pessoas" (`PlanReplies`), under a plan's account and at the end of a plan's panel: its label with
+ * the switch at the end of its line, the switch's middle on the label's capitals' middle as an `.ac-iconline` lead's
+ * is; under them the line saying whom the agent answers, the plan's terms behind its ⓘ, under the switch too, so the
+ * sentence has the whole width on a phone. The label is in the type of the switches beside it (a plan's panel gives
+ * its own).
  */
 .plan-replies {
   display: grid;
@@ -10287,7 +10288,7 @@ html[data-menu-overlay] .shell {
     padding-bottom: calc(16px + var(--cap-top) - 2 * var(--cap-mid) - 0.5lh);
   }
 }
-/* Who the agents reply to ends a plan's panel, as its foot: the icon on the switch's line in the mark's column, the
+/* Who the agents answer ends a plan's panel, as its foot: the icon on the switch's line in the mark's column, the
    words in the panel's type on the text's. */
 .ai-panel__replies {
   font-size: 14px;

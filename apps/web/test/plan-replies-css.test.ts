@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { builtCss, declarations, topLevel } from "./built-css";
 
-test("what ships puts Responde a todos' switch on its label's line and its terms under both, in the panel's type there", async () => {
+test("what ships puts Atende outras pessoas' switch on its label's line and its line under both, in the panel's type there", async () => {
   const css = await builtCss();
   const shipped = topLevel(css);
   const last = (selector: string, property: string) =>
@@ -9,7 +9,7 @@ test("what ships puts Responde a todos' switch on its label's line and its terms
       .filter(([p]) => p === property)
       .at(-1)?.[1];
 
-  // The label and the switch on one line, the terms under both: the few words keep one line on a phone.
+  // The label and the switch on one line, the line saying whom the agent answers under both, with the whole width.
   expect(last(".plan-replies", "display")).toBe("grid");
   expect(last(".plan-replies", "grid-template-columns")).toBe("minmax(0,1fr) auto");
   expect(last(".plan-replies__terms", "grid-column")).toBe("1/-1");

@@ -632,7 +632,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const [added, setAdded] = useState<MachineAccount[]>([]);
   const [arrived, setArrived] = useState<MachineAccount | null>(null);
   const [busy, setBusy] = useState(false);
-  // "Responde a todos" (ADR 0059 §5): switched onto a plan, the agent answers only its owner until they turn it on.
+  // "Atende outras pessoas" (ADR 0059 §5): moved onto a plan, the agent answers only its owner until they turn it on.
   const [share, setShare] = useState<{ kind: BrainKind; onlyOwner: boolean } | null>(null);
   const offId = useId();
   // Opening it is looking at the plans: their usage is looked up again (it comes back as `machine.updated`).
@@ -975,11 +975,12 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         accountKind &&
         (view.canUsePlans ? (
           <PlanReplies
+            agent={agent.name}
             on={!onlyOwner}
             onChange={(on) => setShare({ kind, onlyOwner: !on })}
             brain={accountKind}
             plan={signInPlan({ account, accounts }, row, accountKind)}
-            maker={plan?.maker}
+            coding={plan}
           />
         ) : (
           <PlanRepliesOf on={!onlyOwner} owner={ownerFirst ?? ""} agentName={agent.name} />
