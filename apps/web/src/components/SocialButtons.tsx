@@ -1,6 +1,6 @@
 import { type SignInProvider, useAuthConfig } from "@agenteschat/client";
 import { Button, Icon } from "@agenteschat/ui";
-import type { ReactNode } from "react";
+import { type ReactNode, useId } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/context";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
@@ -50,7 +50,8 @@ export function useSocialProviders(only?: SignInProvider[]): SignInProvider[] {
 }
 
 /**
- * "Continuar com Google/GitHub/Apple": brand mark, the last one used marked.
+ * "Continuar com Google/GitHub/Apple": the brand's mark and the words centred, as on every button. "Último usado" is a
+ * line under the one used last: inside it, the note would push them off centre, or onto the words on a narrow column.
  * `onSocial` takes over the redirect (the Mac app signs in through the browser).
  * `earlyAccess`: the early-access link's token, for the sign-up it opens.
  */
@@ -68,6 +69,7 @@ export function SocialButtons({
   const { t } = useTranslation();
   const auth = useAuth();
   const last = lastSignIn();
+  const lastId = useId();
   if (providers.length === 0) return null;
   const label = {
     google: t("auth.continueWithGoogle"),
@@ -77,27 +79,28 @@ export function SocialButtons({
   return (
     <div className="auth-social">
       {providers.map((p) => (
-        <Button
-          key={p}
-          type="button"
-          size="lg"
-          block
-          className="auth-social__btn"
-          onClick={() => {
-            rememberSignIn(p);
-            if (onSocial) onSocial(p);
-            else void auth.signInSocial(p, callbackURL, earlyAccess);
-          }}
-        >
-          {BRAND[p]}
-          <span className="auth-social__label">{label[p]}</span>
+        <div key={p} className="auth-social__item">
+          <Button
+            type="button"
+            size="lg"
+            block
+            aria-describedby={last === p ? lastId : undefined}
+            onClick={() => {
+              rememberSignIn(p);
+              if (onSocial) onSocial(p);
+              else void auth.signInSocial(p, callbackURL, earlyAccess);
+            }}
+          >
+            {BRAND[p]}
+            {label[p]}
+          </Button>
           {last === p && (
-            <span className="auth-social__last">
+            <span className="auth-social__last ac-iconline" id={lastId}>
               <Icon name="clock" size={14} />
               {t("auth.lastUsed")}
             </span>
           )}
-        </Button>
+        </div>
       ))}
     </div>
   );

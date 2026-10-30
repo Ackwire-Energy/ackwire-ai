@@ -41,7 +41,9 @@ import { CoverParallax, useCoverScroll, useScrollFade } from "@/ui/cover";
 import { openAgentAi } from "../ai/AgentAiScreen";
 import { openConnectAi } from "../ai/NoAiCard";
 import { AgentComputerRow } from "../computer/AgentComputerRow";
+import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { chatHref } from "../links/logic";
+import { useConnectedById } from "../settings/hooks";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook, genderOf } from "../shared/logic";
 import { SheetTitle } from "../shared/PromptForm";
@@ -80,6 +82,7 @@ const AREA_ICON: Record<string, IconName> = {
   forum: "chat",
   sandbox: "laptop",
   browser: "globe",
+  setup: "pen",
   desktop: "laptop",
 };
 
@@ -139,6 +142,7 @@ function Profile({ id }: { id: string }) {
   const did = didLines(forYou.data?.items);
   const memories = knownAboutMe(knows.data);
   const uses = usesOf(access.data);
+  const connected = useConnectedById();
   // A computer brain: its maker's mark and line ("Claude Code · Sonnet no MacBook"; where only for its owner and admins).
   const thinks = agent?.brain && agent.brain.kind !== "model" ? brainLine(t, agent.brain, "") : null;
   const spend = detail.data
@@ -418,11 +422,12 @@ function Profile({ id }: { id: string }) {
                       "area" in u.label ? (
                         <Tile icon={AREA_ICON[u.label.area] ?? "doc"} />
                       ) : (
-                        <Tile>
-                          <Text variant="body" tone="muted" style={{ fontWeight: "600" }}>
-                            {u.label.text.trim().charAt(0).toUpperCase()}
-                          </Text>
-                        </Tile>
+                        <ConnectorIcon
+                          def={(u.connectionId ? connected.get(u.connectionId)?.def : null) ?? null}
+                          image={u.connectionId ? connected.get(u.connectionId)?.image : null}
+                          label={u.label.text}
+                          size={36}
+                        />
                       )
                     }
                     title={

@@ -26,12 +26,7 @@ export function SeriesPrompt({
     >
       <div className="cal-series">
         {(["this", "following", "all"] as const).map((scope) => (
-          <Button
-            key={scope}
-            variant={scope === "this" ? "primary" : "default"}
-            onClick={() => onPick(scope)}
-            className="cal-series__option"
-          >
+          <Button key={scope} variant={scope === "this" ? "primary" : "default"} onClick={() => onPick(scope)}>
             {t(`calendar.series.${scope}`)}
           </Button>
         ))}
