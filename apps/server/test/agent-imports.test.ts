@@ -51,6 +51,7 @@ function fakeGithub(tree: Entry[] = PACKAGE, options: { truncated?: boolean } = 
     fetched.push(url);
     if (init?.redirect !== "error") return new Response("redirects must be refused", { status: 500 });
     if (url === "https://raw.githubusercontent.com/acme/time/main/sales.openmaus.json") return new Response(TEAM);
+    if (url === "https://raw.githubusercontent.com/acme/time/feat%231/sales.openmaus.json") return new Response(TEAM);
     if (url === "https://api.github.com/repos/acme/pacote/git/trees/main?recursive=1") {
       const entries = tree.map((e) => ({ type: "blob", mode: "100644", size: 10, sha: "0", ...e }));
       return Response.json({ sha: "1", tree: entries, truncated: options.truncated ?? false });
@@ -85,6 +86,15 @@ describe("reading a GitHub link for an import", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ files: [{ path: "sales.openmaus.json", text: TEAM }] });
     expect(gh.fetched).toEqual(["https://raw.githubusercontent.com/acme/time/main/sales.openmaus.json"]);
+  });
+
+  test("a branch whose name has # or % is read from that branch, its name still encoded", async () => {
+    const gh = fakeGithub();
+    const { read } = await owner({ http: gh.http, resolveHost: async () => ["140.82.112.3"] });
+    const res = await read("https://github.com/acme/time/blob/feat%231/sales.openmaus.json");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ files: [{ path: "sales.openmaus.json", text: TEAM }] });
+    expect(gh.fetched).toEqual(["https://raw.githubusercontent.com/acme/time/feat%231/sales.openmaus.json"]);
   });
 
   test("a folder: one tree request, then only the allowlisted files, relative to the folder, memory newest first", async () => {

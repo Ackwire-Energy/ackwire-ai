@@ -4556,6 +4556,7 @@ export const en: Translations = {
     pickLead: "This link holds {{count}} skills. Pick the ones to install.",
     pickAll: "All",
     pickMissing: "Pick at least one skill.",
+    pickSkipped: "Can't be installed. {{reason}}",
     installedMany: "{{count}} skills installed.",
     zipHelp: "A .zip with SKILL.md at its root.",
     zipPick: "Choose .zip",
@@ -7204,6 +7205,10 @@ export const en: Translations = {
     skill: {
       noSkillMd: "No SKILL.md in {{path}} or the folders inside it.",
       tooManySkills: "This link holds more than {{max}} skills. Link one of its folders.",
+      invalidName: "The name must use lowercase letters, numbers and hyphens, up to {{max}} characters.",
+      invalidDescription: "The description must have 1 to {{max}} characters.",
+      tooLarge: "The skill is too large (max {{max}} MB).",
+      tooManyFiles: "The skill has too many files (max {{max}}).",
     },
   },
   machines: {

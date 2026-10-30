@@ -136,8 +136,8 @@ import type {
   ServerTelemetry,
   SignInOptions,
   Skill,
-  SkillChoice,
   SkillDetail,
+  SkillPick,
   StorageConfig,
   StorageMigration,
   StorageTestResult,
@@ -698,8 +698,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       list: async (orgId) => (await request<{ skills: Skill[] }>(`${org(orgId)}/skills`)).skills,
       get: (orgId, id) => request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}`),
       create: (orgId, input) => request<SkillDetail>(`${org(orgId)}/skills`, { json: input }),
-      import: (orgId, input) =>
-        request<SkillDetail | { choices: SkillChoice[] }>(`${org(orgId)}/skills/import`, { json: input }),
+      import: (orgId, input) => request<SkillDetail | SkillPick>(`${org(orgId)}/skills/import`, { json: input }),
       importPicked: async (orgId, url, paths) =>
         (await request<{ skills: SkillDetail[] }>(`${org(orgId)}/skills/import`, { json: { url, paths } })).skills,
       update: (orgId, id, patch) =>

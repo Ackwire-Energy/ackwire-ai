@@ -1,7 +1,7 @@
 import type { Database } from "@agenteschat/db";
 import { ValidationError } from "./errors";
 import { requirePermission } from "./organizations";
-import { fetchGithub, type GithubFetchDeps, parseGithubUrl } from "./skills";
+import { encodePath, fetchGithub, type GithubFetchDeps, parseGithubUrl } from "./skills";
 
 /**
  * Bringing agents from another app: the web app parses the files (a team
@@ -71,7 +71,7 @@ export async function readGithubImport(
     throw new ValidationError("Unrecognized GitHub URL");
   }
   const read = async (path: string) => {
-    const raw = `https://raw.githubusercontent.com/${target.owner}/${target.repo}/${target.ref}/${path.split("/").map(encodeURIComponent).join("/")}`;
+    const raw = `https://raw.githubusercontent.com/${target.owner}/${target.repo}/${encodePath(target.ref)}/${encodePath(path)}`;
     const data = await fetchGithub(deps, raw, "text/plain", {
       maxBytes: AGENT_IMPORT_LIMITS.fileBytes,
       tooLarge: "The file is too large (max 4 MB)",

@@ -17,6 +17,7 @@ import {
   NotFoundError,
   parseSkillMarkdown,
   postPersonMessage,
+  SKILL_LIMITS,
   saveSkill,
   setAgentAccess,
   setAgentSkills,
@@ -48,8 +49,11 @@ allowed-tools:
 2. Use o modelo em templates/relatorio.md.
 `;
 
-/** A minimal zip writer (stored entries) for tests. */
-function zip(files: Record<string, string>) {
+/**
+ * A minimal zip writer (stored entries) for tests. `zip64`: the end record as git archive writes it past 65,535 files,
+ * its count at the maximum and the real values in a zip64 record before it.
+ */
+function zip(files: Record<string, string>, options: { zip64?: boolean } = {}) {
   const enc = new TextEncoder();
   const locals: Uint8Array[] = [];
   const centrals: Uint8Array[] = [];
@@ -80,16 +84,34 @@ function zip(files: Record<string, string>) {
     offset += local.length;
   }
   const centralSize = centrals.reduce((n, c) => n + c.length, 0);
+  const zip64: Uint8Array[] = [];
+  if (options.zip64) {
+    const record = new Uint8Array(56);
+    const rv = new DataView(record.buffer);
+    rv.setUint32(0, 0x06064b50, true);
+    rv.setBigUint64(4, 44n, true);
+    rv.setBigUint64(24, BigInt(centrals.length), true);
+    rv.setBigUint64(32, BigInt(centrals.length), true);
+    rv.setBigUint64(40, BigInt(centralSize), true);
+    rv.setBigUint64(48, BigInt(offset), true);
+    const locator = new Uint8Array(20);
+    const lv = new DataView(locator.buffer);
+    lv.setUint32(0, 0x07064b50, true);
+    lv.setBigUint64(8, BigInt(offset + centralSize), true);
+    lv.setUint32(16, 1, true);
+    zip64.push(record, locator);
+  }
   const eocd = new Uint8Array(22);
   const ev = new DataView(eocd.buffer);
   ev.setUint32(0, 0x06054b50, true);
-  ev.setUint16(8, centrals.length, true);
-  ev.setUint16(10, centrals.length, true);
+  ev.setUint16(8, Math.min(centrals.length, 0xffff), true);
+  ev.setUint16(10, Math.min(centrals.length, 0xffff), true);
   ev.setUint32(12, centralSize, true);
   ev.setUint32(16, offset, true);
-  const out = new Uint8Array(offset + centralSize + 22);
+  const parts = [...locals, ...centrals, ...zip64, eocd];
+  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
   let at = 0;
-  for (const part of [...locals, ...centrals, eocd]) {
+  for (const part of parts) {
     out.set(part, at);
     at += part.length;
   }
@@ -112,10 +134,13 @@ const REPOSITORY = {
 };
 
 /**
- * Fake GitHub: github.com redirects acme/skills' archive to codeload (a branch by name, the default branch by its
- * commit), which sends it; anything else is a 404. `limited`: every answer is GitHub limiting us, with these headers.
+ * Fake GitHub: github.com redirects acme/skills' archive (`archive`, else REPOSITORY's) to codeload (a branch by name,
+ * the default branch by its commit), which sends it; anything else is a 404. `limited`: every answer is GitHub
+ * limiting us, with these headers.
  */
-function fakeGithub(options: { redirect?: string; limited?: Record<string, string>; status?: number } = {}) {
+function fakeGithub(
+  options: { redirect?: string; limited?: Record<string, string>; status?: number; archive?: Uint8Array } = {},
+) {
   const fetched: string[] = [];
   const fetch = async (url: string) => {
     fetched.push(url);
@@ -127,7 +152,7 @@ function fakeGithub(options: { redirect?: string; limited?: Record<string, strin
       return new Response(null, { status: 302, headers: { location } });
     }
     if (/^https:\/\/codeload\.github\.com\/acme\/skills\/zip\/(refs\/heads\/main|0123abc)$/.test(url)) {
-      return new Response(zip(REPOSITORY));
+      return new Response(options.archive ?? zip(REPOSITORY));
     }
     return new Response("404: Not Found", { status: 404 });
   };
@@ -307,6 +332,61 @@ describe("import", () => {
     const team = await importSkillFromUrl(deps, f.owner.id, f.org.id, "https://github.com/acme/skills/tree/main/team");
     expect("choices" in team && team.choices.map((c) => c.path)).toEqual(["team/deploy", "team/review"]);
     expect(github.fetched.filter((u) => /api\.github\.com|raw\.githubusercontent\.com/.test(u))).toEqual([]);
+  });
+
+  test("the skills a link holds that can't be installed are listed apart with why, never offered", async () => {
+    f = await setup();
+    const md = (name: string, description: string) => `---\nname: ${name}\ndescription: ${description}\n---\n# ${name}`;
+    const archive = zip({
+      "skills-main/fonts/SKILL.md": md("fonts", "Desenha com as fontes da marca."),
+      "skills-main/fonts/brand.ttf": "x".repeat(SKILL_LIMITS.maxBytes),
+      "skills-main/good/SKILL.md": md("good", "Funciona."),
+      "skills-main/long/SKILL.md": md("long", "x".repeat(1100)),
+    });
+    const deps = { ...skillDeps(), fetch: fakeGithub({ archive }).fetch };
+    const url = "https://github.com/acme/skills";
+    expect(await importSkillFromUrl(deps, f.owner.id, f.org.id, url)).toEqual({
+      choices: [{ path: "good", name: "good", description: "Funciona." }],
+      skipped: [
+        { path: "fonts", code: "skill.too_large", message: "The skill is too large (max 2 MB)", params: { max: 2 } },
+        {
+          path: "long",
+          code: "skill.invalid_description",
+          message: "description: 1 to 1024 characters",
+          params: { max: 1024 },
+        },
+      ],
+    });
+    await expect(importPickedSkills(deps, f.owner.id, f.org.id, url, ["good", "long"])).rejects.toThrow(
+      "long: description",
+    );
+    expect(await listSkills(f.db, f.owner.id, f.org.id)).toEqual([]);
+  });
+
+  test("a repository of 40,000 one-file skill folders is refused for holding too many in a moment", async () => {
+    f = await setup();
+    const files: Record<string, string> = {};
+    for (let i = 0; i < 40_000; i++) files[`skills-main/s${i}/SKILL.md`] = `---\nname: s${i}\ndescription: x\n---\n`;
+    const deps = { ...skillDeps(), fetch: fakeGithub({ archive: zip(files) }).fetch };
+    const started = Date.now();
+    const refusal = await importSkillFromUrl(deps, f.owner.id, f.org.id, "https://github.com/acme/skills").catch(
+      (e: ValidationError) => e,
+    );
+    expect(refusal).toMatchObject({ code: "skill.too_many_skills" });
+    // Every folder found looked up among those above it, never compared with each skill found before it.
+    expect(Date.now() - started).toBeLessThan(5_000);
+  });
+
+  test("a repository archive past 65,535 files is refused, never read in part", async () => {
+    f = await setup();
+    const files: Record<string, string> = {};
+    for (let i = 0; i < 65_500; i++) files[`skills-main/aaa/f${i}.txt`] = "x";
+    files["skills-main/big/SKILL.md"] = "---\nname: big\ndescription: Muitos arquivos.\n---\n# Big";
+    for (let i = 0; i < 100; i++) files[`skills-main/big/f${i}.md`] = "y";
+    const deps = { ...skillDeps(), fetch: fakeGithub({ archive: zip(files, { zip64: true }) }).fetch };
+    const url = "https://github.com/acme/skills/tree/main/big";
+    await expect(importSkillFromUrl(deps, f.owner.id, f.org.id, url)).rejects.toThrow("Too many files to read");
+    expect(await listSkills(f.db, f.owner.id, f.org.id)).toEqual([]);
   });
 
   test("errors say what happened: a hidden repository, a missing ref, GitHub limiting us, no SKILL.md", async () => {

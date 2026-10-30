@@ -4587,6 +4587,7 @@ export const ptBR = {
     pickLead: "Este link tem {{count}} skills. Escolha quais instalar.",
     pickAll: "Todas",
     pickMissing: "Escolha pelo menos uma skill.",
+    pickSkipped: "Não dá para instalar. {{reason}}",
     installedMany: "{{count}} skills instaladas.",
     zipHelp: "Um .zip com o SKILL.md na raiz.",
     zipPick: "Escolher .zip",
@@ -7244,6 +7245,10 @@ export const ptBR = {
     skill: {
       noSkillMd: "Nenhum SKILL.md em {{path}} nem nas pastas dentro dela.",
       tooManySkills: "Este link tem mais de {{max}} skills. Use o link de uma das pastas dele.",
+      invalidName: "O nome precisa ter só letras minúsculas, números e hífens, até {{max}} caracteres.",
+      invalidDescription: "A descrição precisa ter de 1 a {{max}} caracteres.",
+      tooLarge: "A skill é grande demais (máximo de {{max}} MB).",
+      tooManyFiles: "A skill tem arquivos demais (máximo de {{max}}).",
     },
   },
   machines: {

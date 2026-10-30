@@ -177,10 +177,10 @@ import type {
   ServerTelemetry,
   SignInOptions,
   Skill,
-  SkillChoice,
   SkillDetail,
   SkillInput,
   SkillPatch,
+  SkillPick,
   StorageConfig,
   StorageMigration,
   StorageTestResult,
@@ -581,12 +581,10 @@ export interface ApiClient {
     create(orgId: string, input: SkillInput): Promise<SkillDetail>;
     /**
      * A GitHub link (a skill's folder or a file in it) or the folder as a zip in base64 (writes are JSON only). A link
-     * holding several skills installs nothing and answers with them to pick from (`importPicked`).
+     * holding several skills installs nothing and answers with them to pick from (`importPicked`), those that can't
+     * be installed apart.
      */
-    import(
-      orgId: string,
-      input: { url: string } | { zipBase64: string },
-    ): Promise<SkillDetail | { choices: SkillChoice[] }>;
+    import(orgId: string, input: { url: string } | { zipBase64: string }): Promise<SkillDetail | SkillPick>;
     /** Installs the skills picked among a link's choices (their `path`). */
     importPicked(orgId: string, url: string, paths: string[]): Promise<SkillDetail[]>;
     update(orgId: string, id: string, patch: SkillPatch): Promise<SkillDetail>;

@@ -16,6 +16,7 @@ import {
   ValidationError,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
+import { apiError, errorResponse } from "../../http/errors";
 import {
   type AppDeps,
   body,
@@ -64,10 +65,21 @@ const SkillChoice = z
     description: z.string(),
   })
   .openapi("SkillChoice");
+const SkillSkipped = z
+  .object({
+    path: z.string(),
+    code: z.string().openapi({ description: "Why it can't be installed: stable, the app translates it." }),
+    message: z.string().openapi({ description: "English fallback." }),
+    params: z.record(z.string(), z.unknown()).optional(),
+  })
+  .openapi("SkillSkipped");
 const SkillParams = OrgParams.extend({ skillId: z.uuid() });
 const SkillListItem = Skill.extend({
   agentsCount: z.number().openapi({ description: "Active agents with this skill turned on." }),
 }).openapi("SkillListItem");
+
+/** Reading a link downloads the repository's archive (up to 50 MB): to list its skills, install or update one. */
+const LINK_READS = { limit: 60, windowMs: 3600_000 };
 
 /**
  * Skills in Markdown (`SKILL.md`, ADR 0020): install by zip, GitHub URL or by
@@ -83,6 +95,9 @@ export function skillRoutes(deps: AppDeps) {
     if (!blobs) throw new Error("storage is not configured on this server");
     return { db, blobs, fetch: deps.extras?.http, resolveHost: deps.extras?.resolveHost };
   };
+  const linkReadAllowed = async (userId: string) =>
+    (await deps.adapters.rateLimiter.consume(`skill-link:${userId}`, LINK_READS)).allowed;
+  const tooManyReads = "Too many skill links read. Try again later.";
 
   app.openapi(
     createRoute({
@@ -167,13 +182,14 @@ export function skillRoutes(deps: AppDeps) {
       },
       responses: {
         200: json(
-          z.object({ choices: z.array(SkillChoice) }),
-          "The link holds several skills: nothing installed, send the ones picked in `paths`",
+          z.object({ choices: z.array(SkillChoice), skipped: z.array(SkillSkipped).optional() }),
+          "The link holds several skills: nothing installed, send the ones picked in `paths`. `skipped`: those that can't be installed, with why",
         ),
         201: json(
           z.union([SkillDetail, z.object({ skills: z.array(SkillDetail) })]),
           "Created: the skill, or `{ skills }` for `paths`",
         ),
+        429: errorResponse("Too many links read, or GitHub limiting this server"),
         ...errors,
       },
     }),
@@ -182,6 +198,7 @@ export function skillRoutes(deps: AppDeps) {
       const input = c.req.valid("json");
       const actor = c.get("user").id;
       if ("url" in input) {
+        if (!(await linkReadAllowed(actor))) return apiError(c, 429, "rate_limited", tooManyReads);
         if (input.paths) {
           return c.json({ skills: await importPickedSkills(skills(), actor, orgId, input.url, input.paths) }, 201);
         }
@@ -278,11 +295,17 @@ export function skillRoutes(deps: AppDeps) {
       security,
       summary: "Import again from its URL (a new version)",
       request: { params: SkillParams },
-      responses: { 200: json(SkillDetail), ...errors },
+      responses: {
+        200: json(SkillDetail),
+        429: errorResponse("Too many links read, or GitHub limiting this server"),
+        ...errors,
+      },
     }),
     async (c) => {
       const { orgId, skillId } = c.req.valid("param");
-      return c.json(await reimportSkill(skills(), c.get("user").id, orgId, skillId), 200);
+      const actor = c.get("user").id;
+      if (!(await linkReadAllowed(actor))) return apiError(c, 429, "rate_limited", tooManyReads);
+      return c.json(await reimportSkill(skills(), actor, orgId, skillId), 200);
     },
   );
 

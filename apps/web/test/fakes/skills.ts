@@ -3,7 +3,8 @@
  * - `GET/POST …/skills`, `POST …/skills/import { url } | { url, paths } | { zipBase64 }`,
  *   `GET/PATCH/DELETE …/skills/{id}`, `POST …/skills/{id}/reimport`
  * - `GET/PUT …/agents/{id}/skills` → `{ skills: (Skill & { enabled })[] }`
- * A repository's root holds three skills (`{ choices }`); `acme/secret` is private. Scripts are listed as `ignored`.
+ * A repository's root holds three skills to pick and one that can't be installed (`{ choices, skipped }`);
+ * `acme/secret` is private. Scripts are listed as `ignored`.
  */
 import { type ApiClient, ApiError, type SkillDetail } from "@agenteschat/client";
 import { clone, type MockContext, MockNotFoundError, mockId, perOrg } from "./context";
@@ -12,6 +13,14 @@ const CHOICES = [
   { path: "skills/deploy", name: "deploy", description: "Antes de qualquer deploy." },
   { path: "skills/review", name: "review", description: "Revisa um pull request." },
   { path: "skills/triage", name: "triage", description: "Organiza as issues novas." },
+];
+const SKIPPED = [
+  {
+    path: "skills/claude-api",
+    code: "skill.invalid_description",
+    message: "description: 1 to 1024 characters",
+    params: { max: 1024 },
+  },
 ];
 
 export function createFakeSkills(
@@ -113,7 +122,9 @@ export function createFakeSkills(
           repo: "acme/secret",
         });
       }
-      if (url && /^https:\/\/github\.com\/[^/]+\/[^/]+\/?$/.test(url)) return { choices: clone(CHOICES) };
+      if (url && /^https:\/\/github\.com\/[^/]+\/[^/]+\/?$/.test(url)) {
+        return { choices: clone(CHOICES), skipped: clone(SKIPPED) };
+      }
       const name = url ? (url.split("/").filter(Boolean).pop() ?? "skill") : "Skill enviada";
       return make(orgId, {
         name,

@@ -18,7 +18,10 @@ export interface ZipListing {
   local: number;
 }
 
-/** The central directory's files (folders left out); no zip64, so at most 65,535 entries. */
+/**
+ * The central directory's files (folders left out). No zip64, so at most 65,535 entries: an archive past that is
+ * refused, never read in part.
+ */
 export function listZip(buffer: Uint8Array): ZipListing[] {
   const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
   let eocd = -1;
@@ -31,6 +34,12 @@ export function listZip(buffer: Uint8Array): ZipListing[] {
   if (eocd < 0) throw new ValidationError("Not a zip file");
   const count = view.getUint16(eocd + 10, true);
   let offset = view.getUint32(eocd + 16, true);
+  // Past what these fields hold, writers (git archive among them) put their maximum here and the real values in a
+  // zip64 record, whose locator sits just before: read as they are, they would list only the first 65,535 files.
+  const zip64 = eocd >= 20 && view.getUint32(eocd - 20, true) === 0x07064b50;
+  if (zip64 && (count === 0xffff || offset === 0xffffffff)) {
+    throw new ValidationError("Too many files to read (max 65,535)");
+  }
   const decoder = new TextDecoder();
   const files: ZipListing[] = [];
   for (let n = 0; n < count; n++) {

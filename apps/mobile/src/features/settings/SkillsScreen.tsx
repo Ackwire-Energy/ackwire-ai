@@ -1,9 +1,9 @@
-import type { SkillChoice, SkillDetail, SkillFile } from "@agenteschat/client";
+import type { SkillChoice, SkillDetail, SkillFile, SkillSkipped } from "@agenteschat/client";
 import { useSkill, useSkillAction, useSkills, useSkillUsage } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
-import { pickSkills, skillChoicesOf } from "@agenteschat/client/lib/skills";
+import { pickSkills, skillPickOf, skippedSkillText } from "@agenteschat/client/lib/skills";
 import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
 import { router } from "expo-router";
@@ -244,7 +244,8 @@ type InstallTab = "github" | "zip" | "write";
 /**
  * "Instalar skill", as the web's dialog: from a GitHub link, a .zip from Arquivos, or written here. "Instalar" in the
  * bar; while it works, the step it is on; done, the skill's page in its place. A link holding several skills lists
- * them under the field, each checked to install, and "Instalar" installs those.
+ * them under the field, each checked to install, and "Instalar" installs those. Those it holds that can't be installed
+ * follow, with why.
  */
 export function InstallSkillScreen() {
   const { t } = useTranslation();
@@ -258,6 +259,7 @@ export function InstallSkillScreen() {
   const [error, setError] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
   const [choices, setChoices] = useState<SkillChoice[] | null>(null);
+  const [skipped, setSkipped] = useState<SkillSkipped[]>([]);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const busy = action.isPending || reading;
   const step = useStepText(busy, [
@@ -295,9 +297,10 @@ export function InstallSkillScreen() {
       }
       if (!choices) {
         const onSuccess = (result: unknown) => {
-          const found = skillChoicesOf(result);
+          const found = skillPickOf(result);
           if (!found) return done(result);
-          setChoices(found);
+          setChoices(found.choices);
+          setSkipped(found.skipped);
           setPicked(new Set());
         };
         action.mutate({ type: "import", input: { url: url.trim() } }, { onSuccess, onError });
@@ -385,7 +388,7 @@ export function InstallSkillScreen() {
             accessibilityLabel={t("skills.githubUrl")}
           />
           <GroupedFooter>
-            {choices ? t("skills.pickLead", { count: choices.length }) : t("skills.githubHelp")}
+            {choices ? t("skills.pickLead", { count: choices.length + skipped.length }) : t("skills.githubHelp")}
           </GroupedFooter>
           {choices ? (
             <GroupedList>
@@ -408,6 +411,9 @@ export function InstallSkillScreen() {
                   checked={picked.has(c.path)}
                   onPress={() => togglePick([c.path], !picked.has(c.path))}
                 />
+              ))}
+              {skipped.map((s) => (
+                <GroupedRow key={s.path} label={s.path} sub={skippedSkillText(t, s)} subLines={3} disabled />
               ))}
             </GroupedList>
           ) : null}

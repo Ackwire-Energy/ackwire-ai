@@ -2,7 +2,7 @@ import type { BlobStoreResolver } from "@agenteschat/adapters";
 import { and, asc, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
-import { ForbiddenError, NotFoundError, TooManyError, ValidationError } from "./errors";
+import { type ErrorParams, ForbiddenError, NotFoundError, TooManyError, ValidationError } from "./errors";
 import { assertStorageRoom } from "./limits";
 import { assertPublicHttpsUrl, type ResolveHost } from "./net-guard";
 import { can, requirePermission } from "./organizations";
@@ -240,11 +240,23 @@ async function loadSkill(db: Database, orgId: string, id: string) {
   return s;
 }
 
+/** A skill whose files have these sizes within the limits, refused as an upload is. */
+function assertSkillSize(sizes: number[]) {
+  if (sizes.length > SKILL_LIMITS.maxFiles) {
+    throw new ValidationError(`Too many files (max ${SKILL_LIMITS.maxFiles})`, "skill.too_many_files", {
+      max: SKILL_LIMITS.maxFiles,
+    });
+  }
+  if (sizes.reduce((n, size) => n + size, 0) > SKILL_LIMITS.maxBytes) {
+    throw new ValidationError("The skill is too large (max 2 MB)", "skill.too_large", {
+      max: SKILL_LIMITS.maxBytes / 1024 / 1024,
+    });
+  }
+}
+
 /** Where a version's files go and how each is kept, refused before the skill or any file is written. */
 async function planFiles(deps: SkillDeps, orgId: string, files: SkillFileInput[]) {
-  if (files.length > SKILL_LIMITS.maxFiles) throw new ValidationError(`Too many files (max ${SKILL_LIMITS.maxFiles})`);
-  const total = files.reduce((n, f) => n + f.data.byteLength, 0);
-  if (total > SKILL_LIMITS.maxBytes) throw new ValidationError("The skill is too large (max 2 MB)");
+  assertSkillSize(files.map((f) => f.data.byteLength));
   // Two entries that normalize to the same path would share one blob key: the second's bytes overwrite
   // the first on disk while its row insert is dropped on the unique key, so the stored size stops matching disk.
   const normalized = files.map((f) => ({ path: safePath(f.path), data: f.data }));
@@ -505,7 +517,18 @@ const ARCHIVE: GithubFetchOptions = {
 /** How deep below a link a SKILL.md is looked for, and how many skills one link may hold. */
 const SKILL_SEARCH = { depth: 6, max: 100 };
 
-const encodePath = (path: string) => path.split("/").map(encodeURIComponent).join("/");
+/** A path for a URL: each segment percent-encoded, the slashes kept. */
+export const encodePath = (path: string) => path.split("/").map(encodeURIComponent).join("/");
+
+const parentOf = (path: string) => path.slice(0, Math.max(0, path.lastIndexOf("/")));
+
+/** The key of `folders` that is `dir` or a folder above it ("" the root), if any: one lookup a level. */
+function folderOf(folders: ReadonlyMap<string, unknown>, dir: string): string | undefined {
+  for (let at = dir; ; at = parentOf(at)) {
+    if (folders.has(at)) return at;
+    if (!at) return undefined;
+  }
+}
 
 /**
  * The repository at the link's ref, from its zip archive (`github.com/{owner}/{repo}/archive/{ref}.zip`, served by
@@ -548,29 +571,22 @@ function skillFolders(files: GithubRepository["files"], folder: string) {
   const prefix = folder ? `${folder}/` : "";
   const found = [...files]
     .filter(([path]) => path.startsWith(prefix) && /(^|\/)skill\.md$/i.test(path))
-    .map(([path, entry]) => [path.slice(0, Math.max(0, path.lastIndexOf("/"))), entry] as const)
+    .map(([path, entry]) => [parentOf(path), entry] as const)
     .filter(([dir]) => depth(dir) - depth(folder) <= SKILL_SEARCH.depth)
     .sort(([a], [b]) => depth(a) - depth(b));
   const skills = new Map<string, ZipListing>();
-  for (const [dir, entry] of found) {
-    if (![...skills.keys()].some((s) => s === "" || dir === s || dir.startsWith(`${s}/`))) skills.set(dir, entry);
-  }
+  for (const [dir, entry] of found) if (folderOf(skills, dir) === undefined) skills.set(dir, entry);
   return new Map([...skills].sort(([a], [b]) => (a < b ? -1 : 1)));
 }
 
-/** A skill folder of the repository, within the skill limits as an upload is: binaries are listed, never read. */
-function repositorySkill(repository: GithubRepository, dir: string) {
+/** A skill folder of the repository (`inside`: its files) as an upload's: binaries are listed, never inflated. */
+function repositorySkill(zip: Uint8Array, dir: string, inside: [string, ZipListing][]) {
   const prefix = dir ? `${dir}/` : "";
-  const inside = [...repository.files].filter(([path]) => path.startsWith(prefix));
-  if (inside.length > SKILL_LIMITS.maxFiles) throw new ValidationError(`Too many files (max ${SKILL_LIMITS.maxFiles})`);
-  if (inside.reduce((n, [, entry]) => n + entry.size, 0) > SKILL_LIMITS.maxBytes) {
-    throw new ValidationError("The skill is too large (max 2 MB)");
-  }
   const { skillMd, files } = splitSkillFolder(
     inside.map(([path, entry]) => {
       const relative = path.slice(prefix.length);
       const ignored = classifyFile(relative).status === "ignored";
-      return { path: relative, data: ignored ? new Uint8Array() : inflateZipEntry(repository.zip, entry) };
+      return { path: relative, data: ignored ? new Uint8Array() : inflateZipEntry(zip, entry) };
     }),
   );
   return { ...parseSkillMarkdown(skillMd), files };
@@ -583,38 +599,69 @@ export interface SkillChoice {
   description: string;
 }
 
+/** A skill a GitHub link holds that can't be installed, with the refusal: its code, English text and params. */
+export interface SkillSkipped {
+  path: string;
+  code: string;
+  message: string;
+  params?: ErrorParams;
+}
+
 /** What a GitHub link holds: the repository and the skill folders at or below the link (a file's: its folder's). */
 async function readGithubLink(deps: SkillDeps, url: string) {
   const target = parseGithubUrl(url);
   const repository = await githubRepository(deps, target);
-  const folder = target.kind === "file" ? target.path.split("/").slice(0, -1).join("/") : target.path;
-  const found = skillFolders(repository.files, folder);
+  const folder = target.kind === "file" ? parentOf(target.path) : target.path;
+  const folders = skillFolders(repository.files, folder);
   const repo = `${target.owner}/${target.repo}`;
-  if (found.size === 0) {
+  if (folders.size === 0) {
     const where = folder ? `${repo}/${folder}` : repo;
     throw new ValidationError(`No SKILL.md in ${where} or the folders inside it`, "skill.no_skill_md", { path: where });
   }
-  if (found.size > SKILL_SEARCH.max) {
+  if (folders.size > SKILL_SEARCH.max) {
     throw new ValidationError(
       `That link holds more than ${SKILL_SEARCH.max} skills. Link one of its folders.`,
       "skill.too_many_skills",
       { max: SKILL_SEARCH.max },
     );
   }
+  const found = new Map([...folders].map(([dir, skillMd]) => [dir, { skillMd, files: [] as [string, ZipListing][] }]));
+  // Every skill's files in one pass: no skill folder holds another.
+  for (const file of repository.files) {
+    const dir = folderOf(found, parentOf(file[0]));
+    if (dir !== undefined) found.get(dir)?.files.push(file);
+  }
+  /** The skill at `dir`, refused past the skill limits. */
+  const skillIn = (dir: string) => {
+    const skill = found.get(dir);
+    if (!skill) throw new ValidationError(`That link holds no skill at ${dir}`);
+    assertSkillSize(skill.files.map(([, entry]) => entry.size));
+    return skill;
+  };
+  /** The skill at `dir` from its SKILL.md alone, refused as installing it would be for its limits or its text. */
+  const about = (dir: string) =>
+    parseSkillMarkdown(new TextDecoder().decode(inflateZipEntry(repository.zip, skillIn(dir).skillMd)));
   /** The skill at `dir`, ready to save: from the link itself when it points at the skill, else from its folder. */
   const skillAt = (dir: string) => ({
-    ...repositorySkill(repository, dir),
+    ...repositorySkill(repository.zip, dir, skillIn(dir).files),
     source: "url" as const,
     sourceUrl:
       dir === folder ? url : `https://github.com/${encodePath(repo)}/tree/${encodePath(target.ref)}/${encodePath(dir)}`,
   });
-  return { repository, found, skillAt };
+  return { found, about, skillAt };
+}
+
+/** A GitHub link holding several skills: those that can be installed, to pick, and those that can't, with why. */
+export interface SkillPick {
+  choices: SkillChoice[];
+  skipped?: SkillSkipped[];
 }
 
 /**
  * Import from a GitHub link, read by the backend from the repository's archive (only GitHub hosts, the SSRF guard
  * on every request, 2 MB and 200 files a skill): the skill folder it points at (a file's folder), or the one skill
- * below it. A link that holds several answers with them to pick from (`importPickedSkills`), nothing installed.
+ * below it. A link that holds several answers with them to pick from (`importPickedSkills`), nothing installed, and
+ * with those that can't be installed (past the limits, or a SKILL.md that doesn't parse) apart, each with why.
  * Installing a skill whose name is already installed makes a new version.
  */
 export async function importSkillFromUrl(
@@ -622,28 +669,26 @@ export async function importSkillFromUrl(
   actorId: string,
   orgId: string,
   url: string,
-): Promise<SkillDetail | { choices: SkillChoice[] }> {
+): Promise<SkillDetail | SkillPick> {
   await requirePermission(deps.db, actorId, orgId, "manage_agents");
   const link = await readGithubLink(deps, url);
   const [only, ...more] = link.found.keys();
   if (only !== undefined && more.length === 0) return saveSkill(deps, actorId, orgId, link.skillAt(only));
-  // A SKILL.md that can't be installed (past the skill limit, or that doesn't parse) isn't offered.
+  const choices: SkillChoice[] = [];
+  const skipped: SkillSkipped[] = [];
   let refused: unknown;
-  const choices = [...link.found].flatMap(([path, entry]) => {
+  for (const path of link.found.keys()) {
     try {
-      if (entry.size > SKILL_LIMITS.maxBytes) throw new ValidationError("The skill is too large (max 2 MB)");
-      const { name, description } = parseSkillMarkdown(
-        new TextDecoder().decode(inflateZipEntry(link.repository.zip, entry)),
-      );
-      return [{ path, name, description }];
+      const { name, description } = link.about(path);
+      choices.push({ path, name, description });
     } catch (err) {
       if (!(err instanceof ValidationError)) throw err;
       refused ??= err;
-      return [];
+      skipped.push({ path, code: err.code, message: err.message, ...(err.params ? { params: err.params } : {}) });
     }
-  });
+  }
   if (choices.length === 0) throw refused;
-  return { choices };
+  return skipped.length > 0 ? { choices, skipped } : { choices };
 }
 
 /** Installs the skills picked among a link's choices (`paths`, as `importSkillFromUrl` gave them). */

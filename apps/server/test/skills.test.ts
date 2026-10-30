@@ -66,3 +66,22 @@ test("a link holding several skills answers with them, the picked ones install, 
   expect(limited.status).toBe(429);
   expect(await limited.json()).toMatchObject({ error: { code: "github.limited", params: { count: 2 } } });
 });
+
+test("reading links is limited per person, 60 an hour, updating from a link included; a .zip isn't", async () => {
+  const gh = fakeGithub();
+  t = await createTestServer({ http: gh.http, resolveHost: async () => ["140.82.112.3"] });
+  const b = browser(t);
+  await signUp(b, "owner@example.com");
+  const { orgId } = await seedOrg(b);
+  const importing = (json: unknown) => b(`/api/app/organizations/${orgId}/skills/import`, { json });
+  for (let i = 0; i < 60; i++) expect((await importing({ url: "https://github.com/acme/secret" })).status).toBe(400);
+  const limited = await importing({ url: "https://github.com/acme/skills" });
+  expect(limited.status).toBe(429);
+  expect(await limited.json()).toMatchObject({ error: { code: "rate_limited" } });
+  expect(gh.fetched.filter((u) => u.includes("acme/skills"))).toEqual([]);
+
+  const upload = await importing({ zipBase64: Buffer.from(zip([["SKILL.md", skill("enviada")]])).toString("base64") });
+  expect(upload.status).toBe(201);
+  const { id } = (await upload.json()) as { id: string };
+  expect((await b(`/api/app/organizations/${orgId}/skills/${id}/reimport`, { json: {} })).status).toBe(429);
+});

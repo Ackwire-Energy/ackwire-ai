@@ -2276,6 +2276,21 @@ export interface SkillChoice {
   description: string;
 }
 
+/** A skill a GitHub link holds that can't be installed: its folder and the server's refusal. */
+export interface SkillSkipped {
+  path: string;
+  code: string;
+  /** English fallback. */
+  message: string;
+  params?: Record<string, unknown>;
+}
+
+/** A GitHub link holding several skills: the ones to pick from, and those that can't be installed, with why. */
+export interface SkillPick {
+  choices: SkillChoice[];
+  skipped?: SkillSkipped[];
+}
+
 /** `GET …/agents/{id}/skills`: every skill of the library, with whether this agent has it. */
 export interface AgentSkill extends Skill {
   enabled: boolean;

@@ -1,9 +1,9 @@
-import type { Skill, SkillChoice, SkillDetail, SkillFile } from "@agenteschat/client";
+import type { Skill, SkillChoice, SkillDetail, SkillFile, SkillSkipped } from "@agenteschat/client";
 import { useSkill, useSkillAction, useSkills, useSkillUsage } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
-import { pickSkills, skillChoicesOf } from "@agenteschat/client/lib/skills";
+import { pickSkills, skillPickOf, skippedSkillText } from "@agenteschat/client/lib/skills";
 import {
   Alert,
   Button,
@@ -195,8 +195,9 @@ export function InstallSkillDialog({
   const [file, setFile] = useState<File | null>(null);
   const [form, setForm] = useState({ name: "", description: "", body: "" });
   const [error, setError] = useState<string | null>(null);
-  /** The skills a link holds when it holds several, and the ones picked. */
+  /** The skills a link holds when it holds several, those that can't be installed, and the ones picked. */
   const [choices, setChoices] = useState<SkillChoice[] | null>(null);
+  const [skipped, setSkipped] = useState<SkillSkipped[]>([]);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const fileInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -223,9 +224,10 @@ export function InstallSkillDialog({
       if (!githubOk) return setError(t("skills.githubInvalid"));
       if (!choices) {
         const onSuccess = (result: unknown) => {
-          const found = skillChoicesOf(result);
+          const found = skillPickOf(result);
           if (!found) return done(result);
-          setChoices(found);
+          setChoices(found.choices);
+          setSkipped(found.skipped);
           setPicked(new Set());
         };
         return action.mutate({ type: "import", input: { url: url.trim() } }, { onSuccess, onError });
@@ -295,7 +297,9 @@ export function InstallSkillDialog({
               </Field>
               {choices && (
                 <fieldset className="skill-picks">
-                  <legend className="small muted">{t("skills.pickLead", { count: choices.length })}</legend>
+                  <legend className="small muted">
+                    {t("skills.pickLead", { count: choices.length + skipped.length })}
+                  </legend>
                   <label htmlFor="skill-pick-all" className="scope-row">
                     <Checkbox
                       id="skill-pick-all"
@@ -319,6 +323,15 @@ export function InstallSkillDialog({
                       <span className="scope-row__text">
                         <span className="skill-pick__name">{c.name}</span>
                         <span className="small muted skill-pick__about">{c.description}</span>
+                      </span>
+                    </label>
+                  ))}
+                  {skipped.map((s, i) => (
+                    <label key={s.path} htmlFor={`skill-skip-${i}`} className="scope-row">
+                      <Checkbox id={`skill-skip-${i}`} checked={false} disabled />
+                      <span className="scope-row__text">
+                        <span className="skill-pick__name">{s.path}</span>
+                        <span className="small muted skill-pick__about">{skippedSkillText(t, s)}</span>
                       </span>
                     </label>
                   ))}

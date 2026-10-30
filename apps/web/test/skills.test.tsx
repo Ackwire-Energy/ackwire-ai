@@ -151,9 +151,12 @@ describe("Configurações → Skills", () => {
     await type(link, "https://github.com/acme/skills");
     await click(within(dialog).getByRole("button", { name: "Instalar" }));
     await settle(6);
-    // Nothing installed yet: each skill by name and what it is for.
-    expect(dialog.textContent).toContain("Este link tem 3 skills. Escolha quais instalar.");
+    // Nothing installed yet: each skill by name and what it is for, and the one that can't be installed with why.
+    expect(dialog.textContent).toContain("Este link tem 4 skills. Escolha quais instalar.");
     expect(dialog.textContent).toContain("Revisa um pull request.");
+    const skipped = within(dialog).getByRole("checkbox", { name: /claude-api/ });
+    expect(skipped.hasAttribute("disabled")).toBe(true);
+    expect(dialog.textContent).toContain("Não dá para instalar. A descrição precisa ter de 1 a 1024 caracteres.");
     await click(within(dialog).getByRole("button", { name: "Instalar" }));
     expect(dialog.textContent).toContain("Escolha pelo menos uma skill.");
     await click(within(dialog).getByRole("checkbox", { name: /deploy/ }));
