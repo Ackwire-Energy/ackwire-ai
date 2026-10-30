@@ -231,6 +231,9 @@ describe("agent skills", () => {
     // Accents don't matter. Extra 4 is hidden now, and still on.
     await type(search, "relatorio");
     expect(pills()).toEqual(["Relatório semanal"]);
+    // Names only: Atendimento's description ("respostas") doesn't bring its pill back.
+    await type(search, "re");
+    expect(pills()).toEqual(["Revisão de PR", "Relatório semanal"]);
     await type(search, "nada assim");
     expect(pills()).toEqual([]);
     expect(section().textContent).toContain("Nenhuma skill com “nada assim”.");

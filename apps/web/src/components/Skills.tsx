@@ -47,9 +47,9 @@ const sourceKey = (s: Pick<Skill, "source" | "sourceUrl">) =>
 
 const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
-export function searchSkills(skills: Skill[], query: string) {
+export function searchSkills(skills: Skill[], query: string, { nameOnly = false } = {}) {
   const q = fold(query.trim());
-  return q ? skills.filter((s) => fold(`${s.name} ${s.description}`).includes(q)) : skills;
+  return q ? skills.filter((s) => fold(nameOnly ? s.name : `${s.name} ${s.description}`).includes(q)) : skills;
 }
 
 /** A .zip as base64 (writes are JSON only). */
@@ -170,8 +170,8 @@ export function SkillsSection() {
 }
 
 /**
- * An agent's skills (its page, Criar agente): the library as pills, with a search past INLINE. The search only
- * hides pills: a skill switched on stays on while hidden.
+ * An agent's skills (its page, Criar agente): the library as pills, with a search past INLINE. The search matches
+ * names only, since a pill shows nothing else, and only hides pills: a skill switched on stays on while hidden.
  */
 export function SkillPicker({
   skills,
@@ -187,7 +187,7 @@ export function SkillPicker({
   const { t } = useTranslation();
   const [q, setQ] = useState("");
   const searchable = skills.length > INLINE;
-  const shown = searchable ? searchSkills(skills, q) : skills;
+  const shown = searchable ? searchSkills(skills, q, { nameOnly: true }) : skills;
   const toggle = (id: string, on: boolean) => {
     const next = new Set(selected);
     if (on) next.add(id);
