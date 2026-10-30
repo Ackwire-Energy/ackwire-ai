@@ -89,6 +89,7 @@ import { ChannelMembersSheet } from "./ChannelMembers";
 import { DmComputerButton } from "./DmComputerButton";
 import { EventLine } from "./EventLine";
 import { FirstDay } from "./FirstDay";
+import { ConversationSwitcher, type SwitcherTouch } from "./ConversationSwitcher";
 import { HeaderPill } from "./HeaderPill";
 import { composerSuggestions } from "./intent";
 import { IssueTakenLine } from "./issue-work";
@@ -1035,6 +1036,16 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             onMembers={channel && !dm ? openMembers : undefined}
           />,
         );
+  // Holding the pill: the conversation switcher, following the finger until it lets go.
+  const [switcher, setSwitcher] = useState<{ touch: SwitcherTouch | null } | null>(null);
+  const hold = {
+    onHold: () => {
+      Keyboard.dismiss();
+      setSwitcher({ touch: null });
+    },
+    onHoldTouch: (touch: SwitcherTouch) => setSwitcher((s) => (s ? { touch } : s)),
+    holdHint: t("mobile.chat.switchHint"),
+  };
   const pill =
     isThread && info ? (
       <HeaderPill
@@ -1042,6 +1053,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         title={title}
         subtitle={subtitle}
         onPress={openOptions}
+        {...hold}
         label={t("mobile.chat.headerChannel", { who: who(title, subtitle ?? "") })}
       />
     ) : dm ? (
@@ -1059,6 +1071,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         working={Boolean(dmDoing)}
         extraActions={dmAgentId ? 1 : 0}
         onPress={dmAgentId ? () => router.push(`/agent/${dmAgentId}`) : openOptions}
+        {...hold}
         label={
           dmAgentId
             ? t("mobile.chat.headerAgent", { who: who(dm.with.name, dmDoing ?? subtitle ?? "") })
@@ -1094,6 +1107,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
           ) : undefined
         }
         onPress={openMembers}
+        {...hold}
         label={t("mobile.chat.headerChannel", { who: who(title, subtitle ?? "") })}
       />
     ) : null;
@@ -1533,6 +1547,14 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
           </View>
         </KeyboardStickyView>
       </KeyboardGestureArea>
+      {switcher ? (
+        <ConversationSwitcher
+          channelId={channelId}
+          top={headerHeight + 6}
+          touch={switcher.touch}
+          onClose={() => setSwitcher(null)}
+        />
+      ) : null}
     </View>
   );
 }

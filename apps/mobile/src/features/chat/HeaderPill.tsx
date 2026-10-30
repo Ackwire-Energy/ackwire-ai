@@ -1,16 +1,19 @@
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
-import type { ReactNode } from "react";
+import { type ReactNode, useRef } from "react";
+import type { GestureResponderEvent } from "react-native";
 import { Platform, StyleSheet, useWindowDimensions, View } from "react-native";
 import { needsHeaderBlur } from "@/lib/nav";
 import { Dither } from "@/sky/Dither";
 import { softTones } from "@/sky/math";
-import { Glass, PressScale, Text, useTheme } from "@/ui";
+import { Glass, haptics, PressScale, Text, useTheme } from "@/ui";
+import type { SwitcherTouch } from "./ConversationSwitcher";
 
 /**
  * The conversation's title as a glass pill in the header: who
  * or where on the left, the name and a quiet line under it. An agent's pill carries a little of its sky at
  * the right end; while it works, a pixel sweep in its color crosses the pill (the sidebar's trail) and the
- * quiet line says what it is doing. A channel shows who is in on the right.
+ * quiet line says what it is doing. A channel shows who is in on the right. Held (`onHold`), it opens the
+ * conversation switcher and reports where the finger slides until it lets go (`onHoldTouch`).
  */
 export function HeaderPill({
   lead,
@@ -22,6 +25,9 @@ export function HeaderPill({
   onPress,
   label,
   extraActions = 0,
+  onHold,
+  holdHint,
+  onHoldTouch,
 }: {
   lead?: ReactNode;
   title: string;
@@ -36,49 +42,77 @@ export function HeaderPill({
   label: string;
   /** Bar buttons beside "…" (an agent's computer): the centered pill gives up twice their 40 points each. */
   extraActions?: number;
+  onHold?: () => void;
+  /** What a screen reader says the hold does. */
+  holdHint?: string;
+  onHoldTouch?: (touch: SwitcherTouch) => void;
 }) {
   const { colors, shadows } = useTheme();
   const { width } = useWindowDimensions();
+  // After the hold, the same touch keeps going: its moves bubble here even outside the pill.
+  const holding = useRef(false);
+  const report = (e: GestureResponderEvent, up: boolean) => {
+    if (!holding.current) return;
+    if (up) holding.current = false;
+    onHoldTouch?.({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY, up });
+  };
   return (
-    <PressScale
-      to={0.97}
-      onPress={onPress}
-      disabled={!onPress}
-      accessibilityRole={onPress ? "button" : "header"}
-      accessibilityLabel={label}
-      style={[
-        styles.press,
-        { maxWidth: Math.max(160, width - 136 - extraActions * 80) },
-        // Android's pill is opaque: a short shadow floats it over the conversation, as the glass does on iOS.
-        Platform.OS === "android" && { borderRadius: 22, boxShadow: shadows.e1 },
-        LIQUID && styles.liquidNudge,
-      ]}
+    <View
+      onTouchMove={(e) => report(e, false)}
+      onTouchEnd={(e) => report(e, true)}
+      onTouchCancel={(e) => report(e, true)}
     >
-      {/* The same Liquid Glass as the bar's own buttons beside it (iOS 26); the blur and a hairline before. */}
-      <Glass liquid intensity={70} style={[styles.pill, { borderColor: colors.line2 }]}>
-        {color ? (
-          <Dither
-            kind={working ? "pillwork" : "pill"}
-            tones={softTones(color, colors.glassSolid)}
-            pixel={3}
-            clear
-            style={StyleSheet.absoluteFill}
-          />
-        ) : null}
-        {lead ? <View style={styles.lead}>{lead}</View> : null}
-        <View style={styles.text} importantForAccessibility="no-hide-descendants">
-          <Text variant="body" numberOfLines={1} style={styles.title}>
-            {title}
-          </Text>
-          {subtitle ? (
-            <Text variant="caption" tone="muted" numberOfLines={1}>
-              {subtitle}
-            </Text>
+      <PressScale
+        to={0.97}
+        onPress={onPress}
+        disabled={!onPress && !onHold}
+        {...(onHold
+          ? {
+              delayLongPress: 300,
+              onLongPress: () => {
+                holding.current = true;
+                haptics.medium();
+                onHold();
+              },
+            }
+          : {})}
+        accessibilityRole={onPress ? "button" : "header"}
+        accessibilityLabel={label}
+        accessibilityHint={holdHint}
+        style={[
+          styles.press,
+          { maxWidth: Math.max(160, width - 136 - extraActions * 80) },
+          // Android's pill is opaque: a short shadow floats it over the conversation, as the glass does on iOS.
+          Platform.OS === "android" && { borderRadius: 22, boxShadow: shadows.e1 },
+          LIQUID && styles.liquidNudge,
+        ]}
+      >
+        {/* The same Liquid Glass as the bar's own buttons beside it (iOS 26); the blur and a hairline before. */}
+        <Glass liquid intensity={70} style={[styles.pill, { borderColor: colors.line2 }]}>
+          {color ? (
+            <Dither
+              kind={working ? "pillwork" : "pill"}
+              tones={softTones(color, colors.glassSolid)}
+              pixel={3}
+              clear
+              style={StyleSheet.absoluteFill}
+            />
           ) : null}
-        </View>
-        {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
-      </Glass>
-    </PressScale>
+          {lead ? <View style={styles.lead}>{lead}</View> : null}
+          <View style={styles.text} importantForAccessibility="no-hide-descendants">
+            <Text variant="body" numberOfLines={1} style={styles.title}>
+              {title}
+            </Text>
+            {subtitle ? (
+              <Text variant="caption" tone="muted" numberOfLines={1}>
+                {subtitle}
+              </Text>
+            ) : null}
+          </View>
+          {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
+        </Glass>
+      </PressScale>
+    </View>
   );
 }
 
