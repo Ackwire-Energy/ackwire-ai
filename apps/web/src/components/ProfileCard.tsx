@@ -6,7 +6,7 @@ import { formatPercent, relativeTime, shortModel } from "@agenteschat/client/lib
 import { can } from "@agenteschat/client/lib/permissions";
 import { isAuto } from "@agenteschat/client/lib/providers";
 import { timezoneName } from "@agenteschat/client/lib/routines";
-import { Avatar, Button, hoverPointer, Meter, Popover, ProviderLogo } from "@agenteschat/ui";
+import { Avatar, Button, hoverPointer, Meter, PlanMeter, Popover, ProviderLogo } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -15,6 +15,7 @@ import { useOpenAgentPanel } from "@/components/agent-panel-context";
 import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { planMeterText, usageShown } from "@/lib/plan-usage";
 
 /** Hover delay before the card opens (mouse and pen only; touch opens on tap). */
 export const HOVER_OPEN_MS = 400;
@@ -271,12 +272,20 @@ function Spend({ agent, locale }: { agent: Agent; locale: string }) {
   const { org } = useOrg();
   const detail = useAgentDetail(org.id, agent.id);
   if (!detail.data) return null;
-  // A percentage of its budget, never money (owners who aren't admins see this too).
+  // A percentage of its budget, never money (owners who aren't admins see this too); on a plan, its limits first
+  // and the budget only once it spent through the API (ADR 0063 §5).
   const used = detail.data.budgetUsedPercent;
+  const shown = usageShown(agent.brain, used);
+  if (!shown.plan && !shown.budget) return null;
   return (
     <div className="stack-4" style={{ gap: 4 }}>
-      <span className="small">{t("profile.budgetUsed", { percent: formatPercent(locale, used) })}</span>
-      <Meter value={Math.min(100, used)} max={100} label={t("profile.spendLabel")} />
+      {shown.plan && (
+        <PlanMeter compact usage={shown.plan.usage} text={planMeterText(t, locale)} label={shown.plan.account} />
+      )}
+      {shown.budget && (
+        <span className="small">{t("profile.budgetUsed", { percent: formatPercent(locale, used) })}</span>
+      )}
+      {shown.budget && !shown.plan && <Meter value={Math.min(100, used)} max={100} label={t("profile.spendLabel")} />}
     </div>
   );
 }

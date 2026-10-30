@@ -1088,6 +1088,82 @@ test("a worker gets its agent's desktop from root only while it serves a request
   expect(await errorCode(() => look2)).toBe("desktop_unavailable");
 });
 
+test("a browser request that waited for its agent's worker to start says how long; nothing more once it runs", async () => {
+  const t = setup();
+  t.sup.boot();
+  t.sup.attach();
+  const first = handleRequest(t.ctx, browserOpen(ANA, false), scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  await sleep(30);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const q = await requestOn(ana);
+  ana.send({ type: "result", id: q.id, ok: true, data: { success: true, data: null, setup: { launch: 1400 } } });
+  const answer = (await first) as { setup: Record<string, number> };
+  expect(answer).toMatchObject({ success: true, data: null, setup: { launch: 1400 } });
+  expect(answer.setup.worker).toBeGreaterThanOrEqual(30);
+  // Its worker runs: the answer as the worker gave it.
+  const second = handleRequest(t.ctx, browserOpen(ANA, false), scope().scope);
+  const q2 = await requestOn(ana, 2);
+  ana.send({ type: "result", id: q2.id, ok: true, data: { success: true, data: null } });
+  expect(await second).toEqual({ success: true, data: null });
+  // Not a browser request: nothing added, its worker new or not.
+  const read = handleRequest(t.ctx, { op: "read", path: "a.md", maxBytes: 10, agent: BIA }, scope().scope);
+  await waitFor(() => t.workers.length === 2);
+  await sleep(30);
+  const bia = t.last(BIA.id);
+  bia.hello();
+  const q3 = await requestOn(bia);
+  bia.send({ type: "result", id: q3.id, ok: true, data: { base64: null, size: 0 } });
+  expect(await read).toEqual({ base64: null, size: 0 });
+});
+
+test("a worker starting its agent's Chrome ahead on the desktop gets that desktop from root, and only then", async () => {
+  const desktop: WorkerDesktop = {
+    display: 21,
+    width: 1280,
+    height: 800,
+    startedAt: new Date(1000).toISOString(),
+    started: true,
+    xauthority: "/home/ag-a1b2c3d4/.agentes/desktop/Xauthority",
+    home: "/home/ag-a1b2c3d4",
+  };
+  const asked: string[] = [];
+  const t = setup({
+    desktop: async (_agent, use) => {
+      asked.push(use);
+      return desktop;
+    },
+  });
+  t.sup.boot();
+  t.sup.attach();
+  const warm = (on: boolean) =>
+    handleRequest(t.ctx, { op: "browser.warm", agent: ANA, ...(on ? { desktop: true } : {}) }, scope().scope);
+  const headless = warm(false);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  const q = await requestOn(ana);
+  expect(q).toEqual({ op: "browser.warm", agent: ANA, type: "request", id: q.id });
+  ana.send({ type: "desktop.ensure", ensureId: "1", use: "browser" });
+  await waitFor(() => ana.of("desktop.ensured").length === 1);
+  expect(ana.of("desktop.ensured")[0]).toEqual({
+    type: "desktop.ensured",
+    ensureId: "1",
+    error: { code: "not_allowed", message: BROWSER_REFUSED },
+  });
+  ana.send({ type: "result", id: q.id, ok: true, data: { started: true } });
+  expect(await headless).toMatchObject({ started: true });
+  const there = warm(true);
+  const q2 = await requestOn(ana, 2);
+  ana.send({ type: "desktop.ensure", ensureId: "2", use: "browser" });
+  await waitFor(() => ana.of("desktop.ensured").length === 2);
+  expect(ana.of("desktop.ensured")[1]).toEqual({ type: "desktop.ensured", ensureId: "2", desktop });
+  expect(asked).toEqual(["browser"]);
+  ana.send({ type: "result", id: q2.id, ok: true, data: { started: true } });
+  expect(await there).toEqual({ started: true });
+});
+
 test("a worker's word that its Chrome is in use on the desktop holds a while; it learns who watches that desktop", async () => {
   const clock = { now: 1_000_000 };
   const viewers: Record<string, number> = {};
@@ -1809,6 +1885,8 @@ test.if(posix)(
     );
     const workers: FakeWorker[] = [];
     const sockets: FakeSocket[] = [];
+    // Root never installs a browser: the installer shares one with every agent, or each agent's worker installs its own.
+    const prepared = spyOn(BrowserManager.prototype, "prepareInBackground").mockImplementation(async () => {});
     const daemon = new RunnerDaemon({
       home,
       mode: "start",
@@ -1834,6 +1912,7 @@ test.if(posix)(
     daemon.start();
     try {
       await waitFor(() => sockets.length === 1);
+      expect(prepared).not.toHaveBeenCalled();
       let installing = 0;
       const shown = daemon.openBrowser(ANA, () => void installing++);
       await waitFor(() => workers.length === 1);
@@ -1849,6 +1928,7 @@ test.if(posix)(
       expect(await errorCode(() => daemon.openBrowser(ANA, () => {}))).toBe("paused");
       expect(ana.of("browser.show")).toHaveLength(1);
     } finally {
+      prepared.mockRestore();
       await daemon.stop();
     }
   },
@@ -1877,6 +1957,8 @@ test.if(posix)(
       shown.push([agent, folder]);
       installing();
     });
+    // As it starts, with the browser on, it installs what the agents' first browser command would.
+    const prepared = spyOn(BrowserManager.prototype, "prepareInBackground").mockImplementation(async () => {});
     const sockets: FakeSocket[] = [];
     const daemon = new RunnerDaemon({
       home,
@@ -1895,6 +1977,7 @@ test.if(posix)(
     daemon.start();
     try {
       await waitFor(() => sockets.length === 1);
+      expect(prepared).toHaveBeenCalledTimes(1);
       let installing = 0;
       await daemon.openBrowser(ANA, () => void installing++);
       // This runner's own BrowserManager, on the agent's folder in the workspace: no worker in between.
@@ -1905,6 +1988,7 @@ test.if(posix)(
       expect(shown).toHaveLength(1);
     } finally {
       show.mockRestore();
+      prepared.mockRestore();
       await daemon.stop();
     }
   },

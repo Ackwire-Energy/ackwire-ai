@@ -193,6 +193,12 @@ describe("custom MCP servers", () => {
       ["list_tickets", null, true],
     ]);
     expect(JSON.stringify(await f.db.select().from(schema.connectorConnections))).not.toContain("tk_secret_12345");
+    // A new server is every agent's, whole: its tools reach them once classified (below).
+    expect(
+      (await f.db.select().from(schema.agentScopes))
+        .filter((g) => g.connectionId === server.id)
+        .map((g) => [g.agentId, g.scope]),
+    ).toEqual([[f.agent.id, "connector:*"]]);
 
     const source = createConnectorToolSource({ ...deps, connect: mcp.connect });
     const gateway = createToolGateway({ sources: [source] });

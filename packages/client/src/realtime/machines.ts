@@ -102,6 +102,8 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
     void qc.invalidateQueries({ queryKey: keys.aiAccounts(orgId) });
     void qc.invalidateQueries({ queryKey: keys.planUsage(orgId) });
   }
+  // The agent list carries each plan's limits (ADR 0063 §5), and the server says only when they would show otherwise.
+  if (accounts) void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
   switch (e.type) {
     case "machine.status": {
       const online = e.online === true;

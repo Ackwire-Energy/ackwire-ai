@@ -182,6 +182,17 @@ describe("connected computers helpers (ADR 0036)", () => {
     expect(stale()).toEqual([true, true]);
   });
 
+  test("a plan's usage moving on a computer refetches the agent list, which carries each plan's limits", () => {
+    const qc = new QueryClient();
+    const agents = keys.agents("o1");
+    const stale = () => qc.getQueryState(agents)?.isInvalidated ?? false;
+    qc.setQueryData(agents, []);
+    applyMachineEvent(qc, "o1", { type: "machine.updated", machineId: "m1", name: "Mac" } as { type: string });
+    expect(stale()).toBe(false);
+    applyMachineEvent(qc, "o1", { type: "machine.updated", machineId: "m1", accounts: true } as { type: string });
+    expect(stale()).toBe(true);
+  });
+
   test("a sign-in starts with no address asked: Claude's hint is the account's own, dropped if the server refuses it", async () => {
     const sent: AccountLoginInput[] = [];
     const begin = async (input: AccountLoginInput) => {
