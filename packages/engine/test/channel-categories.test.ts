@@ -58,9 +58,9 @@ test("names are unique ignoring case, trimmed, and at most 40 characters", async
     ValidationError,
   );
   const sales = await createChannelCategory(f.db, f.owner.id, f.org.id, { name: "Sales" });
-  await expect(renameChannelCategory(f.db, f.owner.id, f.org.id, sales.id, { name: "MARKETING" })).rejects.toBeInstanceOf(
-    ConflictError,
-  );
+  await expect(
+    renameChannelCategory(f.db, f.owner.id, f.org.id, sales.id, { name: "MARKETING" }),
+  ).rejects.toBeInstanceOf(ConflictError);
   expect((await renameChannelCategory(f.db, f.owner.id, f.org.id, sales.id, { name: "Vendas" })).name).toBe("Vendas");
 });
 

@@ -23,7 +23,8 @@ async function layoutChanged(orgId: string, options: Options) {
 function cleanName(name: string) {
   const clean = name.trim().replace(/\s+/g, " ");
   if (!clean) throw new ValidationError("category name is empty");
-  if (clean.length > CATEGORY_NAME_MAX) throw new ValidationError(`category name: at most ${CATEGORY_NAME_MAX} characters`);
+  if (clean.length > CATEGORY_NAME_MAX)
+    throw new ValidationError(`category name: at most ${CATEGORY_NAME_MAX} characters`);
   return clean;
 }
 
@@ -263,7 +264,12 @@ export async function placeChannel(
     .select()
     .from(channels)
     .where(
-      and(eq(channels.orgId, orgId), eq(channels.id, channelId), eq(channels.kind, "channel"), isNull(channels.archivedAt)),
+      and(
+        eq(channels.orgId, orgId),
+        eq(channels.id, channelId),
+        eq(channels.kind, "channel"),
+        isNull(channels.archivedAt),
+      ),
     );
   if (!channel) throw new NotFoundError("Channel not found");
   if (channel.createdByUserId !== actorId && !can(membership.role, "manage_members")) {

@@ -672,7 +672,8 @@ function SidebarChannels({
     if (m.key === "loose") return place.mutate({ channelId: d.id, categoryId: null }, { onError: failed });
     if (m.key.startsWith(CATEGORY_KEY)) {
       const categoryId = m.key.slice(CATEGORY_KEY.length);
-      if (!sections.isOpen(`${CATEGORY_KEY}${categoryId}` as SectionId)) sections.toggle(`${CATEGORY_KEY}${categoryId}` as SectionId);
+      if (!sections.isOpen(`${CATEGORY_KEY}${categoryId}` as SectionId))
+        sections.toggle(`${CATEGORY_KEY}${categoryId}` as SectionId);
       return place.mutate({ channelId: d.id, categoryId }, { onError: failed });
     }
     const target = channels.find((c) => `channel:${c.id}` === m.key);
@@ -701,7 +702,13 @@ function SidebarChannels({
           },
         });
       if (mayMove(c) && list.length > 0)
-        entries.push({ kind: "item", id: "move", label: t("channelCategories.move"), icon: "move", run: () => setMoving(c) });
+        entries.push({
+          kind: "item",
+          id: "move",
+          label: t("channelCategories.move"),
+          icon: "move",
+          run: () => setMoving(c),
+        });
       if (admin)
         entries.push({
           kind: "item",
@@ -754,33 +761,47 @@ function SidebarChannels({
     });
   };
   const allClosed = categoryIds.every((id) => !sections.isOpen(id));
-  const categoryActions = (category: ChannelCategory): CategoryAction[] => [
-    ...(mayCreate
-      ? [{ id: "new-channel", label: t("channelCategories.newChannelHere"), icon: "plus", run: () => onNewChannel(category.id) }]
-      : []),
-    ...(admin
-      ? [{ id: "rename", label: t("channelCategories.rename"), icon: "edit", run: () => setRenaming(category) }]
-      : []),
-    {
+  const categoryActions = (category: ChannelCategory) => {
+    const actions: CategoryAction[] = [];
+    if (mayCreate)
+      actions.push({
+        id: "new-channel",
+        label: t("channelCategories.newChannelHere"),
+        icon: "plus",
+        run: () => onNewChannel(category.id),
+      });
+    if (admin)
+      actions.push({
+        id: "rename",
+        label: t("channelCategories.rename"),
+        icon: "edit",
+        run: () => setRenaming(category),
+      });
+    actions.push({
       id: "fold",
       label: allClosed ? t("channelCategories.expandAll") : t("channelCategories.collapseAll"),
       icon: "list",
       run: () => sections.setAll(categoryIds, allClosed),
-    },
-    ...(admin
-      ? [
-          { id: "new-category", label: t("channelCategories.newCategory"), icon: "layers", run: () => setNewCategory({}) },
-          {
-            id: "delete",
-            label: t("channelCategories.delete"),
-            description: t("channelCategories.deleteDesc"),
-            icon: "trash",
-            danger: true,
-            run: () => deleteCategory(category),
-          },
-        ]
-      : []),
-  ];
+    });
+    if (admin)
+      actions.push(
+        {
+          id: "new-category",
+          label: t("channelCategories.newCategory"),
+          icon: "layers",
+          run: () => setNewCategory({}),
+        },
+        {
+          id: "delete",
+          label: t("channelCategories.delete"),
+          description: t("channelCategories.deleteDesc"),
+          icon: "trash",
+          danger: true,
+          run: () => deleteCategory(category),
+        },
+      );
+    return actions;
+  };
 
   const row = (c: Channel) => {
     const unread = c.unreadCount ?? 0;
@@ -862,7 +883,15 @@ function SidebarChannels({
   }
   return (
     <>
-      <div className="sidebar__group" data-drop={dropMark("loose")} onDragOver={overLoose} onDrop={drop}>
+      {/* biome-ignore lint/a11y/useSemanticElements: the channels with no category, a drop target, not a form group */}
+      <div
+        className="sidebar__group"
+        role="group"
+        aria-label={t("shell.channels")}
+        data-drop={dropMark("loose")}
+        onDragOver={overLoose}
+        onDrop={drop}
+      >
         {loose.map(row)}
       </div>
       {list.map((category) => {
@@ -874,20 +903,29 @@ function SidebarChannels({
             label={category.name}
             sections={sections}
             className="sidebar__section--category"
-            headProps={{
-              draggable: admin,
-              "data-drop": dropMark(`${CATEGORY_KEY}${category.id}`),
-              onDragStart: (e) => startDrag(e, { kind: "category", id: category.id }),
-              onDragEnd: endDrag,
-              onDragOver: (e) => overCategory(e, category),
-              onDrop: drop,
-              onContextMenu: contextMenuHandler(() => [
-                { kind: "header", label: category.name },
-                ...actions.map(
-                  (a): MenuEntry => ({ kind: "item", id: a.id, label: a.label, icon: a.icon, danger: a.danger, run: a.run }),
-                ),
-              ]),
-            } as HTMLAttributes<HTMLDivElement>}
+            headProps={
+              {
+                draggable: admin,
+                "data-drop": dropMark(`${CATEGORY_KEY}${category.id}`),
+                onDragStart: (e) => startDrag(e, { kind: "category", id: category.id }),
+                onDragEnd: endDrag,
+                onDragOver: (e) => overCategory(e, category),
+                onDrop: drop,
+                onContextMenu: contextMenuHandler(() => [
+                  { kind: "header", label: category.name },
+                  ...actions.map(
+                    (a): MenuEntry => ({
+                      kind: "item",
+                      id: a.id,
+                      label: a.label,
+                      icon: a.icon,
+                      danger: a.danger,
+                      run: a.run,
+                    }),
+                  ),
+                ]),
+              } as HTMLAttributes<HTMLDivElement>
+            }
             action={
               <>
                 {addButton(category.id, t("channelCategories.newChannelIn", { name: category.name }))}

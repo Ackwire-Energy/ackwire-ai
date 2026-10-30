@@ -82,7 +82,7 @@ export function NewChannelDialog({
         name,
         topic: topic.trim() || undefined,
         visibility,
-        categoryId,
+        ...(categoryId ? { categoryId } : {}),
       });
       for (const key of selected) await api.chat.addMember(org.id, channel.id, memberOf(key));
       return channel;

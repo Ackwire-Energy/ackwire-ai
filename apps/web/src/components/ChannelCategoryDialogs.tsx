@@ -353,8 +353,7 @@ export function MoveChannelDialog({
           onOpenChange(false);
           toast.show(t("channelCategories.moved", { channel: channel.name, name: destName }), "info", {
             label: t("channelCategories.undo"),
-            run: () =>
-              place.mutate({ channelId: channel.id, categoryId: current === NONE ? null : current }),
+            run: () => place.mutate({ channelId: channel.id, categoryId: current === NONE ? null : current }),
           });
         },
         onError: (e) => toast.show(e instanceof Error ? e.message : String(e), "error"),

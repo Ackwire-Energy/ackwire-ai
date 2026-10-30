@@ -1488,7 +1488,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       categories: async () => structuredClone(state.channelCategories ?? []),
       createCategory: async (orgId, input) => {
         log("chat.createCategory", orgId, input);
-        const list = (state.channelCategories ??= []);
+        state.channelCategories ??= [];
+        const list = state.channelCategories;
         if (list.some((c) => c.name.toLowerCase() === input.name.trim().toLowerCase()))
           throw new ApiError(409, "conflict", `The category ${input.name} already exists`);
         const category: ChannelCategory = { id: id("cat"), name: input.name.trim(), position: list.length };
