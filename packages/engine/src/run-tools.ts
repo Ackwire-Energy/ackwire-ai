@@ -22,9 +22,9 @@ import { routineBriefOf } from "./routine-brief";
 import type { BridgeIdentity } from "./run-tool-tokens";
 import { type AgentRun, replyThreadOf } from "./runs";
 import { publishSecret, type SecretRequestRow, secretRequestView, syncSecretMessage } from "./secrets";
-import { artifactToolDetail, promptPoll, toolCode, toolCommand, toolDetail } from "./tool-detail";
+import { artifactToolDetail, promptAnswer, promptPoll, toolCode, toolCommand, toolDetail } from "./tool-detail";
 import { directoryRole, ON_DEMAND_USE, resolveDirectoryTool } from "./tools/directory";
-import { type Approval, type InvokeResult, isSensitive, promptAnswer, type ToolGateway } from "./tools/gateway";
+import { type Approval, type InvokeResult, isSensitive, type ToolGateway } from "./tools/gateway";
 import { withWhy } from "./tools/run-policy";
 import type { ToolContext, ToolDefinition, ToolOutput } from "./tools/types";
 import { withWikiLinks } from "./wiki-links";
@@ -338,16 +338,31 @@ export interface RunToolScope {
   turnTools: ToolDefinition[] | null;
 }
 
+/** How a call ended, as its `agent.tool` end says it. */
+type ChipEnd = { failed?: boolean; held?: boolean; why?: string; refusal?: string; requestId?: string };
+
+/** The end's fields that say something. */
+const endFields = (end: ChipEnd) => ({
+  ...(end.failed ? { failed: true } : {}),
+  ...(end.held ? { held: true } : {}),
+  ...(end.why ? { why: end.why } : {}),
+  ...(end.refusal ? { refusal: end.refusal } : {}),
+  ...(end.requestId ? { requestId: end.requestId } : {}),
+});
+
 /**
- * A permission check's end as the chat shows it: refused (with the policy's own reason), waiting on a person,
- * or allowed. Only a `deny` carries its words: an error's text could hold anything.
+ * A permission check's end as the chat shows it: refused (the policy's own reason, and its code for the apps'
+ * words), waiting on a person (its request, which the person's answer names), or allowed. Only a `deny` carries
+ * its words: an error's text could hold anything.
  */
-function promptEnd(output: ToolOutput): { failed?: boolean; held?: boolean; why?: string } {
+function promptEnd(output: ToolOutput): ChipEnd {
   if (output.isError) return { failed: true };
   const answer = promptAnswer(output.content);
   const why = typeof answer.message === "string" ? answer.message.slice(0, 500) : "";
-  if (answer.behavior === "deny") return { failed: true, ...(why ? { why } : {}) };
-  return answer.status === "pending" ? { held: true } : {};
+  const refusal = typeof answer.code === "string" ? answer.code.slice(0, 40) : "";
+  if (answer.behavior === "deny") return { failed: true, why, refusal };
+  if (answer.status !== "pending") return {};
+  return { held: true, ...(typeof answer.request_id === "string" ? { requestId: answer.request_id } : {}) };
 }
 
 /**
@@ -363,8 +378,23 @@ export async function invokeWithChip(
   const { deps, ctx, where } = scope;
   const input = use.input as Record<string, unknown> | undefined;
   const call = { toolUseId: use.id, name: use.name, input: input ?? {} };
-  // The runner asking again about a command that waits on a person: no line of its own, the first ask has one.
-  if (promptPoll(use.name, input)) return scope.tools.invoke(ctx, call);
+  // The runner asking again about a command that waits on a person: no line of its own, the first ask has one,
+  // and the person's answer, once there, ends that line (by its request).
+  if (promptPoll(use.name, input)) {
+    const outcome = await scope.tools.invoke(ctx, call);
+    const end = outcome.type === "result" ? promptEnd(outcome.output) : { held: true };
+    if (!end.held) {
+      const requestId = String(input?.request_id);
+      await publishChannelEvent(deps.pubsub, {
+        type: "agent.tool",
+        ...where,
+        tool: null,
+        ...endFields(end),
+        requestId,
+      });
+    }
+    return outcome;
+  }
   const listed = scope.turnTools?.find((t) => t.name === use.name);
   // Through a big connector's directory: the chip shows the real tool (`use_tool` only points at it).
   const role = directoryRole(listed);
@@ -409,15 +439,13 @@ export async function invokeWithChip(
   });
   // The end names its call and whether the tool answered with an error, or didn't run because it waits on a
   // person (an approval, a question, a secret): the chat marks that line.
-  const ended = (end: { failed?: boolean; held?: boolean; why?: string }) =>
+  const ended = (end: ChipEnd) =>
     publishChannelEvent(deps.pubsub, {
       type: "agent.tool",
       ...where,
       tool: null,
       toolUseId: use.id,
-      ...(end.failed ? { failed: true } : {}),
-      ...(end.held ? { held: true } : {}),
-      ...(end.why ? { why: end.why } : {}),
+      ...endFields(end),
     });
   return scope.tools.invoke(ctx, call).then(
     async (outcome) => {

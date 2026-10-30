@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { LiveConsult, LiveRun, LiveWork, Message } from "@agenteschat/client";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
-import { foldSteps, stepPhrase, toolCalls, toolNow, toolPhrase } from "@agenteschat/client/lib/work";
+import { toolCalls, toolNow, toolPhrase, toolWhy } from "@agenteschat/client/lib/work";
 import {
   artifactsOf,
   buildRows,
@@ -496,7 +496,7 @@ describe("an agent's turn as one block", () => {
     expect(items[0]).toMatchObject({ kind: "call", line: { state: "run", count: 2 } });
   });
 
-  test("a computer command in the phone's words: what it ran, a refusal and why, the task's card once per run", async () => {
+  test("a computer command in the phone's words: what it ran, a refusal and why", async () => {
     const pt = await translator("pt-BR");
     const en = await translator("en");
     const check = (id: string, detail: string, more: Partial<Extract<LiveWork, { kind: "call" }>> = {}) => ({
@@ -512,6 +512,7 @@ describe("an agent's turn as one block", () => {
           check("2", "rm /etc/agentes", {
             failed: true,
             why: "This command was refused because it changes files outside the mission folder. Do it another way.",
+            refusal: "outside",
           }),
         ],
       }),
@@ -526,11 +527,9 @@ describe("an agent's turn as one block", () => {
       "Refused: rm /etc/agentes",
     ]);
     expect(lines[0]?.input).toBe("npx jest a.test.ts");
-    expect(lines[1]?.why).toBe("This command was refused because it changes files outside the mission folder.");
-    // The task's card (`WorkCard`): the same check three times in a row is one line.
-    const steps = [1, 2, 3].map((n) => ({ tool: "permission_prompt", detail: "Run the unit tests", at: at(n) }));
-    expect(foldSteps(steps, (s) => stepPhrase(pt, s)).map((l) => [l.text, l.count])).toEqual([
-      ["Rodou: Run the unit tests", 3],
+    expect(lines.map((l) => [toolWhy(pt, l), toolWhy(en, l)])).toEqual([
+      [null, null],
+      ["Mexe em arquivos fora da pasta do agente", "It changes files outside the agent's folder"],
     ]);
   });
 

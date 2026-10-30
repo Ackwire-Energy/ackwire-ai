@@ -13,6 +13,7 @@ import {
   toolItemsSaved,
   toolNow,
   toolPhrase,
+  toolWhy,
   workFromSteps,
   workMeta,
 } from "@agenteschat/client/lib/work";
@@ -397,7 +398,7 @@ function lineDetail(t: TFunction, l: ToolLine): ReactNode | undefined {
       </>
     );
   if (printed) return <Plate rows={[{ text: printed, danger: l.state === "fail" }]} />;
-  const answer = l.result ?? l.why;
+  const answer = l.result ?? toolWhy(t, l);
   if (!l.input && !answer) return undefined;
   return (
     <Plate
@@ -437,7 +438,7 @@ function blockLine(t: TFunction, locale: string, l: ToolLine, logo: ReactNode): 
     hint: l.code ? null : l.hint,
     time: l.ms !== null && l.state !== "run" ? formatLineTime(locale, l.ms) : undefined,
     count: l.count > 1 ? t("chat.work.times", { count: l.count }) : undefined,
-    why: l.state === "fail" ? l.why : null,
+    why: l.state === "fail" ? toolWhy(t, l) : null,
     detail: lineDetail(t, l),
     defaultOpen: l.state === "run" && Boolean(l.code),
   };

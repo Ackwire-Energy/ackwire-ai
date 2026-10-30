@@ -17,7 +17,6 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { webUrl } from "@agenteschat/client/lib/guards";
 import { isOpen, PRIORITIES, STATUSES } from "@agenteschat/client/lib/issues";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
-import { foldSteps } from "@agenteschat/client/lib/work";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -51,6 +50,7 @@ import {
   issueState,
   minutesSince,
   stageCustomized,
+  workLines,
 } from "./logic";
 import { StateChip, useColumnLabel, useStepText } from "./parts";
 
@@ -200,8 +200,7 @@ function WorkCard({ issue: i }: { issue: Issue }) {
           ? t("mobile.issues.justStarted")
           : t("mobile.issues.workingFor", { count: mins });
   const last = w.steps.length - 1;
-  const lines = foldSteps(w.steps, stepText);
-  const lastLine = lines.length - 1;
+  const lines = workLines(t, w.steps, state === "running");
   return (
     <View style={[styles.work, surface]}>
       <View style={styles.workHead}>
@@ -261,18 +260,15 @@ function WorkCard({ issue: i }: { issue: Issue }) {
         </>
       ) : lines.length > 0 ? (
         <View style={styles.steps}>
-          {lines.map(({ step: s, text, count }, k) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: steps only append; two may share a time and tool
-            <View key={`${s.at}-${s.tool}-${k}`} style={styles.stepRow}>
-              {k === lastLine && state === "running" ? (
+          {lines.map((l) => (
+            <View key={l.key} style={styles.stepRow}>
+              {l.going ? (
                 <PixelOrbit color={color} size={12} />
               ) : (
-                <Icon name="checkc" size={13} color={c.faint} />
+                <Icon name={l.step.outcome === "refused" ? "x" : "checkc"} size={13} color={c.faint} />
               )}
-              <Text variant="small" tone={k === lastLine ? "ink2" : "muted"} style={styles.grow}>
-                {text}
-                {k === lastLine && state === "running" ? "…" : ""}
-                {count > 1 ? ` ${t("chat.work.times", { count })}` : ""}
+              <Text variant="small" tone={l.last ? "ink2" : "muted"} style={styles.grow}>
+                {l.text}
               </Text>
             </View>
           ))}

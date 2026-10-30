@@ -1795,8 +1795,8 @@ export interface IssueWork {
   runId: string | null;
   state: "running" | "waiting_approval" | "waiting_input" | "stalled";
   since: string;
-  /** The run's last tool calls, oldest first. */
-  steps: { tool: string; detail?: string; at: string }[];
+  /** The run's last tool calls, oldest first; a computer command's check says when it was refused or waits. */
+  steps: { tool: string; detail?: string; at: string; outcome?: "refused" | "waiting" }[];
   reason?: "failed" | "canceled" | "budget";
 }
 

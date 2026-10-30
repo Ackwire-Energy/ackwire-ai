@@ -19,7 +19,7 @@ import {
 import { dayLabel } from "@agenteschat/client/lib/format";
 import { initialReveal, REVEAL_MAX_LAG_MS, rebaseReveal, revealStep, wordEnd } from "@agenteschat/client/lib/reveal";
 import { buildTimeline, groupsWith, messageKey } from "@agenteschat/client/lib/timeline";
-import { stepLabel, toolPhrase } from "@agenteschat/client/lib/work";
+import { stepLabel, stepPhrase, toolPhrase, toolWhy } from "@agenteschat/client/lib/work";
 import type { TFunction } from "i18next";
 import { createI18n } from "@/i18n";
 
@@ -208,6 +208,21 @@ describe("humanized activity", () => {
     );
     expect(activityText(t, [entry("Theo", toolActivity("permission_prompt", null, "npm test"))])).toBe(
       "Theo está rodando: npm test…",
+    );
+    // Why it was refused, in the person's words; the task's card never says a refused or waiting one ran.
+    const why = (refusal: string) => toolWhy(t, { why: "This command was refused.", refusal });
+    expect(["person", "expired", "off", "outside", "tooMany"].map(why)).toEqual([
+      "Uma pessoa recusou",
+      "Ninguém respondeu a tempo",
+      "Rodar comandos está desligado para este agente",
+      "Mexe em arquivos fora da pasta do agente",
+      "Pedidos demais seguidos para aprovar",
+    ]);
+    expect(stepPhrase(t, { tool: "permission_prompt", detail: "rm /etc/x", outcome: "refused" })).toBe(
+      "Recusado: rm /etc/x",
+    );
+    expect(stepPhrase(t, { tool: "permission_prompt", detail: "npm publish", outcome: "waiting" })).toBe(
+      "Rodando: npm publish",
     );
     const ours: Record<string, string> = {
       desktop_do: "Usou a tela",

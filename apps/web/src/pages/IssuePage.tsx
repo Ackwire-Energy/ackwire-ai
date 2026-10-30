@@ -401,7 +401,7 @@ function WorkBox({ issue: i }: { issue: Issue }) {
               return (
                 <li key={`${s.at}-${s.tool}`} className={cx(current && "is-current")}>
                   <span className="issue-work__dot" aria-hidden="true">
-                    <Icon name={current ? "play" : "check"} size={14} />
+                    <Icon name={s.outcome === "refused" ? "close" : current ? "play" : "check"} size={14} />
                   </span>
                   <span>{count > 1 ? `${text} ${t("chat.work.times", { count })}` : text}</span>
                   <time dateTime={s.at}>{whenAt(t, i18n.language, s.at)}</time>

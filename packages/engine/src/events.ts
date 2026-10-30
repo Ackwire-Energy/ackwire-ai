@@ -175,8 +175,15 @@ export type ChannelEvent =
       failed?: boolean;
       /** On the end: it didn't run, it waits on a person (an approval, a question, a secret). */
       held?: boolean;
-      /** On the end of a permission check it refused (`failed`): the policy's own reason. */
+      /** On the end of a permission check it refused (`failed`): the policy's own reason, to the agent. */
       why?: string;
+      /** With `why`: the refusal's code (`person`, `outside`…), which the apps say in the person's words. */
+      refusal?: string;
+      /**
+       * A permission check waiting on a person: on its `held` end, its request; with no `toolUseId`, the person's
+       * answer to that request (`failed` when they said no), which ends the line that waited for it.
+       */
+      requestId?: string;
     }
   /** What a computer command prints while it runs (throttled, ≤ 64 KB per call). */
   | {

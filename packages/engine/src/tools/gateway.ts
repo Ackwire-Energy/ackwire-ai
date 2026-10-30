@@ -16,7 +16,7 @@ import {
   summarizeCall,
   type TeamCheck,
 } from "../team-actions";
-import { carriesCredential, toolCommand, toolDetail } from "../tool-detail";
+import { carriesCredential, promptAnswer, toolCommand, toolDetail } from "../tool-detail";
 import { untrustedBlock } from "../untrusted";
 import { checkToolCall } from "./checks";
 import {
@@ -112,24 +112,6 @@ function promptQuestion(input: Record<string, unknown>) {
       ? commandAction(input.tool_name, inner as Record<string, unknown>)
       : null;
   return { poll: null, action };
-}
-
-/**
- * `permission_prompt`'s answer: `{behavior}` when decided (`message` says why a `deny`), `{status: "pending",
- * request_id}` while a person decides.
- */
-export function promptAnswer(content: string): {
-  behavior?: string;
-  message?: string;
-  status?: string;
-  request_id?: string;
-} {
-  try {
-    const parsed = JSON.parse(content) as unknown;
-    return parsed && typeof parsed === "object" ? (parsed as Record<string, string>) : {};
-  } catch {
-    return {};
-  }
 }
 
 /**
@@ -474,7 +456,9 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
         }).catch(() => UNCHECKED);
         if (!seen.proceed) {
           // A computer command is answered the way its prompt expects: a refusal with the notice.
-          const content = prompt ? JSON.stringify({ behavior: "deny", message: seen.notice }) : seen.notice;
+          const content = prompt
+            ? JSON.stringify({ behavior: "deny", message: seen.notice, code: "team" })
+            : seen.notice;
           return finish({ content, isError: !prompt, data: { code: "team.action_seen" } }, "refused");
         }
         teamReason = seen.reason;

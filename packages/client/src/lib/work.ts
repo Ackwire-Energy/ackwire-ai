@@ -24,6 +24,8 @@ export interface WorkItem {
   hint?: string | null;
   /** Why it failed: the first line of the tool's error. */
   why?: string | null;
+  /** A refused command: the refusal's code, which `toolWhy` says in the person's words. */
+  refusal?: string | null;
   /** No result: it never ran (it waited on a person, or the run stopped first). */
   held?: boolean;
   /** What it was given and what it answered, for its open line (shortened). */
@@ -79,8 +81,9 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
   const items: WorkItem[] = [];
   const narration: WorkNarration[] = [];
   const connectors: string[] = [];
-  // Permission checks waiting on a person, by their request: the runner asking again brings the answer.
-  const waiting = new Map<string, { item: WorkItem; since: number }>();
+  // Permission checks waiting on a person, by their request (Claude Code may ask twice while the card is open): the
+  // runner asking again brings the answer.
+  const waiting = new Map<string, { item: WorkItem; since: number }[]>();
   for (const s of steps) {
     if (s.kind === "model_call") {
       const text = typeof s.data.narration === "string" ? s.data.narration.trim() : "";
@@ -108,36 +111,40 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
     const check = name === PERMISSION_TOOL ? checkAnswer(content) : null;
     // The runner asking again about a command waiting on a person: never a line, its answer is the first ask's.
     if (check && typeof input.request_id === "string") {
-      const asked = waiting.get(input.request_id);
-      if (asked && result && !check.request) {
-        delete asked.item.held;
-        asked.item.ms = Math.max(0, time(result.createdAt) - asked.since);
-        if (check.refused) {
-          asked.item.failed = true;
-          asked.item.why = check.why;
+      if (result && !check.request)
+        for (const asked of waiting.get(input.request_id) ?? []) {
+          delete asked.item.held;
+          asked.item.ms = Math.max(0, time(result.createdAt) - asked.since);
+          if (check.refused) {
+            asked.item.failed = true;
+            asked.item.why = check.why;
+            asked.item.refusal = check.code;
+          }
         }
-      }
       continue;
     }
     const source =
       typeof input.code === "string" ? input.code : typeof input.command === "string" ? input.command : null;
     const failed = result?.data.isError === true || check?.refused === true;
     const why = !failed ? null : check?.refused ? check.why : firstLine(content);
+    const held = !result || Boolean(check?.request);
     const ms = result ? Math.max(0, time(result.createdAt) - time(s.createdAt)) : null;
-    // The same thing again, with nothing said in between and no code to show: one line, not five.
+    // The same thing again, with nothing said in between, no code to show and both done: one line, not five. One
+    // that failed or waits stays its own line, as in the live block (a later answer can still change it).
     const prev = items[items.length - 1];
     if (
       prev &&
       source === null &&
       !prev.code &&
+      !prev.failed &&
+      !prev.held &&
+      !failed &&
+      !held &&
       sameActivity(prev, { kind: a.kind, app: a.app, tool: name }) &&
       narration[narration.length - 1]?.at !== items.length
     ) {
       prev.count += 1;
       prev.ms = prev.ms !== null && ms !== null ? prev.ms + ms : (prev.ms ?? ms);
-      prev.failed ||= failed;
-      if (failed) prev.why = why;
-      if (check?.request) waiting.set(check.request, { item: prev, since: time(s.createdAt) });
       continue;
     }
     const item: WorkItem = {
@@ -150,7 +157,8 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
       count: 1,
       hint: toolHint(name, a, detail),
       why,
-      ...(result && !check?.request ? {} : { held: true }),
+      ...(check?.code ? { refusal: check.code } : {}),
+      ...(held ? { held: true } : {}),
       // A permission check opens on the whole command it checked (recorded masked), not on its JSON.
       input: source !== null ? null : typeof s.data.command === "string" ? s.data.command : shortJson(input),
       result: source === null && content && !check ? clip(content) : null,
@@ -170,7 +178,8 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
         : {}),
     };
     items.push(item);
-    if (check?.request) waiting.set(check.request, { item, since: time(s.createdAt) });
+    if (check?.request)
+      waiting.set(check.request, [...(waiting.get(check.request) ?? []), { item, since: time(s.createdAt) }]);
   }
   const first = steps[0];
   const last = steps[steps.length - 1];
@@ -228,10 +237,17 @@ export function stepLabel(t: TFunction, s: Pick<WorkItem, "kind" | "app" | "tool
   return t(`chat.work.step.${s.kind}`, { app: appLabel(s), tool: toolLabel(s.tool) });
 }
 
-/** A step as one line: its phrase and what it worked on unless the phrase says it ("Atualizou uma tarefa · #131"). */
-export function stepPhrase(t: TFunction, step: { tool: string; detail?: string | null }) {
+/**
+ * A step as one line: its phrase and what it worked on unless the phrase says it ("Atualizou uma tarefa · #131"). A
+ * command refused, or still waiting on a person, says so ("Recusado: npm publish", "Rodando: npm publish").
+ */
+export function stepPhrase(
+  t: TFunction,
+  step: { tool: string; detail?: string | null; outcome?: "refused" | "waiting" },
+) {
   const a = toolActivity(step.tool, null, step.detail);
-  const label = stepLabel(t, { ...a, tool: step.tool });
+  const state = step.outcome === "refused" ? "fail" : step.outcome === "waiting" ? "stop" : "done";
+  const label = toolPhrase(t, { ...a, tool: step.tool, state });
   const detail = step.detail?.trim();
   return detail && detail !== a.app ? `${label} · ${detail}` : label;
 }
@@ -305,6 +321,13 @@ const plainWhy = (text: string) => {
   return line ? (/^.+?[.!?](?=\s|$)/.exec(line)?.[0] ?? line) : null;
 };
 
+/**
+ * Why a line failed, for people: a refused command's reason in their words (`chat.work.refusal.<code>`), else
+ * the first sentence of what the tool said.
+ */
+export const toolWhy = (t: TFunction, l: { why?: string | null; refusal?: string | null }) =>
+  l.refusal ? t(`chat.work.refusal.${l.refusal}`, { defaultValue: l.why ?? "" }) || null : (l.why ?? null);
+
 /** A permission check's answer (`permission_prompt`): refused and why, or waiting on a person (its request). */
 function checkAnswer(content: string) {
   let answer: Record<string, unknown> = {};
@@ -318,6 +341,7 @@ function checkAnswer(content: string) {
   return {
     refused,
     why: refused && typeof answer.message === "string" ? plainWhy(answer.message) : null,
+    code: refused && typeof answer.code === "string" ? answer.code : null,
     request: answer.status === "pending" && typeof answer.request_id === "string" ? answer.request_id : null,
   };
 }
@@ -354,6 +378,8 @@ export interface ToolLine {
   ms: number | null;
   count: number;
   why: string | null;
+  /** A refused command: the refusal's code (`toolWhy` says it in the person's words). */
+  refusal?: string | null;
   input: string | null;
   result: string | null;
   code?: LiveCode;
@@ -411,6 +437,7 @@ export function toolItemsLive(work: LiveWork[], stopped = false): ToolItem[] {
         ms: w.ms ?? null,
         count: 1,
         why: w.why ? plainWhy(w.why) : null,
+        refusal: w.refusal ?? null,
         input: w.command ?? null,
         result: null,
         ...(w.code ? { code: w.code } : {}),
@@ -438,6 +465,7 @@ export function toolItemsSaved(work: Work): ToolItem[] {
         ms: s.ms,
         count: s.count,
         why: s.why ?? null,
+        refusal: s.refusal ?? null,
         input: s.input ?? null,
         result: s.result ?? null,
         ...(s.code ? { code: s.code, output: s.output ?? [] } : {}),

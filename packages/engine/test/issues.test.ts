@@ -285,7 +285,7 @@ describe("issues", () => {
     expect(last).toMatchObject({ event: "status_changed", auto: true, textParams: { status: "in_review" } });
   });
 
-  test("the agent's steps: a permission check says its command; the runner asking again about it adds none", async () => {
+  test("the agent's steps: a permission check says its command and whether it was refused or waits", async () => {
     f = await setup({ issueTools: true });
     await grantScopes(f.db, f.org.id, f.agent.id, ISSUES);
     const deps = { db: f.db, pubsub: f.pubsub };
@@ -293,15 +293,48 @@ describe("issues", () => {
     await askAgentToImplement(deps, f.owner.id, f.org.id, issue.id, f.agent.id);
     const [run] = await f.db.select().from(schema.agentRuns);
     if (!run) throw new Error("no run");
-    const check = (input: Record<string, unknown>) =>
-      addRunStep(f.db, run, "tool_call", { toolUseId: crypto.randomUUID(), name: "permission_prompt", input });
-    await check({ tool_name: "Bash", input: { command: "npm test", description: "Run the unit tests" } });
-    await check({ request_id: "req-1" });
-    await check({ tool_name: "Bash", input: { command: "git -C /w commit -m 'Add tests'" } });
+    const check = async (input: Record<string, unknown>, answer?: Record<string, unknown>) => {
+      const toolUseId = crypto.randomUUID();
+      await addRunStep(f.db, run, "tool_call", { toolUseId, name: "permission_prompt", input });
+      if (answer)
+        await addRunStep(f.db, run, "tool_result", {
+          toolUseId,
+          name: "permission_prompt",
+          isError: false,
+          content: JSON.stringify(answer),
+        });
+    };
+    const pending = (id: string) => ({ status: "pending", request_id: id });
+    await check(
+      { tool_name: "Bash", input: { command: "npm test", description: "Run the unit tests" } },
+      {
+        behavior: "allow",
+      },
+    );
+    await check(
+      { tool_name: "Bash", input: { command: "rm -rf /etc/agentes" } },
+      { behavior: "deny", code: "outside" },
+    );
+    // Waited on a person who said no (asked twice while the card was open): the runner asking again brings the
+    // answer, and adds no step.
+    await check({ tool_name: "Bash", input: { command: "npm publish" } }, pending("req-1"));
+    await check({ tool_name: "Bash", input: { command: "npm publish" } }, pending("req-1"));
+    await check({ request_id: "req-1" }, pending("req-1"));
+    await check({ request_id: "req-1" }, { behavior: "deny", code: "person" });
+    // Waited on a person who said yes.
+    await check({ tool_name: "Bash", input: { command: "npm version patch" } }, pending("req-2"));
+    await check({ request_id: "req-2" }, { behavior: "allow" });
+    // Still waiting.
+    await check({ tool_name: "Bash", input: { command: "git -C /w push origin fix" } }, pending("req-3"));
+    await check({ request_id: "req-3" }, pending("req-3"));
     const read = await getIssue(f.db, person(f.owner.id), f.org.id, { id: issue.id });
-    expect(read.work?.steps.map((s) => [s.tool, s.detail])).toEqual([
-      ["permission_prompt", "Run the unit tests"],
-      ["permission_prompt", "git commit"],
+    expect(read.work?.steps.map((s) => [s.detail, s.outcome ?? null])).toEqual([
+      ["Run the unit tests", null],
+      ["rm /etc/agentes", "refused"],
+      ["npm publish", "refused"],
+      ["npm publish", "refused"],
+      ["npm version patch", null],
+      ["git push origin", "waiting"],
     ]);
   });
 

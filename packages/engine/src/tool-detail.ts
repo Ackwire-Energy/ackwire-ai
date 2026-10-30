@@ -1,4 +1,4 @@
-import { commandOf, commandParts, normalizedCommand, PERMISSION_TOOL, redactCommon } from "@agenteschat/adapters";
+import { commandOf, commandWords, normalizedCommand, PERMISSION_TOOL, redactCommon } from "@agenteschat/adapters";
 import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
 
 const MAX = 80;
@@ -39,33 +39,47 @@ function promptAsked(i: Record<string, unknown>): { tool: string; input: Record<
 export const promptPoll = (name: string, input: Record<string, unknown> | undefined) =>
   name === PERMISSION_TOOL && typeof input?.request_id === "string";
 
+/**
+ * `permission_prompt`'s answer: `{behavior}` when decided (a `deny` says why: `message` to the agent, `code` for
+ * the apps), `{status: "pending", request_id}` while a person decides.
+ */
+export function promptAnswer(content: string): {
+  behavior?: string;
+  message?: string;
+  code?: string;
+  status?: string;
+  request_id?: string;
+} {
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
 /** Parts of a command line that only set up the next one (`cd repo && npm test`). */
 const SETUP = new Set(["cd", "pushd", "popd", "export", "source", ".", "set", "unset"]);
 /** Where a command's own words end: an option or a redirection. */
 const OPTION = /^-|[<>]/;
+/** A path or a web address: the only word after an option that can be a command's main argument. */
+const PLACE = /^(?:\.{0,2}\/|~\/|[a-z][a-z0-9+.-]*:\/\/)/i;
 
 /**
- * A command line in a few words: its first program (past `cd` and the like, wrappers and env assignments left out)
- * and its main argument, the words before its first option ("npm run build", "git commit"), else its last word
- * ("rm dist"). Never an option's value, and a web address keeps its site and path only.
+ * A command line, credentials already masked, in a few words: its first program (past `cd` and the like, wrappers
+ * and env assignments left out) and its main argument, the words before its first option ("npm run build", "git
+ * commit"), else its first path or web address ("rm /etc/x", "curl api.example.com/v1"). Never another word after
+ * an option, which could be that option's value; a web address keeps its site and path only.
  */
-function commandGist(command: string): string | undefined {
-  for (const part of commandParts(command)) {
-    const words = part
-      .split(" ")
-      .map((w) => w.replace(/^["'`]+|["'`]+$/g, ""))
-      .filter(Boolean);
-    const start = words.findIndex((w) => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(w));
+function commandGist(masked: string): string | undefined {
+  for (const argv of commandWords(masked)) {
+    const start = argv.findIndex((w) => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(w));
     if (start < 0) continue;
-    const [program = "", ...rest] = normalizedCommand(words.slice(start)).split(" ");
+    const [program = "", ...rest] = normalizedCommand(argv.slice(start)).split(" ");
     if (!program || SETUP.has(program)) continue;
-    const lead: string[] = [];
-    for (const w of rest) {
-      if (OPTION.test(w) || lead.length === 2) break;
-      lead.push(w);
-    }
-    const last = rest.at(-1);
-    const args = lead.length > 0 ? lead : last && !OPTION.test(last) ? [last] : [];
+    const options = rest.findIndex((w) => OPTION.test(w));
+    const lead = rest.slice(0, Math.min(options < 0 ? rest.length : options, 2));
+    const args = lead.length > 0 ? lead : rest.filter((w) => PLACE.test(w)).slice(0, 1);
     return [program, ...args].map((w) => siteOf(w) ?? w).join(" ");
   }
   return undefined;
@@ -75,9 +89,8 @@ function commandGist(command: string): string | undefined {
 function promptLabel(i: Record<string, unknown>): string | undefined {
   const asked = promptAsked(i);
   if (!asked) return undefined;
-  const said = typeof asked.input.description === "string" ? asked.input.description.trim() : "";
-  const what = said || commandGist(commandOf(asked.tool, asked.input));
-  return what ? short(redactCredentials(what)) : undefined;
+  const said = typeof asked.input.description === "string" ? short(redactCredentials(asked.input.description)) : "";
+  return said || short(commandGist(redactCredentials(commandOf(asked.tool, asked.input))));
 }
 
 /** The whole command a permission check (`permission_prompt`) is about, as one line, credentials masked. */
@@ -173,8 +186,19 @@ export function carriesCredential(value: unknown): boolean {
 export const maskCredentials = (text: string) =>
   maskSecrets(text).replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(-----END [A-Z ]*PRIVATE KEY-----|$)/g, "••••");
 
-/** `maskCredentials` and the shapes `redactCommon` knows (bearer headers, `token=` values): text that leaves its place. */
-export const redactCredentials = (text: string) => redactCommon(maskCredentials(text));
+/** An address's user and password (`postgres://user:pass@host`). */
+const USERINFO = /\b([a-z][a-z0-9+.-]*:\/\/)[^\s/?#@'"]+@/gi;
+/** The value after an option named for a secret (`--password hunter2`, `--api-key k`). */
+const SECRET_OPTION =
+  /(?<!\S)(--?[\w-]*(?:password|passwd|secret|token|api[_-]?key)[\w-]*\s+)("[^"]*"|'[^']*'|[^\s"'-]\S*)/gi;
+
+/**
+ * `maskCredentials`, an address's user and password (`postgres://***@host`, first: `redactCommon` would read a
+ * `token:` there as a value to mask up to the next space), the shapes `redactCommon` knows (bearer headers,
+ * `token=` values) and the value after a secret-named option (`--password ***`): text that leaves its place.
+ */
+export const redactCredentials = (text: string) =>
+  redactCommon(maskCredentials(text).replace(USERINFO, "$1***@")).replace(SECRET_OPTION, "$1***");
 
 export const PREVIEW_CODE_CHARS = 4096;
 

@@ -1182,36 +1182,72 @@ test("a routine's run: a bridged gated call posts its card and events in the mai
   expect(chips.every((e) => e.threadId === null)).toBe(true);
 });
 
-/** The computer's permission check, answering by the command: `rm` refused, `npm publish` waits on a person. */
-const permissionSource: ToolSource = {
-  name: "permission",
-  tools: async () => [
-    {
-      name: "permission_prompt",
-      description: "Claude Code's permission prompt",
-      scope: "",
-      inputSchema: { type: "object" },
-      execute: async (input) => {
-        const command = String((input.input as { command?: unknown } | undefined)?.command ?? "");
-        if (typeof input.request_id === "string")
-          return { content: JSON.stringify({ behavior: "deny", message: "A person said no. Don't try it again." }) };
-        if (command.startsWith("rm "))
-          return {
-            content: JSON.stringify({
+/**
+ * The computer's permission check, answering by the command: `rm` refused, `npm publish` waits on a person who
+ * says no (`req-1`), `npm version` on one who says yes on the second time it is asked again (`req-2`).
+ */
+function permissionTool() {
+  let polls = 0;
+  const source: ToolSource = {
+    name: "permission",
+    tools: async () => [
+      {
+        name: "permission_prompt",
+        description: "Claude Code's permission prompt",
+        scope: "",
+        inputSchema: { type: "object" },
+        execute: async (input) => {
+          const command = String((input.input as { command?: unknown } | undefined)?.command ?? "");
+          const answer = (a: Record<string, unknown>) => ({ content: JSON.stringify(a) });
+          if (input.request_id === "req-1")
+            return answer({ behavior: "deny", message: "A person said no. Don't try it again.", code: "person" });
+          if (input.request_id === "req-2")
+            return answer(++polls < 2 ? { status: "pending", request_id: "req-2" } : { behavior: "allow" });
+          if (command.startsWith("rm "))
+            return answer({
               behavior: "deny",
               message:
                 "This command was refused because it changes files outside the mission folder. Do it another way.",
-            }),
-          };
-        if (command === "npm publish") return { content: JSON.stringify({ status: "pending", request_id: "req-1" }) };
-        return { content: JSON.stringify({ behavior: "allow" }) };
+              code: "outside",
+            });
+          if (command === "npm publish") return answer({ status: "pending", request_id: "req-1" });
+          if (command === "npm version patch") return answer({ status: "pending", request_id: "req-2" });
+          return answer({ behavior: "allow" });
+        },
       },
-    },
-  ],
-};
+    ],
+  };
+  return source;
+}
+
+/** Commands whose label could show what their whole command hides, and what it must never show. */
+const LABEL_PROBES = [
+  {
+    command: 'curl -s https://api.example.com/v1/items -H "Authorization: Bearer abc123def456ghi789"',
+    label: "curl api.example.com/v1/items",
+    secret: "abc123def456ghi789",
+  },
+  {
+    command: 'curl -sS https://api.example.com/v1 -H "X-Api-Key: 9f8e7d6c5b4a3210"',
+    label: "curl api.example.com/v1",
+    secret: "9f8e7d6c5b4a3210",
+  },
+  { command: "mysql -h db -u root --password hunter2", label: "mysql", secret: "hunter2" },
+  { command: 'node -e "console.log(1)"', label: "node", secret: null },
+  {
+    command: "psql postgres://user:pass@host:5432/db -c 'select 1'",
+    label: "psql postgres://***@host:5432/db",
+    secret: "user:pass",
+  },
+  {
+    command: "git clone https://x-token:s3cr3tvalue@github.com/acme/app.git",
+    label: "git clone github.com/acme/app.git",
+    secret: "s3cr3tvalue",
+  },
+];
 
 test("a bridged permission check: its line says the command, opens on it masked, says why it was refused", async () => {
-  f = await setup({ toolSources: [permissionSource] });
+  f = await setup({ toolSources: [permissionTool()] });
   const machineId = await computerAgent(f);
   const run = await runningRun(f, await post(f, "Roda os testes"));
   const events = f.listen(f.general.id);
@@ -1232,8 +1268,9 @@ test("a bridged permission check: its line says the command, opens on it masked,
   );
   await ask("p3", bash("rm -rf /etc/agentes"));
   await ask("p4", bash("npm publish"));
-  // The runner asking again about the one waiting on a person: no line of its own.
+  // The runner asking again about the one waiting on a person: no line of its own, the person's answer ends it.
   await ask("p5", { request_id: "req-1" });
+  for (const [i, probe] of LABEL_PROBES.entries()) await ask(`q${i}`, bash(probe.command));
 
   const chips = events.filter((e) => e.type === "agent.tool") as Extract<ChannelEvent, { type: "agent.tool" }>[];
   const started = chips.filter((e) => e.tool !== null);
@@ -1242,29 +1279,62 @@ test("a bridged permission check: its line says the command, opens on it masked,
     ["p2", "curl api.example.com/v1/items"],
     ["p3", "rm /etc/agentes"],
     ["p4", "npm publish"],
+    ...LABEL_PROBES.map((p, i) => [`q${i}`, p.label]),
   ]);
   expect(started[0]?.command).toBe("cd /w/app && npx jest src/a.test.ts --watch=false");
   expect(started[1]?.command).toContain("curl -s -H");
   expect(started[1]?.command).not.toContain("sk-ant-api03");
   expect(started[1]?.command).not.toContain("token=abc");
-  const ends = chips.filter((e) => e.tool === null);
-  expect(ends.map((e) => [e.toolUseId, e.failed ?? false, e.held ?? false, e.why ?? null])).toEqual([
+  for (const [i, probe] of LABEL_PROBES.entries()) {
+    const shown = started.find((e) => e.toolUseId === `q${i}`)?.command ?? "";
+    expect(shown.split(" ")[0]).toBe(probe.command.split(" ")[0]);
+    if (probe.secret) expect(shown).not.toContain(probe.secret);
+  }
+  const ends = chips.filter((e) => e.tool === null && e.toolUseId?.startsWith("p"));
+  expect(ends.map((e) => [e.toolUseId, e.failed ?? false, e.held ?? false, e.refusal ?? null])).toEqual([
     ["p1", false, false, null],
     ["p2", false, false, null],
-    [
-      "p3",
-      true,
-      false,
-      "This command was refused because it changes files outside the mission folder. Do it another way.",
-    ],
+    ["p3", true, false, "outside"],
     ["p4", false, true, null],
   ]);
+  expect(ends[2]?.why).toBe(
+    "This command was refused because it changes files outside the mission folder. Do it another way.",
+  );
+  expect(ends[3]?.requestId).toBe("req-1");
+  // The person's answer reaches the line that waited for it, by its request.
+  const answered = chips.filter((e) => e.tool === null && !e.toolUseId);
+  expect(answered).toMatchObject([{ requestId: "req-1", failed: true, refusal: "person" }]);
   // The steps keep the same label, and the command masked for the line's open view.
   const steps = await f.db.select().from(schema.agentRunSteps).where(eq(schema.agentRunSteps.runId, run.id));
   const call = (id: string) => steps.find((s) => s.kind === "tool_call" && s.data.toolUseId === id)?.data;
   expect(call("p2")).toMatchObject({ detail: "curl api.example.com/v1/items" });
-  expect(String(call("p2")?.command)).not.toContain("sk-ant-api03");
+  expect(call("p2")?.command).toBe(started[1]?.command);
   expect(call("p5")?.detail).toBeUndefined();
+});
+
+test("a reply's tool count leaves out the runner asking again about a command waiting on a person", async () => {
+  f = await setup({ toolSources: [permissionTool()] });
+  const machineId = await computerAgent(f);
+  const { brain } = scriptedComputerBrain(async function* (_n, turn) {
+    const id = { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId };
+    const ask = (call: string, input: Record<string, unknown>) =>
+      executeToolForRun(f.jobDeps, id, { id: call, name: "permission_prompt", input });
+    await ask("v1", { tool_name: "Bash", input: { command: "npm version patch" } });
+    await ask("v2", { request_id: "req-2" });
+    await ask("v3", { request_id: "req-2" });
+    yield { type: "done", text: "Versão nova." };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev sobe a versão");
+  await drainOutbox(f.db, handlers);
+
+  const reply = (await timeline(f)).at(-1);
+  expect(reply?.body).toBe("Versão nova.");
+  expect((reply?.meta.work as { steps?: number } | undefined)?.steps).toBe(1);
 });
 
 test("bridged side effects reach the engine: a bridged react ends the turn silently (no Done.)", async () => {

@@ -16,7 +16,7 @@ import { criteriaProgress, currentStep, type IssueState, isLate, issueState, lat
 export function useStepText() {
   const { t } = useTranslation();
   return useCallback(
-    (step: { tool: string; detail?: string } | null | undefined) => (step ? stepPhrase(t, step) : ""),
+    (step: Parameters<typeof stepPhrase>[1] | null | undefined) => (step ? stepPhrase(t, step) : ""),
     [t],
   );
 }

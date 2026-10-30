@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
-import type { LiveWork } from "../src/index";
-import { applyChannelEvent, emptyStreams } from "../src/index";
+import type { LiveRun, LiveWork } from "../src/index";
+import { applyChannelEvent, emptyStreams, isQuiet, QUIET_AFTER_MS } from "../src/index";
 import {
   foldSteps,
   formatLineTime,
@@ -13,6 +13,7 @@ import {
   toolItemsSaved,
   toolNow,
   toolPhrase,
+  toolWhy,
   workFromSteps,
 } from "../src/lib/work";
 
@@ -265,18 +266,86 @@ describe("a computer command (its permission check)", () => {
     expect(work.steps[2]?.ms).toBe(14_000);
   });
 
+  test("saved: an allowed check and a refused one of the same command are two lines; a later no refuses its own", () => {
+    const check = (seq: number, id: string, input: Record<string, unknown>) => ({
+      seq,
+      kind: "tool_call",
+      data: { toolUseId: id, name: "permission_prompt", input, detail: "npm test", command: "npm test" },
+      createdAt: at(seq),
+    });
+    const answer = (seq: number, id: string, content: unknown) => ({
+      seq,
+      kind: "tool_result",
+      data: { toolUseId: id, name: "permission_prompt", content: JSON.stringify(content) },
+      createdAt: at(seq),
+    });
+    const npmTest = { tool_name: "Bash", input: { command: "npm test" } };
+    const work = workFromSteps([
+      check(1, "t1", npmTest),
+      answer(2, "t1", { behavior: "allow" }),
+      check(3, "t2", npmTest),
+      answer(4, "t2", { behavior: "deny", message: "Too many commands to approve in a row.", code: "tooMany" }),
+      check(5, "t3", npmTest),
+      answer(6, "t3", { behavior: "allow" }),
+      check(7, "t4", npmTest),
+      answer(8, "t4", { status: "pending", request_id: "req-9" }),
+      // Claude Code asking twice while the card is open: the same request.
+      check(9, "t5", npmTest),
+      answer(10, "t5", { status: "pending", request_id: "req-9" }),
+      check(11, "t6", { request_id: "req-9" }),
+      answer(12, "t6", { behavior: "deny", message: "A person said no.", code: "person" }),
+    ]);
+    expect(lines(toolItemsSaved(work)).map((l) => [l.count, l.state, l.refusal ?? null])).toEqual([
+      [1, "done", null],
+      [1, "fail", "tooMany"],
+      [1, "done", null],
+      [1, "fail", "person"],
+      [1, "fail", "person"],
+    ]);
+  });
+
+  test("live: a person's answer ends the line that waited for it; waiting on a person is not silence", () => {
+    let s = applyChannelEvent(emptyStreams, start("a", "permission_prompt", { detail: "npm publish" }), 1000);
+    s = applyChannelEvent(s, { ...end("a"), held: true, requestId: "req-1" } as Ev, 1000);
+    const run = () => s.runs.r1 as LiveRun;
+    expect(lines(toolItemsLive(run().work ?? []))[0]?.state).toBe("stop");
+    expect(isQuiet(run(), 1000 + QUIET_AFTER_MS)).toBe(false);
+    // Another run's answer, or one for no line it knows, changes nothing.
+    expect(applyChannelEvent(s, { ...end(), requestId: "req-7", failed: true } as Ev, 2000)).toBe(s);
+    s = applyChannelEvent(s, { ...end(), requestId: "req-1", failed: true, refusal: "person" } as Ev, 2000);
+    const [line] = lines(toolItemsLive(run().work ?? []));
+    expect(line).toMatchObject({ state: "fail", refusal: "person" });
+    expect(isQuiet(run(), 2000 + QUIET_AFTER_MS)).toBe(true);
+    // A yes reads as done.
+    let yes = applyChannelEvent(emptyStreams, start("b", "permission_prompt", { detail: "npm version" }));
+    yes = applyChannelEvent(yes, { ...end("b"), held: true, requestId: "req-2" } as Ev);
+    yes = applyChannelEvent(yes, { ...end(), requestId: "req-2" } as Ev);
+    expect(lines(toolItemsLive(yes.runs.r1?.work ?? []))[0]?.state).toBe("done");
+  });
+
+  test("a refusal's reason: a known one in the person's words, else its first sentence", () => {
+    expect(toolWhy(t, { why: "A person said no.", refusal: "person" })).toStartWith("chat.work.refusal.person");
+    expect(toolWhy(t, { why: BECAUSE, refusal: null })).toBe(BECAUSE);
+    expect(toolWhy(t, { why: null })).toBeNull();
+  });
+
   test("the task's card: each step in words, the same words in a row once, with the last one's time", () => {
     const steps = [
       { tool: "permission_prompt", detail: "Run the tests", at: at(1) },
       { tool: "permission_prompt", detail: "Run the tests", at: at(2) },
       { tool: "create_issue", detail: "Corrigir login", at: at(3) },
       { tool: "permission_prompt", detail: "Run the tests", at: at(4) },
+      { tool: "permission_prompt", detail: "Run the tests", at: at(5), outcome: "refused" as const },
+      { tool: "permission_prompt", detail: "npm publish", at: at(6), outcome: "waiting" as const },
     ];
     const ran = 'chat.work.step.runningCommand|{"app":"Run the tests","tool":"permission prompt"}';
     expect(foldSteps(steps, (s) => stepPhrase(t, s)).map((l) => [l.text, l.count, l.step.at])).toEqual([
       [ran, 2, at(2)],
       ['chat.work.step.creatingIssue|{"app":"","tool":"create issue"} · Corrigir login', 1, at(3)],
       [ran, 1, at(4)],
+      // Refused, or still waiting on a person: never "Rodou".
+      ['chat.work.refused|{"app":"Run the tests"}', 1, at(5)],
+      ['Chat.activity.runningCommand|{"app":"npm publish"}', 1, at(6)],
     ]);
   });
 });
