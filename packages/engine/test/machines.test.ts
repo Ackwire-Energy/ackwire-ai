@@ -4,6 +4,7 @@ import { MACHINE_PROTOCOL_VERSION, orgTopic, type ServerFrame, sealSecret, secre
 import { eq, schema } from "@agenteschat/db";
 import {
   authenticateMachine,
+  cancelRun,
   createAgent,
   createMachineHub,
   declineSecret,
@@ -1041,6 +1042,164 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     const [closed] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.id, row.id));
     expect(closed?.status).toBe("declined");
   });
+
+  test("a request expiring during staging cannot commit delivery", async () => {
+    const { runner, row } = await asking({ target: "env" }, {
+      onSecretStaged: async (requestId) => {
+        await f.db.update(schema.secretRequests)
+          .set({ expiresAt: new Date(Date.now() - 1000) })
+          .where(eq(schema.secretRequests.id, requestId));
+      },
+    });
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
+    await expect(deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view))).rejects.toThrow(
+      "already answered or expired",
+    );
+    const [closed] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.id, row.id));
+    expect(closed?.status).toBe("pending");
+    expect(closed?.deliveredAt).toBeNull();
+    expect(runner.secrets.has(row.name)).toBe(false);
+    // A pending row may reflect an uncertain concurrent commit; wait for a terminal decision.
+    expect(runner.staged.has(row.id)).toBe(true);
+    expect(await expireSecretRequests({ db: f.db, pubsub: f.pubsub })).toBe(1);
+    await drainOutbox(f.db, f.handlers);
+    expect(runner.staged.has(row.id)).toBe(false);
+    expect(runner.keys.has(row.id)).toBe(false);
+  }, 60_000);
+
+  test("canceling a waiting run queues removal of its unused runner key", async () => {
+    const { runner, row } = await asking();
+    expect(runner.keys.has(row.id)).toBe(true);
+    await cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, row.runId);
+    const [job] = await f.db.select().from(schema.outbox)
+      .where(eq(schema.outbox.dedupeKey, `secret.discard:${row.id}`));
+    expect(job?.status).toBe("pending");
+    await drainOutbox(f.db, f.handlers);
+    expect(runner.keys.has(row.id)).toBe(false);
+  }, 60_000);
+
+  test("identical concurrent deliveries keep the winning staged box until activation", async () => {
+    const gate = () => {
+      let release!: () => void;
+      const promise = new Promise<void>((resolve) => { release = resolve; });
+      return { promise, release };
+    };
+    const firstStaged = gate();
+    const secondStaged = gate();
+    const firstCommit = gate();
+    const secondCommit = gate();
+    const firstActivation = gate();
+    const firstActivationReply = gate();
+    let stages = 0;
+    let activations = 0;
+    const { runner, row } = await asking({ target: "env" }, {
+      onSecretStaged: async () => {
+        (stages++ === 0 ? firstStaged : secondStaged).release();
+      },
+      onSecretActivate: async () => {
+        if (activations++ === 0) {
+          firstActivation.release();
+          await firstActivationReply.promise;
+        }
+      },
+    });
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    const waitBeforeCommit = (until: Promise<void>) => new Proxy(f.db, {
+      get(target, property, receiver) {
+        if (property === "transaction") {
+          return async (callback: Parameters<typeof f.db.transaction>[0]) => {
+            await until;
+            return target.transaction(callback);
+          };
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
+    const box = await seal(view);
+    const first = deliverSecret({ ...sandbox, db: waitBeforeCommit(firstCommit.promise) }, f.owner.id, f.org.id, row.id, box);
+    await firstStaged.promise;
+    const second = deliverSecret({ ...sandbox, db: waitBeforeCommit(secondCommit.promise) }, f.owner.id, f.org.id, row.id, box);
+    try {
+      await secondStaged.promise;
+      firstCommit.release();
+      await firstActivation.promise; // The first delivery committed, but the runner has not activated it.
+      secondCommit.release();
+      expect((await second).status).toBe("delivered");
+      expect(runner.secrets.get(row.name)).toBe(VALUE);
+      firstActivationReply.release();
+      expect((await first).status).toBe("delivered");
+      expect(runner.staged.has(row.id)).toBe(false);
+      const [committed] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.id, row.id));
+      expect(committed?.status).toBe("delivered");
+    } finally {
+      firstCommit.release();
+      secondCommit.release();
+      firstActivationReply.release();
+      await Promise.allSettled([first, second]);
+    }
+  });
+
+  test("a lost commit reply recovers the committed delivery instead of discarding its box", async () => {
+    const { runner, row } = await asking();
+    let loseReply = true;
+    const uncertainDb = new Proxy(f.db, {
+      get(target, property, receiver) {
+        if (property === "transaction") {
+          return async (callback: Parameters<typeof f.db.transaction>[0]) => {
+            const result = await target.transaction(callback);
+            if (loseReply) {
+              loseReply = false;
+              throw new Error("commit reply lost");
+            }
+            return result;
+          };
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), db: uncertainDb, pubsub: f.pubsub };
+    const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
+    const delivered = await deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view));
+    expect(delivered.status).toBe("delivered");
+    expect(loseReply).toBe(false);
+    expect(runner.secrets.get(row.name)).toBe(VALUE);
+    expect(runner.staged.has(row.id)).toBe(false);
+  });
+
+  test("an unreadable or still-pending commit result preserves staged ciphertext for a safe retry", async () => {
+    const { runner, row } = await asking();
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
+    const box = await seal(view);
+    let failed = false;
+    const unreadableDb = new Proxy(f.db, {
+      get(target, property, receiver) {
+        if (property === "transaction") return async () => { failed = true; throw new Error("commit outcome unknown"); };
+        if (property === "select" && failed) return () => { throw new Error("database read unavailable"); };
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    await expect(deliverSecret({ ...sandbox, db: unreadableDb }, f.owner.id, f.org.id, row.id, box))
+      .rejects.toThrow("commit outcome unknown");
+    expect(runner.staged.has(row.id)).toBe(true);
+    expect(runner.keys.has(row.id)).toBe(true);
+
+    const pendingDb = new Proxy(f.db, {
+      get(target, property, receiver) {
+        if (property === "transaction") return async () => { throw new Error("commit did not start"); };
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    await expect(deliverSecret({ ...sandbox, db: pendingDb }, f.owner.id, f.org.id, row.id, box))
+      .rejects.toThrow("commit did not start");
+    expect(runner.staged.has(row.id)).toBe(true);
+    expect(runner.keys.has(row.id)).toBe(true);
+
+    expect((await deliverSecret(sandbox, f.owner.id, f.org.id, row.id, box)).status).toBe("delivered");
+    expect(runner.secrets.get(row.name)).toBe(VALUE);
+  }, 60_000);
 
   test("a delivered request cannot wake its run before activation", async () => {
     const { row } = await asking();
