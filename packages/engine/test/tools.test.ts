@@ -323,7 +323,7 @@ describe("approval flow (end to end)", () => {
       "Approval request: Merge PR #42 in acme/app",
     ]);
     // Its reply came after a tool call: "Ver o que ele fez" has something to show.
-    expect((main[1]?.meta?.work as { steps: number }).steps).toBeGreaterThan(0);
+    expect((main[1]?.meta?.work as { steps: number } | undefined)?.steps).toBeGreaterThan(0);
     // The card carries the agent's reason (ADR 0053 §8).
     expect(main[2]?.meta).toEqual({
       approvalId: approval?.id,

@@ -15,6 +15,7 @@ import { lentAccounts } from "./accounts";
 import { BrainManager } from "./brain";
 import { CodexAppServers } from "./brain-codex-app";
 import { BrowserManager, type BrowserManagerOptions, launchChrome } from "./browser";
+import type { BrowserPorts } from "./browser-ports";
 import { type Dial, RunnerConnection, type SocketHandlers } from "./connection";
 import { DEFAULT_LIMITS, machineOs, prepareWorkspace } from "./daemon";
 import { DesktopManager, type DesktopManagerOptions } from "./desktop";
@@ -26,7 +27,7 @@ import { McpBridge, type McpTaskInfo, mcpSocketPath } from "./mcp";
 import { agentWorkspace } from "./paths";
 import type { FetchLike } from "./push";
 import { ENTER_MS, type ScopeKind, type Spawn, spawnGated } from "./scope-gate";
-import { agentSecrets, type ActivatedSecret, handleSecret, secretValue } from "./secrets";
+import { type ActivatedSecret, agentSecrets, handleSecret, secretValue } from "./secrets";
 import { systemdBooted } from "./service";
 import {
   BROWSER_LEASE_MS,
@@ -37,7 +38,6 @@ import {
   type WorkerState,
 } from "./supervisor";
 import { TaskManager } from "./tasks";
-import type { BrowserPorts } from "./browser-ports";
 
 /**
  * System mode: one agent's runner (`agentes-runner worker --agent <id>`),

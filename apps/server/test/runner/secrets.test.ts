@@ -218,10 +218,15 @@ test("a delayed broker install cannot restore a secret after its request was rem
   await sent.commit();
   await call({ agent: dev, op: "secret", action: "remove", name, throughOrder: sent.order });
   const result = await handleSecret(path.join(home, "secrets"), dev, ws, {
-    action: "install", requestId, name, target: { kind: "env" }, value: "removed-value", order: sent.order,
+    action: "install",
+    requestId,
+    name,
+    target: { kind: "env" },
+    value: "removed-value",
+    order: sent.order,
   });
   expect(result).toEqual({ superseded: true });
-  expect((await call({ agent: dev, ...exec('echo "[$API_KEY]"') }) as { stdout: string }).stdout.trim()).toBe("[]");
+  expect(((await call({ agent: dev, ...exec('echo "[$API_KEY]"') })) as { stdout: string }).stdout.trim()).toBe("[]");
 });
 
 test("removal of an old request leaves a newer value in place", async () => {

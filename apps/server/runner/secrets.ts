@@ -91,7 +91,8 @@ const stagedFile = (dir: string, requestId: string) => {
   if (!REQUEST_ID.test(requestId)) throw new RunnerError("bad_request", "Invalid request id");
   return path.join(dir, "staged", requestId);
 };
-const canceledFile = (dir: string, requestId: string) => path.join(dir, "canceled", path.basename(stagedFile(dir, requestId)));
+const canceledFile = (dir: string, requestId: string) =>
+  path.join(dir, "canceled", path.basename(stagedFile(dir, requestId)));
 const orderFile = (dir: string, name: string) => {
   if (!SECRET_NAME.test(name)) throw new RunnerError("bad_request", "Invalid secret name");
   return path.join(dir, "orders", name);
@@ -107,7 +108,7 @@ async function removedThrough(dir: string, name: string) {
   });
 }
 async function markRemovedThrough(dir: string, name: string, order: string) {
-  if (order <= await removedThrough(dir, name)) return;
+  if (order <= (await removedThrough(dir, name))) return;
   const file = removedFile(dir, name);
   await ensureDir(path.dirname(file));
   const tmp = `${file}.${process.pid}.tmp`;
@@ -165,7 +166,9 @@ export async function handleSecret(
   const dir = dirOf(root, agent);
   const previous = secretQueues.get(dir) ?? Promise.resolve();
   let release!: () => void;
-  const current = new Promise<void>((resolve) => { release = resolve; });
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
   secretQueues.set(dir, current);
   await previous;
   try {
@@ -242,10 +245,16 @@ async function handleSecretLocked(
     case "activate": {
       if (!req.order || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z\|[a-zA-Z0-9-]{8,64}$/.test(req.order))
         throw new RunnerError("bad_request", "Invalid secret delivery order");
-      if (await stat(canceledFile(dir, req.requestId)).then(() => true, (err) => {
-        if (errnoCode(err) === "ENOENT") return false;
-        throw err;
-      })) return { superseded: true };
+      if (
+        await stat(canceledFile(dir, req.requestId)).then(
+          () => true,
+          (err) => {
+            if (errnoCode(err) === "ENOENT") return false;
+            throw err;
+          },
+        )
+      )
+        return { superseded: true };
       const staged = stagedFile(dir, req.requestId);
       let delivery: Staged;
       try {
@@ -280,9 +289,19 @@ async function handleSecretLocked(
         await cancelStaged(dir, req.requestId);
         return { superseded: true };
       }
-      const installed = await installLocked(dir, workspaceReal, {
-        action: "install", requestId: req.requestId, name: delivery.name, target, value, order: req.order,
-      }, options);
+      const installed = await installLocked(
+        dir,
+        workspaceReal,
+        {
+          action: "install",
+          requestId: req.requestId,
+          name: delivery.name,
+          target,
+          value,
+          order: req.order,
+        },
+        options,
+      );
       await rm(file, { force: true });
       await rm(staged, { force: true });
       return installed;
@@ -299,8 +318,10 @@ async function handleSecretLocked(
       // The server's throughOrder fences the entire removed generation, even
       // when its request id was omitted from the requestIds list.
       if (req.throughOrder) await markRemovedThrough(dir, req.name, req.throughOrder);
-      const selected = (s: Stored) => s.name === req.name &&
-        (!req.requestIds || (s.requestId !== undefined && req.requestIds.includes(s.requestId)) ||
+      const selected = (s: Stored) =>
+        s.name === req.name &&
+        (!req.requestIds ||
+          (s.requestId !== undefined && req.requestIds.includes(s.requestId)) ||
           (req.throughOrder !== undefined && (s.order ?? "") <= req.throughOrder));
       const gone = secrets.filter(selected);
       const otherPaths = new Set(
@@ -334,18 +355,23 @@ async function installLocked(
   options: { storageOnly?: boolean },
 ): Promise<MachineReplies["secret"]> {
   // Removal may have won while a root-to-worker install was still in flight.
-  if (await stat(canceledFile(dir, req.requestId)).then(() => true, (err) => {
-    if (errnoCode(err) === "ENOENT") return false;
-    throw err;
-  })) return { superseded: true };
+  if (
+    await stat(canceledFile(dir, req.requestId)).then(
+      () => true,
+      (err) => {
+        if (errnoCode(err) === "ENOENT") return false;
+        throw err;
+      },
+    )
+  )
+    return { superseded: true };
   if ((await removedThrough(dir, req.name)) >= req.order) return { superseded: true };
   if (!SECRET_NAME.test(req.name) || isReservedSecretName(req.name))
     throw new RunnerError("bad_request", "Invalid secret name");
   if (!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z\|[a-zA-Z0-9-]{8,64}$/.test(req.order))
     throw new RunnerError("bad_request", "Invalid secret delivery order");
-  const target = req.target.kind === "file"
-    ? { kind: "file" as const, path: req.target.path }
-    : { kind: "env" as const };
+  const target =
+    req.target.kind === "file" ? { kind: "file" as const, path: req.target.path } : { kind: "env" as const };
   const current = (await readStore(dir)).filter((s) => s.name === req.name).at(-1);
   if ((await latestOrder(dir, req.name, current)) > req.order) return { superseded: true };
   let fileTarget: string | null = null;
