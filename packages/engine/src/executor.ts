@@ -953,7 +953,8 @@ async function executeRunInner(
       ...system.map((b) => b.text),
       ...context.messages.map((m) => (typeof m.content === "string" ? m.content : "")),
     ]);
-    if (archived) system.push({ text: archived });
+    // Per turn, like memory: a live computer session reads "# This turn", never a later system prompt.
+    if (archived) system.push({ turn: true, found: true, text: archived });
     const stats = {
       ...context.stats,
       model: agent.model,

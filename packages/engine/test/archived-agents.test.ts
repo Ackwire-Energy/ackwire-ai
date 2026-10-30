@@ -1,16 +1,29 @@
 import { afterEach, expect, test } from "bun:test";
+import { MACHINE_PROTOCOL_VERSION } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import { systemText } from "@agenteschat/providers";
 import type { FakeReply } from "@agenteschat/providers/testing";
-import { addChannelMember, archiveAgent, createAgent, drainOutbox, postPersonMessage } from "../src";
+import {
+  addChannelMember,
+  archiveAgent,
+  type Brain,
+  computerPrompt,
+  createAgent,
+  createJobHandlers,
+  drainOutbox,
+  listAgents,
+  type MachineStatus,
+  postPersonMessage,
+} from "../src";
 import { type Fixture, setup } from "./fixtures";
+import { pairMachine } from "./machine-fixtures";
 
 let f: Fixture;
 afterEach(() => f?.close());
 
-const post = (body: string) =>
-  postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body });
+const post = (body: string, threadId?: string) =>
+  postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body, threadId });
 const lastText = (req: ModelRequest) => JSON.stringify(req.messages.at(-1)?.content);
 
 const addAgent = (name: string, handle: string, role: string, instructions = "") =>
@@ -109,6 +122,58 @@ test("an unknown handle is answered with the closest handles of the agents here"
   await drainOutbox(f.db, f.handlers);
 
   expect(results[0]).toContain("No agent @infra-codevale here. Closest handles: @infra, @qa, @design.");
+});
+
+test("the agents the @ pickers list leave an archived one out", async () => {
+  f = await setup();
+  await addAgent("Design", "design", "Designer");
+  await archivedInfra();
+
+  expect((await listAgents(f.db, f.owner.id, f.org.id)).map((a) => a.handle)).toEqual(["dev", "design"]);
+});
+
+test("a computer brain's resumed session reads the archived line in its turn", async () => {
+  f = await setup();
+  await archivedInfra();
+  const { machineId } = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, {
+    os: "darwin",
+    protocol: MACHINE_PROTOCOL_VERSION,
+    workspace: "/Users/w/agentes",
+    exec: true,
+  });
+  await f.db.update(schema.agents).set({ machineId, brain: "claude_code" }).where(eq(schema.agents.id, f.agent.id));
+  const status = (id: string): MachineStatus => ({
+    id,
+    orgId: f.org.id,
+    name: "MacBook",
+    online: true,
+    execAllowed: true,
+    os: "darwin",
+    protocol: 8,
+    executors: { claude: { version: "2.1.300", loggedIn: true }, detectedAt: new Date().toISOString() },
+  });
+  const turns: { prompt: string; resume: boolean }[] = [];
+  const brain: Brain = {
+    kind: "claude_code",
+    async *run(turn) {
+      turns.push({ prompt: computerPrompt(turn), resume: Boolean(turn.session?.resume) });
+      yield { type: "usage", input: 40, output: 5, source: "plan", model: "claude-sonnet-5-5" };
+      yield { type: "done", text: "ok" };
+    },
+  };
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => status(id) },
+  });
+  const first = await post("@dev oi");
+  await drainOutbox(f.db, handlers);
+  await post("@dev pede o deploy ao @infra", first.id);
+  await drainOutbox(f.db, handlers);
+
+  // A live session keeps the system prompt it started with: only "# This turn" reaches it.
+  expect(turns.map((t) => t.resume)).toEqual([false, true]);
+  expect(turns[1]?.prompt).toContain("## Archived agents\n@infra is archived: nothing you send reaches it.");
 });
 
 test("an agent's message that mentions an archived agent starts no run for it", async () => {
