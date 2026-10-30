@@ -173,6 +173,8 @@ const BACK_ONLINE_MS = 1600;
 /** A row that just arrived at the bottom rises in (only while it is fresh: not when scrolled back into view). */
 const ENTER = FadeInDown.duration(220);
 const FRESH_MS = 800;
+/** How close to the end a scroll has to stop for a list held at a long message's start to follow again. */
+const READ_RELEASE_PX = 24;
 /** The composer's safe-area padding hides behind the open keyboard; this much stays between them. */
 const KEYBOARD_GAP = 8;
 const COMPOSER_INPUT_ID = "chat-composer";
@@ -509,6 +511,11 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     [rows, meId],
   );
   const [atEnd, setAtEnd] = useState(true);
+  const atEndRef = useRef(atEnd);
+  atEndRef.current = atEnd;
+  // Held at the start of a long message someone else wrote (see "Reading from the top"): the list doesn't follow
+  // the end until the person gets there, sends, or takes the pill.
+  const [readHold, setReadHold] = useState(false);
   const [seenKey, setSeenKey] = useState<string | null>(null);
   const latestSeen = lastSeenKey(scrollRows);
   useEffect(() => {
@@ -548,6 +555,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   }, [rows, divider]);
   const toEnd = useCallback(() => {
     letGo();
+    setReadHold(false);
     setAtEnd(true);
     requestAnimationFrame(() => void listRef.current?.scrollToEnd({ animated: true }));
   }, [letGo]);
@@ -1314,6 +1322,54 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     return state.listen("isFollowingEnd", setAtEnd);
   }, [showList]);
 
+  // ── Reading from the top ──
+  // A message someone else wrote (an agent's reply, also while it streams, or a teammate's) taller than the room
+  // between the bar and the box lands once with its first line under the bar, as on the web (`readingLanding`),
+  // and the list stops following the end, so it reads top to bottom. Reaching the end, sending or the pill
+  // follow again. Rows there when the conversation opens, and one arriving while the person reads above, never
+  // move it.
+  const landedRef = useRef(new Set<string>());
+  const toReadRef = useRef<string | null>(null);
+  const readPrevRef = useRef<string[]>([]);
+  useEffect(() => {
+    const byKey = new Map(scrollRows.map((r) => [r.key, r]));
+    for (const key of appendedKeys(readPrevRef.current, rowKeys)) {
+      const r = byKey.get(key);
+      if (!r || r.kind === "other") continue;
+      // Your own message goes to the end as always; what was waiting to be read before it no longer jumps.
+      toReadRef.current = r.mine || landedRef.current.has(key) ? null : key;
+    }
+    readPrevRef.current = rowKeys;
+  }, [rowKeys, scrollRows]);
+  const readRoom = headerHeight + 8;
+  const checkReading = useCallback(() => {
+    const key = toReadRef.current;
+    const state = listRef.current?.getState();
+    if (!key || !state) return;
+    const index = state.indexByKey(key);
+    if (index === undefined) return;
+    if (state.sizeAtIndex(index) <= state.scrollLength - readRoom - composerHeight) return;
+    toReadRef.current = null;
+    landedRef.current.add(key);
+    if (!atEndRef.current) return;
+    setReadHold(true);
+    // After the render that turns following off, so the end doesn't pull it back down.
+    requestAnimationFrame(() => {
+      void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0, viewOffset: readRoom });
+    });
+  }, [readRoom, composerHeight]);
+  useEffect(() => {
+    if (!showList) return;
+    const state = listRef.current?.getState();
+    if (!state) return;
+    return state.listen("totalSize", checkReading);
+  }, [showList, checkReading]);
+  // The person scrolled down to the end of what they were reading: the list follows again.
+  const releaseAtEnd = useCallback(() => {
+    const state = listRef.current?.getState();
+    if (state && state.distanceFromEnd <= READ_RELEASE_PX) setReadHold(false);
+  }, []);
+
   return (
     <View style={[styles.screen, { backgroundColor: c.bg }]}>
       {/* A clear bar on every conversation (DM, channel, thread): the band behind it is ours, below, so the
@@ -1357,7 +1413,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
                 alignItemsAtEnd
                 // New messages, a reply growing word by word and the working line keep the end in view, but
                 // only while the person is near it.
-                maintainScrollAtEnd
+                maintainScrollAtEnd={!readHold}
                 maintainScrollAtEndThreshold={STICK_TO_END_THRESHOLD}
                 // Older pages above and rows changing size keep what is on screen still.
                 maintainVisibleContentPosition
@@ -1373,6 +1429,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
                 onScrollBeginDrag={() => {
                   dragging.current = true;
                 }}
+                onScrollEndDrag={releaseAtEnd}
+                onMomentumScrollEnd={releaseAtEnd}
                 onStartReachedThreshold={0.5}
                 keyboardDismissMode="interactive"
                 keyboardShouldPersistTaps="handled"
@@ -1402,7 +1460,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
           style={[styles.jumpDock, { bottom: composerHeight + 10 }]}
           pointerEvents="box-none"
         >
-          {showList && !atEnd ? (
+          {showList && (!atEnd || readHold) ? (
             unseen.messages > 0 || unseen.working.length > 0 ? (
               <NewPill unseen={unseen} onPress={toUnseen} />
             ) : (
