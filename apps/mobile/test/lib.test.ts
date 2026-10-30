@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readDeleteResponse } from "../src/features/account/result";
-import { chooseOrg, firstRunMounted, openOrgs, serverDownOf } from "../src/lib/org-choice";
+import { chooseOrg, firstRunMounted, openOrgs, pushOpens, serverDownOf } from "../src/lib/org-choice";
 import { photoSource } from "../src/lib/photo";
 import { createHolder, deviceBody, devicePath, quietWhileOpen, readPushData } from "../src/lib/push-payload";
 import { connectPlan, currentServer, savedServer } from "../src/lib/server-choice";
@@ -112,6 +112,11 @@ test("a workspace its owner is still setting up isn't opened: the first run resu
       { id: "f", name: "F", role: "owner" as const },
     ]),
   ).toHaveLength(2);
+  // A push about it (someone asking to join through the link shared there, its computer ready) opens nothing; one
+  // about a workspace that opens, or one the app doesn't know yet, opens as before.
+  expect(pushOpens([mine, joined], "n")).toBe(false);
+  expect(pushOpens([mine, joined], "a")).toBe(true);
+  expect(pushOpens([mine], "new")).toBe(true);
 });
 
 test("the first run: kept, hidden, under an invitation's screen once mounted; never first mounted under one", () => {

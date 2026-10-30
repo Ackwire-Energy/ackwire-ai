@@ -21,9 +21,17 @@ export type OnboardingStepId = (typeof ONBOARDING_STEPS)[number]["id"];
 
 export const stepIndex = (id: OnboardingStepId) => ONBOARDING_STEPS.findIndex((s) => s.id === id);
 
-/** A ready-made agent as the onboarding makes it: its name and look. */
+/**
+ * Whether the server's answer to a step just saved (`saveOnboarding`) says the onboarding went further in another
+ * window or on another device, or was finished there: the app asks for `me` again and follows it.
+ */
+export const aheadOf = (answer: { step: OnboardingStepId; finished: boolean }, saved: OnboardingStepId) =>
+  answer.finished || stepIndex(answer.step) > stepIndex(saved);
+
+/** A ready-made agent as the onboarding makes it: its name, handle and look. */
 export interface PresetMark {
   name: string;
+  handle: string;
   color: string;
   eyes: string;
   accessory: string;
@@ -31,9 +39,13 @@ export interface PresetMark {
 
 /**
  * The agents an onboarding already made in its workspace, from its agents (oldest first): the ready-made ones by
- * preset, told by name and look, and the rest (imported). A resumed onboarding picks its team up from here.
+ * preset, told by name and look (by name and handle when it has no look, a create cut short before saving it), and
+ * the rest (imported). A resumed onboarding picks its team up from here.
  */
-export function crewOf<P extends string, A extends { name: string; appearance?: AgentLookInput | null }>(
+export function crewOf<
+  P extends string,
+  A extends { name: string; handle: string; appearance?: AgentLookInput | null },
+>(
   agents: readonly A[],
   presets: readonly P[],
   markOf: (preset: P) => PresetMark,
@@ -44,13 +56,10 @@ export function crewOf<P extends string, A extends { name: string; appearance?: 
     const look = agent.appearance;
     const preset = presets.find((p) => {
       const mark = markOf(p);
-      return (
-        !made[p] &&
-        agent.name === mark.name &&
-        look?.color === mark.color &&
-        look.eyes === mark.eyes &&
-        look.accessory === mark.accessory
-      );
+      const same = look
+        ? look.color === mark.color && look.eyes === mark.eyes && look.accessory === mark.accessory
+        : agent.handle === mark.handle;
+      return !made[p] && agent.name === mark.name && same;
     });
     if (preset) made[preset] = agent;
     else others.push(agent);

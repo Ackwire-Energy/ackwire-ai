@@ -1,5 +1,6 @@
 import {
   keys,
+  type Me,
   newClientId,
   useAiStatus,
   useApi,
@@ -13,7 +14,7 @@ import { settingUp } from "@agenteschat/client/lib/guards";
 import { sendsEmail } from "@agenteschat/client/lib/join-requests";
 import { firstMentioned } from "@agenteschat/client/lib/markdown";
 import { type AiChoice, aiStateOf } from "@agenteschat/client/lib/no-ai";
-import { crewOf, stepIndex } from "@agenteschat/client/lib/onboarding";
+import { aheadOf, stepIndex } from "@agenteschat/client/lib/onboarding";
 import { AUTO } from "@agenteschat/client/lib/providers";
 import { handleFrom } from "@agenteschat/client/lib/text";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -26,6 +27,7 @@ import { Pressable, ScrollView, Share, StyleSheet, TextInput, View } from "react
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { signOut } from "@/features/account";
 import { useConnectKey } from "@/features/ai/ConnectAi";
 import { authClient } from "@/lib/auth";
 import { useOrgGate } from "@/providers/org";
@@ -70,15 +72,18 @@ import {
   PRESET_ROWS,
   PRESETS,
   type Preset,
-  phoneStepOf,
   phoneTimezone,
+  presetsMade,
   prevStep,
   progressAt,
+  resumeOf,
   STEPS,
   type StepId,
   serverStepOf,
+  setUpElsewhere,
   stepFailedText,
   stepText,
+  stepToSave,
   zoneLabel,
 } from "./logic";
 
@@ -180,9 +185,12 @@ export function OnboardingFlow() {
   // Each step reached is saved, so the web, or the app opened again, resumes there (creating the workspace passed the
   // first one).
   const reach = async (next: StepId) => {
-    const at = stepIndex(serverStepOf(next));
-    if (created && at > reached) await api.orgs.saveOnboarding(created.orgId, { step: serverStepOf(next) });
-    setReached((r) => Math.max(r, at));
+    const saving = created ? stepToSave(next, reached) : null;
+    const at = created && saving ? await api.orgs.saveOnboarding(created.orgId, { step: saving }) : null;
+    // Further on, or finished, on the web or another device: `me` again, which the app follows (finished, it opens).
+    if (at && saving && aheadOf(at, saving)) await qc.invalidateQueries({ queryKey: keys.me });
+    if (at?.finished) return;
+    setReached((r) => Math.max(r, stepIndex(serverStepOf(next))));
     setStep(next);
   };
 
@@ -207,6 +215,10 @@ export function OnboardingFlow() {
         const res = await api.orgs.create({ name: orgName });
         target = { orgId: res.organization.id, generalChannelId: res.generalChannelId };
         setCreated(target);
+        setName(res.organization.name);
+        // One being set up comes back instead of a new one: `me` says how far it got, and the resume opens it there.
+        await qc.invalidateQueries({ queryKey: keys.me });
+        if (setUpElsewhere(qc.getQueryData<Me | null>(keys.me)?.organizations, target.orgId)) return;
         await Promise.all([
           zone ? api.orgs.updateSettings(target.orgId, { timezone: zone }) : null,
           zone ? api.orgs.updateMe(target.orgId, { timezone: zone }) : null,
@@ -230,8 +242,17 @@ export function OnboardingFlow() {
     return run(
       async () => {
         if (!created) return;
-        const ids = { ...agentIds };
-        const named = { ...handles };
+        // One made already (on the web, or by a create cut short) is kept, never made twice, and put in #general,
+        // where mentions reach it (once more is harmless).
+        const made = presetsMade(t, await api.agents.list(created.orgId));
+        for (const p of PRESETS) {
+          const id = made.ids[p];
+          if (id) await api.chat.addMember(created.orgId, created.generalChannelId, { agentId: id });
+        }
+        const ids = { ...agentIds, ...made.ids };
+        const named = { ...handles, ...made.handles };
+        setAgentIds({ ...ids });
+        setHandles({ ...named });
         for (const p of PRESETS) {
           if (!chosen.has(p) || ids[p]) continue;
           const role = PRESET_ROLE[p];
@@ -322,7 +343,9 @@ export function OnboardingFlow() {
     setPending(true);
     setError(null);
     try {
-      if (message) await api.chat.post(created.orgId, created.generalChannelId, message);
+      // Finished on the web or another device, its first message went from there: none again here.
+      const at = await api.orgs.saveOnboarding(created.orgId, { step: "done" });
+      if (message && !at?.finished) await api.chat.post(created.orgId, created.generalChannelId, message);
       await api.orgs.saveOnboarding(created.orgId, { finished: true });
     } catch {
       setPending(false);
@@ -353,29 +376,21 @@ export function OnboardingFlow() {
     queryFn: async () => {
       if (!saved) return null;
       const [settings, agents] = await Promise.all([api.orgs.settings(saved.orgId), api.agents.list(saved.orgId)]);
-      const mark = (p: Preset) => ({ name: t(`onboarding.presets.${p}.name`), ...PRESET_LOOK[p] });
-      return { saved, settings, made: crewOf(agents, PRESETS, mark).presets };
+      return { settings, ...resumeOf(t, saved, agents) };
     },
   });
   useEffect(() => {
     const r = resume.data;
-    if (!r || pending || stepIndex(r.saved.step) <= reached) return;
-    setCreated({ orgId: r.saved.orgId, generalChannelId: r.saved.generalChannelId });
+    if (!r || pending || r.reached <= reached) return;
+    setCreated(r.created);
     setName(r.settings.name);
     setContext(r.settings.context);
     setSavedContext(r.settings.context);
-    const ids: Partial<Record<Preset, string>> = {};
-    const named: Partial<Record<Preset, string>> = {};
-    for (const p of Object.keys(r.made) as Preset[]) {
-      ids[p] = r.made[p]?.id;
-      named[p] = r.made[p]?.handle;
-    }
-    setAgentIds(ids);
-    setHandles(named);
-    // The team was kept already: those it has (the guide always) stay picked, and no other.
-    if (Object.keys(ids).length > 0) setChosen(new Set([GUIDE, ...(Object.keys(ids) as Preset[])]));
-    setReached(stepIndex(r.saved.step));
-    setStep(phoneStepOf(r.saved.step));
+    setAgentIds(r.ids);
+    setHandles(r.handles);
+    if (r.chosen) setChosen(r.chosen);
+    setReached(r.reached);
+    setStep(r.step);
   }, [resume.data, pending, reached]);
 
   const host = HOST[step];
@@ -429,8 +444,25 @@ export function OnboardingFlow() {
   const action = primary[step];
   const back = prevStep(step);
 
-  // Never the form that would make another workspace while one is being set up.
-  if (created === null && behind) return <View style={[styles.screen, { backgroundColor: c.bg }]} />;
+  // Never the form that would make another workspace while one is being set up: its saved state loads first.
+  if (created === null && behind)
+    return (
+      <View style={[styles.screen, styles.wait, { backgroundColor: c.bg }]}>
+        {resume.isError ? (
+          <>
+            <Text tone="muted" style={styles.waitText}>
+              {t("common.loadFailed")}
+            </Text>
+            <Button
+              variant="secondary"
+              size="sm"
+              label={t("mobile.common.retry")}
+              onPress={() => void resume.refetch()}
+            />
+          </>
+        ) : null}
+      </View>
+    );
 
   return (
     <StepFrame
@@ -453,6 +485,16 @@ export function OnboardingFlow() {
               label={action.label}
               disabled={!action.ready || pending}
               onPress={action.onPress}
+            />
+          ) : null}
+          {/* Until a workspace is set up this is the only screen: the way out of the account is on its first step. */}
+          {step === "workspace" ? (
+            <Button
+              variant="ghost"
+              wide
+              label={t("mobile.org.signOut")}
+              disabled={pending}
+              onPress={() => void signOut()}
             />
           ) : null}
           {step === "import" ? (
@@ -1036,6 +1078,8 @@ function Note({
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  wait: { alignItems: "center", justifyContent: "center", gap: 12, padding: 24 },
+  waitText: { textAlign: "center" },
   doneSky: { position: "absolute", left: 0, right: 0, top: 0, height: 320 },
   top: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingBottom: 8 },
   backSpace: { width: 40, height: 40 },

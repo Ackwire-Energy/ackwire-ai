@@ -16,6 +16,7 @@ import { agentGrammar, isFeminineName, providerGrammar, runErrorGrammar } from "
 import { landingFor, membershipIn, safeRedirect, settingUp, webUrl } from "@agenteschat/client/lib/guards";
 import {
   addInvites,
+  aheadOf,
   crewOf,
   firstAskOrder,
   ONBOARDING_STEPS,
@@ -300,20 +301,39 @@ describe("guards and permissions", () => {
   test("a resumed onboarding knows its ready-made agents by name and look; the rest are imported", () => {
     const look = { color: "indigo", eyes: "round", accessory: "cap" };
     const mark = (p: "theo" | "lia") =>
-      p === "theo" ? { name: "Theo", ...look } : { name: "Lia", color: "rose", eyes: "dots", accessory: "flower" };
+      p === "theo"
+        ? { name: "Theo", handle: "theo", ...look }
+        : { name: "Lia", handle: "lia", color: "rose", eyes: "dots", accessory: "flower" };
     const agents = [
-      { id: "1", name: "Theo", appearance: look },
-      { id: "2", name: "Theo", appearance: { ...look, color: "green" } },
-      { id: "3", name: "Lia", appearance: { color: "rose", eyes: "dots", accessory: "flower" } },
-      { id: "4", name: "Theo", appearance: look },
-      { id: "5", name: "Dev" },
+      { id: "1", name: "Theo", handle: "theo", appearance: look },
+      { id: "2", name: "Theo", handle: "theo-2", appearance: { ...look, color: "green" } },
+      { id: "3", name: "Lia", handle: "lia", appearance: { color: "rose", eyes: "dots", accessory: "flower" } },
+      { id: "4", name: "Theo", handle: "theo-3", appearance: look },
+      { id: "5", name: "Dev", handle: "dev" },
     ];
     const crew = crewOf(agents, ["theo", "lia"] as const, mark);
     expect(Object.keys(crew.presets)).toEqual(["theo", "lia"]);
     expect([crew.presets.theo?.id, crew.presets.lia?.id]).toEqual(["1", "3"]);
     expect(crew.others.map((a) => a.id)).toEqual(["2", "4", "5"]);
+    // A create cut short after the agent but before its look: known by its handle, never made again (a 409).
+    const halfMade = crewOf(
+      [{ id: "6", name: "Lia", handle: "lia", appearance: null }],
+      ["theo", "lia"] as const,
+      mark,
+    );
+    expect(halfMade.presets.lia?.id).toBe("6");
+    // Its handle with another look, or another name: someone else's.
+    expect(
+      crewOf([{ id: "7", name: "Lia", handle: "lia", appearance: look }], ["lia"] as const, mark).others,
+    ).toHaveLength(1);
+    expect(crewOf([{ id: "8", name: "Lia B", handle: "lia" }], ["lia"] as const, mark).others).toHaveLength(1);
     expect(stepIndex("context")).toBe(1);
     expect(stepIndex("done")).toBe(ONBOARDING_STEPS.length - 1);
+  });
+  test("the server's answer to a step saved: further on or finished elsewhere is followed, the same step isn't", () => {
+    expect(aheadOf({ step: "computer", finished: false }, "computer")).toBe(false);
+    expect(aheadOf({ step: "agents", finished: false }, "computer")).toBe(true);
+    expect(aheadOf({ step: "done", finished: true }, "team")).toBe(true);
   });
   test("role table mirrors the backend", () => {
     expect(can("member", "post")).toBe(true);

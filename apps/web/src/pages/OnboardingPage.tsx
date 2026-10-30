@@ -48,6 +48,7 @@ import {
 } from "@agenteschat/client/lib/no-ai";
 import {
   addInvites,
+  aheadOf,
   crewOf,
   firstAskOrder,
   type InviteDraft,
@@ -108,6 +109,7 @@ import {
 } from "@/components/ai/ConnectAiSteps";
 import { JEV_KEY_MIN, JevSteps, JevWhy } from "@/components/ai/Jev";
 import { ImportFlow, ImportReport, useImportFlow } from "@/components/ImportFlow";
+import { ErrorState } from "@/components/Loading";
 import { ConnectComputer, osOf, PAIR_POLL_MS } from "@/components/Machines";
 import { COMPACT_QUERY, useMediaQuery } from "@/components/NavDrawer";
 import { OrgProvider } from "@/components/org-context";
@@ -313,7 +315,10 @@ export function OnboardingPage() {
     role: t(`onboarding.presets.${p}.role`),
     desc: t(`onboarding.presets.${p}.desc`),
   });
-  const presetMark = (p: Preset) => ({ name: presetInfo(p).name, ...PRESET_LOOK[p] });
+  const presetMark = (p: Preset) => {
+    const { name } = presetInfo(p);
+    return { name, handle: handleFrom(name), ...PRESET_LOOK[p] };
+  };
   // In the order they were made (`agentIds` keeps it), the order the workspace lists its agents in.
   const createdPresets = (Object.keys(agentIds) as Preset[]).filter((p) => agentIds[p]);
   /** The imported agents to choose in "Agentes e IA": the ones the plan creates or updates. */
@@ -480,11 +485,13 @@ export function OnboardingPage() {
       if (!created) return;
       const ids = { ...agentIds };
       const named = { ...handles };
-      // One made already (in another tab, or before a reload) is kept, never made twice.
+      // One made already (in another tab, before a reload, or by a create cut short) is kept, never made twice, and
+      // put in #general, where mentions reach it (once more is harmless).
       const made = crewOf(await api.agents.list(created.orgId), PRESETS, presetMark).presets;
       for (const p of Object.keys(made) as Preset[]) {
         const agent = made[p];
-        if (!agent || ids[p]) continue;
+        if (!agent) continue;
+        await api.chat.addMember(created.orgId, created.generalChannelId, { agentId: agent.id });
         ids[p] = agent.id;
         named[p] = agent.handle;
       }
@@ -768,8 +775,10 @@ export function OnboardingPage() {
   const finish = useMutation({
     mutationFn: async (message: { body: string; clientId: string } | null) => {
       if (!created) return;
+      // Finished in another window or on another device, its first message went from there: none again here.
+      const at = await api.orgs.saveOnboarding(created.orgId, { step: "done" });
       // A failed post stays on Done with its text: the app's toast says why.
-      if (message) await api.chat.post(created.orgId, created.generalChannelId, message);
+      if (message && !at?.finished) await api.chat.post(created.orgId, created.generalChannelId, message);
       await api.orgs.saveOnboarding(created.orgId, { finished: true });
       sessionStore.remove(STORAGE_KEYS.confirmationSent);
       await qc.invalidateQueries({ queryKey: keys.me });
@@ -858,9 +867,16 @@ export function OnboardingPage() {
       flow.reset();
       flow.setCard(null);
     }
-    // Creating the workspace passed the first step on the server.
+    // Creating the workspace passed the first step on the server. An import picked is applied with the team: until
+    // then the server keeps its step, where a resume reads the file again.
     const next = ONBOARDING_STEPS[index + 1];
-    if (created && next) await saveStep.mutateAsync(next.id);
+    if (created && next) {
+      const saving = flow.planned && !flow.report ? "import" : next.id;
+      const at = await saveStep.mutateAsync(saving);
+      // Further on, or finished, in another window or on another device: `me` again, which the page follows.
+      if (at && aheadOf(at, saving)) await qc.invalidateQueries({ queryKey: keys.me });
+      if (at?.finished) return;
+    }
     setDone((d) => new Set(d).add(step.id));
     guide.cheer();
     go(index + 1);
@@ -868,10 +884,16 @@ export function OnboardingPage() {
   const skip = () => void advance("skip").catch(() => {});
 
   // The workspace this person is setting up, as the server keeps it: opened at the furthest step reached with what
-  // was saved, and followed when another tab or device gets further.
-  const mine = created
-    ? me.data?.organizations.find((o) => o.id === created.orgId)
-    : me.data?.organizations.find(settingUp);
+  // was saved, and followed when another tab or device gets further. Once seen it is kept (`resuming`): a newer `me`
+  // saying it was finished elsewhere opens it, never the first step's form.
+  const [resuming, setResuming] = useState<{ orgId: string; generalChannelId: string } | null>(null);
+  const unfinished = me.data?.organizations.find(settingUp);
+  useEffect(() => {
+    const general = unfinished?.onboarding?.generalChannelId;
+    if (unfinished && general) setResuming((r) => r ?? { orgId: unfinished.id, generalChannelId: general });
+  }, [unfinished]);
+  const opening = created ?? resuming;
+  const mine = me.data?.organizations.find((o) => o.id === (opening?.orgId ?? unfinished?.id));
   const saved = mine?.onboarding ? { orgId: mine.id, ...mine.onboarding } : null;
   const behind = saved !== null && stepIndex(saved.step) > reached;
   const resume = useQuery({
@@ -960,12 +982,12 @@ export function OnboardingPage() {
 
   // Finished in another tab or on another device: the workspace opens.
   useEffect(() => {
-    if (!created || !mine || mine.onboarding || finish.isPending || finish.isSuccess) return;
+    if (!opening || !mine || mine.onboarding || finish.isPending || finish.isSuccess) return;
     void navigate({
       to: "/org/$orgId/c/$channelId",
-      params: { orgId: created.orgId, channelId: created.generalChannelId },
+      params: { orgId: opening.orgId, channelId: opening.generalChannelId },
     });
-  }, [created, mine, finish.isPending, finish.isSuccess, navigate]);
+  }, [opening, mine, finish.isPending, finish.isSuccess, navigate]);
   const blocked =
     (step.id === "workspace" && (!org.trim() || inviteOnly)) ||
     // Continue is what brings a vault into the wiki: it waits for the vault to be read.
@@ -977,13 +999,15 @@ export function OnboardingPage() {
     (step.id === "import" && !flow.planned) ||
     (step.id === "computer" && !workspaceComputer && (computer === null || (computer === "machine" && !machine)));
 
-  // What the rail shows under each done step.
+  // What the rail shows under each done step. The agents an import brought, once made (all a resumed page knows of
+  // it), else the ones picked.
+  const brought = importedCrew.length ? importedCrew : pickedImports;
   const railValue: Partial<Record<OnboardingStepId, string>> = {
     workspace: org.trim() || undefined,
     context: context.trim() ? t("onboarding.railValue.context") : undefined,
-    import: pickedImports.length
+    import: brought.length
       ? joinNames(
-          pickedImports.map((a) => a.name),
+          brought.map((a) => a.name),
           t("newAgent.and"),
         )
       : t("onboarding.railValue.skipped"),
@@ -1068,8 +1092,15 @@ export function OnboardingPage() {
   // The logo the workspace already has, until one is picked or removed here.
   const savedLogo = logoDirty ? null : mine?.logo;
 
-  // Never the form that would make another workspace while one is being set up.
-  if (created === null && behind) return <BootSplash />;
+  // Never the form that would make another workspace while one is being set up: its saved state loads first.
+  if (created === null && mine)
+    return resume.isError ? (
+      <div className="page page--mid">
+        <ErrorState error={resume.error} onRetry={() => void resume.refetch()} />
+      </div>
+    ) : (
+      <BootSplash />
+    );
 
   return (
     <div className="onb">
@@ -1102,6 +1133,18 @@ export function OnboardingPage() {
             ...(s.id === "computer" && workspaceComputer ? { note: t(workspaceComputer.chipKey) } : {}),
           }))}
         />
+        {/* Until it's finished this is the only screen: the way out of the account is here. */}
+        <button
+          type="button"
+          className="onb__signout"
+          onClick={async () => {
+            await auth.signOut();
+            qc.clear();
+            await navigate({ to: "/login" });
+          }}
+        >
+          {t("auth.signOut")}
+        </button>
         <OnboardingHorizon progress={answered / toAnswer} />
       </aside>
 
@@ -1472,6 +1515,7 @@ export function OnboardingPage() {
               <ImportReport
                 flow={flow}
                 orgId={created.orgId}
+                linked={false}
                 onRetry={async () => {
                   await applyImported(keySaved && draft.provider !== "platform" ? await modelsOf(draft.provider) : []);
                 }}
