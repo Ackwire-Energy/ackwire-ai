@@ -16,7 +16,8 @@
 # MACHINE_PROVISIONING=external (agentes.chat Cloud), uploaded files must not live on this server's
 # disk alone, so the script refuses to deploy without S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID and
 # S3_SECRET_ACCESS_KEY. Set them before the first upload: files already on the disk are not moved to
-# the bucket, and the app stops finding them once it is set. For the workflow,
+# the bucket, and the app stops finding them once it is set. A test server that keeps its files on its disk
+# on purpose says so with FILES_ON_DISK=accepted in .env. For the workflow,
 # the deploy key's line in authorized_keys runs this script alone, with the commit the workflow sends:
 #   command="/srv/agentes/deploy/deploy.sh $SSH_ORIGINAL_COMMAND",restrict ssh-ed25519 AAAA...
 # With DEPLOY_IMAGE=ghcr.io/agentes-chat/agentes:edge before the script's path there, it pulls the
@@ -60,7 +61,7 @@ main() {
     echo "deploy: .env needs AGENTES_IMAGE=agentes:current and RUN_MIGRATIONS_ON_BOOT=false (top of deploy/deploy.sh)" >&2
     false
   fi
-  if grep -Eq "^MACHINE_PROVISIONING=[\"']?external([\"'[:space:]#]|$)" .env; then
+  if grep -Eq "^MACHINE_PROVISIONING=[\"']?external([\"'[:space:]#]|$)" .env && ! grep -qx 'FILES_ON_DISK=accepted' .env; then
     local key missing=""
     for key in S3_ENDPOINT S3_BUCKET S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY; do
       grep -Eq "^${key}=[\"']?[^\"'[:space:]#]" .env || missing+=" $key"
