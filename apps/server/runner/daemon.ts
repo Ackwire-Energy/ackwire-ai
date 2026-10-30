@@ -841,6 +841,7 @@ export class RunnerDaemon implements RequestObserver {
           : new LoopbackGuard({ home, agentUids: () => readAgentUsers(home).map((u) => u.uid), log });
       supervisor = new Supervisor({
         home,
+        requireRootBroker: !this.opts.workers,
         user: agentUser,
         start: launchWorker(this.self.command),
         lend: (kind, accountId, uid) => this.accounts.lendTo(kind, accountId, uid),
