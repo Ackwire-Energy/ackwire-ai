@@ -248,6 +248,27 @@ const browserOpen = (
 });
 const BROWSER_REFUSED = "No browser command of this agent on its desktop is running";
 
+test("system boot guards ports and prepares every persisted UID before restoring a worker", () => {
+  const home = newHome();
+  writeFileSync(path.join(home, WORKER_TASKS_FILE), JSON.stringify({
+    "task-ana-0001": { agentId: ANA.id, startedAt: new Date().toISOString() },
+  }));
+  const order: string[] = [];
+  const t = setup({
+    guard: { start: () => order.push("guard"), stop: () => {} },
+    prepareExisting: (users) => {
+      expect(users.map((u) => u.uid)).toEqual([21000, 21001]);
+      order.push("policy");
+    },
+    start: (user) => {
+      order.push("worker");
+      return new FakeWorker(user);
+    },
+  }, home);
+  t.sup.boot();
+  expect(order).toEqual(["guard", "policy", "worker"]);
+});
+
 test("the computer's own ops stay in the supervisor; an agent's go to its worker, started on its first request", async () => {
   const t = setup();
   t.sup.boot();

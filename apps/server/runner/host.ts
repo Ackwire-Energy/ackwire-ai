@@ -3,7 +3,7 @@ import type { EventEmitter } from "node:events";
 import { mkdirSync, readdirSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { readAgentUsers } from "./agent-users";
+import { readAgentUsers, type AgentUser } from "./agent-users";
 import {
   DEFAULT_AGENT_UID_RANGE,
   expandHome,
@@ -182,9 +182,14 @@ export class HostComputer {
     clearTimeout(timer);
   }
 
+  /** Every persisted agent, including those of organizations not currently running. */
+  agentUsers(): AgentUser[] {
+    return this.homes().flatMap((h) => readAgentUsers(h.dir));
+  }
+
   /** The uids of every organization's agents here (the loopback guard's). */
   agentUids(): number[] {
-    return this.homes().flatMap((h) => readAgentUsers(h.dir).map((u) => u.uid));
+    return this.agentUsers().map((u) => u.uid);
   }
 
   /** One round: what the server says, then the homes and children to match. */

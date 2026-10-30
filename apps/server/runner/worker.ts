@@ -37,6 +37,7 @@ import {
   type WorkerState,
 } from "./supervisor";
 import { TaskManager } from "./tasks";
+import type { BrowserPorts } from "./browser-ports";
 
 /**
  * System mode: one agent's runner (`agentes-runner worker --agent <id>`),
@@ -59,6 +60,8 @@ export interface WorkerOptions {
   /** To the supervisor. */
   output: Writable;
   log: (line: string) => void;
+  /** System mode: preguarded ports assigned from this worker's UID. */
+  browserPorts?: BrowserPorts;
   /** How this runner starts itself (default: this process). */
   self?: { command: string[]; compiled: boolean };
   /** Tests: the computer desktop use sees, and how its helper starts. */
@@ -395,6 +398,7 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
   };
   const browser = new BrowserManager({
     home,
+    ...(o.browserPorts ? { fixedPorts: o.browserPorts } : {}),
     log,
     send: (frame) => live?.send(frame) ?? false,
     secret: (agent, name) => secretValue(secretsDir, agent, name),
