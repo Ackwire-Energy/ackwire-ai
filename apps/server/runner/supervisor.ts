@@ -15,6 +15,7 @@ import {
   unlinkSync,
 } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { ensureBrowserBindPolicy } from "./browser-bind-policy";
 import path from "node:path";
 import type { Readable, Writable } from "node:stream";
 import { AGENT_WORKER_HOMES } from "@agenteschat/adapters/command-policy";
@@ -222,6 +223,8 @@ export interface SupervisorOptions {
   fetch?: FetchLike;
   /** System mode: the loopback firewall (root), started with the supervisor. Absent in single-user and in tests. */
   guard?: { start(): void; stop(): void };
+  /** System mode: apply socket bind policy to every persisted UID before restoring or serving workers. */
+  prepareExisting?: (users: AgentUser[]) => void;
   /** A brain turn's account folder becomes its agent's user's before the turn reaches the worker (`AccountManager.lendTo`). */
   lend?: (kind: "claude_code" | "codex", accountId: string, uid: number) => Promise<unknown>;
   /** The agent's desktop for its worker (`DesktopSessions`), behind the switches `use` needs; without it a worker gets none. */
@@ -321,7 +324,10 @@ export class Supervisor {
 
   /** Starts the workers whose tasks need watching, and the pings. */
   boot() {
+    // Browser ports are guarded for the entire UID range before any worker can bind.
+    this.opts.guard?.start();
     const users = readAgentUsers(this.opts.home);
+    this.opts.prepareExisting?.(users);
     for (const agentId of new Set([...this.owners.values()].map((o) => o.agentId))) {
       const user = users.find((u) => u.id === agentId);
       if (user) this.launch(this.entry(user));
@@ -330,7 +336,6 @@ export class Supervisor {
       for (const w of this.workers.values()) this.send(w, { type: "ping", at: Date.now() });
     }, WORKER_PING_MS);
     this.pinger.unref?.();
-    this.opts.guard?.start();
   }
 
   /** An `agent` op (`OP_ROUTES`), run in the worker of the request's agent. */
@@ -1166,6 +1171,7 @@ export function workerCommand(user: AgentUser, runner: string[], home: string, s
 /** Starts each agent's worker as a process (`runner`: how this runner starts itself). */
 export function launchWorker(runner: string[], base = AGENT_WORKER_HOMES): StartWorker {
   return (user) => {
+    ensureBrowserBindPolicy(user, runner);
     const home = workerHome(base, user);
     retireLegacyPending(base, home, user);
     const { argv, cwd, env } = workerCommand(user, runner, home);
