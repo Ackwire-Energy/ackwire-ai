@@ -93,8 +93,8 @@ export const privacyPtBR: LegalDocument = {
       blocks: [
         {
           list: [
-            "**Dados de conta:** enquanto a conta existir. Quando você exclui a sua conta (Configurações), ela é apagada na hora, junto com qualquer workspace em que você era o único membro; ela sai dos nossos backups em até 30 dias, exceto registros que a lei nos obriga a manter.",
-            "**Conteúdo do Workspace:** enquanto o workspace existir, e antes disso quando o workspace apaga um conteúdo. Quando o plano do agentes.chat de um workspace termina, o conteúdo dele fica disponível por 90 dias e depois é apagado. Quando um workspace é excluído, o conteúdo dele é apagado e sai dos nossos backups em até 30 dias.",
+            "**Dados de conta:** enquanto a conta existir. Quando você exclui a sua conta (Configurações), ela é apagada na hora e sai dos nossos backups em até 30 dias, exceto registros que a lei nos obriga a manter. Qualquer workspace em que você era o único membro fecha no mesmo momento, e o conteúdo dele é apagado 7 dias depois, como descrito a seguir.",
+            "**Conteúdo do Workspace:** enquanto o workspace existir, e antes disso quando o workspace apaga um conteúdo. Quando o plano do agentes.chat de um workspace termina, o conteúdo dele fica disponível por 90 dias e depois é apagado. Quando um dono exclui um workspace, ele fecha para todos na hora e o conteúdo dele é apagado 7 dias depois, a não ser que um dono o restaure antes disso, e sai dos nossos backups em até 30 dias depois disso, exceto o conteúdo que a lei nos obriga a manter ou que é registro de abuso (abaixo).",
             "**Registros:** registros de requisições e de segurança por até 90 dias. Registros de uso de modelos (tokens e custo) enquanto o workspace existir, porque os orçamentos e os relatórios de uso dependem deles.",
             "**Dados de cobrança:** enquanto você paga por um workspace e, depois disso, pelo tempo que as leis fiscais e contábeis exigirem.",
             "**Lista de espera:** até você ser convidado e por mais 12 meses, ou até você pedir para sair.",

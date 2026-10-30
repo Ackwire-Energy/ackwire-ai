@@ -93,8 +93,8 @@ export const privacyEn: LegalDocument = {
       blocks: [
         {
           list: [
-            "**Account data:** for the life of the account. When you delete your account (Settings), it is removed at once, together with any workspace in which you were the only member; it leaves our backups within 30 days, except records we must keep by law.",
-            "**Workspace Content:** for the life of the workspace, and earlier when the workspace deletes specific content. When a workspace's agentes.chat plan ends, its content stays available for 90 days and is then deleted. When a workspace is deleted, its content is removed and leaves our backups within 30 days.",
+            "**Account data:** for the life of the account. When you delete your account (Settings), it is removed at once and leaves our backups within 30 days, except records we must keep by law. Any workspace in which you were the only member closes at the same time, and its content is deleted 7 days later as described next.",
+            "**Workspace Content:** for the life of the workspace, and earlier when the workspace deletes specific content. When a workspace's agentes.chat plan ends, its content stays available for 90 days and is then deleted. When an owner deletes a workspace, it closes for everyone at once and its content is deleted 7 days later, unless an owner restores it before then, and leaves our backups within 30 days after that, except content we must keep by law or as a record of abuse (below).",
             "**Logs:** request and security logs for up to 90 days. Model usage records (tokens and cost) for the life of the workspace, because budgets and usage reports depend on them.",
             "**Billing data:** while you pay for a workspace, and after that for as long as tax and accounting law requires.",
             "**Waiting list:** until you are invited and for 12 months after, or until you ask us to remove you.",
