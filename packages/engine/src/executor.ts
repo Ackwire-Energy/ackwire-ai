@@ -882,6 +882,7 @@ async function executeRunInner(
         trigger,
         routine: Boolean(viaRoutine),
         mayPass: policy.mayPass,
+        machines: deps.machines,
       }),
       contextDeps
         ? retrieveForRun(contextDeps, {

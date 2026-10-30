@@ -2,8 +2,19 @@ import { afterEach, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import { systemText } from "@agenteschat/providers";
-import { addChannelMember, agentScopeNames, createAgent, drainOutbox, postPersonMessage, teamPrompt } from "../src";
+import {
+  addChannelMember,
+  agentScopeNames,
+  createAgent,
+  drainOutbox,
+  type MachineStatus,
+  postPersonMessage,
+  rosterScopeNames,
+  summarizeScopes,
+  teamPrompt,
+} from "../src";
 import { type Fixture, setup } from "./fixtures";
+import { pairMachine } from "./machine-fixtures";
 
 let f: Fixture;
 afterEach(() => f?.close());
@@ -111,4 +122,39 @@ test("a whole-connection grant is named after its connector, not 'Connector'", a
   const names = await agentScopeNames(f.db, f.org.id, [f.agent.id]);
   expect(names.map((n) => n.scope)).toContain("sentry:*");
   expect(names.map((n) => n.scope)).not.toContain("connector:*");
+});
+
+test("another agent's computer, browser and desktop are stated only where its computer serves them", async () => {
+  f = await setup();
+  // Granted to every new agent.
+  const qa = await addAgent("QA", "qa", "Testes");
+  const roster = async (machines?: { status(id: string): Promise<MachineStatus | null> }) =>
+    summarizeScopes((await rosterScopeNames(f.db, machines, f.org.id, [qa.id])).map((s) => s.scope));
+  const none = await roster();
+  expect(none).toContain("Files (Drive)");
+  expect(none).not.toMatch(/Code|Browser|Desktop/);
+
+  // A computer whose browser is on and ready, and no desktop use: Code and Browser.
+  const { machineId } = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "MacBook" });
+  await f.db.update(schema.agents).set({ machineId }).where(eq(schema.agents.id, qa.id));
+  const served = await roster({
+    status: async (id) =>
+      id === machineId
+        ? {
+            id,
+            orgId: f.org.id,
+            name: "MacBook",
+            online: false,
+            execAllowed: true,
+            os: "darwin",
+            protocol: 12,
+            executors: { browser: { available: true, version: "0.39.1" } },
+            paused: null,
+            access: { folders: [], tools: { claude: true, codex: true, commands: true, browser: true } },
+          }
+        : null,
+  });
+  expect(served).toContain("Code");
+  expect(served).toContain("Browser");
+  expect(served).not.toContain("Desktop");
 });

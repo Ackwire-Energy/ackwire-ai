@@ -253,7 +253,7 @@ export async function setup(
     ...(options.askAgent
       ? [
           createAskAgentToolSource({ pubsub, ai: { gateway, machines: machineHub } }),
-          createFindAgentToolSource(),
+          createFindAgentToolSource({ machines: machineHub }),
         ]
       : []),
     ...(options.react ? [createReactToolSource({ pubsub })] : []),
