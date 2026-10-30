@@ -3,6 +3,7 @@ import { channelTopic } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import {
+  addChannelMember,
   agentsByHandle,
   archiveAgent,
   createAgent,
@@ -19,14 +20,16 @@ import {
   loadImportState,
   loadTeam,
   MACHINE_CONTROL_TOPIC,
+  type MachineHub,
   NEW_AGENT_DEFAULTS,
   NotFoundError,
   openDm,
   postPersonMessage,
+  setAgentScopes,
   updateAgent,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
-import { pairMachine } from "./machine-fixtures";
+import { fakeRunner, pairMachine, RUNNER } from "./machine-fixtures";
 
 /** ADR 0080: deleting an agent for good, leaving a tombstone that names what it left behind. */
 
@@ -45,6 +48,26 @@ const ask = (body: string) =>
 const agentRow = async (id = f.agent.id) =>
   (await f.db.select().from(schema.agents).where(eq(schema.agents.id, id)))[0];
 const later = () => new Date(Date.now() + 86_400_000);
+const runsOf = (agentId = f.agent.id) =>
+  f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.agentId, agentId));
+/** A login on a computer, with `agentId` thinking with it. */
+async function login(machineId: string, agentId = f.agent.id) {
+  const id = crypto.randomUUID();
+  await f.db.insert(schema.machineAccounts).values({
+    id,
+    orgId: f.org.id,
+    machineId,
+    kind: "claude_code",
+    label: "Trabalho",
+    status: "active",
+    createdBy: f.owner.id,
+  });
+  await f.db
+    .update(schema.agents)
+    .set({ machineId, brain: "claude_code", brainAccountId: id })
+    .where(eq(schema.agents.id, agentId));
+  return id;
+}
 
 /** One of each thing an agent has, beside what `setup` gave it (scopes, a budget period, #general). */
 async function seed() {
@@ -147,6 +170,18 @@ async function seed() {
       actors: [{ type: "agent", id: agentId }],
     })
     .returning();
+  // A person's turn in a forum topic it opened: the topic goes on without it and still waits for them.
+  const [turn] = await db
+    .insert(schema.notifications)
+    .values({
+      orgId,
+      userId: f.owner.id,
+      kind: "forum_turn",
+      waiting: true,
+      groupKey: `forum_turn:${crypto.randomUUID()}:1`,
+      actors: [{ type: "agent", id: agentId }],
+    })
+    .returning();
   const [mission] = await db
     .insert(schema.missions)
     .values({
@@ -160,7 +195,21 @@ async function seed() {
       mainSessionId: crypto.randomUUID(),
     })
     .returning();
-  return { skill, routine, approval, dm, inbox, mission };
+  // Settings beside its display fields, none at its default.
+  await db
+    .update(schema.agents)
+    .set({
+      monthlyBudgetNanoUsd: 5_000_000_000,
+      audienceMode: "owner",
+      missionCommandApproval: "never",
+      brainModel: "opus",
+      brainEffort: "high",
+      brainFallback: false,
+      operatorHoldAt: new Date(),
+      operatorHoldReason: "abuse",
+    })
+    .where(eq(schema.agents.id, agentId));
+  return { skill, routine, approval, dm, inbox, turn, mission };
 }
 
 describe("deleting an agent", () => {
@@ -183,18 +232,30 @@ describe("deleting an agent", () => {
       .from(schema.usageRecords)
       .where(eq(schema.usageRecords.agentId, f.agent.id));
     expect(usageBefore.length).toBeGreaterThan(0);
-    const { skill, routine, approval, dm, inbox, mission } = await seed();
+    const { skill, routine, approval, dm, inbox, turn, mission } = await seed();
 
     await remove();
 
     const tomb = await agentRow();
+    // Its name, role and look stay; every other setting is back at its default.
     expect(tomb).toMatchObject({
       name: "Dev",
       role: "Developer",
       instructions: "",
       handle: `deleted-${f.agent.id}`,
+      model: "",
       credentialId: null,
       ownerUserId: null,
+      monthlyBudgetNanoUsd: null,
+      audienceMode: "everyone",
+      audienceUserIds: [],
+      missionCommandApproval: null,
+      brain: "model",
+      brainModel: null,
+      brainFallback: true,
+      brainEffort: null,
+      operatorHoldAt: null,
+      operatorHoldReason: null,
     });
     expect(tomb?.deletedAt).toBeInstanceOf(Date);
     expect(tomb?.archivedAt).toBeInstanceOf(Date);
@@ -247,6 +308,11 @@ describe("deleting an agent", () => {
       .from(schema.notifications)
       .where(eq(schema.notifications.id, inbox?.id ?? ""));
     expect(resolved?.doneAt).toBeInstanceOf(Date);
+    const [stillYours] = await f.db
+      .select()
+      .from(schema.notifications)
+      .where(eq(schema.notifications.id, turn?.id ?? ""));
+    expect(stillYours?.doneAt).toBeNull();
     const [conversation] = await f.db.select().from(schema.channels).where(eq(schema.channels.id, dm.id));
     expect(conversation?.archivedAt).toBeInstanceOf(Date);
     expect(await listDms(f.db, f.owner.id, f.org.id)).toEqual([]);
@@ -311,33 +377,156 @@ describe("deleting an agent", () => {
     expect((await agentRow())?.deletedAt).toBeInstanceOf(Date);
   });
 
+  test("what was sent to its runs is dropped: no run of its own starts after it", async () => {
+    f = await setup();
+    await ask("@dev analisa os logs");
+    const [queued] = await runsOf();
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev e o deploy também",
+      threadId: queued?.threadRootId ?? null,
+    });
+    expect((await runsOf())[0]?.pendingMessageIds).toHaveLength(1);
+
+    await remove();
+    await drainOutbox(f.db, f.handlers);
+
+    expect((await runsOf()).map((r) => [r.status, r.error])).toEqual([["canceled", "agent_archived"]]);
+    expect(f.provider.calls).toHaveLength(0);
+  });
+
   test("its login on its computer becomes a tombstone the runner hears about", async () => {
     f = await setup({ machines: true });
     const { machineId } = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "mac" });
-    const accountId = crypto.randomUUID();
-    await f.db.insert(schema.machineAccounts).values({
-      id: accountId,
-      orgId: f.org.id,
-      machineId,
-      kind: "claude_code",
-      label: "Trabalho",
-      status: "active",
-      createdBy: f.owner.id,
-    });
-    await f.db
-      .update(schema.agents)
-      .set({ machineId, brain: "claude_code", brainAccountId: accountId })
-      .where(eq(schema.agents.id, f.agent.id));
+    const accountId = await login(machineId);
     const control: Record<string, unknown>[] = [];
     f.pubsub.subscribe(MACHINE_CONTROL_TOPIC, (event) => control.push(event));
 
     await remove();
 
-    const [login] = await f.db.select().from(schema.machineAccounts).where(eq(schema.machineAccounts.id, accountId));
-    expect(login?.status).toBe("removing");
+    const [account] = await f.db.select().from(schema.machineAccounts).where(eq(schema.machineAccounts.id, accountId));
+    expect(account?.status).toBe("removing");
     expect(await agentRow()).toMatchObject({ brainAccountId: null, machineId: null });
     expect(control).toContainEqual({ type: "machine.accounts", machineId });
     expect(control).toContainEqual({ type: "machine.agents", orgId: f.org.id });
+  });
+
+  test("an archived agent's login a live agent thinks with now stays with that agent", async () => {
+    f = await setup({ machines: true });
+    const { machineId } = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "mac" });
+    const accountId = await login(machineId);
+    await archiveAgent(f.db, f.owner.id, f.org.id, f.agent.id);
+    // Archived agents hold no login for themselves alone: it was given to Theo.
+    const theo = await createAgent(f.db, f.owner.id, f.org.id, { name: "Theo", handle: "theo" }, NEW_AGENT_DEFAULTS);
+    await f.db
+      .update(schema.agents)
+      .set({ machineId, brain: "claude_code", brainAccountId: accountId })
+      .where(eq(schema.agents.id, theo.id));
+
+    await remove();
+
+    expect(await agentRow(theo.id)).toMatchObject({ brain: "claude_code", brainAccountId: accountId });
+    const [account] = await f.db.select().from(schema.machineAccounts).where(eq(schema.machineAccounts.id, accountId));
+    expect(account?.status).toBe("active");
+    expect((await agentRow())?.brainAccountId).toBeNull();
+  });
+
+  test("the secrets people gave it leave the computers that answer; an offline one keeps its row open", async () => {
+    f = await setup({ machines: true });
+    // Computers it worked on before: the secrets stay on the one they were delivered to.
+    const paired = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "on", ...RUNNER });
+    const runner = fakeRunner(f.machineHub as MachineHub);
+    await runner.hello(paired.token);
+    const offline = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "off" });
+    await ask("@dev oi");
+    const [run] = await runsOf();
+    const delivered = (machineId: string, name: string) => ({
+      orgId: f.org.id,
+      runId: run?.id ?? "",
+      agentId: f.agent.id,
+      channelId: f.general.id,
+      toolUseId: `tool-${name}`,
+      requestedForUserId: f.owner.id,
+      name,
+      purpose: "publicar o pacote",
+      targetKind: "env" as const,
+      machineId,
+      publicKey: "pk",
+      status: "delivered" as const,
+      deliveredAt: new Date(),
+      expiresAt: later(),
+    });
+    await f.db
+      .insert(schema.secretRequests)
+      .values([delivered(paired.machineId, "NPM_TOKEN"), delivered(offline.machineId, "AWS_KEY")]);
+
+    await remove();
+
+    expect(runner.sent).toContainEqual(
+      expect.objectContaining({ type: "request", op: "secret", action: "remove", name: "NPM_TOKEN" }),
+    );
+    const rows = await f.db.select().from(schema.secretRequests);
+    expect(Object.fromEntries(rows.map((r) => [r.name, r.removedAt !== null]))).toEqual({
+      NPM_TOKEN: true,
+      AWS_KEY: false,
+    });
+  });
+
+  test("another agent keeps its work and data", async () => {
+    f = await setup({ machines: true });
+    const { machineId } = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "mac" });
+    const theo = await createAgent(f.db, f.owner.id, f.org.id, { name: "Theo", handle: "theo" }, NEW_AGENT_DEFAULTS);
+    await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId: theo.id });
+    await ask("@dev oi");
+    await ask("@theo oi");
+    const logins: Record<string, string> = {};
+    for (const agentId of [f.agent.id, theo.id]) {
+      logins[agentId] = await login(machineId, agentId);
+      await f.db.insert(schema.machineTasks).values({
+        orgId: f.org.id,
+        agentId,
+        machineId,
+        channelId: f.general.id,
+        title: "Build",
+        executor: "shell",
+        status: "running",
+      });
+      await f.db.insert(schema.contextItems).values({
+        orgId: f.org.id,
+        kind: "note",
+        scopeType: "agent",
+        scopeId: agentId,
+        agentId,
+        content: "Prefere respostas curtas.",
+      });
+    }
+    const theirs = async () => ({
+      agent: await agentRow(theo.id),
+      login: await f.db
+        .select()
+        .from(schema.machineAccounts)
+        .where(eq(schema.machineAccounts.id, logins[theo.id] ?? "")),
+      runs: await runsOf(theo.id),
+      tasks: await f.db.select().from(schema.machineTasks).where(eq(schema.machineTasks.agentId, theo.id)),
+      scopes: await f.db.select().from(schema.agentScopes).where(eq(schema.agentScopes.agentId, theo.id)),
+      channels: await f.db.select().from(schema.channelMembers).where(eq(schema.channelMembers.agentId, theo.id)),
+      notes: await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.agentId, theo.id)),
+      budget: await f.db.select().from(schema.agentBudgetPeriods).where(eq(schema.agentBudgetPeriods.agentId, theo.id)),
+    });
+    const before = await theirs();
+    expect(before.runs).toMatchObject([{ status: "queued" }]);
+    expect(before.scopes.length).toBeGreaterThan(0);
+
+    await remove();
+
+    expect(await theirs()).toEqual(before);
+    const [own] = await f.db
+      .select()
+      .from(schema.machineAccounts)
+      .where(eq(schema.machineAccounts.id, logins[f.agent.id] ?? ""));
+    expect(own?.status).toBe("removing");
+    const [task] = await f.db.select().from(schema.machineTasks).where(eq(schema.machineTasks.agentId, f.agent.id));
+    expect(task).toMatchObject({ status: "canceled", canceledBy: "system" });
+    expect((await runsOf()).map((r) => r.status)).toEqual(["canceled"]);
   });
 
   test("lists and pickers never offer it", async () => {
@@ -361,5 +550,9 @@ describe("deleting an agent", () => {
     await expect(updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { name: "Back" })).rejects.toBeInstanceOf(
       NotFoundError,
     );
+    await expect(
+      setAgentScopes(f.db, f.owner.id, f.org.id, f.agent.id, [{ connectionId: null, scope: "drive:read" }]),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    expect(await f.db.select().from(schema.agentScopes).where(eq(schema.agentScopes.agentId, f.agent.id))).toEqual([]);
   });
 });

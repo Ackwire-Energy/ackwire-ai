@@ -621,6 +621,37 @@ export async function removeAgentSecret(
 ) {
   await requireComputerManager(deps.db, actorId, orgId, agentId);
   if (!SECRET_NAME.test(name)) throw new ValidationError("Invalid secret name");
+  await removeSecret(deps, actorId, orgId, agentId, name, machineId);
+}
+
+/**
+ * An agent being deleted (ADR 0080 §4): every secret people delivered to it leaves the computer it was delivered
+ * to, as `removeAgentSecret` does. One whose computer doesn't answer now (offline) keeps its value there and its
+ * row open.
+ */
+export async function removeAgentSecrets(deps: SandboxDeps, actorId: string, orgId: string, agentId: string) {
+  const held = await deps.db
+    .selectDistinct({ name: secretRequests.name, machineId: secretRequests.machineId })
+    .from(secretRequests)
+    .where(
+      and(
+        eq(secretRequests.orgId, orgId),
+        eq(secretRequests.agentId, agentId),
+        eq(secretRequests.status, "delivered"),
+        isNull(secretRequests.removedAt),
+      ),
+    );
+  for (const s of held) await removeSecret(deps, actorId, orgId, agentId, s.name, s.machineId).catch(() => null);
+}
+
+async function removeSecret(
+  deps: SandboxDeps,
+  actorId: string,
+  orgId: string,
+  agentId: string,
+  name: string,
+  machineId: string | null,
+) {
   const live = await deps.db
     .select()
     .from(secretRequests)

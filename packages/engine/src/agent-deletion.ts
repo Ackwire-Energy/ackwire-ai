@@ -12,6 +12,7 @@ import { resolveNotifications } from "./notifications";
 import { recordOperatorEvent } from "./operator-events";
 import { requirePermission } from "./organizations";
 import { deleteAgentRoutines, type RoutineDeps } from "./routines";
+import { removeAgentSecrets } from "./secrets";
 
 const {
   agentBudgetPeriods,
@@ -63,23 +64,36 @@ export async function deleteAgent(deps: AgentDeletionDeps, actorId: string, orgI
   }
   await deleteAgentRoutines(deps, actorId, orgId, agentId);
   await stopOrgWork({ db, pubsub: deps.pubsub, hub: deps.hub ?? undefined }, orgId, "agent_archived", agentId);
+  // Before the tombstone: the runner finds a secret's file by the agent's handle.
+  await removeAgentSecrets({ db, machines: deps.hub ? { hub: deps.hub } : null }, actorId, orgId, agentId);
 
   const now = new Date();
   const { released, dms } = await db.transaction(async (tx) => {
     const released = await releaseAgentLogin(tx, orgId, agentId);
+    // Only its name, role and look stay: every other setting goes back to its default.
     const [gone] = await tx
       .update(agents)
       .set({
         deletedAt: now,
         handle: deletedHandle(agentId),
         instructions: "",
+        model: "",
         credentialId: null,
         ownerUserId: null,
-        machineId: null,
-        brainAccountId: null,
-        browserMachineId: null,
-        browserAllowedDomains: null,
+        monthlyBudgetNanoUsd: null,
+        audienceMode: "everyone",
         audienceUserIds: [],
+        machineId: null,
+        missionCommandApproval: null,
+        brain: "model",
+        brainModel: null,
+        brainFallback: true,
+        brainAccountId: null,
+        brainEffort: null,
+        browserAllowedDomains: null,
+        browserMachineId: null,
+        operatorHoldAt: null,
+        operatorHoldReason: null,
         updatedAt: now,
       })
       .where(and(eq(agents.id, agentId), isNull(agents.deletedAt)))
@@ -138,7 +152,8 @@ export async function deleteAgent(deps: AgentDeletionDeps, actorId: string, orgI
     return { released, dms };
   });
   invalidateOrg(orgId);
-  // What it waited on people for (approvals, questions, handoffs) leaves their inboxes, as a closed source does.
+  // What it waited on people for (approvals, questions, handoffs) leaves their inboxes, as a closed source does. A
+  // turn in a forum topic it opened stays: the topic goes on without it.
   const waiting = await db
     .selectDistinct({ groupKey: notifications.groupKey })
     .from(notifications)
@@ -147,6 +162,7 @@ export async function deleteAgent(deps: AgentDeletionDeps, actorId: string, orgI
         eq(notifications.orgId, orgId),
         isNull(notifications.doneAt),
         eq(notifications.waiting, true),
+        inArray(notifications.kind, ["approval", "agent_question", "browser_handoff"]),
         sql`${notifications.actors} @> ${JSON.stringify([{ type: "agent", id: agentId }])}::jsonb`,
       ),
     );

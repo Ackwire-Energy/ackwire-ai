@@ -1205,6 +1205,20 @@ export async function releaseAgentLogin(db: Executor, orgId: string, agentId: st
     )
     .where(and(eq(agents.orgId, orgId), eq(agents.id, agentId), ne(machineAccounts.status, "removing")));
   if (!login) return { machines: [], agents: [] };
+  // An archived agent's login may have been given to a live agent since (one agent per login counts only those
+  // not archived): it stays that agent's.
+  const [live] = await db
+    .select({ id: agents.id })
+    .from(agents)
+    .where(
+      and(
+        eq(agents.orgId, orgId),
+        eq(agents.brainAccountId, login.id),
+        ne(agents.id, agentId),
+        isNull(agents.archivedAt),
+      ),
+    );
+  if (live) return { machines: [], agents: [] };
   const agentIds = await tombstone(db, orgId, [login.id]);
   return { machines: [{ orgId, machineId: login.machineId }], agents: [{ orgId, agentIds }] };
 }

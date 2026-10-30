@@ -243,7 +243,13 @@ export function TeamPage() {
                 <b>{a.name}</b>
                 {a.role && <span className="small muted">{a.role}</span>}
               </span>
-              <Button size="sm" variant="ghost" icon="trash" onClick={() => setDeleting(a)}>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon="trash"
+                aria-label={t("agentPage.delete.action", agentGrammar(t, a.name))}
+                onClick={() => setDeleting(a)}
+              >
                 {t("agentPage.delete.button")}
               </Button>
             </div>

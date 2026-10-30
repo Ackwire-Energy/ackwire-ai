@@ -5,6 +5,7 @@ setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { notification } from "./fakes/notifications";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -52,10 +53,42 @@ describe("deleting an agent (ADR 0080)", () => {
   });
 
   test("an old message still names a deleted agent; its card says it left, with nothing to do", async () => {
-    await go(`c/${ENG_ID}`, adaDeleted());
+    const state = adaDeleted();
+    // A question she asked, answered before she went.
+    state.messages.push({
+      id: "msg-q",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ADA_ID },
+      body: "",
+      mentionedAgentIds: [],
+      agentRunId: "r-1",
+      meta: {
+        question: {
+          id: "q1",
+          agentId: ADA_ID,
+          channelId: ENG_ID,
+          threadId: null,
+          messageId: "msg-q",
+          text: "Faço o deploy agora ou depois das 18h?",
+          choices: ["Agora", "Depois das 18h"],
+          status: "answered",
+          answer: "Agora",
+          answeredByUserId: "u-joao",
+        },
+      },
+      createdAt: new Date().toISOString(),
+    });
+    await go(`c/${ENG_ID}`, state);
     const names = screen().getAllByRole("button", { name: "Perfil de Ada" });
     expect(names.length).toBeGreaterThan(0);
-    expect(document.body.textContent).not.toContain("Agente desconhecido");
+    expect(screen().getByRole("group", { name: "Pergunta de Ada" })).toBeTruthy();
+    // Her face, never a person's initial.
+    const faces = [...document.querySelectorAll('[aria-label="Perfil de Ada"] [data-kind]')].map((e) =>
+      e.getAttribute("data-kind"),
+    );
+    expect(faces).toContain("agent");
+    expect(faces).not.toContain("person");
     await click(names[0] as HTMLElement);
     await settle(4);
     const card = screen().getByRole("dialog", { name: "Perfil" });
@@ -81,7 +114,7 @@ describe("deleting an agent (ADR 0080)", () => {
     await go("team", state);
     const card = screen().getByRole("heading", { name: "Arquivados" }).closest(".team-archived") as HTMLElement;
     expect(card.textContent).toContain("New agent");
-    await click(within(card).getByRole("button", { name: "Apagar" }));
+    await click(within(card).getByRole("button", { name: "Apagar o New agent" }));
     const dialog = screen().getByRole("dialog", { name: "Apagar o New agent de vez?" });
     await type(within(dialog).getByRole("textbox", { name: "Digite New agent para confirmar" }), "new agent");
     await click(within(dialog).getByRole("button", { name: "Apagar" }));
@@ -96,6 +129,21 @@ describe("deleting an agent (ADR 0080)", () => {
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
     await go("team", state);
     expect(screen().queryByRole("heading", { name: "Arquivados" })).toBeNull();
+  });
+
+  test("the inbox still names it", async () => {
+    const state = adaDeleted();
+    state.notifications = [
+      notification({
+        id: "n-thread",
+        kind: "thread_reply",
+        actors: [{ type: "agent", id: ADA_ID }],
+        source: { channelId: ENG_ID, threadId: "m-1", label: "Login 401" },
+        latest: { text: "Corrigi o refresh." },
+      }),
+    ];
+    await go("notifications", state);
+    expect(screen().getByRole("main").textContent).toContain("Ada respondeu em Login 401");
   });
 
   test("its page is gone", async () => {
