@@ -26,7 +26,7 @@
   margin-left: auto;
 }
 .jr-role {
-  width: 132px;
+  width: 180px;
 }
 /* The link's part of the "Invite people" card, under a hairline. */
 .jr-link {
@@ -58,4 +58,14 @@
 /* Turn off is a text button: its word ends where Copy ends above it (its padding hangs past), on its own line too. */
 .jr-link__foot > .ac-btn--ghost {
   margin: 0 calc(-1 * var(--control-px-sm)) 0 auto;
+}
+/* A person's roles (ADR 0081): the owner's chip, their roles' chips, a "+" to give or take them. */
+.members-roles {
+  flex: 0 1 280px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
 }

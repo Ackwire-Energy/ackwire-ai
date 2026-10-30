@@ -48,6 +48,14 @@ async function codeFor(b: Browser, token: string, email?: string) {
   if (checked.status !== 200) throw new Error(`check: ${checked.status} ${await checked.text()}`);
   return code;
 }
+/** The workspace's role holding `administrator` (its "Admin", ADR 0081), as the members screen reads it. */
+async function adminRole(b: Browser, orgId: string) {
+  const { roles } = (await (await b(`/api/app/organizations/${orgId}/roles`)).json()) as {
+    roles: { id: string; permissions: string[] }[];
+  };
+  return roles.find((r) => r.permissions.includes("administrator"))?.id ?? "";
+}
+
 /** Asks signed out with the address proven. */
 async function provenAsk(token: string, json: { name: string; email: string; note?: string }) {
   const b = browser(t);
@@ -135,9 +143,7 @@ test("a link only asks: the same link every time, no sign-up from it, and an app
     }),
   ]);
 
-  const approved = await owner(`/api/app/organizations/${orgId}/join-requests/${request?.id}/approve`, {
-    json: { role: "member" },
-  });
+  const approved = await owner(`/api/app/organizations/${orgId}/join-requests/${request?.id}/approve`, { json: {} });
   const answer = (await approved.json()) as { outcome: string; url: string; emailed: boolean };
   expect(answer).toMatchObject({ outcome: "invited", emailed: true });
   expect(await requests(owner, orgId)).toEqual([]);
@@ -145,7 +151,7 @@ test("a link only asks: the same link every time, no sign-up from it, and an app
   const toAna = mailTo("ana@example.com").find((m) => m.subject === "Seu pedido para entrar foi aprovado");
   expect(toAna?.text).toContain(answer.url);
 
-  // The invitation opens sign-up for that address only, and joins as the role picked.
+  // The invitation opens sign-up for that address only, and joins as a member.
   const ana = browser(t);
   await signUp(ana, "ana@example.com");
   const invitation = answer.url.split("/invite/")[1] ?? "";
@@ -293,8 +299,9 @@ test("signed in: a confirmed address joins at approval; an unconfirmed one gets 
   const [request] = await requests(owner, orgId);
   expect(request).toMatchObject({ email: "bia@example.com", confirmed: true });
 
+  const admin = await adminRole(owner, orgId);
   const res = await owner(`/api/app/organizations/${orgId}/join-requests/${request?.id}/approve`, {
-    json: { role: "admin" },
+    json: { roleIds: [admin] },
   });
   expect(await res.json()).toEqual({ outcome: "joined" });
   expect(await preview(bia)).toEqual({
@@ -303,8 +310,19 @@ test("signed in: a confirmed address joins at approval; an unconfirmed one gets 
     email: "bia@example.com",
     request: { status: "approved", reason: null },
   });
-  const me = (await (await bia("/api/app/me")).json()) as { organizations: { id: string; role: string }[] };
-  expect(me.organizations).toEqual([expect.objectContaining({ id: orgId, role: "admin" })]);
+  const me = (await (await bia("/api/app/me")).json()) as {
+    organizations: { id: string; role: string; permissions: string[] }[];
+  };
+  // With the roles picked: the Admin role, so everything but ownership.
+  expect(me.organizations).toEqual([
+    expect.objectContaining({
+      id: orgId,
+      role: "member",
+      rank: 0,
+      permissions: expect.arrayContaining(["administrator", "manage_members"]),
+    }),
+  ]);
+  expect(me.organizations[0]?.permissions).not.toContain("manage_owners");
   expect((await ask(bia, token, {})).status).toBe(409);
 
   // Not confirmed: the account's own address proves itself with a code, which never confirms the account.
@@ -319,14 +337,14 @@ test("signed in: a confirmed address joins at approval; an unconfirmed one gets 
   const [account] = await t.db.select().from(schema.users).where(eq(schema.users.email, "cris@example.com"));
   expect(account?.emailVerified).toBe(false);
   const invited = await owner(`/api/app/organizations/${orgId}/join-requests/${unconfirmed?.id}/approve`, {
-    json: { role: "member" },
+    json: {},
   });
   expect(await invited.json()).toMatchObject({ outcome: "invited" });
   // Confirmed accounts never need one.
   expect(await errorCode(await sendCode(bia, token))).toBe("join.verified");
 });
 
-test("members' open apps hear whoever joins, changes role or leaves, to read the people again", async () => {
+test("members' open apps hear whoever joins, changes roles or leaves, to read the people again", async () => {
   const { owner, orgId, token } = await start({ ALLOW_SIGNUP: "true" });
   let heard = 0;
   t.adapters.pubsub.subscribe(orgTopic(orgId), (e) => {
@@ -337,13 +355,14 @@ test("members' open apps hear whoever joins, changes role or leaves, to read the
   await t.db.update(schema.users).set({ emailVerified: true }).where(eq(schema.users.email, "bia@example.com"));
   await ask(bia, token, {});
   const [request] = await requests(owner, orgId);
-  await owner(`/api/app/organizations/${orgId}/join-requests/${request?.id}/approve`, { json: { role: "member" } });
+  await owner(`/api/app/organizations/${orgId}/join-requests/${request?.id}/approve`, { json: {} });
   expect(heard).toBe(1);
   const cai = await joinByInvitation(t, owner, orgId, "cai@example.com");
   expect(heard).toBe(2);
   const { user } = (await (await cai("/api/app/me")).json()) as { user: { id: string } };
   const member = `/api/app/organizations/${orgId}/members/${user.id}`;
-  expect((await owner(member, { method: "PATCH", json: { role: "admin" } })).status).toBe(204);
+  const roles = { roleIds: [await adminRole(owner, orgId)] };
+  expect((await owner(`${member}/roles`, { method: "PUT", json: roles })).status).toBe(200);
   expect(heard).toBe(3);
   expect((await owner(member, { method: "DELETE" })).status).toBe(204);
   expect(heard).toBe(4);
@@ -356,7 +375,7 @@ test("only admins see and answer requests; asks must come from our own pages", a
   const member = await joinByInvitation(t, owner, orgId, "member@example.com");
   const calls = (b: Browser) => [
     b(`/api/app/organizations/${orgId}/join-requests`),
-    b(`/api/app/organizations/${orgId}/join-requests/${request?.id}/approve`, { json: { role: "member" } }),
+    b(`/api/app/organizations/${orgId}/join-requests/${request?.id}/approve`, { json: {} }),
     b(`/api/app/organizations/${orgId}/join-requests/${request?.id}/deny`, { json: {} }),
     b(`/api/app/organizations/${orgId}/invite-links`),
     b(`/api/app/organizations/${orgId}/invite-links`, { json: {} }),

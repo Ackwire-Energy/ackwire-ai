@@ -294,8 +294,15 @@ export async function joinByInvitation(
   email: string,
   options: { role?: "member" | "admin"; as?: Browser } = {},
 ) {
+  // `admin`: invited with the workspace's role that holds `administrator` (its "Admin", ADR 0081).
+  let roleIds: string[] = [];
+  if (options.role === "admin") {
+    const res = await admin(`/api/app/organizations/${orgId}/roles`);
+    const { roles } = (await res.json()) as { roles: { id: string; permissions: string[] }[] };
+    roleIds = roles.filter((r) => r.permissions.includes("administrator")).map((r) => r.id).slice(0, 1);
+  }
   const invited = await admin(`/api/app/organizations/${orgId}/invitations`, {
-    json: { email, role: options.role ?? "member" },
+    json: { email, roleIds },
   });
   if (invited.status !== 201) throw new Error(`invite failed: ${invited.status} ${await invited.text()}`);
   const token = ((await invited.json()) as { url: string }).url.split("/invite/")[1] ?? "";

@@ -39,7 +39,7 @@ export function MeScreen() {
   const theme = useTheme();
   const dir = useDirectory();
   const issues = useIssues(org.orgId);
-  const admin = can(org.org?.role, "manage_credentials");
+  const admin = can(org.org, "manage_credentials");
   const credentials = useCredentials(org.orgId, admin);
   const liveKeys = (credentials.data ?? []).filter((k) => !k.revokedAt).length;
   // What the agents think with: the computers' own sign-ins and the person's accounts ("Contas de IA" counts them,
@@ -49,9 +49,9 @@ export function MeScreen() {
   const accounts = groupPlans(ai.data?.accounts ?? []);
   const plans = own.length + accounts.length;
   const c = useColors();
-  // Membros, for whoever manages them (the requests to join and the invitation link live there).
-  const manager = can(org.org?.role, "manage_members");
-  const requests = useJoinRequests(org.orgId, manager);
+  // Membros, for who invites people or manages members (the requests to join and the invitation link live there).
+  const manager = can(org.org, "invite_people") || can(org.org, "manage_members");
+  const requests = useJoinRequests(org.orgId, can(org.org, "invite_people"));
   const waiting = requests.data?.length ?? 0;
   const push = usePushSwitch().on;
 
@@ -179,19 +179,21 @@ export function MeScreen() {
                 </Text>
               </Pressable>
             ))}
-            <Pressable
-              onPress={() => open("/new-agent")}
-              accessibilityRole="button"
-              accessibilityLabel={t("mobile.me.newAgent")}
-              style={styles.crewItem}
-            >
-              <View style={[styles.add, { borderColor: c.line2 }]}>
-                <Icon name="plus" size={22} color={c.faint} />
-              </View>
-              <Text variant="caption" tone="muted" numberOfLines={1}>
-                {t("mobile.me.newAgent")}
-              </Text>
-            </Pressable>
+            {can(org.org, "create_agents") ? (
+              <Pressable
+                onPress={() => open("/new-agent")}
+                accessibilityRole="button"
+                accessibilityLabel={t("mobile.me.newAgent")}
+                style={styles.crewItem}
+              >
+                <View style={[styles.add, { borderColor: c.line2 }]}>
+                  <Icon name="plus" size={22} color={c.faint} />
+                </View>
+                <Text variant="caption" tone="muted" numberOfLines={1}>
+                  {t("mobile.me.newAgent")}
+                </Text>
+              </Pressable>
+            ) : null}
           </ScrollView>
         </>
       ) : null}

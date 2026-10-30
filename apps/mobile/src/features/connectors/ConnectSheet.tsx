@@ -75,7 +75,7 @@ export function ConnectSheet({
   const catalog = useCatalog();
   const connections = useConnections(orgId);
   const servers = useCustomServers(orgId);
-  const admin = can(org?.role, "configure");
+  const admin = can(org, "manage_connectors");
   const existing =
     item ??
     connectionOf(def, connectedItems(connections.data ?? [], servers.data ?? [], catalog.data?.connectors ?? [def]));
@@ -198,7 +198,7 @@ export function AddressSheet() {
 export function ServerSheet({ item, start, fresh = false }: { item: ConnectedItem; start?: Step; fresh?: boolean }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const admin = can(org?.role, "configure");
+  const admin = can(org, "manage_connectors");
   const [step, setStep] = useState<Step>(() => firstStep(item, admin, start));
   const name = itemName(t, item);
   return (
@@ -260,7 +260,7 @@ function ConnectedSteps({
   const catalog = useCatalog();
   const connections = useConnections(orgId);
   const servers = useCustomServers(orgId);
-  const admin = can(org?.role, "configure");
+  const admin = can(org, "manage_connectors");
   const live =
     connectedItems(connections.data ?? [], servers.data ?? [], catalog.data?.connectors ?? []).find(
       (i) => i.id === connectionId,
@@ -610,7 +610,7 @@ function AgentLevel({ orgId, agentId, connectionId }: { orgId: string; agentId: 
   const resource = access.data ? resourcesOf(access.data).find((r) => r.id === `connector:${connectionId}`) : undefined;
   const current = saving ?? (resource ? levelOf(resource) : "none");
   // Giving an agent a connector is an admin's call, like its scopes (the server checks it again).
-  const mayChange = can(org?.role, "manage_agents");
+  const mayChange = can(org, "manage_agents");
   const choose = (level: Level) => {
     if (!resource || level === current) return;
     setSaving(level);

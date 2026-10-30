@@ -6,7 +6,7 @@ import type {
   MachineOs,
   MachinePause,
   MachineToolName,
-  Role,
+  OrgSummary,
   S3Input,
   Skill,
   StorageConfig,
@@ -23,8 +23,8 @@ import type { IconName } from "@/ui";
 
 /*
  * The workspace's settings on the phone, as the web's (`apps/web/src/pages/SettingsPage.tsx`): which sections each
- * role opens, the line the workspace's page shows under each area, and what the screens decide before they draw.
- * Pure, so it is unit-tested; the screens turn it into views.
+ * person opens (from their permissions, ADR 0081), the line the workspace's page shows under each area, and what the
+ * screens decide before they draw. Pure, so it is unit-tested; the screens turn it into views.
  */
 
 // ── Sections ────────────────────────────────────────────────────────────────
@@ -51,34 +51,40 @@ export interface SettingsEntry {
   /** The phone's screen for it. */
   href: string;
   /** Who opens it: the web's rule (`apps/web/src/pages/settings-sections.ts`), but for Membros (see there). */
-  allowed: (role: Role | undefined) => boolean;
+  allowed: (org: OrgSummary | null | undefined) => boolean;
 }
 
 /** The web's settings, in its order and groups (`settings.group.*`, `settings.section.*`), with the phone's screens. */
 export const SETTINGS_SECTIONS: readonly SettingsEntry[] = [
   { id: "general", group: "org", icon: "home", href: "/settings/general", allowed: () => true },
-  // Everyone on the web (a read-only list for members); the phone's Membros is the managers' (the requests to join
-  // and the invitation link), so it opens for them, as Você already does.
-  { id: "members", group: "org", icon: "members", href: "/me/members", allowed: (r) => can(r, "manage_members") },
-  // What agents did and people changed: admins only (it shows everyone's work).
-  { id: "audit", group: "org", icon: "shield", href: "/settings/audit", allowed: (r) => can(r, "configure") },
-  { id: "access", group: "agents", icon: "agent", href: "/settings/access", allowed: (r) => can(r, "configure") },
+  // Everyone on the web (a read-only list for members); the phone's Membros holds the requests to join and the
+  // invitation link, so it opens for who invites people or manages members, as Você already does.
+  {
+    id: "members",
+    group: "org",
+    icon: "members",
+    href: "/me/members",
+    allowed: (o) => can(o, "invite_people") || can(o, "manage_members"),
+  },
+  // What agents did and people changed: who may see the audit (it shows everyone's work).
+  { id: "audit", group: "org", icon: "shield", href: "/settings/audit", allowed: (o) => can(o, "view_audit") },
+  { id: "access", group: "agents", icon: "agent", href: "/settings/access", allowed: (o) => can(o, "manage_agents") },
   { id: "connectors", group: "agents", icon: "bolt", href: "/connectors", allowed: () => true },
-  { id: "skills", group: "agents", icon: "sparkle", href: "/settings/skills", allowed: (r) => can(r, "configure") },
+  { id: "skills", group: "agents", icon: "sparkle", href: "/settings/skills", allowed: (o) => can(o, "manage_agents") },
   // Every member sees the computers and connects one (ADR 0025).
-  { id: "computers", group: "agents", icon: "laptop", href: "/settings/computers", allowed: (r) => can(r, "read") },
+  { id: "computers", group: "agents", icon: "laptop", href: "/settings/computers", allowed: (o) => can(o, "read") },
   // Everyone (ADR 0063): tokens and percentages; money only for who has `view_usage`.
   { id: "usage", group: "costs", icon: "chart", href: "/usage", allowed: () => true },
   // "Contas de IA": everyone's own plans; the workspace's API keys only for who manages them.
-  { id: "keys", group: "costs", icon: "brain", href: "/ai-accounts", allowed: (r) => can(r, "read") },
-  { id: "storage", group: "costs", icon: "drive", href: "/settings/storage", allowed: (r) => can(r, "configure") },
-  { id: "import", group: "costs", icon: "archive", href: "/settings/import", allowed: (r) => can(r, "manage_agents") },
+  { id: "keys", group: "costs", icon: "brain", href: "/ai-accounts", allowed: (o) => can(o, "read") },
+  { id: "storage", group: "costs", icon: "drive", href: "/settings/storage", allowed: (o) => can(o, "configure") },
+  { id: "import", group: "costs", icon: "archive", href: "/settings/import", allowed: (o) => can(o, "create_agents") },
 ];
 
 export const SETTINGS_GROUPS: readonly SettingsGroup[] = ["org", "agents", "costs"];
 
-/** The sections this role opens, in order. */
-export const visibleSections = (role: Role | undefined) => SETTINGS_SECTIONS.filter((s) => s.allowed(role));
+/** The sections this membership opens, in order. */
+export const visibleSections = (org: OrgSummary | null | undefined) => SETTINGS_SECTIONS.filter((s) => s.allowed(org));
 
 // ── The workspace's page and Editar workspace ──────────────────────────────
 

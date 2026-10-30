@@ -37,7 +37,7 @@ export function ConnectionScreen({ id }: { id: string }) {
   const catalog = useCatalog();
   const connections = useConnections(orgId);
   const servers = useCustomServers(orgId);
-  const admin = can(org?.role, "configure");
+  const admin = can(org, "manage_connectors");
   const { y, onScroll } = useCoverScroll();
   const item = connectedItems(connections.data ?? [], servers.data ?? [], catalog.data?.connectors ?? []).find(
     (i) => i.id === id,

@@ -12,6 +12,7 @@ import {
   type Browser,
   browser,
   createTestServer,
+  joinByInvitation,
   listen,
   ORIGIN,
   pairComputer,
@@ -80,14 +81,8 @@ async function seeded() {
   await grantScopes(t.db, org.orgId, org.agentId, [{ connectionId: null, scope: DESKTOP_SCOPE }]);
   const desktop = `${base()}/api/desktop?orgId=${org.orgId}&agentId=${org.agentId}&mode=watch`;
   const terminal = `${base()}/api/terminal?orgId=${org.orgId}&agentId=${org.agentId}&cols=80&rows=24`;
-  /** Someone the owner invites, signed in. */
-  const invite = async (email: string, role: "admin" | "member") => {
-    const { url } = (await (await api("/invitations", { json: { email, role } })).json()) as { url: string };
-    const person = browser(t);
-    await signUp(person, email);
-    await person(`/api/app/invitations/${url.split("/invite/")[1]}/accept`, { json: {} });
-    return person;
-  };
+  /** Someone the owner invites, signed in (`admin`: with the workspace's Admin role). */
+  const invite = (email: string, role: "admin" | "member") => joinByInvitation(t, owner, org.orgId, email, { role });
   return { owner, org, machine, desktop, terminal, invite };
 }
 

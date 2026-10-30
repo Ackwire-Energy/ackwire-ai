@@ -103,17 +103,17 @@ describe("text", () => {
     ]);
     const first = addInvites([], "Marina@acme.com.br, joao@acme.com.br\nnão-é-email");
     expect(first).toEqual([
-      { email: "marina@acme.com.br", role: "member", valid: true },
-      { email: "joao@acme.com.br", role: "member", valid: true },
-      { email: "não-é-email", role: "member", valid: false },
+      { email: "marina@acme.com.br", admin: false, valid: true },
+      { email: "joao@acme.com.br", admin: false, valid: true },
+      { email: "não-é-email", admin: false, valid: false },
     ]);
-    // Already there: kept as is (its role too); nothing new returns the same list.
-    const admin = first.map((i) => (i.email === "joao@acme.com.br" ? { ...i, role: "admin" as const } : i));
+    // Already there: kept as is ("Admin" too); nothing new returns the same list.
+    const admin = first.map((i) => (i.email === "joao@acme.com.br" ? { ...i, admin: true } : i));
     expect(addInvites(admin, "joao@acme.com.br")).toBe(admin);
     expect(addInvites(admin, "  ,\n ")).toBe(admin);
-    expect(addInvites(admin, "ana@acme.com.br", "admin").at(-1)).toEqual({
+    expect(addInvites(admin, "ana@acme.com.br", true).at(-1)).toEqual({
       email: "ana@acme.com.br",
-      role: "admin",
+      admin: true,
       valid: true,
     });
     expect(validInvites(first).map((i) => i.email)).toEqual(["marina@acme.com.br", "joao@acme.com.br"]);
@@ -295,7 +295,7 @@ describe("guards and permissions", () => {
     // Another of theirs is set up: that one opens, last visited or not.
     expect(landingFor({ ...me, organizations: [mine, ...me.organizations] }, "n")).toEqual({ orgId: "a" });
     // Invited into one being set up, or finished: no onboarding of theirs.
-    expect(settingUp({ ...mine, role: "admin" })).toBe(false);
+    expect(settingUp({ ...mine, role: "member" })).toBe(false);
     expect(landingFor({ ...me, organizations: [{ ...mine, role: "member" }] }, null)).toEqual({ orgId: "n" });
     expect(settingUp({ id: "n", name: "N", role: "owner" })).toBe(false);
   });
@@ -337,12 +337,14 @@ describe("guards and permissions", () => {
     expect(aheadOf({ step: "ai", finished: false }, "computer")).toBe(true);
     expect(aheadOf({ step: "done", finished: true }, "team")).toBe(true);
   });
-  test("role table mirrors the backend", () => {
-    expect(can("member", "post")).toBe(true);
-    expect(can("member", "manage_agents")).toBe(false);
-    expect(can("admin", "manage_members")).toBe(true);
-    expect(can("admin", "manage_owners")).toBe(false);
-    expect(can("owner", "manage_owners")).toBe(true);
+  test("what a membership may do is what the server resolved from its roles", () => {
+    const member = { id: "b", name: "B", role: "member" as const, permissions: ["read", "post"] };
+    expect(can(member, "post")).toBe(true);
+    expect(can(member, "manage_agents")).toBe(false);
+    const owner = { id: "a", name: "A", role: "owner" as const, permissions: ["read", "manage_owners", "configure"] };
+    expect(can(owner, "manage_owners")).toBe(true);
+    // No list: nothing (the server checks every request anyway).
+    expect(can({ id: "c", name: "C", role: "owner" as const }, "read")).toBe(false);
     expect(can(undefined, "read")).toBe(false);
   });
 });

@@ -143,7 +143,7 @@ function ConnectAiDialog({
   const navigate = useNavigate();
   const add = useAddCredential(org.id);
   // An API key is the organization's (admins); a plan thinks only for its owner's agents (ADR 0059 §3).
-  const mayAddKey = can(org.role, "manage_credentials");
+  const mayAddKey = can(org, "manage_credentials");
   const mine = dir.agents.filter((a) => a.ownerUserId === me.user.id);
   // An agent's card names whom to choose from. Opened for one agent, it is for that agent alone: the title names it,
   // so no For offers another. Anywhere else every agent of the viewer's stays a choice.

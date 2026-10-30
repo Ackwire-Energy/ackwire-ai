@@ -1768,9 +1768,7 @@ describe("Onboarding", () => {
     await click(button("Remover joao@acme.com.br"), 1);
     await click(button(/Convidar 1 pessoa/), 8);
     // Only the valid addresses are invited.
-    expect(calls(state, "orgs.invite").map((c) => c.args[1])).toEqual([
-      { email: "marina@acme.com.br", role: "member" },
-    ]);
+    expect(calls(state, "orgs.invite").map((c) => c.args[1])).toEqual([{ email: "marina@acme.com.br", roleIds: [] }]);
 
     expect(screen().getByRole("heading", { name: "Boas-vindas à Acme Saúde" })).toBeTruthy();
     expect(welcome()).toBe("Theo e Ada já estão no #general. Mandamos 1 convite por e-mail.");

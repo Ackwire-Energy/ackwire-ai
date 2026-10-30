@@ -460,7 +460,7 @@ export function Sidebar() {
           total={dir.agents.length}
           clear={() => [meRow.current?.querySelector(".ac-avatar")]}
         />
-        {can(org.role, "manage_agents") && (
+        {can(org, "create_agents") && (
           <Button asChild block variant="ghost" className="sidebar__create">
             <Link to="/org/$orgId/agents/new" params={{ orgId }} title={t("shell.createAgent")}>
               <Icon name="plus" />
@@ -578,8 +578,8 @@ const CATEGORY_KEY = "category:";
 /**
  * The channels (ADR 0080). With no categories, the "Canais" section as before. With them, the channels with
  * none come first with no header, then one section per category, like Agentes; closed, a category keeps the
- * open channel and the unread ones in sight (CSS). Admins arrange the categories; a channel's creator or an
- * admin moves it by dragging, from its right click in the desktop app ("Mover para…") or in its details.
+ * open channel and the unread ones in sight (CSS). Who may manage channels arranges the categories; they and a
+ * channel's creator move it by dragging, from its right click in the desktop app ("Mover para…") or in its details.
  */
 function SidebarChannels({
   channels,
@@ -605,9 +605,10 @@ function SidebarChannels({
   const placeCategory = usePlaceChannelCategory(orgId);
   const removeCategory = useDeleteChannelCategory(orgId);
   const recreate = useCreateChannelCategory(orgId);
-  const admin = can(org.role, "configure");
-  const mayCreate = can(org.role, "create_channels");
-  const mayMove = (c: Channel) => c.createdByUserId === me.user.id || can(org.role, "manage_members");
+  const manages = can(org, "manage_channels");
+  const mayCreate = can(org, "create_channels");
+  // A channel's creator edits and moves it too, as the server allows.
+  const mayChange = (c: Channel) => c.createdByUserId === me.user.id || manages;
   const [newCategory, setNewCategory] = useState<{ withChannel?: string } | null>(null);
   const [renaming, setRenaming] = useState<ChannelCategory | null>(null);
   const [moving, setMoving] = useState<Channel | null>(null);
@@ -690,7 +691,7 @@ function SidebarChannels({
   const channelMenu = (c: Channel) =>
     contextMenuHandler(() => {
       const entries: MenuEntry[] = [{ kind: "header", label: `#${c.name}` }];
-      if (admin)
+      if (mayChange(c))
         entries.push({
           kind: "item",
           id: "edit",
@@ -701,7 +702,7 @@ function SidebarChannels({
             void navigate({ to: "/org/$orgId/c/$channelId", params: { orgId, channelId: c.id } });
           },
         });
-      if (mayMove(c) && list.length > 0)
+      if (mayChange(c) && list.length > 0)
         entries.push({
           kind: "item",
           id: "move",
@@ -709,7 +710,7 @@ function SidebarChannels({
           icon: "move",
           run: () => setMoving(c),
         });
-      if (admin)
+      if (manages)
         entries.push({
           kind: "item",
           id: "new-category",
@@ -770,7 +771,7 @@ function SidebarChannels({
         icon: "plus",
         run: () => onNewChannel(category.id),
       });
-    if (admin)
+    if (manages)
       actions.push({
         id: "rename",
         label: t("channelCategories.rename"),
@@ -783,7 +784,7 @@ function SidebarChannels({
       icon: "list",
       run: () => sections.setAll(categoryIds, allClosed),
     });
-    if (admin)
+    if (manages)
       actions.push(
         {
           id: "new-category",
@@ -814,7 +815,7 @@ function SidebarChannels({
         title={`#${c.name}`}
         data-unread={unread > 0}
         data-drop={dropMark(`channel:${c.id}`)}
-        draggable={list.length > 0 && mayMove(c)}
+        draggable={list.length > 0 && mayChange(c)}
         onDragStart={(e) => startDrag(e, { kind: "channel", id: c.id })}
         onDragEnd={endDrag}
         onDragOver={(e) => overChannel(e, c)}
@@ -854,10 +855,10 @@ function SidebarChannels({
         withChannel={newCategory?.withChannel}
       />
       <RenameCategoryDialog category={renaming} onOpenChange={(open) => !open && setRenaming(null)} />
-      <MoveChannelDialog channel={moving} onOpenChange={(open) => !open && setMoving(null)} canCreate={admin} />
+      <MoveChannelDialog channel={moving} onOpenChange={(open) => !open && setMoving(null)} canCreate={manages} />
     </>
   );
-  const newCategoryRow = admin && (
+  const newCategoryRow = manages && (
     <button type="button" className="sidebar__item sidebar__new-category" onClick={() => setNewCategory({})}>
       <Icon name="plus" />
       <span className="sidebar__item-label">{t("channelCategories.newCategory")}</span>
@@ -905,7 +906,7 @@ function SidebarChannels({
             className="sidebar__section--category"
             headProps={
               {
-                draggable: admin,
+                draggable: manages,
                 "data-drop": dropMark(`${CATEGORY_KEY}${category.id}`),
                 onDragStart: (e) => startDrag(e, { kind: "category", id: category.id }),
                 onDragEnd: endDrag,
@@ -1323,7 +1324,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
             </MenuOverlayRow>
           )}
           {budgetUsed !== null &&
-            (can(org.role, "view_usage") ? (
+            (can(org, "view_usage") ? (
               <MenuOverlayItem
                 icon="wallet"
                 shortcut="4"
@@ -1424,9 +1425,9 @@ function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
   const { org, me } = useOrg();
   const navigate = useNavigate();
   const overview = useOverview(org.id);
-  const admin = can(org.role, "configure");
+  const managesAgents = can(org, "manage_agents");
   const connections = useConnections(org.id);
-  const skills = useSkills(org.id, admin);
+  const skills = useSkills(org.id, managesAgents);
   const go = (section?: SettingsSection) => () => {
     onDone();
     void (section
@@ -1438,7 +1439,7 @@ function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
   return (
     <>
       <MenuOverlayGroup label={t("shell.workspaceMenuOf", { name: org.name })}>
-        {can(org.role, "manage_members") && (
+        {can(org, "invite_people") && (
           <MenuOverlayItem icon="plus" shortcut={next()} description={t("shell.inviteHint")} onSelect={go("members")}>
             {t("shell.invite")}
           </MenuOverlayItem>
@@ -1454,12 +1455,12 @@ function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
         >
           {t("settings.section.connectors")}
         </MenuOverlayItem>
-        {admin && (
+        {managesAgents && (
           <MenuOverlayItem icon="agent" shortcut={next()} onSelect={go("access")}>
             {t("settings.section.access")}
           </MenuOverlayItem>
         )}
-        {admin && (
+        {managesAgents && (
           <MenuOverlayItem
             icon="book"
             shortcut={next()}

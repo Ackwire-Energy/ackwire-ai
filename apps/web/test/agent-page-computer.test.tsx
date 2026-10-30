@@ -5,7 +5,7 @@ setupDom();
 
 import type { ComputerSetup, DesktopStatus, Machine } from "@agenteschat/client";
 import { cleanup, within } from "@testing-library/react";
-import { ADA_ID, createFakeApi, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, fakeBrowserOf, fakeMachinesOf, meAsAdmin, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -28,7 +28,9 @@ interface Options {
 async function entryOf(o: Options = {}) {
   const state = seedState();
   const org = state.me?.organizations[0];
-  if (org && o.role) org.role = o.role;
+  // An admin: a member with the "Admin" role (ADR 0081).
+  if (o.role === "admin") meAsAdmin(state);
+  else if (org && o.role) org.role = o.role;
   if (org && o.standing) org.standing = { state: o.standing, reason: null };
   const api = createFakeApi(state);
   const fake = fakeBrowserOf.get(api);

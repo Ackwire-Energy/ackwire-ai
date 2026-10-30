@@ -188,7 +188,7 @@ export function TeamPage() {
             </p>
           )}
         </div>
-        {can(org.role, "manage_agents") && (
+        {can(org, "create_agents") && (
           <Button asChild variant="primary" icon="plus">
             <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }}>
               {t("shell.createAgent")}

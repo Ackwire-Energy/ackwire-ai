@@ -24,7 +24,7 @@ import {
   setAgentBrain,
   ValidationError,
 } from "../src";
-import { addMember, addUser, type Fixture, setup } from "./fixtures";
+import { addMember, addUser, type Fixture, makeAdmin, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
 let f: Fixture;
@@ -211,10 +211,7 @@ describe("who can talk to the agent", () => {
       target: { type: "channel" as const, channelId: f.general.id },
       trigger: { type: "schedule" as const, phrase: "todo dia às 9h" },
     };
-    await f.db
-      .update(schema.organizationMembers)
-      .set({ role: "admin" })
-      .where(eq(schema.organizationMembers.userId, bia.id));
+    await makeAdmin(f.db, f.org.id, bia.id);
     const routine = await createRoutine(routineDeps, bia.id, f.org.id, input);
     await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, { mode: "owner", userIds: [] });
     await expect(createRoutine(routineDeps, bia.id, f.org.id, input)).rejects.toMatchObject({ code: "audience.only" });

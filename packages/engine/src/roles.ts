@@ -48,8 +48,10 @@ export interface RoleView {
   hoist: boolean;
   /** How many people hold it (`everyone`: every member). */
   people: number;
-  /** Whether the person asking may change it (and give it). */
+  /** Whether the person asking may change it: they manage roles and stand above it. */
   editable: boolean;
+  /** Whether they may give it to people (invitations, requests to join, a person's roles): a role below theirs. */
+  givable: boolean;
 }
 
 /** The base role and an "Admin" that holds `administrator`, for a new workspace (as migration 0126 did for the rest). */
@@ -106,6 +108,7 @@ export async function listRoles(db: Database, actorId: string, orgId: string) {
     ...r,
     permissions: r.permissions.filter(isRolePermission),
     editable: mayEdit(actor, r),
+    givable: r.kind === "custom" && outranks(actor, r.position),
   }));
   return { roles, areas: PERMISSION_AREAS, colors: ROLE_COLORS, icons: ROLE_ICONS };
 }

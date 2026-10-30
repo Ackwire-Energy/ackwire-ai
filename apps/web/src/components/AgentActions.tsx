@@ -11,6 +11,7 @@ import {
   undoableNow,
 } from "@agenteschat/client/lib/actions";
 import { relativeTime, toYmd } from "@agenteschat/client/lib/format";
+import { can } from "@agenteschat/client/lib/permissions";
 import { cx, Icon, type IconName, onScreenNow } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
@@ -99,7 +100,11 @@ function Receipts({ message, list: server }: { message: Message; list: AgentActi
   const live = server.some((a) => actionPhase(a) !== "settled");
   const now = useVisibleNow(ref, live);
   const agent = dir.agentById.get(message.author.id ?? "");
-  const viewer = { userId: me.user.id, role: org.role, ownsAgent: agent?.ownerUserId === me.user.id };
+  const viewer = {
+    userId: me.user.id,
+    managesAgents: can(org, "manage_agents"),
+    ownsAgent: agent?.ownerUserId === me.user.id,
+  };
 
   const hold = (ids: string[], o: Override | null) =>
     setPending((p) => {

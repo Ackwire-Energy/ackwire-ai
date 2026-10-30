@@ -1,8 +1,10 @@
 import { useApi } from "@agenteschat/client";
+import { can } from "@agenteschat/client/lib/permissions";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet } from "react-native";
+import { useOrg } from "@/providers/org";
 import { Button, SheetScreen, Text } from "@/ui";
 import { busyAgents } from "../agents/logic";
 import { AgentFace } from "../shared/Face";
@@ -31,6 +33,8 @@ export function NewSheet() {
   const { t } = useTranslation();
   const api = useApi();
   const orgId = useOrgId();
+  // "Criar agente" only for who may create one (ADR 0081).
+  const createsAgents = can(useOrg().org, "create_agents");
   const dir = useDirectory();
   const list = useConversations();
   const openDm = useOpenDm();
@@ -56,7 +60,7 @@ export function NewSheet() {
 
   const noAgents = !dir.loading && targets.length === 0;
   const startItems = [
-    ...(noAgents
+    ...(noAgents || !createsAgents
       ? []
       : [
           {
@@ -88,7 +92,9 @@ export function NewSheet() {
           <Text variant="body" tone="muted" style={styles.lone}>
             {t("mobile.new.ask.noAgents")}
           </Text>
-          <Button variant="primary" wide icon="plus" label={t("mobile.agents.new")} onPress={() => openNewAgent()} />
+          {createsAgents ? (
+            <Button variant="primary" wide icon="plus" label={t("mobile.agents.new")} onPress={() => openNewAgent()} />
+          ) : null}
         </>
       ) : (
         <>

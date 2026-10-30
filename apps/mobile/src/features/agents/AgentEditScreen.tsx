@@ -28,11 +28,11 @@ export function AgentEditScreen({ id }: { id: string }) {
   const failed = useFailed();
   const dir = useDirectory();
   const meId = useMeId();
-  const role = useOrg().org?.role;
+  const org = useOrg().org;
   const agent = dir.agentById.get(id);
   const update = useUpdateAgent(useOrgId(), id);
   const fields = editableFields({
-    admin: can(role, "manage_agents"),
+    admin: can(org, "manage_agents"),
     owner: Boolean(meId && agent?.ownerUserId === meId),
   });
   const saved = useMemo<AgentDraft | null>(

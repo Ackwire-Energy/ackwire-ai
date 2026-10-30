@@ -192,7 +192,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
   const dir = useDirectory(org.id);
   const models = useModels();
   const openPanel = useOpenAgentPanel();
-  const seesSpend = can(org.role, "view_usage") || agent.ownerUserId === me.user.id;
+  const seesSpend = can(org, "view_usage") || agent.ownerUserId === me.user.id;
   const owner = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId)?.name : null;
   const model = isAuto(agent.model)
     ? t("brain.auto.label")

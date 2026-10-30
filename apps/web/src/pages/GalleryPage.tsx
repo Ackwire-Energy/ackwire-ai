@@ -129,7 +129,7 @@ export function GalleryPage() {
               onValueChange={setRole}
               options={[
                 { value: "member", label: "Membro", description: "Conversa, cria issues, aprova os próprios agentes" },
-                { value: "admin", label: "Admin", description: "Também gerencia membros, agentes e chaves" },
+                { value: "owner", label: "Dono", description: "Pode tudo, inclusive passar a posse do workspace" },
               ]}
             />
           </Field>

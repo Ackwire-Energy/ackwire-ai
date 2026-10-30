@@ -52,7 +52,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
   const g = agentGrammar(t, name);
   const ownerFirst = agent?.ownerUserId ? dir.memberById.get(agent.ownerUserId)?.name.split(" ")[0] : undefined;
   // As on the web: its owner and admins load it, members don't.
-  const allowed = (meId !== null && agent?.ownerUserId === meId) || can(org?.role, "manage_agents");
+  const allowed = (meId !== null && agent?.ownerUserId === meId) || can(org, "manage_agents");
   const brain = useAgentBrain(orgId, agentId, allowed);
   const [busy, setBusy] = useState(false);
   // Looking at the plan: its usage is looked up again (it comes back as `machine.updated`).

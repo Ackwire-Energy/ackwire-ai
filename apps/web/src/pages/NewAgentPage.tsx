@@ -139,7 +139,7 @@ interface Created {
 export function NewAgentPage() {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const allowed = can(org.role, "manage_agents");
+  const allowed = can(org, "create_agents");
   if (!allowed) {
     return (
       <main className="shell__main">

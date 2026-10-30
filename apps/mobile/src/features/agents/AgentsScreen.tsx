@@ -2,10 +2,12 @@ import { useAiStatus, useApprovals, useDms, useWorkingRuns } from "@agenteschat/
 import { waitingComputerByAgent } from "@agenteschat/client/lib/machine-outages";
 import { previewBody } from "@agenteschat/client/lib/message-body";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
+import { can } from "@agenteschat/client/lib/permissions";
 import { router } from "expo-router";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { useOrg } from "@/providers/org";
 import { Chip, EmptyState, Icon, LargeTitleScreen, LIST_PREVIEW, ListRow, PixelOrbit, SectionHeader, Text } from "@/ui";
 import { useMachineOutages } from "../outages/queries";
 import { AgentFace } from "../shared/Face";
@@ -25,7 +27,7 @@ const LIVE_ROWS = 8;
  * "Esperando você" (the exact request and since when), "Trabalhando agora" (what each one is on, since when,
  * with the pixel orbit), then "Livres" (its role in plain words, and when you last talked; first, dozing, the
  * ones waiting for their offline computer: "Esperando o MacBook Air"). Tapping an agent
- * opens its profile (Conversar is one tap there); "Novo agente" at the end.
+ * opens its profile (Conversar is one tap there); "Novo agente" at the end, for who may create one.
  */
 export function AgentsScreen() {
   const { t } = useTranslation();
@@ -33,6 +35,7 @@ export function AgentsScreen() {
   const c = useColors();
   const header = useTabHeader();
   const orgId = useOrgId();
+  const createsAgents = can(useOrg().org, "create_agents");
   const runs = useWorkingRuns(orgId);
   const dms = useDms(orgId);
   const approvals = useApprovals(orgId);
@@ -78,16 +81,18 @@ export function AgentsScreen() {
           ))}
         </>
       ) : null}
-      <Pressable
-        onPress={() => router.push("/new-agent")}
-        accessibilityRole="button"
-        style={({ pressed }) => [styles.newRow, pressed && { backgroundColor: c.sunken }]}
-      >
-        <Tile icon="plus" size={36} />
-        <Text variant="callout" tone="ink2" style={styles.bold}>
-          {t("mobile.agents.new")}
-        </Text>
-      </Pressable>
+      {createsAgents ? (
+        <Pressable
+          onPress={() => router.push("/new-agent")}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.newRow, pressed && { backgroundColor: c.sunken }]}
+        >
+          <Tile icon="plus" size={36} />
+          <Text variant="callout" tone="ink2" style={styles.bold}>
+            {t("mobile.agents.new")}
+          </Text>
+        </Pressable>
+      ) : null}
     </LargeTitleScreen>
   );
 }

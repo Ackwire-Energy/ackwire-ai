@@ -263,7 +263,10 @@ describe("Membros", () => {
     const people = screen().getByRole("region", { name: "Pessoas" });
     expect(people.textContent).toContain("Walter (você)");
     expect(people.textContent).toContain("Ativo agora");
-    expect(within(people).getByRole("combobox", { name: "Papel de João" }).textContent).toContain("Admin");
+    // Each person's roles as chips (ADR 0081), and a "+" to give or take them.
+    const joao = within(people).getByText("João").closest(".ac-list__row") as HTMLElement;
+    expect(joao.querySelector(".members-roles")?.textContent).toContain("Admin");
+    expect(within(joao).getByRole("button", { name: "Papéis de João" })).toBeTruthy();
     const agents = screen().getByRole("region", { name: "Agentes" });
     expect(agents.textContent).toContain("Ada · Dev");
     expect(agents.textContent).toContain("Responsável: João");
@@ -276,7 +279,7 @@ describe("Membros", () => {
     state.invitations.push({
       id: "inv-old",
       email: "rafa@acme.com.br",
-      role: "admin",
+      role: "member",
       status: "expired",
       expiresAt: new Date(Date.now() - 86_400_000).toISOString(),
       createdAt: new Date(Date.now() - 8 * 86_400_000).toISOString(),
@@ -294,7 +297,7 @@ describe("Membros", () => {
     await settle(6);
     expect(state.calls.find((c) => c.method === "orgs.inviteMany")?.args[1]).toEqual({
       emails: ["carla@acme.com.br", "joao@acme.com.br"],
-      role: "member",
+      roleIds: [],
     });
     expect(document.body.textContent).toContain("joao@acme.com.br já faz parte do workspace.");
     expect((input as HTMLInputElement).value).toBe("joao@acme.com.br");

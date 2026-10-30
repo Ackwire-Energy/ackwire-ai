@@ -301,17 +301,17 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     [live.consults, isThread, threadId, topIds],
   );
 
-  // "Parar" in the working line (as on the web): admins, the agent's owner, or who started it.
-  const role = useOrg().org?.role;
+  // "Parar" in the working line (as on the web): who manages agents, the agent's owner, or who started it.
+  const manageAgents = can(useOrg().org, "manage_agents");
   const canStop = useCallback(
     (r: LiveRun) =>
       mayStopRun(r, {
         meId,
-        manageAgents: can(role, "manage_agents"),
+        manageAgents,
         agentOwnerId: dir.agentById.get(r.agentId)?.ownerUserId,
         messages: list,
       }),
-    [meId, role, dir.agentById, list],
+    [meId, manageAgents, dir.agentById, list],
   );
   const { stop } = live;
   const stopRun = useCallback(

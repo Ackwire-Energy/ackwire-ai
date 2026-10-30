@@ -1,6 +1,7 @@
 import { useAuthConfig, useChannels, useForumTopics, useWikiTree } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { setDraftFor } from "@agenteschat/client/lib/drafts";
+import { can } from "@agenteschat/client/lib/permissions";
 import { Avatar, CommandPalette, Icon, type PaletteItem } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -129,17 +130,18 @@ export function CommandMenu() {
         onSelect: () => void navigate({ to: "/org/$orgId/wiki/$slug", params: { orgId, slug: p.slug } }),
       });
     }
-    list.push({
-      key: "w:new",
-      group: goTo,
-      label: t("palette.wikiNew"),
-      sub: t("shell.wiki"),
-      keywords: t("palette.newWikiKeywords"),
-      mark: <Icon name="plus" size={16} />,
-      onSelect: () => void navigate({ to: "/org/$orgId/wiki", params: { orgId }, search: { new: "" } }),
-    });
+    if (can(org, "edit_wiki"))
+      list.push({
+        key: "w:new",
+        group: goTo,
+        label: t("palette.wikiNew"),
+        sub: t("shell.wiki"),
+        keywords: t("palette.newWikiKeywords"),
+        mark: <Icon name="plus" size={16} />,
+        onSelect: () => void navigate({ to: "/org/$orgId/wiki", params: { orgId }, search: { new: "" } }),
+      });
     for (const s of SETTINGS_SECTIONS) {
-      if (!s.allowed(org.role, server)) continue;
+      if (!s.allowed(org, server)) continue;
       list.push({
         key: `s:${s.id}`,
         group: goTo,
@@ -158,8 +160,7 @@ export function CommandMenu() {
     dir.agents,
     dir.members,
     me.user.id,
-    org.id,
-    org.role,
+    org,
     server,
     navigate,
     t,

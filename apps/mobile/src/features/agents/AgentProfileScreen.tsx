@@ -111,7 +111,7 @@ function Profile({ id }: { id: string }) {
   const sheet = useSheet();
   const when = useWhen();
   const meId = useMeId();
-  const role = useOrg().org?.role;
+  const org = useOrg().org;
   const insets = useSafeAreaInsets();
   // The cover's sky lags behind the scroll and stretches on pull; the agent fades as it nears the bar.
   const { y, onScroll } = useCoverScroll();
@@ -137,8 +137,8 @@ function Profile({ id }: { id: string }) {
   const roleName = (agent?.role || detail.data?.role || "").trim();
   const plain = plainRole(agent?.instructions || detail.data?.instructions);
   const busy = work.length > 0;
-  const editable = canEditMemories(agent, { id: meId, role });
-  const decides = mine || can(role, "manage_agents");
+  const editable = canEditMemories(agent, { id: meId, org });
+  const decides = mine || can(org, "manage_agents");
   const did = didLines(forYou.data?.items);
   const memories = knownAboutMe(knows.data);
   const uses = usesOf(access.data);

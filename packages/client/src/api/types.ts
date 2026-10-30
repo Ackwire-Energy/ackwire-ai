@@ -232,8 +232,10 @@ export interface OrgRole {
   mentionable: boolean;
   hoist: boolean;
   people: number;
-  /** Whether you may change it and give it (it is below your own). */
+  /** Whether you may change it (you manage roles and it is below your own). */
   editable: boolean;
+  /** Whether you may give it to people: it is below your own. */
+  givable: boolean;
 }
 
 /** A permission area: its "use" keys and every key (its "manage" level). */
@@ -1185,6 +1187,8 @@ export interface Person {
   name: string;
   email: string;
   image: string | null;
+  /** The photo uploaded here (`PUT …/me/avatar`); wins over `image`. */
+  avatarUrl?: string | null;
   role: Role;
   /** Their roles (`OrgRole` ids), not `everyone`. */
   roleIds?: string[];

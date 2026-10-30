@@ -130,12 +130,12 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
   const toast = useToast();
   const navigate = useNavigate();
   const dir = useDirectory(org.id);
-  const admin = can(org.role, "manage_agents");
+  const admin = can(org, "manage_agents");
   const viewer: Viewer = admin ? "admin" : agent.ownerUserId === me.user.id ? "owner" : "member";
   const models = useModels();
   const detail = useAgentDetail(org.id, agent.id);
   const settings = useSettings(org.id);
-  const credentials = useCredentials(org.id, can(org.role, "manage_credentials"));
+  const credentials = useCredentials(org.id, can(org, "manage_credentials"));
   const access = useAgentAccess(org.id, agent.id);
   const repos = useAgentRepos(org.id, agent.id);
   const library = useAgentSkills(org.id, agent.id);

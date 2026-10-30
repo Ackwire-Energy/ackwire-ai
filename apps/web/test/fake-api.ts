@@ -36,6 +36,7 @@ import type {
   Member,
   Memory,
   Message,
+  OrgRole,
   PlanAccountUsage,
   Proposal,
   ReactionCount,
@@ -53,6 +54,7 @@ import type {
 import { ApiError } from "@agenteschat/client";
 import { answersOthers, audienceOf } from "@agenteschat/client/lib/audience";
 import { stepIndex } from "@agenteschat/client/lib/onboarding";
+import { grants, SUMMARY_ORDER } from "@agenteschat/client/lib/roles";
 import { createFakeAccess } from "./fakes/access";
 import { createMockArtifacts } from "./fakes/artifacts";
 import { createFakeBrowser, type FakeBrowser } from "./fakes/browser";
@@ -239,7 +241,80 @@ export interface FakeState {
   approval?: JoinApproval;
   /** Make `joinRequests.approve` and `deny` fail with this error (`join.answered`…). */
   answerError?: ApiError;
+  /** The workspace's roles (ADR 0081, `roles.*`); unset: a new workspace's (`seedRoles`). */
+  roles?: OrgRole[];
 }
+
+/** A new workspace's "Admin" role (ADR 0081); João holds it. */
+export const ADMIN_ROLE_ID = "role-admin";
+
+/** A new workspace's roles, as the server makes them: "Admin" (`administrator`) and `everyone`. */
+export function seedRoles(): OrgRole[] {
+  const role = { mentionable: false, hoist: false, people: 0, editable: true, givable: true };
+  return [
+    {
+      ...role,
+      id: ADMIN_ROLE_ID,
+      kind: "custom",
+      name: "Admin",
+      icon: "shield",
+      color: "indigo",
+      position: 0,
+      permissions: ["administrator"],
+    },
+    {
+      ...role,
+      id: "role-everyone",
+      kind: "everyone",
+      name: "everyone",
+      icon: "audienceEveryone",
+      color: "graphite",
+      position: 1,
+      permissions: [
+        "post",
+        "create_channels",
+        "talk_to_agents",
+        "assign_work",
+        "pair_computers",
+        "edit_wiki",
+        "upload_files",
+      ],
+    },
+  ];
+}
+
+/** Me as a member who holds the "Admin" role (ADR 0081): what an admin was before roles. */
+export function meAsAdmin(state: FakeState) {
+  const org = state.me?.organizations[0];
+  if (org) org.role = "member";
+  const me = state.members.find((m) => m.userId === state.me?.user.id);
+  if (me) me.roleIds = [ADMIN_ROLE_ID];
+}
+
+/** The permission areas `roles.list` sends (the server's `PERMISSION_AREAS`). */
+const PERMISSION_AREAS = [
+  { id: "chat", use: ["post", "create_channels"], keys: ["post", "create_channels", "manage_channels"] },
+  {
+    id: "agents",
+    use: ["talk_to_agents", "assign_work", "manage_routines"],
+    keys: ["talk_to_agents", "assign_work", "manage_routines", "approve_actions", "create_agents", "manage_agents"],
+  },
+  {
+    id: "tools",
+    use: ["pair_computers", "control_computers"],
+    keys: ["pair_computers", "control_computers", "manage_connectors", "manage_credentials"],
+  },
+  {
+    id: "knowledge",
+    use: ["edit_wiki", "upload_files"],
+    keys: ["edit_wiki", "upload_files", "review_memory"],
+  },
+  {
+    id: "org",
+    use: ["invite_people"],
+    keys: ["invite_people", "view_usage", "view_audit", "configure", "manage_members", "manage_roles", "manage_billing"],
+  },
+];
 
 /** A small in-memory backend with the design's demo data ("Acme"). */
 export function seedState(overrides: Partial<FakeState> = {}): FakeState {
@@ -258,7 +333,8 @@ export function seedState(overrides: Partial<FakeState> = {}): FakeState {
     name: "João",
     email: "joao@acme.com.br",
     image: null,
-    role: "admin",
+    role: "member",
+    roleIds: [ADMIN_ROLE_ID],
     joinedAt: minutesAgo(60 * 24 * 20),
     handle: "joao",
     timezone: "Europe/Lisbon",
@@ -756,6 +832,24 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
     if (!state.me) throw new ApiError(401, "unauthorized", "Sign in to continue");
     return state.me;
   };
+  const roles = () => {
+    state.roles ??= seedRoles();
+    return state.roles;
+  };
+  // What each membership may do, as the server resolves it (ADR 0081): an owner everything, a member what their
+  // roles and `everyone` give. A test may set `permissions` itself.
+  const withPermissions = (me: Me): Me => ({
+    ...me,
+    organizations: me.organizations.map((o) => {
+      if (o.permissions) return o;
+      if (o.role === "owner") return { ...o, permissions: ["read", "manage_owners", ...SUMMARY_ORDER] };
+      const mine = state.members.find((m) => m.userId === me.user.id)?.roleIds ?? [];
+      const keys = roles()
+        .filter((r) => r.kind === "everyone" || mine.includes(r.id))
+        .flatMap((r) => r.permissions);
+      return { ...o, permissions: ["read", ...grants(keys)] };
+    }),
+  });
   // "Quem pensa": every agent starts on the API, with a MacBook that has Claude Code and Codex.
   const brains = new Map<string, AgentBrain>();
   const brainOf = (agentId: string): AgentBrain => {
@@ -838,7 +932,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (humanCheck !== undefined) state.calls.push({ method: "account.signInOptions", args: [input, humanCheck] });
         return state.signInOptions ?? { account: false, password: false, providers: [], canSignUp: true };
       },
-      me: async () => state.me,
+      me: async () => state.me && withPermissions(state.me),
       updateMe: async (input) => {
         log("account.updateMe", input);
       },
@@ -866,6 +960,61 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       stale: async (ids) => {
         log("push.stale", ids);
         return ids.filter((id) => state.stalePushIds?.includes(id));
+      },
+    },
+    roles: {
+      list: async (orgId) => {
+        log("roles.list", orgId);
+        return {
+          roles: roles().map((r) => ({
+            ...r,
+            people:
+              r.kind === "everyone"
+                ? state.members.length
+                : state.members.filter((m) => m.roleIds?.includes(r.id)).length,
+          })),
+          areas: structuredClone(PERMISSION_AREAS),
+          colors: ["indigo", "violet", "rose", "amber", "green", "teal", "graphite"],
+          icons: ["shield", "code", "wallet", "mail", "bolt", "flag", "book", "chart", "bulb", "globe", "person"],
+        };
+      },
+      create: async (orgId, input) => {
+        log("roles.create", orgId, input);
+        const role: OrgRole = {
+          id: id("role"),
+          kind: "custom",
+          name: input.name,
+          icon: input.icon ?? "shield",
+          color: input.color ?? "indigo",
+          position: roles().filter((r) => r.kind !== "everyone").length,
+          permissions: input.permissions ?? [],
+          mentionable: input.mentionable ?? false,
+          hoist: input.hoist ?? false,
+          people: 0,
+          editable: true,
+          givable: true,
+        };
+        state.roles = [...roles(), role];
+        return { id: role.id };
+      },
+      update: async (orgId, roleId, patch) => {
+        log("roles.update", orgId, roleId, patch);
+        state.roles = roles().map((r) => (r.id === roleId ? { ...r, ...patch } : r));
+      },
+      remove: async (orgId, roleId) => {
+        log("roles.remove", orgId, roleId);
+        state.roles = roles().filter((r) => r.id !== roleId);
+        for (const m of state.members) m.roleIds = m.roleIds?.filter((x) => x !== roleId);
+      },
+      reorder: async (orgId, ids) => {
+        log("roles.reorder", orgId, ids);
+        state.roles = roles().map((r) => (ids.includes(r.id) ? { ...r, position: ids.indexOf(r.id) } : r));
+      },
+      setFor: async (orgId, userId, roleIds) => {
+        log("roles.setFor", orgId, userId, roleIds);
+        const m = state.members.find((x) => x.userId === userId);
+        if (m) m.roleIds = [...roleIds];
+        return { roleIds: [...roleIds] };
       },
     },
     orgs: {
@@ -969,7 +1118,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("orgs.invite", orgId, input);
         if (state.members.some((m) => m.email === input.email))
           throw new ApiError(409, "conflict", `${input.email} is already a member`);
-        const invitation = newInvitation(input.email, input.role);
+        const invitation = newInvitation(input.email, input.role ?? "member", input.roleIds);
         state.invitations.push(invitation);
         return { invitation, url: `http://localhost:3000/invite/tok-${invitation.id}` };
       },
@@ -1031,7 +1180,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return input.emails.map((email) => {
           if (state.members.some((m) => m.email === email)) return { email, status: "already_member" as const };
           if (state.invitations.some((i) => i.email === email)) return { email, status: "already_invited" as const };
-          const inv = newInvitation(email, input.role);
+          const inv = newInvitation(email, "member", input.roleIds);
           state.invitations.push(inv);
           return {
             email,
@@ -1989,11 +2138,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
   }
 }
 
-function newInvitation(email: string, role: Role): InvitationWithStatus {
+function newInvitation(email: string, role: Role, roleIds: string[] = []): InvitationWithStatus {
   return {
     id: id("inv"),
     email,
     role,
+    roleIds,
     status: "pending",
     expiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
     createdAt: new Date().toISOString(),
@@ -2112,8 +2262,8 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
         state.calls.push({ method: "joinRequests.list", args: [orgId] });
         return structuredClone(state.joinRequests ?? []);
       },
-      approve: async (orgId, requestId, role) => {
-        state.calls.push({ method: "joinRequests.approve", args: [orgId, requestId, role] });
+      approve: async (orgId, requestId, roleIds) => {
+        state.calls.push({ method: "joinRequests.approve", args: [orgId, requestId, roleIds] });
         if (state.answerError) throw state.answerError;
         const request = state.joinRequests?.find((r) => r.id === requestId);
         state.joinRequests = state.joinRequests?.filter((r) => r.id !== requestId);
@@ -2123,7 +2273,8 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
             name: request.name,
             email: request.email,
             image: null,
-            role,
+            role: "member",
+            roleIds: roleIds ?? [],
             joinedAt: new Date().toISOString(),
             handle: requestId,
             timezone: "America/Sao_Paulo",

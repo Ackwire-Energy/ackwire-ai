@@ -82,7 +82,7 @@ export function ConnectAiSheet() {
     ready?: string;
   }>();
   // An API key is the organization's (admins); a plan thinks only for its owner's agents (ADR 0059 §3).
-  const mayAddKey = can(org?.role, "manage_credentials");
+  const mayAddKey = can(org, "manage_credentials");
   const mine = dir.agents.filter((a) => a.ownerUserId === meId);
   const named = params.agentId ? [params.agentId] : null;
   const agents = (named ? mine.filter((a) => named.includes(a.id)) : mine).map((a) => ({ id: a.id, name: a.name }));

@@ -36,7 +36,10 @@ const OrgRole = z
     mentionable: z.boolean(),
     hoist: z.boolean().openapi({ description: "Its people are listed apart." }),
     people: z.number().int(),
-    editable: z.boolean().openapi({ description: "Whether you may change it and give it: it is below your own." }),
+    editable: z.boolean().openapi({ description: "Whether you may change it: you manage roles and it is below your own." }),
+    givable: z
+      .boolean()
+      .openapi({ description: "Whether you may give it to people (invitations, requests, a person's roles): it is below your own." }),
   })
   .openapi("OrgRole");
 

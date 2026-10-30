@@ -9,7 +9,7 @@ import {
   type PlatformCredentials,
   type RealtimeEvent,
 } from "@agenteschat/adapters";
-import { type Database, schema, sql } from "@agenteschat/db";
+import { and, arrayContains, type Database, eq, schema, sql } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
 import { PROVIDER_IDS } from "@agenteschat/providers";
 import { createFakeEmbeddings, createFakeProvider, type FakeProvider } from "@agenteschat/providers/testing";
@@ -22,6 +22,7 @@ import {
   createArtifactToolSource,
   createAskAgentToolSource,
   createAskUserToolSource,
+  createDefaultRoles,
   createBlobStoreResolver,
   createCalendarToolSource,
   createChatToolSource,
@@ -50,7 +51,6 @@ import {
   type FakeScheduleAnswer,
   type FakeScheduleAnswers,
   localDateTimeOf,
-  type MemberRole,
   type SandboxDeps,
   type StorageDeps,
   type ToolSource,
@@ -66,9 +66,47 @@ export async function addUser(db: Database, name: string) {
   return { id, name, email: `${name}-${id.slice(-8)}@example.com` };
 }
 
-export async function addMember(db: Database, orgId: string, role: MemberRole, name: string = role) {
+/** How tests name people: `admin` is a member holding the workspace's "Admin" role (ADR 0081). */
+export type TestRole = "owner" | "admin" | "member";
+
+/** The workspace's base and "Admin" roles, made when a test inserted the workspace itself. */
+export async function ensureRoles(db: Database, orgId: string) {
+  const [base] = await db
+    .select({ id: schema.orgRoles.id })
+    .from(schema.orgRoles)
+    .where(and(eq(schema.orgRoles.orgId, orgId), eq(schema.orgRoles.kind, "everyone")));
+  if (!base) await createDefaultRoles(db, orgId);
+}
+
+/** The workspace's role holding `administrator` (its "Admin"). */
+export async function adminRoleId(db: Database, orgId: string) {
+  await ensureRoles(db, orgId);
+  const [role] = await db
+    .select({ id: schema.orgRoles.id })
+    .from(schema.orgRoles)
+    .where(
+      and(
+        eq(schema.orgRoles.orgId, orgId),
+        eq(schema.orgRoles.kind, "custom"),
+        arrayContains(schema.orgRoles.permissions, ["administrator"]),
+      ),
+    )
+    .limit(1);
+  if (!role) throw new Error("no administrator role");
+  return role.id;
+}
+
+/** Gives a member the workspace's "Admin" role. */
+export async function makeAdmin(db: Database, orgId: string, userId: string) {
+  const roleId = await adminRoleId(db, orgId);
+  await db.insert(schema.organizationMemberRoles).values({ orgId, userId, roleId }).onConflictDoNothing();
+}
+
+export async function addMember(db: Database, orgId: string, role: TestRole, name: string = role) {
   const user = await addUser(db, name);
-  await db.insert(schema.organizationMembers).values({ orgId, userId: user.id, role });
+  await ensureRoles(db, orgId);
+  await db.insert(schema.organizationMembers).values({ orgId, userId: user.id, role: role === "owner" ? "owner" : "member" });
+  if (role === "admin") await makeAdmin(db, orgId, user.id);
   return user;
 }
 
