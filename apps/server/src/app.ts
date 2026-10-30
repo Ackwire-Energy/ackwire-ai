@@ -205,7 +205,11 @@ export function createApp(options: AppOptions) {
       description: "Workspace where people and AI agents work together.",
     },
   });
-  api.get("/reference", Scalar({ url: "/api/openapi.json", pageTitle: "agentes.chat API" }));
+  // The interactive explorer loads its bundle from a CDN; keep it off the production origin, where a
+  // compromised CDN would run on the session's origin. The OpenAPI document itself stays available everywhere.
+  if (options.services?.config.NODE_ENV !== "production") {
+    api.get("/reference", Scalar({ url: "/api/openapi.json", pageTitle: "agentes.chat API" }));
+  }
 
   const app = new OpenAPIHono();
   app.onError((error, c) => {
