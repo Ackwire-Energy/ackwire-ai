@@ -214,6 +214,16 @@ export function createApp(options: AppOptions) {
     log.error("unhandled error", { method: c.req.method, path: c.req.path, error: String(error), stack: error.stack });
     return apiError(c, 500, "internal_error", "Something went wrong on our side");
   });
+  // Security headers on every response: the app may not be framed (clickjacking of approval, merge and deploy
+  // cards), <base> is pinned to our own origin, and HSTS is sent where the instance is served over TLS.
+  const httpsPublicUrl = options.services?.config.PUBLIC_URL?.startsWith("https:") ?? false;
+  app.use("*", async (c, next) => {
+    await next();
+    const h = c.res.headers;
+    if (!h.has("x-frame-options")) h.set("x-frame-options", "DENY");
+    if (!h.has("content-security-policy")) h.set("content-security-policy", "frame-ancestors 'none'; base-uri 'self'");
+    if (httpsPublicUrl && !h.has("strict-transport-security")) h.set("strict-transport-security", "max-age=63072000");
+  });
   // A CDN in front may cache by the path's extension, whatever the type: without this, a private
   // answer at a path that ends like a file (a skill's `data.csv`) would be served to anyone asking.
   app.use("/api/*", async (c, next) => {

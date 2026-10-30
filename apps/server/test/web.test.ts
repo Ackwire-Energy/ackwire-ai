@@ -62,6 +62,14 @@ describe("web app serving", () => {
     expect(missing.headers.get("cache-control")).toBe("no-store");
   });
 
+  test("every response refuses framing and pins the base URI (clickjacking defense)", async () => {
+    for (const path of ["/", "/login", "/api/health"]) {
+      const res = await app.request(path);
+      expect(res.headers.get("x-frame-options")).toBe("DENY");
+      expect(res.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
+    }
+  });
+
   test("the runner bundle: JavaScript, revalidated, and never index.html when missing", async () => {
     const res = await app.request("/runner/agentes-runner.mjs");
     expect(res.status).toBe(200);
