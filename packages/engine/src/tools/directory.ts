@@ -257,7 +257,8 @@ export const ON_DEMAND_USE = "use_tool";
  * (BM25, no model call) and `use_tool` runs one by its name, through the
  * gateway like any direct call. Its description names every group, so the
  * model knows what it can reach. The search ranks the run's `loaded` tools
- * too: a model that searches for a tool it already has is told to call it.
+ * too: a model that searches for a tool it already has is told to call it,
+ * never ahead of a better match.
  */
 function onDemandTools(tools: ToolDefinition[], sensitive: IsSensitive, loaded: ToolDefinition[]): ToolDefinition[] {
   const groups = deferrableGroups(tools);
@@ -373,8 +374,8 @@ export function compactSchema(schema: JsonSchema) {
 }
 
 /**
- * A search's answer. `loaded`: tools already in the model's list, ranked with the directory's in one pass;
- * those that match come first, to call directly.
+ * A search's answer. `loaded`: tools already in the model's list, ranked with the directory's in one pass.
+ * Those that outrank every other match open the answer, to call directly; any other keeps its rank, marked.
  */
 function findTools(
   tools: ToolDefinition[],
@@ -393,8 +394,9 @@ function findTools(
     return `No ${label} tool matches "${query}". Try other words (${areas.slice(0, 12).join(", ")}).`;
   }
   const listed = new Set(loaded);
-  const ready = matches.filter((t) => listed.has(t));
-  const more = matches.filter((t) => !listed.has(t));
+  const lead = matches.findIndex((t) => !listed.has(t));
+  const ready = lead < 0 ? matches : matches.slice(0, lead);
+  const more = matches.slice(ready.length);
   const parts: string[] = [];
   if (ready.length > 0) {
     const names = ready.map((t) => `- ${t.name}: ${t.description.slice(0, 300)}`);
@@ -403,9 +405,10 @@ function findTools(
     );
   }
   if (more.length > 0) {
-    const lines = more.map(
-      (t) =>
-        `- ${t.name}${sensitive(t) ? " (asks a person's approval; its input includes why)" : ""}: ${t.description.slice(0, 300)}\n  input: ${compactSchema(t.inputSchema)}`,
+    const lines = more.map((t) =>
+      listed.has(t)
+        ? `- ${t.name} (already in your tool list: call it directly): ${t.description.slice(0, 300)}`
+        : `- ${t.name}${sensitive(t) ? " (asks a person's approval; its input includes why)" : ""}: ${t.description.slice(0, 300)}\n  input: ${compactSchema(t.inputSchema)}`,
     );
     parts.push(`${label} tools for "${query}" (call one with ${useName}):\n${lines.join("\n")}`);
   }

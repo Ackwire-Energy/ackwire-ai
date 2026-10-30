@@ -6,7 +6,7 @@ import { BROWSER_SCOPE, DESKTOP_SCOPE } from "./browser/types";
 import { caches } from "./cache";
 import { capabilityKeys, summarizeScopes } from "./capabilities";
 import { agentDesktopUseStatus } from "./desktop/status";
-import type { MachineCaller } from "./machine-hub";
+import type { MachineCaller, MachineStatus } from "./machine-hub";
 import { requirePermission } from "./organizations";
 import { personBehindCall } from "./requester";
 import { getSandboxSettings, SANDBOX_SCOPE } from "./sandbox";
@@ -45,29 +45,43 @@ export async function rosterScopeNames(
   orgId: string,
   agentIds: string[],
 ) {
-  const rows = await agentScopeNames(db, orgId, agentIds);
-  const granted = [...new Set(rows.filter((r) => COMPUTER_SCOPES.has(r.scope)).map((r) => r.agentId))];
-  if (granted.length === 0) return rows;
-  const hub = machines ?? undefined;
-  const codeOn = (await getSandboxSettings(db, orgId)).enabled;
-  const served = new Map(
-    await Promise.all(
-      granted.map(async (agentId) => {
+  if (agentIds.length === 0) return [];
+  // Every run's context reads this: one round trip, and one read per computer however many agents share it.
+  const reads = new Map<string, Promise<MachineStatus | null>>();
+  const hub = machines
+    ? {
+        status: (id: string) => {
+          const read = reads.get(id) ?? machines.status(id);
+          reads.set(id, read);
+          return read;
+        },
+      }
+    : undefined;
+  const [rows, sandbox, statuses] = await Promise.all([
+    agentScopeNames(db, orgId, agentIds),
+    getSandboxSettings(db, orgId),
+    Promise.all(
+      agentIds.map(async (agentId) => {
         const [browser, desktop] = await Promise.all([
           agentBrowserStatus(db, hub, orgId, agentId),
           agentDesktopUseStatus(db, hub, orgId, agentId),
         ]);
-        // No computer, or a removed one, is what the browser's status checks first.
-        const computer = browser.available || !["no_machine", "machine_removed"].includes(browser.code);
-        const code = codeOn && computer && rows.some((r) => r.agentId === agentId && r.scope === SANDBOX_SCOPE);
-        const scopes = [
-          ...(code ? [SANDBOX_SCOPE] : []),
-          ...(browser.available ? [BROWSER_SCOPE] : []),
-          ...(code && desktop.available ? [DESKTOP_SCOPE] : []),
-        ];
-        return [agentId, new Set(scopes)] as const;
+        return { agentId, browser, desktop };
       }),
     ),
+  ]);
+  const served = new Map(
+    statuses.map(({ agentId, browser, desktop }) => {
+      // No computer, or a removed one, is what the browser's status checks first.
+      const computer = browser.available || !["no_machine", "machine_removed"].includes(browser.code);
+      const code = sandbox.enabled && computer && rows.some((r) => r.agentId === agentId && r.scope === SANDBOX_SCOPE);
+      const scopes = [
+        ...(code ? [SANDBOX_SCOPE] : []),
+        ...(browser.available ? [BROWSER_SCOPE] : []),
+        ...(code && desktop.available ? [DESKTOP_SCOPE] : []),
+      ];
+      return [agentId, new Set(scopes)] as const;
+    }),
   );
   return rows.filter((r) => !COMPUTER_SCOPES.has(r.scope) || served.get(r.agentId)?.has(r.scope));
 }

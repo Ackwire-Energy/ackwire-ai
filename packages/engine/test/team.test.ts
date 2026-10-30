@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { eq, schema } from "@agenteschat/db";
+import { countQueries, eq, inArray, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import { systemText } from "@agenteschat/providers";
 import {
@@ -7,6 +7,7 @@ import {
   agentScopeNames,
   createAgent,
   drainOutbox,
+  enableCaches,
   type MachineStatus,
   postPersonMessage,
   rosterScopeNames,
@@ -157,4 +158,21 @@ test("another agent's computer, browser and desktop are stated only where its co
   expect(served).toContain("Code");
   expect(served).toContain("Browser");
   expect(served).not.toContain("Desktop");
+});
+
+test("the roster reads a computer once, however many agents share it", async () => {
+  f = await setup({ machines: true });
+  const ids = (await Promise.all(["qa", "ops", "web"].map((h) => addAgent(h.toUpperCase(), h, "")))).map((a) => a.id);
+  const { machineId } = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "MacBook" });
+  await f.db.update(schema.agents).set({ machineId }).where(inArray(schema.agents.id, ids));
+  enableCaches();
+  try {
+    // A running server has the agents cached.
+    await rosterScopeNames(f.db, f.machineHub, f.org.id, ids);
+    const { queries } = await countQueries(() => rosterScopeNames(f.db, f.machineHub, f.org.id, ids));
+    // Their scopes, the code environment's switch and the computer.
+    expect(queries).toBeLessThanOrEqual(3);
+  } finally {
+    enableCaches(false);
+  }
 });
