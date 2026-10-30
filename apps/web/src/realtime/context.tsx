@@ -457,8 +457,14 @@ export function RealtimeProvider({
       // Notifications in this browser (ADR 0071): what was read, done or snoozed closes there too; a drop in
       // the badge ("Marcar tudo como lido") has one tab ask the server which shown ones went stale.
       if (isNotificationEvent(event)) settleShownPushes(orgId, event, notificationAudience().mine);
-      // In the desktop app: what a phone would get pushed, shown by the app while its window is in the background.
-      if (isNotificationEvent(event) && event.type === "notification.upserted" && inDesktopApp()) {
+      // In the desktop app: what a phone would get pushed, shown by the app while its window is in the background,
+      // unless the person turned that kind off (`alert`, ADR 0071 §8).
+      if (
+        isNotificationEvent(event) &&
+        event.type === "notification.upserted" &&
+        event.alert !== false &&
+        inDesktopApp()
+      ) {
         const notice = desktopNotice(tRef.current, orgId, event.notification);
         if (notice) void thisMac.notify(notice.title, notice.body, notice.path).catch(() => {});
       }
@@ -471,6 +477,11 @@ export function RealtimeProvider({
         void qc.invalidateQueries({ queryKey: keys.people(orgId) });
         void qc.invalidateQueries({ queryKey: keys.members(orgId) });
         void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
+      }
+      // Someone arranged the sidebar's channel categories (ADR 0080): channels and categories refetch.
+      if (event.type === "channels.layout") {
+        void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
+        void qc.invalidateQueries({ queryKey: keys.channelCategories(orgId) });
       }
       // Someone changed the calendar: the open ranges refetch.
       if (event.type === "calendar.event_updated" || event.type === "calendar.event_deleted") {

@@ -1,4 +1,5 @@
 import { type AiStatus, keys, type Me, useApi } from "@agenteschat/client";
+import { type PushOfferMoment, pushOfferDue, pushOffersFrom } from "@agenteschat/client/lib/push-offer";
 import { useQueryClient } from "@tanstack/react-query";
 import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
@@ -15,7 +16,6 @@ import {
   pushTurnedOff,
   registerForPush,
 } from "@/lib/push";
-import { type PushOfferMoment, pushOfferDue, pushOffersFrom } from "@/lib/push-offer";
 import { readPushData } from "@/lib/push-payload";
 import { readValueSync, STORED, writeValue } from "@/lib/storage";
 import { useOrgMaybe } from "./org";
@@ -42,7 +42,7 @@ const opened = new Set<string>();
 
 /**
  * Push for a signed-in person with an organization: registers silently when already allowed, says when our
- * sheet should come before the system's prompt (`lib/push-offer.ts`; never at launch, never inside a
+ * sheet should come before the system's prompt (`@agenteschat/client/lib/push-offer`; never at launch, never inside a
  * conversation: Conversas opens it), and opens what a tapped notification is about.
  */
 export function PushProvider({ children }: { children: ReactNode }) {

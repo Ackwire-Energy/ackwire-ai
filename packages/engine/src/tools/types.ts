@@ -66,6 +66,11 @@ export interface ToolDefinition {
   scope: string;
   /** Org connector connection the scope belongs to; null/undefined for built-in tools. */
   connectionId?: string | null;
+  /**
+   * A built-in tool the agent must also be allowed to call for this one to work (the desktop runs commands:
+   * `run_code`). Without it the gateway neither lists nor runs this tool, and names that tool's scope.
+   */
+  needs?: { name: string; scope: string };
   /** The app's name for connector tools ("GitHub", "himetrica"), for activity indicators. */
   connectorLabel?: string;
   /** Needs a person's approval for every call. Merge, deploy and rollback always do. */

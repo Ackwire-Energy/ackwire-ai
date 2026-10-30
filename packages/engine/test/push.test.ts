@@ -23,6 +23,9 @@ import {
   listMembers,
   listPushDevices,
   markNotificationRead,
+  noticeCategoryOf,
+  noticePrefsOf,
+  noticePrefsView,
   notify,
   notifyApproval,
   openDm,
@@ -35,6 +38,7 @@ import {
   registerPushDevice,
   renderPush,
   sealSecret,
+  setNoticePref,
   unregisterPushDevice,
   VAPID_FALLBACK_SUBJECT,
   VAPID_KEEP_NEW_MS,
@@ -194,6 +198,41 @@ describe("push delivery", () => {
     expect(n?.kind).toBe("thread_reply");
     expect(push.sent).toHaveLength(0);
     expect(await pushJobs()).toEqual([]);
+  });
+
+  test("the person's choices decide: threads turned on push, mentions turned off don't (ADR 0071 §8)", async () => {
+    f = await setup();
+    const { bia, push, drain } = await withPhone();
+    const before = await noticePrefsView(f.db, f.org.id, bia.id);
+    expect(before.phones).toBe(1);
+    expect(before.categories.filter((c) => c.on).map((c) => c.id)).toEqual([
+      "waiting",
+      "replies",
+      "mentions",
+      "routines",
+      "computers",
+    ]);
+    await setNoticePref(f.db, f.org.id, bia.id, "threads", true);
+    const after = await setNoticePref(f.db, f.org.id, bia.id, "mentions", false);
+    expect(after.categories.find((c) => c.id === "mentions")?.on).toBe(false);
+
+    const root = await postPersonMessage(deps(), bia.id, f.org.id, f.general.id, { body: "Release checklist" });
+    await postPersonMessage(deps(), f.owner.id, f.org.id, f.general.id, { body: "done", threadId: root.id });
+    await postPersonMessage(deps(), f.owner.id, f.org.id, f.general.id, { body: "@bia pode revisar?" });
+    await drain();
+    expect(push.sent.map((m) => m.data?.kind)).toEqual(["thread_reply"]);
+    // The inbox keeps both either way.
+    const rows = await f.db.select().from(schema.notifications).where(eq(schema.notifications.userId, bia.id));
+    expect(rows.map((r) => r.kind).sort()).toEqual(["mention", "thread_reply"]);
+  });
+
+  test("categories: anything waiting is `waiting`; unknown kinds and stored junk notify nothing", () => {
+    expect(noticeCategoryOf("approval", true)).toBe("waiting");
+    expect(noticeCategoryOf("thread_reply", true)).toBe("waiting");
+    expect(noticeCategoryOf("agent_reply", false)).toBe("replies");
+    expect(noticeCategoryOf("forum_synthesis", false)).toBeNull();
+    expect(noticePrefsOf({ threads: true, mentions: "no", junk: true })).toEqual({ threads: true });
+    expect(noticePrefsOf(null)).toEqual({});
   });
 
   test("waiting items push with high priority; read before delivery means no push", async () => {

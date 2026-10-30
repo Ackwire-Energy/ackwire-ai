@@ -1113,9 +1113,10 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     name: "browser",
     async tools(ctx) {
       if (!hub) return [];
-      // Most agents have no browser: the cached grants decide before any machine lookup.
+      // Most agents have no browser: the cached grants decide before any machine lookup. Without them the
+      // gateway keeps these from the agent, and `find_tools` names them as not allowed yet.
       const granted = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
-      if (!definitions.some((t) => isAllowed(toolAccess(granted, t)))) return [];
+      if (!definitions.some((t) => isAllowed(toolAccess(granted, t)))) return definitions;
       const status = await machineOf(ctx);
       if (!status.available) return [];
       // A browser password needs `request_secret`: the computer's tools offer it when the agent may run code

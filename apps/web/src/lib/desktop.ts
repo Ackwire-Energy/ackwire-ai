@@ -40,6 +40,7 @@ export function applyDesktopDevice(i18n: I18n, platform: DesktopPlatform) {
 const NOTICE_KINDS = [
   "mention",
   "dm",
+  "agent_reply",
   "agent_question",
   "approval",
   "forum_turn",

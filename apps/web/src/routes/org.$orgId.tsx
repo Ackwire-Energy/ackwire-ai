@@ -20,7 +20,7 @@ import { OrgProvider } from "@/components/org-context";
 import { Sidebar } from "@/components/Sidebar";
 import { BootSplash } from "@/components/Sky";
 import { HoldBanner, SuspendedScreen } from "@/components/Standing";
-import { useWebPushClear, useWebPushRefresh } from "@/components/WebPush";
+import { useWebPushClear, useWebPushRefresh, WebPushAsk } from "@/components/WebPush";
 import { ComputerSetupNotice } from "@/components/WorkspaceComputer";
 import { inDesktopApp } from "@/lib/desktop";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
@@ -117,6 +117,7 @@ function OrgLayout() {
                   <ConnectAiProvider>
                     <ComputerDialogProvider>
                       <PushOpens />
+                      <WebPushAsk />
                       <Outlet />
                     </ComputerDialogProvider>
                   </ConnectAiProvider>

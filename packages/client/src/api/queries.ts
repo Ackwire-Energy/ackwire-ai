@@ -77,6 +77,8 @@ import type {
   Message,
   MessageMemory,
   MoveAgentsInput,
+  NoticeCategory,
+  NoticePrefs,
   NotificationCount,
   NotificationEvent,
   NotificationFilter,
@@ -328,6 +330,81 @@ export function useAddCredential(orgId: string) {
 // ── Chat ────────────────────────────────────────────────────────────────────
 
 export const useChannels = (orgId: string) => useQuery(channelsQuery(useApi(), orgId));
+
+/** The sidebar's channel categories, in order (ADR 0080). */
+export const channelCategoriesQuery = (api: ApiClient, orgId: string) =>
+  queryOptions({
+    queryKey: keys.channelCategories(orgId),
+    queryFn: () => api.chat.categories(orgId),
+    staleTime: 30_000,
+  });
+export const useChannelCategories = (orgId: string) => useQuery(channelCategoriesQuery(useApi(), orgId));
+
+/** After any layout change: the channels (their category and order) and the categories refetch. */
+function refreshLayout(qc: QueryClient, orgId: string) {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: keys.channels(orgId) }),
+    qc.invalidateQueries({ queryKey: keys.channelCategories(orgId) }),
+  ]);
+}
+
+/** Admins: a new category at the end, optionally taking channels along. */
+export function useCreateChannelCategory(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { name: string; channelIds?: string[] }) => api.chat.createCategory(orgId, input),
+    onSuccess: () => refreshLayout(qc, orgId),
+  });
+}
+
+export function useRenameChannelCategory(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { categoryId: string; name: string }) =>
+      api.chat.renameCategory(orgId, input.categoryId, input.name),
+    onSuccess: () => refreshLayout(qc, orgId),
+  });
+}
+
+export function useDeleteChannelCategory(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (categoryId: string) => api.chat.deleteCategory(orgId, categoryId),
+    onSuccess: () => refreshLayout(qc, orgId),
+  });
+}
+
+export function usePlaceChannelCategory(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { categoryId: string; beforeCategoryId: string | null }) =>
+      api.chat.placeCategory(orgId, input.categoryId, input.beforeCategoryId),
+    onSuccess: () => refreshLayout(qc, orgId),
+  });
+}
+
+/**
+ * Puts a channel in a category (null: none), before another channel or at its end. The list moves at once
+ * (the channel takes its new category) and refetches for the exact order.
+ */
+export function usePlaceChannel(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { channelId: string; categoryId: string | null; beforeChannelId?: string | null }) =>
+      api.chat.place(orgId, input.channelId, { categoryId: input.categoryId, beforeChannelId: input.beforeChannelId }),
+    onMutate: (input) => {
+      qc.setQueryData<Channel[]>(keys.channels(orgId), (list) =>
+        list?.map((c) => (c.id === input.channelId ? { ...c, categoryId: input.categoryId } : c)),
+      );
+    },
+    onSettled: () => refreshLayout(qc, orgId),
+  });
+}
 
 export const channelMembersQuery = (api: ApiClient, orgId: string, channelId: string) =>
   queryOptions({
@@ -1293,6 +1370,16 @@ export function useUpdateChannel(orgId: string, channelId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: { name?: string; topic?: string }) => api.chat.update(orgId, channelId, input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.channels(orgId) }),
+  });
+}
+
+/** Archives a channel (creator or admin): it leaves the list. */
+export function useArchiveChannel(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (channelId: string) => api.chat.archive(orgId, channelId),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.channels(orgId) }),
   });
 }
@@ -2695,6 +2782,32 @@ export const useNotificationCount = (orgId: string) => {
     meta: { quiet: true },
   });
 };
+
+/** What reaches my devices as a notification in this workspace (ADR 0071 §8). */
+export const useNoticePrefs = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.noticePrefs(orgId), queryFn: () => api.notifications.prefs(orgId) });
+};
+
+/** One category on or off: the switch moves at once, and goes back if the server refuses. */
+export function useSetNoticePref(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ category, on }: { category: NoticeCategory; on: boolean }) =>
+      api.notifications.setPref(orgId, category, on),
+    onMutate: async ({ category, on }) => {
+      await qc.cancelQueries({ queryKey: keys.noticePrefs(orgId) });
+      const before = qc.getQueryData<NoticePrefs>(keys.noticePrefs(orgId));
+      qc.setQueryData<NoticePrefs>(keys.noticePrefs(orgId), (prefs) =>
+        prefs ? { ...prefs, categories: prefs.categories.map((c) => (c.id === category ? { ...c, on } : c)) } : prefs,
+      );
+      return { before };
+    },
+    onError: (_error, _input, context) => qc.setQueryData(keys.noticePrefs(orgId), context?.before),
+    onSuccess: (prefs) => qc.setQueryData(keys.noticePrefs(orgId), prefs),
+  });
+}
 
 const listCaches = (qc: QC, orgId: string) =>
   qc.getQueriesData<NotificationPages>({ queryKey: [...keys.notifications(orgId), "list"] });

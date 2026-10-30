@@ -11,6 +11,7 @@ import {
   listMembers,
   listNotifications,
   markAllNotificationsRead,
+  markChannelRead,
   markNotificationDone,
   markNotificationRead,
   NotFoundError,
@@ -20,6 +21,7 @@ import {
   openDm,
   postPersonMessage,
   resolveNotifications,
+  setNoticePref,
   snoozeNotification,
   updateIssue,
   ValidationError,
@@ -115,6 +117,39 @@ test("mentions, DMs, filters and counts; the actor never hears their own action"
   // "@ana" is the author herself.
   expect((await inbox(f.owner.id)).items).toEqual([]);
   expect(await notificationCounts(deps(), bia.id, f.org.id)).toEqual({ unread: 2, waiting: 0 });
+});
+
+test("an agent's answer reaches the person who asked, merged per conversation; reading it there resolves it", async () => {
+  f = await setup();
+  const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+  await post(f.owner.id, "Faz o relatório?", undefined, dm.id);
+
+  const first = await inbox(f.owner.id);
+  expect(first.items.map((n) => [n.kind, n.count])).toEqual([["agent_reply", 1]]);
+  expect(first.items[0]).toMatchObject({
+    actors: [{ type: "agent", id: f.agent.id }],
+    source: { dmId: dm.id, channelId: dm.id },
+  });
+  expect(first.counts.mentions).toBe(1);
+
+  // A second answer while the first is unread merges into it (and pushes nothing new: only count 1 does).
+  await post(f.owner.id, "E o gráfico?", undefined, dm.id);
+  expect((await inbox(f.owner.id)).items.map((n) => [n.kind, n.count])).toEqual([["agent_reply", 2]]);
+
+  // Read in the conversation: it leaves the inbox.
+  await markChannelRead(f.db, f.owner.id, f.org.id, dm.id, new Date(), f.pubsub);
+  expect((await inbox(f.owner.id)).items).toEqual([]);
+});
+
+test("the realtime event says whether it reaches the person's devices, by their choices", async () => {
+  f = await setup();
+  const { bia } = await people();
+  const events = hear(bia.id);
+  await post(f.owner.id, "@bia olha isso");
+  await setNoticePref(f.db, f.org.id, bia.id, "mentions", false);
+  await post(f.owner.id, "@bia e isso");
+  const alerts = events.filter((e) => e.type === "notification.upserted").map((e) => e.alert);
+  expect(alerts).toEqual([true, false]);
 });
 
 test("reactions to my message merge (also within 30 min after reading); my own reactions don't count", async () => {

@@ -969,16 +969,26 @@ p {
   color: var(--ink-muted);
   vertical-align: 1px;
 }
-/* "Adicionar pessoa ou agente": the last row of the channel's member list. */
+/*
+ * "Adicionar pessoa ou agente": the last row of the channel's member list. Light: a dashed key the avatars' size
+ * and the rows' weight; it darkens on hover. The list keeps some air under it.
+ */
 .member-row--add {
   width: calc(100% + 16px);
+  margin-top: 4px;
   border: 0;
   background: transparent;
   font: inherit;
-  font-weight: 600;
-  color: var(--ink2);
+  font-weight: 500;
+  color: var(--ink-muted);
   text-align: left;
   cursor: pointer;
+}
+.member-row--add:hover {
+  color: var(--ink);
+}
+.ac-dialog__list:has(> .member-row--add:last-child) {
+  padding-bottom: 16px;
 }
 .member-row--add:focus-visible {
   outline: none;
@@ -989,10 +999,23 @@ p {
   place-items: center;
   width: 32px;
   height: 32px;
+  box-sizing: border-box;
   flex: none;
-  border-radius: 30%;
-  background: var(--surface-sunken);
-  box-shadow: inset 0 0 0 1px var(--line);
+  border: 1.5px dashed var(--line-strong);
+  border-radius: 30% 30% 30% 9%;
+  color: var(--ink-muted);
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+.member-row__plus .ac-icon {
+  width: 16px;
+  height: 16px;
+}
+.member-row--add:hover .member-row__plus {
+  border-style: solid;
+  border-color: var(--ink-muted);
+  color: var(--ink);
 }
 .member-group {
   display: flex;
@@ -7586,6 +7609,11 @@ a.machine-row__name:hover {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
+/* The line under the plan cards ("No plano, … só a você"): the steps have no gap, so it sits as far below them as
+   an error line or a note does. */
+.newag__models + .small {
+  margin-top: 12px;
+}
 .newag__model {
   gap: 6px;
   padding: 14px 16px;
@@ -9772,8 +9800,57 @@ html[data-menu-overlay] .shell {
   transition: opacity 0.15s;
 }
 .sidebar__section-head:hover .sidebar__section-add,
-.sidebar__section-add:focus-visible {
+.sidebar__section-add:focus-visible,
+.sidebar__section-add[data-state="open"] {
   opacity: 1;
+}
+/*
+ * Channel categories (ADR 0080). Closed, a category also keeps its unread channels in sight, not only the open
+ * one (the rule above hides the rest).
+ */
+.sidebar__section--category[data-open="false"] .sidebar__section-body > [data-unread="true"] {
+  display: flex;
+}
+.sidebar__new-category {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: var(--ink-muted);
+  text-align: left;
+  cursor: pointer;
+}
+.sidebar__new-category:hover {
+  color: var(--ink);
+}
+/* Dragging a channel or a category: a 2px line where it lands, or the header that takes it. */
+.sidebar [data-drop="before"] {
+  box-shadow: inset 0 2px 0 var(--ink);
+}
+.sidebar [data-drop="after"] {
+  box-shadow: inset 0 -2px 0 var(--ink);
+}
+.sidebar [data-drop="into"] {
+  background: var(--plate);
+}
+.channel-category__channel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.channel-category__channel .ac-icon {
+  color: var(--faint);
+}
+/* The fields above a list keep their height; the list is what scrolls. */
+.channel-category__fields {
+  flex: none;
+  overflow: visible;
+}
+.channel-category__add {
+  margin-top: 4px;
+}
+.channel-details__archive {
+  color: var(--danger);
 }
 @media (hover: none) {
   .sidebar__section-add {
@@ -10511,4 +10588,89 @@ html[data-menu-overlay] .shell {
   font-size: 12px;
   line-height: 16px;
   color: var(--ink-muted);
+}
+
+/* The notifications dialog (WebPush.tsx `WebPushAsk`, ADR 0071): three notifications as the computer shows them,
+   stacked like the phone's sheet, then "Ativar avisos" and "Agora não" full width. */
+.web-push-ask {
+  gap: 16px;
+}
+.web-push-ask__examples {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.web-push-ask__example {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--raised);
+  box-shadow: var(--e2);
+}
+.web-push-ask__example img {
+  flex: none;
+  border-radius: 8px;
+}
+.web-push-ask__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.web-push-ask__top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.web-push-ask__top strong {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.web-push-ask__top span {
+  font-size: 12px;
+  color: var(--faint);
+}
+.web-push-ask__body {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.web-push-ask__acts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Configurações › Notificações (NoticePrefs.tsx, ADR 0071 §8): settings rows with the kind's icon before its name
+   and a switch or a chip at the end. The icon sits in the agent page cells' tile (`.agp-cell__key`). */
+.notice-prefs__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px 10px 10px 4px;
+  color: var(--muted);
+  background: var(--raised);
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    var(--top);
+}
+.notice-prefs__control {
+  flex: none;
+  display: flex;
+  align-items: center;
 }

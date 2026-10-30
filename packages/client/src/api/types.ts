@@ -413,6 +413,12 @@ export interface Channel {
   visibility: "public" | "private";
   isMember: boolean;
   createdAt: string;
+  /** Who created it: may change it and its members, like admins. */
+  createdByUserId?: string | null;
+  /** Its sidebar category (ADR 0080); null or absent: on top, with none. */
+  categoryId?: string | null;
+  /** Order inside its category, from 0. */
+  position?: number;
   /**
    * Channel list only (`chat.channels`): messages since you last read it
    * (since you joined, if never), not yours; a thread reply counts only in a
@@ -421,6 +427,14 @@ export interface Channel {
   unreadCount?: number;
   /** Channel list only: the latest top-level message; null when empty or not a member. */
   lastMessage?: ChannelLastMessage | null;
+}
+
+/** A named group of channels in the sidebar, the same for everyone in the organization (ADR 0080). */
+export interface ChannelCategory {
+  id: string;
+  name: string;
+  /** Order in the sidebar, from 0. */
+  position: number;
 }
 
 /** A channel's latest top-level message, for the conversation list. */
@@ -3961,6 +3975,7 @@ export type NotificationKind =
   | "mention"
   | "thread_reply"
   | "dm"
+  | "agent_reply"
   | "agent_question"
   | "issue_assigned"
   | "issue_comment"
@@ -4139,6 +4154,27 @@ export interface NotificationPage {
 }
 
 /** The sidebar badge (`GET …/notifications/count`, `notification.counts`). */
+/**
+ * What reaches my devices as a notification, by category (ADR 0071 §8): the phone's and the browser's pushes and
+ * the desktop app's banners. The inbox keeps everything either way.
+ */
+export type NoticeCategory =
+  | "waiting"
+  | "replies"
+  | "mentions"
+  | "threads"
+  | "tasks"
+  | "routines"
+  | "computers"
+  | "reactions";
+
+export interface NoticePrefs {
+  /** Every category, in the order the settings show them. */
+  categories: { id: NoticeCategory; on: boolean }[];
+  /** My phones that get pushes (the phone app). */
+  phones: number;
+}
+
 export interface NotificationCount {
   unread: number;
   waiting: number;
@@ -4146,7 +4182,12 @@ export interface NotificationCount {
 
 /** Per person (user scope): created or merged, auto-resolved, and the new counts. */
 export type NotificationEvent =
-  | { type: "notification.upserted"; notification: AppNotification }
+  | {
+      type: "notification.upserted";
+      notification: AppNotification;
+      /** Whether it reaches my devices as a notification, by my choices (ADR 0071 §8); absent from older servers. */
+      alert?: boolean;
+    }
   | { type: "notification.removed"; id: string }
   | ({ type: "notification.counts" } & NotificationCount);
 

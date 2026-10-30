@@ -260,6 +260,8 @@ type WhatKey =
   | "mentionComment"
   | "replied"
   | "repliedThread"
+  | "answered"
+  | "answeredIn"
   | "dm"
   | "question"
   | "issueAssigned"
@@ -310,6 +312,8 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
       return label ? k("replied", { names, label, count }) : k("repliedThread", { names, count });
     case "dm":
       return k("dm", { name });
+    case "agent_reply":
+      return label ? k("answeredIn", { name, label }) : k("answered", { name });
     case "agent_question":
       return k("question", { name });
     case "issue_assigned":

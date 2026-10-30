@@ -16,6 +16,7 @@ import {
 } from "@agenteschat/db";
 import { NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
+import { noticeOn, noticePrefsOf } from "./notice-prefs";
 import { requirePermission } from "./organizations";
 import { enqueuePush } from "./push";
 import type { ApprovalOrigin } from "./tools/run-policy";
@@ -43,6 +44,11 @@ export const NOTIFICATION_KINDS = [
   "mention",
   "thread_reply",
   "dm",
+  /**
+   * An agent answered the person behind its run (ADR 0071): merged per conversation (`agentReplyGroup`), resolved
+   * when they read it there. So someone can close the tab while an agent works and still hear when it's done.
+   */
+  "agent_reply",
   "agent_question",
   "issue_assigned",
   "issue_comment",
@@ -175,9 +181,15 @@ export interface NotificationDeps {
 type Row = typeof notifications.$inferSelect;
 
 /** Kinds whose events merge into one open row of their group. */
-const MERGING: ReadonlySet<NotificationKind> = new Set(["thread_reply", "issue_comment", "reaction", "join_request"]);
+const MERGING: ReadonlySet<NotificationKind> = new Set([
+  "thread_reply",
+  "agent_reply",
+  "issue_comment",
+  "reaction",
+  "join_request",
+]);
 /** "Menções" in the inbox: what was said to me. */
-const MENTION_KINDS: NotificationKind[] = ["mention", "dm", "agent_question"];
+const MENTION_KINDS: NotificationKind[] = ["mention", "dm", "agent_reply", "agent_question"];
 /** A read reaction row still takes new reactions for this long (the "9 min" span on the card). */
 export const REACTION_MERGE_MS = 30 * 60_000;
 export const MAX_ACTORS = 10;
@@ -278,21 +290,28 @@ export async function notify(deps: NotificationDeps, input: NotifyInput): Promis
   if (wanted.length === 0) return [];
   // People of this organization only (an agent's id never matches a member).
   const members = await deps.db
-    .select({ userId: organizationMembers.userId })
+    .select({ userId: organizationMembers.userId, prefs: organizationMembers.noticePrefs })
     .from(organizationMembers)
     .where(and(eq(organizationMembers.orgId, input.orgId), inArray(organizationMembers.userId, wanted)));
   const out: NotificationView[] = [];
-  for (const { userId } of members) {
+  for (const member of members) {
+    const { userId } = member;
     const row = await upsertOne(deps, input, userId);
     if (!row) continue;
     const view = notificationView(row);
     out.push(view);
+    // Whether it reaches their devices as a notification (ADR 0071 §8): the desktop app's banner reads `alert`.
+    const prefs = noticePrefsOf(member.prefs);
     const snoozed = row.snoozedUntil && row.snoozedUntil.getTime() > nowOf(deps).getTime();
     if (!snoozed)
-      await publishUserEvent(deps.pubsub, input.orgId, userId, { type: "notification.upserted", notification: view });
+      await publishUserEvent(deps.pubsub, input.orgId, userId, {
+        type: "notification.upserted",
+        notification: view,
+        alert: noticeOn(prefs, row.kind, row.waiting),
+      });
     await publishCounts(deps, input.orgId, userId);
-    // Their phone too (ADR 0035), through the outbox; never undoes the notification.
-    await enqueuePush(deps.db, row, nowOf(deps)).catch(() => false);
+    // Their phone and browsers too (ADR 0035, 0071), through the outbox; never undoes the notification.
+    await enqueuePush(deps.db, row, nowOf(deps), prefs).catch(() => false);
   }
   return out;
 }

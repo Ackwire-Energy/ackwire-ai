@@ -1,11 +1,18 @@
 import {
   archiveChannel,
   channelMembersDetail,
+  createChannelCategory,
+  deleteChannelCategory,
+  listChannelCategories,
   listPins,
   pinMessage,
+  placeChannel,
+  placeChannelCategory,
   removeChannelMember,
+  renameChannelCategory,
   requireChannelAccess,
   setChannelAgentAutoReply,
+  unarchiveChannel,
   unpinMessage,
   updateChannel,
 } from "@agenteschat/engine";
@@ -21,11 +28,17 @@ import {
   requireSession,
   security,
 } from "./context";
-import { Channel, Message } from "./schemas";
+import { Channel, ChannelCategory, Message } from "./schemas";
 
 const tags = ["Channels"];
 const ChannelParams = OrgParams.extend({ channelId: z.uuid() });
 const PinParams = ChannelParams.extend({ messageId: z.uuid() });
+const CategoryParams = OrgParams.extend({ categoryId: z.uuid() });
+const categoryJson = (r: { id: string; name: string; position: number }) => ({
+  id: r.id,
+  name: r.name,
+  position: r.position,
+});
 const Pin = z
   .object({
     messageId: z.uuid(),
@@ -143,6 +156,23 @@ export function channelRoutes(deps: AppDeps) {
 
   app.openapi(
     createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/channels/{channelId}/unarchive",
+      tags,
+      security,
+      summary: "Bring an archived channel back as it was (creator or admin): the undo after archiving",
+      request: { params: ChannelParams },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, channelId } = c.req.valid("param");
+      await unarchiveChannel(db, c.get("user").id, orgId, channelId);
+      return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
       method: "patch",
       path: "/organizations/{orgId}/channels/{channelId}",
       tags,
@@ -172,9 +202,134 @@ export function channelRoutes(deps: AppDeps) {
           isMember: true,
           createdByUserId: r.createdByUserId,
           createdAt: r.createdAt.toISOString(),
+          categoryId: r.categoryId,
+          position: r.position,
         },
         200,
       );
+    },
+  );
+
+  // ── Sidebar categories (ADR 0080): the org's layout, the same for everyone ──
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/channel-categories",
+      tags,
+      security,
+      summary: "The sidebar's channel categories, in order",
+      request: { params: OrgParams },
+      responses: { 200: json(z.object({ categories: z.array(ChannelCategory) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const rows = await listChannelCategories(db, c.get("user").id, orgId);
+      return c.json({ categories: rows.map(categoryJson) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/channel-categories",
+      tags,
+      security,
+      summary: "Create a category at the end of the sidebar, optionally with channels (admins)",
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            name: z.string().min(1).max(40),
+            channelIds: z.array(z.uuid()).max(200).optional().openapi({ description: "Channels it takes, in order." }),
+          }),
+        ),
+      },
+      responses: { 201: json(ChannelCategory, "Created"), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const r = await createChannelCategory(db, c.get("user").id, orgId, c.req.valid("json"), opts);
+      return c.json(categoryJson(r), 201);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "patch",
+      path: "/organizations/{orgId}/channel-categories/{categoryId}",
+      tags,
+      security,
+      summary: "Rename a category (admins)",
+      request: { params: CategoryParams, body: body(z.object({ name: z.string().min(1).max(40) })) },
+      responses: { 200: json(ChannelCategory), ...errors },
+    }),
+    async (c) => {
+      const { orgId, categoryId } = c.req.valid("param");
+      const r = await renameChannelCategory(db, c.get("user").id, orgId, categoryId, c.req.valid("json"), opts);
+      return c.json(categoryJson(r), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/channel-categories/{categoryId}",
+      tags,
+      security,
+      summary: "Delete a category; its channels go on top, with none (admins)",
+      request: { params: CategoryParams },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, categoryId } = c.req.valid("param");
+      await deleteChannelCategory(db, c.get("user").id, orgId, categoryId, opts);
+      return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/channel-categories/{categoryId}/place",
+      tags,
+      security,
+      summary: "Move a category before another one, or to the end (admins)",
+      request: {
+        params: CategoryParams,
+        body: body(z.object({ beforeCategoryId: z.uuid().nullable().openapi({ description: "Null: to the end." }) })),
+      },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, categoryId } = c.req.valid("param");
+      await placeChannelCategory(db, c.get("user").id, orgId, categoryId, c.req.valid("json"), opts);
+      return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/channels/{channelId}/place",
+      tags,
+      security,
+      summary: "Put a channel in a category, before another channel or at its end (creator or admin)",
+      request: {
+        params: ChannelParams,
+        body: body(
+          z.object({
+            categoryId: z.uuid().nullable().openapi({ description: "Null: on top, with no category." }),
+            beforeChannelId: z.uuid().nullable().optional().openapi({ description: "Absent or null: at the end." }),
+          }),
+        ),
+      },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, channelId } = c.req.valid("param");
+      await placeChannel(db, c.get("user").id, orgId, channelId, c.req.valid("json"), opts);
+      return c.body(null, 204);
     },
   );
 
