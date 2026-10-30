@@ -54,7 +54,7 @@ Driving a desktop runs commands. It has a terminal and "Open Terminal Here", and
 
 ### 2. Tools and verbs
 
-- `desktop_do` (a plan of up to 15 steps), `desktop_read` (a look, or `find`), `desktop_screenshot` (a JPEG saved in the agent's folder through `desktop.capture` and the existing `write`, for brains that read images themselves), and ADR 0058's `desktop_ask_person`.
+- `desktop_do` (a plan of up to 15 steps), `desktop_read` (a look, or `find`), `desktop_screenshot` (a JPEG saved in the agent's folder through `desktop.capture` and the existing `write`, for brains that read images themselves; with `share`, also sent to the Drive and shown with the reply, as `browser_screenshot` does), and ADR 0058's `desktop_ask_person`.
 - The browser's verbs, plus:
   - `focus`: a window. Only window lines and the panel's window buttons are offered, never another element in their place.
   - `double_click` and `right_click`.

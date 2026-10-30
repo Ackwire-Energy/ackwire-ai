@@ -1,5 +1,6 @@
 import { type PubSub, uploadTopic } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, schema } from "@agenteschat/db";
+import { getAgentCached } from "./agents";
 import {
   ARTIFACT_LIMITS,
   type ArtifactActor,
@@ -10,6 +11,12 @@ import {
 } from "./artifacts";
 import { recordAudit } from "./audit";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
+import { formatBytes } from "./format";
+import type { MachineCaller } from "./machine-hub";
+import { replyThreadOf } from "./runs";
+import { type ComputerHandle, withConnectedMachine } from "./sandbox";
+import { BUILTIN_SCOPES, freshGrantedKeys, isAllowed, toolAccess } from "./tools/scopes";
+import type { ToolContext, ToolOutput } from "./tools/types";
 
 const { artifactUploads, artifacts, artifactVersions } = schema;
 
@@ -286,4 +293,110 @@ export async function uploadedFile(db: Database, row: UploadRow) {
     .where(and(eq(artifactVersions.artifactId, row.artifactId), eq(artifactVersions.version, row.version)));
   if (!found) return null;
   return { id: row.artifactId, version: row.version, title: found.title, name: found.name ?? "file", size: found.size };
+}
+
+/** How long `upload_file` waits for the bytes. */
+export const UPLOAD_TIMEOUT_SECONDS = 300;
+
+/**
+ * A file or folder on the agent's computer to the Drive as is (`upload_file`, a screenshot's `share`): the
+ * computer sends it itself (`pushFile`) to our upload URL, and the upload completes when the bytes arrive
+ * (`receiveMachineUpload`), as the agent in its run's channel and thread.
+ */
+export async function uploadFromComputer(
+  deps: { db: Database; pubsub?: PubSub; publicUrl?: string },
+  ctx: ToolContext,
+  computer: ComputerHandle,
+  path: string,
+  input: { title: string | null; note: string | null; targetArtifactId: string | null },
+): Promise<UploadRow> {
+  const upload = await createUpload(deps.db, {
+    orgId: ctx.orgId,
+    agentId: ctx.agentId,
+    runId: ctx.runId,
+    channelId: ctx.channelId,
+    threadId: replyThreadOf(ctx),
+    computer: computer.ref,
+    machineId: computer.machineId,
+    path,
+    ...input,
+  });
+  const base = (deps.publicUrl ?? "").replace(/\/$/, "");
+  try {
+    await computer.provider.pushFile(computer.id, path, {
+      url: `${base}/api/machines/uploads/${upload.id}`,
+      uploadId: upload.id,
+      maxBytes: upload.maxBytes,
+    });
+  } catch (error) {
+    // The answer may be what got lost (the link dropped after the bytes arrived): what landed is the file.
+    const landed = await getUpload(deps.db, upload.id);
+    if (landed?.status === "done") return landed;
+    if (landed?.status === "storing") return waitForUpload(deps, upload.id, UPLOAD_TIMEOUT_SECONDS * 1000);
+    await failUpload(deps, upload.id, error instanceof Error ? error.message : String(error));
+    throw error;
+  }
+  return waitForUpload(deps, upload.id, UPLOAD_TIMEOUT_SECONDS * 1000);
+}
+
+/** A screenshot tool's `share`. */
+export const SHARE_INPUT = {
+  type: "boolean",
+  description: "Show it in this conversation: it goes to the Drive and its card goes with your reply.",
+} as const;
+
+/** What a screenshot taken without `share` adds to its answer. */
+export const SHARE_HINT = "To show a screenshot in this conversation, take it with share: true.";
+
+/** What sharing a file makes: a Drive file ("Write files"), as `create_artifact` does. Never Run code. */
+const DRIVE_FILE = { name: "create_artifact", scope: "drive:write" };
+
+/**
+ * A file the agent just saved in its folder (`saved`: that tool's answer), shown in this conversation: it goes to
+ * the Drive the way `upload_file` sends one, and its card goes with the reply (`data.artifact`). Without "Write
+ * files" the file stays saved, and the answer says how to ask for it.
+ */
+export async function shareSavedFile(
+  deps: { machines?: { hub: MachineCaller } | null; pubsub?: PubSub; publicUrl?: string },
+  ctx: ToolContext,
+  machineId: string,
+  path: string,
+  saved: ToolOutput,
+): Promise<ToolOutput> {
+  const access = toolAccess(await freshGrantedKeys(ctx.db, ctx.orgId, ctx.agentId), DRIVE_FILE);
+  if (!isAllowed(access)) {
+    const why =
+      access === "denied"
+        ? "making Drive files is turned off for you; tell the people"
+        : `that needs "${BUILTIN_SCOPES[DRIVE_FILE.scope]?.label}" (${DRIVE_FILE.scope}), which you don't have. Ask for it with request_permission, then take it again with share: true`;
+    return { ...saved, content: `${saved.content} It isn't shown in this conversation: ${why}.` };
+  }
+  try {
+    const hub = deps.machines?.hub;
+    if (!hub) throw new Error("Connected computers are not available on this server.");
+    const agent = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
+    const row = await withConnectedMachine(
+      hub,
+      ctx,
+      { machineId, handle: agent?.handle ?? "agent", ...(agent?.name ? { name: agent.name } : {}) },
+      (computer) =>
+        uploadFromComputer({ db: ctx.db, pubsub: deps.pubsub, publicUrl: deps.publicUrl }, ctx, computer, path, {
+          title: null,
+          note: null,
+          targetArtifactId: null,
+        }),
+    );
+    const done = await uploadedFile(ctx.db, row);
+    if (!done) throw new Error(row.error ?? "the upload did not finish");
+    return {
+      content: `${saved.content} It is shown in this conversation: its card goes with your reply ("${done.title}" in the Drive, ${formatBytes(done.size)}, artifact ${done.id}).`,
+      data: { ...saved.data, artifact: { id: done.id, version: done.version } },
+    };
+  } catch (error) {
+    return {
+      ...saved,
+      content: `${saved.content} It couldn't be shown in this conversation: ${error instanceof Error ? error.message : String(error)}`,
+      isError: true,
+    };
+  }
 }
