@@ -43,7 +43,8 @@
   font-size: 13.5px;
   white-space: pre-line;
 }
-/* The preview: the agent, live */
+/* The preview: the agent, live. It comes in with the first role picked, in the column `.newag__work` keeps for it from
+   the start, so the form beside it never moves. */
 .newag__aside {
   position: sticky;
   top: 0;
@@ -54,6 +55,7 @@
   height: 100dvh;
   padding: 38px 0 16px;
   box-sizing: border-box;
+  animation: newag-in 0.32s var(--out) both;
 }
 /* The step title's ⓘ: the line takes the title's type (`.onb__title`), so the ⓘ sits on its line's capitals. */
 .ac-hintline:has(> .newag__title) {
@@ -281,6 +283,10 @@
     max-width: 660px;
     padding: 22px 0 0;
   }
+  /* Above the form it would push the role cards down as one is picked: it comes in with the next step. */
+  .newag__aside[data-step="role"] {
+    display: none;
+  }
   .newag__cap,
   .newag__pv-state,
   .newag__pv-wide {
@@ -372,6 +378,7 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .newag__aside,
   .newag__pv-cover {
     animation: none;
     transition: none;
