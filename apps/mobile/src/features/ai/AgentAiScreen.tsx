@@ -1,15 +1,16 @@
-import type { AgentBrain, AgentBrainInput, MachineAccount } from "@agenteschat/client";
+import type { AgentBrainInput, MachineAccount } from "@agenteschat/client";
 import { keys, useAgentBrain, useAiAccounts, useApi } from "@agenteschat/client";
 import { accountChoices, ownSignInName, signInPlan } from "@agenteschat/client/lib/ai-accounts";
 import { brainLine } from "@agenteschat/client/lib/brain";
 import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
-import { accountPlan, planName, planOf } from "@agenteschat/client/lib/plans";
+import { brainPlan, planName, planOf } from "@agenteschat/client/lib/plans";
+import { providerLabel } from "@agenteschat/client/lib/providers";
 import { limitOffers, planState } from "@agenteschat/ui/plan-state";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,7 +19,7 @@ import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, ProviderLogo, Te
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { PushedHeader } from "../shared/parts";
 import { PlanMeter } from "../usage/parts";
-import { accountKindOf, agentAccounts, modelInput, modelRows, takenFrom, thinkingUsage } from "./logic";
+import { accountKindOf, agentAccounts, modelInput, modelRows, modelSections, takenFrom, thinkingUsage } from "./logic";
 import { openConnectAi } from "./NoAiCard";
 import { Note, PlanReplies, PlanRepliesOf } from "./parts";
 
@@ -69,9 +70,6 @@ function useSaveBrain(agentId: string) {
   return { busy, save };
 }
 
-/** The plan of the account the agent thinks with, which names its models. */
-const thinkingPlan = (view: AgentBrain) => accountPlan(view.accounts.find((a) => a.id === view.account));
-
 export function AgentAiScreen({ agentId }: { agentId: string }) {
   const { t, i18n } = useTranslation();
   const { orgId, org } = useOrg();
@@ -100,7 +98,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
     (c) => c.machineId === view?.computer?.machineId,
   );
   const thinks = brainLine(t, agent?.brain, t("brain.model"));
-  const model = view && kind ? modelRows(t, view, thinkingPlan(view)).find((r) => r.checked) : undefined;
+  const model = view && kind ? modelRows(t, view, brainPlan(view)).find((r) => r.checked) : undefined;
   const accounts = view && kind ? agentAccounts(view, kind) : [];
   const current = view ? accounts.find((a) => a.id === view.account) : undefined;
   // Another account, or one more login of `a` other agents use (`also`, its email Claude's hint): Connect an AI on that
@@ -219,6 +217,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                   <GroupedRow
                     label={model?.label ?? view.effectiveModel ?? ""}
                     {...(model?.sub ? { sub: model.sub } : {})}
+                    {...(model?.note ? { belowText: model.note } : {})}
                     chevron
                     onPress={() => openAgentModel(agentId)}
                   />
@@ -306,7 +305,7 @@ export function AgentModelScreen({ agentId }: { agentId: string }) {
   const brain = useAgentBrain(orgId, agentId);
   const { busy, save } = useSaveBrain(agentId);
   const view = brain.data;
-  const rows = view ? modelRows(t, view, thinkingPlan(view)) : [];
+  const rows = view ? modelRows(t, view, brainPlan(view)) : [];
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
       <PushedHeader title={t("agentPage.work.brain.planModel")} solid={false} grouped />
@@ -319,25 +318,32 @@ export function AgentModelScreen({ agentId }: { agentId: string }) {
         ) : !view || view.brain === "model" ? (
           <Note icon="x">{t("common.loadFailed")}</Note>
         ) : (
-          <GroupedList>
-            {rows.map((r) => (
-              <GroupedRow
-                key={r.value}
-                label={r.label}
-                {...(r.sub ? { sub: r.sub } : {})}
-                checked={r.checked}
-                disabled={busy}
-                onPress={() => {
-                  if (r.checked) return;
-                  const done = t("agentPage.work.saved.brain", {
-                    ...g,
-                    brain: `${t(`brain.card.${view.brain}`)} · ${r.label}`,
-                  });
-                  void save(modelInput(r.value, view), done);
-                }}
-              />
-            ))}
-          </GroupedList>
+          modelSections(rows).map((s) => (
+            <Fragment key={s.maker ?? ""}>
+              {s.maker ? <GroupedHeader>{providerLabel(s.maker)}</GroupedHeader> : null}
+              <GroupedList>
+                {s.rows.map((r) => (
+                  <GroupedRow
+                    key={r.value}
+                    label={r.label}
+                    {...(r.sub ? { sub: r.sub } : {})}
+                    {...(r.note ? { belowText: r.note } : {})}
+                    {...(r.maker ? { leading: <ProviderLogo id={r.maker} size="sm" /> } : {})}
+                    checked={r.checked}
+                    disabled={busy}
+                    onPress={() => {
+                      if (r.checked) return;
+                      const done = t("agentPage.work.saved.brain", {
+                        ...g,
+                        brain: `${t(`brain.card.${view.brain}`)} · ${r.label}`,
+                      });
+                      void save(modelInput(r.value, view), done);
+                    }}
+                  />
+                ))}
+              </GroupedList>
+            </Fragment>
+          ))
         )}
       </ScrollView>
     </View>

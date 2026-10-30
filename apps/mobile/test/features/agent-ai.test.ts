@@ -6,6 +6,7 @@ import {
   agentAccounts,
   modelInput,
   modelRows,
+  modelSections,
   takenFrom,
   thinkingUsage,
 } from "../../src/features/ai/logic";
@@ -275,13 +276,43 @@ describe("the agent's AI", () => {
       sub: "Escolhe o modelo e o esforço para cada tarefa",
       checked: false,
     });
-    expect(go.slice(1, 3).map((r) => [r.value, r.label])).toEqual([
-      ["sonnet", "MiniMax M3"],
-      ["haiku", "Claude Haiku 5.5"],
+    expect(go.slice(1, 4).map((r) => [r.value, r.label, r.maker])).toEqual([
+      ["sonnet", "MiniMax M3", "minimax"],
+      ["minimax-m3.1-flash", "MiniMax M3.1 Flash", "minimax"],
+      ["haiku", "Claude Haiku 5.5", "anthropic"],
     ]);
+    // What it's sold as, and what the plan's account must allow first (read out with its name).
     expect(go.filter((r) => r.checked)).toEqual([
-      { value: "deepseek-v4.1-flash", label: "DeepSeek V4.1 Flash", sub: "Econômico", checked: true },
+      {
+        value: "deepseek-v4.1-flash",
+        label: "DeepSeek V4.1 Flash",
+        sub: "Econômico",
+        note: "Precisa da região Global no OpenCode",
+        maker: "deepseek",
+        checked: true,
+      },
     ]);
+    // A list per maker after Automático's, as the web groups them.
+    const sections = modelSections(go);
+    expect(sections.map((s) => s.maker ?? null)).toEqual([
+      null,
+      "minimax",
+      "anthropic",
+      "zai",
+      "moonshot",
+      "Alibaba",
+      "deepseek",
+      "Xiaomi",
+      "openai",
+      "gemini",
+      "xAI",
+      "Meituan",
+      "Tencent",
+      "StepFun",
+    ]);
+    expect(sections[0]?.rows.map((r) => r.label)).toEqual(["Automático"]);
+    expect(sections.flatMap((s) => s.rows)).toEqual(go);
+    expect(modelSections(modelRows(t, view("k3-256k"), planOf("kimi")))).toHaveLength(1);
     // On Claude's sign-in: its aliases; a plan's model kept from before runs Sonnet there.
     const own = modelRows(t, view("deepseek-v4.1-flash"), undefined);
     expect(own.map((r) => r.label)).toEqual(["Automático", "Opus", "Sonnet", "Haiku"]);
@@ -308,6 +339,9 @@ describe("the agent's AI", () => {
     expect(screen).toContain("router.push(`/agent-model/");
     expect(screen).toContain("onPress={() => openAgentModel(agentId)}");
     expect(screen).toContain("void save(modelInput(r.value, view), done);");
+    expect(screen).toContain("modelSections(rows).map(");
+    expect(screen).toContain("<GroupedHeader>{providerLabel(s.maker)}</GroupedHeader>");
+    expect(screen).toContain("belowText: r.note");
     const route = await Bun.file(new URL("../../app/(app)/agent-model/[id].tsx", import.meta.url).pathname).text();
     expect(route).toContain("<AgentModelScreen agentId={id");
   });

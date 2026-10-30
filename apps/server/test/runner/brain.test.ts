@@ -835,6 +835,7 @@ test.if(posix)(
         ANTHROPIC_DEFAULT_OPUS_MODEL: "glm-5.3[1m]",
         ANTHROPIC_DEFAULT_SONNET_MODEL: "glm-5.3[1m]",
         ANTHROPIC_DEFAULT_HAIKU_MODEL: "glm-5.3-flash[1m]",
+        ANTHROPIC_DEFAULT_FABLE_MODEL: "glm-5.3[1m]",
         CLAUDE_CODE_SUBAGENT_MODEL: "glm-5.3[1m]",
         CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
         API_TIMEOUT_MS: "3000000",
@@ -897,6 +898,8 @@ test.if(posix)(
         CLAUDE_CODE_SUBAGENT_MODEL: "k3-256k",
         ANTHROPIC_DEFAULT_OPUS_MODEL: "k3.1-pro",
         ANTHROPIC_DEFAULT_SONNET_MODEL: "kimi-for-coding",
+        // A subagent called with `fable` runs the plan's opus, never a Claude model the plan doesn't serve.
+        ANTHROPIC_DEFAULT_FABLE_MODEL: "k3.1-pro",
       });
       // Another plan's model runs the plan's own sonnet.
       await turn(7, "hi", { account: KIMI_ACCOUNT, model: "minimax-m3", session: { id: SESSION(7), resume: false } });

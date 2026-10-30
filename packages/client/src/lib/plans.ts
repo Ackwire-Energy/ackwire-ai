@@ -1,20 +1,19 @@
 import {
   type CodingPlan,
   claudeCodeModel,
-  type PlanModelTag,
+  type PlanModel,
   planModel,
   planModelValue,
   planOf,
 } from "@agenteschat/providers/plans";
 import type { TFunction } from "i18next";
+import type { AgentBrain } from "../api/types";
 import { isAuto } from "./providers";
 
 export * from "@agenteschat/providers/plans";
 
-export interface BrainModelChoice {
+export interface BrainModelChoice extends Pick<PlanModel, "label" | "tag" | "needs" | "maker"> {
   value: string;
-  label: string;
-  tag?: PlanModelTag;
 }
 
 /**
@@ -30,6 +29,8 @@ export const brainModelChoices = (
         value: planModelValue(m),
         label: m.label,
         ...(m.tag ? { tag: m.tag } : {}),
+        ...(m.needs ? { needs: m.needs } : {}),
+        ...(m.maker ? { maker: m.maker } : {}),
       }))
     : models.map(({ value, label }) => ({ value, label }));
 
@@ -44,6 +45,10 @@ export function brainModelChoice(kind: string, plan: CodingPlan | undefined, val
 
 /** The plan of an account (its `provider`), or none for the CLI's own sign-in. */
 export const accountPlan = (account: { provider: string | null } | null | undefined) => planOf(account?.provider);
+
+/** The plan of the account an agent thinks with, which names its models. */
+export const brainPlan = (view: Pick<AgentBrain, "account" | "accounts">) =>
+  accountPlan(view.accounts.find((a) => a.id === view.account));
 
 /** The plan as the CLI says it (`team`, `max`), as a name ("Team"). */
 export const planName = (plan: string) => plan.charAt(0).toUpperCase() + plan.slice(1);

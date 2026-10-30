@@ -14,7 +14,10 @@
  * maker lists them (read 2026-10-30): docs.z.ai/devpack/overview,
  * kimi.com/code/docs/en/kimi-code/models.html,
  * platform.minimax.io/docs/coding-plan/intro, and opencode.ai/v2/docs/console/go
- * with its live list (opencode.ai/inference/go/v1/models).
+ * with its live list (opencode.ai/inference/go/v1/models). Flagships in their
+ * makers' words (read 2026-10-30): docs.z.ai/guides/llm/glm-5.3, Kimi's models
+ * page, Alibaba's Qwen3.8-Max announcement and
+ * ai.google.dev/gemini-api/docs/models/gemini-4-argon.
  */
 
 /** Claude Code's model aliases: "Automático" picks one per run, and the plan names the model each one runs. */
@@ -27,6 +30,9 @@ export const PLAN_ALIASES: readonly PlanAlias[] = ["opus", "sonnet", "haiku"];
  */
 export type PlanModelTag = "cheap" | "fast" | "smart";
 
+/** What the plan's account must allow before a model answers: `globalRegion`, OpenCode's Global region. */
+export type PlanModelNeed = "globalRegion";
+
 export interface PlanModel {
   /** What Claude Code sends (`--model`, or `ANTHROPIC_DEFAULT_SONNET_MODEL` for its alias); `[1m]`: a 1M-token window. */
   id: string;
@@ -38,6 +44,12 @@ export interface PlanModel {
    */
   alias?: PlanAlias;
   tag?: PlanModelTag;
+  needs?: PlanModelNeed;
+  /**
+   * Who makes it, on a plan that sells several makers' models (the picker groups them): an API provider's id
+   * (`@agenteschat/providers`: its name and logo), else the maker's name.
+   */
+  maker?: string;
 }
 
 export interface CodingPlan {
@@ -58,7 +70,7 @@ export interface CodingPlan {
     baseUrl: string;
     /** The variable Claude Code reads the key from. */
     tokenEnv: "ANTHROPIC_AUTH_TOKEN" | "ANTHROPIC_API_KEY";
-    /** Every model of the plan that answers through Claude Code, the ones its aliases run first. */
+    /** Every model of the plan that answers through Claude Code, each maker's together, the aliases' makers first. */
     models: readonly PlanModel[];
     /** The maker's other documented settings. */
     env?: Readonly<Record<string, string>>;
@@ -95,16 +107,16 @@ export const CODING_PLANS = {
     claudeCode: {
       baseUrl: "https://api.kimi.ai/coding/",
       tokenEnv: "ANTHROPIC_API_KEY",
-      // Every membership with coding quota has `kimi-for-coding`; K3.1 Pro and both K3 need Plus or above, the
-      // high-speed versions Pro or above (about 2× and 3× the quota of their regular ones). K3 256K spends about
-      // half of K3's.
+      // `kimi-for-coding` (K2.8 Preview), K3.1 Pro and both K3 need Plus or above, the high-speed models Pro or
+      // above. K3.1 Pro Highspeed spends about 2× K3.1 Pro's quota; K2.7 Code Highspeed is another model, at about
+      // 3× the quota of K2.7 Code (not in the plan). K3 256K spends about half of K3's.
       models: [
         { id: "kimi-for-coding", label: "Kimi for Coding", alias: "sonnet" },
         { id: "k3.1-pro", label: "K3.1 Pro", alias: "opus", tag: "smart" },
         { id: "k3.1-pro-highspeed", label: "K3.1 Pro Highspeed", tag: "fast" },
-        { id: "kimi-for-coding-highspeed", label: "Kimi for Coding Highspeed", tag: "fast" },
+        { id: "kimi-for-coding-highspeed", label: "K2.7 Code Highspeed", tag: "fast" },
         { id: "k3", label: "K3" },
-        { id: "k3-256k", label: "K3 256K", tag: "cheap" },
+        { id: "k3-256k", label: "K3 256K" },
       ],
     },
     usage: { url: "https://api.kimi.com/coding/v1/usages", auth: "bearer" },
@@ -134,32 +146,38 @@ export const CODING_PLANS = {
       // Go answers in Anthropic's format for every model, translating the others. Each model has its own
       // monthly cap; `cheap`: 20,000 or more requests a month on Go by OpenCode's own estimates. Left out: the
       // free models (for a limited time) and the ones that train on what they're sent. DeepSeek's models answer
-      // only once the OpenCode workspace allows the Global region.
+      // only once the OpenCode workspace allows the Global region (Settings › Privacy), off by default.
       models: [
-        { id: "minimax-m3", label: "MiniMax M3", alias: "sonnet" },
-        { id: "claude-haiku-5-5", label: "Claude Haiku 5.5", alias: "haiku" },
-        { id: "minimax-m3.1-flash", label: "MiniMax M3.1 Flash" },
-        { id: "glm-5.3", label: "GLM-5.3", tag: "smart" },
-        { id: "glm-5.3-flash", label: "GLM-5.3 Flash", tag: "cheap" },
-        { id: "glm-5.2", label: "GLM-5.2" },
-        { id: "kimi-k3.1-pro", label: "Kimi K3.1 Pro", tag: "smart" },
-        { id: "kimi-k3", label: "Kimi K3" },
-        { id: "kimi-k2.7-code", label: "Kimi K2.7 Code" },
-        { id: "qwen3.8-max", label: "Qwen3.8 Max", tag: "smart" },
-        { id: "qwen3.8-flash", label: "Qwen3.8 Flash", tag: "cheap" },
-        { id: "qwen3.7-plus", label: "Qwen3.7 Plus", tag: "cheap" },
-        { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro", tag: "smart" },
-        { id: "deepseek-v4.1-flash", label: "DeepSeek V4.1 Flash", tag: "cheap" },
-        { id: "mimo-v2.6-pro", label: "MiMo V2.6 Pro" },
-        { id: "mimo-v2.6-flash", label: "MiMo V2.6 Flash", tag: "cheap" },
-        { id: "gpt-6-luna", label: "GPT-6 Luna", tag: "cheap" },
-        { id: "gpt-5.6-luna", label: "GPT-5.6 Luna" },
-        { id: "gemini-4-argon", label: "Gemini 4 Argon", tag: "smart" },
-        { id: "grok-4.7", label: "Grok 4.7" },
-        { id: "longcat-2.0", label: "LongCat 2.0", tag: "cheap" },
-        { id: "hy3", label: "Hy3", tag: "cheap" },
-        { id: "hy4-preview", label: "Hy4 Preview" },
-        { id: "step-5-preview", label: "Step 5 Preview" },
+        { id: "minimax-m3", label: "MiniMax M3", alias: "sonnet", maker: "minimax" },
+        { id: "minimax-m3.1-flash", label: "MiniMax M3.1 Flash", maker: "minimax" },
+        { id: "claude-haiku-5-5", label: "Claude Haiku 5.5", alias: "haiku", maker: "anthropic" },
+        { id: "glm-5.3", label: "GLM-5.3", tag: "smart", maker: "zai" },
+        { id: "glm-5.3-flash", label: "GLM-5.3 Flash", tag: "cheap", maker: "zai" },
+        { id: "glm-5.2", label: "GLM-5.2", maker: "zai" },
+        { id: "kimi-k3.1-pro", label: "Kimi K3.1 Pro", tag: "smart", maker: "moonshot" },
+        { id: "kimi-k3", label: "Kimi K3", maker: "moonshot" },
+        { id: "kimi-k2.7-code", label: "Kimi K2.7 Code", maker: "moonshot" },
+        { id: "qwen3.8-max", label: "Qwen3.8 Max", tag: "smart", maker: "Alibaba" },
+        { id: "qwen3.8-flash", label: "Qwen3.8 Flash", tag: "cheap", maker: "Alibaba" },
+        { id: "qwen3.7-plus", label: "Qwen3.7 Plus", tag: "cheap", maker: "Alibaba" },
+        { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro", needs: "globalRegion", maker: "deepseek" },
+        {
+          id: "deepseek-v4.1-flash",
+          label: "DeepSeek V4.1 Flash",
+          tag: "cheap",
+          needs: "globalRegion",
+          maker: "deepseek",
+        },
+        { id: "mimo-v2.6-pro", label: "MiMo V2.6 Pro", maker: "Xiaomi" },
+        { id: "mimo-v2.6-flash", label: "MiMo V2.6 Flash", tag: "cheap", maker: "Xiaomi" },
+        { id: "gpt-6-luna", label: "GPT-6 Luna", tag: "cheap", maker: "openai" },
+        { id: "gpt-5.6-luna", label: "GPT-5.6 Luna", maker: "openai" },
+        { id: "gemini-4-argon", label: "Gemini 4 Argon", tag: "smart", maker: "gemini" },
+        { id: "grok-4.7", label: "Grok 4.7", maker: "xAI" },
+        { id: "longcat-2.0", label: "LongCat 2.0", tag: "cheap", maker: "Meituan" },
+        { id: "hy3", label: "Hy3", tag: "cheap", maker: "Tencent" },
+        { id: "hy4-preview", label: "Hy4 Preview", maker: "Tencent" },
+        { id: "step-5-preview", label: "Step 5 Preview", maker: "StepFun" },
       ],
       // Its models that aren't Claude refuse some of Claude Code's betas; the OpenCode CLI, if the agent runs
       // it, reads no project config that could point it elsewhere.
@@ -194,9 +212,14 @@ export function planModel(plan: CodingPlan, value: string | null | undefined): P
 /** What a plan's model is stored and chosen as: its alias where it has one (portable to Claude), else its id. */
 export const planModelValue = (m: PlanModel): string => m.alias ?? m.id;
 
+/** A coding plan's model by its id, whichever plan has it. */
+export const planModelById = (id: string): PlanModel | undefined =>
+  Object.values<CodingPlan>(CODING_PLANS)
+    .flatMap((p) => p.claudeCode.models)
+    .find((m) => m.id === id);
+
 /** Every coding plan's model ids: what an agent on Claude Code may store besides Claude's own. */
-export const isPlanModelId = (v: string) =>
-  Object.values<CodingPlan>(CODING_PLANS).some((p) => p.claudeCode.models.some((m) => m.id === v));
+export const isPlanModelId = (v: string) => planModelById(v) !== undefined;
 
 /**
  * The `--model` of a Claude Code turn for a stored value: an alias as is (on a plan, the plan names its model);

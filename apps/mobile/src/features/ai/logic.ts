@@ -66,7 +66,12 @@ export const takenFrom = (account: Pick<MachineAccount, "usedBy">, agentName: st
 export interface ModelRow {
   value: string;
   label: string;
+  /** What it does or is sold as. */
   sub?: string;
+  /** What the plan's account must allow before it answers. */
+  note?: string;
+  /** Who makes it, on a plan of several makers' models: a provider's id or the maker's name. */
+  maker?: string;
   checked: boolean;
 }
 
@@ -83,13 +88,26 @@ export function modelRows(
   const chosen = brainModelChoice(view.brain, plan, view.effectiveModel ?? option?.defaultModel ?? "");
   const rows: Omit<ModelRow, "checked">[] = [
     { value: AUTO, label: t("brain.auto.label"), sub: t("brain.auto.hint") },
-    ...brainModelChoices(plan, option?.models ?? []).map(({ value, label, tag }) => ({
+    ...brainModelChoices(plan, option?.models ?? []).map(({ value, label, tag, needs, maker }) => ({
       value,
       label,
       ...(tag ? { sub: t(`brain.modelTag.${tag}`) } : {}),
+      ...(needs ? { note: t(`brain.modelNeeds.${needs}`) } : {}),
+      ...(maker ? { maker } : {}),
     })),
   ];
   return rows.map((r) => ({ ...r, checked: r.value === chosen }));
+}
+
+/** The model page's lists: one, or on a plan of several makers' models Automático's and one per maker. */
+export function modelSections(rows: ModelRow[]): { maker?: string; rows: ModelRow[] }[] {
+  const sections: { maker?: string; rows: ModelRow[] }[] = [];
+  for (const r of rows) {
+    const last = sections.at(-1);
+    if (last && last.maker === r.maker) last.rows.push(r);
+    else sections.push({ ...(r.maker ? { maker: r.maker } : {}), rows: [r] });
+  }
+  return sections;
 }
 
 /** What picking a model saves, as the web's dialog does: Automático picks the effort too; a fixed one after it, Médio. */

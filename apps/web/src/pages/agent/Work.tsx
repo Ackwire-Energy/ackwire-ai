@@ -45,6 +45,7 @@ import {
   accountPlan,
   brainModelChoice,
   brainModelChoices,
+  brainPlan,
   isPlanId,
   planName,
   planOf,
@@ -202,8 +203,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
   const shownPlanModel = view ? view.effectiveModel : (agent.brain?.model ?? null);
   // A coding plan's account: its maker's model thinks.
   const thinkingAccount = view?.account ? view.accounts.find((a) => a.id === view.account) : undefined;
-  const plan =
-    kind === "claude_code" ? (view ? accountPlan(thinkingAccount) : planOf(agent.brain?.provider)) : undefined;
+  const plan = kind === "claude_code" ? (view ? brainPlan(view) : planOf(agent.brain?.provider)) : undefined;
   const effectiveChoice = view?.effectiveModel ? brainModelChoice(kind, plan, view.effectiveModel) : null;
   const planModel = isAuto(shownPlanModel)
     ? t("brain.auto.label")
@@ -679,6 +679,15 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   // On a coding plan Claude Code runs the plan's models: any of them, or the ones its aliases name.
   const plan = accountKind === "claude_code" ? accountPlan(current) : undefined;
   const modelOptions = brainModelChoices(plan, option?.models ?? []);
+  // A model with words of its own (what it's sold as, what it needs) shows them, in the select.
+  const segmented = modelOptions.length < MODEL_SEGMENTS && modelOptions.every((o) => !o.tag && !o.needs);
+  // Several makers' models: grouped by maker, each beside its logo (Automático beside its bulb).
+  const byMaker = modelOptions.some((o) => o.maker);
+  const autoMark = (
+    <span className="newag__ib">
+      <Icon name="bulb" size={16} />
+    </span>
+  );
   // The chosen account's plan usage; the computer's own sign-in's only where it can think for this agent.
   const usage = accountKind
     ? account === null
@@ -939,7 +948,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const planRows = (
     <>
       <BrainField label={t("agentPage.work.brain.planModel")}>
-        {modelOptions.length + 1 <= MODEL_SEGMENTS ? (
+        {segmented ? (
           <>
             <Segmented
               className="agp-brainseg"
@@ -965,11 +974,23 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             onValueChange={setPlanModel}
             renderValue={pickerValue}
             options={[
-              { value: AUTO, label: t("brain.auto.label"), description: t("brain.auto.hint") },
-              ...modelOptions.map(({ value, label, tag }) => ({
+              {
+                value: AUTO,
+                label: t("brain.auto.label"),
+                description: t("brain.auto.hint"),
+                ...(byMaker ? { leading: autoMark } : {}),
+              },
+              ...modelOptions.map(({ value, label, tag, needs, maker }) => ({
                 value,
                 label,
-                ...(tag ? { description: t(`brain.modelTag.${tag}`) } : {}),
+                ...(maker ? { group: providerLabel(maker), leading: <ProviderLogo id={maker} size="sm" /> } : {}),
+                ...(tag || needs
+                  ? {
+                      description: [tag && t(`brain.modelTag.${tag}`), needs && t(`brain.modelNeeds.${needs}`)]
+                        .filter(Boolean)
+                        .join(" · "),
+                    }
+                  : {}),
               })),
             ]}
           />
@@ -1026,11 +1047,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
               value: AUTO,
               label: t("brain.auto.label"),
               description: t("brain.auto.hint"),
-              leading: (
-                <span className="newag__ib">
-                  <Icon name="bulb" size={16} />
-                </span>
-              ),
+              leading: autoMark,
             },
             ...choices.flatMap(([provider, list]) =>
               list.map(({ model: m, available }) => ({

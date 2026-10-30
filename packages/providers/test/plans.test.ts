@@ -8,6 +8,7 @@ import {
   type PlanId,
   type PlanModel,
   planModel,
+  planModelById,
   planModelValue,
 } from "../src/plans";
 
@@ -37,6 +38,15 @@ describe("coding plans' models", () => {
       "k3",
       "k3-256k",
     ]);
+    // Kimi's own names: `kimi-for-coding-highspeed` is K2.7 Code's high-speed version, not Kimi for Coding's.
+    expect(models("kimi").map((m) => m.label)).toEqual([
+      "Kimi for Coding",
+      "K3.1 Pro",
+      "K3.1 Pro Highspeed",
+      "K2.7 Code Highspeed",
+      "K3",
+      "K3 256K",
+    ]);
     expect(aliases("kimi")).toEqual({ opus: "k3.1-pro", sonnet: "kimi-for-coding", haiku: "kimi-for-coding" });
     expect(ids("minimax")).toEqual(["MiniMax-M3.1-Flash[1m]"]);
     expect(aliases("opencode")).toEqual({ opus: "minimax-m3", sonnet: "minimax-m3", haiku: "claude-haiku-5-5" });
@@ -58,6 +68,49 @@ describe("coding plans' models", () => {
     ]);
   });
 
+  test("a tag only where its maker or plan says so", () => {
+    const tagged = (plan: PlanId, tag: string) =>
+      models(plan)
+        .filter((m) => m.tag === tag)
+        .map((m) => m.id);
+    // Flagship: the maker's own word for it (DeepSeek doesn't call V4 Pro that).
+    expect(tagged("zai", "smart")).toEqual(["glm-5.3[1m]"]);
+    expect(tagged("kimi", "smart")).toEqual(["k3.1-pro"]);
+    expect(tagged("opencode", "smart")).toEqual(["glm-5.3", "kimi-k3.1-pro", "qwen3.8-max", "gemini-4-argon"]);
+    // Kimi compares K3 256K's quota only with K3's: no model of its plan is the cheapest in its words.
+    expect(tagged("kimi", "cheap")).toEqual([]);
+  });
+
+  test("a model that answers only once the plan's account allows it says so", () => {
+    const needs = PLAN_IDS.flatMap((p) => models(p).flatMap((m) => (m.needs ? [[m.id, m.needs]] : [])));
+    expect(needs).toEqual([
+      ["deepseek-v4-pro", "globalRegion"],
+      ["deepseek-v4.1-flash", "globalRegion"],
+    ]);
+  });
+
+  test("a plan that sells several makers' models names each one's maker, each maker's models together", () => {
+    const makers = models("opencode").map((m) => m.maker);
+    expect(makers.every(Boolean)).toBe(true);
+    const runs = makers.filter((m, i) => m !== makers[i - 1]);
+    expect(runs).toEqual([
+      "minimax",
+      "anthropic",
+      "zai",
+      "moonshot",
+      "Alibaba",
+      "deepseek",
+      "Xiaomi",
+      "openai",
+      "gemini",
+      "xAI",
+      "Meituan",
+      "Tencent",
+      "StepFun",
+    ]);
+    for (const plan of ["zai", "kimi", "minimax"] as const) expect(models(plan).some((m) => m.maker)).toBe(false);
+  });
+
   test("a stored value: one of the plan's models by id, an alias's model, else sonnet's", () => {
     const go = CODING_PLANS.opencode;
     expect(planModel(go, "deepseek-v4.1-flash").label).toBe("DeepSeek V4.1 Flash");
@@ -65,7 +118,11 @@ describe("coding plans' models", () => {
     for (const other of [null, undefined, "auto", "opus", "k3.1-pro", "glm-5.3[1m]"])
       expect(planModel(go, other).id).toBe("minimax-m3");
     // Chosen and stored by its alias where it has one (portable to Claude), else by its id.
-    expect(go.claudeCode.models.slice(0, 3).map(planModelValue)).toEqual(["sonnet", "haiku", "minimax-m3.1-flash"]);
+    expect(go.claudeCode.models.slice(0, 3).map(planModelValue)).toEqual(["sonnet", "minimax-m3.1-flash", "haiku"]);
+    // Whichever plan has it, by its id.
+    expect(planModelById("k3-256k")?.label).toBe("K3 256K");
+    expect(planModelById("deepseek-v4.1-flash")?.label).toBe("DeepSeek V4.1 Flash");
+    expect(planModelById("sonnet")).toBeUndefined();
   });
 
   test("a turn's --model: an alias as is, the plan's own model by id, Claude's ids without a plan, else sonnet", () => {

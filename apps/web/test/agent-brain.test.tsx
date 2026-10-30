@@ -838,7 +838,7 @@ describe("Quem pensa: a coding plan's models", () => {
     return state;
   }
 
-  test("every model of the plan in a select, each with what it's sold as; one by id is saved by its id", async () => {
+  test("every model of the plan in a select, by maker, each with what it's sold as and needs; saved by its id", async () => {
     const state = await onPlan("opencode");
     const d = await brainDialog();
     expect(within(d).queryByRole("radiogroup", { name: "Modelo" })).toBeNull();
@@ -853,27 +853,73 @@ describe("Quem pensa: a coding plan's models", () => {
     expect(options.slice(0, 4)).toEqual([
       "AutomáticoEscolhe o modelo e o esforço para cada tarefa",
       "MiniMax M3",
-      "Claude Haiku 5.5",
       "MiniMax M3.1 Flash",
+      "Claude Haiku 5.5",
     ]);
-    expect(options).toContain("DeepSeek V4.1 FlashEconômico");
     expect(options).toContain("Kimi K3.1 ProTopo de linha");
+    // Grouped by maker, as the workspace's models are, each beside its logo.
+    const list = screen().getByRole("listbox");
+    expect([...list.querySelectorAll(".ac-menu__heading")].map((h) => h.textContent)).toEqual([
+      "MiniMax",
+      "Claude",
+      "Z.ai",
+      "Kimi",
+      "Alibaba",
+      "DeepSeek",
+      "Xiaomi",
+      "OpenAI",
+      "Gemini",
+      "xAI",
+      "Meituan",
+      "Tencent",
+      "StepFun",
+    ]);
+    expect(list.querySelectorAll(".ac-menu__leading")).toHaveLength(25);
+    // DeepSeek's answer only once the OpenCode workspace allows the Global region.
+    expect(
+      within(within(list).getByRole("group", { name: "DeepSeek" }))
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual([
+      "DeepSeek V4 ProPrecisa da região Global no OpenCode",
+      "DeepSeek V4.1 FlashEconômico · Precisa da região Global no OpenCode",
+    ]);
     await click(screen().getByRole("option", { name: /^DeepSeek V4\.1 Flash/ }));
+    expect(within(d).getByRole("combobox", { name: "Modelo" }).textContent).toContain(
+      "Precisa da região Global no OpenCode",
+    );
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
     expect(brainCalls(state).at(-1)).toMatchObject({ brain: "claude_code", model: "deepseek-v4.1-flash" });
     expect(document.body.textContent).toContain("A Ada agora pensa com Claude Code · DeepSeek V4.1 Flash.");
   });
 
-  test("the cell names the plan's model it runs; a plan with few models keeps the segments", async () => {
+  test("the cell names the plan's model it runs; models sold with words show them, the others keep the segments", async () => {
     await onPlan("kimi", { model: "k3-256k", effectiveModel: "k3-256k" });
     expect(sentence().textContent).toContain("K3 256K");
     cleanup();
     await onPlan("zai", { model: "opus", effectiveModel: "opus" });
-    const d = await brainDialog();
+    let d = await brainDialog();
+    expect(within(d).queryByRole("radiogroup", { name: "Modelo" })).toBeNull();
+    // An alias the plan leaves out runs its main model: shown as that one, with what it's sold as.
+    const trigger = within(d).getByRole("combobox", { name: "Modelo" });
+    expect(trigger.textContent).toBe("GLM-5.3Topo de linha");
+    trigger.focus();
+    await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+    expect(
+      screen()
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual([
+      "AutomáticoEscolhe o modelo e o esforço para cada tarefa",
+      "GLM-5.3Topo de linha",
+      "GLM-5.3 FlashEconômico",
+    ]);
+    cleanup();
+    await onPlan("minimax");
+    d = await brainDialog();
     const models = within(within(d).getByRole("radiogroup", { name: "Modelo" })).getAllByRole("radio");
-    expect(models.map((r) => r.textContent)).toEqual(["Automático", "GLM-5.3", "GLM-5.3 Flash"]);
-    // An alias the plan leaves out runs its main model: shown as that one.
+    expect(models.map((r) => r.textContent)).toEqual(["Automático", "MiniMax M3.1 Flash"]);
     expect(models[1]?.getAttribute("aria-checked")).toBe("true");
   });
 });

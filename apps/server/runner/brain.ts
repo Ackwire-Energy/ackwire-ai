@@ -568,6 +568,8 @@ export function accountSettingsEnv(
   for (const k of NETWORK_ENV) env[k] = runner[k] ?? "";
   if (!plan) return env;
   for (const alias of PLAN_ALIASES) env[`ANTHROPIC_DEFAULT_${alias.toUpperCase()}_MODEL`] = planModel(plan, alias).id;
+  // A subagent called with Claude Code's `fable` alias would otherwise ask the plan for a Claude model it doesn't serve.
+  env.ANTHROPIC_DEFAULT_FABLE_MODEL = planModel(plan, "opus").id;
   env.CLAUDE_CODE_SUBAGENT_MODEL = planModel(plan, model).id;
   env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1";
   return { ...env, ...plan.claudeCode.env };
