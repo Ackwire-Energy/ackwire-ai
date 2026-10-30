@@ -4,6 +4,7 @@ import {
   boolean,
   foreignKey,
   index,
+  integer,
   jsonb,
   pgTable,
   text,
@@ -54,6 +55,25 @@ export const providerCredentials = pgTable(
     revokedAt: timestamp({ withTimezone: true }),
   },
   (t) => [index().on(t.orgId)],
+);
+
+/**
+ * A named group of the workspace's agents, shared by everyone in it (ADR 0083): the sidebar's sections.
+ * An agent is in at most one (`agents.group_id`).
+ */
+export const agentGroups = pgTable(
+  "agent_groups",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    /** Order among the workspace's groups. */
+    position: integer().notNull().default(0),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.orgId, t.position)],
 );
 
 /**
@@ -135,6 +155,10 @@ export const agents = pgTable(
      */
     operatorHoldAt: timestamp({ withTimezone: true }),
     operatorHoldReason: text(),
+    /** Its group in the sidebar (ADR 0083); null = none. Deleting the group sets it back to null. */
+    groupId: uuid().references(() => agentGroups.id, { onDelete: "set null" }),
+    /** Order inside its group. */
+    groupPosition: integer().notNull().default(0),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     archivedAt: timestamp({ withTimezone: true }),

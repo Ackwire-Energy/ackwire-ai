@@ -864,6 +864,24 @@ export const en: Translations = {
     unreadNotifications_one: "{{count}} unread notification",
     unreadNotifications_other: "{{count}} unread notifications",
   },
+  agentGroups: {
+    group: "Group",
+    none: "No group",
+    newGroup: "New group",
+    newFromAgent: "New group…",
+    nameLabel: "Name",
+    namePlaceholder: "E.g. Product and marketing",
+    create: "Create group",
+    renameTitle: "Rename group",
+    rename: "Rename",
+    options: "{{name}} options",
+    moveUp: "Move up",
+    moveDown: "Move down",
+    delete: "Delete group",
+    deleteTitle: "Delete the group {{name}}?",
+    deleteText: "Its agents go back to Agents.",
+    dropHere: "Drag agents here",
+  },
   openOnPhone: {
     qr: "QR code to sign in to the agentes app",
     making: "Making the code…",
@@ -2143,6 +2161,7 @@ export const en: Translations = {
       machine: "Computer",
       brain: "Who thinks",
       repos: "GitHub repositories",
+      group: "Group",
     },
     lines: {
       added_one: "{{count}} new line",
@@ -7248,6 +7267,10 @@ export const en: Translations = {
       targetNotFound: "That computer no longer exists. Choose another one.",
       targetSame: "The agents are already on that computer.",
       targetPaused: "That computer is paused. Choose another one.",
+    },
+    agentGroup: {
+      notFound: "This group no longer exists.",
+      tooMany: "This workspace already has {{max}} groups. Delete one first.",
     },
   },
   machines: {

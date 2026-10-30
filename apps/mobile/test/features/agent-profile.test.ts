@@ -6,6 +6,7 @@ import {
   canEditMemories,
   dayWord,
   didLines,
+  freeSections,
   knownAboutMe,
   memoryOrigin,
   plainRole,
@@ -62,6 +63,26 @@ describe("Agentes: esperando você, trabalhando, livres", () => {
     expect(waiting).toEqual([]);
     expect(working.map((l) => l.agent.id)).toEqual(["nina"]);
     expect(free.map((l) => l.agent.id).sort()).toEqual(["iris", "theo"]);
+  });
+
+  test("Livres by the workspace's groups: the ones in none first, then each group in its order; empty ones left out", () => {
+    const team = [...agents, agent({ id: "zoe", name: "Zoe" }), agent({ id: "ana", name: "Ana" })];
+    const { working, free } = teamLines(team, [work("nina", ago(1))], []);
+    const groups = [
+      { id: "g1", name: "Integrations", agentIds: ["zoe", "nina", "theo"] },
+      { id: "g2", name: "Produto", agentIds: ["nina"] },
+      { id: "g3", name: "Florim | Gestão e Financeiro", agentIds: ["ana"] },
+    ];
+    const sections = freeSections(free, groups);
+    expect(sections.map((s) => [s.group?.name ?? null, s.lines.map((l) => l.agent.id)])).toEqual([
+      [null, ["iris"]],
+      ["Integrations", ["zoe", "theo"]],
+      ["Florim | Gestão e Financeiro", ["ana"]],
+    ]);
+    // A working agent stays under "Trabalhando agora", out of its group's section.
+    expect(working.map((l) => l.agent.id)).toEqual(["nina"]);
+    // No groups: Livres alone, as before.
+    expect(freeSections(free, []).map((s) => [s.group, s.lines.length])).toEqual([[null, free.length]]);
   });
 });
 

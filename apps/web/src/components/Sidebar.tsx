@@ -1,8 +1,9 @@
-import type { Agent, Channel, ChannelCategory } from "@agenteschat/client";
+import type { Agent, AgentGroup, Channel, ChannelCategory } from "@agenteschat/client";
 import {
   agentStateIn,
   keys,
   runningAgents,
+  useAgentGroups,
   useChannelCategories,
   useChannels,
   useConnections,
@@ -19,6 +20,7 @@ import {
   usePrefetchRecent,
   useSkills,
 } from "@agenteschat/client";
+import { agentSections } from "@agenteschat/client/lib/agent-groups";
 import { audienceChip, audienceNotice } from "@agenteschat/client/lib/audience";
 import { formatPercent } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -98,6 +100,14 @@ import type { SettingsSection } from "@/pages/settings-sections";
 import { useLiveStore, useStreams } from "@/realtime/context";
 import { AddPasswordDialog } from "./AddPassword";
 import { AgentAvatar } from "./AgentAvatar";
+import {
+  AgentGroupMenu,
+  DeleteGroupDialog,
+  type GroupDialogFor,
+  GroupMenu,
+  GroupNameDialog,
+  useAgentDrag,
+} from "./AgentGroups";
 import { MoveChannelDialog, NewCategoryDialog, RenameCategoryDialog } from "./ChannelCategoryDialogs";
 import { openPalette } from "./CommandMenu";
 import { COMPACT_QUERY, useMediaQuery, useNavDrawer } from "./NavDrawer";
@@ -218,9 +228,15 @@ export function Sidebar() {
     if (channelId) prefetch(channelId);
   };
   // A closed conversation category still says how many unread messages it holds.
-  const agentsUnread = dir.agents.reduce((n, a) => n + (unreadWith.get(a.id) ?? 0), 0);
+  const unreadOf = (agents: Agent[]) => agents.reduce((n, a) => n + (unreadWith.get(a.id) ?? 0), 0);
   const peopleUnread = people.reduce((n, m) => n + (unreadWith.get(m.userId) ?? 0), 0);
   const sections = useSidebarSections();
+  // The workspace's groups of agents (ADR 0083): the agents in none stay under "Agentes", each group is a category.
+  const groups = useAgentGroups(orgId).data ?? [];
+  const byGroup = agentSections(dir.agents, groups, (a) => a.id);
+  const drag = useAgentDrag(groups);
+  const [groupDialog, setGroupDialog] = useState<GroupDialogFor | null>(null);
+  const [deletingGroup, setDeletingGroup] = useState<AgentGroup | null>(null);
 
   // How many of the workspace's agents are working now: the sky at the bottom rises with it.
   const agentIds = dir.agents.map((a) => a.id).join();
@@ -235,6 +251,28 @@ export function Sidebar() {
   const tablet = useMediaQuery(TABLET_QUERY);
   const [collapsed, toggleCollapsed] = useSidebarCollapsed();
   const rail = !compact && (tablet || collapsed);
+  // Owners and admins organize the groups, with the full sidebar (the rail shows faces only).
+  const organize = can(org.role, "manage_agents") && !rail;
+  const agentRow = (a: Agent) => (
+    <AgentRow
+      key={a.id}
+      agent={a}
+      unread={unreadWith.get(a.id) ?? 0}
+      waitingFor={waitingFor.get(a.id)}
+      onPrefetch={() => prefetchDm(a.id)}
+      onOpen={() => markOpen(dmWith.get(a.id) ?? a.id)}
+      drag={organize ? drag.row(a.id) : undefined}
+      menu={
+        organize ? (
+          <AgentGroupMenu
+            agent={a}
+            groups={groups}
+            onNewGroup={() => setGroupDialog({ mode: "create", agentIds: [a.id] })}
+          />
+        ) : undefined
+      }
+    />
+  );
 
   // Only the middle scrolls: the workspace card on top and the foot stay put. The active item
   // paints its own background (no sliding pill).
@@ -258,7 +296,7 @@ export function Sidebar() {
       ro?.disconnect();
       nav.removeEventListener("scroll", edges);
     };
-  }, [channels.data, dir.agents.length, people.length, rail]);
+  }, [channels.data, dir.agents.length, people.length, rail, groups.length]);
 
   // The open conversation stays in sight: once per navigation (as soon as its row exists), a row
   // hidden past the list's edge is brought to the middle. Later scrolling is the person's.
@@ -398,24 +436,69 @@ export function Sidebar() {
             id="agents"
             label={t("shell.agents")}
             sections={sections}
-            summary={agentsUnread > 0 && <UnreadCount count={agentsUnread} />}
+            summary={unreadOf(byGroup.ungrouped) > 0 && <UnreadCount count={unreadOf(byGroup.ungrouped)} />}
+            action={
+              organize && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconOnly
+                  icon="plus"
+                  className="sidebar__section-add"
+                  aria-label={t("agentGroups.newGroup")}
+                  title={t("agentGroups.newGroup")}
+                  onClick={() => setGroupDialog({ mode: "create" })}
+                />
+              )
+            }
+            drop={organize ? drag.zone(null) : undefined}
           >
             <Link to="/org/$orgId/team" params={{ orgId }} className="sidebar__item" title={t("shell.team")}>
               <Icon name="agent" />
               <span className="sidebar__item-label">{t("shell.team")}</span>
             </Link>
-            {dir.agents.map((a) => (
-              <AgentRow
-                key={a.id}
-                agent={a}
-                unread={unreadWith.get(a.id) ?? 0}
-                waitingFor={waitingFor.get(a.id)}
-                onPrefetch={() => prefetchDm(a.id)}
-                onOpen={() => markOpen(dmWith.get(a.id) ?? a.id)}
-              />
-            ))}
+            {byGroup.ungrouped.map(agentRow)}
           </SidebarSection>
         )}
+        {dir.agents.length > 0 &&
+          byGroup.groups.map(({ group, items }, i) => {
+            // Where a dragged row would land: a line before the row at that place among the others.
+            const others = items.filter((a) => a.id !== drag.dragging);
+            const lineAt = drag.over?.groupId === group.id ? drag.over.index : null;
+            const line = <span className="sidebar__drop-line" aria-hidden="true" />;
+            return (
+              <SidebarSection
+                key={group.id}
+                id={`group:${group.id}`}
+                label={group.name}
+                sections={sections}
+                summary={unreadOf(items) > 0 && <UnreadCount count={unreadOf(items)} />}
+                action={
+                  organize && (
+                    <GroupMenu
+                      group={group}
+                      index={i}
+                      count={byGroup.groups.length}
+                      onRename={() => setGroupDialog({ mode: "rename", group })}
+                      onDelete={() => setDeletingGroup(group)}
+                    />
+                  )
+                }
+                drop={organize ? drag.zone(group.id) : undefined}
+              >
+                {items.map((a) => (
+                  <Fragment key={a.id}>
+                    {lineAt === others.indexOf(a) && line}
+                    {agentRow(a)}
+                  </Fragment>
+                ))}
+                {lineAt !== null && lineAt >= others.length && line}
+                {organize && items.length === 0 && (
+                  <span className="sidebar__drop-hint">{t("agentGroups.dropHere")}</span>
+                )}
+              </SidebarSection>
+            );
+          })}
 
         {people.length > 0 && (
           <SidebarSection
@@ -453,6 +536,8 @@ export function Sidebar() {
         onOpenChange={(open) => setCreatingChannel(open)}
         category={typeof creatingChannel === "string" ? creatingChannel : null}
       />
+      {groupDialog && <GroupNameDialog purpose={groupDialog} onClose={() => setGroupDialog(null)} />}
+      {deletingGroup && <DeleteGroupDialog group={deletingGroup} onClose={() => setDeletingGroup(null)} />}
 
       <div className="sidebar__foot">
         <SidebarHorizon
@@ -476,8 +561,11 @@ export function Sidebar() {
   );
 }
 
-/** The fixed sections, and a channel category as `category:<id>` (ADR 0080). */
-type SectionId = "channels" | "agents" | "people" | `category:${string}`;
+/**
+ * The fixed sections, a channel category as `category:<id>` (ADR 0080) and a group of agents as `group:<id>`
+ * (ADR 0083).
+ */
+type SectionId = "channels" | "agents" | "people" | `category:${string}` | `group:${string}`;
 
 /** Which sidebar categories are closed, remembered per browser. */
 function useSidebarSections() {
@@ -514,7 +602,7 @@ function useSidebarSections() {
 /**
  * A sidebar category that opens and closes. Closed, it keeps its open page's row in sight (CSS shows
  * only the active item), and shows `summary` (a count) on its header.
- * On the icon rail the header goes away and every item shows.
+ * On the icon rail the header goes away and every item shows. `drop`: it takes dragged agents (`useAgentDrag`).
  */
 function SidebarSection({
   id,
@@ -522,6 +610,7 @@ function SidebarSection({
   sections,
   summary,
   action,
+  drop,
   className,
   headProps,
   children,
@@ -531,6 +620,7 @@ function SidebarSection({
   sections: ReturnType<typeof useSidebarSections>;
   summary?: ReactNode;
   action?: ReactNode;
+  drop?: ReturnType<ReturnType<typeof useAgentDrag>["zone"]>;
   className?: string;
   /** A channel category's header: its right click and dragging. */
   headProps?: HTMLAttributes<HTMLDivElement>;
@@ -539,7 +629,7 @@ function SidebarSection({
   const open = sections.isOpen(id);
   const bodyId = `sidebar-section-${id.replace(":", "-")}`;
   return (
-    <div className={cx("sidebar__group sidebar__section", className)} data-open={open}>
+    <div className={cx("sidebar__group sidebar__section", className)} data-open={open} {...drop}>
       <div className="sidebar__section-head" {...headProps}>
         <button
           type="button"
@@ -1031,13 +1121,18 @@ function MoreTools() {
   );
 }
 
-/** An agent in the sidebar; while it works, a light sweep in its color runs behind the row (a pulse in the rail). */
+/**
+ * An agent in the sidebar; while it works, a light sweep in its color runs behind the row (a pulse in the rail).
+ * For owners and admins it drags to another group (`drag`) and has a "…" (`menu`) over its end on hover.
+ */
 function AgentRow({
   agent: a,
   unread,
   waitingFor,
   onPrefetch,
   onOpen,
+  drag,
+  menu,
 }: {
   agent: Agent;
   unread: number;
@@ -1045,6 +1140,8 @@ function AgentRow({
   waitingFor?: string;
   onPrefetch: () => void;
   onOpen: () => void;
+  drag?: ReturnType<ReturnType<typeof useAgentDrag>["row"]>;
+  menu?: ReactNode;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -1099,56 +1196,60 @@ function AgentRow({
     ];
   });
   return (
-    <Link
-      onContextMenu={onContextMenu}
-      to="/org/$orgId/dm/agent/$agentId"
-      params={{ orgId: org.id, agentId: a.id }}
-      className="sidebar__item"
-      title={a.role ? `${a.name} · ${a.role}` : a.name}
-      onMouseEnter={onPrefetch}
-      onFocus={onPrefetch}
-      onClick={onOpen}
-      data-unread={unread > 0}
-      data-busy={busy}
-      style={selectionSky(color)}
-    >
-      {busy && <AgentTrail color={color} />}
-      {busy && <AgentGlow color={color} />}
-      <AgentAvatar
-        agentId={a.id}
-        name={a.name}
-        size="sm"
-        {...(waitingFor ? { state: "idle" as const, expression: "closed" as const } : {})}
-      />
-      <span className="sidebar__item-label">{a.name}</span>
-      {unread > 0 ? (
-        <UnreadCount count={unread} />
-      ) : waitingFor ? (
-        <span className="sidebar__item-meta sidebar__waiting" title={t("outage.sidebar.tip", { name: waitingFor })}>
-          <Icon name="waiting" size={14} />
-          {t("outage.sidebar.waiting")}
-        </span>
-      ) : busy ? (
-        <span className="sidebar__item-meta sidebar__busy">{t(`sky.busy.${state}`)}</span>
-      ) : (
-        (chip ?? a.role) &&
-        (chip ? (
-          <span className="sidebar__item-meta sidebar__item-meta--audience">
-            {a.role && <span>{a.role}</span>}
-            <span
-              className="sidebar__lock"
-              role="img"
-              aria-label={chip}
-              title={audienceNotice(t, a, (id) => dir.memberById.get(id)?.name) || chip}
-            >
-              <Icon name="lock" size={14} />
-            </span>
+    <div className="sidebar__row" data-agent-row={a.id}>
+      <Link
+        onContextMenu={onContextMenu}
+        to="/org/$orgId/dm/agent/$agentId"
+        params={{ orgId: org.id, agentId: a.id }}
+        className="sidebar__item"
+        title={a.role ? `${a.name} · ${a.role}` : a.name}
+        onMouseEnter={onPrefetch}
+        onFocus={onPrefetch}
+        onClick={onOpen}
+        data-unread={unread > 0}
+        data-busy={busy}
+        style={selectionSky(color)}
+        {...drag}
+      >
+        {busy && <AgentTrail color={color} />}
+        {busy && <AgentGlow color={color} />}
+        <AgentAvatar
+          agentId={a.id}
+          name={a.name}
+          size="sm"
+          {...(waitingFor ? { state: "idle" as const, expression: "closed" as const } : {})}
+        />
+        <span className="sidebar__item-label">{a.name}</span>
+        {unread > 0 ? (
+          <UnreadCount count={unread} />
+        ) : waitingFor ? (
+          <span className="sidebar__item-meta sidebar__waiting" title={t("outage.sidebar.tip", { name: waitingFor })}>
+            <Icon name="waiting" size={14} />
+            {t("outage.sidebar.waiting")}
           </span>
+        ) : busy ? (
+          <span className="sidebar__item-meta sidebar__busy">{t(`sky.busy.${state}`)}</span>
         ) : (
-          <span className="sidebar__item-meta">{a.role}</span>
-        ))
-      )}
-    </Link>
+          (chip ?? a.role) &&
+          (chip ? (
+            <span className="sidebar__item-meta sidebar__item-meta--audience">
+              {a.role && <span>{a.role}</span>}
+              <span
+                className="sidebar__lock"
+                role="img"
+                aria-label={chip}
+                title={audienceNotice(t, a, (id) => dir.memberById.get(id)?.name) || chip}
+              >
+                <Icon name="lock" size={14} />
+              </span>
+            </span>
+          ) : (
+            <span className="sidebar__item-meta">{a.role}</span>
+          ))
+        )}
+      </Link>
+      {menu}
+    </div>
   );
 }
 

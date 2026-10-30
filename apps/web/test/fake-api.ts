@@ -3,6 +3,7 @@ import type {
   Agent,
   AgentAudience,
   AgentBrain,
+  AgentGroup,
   AgentProposal,
   AgentProposalCard,
   AgentQuestion,
@@ -55,6 +56,7 @@ import type {
   WorkspaceLimits,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
+import { moveInGroups } from "@agenteschat/client/lib/agent-groups";
 import { answersOthers, audienceOf } from "@agenteschat/client/lib/audience";
 import { stepIndex } from "@agenteschat/client/lib/onboarding";
 import { createFakeAccess } from "./fakes/access";
@@ -147,6 +149,8 @@ export interface FakeState {
   agentSecrets?: Record<string, AgentSecret[]>;
   members: Member[];
   agents: Agent[];
+  /** The workspace's groups of agents (`agentGroups.*`); unset = none. */
+  agentGroups?: AgentGroup[];
   /** Agents no longer in the team (`agents.former`); a purge moves one here. */
   former?: FormerAgent[];
   channels: Channel[];
@@ -1111,6 +1115,42 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           budgetUsedPercent: percentOf(a),
         })),
       }),
+    },
+    // Groups of agents (ADR 0083), with the server's order rules; every change answers with all of them.
+    agentGroups: {
+      list: async () => structuredClone(state.agentGroups ?? []),
+      create: async (orgId, input) => {
+        state.calls.push({ method: "agentGroups.create", args: [orgId, input] });
+        const ids = input.agentIds ?? [];
+        state.agentGroups = [
+          ...(state.agentGroups ?? []).map((g) => ({ ...g, agentIds: g.agentIds.filter((id) => !ids.includes(id)) })),
+          { id: crypto.randomUUID(), name: input.name, agentIds: ids },
+        ];
+        return structuredClone(state.agentGroups);
+      },
+      update: async (orgId, groupId, patch) => {
+        state.calls.push({ method: "agentGroups.update", args: [orgId, groupId, patch] });
+        const groups = (state.agentGroups ?? []).map((g) =>
+          g.id === groupId && patch.name ? { ...g, name: patch.name } : g,
+        );
+        const group = groups.find((g) => g.id === groupId);
+        const others = groups.filter((g) => g.id !== groupId);
+        state.agentGroups =
+          group && patch.index !== undefined
+            ? [...others.slice(0, patch.index), group, ...others.slice(patch.index)]
+            : groups;
+        return structuredClone(state.agentGroups);
+      },
+      remove: async (orgId, groupId) => {
+        state.calls.push({ method: "agentGroups.remove", args: [orgId, groupId] });
+        state.agentGroups = (state.agentGroups ?? []).filter((g) => g.id !== groupId);
+        return structuredClone(state.agentGroups);
+      },
+      move: async (orgId, agentId, input) => {
+        state.calls.push({ method: "agentGroups.move", args: [orgId, agentId, input] });
+        state.agentGroups = moveInGroups(state.agentGroups ?? [], agentId, input.groupId, input.index);
+        return structuredClone(state.agentGroups);
+      },
     },
     agents: {
       planUsage: async (_orgId, agentId) => {

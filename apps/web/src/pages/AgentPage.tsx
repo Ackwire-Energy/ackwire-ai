@@ -3,6 +3,7 @@ import {
   keys,
   useAgentAccess,
   useAgentDetail,
+  useAgentGroups,
   useAgentRepos,
   useAgentSkills,
   useCredentials,
@@ -13,6 +14,7 @@ import {
   useUpdateAgent,
 } from "@agenteschat/client";
 import { type Level, levelsOf, resourcesOf } from "@agenteschat/client/lib/access-levels";
+import { groupOf, NO_GROUP } from "@agenteschat/client/lib/agent-groups";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -139,6 +141,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
   const credentials = useCredentials(org.id, can(org.role, "manage_credentials"));
   const access = useAgentAccess(org.id, agent.id);
   const repos = useAgentRepos(org.id, agent.id);
+  const groups = useAgentGroups(org.id);
   const library = useAgentSkills(org.id, agent.id);
   const proposals = useProposals(org.id);
   const runs = useRuns(org.id, agent.id, viewer !== "member");
@@ -185,8 +188,9 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
       skills: library.data ? sortIds(library.data.filter((s) => s.enabled).map((s) => s.id)) : undefined,
       channels:
         d && visible.ready ? sortIds(d.channels.map((c) => c.id).filter((id) => visibleIds.has(id))) : undefined,
+      group: groups.data ? (groupOf(groups.data, agent.id)?.id ?? NO_GROUP) : undefined,
     };
-  }, [agent, admin, detail.data, settings.data, access.data, repos.data, library.data, visible]);
+  }, [agent, admin, detail.data, settings.data, access.data, repos.data, library.data, visible, groups.data]);
 
   /* ---------- The draft ---------- */
 
@@ -208,6 +212,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
     repos: edits.repos ?? saved.repos,
     skills: edits.skills ?? saved.skills,
     channels: edits.channels ?? saved.channels,
+    group: edits.group ?? saved.group,
   };
 
   /* ---------- What changed, said in words ---------- */
@@ -245,6 +250,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
       : t("agentPage.none");
   const modelText = (id: string) =>
     isAuto(id) ? t("brain.auto.label") : (models.data?.models.find((m) => m.id === id)?.label ?? id);
+  const groupText = (id: string | undefined) => groups.data?.find((g) => g.id === id)?.name ?? t("agentGroups.none");
   const resourceById = new Map(resources.map((r) => [r.id, r]));
 
   const changes: Change[] = changedKeys(saved, edits).map(({ key, field, resource }) => {
@@ -328,6 +334,8 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
           was: channelText(saved.channels ?? []),
           now: channelText(draft.channels ?? []),
         };
+      case "group":
+        return { ...base, label: label("group"), was: groupText(saved.group), now: groupText(draft.group) };
       default:
         // The computer and who thinks are saved by their own dialogs (the sentence under the name).
         return { ...base, label: label(field), was: "", now: "" };
@@ -490,6 +498,18 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
         );
         void qc.invalidateQueries({ queryKey: keys.agentDetail(org.id, agent.id) });
         done.push("channels");
+      } catch (e) {
+        fail(e, true);
+      }
+    }
+    // 5. Its group (at the end of the chosen one).
+    if (!failed && fields.has("group") && draft.group) {
+      try {
+        const next = await api.agentGroups.move(org.id, agent.id, {
+          groupId: draft.group === NO_GROUP ? null : draft.group,
+        });
+        qc.setQueryData(keys.agentGroups(org.id), next);
+        done.push("group");
       } catch (e) {
         fail(e, true);
       }

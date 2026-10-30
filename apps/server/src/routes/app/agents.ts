@@ -11,17 +11,21 @@ import {
   canViewCost,
   createAgent,
   createAgentFromProposal,
+  createAgentGroup,
   createCredential,
   deleteAgent,
+  deleteAgentGroup,
   deleteCredential,
   denyAgentProposal,
   getAgent,
   getAgentBrain,
   getAgentProposal,
   getTeam,
+  listAgentGroups,
   listAgents,
   listCredentials,
   listFormerAgents,
+  moveAgentToGroup,
   NEW_AGENT_DEFAULTS,
   NotFoundError,
   newAgentBrainMachines,
@@ -34,6 +38,7 @@ import {
   setAgentAudience,
   setAgentBrain,
   updateAgent,
+  updateAgentGroup,
   usageSummary,
 } from "@agenteschat/engine";
 import { MODEL_CATALOG, nanoUsdToUsd, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
@@ -585,6 +590,117 @@ export function agentRoutes(deps: AppDeps) {
       await archiveAgent(db, actor, orgId, agentId);
       await publishMachineAgentsChanged(adapters.pubsub, orgId);
       return c.body(null, 204);
+    },
+  );
+
+  // ── Agent groups (ADR 0083) ───────────────────────────────────────────────
+  // Every write answers with every group and tells the workspace's open apps (`agent.groups`).
+  const groups = { db, pubsub: adapters.pubsub };
+  const Groups = z.object({
+    groups: z.array(
+      z.object({
+        id: z.uuid(),
+        name: z.string(),
+        agentIds: z.array(z.uuid()).openapi({ description: "Its agents in order (archived ones left out)." }),
+      }),
+    ),
+  });
+  const GroupParams = OrgParams.extend({ groupId: z.uuid() });
+  const GroupName = z.string().trim().min(1).max(80);
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/agent-groups",
+      tags,
+      security,
+      summary: "The workspace's groups of agents, in order; an agent is in one at most",
+      request: { params: OrgParams },
+      responses: { 200: json(Groups), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ groups: await listAgentGroups(db, c.get("user").id, orgId) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/agent-groups",
+      tags,
+      security,
+      summary: "Add a group after the others, with these agents in it in order (owners and admins)",
+      request: {
+        params: OrgParams,
+        body: body(z.object({ name: GroupName, agentIds: z.array(z.uuid()).max(200).optional() })),
+      },
+      responses: { 201: json(Groups, "Created"), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ groups: await createAgentGroup(groups, c.get("user").id, orgId, c.req.valid("json")) }, 201);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "patch",
+      path: "/organizations/{orgId}/agent-groups/{groupId}",
+      tags,
+      security,
+      summary: "Rename a group, or move it among the groups (`index`) (owners and admins)",
+      request: {
+        params: GroupParams,
+        body: body(z.object({ name: GroupName.optional(), index: z.number().int().min(0).optional() })),
+      },
+      responses: { 200: json(Groups), ...errors },
+    }),
+    async (c) => {
+      const { orgId, groupId } = c.req.valid("param");
+      return c.json(
+        { groups: await updateAgentGroup(groups, c.get("user").id, orgId, groupId, c.req.valid("json")) },
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/agent-groups/{groupId}",
+      tags,
+      security,
+      summary: "Delete a group; its agents go back to no group (owners and admins)",
+      request: { params: GroupParams },
+      responses: { 200: json(Groups), ...errors },
+    }),
+    async (c) => {
+      const { orgId, groupId } = c.req.valid("param");
+      return c.json({ groups: await deleteAgentGroup(groups, c.get("user").id, orgId, groupId) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/agents/{agentId}/group",
+      tags,
+      security,
+      summary:
+        "Move an agent into a group (at `index` among its agents, else at the end) or out of any (owners and admins)",
+      request: {
+        params: AgentParams,
+        body: body(z.object({ groupId: z.uuid().nullable(), index: z.number().int().min(0).optional() })),
+      },
+      responses: { 200: json(Groups), ...errors },
+    }),
+    async (c) => {
+      const { orgId, agentId } = c.req.valid("param");
+      return c.json(
+        { groups: await moveAgentToGroup(groups, c.get("user").id, orgId, agentId, c.req.valid("json")) },
+        200,
+      );
     },
   );
 

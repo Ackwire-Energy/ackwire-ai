@@ -338,6 +338,16 @@ export interface FormerAgent {
   deleted: boolean;
 }
 
+/**
+ * A named group of the workspace's agents (ADR 0083), shared by everyone in it: the sidebar's sections. The list
+ * comes in the workspace's order; `agentIds` in the group's. An agent is in one group at most.
+ */
+export interface AgentGroup {
+  id: string;
+  name: string;
+  agentIds: string[];
+}
+
 /** An agent on the team screen: what it can do. What it does comes from its instructions (`Agent`). */
 export interface TeamAgent {
   id: string;

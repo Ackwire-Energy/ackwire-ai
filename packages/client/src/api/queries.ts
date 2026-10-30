@@ -9,6 +9,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef } from "react";
+import { moveInGroups } from "../lib/agent-groups";
 import { artifactRefs } from "../lib/artifacts";
 import { newerSetup } from "../lib/computer";
 import { sendWaits } from "../lib/errors";
@@ -36,6 +37,7 @@ import type {
   AgentComputer,
   AgentDatabase,
   AgentDatabaseInput,
+  AgentGroup,
   AgentInput,
   AgentMailbox,
   AgentMailboxInput,
@@ -355,6 +357,51 @@ export function useAddCredential(orgId: string) {
   return useMutation({
     mutationFn: (input: Parameters<ApiClient["agents"]["addCredential"]>[1]) => api.agents.addCredential(orgId, input),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.credentials(orgId) }),
+  });
+}
+
+// ── Agent groups (ADR 0083) ─────────────────────────────────────────────────
+
+export const useAgentGroups = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.agentGroups(orgId), queryFn: () => api.agentGroups.list(orgId), staleTime: 30_000 });
+};
+
+export type AgentGroupAction =
+  | { type: "create"; name: string; agentIds?: string[] }
+  | { type: "update"; groupId: string; name?: string; index?: number }
+  | { type: "remove"; groupId: string }
+  | { type: "move"; agentId: string; groupId: string | null; index?: number };
+
+/** Every change answers with all the groups. A move shows at once, and goes back if the server refuses it. */
+export function useAgentGroupAction(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const key = keys.agentGroups(orgId);
+  return useMutation({
+    mutationFn: (action: AgentGroupAction): Promise<AgentGroup[]> => {
+      switch (action.type) {
+        case "create":
+          return api.agentGroups.create(orgId, { name: action.name, agentIds: action.agentIds });
+        case "update":
+          return api.agentGroups.update(orgId, action.groupId, { name: action.name, index: action.index });
+        case "remove":
+          return api.agentGroups.remove(orgId, action.groupId);
+        case "move":
+          return api.agentGroups.move(orgId, action.agentId, { groupId: action.groupId, index: action.index });
+      }
+    },
+    onMutate: async (action) => {
+      if (action.type !== "move") return undefined;
+      await qc.cancelQueries({ queryKey: key });
+      const before = qc.getQueryData<AgentGroup[]>(key);
+      if (before) qc.setQueryData(key, moveInGroups(before, action.agentId, action.groupId, action.index));
+      return { before };
+    },
+    onError: (_error, _action, context) => {
+      if (context?.before) qc.setQueryData(key, context.before);
+    },
+    onSuccess: (groups) => qc.setQueryData(key, groups),
   });
 }
 

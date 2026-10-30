@@ -2,6 +2,7 @@ import type {
   Agent,
   AgentAccess,
   AgentForYouItem,
+  AgentGroup,
   AgentUsage,
   Approval,
   DirectMessage,
@@ -12,6 +13,7 @@ import type {
   WorkingRun,
 } from "@agenteschat/client";
 import { asksAt, levelOf, resourcesOf } from "@agenteschat/client/lib/access-levels";
+import { agentSections } from "@agenteschat/client/lib/agent-groups";
 import { can } from "@agenteschat/client/lib/permissions";
 import { daysAgo, previewOf } from "../shared/logic";
 
@@ -191,6 +193,21 @@ export function teamLines(
       return a.agent.name.localeCompare(b.agent.name);
     });
   return { waiting, working, free };
+}
+
+/**
+ * Livres by the workspace's groups of agents (ADR 0083), as the web sidebar shows them: the agents in no group
+ * first (`group` null), in Livres' order, then each group with its free agents in the group's order. Empty ones are
+ * left out, so with no groups this is Livres alone.
+ */
+export function freeSections(
+  free: TeamLine[],
+  groups: readonly AgentGroup[] | undefined,
+): { group: AgentGroup | null; lines: TeamLine[] }[] {
+  const { ungrouped, groups: grouped } = agentSections(free, groups, (l) => l.agent.id);
+  return [{ group: null, lines: ungrouped }, ...grouped.map(({ group, items }) => ({ group, lines: items }))].filter(
+    (s) => s.lines.length > 0,
+  );
 }
 
 /** "há 4 min": how long ago, in the largest whole unit (under a minute: now). */

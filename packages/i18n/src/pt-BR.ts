@@ -875,6 +875,24 @@ export const ptBR = {
     unreadNotifications_one: "{{count}} notificação não lida",
     unreadNotifications_other: "{{count}} notificações não lidas",
   },
+  agentGroups: {
+    group: "Grupo",
+    none: "Sem grupo",
+    newGroup: "Novo grupo",
+    newFromAgent: "Novo grupo…",
+    nameLabel: "Nome",
+    namePlaceholder: "Ex.: Produto e marketing",
+    create: "Criar grupo",
+    renameTitle: "Renomear grupo",
+    rename: "Renomear",
+    options: "Opções de {{name}}",
+    moveUp: "Mover para cima",
+    moveDown: "Mover para baixo",
+    delete: "Excluir grupo",
+    deleteTitle: "Excluir o grupo {{name}}?",
+    deleteText: "Os agentes dele voltam para Agentes.",
+    dropHere: "Arraste agentes para cá",
+  },
   openOnPhone: {
     qr: "QR code para entrar no app agentes",
     making: "Gerando o código…",
@@ -2168,6 +2186,7 @@ export const ptBR = {
       machine: "Computador",
       brain: "Quem pensa",
       repos: "Repositórios do GitHub",
+      group: "Grupo",
     },
     lines: {
       added_one: "{{count}} linha nova",
@@ -7292,6 +7311,10 @@ export const ptBR = {
       targetNotFound: "Esse computador não existe mais. Escolha outro.",
       targetSame: "Os agentes já estão nesse computador.",
       targetPaused: "Esse computador está pausado. Escolha outro.",
+    },
+    agentGroup: {
+      notFound: "Este grupo não existe mais.",
+      tooMany: "Este workspace já tem {{max}} grupos. Exclua um antes.",
     },
   },
   machines: {

@@ -9847,10 +9847,12 @@ html[data-menu-overlay] .shell {
   flex-direction: column;
   gap: 2px;
 }
-.sidebar__section[data-open="false"] .sidebar__section-body > :not([data-status="active"]) {
+.sidebar__section[data-open="false"]
+  .sidebar__section-body
+  > :not([data-status="active"], :has(> [data-status="active"])) {
   display: none;
 }
-/* The + on a category header shows on hover or focus (always on touch screens). */
+/* The + (or …) on a category header shows on hover or focus (always on touch screens). */
 .sidebar__section-add {
   opacity: 0;
   transition: opacity 0.15s;
@@ -9912,6 +9914,59 @@ html[data-menu-overlay] .shell {
   .sidebar__section-add {
     opacity: 1;
   }
+}
+/* An agent's row with its "…" (owners and admins: its group), over the row's end on hover or focus, where it
+   takes the place of the role or the count. Touch screens move agents from the agent's page. */
+.sidebar__row {
+  position: relative;
+  display: flex;
+}
+.sidebar__row > .sidebar__item {
+  flex: 1;
+  min-width: 0;
+}
+.sidebar__row-menu.ac-btn {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.sidebar__row:hover > .sidebar__row-menu,
+.sidebar__row-menu:focus-visible,
+.sidebar__row-menu[data-state="open"] {
+  opacity: 1;
+}
+.sidebar__row:hover:has(> .sidebar__row-menu) > .sidebar__item > :is(.sidebar__item-meta, .sidebar__unread),
+.sidebar__row:has(> .sidebar__row-menu:is(:focus-visible, [data-state="open"]))
+  > .sidebar__item
+  > :is(.sidebar__item-meta, .sidebar__unread) {
+  visibility: hidden;
+}
+@media (hover: none) {
+  .sidebar__row-menu.ac-btn {
+    display: none;
+  }
+}
+/* Dragging an agent: the category it would land in, and inside a group the line where it would go. */
+.sidebar__section[data-drop="true"] {
+  border-radius: var(--control-r-sm);
+  background: var(--plate-soft);
+}
+.sidebar__drop-line {
+  height: 3px;
+  margin: -2px 8px;
+  border-radius: 2px;
+  background: var(--ink);
+  opacity: 0.55;
+}
+/* An empty group, for whoever organizes: where its agents go, in the column of the agents' names. */
+.sidebar__drop-hint {
+  padding: 6px 8px 6px 36px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--faint);
 }
 /* More: the other tools in a panel beside the sidebar, each with a line on what it is for. */
 .sidebar__more {

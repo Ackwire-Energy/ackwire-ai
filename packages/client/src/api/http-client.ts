@@ -19,6 +19,7 @@ import type {
   AgentDatabase,
   AgentDetail,
   AgentForYou,
+  AgentGroup,
   AgentMailbox,
   AgentPlanUsage,
   AgentProposal,
@@ -413,6 +414,28 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
             limit: query.limit,
           },
         }),
+    },
+    agentGroups: {
+      list: async (orgId) => (await request<{ groups: AgentGroup[] }>(`${org(orgId)}/agent-groups`)).groups,
+      create: async (orgId, input) =>
+        (await request<{ groups: AgentGroup[] }>(`${org(orgId)}/agent-groups`, { json: input })).groups,
+      update: async (orgId, groupId, patch) =>
+        (
+          await request<{ groups: AgentGroup[] }>(`${org(orgId)}/agent-groups/${enc(groupId)}`, {
+            method: "PATCH",
+            json: patch,
+          })
+        ).groups,
+      remove: async (orgId, groupId) =>
+        (await request<{ groups: AgentGroup[] }>(`${org(orgId)}/agent-groups/${enc(groupId)}`, { method: "DELETE" }))
+          .groups,
+      move: async (orgId, agentId, input) =>
+        (
+          await request<{ groups: AgentGroup[] }>(`${org(orgId)}/agents/${enc(agentId)}/group`, {
+            method: "PUT",
+            json: input,
+          })
+        ).groups,
     },
     agents: {
       list: async (orgId) => (await request<{ agents: Agent[] }>(`${org(orgId)}/agents`)).agents,

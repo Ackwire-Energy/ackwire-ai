@@ -657,6 +657,7 @@ export const featureKeysPtBR = {
     createFailed: "Não deu para criar o agente. Talvez esse nome já exista.",
     empty: "Nenhum agente ainda.",
     freeSection: "Livres",
+    noGroupSection: "Sem grupo",
   },
   agentEdit: {
     missing: "Este agente não existe mais.",
