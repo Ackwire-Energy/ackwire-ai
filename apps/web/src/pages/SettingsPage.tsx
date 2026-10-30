@@ -2,6 +2,7 @@ import type { Credential, OrgSettings } from "@agenteschat/client";
 import {
   useAddCredential,
   useAiAccounts,
+  useAuthConfig,
   useComputerSetup,
   useConnections,
   useCredentials,
@@ -57,9 +58,11 @@ import { AccessMatrixSection } from "@/components/AccessLevels";
 import { AuditSection } from "@/components/Audit";
 import { AiAccountsSection } from "@/components/ai/AiAccounts";
 import { WhoPicksSection } from "@/components/ai/Jev";
+import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { ComputersSection } from "@/components/Computers";
 import { ConnectorsSection } from "@/components/Connectors";
 import { ImportExportSection } from "@/components/ImportFlow";
+import { BillingMeters } from "@/components/Limits";
 import { ErrorState, LoadingLine, LoadingList } from "@/components/Loading";
 import { MachinePage } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
@@ -95,7 +98,8 @@ export function SettingsPage({
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const visible = SETTINGS_SECTIONS.filter((s) => s.allowed(org.role));
+  const server = useAuthConfig().data;
+  const visible = SETTINGS_SECTIONS.filter((s) => s.allowed(org.role, server));
   const current = visible.some((s) => s.id === section) ? section : "general";
   const setup = useComputerSetup(org.id);
   const edition = computerEdition(setup.data);
@@ -177,8 +181,28 @@ export function SettingsPage({
         {current === "computers" && (machineId ? <MachinePage machineId={machineId} /> : <ComputersSection />)}
         {current === "usage" && <UsageSection />}
         {current === "import" && <ImportExportSection />}
+        {current === "billing" && <BillingSection />}
       </div>
     </div>
+  );
+}
+
+/**
+ * Plano e cobrança (ADR 0079): people and files against the plan's limits; the plan, card and invoices live on the
+ * billing service, opened signed in.
+ */
+function BillingSection() {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  return (
+    <Card aria-label={t("settings.section.billing")}>
+      <BillingMeters />
+      <div className="row">
+        <BillingLinkButton orgId={org.id} from="settings" variant="primary" icon="external">
+          {t("billing.open")}
+        </BillingLinkButton>
+      </div>
+    </Card>
   );
 }
 
@@ -482,7 +506,8 @@ function SettingsTiles() {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const role = org.role;
-  const shown = (id: SettingsSection) => SETTINGS_SECTIONS.some((s) => s.id === id && s.allowed(role));
+  const server = useAuthConfig().data;
+  const shown = (id: SettingsSection) => SETTINGS_SECTIONS.some((s) => s.id === id && s.allowed(role, server));
   const overview = useOverview(org.id);
   const invitations = useInvitations(org.id, can(role, "manage_members"));
   const connections = useConnections(org.id);
@@ -546,7 +571,7 @@ function SettingsTiles() {
         : undefined,
   };
   type Tile = (typeof SETTINGS_SECTIONS)[number] & { id: Exclude<SettingsSection, "general"> };
-  const tiles = SETTINGS_SECTIONS.filter((s): s is Tile => s.id !== "general" && s.allowed(role));
+  const tiles = SETTINGS_SECTIONS.filter((s): s is Tile => s.id !== "general" && s.allowed(role, server));
   return (
     <section className="settings-tiles" aria-labelledby="sec-tiles">
       <h2 id="sec-tiles" className="settings-tiles__title">

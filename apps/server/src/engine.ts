@@ -63,6 +63,7 @@ import {
   messageRouter,
   missionTurnPermissions,
   notifyOwnerOnBudget,
+  platformCapJudge,
   prepareAgentCode,
   queueBudgetEmail,
   type ResolveHost,
@@ -169,20 +170,23 @@ export function buildEngine(o: EngineOptions) {
   // Claude or an OpenAI key, the catalog's routing pick on the others.
   const smallModels = { anthropic: config.ROUTER_MODEL, openai: config.OPENAI_CHEAP_MODEL };
   // Semantic judgments (stop requests, hand-offs, permission changes): Jev while the installation has its key,
-  // with the org's small model as fallback.
+  // with the org's small model as fallback (also past a workspace's platform AI for the month, ADR 0079).
   if (!context.judge) {
     const llmJudge = createLlmJudge({
       gateway,
       resolveModel: (orgId) => smallModelFor({ db, gateway }, orgId, smallModels),
     });
     context.judge = withJudgeFallback(
-      createJevJudge({
-        key: jevKey,
-        gateway,
-        timeoutMs: config.JEV_TIMEOUT_MS,
-        visionModel: config.JEV_VISION_MODEL,
-        fetch: o.jevFetch,
-      }),
+      platformCapJudge(
+        db,
+        createJevJudge({
+          key: jevKey,
+          gateway,
+          timeoutMs: config.JEV_TIMEOUT_MS,
+          visionModel: config.JEV_VISION_MODEL,
+          fetch: o.jevFetch,
+        }),
+      ),
       llmJudge,
       () => jevKey.usable(),
     );

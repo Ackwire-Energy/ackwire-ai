@@ -101,6 +101,12 @@ html[data-desktop="linux"] {
   height: var(--titlebar-h);
   z-index: 50;
 }
+/* No strip where the page doesn't drag the window: a full-screen window doesn't move, and Windows and Linux move it by
+   the system's own title bar. There it would only take the clicks meant for what is under it (the onboarding's Back,
+   its step bar). */
+html:is([data-fullscreen], [data-desktop="windows"], [data-desktop="linux"]) .titlebar-strip {
+  display: none;
+}
 
 /* The workspace sits under the bar; ⌘K and the sidebar toggle live in the bar, so the sidebar's row goes. */
 html[data-desktop] .shell {
@@ -119,6 +125,13 @@ html[data-desktop] .auth__logo {
    system's title bar above the page). */
 html[data-desktop="mac"]:not([data-fullscreen]) .onb__rail {
   padding-top: calc(var(--titlebar-h) + 8px);
+}
+/* The onboarding's step stays on the wordmark's line, 16px under the rail's padding (onboarding.css). A window
+   narrow enough for the step bar keeps the phone's: the bar on top clears the buttons. */
+@media (min-width: 761px) {
+  html[data-desktop="mac"]:not([data-fullscreen]) .onb__body {
+    padding-top: calc(var(--titlebar-h) + 8px + 16px);
+  }
 }
 
 /*

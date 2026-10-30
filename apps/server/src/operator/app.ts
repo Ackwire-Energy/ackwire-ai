@@ -7,6 +7,7 @@ import { apiError, domainErrorResponse, validationHook } from "../http/errors";
 import type { Logger } from "../logger";
 import { registerOperatorAccess } from "./access";
 import { registerOperatorEvents } from "./events";
+import { registerOperatorLimits } from "./limits";
 import { registerOperatorMachines } from "./machines";
 import { registerOperatorOrgs } from "./orgs";
 import { registerOperatorStanding } from "./standing";
@@ -55,6 +56,7 @@ export function createOperatorApp(deps: OperatorDeps, token: string) {
   });
   registerOperatorOrgs(api, deps);
   registerOperatorStanding(api, deps);
+  registerOperatorLimits(api, deps);
   registerOperatorEvents(api, deps);
   registerOperatorMachines(api, deps);
   registerOperatorAccess(api, deps);
@@ -64,7 +66,7 @@ export function createOperatorApp(deps: OperatorDeps, token: string) {
       title: "agentes.chat operator API",
       version: deps.version,
       description:
-        "Workspace and account lookups, workspace standing, the events feed and review blocks, the workspaces' computers from an external provisioner, and who may sign up (the waiting list and early-access invitations, ADR 0078), for the people who run this instance (ADR 0056).",
+        "Workspace and account lookups, workspace standing, billing holds and limits (ADR 0079), the events feed and review blocks, the workspaces' computers from an external provisioner, and who may sign up (the waiting list and early-access invitations, ADR 0078), for the people who run this instance (ADR 0056).",
     },
     servers: [{ url: OPERATOR_API_PREFIX }],
     security: [{ operator: [] }],

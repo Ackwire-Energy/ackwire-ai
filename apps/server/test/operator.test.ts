@@ -222,6 +222,8 @@ test("org detail: owners and admins, and counts of what is in it", async () => {
       },
     ],
     counts: { members: 2, agents: 1, channels: 1, machines: 1, invitations: 1 },
+    limits: { members: null, storageBytes: null, uploadBytesPerDay: null, platformUsdPerMonth: null, updatedAt: null },
+    meters: { storageBytes: 0, uploadBytes24h: 0, ownStorage: false, platformUsdThisMonth: 0 },
   });
 
   expect((await op("/orgs/0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b")).status).toBe(404);
@@ -597,6 +599,81 @@ test("external provisioning: requests, progress, the workspace's computer and it
   });
   expect((await put(`/orgs/${orgId}/standing`, { state: "active", reason: "back", notice: "shown" })).status).toBe(200);
   expect((await put(`/orgs/${orgId}/provisioning`, { state: "waiting", reason: "capacity" })).status).toBe(204);
+});
+
+test("billing holds: put on, changed and lifted, never over a hold set through /standing", async () => {
+  const [org] = await t.db.insert(schema.organizations).values({ name: "Billing Co" }).returning();
+  if (!org) throw new Error("no org");
+  type Result = { applied: boolean; standing: { state: string; reason: string | null; notice: string } };
+  const hold = async (json: unknown) => body<Result>(await put(`/orgs/${org.id}/billing-hold`, json));
+
+  for (const bad of [{}, { hold: "late" }, { hold: "Payment" }]) {
+    expect({ bad, status: (await put(`/orgs/${org.id}/billing-hold`, bad)).status }).toEqual({ bad, status: 400 });
+  }
+  expect((await put("/orgs/0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b/billing-hold", { hold: null })).status).toBe(404);
+
+  expect(await hold({ hold: "payment" })).toMatchObject({
+    applied: true,
+    standing: { state: "hold", reason: "payment", notice: "shown" },
+  });
+  expect((await hold({ hold: "payment" })).applied).toBe(false);
+  expect(await hold({ hold: "unpaid" })).toMatchObject({ applied: true, standing: { reason: "unpaid" } });
+
+  // A hold set through /standing wins: the billing service neither replaces nor lifts it.
+  await body(await put(`/orgs/${org.id}/standing`, { state: "hold", reason: "Review", notice: "silent" }));
+  for (const code of [null, "ended"]) {
+    expect(await hold({ hold: code })).toMatchObject({ applied: false, standing: { state: "hold", reason: "Review" } });
+  }
+  await body(await put(`/orgs/${org.id}/standing`, { state: "active", reason: "Cleared", notice: "shown" }));
+  expect(await hold({ hold: "ended" })).toMatchObject({ applied: true, standing: { state: "hold", reason: "ended" } });
+  expect(await hold({ hold: null })).toMatchObject({ applied: true, standing: { state: "active", reason: null } });
+  expect((await hold({ hold: null })).applied).toBe(false);
+});
+
+test("limits: set all four, read back with what the workspace uses; any standing; idempotent", async () => {
+  const { orgId } = acme;
+  type State = { updatedAt: string | null; [key: string]: unknown };
+  const limits = {
+    members: 10,
+    storageBytes: 200 * 1024 ** 3,
+    uploadBytesPerDay: 10 * 1024 ** 3,
+    platformUsdPerMonth: 10,
+  };
+  for (const bad of [
+    {},
+    { ...limits, members: undefined },
+    { ...limits, members: 0 },
+    { ...limits, members: 1.5 },
+    { ...limits, storageBytes: -1 },
+    { ...limits, platformUsdPerMonth: 100_001 },
+    { ...limits, platformUsdPerMonth: "10" },
+  ]) {
+    expect({ bad, status: (await put(`/orgs/${orgId}/limits`, bad)).status }).toEqual({ bad, status: 400 });
+  }
+  expect((await put("/orgs/0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b/limits", limits)).status).toBe(404);
+  // Its apps hear of a change at once, and of nothing when the same limits are set again.
+  const heard: unknown[] = [];
+  t.adapters.pubsub.subscribe(orgTopic(orgId), (e) => {
+    if (e.type === "org.broadcast") heard.push(e.event);
+  });
+
+  const set = await body<State>(await put(`/orgs/${orgId}/limits`, limits));
+  expect(set).toEqual({ ...limits, updatedAt: expect.any(String) });
+  expect(heard).toEqual([{ type: "org.limits", orgId }]);
+  const again = await body<State>(await put(`/orgs/${orgId}/limits`, limits));
+  expect(again.updatedAt).toBe(set.updatedAt);
+  expect(heard).toHaveLength(1);
+  const org = await body<{ limits: unknown; meters: unknown }>(await op(`/orgs/${orgId}`));
+  expect(org.limits).toEqual(set);
+  expect(org.meters).toEqual({ storageBytes: 0, uploadBytes24h: 0, ownStorage: false, platformUsdThisMonth: 0 });
+
+  // Limits and standing are apart: a held workspace takes new limits too.
+  await body(await put(`/orgs/${orgId}/billing-hold`, { hold: "unpaid" }));
+  const none = { members: null, storageBytes: null, uploadBytesPerDay: null, platformUsdPerMonth: null };
+  heard.length = 0;
+  expect(await body(await put(`/orgs/${orgId}/limits`, none))).toEqual({ ...none, updatedAt: expect.any(String) });
+  expect(heard).toEqual([{ type: "org.limits", orgId }]);
+  await body(await put(`/orgs/${orgId}/billing-hold`, { hold: null }));
 });
 
 test("early access: every route needs the token, answers in its shape, and refuses with its codes", async () => {

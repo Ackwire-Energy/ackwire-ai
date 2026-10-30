@@ -4,6 +4,7 @@ import { apiError, errorResponse } from "../http/errors";
 import { iso, json, OrgParams } from "../routes/app/context";
 import { Role } from "../routes/app/schemas";
 import type { OperatorDeps } from "./app";
+import { LimitsState, limitsJson, Meters } from "./limits";
 import { Standing, StandingState, standingJson, UserParams } from "./standing";
 
 const tags = ["Operator"];
@@ -98,6 +99,8 @@ const Org = z
       machines: z.number().int().openapi({ description: "Connected computers." }),
       invitations: z.number().int().openapi({ description: "Pending: neither accepted nor expired." }),
     }),
+    limits: LimitsState,
+    meters: Meters,
   })
   .openapi("OperatorOrg");
 
@@ -174,7 +177,7 @@ export function registerOperatorOrgs(api: OpenAPIHono, { db, version, humanCheck
       method: "get",
       path: "/orgs/{orgId}",
       tags,
-      summary: "One workspace: its owners and admins, and how much is in it",
+      summary: "One workspace: its owners and admins, how much is in it, and its limits with what it uses",
       request: { params: OrgParams },
       responses: { 200: json(Org), ...errors },
     }),
@@ -186,6 +189,7 @@ export function registerOperatorOrgs(api: OpenAPIHono, { db, version, humanCheck
           ...org,
           createdAt: org.createdAt.toISOString(),
           standing: standingJson(org.standing),
+          limits: limitsJson(org.limits),
           admins: org.admins.map((a) => ({
             ...a,
             createdAt: a.createdAt.toISOString(),

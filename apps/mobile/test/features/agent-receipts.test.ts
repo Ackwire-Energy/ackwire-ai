@@ -96,6 +96,11 @@ describe("the agents' receipt line under a person's message", () => {
     expect(line?.action).toBeNull();
   });
 
+  test("past the workspace's platform AI nobody is asked: to mention an agent, nothing to tap", () => {
+    const line = receiptLine(routed({}, { seenBy: [], pickedBy: [], reason: "platform_cap" }).m1);
+    expect(line).toMatchObject({ faces: [], mark: "none", words: { key: "receipts.platformCap" }, action: null });
+  });
+
   test("nothing could pick: 'without an @', muted, and a tap opens the agents it reached, also after a reload", () => {
     const live = routed({}, { pickedBy: [], reason: "mention_needed" }).m1;
     const line = receiptLine(live);

@@ -13,6 +13,7 @@ export type Permission =
   | "manage_credentials"
   | "view_usage"
   | "manage_members"
+  | "manage_billing"
   | "manage_owners";
 
 const MEMBER: Permission[] = ["read", "post", "create_channels"];
@@ -23,6 +24,7 @@ const ADMIN: Permission[] = [
   "manage_credentials",
   "view_usage",
   "manage_members",
+  "manage_billing",
 ];
 const TABLE: Record<Role, ReadonlySet<Permission>> = {
   owner: new Set([...ADMIN, "manage_owners"]),

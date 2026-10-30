@@ -22,13 +22,16 @@ import { earlyAccessLink, hasWorkspaceAllowance, recordFirstWorkspace, signupMod
 import { ConflictError, ForbiddenError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
 import { deleteJevKey } from "./jev-key";
+import { assertMemberRoom } from "./limits";
 import { followWorkspaceName } from "./machine-provisioning";
 import { addressDomain } from "./mail/text";
 import { type OperatorEvent, recordOperatorEvent } from "./operator-events";
 import { enqueue } from "./outbox";
 import {
   assertCanWork,
+  type BillingHold,
   cloudNotice,
+  isBillingHold,
   isUserBlocked,
   OrgPausedError,
   STANDING_COLUMNS,
@@ -51,6 +54,9 @@ const {
 
 export type MemberRole = "owner" | "admin" | "member";
 
+/** The billing hold of a workspace with no plan yet: the one a new workspace may start on. */
+const PAYMENT: BillingHold = "payment";
+
 /**
  * What each role may do in an organization (docs/adr/0006-auth-and-tenancy.md).
  * Checked by the backend on every request; the UI only hides what's not
@@ -67,6 +73,7 @@ export type Permission =
   | "manage_connectors" // connect MCP servers (GitHub, Sentry…) for the organization
   | "view_usage" // tokens and cost of every agent
   | "manage_members" // invite, remove, change roles (except owners)
+  | "manage_billing" // open the workspace's plan and billing on the billing service (ADR 0079)
   | "manage_owners"; // grant/revoke owner
 
 const MEMBER: Permission[] = ["read", "post", "create_channels"];
@@ -78,6 +85,7 @@ const ADMIN: Permission[] = [
   "manage_connectors",
   "view_usage",
   "manage_members",
+  "manage_billing",
 ];
 const PERMISSIONS: Record<MemberRole, ReadonlySet<Permission>> = {
   owner: new Set([...ADMIN, "manage_owners"]),
@@ -173,42 +181,61 @@ export function assertInviting(membership: Membership) {
 
 /**
  * Creates an organization owned by `userId`, with a `general` channel. Refused while their account is
- * blocked or they are in a workspace on hold or suspended: they don't carry on in a new one
- * (`org.create_refused`, the same words whatever the cause, and how to contest it on agentes.chat Cloud).
+ * blocked or they are in a workspace suspended or on any hold but a billing one: they don't carry on in a new
+ * one (`org.create_refused`, the same words whatever the cause, and how to contest it on agentes.chat Cloud).
+ * Billing holds refuse nobody, but one person
+ * owns at most one workspace waiting for its first plan (`org.create_unpaid`, with that workspace's id).
  * With `needsAllowance` (`needsWorkspaceAllowance`) early access must have allowed the account, else
  * `org.create_invite_only` and nothing is made. An allowed account's first workspace is recorded on its invitation.
+ * `holdForPayment`: the workspace starts on the `payment` hold (ADR 0079), with no audit row or notification.
  * With `onboarding` (the app's), its owner sets it up in the onboarding, already past its first step; while they
- * have one they haven't finished, that one comes back (`existing`) instead of a new one.
+ * have one they haven't finished, that one comes back (`existing`) instead of a new one, even one waiting for its
+ * first plan.
  */
 export async function createOrganization(
   db: Database,
   userId: string,
   input: { name: string; context?: string },
-  options: { needsAllowance?: boolean; onboarding?: boolean } = {},
+  options: { holdForPayment?: boolean; needsAllowance?: boolean; onboarding?: boolean } = {},
 ) {
-  const [paused] = await db
-    .select({ id: organizations.id })
-    .from(organizationMembers)
-    .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
-    .where(and(eq(organizationMembers.userId, userId), ne(organizations.standing, "active")))
-    .limit(1);
-  if (paused || (await isUserBlocked(db, userId)))
-    throw new ForbiddenError("You can't create a workspace right now", "org.create_refused", cloudNotice());
-  if (options.needsAllowance && !(await hasWorkspaceAllowance(db, userId)))
-    throw new ForbiddenError("New workspaces need an invitation for now", "org.create_invite_only");
   return db.transaction(async (tx) => {
+    // One create at a time per person, checked after the lock: two at once would both start waiting for a plan.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-create:${userId}`}))`);
+    const held = await tx
+      .select({ id: organizations.id, role: organizationMembers.role, standing: STANDING_COLUMNS })
+      .from(organizationMembers)
+      .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
+      .where(and(eq(organizationMembers.userId, userId), ne(organizations.standing, "active")))
+      .orderBy(asc(organizations.createdAt));
+    if (held.some((o) => !isBillingHold(o.standing)) || (await isUserBlocked(tx, userId)))
+      throw new ForbiddenError("You can't create a workspace right now", "org.create_refused", cloudNotice());
+    if (options.needsAllowance && !(await hasWorkspaceAllowance(tx, userId)))
+      throw new ForbiddenError("New workspaces need an invitation for now", "org.create_invite_only");
     if (options.onboarding) {
       // Locked first, so a second create at the same time (a double submit, another tab) waits and finds this one.
       await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for("update");
       const [open] = await unfinishedWorkspaces(tx, userId);
       if (open) return { ...open, existing: true };
     }
+    const unpaid = held.find((o) => o.role === "owner" && o.standing.reason === PAYMENT);
+    if (unpaid)
+      throw new ForbiddenError("You already have a workspace waiting for a plan", "org.create_unpaid", {
+        orgId: unpaid.id,
+      });
     const [organization] = await tx
       .insert(organizations)
       .values({
         name: input.name,
         context: input.context ?? "",
         ...(options.onboarding ? { onboardingStep: "context" as const, onboardedAt: null } : {}),
+        ...(options.holdForPayment
+          ? ({
+              standing: "hold",
+              standingReason: PAYMENT,
+              standingNotice: "shown",
+              standingChangedAt: new Date(),
+            } as const)
+          : {}),
       })
       .returning();
     if (!organization) throw new Error("organization insert returned nothing");
@@ -1009,6 +1036,7 @@ export async function createInvitation(
     .innerJoin(organizationMembers, eq(organizationMembers.userId, users.id))
     .where(and(eq(users.email, email), eq(organizationMembers.orgId, orgId)));
   if (alreadyMember) throw new ConflictError(`${email} is already a member`);
+  await assertMemberRoom(db, orgId);
   const ownersOk = can(actor.role, "manage_owners");
   return sendInvitation(db, { orgId, email, role: input.role, invitedBy: actorId, ownersOk, now });
 }
@@ -1235,10 +1263,18 @@ export async function acceptInvitation(
 }
 
 /**
- * Adds a person to an organization (keeping an existing role) and to `general`. A request to join that they or
- * their address had waiting closes: whoever answers it next finds it answered.
+ * Adds a person to an organization (keeping an existing role) and to `general`, in the caller's transaction. A
+ * request to join that they or their address had waiting closes: whoever answers it next finds it answered. A
+ * full workspace refuses a new member (`org.members_full`), under the lock role changes and removals take, so
+ * two people taking the last seat at once can't both get in.
  */
 export async function joinOrganization(tx: Executor, orgId: string, userId: string, role: MemberRole) {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-members:${orgId}`}))`);
+  const [member] = await tx
+    .select({ userId: organizationMembers.userId })
+    .from(organizationMembers)
+    .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+  if (!member) await assertMemberRoom(tx, orgId);
   await tx.insert(organizationMembers).values({ orgId, userId, role }).onConflictDoNothing();
   await tx
     .update(organizationJoinRequests)
@@ -1316,7 +1352,8 @@ export async function inviteMany(
       const { invitation, token } = await createInvitation(db, actorId, orgId, { email, role: input.role }, now);
       out.push({ email, status: "invited", invitationId: invitation.id, token });
     } catch (error) {
-      if (error instanceof ConflictError) out.push({ email, status: "already_member" });
+      // A full workspace (`org.members_full`) refuses the batch, not one address.
+      if (error instanceof ConflictError && error.code === "conflict") out.push({ email, status: "already_member" });
       else throw error;
     }
   }
@@ -1338,6 +1375,7 @@ export async function resendInvitation(
     .from(organizationInvitations)
     .where(and(eq(organizationInvitations.id, invitationId), eq(organizationInvitations.orgId, orgId)));
   if (!existing || existing.acceptedAt) throw new ConflictError("This invitation can't be resent");
+  await assertMemberRoom(db, orgId);
   return sendInvitation(db, {
     orgId,
     email: existing.email,

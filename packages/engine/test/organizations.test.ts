@@ -7,13 +7,17 @@ import {
   can,
   changeMemberRole,
   createInvitation,
+  createOrganization,
   ForbiddenError,
   isSignupAllowed,
+  listMachineRequests,
   listMemberships,
   type Permission,
   previewInvitation,
   removeMember,
   requirePermission,
+  setBillingHold,
+  setOrgStanding,
   sha256,
   unfinishedWorkspaces,
   updateOrganization,
@@ -37,6 +41,7 @@ describe("permissions", () => {
       "manage_credentials",
       "view_usage",
       "manage_members",
+      "manage_billing",
       "manage_owners",
     ];
     const allowed = (role: "owner" | "admin" | "member") => all.filter((p) => can(role, p));
@@ -193,5 +198,73 @@ describe("self-host sign-up policy", () => {
     expect(await isSignupAllowed(f.db, "first@example.com", closed)).toBe(true);
     expect(await isSignupAllowed(f.db, "first@example.com", { ...closed, ownerByLink: true })).toBe(false);
     expect(await isSignupAllowed(f.db, "first@example.com", { allowSignup: true, ownerByLink: true })).toBe(false);
+  });
+});
+
+describe("creating a workspace while one is held", () => {
+  const refusal = (userId: string) =>
+    createOrganization(f.db, userId, { name: "Next" }).then(
+      () => null,
+      (e: ForbiddenError) => ({ code: e.code, params: e.params }),
+    );
+
+  test("billing holds refuse nobody but the owner of a workspace waiting for its first plan; other holds still do", async () => {
+    const admin = await addMember(f.db, f.org.id, "admin");
+    const member = await addMember(f.db, f.org.id, "member");
+    const { organization: second } = await createOrganization(f.db, f.owner.id, { name: "Second" });
+    for (const hold of ["unpaid", "ended", "payment"] as const) {
+      await setBillingHold({ db: f.db }, f.org.id, hold);
+      expect(await refusal(admin.id)).toBeNull();
+      expect(await refusal(member.id)).toBeNull();
+    }
+    // Their own: the oldest one waiting.
+    await setBillingHold({ db: f.db }, second.id, "payment");
+    expect(await refusal(f.owner.id)).toEqual({ code: "org.create_unpaid", params: { orgId: f.org.id } });
+
+    // A hold set through the standing (shown or silent) or a suspension refuses everyone in it, as before.
+    await setOrgStanding({ db: f.db }, f.org.id, { state: "hold", reason: "review", notice: "shown" });
+    for (const who of [f.owner.id, admin.id, member.id])
+      expect(await refusal(who)).toEqual({ code: "org.create_refused", params: undefined });
+    await setOrgStanding({ db: f.db }, f.org.id, { state: "hold", reason: "payment", notice: "silent" });
+    expect(await refusal(member.id)).toEqual({ code: "org.create_refused", params: undefined });
+  });
+
+  test("holdForPayment: the workspace starts on that hold, with no audit row, notification or computer request", async () => {
+    const ana = await addUser(f.db, "ana");
+    const { organization } = await createOrganization(f.db, ana.id, { name: "Ana's" }, { holdForPayment: true });
+    expect(organization).toMatchObject({
+      standing: "hold",
+      standingReason: "payment",
+      standingNotice: "shown",
+      standingNote: null,
+    });
+    expect(organization.standingChangedAt).toBeInstanceOf(Date);
+    expect(await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.orgId, organization.id))).toEqual([]);
+    expect(
+      await f.db.select().from(schema.notifications).where(eq(schema.notifications.orgId, organization.id)),
+    ).toEqual([]);
+    const requests = await listMachineRequests(f.db, "external", { limit: 50 });
+    expect(requests.requests.map((r) => r.orgId)).toEqual([f.org.id]);
+
+    expect(await refusal(ana.id)).toEqual({ code: "org.create_unpaid", params: { orgId: organization.id } });
+    // Paid (the hold lifted), the next one may start.
+    await setBillingHold({ db: f.db }, organization.id, null);
+    expect((await createOrganization(f.db, ana.id, { name: "Ana 2" })).organization.standing).toBe("active");
+  });
+
+  test("two creates at once start one workspace waiting for its plan, and refuse the other", async () => {
+    const ana = await addUser(f.db, "ana");
+    const create = (name: string) =>
+      createOrganization(f.db, ana.id, { name }, { holdForPayment: true }).then(
+        ({ organization }) => organization.id,
+        (e: ForbiddenError) => e.code,
+      );
+    const results = await Promise.all([create("One"), create("Two")]);
+    expect(results.filter((r) => r === "org.create_unpaid")).toHaveLength(1);
+    const owned = await f.db
+      .select({ orgId: schema.organizationMembers.orgId })
+      .from(schema.organizationMembers)
+      .where(eq(schema.organizationMembers.userId, ana.id));
+    expect(owned).toHaveLength(1);
   });
 });

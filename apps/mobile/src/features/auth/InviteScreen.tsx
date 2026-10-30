@@ -8,7 +8,7 @@ import {
   useMe,
 } from "@agenteschat/client";
 import { formatTimeLeft } from "@agenteschat/client/lib/actions";
-import { errorCode } from "@agenteschat/client/lib/errors";
+import { errorCode, invitedErrorText } from "@agenteschat/client/lib/errors";
 import { type HumanCheck, withHumanCheck } from "@agenteschat/client/lib/human-check";
 import {
   ANSWER_POLL_MS,
@@ -122,7 +122,10 @@ export function InviteScreen({ token }: { token: string }) {
       router.replace("/");
     } catch (e) {
       const wrong = e instanceof ApiError && e.status === 403;
-      setError(wrong ? t("mobile.invite.wrongAccount", { email: invitation.email }) : t("mobile.invite.failed"));
+      setError(
+        invitedErrorText(t, e) ??
+          (wrong ? t("mobile.invite.wrongAccount", { email: invitation.email }) : t("mobile.invite.failed")),
+      );
     } finally {
       setJoining(false);
     }
@@ -310,7 +313,7 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
       haptics.warning();
       // The proof ran out (30 minutes) or was used: Verify again.
       if (errorCode(e)?.startsWith("join.code_")) setProof(null);
-      setError(failureText(t, e));
+      setError((e instanceof ApiError ? invitedErrorText(t, e) : null) ?? failureText(t, e));
       // A link turned off, or an answer already given, then shows as its own state.
       void refresh();
     } finally {

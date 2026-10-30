@@ -86,6 +86,9 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "mobile.outage.sheet.managedDesc",
     // Shown only on the Cloud, to owners, while email goes out.
     "connectAi.wait.email",
+    // The computer step's plan offer: only where the workspace gets its own computer (`setupView`, as
+    // `computerSetup.`) and waits for its first plan (ADR 0079).
+    "onboarding.computer.payment.",
   ],
   selfhost: [
     "auth.owner.",

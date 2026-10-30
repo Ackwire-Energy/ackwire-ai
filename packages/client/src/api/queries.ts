@@ -1585,6 +1585,12 @@ export function useDecideProposal(orgId: string) {
   });
 }
 
+/** People, files and today's uploads against the workspace's limits (ADR 0079): any member. */
+export const useWorkspaceLimits = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.limits(orgId), queryFn: () => api.orgs.limits(orgId), enabled });
+};
+
 export const useStorage = (orgId: string, enabled = true) => {
   const api = useApi();
   return useQuery({ queryKey: keys.storage(orgId), queryFn: () => api.storage.get(orgId), enabled });
@@ -1603,6 +1609,7 @@ export function useSaveStorage(orgId: string) {
     onSuccess: (config) => {
       qc.setQueryData(keys.storage(orgId), config);
       qc.removeQueries({ queryKey: keys.storageMigration(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.limits(orgId) });
     },
   });
 }
@@ -1616,9 +1623,12 @@ export const useStorageMigration = (orgId: string, enabled: boolean) => {
     queryFn: async () => {
       const was = qc.getQueryData<StorageMigration | null>(keys.storageMigration(orgId))?.status;
       const m = await api.storage.migration(orgId);
-      // A copy that stops has moved files from one storage to the other: what each holds (`usage`) is stale.
-      if (was === "running" && m?.status !== "running")
+      // A copy that stops has moved files from one storage to the other: what each holds (`usage`, and what the
+      // storage limit counts) is stale.
+      if (was === "running" && m?.status !== "running") {
         void qc.invalidateQueries({ queryKey: keys.storage(orgId), exact: true });
+        void qc.invalidateQueries({ queryKey: keys.limits(orgId) });
+      }
       return m;
     },
     enabled,

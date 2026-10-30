@@ -12,6 +12,7 @@ import {
   auditOutcome,
   auditPhrase,
   auditQueryOf,
+  auditReason,
   auditReasonKey,
   auditRoutine,
   auditSecretText,
@@ -244,7 +245,7 @@ export function AuditRowScreen({ id }: { id: string }) {
   const name = auditActorName(t, row) ?? t("audit.system");
   const { name: who, text } = auditSentence(t, row);
   const look = auditOutcome(t, row);
-  const reason = auditStr(row.details.reason);
+  const reason = auditReason(t, row);
   const reasonKey = auditReasonKey(row);
   const isCall = row.action === TOOL_CALL;
   const where = auditWhere(t, row);

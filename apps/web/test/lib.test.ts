@@ -123,8 +123,9 @@ describe("text", () => {
       "workspace",
       "context",
       "import",
-      "computer",
       "agents",
+      "computer",
+      "ai",
       "team",
       "done",
     ]);
@@ -332,7 +333,8 @@ describe("guards and permissions", () => {
   });
   test("the server's answer to a step saved: further on or finished elsewhere is followed, the same step isn't", () => {
     expect(aheadOf({ step: "computer", finished: false }, "computer")).toBe(false);
-    expect(aheadOf({ step: "agents", finished: false }, "computer")).toBe(true);
+    expect(aheadOf({ step: "computer", finished: false }, "agents")).toBe(true);
+    expect(aheadOf({ step: "ai", finished: false }, "computer")).toBe(true);
     expect(aheadOf({ step: "done", finished: true }, "team")).toBe(true);
   });
   test("role table mirrors the backend", () => {

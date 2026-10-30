@@ -56,9 +56,29 @@ export interface AuthConfig {
   supportEmail?: string | null;
   /** Every workspace gets a computer of its own (the Cloud); absent: a server too old to say. */
   workspaceComputer?: boolean;
+  /** The billing service (ADR 0079): owners and admins open a workspace's plan there; null or absent: no billing. */
+  billingUrl?: string | null;
   /** The bot check's site key (Cloudflare Turnstile, ADR 0075); null or absent: no check, nothing from Cloudflare. */
   turnstileSiteKey?: string | null;
 }
+
+/** A workspace's use against its limits (ADR 0079, `GET …/limits`), for any member; a null limit: none. */
+export interface WorkspaceLimits {
+  members: { used: number; limit: number | null };
+  /** `ownStorage`: new files go to the workspace's own bucket, which no limit counts. */
+  storage: { usedBytes: number; limitBytes: number | null; ownStorage: boolean };
+  uploads: { usedBytes24h: number; limitBytesPerDay: number | null };
+}
+
+/** Where in the app a billing link is opened from: the billing service opens on what it came for (ADR 0079). */
+export type BillingFrom =
+  | "settings"
+  | "hold"
+  | "onboarding"
+  | "new_workspace"
+  | "invite_full"
+  | "upload_full"
+  | "storage";
 
 export type SignInProvider = "google" | "github" | "apple";
 
@@ -111,7 +131,10 @@ export interface User {
   hasPassword?: boolean;
   /** Opened the link that confirms the email address. */
   emailVerified?: boolean;
-  /** A new workspace would be made for them (false on agentes.chat Cloud while sign-up is by invitation, unless early access allowed them). */
+  /**
+   * A new workspace would be made for them (false on agentes.chat Cloud while sign-up is by invitation, unless early
+   * access allowed them; `org.create_refused` and `org.create_unpaid` can still refuse it).
+   */
   canCreateWorkspace?: boolean;
 }
 
@@ -482,6 +505,8 @@ export interface MessageReceipts {
   referenced?: string[];
   /** Nobody was asked: the organization has no AI connected. */
   noAi?: boolean;
+  /** Nobody was asked: the workspace used up its platform AI for the month, so only @mentions start agents. */
+  platformCap?: boolean;
   /** Who picked the agents for it (ADR 0074); absent on a decision from before. */
   decidedBy?: DecidedBy;
   /** No step could read it and no rule fit: only a mention reaches an agent. */
@@ -739,7 +764,8 @@ export type ChannelEvent =
       strategy?: "mention" | "dm" | "router" | "none";
       /**
        * `no_ai`: the organization has no AI connected. `mention_needed`: no step could pick an agent (no Jev, no
-       * small model, no plan of the author, no rule): a mention still calls one.
+       * small model, no plan of the author, no rule): a mention still calls one. `platform_cap`: the workspace used
+       * up its platform AI for the month, so only a mention gets one.
        */
       reason?: string;
       /** Who picked (ADR 0074). */
@@ -4010,6 +4036,8 @@ export interface NotificationLatest {
   quote?: string;
   statusFrom?: string;
   statusTo?: string;
+  /** `org_standing`: the billing hold put on (ADR 0079), in place of `text`. */
+  billingHold?: string;
   /** Missions and routines. */
   steps?: { done: number; total: number; failedAt?: number };
   /** An agent's question with options. */

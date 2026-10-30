@@ -68,14 +68,14 @@ export const mobileEn: MobileTranslations = {
     },
   },
   org: {
-    noneTitle: "You're not in an organization yet",
-    noneSubtitle: "Ask someone on your team for an invitation, or create the organization on the website.",
+    noneTitle: "You're not in a workspace yet",
+    noneSubtitle: "Ask someone on your team for an invitation, or create the workspace on the website.",
     openSite: "Open the website",
     signOut: "Sign out",
   },
   account: {
     deleteSoleOwner:
-      "You're the only owner of an organization with other members. On the website, in People, make someone else an owner, then come back.",
+      "You're the only owner of a workspace with other members. On the website, in People, make someone else an owner, then come back.",
     deleteFailed: "Couldn't delete your account right now. Try again.",
     deleted: "Your account was deleted.",
     signedOut: "You signed out.",

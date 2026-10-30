@@ -43,7 +43,7 @@ describe("/conectar: confirm a computer's code", () => {
     expect(page.textContent).toContain("Perto de Curitiba, PR, Brasil");
     expect(page.textContent).toContain("Pediu agora");
     expect(page.textContent).toContain("Só confirme se você acabou de abrir isso no seu computador.");
-    expect(within(page).getByRole("combobox", { name: "Organização" }).textContent).toContain("Acme");
+    expect(within(page).getByRole("combobox", { name: "Workspace" }).textContent).toContain("Acme");
     const name = within(page).getByLabelText("Nome do computador") as HTMLInputElement;
     expect(name.value).toBe("MacBook do Walter");
     await act(async () => fireEvent.change(name, { target: { value: "Mac do escritório" } }));
@@ -108,7 +108,7 @@ describe("/conectar: confirm a computer's code", () => {
     expect(within(page).getByRole("heading", { name: "Reconectar o Mac da Ana?" })).toBeTruthy();
     expect(page.textContent).toContain("Os agentes que usavam este computador voltam a usar.");
     expect(page.textContent).toContain("Na Acme, com o mesmo nome e as mesmas permissões.");
-    expect(within(page).queryByRole("combobox", { name: "Organização" })).toBeNull();
+    expect(within(page).queryByRole("combobox", { name: "Workspace" })).toBeNull();
     expect(within(page).queryByLabelText("Nome do computador")).toBeNull();
     await click(within(page).getByRole("button", { name: "Reconectar" }));
     await settle(4);

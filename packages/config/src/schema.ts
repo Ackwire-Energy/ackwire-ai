@@ -704,6 +704,30 @@ export const envVars = {
     section: "Operator",
     example: "support@example.com",
   },
+  BILLING_URL: {
+    schema: z.url({ protocol: /^https$/ }).optional(),
+    description:
+      "Your billing service's address. With `BILLING_LINK_SECRET`, owners and admins get a Plan and billing page and buttons on billing holds and full workspaces that open it signed in. Unset (default): no billing anywhere.",
+    section: "Operator",
+    example: "https://billing.example.com",
+  },
+  BILLING_LINK_SECRET: {
+    schema: z
+      .string()
+      .min(32, "must be at least 32 characters; generate one with `openssl rand -base64 48`")
+      .optional(),
+    description:
+      "Signs the link to the billing service (HMAC-SHA256, 5 minutes). The billing service holds the same value. Generate with `openssl rand -base64 48`.",
+    section: "Operator",
+    example: "<output of openssl rand -base64 48>",
+    secret: true,
+  },
+  BILLING_HOLD_NEW_WORKSPACES: {
+    schema: z.stringbool().default(false),
+    description:
+      "New workspaces start on a payment hold: their agents wait until the billing service lifts it. Needs `BILLING_URL`, `BILLING_LINK_SECRET` and `OPERATOR_API_TOKEN`.",
+    section: "Operator",
+  },
   SESSION_SCREENING: {
     schema: z.stringbool().default(false),
     description:

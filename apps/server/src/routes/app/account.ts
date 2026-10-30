@@ -118,6 +118,10 @@ export function accountRoutes(deps: AppDeps) {
               description:
                 "Every workspace gets a computer of its own (MACHINE_PROVISIONING=external): a new person's setup has none to connect.",
             }),
+            billingUrl: z.string().nullable().openapi({
+              description:
+                "The billing service (BILLING_URL, ADR 0079): owners and admins open a workspace's plan and billing there through `POST …/billing-link`. Null: no billing.",
+            }),
             turnstileSiteKey: z.string().nullable().openapi({
               description:
                 "The bot check's site key (`TURNSTILE_SITE_KEY`, ADR 0075): pages run Cloudflare Turnstile and send its token in `x-captcha-response`. Null: no check, and nothing loads from Cloudflare.",
@@ -138,6 +142,7 @@ export function accountRoutes(deps: AppDeps) {
           ownerClaim: users === 0 && Boolean(config.OWNER_CLAIM_SHA256),
           passwordReset: deps.adapters.email.delivers === true,
           workspaceComputer: config.MACHINE_PROVISIONING === "external",
+          billingUrl: config.BILLING_URL ?? null,
           turnstileSiteKey: deps.adapters.humanCheck?.siteKey ?? null,
         },
         200,
@@ -297,7 +302,7 @@ export function accountRoutes(deps: AppDeps) {
               }),
               canCreateWorkspace: z.boolean().openapi({
                 description:
-                  "`POST /organizations` would make a workspace for them. False on agentes.chat Cloud while sign-up is by invitation, unless early access allowed their account and its address is confirmed (ADR 0078).",
+                  "`POST /organizations` would make a workspace for them. False on agentes.chat Cloud while sign-up is by invitation, unless early access allowed their account and its address is confirmed (ADR 0078). `org.create_refused` and `org.create_unpaid` (ADR 0079) can still refuse it.",
               }),
             }),
             organizations: z.array(Organization),
@@ -614,7 +619,7 @@ export function accountRoutes(deps: AppDeps) {
       security,
       summary: "Create an organization (you become its owner)",
       description:
-        "Its owner sets it up in the onboarding, already past its first step (`onboarding` in `GET /me` until `PATCH …/onboarding` says it's finished). While they have one they haven't finished, that one comes back (200) instead of a new one, so a stale tab or a second press makes no other. Refused with 403 `org.create_invite_only` on agentes.chat Cloud while sign-up is by invitation, unless early access allowed the person's account and its address is confirmed (ADR 0078).",
+        "Its owner sets it up in the onboarding, already past its first step (`onboarding` in `GET /me` until `PATCH …/onboarding` says it's finished). While they have one they haven't finished, that one comes back (200) instead of a new one, so a stale tab or a second press makes no other, even one waiting for its first plan. 403 `org.create_refused` while your account is blocked or you are in a workspace suspended or on a hold the billing service didn't set; 403 `org.create_unpaid` (`params.orgId`) while you own a workspace waiting for its first plan; 403 `org.create_invite_only` on agentes.chat Cloud while sign-up is by invitation, unless early access allowed the person's account and its address is confirmed (ADR 0078). With BILLING_HOLD_NEW_WORKSPACES it starts on the `payment` hold (ADR 0079).",
       request: {
         body: body(
           z.object({
@@ -638,6 +643,7 @@ export function accountRoutes(deps: AppDeps) {
       const { teamSize, timezone, ...input } = c.req.valid("json");
       const userId = c.get("user").id;
       const { organization, general, existing } = await createOrganization(db, userId, input, {
+        holdForPayment: config.BILLING_HOLD_NEW_WORKSPACES,
         needsAllowance: await needsWorkspaceAllowance(db, userId, workspacePolicy(config)),
         onboarding: true,
       });

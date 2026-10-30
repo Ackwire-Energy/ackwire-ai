@@ -1,9 +1,21 @@
 import { sql } from "drizzle-orm";
-import { index, integer, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  index,
+  integer,
+  pgEnum,
+  pgTable,
+  primaryKey,
+  smallint,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { users } from "./auth";
 
 /** The onboarding's steps, in order (the apps' `ONBOARDING_STEPS`, `packages/client/src/lib/onboarding.ts`). */
-export const ONBOARDING_STEPS = ["workspace", "context", "import", "computer", "agents", "team", "done"] as const;
+export const ONBOARDING_STEPS = ["workspace", "context", "import", "agents", "computer", "ai", "team", "done"] as const;
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
 /**
@@ -40,6 +52,20 @@ export const organizations = pgTable("organizations", {
    * default counts every other one, and every one made before the onboarding was kept, as set up.
    */
   onboardedAt: timestamp({ withTimezone: true }).defaultNow(),
+  /**
+   * Limits a billing service sets through the operator API (ADR 0079, `limits.ts`); null: no limit, all a
+   * self-hosted server ever has. The platform's AI per UTC month is kept in nano-US$, the unit of
+   * `usage_records.cost_nano_usd`.
+   */
+  limitMembers: integer(),
+  limitStorageBytes: bigint({ mode: "number" }),
+  limitUploadBytesPerDay: bigint({ mode: "number" }),
+  limitPlatformNanoUsd: bigint({ mode: "number" }),
+  /** When a limit last changed; null: never set. */
+  limitsUpdatedAt: timestamp({ withTimezone: true }),
+  /** The month (`YYYY-MM`) and highest share (50, 100) of the platform's AI already told (`platform_ai.threshold`). */
+  platformAlertMonth: text(),
+  platformAlertPercent: smallint(),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });
 

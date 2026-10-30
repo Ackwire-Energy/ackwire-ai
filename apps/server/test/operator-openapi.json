@@ -3,7 +3,7 @@
   "info": {
     "title": "agentes.chat operator API",
     "version": "test",
-    "description": "Workspace and account lookups, workspace standing, the events feed and review blocks, the workspaces' computers from an external provisioner, and who may sign up (the waiting list and early-access invitations, ADR 0078), for the people who run this instance (ADR 0056)."
+    "description": "Workspace and account lookups, workspace standing, billing holds and limits (ADR 0079), the events feed and review blocks, the workspaces' computers from an external provisioner, and who may sign up (the waiting list and early-access invitations, ADR 0078), for the people who run this instance (ADR 0056)."
   },
   "servers": [
     {
@@ -215,9 +215,15 @@
               }
             },
             "required": ["members", "agents", "channels", "machines", "invitations"]
+          },
+          "limits": {
+            "$ref": "#/components/schemas/OperatorLimitsState"
+          },
+          "meters": {
+            "$ref": "#/components/schemas/OperatorMeters"
           }
         },
-        "required": ["id", "name", "createdAt", "standing", "admins", "counts"]
+        "required": ["id", "name", "createdAt", "standing", "admins", "counts", "limits", "meters"]
       },
       "OperatorStanding": {
         "type": "object",
@@ -250,6 +256,77 @@
       "Role": {
         "type": "string",
         "enum": ["owner", "admin", "member"]
+      },
+      "OperatorLimitsState": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/OperatorLimits"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "updatedAt": {
+                "type": ["string", "null"],
+                "description": "When a value last changed; null: never set."
+              }
+            },
+            "required": ["updatedAt"]
+          }
+        ],
+        "description": "Null: no limit. A self-hosted server never sets any."
+      },
+      "OperatorLimits": {
+        "type": "object",
+        "properties": {
+          "members": {
+            "type": ["integer", "null"],
+            "minimum": 1,
+            "maximum": 100000,
+            "description": "People in it, blocked accounts included; agents, invitations and requests to join never count."
+          },
+          "storageBytes": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Bytes of files kept on this server's storage; files in the trash and its own bucket don't count."
+          },
+          "uploadBytesPerDay": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Bytes written to this server's storage in any 24 hours."
+          },
+          "platformUsdPerMonth": {
+            "type": ["number", "null"],
+            "minimum": 0,
+            "maximum": 100000,
+            "description": "What the platform's own AI (Jev) may cost for it in a UTC calendar month, in US$. Past it, Jev's judgments go to the workspace's own model and only @mentions start agents."
+          }
+        },
+        "required": ["members", "storageBytes", "uploadBytesPerDay", "platformUsdPerMonth"],
+        "description": "Null: no limit. A self-hosted server never sets any."
+      },
+      "OperatorMeters": {
+        "type": "object",
+        "properties": {
+          "storageBytes": {
+            "type": "integer",
+            "description": "Bytes of files kept on this server's storage, files in the trash and the workspace's own bucket left out."
+          },
+          "uploadBytes24h": {
+            "type": "integer",
+            "description": "Bytes written to this server's storage in the last 24 hours."
+          },
+          "ownStorage": {
+            "type": "boolean",
+            "description": "New files go to the workspace's own bucket: no storage limit applies."
+          },
+          "platformUsdThisMonth": {
+            "type": "number",
+            "description": "Usage billed to the platform (Jev) this UTC calendar month, in US$."
+          }
+        },
+        "required": ["storageBytes", "uploadBytes24h", "ownStorage", "platformUsdThisMonth"]
       },
       "OperatorUser": {
         "type": "object",
@@ -367,6 +444,24 @@
         },
         "required": ["blocked", "blockedAt", "reason", "sessionsRevoked"]
       },
+      "OperatorBillingHoldResult": {
+        "type": "object",
+        "properties": {
+          "applied": {
+            "type": "boolean",
+            "description": "False when nothing changed: already so, or a hold set through PUT /standing or a suspension is in place, which a billing hold never replaces."
+          },
+          "standing": {
+            "$ref": "#/components/schemas/OperatorStanding"
+          }
+        },
+        "required": ["applied", "standing"]
+      },
+      "OperatorBillingHold": {
+        "type": ["string", "null"],
+        "enum": ["payment", "unpaid", "ended", null],
+        "description": "`payment`: no plan yet. `unpaid`: its payment failed. `ended`: its plan ended. Agents stop as with any hold; people still read and write."
+      },
       "OperatorEventPage": {
         "type": "object",
         "properties": {
@@ -395,7 +490,7 @@
           },
           "type": {
             "type": "string",
-            "description": "`user.signed_up`, `session.created`, `user.deleted`, `organization.created`, `organization.deleted`, `invitation.created`, `agent.created`, `mail.sent`, `run.finished`, `task.finished`, `desktop_control.ended` or `content.viewed` (ADR 0056 §5 lists each one's `data`). Ignore types you don't know: new ones keep v1."
+            "description": "`user.signed_up`, `session.created`, `user.deleted`, `organization.created`, `organization.deleted`, `invitation.created`, `agent.created`, `mail.sent`, `run.finished`, `task.finished`, `desktop_control.ended`, `content.viewed` or `platform_ai.threshold` (ADR 0056 §5 lists each one's `data`). Ignore types you don't know: new ones keep v1."
           },
           "orgId": {
             "type": ["string", "null"],
@@ -1004,7 +1099,7 @@
     "/orgs/{orgId}": {
       "get": {
         "tags": ["Operator"],
-        "summary": "One workspace: its owners and admins, and how much is in it",
+        "summary": "One workspace: its owners and admins, how much is in it, and its limits with what it uses",
         "parameters": [
           {
             "schema": {
@@ -1344,6 +1439,152 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OperatorUserBlock"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/billing-hold": {
+      "put": {
+        "tags": ["Operator"],
+        "summary": "Put a billing hold on a workspace, change its code, or lift it",
+        "description": "A billing hold is a hold with one of these codes as its reason and the notice `shown`: the workspace reads it in its own words, and owners and admins get the way to fix it. It never replaces nor lifts a hold set through PUT /standing or a suspension (`applied: false`); one of those replaces it, so set it again once that is lifted. Its owners and admins are notified when the state changes.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "hold": {
+                    "$ref": "#/components/schemas/OperatorBillingHold"
+                  }
+                },
+                "required": ["hold"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorBillingHoldResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/limits": {
+      "put": {
+        "tags": ["Operator"],
+        "summary": "Set a workspace's limits",
+        "description": "All four at once. Enforced where each is used: joining and inviting (`org.members_full`), every file written to this server's storage (`storage.full`, `storage.daily_full`), the platform's AI (within a minute). Lowering one takes nothing away: people stay, files stay, only what is new is refused. Allowed whatever the workspace's standing. Setting what is already set changes nothing, `updatedAt` included.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorLimits"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorLimitsState"
                 }
               }
             }

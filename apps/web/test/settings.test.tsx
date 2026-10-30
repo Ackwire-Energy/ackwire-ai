@@ -4,6 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { setNavigateAway } from "@/lib/navigate";
 import { pick } from "./catalog";
 import { createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { shownText } from "./hint";
@@ -31,12 +32,12 @@ const hintOf = (label: string, inside: HTMLElement = document.body) => {
   return { button, text: text?.textContent, hidden: text?.hidden };
 };
 
-describe("Configurações da organização", () => {
+describe("Configurações do workspace", () => {
   test("organization context saves by itself with PATCH /settings (no save button)", async () => {
     const { state } = await go();
     expect(screen().getByRole("heading", { level: 2, name: "Geral" })).toBeTruthy();
     expect(screen().queryByRole("button", { name: "Salvar organização" })).toBeNull();
-    const field = screen().getByLabelText("Contexto da organização");
+    const field = screen().getByLabelText("Contexto do workspace");
     await type(field, "A Acme faz um app para clínicas.");
     await act(async () => fireEvent.blur(field));
     await settle(4);
@@ -47,7 +48,7 @@ describe("Configurações da organização", () => {
 
   test("Geral: each row is its label and control; what a setting means is behind its ⓘ", async () => {
     await go();
-    const org = screen().getByRole("region", { name: "Organização" });
+    const org = screen().getByRole("region", { name: "Workspace" });
     expect(org.querySelectorAll(".settings-row__help")).toHaveLength(0);
     expect(hintOf("Fuso horário", org)).toMatchObject({
       text: "As rotinas e os resumos usam este fuso.",
@@ -60,7 +61,7 @@ describe("Configurações da organização", () => {
     );
     expect(context.querySelector(".ac-card__sub, .ac-card__foot")).toBeNull();
     // Each tile: the area's name and how it is now, nothing more.
-    const tiles = screen().getByRole("region", { name: "Tudo da organização" });
+    const tiles = screen().getByRole("region", { name: "Tudo do workspace" });
     expect(tiles.querySelectorAll(".settings-tile").length).toBeGreaterThan(0);
     expect(tiles.querySelector(".ac-card__sub")).toBeNull();
   });
@@ -368,7 +369,7 @@ describe("Configurações da organização", () => {
     expect(within(plans).getByRole("meter", { name: "Semana" }).getAttribute("aria-valuenow")).toBe("41");
     expect(plans.textContent).toContain("Ada ≈ 30% · Atlas ≈ 11%");
     expect(plans.textContent).toContain("5,1 mi tokens este mês · ≈ US$ 92,00 pela API");
-    const api = screen().getByRole("region", { name: "API da organização" });
+    const api = screen().getByRole("region", { name: "API do workspace" });
     expect(api.textContent).toContain("23% do orçamento");
     expect(api.textContent).toContain("US$ 11,50 de US$ 50,00 (padrão do workspace)");
     expect(within(api).getByRole("meter", { name: "Orçamento usado de Atlas" }).getAttribute("aria-valuenow")).toBe(
@@ -472,7 +473,7 @@ describe("Configurações da organização", () => {
     await go(state, "settings/usage");
     const plans = screen().getByRole("region", { name: "Contas dos planos" });
     expect(within(plans).getByRole("meter", { name: "5 horas" }).getAttribute("aria-valuenow")).toBe("62");
-    expect(screen().getByRole("region", { name: "API da organização" }).textContent).toContain("23% do orçamento");
+    expect(screen().getByRole("region", { name: "API do workspace" }).textContent).toContain("23% do orçamento");
     expect(screen().queryByRole("region", { name: "Gastos da API por tipo" })).toBeNull();
     expect(screen().queryByRole("region", { name: "Orçamento padrão dos agentes" })).toBeNull();
     expect(document.body.textContent).not.toContain("US$");
@@ -483,6 +484,34 @@ describe("Configurações da organização", () => {
     expect(screen().queryByRole("region", { name: "Armazenamento" })).toBeNull();
   });
 
+  test("Plano e cobrança: only where a billing service runs, for owners and admins, opened there signed in", async () => {
+    const left: string[] = [];
+    setNavigateAway((url) => left.push(url));
+    const nav = () => within(screen().getByRole("navigation", { name: "Seções das configurações" }));
+    await go();
+    expect(nav().queryByRole("link", { name: "Plano e cobrança" })).toBeNull();
+    cleanup();
+
+    const state = seedState();
+    state.authConfig = { ...state.authConfig, billingUrl: "https://billing.example.com" };
+    await go(state, "settings/billing");
+    expect(nav().getByRole("link", { name: "Plano e cobrança" }).getAttribute("aria-current")).toBe("page");
+    expect(screen().getByRole("heading", { level: 2, name: "Plano e cobrança" })).toBeTruthy();
+    expect(document.body.textContent).toContain(
+      "O plano do agentes.chat deste workspace, o cartão e as faturas ficam numa página nossa, fora do app.",
+    );
+    await click(screen().getByRole("button", { name: "Abrir plano e cobrança" }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "orgs.billingLink")?.args).toEqual([ORG_ID, "settings"]);
+    expect(left).toEqual(["https://billing.example.com/link?t=settings"]);
+    cleanup();
+
+    if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
+    await go(state, "settings/billing");
+    expect(nav().queryByRole("link", { name: "Plano e cobrança" })).toBeNull();
+    expect(screen().getByRole("heading", { level: 2, name: "Geral" })).toBeTruthy();
+  });
+
   test("budget and usage: the plans' estimate is their title's ⓘ, no card has a subtitle or footer; no plans, one line", async () => {
     await go(seedState(), "settings/usage");
     const plans = screen().getByRole("region", { name: "Contas dos planos" });
@@ -491,7 +520,7 @@ describe("Configurações da organização", () => {
       hidden: true,
     });
     expect(shownText(plans)).not.toContain("estimativa");
-    for (const card of [plans, screen().getByRole("region", { name: "API da organização" })])
+    for (const card of [plans, screen().getByRole("region", { name: "API do workspace" })])
       expect(card.querySelector(".ac-card__sub, .ac-card__foot")).toBeNull();
     cleanup();
     const api = createFakeApi(seedState());

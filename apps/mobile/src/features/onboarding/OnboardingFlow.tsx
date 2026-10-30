@@ -201,7 +201,7 @@ export function OnboardingFlow() {
       await work();
       await reach(typeof then === "function" ? then() : then);
     } catch (e) {
-      setError({ at: step, text: stepFailedText(t, e) });
+      setError({ at: step, text: stepFailedText(t, e, i18n.language) });
     } finally {
       setPending(false);
     }

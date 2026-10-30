@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { ApiError } from "@agenteschat/client";
+import { invitedErrorText } from "@agenteschat/client/lib/errors";
 import { joinRequestLine } from "../../src/features/activity/logic";
 import { afterSignIn, boldParts, signInPurpose, storedInvite, storedInviteOf } from "../../src/features/auth/links";
 import { membersByName, requestChips } from "../../src/features/members/logic";
@@ -112,4 +114,13 @@ describe("a request to join, in the Requests sheet", () => {
     expect(requestChips(en, "en", old(true), now).unverified).toBeNull();
     expect(requestChips(en, "en", old(false), now).unverified).toBe("Not verified");
   });
+});
+
+test("invited to a full workspace: whom to tell, never its numbers", async () => {
+  const full = new ApiError(409, "org.members_full", "This workspace is full", { members: 10, limit: 10 });
+  for (const lng of ["pt-BR", "en"] as const) {
+    const t = await translator(lng);
+    expect(invitedErrorText(t, full)).toBe(t("errors.org.membersFull"));
+    expect(invitedErrorText(t, full)).not.toMatch(/\d/);
+  }
 });

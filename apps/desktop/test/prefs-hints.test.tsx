@@ -237,12 +237,12 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
         expect(claude?.querySelector(".ac-hintline > .ac-chip")?.textContent).toBe("Connected");
         const under = [...el.querySelectorAll(".dk-crow__under")].map((u) => u.textContent);
         expect(under).toEqual([
-          "Commands can reach the rest of this Mac, other organizations' folders included.",
+          "Commands can reach the rest of this Mac, other workspaces' folders included.",
           "Logins an agent makes stay on this Mac, in its folder. Use only test accounts or the agent's own.",
         ]);
         // Their switches read the hint, then the line kept in sight under them.
         expect(describedBy(el.querySelector("#tool-commands"))).toBe(
-          "Tests, builds and other Terminal commands. Each one shows in Activity. Commands can reach the rest of this Mac, other organizations' folders included.",
+          "Tests, builds and other Terminal commands. Each one shows in Activity. Commands can reach the rest of this Mac, other workspaces' folders included.",
         );
         expect(describedBy(el.querySelector("#tool-browser"))).toBe(
           "Opens websites for the agents in a browser of their own, without your logins. Logins an agent makes stay on this Mac, in its folder. Use only test accounts or the agent's own.",
@@ -251,7 +251,7 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
           "Commands only write in the allowed folders and don't read the rest of the Mac. Some tools may get slower.",
         );
         expect(el.querySelector(".dk-phead .dk-lead")?.textContent).toBe(
-          "What agents of every organization can run on this Mac.",
+          "What agents of every workspace can run on this Mac.",
         );
       },
     ));
@@ -263,10 +263,10 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
       (el) => el.querySelector("#tool-commands-some"),
       (el) => {
         expect(el.querySelector("#tool-commands-some")?.textContent).toBe(
-          "On only for Acme. Turn it on for every organization here.",
+          "On only for Acme. Turn it on for every workspace here.",
         );
         expect(describedBy(el.querySelector("#tool-commands"))).toBe(
-          "Tests, builds and other Terminal commands. Each one shows in Activity. On only for Acme. Turn it on for every organization here. Commands can reach the rest of this Mac, other organizations' folders included.",
+          "Tests, builds and other Terminal commands. Each one shows in Activity. On only for Acme. Turn it on for every workspace here. Commands can reach the rest of this Mac, other workspaces' folders included.",
         );
       },
       { someCommands: true },
@@ -321,13 +321,13 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
         expect([...rows(jobs as HTMLElement), ...rows(claude as HTMLElement)]).toEqual([
           {
             title: "At the same time",
-            hint: "How many long jobs, like builds and tests, run together in each organization.",
+            hint: "How many long jobs, like builds and tests, run together in each workspace.",
             line: null,
           },
           { title: "Longest each one may run", hint: "After that the job stops and the agent says so.", line: null },
           {
             title: "Open conversations",
-            hint: "How many stay open in each organization. More of them answer faster but use more memory.",
+            hint: "How many stay open in each workspace. More of them answer faster but use more memory.",
             line: null,
           },
           { title: "Close an idle conversation after", hint: null, line: null },
@@ -336,9 +336,9 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
           (t) => t.querySelector("h3")?.textContent === "Agents' folder",
         );
         expect(describedBy(title?.querySelector("button.ac-hint"))).toBe(
-          "One folder per organization, with a folder for each agent.",
+          "One folder per workspace, with a folder for each agent.",
         );
-        for (const r of rows(folders as HTMLElement)) expect(r.line).not.toContain("One folder per organization");
+        for (const r of rows(folders as HTMLElement)) expect(r.line).not.toContain("One folder per workspace");
       },
     ));
 

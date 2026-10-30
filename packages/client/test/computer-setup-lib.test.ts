@@ -11,6 +11,8 @@ import {
   noComputerChoice,
   SETUP_STAGES,
   SETUP_STEPS,
+  type SetupView,
+  setupLines,
   setupNoticeKey,
   setupNoticeTitleKey,
   setupPending,
@@ -93,6 +95,33 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
     expect(setupView(external({ state: "waiting", step: "installing", stage: "updating" }))?.textKey).toBe(
       "computerSetup.status.capacity",
     );
+  });
+
+  test("the team's lines: by what the status line says, only agents on the team, the memory ones once its size is known", () => {
+    const team = [{ handle: "ada" }, { handle: "atlas" }, { handle: "marina" }];
+    const linesOf = (patch: Partial<ComputerSetup>, who = team) =>
+      setupLines(setupView(external(patch)) as SetupView, who).map((l) => l.key);
+    // Its step's, or its stage's when the stage has words; Theo isn't on this team, so his line is left out.
+    expect(linesOf({ step: "starting" })).toEqual([
+      "computerSetup.lines.starting.atlas",
+      "computerSetup.lines.starting.ada",
+    ]);
+    expect(linesOf({ step: "installing", stage: "updating" })).toEqual(["computerSetup.lines.updating.ada"]);
+    expect(linesOf({ step: "installing", stage: "defragmenting" })).toEqual(["computerSetup.lines.installing.ada"]);
+    // The computer's memory, only once its size is known.
+    expect(linesOf({ step: "installing", stage: "booting" })).toEqual(["computerSetup.lines.booting.atlas"]);
+    expect(linesOf({ step: "installing", stage: "booting", specs: { cpus: 4, memoryGb: 8, diskGb: 100 } })).toEqual([
+      "computerSetup.lines.booting.ada",
+      "computerSetup.lines.booting.atlas",
+    ]);
+    // No step yet, a wait, or nobody the lines name: none.
+    expect(linesOf({})).toEqual([]);
+    expect(linesOf({ state: "waiting", step: "starting" })).toEqual([]);
+    expect(linesOf({ step: "starting" }, [{ handle: "marina" }])).toEqual([]);
+    // Each with the agent it names.
+    expect(setupLines(setupView(external({ step: "reserving" })) as SetupView, team)).toEqual([
+      { key: "computerSetup.lines.reserving.atlas", agent: { handle: "atlas" } },
+    ]);
   });
 
   test("a wait is for an available computer, whatever reason it gives; problem and ready have their own words", () => {
@@ -256,7 +285,7 @@ describe("the workspace's own computer (ADR 0056 §10)", () => {
   });
 });
 
-describe("live: machine.provisioning and org.standing", () => {
+describe("live: machine.provisioning, org.standing and org.limits", () => {
   test("a provisioning event replaces the setup; ready refreshes the computers", () => {
     const qc = new QueryClient();
     qc.setQueryData(keys.computerSetup("o1"), external({ step: "reserving" }));
@@ -358,6 +387,13 @@ describe("live: machine.provisioning and org.standing", () => {
       reason: "review",
       cloud: true,
     });
+  });
+
+  test("a limits event (a new plan, ADR 0079) asks for the workspace's limits again", () => {
+    const qc = new QueryClient();
+    qc.setQueryData(keys.limits("o1"), { members: { used: 1, limit: 1 } });
+    expect(applyWorkspaceEvent(qc, "o1", { type: "org.limits", orgId: "o1" } as { type: string })).toBe(true);
+    expect(qc.getQueryState(keys.limits("o1"))?.isInvalidated).toBe(true);
   });
 });
 

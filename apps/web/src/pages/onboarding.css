@@ -37,9 +37,11 @@
   min-width: 0;
 }
 /*
- * One calm column per step: the host asks, the answer, one big action. It is as tall as the screen at least, so the
- * step's actions rest at the screen's bottom however short the step is. On a desktop the step centres in the room
- * above them.
+ * One calm column per step: the host asks, the answer, one big action. Every step starts at the same top, so nothing
+ * a step loads later moves its question. The top is the rail wordmark's line, the middle of its lowercase letters
+ * (16px under the rail's 24px padding at the logo's size 22, measured): Back's middle sits on it (its -16px top
+ * margin), its box level with the logo's top. The column is as tall as the screen at least, so the step's actions
+ * rest at the screen's bottom however short the step is, the room left above them.
  */
 .onb__body {
   --onb-gutter: clamp(16px, 4vw, 32px);
@@ -48,15 +50,17 @@
   gap: 24px;
   width: 100%;
   max-width: 600px;
-  padding: 48px var(--onb-gutter) 0;
+  padding: 40px var(--onb-gutter) 0;
   text-wrap: pretty;
   animation: onb-in 0.36s var(--out) both;
 }
-/* An empty first row (its gap taken back) holds the half of the spare room that goes above the step. The page pins
-   that room as the step opens (`--onb-lead`), so what changes in the step grows or shrinks it downward. */
-.onb__body::before {
-  content: "";
-  margin-block: var(--onb-lead, auto) -24px;
+/* With no Back (the first step), an empty row in its place: the host starts where it does on every step. */
+@media (min-width: 761px) {
+  .onb__body:not(:has(> .onb__back))::before {
+    content: "";
+    height: 32px;
+    margin: -16px 0 -8px;
+  }
 }
 @keyframes onb-in {
   from {
@@ -323,6 +327,12 @@ textarea.onb__big.ac-input {
 .onb__actions > .ac-btn--ghost {
   margin-inline: auto;
 }
+/* A step with no bar (the plan offer: its one action is its banner) keeps the bar's clearance of the home bar in an
+   empty last row: at the end of the scroll its last line stays the column's gap above the screen's bottom. */
+.onb__body:not(:has(> .onb__actions))::after {
+  content: "";
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
 /* A field being typed in stays clear of the bar: the page scrolls it above the bar's tallest (two rows). */
 html:has(.onb) {
   scroll-padding-bottom: 104px;
@@ -414,6 +424,155 @@ html:has(.onb) {
   background: var(--surface-sunken);
   font-size: 13px;
   overflow-wrap: anywhere;
+}
+/* Back from paying: the plan is active, said once over the AI step's question. */
+.onb__paid {
+  align-self: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 14px 10px 12px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+  color: var(--ok);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+/* Paid, until the billing service lifts the hold: the payment received, neutral, where the plan then says active. */
+.onb__paid[data-state="confirming"] {
+  background: var(--plate);
+  color: var(--muted);
+}
+/* The computer step waiting for the workspace's plan: the scene, what is done, and the banner with its one action. */
+.onb__offer {
+  --card-pad: 10px;
+  gap: 0;
+}
+/* The computer in the middle whatever the team's size, the agents standing on one floor on both sides. */
+.onb__scene {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: end;
+  gap: 18px;
+  height: 216px;
+  padding: 0 16px 20px;
+  overflow: hidden;
+  border-radius: 14px 14px 14px 3px;
+  background: linear-gradient(to top, color-mix(in srgb, var(--ink) 5%, transparent), transparent 44px) var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.onb__scene-side {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.onb__scene-side:last-child {
+  justify-content: flex-start;
+}
+.onb__done-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 6px 10px 2px;
+  list-style: none;
+}
+/* Everything on the first line, so a name that wraps keeps its check, its note and the faces there; a row of one
+   line stays in the middle. */
+.onb__done-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-content: center;
+  align-items: baseline;
+  column-gap: 10px;
+  min-height: 48px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  font-weight: 600;
+  /* In em, so the note and the faces inherit the name's line as a length. */
+  line-height: 1.35em;
+}
+.onb__done-row:first-child {
+  border-top: 0;
+}
+/* An `.ac-iconline` lead: on the first line's capitals' middle. */
+.onb__done-row > .ac-icon {
+  align-self: start;
+  color: var(--ok);
+  translate: 0 calc(9.45px - var(--cap-mid) - 50%);
+}
+.onb__done-note {
+  justify-self: end;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+  text-align: right;
+}
+/* No baseline to share: the faces take the first line's height, centred on it. */
+.onb__done-note:has(> .onb__done-faces) {
+  align-self: start;
+}
+.onb__done-faces {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 18.9px;
+}
+@supports (top: 1lh) {
+  .onb__done-row > .ac-icon {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
+  .onb__done-faces {
+    height: 1lh;
+  }
+}
+/* The step's one action on the agents' sky, in their blue. */
+.onb__offer-banner {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 16px;
+  margin-top: 6px;
+  padding: 46px 16px 16px;
+  border-radius: 14px 14px 14px 3px;
+  background: var(--agent-soft);
+}
+.onb__offer-sky {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: -1;
+  height: 56px;
+  pointer-events: none;
+}
+.onb__offer-text {
+  flex: 1 1 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.onb__offer-text > b {
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+.onb__offer-text > span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.onb__offer-banner > .ac-btn {
+  flex: none;
+}
+/* "Agora não": quiet, under the card, never a second button beside the plan. */
+.onb__later {
+  align-self: flex-end;
+  margin: -4px -4px 0 0;
+  color: var(--muted);
 }
 .onb__emails {
   display: flex;
@@ -547,16 +706,44 @@ html:has(.onb) {
   .onb__body {
     padding-top: 24px;
   }
-  /* The step starts under the step bar, and the spare room all goes above the actions. */
-  .onb__body::before {
-    display: none;
-  }
   .onb__ask .onb__title {
     font-size: 18px;
   }
   /* Four faces and the computer on one line from 360 px wide; the portrait keeps its 48 px, whole pixels. */
   .onb__crew {
     gap: 8px;
+  }
+  /* Two agents a side around the computer from 360 px wide; the checklist names everyone. */
+  .onb__scene {
+    gap: 8px;
+    height: 184px;
+    padding: 0 8px 16px;
+  }
+  .onb__scene .ac-avatar--lg {
+    width: 40px;
+    height: 40px;
+  }
+  .onb__scene-side > :nth-child(n + 3) {
+    display: none;
+  }
+  .onb__done-row {
+    grid-template-columns: 20px minmax(0, 1fr);
+  }
+  .onb__done-note {
+    grid-column: 2;
+    justify-self: start;
+    margin-top: 4px;
+    text-align: left;
+  }
+  /* A line of their own. */
+  .onb__done-faces {
+    height: auto;
+  }
+  .onb__offer-banner > .ac-btn {
+    flex: 1 1 100%;
+  }
+  .onb__later {
+    align-self: center;
   }
   .onb__crew .ac-avatar--lg,
   .onb__crew-computer {

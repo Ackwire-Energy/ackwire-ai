@@ -856,7 +856,7 @@ export const featureKeysEn: FeatureTranslations = {
     intro: "There's no undo.",
     goes: {
       account: "Your account, your access and your sessions are gone.",
-      orgs: "Organizations where you are the only member are deleted.",
+      orgs: "Workspaces where you are the only member are deleted.",
       phones: "This phone and the others stop getting alerts.",
     },
     stays: "Messages you wrote stay in the chats, without your name.",

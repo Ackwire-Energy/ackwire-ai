@@ -1,4 +1,5 @@
 import type { ChannelEvent, ConnectIntent, DecidedBy, Message, MessageReceipts, RunStatus } from "../api/types";
+import { PLATFORM_CAP } from "../lib/limits";
 import { NO_AI } from "../lib/no-ai";
 import type { RunSteeredEvent } from "./streams";
 
@@ -31,6 +32,8 @@ export interface MessageReceipt {
   referenced?: string[];
   /** Routed to nobody: the organization has no AI connected (with the Connect step the message asked for). */
   noAi?: { intent?: ConnectIntent; provider?: string };
+  /** Routed to nobody: the workspace used up its platform AI for the month, so only @mentions start agents. */
+  platformCap?: true;
   /** Who picked the agents (ADR 0074). */
   decidedBy?: DecidedBy;
   /** Nobody could read it (no Jev, small model, plan or rule): only a mention reaches an agent. */
@@ -182,7 +185,8 @@ export function seedReceipt(state: ReceiptsState, message: Message, fresh = fals
     // Receipts come from the router's decision: "nobody picked it" is final. A read with none (the router is
     // still on it) keeps "Picking who answers", and a `message.routing` after it still counts.
     const current = next[message.id] ?? { routed: false, agents: [] };
-    const decided = r.seenBy.length > 0 || r.handled.length > 0 || Boolean(r.noAi || r.reason || r.decidedBy);
+    const decided =
+      r.seenBy.length > 0 || r.handled.length > 0 || Boolean(r.noAi || r.platformCap || r.reason || r.decidedBy);
     return withMentions({
       ...next,
       [message.id]: {
@@ -192,6 +196,7 @@ export function seedReceipt(state: ReceiptsState, message: Message, fresh = fals
         blocked: r.blocked ?? [],
         // The Connect step `message.routed` asked for stays while the server still says "no AI".
         ...(r.noAi ? { noAi: existing?.noAi ?? {} } : {}),
+        ...(r.platformCap ? { platformCap: true as const } : {}),
         ...(r.decidedBy ? { decidedBy: r.decidedBy } : {}),
         ...(r.reason === MENTION_NEEDED ? { mentionNeeded: true as const } : {}),
         server: r,
@@ -239,6 +244,7 @@ export function applyReceiptEvent(
       for (const r of event.runs ?? []) next = linkRun(next, event.messageId, r.runId, r.agentId);
       const {
         noAi: _before,
+        platformCap: _capped,
         picking: _picking,
         decidedBy: _decidedBy,
         mentionNeeded: _mentionNeeded,
@@ -257,6 +263,7 @@ export function applyReceiptEvent(
           ...(referenced ? { referenced } : {}),
           // Routed again once an AI is connected: the decision that replaces it says what happens now.
           ...(event.reason === NO_AI ? { noAi: { intent: event.intent, provider: event.provider } } : {}),
+          ...(event.reason === PLATFORM_CAP ? { platformCap: true as const } : {}),
           ...(event.decidedBy ? { decidedBy: event.decidedBy } : {}),
           ...(event.reason === MENTION_NEEDED ? { mentionNeeded: true as const } : {}),
         },
@@ -333,6 +340,8 @@ export interface ReceiptView {
     | { kind: "nobody"; mentionNeeded?: true }
     /** Nobody will answer for want of an AI (`agents`: those that couldn't think; empty: nobody was asked). */
     | { kind: "no_ai"; agents: string[] }
+    /** Nobody was asked: the workspace used up its platform AI for the month, an @mention still gets an answer. */
+    | { kind: "platform_cap" }
     | null;
   /** Everyone who answered answered: the row can shrink to avatars. */
   done: boolean;
@@ -347,7 +356,7 @@ export interface ReceiptView {
 export function receiptView(receipt: MessageReceipt | undefined): ReceiptView {
   if (receipt?.picking && !receipt.routed)
     return { seen: [], status: null, done: false, referenced: [], picking: true };
-  if (!receipt || (receipt.agents.length === 0 && !receipt.noAi))
+  if (!receipt || (receipt.agents.length === 0 && !receipt.noAi && !receipt.platformCap))
     return { seen: [], status: null, done: false, referenced: [] };
   const decided = receipt.decidedBy ? { decidedBy: receipt.decidedBy } : {};
   const seen = receipt.agents.map(([id]) => id);
@@ -363,6 +372,7 @@ export function receiptView(receipt: MessageReceipt | undefined): ReceiptView {
   }
   const handled = with_("handled");
   if (handled.length) return { seen, status: { kind: "handled", agents: handled }, done: true, referenced, ...decided };
+  if (receipt.platformCap) return { seen, status: { kind: "platform_cap" }, done: false, referenced };
   // A mention always gets an answer unless the server said that agent can't, or that the message only
   // references it (never "nobody" on a guess).
   const blocked = new Set([...(receipt.blocked ?? []), ...(receipt.referenced ?? [])]);

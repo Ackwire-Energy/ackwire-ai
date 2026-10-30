@@ -248,7 +248,8 @@ export function askLineOf(
 }
 
 /** A step that failed: what the server's code says (a refused workspace, a restriction), else that it didn't save. */
-export const stepFailedText = (t: TFunction, error: unknown) => knownErrorText(t, error) ?? t("mobile.onb.failed");
+export const stepFailedText = (t: TFunction, error: unknown, locale?: string) =>
+  knownErrorText(t, error, locale) ?? t("mobile.onb.failed");
 
 /** Sends each invitation in turn; the addresses whose invitation failed, in order. */
 export async function inviteEach(emails: string[], invite: (email: string) => Promise<unknown>): Promise<string[]> {

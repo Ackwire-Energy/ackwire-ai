@@ -6465,6 +6465,41 @@ a.machine-row__name:hover {
 .setup-progress {
   margin: 0;
 }
+.setup-progress--steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* A plate, so it shows on a sunken well too (the AI step's wait, the setup's Computer step). */
+.setup-progress--steps .ac-chip {
+  background: var(--plate);
+}
+/* The team's lines share one cell, so the next one fades in where the last fades out. */
+.setup-says {
+  display: grid;
+  justify-items: start;
+  min-width: 0;
+}
+.setup-say {
+  grid-area: 1 / 1;
+  max-width: 100%;
+  padding-left: 2px;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.6s var(--out),
+    visibility 0s linear 0.6s;
+}
+.setup-say[data-on] {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0.15s, 0s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .setup-say {
+    transition: none;
+  }
+}
 .setup-progress--line {
   font-size: 13px;
   color: var(--ink-muted);
@@ -10189,6 +10224,15 @@ html[data-menu-overlay] .shell {
 /* The Computer step's lines are the well's own, at its gap. */
 .onb__wait > .setup-wait {
   display: contents;
+}
+/* So are the team's line and the steps under it, in both wells. */
+.onb__wait .setup-progress--steps,
+.ai-panel__wait > .setup-progress--steps {
+  display: contents;
+}
+/* Boxless there, the steps take the wait's words edge themselves, as the time left under them does. */
+.onb__wait .setup-progress--steps > * {
+  margin-left: 22px;
 }
 /* "All agents": each agent's face and name, then done, signing in, or nothing while it waits. One line each, so its
    face and mark centre on it. */

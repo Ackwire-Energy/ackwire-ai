@@ -201,7 +201,7 @@ describe("Responde a todos (Quem pensa)", () => {
     const d = await brainDialog();
     await click(
       within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getByRole("radio", {
-        name: /^Modelo da organização/,
+        name: /^Modelo do workspace/,
       }),
     );
     await click(within(d).getByRole("button", { name: "Usar" }));

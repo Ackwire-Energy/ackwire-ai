@@ -1,7 +1,9 @@
 import type { TFunction } from "i18next";
 import { ApiError } from "../api/http";
 import type { AuthConfig, OrgStanding } from "../api/types";
+import { billingHoldOf } from "./billing";
 import { MAX_UPLOAD_MB } from "./files";
+import { limitRefusalText } from "./limits";
 import { endSentence } from "./text";
 
 /**
@@ -72,6 +74,8 @@ const KNOWN = {
   "routine.take_over_no_access": "errors.routine.takeOverNoAccess",
   "routine.agent_not_in_channel": "errors.routine.agentNotInChannel",
   "audience.plan_owner_only": "aiAccounts.errors.planOwnerOnly",
+  // Facts only (the phone shows this one): the web's onboarding says `standing.createUnpaid` beside the way to pay.
+  "org.create_unpaid": "standing.createInactive",
   "machine.managed": "computerSetup.managedNotRemovable",
   "machine.managed_access": "computerSetup.managedAccess",
   "join.link_closed": "errors.join.linkClosed",
@@ -146,9 +150,13 @@ export function restrictionLine(
   const contested = (line: string) =>
     cloud && !UNCONTESTED.has(reason) ? `${endSentence(line)} ${t("standing.cloud.contest", email)}` : line;
   switch (code?.startsWith("run.") ? code.slice(4).replace("_", ".") : code) {
-    case "org.paused":
+    case "org.paused": {
+      // A billing hold (ADR 0079) is said in words of its own, never as the reason.
+      const billing = billingHoldOf({ state: "hold", reason });
+      if (billing) return t(`standing.billing.${billing}`);
       if (cloud && reason === REVIEW_REASON) return t("standing.cloud.review", email);
       return reason ? contested(t("standing.onHold", { reason })) : t("standing.paused");
+    }
     case "org.suspended":
       return reason ? contested(t("standing.suspendedFor", { reason })) : t("standing.suspended");
     case "agent.paused":
@@ -219,16 +227,26 @@ export const sendWaits = (error: unknown) => error instanceof TypeError || serve
 
 /**
  * A known server code in the person's language, and any other limit (a 429, or `rate_limited`) as "too many tries",
- * since the server says those in English. Null for anything else (the caller keeps its own words).
+ * since the server says those in English. Null for anything else (the caller keeps its own words). `locale`
+ * writes the sizes a limit's refusal names.
  */
-export function knownErrorText(t: TFunction, error: unknown): string | null {
+export function knownErrorText(t: TFunction, error: unknown, locale = "en"): string | null {
   if (!(error instanceof ApiError)) return null;
   const restriction = restrictionLine(t, error.code, error.params);
   if (restriction) return restriction;
+  const limit = limitRefusalText(t, locale, error.code, error.params);
+  if (limit) return limit;
   const key = KNOWN[error.code as keyof typeof KNOWN];
   if (key) return t(key, { max: MAX_UPLOAD_MB, ...error.params });
   return error.status === 429 || error.code === "rate_limited" ? t("common.tooMany") : null;
 }
+
+/**
+ * `knownErrorText` for the person an invitation is for: a full workspace says whom to tell, never its numbers,
+ * which are for its admins.
+ */
+export const invitedErrorText = (t: TFunction, error: unknown, locale?: string): string | null =>
+  errorCode(error) === "org.members_full" ? t("errors.org.membersFull") : knownErrorText(t, error, locale);
 
 /**
  * A sign-in, sign-up or reset Better Auth refused (`{ status, code, message }`, a block's kind on agentes.chat Cloud)
@@ -245,9 +263,9 @@ export function authErrorText(
 }
 
 /** Translated text for a failed request. */
-export function errorText(t: TFunction, error: unknown): string {
+export function errorText(t: TFunction, error: unknown, locale?: string): string {
   if (error instanceof ApiError) {
-    const known = knownErrorText(t, error);
+    const known = knownErrorText(t, error, locale);
     if (known) return known;
     if (error.status === 413) return t("errors.artifact.fileTooLarge", { max: MAX_UPLOAD_MB });
     if (error.status === 403) return t("common.notAllowed");

@@ -38,6 +38,7 @@ export type ReceiptWords =
   | "receipts.handled"
   | "receipts.failed"
   | "receipts.nobody"
+  | "receipts.platformCap"
   | "receipts.mentionNeeded"
   | "receipts.picking"
   | "noAi.receipt";
@@ -54,7 +55,7 @@ export function receiptLine(receipt: MessageReceipt | undefined): ReceiptLine | 
     const words = { key: "receipts.picking" as const, agents: [] };
     return { faces: [], more: 0, mark: "picking", words, label: words, action: null, alert: false };
   }
-  if (view.seen.length === 0 && status?.kind !== "no_ai") return null;
+  if (view.seen.length === 0 && status?.kind !== "no_ai" && status?.kind !== "platform_cap") return null;
   if (status === null) {
     const words = { key: "receipts.seenBy" as const, agents: view.seen };
     return { ...faces(view.seen), mark: "seen", words, label: words, action: null, alert: false };
@@ -81,6 +82,10 @@ export function receiptLine(receipt: MessageReceipt | undefined): ReceiptLine | 
     case "nobody": {
       const key = status.mentionNeeded ? ("receipts.mentionNeeded" as const) : ("receipts.nobody" as const);
       const words = { key, agents: [] };
+      return { faces: [], more: 0, mark: "none", words, label: words, action: null, alert: false };
+    }
+    case "platform_cap": {
+      const words = { key: "receipts.platformCap" as const, agents: [] };
       return { faces: [], more: 0, mark: "none", words, label: words, action: null, alert: false };
     }
     case "no_ai": {

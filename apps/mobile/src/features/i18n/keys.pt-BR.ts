@@ -861,7 +861,7 @@ export const featureKeysPtBR = {
     intro: "Isso não tem volta.",
     goes: {
       account: "Sua conta, seus acessos e suas sessões somem.",
-      orgs: "Organizações em que só você está são apagadas.",
+      orgs: "Workspaces em que só você está são apagados.",
       phones: "Este celular e os outros param de receber avisos.",
     },
     stays: "Mensagens que você escreveu ficam nas conversas, sem seu nome.",

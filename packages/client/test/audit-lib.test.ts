@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { AuditRow } from "../src/api/types";
-import { auditOutcome, auditQueryOf, auditSentence, auditSubLine } from "../src/lib/audit";
+import { auditOutcome, auditQueryOf, auditReason, auditSentence, auditSubLine } from "../src/lib/audit";
 
 // The key and its values, so each test reads which words were picked.
 const t = ((key: string, o?: Record<string, unknown>) =>
@@ -35,6 +35,17 @@ describe("Auditoria in words (web and phone)", () => {
     expect(auditQueryOf("waiting", null)).toEqual({ waiting: true });
     // People's changes are people's, whichever agent was picked.
     expect(auditQueryOf("people", "ag")).toEqual({ actorType: "person", kind: "change" });
+  });
+
+  test("a billing hold's reason is said in words, never as its code; any other reason as written", () => {
+    const standing = (details: Record<string, unknown>) =>
+      row({ actor: { type: "system", id: null, name: null }, action: "organization.standing_changed", details });
+    expect(auditReason(t, standing({ from: "active", to: "hold", reason: "unpaid" }))).toBe(
+      "standing.notification.billing.unpaid",
+    );
+    expect(auditReason(t, standing({ from: "hold", to: "active", reason: null }))).toBeNull();
+    expect(auditReason(t, standing({ from: "active", to: "hold", reason: "Spam reports" }))).toBe("Spam reports");
+    expect(auditReason(t, row({ details: { reason: "unpaid" } }))).toBe("unpaid");
   });
 
   test("who did what, then about what, who asked and where", () => {

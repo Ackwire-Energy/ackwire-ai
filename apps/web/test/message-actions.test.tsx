@@ -210,6 +210,31 @@ describe("message action bars", () => {
     expect(rows.some((r) => /--msg-inline:\s*12px/.test(r.body))).toBe(true);
   });
 
+  test("past the platform AI cap the receipt's words go under the text, never by the name", async () => {
+    const state = seedState();
+    state.messages = [
+      {
+        id: "c1",
+        channelId: ENG_ID,
+        threadId: null,
+        author: { type: "person", id: "u-walter" },
+        body: "Alguém revisa o contrato?",
+        mentionedAgentIds: [],
+        agentRunId: null,
+        createdAt: NOW.toISOString(),
+        receipts: { seenBy: [], pickedBy: [], handled: [], platformCap: true },
+      } as Message,
+    ];
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(8);
+    const row = document.querySelector('article[data-message-id="c1"]') as HTMLElement;
+    const foot = row.querySelector(".ac-msg__body > .ac-msg__foot:last-child") as HTMLElement;
+    expect(foot.querySelector(".ac-receipt > .ac-receipt__words")?.textContent).toBe(
+      "Mencione um agente com @ para ele responder.",
+    );
+    expect(row.querySelector(".ac-msg__head .ac-receipt, .ac-msg__aside .ac-receipt")).toBeNull();
+  });
+
   test("on touch a tap on a message opens its bar's actions in a menu off its text, an agent's with its feedback", async () => {
     const restore = onTouch();
     try {

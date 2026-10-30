@@ -419,13 +419,24 @@ export function RealtimeProvider({
       qc.removeQueries({ queryKey: ["org", orgId, "reactions"] });
       // Notifications that arrived while offline: the inbox and the badge catch up.
       void qc.invalidateQueries({ queryKey: keys.notifications(orgId) });
-      // The workspace's computer on its way and its standing may have moved meanwhile, and so may the computers
-      // (one back online, a pause) and the agents' screens.
+      // The workspace's computer on its way, its standing and its limits (a new plan) may have moved meanwhile, and so
+      // may the computers (one back online, a pause) and the agents' screens.
       void qc.invalidateQueries({ queryKey: keys.computerSetup(orgId) });
       void qc.invalidateQueries({ queryKey: keys.machines(orgId) });
       void qc.invalidateQueries({ queryKey: keys.agentDesktops(orgId) });
       void qc.invalidateQueries({ queryKey: keys.me });
+      void qc.invalidateQueries({ queryKey: keys.limits(orgId) });
       void qc.invalidateQueries({ queryKey: ["org", orgId, "channel"] });
+    });
+    // The first open too, for what a return from the billing service changes: a new plan's limits, standing and
+    // computer can land in core between this page's first reads and the socket's open, and that event reaches no one.
+    let opened = false;
+    const offOpen = conn.onStatus((status) => {
+      if (status !== "open" || opened) return;
+      opened = true;
+      void qc.invalidateQueries({ queryKey: keys.limits(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.me });
+      void qc.invalidateQueries({ queryKey: keys.computerSetup(orgId) });
     });
     // Approvals I can decide arrive here even when I'm not in that channel (sidebar badge, Aprovações).
     const offUser = conn.onUserEvent((event) => {
@@ -519,6 +530,7 @@ export function RealtimeProvider({
     setConnection(conn);
     return () => {
       offReconnect();
+      offOpen();
       offUser();
       conn.stop();
       setConnection(null);

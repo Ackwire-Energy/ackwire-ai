@@ -30,7 +30,8 @@ export type OperatorEventType =
   | "run.finished"
   | "task.finished"
   | "desktop_control.ended"
-  | "content.viewed";
+  | "content.viewed"
+  | "platform_ai.threshold";
 
 export interface OperatorEvent {
   type: OperatorEventType;

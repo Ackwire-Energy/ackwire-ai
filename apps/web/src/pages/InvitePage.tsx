@@ -1,7 +1,7 @@
 import type { AskToJoinResult, InvitationPreview } from "@agenteschat/client";
 import { ApiError, invitationQuery, keys, useAuthConfig, useMe } from "@agenteschat/client";
 import { formatTimeLeft } from "@agenteschat/client/lib/actions";
-import { authErrorText, errorCode, errorText } from "@agenteschat/client/lib/errors";
+import { authErrorText, errorCode, errorText, invitedErrorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { signInPath } from "@agenteschat/client/lib/guards";
 import { withHumanCheck } from "@agenteschat/client/lib/human-check";
@@ -32,7 +32,7 @@ import "./invite.css";
 
 /** An invitation, valid or expired; an invitation link only lets people ask to join (`AskToJoin`). */
 export function InvitePage({ token }: { token: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const api = useApi();
   const auth = useAuth();
   const qc = useQueryClient();
@@ -55,7 +55,9 @@ export function InvitePage({ token }: { token: string }) {
       await qc.invalidateQueries({ queryKey: keys.me });
       await navigate({ to: "/org/$orgId", params: { orgId } });
     },
-    onError: (e) => setError(e instanceof Error ? e.message : t("common.unknownError")),
+    // A known code in the invited person's words (a hold's code never as it comes), else the server's own.
+    onError: (e) =>
+      setError(invitedErrorText(t, e, i18n.language) ?? (e instanceof Error ? e.message : t("common.unknownError"))),
   });
 
   // From the press on: the bot check may wait for its token, or for a click, before the sign-up goes out.

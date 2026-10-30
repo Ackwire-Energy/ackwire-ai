@@ -261,6 +261,19 @@ export function toolOff(
   return status.execAllowed ? null : { code: "exec_disabled", message: `Commands are turned off on ${status.name}.` };
 }
 
+/**
+ * The runner refused the turn before starting it, for lack of room (`no_slot`) or at its request ceiling
+ * (`internal` "busy", every runner version): `busy`, and the engine waits for room.
+ */
+export function busyRefusal(error: unknown): BrainEvent | null {
+  if (!(error instanceof MachineRequestError)) return null;
+  if (error.code === "no_slot") return err("busy", error.message, true);
+  if (error.code === "internal" && error.message === "busy") {
+    return err("busy", "The computer is busy with other requests.", true);
+  }
+  return null;
+}
+
 /** A failed `brain.turn` request as the turn's error. */
 export function claudeCodeCallError(error: unknown): BrainEvent {
   if (error instanceof MachineDroppedError && error.serverStop) {
@@ -268,6 +281,8 @@ export function claudeCodeCallError(error: unknown): BrainEvent {
   }
   if (error instanceof MachineOfflineError) return err("machine_offline", error.message, true);
   if (error instanceof MachinePausedError) return err("machine_paused", error.message, true);
+  const busy = busyRefusal(error);
+  if (busy) return busy;
   if (error instanceof MachineRequestError) {
     switch (error.code) {
       case "canceled":
@@ -276,11 +291,6 @@ export function claudeCodeCallError(error: unknown): BrainEvent {
         return err("timeout", error.message, false);
       case "exec_disabled":
         return err("exec_disabled", error.message, true);
-      case "no_slot":
-        return err("busy", error.message, true);
-      case "internal":
-        if (error.message === "busy") return err("busy", "The computer is busy with other requests.", true);
-        return err("runner_error", error.message, false);
       case "bad_request":
         if (/unknown op|no brain turns/i.test(error.message)) return err("runner_outdated", error.message, true);
         return err("bad_request", error.message, false);

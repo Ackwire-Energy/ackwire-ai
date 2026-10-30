@@ -47,6 +47,7 @@ import type {
   SignInOptions,
   StoragePlatform,
   StorageUsage,
+  WorkspaceLimits,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { answersOthers, audienceOf } from "@agenteschat/client/lib/audience";
@@ -188,6 +189,10 @@ export interface FakeState {
   failPosts?: boolean | ApiError;
   /** `chat.post` waits for this (to see the pending state). */
   holdPosts?: Promise<void>;
+  /** What `orgs.billingLink` throws (default: a link on billing.example.com). */
+  billingLinkError?: ApiError;
+  /** `orgs.limits` (ADR 0079); unset = no limits, the members counted from `members`. */
+  limits?: WorkspaceLimits;
   /** `agents.aiStatus`; unset = every agent ready. */
   aiStatus?: AiStatus;
   /** Make `chat.answerNow` fail with this error (`ai.still_missing`…). */
@@ -938,6 +943,17 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("orgs.removeLogo", orgId);
         setOrgLogo(orgId, null);
       },
+      billingLink: async (orgId, from) => {
+        log("orgs.billingLink", orgId, from);
+        if (state.billingLinkError) throw state.billingLinkError;
+        return { url: `https://billing.example.com/link?t=${from}`, expiresAt: NOW.toISOString() };
+      },
+      limits: async () =>
+        state.limits ?? {
+          members: { used: state.members.length, limit: null },
+          storage: { usedBytes: 0, limitBytes: null, ownStorage: false },
+          uploads: { usedBytes24h: 0, limitBytesPerDay: null },
+        },
       members: async () => state.members,
       changeRole: async (orgId, userId, role: Role) => {
         log("orgs.changeRole", orgId, userId, role);

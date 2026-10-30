@@ -733,25 +733,27 @@ export async function notifyComputerReady(
 
 /**
  * The people who run this server held, suspended or restored the workspace, with the notice shown: its
- * owners and admins hear it, with the reason (`latest.text`), and on agentes.chat Cloud `latest.cloud`, so the apps
- * read it as the restriction itself reads. One row per change.
+ * owners and admins hear it, with the reason (`latest.text`), or a billing hold's code (`latest.billingHold`,
+ * ADR 0079), which the apps say in the person's words, and on agentes.chat Cloud `latest.cloud`, so the apps
+ * read a restriction as the restriction itself reads. One row per change.
  */
 export async function notifyOrgStanding(
   deps: NotificationDeps,
   orgId: string,
-  standing: { state: string; reason: string | null; changedAt: Date | null; cloud?: boolean },
+  standing: { state: string; reason: string | null; changedAt: Date | null; billing?: boolean; cloud?: boolean },
 ) {
+  const why = standing.billing
+    ? { billingHold: standing.reason ?? "" }
+    : standing.reason
+      ? { text: notificationSnippet(standing.reason) }
+      : {};
   await notify(deps, {
     orgId,
     userIds: await adminsOf(deps, orgId),
     kind: "org_standing",
     groupKey: `org_standing:${orgId}:${standing.changedAt?.getTime() ?? 0}`,
     source: {},
-    latest: {
-      statusTo: standing.state,
-      ...(standing.reason ? { text: notificationSnippet(standing.reason) } : {}),
-      ...(standing.cloud ? { cloud: true } : {}),
-    },
+    latest: { statusTo: standing.state, ...why, ...(standing.cloud ? { cloud: true } : {}) },
   });
 }
 

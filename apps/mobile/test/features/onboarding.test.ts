@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
 import { type AiStatus, ApiError } from "@agenteschat/client";
+import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { isInviteToken } from "../../src/features/auth/links";
 import {
   askLineOf,
@@ -82,8 +83,8 @@ test("a resume opens the workspace where the server has it, with the team made t
     ids: { theo: "t", ada: "a" },
     handles: { theo: "theo", ada: "ada" },
     chosen: new Set(["ada", "theo"]),
-    // The web's computer step: the phone has none, so its agents.
-    reached: 3,
+    // The web's computer step (after its agents): the phone has none, so its agents.
+    reached: 4,
     step: "agents",
   });
   // No team yet: the picks stay as they are.
@@ -266,6 +267,18 @@ test("invitations: each is sent once, and the ones that failed are what is left 
   expect(sent).toEqual(["ana@acme.com", "bia@acme", "caio@acme.com"]);
   expect(failed).toEqual(["bia@acme"]);
   expect(await inviteEach(["ana@acme.com"], async () => undefined)).toEqual([]);
+});
+
+test("a second workspace refused while one isn't active: the facts, with no plan or way to pay (store rules)", async () => {
+  const refused = new ApiError(403, "org.create_unpaid", "You already have a workspace waiting for a plan", {
+    orgId: "o1",
+  });
+  for (const lng of ["pt-BR", "en"] as const) {
+    const t = await translator(lng);
+    const said = knownErrorText(t, refused, lng);
+    expect(said).toBe(t("standing.createInactive"));
+    expect(said).not.toMatch(/plan|pag|pay|escolh|choose/i);
+  }
 });
 
 test("a step that failed says why the server refused it, else that it didn't save", async () => {

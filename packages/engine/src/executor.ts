@@ -119,6 +119,7 @@ import {
 import {
   type AgentRun,
   addRunStep,
+  COMPUTER_BUSY,
   isTerminal,
   NO_AI,
   type RunStatus,
@@ -192,6 +193,8 @@ export interface EngineDeps {
   machines?: { status(machineId: string): Promise<MachineStatus | null> };
   /** How long a run whose computer dropped mid-turn waits quietly for it (default `COMPUTER_DROP_GRACE_MS`). */
   computerDropGraceMs?: number;
+  /** How long a run waits for room on a busy computer before it fails (default `COMPUTER_BUSY_WAIT_MS`). */
+  computerBusyWaitMs?: number;
   /**
    * Tools on demand (ADR 0043): each run lists the core tools and the groups the
    * judge (`context.judge`) expects it to need; the rest go behind
@@ -264,6 +267,8 @@ export interface Transcript {
   fallback?: { from: BrainKind; code: string; message: string };
   /** The computer brain is unavailable and nothing can stand in: the run waits for the computer. */
   waitingForBrain?: { kind: BrainKind; machineId: string; code: string; waitId?: string };
+  /** When the computer first had no room for this run's turn (ms), until a turn starts or it waits on something else. */
+  roomWaitSince?: number;
   /** The "unavailable" note already posted in this run (its code): not repeated while it waits. */
   brainNotice?: string;
   /**
@@ -335,6 +340,13 @@ export class BrainFailure extends Error {
 export const COMPUTER_DROP_GRACE_MS = 2 * 60_000;
 /** A run resumes on its computer after this many drops at most; then it ends like any failed turn. */
 export const MAX_COMPUTER_DROPS = 3;
+/** How often a run whose computer had no room for its turn asks again (the runner admits turns by room). */
+export const COMPUTER_BUSY_RETRY_MS = 15_000;
+/**
+ * How long it keeps asking. A turn usually ends within minutes, so a computer with no room for this long is
+ * stuck or too small for its agents: the run fails with `computer_busy` and the person can ask again.
+ */
+export const COMPUTER_BUSY_WAIT_MS = 30 * 60_000;
 
 /** What a computer brain is asked again after its computer dropped mid-turn. */
 export function interruptedTurnPrompt(
@@ -440,17 +452,22 @@ async function executeRunInner(
   signal: AbortSignal,
 ) {
   const { db } = deps;
-  // A job for one wait for the computer (back, grace, plan reset): only while the run still waits on it.
+  // A job for one wait for the computer (back, grace, plan reset, room): only while the run still waits on it.
   // Another job may have resumed it already; running it again would run the run twice.
+  let askingForRoom = false;
   if (options.wait) {
     const [row] = await db
       .select({
         status: agentRuns.status,
         waitId: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`,
+        code: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'code'`,
       })
       .from(agentRuns)
       .where(eq(agentRuns.id, runId));
     if (row?.status !== "waiting_input" || row.waitId !== options.wait) return;
+    // Asking a busy computer again: nothing says it works until a turn starts (its first words do), or the
+    // conversation would flash "thinking" every few seconds while it waits.
+    askingForRoom = row.code === "busy";
   }
   // Claim first (the common case is a queued run): one statement.
   let run: AgentRun;
@@ -538,14 +555,16 @@ async function executeRunInner(
   const where = { channelId: run.channelId, threadId: replyThreadId, agentId: run.agentId, runId: run.id };
   // Background work (a routine's run) says so: the apps keep it out of the conversation's "working" row.
   const bg = run.background ? { background: true as const } : {};
-  await publishChannelEvent(deps.pubsub, { type: "agent.thinking", ...where, ...bg });
-  await publishChannelEvent(deps.pubsub, {
-    type: "message.claimed",
-    channelId: run.channelId,
-    messageId: run.triggerMessageId,
-    agentId: run.agentId,
-    runId: run.id,
-  });
+  if (!askingForRoom) {
+    await publishChannelEvent(deps.pubsub, { type: "agent.thinking", ...where, ...bg });
+    await publishChannelEvent(deps.pubsub, {
+      type: "message.claimed",
+      channelId: run.channelId,
+      messageId: run.triggerMessageId,
+      agentId: run.agentId,
+      runId: run.id,
+    });
+  }
   /** Who thinks for this run (set before the first turn). */
   let brainPlan: BrainPlan | null = null;
   /** Tells the channel the run stopped: idle, finished, and the receipt for the trigger message. */
@@ -711,7 +730,7 @@ async function executeRunInner(
     const ai = await agentAiState({ db, gateway: deps.gateway, machines: deps.machines }, agent, run);
     if (ai.state === "no_ai") return failNoAi(ai.reason ?? "no_key");
   }
-  await publishChannelEvent(deps.pubsub, event("running"));
+  if (!askingForRoom) await publishChannelEvent(deps.pubsub, event("running"));
   // Tools on demand (ADR 0043): a new run lists the core tools and the groups the judge expects it to need.
   let toolChoice: ToolGroupChoice | null = null;
   const judge = deps.context?.judge;
@@ -1338,7 +1357,8 @@ async function executeRunInner(
 
   /**
    * The computer brain can't answer: the model brain stands in with a quiet note, or the run waits for the
-   * computer, or (nothing to think with) it fails with `no_ai`.
+   * computer, or (nothing to think with) it fails with `no_ai`. A computer with no room for the turn (`busy`)
+   * is asked again every `COMPUTER_BUSY_RETRY_MS`, until `COMPUTER_BUSY_WAIT_MS` after its first refusal.
    */
   const brainUnavailable = async (u: {
     code: string;
@@ -1380,6 +1400,16 @@ async function executeRunInner(
     }
     const machineId = plan.session?.machineId ?? agent.machineId ?? null;
     if (!machineId || !UNAVAILABLE_CODES.has(u.code)) return "no";
+    const busy = u.code === "busy";
+    // Still no room since an earlier refusal: the same wait goes on (no new step, the same deadline).
+    const stillBusy = busy && t.roomWaitSince !== undefined;
+    if (busy) {
+      t.roomWaitSince ??= Date.now();
+      if (Date.now() - t.roomWaitSince >= (deps.computerBusyWaitMs ?? COMPUTER_BUSY_WAIT_MS)) {
+        await fail(COMPUTER_BUSY);
+        return "failed";
+      }
+    } else delete t.roomWaitSince;
     // Nothing can stand in (no model credential, or background work): the run waits for the computer.
     await deferred;
     const name = from === "codex" ? "Codex" : "Claude Code";
@@ -1395,7 +1425,9 @@ async function executeRunInner(
           const m = await post(
             tx,
             replyThreadId,
-            `${u.message} I'll answer when it's back.`,
+            busy
+              ? "My computer is busy with other tasks right now. I'll answer as soon as it's free."
+              : `${u.message} I'll answer when it's back.`,
             {
               ...bodyCode("brain_unavailable", { brain: name }),
               // `machineId` and `agentId`: the app shows the note as a live "waiting" card tied to the computer's outage.
@@ -1420,14 +1452,29 @@ async function executeRunInner(
     if (!quiet) t.brainNoticeIn = { channelId: run.channelId, threadId: replyThreadId };
     // `waitId`: one wait (its "computer is back" job is queued once per wait, `resumeRunsWaitingForMachine`).
     t.waitingForBrain = { kind: from, machineId, code: u.code, waitId: Bun.randomUUIDv7() };
-    await addRunStep(db, run, "error", { reason: "brain_unavailable", code: u.code, message: u.message });
+    if (!stillBusy)
+      await addRunStep(db, run, "error", { reason: "brain_unavailable", code: u.code, message: u.message });
+    // Online and full, it sends no "back" signal: ask again soon. Queued before the wait is stored, so a crash
+    // in between leaves at worst a job that finds another wait and does nothing.
+    if (busy) {
+      await enqueue(db, {
+        orgId: run.orgId,
+        kind: "agent_run.execute",
+        payload: { runId: run.id, wait: t.waitingForBrain.waitId },
+        dedupeKey: `agent_run.execute:${run.id}:room:${t.waitingForBrain.waitId}`,
+        runAt: new Date(Date.now() + COMPUTER_BUSY_RETRY_MS),
+        maxAttempts: 4,
+      });
+    }
     const moved = await transitionRun(db, run.id, "running", "waiting_input", {
       transcript: storedTranscript(t),
       waitingMachineId: machineId,
     });
     if (!moved) throw new PermanentJobError("run changed state while executing");
     // A routine's run waits for its own computer, never the API (ADR 0053 §6.4): its people hear it once.
-    if (run.background) await routineRunWaitingForComputer({ db, pubsub: deps.pubsub }, run, machineId).catch(() => {});
+    // Waiting for room is no outage: it ends within `COMPUTER_BUSY_WAIT_MS`, and the routine's ledger tells.
+    if (run.background && !busy)
+      await routineRunWaitingForComputer({ db, pubsub: deps.pubsub }, run, machineId).catch(() => {});
     if (note) {
       const [view] = await withWikiLinks(db, run.orgId, [messageView(note)]);
       if (view) await publishMessageCreated(deps.pubsub, view);
@@ -1800,8 +1847,9 @@ async function executeRunInner(
           // The account it ran with (ADR 0041): when it was last used, after the turn.
           const account = turnPlan.account;
           if (account && computerTurns === 1) later(() => touchMachineAccount(db, run.orgId, account.id));
-          // A turn cut off by its computer is finished now.
+          // A turn cut off by its computer is finished now, and one that found room ends that wait.
           delete transcript.interruptedTurn;
+          delete transcript.roomWaitSince;
           // Later turns of this run continue the same session.
           if (plan.session) plan = { ...plan, session: { ...plan.session, resume: true } };
         }
@@ -1812,6 +1860,8 @@ async function executeRunInner(
         if (await isCanceled()) return stopCanceled(deltas.text());
         // Keep the sequence moving: a retried turn must not reuse numbers the app already saw (it drops them).
         transcript.deltaSeq = deltas.seq();
+        // Anything but "no room" means the computer took the turn: that wait for room is over.
+        if (!(error instanceof BrainFailure && error.code === "busy")) delete transcript.roomWaitSince;
         if (turnAbort?.signal.aborted) {
           await interruptedTurn(turn, deltas.text());
           continue;

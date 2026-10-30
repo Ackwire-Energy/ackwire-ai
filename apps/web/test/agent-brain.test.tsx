@@ -62,7 +62,7 @@ describe("Como trabalha under the name", () => {
     await open();
     expect(sentence().textContent).toContain("ComputadorNenhum computador");
     expect(sentence().textContent).toContain("Pensa com");
-    expect(sentence().textContent).toContain("o modelo da organização");
+    expect(sentence().textContent).toContain("o modelo do workspace");
     expect(sentence().textContent).toContain("Navegadornão navega em sites");
     expect(sentence().textContent?.indexOf("Computador")).toBeLessThan(
       sentence().textContent?.indexOf("Pensa com") ?? 0,
@@ -83,7 +83,7 @@ describe("Como trabalha under the name", () => {
     const member = seedState();
     if (member.me?.organizations[0]) member.me.organizations[0].role = "member";
     await open(member);
-    expect(sentence().textContent).toContain("o modelo da organização");
+    expect(sentence().textContent).toContain("o modelo do workspace");
     expect(screen().queryByRole("button", { name: "Mudar quem pensa" })).toBeNull();
     cleanup();
     const owner = seedState();
@@ -101,7 +101,7 @@ describe("Quem pensa (its dialog)", () => {
     const d = await brainDialog();
     const rows = within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getAllByRole("radio");
     expect(rows.map((r) => r.querySelector(".ac-optrow__title")?.textContent)).toEqual([
-      "Modelo da organização",
+      "Modelo do workspace",
       "Claude Code",
       "CodexEm teste",
     ]);
@@ -135,7 +135,7 @@ describe("Quem pensa (its dialog)", () => {
     // One line, its label and its ⓘ: what it does, the same on or off, describes the switch.
     const fallback = hintOf("Se o MacBook parar de responder, responder pela API", d);
     expect(fallback.text).toBe(
-      "Usa o modelo da organização e conta no orçamento da Ada. Se não, a Ada avisa quem chamou e espera o computador voltar.",
+      "Usa o modelo do workspace e conta no orçamento da Ada. Se não, a Ada avisa quem chamou e espera o computador voltar.",
     );
     expect(offSwitch(d).getAttribute("aria-describedby")).toBe(fallback.button.getAttribute("aria-describedby"));
     await click(offSwitch(d));

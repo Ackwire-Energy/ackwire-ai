@@ -70,14 +70,14 @@ export const mobilePtBR = {
     },
   },
   org: {
-    noneTitle: "Você ainda não está em uma organização",
-    noneSubtitle: "Peça um convite a alguém do seu time, ou crie a organização pelo site.",
+    noneTitle: "Você ainda não está em um workspace",
+    noneSubtitle: "Peça um convite a alguém do seu time, ou crie o workspace pelo site.",
     openSite: "Abrir o site",
     signOut: "Sair",
   },
   account: {
     deleteSoleOwner:
-      "Você é a única pessoa dona de uma organização com outros membros. No site, em Pessoas, torne outra pessoa dona e depois volte aqui.",
+      "Você é a única pessoa dona de um workspace com outros membros. No site, em Pessoas, torne outra pessoa dona e depois volte aqui.",
     deleteFailed: "Não deu para apagar sua conta agora. Tente de novo.",
     deleted: "Sua conta foi apagada.",
     signedOut: "Você saiu.",

@@ -1,5 +1,6 @@
-import type { AiStatus, Machine, Role } from "@agenteschat/client";
+import type { AiStatus, ApiClient, Machine, Role } from "@agenteschat/client";
 import {
+  ApiError,
   keys,
   meQuery,
   newClientId,
@@ -11,6 +12,7 @@ import {
   useMachines,
   useSaveJevKey,
 } from "@agenteschat/client";
+import { billingHoldOf } from "@agenteschat/client/lib/billing";
 import {
   computerEdition,
   computerName,
@@ -23,6 +25,7 @@ import {
 } from "@agenteschat/client/lib/computer";
 import { errorCode, errorText, holdText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
+import { isFeminineName } from "@agenteschat/client/lib/grammar";
 import { settingUp } from "@agenteschat/client/lib/guards";
 import { sendsEmail } from "@agenteschat/client/lib/join-requests";
 import {
@@ -108,13 +111,15 @@ import {
   WhoThinks,
 } from "@/components/ai/ConnectAiSteps";
 import { JEV_KEY_MIN, JevSteps, JevWhy } from "@/components/ai/Jev";
+import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { ImportFlow, ImportReport, useImportFlow } from "@/components/ImportFlow";
+import { MembersFull } from "@/components/Limits";
 import { ErrorState } from "@/components/Loading";
 import { ConnectComputer, osOf, PAIR_POLL_MS } from "@/components/Machines";
 import { COMPACT_QUERY, useMediaQuery } from "@/components/NavDrawer";
 import { OrgProvider } from "@/components/org-context";
 import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
-import { BootSplash, OnboardingHorizon, OnboardingProgress, WelcomeSky } from "@/components/Sky";
+import { BootSplash, OnboardingHorizon, OnboardingOfferSky, OnboardingProgress, WelcomeSky } from "@/components/Sky";
 import { StepRail } from "@/components/StepRail";
 import { OpenPrefsButton, useAgentsHere, useOrgName } from "@/components/ThisMac";
 import { ComputerTitle, SetupWait, useSetupWait, type WaitReader } from "@/components/WorkspaceComputer";
@@ -149,11 +154,14 @@ const HOST: Record<OnboardingStepId, Preset> = {
   workspace: "ada",
   context: "lia",
   import: "theo",
-  computer: "atlas",
   agents: "ada",
+  computer: "atlas",
+  ai: "ada",
   team: "theo",
   done: "ada",
 };
+/** Where the onboarding resumes on the way back from paying for the workspace's plan. */
+const AI_STEP = ONBOARDING_STEPS.findIndex((s) => s.id === "ai");
 /** How long the guide keeps writing after a keystroke, and smiling after a step. */
 const TYPING_MS = 900;
 const HAPPY_MS = 1600;
@@ -185,6 +193,71 @@ interface CrewMember {
 interface ImportedCrew extends CrewMember {
   model: string | null;
 }
+/** A workspace's onboarding as the server has it, made up to its computer: where the way back from paying lands. */
+export interface ResumedOnboarding {
+  created: { orgId: string; generalChannelId: string };
+  org: string;
+  zone: string;
+  context: string;
+  agentIds: Partial<Record<Preset, string>>;
+  handles: Partial<Record<Preset, string>>;
+  importedCrew: ImportedCrew[];
+  platform: boolean;
+}
+
+/**
+ * Back from the billing service (ADR 0079): the workspace, its context and its team. The agents the import made, and
+ * their models, are the ones this tab kept (`createTeam`); the ready-made agents are known by the handles the
+ * onboarding gives them, and any other agent came with the import (in another tab, with its model no longer known).
+ */
+export async function resumeOnboarding(api: ApiClient, orgId: string): Promise<ResumedOnboarding> {
+  const [channels, settings, agents, platform] = await Promise.all([
+    api.chat.channels(orgId),
+    api.orgs.settings(orgId),
+    api.agents.list(orgId),
+    api.agents.platformKeyAvailable(orgId).catch(() => false),
+  ]);
+  const general = channels.find((c) => c.name === "general") ?? channels[0];
+  if (!general) throw new Error("onboarding: the workspace has no channel");
+  let imported = new Map<string, string | null>();
+  try {
+    imported = new Map(JSON.parse(sessionStore.get(`${STORAGE_KEYS.onboardingImports}.${orgId}`) ?? "[]"));
+  } catch {
+    // Nothing readable kept: the handles say who's who.
+  }
+  const agentIds: Partial<Record<Preset, string>> = {};
+  const handles: Partial<Record<Preset, string>> = {};
+  const importedCrew: ImportedCrew[] = [];
+  for (const a of agents) {
+    const preset = imported.has(a.id) ? undefined : PRESETS.find((p) => p === a.handle);
+    if (preset) {
+      agentIds[preset] = a.id;
+      handles[preset] = a.handle;
+    } else {
+      const look = normalizeAppearance(a.appearance);
+      importedCrew.push({
+        key: a.id,
+        id: a.id,
+        handle: a.handle,
+        name: a.name,
+        role: a.role,
+        appearance: look,
+        model: imported.get(a.id) ?? null,
+      });
+    }
+  }
+  return {
+    created: { orgId, generalChannelId: general.id },
+    org: settings.name,
+    zone: settings.timezone,
+    context: settings.context,
+    agentIds,
+    handles,
+    importedCrew,
+    platform,
+  };
+}
+
 /** Done's computer at the end of the faces: its portrait and what it says to someone pointing at it or reading. */
 interface ComputerPlate {
   kind: ComputerKind;
@@ -233,9 +306,10 @@ function useGuideMood() {
  * The onboarding: the steps on a rail (the pixel sky
  * on top fills as they get done); each step is one calm screen hosted by an
  * agent of the team, who asks in a speech bubble (introducing itself the first
- * time); one big action under the answer, "Pular esta etapa" on optional steps.
+ * time); one big action under the answer, "Pular esta etapa" on optional steps. `resumed`: a workspace made already,
+ * back from its plan, opened at the AI step; `paid`: back from paying for it.
  */
-export function OnboardingPage() {
+export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnboarding | null; paid?: boolean }) {
   const { t, i18n } = useTranslation();
   const api = useApi();
   const auth = useAuth();
@@ -244,34 +318,41 @@ export function OnboardingPage() {
   const toast = useToast();
   const guide = useGuideMood();
 
-  const [index, setIndex] = useState(0);
-  const [reached, setReached] = useState(0);
-  const [done, setDone] = useState<Set<OnboardingStepId>>(new Set());
+  const at = resumed ? AI_STEP : 0;
+  const [index, setIndex] = useState(at);
+  const [reached, setReached] = useState(at);
+  const [done, setDone] = useState<Set<OnboardingStepId>>(
+    () => new Set(ONBOARDING_STEPS.slice(0, at).map((s) => s.id)),
+  );
   // The step where each host agent first showed up (it introduces itself there only).
-  const [metAt, setMetAt] = useState<Partial<Record<Preset, OnboardingStepId>>>({});
+  const [metAt, setMetAt] = useState(() => {
+    const met: Partial<Record<Preset, OnboardingStepId>> = {};
+    for (const s of ONBOARDING_STEPS.slice(0, at)) met[HOST[s.id]] ??= s.id;
+    return met;
+  });
   // Workspace
-  const [org, setOrg] = useState("");
-  const [zone, setZone] = useState(() => browserTimezone() ?? "UTC");
+  const [org, setOrg] = useState(resumed?.org ?? "");
+  const [zone, setZone] = useState(() => resumed?.zone ?? browserTimezone() ?? "UTC");
   const [zoneOpen, setZoneOpen] = useState(false);
   const [logo, setLogo] = useState<{ imageBase64: string; contentType: string } | null>(null);
   const [logoDirty, setLogoDirty] = useState(false);
   const [logoOpen, setLogoOpen] = useState(false);
-  const [created, setCreated] = useState<{ orgId: string; generalChannelId: string } | null>(null);
+  const [created, setCreated] = useState(resumed?.created ?? null);
   // Context
-  const [context, setContext] = useState("");
-  const [savedContext, setSavedContext] = useState("");
+  const [context, setContext] = useState(resumed?.context ?? "");
+  const [savedContext, setSavedContext] = useState(resumed?.context ?? "");
   const contextBox = useRef<HTMLTextAreaElement>(null);
   // An Obsidian vault for the wiki: read in step 2, imported when it continues.
   const vault = useVaultReader([]);
   // Import: read and planned in its step, applied when the team is kept (a key saved later gives back their models).
   const flow = useImportFlow(created?.orgId ?? null);
-  const [importedCrew, setImportedCrew] = useState<ImportedCrew[]>([]);
-  // Agents and AI: first who joins (created when that screen is left), then what they think with, then (the server's
-  // owner, once an AI is connected) Jev's key.
-  const [chosen, setChosen] = useState<Set<Preset>>(new Set(PRESETS));
-  const [agentsPhase, setAgentsPhase] = useState<"pick" | "ai" | "jev">("pick");
-  const [agentIds, setAgentIds] = useState<Partial<Record<Preset, string>>>({});
-  const [handles, setHandles] = useState<Partial<Record<Preset, string>>>({});
+  const [importedCrew, setImportedCrew] = useState<ImportedCrew[]>(resumed?.importedCrew ?? []);
+  // Agents: who joins, created when that step is left. AI: what they think with, then (the server's owner, once an
+  // AI is connected) Jev's key, on a screen of its own (`jev`).
+  const [chosen, setChosen] = useState(() => new Set(resumed ? (Object.keys(resumed.agentIds) as Preset[]) : PRESETS));
+  const [jev, setJev] = useState(false);
+  const [agentIds, setAgentIds] = useState<Partial<Record<Preset, string>>>(resumed?.agentIds ?? {});
+  const [handles, setHandles] = useState<Partial<Record<Preset, string>>>(resumed?.handles ?? {});
   // The option picked (none: the default), whom a plan is for (an agent, or all of them), and the plans given so
   // far (by agent).
   const [aiPicked, setAiPicked] = useState<AiChoice | null>(null);
@@ -284,16 +365,19 @@ export function OnboardingPage() {
   // The workspace key: a provider's key, or the platform key where the server offers one.
   const [draft, setDraft] = useState<KeyDraft>({ provider: "anthropic", apiKey: "" });
   const [keySaved, setKeySaved] = useState(false);
-  const [platform, setPlatform] = useState(false);
+  const [platform, setPlatform] = useState(resumed?.platform ?? false);
   // The monthly budget of every agent (US$, API usage only); null = the workspace default as it is.
   const [budget, setBudget] = useState<string | null>(null);
   // Jev's key as typed, and the text already answered for: refused, or saved for an account with no credit yet.
   const [jevDraft, setJevDraft] = useState("");
   const [jevDone, setJevDone] = useState<{ text: string; saved: boolean } | null>(null);
   const [jevError, setJevError] = useState<string | null>(null);
-  // Computer (before the agents): where they work, and where a plan signs in.
+  // Computer (after the agents, before the AI): where they work, and where a plan signs in.
   const [computer, setComputer] = useState<Computer>(null);
   const [machine, setMachine] = useState<Machine | null>(null);
+  // The computer the team was last sent to: leaving the step again with the same choice moves nobody. Undefined: some
+  // are on none, made after the rest went to one.
+  const placedOn = useRef<string | null | undefined>(null);
   // Team
   const [invites, setInvites] = useState<InviteDraft[]>([]);
   const [sent, setSent] = useState<Set<string>>(new Set());
@@ -357,24 +441,12 @@ export function OnboardingPage() {
     setMetAt((m) => (m[host] ? m : { ...m, [host]: step.id }));
   }, [host, step.id]);
 
-  // Each step opens centered, then stays where it opened: what changes in it (the computer's progress, a toggle)
-  // grows or shrinks it downward instead of moving the question and Back under the pointer. The room above the step
-  // is the auto margin of the column's empty first row (onboarding.css), pinned here at the size it opened with.
-  const column = useRef<HTMLDivElement>(null);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: placed again for each step and each of its screens
-  useLayoutEffect(() => {
-    const el = column.current;
-    if (!el) return;
-    const place = () => {
-      el.style.removeProperty("--onb-lead");
-      el.style.setProperty("--onb-lead", getComputedStyle(el, "::before").marginTop);
-    };
-    place();
-    window.addEventListener("resize", place);
-    return () => window.removeEventListener("resize", place);
-  }, [step.id, agentsPhase]);
-
   const saveWorkspace = useMutation({
+    // Owning a workspace that waits for its first plan is said in place, with the way to that plan.
+    meta: { silent: true },
+    onError: (e) => {
+      if (errorCode(e) !== "org.create_unpaid") toast.show(errorText(t, e), "error");
+    },
     mutationFn: async () => {
       let target = created;
       if (!target) {
@@ -469,7 +541,7 @@ export function OnboardingPage() {
   const settings = useQuery({
     queryKey: ["onboarding", "settings", created?.orgId],
     queryFn: () => api.orgs.settings(created?.orgId ?? ""),
-    enabled: Boolean(created) && step.id === "agents",
+    enabled: Boolean(created) && step.id === "ai",
     staleTime: Number.POSITIVE_INFINITY,
   });
   const budgetValue = budget ?? (settings.data?.defaultAgentBudgetUsd?.toString() || "");
@@ -477,8 +549,8 @@ export function OnboardingPage() {
 
   /**
    * "Fica com esse time?": the chosen presets (each on Automático, in #general) and the import, then, on a computer
-   * connected a step before, every one of them works there. Created before the AI, so leaving the AI step for later
-   * (or for good) leaves a whole team.
+   * connected already (back here from a later step), every one of them works there. Created before the computer and
+   * the AI, so leaving either for later (or for good) leaves a whole team.
    */
   const createTeam = useMutation({
     mutationFn: async () => {
@@ -521,9 +593,20 @@ export function OnboardingPage() {
       // Imported: one apply after the presets (a handle a preset took gets the next free one). A new workspace has
       // no key yet, so they start on Automático; saving one later gives back the models it runs.
       const crewSoFar = await applyImported([]);
-      if ((computer !== "machine" && computer !== "host") || !machine) return;
+      // The way back from paying reads the team from the server, which can't tell an imported agent with a ready-made
+      // one's handle from that one, and no longer knows the models they came with: this tab keeps both.
+      if (crewSoFar.length)
+        sessionStore.set(
+          `${STORAGE_KEYS.onboardingImports}.${created.orgId}`,
+          JSON.stringify(crewSoFar.map((c) => [c.id, c.model])),
+        );
       const all = [...PRESETS.flatMap((p) => (ids[p] ? [ids[p]] : [])), ...crewSoFar.map((c) => c.id)];
-      for (const agentId of all) await api.sandbox.setTarget(created.orgId, agentId, machine.id);
+      if ((computer === "machine" || computer === "host") && machine) {
+        for (const agentId of all) await api.sandbox.setTarget(created.orgId, agentId, machine.id);
+        placedOn.current = machine.id;
+      } else if (all.length > crew.length && placedOn.current !== null) {
+        placedOn.current = undefined;
+      }
     },
   });
 
@@ -574,17 +657,20 @@ export function OnboardingPage() {
   // no socket is open here), and a hold put on the workspace meanwhile, which ends the countdown. While it is
   // on its way every step follows it (the rail, the AI step); the confirmation line follows `me` on focus.
   const computerPoll = step.id === "computer" ? COMPUTER_POLL_MS : false;
+  // Back from paying, the billing service lifts the payment hold on its next pass, seconds later: until then the
+  // computer waits on it, and every step asks about both again, so the plan shows active without a reload.
+  const awaiting = (view: SetupView | null) => resumed != null && view?.phase === "paused";
   const setup = useComputerSetup(created?.orgId ?? "", Boolean(created), (data) => {
     const view = setupView(data);
     if (view?.phase === "preparing" && view.secondsLeft === null && (view.waited ?? 0) < 60) return FIRST_TIME_POLL_MS;
-    return computerPoll || (setupPending(view) ? COMPUTER_POLL_MS : false);
+    return computerPoll || (setupPending(view) || awaiting(view) ? COMPUTER_POLL_MS : false);
   });
   const workspaceComputer = setupView(setup.data, setup.dataUpdatedAt);
   // The rail says where that computer is, except at phone width (a bar of step numbers there).
   const phone = useMediaQuery(COMPACT_QUERY);
   const railSaysComputer = workspaceComputer !== null && !phone;
-  const aiOpen = step.id === "agents" && agentsPhase === "ai";
-  const jevOpen = step.id === "agents" && agentsPhase === "jev";
+  const aiOpen = step.id === "ai" && !jev;
+  const jevOpen = step.id === "ai" && jev;
   // Only the server's owner, on a self-hosted server, gets a view (null everywhere else); `source` null: no key yet.
   const jevKey = useJevKey();
   const saveJev = useSaveJevKey();
@@ -592,7 +678,9 @@ export function OnboardingPage() {
   // A refused key never blocks the setup: once answered for, the same text moves on.
   const jevSaves = jevTyped !== "" && jevTyped !== jevDone?.text;
   // The AI step's plan panel waits for that computer too, and says a hold instead once one is put on.
-  const mePoll = computerPoll || (aiOpen && setupPending(workspaceComputer) ? COMPUTER_POLL_MS : false);
+  const mePoll =
+    computerPoll ||
+    ((aiOpen && setupPending(workspaceComputer)) || awaiting(workspaceComputer) ? COMPUTER_POLL_MS : false);
   const me = useQuery({ ...meQuery(api), refetchInterval: mePoll, refetchOnWindowFocus: "always" });
   const authConfig = useAuthConfig().data;
   // On agentes.chat Cloud, while sign-up is by invitation, only accounts early access allowed make workspaces (ADR 0078).
@@ -601,7 +689,21 @@ export function OnboardingPage() {
   const edition = computerEdition(setup.data, authConfig?.workspaceComputer);
   // A server that sends no email invites by link only.
   const emails = sendsEmail(authConfig);
-  const hold = holdText(t, me.data?.organizations.find((o) => o.id === created?.orgId)?.standing);
+  const standing = me.data?.organizations.find((o) => o.id === created?.orgId)?.standing;
+  const hold = holdText(t, standing);
+  // A new workspace waiting for its first plan (ADR 0079): its computer and its invitations come with the plan.
+  const unpaid = billingHoldOf(standing) === "payment";
+  // Back at the AI step, the plan says active once its hold is gone. Back from paying, the billing service lifts it
+  // seconds later: until then the same line says the payment arrived.
+  const paidLine = !aiOpen || !resumed || !me.data ? null : !unpaid ? "paid" : paid ? "confirming" : null;
+  // Its computer step offers that plan, as the step's one action.
+  const computerOffer = step.id === "computer" && workspaceComputer !== null && unpaid;
+  // Creating another refused while one waits for its plan: the way to that one's plan.
+  const refused = saveWorkspace.error;
+  const unpaidElsewhere =
+    refused instanceof ApiError && refused.code === "org.create_unpaid" && typeof refused.params?.orgId === "string"
+      ? refused.params.orgId
+      : null;
   // Someone who already has a workspace can give up on a new one: back to the one they were in (or any other).
   const others = (me.data?.organizations ?? []).filter((o) => o.id !== created?.orgId);
   const leaveTo = others.find((o) => o.id === storage.get(STORAGE_KEYS.lastOrg)) ?? others[0];
@@ -630,7 +732,7 @@ export function OnboardingPage() {
   const setOf = (c: AiChoice) =>
     c === "key" ? [] : allAgents({ choice: c, agents: crewAgents, aiOf, machineOf: () => null });
   // The step's host asks which AI they use: the plan is for it first, as its face, the "For" select and the foot say.
-  const aimed = { agents: crewAgents, hasAi, picked: aiTarget, host: agentIds[HOST.agents] };
+  const aimed = { agents: crewAgents, hasAi, picked: aiTarget, host: agentIds[HOST.ai] };
   // With no set, the agent whose computer the panel reads, "All agents" too.
   const gates = usePlanGates(
     created?.orgId ?? "",
@@ -671,11 +773,13 @@ export function OnboardingPage() {
   const saveComputer = useMutation({
     mutationFn: async (skipped: boolean) => {
       if (!created) return;
-      // The agents come next and go to the connected computer when they are created; ones made already (back here
-      // from the AI step) follow the new choice now, off the computer they were on when there's none.
+      // The agents, made a step before, follow the choice: onto the connected computer, or off the one they were on
+      // when there's none.
       if (edition !== "selfhost") return;
       const target = !skipped && (computer === "machine" || computer === "host") && machine ? machine.id : null;
+      if (target === placedOn.current) return;
       for (const c of crewAgents) await api.sandbox.setTarget(created.orgId, c.id, target);
+      placedOn.current = target;
     },
   });
 
@@ -689,6 +793,8 @@ export function OnboardingPage() {
           next.add(invite.email);
         } catch (err) {
           toast.show(`${invite.email}: ${errorText(t, err)}`, "error");
+          // A full workspace refuses the rest the same way.
+          if (errorCode(err) === "org.members_full") break;
         }
       }
       setSent(next);
@@ -793,14 +899,16 @@ export function OnboardingPage() {
     mutationFn: (reachedStep: OnboardingStepId) => api.orgs.saveOnboarding(created?.orgId ?? "", { step: reachedStep }),
   });
 
-  const go = (i: number) => {
+  // Every screen opens at the page's top, Jev's too (`onJev`): a screen switched without `go` keeps the last one's
+  // scroll.
+  const go = (i: number, onJev = false) => {
     const next = Math.max(0, Math.min(total - 1, i));
     // Done asks again whether the agents have an AI: one connected on a way back there counts.
     if (created && ONBOARDING_STEPS[next]?.id === "done")
       void qc.invalidateQueries({ queryKey: keys.aiStatus(created.orgId), refetchType: "none" });
     setIndex(next);
     setReached((r) => Math.max(r, next));
-    setAgentsPhase("pick");
+    setJev(onJev);
     if (typeof window !== "undefined" && typeof window.scrollTo === "function") {
       try {
         window.scrollTo({ top: 0 });
@@ -829,21 +937,16 @@ export function OnboardingPage() {
         // The vault goes in the background: the next steps don't wait for the attachments.
         if (vault.report && (importWiki.isIdle || importWiki.isError)) importWiki.mutate();
       }
-      if (step.id === "agents") {
-        // The team first, then what it thinks with, on its own screen.
-        if (agentsPhase === "pick") {
-          await createTeam.mutateAsync();
-          setAgentsPhase("ai");
-          return;
-        }
-        if (agentsPhase === "ai" && how !== "keyLater") {
+      if (step.id === "agents") await createTeam.mutateAsync();
+      if (step.id === "ai") {
+        if (!jev && how !== "keyLater") {
           await finishAi.mutateAsync();
           if (jevKey.data?.source === null) {
-            setAgentsPhase("jev");
+            go(index, true);
             return;
           }
         }
-        if (agentsPhase === "jev" && jevSaves) {
+        if (jev && jevSaves) {
           const saved = await saveJev.mutateAsync(jevTyped).catch((error: unknown) => {
             // Only TypeSafe's refusal answers for this text: after a limit or an outage, the same key can be tried again.
             if (errorCode(error) === "jev_key_invalid") setJevDone({ text: jevTyped, saved: false });
@@ -977,7 +1080,7 @@ export function OnboardingPage() {
     setDone(new Set(ONBOARDING_STEPS.slice(0, r.at).map((s) => s.id)));
     setReached(r.at);
     setIndex(r.at);
-    setAgentsPhase("pick");
+    setJev(false);
   }, [resume.data, busy, reached]);
 
   // Finished in another tab or on another device: the workspace opens.
@@ -997,7 +1100,9 @@ export function OnboardingPage() {
         (choice === "key" && !budgetOk))) ||
     (jevOpen && jevSaves && jevTyped.length < JEV_KEY_MIN) ||
     (step.id === "import" && !flow.planned) ||
-    (step.id === "computer" && !workspaceComputer && (computer === null || (computer === "machine" && !machine)));
+    (step.id === "computer" && !workspaceComputer && (computer === null || (computer === "machine" && !machine))) ||
+    // Its one action is the plan; "Agora não" goes on, never Enter.
+    computerOffer;
 
   // What the rail shows under each done step. The agents an import brought, once made (all a resumed page knows of
   // it), else the ones picked.
@@ -1024,19 +1129,18 @@ export function OnboardingPage() {
           t("newAgent.and"),
         )
       : undefined,
+    ai: aiDone ? undefined : t("onboarding.railValue.later"),
     team: sent.size ? t("onboarding.railValue.invites", { count: sent.size }) : t("onboarding.railValue.later"),
   };
 
-  // The question: the step's, the AI's on the agents' second screen, or Jev's on the third.
+  // The team the computer step's host names beside itself ("Theo, Ada and I are here").
+  const hostsTeam = crew.filter((c) => c.key !== HOST.computer).map((c) => c.name);
+  // The question: the step's, the AI's, or Jev's on the AI step's second screen.
   const ask: { title: string; tag?: string; lead: ReactNode } | null =
     step.id === "done"
       ? null
-      : aiOpen
-        ? {
-            title: t("onboarding.keyStep.title"),
-            lead: t(noComputer ? "onboarding.keyStep.leadNoComputer" : "onboarding.keyStep.lead"),
-          }
-        : jevOpen
+      : step.id === "ai"
+        ? jev
           ? {
               title: t("onboarding.jev.title"),
               tag: t("onboarding.optionalTag"),
@@ -1046,6 +1150,17 @@ export function OnboardingPage() {
                   <InfoHint name={t("common.about", { label: t("jev.title") })}>{t("jev.withoutHint")}</InfoHint>
                 </span>
               ),
+            }
+          : {
+              title: t("onboarding.keyStep.title"),
+              lead: t(noComputer ? "onboarding.keyStep.leadNoComputer" : "onboarding.keyStep.lead"),
+            }
+        : computerOffer
+          ? {
+              title: hostsTeam.length
+                ? t("onboarding.computer.payment.title", { names: joinNames(hostsTeam, ", ") })
+                : t("onboarding.computer.payment.titleAlone"),
+              lead: t("onboarding.computer.payment.lead"),
             }
           : {
               title:
@@ -1072,23 +1187,19 @@ export function OnboardingPage() {
         : mentioned
           ? t("onboarding.done.first.send", { name: mentioned.name })
           : t("onboarding.done.first.sendGeneral")
-      : step.id === "agents" && agentsPhase === "pick" && joiningLeft > 0
+      : step.id === "agents" && joiningLeft > 0
         ? t("onboarding.actions.create", { count: joiningLeft })
         : (aiOpen && keyPending) || (jevOpen && jevSaves)
           ? t("onboarding.actions.saveAndContinue")
           : step.id === "team" && toSend.length > 0
             ? t("onboarding.actions.invite", { count: toSend.length })
             : t("onboarding.actions.continue");
-  // "Pular esta etapa" only on optional steps ("agents" never is, so its AI phase needs no exception); the
-  // computer is one only where it is a choice, shown once its setup has answered. On Done the same place opens
-  // #general without the first message, while there is one.
+  // "Pular esta etapa" only on optional steps (the AI's way on is "Conectar depois"); the computer is one only where
+  // it is a choice, shown once its setup has answered. On Done the same place opens #general without the first
+  // message, while there is one.
   const showSkip =
     step.id === "computer" ? !workspaceComputer && !setup.isLoading : step.id === "done" ? asking : step.optional;
-  const back = () => {
-    if (aiOpen) setAgentsPhase("pick");
-    else if (jevOpen) setAgentsPhase("ai");
-    else go(index - 1);
-  };
+  const back = () => go(jevOpen ? index : index - 1);
   // The logo the workspace already has, until one is picked or removed here.
   const savedLogo = logoDirty ? null : mine?.logo;
 
@@ -1130,7 +1241,10 @@ export function OnboardingPage() {
             // A computer is a choice only where people connect their own: the workspace's own says how far it is.
             optional: s.id === "computer" ? edition === "selfhost" : s.optional,
             value: railValue[s.id],
-            ...(s.id === "computer" && workspaceComputer ? { note: t(workspaceComputer.chipKey) } : {}),
+            // Waiting for its plan, it waits for the person: said as that, not as a state of ours ("Pausado").
+            ...(s.id === "computer" && workspaceComputer
+              ? { note: unpaid ? t("onboarding.computer.payment.rail") : t(workspaceComputer.chipKey) }
+              : {}),
           }))}
         />
         {/* Until it's finished this is the only screen: the way out of the account is here. */}
@@ -1163,8 +1277,8 @@ export function OnboardingPage() {
           void advance().catch(() => {});
         }}
       >
-        <div className="onb__body" key={`${step.id}-${agentsPhase}`} ref={column}>
-          {index > 0 || aiOpen ? (
+        <div className="onb__body" key={`${step.id}-${jev}`}>
+          {index > 0 ? (
             <button type="button" className="onb__back" onClick={back} disabled={busy}>
               <Icon name="chevronLeft" size={16} />
               {t("onboarding.back")}
@@ -1180,6 +1294,13 @@ export function OnboardingPage() {
               {t("onboarding.leave", { name: leaveTo.name })}
             </button>
           ) : null}
+
+          {paidLine && (
+            <p className="onb__paid ac-iconline" role="status" data-state={paidLine}>
+              {paidLine === "paid" ? <Icon name="check" size={16} /> : <Spinner size={16} />}
+              <span>{t(`onboarding.keyStep.${paidLine}`)}</span>
+            </p>
+          )}
 
           {ask && (
             <HostAsk
@@ -1270,6 +1391,21 @@ export function OnboardingPage() {
                 onSaved={() => setLogoOpen(false)}
                 onRemoved={() => setLogoOpen(false)}
               />
+              {unpaidElsewhere && (
+                <>
+                  <p className="onb__status ac-iconline" role="alert">
+                    <Icon name="pause" size={14} />
+                    <span>{t("standing.createUnpaid")}</span>
+                  </p>
+                  {authConfig?.billingUrl && (
+                    <div className="row">
+                      <BillingLinkButton orgId={unpaidElsewhere} from="new_workspace" icon="external">
+                        {t("standing.billing.cta.payment")}
+                      </BillingLinkButton>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
 
@@ -1318,14 +1454,41 @@ export function OnboardingPage() {
             </div>
           )}
 
-          {step.id === "computer" && created && workspaceComputer && (
+          {computerOffer && created && (
             <div className="onb__answer">
-              <WorkspaceComputerStep
-                view={workspaceComputer}
+              <ComputerOffer
+                orgId={created.orgId}
                 orgName={orgName}
-                reader={{ owner: true, email, held: hold !== null }}
-                hold={hold}
+                context={savedContext.trim() !== ""}
+                agents={crew}
+                billing={Boolean(authConfig?.billingUrl)}
               />
+              <Button
+                variant="ghost"
+                className="onb__later"
+                onClick={() => void advance().catch(() => {})}
+                disabled={busy}
+              >
+                {t("onboarding.computer.payment.later")}
+              </Button>
+            </div>
+          )}
+
+          {step.id === "computer" && created && workspaceComputer && !unpaid && (
+            <div className="onb__answer">
+              {orgSummary && me.data ? (
+                // Its progress names the workspace's agents.
+                <OrgProvider org={orgSummary} me={me.data}>
+                  <WorkspaceComputerStep
+                    view={workspaceComputer}
+                    orgName={orgName}
+                    reader={{ owner: true, email, held: hold !== null }}
+                    hold={hold}
+                  />
+                </OrgProvider>
+              ) : (
+                <Spinner />
+              )}
             </div>
           )}
 
@@ -1355,7 +1518,7 @@ export function OnboardingPage() {
             </div>
           )}
 
-          {step.id === "agents" && agentsPhase === "pick" && (
+          {step.id === "agents" && (
             <div className="onb__answer">
               {importAgents.length > 0 && (
                 // biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset
@@ -1489,15 +1652,26 @@ export function OnboardingPage() {
 
           {step.id === "team" && created && (
             <div className="onb__answer">
-              <TeamStep
-                orgId={created.orgId}
-                viewerId={me.data?.user.id ?? ""}
-                emails={emails}
-                invites={invites}
-                sent={sent}
-                onChange={setInvites}
-                agents={crew}
-              />
+              {unpaid ? (
+                <p className="onb__help">{t("onboarding.team.payment")}</p>
+              ) : (
+                <>
+                  {orgSummary && me.data && (
+                    <OrgProvider org={orgSummary} me={me.data}>
+                      <MembersFull />
+                    </OrgProvider>
+                  )}
+                  <TeamStep
+                    orgId={created.orgId}
+                    viewerId={me.data?.user.id ?? ""}
+                    emails={emails}
+                    invites={invites}
+                    sent={sent}
+                    onChange={setInvites}
+                    agents={crew}
+                  />
+                </>
+              )}
             </div>
           )}
 
@@ -1570,28 +1744,30 @@ export function OnboardingPage() {
             </p>
           )}
 
-          <div className="onb__actions">
-            <Button
-              variant="primary"
-              size="lg"
-              kbd={["↵"]}
-              onClick={() => void advance().catch(() => {})}
-              disabled={blocked || busy}
-              loading={busy}
-            >
-              {primaryLabel}
-            </Button>
-            {showSkip && (
-              <Button variant="ghost" onClick={skip} disabled={busy}>
-                {step.id === "done" ? t("onboarding.done.first.skip") : t("onboarding.skip")}
+          {!computerOffer && (
+            <div className="onb__actions">
+              <Button
+                variant="primary"
+                size="lg"
+                kbd={["↵"]}
+                onClick={() => void advance().catch(() => {})}
+                disabled={blocked || busy}
+                loading={busy}
+              >
+                {primaryLabel}
               </Button>
-            )}
-            {aiOpen && !aiDone && (
-              <Button variant="ghost" onClick={() => void advance("keyLater").catch(() => {})} disabled={busy}>
-                {t("connectAi.later")}
-              </Button>
-            )}
-          </div>
+              {showSkip && (
+                <Button variant="ghost" onClick={skip} disabled={busy}>
+                  {step.id === "done" ? t("onboarding.done.first.skip") : t("onboarding.skip")}
+                </Button>
+              )}
+              {aiOpen && !aiDone && (
+                <Button variant="ghost" onClick={() => void advance("keyLater").catch(() => {})} disabled={busy}>
+                  {t("connectAi.later")}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </main>
     </div>
@@ -1899,6 +2075,96 @@ function ComputerStep({
         </Card>
       )}
     </>
+  );
+}
+
+/**
+ * The computer step of a new workspace waiting for its first plan (ADR 0079): its computer waiting with the team
+ * around it, only what is done so far, then the banner holding the step's one action, the plan that brings the
+ * computer (`billing`: the server has a billing service).
+ */
+function ComputerOffer({
+  orgId,
+  orgName,
+  context,
+  agents,
+  billing,
+}: {
+  orgId: string;
+  orgName: string;
+  /** The person wrote about the company in the Context step. */
+  context: boolean;
+  agents: CrewMember[];
+  billing: boolean;
+}) {
+  const { t } = useTranslation();
+  // At most three on each side of the computer: the checklist names all of them.
+  const scene = agents.slice(0, 6);
+  const half = Math.ceil(scene.length / 2);
+  const figure = (a: CrewMember) => (
+    <AgentAvatar
+      key={a.key}
+      name={a.name}
+      initials={a.initials}
+      appearance={a.appearance}
+      size="lg"
+      framed={false}
+      state="waiting"
+    />
+  );
+  const row = (what: string, note: ReactNode) => (
+    <li className="onb__done-row">
+      <Icon name="check" />
+      <span className="onb__done-what">{what}</span>
+      <span className="onb__done-note">{note}</span>
+    </li>
+  );
+  return (
+    <Card as="div" className="onb__offer">
+      <div className="onb__scene" aria-hidden="true">
+        <span className="onb__scene-side">{scene.slice(0, half).map(figure)}</span>
+        <ComputerPortrait kind={WORKSPACE_COMPUTER_KIND} state="paused" size={144} />
+        <span className="onb__scene-side">{scene.slice(half).map(figure)}</span>
+      </div>
+      <ul className="onb__done-list">
+        {row(t("onboarding.computer.payment.workspace"), orgName)}
+        {context && row(t("onboarding.computer.payment.context"), t("onboarding.computer.payment.contextNote"))}
+        {agents.length > 0 &&
+          row(
+            // pt-BR agrees with their names' gender: "Ada criada", "Ada e Lia criadas", "Theo e Ada criados".
+            t(
+              agents.every((a) => isFeminineName(a.name))
+                ? "onboarding.computer.payment.agentsF"
+                : "onboarding.computer.payment.agentsM",
+              {
+                count: agents.length,
+                names: joinNames(
+                  agents.map((a) => a.name),
+                  t("newAgent.and"),
+                ),
+              },
+            ),
+            <span className="onb__done-faces">
+              {agents.map((a) => (
+                <AgentAvatar key={a.key} name={a.name} initials={a.initials} appearance={a.appearance} size="sm" />
+              ))}
+            </span>,
+          )}
+      </ul>
+      <div className="onb__offer-banner">
+        <OnboardingOfferSky />
+        <span className="onb__offer-text">
+          <b>{t("onboarding.computer.payment.offer")}</b>
+          <span>{t("onboarding.computer.payment.offerNote")}</span>
+        </span>
+        {billing && (
+          <BillingLinkButton orgId={orgId} from="onboarding" variant="primary" size="lg">
+            {t("onboarding.computer.payment.get")}
+            <Icon name="arrowRight" />
+          </BillingLinkButton>
+        )}
+      </div>
+    </Card>
   );
 }
 

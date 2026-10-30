@@ -30,12 +30,10 @@ describe("a restriction's line on agentes.chat Cloud, by its kind, never its sto
     expect(restrictionLine(t, "org.suspended", cloud)).toBe("standing.suspended");
   });
 
-  test("an ended plan's hold is a billing matter: its reason, nothing to contest", () => {
-    expect(restrictionLine(t, "org.paused", { reason: "ended", ...cloud })).toBe('standing.onHold {"reason":"ended"}');
-    expect(restrictionLine(t, "run.org_paused", { reason: "ended", cloud: "true" })).toBe(
-      'standing.onHold {"reason":"ended"}',
-    );
-    expect(holdText(t, { state: "hold", reason: "ended", cloud: true })).toBe('standing.onHold {"reason":"ended"}');
+  test("an ended plan's hold is a billing matter: its own words, nothing to contest", () => {
+    expect(restrictionLine(t, "org.paused", { reason: "ended", ...cloud })).toBe("standing.billing.ended");
+    expect(restrictionLine(t, "run.org_paused", { reason: "ended", cloud: "true" })).toBe("standing.billing.ended");
+    expect(holdText(t, { state: "hold", reason: "ended", cloud: true })).toBe("standing.billing.ended");
   });
 
   test("a held agent: a network rule's or the team's", () => {

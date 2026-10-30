@@ -5,6 +5,7 @@ import { recordAudit } from "./audit";
 import { markdownToDocx } from "./docx";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
+import { assertStorageRoom } from "./limits";
 import { can, requireActiveMembership } from "./organizations";
 import { markdownToPdf } from "./pdf";
 import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./search";
@@ -435,6 +436,8 @@ interface Stored {
 async function writeBlob(deps: ArtifactDeps, orgId: string, artifactId: string, version: number, stored: Stored) {
   const location = await deps.blobs.forOrg(orgId);
   const { body, contentType } = stored;
+  // The workspace's own bucket counts against no limit of ours.
+  if (location.storageConfigId === null) await assertStorageRoom(deps.db, orgId, body.byteLength);
   // A per-write suffix so two saves racing on the same version number never share a key: without it the
   // loser's put overwrites the winner's committed bytes, leaving the row's size and sha not matching disk.
   const key = `${location.prefix}artifacts/${artifactId}/v${version}-${Bun.randomUUIDv7()}`;
@@ -1131,6 +1134,13 @@ export async function restoreArtifact(deps: ArtifactDeps, userId: string, orgId:
   if (!(await canDeleteArtifact(deps.db, userId, orgId, a))) {
     throw new ForbiddenError("Only who could delete it can restore it", "artifact.restore_forbidden");
   }
+  // Out of the trash, what it keeps on this server's storage counts against the limit again.
+  const [kept] = await deps.db
+    .select({ bytes: sql<string>`coalesce(sum(${artifactVersions.size}), 0)` })
+    .from(artifactVersions)
+    .where(and(eq(artifactVersions.artifactId, a.id), isNull(artifactVersions.storageConfigId)));
+  const bytes = Number(kept?.bytes ?? 0);
+  if (bytes > 0) await assertStorageRoom(deps.db, orgId, bytes, { daily: false });
   const [row] = await deps.db.transaction(async (tx) => {
     const updated = await tx.update(artifacts).set({ deletedAt: null }).where(eq(artifacts.id, a.id)).returning();
     await enqueueIndex(tx, { orgId, kind: "file", sourceId: a.id });

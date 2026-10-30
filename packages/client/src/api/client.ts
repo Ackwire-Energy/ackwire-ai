@@ -39,6 +39,7 @@ import type {
   AuditQuery,
   AuthConfig,
   BatchInviteResult,
+  BillingFrom,
   BrainKind,
   BrainMachine,
   BrowserHandoff,
@@ -202,6 +203,7 @@ import type {
   WikiUpdateInput,
   WikiVersion,
   WorkingRun,
+  WorkspaceLimits,
 } from "./types";
 
 /**
@@ -280,6 +282,14 @@ export interface ApiClient {
     /** The workspace logo (admins): a square image (JSON only: base64), already cropped. */
     setLogo(orgId: string, input: { imageBase64: string; contentType: string }): Promise<{ logo: string }>;
     removeLogo(orgId: string): Promise<void>;
+    /**
+     * A signed link that opens the workspace's plan and billing on the billing service (owners and admins; ADR
+     * 0079). Navigate to it at once and keep it nowhere else: it lasts 5 minutes and opens once. `billing.off` 404
+     * on a server without billing.
+     */
+    billingLink(orgId: string, from: BillingFrom): Promise<{ url: string; expiresAt: string }>;
+    /** People, files and today's uploads against the workspace's limits (any member; ADR 0079). */
+    limits(orgId: string): Promise<WorkspaceLimits>;
     members(orgId: string): Promise<Member[]>;
     changeRole(orgId: string, userId: string, role: Role): Promise<void>;
     removeMember(orgId: string, userId: string): Promise<void>;

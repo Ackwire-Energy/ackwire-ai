@@ -13,6 +13,7 @@ import type {
   NotificationKind,
   NotificationPage,
 } from "../api/types";
+import { billingHoldOf } from "./billing";
 
 export const NOTIFICATION_FILTERS: NotificationFilter[] = ["all", "mentions", "waiting", "unread", "reactions"];
 
@@ -179,6 +180,8 @@ export function workspaceHeadline(n: Pick<AppNotification, "kind" | "latest">) {
   if (n.kind === "computer_ready") return "computerSetup.notification.ready" as const;
   if (n.kind !== "org_standing") return null;
   const to = n.latest.statusTo;
+  const billing = billingHoldOf({ state: "hold", reason: n.latest.billingHold ?? null });
+  if (to === "hold" && billing) return `standing.notification.billing.${billing}` as const;
   return to === "suspended"
     ? ("standing.notification.suspended" as const)
     : to === "active"
