@@ -100,14 +100,12 @@ export function AgentsScreen() {
 
 /**
  * Livres by group: the agents in no group under "Livres" ("Sem grupo" once there are groups), then each group, which
- * collapses (remembered on this phone). Mounted once the groups are in, so what was collapsed is read against them.
+ * collapses (remembered on this phone, for every workspace). Mounted once the groups are in, so Livres doesn't show
+ * whole and then split.
  */
 function FreeSections({ free, groups, before }: { free: TeamLine[]; groups: AgentGroup[]; before: number }) {
   const { t } = useTranslation();
-  const { collapsed, toggle } = useCollapsedSections<string>(
-    STORED.agentGroupsCollapsed,
-    groups.map((g) => g.id),
-  );
+  const { collapsed, toggle } = useCollapsedSections<string>(STORED.agentGroupsCollapsed, null);
   let shown = before;
   return (
     <>

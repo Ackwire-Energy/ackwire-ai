@@ -7193,6 +7193,10 @@ export const ptBR = {
       targetSame: "Os agentes já estão nesse computador.",
       targetPaused: "Esse computador está pausado. Escolha outro.",
     },
+    agentGroup: {
+      notFound: "Este grupo não existe mais.",
+      tooMany: "Este workspace já tem {{max}} grupos. Exclua um antes.",
+    },
   },
   machines: {
     online: "Online",

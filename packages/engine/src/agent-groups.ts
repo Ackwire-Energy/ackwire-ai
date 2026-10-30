@@ -20,6 +20,8 @@ export interface AgentGroupDeps {
 
 const MAX_GROUPS = 50;
 
+const groupNotFound = () => new NotFoundError("Group not found", "agent_group.not_found");
+
 const cleanName = (name: string) => {
   const n = name.trim().slice(0, 80);
   if (!n) throw new ValidationError("name is required");
@@ -54,11 +56,13 @@ export async function agentGroupViews(db: Executor, orgId: string): Promise<Agen
   }));
 }
 
-/** Every open app of the workspace gets the groups as they are now (an org broadcast, like the board's columns). */
+/**
+ * Tells every open app of the workspace to read the groups again (an org broadcast), and gives them as they are now.
+ * The event carries no list: it grows with the agents, and Postgres NOTIFY refuses payloads near 8000 bytes.
+ */
 async function announce(deps: AgentGroupDeps, orgId: string) {
-  const groups = await agentGroupViews(deps.db, orgId);
-  await publishOrgEvent(deps.pubsub, { type: "org.broadcast", orgId, event: { type: "agent.groups", groups } });
-  return groups;
+  await publishOrgEvent(deps.pubsub, { type: "org.broadcast", orgId, event: { type: "agent.groups" } });
+  return agentGroupViews(deps.db, orgId);
 }
 
 async function requireAgents(db: Executor, orgId: string, ids: string[]) {
@@ -100,7 +104,11 @@ export async function createAgentGroup(
   const ids = [...new Set(input.agentIds ?? [])];
   await deps.db.transaction(async (tx) => {
     const groups = await groupRows(tx, orgId);
-    if (groups.length >= MAX_GROUPS) throw new ValidationError(`A workspace holds at most ${MAX_GROUPS} groups`);
+    if (groups.length >= MAX_GROUPS) {
+      throw new ValidationError(`A workspace holds at most ${MAX_GROUPS} groups`, "agent_group.too_many", {
+        max: MAX_GROUPS,
+      });
+    }
     if (ids.length) await requireAgents(tx, orgId, ids);
     const [group] = await tx
       .insert(agentGroups)
@@ -122,7 +130,7 @@ export async function updateAgentGroup(
   await requirePermission(deps.db, userId, orgId, "manage_agents");
   const groups = await groupRows(deps.db, orgId);
   const group = groups.find((g) => g.id === groupId);
-  if (!group) throw new NotFoundError("Group not found");
+  if (!group) throw groupNotFound();
   const name = patch.name === undefined ? undefined : cleanName(patch.name);
   const index = patch.index;
   await deps.db.transaction(async (tx) => {
@@ -152,7 +160,7 @@ export async function deleteAgentGroup(
     .delete(agentGroups)
     .where(and(eq(agentGroups.id, groupId), eq(agentGroups.orgId, orgId)))
     .returning({ id: agentGroups.id });
-  if (gone.length === 0) throw new NotFoundError("Group not found");
+  if (gone.length === 0) throw groupNotFound();
   return announce(deps, orgId);
 }
 
@@ -176,7 +184,7 @@ export async function moveAgentToGroup(
       .select({ id: agentGroups.id })
       .from(agentGroups)
       .where(and(eq(agentGroups.id, groupId), eq(agentGroups.orgId, orgId)));
-    if (!group) throw new NotFoundError("Group not found");
+    if (!group) throw groupNotFound();
     const others = await tx
       .select({ id: agents.id })
       .from(agents)

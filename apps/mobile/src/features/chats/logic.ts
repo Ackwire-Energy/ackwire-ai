@@ -276,27 +276,32 @@ export const threadRows = (rows: ConversationRow[]) => rowsOfKind(rows, "threads
  */
 export const unreadThreadCount = (rows: ConversationRow[]) => threadRows(rows).filter((r) => r.unread > 0).length;
 
-/** The sections the person collapsed, as remembered (anything unreadable: none), out of `keys`. */
+/**
+ * The sections the person collapsed, as remembered (anything unreadable: none), out of `keys`. Null `keys` takes any
+ * ids: the groups of agents of every workspace share one list, so one workspace's toggles keep the others'.
+ */
 export function parseCollapsed<K extends string>(
   raw: string | null,
-  keys: readonly K[] = HOME_SECTIONS as unknown as readonly K[],
+  keys: readonly K[] | null = HOME_SECTIONS as unknown as readonly K[],
 ): K[] {
   if (!raw) return [];
   try {
     const v: unknown = JSON.parse(raw);
-    return Array.isArray(v) ? keys.filter((k) => v.includes(k)) : [];
+    if (!Array.isArray(v)) return [];
+    return keys ? keys.filter((k) => v.includes(k)) : v.filter((k): k is K => typeof k === "string");
   } catch {
     return [];
   }
 }
 
-/** Collapses or opens a section (in the sections' order). */
+/** Collapses or opens a section (in the sections' order; with null `keys`, the others stay as they were). */
 export function toggleCollapsed<K extends string>(
   list: readonly K[],
   key: K,
-  keys: readonly K[] = HOME_SECTIONS as unknown as readonly K[],
+  keys: readonly K[] | null = HOME_SECTIONS as unknown as readonly K[],
 ): K[] {
   const on = list.includes(key);
+  if (!keys) return on ? list.filter((k) => k !== key) : [...list, key];
   return keys.filter((k) => (k === key ? !on : list.includes(k)));
 }
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { createMemoryPubSub, orgTopic } from "@agenteschat/adapters";
+import { createMemoryPubSub, createPostgresPubSub, orgTopic } from "@agenteschat/adapters";
 import { type Database, eq, schema } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
 import {
@@ -41,6 +41,9 @@ async function workspace() {
   const admin = await addMember(db, org.id, "admin");
   return { db, pubsub, deps: { db, pubsub }, owner, org, ada, bia, caio, member, admin };
 }
+
+/** A group that isn't there (deleted meanwhile, or another workspace's), with the code the apps translate. */
+const GONE = { name: "NotFoundError", code: "agent_group.not_found" };
 
 const shape = (groups: AgentGroupView[], names: Record<string, string>) =>
   groups.map((g) => [g.name, g.agentIds.map((id) => names[id] ?? id)]);
@@ -114,9 +117,7 @@ describe("agent groups", () => {
     expect(left).toEqual([{ id: groups[1]?.id ?? "", name: "Produto", agentIds: [w.caio.id] }]);
     const rows = await w.db.select().from(schema.agents).where(eq(schema.agents.orgId, w.org.id));
     expect(rows.filter((a) => a.groupId === null).map((a) => a.name)).toEqual(expect.arrayContaining(["Ada", "Bia"]));
-    await expect(deleteAgentGroup(w.deps, w.owner.id, w.org.id, groups[0]?.id ?? "")).rejects.toBeInstanceOf(
-      NotFoundError,
-    );
+    await expect(deleteAgentGroup(w.deps, w.owner.id, w.org.id, groups[0]?.id ?? "")).rejects.toMatchObject(GONE);
   });
 
   test("only owners and admins change them; members read them; nobody outside the workspace does", async () => {
@@ -155,31 +156,51 @@ describe("agent groups", () => {
     expect(await listAgentGroups(w.db, w.owner.id, w.org.id)).toEqual([]);
     await expect(
       moveAgentToGroup(w.deps, w.owner.id, w.org.id, w.ada.id, { groupId: theirGroups[0]?.id ?? "" }),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    ).rejects.toMatchObject(GONE);
     await expect(moveAgentToGroup(w.deps, w.owner.id, w.org.id, theirs.id, { groupId: null })).rejects.toBeInstanceOf(
       NotFoundError,
     );
     await expect(
       updateAgentGroup(w.deps, w.owner.id, w.org.id, theirGroups[0]?.id ?? "", { name: "Nosso" }),
-    ).rejects.toBeInstanceOf(NotFoundError);
+    ).rejects.toMatchObject(GONE);
   });
 
-  test("every change reaches the workspace's open apps: one broadcast with the groups as they are now", async () => {
+  test("every change reaches the workspace's open apps: one broadcast each, for them to read the groups again", async () => {
     const w = await workspace();
-    const heard: { type?: string; groups?: AgentGroupView[] }[] = [];
-    w.pubsub.subscribe(orgTopic(w.org.id), (e) => {
-      const event = (e as { type: string; event?: { type?: string; groups?: AgentGroupView[] } }).event;
-      if ((e as { type: string }).type === "org.broadcast" && event) heard.push(event);
-    });
+    const heard: unknown[] = [];
+    w.pubsub.subscribe(orgTopic(w.org.id), (e) => heard.push(e));
     const created = await createAgentGroup(w.deps, w.owner.id, w.org.id, { name: "Integrations" });
     const id = created[0]?.id ?? "";
-    const moved = await moveAgentToGroup(w.deps, w.owner.id, w.org.id, w.ada.id, { groupId: id });
+    await moveAgentToGroup(w.deps, w.owner.id, w.org.id, w.ada.id, { groupId: id });
     await updateAgentGroup(w.deps, w.owner.id, w.org.id, id, { name: "APIs" });
     await deleteAgentGroup(w.deps, w.owner.id, w.org.id, id);
-    expect(heard.map((e) => e.type)).toEqual(["agent.groups", "agent.groups", "agent.groups", "agent.groups"]);
-    expect(heard[0]?.groups).toEqual(created);
-    expect(heard[1]?.groups).toEqual(moved);
-    expect(heard[2]?.groups?.[0]?.name).toBe("APIs");
-    expect(heard[3]?.groups).toEqual([]);
+    const event = { type: "org.broadcast", orgId: w.org.id, event: { type: "agent.groups" } };
+    expect(heard).toEqual([event, event, event, event]);
+  });
+
+  test("at the limits every change still goes out over Postgres NOTIFY; a group past them is refused with its code", async () => {
+    const w = await workspace();
+    const sent: string[] = [];
+    const pubsub = await createPostgresPubSub({
+      listen: async () => async () => {},
+      notify: async (_channel, payload) => {
+        sent.push(payload);
+      },
+    });
+    const deps = { db: w.db, pubsub };
+    // The longest names in bytes: 80 two-byte letters.
+    for (let i = 0; i < 50; i++) {
+      const agentIds = i === 49 ? [w.ada.id, w.bia.id, w.caio.id] : [];
+      await createAgentGroup(deps, w.owner.id, w.org.id, { name: `${i}`.padEnd(80, "ç"), agentIds });
+    }
+    await pubsub.close?.();
+    expect(sent.map((p) => (JSON.parse(p) as { e: { event: { type: string } } }).e.event.type)).toEqual(
+      Array(50).fill("agent.groups"),
+    );
+    await expect(createAgentGroup(deps, w.owner.id, w.org.id, { name: "Mais um" })).rejects.toMatchObject({
+      name: "ValidationError",
+      code: "agent_group.too_many",
+      params: { max: 50 },
+    });
   });
 });

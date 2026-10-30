@@ -7153,6 +7153,10 @@ export const en: Translations = {
       targetSame: "The agents are already on that computer.",
       targetPaused: "That computer is paused. Choose another one.",
     },
+    agentGroup: {
+      notFound: "This group no longer exists.",
+      tooMany: "This workspace already has {{max}} groups. Delete one first.",
+    },
   },
   machines: {
     online: "Online",

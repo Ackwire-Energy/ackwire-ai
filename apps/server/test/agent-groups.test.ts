@@ -63,7 +63,9 @@ test("agent groups API: owners and admins change them, members read them, agents
 
   const deleted = await api(owner, `/agent-groups/${id}`, { method: "DELETE" });
   expect(((await deleted.json()) as Groups).groups.map((g) => g.name)).toEqual(["Produto e marketing"]);
-  expect((await api(owner, `/agent-groups/${id}`, { method: "DELETE" })).status).toBe(404);
+  const gone = await api(owner, `/agent-groups/${id}`, { method: "DELETE" });
+  expect(gone.status).toBe(404);
+  expect(await gone.json()).toMatchObject({ error: { code: "agent_group.not_found" } });
   expect((await api(owner, "/agent-groups", { json: { name: "  " } })).status).toBe(400);
 });
 
@@ -73,7 +75,7 @@ test("a change reaches every open app of the workspace over its socket", async (
   const socket = new WebSocket(`ws://127.0.0.1:${server.port}/api/ws?orgId=${orgId}`, {
     headers: { origin: ORIGIN, cookie: member.cookie() },
   } as unknown as string[]);
-  const frames: { type?: string; scope?: string; event?: { type?: string; groups?: Groups["groups"] } }[] = [];
+  const frames: { type?: string; scope?: string; event?: { type?: string } }[] = [];
   try {
     await new Promise<void>((resolve, reject) => {
       socket.addEventListener("message", (event) => {
@@ -83,8 +85,7 @@ test("a change reaches every open app of the workspace over its socket", async (
       });
       socket.addEventListener("error", () => reject(new Error("socket did not open")), { once: true });
     });
-    const created = await api(owner, "/agent-groups", { json: { name: "Integrations", agentIds: [dev] } });
-    const { groups } = (await created.json()) as Groups;
+    expect((await api(owner, "/agent-groups", { json: { name: "Integrations", agentIds: [dev] } })).status).toBe(201);
     const heard = async () => {
       for (let i = 0; i < 40; i++) {
         const frame = frames.find((f) => f.scope === "org" && f.event?.type === "agent.groups");
@@ -93,7 +94,8 @@ test("a change reaches every open app of the workspace over its socket", async (
       }
       return null;
     };
-    expect(await heard()).toEqual({ type: "event", scope: "org", event: { type: "agent.groups", groups } });
+    // A bare signal (NOTIFY payloads stay small): each app reads the groups again.
+    expect(await heard()).toEqual({ type: "event", scope: "org", event: { type: "agent.groups" } });
   } finally {
     socket.close();
     await Promise.race([server.stop(true), Bun.sleep(500)]);

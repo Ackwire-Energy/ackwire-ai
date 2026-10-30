@@ -179,19 +179,13 @@ describe("groups of agents in the sidebar (ADR 0080)", () => {
   });
 
   test("a change made elsewhere shows at once (the workspace's realtime)", async () => {
-    const { sockets } = await go(withGroups());
+    const { sockets, state } = await go(withGroups());
     const socket = sockets.last();
     await act(async () => socket.open());
-    await act(async () =>
-      socket.push({
-        type: "event",
-        scope: "org",
-        event: {
-          type: "agent.groups",
-          groups: [{ id: INTEGRATIONS, name: "Integrations", agentIds: [ADA_ID, ATLAS_ID] }],
-        },
-      }),
-    );
+    await settle(3);
+    // Someone else moved Ada into Integrations: the event says the groups changed, the sidebar reads them again.
+    state.agentGroups = [{ id: INTEGRATIONS, name: "Integrations", agentIds: [ADA_ID, ATLAS_ID] }];
+    await act(async () => socket.push({ type: "event", scope: "org", event: { type: "agent.groups" } }));
     await settle(3);
     expect(category("Integrations").agents()).toEqual(["Ada", "Atlas"]);
     expect(category("Agentes").agents()).toEqual([]);

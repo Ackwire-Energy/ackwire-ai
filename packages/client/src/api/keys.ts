@@ -19,7 +19,7 @@ export const keys = {
   limits: (orgId: string) => ["org", orgId, "members", "limits"] as const,
   invitations: (orgId: string) => ["org", orgId, "invitations"] as const,
   agents: (orgId: string) => ["org", orgId, "agents"] as const,
-  /** Set whole by every change and by the `agent.groups` org event. */
+  /** Set whole by every change; read again on the `agent.groups` org event. */
   agentGroups: (orgId: string) => ["org", orgId, "agent-groups"] as const,
   team: (orgId: string) => ["org", orgId, "team"] as const,
   credentials: (orgId: string) => ["org", orgId, "credentials"] as const,

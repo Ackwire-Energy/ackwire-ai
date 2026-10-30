@@ -1,9 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { QueryClient } from "@tanstack/react-query";
+import type { TFunction } from "i18next";
+import { ApiError } from "../src/api/http";
 import { createHttpApi } from "../src/api/http-client";
 import { keys } from "../src/api/keys";
 import type { AgentGroup } from "../src/api/types";
 import { agentSections, groupOf, moveInGroups } from "../src/lib/agent-groups";
+import { knownErrorText } from "../src/lib/errors";
 import { applyWorkspaceEvent } from "../src/realtime/machines";
 
 const groups: AgentGroup[] = [
@@ -64,14 +67,18 @@ describe("agent groups (ADR 0080)", () => {
     ]);
   });
 
-  test("the org event replaces the cached groups", () => {
+  test("the org event reads the groups again", () => {
     const qc = new QueryClient();
     qc.setQueryData(keys.agentGroups("o1"), groups);
-    const next = [{ id: "g2", name: "Produto", agentIds: ["b"] }];
-    expect(applyWorkspaceEvent(qc, "o1", { type: "agent.groups", groups: next } as { type: string })).toBe(true);
-    expect(qc.getQueryData(keys.agentGroups("o1"))).toEqual(next);
-    // A malformed one changes nothing (still one of these events).
     expect(applyWorkspaceEvent(qc, "o1", { type: "agent.groups" })).toBe(true);
-    expect(qc.getQueryData(keys.agentGroups("o1"))).toEqual(next);
+    expect(qc.getQueryState(keys.agentGroups("o1"))?.isInvalidated).toBe(true);
+  });
+
+  test("its refusals in the person's words: too many groups, a group gone meanwhile", () => {
+    const t = ((key: string, o?: { max?: number }) => `${key} ${o?.max}`) as unknown as TFunction;
+    const said = (status: number, code: string, params?: { max: number }) =>
+      knownErrorText(t, new ApiError(status, code, "In English", params));
+    expect(said(400, "agent_group.too_many", { max: 50 })).toBe("errors.agentGroup.tooMany 50");
+    expect(said(404, "agent_group.not_found")).toStartWith("errors.agentGroup.notFound");
   });
 });
