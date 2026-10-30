@@ -757,8 +757,7 @@ export const en: Translations = {
   },
   webPushAsk: {
     title: "Know when an agent needs you",
-    text:
-      "They work while you do something else. Even with the tab closed, we'll tell you when they need your ok, finish what you asked or call you.",
+    text: "They work while you do something else. Even with the tab closed, we'll tell you when they need your ok, finish what you asked or call you.",
     on: "Turn on notifications",
     later: "Not now",
     done: "Notifications on in this browser",

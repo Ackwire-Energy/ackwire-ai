@@ -1,6 +1,6 @@
 import { and, type Database, eq, schema, sql } from "@agenteschat/db";
-import { NotFoundError } from "./errors";
 import type { NotificationKind } from "./notifications";
+import { requirePermission } from "./organizations";
 
 const { organizationMembers, pushDevices } = schema;
 
@@ -86,12 +86,8 @@ export interface NoticePrefsView {
 
 /** The person's choices in this workspace, every category in order, and how many phones they have. */
 export async function noticePrefsView(db: Database, orgId: string, userId: string): Promise<NoticePrefsView> {
-  const [member] = await db
-    .select({ prefs: organizationMembers.noticePrefs })
-    .from(organizationMembers)
-    .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
-  if (!member) throw new NotFoundError("Organization not found");
-  const prefs = noticePrefsOf(member.prefs);
+  await requirePermission(db, userId, orgId, "read");
+  const prefs = await readNoticePrefs(db, orgId, userId);
   const [phones] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(pushDevices)
@@ -110,13 +106,12 @@ export async function setNoticePref(
   category: NoticeCategory,
   on: boolean,
 ): Promise<NoticePrefsView> {
-  const rows = await db
+  await requirePermission(db, userId, orgId, "read");
+  await db
     .update(organizationMembers)
     .set({
       noticePrefs: sql`${organizationMembers.noticePrefs} || jsonb_build_object(${category}::text, ${on}::boolean)`,
     })
-    .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)))
-    .returning({ userId: organizationMembers.userId });
-  if (rows.length === 0) throw new NotFoundError("Organization not found");
+    .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
   return noticePrefsView(db, orgId, userId);
 }

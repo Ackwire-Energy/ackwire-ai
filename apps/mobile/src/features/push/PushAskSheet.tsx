@@ -1,9 +1,9 @@
+import { exampleSenders } from "@agenteschat/client/lib/push-offer";
 import { Image } from "expo-image";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { pushPermission } from "@/lib/push";
-import { exampleSenders } from "@agenteschat/client/lib/push-offer";
 import { usePush } from "@/providers/push";
 import { Button, SheetScreen, Text, useToast } from "@/ui";
 import { useDirectory } from "../shared/hooks";

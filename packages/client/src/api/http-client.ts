@@ -108,7 +108,6 @@ import type {
   MissionSummary,
   Model,
   MoveAgentsResult,
-  NoticeCategory,
   NoticePrefs,
   NotificationCount,
   NotificationPage,

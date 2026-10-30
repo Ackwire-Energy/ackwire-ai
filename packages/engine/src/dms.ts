@@ -6,8 +6,8 @@ import { caches } from "./cache";
 import { sha256 } from "./crypto";
 import { NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
-import { resolveNotifications } from "./notifications";
 import { type PreviewMeta, previewMeta } from "./message-preview";
+import { resolveNotifications } from "./notifications";
 import { getMembership, requirePermission } from "./organizations";
 
 const { channels, channelMembers, channelReads, messages, agents, users } = schema;
