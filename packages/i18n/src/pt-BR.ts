@@ -2638,7 +2638,7 @@ export const ptBR = {
     plans: "Pelo plano, num computador",
     plansHelp: "Claude Code ou Codex com a assinatura de quem conectou o computador. Não usa chave.",
     planOnlyOwner:
-      "No plano, {{article}} {{name}} começa respondendo só a {{owner}}. Dá para liberar para mais gente na página {{of}} {{name}}.",
+      "No plano, {{article}} {{name}} começa atendendo só {{owner}}. Na página {{of}} {{name}}, {{owner}} pode escolher se {{she}} atende outras pessoas.",
     planNotSaved:
       "{{The}} {{name}} já existe, mas não deu para usar o {{brain}} agora. Escolha de novo em Quem pensa, na página {{of}} {{name}}.",
     autoCost: "O custo acompanha cada tarefa",

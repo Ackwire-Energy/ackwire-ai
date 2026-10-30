@@ -77,7 +77,7 @@ const SELFHOST_ONLY = [
 
 /**
  * "Atende outras pessoas", its line and its ⓘ (ADR 0059 §5): beside every plan's sign-in and on every agent's page on
- * a plan, the Cloud's included, so they're checked against both editions' words.
+ * a plan, with New agent's note on a plan, the Cloud's included, so they're checked against both editions' words.
  */
 const PLAN_LINES = ["off", "on", "offAll", "onAll"].map((k) => `aiAccounts.share.line.${k}`);
 const PLAN_TERMS = ["own", "seat", "other"].map((k) => `aiAccounts.share.terms.${k}`);
@@ -90,6 +90,7 @@ const PLAN_REPLIES = [
   ...["own", "seat", "coding"].map((k) => `aiAccounts.share.plan.${k}`),
   "aiAccounts.share.terms.about",
   ...PLAN_TERMS,
+  "newAgent.planOnlyOwner",
 ];
 
 /** Every key a Cloud workspace shows where a computer is named, past the `computerSetup.` and `agentComputer.` ones. */
