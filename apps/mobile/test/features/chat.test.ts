@@ -310,7 +310,7 @@ describe("composer", () => {
 });
 
 describe("markdown", () => {
-  test("inline marks, links as text, mentions", () => {
+  test("inline marks, links, mentions", () => {
     expect(parseInline("Oi @theo, veja **isto** e `npm i` em [docs](https://x)")).toEqual([
       { kind: "text", text: "Oi " },
       { kind: "mention", text: "@theo" },
@@ -318,10 +318,27 @@ describe("markdown", () => {
       { kind: "bold", text: "isto" },
       { kind: "text", text: " e " },
       { kind: "code", text: "npm i" },
-      { kind: "text", text: " em docs" },
+      { kind: "text", text: " em " },
+      { kind: "link", text: "docs", href: "https://x" },
     ]);
     expect(parseInline("e-mail ana@x.com não é menção")).toEqual([
       { kind: "text", text: "e-mail ana@x.com não é menção" },
+    ]);
+  });
+  test("bare addresses are links, without trailing punctuation; only web and e-mail open", () => {
+    expect(parseInline("Aqui: https://github.com/acme/app/pull/76.")).toEqual([
+      { kind: "text", text: "Aqui: " },
+      { kind: "link", text: "https://github.com/acme/app/pull/76", href: "https://github.com/acme/app/pull/76" },
+      { kind: "text", text: "." },
+    ]);
+    expect(parseInline("(veja https://x.com/a_b_c)")).toEqual([
+      { kind: "text", text: "(veja " },
+      { kind: "link", text: "https://x.com/a_b_c", href: "https://x.com/a_b_c" },
+      { kind: "text", text: ")" },
+    ]);
+    expect(parseInline("[x](ftp://h) e ![logo](https://x/l.png) e `https://y`")).toEqual([
+      { kind: "text", text: "x e logo e " },
+      { kind: "code", text: "https://y" },
     ]);
   });
   test("blocks: paragraphs, lists, headings, quotes, code", () => {
