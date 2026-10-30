@@ -39,6 +39,7 @@ import type {
   AgentInput,
   AgentMailbox,
   AgentMailboxInput,
+  AgentProposalCard,
   AiStatus,
   ApiRule,
   AppNotification,
@@ -300,7 +301,32 @@ export function useCreateAgent(orgId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: AgentInput) => api.agents.create(orgId, input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.agents(orgId) }),
+    onSuccess: (_agent, input) => {
+      void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+      // Made from a card: the card says so (its conversation gets the change live too).
+      if (input.proposal) void qc.invalidateQueries({ queryKey: keys.agentProposal(orgId, input.proposal) });
+    },
+  });
+}
+
+/** An agent's proposal of a new agent (ADR 0080), by its card's message; `null` id: none. */
+export function useAgentProposal(orgId: string, messageId: string | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.agentProposal(orgId, messageId ?? ""),
+    queryFn: () => api.agents.proposal(orgId, messageId ?? ""),
+    enabled: Boolean(messageId),
+  });
+}
+
+/** "Recusar" on an agent's proposal: the card shows it at once. */
+export function useDenyAgentProposal(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (messageId: string) => api.agents.denyProposal(orgId, messageId),
+    onSuccess: ({ messageId, channelId, threadId: _t, proposedByAgentId: _a, expired: _e, canDecide: _c, ...card }) =>
+      cacheAgentProposal(qc, orgId, { channelId, messageId }, card),
   });
 }
 
@@ -512,6 +538,22 @@ export function cacheReceipts(
   );
 }
 
+/** A card's meta changed (`patch`, by key): that message in every loaded list of its channel. */
+export function cacheMessageMeta(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  channelId: string,
+  messageId: string,
+  patch: Record<string, unknown>,
+) {
+  qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
+    if (!Array.isArray(data)) return data;
+    const list = data as Message[];
+    if (!list.some((m) => m && m.id === messageId)) return data;
+    return list.map((m) => (m.id === messageId ? { ...m, meta: { ...(m.meta ?? {}), ...patch } } : m));
+  });
+}
+
 /**
  * A forum suggestion card changed (accepted, dismissed, or my own "Agora não"):
  * the message's `meta.forumSuggestion` in every loaded list of that channel.
@@ -523,14 +565,18 @@ export function cacheForumSuggestion(
   messageId: string,
   suggestion: ForumSuggestion,
 ) {
-  qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
-    if (!Array.isArray(data)) return data;
-    const list = data as Message[];
-    if (!list.some((m) => m && m.id === messageId)) return data;
-    return list.map((m) =>
-      m.id === messageId ? { ...m, meta: { ...(m.meta ?? {}), forumSuggestion: suggestion } } : m,
-    );
-  });
+  cacheMessageMeta(qc, orgId, channelId, messageId, { forumSuggestion: suggestion });
+}
+
+/** An agent's proposal of a new agent changed (ADR 0080): its card in the chat and its own query. */
+export function cacheAgentProposal(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  where: { channelId: string; messageId: string },
+  card: AgentProposalCard,
+) {
+  cacheMessageMeta(qc, orgId, where.channelId, where.messageId, { actionCard: card });
+  void qc.invalidateQueries({ queryKey: keys.agentProposal(orgId, where.messageId) });
 }
 
 /** A new message's `clientId`: sent again with the same one (its answer was lost), it's written only once. */

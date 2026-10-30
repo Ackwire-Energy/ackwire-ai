@@ -385,6 +385,56 @@ export interface AgentInput {
   monthlyBudgetUsd?: number | null;
   audience?: AgentAudience;
   appearance?: AgentLookInput;
+  /** Created from an agent's proposal (its card's message id, ADR 0080): the card is marked created. */
+  proposal?: string;
+}
+
+/**
+ * The AI a proposed agent starts with (ADR 0080): an account of the person it was proposed for that thinks for
+ * no agent, else the workspace's model (it has a key), else none (connected after it is created).
+ */
+export type SuggestedAi =
+  | { kind: "account"; brain: "claude_code" | "codex"; machineId: string; accountId: string; label: string }
+  | { kind: "model" }
+  | { kind: "none" };
+
+/** What an agent proposes, as "Criar agente" takes it. */
+export interface AgentDraft {
+  name: string;
+  handle: string;
+  role: string;
+  instructions: string;
+  appearance: Required<AgentLookInput> | null;
+  /** Public channels it joins. */
+  channelIds: string[];
+  /** Its level on the workspace's connections (the connected apps' ids). */
+  access: { connectionId: string; level: "read" | "write" }[];
+  ai: SuggestedAi;
+}
+
+/** An agent's proposal of a new agent (`meta.actionCard` of its card, ADR 0080). A person creates it or says no. */
+export interface AgentProposalCard {
+  kind: "agent_proposal";
+  /** The person behind the run that proposed it. */
+  forUserId: string | null;
+  params: { draft: AgentDraft; why: string };
+  /** `creating`: a person is creating it right now. */
+  state: "pending" | "creating" | "created" | "denied";
+  agentId: string | null;
+  decidedByUserId: string | null;
+  decidedAt: string | null;
+  /** Past it, a pending one is expired. */
+  expiresAt: string;
+}
+
+/** `GET …/agent-proposals/{messageId}`: the card, where it is and what the viewer may do. */
+export interface AgentProposal extends AgentProposalCard {
+  messageId: string;
+  channelId: string;
+  threadId: string | null;
+  proposedByAgentId: string;
+  expired: boolean;
+  canDecide: boolean;
 }
 
 export interface Model {
@@ -661,6 +711,14 @@ export type ChannelEvent =
       threadId: string | null;
       messageId: string;
       suggestion: ForumSuggestion;
+    }
+  /** An agent's proposal of a new agent was decided (ADR 0080): its card (`meta.actionCard`) now. */
+  | {
+      type: "agent.proposal.updated";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+      card: AgentProposalCard;
     }
   // ── Chat latency batch (packages/engine/src/events.ts) ──────────────────────
   /** An agent will answer: show "thinking" at once. `runId` is null when announced at post time. */

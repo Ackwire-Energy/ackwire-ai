@@ -10,10 +10,13 @@ import {
   canTalkTo,
   canViewCost,
   createAgent,
+  createAgentFromProposal,
   createCredential,
   deleteCredential,
+  denyAgentProposal,
   getAgent,
   getAgentBrain,
+  getAgentProposal,
   getTeam,
   listAgents,
   listCredentials,
@@ -113,6 +116,51 @@ const AgentFields = z.object({
 
 const budget = (usd: number | null | undefined) =>
   usd === undefined ? undefined : usd === null ? null : usdToNanoUsd(usd);
+
+const ProposalParams = OrgParams.extend({ messageId: z.uuid() });
+const AgentProposal = z
+  .object({
+    kind: z.literal("agent_proposal"),
+    messageId: z.uuid(),
+    channelId: z.uuid(),
+    threadId: z.uuid().nullable(),
+    proposedByAgentId: z.uuid(),
+    forUserId: z.string().nullable(),
+    params: z.object({
+      draft: z.object({
+        name: z.string(),
+        handle: z.string(),
+        role: z.string(),
+        instructions: z.string(),
+        appearance: AgentAppearance.nullable(),
+        channelIds: z.array(z.uuid()),
+        access: z.array(z.object({ connectionId: z.uuid(), level: z.enum(["read", "write"]) })),
+        ai: z.discriminatedUnion("kind", [
+          z.object({
+            kind: z.literal("account"),
+            brain: z.enum(["claude_code", "codex"]),
+            machineId: z.uuid(),
+            accountId: z.uuid(),
+            label: z.string(),
+          }),
+          z.object({ kind: z.literal("model") }),
+          z.object({ kind: z.literal("none") }),
+        ]),
+      }),
+      why: z.string(),
+    }),
+    state: z.enum(["pending", "creating", "created", "denied"]),
+    agentId: z.uuid().nullable(),
+    decidedByUserId: z.string().nullable(),
+    decidedAt: z.string().nullable(),
+    expiresAt: z.string(),
+    expired: z.boolean(),
+    canDecide: z.boolean(),
+  })
+  .openapi("AgentProposal", {
+    description:
+      "An agent's proposal of a new agent (`meta.actionCard` of its card, ADR 0080): the draft, the AI it suggests and what was decided.",
+  });
 
 /** Provider credentials, agents, usage and the model catalog. */
 export function agentRoutes(deps: AppDeps) {
@@ -372,25 +420,72 @@ export function agentRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Create an agent",
-      request: { params: OrgParams, body: body(AgentFields.extend({ handle: z.string().min(2).max(32) })) },
+      request: {
+        params: OrgParams,
+        body: body(
+          AgentFields.extend({
+            handle: z.string().min(2).max(32),
+            proposal: z.uuid().optional().openapi({
+              description: "The card of an agent's proposal it comes from (ADR 0080): it is marked created.",
+            }),
+          }),
+        ),
+      },
       responses: { 201: json(Agent, "Created"), ...errors },
     }),
     async (c) => {
-      const { monthlyBudgetUsd, audience, appearance, ...input } = c.req.valid("json");
+      const { monthlyBudgetUsd, audience, appearance, proposal, ...input } = c.req.valid("json");
       const orgId = c.req.valid("param").orgId;
-      let agent = await createAgent(
-        db,
-        c.get("user").id,
-        orgId,
-        { ...input, monthlyBudgetNanoUsd: budget(monthlyBudgetUsd) },
-        // New agents start on "Automático".
-        NEW_AGENT_DEFAULTS,
-      );
+      const make = () =>
+        createAgent(
+          db,
+          c.get("user").id,
+          orgId,
+          { ...input, monthlyBudgetNanoUsd: budget(monthlyBudgetUsd) },
+          // New agents start on "Automático".
+          NEW_AGENT_DEFAULTS,
+        );
+      let agent = proposal
+        ? await createAgentFromProposal({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, proposal, make)
+        : await make();
       if (audience) agent = await setAgentAudience(db, c.get("user").id, orgId, agent.id, audience);
       if (appearance) agent = await setAgentAppearance(db, c.get("user").id, orgId, agent.id, appearance);
       // Born on the workspace's own computer: it lists its agents again.
       if (agent.machineId) await publishMachineAgentsChanged(adapters.pubsub, orgId);
       return c.json(toAgent(agent, c.get("user").id, await canViewCost(db, c.get("user").id, orgId)), 201);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/agent-proposals/{messageId}",
+      tags,
+      security,
+      summary: "An agent's proposal of a new agent (its card's message), for whoever reads its conversation",
+      request: { params: ProposalParams },
+      responses: { 200: json(AgentProposal), ...errors },
+    }),
+    async (c) => {
+      const { orgId, messageId } = c.req.valid("param");
+      const gateway = deps.extras?.context?.gateway;
+      return c.json(await getAgentProposal({ db, gateway }, c.get("user").id, orgId, messageId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/agent-proposals/{messageId}/deny",
+      tags,
+      security,
+      summary: "Say no to an agent's proposal of a new agent (who may create agents): the card stays, marked denied",
+      request: { params: ProposalParams },
+      responses: { 200: json(AgentProposal), ...errors },
+    }),
+    async (c) => {
+      const { orgId, messageId } = c.req.valid("param");
+      return c.json(await denyAgentProposal({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, messageId), 200);
     },
   );
 

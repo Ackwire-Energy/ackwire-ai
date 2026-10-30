@@ -3,6 +3,7 @@ export * from "./agent-actions";
 export * from "./agent-audit";
 export * from "./agent-for-you";
 export * from "./agent-import";
+export * from "./agent-proposals";
 export * from "./agent-undo";
 export * from "./agents";
 export * from "./ai-intent";

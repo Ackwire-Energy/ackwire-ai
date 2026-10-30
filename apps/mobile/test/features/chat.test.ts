@@ -400,6 +400,22 @@ describe("an agent's question (ask_user)", () => {
     });
     expect(hidesBody(asked)).toBe(true);
     expect(hidesBody({ ...asked, body: "Antes, uma pergunta." })).toBe(false);
+    // An agent's proposal of a new agent is its card (ADR 0080); a Connect card, with no card here, keeps its text.
+    const draft = { name: "Nina", handle: "nina", role: "", instructions: "x", appearance: null, channelIds: [] };
+    const proposal = {
+      kind: "agent_proposal",
+      forUserId: null,
+      params: { draft: { ...draft, access: [], ai: { kind: "none" } }, why: "x" },
+      state: "pending",
+      expiresAt: at(30),
+    };
+    expect(hidesBody(message({ id: "a1", author: { type: "agent", id: "dev" }, meta: { actionCard: proposal } }))).toBe(
+      true,
+    );
+    const connect = { kind: "connect_ai", forUserId: null, params: { agentIds: [], why: "x" } };
+    expect(hidesBody(message({ id: "a2", author: { type: "agent", id: "dev" }, meta: { actionCard: connect } }))).toBe(
+      false,
+    );
     const rows = buildRows([message({ id: "p", author: { type: "agent", id: "dev" }, createdAt: at(11) }), asked]);
     expect(rows.filter((r) => r.kind === "message").map((r) => r.kind === "message" && r.grouped)).toEqual([
       false,

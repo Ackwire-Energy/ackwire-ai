@@ -3,6 +3,8 @@ import type {
   Agent,
   AgentAudience,
   AgentBrain,
+  AgentProposal,
+  AgentProposalCard,
   AgentQuestion,
   AgentSecret,
   AiStatus,
@@ -1181,6 +1183,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         }),
       create: async (orgId, input) => {
         log("agents.create", orgId, input);
+        if (input.proposal) {
+          const found = proposalCard(input.proposal);
+          if (found.card.state !== "pending") throw new ApiError(409, "agent_proposal.decided", "Already decided");
+        }
         const agent: Agent = {
           id: id("agent"),
           name: input.name,
@@ -1196,7 +1202,14 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           ...(input.appearance ? { appearance: input.appearance } : {}),
         };
         state.agents.push(agent);
+        if (input.proposal) Object.assign(proposalCard(input.proposal).card, { state: "created", agentId: agent.id });
         return agent;
+      },
+      proposal: async (_orgId, messageId) => proposalView(messageId),
+      denyProposal: async (orgId, messageId) => {
+        log("agents.denyProposal", orgId, messageId);
+        Object.assign(proposalCard(messageId).card, { state: "denied", decidedByUserId: state.me?.user.id ?? null });
+        return proposalView(messageId);
       },
       update: async (orgId, agentId, input) => {
         log("agents.update", orgId, agentId, input);
@@ -1924,6 +1937,29 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
     const p = state.proposals.find((x) => x.id === id);
     if (!p) throw new ApiError(404, "not_found", "Proposal not found");
     return p;
+  }
+
+  /** An agent's proposal of a new agent: its card message (`meta.actionCard`), changed in place like the server's. */
+  function proposalCard(messageId: string) {
+    const message = state.messages.find((m) => m.id === messageId);
+    const card = message?.meta?.actionCard as AgentProposalCard | undefined;
+    if (!message || card?.kind !== "agent_proposal") throw new ApiError(404, "not_found", "Proposal not found");
+    return { message, card };
+  }
+
+  function proposalView(messageId: string): AgentProposal {
+    const { message, card } = proposalCard(messageId);
+    const expired = card.state === "pending" && Date.parse(card.expiresAt) <= Date.now();
+    const role = state.me?.organizations[0]?.role;
+    return {
+      ...structuredClone(card),
+      messageId,
+      channelId: message.channelId,
+      threadId: message.threadId,
+      proposedByAgentId: message.author.id ?? "",
+      expired,
+      canDecide: card.state === "pending" && !expired && (role === "owner" || role === "admin"),
+    };
   }
 
   function decide(orgId: string, approvalId: string, status: "approved" | "refused", reason?: string) {

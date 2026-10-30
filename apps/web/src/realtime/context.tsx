@@ -31,6 +31,7 @@ import {
   type BrowserLiveUnavailable,
   type ConnectionStatus,
   type ConsultsState,
+  cacheAgentProposal,
   cacheApproval,
   cacheDmRead,
   cacheForumSuggestion,
@@ -739,6 +740,9 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       // Missions (ADR 0029): the pinned card, the cards in the thread, the lists; a task's row.
       if (event.type === "mission.updated") applyMissionEvent(qc, orgId, event);
       if (event.type === "machine.task") applyTaskEvent(qc, orgId, event.task);
+      // An agent's proposal of a new agent was created or denied (by anyone): its card.
+      if (event.type === "agent.proposal.updated")
+        cacheAgentProposal(qc, orgId, { channelId, messageId: event.messageId }, event.card);
       // An agent's "Vale um fórum?" card was accepted or dismissed (by anyone).
       if (event.type === "forum.suggestion.updated") {
         cacheForumSuggestion(qc, orgId, channelId, event.messageId, event.suggestion);

@@ -466,6 +466,14 @@ export type ChannelEvent =
       threadId: string | null;
       messageId: string;
       suggestion: Record<string, unknown>;
+    }
+  /** An agent's proposal of a new agent was decided (ADR 0080): its card (`meta.actionCard`) now. */
+  | {
+      type: "agent.proposal.updated";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+      card: Record<string, unknown>;
     };
 
 const INLINE_LIMIT = 6000;

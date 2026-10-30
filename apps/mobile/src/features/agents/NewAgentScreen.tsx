@@ -1,4 +1,6 @@
 import {
+  type AgentProposal,
+  useAgentProposal,
   useApi,
   useCatalog,
   useChannels,
@@ -9,6 +11,7 @@ import {
   useSkills,
 } from "@agenteschat/client";
 import { type Level, saveLevels } from "@agenteschat/client/lib/access-levels";
+import { draftLevels, suggestedAiText } from "@agenteschat/client/lib/action-cards";
 import { connectedItems, itemName } from "@agenteschat/client/lib/connected";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
@@ -23,13 +26,14 @@ import {
   type RoleId,
 } from "@agenteschat/client/lib/new-agent";
 import { AUTO } from "@agenteschat/client/lib/providers";
-import { usePreventRemove } from "expo-router";
+import { router, usePreventRemove } from "expo-router";
 import { type ReactNode, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Pressable, ScrollView, type ScrollViewInstance, StyleSheet, TextInput, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AgentAvatar, Button, Card, fieldText, Icon, Row, Text, Toggle, useToast } from "@/ui";
+import { openConnectAi } from "../ai/NoAiCard";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { suggestAgentName } from "../new/logic";
 import { useOpenDm } from "../new/useOpenDm";
@@ -46,9 +50,44 @@ import { firstBlockedStep, NEW_AGENT_PHONE_STEPS, type PhoneStep, stepBlocked } 
  * (name, @ and look), O que faz (the instructions, prefilled by the role) and Revisar (what it can use
  * and the channels it joins, from the role). Model, budget and who it answers start at the workspace's
  * defaults and change on its page. Created, it opens the direct conversation with it. `initialWhat`
- * (an example in the empty Conversas) starts from scratch with that text.
+ * (an example in the empty Conversas) starts from scratch with that text. `proposalId` (an agent's
+ * proposal card, ADR 0080) starts on Revisar, filled in with the draft, while the proposal is open.
  */
-export function NewAgentScreen({ initialWhat = "" }: { initialWhat?: string }) {
+export function NewAgentScreen({
+  initialWhat = "",
+  proposalId = null,
+}: {
+  initialWhat?: string;
+  proposalId?: string | null;
+}) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const orgId = useOrgId();
+  const proposal = useAgentProposal(orgId, proposalId);
+  // The draft as it was when it opened: once created here the proposal is closed, and the form stays on.
+  const opened = useRef<AgentProposal | null>(null);
+  if (proposal.data?.canDecide && opened.current?.messageId !== proposal.data.messageId) opened.current = proposal.data;
+  if (proposalId && !opened.current) {
+    return (
+      <View style={[styles.fill, { backgroundColor: c.bg }]}>
+        <PushedHeader title={t("newAgent.title")} solid={false} />
+        <View style={styles.body}>
+          {proposal.isPending ? null : (
+            <>
+              <Text variant="body" tone="muted">
+                {t("newAgent.proposalClosed")}
+              </Text>
+              <Button variant="secondary" label={t("newAgent.backToChat")} onPress={() => router.back()} />
+            </>
+          )}
+        </View>
+      </View>
+    );
+  }
+  return <NewAgentForm initialWhat={initialWhat} from={opened.current ?? undefined} />;
+}
+
+function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: AgentProposal }) {
   const { t } = useTranslation();
   const c = useColors();
   const toast = useToast();
@@ -69,16 +108,18 @@ export function NewAgentScreen({ initialWhat = "" }: { initialWhat?: string }) {
   const scroll = useRef<ScrollViewInstance>(null);
 
   const suggested = suggestAgentName(dir.agents.map((a) => a.name));
-  const [index, setIndex] = useState(initialWhat ? 1 : 0);
+  const proposed = from?.params.draft;
+  const [index, setIndex] = useState(proposed ? NEW_AGENT_PHONE_STEPS.length - 1 : initialWhat ? 1 : 0);
   const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [role, setRole] = useState<RoleId | null>(initialWhat ? "custom" : null);
-  const [name, setName] = useState(initialWhat ? suggested : "");
-  const [handle, setHandle] = useState(initialWhat ? handleForName(suggested) : "");
-  const [handleTouched, setHandleTouched] = useState(false);
-  const [look, setLook] = useState<FullLook>(fullLook(ROLE_DEFAULTS.custom.look));
-  const [instructions, setInstructions] = useState(initialWhat);
-  const [channelIds, setChannelIds] = useState<Set<string>>(new Set());
+  const [role, setRole] = useState<RoleId | null>(proposed || initialWhat ? "custom" : null);
+  const [roleText, setRoleText] = useState(proposed?.role ?? "");
+  const [name, setName] = useState(proposed?.name ?? (initialWhat ? suggested : ""));
+  const [handle, setHandle] = useState(proposed?.handle ?? (initialWhat ? handleForName(suggested) : ""));
+  const [handleTouched, setHandleTouched] = useState(Boolean(proposed));
+  const [look, setLook] = useState<FullLook>(fullLook(proposed?.appearance ?? ROLE_DEFAULTS.custom.look));
+  const [instructions, setInstructions] = useState(proposed?.instructions ?? initialWhat);
+  const [channelIds, setChannelIds] = useState<Set<string>>(new Set(proposed?.channelIds));
   const created = useRef(false);
 
   const step: PhoneStep = NEW_AGENT_PHONE_STEPS[index] ?? "role";
@@ -87,7 +128,14 @@ export function NewAgentScreen({ initialWhat = "" }: { initialWhat?: string }) {
     () => connectedItems(connections.data ?? [], servers.data ?? [], catalog.data?.connectors ?? []),
     [connections.data, servers.data, catalog.data],
   );
-  const levels = useMemo(() => presetLevels(role ?? "custom", items), [role, items]);
+  // A proposal's levels while its role stays its own; a preset's once one is picked.
+  const levels = useMemo(
+    () =>
+      proposed && role === "custom"
+        ? { ...presetLevels("custom", items), ...draftLevels(proposed) }
+        : presetLevels(role ?? "custom", items),
+    [proposed, role, items],
+  );
   const granted = items.filter((i) => (levels[i.id] ?? "none") !== "none");
   const myChannels = useMemo(() => {
     const dmIds = new Set((dms.data ?? []).map((d) => d.channelId));
@@ -135,6 +183,7 @@ export function NewAgentScreen({ initialWhat = "" }: { initialWhat?: string }) {
     tapHaptic();
     const agentName = id === "custom" ? "" : t(`newAgent.roles.${id}.agent`);
     setRole(id);
+    setRoleText("");
     setName(agentName);
     setHandle(handleForName(agentName));
     setHandleTouched(false);
@@ -161,7 +210,7 @@ export function NewAgentScreen({ initialWhat = "" }: { initialWhat?: string }) {
       const agent = await create.mutateAsync({
         name: name.trim(),
         handle,
-        role: role && role !== "custom" ? t(`newAgent.roles.${role}.name`) : "",
+        role: role && role !== "custom" ? t(`newAgent.roles.${role}.name`) : roleText.trim(),
         instructions,
         model: AUTO,
         ownerUserId: meId ?? null,
@@ -169,6 +218,7 @@ export function NewAgentScreen({ initialWhat = "" }: { initialWhat?: string }) {
         credentialId: null,
         monthlyBudgetUsd: null,
         appearance: look,
+        ...(from ? { proposal: from.messageId } : {}),
       });
       created.current = true;
       // What the role brings, as the web's last step: its channels, its apps' levels, the default skills.
@@ -188,9 +238,18 @@ export function NewAgentScreen({ initialWhat = "" }: { initialWhat?: string }) {
           agent.id,
           list.map((s) => ({ skillId: s.id, enabled: s.defaultForNewAgents })),
         );
+      // The AI the server suggests for me: an account of mine on its computer; the workspace's model needs nothing.
+      const ai = proposed?.ai;
+      if (ai?.kind === "account") {
+        await api.sandbox.setTarget(orgId, agent.id, ai.machineId);
+        await api.agents.setBrain(orgId, agent.id, { brain: ai.brain, account: ai.accountId });
+      }
       successHaptic();
       toast({ title: t("mobile.agents.created", { name: agent.name }), agentId: agent.id });
-      void openDm({ agentId: agent.id });
+      // Nothing to think with yet: Connect opens for it over its conversation.
+      void openDm({ agentId: agent.id }).then(() => {
+        if (ai?.kind === "none") openConnectAi({ agentId: agent.id });
+      });
     } catch (e) {
       if (created.current) {
         // The agent exists; only part of what the role brings didn't go through.
@@ -365,7 +424,9 @@ export function NewAgentScreen({ initialWhat = "" }: { initialWhat?: string }) {
             title={t("newAgent.steps.role.name")}
             meta={
               <Text variant="small" tone="muted">
-                {role && role !== "custom" ? t(`newAgent.roles.${role}.name`) : t("newAgent.roles.custom.name")}
+                {role && role !== "custom"
+                  ? t(`newAgent.roles.${role}.name`)
+                  : roleText || t("newAgent.roles.custom.name")}
               </Text>
             }
             chevron
@@ -378,6 +439,11 @@ export function NewAgentScreen({ initialWhat = "" }: { initialWhat?: string }) {
             onPress={() => goTo(2)}
           />
         </Card>
+        {proposed ? (
+          <Text variant="footnote" tone="muted">
+            {suggestedAiText(t, proposed.ai)}
+          </Text>
+        ) : null}
 
         <View style={styles.section}>
           <Text variant="title" accessibilityRole="header">

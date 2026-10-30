@@ -1226,6 +1226,14 @@ export const ptBR = {
     },
     connect: "Conectar",
     connected: "Conectado",
+    agentProposal: {
+      title: "{{agent}} propõe um novo agente",
+      review: "Revisar",
+      created: "Criado",
+      aiAccount: "Pensa com {{account}}",
+      aiModel: "Pensa com o modelo do workspace",
+      aiNone: "Sem IA ainda. Conecte uma depois de criar",
+    },
   },
   dm: {
     subtitle: "{{role}} · de {{owner}}",
@@ -2697,6 +2705,8 @@ export const ptBR = {
     openProfile: "Abrir perfil",
     createAnother: "Criar outro agente",
     adminsOnly: "Só admins e donos criam agentes. Peça a um admin da {{org}}.",
+    proposalClosed: "Esta proposta já foi decidida ou expirou.",
+    backToChat: "Voltar para a conversa",
     and: " e ",
   },
   members: {
@@ -7069,6 +7079,10 @@ export const ptBR = {
     downloadOnly: "Sem prévia para este tipo de arquivo. Baixe para abrir.",
   },
   errors: {
+    agentProposal: {
+      decided: "Alguém já decidiu esta proposta.",
+      expired: "Esta proposta expirou: ninguém decidiu em um dia.",
+    },
     join: {
       linkClosed: "Este link não funciona mais. Peça um novo a quem mandou.",
       full: "Este workspace tem muitos pedidos esperando. Tente mais tarde ou peça a alguém de lá para convidar você.",
@@ -7979,6 +7993,7 @@ export const ptBR = {
         readingForum: "Leu o fórum",
         creatingChannel: "Criou um canal",
         offeringConnectAi: "Ofereceu conectar uma IA",
+        proposingAgent: "Propôs um agente",
         askingAgent: "Perguntou a outro agente",
         tellingAgent: "Avisou outro agente",
         findingTools: "Procurou ferramentas",
@@ -8042,6 +8057,7 @@ export const ptBR = {
       readingForum: "lendo o fórum",
       creatingChannel: "criando um canal",
       offeringConnectAi: "preparando a conexão de uma IA",
+      proposingAgent: "propondo um agente",
       askingAgent: "perguntando a outro agente",
       tellingAgent: "avisando outro agente",
       findingTools: "procurando ferramentas",
@@ -8108,6 +8124,7 @@ export const ptBR = {
       no_ai: "Ainda não consigo responder: não tenho uma IA conectada.",
       no_ai_signed_out: "Ainda não consigo responder: minha IA saiu da conta.",
       action_connect_ai: "Conectar uma IA",
+      agent_proposal: "Propôs um novo agente: {{name}}",
       approval_request: "Pedido de aprovação: {{title}}",
       secret_request: "Pedido de segredo: {{name}}",
       browser_handoff: "Preciso de ajuda no meu navegador.",
@@ -8285,6 +8302,10 @@ export const ptBR = {
     offer_connect_ai: {
       label: "Oferecer conectar uma IA",
       description: "Posta um card cujo botão abre a conexão de um plano ou de uma chave de API.",
+    },
+    propose_agent: {
+      label: "Propor um agente",
+      description: "Posta um card com um novo agente para revisar. Uma pessoa cria.",
     },
     create_channel: {
       label: "Criar canal",

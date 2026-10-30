@@ -1205,6 +1205,14 @@ export const en: Translations = {
     },
     connect: "Connect",
     connected: "Connected",
+    agentProposal: {
+      title: "{{agent}} proposes a new agent",
+      review: "Review",
+      created: "Created",
+      aiAccount: "Thinks with {{account}}",
+      aiModel: "Thinks with the workspace's model",
+      aiNone: "No AI yet. Connect one after creating it",
+    },
   },
   dm: {
     subtitle: "{{role}} · owned by {{owner}}",
@@ -2668,6 +2676,8 @@ export const en: Translations = {
     openProfile: "Open profile",
     createAnother: "Create another agent",
     adminsOnly: "Only admins and owners create agents. Ask a {{org}} admin.",
+    proposalClosed: "This proposal was already decided or expired.",
+    backToChat: "Back to the conversation",
     and: " and ",
   },
   members: {
@@ -7029,6 +7039,10 @@ export const en: Translations = {
     downloadOnly: "No preview for this type of file. Download it to open.",
   },
   errors: {
+    agentProposal: {
+      decided: "Someone already decided this proposal.",
+      expired: "This proposal expired: nobody decided it in a day.",
+    },
     join: {
       linkClosed: "This link no longer works. Ask whoever sent it for a new one.",
       full: "This workspace has many requests waiting. Try again later, or ask someone there to invite you.",
@@ -7928,6 +7942,7 @@ export const en: Translations = {
         readingForum: "Read the forum",
         creatingChannel: "Created a channel",
         offeringConnectAi: "Offered to connect an AI",
+        proposingAgent: "Proposed an agent",
         askingAgent: "Asked another agent",
         tellingAgent: "Told another agent",
         findingTools: "Looked for tools",
@@ -7991,6 +8006,7 @@ export const en: Translations = {
       readingForum: "reading the forum",
       creatingChannel: "creating a channel",
       offeringConnectAi: "getting an AI ready to connect",
+      proposingAgent: "proposing an agent",
       askingAgent: "asking another agent",
       tellingAgent: "telling another agent",
       findingTools: "looking for tools",
@@ -8057,6 +8073,7 @@ export const en: Translations = {
       no_ai: "I can't answer yet: I have no AI connected.",
       no_ai_signed_out: "I can't answer yet: my AI is signed out.",
       action_connect_ai: "Connect an AI",
+      agent_proposal: "Proposed a new agent: {{name}}",
       approval_request: "Approval request: {{title}}",
       secret_request: "Secret request: {{name}}",
       browser_handoff: "I need help in my browser.",
@@ -8235,6 +8252,10 @@ export const en: Translations = {
     offer_connect_ai: {
       label: "Offer to connect an AI",
       description: "Posts a card whose button opens the dialog to connect a plan or an API key.",
+    },
+    propose_agent: {
+      label: "Propose an agent",
+      description: "Posts a card with a new agent to review. A person creates it.",
     },
     create_channel: {
       label: "Create channel",
