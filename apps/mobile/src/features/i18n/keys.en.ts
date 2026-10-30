@@ -633,6 +633,7 @@ export const featureKeysEn: FeatureTranslations = {
     createFailed: "Couldn't create the agent. Maybe that name is taken.",
     empty: "No agents yet.",
     freeSection: "Free",
+    noGroupSection: "No group",
   },
   agentEdit: {
     missing: "This agent no longer exists.",

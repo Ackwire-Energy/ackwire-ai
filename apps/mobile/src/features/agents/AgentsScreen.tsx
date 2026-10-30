@@ -1,12 +1,21 @@
-import { useAiStatus, useApprovals, useDms, useWorkingRuns } from "@agenteschat/client";
+import {
+  type AgentGroup,
+  useAgentGroups,
+  useAiStatus,
+  useApprovals,
+  useDms,
+  useWorkingRuns,
+} from "@agenteschat/client";
 import { waitingComputerByAgent } from "@agenteschat/client/lib/machine-outages";
 import { previewBody } from "@agenteschat/client/lib/message-body";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { router } from "expo-router";
-import { useMemo } from "react";
+import { Fragment, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { STORED } from "@/lib/storage";
 import { Chip, EmptyState, Icon, LargeTitleScreen, LIST_PREVIEW, ListRow, PixelOrbit, SectionHeader, Text } from "@/ui";
+import { CollapsibleSection, useCollapsedSections } from "../chats/HomeSection";
 import { useMachineOutages } from "../outages/queries";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useNow, useOrgId, usePullRefresh, useWhen } from "../shared/hooks";
@@ -14,7 +23,7 @@ import { agentLook } from "../shared/logic";
 import { Tile } from "../shared/parts";
 import { useWaitingApprovals, useWorkingNow } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
-import { agoOf, plainRole, type TeamLine, teamLines } from "./logic";
+import { agoOf, freeSections, plainRole, type TeamLine, teamLines } from "./logic";
 import { agoText, workTitle } from "./work";
 
 /** Rows whose agent moves (a long team stays light). */
@@ -24,8 +33,9 @@ const LIVE_ROWS = 8;
  * Agentes: the team in Conversas' rows, who needs you first.
  * "Esperando você" (the exact request and since when), "Trabalhando agora" (what each one is on, since when,
  * with the pixel orbit), then "Livres" (its role in plain words, and when you last talked; first, dozing, the
- * ones waiting for their offline computer: "Esperando o MacBook Air"). Tapping an agent
- * opens its profile (Conversar is one tap there); "Novo agente" at the end.
+ * ones waiting for their offline computer: "Esperando o MacBook Air"), split by the workspace's groups of agents
+ * when it has some. Tapping an agent opens its profile (Conversar is one tap there); "Novo agente" at the end.
+ * Agents move between groups on the web.
  */
 export function AgentsScreen() {
   const { t } = useTranslation();
@@ -39,11 +49,12 @@ export function AgentsScreen() {
   const work = useWorkingNow();
   const asking = useWaitingApprovals();
   const outages = useMachineOutages();
+  const groups = useAgentGroups(orgId);
   const offline = useMemo(() => waitingComputerByAgent(outages.outages), [outages.outages]);
   const { waiting, working, free } = teamLines(dir.agents, work, dms.data ?? [], asking, offline);
   const busy = waiting.length + working.length;
   const pull = usePullRefresh(() =>
-    Promise.allSettled([runs.refetch(), dms.refetch(), approvals.refetch(), outages.refetch()]),
+    Promise.allSettled([runs.refetch(), dms.refetch(), approvals.refetch(), outages.refetch(), groups.refetch()]),
   );
   const total = dir.agents.length;
   return (
@@ -70,13 +81,8 @@ export function AgentsScreen() {
           ))}
         </>
       ) : null}
-      {free.length > 0 ? (
-        <>
-          <SectionHeader title={t("mobile.agents.freeSection")} count={free.length} />
-          {free.map((l, i) => (
-            <AgentRow key={l.agent.id} line={l} divider={i > 0} live={busy + i < LIVE_ROWS} />
-          ))}
-        </>
+      {free.length > 0 && !groups.isPending ? (
+        <FreeSections free={free} groups={groups.data ?? []} before={busy} />
       ) : null}
       <Pressable
         onPress={() => router.push("/new-agent")}
@@ -89,6 +95,49 @@ export function AgentsScreen() {
         </Text>
       </Pressable>
     </LargeTitleScreen>
+  );
+}
+
+/**
+ * Livres by group: the agents in no group under "Livres" ("Sem grupo" once there are groups), then each group, which
+ * collapses (remembered on this phone). Mounted once the groups are in, so what was collapsed is read against them.
+ */
+function FreeSections({ free, groups, before }: { free: TeamLine[]; groups: AgentGroup[]; before: number }) {
+  const { t } = useTranslation();
+  const { collapsed, toggle } = useCollapsedSections<string>(
+    STORED.agentGroupsCollapsed,
+    groups.map((g) => g.id),
+  );
+  let shown = before;
+  return (
+    <>
+      {freeSections(free, groups).map(({ group, lines }) => {
+        const first = shown;
+        shown += lines.length;
+        const rows = lines.map((l, i) => (
+          <AgentRow key={l.agent.id} line={l} divider={i > 0} live={first + i < LIVE_ROWS} />
+        ));
+        return group ? (
+          <CollapsibleSection
+            key={group.id}
+            title={group.name}
+            count={lines.length}
+            collapsed={collapsed.includes(group.id)}
+            onToggle={() => toggle(group.id)}
+          >
+            {rows}
+          </CollapsibleSection>
+        ) : (
+          <Fragment key="free">
+            <SectionHeader
+              title={groups.length > 0 ? t("mobile.agents.noGroupSection") : t("mobile.agents.freeSection")}
+              count={lines.length}
+            />
+            {rows}
+          </Fragment>
+        );
+      })}
+    </>
   );
 }
 

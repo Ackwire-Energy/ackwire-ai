@@ -427,6 +427,8 @@ export function RealtimeProvider({
       void qc.invalidateQueries({ queryKey: keys.me });
       void qc.invalidateQueries({ queryKey: keys.limits(orgId) });
       void qc.invalidateQueries({ queryKey: ["org", orgId, "channel"] });
+      // The groups of agents someone changed meanwhile.
+      void qc.invalidateQueries({ queryKey: keys.agentGroups(orgId) });
     });
     // The first open too, for what a return from the billing service changes: a new plan's limits, standing and
     // computer can land in core between this page's first reads and the socket's open, and that event reaches no one.
@@ -522,7 +524,8 @@ export function RealtimeProvider({
       applyComputerEvent(qc, orgId, event);
       // Connected computers: online/offline, paired, renamed, removed.
       applyMachineEvent(qc, orgId, event);
-      // The workspace's own computer on its way, and its standing (the hold banner, the suspended screen).
+      // The workspace's own computer on its way, its standing (the hold banner, the suspended screen), and the groups
+      // of agents (the sidebar's sections).
       applyWorkspaceEvent(qc, orgId, event);
       if ((event.type === "budget.warning" || event.type === "budget.exhausted") && "agentId" in event) {
         const budgetEvent = event as BudgetEvent;

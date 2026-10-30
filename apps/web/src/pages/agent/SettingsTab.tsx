@@ -1,4 +1,5 @@
-import { type AgentAudience, useAgentDetail, useSettings, useUsage } from "@agenteschat/client";
+import { type AgentAudience, useAgentDetail, useAgentGroups, useSettings, useUsage } from "@agenteschat/client";
+import { groupOf, NO_GROUP } from "@agenteschat/client/lib/agent-groups";
 import { audienceSummary, audienceWidens } from "@agenteschat/client/lib/audience";
 import { engineOfBrain } from "@agenteschat/client/lib/brain";
 import { formatMonth, formatPercent, formatTokensShort, formatUsd } from "@agenteschat/client/lib/format";
@@ -16,6 +17,7 @@ import {
   Input,
   Meter,
   randomAppearance,
+  Select,
   SettingNote,
 } from "@agenteschat/ui";
 import { type CSSProperties, type ReactNode, useState } from "react";
@@ -108,6 +110,8 @@ export function SettingsTab({
   const settings = useSettings(org.id);
   const detail = useAgentDetail(org.id, agent.id);
   const usage = useUsage(org.id);
+  const groups = useAgentGroups(org.id).data ?? [];
+  const inGroup = groupOf(groups, agent.id);
   // "Quem pensa" lives in the sentence under the name now (its dialog saves at once).
   const sections = AGENT_SECTIONS.filter((s) => s !== "brain" && (s !== "danger" || admin));
   const owner = draft.owner === NO_OWNER ? undefined : dir.memberById.get(draft.owner);
@@ -160,7 +164,7 @@ export function SettingsTab({
           <Section
             id="identity"
             title={t("agentPage.settings.identity")}
-            fields={["name", "role", "look"]}
+            fields={["name", "role", "look", "group"]}
             action={
               can("look") ? (
                 <Button
@@ -215,6 +219,30 @@ export function SettingsTab({
                   </div>
                 )}
                 <span className="small muted">{t("agent.identityHelp", { handle: agent.handle })}</span>
+                {/* Only once the workspace has groups (ADR 0080); they are made in the sidebar. */}
+                {groups.length > 0 && can("group") ? (
+                  <div className="agp-field">
+                    <Field label={t("agentPage.fields.group")} id="agp-group">
+                      <Select
+                        className="newag__sel"
+                        value={draft.group}
+                        onValueChange={(v) => set("group", v)}
+                        options={[
+                          { value: NO_GROUP, label: t("agentGroups.none") },
+                          ...groups.map((g) => ({ value: g.id, label: g.name })),
+                        ]}
+                      />
+                    </Field>
+                    <WasLine changeKey="group" />
+                  </div>
+                ) : (
+                  inGroup && (
+                    <div className="agp-field">
+                      <span className="newag__label">{t("agentPage.fields.group")}</span>
+                      <ReadValue>{inGroup.name}</ReadValue>
+                    </div>
+                  )
+                )}
               </div>
             </div>
             {can("look") ? (

@@ -46,6 +46,8 @@ export const STORED = {
   homeCollapsed: "home-collapsed",
   /** The Threads tab's sections the person collapsed (JSON list). */
   threadsCollapsed: "threads-collapsed",
+  /** Agentes' groups the person collapsed (JSON list of group ids). */
+  agentGroupsCollapsed: "agent-groups-collapsed",
   /** An invitation opened before signing in: dealt with once the person is in (features/auth/invite.ts). */
   invite: "invite",
   /** The app's sounds on this phone: "tactile" (default), "sky", "pixel" or "off" (lib/sounds.ts). */

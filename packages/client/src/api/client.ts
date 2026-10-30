@@ -16,6 +16,7 @@ import type {
   AgentDatabaseInput,
   AgentDetail,
   AgentForYou,
+  AgentGroup,
   AgentInput,
   AgentMailbox,
   AgentMailboxInput,
@@ -316,6 +317,18 @@ export interface ApiClient {
     planUsage(orgId: string): Promise<OrgPlanUsage>;
     /** The audit log, newest first (admins): agents' tool calls and people's changes. `before`: `next`. */
     audit(orgId: string, query?: AuditQuery & { before?: string; limit?: number }): Promise<AuditPage>;
+  };
+  /** Groups of agents (ADR 0080): everyone reads them, owners and admins change them; each change answers with all. */
+  agentGroups: {
+    list(orgId: string): Promise<AgentGroup[]>;
+    /** After the other groups, with `agentIds` in it in that order (out of any group they were in). */
+    create(orgId: string, input: { name: string; agentIds?: string[] }): Promise<AgentGroup[]>;
+    /** Renames it, or moves it among the groups (`index`). */
+    update(orgId: string, groupId: string, patch: { name?: string; index?: number }): Promise<AgentGroup[]>;
+    /** Its agents go back to no group. */
+    remove(orgId: string, groupId: string): Promise<AgentGroup[]>;
+    /** Into a group at `index` among its agents (the end without one), or out of any (`groupId` null). */
+    move(orgId: string, agentId: string, input: { groupId: string | null; index?: number }): Promise<AgentGroup[]>;
   };
   agents: {
     list(orgId: string): Promise<Agent[]>;

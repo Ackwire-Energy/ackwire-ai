@@ -2,6 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { keys } from "../api/keys";
 import type {
   AgentComputer,
+  AgentGroup,
   ComputerSetup,
   ComputerTarget,
   Machine,
@@ -195,9 +196,15 @@ const SETUP_FIELDS = [
  * (`ready`) refetches the computers; `org.standing` sets this workspace's standing in `GET /me`, so the banner
  * and the suspended screen follow without a reload, and asks for the setup again: a workspace on hold waits for no
  * computer, and one active again waits for one. `org.limits` (a new plan, ADR 0079) asks for the limits again, so a
- * full workspace's invitations open by themselves. Returns whether the event was one of these.
+ * full workspace's invitations open by themselves. `agent.groups` (ADR 0080) carries every group of agents: it
+ * replaces the cached list. Returns whether the event was one of these.
  */
 export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { type: string }): boolean {
+  if (event.type === "agent.groups") {
+    const groups = (event as { groups?: unknown }).groups;
+    if (Array.isArray(groups)) qc.setQueryData<AgentGroup[]>(keys.agentGroups(orgId), groups as AgentGroup[]);
+    return true;
+  }
   if (event.type === "machine.provisioning") {
     const e = event as Partial<Record<(typeof SETUP_FIELDS)[number] | "notifyByEmail", unknown>>;
     const next = Object.fromEntries(SETUP_FIELDS.map((k) => [k, e[k] ?? null])) as Omit<
