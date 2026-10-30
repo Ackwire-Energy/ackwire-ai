@@ -6,6 +6,7 @@ import {
   addChannelMember,
   artifactDownload,
   artifactFile,
+  ConflictError,
   createArtifact,
   createChannel,
   deleteArtifact,
@@ -13,6 +14,7 @@ import {
   ForbiddenError,
   getArtifact,
   grantScopes,
+  insertVersion,
   listAgentScopes,
   listArtifacts,
   listArtifactVersions,
@@ -236,6 +238,36 @@ describe("visibility and editing", () => {
     await expect(deleteArtifact(f.artifactDeps, other.id, f.org.id, table.id)).rejects.toBeInstanceOf(ForbiddenError);
     await deleteArtifact(f.artifactDeps, bia.id, f.org.id, table.id);
     await expect(getArtifact(f.artifactDeps, person(bia.id), f.org.id, table.id)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  test("two saves at the same version get distinct blob keys (a lost race keeps committed bytes)", async () => {
+    f = await setup();
+    const created = await createArtifact(f.artifactDeps, person(f.owner.id), f.org.id, {
+      title: "Doc",
+      content: { kind: "document", markdown: "# v1" },
+    });
+    // The row as two racers would both have read it: currentVersion 1, so both compute v2.
+    const [current] = await f.db.select().from(schema.artifacts).where(eq(schema.artifacts.id, created.id));
+    if (!current) throw new Error("no artifact row");
+    const actor = person(f.owner.id);
+    const bytesA = new TextEncoder().encode("AAAA");
+    const bytesB = new TextEncoder().encode("BBBBBBBB");
+    const a = await insertVersion(f.artifactDeps, actor, f.org.id, current, {
+      stored: { body: bytesA, contentType: "text/markdown" },
+      excerpt: "",
+    });
+    expect(a.version).toBe(2);
+    // The second save holds the same stale v1: it writes its blob first, then the DB guard rejects it.
+    await expect(
+      insertVersion(f.artifactDeps, actor, f.org.id, current, {
+        stored: { body: bytesB, contentType: "text/markdown" },
+        excerpt: "",
+      }),
+    ).rejects.toThrow(ConflictError);
+    // v2's committed bytes survive: with a shared key the losing put would have overwritten them.
+    const store = await f.artifactDeps.blobs.forConfig(f.org.id, a.blob.storageConfigId);
+    const got = await store.get(a.blob.key);
+    expect(got ? [...got.body] : []).toEqual([...bytesA]);
   });
 
   test("an author's files: made by them, or made or changed by them (an agent's page)", async () => {
