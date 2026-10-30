@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import {
   generateSecretKeyPair,
   MACHINE_PROTOCOL_VERSION,
+  type MachineReplies,
+  type MachineRequest,
   openSecret,
   type PubSub,
   type SecretRequest,
@@ -12,11 +14,34 @@ import {
   confirmDeviceCode,
   grantScopes,
   type MachineHub,
+  MachineRequestError,
   pollDeviceToken,
+  receiveMachineUpload,
   setAgentComputerTarget,
   startDeviceCode,
 } from "../src";
 import type { Fixture } from "./fixtures";
+
+/**
+ * A runner's `push` for a fake hub: the file at the request's path in the agent's folder (`folder`) goes to its
+ * upload as that machine, the way a real runner sends it to the upload URL.
+ */
+export async function pushFromFolder(
+  f: Fixture,
+  machineId: string,
+  folder: Map<string, Uint8Array>,
+  req: Extract<MachineRequest, { op: "push" }>,
+): Promise<MachineReplies["push"]> {
+  const body = folder.get(req.path);
+  if (!body) throw new MachineRequestError("not_found", `no ${req.path}`);
+  const name = req.path.split("/").at(-1) ?? req.path;
+  const sha256 = createHash("sha256").update(body).digest("hex");
+  await receiveMachineUpload(
+    { db: f.db, artifacts: f.artifactDeps, pubsub: f.pubsub },
+    { uploadId: req.uploadId, machineId, name, contentType: "", sha256, body },
+  );
+  return { name, size: body.byteLength, sha256, contentType: "" };
+}
 
 export interface PairInput {
   name?: string;

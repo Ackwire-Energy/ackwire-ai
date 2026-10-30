@@ -2,6 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { DESKTOP_USE_PROTOCOL, type MachineRequest } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
+  ARTIFACT_LIMITS,
+  absorbToolData,
   agentDesktopUseStatus,
   createDesktopToolSource,
   createFakeJudge,
@@ -18,6 +20,7 @@ import {
   SANDBOX_SCOPE,
   startTakeover,
   type ToolDefinition,
+  type ToolSideEffects,
   toolDenyScope,
   toolPolicy,
   updateSandboxSettings,
@@ -25,7 +28,7 @@ import {
 import { pickApp } from "../src/desktop/surface";
 import { APPS, fakeHub, lookOf } from "./desktop-fixtures";
 import { type Fixture, setup } from "./fixtures";
-import { pairMachine } from "./machine-fixtures";
+import { pairMachine, pushFromFolder } from "./machine-fixtures";
 import { runContext } from "./mail-fixtures";
 import { THUNAR } from "./screen-fixtures";
 
@@ -47,6 +50,7 @@ async function desktopSetup(options: { judge?: Judge } = {}) {
       },
     },
     ...(options.judge ? { judge: options.judge } : {}),
+    publicUrl: "http://localhost:3000",
   });
   f = await setup({ toolSources: [source] });
   const paired = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "Box" });
@@ -74,7 +78,7 @@ async function desktopSetup(options: { judge?: Judge } = {}) {
       f.agent.id,
       scopes.map((scope) => ({ connectionId: null, scope })),
     );
-  return { ...fake, source, ctx, listed, names, call, since, grant };
+  return { ...fake, machineId: paired.machineId, source, ctx, listed, names, call, since, grant };
 }
 
 const acts = (calls: MachineRequest[]) =>
@@ -246,6 +250,71 @@ test("desktop_read: the screen as untrusted text; desktop_screenshot: a JPEG wri
   expect(sent()).toEqual([]);
   const defaulted = await d.call("desktop_screenshot", {});
   expect(defaulted.data?.path).toMatch(/^screenshots\/.+\.jpg$/);
+});
+
+test("desktop_screenshot with share: sent to the Drive and attached to the reply as upload_file does", async () => {
+  const d = await desktopSetup();
+  await d.grant(DESKTOP_SCOPE, SANDBOX_SCOPE);
+  // The agent's folder on the computer: the screenshot is written there and pushed from there.
+  const folder = new Map<string, Uint8Array>();
+  d.s.respond = (r) => {
+    if (r.op === "write") folder.set(r.path, new Uint8Array(Buffer.from(r.base64, "base64")));
+    if (r.op === "push") return pushFromFolder(f, d.machineId, folder, r);
+    return undefined;
+  };
+  const kept = await d.call("desktop_screenshot", { path: "shots/kept.jpg" });
+  expect(kept.content).toBe(
+    "Saved shots/kept.jpg in your folder: the whole screen as a JPEG (1280×800). Open it with your own Read tool to look at it. To show a screenshot in this conversation, take it with share: true.",
+  );
+
+  const sent = d.since();
+  const out = await d.call("desktop_screenshot", { path: "shots/a.png", share: true });
+  expect(out.isError).toBeUndefined();
+  const [a] = await f.db.select().from(schema.artifacts);
+  expect(a).toMatchObject({ kind: "file", title: "a.jpg", channelId: f.general.id });
+  expect(out.data).toEqual({ path: "shots/a.jpg", artifact: { id: a?.id, version: 1 } });
+  const reply: ToolSideEffects = {};
+  absorbToolData(reply, out.data);
+  expect(reply.artifacts).toEqual([{ id: a?.id as string, version: 1 }]);
+  expect(out.content).toContain(
+    `It is shown in this conversation: its card goes with your reply ("a.jpg" in the Drive`,
+  );
+  const [up] = await f.db.select().from(schema.artifactUploads);
+  expect(up).toMatchObject({
+    status: "done",
+    path: "shots/a.jpg",
+    runId: d.ctx.runId,
+    computer: `machine:${d.machineId}`,
+  });
+  // Pushed by the computer itself, for the same agent (so from the same folder) the screenshot was written in.
+  const [capture, write, push] = sent();
+  expect(capture?.op).toBe("desktop.capture");
+  expect(write).toMatchObject({ op: "write", path: "shots/a.jpg" });
+  expect(push).toEqual({
+    op: "push",
+    agent: write?.agent as MachineRequest["agent"],
+    path: "shots/a.jpg",
+    url: `http://localhost:3000/api/machines/uploads/${up?.id}`,
+    uploadId: up?.id as string,
+    maxBytes: ARTIFACT_LIMITS.fileBytes,
+  });
+});
+
+test("desktop_screenshot with share but without Write files: saved, and the answer says how to ask for it", async () => {
+  const d = await desktopSetup();
+  await d.grant(DESKTOP_SCOPE, SANDBOX_SCOPE);
+  await f.db
+    .delete(schema.agentScopes)
+    .where(and(eq(schema.agentScopes.agentId, f.agent.id), eq(schema.agentScopes.scope, "drive:write")));
+  const sent = d.since();
+  const out = await d.call("desktop_screenshot", { path: "shots/b.jpg", share: true });
+  expect(out.isError).toBeUndefined();
+  expect(out.content).toBe(
+    `Saved shots/b.jpg in your folder: the whole screen as a JPEG (1280×800). Open it with your own Read tool to look at it. It isn't shown in this conversation: that needs "Write files" (drive:write), which you don't have. Ask for it with request_permission, then take it again with share: true.`,
+  );
+  expect(out.data).toEqual({ path: "shots/b.jpg" });
+  expect(sent().map((c) => c.op)).toEqual(["desktop.capture", "write"]);
+  expect(await f.db.select().from(schema.artifactUploads)).toEqual([]);
 });
 
 test("the computer's refusals in the agent's words", async () => {

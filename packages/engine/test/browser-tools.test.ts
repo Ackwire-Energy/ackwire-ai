@@ -2,6 +2,8 @@ import { afterEach, expect, test } from "bun:test";
 import { DESKTOP_PROTOCOL, type MachineRequest, SECRET_ACTIVATE_PROTOCOL } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
+  ARTIFACT_LIMITS,
+  absorbToolData,
   agentBrowserStatus,
   agentFolderPath,
   BROWSER_SCOPE,
@@ -19,11 +21,14 @@ import {
   type MachineStatus,
   normalizeRef,
   setAgentBrowserDomains,
+  type ToolSideEffects,
+  toolDenyScope,
+  updateSandboxSettings,
   wrapPage,
 } from "../src";
 import { actionCommands } from "../src/browser/surface";
 import { addMember, type Fixture, setup } from "./fixtures";
-import { pairMachine } from "./machine-fixtures";
+import { pairMachine, pushFromFolder } from "./machine-fixtures";
 import { runContext } from "./mail-fixtures";
 
 let f: Fixture;
@@ -85,6 +90,7 @@ async function browserSetup(options: { judge?: Judge; vision?: boolean; now?: ()
         ...(options.judge ? { judge: options.judge } : {}),
         ...(options.vision ? { vision: () => true } : {}),
         ...(options.now ? { now: options.now } : {}),
+        publicUrl: "http://localhost:3000",
       }),
     ],
   });
@@ -694,4 +700,79 @@ test("with the computer and the browser, there is exactly one request_secret (th
   const both = await secretTools();
   expect(both).toHaveLength(1);
   expect(both[0]?.scope).toBe("sandbox:run");
+});
+
+const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+test("browser_screenshot with share: sent to the Drive and attached to the reply as upload_file does, without Run code", async () => {
+  const b = await browserSetup();
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  await updateSandboxSettings(f.db, f.owner.id, f.org.id, { enabled: false });
+  // The agent's folder on the computer: the screenshot is written there and pushed from there.
+  const folder = new Map<string, Uint8Array>();
+  b.s.respond = (r) => {
+    if (r.op === "push") return pushFromFolder(f, b.machineId, folder, r);
+    if (r.op === "browser.act" && r.command === "screenshot") folder.set(String(r.args[0]), PNG);
+    return ok();
+  };
+
+  const kept = await b.call("browser_screenshot", { path: "shots/kept.png" });
+  expect(kept.content).toBe(
+    "Saved shots/kept.png in your folder. To show a screenshot in this conversation, take it with share: true.",
+  );
+  expect(b.calls.filter((c) => c.op === "push")).toEqual([]);
+
+  const sent = b.since();
+  const out = await b.call("browser_screenshot", { share: true });
+  expect(out.isError).toBeUndefined();
+  const shot = sent()[0];
+  const path = String(shot?.args[0]);
+  expect(path).toMatch(/^screenshots\/.+\.png$/);
+  const [a] = await f.db.select().from(schema.artifacts);
+  expect(a).toMatchObject({ kind: "file", title: path.slice("screenshots/".length), channelId: f.general.id });
+  expect(out.data).toEqual({ path, artifact: { id: a?.id, version: 1 } });
+  const reply: ToolSideEffects = {};
+  absorbToolData(reply, out.data);
+  expect(reply.artifacts).toEqual([{ id: a?.id as string, version: 1 }]);
+  expect(out.content).toBe(
+    `Saved ${path} in your folder. It is shown in this conversation: its card goes with your reply ("${a?.title}" in the Drive, 8 bytes, artifact ${a?.id}).`,
+  );
+  const [up] = await f.db.select().from(schema.artifactUploads);
+  expect(up).toMatchObject({ status: "done", path, runId: b.ctx.runId, computer: `machine:${b.machineId}` });
+  // Pushed by the computer itself, for the same agent (so from the same folder) the browser wrote it in.
+  expect(b.calls.filter((c) => c.op === "push")).toEqual([
+    {
+      op: "push",
+      agent: shot?.agent as Act["agent"],
+      path,
+      url: `http://localhost:3000/api/machines/uploads/${up?.id}`,
+      uploadId: up?.id as string,
+      maxBytes: ARTIFACT_LIMITS.fileBytes,
+    },
+  ]);
+});
+
+test("browser_screenshot with share but without Write files: saved, and the answer says how to ask for it", async () => {
+  const b = await browserSetup();
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  await f.db
+    .delete(schema.agentScopes)
+    .where(and(eq(schema.agentScopes.agentId, f.agent.id), eq(schema.agentScopes.scope, "drive:write")));
+  const out = await b.call("browser_screenshot", { path: "shots/x.png", share: true });
+  expect(out.isError).toBeUndefined();
+  expect(out.content).toBe(
+    `Saved shots/x.png in your folder. It isn't shown in this conversation: that needs "Write files" (drive:write), which you don't have. Ask for it with request_permission, then take it again with share: true.`,
+  );
+  expect(out.data).toEqual({ url: "https://shop.example/", path: "shots/x.png" });
+  // Turned off by name: nothing to ask for.
+  await grantScopes(f.db, f.org.id, f.agent.id, [
+    { connectionId: null, scope: "drive:write" },
+    { connectionId: null, scope: toolDenyScope("create_artifact") },
+  ]);
+  const off = await b.call("browser_screenshot", { path: "shots/y.png", share: true });
+  expect(off.content).toContain("It isn't shown in this conversation: making Drive files is turned off for you");
+  const shots = b.calls.filter((c): c is Act => c.op === "browser.act" && c.command === "screenshot");
+  expect(shots.map((c) => c.args[0])).toEqual(["shots/x.png", "shots/y.png"]);
+  expect(b.calls.filter((c) => c.op === "push")).toEqual([]);
+  expect(await f.db.select().from(schema.artifactUploads)).toEqual([]);
 });
