@@ -746,7 +746,7 @@ export const ptBR = {
     browser: "Este navegador",
     phone: "Celular",
     phoneOn: "No app do celular, com o aparelho bloqueado também",
-    phoneOff: "Ative no app do celular, em Você › Notificações",
+    phoneOff: "Ative no app do celular, em Você\u00a0›\u00a0Notificações",
     mac: "App do Mac",
     macHelp: "Enquanto o app estiver aberto, mesmo em segundo plano",
     on: "Ligado",

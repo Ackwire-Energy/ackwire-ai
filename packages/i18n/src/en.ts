@@ -735,7 +735,7 @@ export const en: Translations = {
     browser: "This browser",
     phone: "Phone",
     phoneOn: "In the phone app, even with the phone locked",
-    phoneOff: "Turn them on in the phone app, under You › Notifications",
+    phoneOff: "Turn them on in the phone app, under You\u00a0›\u00a0Notifications",
     mac: "Mac app",
     macHelp: "While the app is open, even in the background",
     on: "On",
