@@ -992,7 +992,7 @@ function ApprovalDetails({
     .slice(-12);
   const ok = record.filter((x) => x.status === "approved").length;
   const ownerId = a.ownerUserId ?? agent?.ownerUserId ?? null;
-  // What a person's roles give them, `everyone`'s included (ADR 0081); owners may everything.
+  // What a person's roles give them, `everyone`'s included (ADR 0084); owners may everything.
   const everyone = everyoneOf(roles);
   const keysOf = (m: Member) =>
     grants([

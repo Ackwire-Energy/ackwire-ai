@@ -23,7 +23,7 @@ import type { IconName } from "@/ui";
 
 /*
  * The workspace's settings on the phone, as the web's (`apps/web/src/pages/SettingsPage.tsx`): which sections each
- * person opens (from their permissions, ADR 0081), the line the workspace's page shows under each area, and what the
+ * person opens (from their permissions, ADR 0084), the line the workspace's page shows under each area, and what the
  * screens decide before they draw. Pure, so it is unit-tested; the screens turn it into views.
  */
 

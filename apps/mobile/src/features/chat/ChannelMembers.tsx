@@ -71,7 +71,7 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
   const c = useColors();
   const roster = useRoster(orgId, channelId);
   const routing = useAiStatus(orgId).data?.routing;
-  // Who manages channels, or the channel's creator (ADR 0081; the server checks it again).
+  // Who manages channels, or the channel's creator (ADR 0084; the server checks it again).
   const creator = useChannels(orgId).data?.find((x) => x.id === channelId)?.createdByUserId ?? null;
   const editable = can(org, "manage_channels") || (meId !== null && creator === meId);
   const [q, setQ] = useState("");

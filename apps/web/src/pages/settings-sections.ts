@@ -34,7 +34,7 @@ export const SETTINGS_SECTIONS: {
   { id: "notifications", icon: "bell", group: "you", allowed: () => true },
   { id: "general", icon: "settings", group: "org", allowed: () => true },
   { id: "members", icon: "members", group: "org", allowed: () => true },
-  // Every member reads what each role allows (ADR 0081); who manages roles changes the ones below theirs.
+  // Every member reads what each role allows (ADR 0084); who manages roles changes the ones below theirs.
   { id: "roles", icon: "audiencePeople", group: "org", allowed: () => true },
   // What agents did and people changed: only for who may see it (it shows everyone's work).
   { id: "audit", icon: "shield", group: "org", allowed: (o) => can(o, "view_audit") },

@@ -737,7 +737,7 @@ export function notifyOwnerOnBudget(pubsub: PubSub, db?: Database): NonNullable<
 }
 
 /**
- * Who in an organization may `permission` (ADR 0081), owners included: by default who manages agents, who
+ * Who in an organization may `permission` (ADR 0084), owners included: by default who manages agents, who
  * decides when an agent has no owner.
  */
 export async function adminIds(db: Database, orgId: string, permission: RolePermission = "manage_agents") {

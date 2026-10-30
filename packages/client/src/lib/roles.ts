@@ -2,7 +2,7 @@ import type { OrgRole, PermissionArea, Person } from "../api/types";
 import type { RolePermission } from "./permissions";
 
 /**
- * A workspace's roles on screen (ADR 0081): each area of permissions at a level, the line that sums a role up, and
+ * A workspace's roles on screen (ADR 0084): each area of permissions at a level, the line that sums a role up, and
  * the order. Pure, for the web and the phone app.
  */
 

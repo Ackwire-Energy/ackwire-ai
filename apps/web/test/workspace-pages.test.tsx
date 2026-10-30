@@ -263,7 +263,7 @@ describe("Membros", () => {
     const people = screen().getByRole("region", { name: "Pessoas" });
     expect(people.textContent).toContain("Walter (você)");
     expect(people.textContent).toContain("Ativo agora");
-    // Each person's roles as chips (ADR 0081), and a "+" to give or take them.
+    // Each person's roles as chips (ADR 0084), and a "+" to give or take them.
     const joao = within(people).getByText("João").closest(".ac-list__row") as HTMLElement;
     expect(joao.querySelector(".members-roles")?.textContent).toContain("Admin");
     expect(within(joao).getByRole("button", { name: "Papéis de João" })).toBeTruthy();

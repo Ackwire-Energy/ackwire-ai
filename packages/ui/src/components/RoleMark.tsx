@@ -9,7 +9,7 @@ const fit = (size: number) =>
   size <= 20 ? { cells: 8, icon: 12 } : size <= 28 ? { cells: 10, icon: 16 } : size <= 40 ? { cells: 14, icon: 20 } : { cells: 18, icon: Math.round(size * 0.47) };
 
 /**
- * A workspace role's mark (ADR 0081): the role's color in the agents' dither, on the people tile's shape (the cut
+ * A workspace role's mark (ADR 0084): the role's color in the agents' dither, on the people tile's shape (the cut
  * corner), its icon in white on top. Decorative: the role's name is always beside it.
  */
 export function RoleMark({

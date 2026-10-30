@@ -54,7 +54,7 @@ const {
   instanceTelemetry,
 } = schema;
 
-/** Whether a person owns the workspace (ADR 0081); what a member may do comes from their roles (`roles.ts`). */
+/** Whether a person owns the workspace (ADR 0084); what a member may do comes from their roles (`roles.ts`). */
 export type MemberRole = "owner" | "member";
 
 /** The billing hold of a workspace with no plan yet: the one a new workspace may start on. */
@@ -65,7 +65,7 @@ export interface Membership {
   orgName: string;
   role: MemberRole;
   /**
-   * Everything this person may do here (ADR 0081): the keys of their roles and of `everyone`, every one of them
+   * Everything this person may do here (ADR 0084): the keys of their roles and of `everyone`, every one of them
    * with `administrator`, all of it for an owner. Checked by the backend on every request; the apps only hide.
    */
   permissions: ReadonlySet<Permission>;
@@ -82,7 +82,7 @@ export const can = (membership: Pick<Membership, "permissions"> | null | undefin
   membership?.permissions.has(permission) === true;
 
 /**
- * Whether `actor` stands above a role at `position` or a person whose highest role is `rank` (ADR 0081): an owner
+ * Whether `actor` stands above a role at `position` or a person whose highest role is `rank` (ADR 0084): an owner
  * above everything, anyone else only strictly above (lower position). `everyone` (`Infinity`) is below everybody.
  */
 export function outranks(actor: Pick<Membership, "role" | "rank">, rank: number | null) {
@@ -734,7 +734,7 @@ async function auditMember(
 }
 
 /**
- * Makes a member an owner or takes it back (ADR 0081): only an owner does it, and nobody can demote the last
+ * Makes a member an owner or takes it back (ADR 0084): only an owner does it, and nobody can demote the last
  * owner. What anyone else may do is their roles (`setMemberRoles`).
  */
 export async function changeMemberRole(
@@ -778,7 +778,7 @@ export async function removeMember(
   if (actorId !== targetUserId) {
     const actor = await requirePermission(db, actorId, orgId, "manage_members");
     if (target.role === "owner" && !can(actor, "manage_owners")) throw new ForbiddenError("Only owners can remove owners");
-    // Only someone above them (ADR 0081): their highest role below the actor's.
+    // Only someone above them (ADR 0084): their highest role below the actor's.
     if (!outranks(actor, target.rank)) throw new ForbiddenError("Only someone above them can remove them");
   }
   // Loaded here: the accounts module builds on this one.

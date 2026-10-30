@@ -1,5 +1,5 @@
 /**
- * The keys of a workspace's permissions (ADR 0081, packages/engine/src/permissions.ts). The server sends each
+ * The keys of a workspace's permissions (ADR 0084, packages/engine/src/permissions.ts). The server sends each
  * person's resolved `permissions` with their membership (`OrgSummary`); the UI only hides what isn't allowed, the
  * server checks every request.
  */

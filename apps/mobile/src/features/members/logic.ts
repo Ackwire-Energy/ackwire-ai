@@ -26,7 +26,7 @@ export function membersByName<M extends { name: string }>(members: readonly M[],
 }
 
 /**
- * A person's roles on Membros (ADR 0081): "Dono" first for an owner, then their roles top first, joined; nothing for
+ * A person's roles on Membros (ADR 0084): "Dono" first for an owner, then their roles top first, joined; nothing for
  * someone with no role (what everyone may do goes without saying).
  */
 export function roleLine(

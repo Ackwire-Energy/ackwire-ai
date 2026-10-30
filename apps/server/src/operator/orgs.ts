@@ -8,7 +8,7 @@ import { Standing, StandingState, standingJson, UserParams } from "./standing";
 
 /**
  * A person's place in a workspace, as the operator API has always named it: an owner, someone holding
- * `administrator` (ADR 0081), or a member.
+ * `administrator` (ADR 0084), or a member.
  */
 const Role = z.enum(["owner", "admin", "member"]).openapi("Role");
 

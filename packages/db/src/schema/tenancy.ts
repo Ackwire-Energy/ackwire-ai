@@ -76,7 +76,7 @@ export const organizations = pgTable("organizations", {
 export const memberRoleEnum = pgEnum("member_role", ["owner", "member"]);
 
 /**
- * People in an organization (ADR 0081). `role` is only whether the person owns it: an `owner` may do everything,
+ * People in an organization (ADR 0084). `role` is only whether the person owns it: an `owner` may do everything,
  * including what no role grants (ownership, deleting the organization); a `member` may do what the `everyone` role
  * and their own roles (`organization_member_roles`) allow. An organization always keeps at least one owner.
  */
@@ -111,7 +111,7 @@ export const organizationMembers = pgTable(
 );
 
 /**
- * A workspace's roles (ADR 0081), Discord-like: a person holds any number and may do what any of them allows.
+ * A workspace's roles (ADR 0084), Discord-like: a person holds any number and may do what any of them allows.
  * `everyone` is the base every member holds without a row in `organization_member_roles`; there is exactly one
  * per organization, always below the others. `position` orders the rest, 0 the highest: whoever is higher
  * manages the roles and the people below. `permissions` holds `RolePermission` keys

@@ -66,7 +66,7 @@ export function targetHref(target: AgentActionTarget, channelId: string): AppHre
 
 export interface Viewer {
   userId: string | null;
-  /** They may manage agents here (`manage_agents`, ADR 0081). */
+  /** They may manage agents here (`manage_agents`, ADR 0084). */
   managesAgents: boolean;
   /** The agent that acted is this person's (they own it). */
   ownsAgent: boolean;

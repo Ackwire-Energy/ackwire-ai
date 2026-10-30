@@ -66,7 +66,7 @@ export async function addUser(db: Database, name: string) {
   return { id, name, email: `${name}-${id.slice(-8)}@example.com` };
 }
 
-/** How tests name people: `admin` is a member holding the workspace's "Admin" role (ADR 0081). */
+/** How tests name people: `admin` is a member holding the workspace's "Admin" role (ADR 0084). */
 export type TestRole = "owner" | "admin" | "member";
 
 /** The workspace's base and "Admin" roles, made when a test inserted the workspace itself. */

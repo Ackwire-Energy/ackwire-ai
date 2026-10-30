@@ -15,7 +15,7 @@ export const keys = {
   invitation: (token: string) => ["invitation", token] as const,
   org: (orgId: string) => ["org", orgId] as const,
   members: (orgId: string) => ["org", orgId, "members"] as const,
-  /** The workspace's roles (ADR 0081). */
+  /** The workspace's roles (ADR 0084). */
   roles: (orgId: string) => ["org", orgId, "roles"] as const,
   /** Under `members`: someone joining or leaving refreshes it too. */
   limits: (orgId: string) => ["org", orgId, "members", "limits"] as const,

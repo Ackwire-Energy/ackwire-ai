@@ -1,7 +1,7 @@
 import { type SQL, sql } from "@agenteschat/db";
 
 /**
- * What a role may grant in a workspace (ADR 0081), in five areas. Every member may also `read` (see the workspace,
+ * What a role may grant in a workspace (ADR 0084), in five areas. Every member may also `read` (see the workspace,
  * its people, agents and the channels open to them); only an owner may `manage_owners` (give and take ownership,
  * delete the workspace). Agents never hold these: what an agent may do comes from its own scopes (Tool Gateway).
  * The apps draw the roles screen from `PERMISSION_AREAS` (sent by `GET …/roles`) and name each key with i18n.
@@ -49,7 +49,7 @@ export const isRolePermission = (v: unknown): v is RolePermission =>
 
 /**
  * What the `everyone` role ("Todos") holds in a new workspace: what any member could do before roles, now as
- * keys (the same list as migration 0126).
+ * keys (the same list as migration 0128).
  */
 export const EVERYONE_DEFAULTS: readonly RolePermission[] = [
   "post",

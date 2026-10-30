@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import "./roles.css";
 
 /**
- * Picks roles (ADR 0081) from a menu that stays open: only the ones the person may give (below their own). The
+ * Picks roles (ADR 0084) from a menu that stays open: only the ones the person may give (below their own). The
  * trigger is a field-like button that names what's picked ("Só Todos" with none), or `trigger` (a "+" on a
  * person's row).
  */

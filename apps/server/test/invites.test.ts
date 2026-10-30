@@ -48,7 +48,7 @@ async function codeFor(b: Browser, token: string, email?: string) {
   if (checked.status !== 200) throw new Error(`check: ${checked.status} ${await checked.text()}`);
   return code;
 }
-/** The workspace's role holding `administrator` (its "Admin", ADR 0081), as the members screen reads it. */
+/** The workspace's role holding `administrator` (its "Admin", ADR 0084), as the members screen reads it. */
 async function adminRole(b: Browser, orgId: string) {
   const { roles } = (await (await b(`/api/app/organizations/${orgId}/roles`)).json()) as {
     roles: { id: string; permissions: string[] }[];

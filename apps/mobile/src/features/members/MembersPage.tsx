@@ -28,7 +28,7 @@ const COPIED_MS = 1800;
  * Membros, a screen of Você's for who invites people or manages members: the requests to join (they open in their
  * sheet) and the workspace's invitation link as the web's Members has it (ADR 0068: copy or share it, when it works
  * until, turn it off; links made before links could be shown again, to turn off; make one), for who invites; then
- * the people, each with their roles (ADR 0081).
+ * the people, each with their roles (ADR 0084).
  */
 export function MembersPage() {
   const { t, i18n } = useTranslation();

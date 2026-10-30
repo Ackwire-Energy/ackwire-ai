@@ -11,10 +11,10 @@ export const PreviewMeta = z.record(z.string(), z.unknown()).nullable().openapi(
 
 export const Role = z.enum(["owner", "member"]).openapi("Role", {
   description:
-    "Whether the person owns the workspace (ADR 0081). What a member may do comes from their roles (`roleIds`, `GET …/roles`) and is sent resolved as `permissions`.",
+    "Whether the person owns the workspace (ADR 0084). What a member may do comes from their roles (`roleIds`, `GET …/roles`) and is sent resolved as `permissions`.",
 });
 
-/** One person's resolved permissions in a workspace (ADR 0081): the apps hide what's not there. */
+/** One person's resolved permissions in a workspace (ADR 0084): the apps hide what's not there. */
 const Permissions = z.array(z.string()).openapi({
   description:
     "Everything this person may do here: their roles' keys and `everyone`'s, every key with `administrator`, all of them for an owner, plus `read` (any member) and `manage_owners` (owners).",

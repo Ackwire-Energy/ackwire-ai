@@ -52,7 +52,7 @@ export function SearchResults({ q }: { q: string }) {
     dms: dms.data ?? [],
     hits: hits.data ?? [],
   });
-  // "Novo agente" only for who may create one (ADR 0081).
+  // "Novo agente" only for who may create one (ADR 0084).
   const all = createsAgents ? found : { ...found, actions: found.actions.filter((a) => a !== "newAgent") };
   const counts = searchCounts(all);
   const r = filterResults(all, filter);

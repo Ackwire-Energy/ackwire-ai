@@ -24,7 +24,7 @@ import {
 } from "./permissions";
 
 /**
- * A workspace's roles (ADR 0081): Discord-like, a person holds any number and may do what any allows; `everyone`
+ * A workspace's roles (ADR 0084): Discord-like, a person holds any number and may do what any allows; `everyone`
  * ("Todos") is the base every member holds; order is hierarchy. Two rules keep it from being climbed: anyone but
  * an owner only touches roles below their own highest one (and people whose highest role is below theirs), and
  * never gives a key they don't hold themselves.
@@ -54,7 +54,7 @@ export interface RoleView {
   givable: boolean;
 }
 
-/** The base role and an "Admin" that holds `administrator`, for a new workspace (as migration 0126 did for the rest). */
+/** The base role and an "Admin" that holds `administrator`, for a new workspace (as migration 0128 did for the rest). */
 export async function createDefaultRoles(tx: Executor, orgId: string) {
   await tx.insert(orgRoles).values([
     {
@@ -372,7 +372,7 @@ export async function memberRoleIds(db: Executor, orgId: string, userId: string)
 }
 
 /**
- * Sets a member's roles to exactly `roleIds` (ADR 0081). Needs `manage_members`; anyone but an owner only touches
+ * Sets a member's roles to exactly `roleIds` (ADR 0084). Needs `manage_members`; anyone but an owner only touches
  * people below them (themselves aside) and only adds or removes roles below their own. An owner's roles are set
  * by owners only.
  */

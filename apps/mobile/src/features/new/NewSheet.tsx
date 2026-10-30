@@ -33,7 +33,7 @@ export function NewSheet() {
   const { t } = useTranslation();
   const api = useApi();
   const orgId = useOrgId();
-  // "Criar agente" only for who may create one (ADR 0081).
+  // "Criar agente" only for who may create one (ADR 0084).
   const createsAgents = can(useOrg().org, "create_agents");
   const dir = useDirectory();
   const list = useConversations();

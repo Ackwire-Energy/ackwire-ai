@@ -324,7 +324,7 @@ export interface ApiClient {
     /** The audit log, newest first (admins): agents' tool calls and people's changes. `before`: `next`. */
     audit(orgId: string, query?: AuditQuery & { before?: string; limit?: number }): Promise<AuditPage>;
   };
-  /** A workspace's roles (ADR 0081): every member reads them; who may manage roles changes those below theirs. */
+  /** A workspace's roles (ADR 0084): every member reads them; who may manage roles changes those below theirs. */
   roles: {
     list(orgId: string): Promise<OrgRoles>;
     create(orgId: string, input: RoleInput): Promise<{ id: string }>;

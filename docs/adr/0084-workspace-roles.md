@@ -1,9 +1,9 @@
-# 0081. Workspace roles: Discord-like roles that add up
+# 0084. Workspace roles: Discord-like roles that add up
 
 - Status: Accepted (built: the server, the shared client, the web and the phone app; channel and agent exceptions, and guests, come next)
 - Date: 2026-10-30
 - Revises: ADR 0006 (the fixed owner / admin / member table)
-- Code: `packages/engine/src/permissions.ts`, `packages/engine/src/roles.ts`, `packages/engine/src/organizations.ts` (`Membership`, `can`, `outranks`), `packages/db/src/schema/tenancy.ts` (`org_roles`, `organization_member_roles`), migration `0126_roles`, `apps/server/src/routes/app/roles.ts`, `packages/client/src/lib/permissions.ts`, `packages/client/src/lib/roles.ts`, `packages/ui/src/components/RoleMark.tsx`, `apps/web/src/components/roles/RolesSection.tsx`
+- Code: `packages/engine/src/permissions.ts`, `packages/engine/src/roles.ts`, `packages/engine/src/organizations.ts` (`Membership`, `can`, `outranks`), `packages/db/src/schema/tenancy.ts` (`org_roles`, `organization_member_roles`), migration `0128_roles`, `apps/server/src/routes/app/roles.ts`, `packages/client/src/lib/permissions.ts`, `packages/client/src/lib/roles.ts`, `packages/ui/src/components/RoleMark.tsx`, `apps/web/src/components/roles/RolesSection.tsx`
 
 ## Context
 
@@ -19,7 +19,7 @@ A workspace had three fixed roles. "Admin" meant everything but ownership, "memb
 6. **Order is hierarchy.** `position` orders the roles, 0 the highest; `everyone` is always below them all. A person's rank is their highest role's position. Anyone but an owner only changes, deletes, moves or gives roles below their own rank, and only changes the roles of people below them (themselves aside). An owner's roles only owners change.
 7. **Nobody gives what they can't do.** Creating or changing a role, anyone but an owner may only add or remove keys they hold themselves (`role.grant_forbidden`). `everyone` never holds `administrator`.
 8. **Invitations carry roles.** An email invitation and an approved request to join carry the roles the person gets on joining (`role_ids`, checked against the sender's rank); roles deleted since are skipped.
-9. **Every workspace starts with two roles**: `everyone` with what a member could do before (send messages, create channels, talk to agents, give missions, pair computers, edit the wiki, upload files) and "Admin" with `administrator`. Migration 0126 gave them to every workspace and moved its admins to "Admin".
+9. **Every workspace starts with two roles**: `everyone` with what a member could do before (send messages, create channels, talk to agents, give missions, pair computers, edit the wiki, upload files) and "Admin" with `administrator`. Migration 0128 gave them to every workspace and moved its admins to "Admin".
 10. **On screen** (Settings › Papéis e permissões): the roles as rows, each summed up in one sentence (its keys past `everyone`'s); the owner shown on top as a role. A role opens on its own page: its mark (the role's color in the agents' dither, the people tile's shape), the administrator switch, each area as a segmented control whose options carry the tool-review level swatches, item by item behind "Ajustar" (keys that come from `everyone` or from administrator show it and can't be turned off there), the people who hold it, and its name, color and icon. People and invitations show each person's roles as chips.
 11. **The operator API keeps its words.** Its `role` is `owner`, `admin` (holds `administrator`) or `member`; its admins list is the owners and the administrators.
 
