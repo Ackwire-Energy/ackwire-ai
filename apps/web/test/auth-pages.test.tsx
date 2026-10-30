@@ -7,6 +7,8 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { ApiError, type ImportInput, type InvitationPreview, type SignInOptions } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { rememberSignIn } from "@/components/SocialButtons";
+import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { ADA_ID, createFakeApi, fakeMachinesOf, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { createFakeAuth } from "./fake-auth";
 import { installTurnstile, removeTurnstile } from "./fake-turnstile";
@@ -141,6 +143,16 @@ describe("Entrar (e-mail primeiro)", () => {
     expect(screen().queryByLabelText("Senha")).toBeNull();
     await press(/Continuar com GitHub/);
     expect(calls[0]).toEqual({ method: "signInSocial", args: ["github", "/"] });
+  });
+
+  test("the provider used last is marked on a line under its button, which keeps only its mark and words", async () => {
+    rememberSignIn("github");
+    try {
+      await renderApp("/login", { api: authApi(ACCOUNT).api, auth: createFakeAuth().auth });
+      expect(screen().getByRole("button", { name: "Continuar com GitHub", description: "Último usado" })).toBeTruthy();
+    } finally {
+      storage.remove(STORAGE_KEYS.lastSignIn);
+    }
   });
 
   test("a misspelled webmail domain gets a one-click fix", async () => {
