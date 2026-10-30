@@ -786,7 +786,7 @@ export function accountRoutes(deps: AppDeps) {
       security,
       summary: "Delete a workspace (owners)",
       description:
-        "It closes to everyone now, like a suspended workspace (`org.deleting`, as an `org.deleting` org event), its work stops, and it is deleted for good 7 days later. Until then any owner can restore it (`DELETE …/deletion`). Proof that it's you: a sign-in in the last 10 minutes, else `password` (403 `reauth.sign_in` without one, `reauth.password` for a wrong one, 429 after 5 in 15 minutes). A workspace takes 3 deletions a day (429). Already being deleted, it answers 202 with its date, and nobody is told again. 403 `forbidden` for anyone but an owner, `org.suspended` while suspended.",
+        "It closes to everyone now, like a suspended workspace: requests answer 403 `org.deleting`, and its people's apps hear an `org.deleting` org event. Its work stops, and it is deleted for good 7 days later. Until then any owner can restore it (`DELETE …/deletion`). Proof that it's you: a sign-in in the last 10 minutes, else `password` (403 `reauth.sign_in` without one, `reauth.password` for a wrong one, 429 after 5 in 15 minutes). A workspace takes 3 deletions a day (429). Already being deleted, it answers 202 with its date, and nobody is told again. 403 `forbidden` for anyone but an owner, `org.suspended` while suspended.",
       request: {
         params: OrgParams,
         body: body(z.object({ password: z.string().min(1).max(128).optional() })),

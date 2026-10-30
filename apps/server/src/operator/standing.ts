@@ -67,7 +67,7 @@ const UserBlock = z
   })
   .openapi("OperatorUserBlock");
 
-export const DeletionHold = z
+const DeletionHold = z
   .object({
     held: z.boolean(),
     heldAt: z.string().nullable(),
