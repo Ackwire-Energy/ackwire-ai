@@ -1,11 +1,14 @@
-import type { Skill, SkillDetail, SkillFile } from "@agenteschat/client";
+import type { Skill, SkillChoice, SkillDetail, SkillFile } from "@agenteschat/client";
 import { useSkill, useSkillAction, useSkills, useSkillUsage } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
+import { pickSkills, skillChoicesOf } from "@agenteschat/client/lib/skills";
 import {
   Alert,
   Button,
   Card,
+  Checkbox,
   Chip,
   DetailsDialog,
   Dialog,
@@ -192,6 +195,9 @@ export function InstallSkillDialog({
   const [file, setFile] = useState<File | null>(null);
   const [form, setForm] = useState({ name: "", description: "", body: "" });
   const [error, setError] = useState<string | null>(null);
+  /** The skills a link holds when it holds several, and the ones picked. */
+  const [choices, setChoices] = useState<SkillChoice[] | null>(null);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const fileInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -199,6 +205,7 @@ export function InstallSkillDialog({
     setFile(null);
     setForm({ name: "", description: "", body: "" });
     setError(null);
+    setChoices(null);
   }, [open]);
   const githubOk = /^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(url.trim());
   const writeOk = form.name.trim() && form.description.trim() && form.body.trim();
@@ -208,12 +215,34 @@ export function InstallSkillDialog({
     onOpenChange(false);
     onInstalled(s.id);
   };
+  const pick = (paths: string[], on: boolean) => setPicked(pickSkills(picked, paths, on));
   const submit = async () => {
     setError(null);
-    const onError = (e: Error) => setError(e.message || t("common.unknownError"));
+    const onError = (e: Error) => setError(errorText(t, e));
     if (tab === "github") {
       if (!githubOk) return setError(t("skills.githubInvalid"));
-      action.mutate({ type: "import", input: { url: url.trim() } }, { onSuccess: done, onError });
+      if (!choices) {
+        const onSuccess = (result: unknown) => {
+          const found = skillChoicesOf(result);
+          if (!found) return done(result);
+          setChoices(found);
+          setPicked(new Set());
+        };
+        return action.mutate({ type: "import", input: { url: url.trim() } }, { onSuccess, onError });
+      }
+      if (picked.size === 0) return setError(t("skills.pickMissing"));
+      action.mutate(
+        { type: "importPicked", url: url.trim(), paths: choices.map((c) => c.path).filter((p) => picked.has(p)) },
+        {
+          onSuccess: (installed) => {
+            const list = installed as SkillDetail[];
+            if (list.length === 1) return done(list[0]);
+            toast.show(t("skills.installedMany", { count: list.length }));
+            onOpenChange(false);
+          },
+          onError,
+        },
+      );
     } else if (tab === "zip") {
       if (!file) return setError(t("skills.zipMissing"));
       const zipBase64 = await fileToBase64(file);
@@ -256,11 +285,45 @@ export function InstallSkillDialog({
               <Field label={t("skills.githubUrl")} id="skill-url" help={t("skills.githubHelp")}>
                 <Input
                   value={url}
-                  onChange={(e) => setUrl(e.target.value)}
+                  onChange={(e) => {
+                    setUrl(e.target.value);
+                    setChoices(null);
+                  }}
                   placeholder="https://github.com/…"
                   inputMode="url"
                 />
               </Field>
+              {choices && (
+                <fieldset className="skill-picks">
+                  <legend className="small muted">{t("skills.pickLead", { count: choices.length })}</legend>
+                  <label htmlFor="skill-pick-all" className="scope-row">
+                    <Checkbox
+                      id="skill-pick-all"
+                      checked={picked.size === 0 ? false : picked.size === choices.length ? true : "indeterminate"}
+                      onCheckedChange={(on) =>
+                        pick(
+                          choices.map((c) => c.path),
+                          on,
+                        )
+                      }
+                    />
+                    <span className="scope-row__text">{t("skills.pickAll")}</span>
+                  </label>
+                  {choices.map((c, i) => (
+                    <label key={c.path} htmlFor={`skill-pick-${i}`} className="scope-row">
+                      <Checkbox
+                        id={`skill-pick-${i}`}
+                        checked={picked.has(c.path)}
+                        onCheckedChange={(on) => pick([c.path], on)}
+                      />
+                      <span className="scope-row__text">
+                        <span className="skill-pick__name">{c.name}</span>
+                        <span className="small muted skill-pick__about">{c.description}</span>
+                      </span>
+                    </label>
+                  ))}
+                </fieldset>
+              )}
             </TabPanel>
             <TabPanel value="zip">
               <span className="small muted">{t("skills.zipHelp")}</span>

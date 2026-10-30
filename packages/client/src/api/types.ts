@@ -2268,6 +2268,14 @@ export interface SkillDetail extends Skill {
   files: SkillFile[];
 }
 
+/** A skill a GitHub link holds, offered to pick when it holds several. */
+export interface SkillChoice {
+  /** Its folder from the repository's root: what `importPicked` sends back. */
+  path: string;
+  name: string;
+  description: string;
+}
+
 /** `GET …/agents/{id}/skills`: every skill of the library, with whether this agent has it. */
 export interface AgentSkill extends Skill {
   enabled: boolean;

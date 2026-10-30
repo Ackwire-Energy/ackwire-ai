@@ -2813,6 +2813,25 @@ p {
 .skill-row .ac-chip {
   margin-left: 0;
 }
+.skill-picks {
+  margin: 12px 0 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.skill-picks > legend {
+  padding: 0;
+  margin-bottom: 4px;
+}
+.skill-pick__name {
+  font-weight: 600;
+}
+.skill-pick__about {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
 .skill-sheet {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 240px;

@@ -9,6 +9,7 @@ import {
   enabledSkills,
   getSkill,
   getSkillFile,
+  importPickedSkills,
   importSkillFromUrl,
   importSkillZip,
   listAgentScopes,
@@ -19,6 +20,7 @@ import {
   saveSkill,
   setAgentAccess,
   setAgentSkills,
+  type TooManyError,
   ValidationError,
 } from "../src";
 import { toolDetail } from "../src/tool-detail";
@@ -95,6 +97,42 @@ function zip(files: Record<string, string>) {
 }
 
 const skillDeps = () => ({ db: f.db, blobs: f.artifactDeps.blobs, resolveHost: async () => ["140.82.112.3"] });
+
+/** acme/skills as its archive holds it: under the archive's own folder, a skill with a skill inside, two more. */
+const REPOSITORY = {
+  "skills-main/README.md": "# Skills",
+  "skills-main/docs/guide.md": "# Guia",
+  "skills-main/relatorio-semanal/SKILL.md": SKILL_MD,
+  "skills-main/relatorio-semanal/templates/relatorio.md": "# Semana {{n}}",
+  "skills-main/relatorio-semanal/build.py": "print(1)",
+  "skills-main/relatorio-semanal/logo.png": "PNG",
+  "skills-main/relatorio-semanal/examples/inner/SKILL.md": "---\nname: inner\ndescription: Um exemplo.\n---\nx",
+  "skills-main/team/deploy/SKILL.md": "---\nname: deploy\ndescription: Antes de qualquer deploy.\n---\n# Deploy",
+  "skills-main/team/review/SKILL.md": "---\nname: review\ndescription: Revisa um pull request.\n---\n# Review",
+};
+
+/**
+ * Fake GitHub: github.com redirects acme/skills' archive to codeload (a branch by name, the default branch by its
+ * commit), which sends it; anything else is a 404. `limited`: every answer is GitHub limiting us, with these headers.
+ */
+function fakeGithub(options: { redirect?: string; limited?: Record<string, string>; status?: number } = {}) {
+  const fetched: string[] = [];
+  const fetch = async (url: string) => {
+    fetched.push(url);
+    if (options.limited) return new Response("slow down", { status: options.status ?? 429, headers: options.limited });
+    const ref = /^https:\/\/github\.com\/acme\/skills\/archive\/(.+)\.zip$/.exec(url)?.[1];
+    if (ref) {
+      const at = ref === "HEAD" ? "0123abc" : ref === "main" ? "refs/heads/main" : ref;
+      const location = options.redirect ?? `https://codeload.github.com/acme/skills/zip/${at}`;
+      return new Response(null, { status: 302, headers: { location } });
+    }
+    if (/^https:\/\/codeload\.github\.com\/acme\/skills\/zip\/(refs\/heads\/main|0123abc)$/.test(url)) {
+      return new Response(zip(REPOSITORY));
+    }
+    return new Response("404: Not Found", { status: 404 });
+  };
+  return { fetch, fetched };
+}
 
 describe("SKILL.md", () => {
   test("frontmatter and body; other fields kept; name and description validated", () => {
@@ -195,42 +233,115 @@ describe("import", () => {
     ).rejects.toThrow(/share the path/);
   });
 
-  test("a GitHub folder URL, fetched within limits; non-GitHub and private addresses are refused", async () => {
+  test("a skill's folder link: the repository's archive, through codeload's redirect, never the REST API", async () => {
     f = await setup();
-    const fetched: string[] = [];
-    const fake = async (url: string) => {
-      fetched.push(url);
-      if (url.startsWith("https://api.github.com/repos/acme/skills/contents/relatorio-semanal/templates")) {
-        return Response.json([{ type: "file", path: "relatorio-semanal/templates/relatorio.md", size: 14 }]);
-      }
-      if (url.startsWith("https://api.github.com/repos/acme/skills/contents/relatorio-semanal")) {
-        return Response.json([
-          { type: "file", path: "relatorio-semanal/SKILL.md", size: SKILL_MD.length },
-          { type: "file", path: "relatorio-semanal/build.py", size: 10 },
-          { type: "dir", path: "relatorio-semanal/templates", size: 0 },
-        ]);
-      }
-      if (url.endsWith("/relatorio-semanal/SKILL.md")) return new Response(SKILL_MD);
-      if (url.endsWith("/templates/relatorio.md")) return new Response("# Semana {{n}}");
-      if (url.endsWith("/relatorio-semanal/build.py")) return new Response("print(1)");
-      return new Response("not found", { status: 404 });
-    };
-    const deps = { ...skillDeps(), fetch: fake };
+    const github = fakeGithub();
+    const deps = { ...skillDeps(), fetch: github.fetch };
     const url = "https://github.com/acme/skills/tree/main/relatorio-semanal";
     const skill = await importSkillFromUrl(deps, f.owner.id, f.org.id, url);
     expect(skill).toMatchObject({ name: "relatorio-semanal", source: "url", sourceUrl: url });
-    expect(skill.files.map((x) => [x.path, x.status])).toEqual([
+    expect("files" in skill && skill.files.map((x) => [x.path, x.status])).toEqual([
       ["build.py", "script"],
+      ["examples/inner/SKILL.md", "stored"],
+      ["logo.png", "ignored"],
       ["templates/relatorio.md", "stored"],
     ]);
-    // Scripts are kept for the agent's computer (never shown to the model).
-    expect(fetched.some((u) => u.endsWith("build.py"))).toBe(true);
+    expect(github.fetched).toEqual([
+      "https://github.com/acme/skills/archive/main.zip",
+      "https://codeload.github.com/acme/skills/zip/refs/heads/main",
+    ]);
+
+    // A file in the folder, its SKILL.md included, is the folder: the same skill again, with its files.
+    const again = await importSkillFromUrl(
+      deps,
+      f.owner.id,
+      f.org.id,
+      "https://github.com/acme/skills/blob/main/relatorio-semanal/SKILL.md",
+    );
+    expect(again).toMatchObject({ name: "relatorio-semanal", version: 2 });
+    expect("files" in again && again.files.map((x) => x.path)).toContain("templates/relatorio.md");
+    expect(github.fetched.filter((u) => /api\.github\.com|raw\.githubusercontent\.com/.test(u))).toEqual([]);
 
     await expect(importSkillFromUrl(deps, f.owner.id, f.org.id, "https://example.com/SKILL.md")).rejects.toThrow(
       "GitHub",
     );
     const privateDns = { ...deps, resolveHost: async () => ["10.0.0.7"] };
     await expect(importSkillFromUrl(privateDns, f.owner.id, f.org.id, url)).rejects.toBeInstanceOf(ValidationError);
+    // A redirect off GitHub is refused like a link off GitHub.
+    const away = fakeGithub({ redirect: "https://example.com/acme.zip" });
+    await expect(importSkillFromUrl({ ...skillDeps(), fetch: away.fetch }, f.owner.id, f.org.id, url)).rejects.toThrow(
+      "Only GitHub URLs",
+    );
+    expect(away.fetched.some((u) => u.includes("example.com"))).toBe(false);
+  });
+
+  test("a repository holding several skills lists them by name and description; the picked ones install", async () => {
+    f = await setup();
+    const github = fakeGithub();
+    const deps = { ...skillDeps(), fetch: github.fetch };
+    const url = "https://github.com/acme/skills";
+    const listed = await importSkillFromUrl(deps, f.owner.id, f.org.id, url);
+    // The SKILL.md inside relatorio-semanal is one of its files, not a skill; nothing is installed yet.
+    expect(listed).toEqual({
+      choices: [
+        { path: "relatorio-semanal", name: "relatorio-semanal", description: expect.stringContaining("semanal") },
+        { path: "team/deploy", name: "deploy", description: "Antes de qualquer deploy." },
+        { path: "team/review", name: "review", description: "Revisa um pull request." },
+      ],
+    });
+    expect(await listSkills(f.db, f.owner.id, f.org.id)).toEqual([]);
+    expect(github.fetched).toEqual([
+      "https://github.com/acme/skills/archive/HEAD.zip",
+      "https://codeload.github.com/acme/skills/zip/0123abc",
+    ]);
+
+    const installed = await importPickedSkills(deps, f.owner.id, f.org.id, url, ["team/deploy", "relatorio-semanal"]);
+    expect(installed.map((s) => [s.name, s.sourceUrl])).toEqual([
+      ["deploy", "https://github.com/acme/skills/tree/HEAD/team/deploy"],
+      ["relatorio-semanal", "https://github.com/acme/skills/tree/HEAD/relatorio-semanal"],
+    ]);
+    expect(installed[1]?.files.map((x) => x.path)).toContain("examples/inner/SKILL.md");
+    expect((await listSkills(f.db, f.owner.id, f.org.id)).map((s) => s.name)).toEqual(["deploy", "relatorio-semanal"]);
+    await expect(importPickedSkills(deps, f.owner.id, f.org.id, url, ["docs"])).rejects.toThrow("no skill at docs");
+    // A folder holding skills lists only its own.
+    const team = await importSkillFromUrl(deps, f.owner.id, f.org.id, "https://github.com/acme/skills/tree/main/team");
+    expect("choices" in team && team.choices.map((c) => c.path)).toEqual(["team/deploy", "team/review"]);
+    expect(github.fetched.filter((u) => /api\.github\.com|raw\.githubusercontent\.com/.test(u))).toEqual([]);
+  });
+
+  test("errors say what happened: a hidden repository, a missing ref, GitHub limiting us, no SKILL.md", async () => {
+    f = await setup();
+    const refusal = async (url: string, github = fakeGithub()) => {
+      const err = await importSkillFromUrl({ ...skillDeps(), fetch: github.fetch }, f.owner.id, f.org.id, url).then(
+        () => null,
+        (e: ValidationError | TooManyError) => e,
+      );
+      return { kind: err?.constructor.name, code: err?.code, params: err?.params };
+    };
+    expect(await refusal("https://github.com/acme/secret/tree/main/x")).toEqual({
+      kind: "ValidationError",
+      code: "github.repo_missing",
+      params: { repo: "acme/secret" },
+    });
+    expect(await refusal("https://github.com/acme/skills/tree/v9/relatorio-semanal")).toEqual({
+      kind: "ValidationError",
+      code: "github.ref_missing",
+      params: { repo: "acme/skills", ref: "v9" },
+    });
+    expect(await refusal("https://github.com/acme/skills/tree/main/docs")).toEqual({
+      kind: "ValidationError",
+      code: "skill.no_skill_md",
+      params: { path: "acme/skills/docs" },
+    });
+    expect(await refusal("https://github.com/acme/skills", fakeGithub({ limited: { "retry-after": "120" } }))).toEqual({
+      kind: "TooManyError",
+      code: "github.limited",
+      params: { count: 2 },
+    });
+    // The REST API's way: a 403 with none remaining until the reset.
+    const reset = String(Math.floor(Date.now() / 1000) + 290);
+    const spent = fakeGithub({ limited: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": reset }, status: 403 });
+    expect(await refusal("https://github.com/acme/skills", spent)).toMatchObject({ params: { count: 5 } });
   });
 });
 

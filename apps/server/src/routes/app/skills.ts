@@ -3,6 +3,7 @@ import {
   deleteSkill,
   getSkill,
   getSkillFile,
+  importPickedSkills,
   importSkillFromUrl,
   importSkillZip,
   listSkills,
@@ -56,6 +57,13 @@ const SkillDetail = Skill.extend({
     }),
   ),
 }).openapi("SkillDetail");
+const SkillChoice = z
+  .object({
+    path: z.string().openapi({ description: "The skill's folder from the repository's root: what `paths` sends." }),
+    name: z.string(),
+    description: z.string(),
+  })
+  .openapi("SkillChoice");
 const SkillParams = OrgParams.extend({ skillId: z.uuid() });
 const SkillListItem = Skill.extend({
   agentsCount: z.number().openapi({ description: "Active agents with this skill turned on." }),
@@ -133,12 +141,21 @@ export function skillRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/skills/import",
       tags,
       security,
-      summary: "Import a skill: a GitHub URL (folder or SKILL.md) or a zip of the folder (base64)",
+      summary:
+        "Import a skill: a GitHub link (a skill's folder or a file in it, or a folder holding several to pick from) or a zip of the folder (base64)",
       request: {
         params: OrgParams,
         body: body(
           z.union([
-            z.object({ url: z.string().url().max(500) }),
+            z.object({
+              url: z.string().url().max(500),
+              paths: z
+                .array(z.string().max(500))
+                .min(1)
+                .max(100)
+                .optional()
+                .openapi({ description: "The skills picked among the link's `choices` (their `path`)." }),
+            }),
             z.object({
               zipBase64: z
                 .string()
@@ -148,13 +165,29 @@ export function skillRoutes(deps: AppDeps) {
           ]),
         ),
       },
-      responses: { 201: json(SkillDetail, "Created"), ...errors },
+      responses: {
+        200: json(
+          z.object({ choices: z.array(SkillChoice) }),
+          "The link holds several skills: nothing installed, send the ones picked in `paths`",
+        ),
+        201: json(
+          z.union([SkillDetail, z.object({ skills: z.array(SkillDetail) })]),
+          "Created: the skill, or `{ skills }` for `paths`",
+        ),
+        ...errors,
+      },
     }),
     async (c) => {
       const { orgId } = c.req.valid("param");
       const input = c.req.valid("json");
       const actor = c.get("user").id;
-      if ("url" in input) return c.json(await importSkillFromUrl(skills(), actor, orgId, input.url), 201);
+      if ("url" in input) {
+        if (input.paths) {
+          return c.json({ skills: await importPickedSkills(skills(), actor, orgId, input.url, input.paths) }, 201);
+        }
+        const result = await importSkillFromUrl(skills(), actor, orgId, input.url);
+        return "choices" in result ? c.json(result, 200) : c.json(result, 201);
+      }
       let zip: Uint8Array;
       try {
         zip = new Uint8Array(Buffer.from(input.zipBase64, "base64"));

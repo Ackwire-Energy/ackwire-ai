@@ -1,8 +1,9 @@
-import type { SkillDetail, SkillFile } from "@agenteschat/client";
+import type { SkillChoice, SkillDetail, SkillFile } from "@agenteschat/client";
 import { useSkill, useSkillAction, useSkills, useSkillUsage } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
+import { pickSkills, skillChoicesOf } from "@agenteschat/client/lib/skills";
 import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
 import { router } from "expo-router";
@@ -242,7 +243,8 @@ type InstallTab = "github" | "zip" | "write";
 
 /**
  * "Instalar skill", as the web's dialog: from a GitHub link, a .zip from Arquivos, or written here. "Instalar" in the
- * bar; while it works, the step it is on; done, the skill's page in its place.
+ * bar; while it works, the step it is on; done, the skill's page in its place. A link holding several skills lists
+ * them under the field, each checked to install, and "Instalar" installs those.
  */
 export function InstallSkillScreen() {
   const { t } = useTranslation();
@@ -255,6 +257,8 @@ export function InstallSkillScreen() {
   const [form, setForm] = useState({ name: "", description: "", body: "" });
   const [error, setError] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
+  const [choices, setChoices] = useState<SkillChoice[] | null>(null);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const busy = action.isPending || reading;
   const step = useStepText(busy, [
     t("skills.installStep.fetching"),
@@ -269,6 +273,7 @@ export function InstallSkillScreen() {
     router.replace(`/settings/skills/${s.id}`);
   };
   const onError = (e: unknown) => setError(errorText(t, e));
+  const togglePick = (paths: string[], on: boolean) => setPicked(pickSkills(picked, paths, on));
   const pickZip = async () => {
     const res = await DocumentPicker.getDocumentAsync({
       type: ["application/zip", "application/x-zip-compressed"],
@@ -288,7 +293,29 @@ export function InstallSkillScreen() {
         setError(t("skills.githubInvalid"));
         return;
       }
-      action.mutate({ type: "import", input: { url: url.trim() } }, { onSuccess: done, onError });
+      if (!choices) {
+        const onSuccess = (result: unknown) => {
+          const found = skillChoicesOf(result);
+          if (!found) return done(result);
+          setChoices(found);
+          setPicked(new Set());
+        };
+        action.mutate({ type: "import", input: { url: url.trim() } }, { onSuccess, onError });
+        return;
+      }
+      if (picked.size === 0) {
+        setError(t("skills.pickMissing"));
+        return;
+      }
+      const paths = choices.map((c) => c.path).filter((p) => picked.has(p));
+      const onSuccess = (installed: unknown) => {
+        const list = installed as SkillDetail[];
+        if (list.length === 1) return done(list[0]);
+        successHaptic();
+        toast({ title: t("skills.installedMany", { count: list.length }), icon: "check" });
+        goBack();
+      };
+      action.mutate({ type: "importPicked", url: url.trim(), paths }, { onSuccess, onError });
       return;
     }
     if (tab === "zip") {
@@ -343,7 +370,10 @@ export function InstallSkillScreen() {
           <GroupedHeader>{t("skills.githubUrl")}</GroupedHeader>
           <TextArea
             value={url}
-            onChangeText={setUrl}
+            onChangeText={(next) => {
+              setUrl(next);
+              setChoices(null);
+            }}
             placeholder="https://github.com/…"
             multiline={false}
             minHeight={50}
@@ -354,7 +384,33 @@ export function InstallSkillScreen() {
             onSubmitEditing={() => void submit()}
             accessibilityLabel={t("skills.githubUrl")}
           />
-          <GroupedFooter>{t("skills.githubHelp")}</GroupedFooter>
+          <GroupedFooter>
+            {choices ? t("skills.pickLead", { count: choices.length }) : t("skills.githubHelp")}
+          </GroupedFooter>
+          {choices ? (
+            <GroupedList>
+              <GroupedRow
+                label={t("skills.pickAll")}
+                checked={picked.size === choices.length}
+                onPress={() =>
+                  togglePick(
+                    choices.map((c) => c.path),
+                    picked.size < choices.length,
+                  )
+                }
+              />
+              {choices.map((c) => (
+                <GroupedRow
+                  key={c.path}
+                  label={c.name}
+                  sub={c.description}
+                  subLines={2}
+                  checked={picked.has(c.path)}
+                  onPress={() => togglePick([c.path], !picked.has(c.path))}
+                />
+              ))}
+            </GroupedList>
+          ) : null}
         </>
       ) : tab === "zip" ? (
         <>

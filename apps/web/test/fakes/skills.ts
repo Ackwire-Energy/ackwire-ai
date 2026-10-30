@@ -1,12 +1,18 @@
 /**
  * Test fake — skills (apps/server/src/routes/app/skills.ts), same shapes:
- * - `GET/POST …/skills`, `POST …/skills/import { url } | { zipBase64 }`, `GET/PATCH/DELETE …/skills/{id}`,
- *   `POST …/skills/{id}/reimport`
+ * - `GET/POST …/skills`, `POST …/skills/import { url } | { url, paths } | { zipBase64 }`,
+ *   `GET/PATCH/DELETE …/skills/{id}`, `POST …/skills/{id}/reimport`
  * - `GET/PUT …/agents/{id}/skills` → `{ skills: (Skill & { enabled })[] }`
- * Scripts are listed as `ignored` (never run).
+ * A repository's root holds three skills (`{ choices }`); `acme/secret` is private. Scripts are listed as `ignored`.
  */
-import type { ApiClient, SkillDetail } from "@agenteschat/client";
+import { type ApiClient, ApiError, type SkillDetail } from "@agenteschat/client";
 import { clone, type MockContext, MockNotFoundError, mockId, perOrg } from "./context";
+
+const CHOICES = [
+  { path: "skills/deploy", name: "deploy", description: "Antes de qualquer deploy." },
+  { path: "skills/review", name: "review", description: "Revisa um pull request." },
+  { path: "skills/triage", name: "triage", description: "Organiza as issues novas." },
+];
 
 export function createFakeSkills(
   ctx: MockContext,
@@ -102,6 +108,12 @@ export function createFakeSkills(
     import: async (orgId, input) => {
       log("skills.import", orgId, input);
       const url = "url" in input ? input.url : null;
+      if (url?.includes("/acme/secret")) {
+        throw new ApiError(400, "github.repo_missing", "acme/secret is private or doesn't exist on GitHub", {
+          repo: "acme/secret",
+        });
+      }
+      if (url && /^https:\/\/github\.com\/[^/]+\/[^/]+\/?$/.test(url)) return { choices: clone(CHOICES) };
       const name = url ? (url.split("/").filter(Boolean).pop() ?? "skill") : "Skill enviada";
       return make(orgId, {
         name,
@@ -112,6 +124,26 @@ export function createFakeSkills(
         defaultForNewAgents: false,
         files: [{ path: "SKILL.md", size: 10, mime: "text/markdown", status: "stored" }],
       });
+    },
+    importPicked: async (orgId, url, paths) => {
+      log("skills.importPicked", orgId, url, paths);
+      const installed: SkillDetail[] = [];
+      for (const path of paths) {
+        const choice = CHOICES.find((c) => c.path === path);
+        if (!choice) throw new MockNotFoundError("Skill não encontrada.");
+        installed.push(
+          await make(orgId, {
+            name: choice.name,
+            description: choice.description,
+            body: `# ${choice.name}`,
+            source: "url",
+            sourceUrl: `${url}/tree/HEAD/${path}`,
+            defaultForNewAgents: false,
+            files: [{ path: "SKILL.md", size: 10, mime: "text/markdown", status: "stored" }],
+          }),
+        );
+      }
+      return installed;
     },
     update: async (orgId, id, patch) => {
       log("skills.update", orgId, id, patch);

@@ -177,6 +177,7 @@ import type {
   ServerTelemetry,
   SignInOptions,
   Skill,
+  SkillChoice,
   SkillDetail,
   SkillInput,
   SkillPatch,
@@ -578,8 +579,16 @@ export interface ApiClient {
     get(orgId: string, id: string): Promise<SkillDetail>;
     /** "Escrever". */
     create(orgId: string, input: SkillInput): Promise<SkillDetail>;
-    /** A GitHub link (folder or SKILL.md) or the folder as a zip in base64 (writes are JSON only). */
-    import(orgId: string, input: { url: string } | { zipBase64: string }): Promise<SkillDetail>;
+    /**
+     * A GitHub link (a skill's folder or a file in it) or the folder as a zip in base64 (writes are JSON only). A link
+     * holding several skills installs nothing and answers with them to pick from (`importPicked`).
+     */
+    import(
+      orgId: string,
+      input: { url: string } | { zipBase64: string },
+    ): Promise<SkillDetail | { choices: SkillChoice[] }>;
+    /** Installs the skills picked among a link's choices (their `path`). */
+    importPicked(orgId: string, url: string, paths: string[]): Promise<SkillDetail[]>;
     update(orgId: string, id: string, patch: SkillPatch): Promise<SkillDetail>;
     /** Fetch the link again (`url` skills). */
     reimport(orgId: string, id: string): Promise<SkillDetail>;

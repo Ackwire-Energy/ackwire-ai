@@ -2,11 +2,11 @@ import type { BlobStoreResolver } from "@agenteschat/adapters";
 import { and, asc, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
-import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
+import { ForbiddenError, NotFoundError, TooManyError, ValidationError } from "./errors";
 import { assertStorageRoom } from "./limits";
 import { assertPublicHttpsUrl, type ResolveHost } from "./net-guard";
 import { can, requirePermission } from "./organizations";
-import { readZip } from "./zip";
+import { inflateZipEntry, listZip, readZip, type ZipListing } from "./zip";
 
 const { skills, skillFiles, agentSkills } = schema;
 
@@ -369,7 +369,7 @@ export async function importSkillZip(deps: SkillDeps, actorId: string, orgId: st
   return saveSkill(deps, actorId, orgId, { ...parseSkillMarkdown(skillMd), source: "upload", files });
 }
 
-const GITHUB_HOSTS = new Set(["github.com", "raw.githubusercontent.com", "api.github.com"]);
+const GITHUB_HOSTS = new Set(["github.com", "raw.githubusercontent.com", "api.github.com", "codeload.github.com"]);
 
 /** Outbound HTTP and DNS for GitHub reads (tests: fakes). */
 export interface GithubFetchDeps {
@@ -377,117 +377,311 @@ export interface GithubFetchDeps {
   resolveHost?: ResolveHost;
 }
 
+export interface GithubFetchOptions {
+  maxBytes: number;
+  tooLarge: string;
+  /** Redirects followed, each hop checked as the first request is. None by default: a redirect is refused. */
+  redirects?: number;
+  /** Over the whole exchange, body included (default 15 s). */
+  timeoutMs?: number;
+}
+
 /**
- * GET one GitHub URL (github.com, raw.githubusercontent.com or api.github.com
- * only), with the SSRF guard, no redirects, a 15 s timeout and a size cap.
+ * Minutes until GitHub stops limiting this server, or null when it isn't. GitHub answers 403 or 429 and says when
+ * to retry in `retry-after` (seconds), else in `x-ratelimit-reset` once none remain, else "at least one minute"
+ * (docs.github.com, "Rate limits for the REST API").
  */
-export async function fetchGithub(
-  deps: GithubFetchDeps,
-  url: string,
-  accept: string,
-  limit: { maxBytes: number; tooLarge: string } = {
-    maxBytes: SKILL_LIMITS.maxBytes,
-    tooLarge: "The skill is too large (max 2 MB)",
-  },
-) {
-  const u = await assertPublicHttpsUrl(url, deps.resolveHost);
-  if (!GITHUB_HOSTS.has(u.hostname)) throw new ValidationError("Only GitHub URLs can be imported for now");
+function githubWaitMinutes(res: Response): number | null {
+  const retryAfter = Number(res.headers.get("retry-after"));
+  const spent = res.headers.get("x-ratelimit-remaining") === "0";
+  if (res.status !== 429 && !(res.status === 403 && (spent || retryAfter > 0))) return null;
+  const reset = Number(res.headers.get("x-ratelimit-reset"));
+  const seconds = retryAfter > 0 ? retryAfter : spent && reset > 0 ? reset - Date.now() / 1000 : 60;
+  return Math.max(1, Math.ceil(seconds / 60));
+}
+
+/** One GET to a GitHub host through the SSRF guard (on every hop); GitHub limiting this server is refused as such. */
+async function githubGet(deps: GithubFetchDeps, url: string, accept: string, options: GithubFetchOptions) {
   const http = deps.fetch ?? ((input: string, init?: RequestInit) => fetch(input, init));
-  const res = await http(u.toString(), {
-    headers: { accept, "user-agent": "agentes.chat" },
-    redirect: "error",
-    signal: AbortSignal.timeout(15_000),
-  }).catch(() => {
-    throw new ValidationError("Could not reach GitHub");
-  });
-  if (!res.ok) throw new ValidationError(`GitHub answered ${res.status} for ${u.pathname}`);
-  const length = Number(res.headers.get("content-length") ?? 0);
-  if (length > limit.maxBytes) throw new ValidationError(limit.tooLarge);
-  const data = new Uint8Array(await res.arrayBuffer());
-  if (data.byteLength > limit.maxBytes) throw new ValidationError(limit.tooLarge);
-  return data;
+  const signal = AbortSignal.timeout(options.timeoutMs ?? 15_000);
+  const redirects = options.redirects ?? 0;
+  let next = url;
+  for (let hop = 0; ; hop++) {
+    const at = await assertPublicHttpsUrl(next, deps.resolveHost);
+    if (!GITHUB_HOSTS.has(at.hostname)) throw new ValidationError("Only GitHub URLs can be imported for now");
+    const res = await http(at.toString(), {
+      headers: { accept, "user-agent": "agentes.chat" },
+      redirect: redirects > 0 ? "manual" : "error",
+      signal,
+    }).catch(() => {
+      throw new ValidationError("Could not reach GitHub");
+    });
+    const location = res.headers.get("location");
+    if (hop < redirects && res.status >= 300 && res.status < 400 && location) {
+      await res.body?.cancel();
+      next = new URL(location, at).toString();
+      continue;
+    }
+    const minutes = githubWaitMinutes(res);
+    if (minutes !== null) {
+      throw new TooManyError(`GitHub is limiting downloads for now. Try again in ${minutes} min.`, "github.limited", {
+        count: minutes,
+      });
+    }
+    return { res, at };
+  }
 }
 
-const fetchChecked = (deps: SkillDeps, url: string, accept: string) => fetchGithub(deps, url, accept);
-
-/**
- * Where a GitHub URL points: a folder (`/tree/{ref}/{path}`) or one
- * `SKILL.md` (`/blob/…` or raw.githubusercontent).
- */
-export function parseGithubUrl(url: string) {
-  const u = new URL(url);
-  if (u.hostname === "raw.githubusercontent.com") {
-    const [owner, repo, ref, ...rest] = u.pathname.split("/").filter(Boolean);
-    if (!owner || !repo || !ref || rest.length === 0) throw new ValidationError("Unrecognized GitHub URL");
-    return { kind: "file" as const, owner, repo, ref, path: rest.join("/") };
-  }
-  if (u.hostname !== "github.com") throw new ValidationError("Only GitHub URLs can be imported for now");
-  const [owner, repo, mode, ref, ...rest] = u.pathname.split("/").filter(Boolean);
-  if (!owner || !repo) throw new ValidationError("Unrecognized GitHub URL");
-  if (mode === "blob" && ref) return { kind: "file" as const, owner, repo, ref, path: rest.join("/") };
-  return { kind: "folder" as const, owner, repo, ref: mode === "tree" && ref ? ref : "HEAD", path: rest.join("/") };
-}
-
-/**
- * Import from GitHub (a folder or a `SKILL.md`), fetched by the backend with
- * a 2 MB / 200 files limit; only GitHub hosts, and the SSRF guard on every
- * request. Importing the same skill again makes a new version.
- */
-export async function importSkillFromUrl(deps: SkillDeps, actorId: string, orgId: string, url: string) {
-  await requirePermission(deps.db, actorId, orgId, "manage_agents");
-  const target = parseGithubUrl(url);
-  const raw = (path: string) =>
-    `https://raw.githubusercontent.com/${target.owner}/${target.repo}/${target.ref}/${path.split("/").map(encodeURIComponent).join("/")}`;
-  if (target.kind === "file") {
-    const text = new TextDecoder().decode(await fetchChecked(deps, raw(target.path), "text/plain"));
-    return saveSkill(deps, actorId, orgId, { ...parseSkillMarkdown(text), source: "url", sourceUrl: url });
-  }
-  // Folder: list it through the contents API (recursively, within limits), then fetch each file raw.
-  const files: SkillFileInput[] = [];
-  let total = 0;
-  const walk = async (dir: string, depth: number) => {
-    if (depth > 4) return;
-    const listing = JSON.parse(
-      new TextDecoder().decode(
-        await fetchChecked(
-          deps,
-          `https://api.github.com/repos/${target.owner}/${target.repo}/contents/${dir}?ref=${encodeURIComponent(target.ref)}`,
-          "application/vnd.github+json",
-        ),
-      ),
-    ) as { type: string; path: string; size: number }[];
-    if (!Array.isArray(listing)) throw new ValidationError("That URL is not a folder");
-    for (const item of listing) {
-      if (files.length >= SKILL_LIMITS.maxFiles) throw new ValidationError("Too many files (max 200)");
-      const relative = target.path ? item.path.slice(target.path.length + 1) : item.path;
-      if (item.type === "dir") await walk(item.path, depth + 1);
-      else if (item.type === "file") {
-        total += item.size;
-        if (total > SKILL_LIMITS.maxBytes) throw new ValidationError("The skill is too large (max 2 MB)");
-        // Binaries aren't downloaded (only listed); text and scripts are.
-        const data =
-          classifyFile(item.path).status !== "ignored"
-            ? await fetchChecked(deps, raw(item.path), "*/*")
-            : new Uint8Array();
-        files.push({ path: relative, data });
+/** A success's body, refused past `maxBytes` while it streams (codeload sends no length). */
+async function githubBody(res: Response, at: URL, options: GithubFetchOptions) {
+  if (!res.ok) throw new ValidationError(`GitHub answered ${res.status} for ${at.pathname}`);
+  if (Number(res.headers.get("content-length") ?? 0) > options.maxBytes) throw new ValidationError(options.tooLarge);
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    if (res.body) {
+      for await (const chunk of res.body) {
+        size += chunk.byteLength;
+        if (size > options.maxBytes) throw new ValidationError(options.tooLarge);
+        chunks.push(chunk);
       }
     }
-  };
-  await walk(target.path, 0);
-  const { skillMd, files: rest } = splitSkillFolder(files);
-  return saveSkill(deps, actorId, orgId, {
-    ...parseSkillMarkdown(skillMd),
-    source: "url",
-    sourceUrl: url,
-    files: rest,
+  } catch (err) {
+    if (err instanceof ValidationError) throw err;
+    throw new ValidationError("Could not reach GitHub");
+  }
+  return Buffer.concat(chunks);
+}
+
+/**
+ * GET one GitHub URL (github.com, raw.githubusercontent.com, api.github.com or codeload.github.com only), with the
+ * SSRF guard, no redirects unless `options.redirects`, a timeout and a size cap.
+ */
+export async function fetchGithub(deps: GithubFetchDeps, url: string, accept: string, options: GithubFetchOptions) {
+  const { res, at } = await githubGet(deps, url, accept, options);
+  return githubBody(res, at, options);
+}
+
+/**
+ * Where a GitHub URL points: a folder (the repository, or `/tree/{ref}/{path}`) or a file (`/blob/…` or
+ * raw.githubusercontent), with its path decoded. No ref is the default branch (`HEAD`).
+ */
+export function parseGithubUrl(url: string) {
+  let u: URL;
+  let segments: string[];
+  try {
+    u = new URL(url);
+    segments = u.pathname.split("/").filter(Boolean).map(decodeURIComponent);
+  } catch {
+    throw new ValidationError("Unrecognized GitHub URL");
+  }
+  if (u.hostname === "raw.githubusercontent.com") {
+    const [owner, repo, ...rest] = segments;
+    // GitHub's Raw button spells the branch out: `refs/heads/main/…`.
+    const [ref, ...path] = rest[0] === "refs" && (rest[1] === "heads" || rest[1] === "tags") ? rest.slice(2) : rest;
+    if (!owner || !repo || !ref || path.length === 0) throw new ValidationError("Unrecognized GitHub URL");
+    return { kind: "file" as const, owner, repo, ref, path: path.join("/") };
+  }
+  if (u.hostname !== "github.com") throw new ValidationError("Only GitHub URLs can be imported for now");
+  const [owner, name, mode, ref, ...rest] = segments;
+  const repo = name?.replace(/\.git$/, "");
+  if (!owner || !repo) throw new ValidationError("Unrecognized GitHub URL");
+  if (mode === "blob" && ref) return { kind: "file" as const, owner, repo, ref, path: rest.join("/") };
+  if (mode === "tree" && ref) return { kind: "folder" as const, owner, repo, ref, path: rest.join("/") };
+  return { kind: "folder" as const, owner, repo, ref: "HEAD", path: "" };
+}
+
+type GithubTarget = ReturnType<typeof parseGithubUrl>;
+
+/** A repository's archive is downloaded whole: past this size a link into it can't be read. */
+const ARCHIVE: GithubFetchOptions = {
+  maxBytes: 50 * 1024 * 1024,
+  tooLarge: "The repository is too large to download (max 50 MB). Upload the skill's folder as a .zip instead.",
+  // github.com redirects to codeload.github.com, and first to the new name of a renamed repository.
+  redirects: 3,
+  timeoutMs: 60_000,
+};
+
+/** How deep below a link a SKILL.md is looked for, and how many skills one link may hold. */
+const SKILL_SEARCH = { depth: 6, max: 100 };
+
+const encodePath = (path: string) => path.split("/").map(encodeURIComponent).join("/");
+
+/**
+ * The repository at the link's ref, from its zip archive (`github.com/{owner}/{repo}/archive/{ref}.zip`, served by
+ * codeload.github.com): one download, outside the REST API, where unauthenticated calls share one limit per server
+ * address (60 an hour) that every workspace's imports would spend. Its files by path from the repository's root,
+ * symbolic links left out.
+ */
+async function githubRepository(deps: SkillDeps, target: GithubTarget) {
+  const repo = `${target.owner}/${target.repo}`;
+  const archive = `https://github.com/${encodePath(repo)}/archive/${encodePath(target.ref)}.zip`;
+  const { res, at } = await githubGet(deps, archive, "application/zip", ARCHIVE);
+  if (res.status === 404) {
+    // github.com hides a private or missing repository; past its redirect, codeload lacks the ref.
+    if (at.hostname === "codeload.github.com" && target.ref !== "HEAD") {
+      throw new ValidationError(`${repo} has no branch, tag or commit ${target.ref}`, "github.ref_missing", {
+        repo,
+        ref: target.ref,
+      });
+    }
+    throw new ValidationError(`${repo} is private or doesn't exist on GitHub`, "github.repo_missing", { repo });
+  }
+  const zip = await githubBody(res, at, ARCHIVE);
+  const files = new Map<string, ZipListing>();
+  for (const entry of listZip(zip)) {
+    // Every path starts with the archive's own folder (`{repo}-{ref}/`).
+    const slash = entry.path.indexOf("/");
+    if (!entry.symlink && slash > 0) files.set(entry.path.slice(slash + 1), entry);
+  }
+  return { zip, files };
+}
+
+type GithubRepository = Awaited<ReturnType<typeof githubRepository>>;
+
+/**
+ * The skill folders at or below `folder`, each with its SKILL.md, by path. A SKILL.md inside another skill's folder
+ * is a file of that skill, not a skill of its own.
+ */
+function skillFolders(files: GithubRepository["files"], folder: string) {
+  const depth = (dir: string) => (dir ? dir.split("/").length : 0);
+  const prefix = folder ? `${folder}/` : "";
+  const found = [...files]
+    .filter(([path]) => path.startsWith(prefix) && /(^|\/)skill\.md$/i.test(path))
+    .map(([path, entry]) => [path.slice(0, Math.max(0, path.lastIndexOf("/"))), entry] as const)
+    .filter(([dir]) => depth(dir) - depth(folder) <= SKILL_SEARCH.depth)
+    .sort(([a], [b]) => depth(a) - depth(b));
+  const skills = new Map<string, ZipListing>();
+  for (const [dir, entry] of found) {
+    if (![...skills.keys()].some((s) => s === "" || dir === s || dir.startsWith(`${s}/`))) skills.set(dir, entry);
+  }
+  return new Map([...skills].sort(([a], [b]) => (a < b ? -1 : 1)));
+}
+
+/** A skill folder of the repository, within the skill limits as an upload is: binaries are listed, never read. */
+function repositorySkill(repository: GithubRepository, dir: string) {
+  const prefix = dir ? `${dir}/` : "";
+  const inside = [...repository.files].filter(([path]) => path.startsWith(prefix));
+  if (inside.length > SKILL_LIMITS.maxFiles) throw new ValidationError(`Too many files (max ${SKILL_LIMITS.maxFiles})`);
+  if (inside.reduce((n, [, entry]) => n + entry.size, 0) > SKILL_LIMITS.maxBytes) {
+    throw new ValidationError("The skill is too large (max 2 MB)");
+  }
+  const { skillMd, files } = splitSkillFolder(
+    inside.map(([path, entry]) => {
+      const relative = path.slice(prefix.length);
+      const ignored = classifyFile(relative).status === "ignored";
+      return { path: relative, data: ignored ? new Uint8Array() : inflateZipEntry(repository.zip, entry) };
+    }),
+  );
+  return { ...parseSkillMarkdown(skillMd), files };
+}
+
+/** A skill a GitHub link holds, offered to pick when it holds several. `path`: its folder from the repository's root. */
+export interface SkillChoice {
+  path: string;
+  name: string;
+  description: string;
+}
+
+/** What a GitHub link holds: the repository and the skill folders at or below the link (a file's: its folder's). */
+async function readGithubLink(deps: SkillDeps, url: string) {
+  const target = parseGithubUrl(url);
+  const repository = await githubRepository(deps, target);
+  const folder = target.kind === "file" ? target.path.split("/").slice(0, -1).join("/") : target.path;
+  const found = skillFolders(repository.files, folder);
+  const repo = `${target.owner}/${target.repo}`;
+  if (found.size === 0) {
+    const where = folder ? `${repo}/${folder}` : repo;
+    throw new ValidationError(`No SKILL.md in ${where} or the folders inside it`, "skill.no_skill_md", { path: where });
+  }
+  if (found.size > SKILL_SEARCH.max) {
+    throw new ValidationError(
+      `That link holds more than ${SKILL_SEARCH.max} skills. Link one of its folders.`,
+      "skill.too_many_skills",
+      { max: SKILL_SEARCH.max },
+    );
+  }
+  /** The skill at `dir`, ready to save: from the link itself when it points at the skill, else from its folder. */
+  const skillAt = (dir: string) => ({
+    ...repositorySkill(repository, dir),
+    source: "url" as const,
+    sourceUrl:
+      dir === folder ? url : `https://github.com/${encodePath(repo)}/tree/${encodePath(target.ref)}/${encodePath(dir)}`,
   });
+  return { repository, found, skillAt };
+}
+
+/**
+ * Import from a GitHub link, read by the backend from the repository's archive (only GitHub hosts, the SSRF guard
+ * on every request, 2 MB and 200 files a skill): the skill folder it points at (a file's folder), or the one skill
+ * below it. A link that holds several answers with them to pick from (`importPickedSkills`), nothing installed.
+ * Installing a skill whose name is already installed makes a new version.
+ */
+export async function importSkillFromUrl(
+  deps: SkillDeps,
+  actorId: string,
+  orgId: string,
+  url: string,
+): Promise<SkillDetail | { choices: SkillChoice[] }> {
+  await requirePermission(deps.db, actorId, orgId, "manage_agents");
+  const link = await readGithubLink(deps, url);
+  const [only, ...more] = link.found.keys();
+  if (only !== undefined && more.length === 0) return saveSkill(deps, actorId, orgId, link.skillAt(only));
+  // A SKILL.md that can't be installed (past the skill limit, or that doesn't parse) isn't offered.
+  let refused: unknown;
+  const choices = [...link.found].flatMap(([path, entry]) => {
+    try {
+      if (entry.size > SKILL_LIMITS.maxBytes) throw new ValidationError("The skill is too large (max 2 MB)");
+      const { name, description } = parseSkillMarkdown(
+        new TextDecoder().decode(inflateZipEntry(link.repository.zip, entry)),
+      );
+      return [{ path, name, description }];
+    } catch (err) {
+      if (!(err instanceof ValidationError)) throw err;
+      refused ??= err;
+      return [];
+    }
+  });
+  if (choices.length === 0) throw refused;
+  return { choices };
+}
+
+/** Installs the skills picked among a link's choices (`paths`, as `importSkillFromUrl` gave them). */
+export async function importPickedSkills(
+  deps: SkillDeps,
+  actorId: string,
+  orgId: string,
+  url: string,
+  paths: string[],
+) {
+  await requirePermission(deps.db, actorId, orgId, "manage_agents");
+  const link = await readGithubLink(deps, url);
+  // Every pick is checked before any is saved; a refusal names the skill's folder.
+  const skills = [...new Set(paths)].map((dir) => {
+    if (!link.found.has(dir)) throw new ValidationError(`That link holds no skill at ${dir}`);
+    try {
+      return link.skillAt(dir);
+    } catch (err) {
+      if (err instanceof ValidationError) throw new ValidationError(`${dir}: ${err.message}`, err.code, err.params);
+      throw err;
+    }
+  });
+  const twin = skills.find((s, i) => skills.findIndex((other) => other.name === s.name) !== i);
+  if (twin) throw new ValidationError(`Two of the skills picked are named ${twin.name}. Pick one of them.`);
+  const installed: SkillDetail[] = [];
+  for (const skill of skills) installed.push(await saveSkill(deps, actorId, orgId, skill));
+  return installed;
 }
 
 /** Imports the skill again from where it came (a new version). */
 export async function reimportSkill(deps: SkillDeps, actorId: string, orgId: string, id: string) {
   const s = await loadSkill(deps.db, orgId, id);
   if (!s.sourceUrl) throw new ValidationError("This skill wasn't imported from a URL");
-  return importSkillFromUrl(deps, actorId, orgId, s.sourceUrl);
+  const again = await importSkillFromUrl(deps, actorId, orgId, s.sourceUrl);
+  if ("choices" in again) {
+    throw new ValidationError("Its link holds several skills now. Install this one again from its own folder.");
+  }
+  return again;
 }
 
 export async function listSkills(db: Database, actorId: string, orgId: string) {
