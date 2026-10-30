@@ -101,6 +101,24 @@ const Org = z
     }),
     limits: LimitsState,
     meters: Meters,
+    deletion: z
+      .object({
+        dueAt: z.string().openapi({ description: "When it is deleted for good, unless a hold keeps it longer." }),
+        requestedAt: z.string().nullable(),
+        requestedBy: z.string().nullable().openapi({ description: "Who asked; null once their account is gone." }),
+      })
+      .nullable()
+      .openapi({
+        description:
+          "Its deletion, asked by an owner or with its only member's account: closed until `dueAt`. Null when it isn't being deleted.",
+      }),
+    deletionHold: z
+      .object({
+        heldAt: z.string(),
+        reason: z.string().nullable(),
+      })
+      .nullable()
+      .openapi({ description: "The operator's deletion hold (`PUT /orgs/{orgId}/deletion-hold`); null when none." }),
   })
   .openapi("OperatorOrg");
 
@@ -190,6 +208,15 @@ export function registerOperatorOrgs(api: OpenAPIHono, { db, version, humanCheck
           createdAt: org.createdAt.toISOString(),
           standing: standingJson(org.standing),
           limits: limitsJson(org.limits),
+          deletion: org.deletion && {
+            dueAt: org.deletion.dueAt.toISOString(),
+            requestedAt: iso(org.deletion.requestedAt),
+            requestedBy: org.deletion.requestedBy,
+          },
+          deletionHold: org.deletionHold && {
+            heldAt: org.deletionHold.heldAt.toISOString(),
+            reason: org.deletionHold.reason,
+          },
           admins: org.admins.map((a) => ({
             ...a,
             createdAt: a.createdAt.toISOString(),

@@ -47,6 +47,22 @@ export const Organization = z
         description:
           "In `GET /me`, to its owner only, while the workspace's onboarding isn't finished: the apps open the onboarding, which resumes it, instead of the workspace (`PATCH …/onboarding` saves it). Absent: finished, or not theirs to set up.",
       }),
+    deletion: z
+      .object({
+        dueAt: z.string().nullable().openapi({
+          description: "When it goes for good; null once that date passed, when it is only being deleted.",
+        }),
+        requestedAt: z.string().nullable(),
+        requestedBy: z
+          .object({ id: z.string(), name: z.string() })
+          .nullable()
+          .openapi({ description: "Who deleted it; null once their account is gone." }),
+      })
+      .optional()
+      .openapi({
+        description:
+          "In `GET /me`, while an owner's deletion is pending: the workspace is closed (`org.deleting`), and any owner can restore it until `dueAt` (`DELETE …/deletion`). Absent: not being deleted.",
+      }),
   })
   .openapi("Organization");
 

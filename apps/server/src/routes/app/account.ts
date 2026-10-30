@@ -10,6 +10,7 @@ import {
   countUsers,
   createInvitation,
   createOrganization,
+  type DeletionDeps,
   deleteAccount,
   getOrganization,
   hasPassword,
@@ -27,9 +28,12 @@ import {
   removeAvatar,
   removeMember,
   removeOrgLogo,
+  requireOwnerToDelete,
   requirePermission,
+  restoreWorkspace,
   revokeInvitation,
   saveOnboarding,
+  scheduleDeletion,
   setAvatar,
   setMyLocale,
   setOrgLogo,
@@ -40,9 +44,19 @@ import {
   unfinishedWorkspaces,
   updateOrganization,
   updateOrgSettings,
+  workspaceDeletions,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
-import { authUiConfig, mintPhoneSignIn, sessionUser, signupOpen, signupPolicy, workspacePolicy } from "../../auth";
+import {
+  authUiConfig,
+  deletionProof,
+  mintPhoneSignIn,
+  sessionUser,
+  signedInLately,
+  signupOpen,
+  signupPolicy,
+  workspacePolicy,
+} from "../../auth";
 import { requestLimitIp } from "../../http/client-ip";
 import { apiError, errorResponse } from "../../http/errors";
 import { humanCheckRefusal } from "../../http/human-check";
@@ -63,6 +77,8 @@ import { Invitation, Member, Organization, Role } from "./schemas";
 const tags = ["Account"];
 /** E-mail lookups on the sign-in screen: enough for typos and a few accounts, not for listing who has one. */
 const SIGN_IN_OPTIONS_PER_IP = { limit: 30, windowMs: 10 * 60_000 };
+/** A workspace's deletions in a day: deleting and restoring it over and over can't email its people all day. */
+const DELETIONS_PER_DAY = { limit: 3, windowMs: 86_400_000 };
 const Name = z.string().trim().min(1).max(100);
 const Context = z.string().max(20_000).openapi({ description: "Shared with every agent of the organization." });
 
@@ -71,6 +87,12 @@ export function accountRoutes(deps: AppDeps) {
   const { db, config } = deps;
   const app = createAppRouter(deps);
   const session = requireSession(deps.auth);
+  const deletion: DeletionDeps = {
+    db,
+    pubsub: deps.adapters.pubsub,
+    hub: deps.extras?.sandbox?.machines?.hub,
+    emails: deps.adapters.email.delivers ? { publicUrl: config.PUBLIC_URL } : null,
+  };
   for (const path of [
     "/me",
     "/me/password",
@@ -321,6 +343,11 @@ export function accountRoutes(deps: AppDeps) {
         unfinishedWorkspaces(db, user.id),
       ]);
       const onboardingOf = (orgId: string) => unfinished.find((u) => u.organization.id === orgId);
+      const deletions = await workspaceDeletions(
+        db,
+        memberships.flatMap((m) => (m.standing?.deletionDueAt ? [m.orgId] : [])),
+      );
+      const now = Date.now();
       return c.json(
         {
           user: {
@@ -334,6 +361,7 @@ export function accountRoutes(deps: AppDeps) {
           },
           organizations: memberships.map((m) => {
             const setup = onboardingOf(m.orgId);
+            const deleting = deletions.get(m.orgId);
             return {
               id: m.orgId,
               name: m.orgName,
@@ -344,6 +372,15 @@ export function accountRoutes(deps: AppDeps) {
                 : {}),
               ...(setup
                 ? { onboarding: { step: setup.organization.onboardingStep, generalChannelId: setup.general.id } }
+                : {}),
+              ...(deleting
+                ? {
+                    deletion: {
+                      dueAt: deleting.dueAt.getTime() > now ? deleting.dueAt.toISOString() : null,
+                      requestedAt: iso(deleting.requestedAt),
+                      requestedBy: deleting.requestedBy,
+                    },
+                  }
                 : {}),
             };
           }),
@@ -378,11 +415,14 @@ export function accountRoutes(deps: AppDeps) {
       security,
       summary: "Add a password to an account that has none",
       description:
-        "For an account that signs in another way (Google, Apple, or the desktop app that runs this server), so it can also sign in with its email from other browsers. Refused with `password_set` when it has one: changing a password is the reset flow.",
+        "For an account that signs in another way (Google, Apple, or the desktop app that runs this server), so it can also sign in with its email from other browsers. Needs a sign-in in the last 10 minutes (403 `reauth.sign_in`): a password proves it's the person, so a session alone can't add one. Refused with `password_set` when it has one: changing a password is the reset flow.",
       request: { body: body(z.object({ password: z.string().min(8).max(128) })) },
       responses: { 204: noContent[204], ...errors, 409: errorResponse("Already has a password (`password_set`)") },
     }),
     async (c) => {
+      if (!(await signedInLately(deps.auth, c.req.raw.headers, c.get("user").id))) {
+        return apiError(c, 403, "reauth.sign_in", "Sign in again to add a password");
+      }
       if (await hasPassword(db, c.get("user").id)) {
         return apiError(c, 409, "password_set", "This account already has a password");
       }
@@ -734,6 +774,72 @@ export function accountRoutes(deps: AppDeps) {
     }),
     async (c) => {
       await updateOrganization(db, c.get("user").id, c.req.valid("param").orgId, c.req.valid("json"));
+      return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/deletion",
+      tags,
+      security,
+      summary: "Delete a workspace (owners)",
+      description:
+        "It closes to everyone now, like a suspended workspace (`org.deleting`, as an `org.deleting` org event), its work stops, and it is deleted for good 7 days later. Until then any owner can restore it (`DELETE …/deletion`). Proof that it's you: a sign-in in the last 10 minutes, else `password` (403 `reauth.sign_in` without one, `reauth.password` for a wrong one, 429 after 5 in 15 minutes). A workspace takes 3 deletions a day (429). Already being deleted, it answers 202 with its date, and nobody is told again. 403 `forbidden` for anyone but an owner, `org.suspended` while suspended.",
+      request: {
+        params: OrgParams,
+        body: body(z.object({ password: z.string().min(1).max(128).optional() })),
+      },
+      responses: {
+        202: json(
+          z.object({
+            deletion: z.object({ dueAt: z.string().openapi({ description: "When it goes for good." }) }),
+          }),
+          "Being deleted",
+        ),
+        ...errors,
+        429: errorResponse("Too many tries, or too many deletions of it today (`rate_limited`)"),
+      },
+    }),
+    async (c) => {
+      const user = c.get("user");
+      const { orgId } = c.req.valid("param");
+      const due = (await requireOwnerToDelete(db, user.id, orgId)).standing?.deletionDueAt;
+      if (due) return c.json({ deletion: { dueAt: due.toISOString() } }, 202);
+      await deletionProof(
+        deps.auth,
+        deps.adapters.rateLimiter,
+        c.req.raw.headers,
+        user.id,
+        c.req.valid("json").password,
+      );
+      if (!(await deps.adapters.rateLimiter.consume(`org-deletion:${orgId}`, DELETIONS_PER_DAY)).allowed) {
+        return apiError(c, 429, "rate_limited", "This workspace was deleted too many times today. Try again tomorrow.");
+      }
+      const { dueAt } = await scheduleDeletion(deletion, user.id, orgId, "owner");
+      deps.wakeWorkers?.();
+      return c.json({ deletion: { dueAt: dueAt.toISOString() } }, 202);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/deletion",
+      tags,
+      security,
+      summary: "Restore a workspace being deleted (owners)",
+      description:
+        "Any owner, before its date; it opens again and its members are told. 409 `org.not_restorable` when it isn't being deleted or its date passed; 403 `forbidden` for anyone but an owner, `org.suspended` while suspended, `org.create_unpaid` (`params.orgId`) when it waits for its first plan and you own another that does; 404 once it is gone.",
+      request: { params: OrgParams },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      await requireOwnerToDelete(db, c.get("user").id, orgId);
+      await restoreWorkspace(deletion, c.get("user").id, orgId);
+      deps.wakeWorkers?.();
       return c.body(null, 204);
     },
   );

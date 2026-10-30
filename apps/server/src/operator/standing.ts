@@ -1,4 +1,11 @@
-import { STANDING_NOTICES, STANDING_STATES, setAgentHold, setOrgStanding, setUserBlocked } from "@agenteschat/engine";
+import {
+  STANDING_NOTICES,
+  STANDING_STATES,
+  setAgentHold,
+  setDeletionHold,
+  setOrgStanding,
+  setUserBlocked,
+} from "@agenteschat/engine";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { apiError, errorResponse } from "../http/errors";
 import { body, iso, json, OrgParams } from "../routes/app/context";
@@ -60,6 +67,14 @@ const UserBlock = z
   })
   .openapi("OperatorUserBlock");
 
+export const DeletionHold = z
+  .object({
+    held: z.boolean(),
+    heldAt: z.string().nullable(),
+    reason: z.string().nullable().openapi({ description: "The operator's own reason: never shown to the workspace." }),
+  })
+  .openapi("OperatorDeletionHold");
+
 const AgentParams = OrgParams.extend({ agentId: z.uuid().openapi({ param: { name: "agentId", in: "path" } }) });
 
 export const UserParams = z.object({
@@ -118,6 +133,25 @@ export function registerOperatorStanding(api: OpenAPIHono, { db, pubsub, hub }: 
       const { held, reason } = c.req.valid("json");
       const row = await setAgentHold(db, orgId, agentId, { held, reason: reason ?? null }, pubsub);
       if (!row) return apiError(c, 404, "not_found", "No agent with this id in this workspace");
+      return c.json({ held: row.heldAt !== null, heldAt: iso(row.heldAt), reason: row.reason }, 200);
+    },
+  );
+
+  api.openapi(
+    createRoute({
+      method: "put",
+      path: "/orgs/{orgId}/deletion-hold",
+      tags,
+      summary: "Hold a workspace's deletion (a legal hold), or let it go",
+      description:
+        "While held, a workspace whose deletion was asked for (by an owner, or with its only member's account) waits past its date instead of being deleted: it stays closed, with everything in it. Nothing is refused and the workspace is told nothing: no audit row, no notice. Restoring the workspace never lifts it. Let go, a deletion past its date goes ahead within an hour.",
+      request: { params: OrgParams, body: body(z.object({ held: z.boolean(), reason: Reason })) },
+      responses: { 200: json(DeletionHold), ...errors },
+    }),
+    async (c) => {
+      const { held, reason } = c.req.valid("json");
+      const row = await setDeletionHold(db, c.req.valid("param").orgId, { held, reason: reason ?? null });
+      if (!row) return apiError(c, 404, "not_found", "No workspace with this id");
       return c.json({ held: row.heldAt !== null, heldAt: iso(row.heldAt), reason: row.reason }, 200);
     },
   );

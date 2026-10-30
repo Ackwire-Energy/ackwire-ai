@@ -5,11 +5,13 @@ import { type Database, schema } from "@agenteschat/db";
 import {
   accountBlock,
   countUsers,
+  DELETION_PROOF_FRESH_MS,
   deriveSecret,
   EARLY_ACCESS_HEADER,
   EARLY_ACCESS_TOKEN,
   earlyAccessLink,
   emailLocale,
+  ForbiddenError,
   isAgentesCloud,
   onUserCreated,
   queueEmail,
@@ -20,6 +22,7 @@ import {
   sha256,
   signupAdmission,
   signupOpenToAll,
+  TooManyError,
   useEarlyAccess,
   type WorkspacePolicy,
 } from "@agenteschat/engine";
@@ -332,6 +335,44 @@ export async function sessionUser(auth: Auth, headers: Headers): Promise<Session
 }
 
 /**
+ * Whether this request's session signed in, as `userId`, within `DELETION_PROOF_FRESH_MS`. Read from the database: a
+ * cached cookie can't vouch for it. A session minted from another keeps that one's sign-in time.
+ */
+export async function signedInLately(auth: Auth, headers: Headers, userId: string) {
+  const current = await auth.api.getSession({ headers, query: { disableCookieCache: true } });
+  if (current?.user.id !== userId) return false;
+  return Date.now() - new Date(current.session.createdAt).getTime() < DELETION_PROOF_FRESH_MS;
+}
+
+/** Passwords an account may try in 15 minutes to prove it's them. */
+const PROOF_TRIES = { limit: 5, windowMs: 15 * 60_000 };
+
+/**
+ * Proof that the person at this session is the account's own, before deleting: a sign-in in the last 10 minutes, else
+ * their `password`, with 5 tries per 15 minutes per account (429 after). Throws `reauth.sign_in` without a password and
+ * `reauth.password` for a wrong one.
+ */
+export async function deletionProof(
+  auth: Auth,
+  limiter: RateLimiter,
+  headers: Headers,
+  userId: string,
+  password?: string,
+) {
+  if (await signedInLately(auth, headers, userId)) return;
+  if (!password) throw new ForbiddenError("Sign in again to confirm it's you", "reauth.sign_in");
+  // Counted before the check: a guess past the limit learns nothing.
+  if (!(await limiter.consume(`deletion-proof:${userId}`, PROOF_TRIES)).allowed) {
+    throw new TooManyError("Too many tries. Try again in a few minutes.");
+  }
+  const right = await auth.api.verifyPassword({ body: { password }, headers }).then(
+    () => true,
+    () => false,
+  );
+  if (!right) throw new ForbiddenError("That password isn't right", "reauth.password");
+}
+
+/**
  * The Expo plugin's `/expo-authorization-proxy` (the phone app's social sign-in, ADR 0035) redirects to any
  * https address and signs that address's `state` into the visitor's state cookie: an open redirect, and a way
  * to plant someone else's sign-in on a victim. It only goes on to a configured provider's own authorization
@@ -512,14 +553,21 @@ const phoneSignIn = {
         const { internalAdapter } = ctx.context;
         const minted = await internalAdapter.consumeVerificationValue(phoneSignInKey(ctx.body.token));
         let user: Awaited<ReturnType<typeof internalAdapter.findUserById>> = null;
+        let signedIn: Date | undefined;
         if (minted?.value.startsWith(FOR_USER))
           user = await internalAdapter.findUserById(minted.value.slice(FOR_USER.length));
         else if (minted) {
           const from = await internalAdapter.findSession(minted.value);
-          if (from && from.session.expiresAt >= new Date()) user = from.user;
+          if (from && from.session.expiresAt >= new Date()) {
+            user = from.user;
+            signedIn = from.session.createdAt;
+          }
         }
         if (!user) throw new APIError("UNAUTHORIZED", { message: "This code expired or was already used" });
-        const session = await internalAdapter.createSession(user.id);
+        // Minted from a session, it signed in when that one did: it proves no fresher sign-in (`deletionProof`).
+        const session = signedIn
+          ? await internalAdapter.createSession(user.id, undefined, { createdAt: signedIn }, true)
+          : await internalAdapter.createSession(user.id);
         await setSessionCookie(ctx, { session, user });
         return ctx.json({ user: { id: user.id, name: user.name, email: user.email } });
       },

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import { orgTopic } from "@agenteschat/adapters";
 import { testConfig } from "@agenteschat/config";
 import { desc, eq, schema, sql } from "@agenteschat/db";
-import { setRestrictionNotices } from "@agenteschat/engine";
+import { enableOperatorEvents, purgeWorkspace, setRestrictionNotices } from "@agenteschat/engine";
 import { createLogger } from "../src/logger";
 import { createOperatorApp, type OperatorDeps, serveOperatorApi } from "../src/operator/app";
 import { type Browser, browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
@@ -224,6 +224,8 @@ test("org detail: owners and admins, and counts of what is in it", async () => {
     counts: { members: 2, agents: 1, channels: 1, machines: 1, invitations: 1 },
     limits: { members: null, storageBytes: null, uploadBytesPerDay: null, platformUsdPerMonth: null, updatedAt: null },
     meters: { storageBytes: 0, uploadBytes24h: 0, ownStorage: false, platformUsdThisMonth: 0 },
+    deletion: null,
+    deletionHold: null,
   });
 
   expect((await op("/orgs/0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b")).status).toBe(404);
@@ -878,6 +880,68 @@ test("no answer carries a secret or a field named like one", async () => {
     const text = await (await op(path)).text();
     for (const secret of secrets) expect(text).not.toContain(secret);
     expect(text).not.toMatch(/"[^"]*(token|password|secret|hash|cipher|key)[^"]*":/i);
+  }
+});
+
+test("a workspace's deletion: its hold set and let go in silence, both in its detail, and the three events in the feed", async () => {
+  enableOperatorEvents();
+  try {
+    const [doomed] = await t.db.insert(schema.organizations).values({ name: "Doomed" }).returning();
+    if (!doomed) throw new Error("no org");
+    const orgId = doomed.id;
+    await t.db.insert(schema.organizationMembers).values({ orgId, userId: acme.ownerId, role: "owner" });
+    const detail = async () => {
+      const { deletion, deletionHold } = await body<{ deletion: unknown; deletionHold: unknown }>(
+        await op(`/orgs/${orgId}`),
+      );
+      return { deletion, deletionHold };
+    };
+    const app = (method: "POST" | "DELETE") =>
+      owner(`/api/app/organizations/${orgId}/deletion`, method === "POST" ? { json: {} } : { method });
+
+    expect(await body(await put(`/orgs/${orgId}/deletion-hold`, { held: true, reason: "legal_hold" }))).toEqual({
+      held: true,
+      heldAt: expect.any(String),
+      reason: "legal_hold",
+    });
+    expect(await detail()).toEqual({
+      deletion: null,
+      deletionHold: { heldAt: expect.any(String), reason: "legal_hold" },
+    });
+    expect(await t.db.select().from(schema.auditLog).where(eq(schema.auditLog.orgId, orgId))).toEqual([]);
+
+    expect((await app("POST")).status).toBe(202);
+    expect(await detail()).toEqual({
+      deletion: { dueAt: expect.any(String), requestedAt: expect.any(String), requestedBy: acme.ownerId },
+      deletionHold: { heldAt: expect.any(String), reason: "legal_hold" },
+    });
+    expect((await app("DELETE")).status).toBe(204);
+    expect((await detail()).deletionHold).toEqual({ heldAt: expect.any(String), reason: "legal_hold" });
+    expect((await app("POST")).status).toBe(202);
+    expect(await body(await put(`/orgs/${orgId}/deletion-hold`, { held: false }))).toEqual({
+      held: false,
+      heldAt: null,
+      reason: null,
+    });
+    await t.db
+      .update(schema.organizations)
+      .set({ deletionDueAt: new Date(Date.now() - 60_000) })
+      .where(eq(schema.organizations.id, orgId));
+    expect(await purgeWorkspace({ db: t.db }, orgId)).toBe(true);
+    expect((await op(`/orgs/${orgId}`)).status).toBe(404);
+    expect((await put(`/orgs/${orgId}/deletion-hold`, { held: true })).status).toBe(404);
+
+    const { events } = await body<{ events: { type: string; orgId: string | null; userId: string | null }[] }>(
+      await op("/events?limit=1000"),
+    );
+    expect(events.filter((e) => e.orgId === orgId).map((e) => [e.type, e.userId])).toEqual([
+      ["organization.deletion_requested", acme.ownerId],
+      ["organization.deletion_canceled", acme.ownerId],
+      ["organization.deletion_requested", acme.ownerId],
+      ["organization.deleted", acme.ownerId],
+    ]);
+  } finally {
+    enableOperatorEvents(false);
   }
 });
 

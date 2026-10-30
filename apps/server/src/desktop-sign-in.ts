@@ -135,7 +135,13 @@ export function desktopSignIn() {
           const source = await ctx.context.internalAdapter.findSession(found.value);
           if (!source || source.session.expiresAt <= new Date()) return ctx.json({ signedIn: false });
           const { user } = source;
-          const session = await ctx.context.internalAdapter.createSession(user.id);
+          // It signed in when the browser's session did: it proves no fresher sign-in (`deletionProof`).
+          const session = await ctx.context.internalAdapter.createSession(
+            user.id,
+            undefined,
+            { createdAt: source.session.createdAt },
+            true,
+          );
           await setSessionCookie(ctx, { session, user });
           return ctx.json({ signedIn: true });
         },
