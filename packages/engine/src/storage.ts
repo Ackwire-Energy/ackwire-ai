@@ -483,6 +483,9 @@ export async function getMigration(db: Database, actorId: string, orgId: string)
 const notAt = (orgId: string, target: string | null) =>
   and(
     eq(artifactVersions.orgId, orgId),
+    // Only a live artifact's versions: a trashed one's copies aren't counted or moved (matching storedBytes),
+    // so cycling storages doesn't drag dead files along.
+    sql`exists (select 1 from ${artifacts} where ${artifacts.id} = ${artifactVersions.artifactId} and ${artifacts.deletedAt} is null)`,
     target ? or(isNull(artifactVersions.storageConfigId), ne(artifactVersions.storageConfigId, target)) : undefined,
     target ? undefined : sql`${artifactVersions.storageConfigId} is not null`,
   );
@@ -501,13 +504,12 @@ export async function startMigration(deps: StorageDeps, actorId: string, orgId: 
     .from(artifactVersions)
     .where(notAt(orgId, target));
   const remaining = counted?.n ?? 0;
-  // Back onto this server's storage, the files count against its limit (those in the trash once restored).
+  // Back onto this server's storage, the files it copies count against its limit.
   if (target === null) {
     const [moving] = await deps.db
       .select({ bytes: sql<string>`coalesce(sum(${artifactVersions.size}), 0)` })
       .from(artifactVersions)
-      .innerJoin(artifacts, eq(artifacts.id, artifactVersions.artifactId))
-      .where(and(notAt(orgId, null), isNull(artifacts.deletedAt)));
+      .where(notAt(orgId, null));
     const bytes = Number(moving?.bytes ?? 0);
     if (bytes > 0) await assertStorageRoom(deps.db, orgId, bytes, { daily: false });
   }
@@ -610,6 +612,9 @@ export async function runMigration(deps: StorageDeps, migrationId: string, optio
           .update(artifactVersions)
           .set({ storageConfigId: target.storageConfigId, blobKey: key })
           .where(eq(artifactVersions.id, v.id));
+        // The row now points at the target copy; drop the old object so cycling storages doesn't pile up copies.
+        // Never delete the key the row now holds (a store that overwrote in place): orphan beats data loss.
+        if (v.blobKey !== key) await source.delete(v.blobKey).catch(() => undefined);
       } catch (error) {
         await db
           .update(storageMigrations)

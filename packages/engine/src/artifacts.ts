@@ -438,7 +438,9 @@ async function writeBlob(deps: ArtifactDeps, orgId: string, artifactId: string, 
   const { body, contentType } = stored;
   // The workspace's own bucket counts against no limit of ours.
   if (location.storageConfigId === null) await assertStorageRoom(deps.db, orgId, body.byteLength);
-  const key = `${location.prefix}artifacts/${artifactId}/v${version}`;
+  // A per-write suffix so two saves racing on the same version number never share a key: without it the
+  // loser's put overwrites the winner's committed bytes, leaving the row's size and sha not matching disk.
+  const key = `${location.prefix}artifacts/${artifactId}/v${version}-${Bun.randomUUIDv7()}`;
   await location.store.put(key, body, { contentType });
   return { storageConfigId: location.storageConfigId, key, contentType, size: body.byteLength, sha: sha256Hex(body) };
 }
@@ -535,7 +537,7 @@ async function insertArtifact(
 }
 
 /** A new version of `current`: blob, rows (a newer version in between is a conflict), index, audit, event. */
-async function insertVersion(
+export async function insertVersion(
   deps: ArtifactDeps,
   actor: ArtifactActor,
   orgId: string,

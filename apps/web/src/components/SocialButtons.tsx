@@ -52,15 +52,18 @@ export function useSocialProviders(only?: SignInProvider[]): SignInProvider[] {
 /**
  * "Continuar com Google/GitHub/Apple": brand mark, the last one used marked.
  * `onSocial` takes over the redirect (the Mac app signs in through the browser).
+ * `earlyAccess`: the early-access link's token, for the sign-up it opens.
  */
 export function SocialButtons({
   callbackURL,
   providers,
   onSocial,
+  earlyAccess,
 }: {
   callbackURL: string;
   providers: SignInProvider[];
   onSocial?: (provider: SignInProvider) => void;
+  earlyAccess?: string;
 }) {
   const { t } = useTranslation();
   const auth = useAuth();
@@ -83,7 +86,7 @@ export function SocialButtons({
           onClick={() => {
             rememberSignIn(p);
             if (onSocial) onSocial(p);
-            else void auth.signInSocial(p, callbackURL);
+            else void auth.signInSocial(p, callbackURL, earlyAccess);
           }}
         >
           {BRAND[p]}

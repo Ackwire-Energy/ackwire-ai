@@ -18,6 +18,7 @@ import { appLocale } from "@agenteschat/i18n/locale";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { inviteLinkToken, randomToken, sha256 } from "./crypto";
+import { earlyAccessLink, hasWorkspaceAllowance, recordFirstWorkspace, signupMode } from "./early-access";
 import { ConflictError, ForbiddenError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
 import { deleteJevKey } from "./jev-key";
@@ -72,7 +73,7 @@ export type Permission =
   | "manage_connectors" // connect MCP servers (GitHub, Sentry…) for the organization
   | "view_usage" // tokens and cost of every agent
   | "manage_members" // invite, remove, change roles (except owners)
-  | "manage_billing" // open the workspace's plan and billing on the billing service (ADR 0078)
+  | "manage_billing" // open the workspace's plan and billing on the billing service (ADR 0079)
   | "manage_owners"; // grant/revoke owner
 
 const MEMBER: Permission[] = ["read", "post", "create_channels"];
@@ -184,13 +185,15 @@ export function assertInviting(membership: Membership) {
  * one (`org.create_refused`, the same words whatever the cause, and how to contest it on agentes.chat Cloud).
  * Billing holds refuse nobody, but one person
  * owns at most one workspace waiting for its first plan (`org.create_unpaid`, with that workspace's id).
- * `holdForPayment`: the workspace starts on that hold (ADR 0078), with no audit row or notification.
+ * With `needsAllowance` (`needsWorkspaceAllowance`) early access must have allowed the account, else
+ * `org.create_invite_only` and nothing is made. An allowed account's first workspace is recorded on its invitation.
+ * `holdForPayment`: the workspace starts on the `payment` hold (ADR 0079), with no audit row or notification.
  */
 export async function createOrganization(
   db: Database,
   userId: string,
   input: { name: string; context?: string },
-  options: { holdForPayment?: boolean } = {},
+  options: { holdForPayment?: boolean; needsAllowance?: boolean } = {},
 ) {
   return db.transaction(async (tx) => {
     // One create at a time per person, checked after the lock: two at once would both start waiting for a plan.
@@ -208,6 +211,8 @@ export async function createOrganization(
       throw new ForbiddenError("You already have a workspace waiting for a plan", "org.create_unpaid", {
         orgId: unpaid.id,
       });
+    if (options.needsAllowance && !(await hasWorkspaceAllowance(tx, userId)))
+      throw new ForbiddenError("New workspaces need an invitation for now", "org.create_invite_only");
     const [organization] = await tx
       .insert(organizations)
       .values({
@@ -224,6 +229,7 @@ export async function createOrganization(
       })
       .returning();
     if (!organization) throw new Error("organization insert returned nothing");
+    await recordFirstWorkspace(tx, userId, organization.id);
     await tx.insert(organizationMembers).values({ orgId: organization.id, userId, role: "owner" });
     await assignHandle(tx, organization.id, userId);
     const [general] = await tx
@@ -318,32 +324,77 @@ export interface SignupPolicy {
   allowSignup: boolean;
   /** An owner link (`OWNER_CLAIM_SHA256`) or the desktop app's owner key (`OWNER_KEY_SHA256`) makes the first account (ADR 0060 §6). */
   ownerByLink: boolean;
+  /** `HOST_COMPUTER_TOKEN`: agents run on this server's own machine, so the live mode never opens sign-up. */
+  hostComputer?: boolean;
 }
 
+/** Anyone may sign up once the first account exists: `ALLOW_SIGNUP`, or the live mode `open` (ADR 0078). */
+export async function signupOpenToAll(db: Database, policy: SignupPolicy) {
+  return policy.allowSignup || (!policy.hostComputer && (await signupMode(db)).mode === "open");
+}
+
+/** Why a sign-up may go ahead (`signupAdmission`). */
+export type SignupAdmission = "open" | "first" | "invitation" | "early_access";
+
 /**
- * Self-hosted sign-up policy: the first account may always register (there is
- * no other way in), unless the installation waits for its owner's link or key,
- * which make it on their own path; after that, only with ALLOW_SIGNUP or a pending
- * invitation for that email. An invitation link never opens it (ADR 0068): whoever holds one asks to join
- * without an account. Open sign-up on a reachable server would let anyone create organizations (and spend
- * model credits) on it.
+ * Who may create an account (ADR 0006, ADR 0078): the first account may always register (there is no other way
+ * in), unless the installation waits for its owner's link or key, which make it on their own path. After that,
+ * anyone with `ALLOW_SIGNUP` or while the sign-up mode is `open` (`signupOpenToAll`); else only a pending workspace
+ * invitation for that email, or an early-access link (`access`) sent to it. An invitation link never opens it
+ * (ADR 0068): whoever holds one asks to join without an account. Open sign-up on a reachable server would let
+ * anyone create organizations (and spend model credits) on it. Null: refused.
  */
-export async function isSignupAllowed(db: Database, email: string, policy: SignupPolicy, now = new Date()) {
-  if (policy.allowSignup && !policy.ownerByLink) return true;
-  if ((await countUsers(db)) === 0) return !policy.ownerByLink;
-  if (policy.allowSignup) return true;
+export async function signupAdmission(
+  db: Database,
+  email: string,
+  policy: SignupPolicy,
+  options: { access?: string | null; now?: Date } = {},
+): Promise<SignupAdmission | null> {
+  const now = options.now ?? new Date();
+  const stored = email.trim().toLowerCase();
+  if (policy.allowSignup && !policy.ownerByLink) return "open";
+  if ((await countUsers(db)) === 0) return policy.ownerByLink ? null : "first";
+  if (await signupOpenToAll(db, policy)) return "open";
   const [invite] = await db
     .select({ id: organizationInvitations.id })
     .from(organizationInvitations)
     .where(
       and(
-        eq(organizationInvitations.email, email.toLowerCase()),
+        eq(organizationInvitations.email, stored),
         isNull(organizationInvitations.acceptedAt),
         gt(organizationInvitations.expiresAt, now),
       ),
     )
     .limit(1);
-  return invite !== undefined;
+  if (invite) return "invitation";
+  const link = await earlyAccessLink(db, options.access);
+  return link && link.expiresAt > now && link.email === stored ? "early_access" : null;
+}
+
+export async function isSignupAllowed(db: Database, email: string, policy: SignupPolicy, now = new Date()) {
+  return (await signupAdmission(db, email, policy, { now })) !== null;
+}
+
+/** What decides whether making a workspace needs early access (`needsWorkspaceAllowance`). */
+export interface WorkspacePolicy {
+  /** agentes.chat Cloud, whose provisioner gives every workspace a computer that costs money (ADR 0056 §10). */
+  paidMachines: boolean;
+  /** `ALLOW_SIGNUP`. */
+  allowSignup: boolean;
+}
+
+/**
+ * Whether making a workspace needs the account allowed by early access (ADR 0078 §4): on agentes.chat Cloud, where
+ * every workspace gets a paid computer, while sign-up is by invitation only, for everyone but the installation's owner.
+ */
+export async function needsWorkspaceAllowance(db: Database, userId: string, policy: WorkspacePolicy) {
+  if (!policy.paidMachines || policy.allowSignup) return false;
+  if ((await signupMode(db)).mode === "open") return false;
+  return userId !== (await pinnedOwner(db));
+}
+
+export async function canCreateWorkspace(db: Database, userId: string, policy: WorkspacePolicy) {
+  return !(await needsWorkspaceAllowance(db, userId, policy)) || (await hasWorkspaceAllowance(db, userId));
 }
 
 export type SignInProvider = "google" | "github" | "apple";
@@ -352,21 +403,33 @@ const SIGN_IN_PROVIDERS = new Set<string>(["google", "github", "apple"]);
 /**
  * The sign-in screen asks for the e-mail first, then shows the one next step:
  * the password, the provider the account signs in with, or the sign-up (when
- * allowed for that e-mail). This tells whether the e-mail has an account, so
- * the route that serves it is rate limited.
+ * allowed for that e-mail, with the early-access link's `access` when the page
+ * has one). This tells whether the e-mail has an account, so the route that
+ * serves it is rate limited. `accessExpired` speaks only of a link sent to this
+ * same address.
  */
-export async function signInOptions(db: Database, email: string, policy: SignupPolicy) {
+export async function signInOptions(
+  db: Database,
+  email: string,
+  policy: SignupPolicy,
+  access?: string | null,
+  now = new Date(),
+) {
+  const stored = email.trim().toLowerCase();
   const rows = await db
     .select({ providerId: accounts.providerId })
     .from(users)
     .leftJoin(accounts, eq(accounts.userId, users.id))
-    .where(eq(users.email, email.trim().toLowerCase()));
+    .where(eq(users.email, stored));
   if (rows.length === 0) {
+    const canSignUp = (await signupAdmission(db, email, policy, { access, now })) !== null;
+    const link = canSignUp ? null : await earlyAccessLink(db, access);
     return {
       account: false,
       password: false,
       providers: [] as SignInProvider[],
-      canSignUp: await isSignupAllowed(db, email, policy),
+      canSignUp,
+      ...(link && link.email === stored && link.expiresAt <= now ? { accessExpired: true as const } : {}),
     };
   }
   const ids = rows.map((r) => r.providerId).filter((id): id is string => id !== null);

@@ -78,7 +78,7 @@ export const limitsJson = ({ updatedAt, ...limits }: z.infer<typeof Limits> & { 
   updatedAt: iso(updatedAt),
 });
 
-/** Billing holds and limits (ADR 0078): what a billing service applies, knowing plans this server never does. */
+/** Billing holds and limits (ADR 0079): what a billing service applies, knowing plans this server never does. */
 export function registerOperatorLimits(api: OpenAPIHono, { db, pubsub, hub }: OperatorDeps) {
   api.openapi(
     createRoute({

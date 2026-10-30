@@ -41,7 +41,7 @@ export const organizations = pgTable("organizations", {
   /** When `standing` last changed; null: never. */
   standingChangedAt: timestamp({ withTimezone: true }),
   /**
-   * Limits a billing service sets through the operator API (ADR 0078, `limits.ts`); null: no limit, all a
+   * Limits a billing service sets through the operator API (ADR 0079, `limits.ts`); null: no limit, all a
    * self-hosted server ever has. The platform's AI per UTC month is kept in nano-US$, the unit of
    * `usage_records.cost_nano_usd`.
    */

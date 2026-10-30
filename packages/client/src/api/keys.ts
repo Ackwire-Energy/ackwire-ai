@@ -3,6 +3,7 @@ import type { ScreenKind } from "./types";
 /** React Query keys. Everything under ["org", orgId] is dropped when switching organizations. */
 export const keys = {
   health: ["health"] as const,
+  instance: ["instance"] as const,
   telemetry: ["telemetry"] as const,
   jev: ["jev"] as const,
   authConfig: ["auth-config"] as const,

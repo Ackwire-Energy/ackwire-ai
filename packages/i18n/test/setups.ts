@@ -87,7 +87,7 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     // Shown only on the Cloud, to owners, while email goes out.
     "connectAi.wait.email",
     // The computer step's plan offer: only where the workspace gets its own computer (`setupView`, as
-    // `computerSetup.`) and waits for its first plan (ADR 0078).
+    // `computerSetup.`) and waits for its first plan (ADR 0079).
     "onboarding.computer.payment.",
   ],
   selfhost: [
@@ -137,6 +137,8 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "storage.usage.free",
     "support.ask",
     "help.selfhost.",
+    // A server other than the Cloud with no terms or privacy page of its own: the Cloud always shows its documents.
+    "legal.none.",
     "mobile.newMission.noAgents",
     "mobile.newMission.reason.no_computer",
     // The Jev card and its setup screen render only for the installation's owner on self-host

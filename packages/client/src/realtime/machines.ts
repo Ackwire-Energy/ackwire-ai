@@ -194,7 +194,7 @@ const SETUP_FIELDS = [
  * `GET …/computer-setup` but `mode`) replaces what the setup query holds, and the computer's first hello
  * (`ready`) refetches the computers; `org.standing` sets this workspace's standing in `GET /me`, so the banner
  * and the suspended screen follow without a reload, and asks for the setup again: a workspace on hold waits for no
- * computer, and one active again waits for one. `org.limits` (a new plan, ADR 0078) asks for the limits again, so a
+ * computer, and one active again waits for one. `org.limits` (a new plan, ADR 0079) asks for the limits again, so a
  * full workspace's invitations open by themselves. Returns whether the event was one of these.
  */
 export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { type: string }): boolean {

@@ -4,6 +4,7 @@ import {
   announceMembers,
   appleSignInTokens,
   avatarFile,
+  canCreateWorkspace,
   changeMemberRole,
   cloudNotice,
   countUsers,
@@ -18,6 +19,7 @@ import {
   listInvitations,
   listMembers,
   listMemberships,
+  needsWorkspaceAllowance,
   orgLogoFile,
   previewInvitation,
   queueInvitationEmail,
@@ -37,7 +39,7 @@ import {
   updateOrgSettings,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
-import { authUiConfig, mintPhoneSignIn, sessionUser, signupPolicy } from "../../auth";
+import { authUiConfig, mintPhoneSignIn, sessionUser, signupOpen, signupPolicy, workspacePolicy } from "../../auth";
 import { requestLimitIp } from "../../http/client-ip";
 import { apiError, errorResponse } from "../../http/errors";
 import { humanCheckRefusal } from "../../http/human-check";
@@ -115,7 +117,7 @@ export function accountRoutes(deps: AppDeps) {
             }),
             billingUrl: z.string().nullable().openapi({
               description:
-                "The billing service (BILLING_URL, ADR 0078): owners and admins open a workspace's plan and billing there through `POST …/billing-link`. Null: no billing.",
+                "The billing service (BILLING_URL, ADR 0079): owners and admins open a workspace's plan and billing there through `POST …/billing-link`. Null: no billing.",
             }),
             turnstileSiteKey: z.string().nullable().openapi({
               description:
@@ -132,7 +134,7 @@ export function accountRoutes(deps: AppDeps) {
       return c.json(
         {
           ...authUiConfig(config),
-          signupOpen: !ownerWaits && (config.ALLOW_SIGNUP || users === 0),
+          signupOpen: await signupOpen(db, config, users),
           firstRun: users === 0 && !ownerWaits,
           ownerClaim: users === 0 && Boolean(config.OWNER_CLAIM_SHA256),
           passwordReset: deps.adapters.email.delivers === true,
@@ -154,7 +156,17 @@ export function accountRoutes(deps: AppDeps) {
       description:
         "Tells whether the e-mail has an account, so it is rate limited per IP, and guarded by the bot check when this server has one (`human_check`, `human_check_blocked`).",
       request: {
-        body: body(z.object({ email: z.email().max(254) })),
+        body: body(
+          z.object({
+            email: z.email().max(254),
+            access: z.string().max(64).optional().catch(undefined).openapi({
+              type: "string",
+              maxLength: 64,
+              description:
+                "The token of an early-access link (`/signup?access=`, ADR 0078), when the page has one. Any other value counts as absent.",
+            }),
+          }),
+        ),
       },
       responses: {
         200: json(
@@ -165,6 +177,9 @@ export function accountRoutes(deps: AppDeps) {
               .array(z.enum(["google", "github", "apple"]))
               .openapi({ description: "Social sign-ins linked." }),
             canSignUp: z.boolean().openapi({ description: "No account, and this e-mail may create one." }),
+            accessExpired: z.literal(true).optional().openapi({
+              description: "`access` is the link of an invitation to this same address, and it expired.",
+            }),
           }),
         ),
         429: errorResponse("Too many attempts (`rate_limited`)"),
@@ -182,7 +197,8 @@ export function accountRoutes(deps: AppDeps) {
         config.TRUSTED_PROXIES,
       );
       if (refused) return apiError(c, 403, refused.code, refused.message);
-      return c.json(await signInOptions(db, c.req.valid("json").email, signupPolicy(config)), 200);
+      const { email, access } = c.req.valid("json");
+      return c.json(await signInOptions(db, email, signupPolicy(config), access), 200);
     },
   );
 
@@ -281,6 +297,10 @@ export function accountRoutes(deps: AppDeps) {
               emailVerified: z.boolean().openapi({
                 description: "The person opened the link that confirms their email address.",
               }),
+              canCreateWorkspace: z.boolean().openapi({
+                description:
+                  "`POST /organizations` would make a workspace for them. False on agentes.chat Cloud while sign-up is by invitation, unless early access allowed their account and its address is confirmed (ADR 0078). `org.create_refused` and `org.create_unpaid` (ADR 0079) can still refuse it.",
+              }),
             }),
             organizations: z.array(Organization),
           }),
@@ -290,10 +310,11 @@ export function accountRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const user = c.get("user");
-      const [memberships, password, verified] = await Promise.all([
+      const [memberships, password, verified, creates] = await Promise.all([
         listMemberships(db, user.id),
         hasPassword(db, user.id),
         isEmailVerified(db, user.id),
+        canCreateWorkspace(db, user.id, workspacePolicy(config)),
       ]);
       return c.json(
         {
@@ -304,6 +325,7 @@ export function accountRoutes(deps: AppDeps) {
             image: user.image ?? null,
             hasPassword: password,
             emailVerified: verified,
+            canCreateWorkspace: creates,
           },
           organizations: memberships.map((m) => ({
             id: m.orgId,
@@ -586,7 +608,7 @@ export function accountRoutes(deps: AppDeps) {
       security,
       summary: "Create an organization (you become its owner)",
       description:
-        "403 `org.create_refused` while your account is blocked or you are in a workspace suspended or on a hold the billing service didn't set; 403 `org.create_unpaid` (`params.orgId`) while you own a workspace waiting for its first plan. With BILLING_HOLD_NEW_WORKSPACES it starts on that hold (ADR 0078).",
+        "403 `org.create_refused` while your account is blocked or you are in a workspace suspended or on a hold the billing service didn't set; 403 `org.create_unpaid` (`params.orgId`) while you own a workspace waiting for its first plan; 403 `org.create_invite_only` on agentes.chat Cloud while sign-up is by invitation, unless early access allowed the person's account and its address is confirmed (ADR 0078). With BILLING_HOLD_NEW_WORKSPACES it starts on the `payment` hold (ADR 0079).",
       request: {
         body: body(
           z.object({
@@ -604,8 +626,10 @@ export function accountRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { teamSize, timezone, ...input } = c.req.valid("json");
-      const { organization, general } = await createOrganization(db, c.get("user").id, input, {
+      const userId = c.get("user").id;
+      const { organization, general } = await createOrganization(db, userId, input, {
         holdForPayment: config.BILLING_HOLD_NEW_WORKSPACES,
+        needsAllowance: await needsWorkspaceAllowance(db, userId, workspacePolicy(config)),
       });
       if (config.HOST_COMPUTER_TOKEN) await addHostComputer(db, organization.id);
       if (teamSize || (timezone && isValidTimeZone(timezone))) {

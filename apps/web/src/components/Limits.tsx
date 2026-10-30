@@ -11,7 +11,7 @@ import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
 
 /**
- * A workspace's limits in the web app (ADR 0078): numbers its billing service set, said without a plan, price or
+ * A workspace's limits in the web app (ADR 0079): numbers its billing service set, said without a plan, price or
  * currency, with the way to more room for whoever manages the plan.
  */
 

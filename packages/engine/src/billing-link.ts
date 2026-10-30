@@ -6,7 +6,7 @@ import { requirePermission, type UserLocale } from "./organizations";
 
 const { organizations, channels, messages, artifacts, wikiPages, issues } = schema;
 
-/** Where in the app a billing link was opened from: the billing service opens on what it came for (ADR 0078). */
+/** Where in the app a billing link was opened from: the billing service opens on what it came for (ADR 0079). */
 export const BILLING_FROM = [
   "settings",
   "hold",
@@ -74,7 +74,7 @@ const RETURN_TO: Partial<Record<BillingFrom, string>> = {
 };
 
 /**
- * What a workspace holds, for the billing service's pages (ADR 0078 §3): workspace-wide counts, never a name, a word of
+ * What a workspace holds, for the billing service's pages (ADR 0079 §3): workspace-wide counts, never a name, a word of
  * content, or a figure per channel or person. Messages are those of every conversation a person can read (an
  * agent-only room has no `u:` in its key, as `isAgentOnlyDm` reads it), counted per conversation on each month's
  * `(channel_id, created_at)` index without reading a row: no index of `messages` starts with `org_id` (ADR 0009).

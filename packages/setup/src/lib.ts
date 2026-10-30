@@ -270,7 +270,7 @@ export function httpUrlProblem(url: string): string | null {
 const SENDER_NAME = "agentes.chat";
 
 /** A sender at `domain`, as the server's default one reads. */
-export const senderAt = (domain: string) => `${SENDER_NAME} <ola@${domain}>`;
+export const senderAt = (domain: string) => `${SENDER_NAME} <ping@${domain}>`;
 
 /** The sender the setup offers: at a public domain only, which a provider can verify (a ts.net name or localhost no). */
 export const senderFor = (network: Network, domain: string | null) =>

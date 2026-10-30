@@ -82,7 +82,7 @@ export const OPERATOR_STANDING_COLUMNS = {
 export type WorkspaceStanding = Pick<OrgStanding, "state" | "reason" | "notice">;
 
 /**
- * Holds a billing service sets (ADR 0078): a shown hold whose reason is one of these codes, which the apps say in
+ * Holds a billing service sets (ADR 0079): a shown hold whose reason is one of these codes, which the apps say in
  * the person's words. `payment`: no plan yet; `unpaid`: its payment failed; `ended`: its plan ended.
  */
 export const BILLING_HOLDS = ["payment", "unpaid", "ended"] as const;

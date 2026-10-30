@@ -170,7 +170,7 @@ export function buildEngine(o: EngineOptions) {
   // Claude or an OpenAI key, the catalog's routing pick on the others.
   const smallModels = { anthropic: config.ROUTER_MODEL, openai: config.OPENAI_CHEAP_MODEL };
   // Semantic judgments (stop requests, hand-offs, permission changes): Jev while the installation has its key,
-  // with the org's small model as fallback (also past a workspace's platform AI for the month, ADR 0078).
+  // with the org's small model as fallback (also past a workspace's platform AI for the month, ADR 0079).
   if (!context.judge) {
     const llmJudge = createLlmJudge({
       gateway,

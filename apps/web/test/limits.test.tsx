@@ -33,7 +33,7 @@ async function go(path: string, over: Partial<WorkspaceLimits>, billing = true) 
   return { api, state, left, billingLinks, sockets };
 }
 
-describe("a workspace's limits (ADR 0078)", () => {
+describe("a workspace's limits (ADR 0079)", () => {
   test("Plano e cobrança: people and files against them, in plain numbers", async () => {
     await go("settings/billing", {
       members: { used: 3, limit: 10 },

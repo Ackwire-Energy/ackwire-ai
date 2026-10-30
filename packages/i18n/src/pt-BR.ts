@@ -94,6 +94,10 @@ export const ptBR = {
     privacy: "Política de privacidade",
     termsAfter: ".",
     signOut: "Sair",
+    earlyAccess: {
+      otherEmail: "Este convite é para outro endereço. Cadastre-se com o endereço que recebeu o convite.",
+      unverified: "Seu provedor de login não confirmou este endereço. Confirme lá, ou cadastre-se com uma senha.",
+    },
     flow: {
       email: "Oi. Qual é o seu e-mail?",
       emailLead: "Vale para entrar ou para criar uma conta.",
@@ -119,6 +123,9 @@ export const ptBR = {
       newPasswordNamed: "Boa, {{name}}. Agora uma senha.",
       closed: "Esse e-mail ainda não tem conta.",
       closedLead: "O cadastro está fechado. Peça um convite a quem administra o seu workspace.",
+      expired: "Este convite expirou.",
+      expiredLead: "Peça um novo em {{email}}.",
+      expiredLeadAsk: "Peça um novo a quem convidou você.",
       otherEmail: "Usar outro e-mail",
       forgot: "Te mando um link para criar outra senha.",
       forgotLead: "Confira o e-mail:",
@@ -289,6 +296,8 @@ export const ptBR = {
       namePlaceholder: "Ex.: Acme",
       timezone: "Fuso horário",
       timezoneHelp: "Para rotinas e lembretes. Detectado pelo seu navegador.",
+      inviteOnly: "Novos workspaces precisam de convite por enquanto.",
+      inviteOnlyAsk: "Novos workspaces precisam de convite por enquanto. Peça um em {{email}}.",
     },
     vault: {
       title: "Já tem documentação no Obsidian?",
@@ -555,7 +564,7 @@ export const ptBR = {
       title: "Qual IA eles vão usar?",
       lead: "Entre com o seu plano de IA: sem\u00a0chave\u00a0de\u00a0API.",
       paid: "Seu plano do agentes.chat está ativo. O computador deles está a caminho.",
-      /** Back from paying, until the billing service lifts the workspace's hold (ADR 0078). */
+      /** Back from paying, until the billing service lifts the workspace's hold (ADR 0079). */
       confirming: "Pagamento recebido. Ativando o plano do agentes.chat deste workspace.",
       leadNoComputer:
         "Os agentes pensam com uma chave\u00a0de\u00a0API, ou com o seu plano de IA num computador que você conectar.",
@@ -679,6 +688,7 @@ export const ptBR = {
     skip: "Pular esta etapa",
     confirmation: {
       sent: "Mandamos um link de confirmação para {{email}}.",
+      first: "Já tem convite? Confirme seu e-mail primeiro.",
     },
   },
   /** The desktop app's right click (lib/context-menu.ts). */
@@ -722,6 +732,11 @@ export const ptBR = {
     updated: "Atualizado em {{date}}",
     contents: "Nesta página",
     home: "Ir para o início",
+    /** `/terms` and `/privacy` on a server that has no page of its own for them. */
+    none: {
+      terms: "Este servidor não tem página de termos",
+      privacy: "Este servidor não tem página de privacidade",
+    },
   },
   shell: {
     // The Mac app's own title bar (ADR 0036).
@@ -7001,9 +7016,6 @@ export const ptBR = {
     downloadOnly: "Sem prévia para este tipo de arquivo. Baixe para abrir.",
   },
   errors: {
-    org: {
-      membersFull: "Este workspace está sem lugar para mais pessoas agora. Avise quem convidou você.",
-    },
     join: {
       linkClosed: "Este link não funciona mais. Peça um novo a quem mandou.",
       full: "Este workspace tem muitos pedidos esperando. Tente mais tarde ou peça a alguém de lá para convidar você.",
@@ -7022,6 +7034,10 @@ export const ptBR = {
     },
     invitation: {
       askToJoin: "Este link agora passa por um admin. Abra de novo para pedir para entrar.",
+    },
+    org: {
+      createInviteOnly: "Novos workspaces precisam de convite por enquanto.",
+      membersFull: "Este workspace está sem lugar para mais pessoas agora. Avise quem convidou você.",
     },
     humanCheck: "Não conseguimos confirmar que você é uma pessoa. Tente de novo.",
     humanCheckBlocked: "A verificação não carregou. Tente outro navegador ou outra rede.",
@@ -8606,14 +8622,14 @@ export const ptBR = {
       suspended: "O workspace foi suspenso",
       active: "O workspace voltou a funcionar",
       agentHold: "{{name}} está em pausa",
-      /** A hold the billing service set (ADR 0078): its code, never shown as it comes. */
+      /** A hold the billing service set (ADR 0079): its code, never shown as it comes. */
       billing: {
         payment: "O workspace precisa de um plano do agentes.chat",
         unpaid: "O pagamento do plano do agentes.chat não passou",
         ended: "O plano do agentes.chat do workspace terminou",
       },
     },
-    /** A hold the billing service set (ADR 0078), said in place of its code. */
+    /** A hold the billing service set (ADR 0079), said in place of its code. */
     billing: {
       payment:
         "Este workspace ainda não tem um plano do agentes.chat. Os agentes começam a trabalhar quando ele tiver.",
@@ -8653,7 +8669,7 @@ export const ptBR = {
     writeAfter: ".",
     ask: "Precisa de ajuda? Fale com quem cuida deste servidor.",
   },
-  /** The billing service (ADR 0078): this server shows no plan, price or currency, only the way there. */
+  /** The billing service (ADR 0079): this server shows no plan, price or currency, only the way there. */
   billing: {
     open: "Abrir plano e cobrança",
     opening: "Abrindo…",
@@ -8666,7 +8682,7 @@ export const ptBR = {
     noLimit: "Sem limite",
     ownBucket: "No seu próprio bucket, sem limite nosso",
   },
-  /** A workspace's limits, set by the billing service (ADR 0078): people and files. */
+  /** A workspace's limits, set by the billing service (ADR 0079): people and files. */
   limits: {
     members: {
       full: "Este workspace está com {{members}} de {{limit}} pessoas.",

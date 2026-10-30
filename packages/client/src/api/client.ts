@@ -81,6 +81,7 @@ import type {
   HostComputer,
   ImportInput,
   ImportPlan,
+  Instance,
   Invitation,
   InvitationPreview,
   InvitationWithStatus,
@@ -212,6 +213,7 @@ import type {
 export interface ApiClient {
   system: {
     health(): Promise<Health>;
+    instance(): Promise<Instance>;
     /** `null` unless I am the installation's owner (and not on agentes.chat itself). */
     telemetry(): Promise<ServerTelemetry | null>;
     setTelemetry(enabled: boolean): Promise<ServerTelemetry>;
@@ -225,10 +227,11 @@ export interface ApiClient {
   account: {
     authConfig(): Promise<AuthConfig>;
     /**
-     * Whether the e-mail has an account and how it signs in (rate limited: `rate_limited` 429). `humanCheck`: the
-     * bot check's token, when the server has one (`human_check` 403 without it).
+     * Whether the e-mail has an account and how it signs in (rate limited: `rate_limited` 429). `access`: the
+     * early-access link's token, when the page has one. `humanCheck`: the bot check's token, when the server has one
+     * (`human_check` 403 without it).
      */
-    signInOptions(input: { email: string }, humanCheck?: string): Promise<SignInOptions>;
+    signInOptions(input: { email: string; access?: string }, humanCheck?: string): Promise<SignInOptions>;
     /** `null` when signed out. */
     me(): Promise<Me | null>;
     /** My app language (emails and pushes are written in it). */
@@ -272,11 +275,11 @@ export interface ApiClient {
     removeLogo(orgId: string): Promise<void>;
     /**
      * A signed link that opens the workspace's plan and billing on the billing service (owners and admins; ADR
-     * 0078). Navigate to it at once and keep it nowhere else: it lasts 5 minutes and opens once. `billing.off` 404
+     * 0079). Navigate to it at once and keep it nowhere else: it lasts 5 minutes and opens once. `billing.off` 404
      * on a server without billing.
      */
     billingLink(orgId: string, from: BillingFrom): Promise<{ url: string; expiresAt: string }>;
-    /** People, files and today's uploads against the workspace's limits (any member; ADR 0078). */
+    /** People, files and today's uploads against the workspace's limits (any member; ADR 0079). */
     limits(orgId: string): Promise<WorkspaceLimits>;
     members(orgId: string): Promise<Member[]>;
     changeRole(orgId: string, userId: string, role: Role): Promise<void>;

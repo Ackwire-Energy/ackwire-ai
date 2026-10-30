@@ -145,6 +145,9 @@ esac
       expect(at.head()).toBe(commits.first);
       expect(calls.filter((call) => call.startsWith("docker build") || call.includes(" migrate"))).toEqual([]);
     }
+    // A test server that keeps its files on its disk on purpose says so, and deploys without a bucket.
+    const test = cloud.filter((line) => !line.startsWith("S3_")).concat("FILES_ON_DISK=accepted");
+    expect(server(commits.first, `${test.join("\n")}\n`).deploy([commits.second]).code).toBe(0);
     // A self-hosted server keeps its files where it likes (FILES_DIR or Postgres).
     const selfHosted = server(commits.first, "AGENTES_IMAGE=agentes:current\nRUN_MIGRATIONS_ON_BOOT=false\n");
     expect(selfHosted.deploy([commits.second]).code).toBe(0);

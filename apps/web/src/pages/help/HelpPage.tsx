@@ -1,5 +1,5 @@
+import { useAuthConfig } from "@agenteschat/client";
 import { type HelpBlock, helpDocument, helpInline, isHelpSlug } from "@agenteschat/i18n/help";
-import { type LegalKind, legalDocument } from "@agenteschat/i18n/legal";
 import { Logo, Segmented } from "@agenteschat/ui";
 import { Link, Navigate, useNavigate } from "@tanstack/react-router";
 import { Fragment } from "react";
@@ -8,8 +8,6 @@ import { type LocaleCode, locales, setLocale, usePageT } from "@/i18n";
 import { useDocumentTitle } from "@/lib/desktop";
 import "../legal.css";
 import "./help.css";
-
-const LEGAL_KINDS: LegalKind[] = ["terms", "privacy"];
 
 /**
  * A help page (`/help/<slug>`): the background reading a screen of the app links to once, public, laid out like the
@@ -20,6 +18,7 @@ export function HelpPage({ slug, lang }: { slug: string; lang?: LocaleCode }) {
   const navigate = useNavigate();
   const locale: LocaleCode = lang ?? (i18n.language === "en" ? "en" : "pt-BR");
   const t = usePageT(locale);
+  const config = useAuthConfig().data;
   const doc = isHelpSlug(slug) ? helpDocument(slug, locale) : null;
   useDocumentTitle(doc ? `${doc.title} · agentes.chat` : undefined);
   if (!doc) return <Navigate to="/" replace />;
@@ -58,13 +57,12 @@ export function HelpPage({ slug, lang }: { slug: string; lang?: LocaleCode }) {
             </section>
           ))}
         </article>
-        <footer className="legal__foot help__foot">
-          {LEGAL_KINDS.map((kind) => (
-            <a key={kind} href={`/${kind}`}>
-              {legalDocument(kind, locale).title}
-            </a>
-          ))}
-        </footer>
+        {config?.termsUrl && config.privacyUrl && (
+          <footer className="legal__foot help__foot">
+            <a href={config.termsUrl}>{t("auth.terms")}</a>
+            <a href={config.privacyUrl}>{t("auth.privacy")}</a>
+          </footer>
+        )}
       </main>
     </div>
   );

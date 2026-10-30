@@ -207,7 +207,11 @@ export function createApp(options: AppOptions) {
       description: "Workspace where people and AI agents work together.",
     },
   });
-  api.get("/reference", Scalar({ url: "/api/openapi.json", pageTitle: "agentes.chat API" }));
+  // The interactive explorer loads its bundle from a CDN; keep it off the production origin, where a
+  // compromised CDN would run on the session's origin. The OpenAPI document itself stays available everywhere.
+  if (options.services?.config.NODE_ENV !== "production") {
+    api.get("/reference", Scalar({ url: "/api/openapi.json", pageTitle: "agentes.chat API" }));
+  }
 
   const app = new OpenAPIHono();
   app.onError((error, c) => {
@@ -215,6 +219,16 @@ export function createApp(options: AppOptions) {
     if (mapped) return mapped;
     log.error("unhandled error", { method: c.req.method, path: c.req.path, error: String(error), stack: error.stack });
     return apiError(c, 500, "internal_error", "Something went wrong on our side");
+  });
+  // Security headers on every response: the app may not be framed (clickjacking of approval, merge and deploy
+  // cards), <base> is pinned to our own origin, and HSTS is sent where the instance is served over TLS.
+  const httpsPublicUrl = options.services?.config.PUBLIC_URL?.startsWith("https:") ?? false;
+  app.use("*", async (c, next) => {
+    await next();
+    const h = c.res.headers;
+    if (!h.has("x-frame-options")) h.set("x-frame-options", "DENY");
+    if (!h.has("content-security-policy")) h.set("content-security-policy", "frame-ancestors 'none'; base-uri 'self'");
+    if (httpsPublicUrl && !h.has("strict-transport-security")) h.set("strict-transport-security", "max-age=63072000");
   });
   // A CDN in front may cache by the path's extension, whatever the type: without this, a private
   // answer at a path that ends like a file (a skill's `data.csv`) would be served to anyone asking.

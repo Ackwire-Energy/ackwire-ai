@@ -54,13 +54,13 @@ export interface AuthConfig {
   supportEmail?: string | null;
   /** Every workspace gets a computer of its own (the Cloud); absent: a server too old to say. */
   workspaceComputer?: boolean;
-  /** The billing service (ADR 0078): owners and admins open a workspace's plan there; null or absent: no billing. */
+  /** The billing service (ADR 0079): owners and admins open a workspace's plan there; null or absent: no billing. */
   billingUrl?: string | null;
   /** The bot check's site key (Cloudflare Turnstile, ADR 0075); null or absent: no check, nothing from Cloudflare. */
   turnstileSiteKey?: string | null;
 }
 
-/** A workspace's use against its limits (ADR 0078, `GET …/limits`), for any member; a null limit: none. */
+/** A workspace's use against its limits (ADR 0079, `GET …/limits`), for any member; a null limit: none. */
 export interface WorkspaceLimits {
   members: { used: number; limit: number | null };
   /** `ownStorage`: new files go to the workspace's own bucket, which no limit counts. */
@@ -68,7 +68,7 @@ export interface WorkspaceLimits {
   uploads: { usedBytes24h: number; limitBytesPerDay: number | null };
 }
 
-/** Where in the app a billing link is opened from: the billing service opens on what it came for (ADR 0078). */
+/** Where in the app a billing link is opened from: the billing service opens on what it came for (ADR 0079). */
 export type BillingFrom =
   | "settings"
   | "hold"
@@ -89,6 +89,8 @@ export interface SignInOptions {
   providers: SignInProvider[];
   /** No account, and this e-mail may create one. */
   canSignUp: boolean;
+  /** The page's early-access link is for this address, and it expired. */
+  accessExpired?: true;
 }
 
 /** `GET /api/instance`: what the phone and desktop apps check before using a server. Public, nothing secret. */
@@ -105,6 +107,8 @@ export interface Instance {
   signup: "open" | "invite";
   /** No account yet, and the first one only through the owner link the setup printed (absent: false). */
   ownerClaim?: boolean;
+  /** One of agentes.chat's own servers: `/terms` and `/privacy` are agentes.chat Cloud's (absent: an older server). */
+  cloud?: boolean;
 }
 
 /** "Abrir no celular": a sign-in for the phone, single use, a few minutes long. */
@@ -125,6 +129,11 @@ export interface User {
   hasPassword?: boolean;
   /** Opened the link that confirms the email address. */
   emailVerified?: boolean;
+  /**
+   * A new workspace would be made for them (false on agentes.chat Cloud while sign-up is by invitation, unless early
+   * access allowed them; `org.create_refused` and `org.create_unpaid` can still refuse it).
+   */
+  canCreateWorkspace?: boolean;
 }
 
 /** ADR 0056 §8: `hold` pauses the agents, `suspended` closes the workspace. */
@@ -4012,7 +4021,7 @@ export interface NotificationLatest {
   quote?: string;
   statusFrom?: string;
   statusTo?: string;
-  /** `org_standing`: the billing hold put on (ADR 0078), in place of `text`. */
+  /** `org_standing`: the billing hold put on (ADR 0079), in place of `text`. */
   billingHold?: string;
   /** Missions and routines. */
   steps?: { done: number; total: number; failedAt?: number };

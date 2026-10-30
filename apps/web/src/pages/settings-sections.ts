@@ -42,7 +42,7 @@ export const SETTINGS_SECTIONS: {
   // "Contas de IA": everyone's own plans; the workspace's API keys only for who manages them.
   { id: "keys", icon: "key", group: "costs", allowed: (r) => can(r, "read") },
   { id: "storage", icon: "drive", group: "costs", allowed: (r) => can(r, "configure") },
-  // Only where a billing service runs (ADR 0078), for who may open it.
+  // Only where a billing service runs (ADR 0079), for who may open it.
   {
     id: "billing",
     icon: "coin",

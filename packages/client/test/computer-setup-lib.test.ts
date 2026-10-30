@@ -389,7 +389,7 @@ describe("live: machine.provisioning, org.standing and org.limits", () => {
     });
   });
 
-  test("a limits event (a new plan, ADR 0078) asks for the workspace's limits again", () => {
+  test("a limits event (a new plan, ADR 0079) asks for the workspace's limits again", () => {
     const qc = new QueryClient();
     qc.setQueryData(keys.limits("o1"), { members: { used: 1, limit: 1 } });
     expect(applyWorkspaceEvent(qc, "o1", { type: "org.limits", orgId: "o1" } as { type: string })).toBe(true);

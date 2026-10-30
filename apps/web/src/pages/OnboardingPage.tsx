@@ -201,7 +201,7 @@ export interface ResumedOnboarding {
 }
 
 /**
- * Back from the billing service (ADR 0078): the workspace, its context and its team. The agents the import made, and
+ * Back from the billing service (ADR 0079): the workspace, its context and its team. The agents the import made, and
  * their models, are the ones this tab kept (`createTeam`); the ready-made agents are known by the handles the
  * onboarding gives them, and any other agent came with the import (in another tab, with its model no longer known).
  */
@@ -662,13 +662,15 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
     ((aiOpen && setupPending(workspaceComputer)) || awaiting(workspaceComputer) ? COMPUTER_POLL_MS : false);
   const me = useQuery({ ...meQuery(api), refetchInterval: mePoll, refetchOnWindowFocus: "always" });
   const authConfig = useAuthConfig().data;
+  // On agentes.chat Cloud, while sign-up is by invitation, only accounts early access allowed make workspaces (ADR 0078).
+  const inviteOnly = me.data?.user.canCreateWorkspace === false && created === null;
   // Whether a computer is a choice: the workspace's setup says, and the server before it exists; never a guess.
   const edition = computerEdition(setup.data, authConfig?.workspaceComputer);
   // A server that sends no email invites by link only.
   const emails = sendsEmail(authConfig);
   const standing = me.data?.organizations.find((o) => o.id === created?.orgId)?.standing;
   const hold = holdText(t, standing);
-  // A new workspace waiting for its first plan (ADR 0078): its computer and its invitations come with the plan.
+  // A new workspace waiting for its first plan (ADR 0079): its computer and its invitations come with the plan.
   const unpaid = billingHoldOf(standing) === "payment";
   // Back at the AI step, the plan says active once its hold is gone. Back from paying, the billing service lifts it
   // seconds later: until then the same line says the payment arrived.
@@ -691,6 +693,8 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
   const verified = me.data?.user.emailVerified === true;
   // Confirmed, the line goes: the tab the link opened in says so.
   const confirmationSent = email !== "" && sentTo === email && !verified;
+  // Early access counts only for a confirmed address (ADR 0078 §4): held here unconfirmed, a new link is the way on.
+  const confirmFirst = inviteOnly && emails && email !== "" && !verified && !confirmationSent;
   useEffect(() => {
     if (verified) sessionStore.remove(STORAGE_KEYS.confirmationSent);
   }, [verified]);
@@ -955,7 +959,7 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
     saveJev.isPending ||
     finish.isPending;
   const blocked =
-    (step.id === "workspace" && !org.trim()) ||
+    (step.id === "workspace" && (!org.trim() || inviteOnly)) ||
     // Continue is what brings a vault into the wiki: it waits for the vault to be read.
     (step.id === "context" && vault.state.step === "reading") ||
     (aiOpen &&
@@ -1546,11 +1550,22 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
             />
           )}
 
-          {step.id === "workspace" && confirmationSent && (
+          {step.id === "workspace" && inviteOnly && (
+            <p className="onb__help onb__note ac-iconline" role="status">
+              <Icon name="lock" size={14} />
+              <span>
+                {authConfig?.supportEmail
+                  ? t("onboarding.workspace.inviteOnlyAsk", { email: authConfig.supportEmail })
+                  : t("onboarding.workspace.inviteOnly")}
+              </span>
+            </p>
+          )}
+
+          {step.id === "workspace" && (confirmationSent || confirmFirst) && (
             <p className="onb__help onb__note ac-iconline" role="status">
               <Icon name="mail" size={14} />
               <span>
-                {t("onboarding.confirmation.sent", { email })}
+                {confirmationSent ? t("onboarding.confirmation.sent", { email }) : t("onboarding.confirmation.first")}
                 {!resend.data && (
                   <>
                     <br />
@@ -1903,7 +1918,7 @@ function ComputerStep({
 }
 
 /**
- * The computer step of a new workspace waiting for its first plan (ADR 0078): its computer waiting with the team
+ * The computer step of a new workspace waiting for its first plan (ADR 0079): its computer waiting with the team
  * around it, only what is done so far, then the banner holding the step's one action, the plan that brings the
  * computer (`billing`: the server has a billing service).
  */

@@ -87,6 +87,10 @@ export const en: Translations = {
     privacy: "Privacy policy",
     termsAfter: ".",
     signOut: "Sign out",
+    earlyAccess: {
+      otherEmail: "This invitation is for another address. Sign up with the address it was sent to.",
+      unverified: "Your sign-in provider hasn't confirmed this address. Confirm it there, or sign up with a password.",
+    },
     flow: {
       email: "Hi. What's your email?",
       emailLead: "It works to sign in or to create an account.",
@@ -112,6 +116,9 @@ export const en: Translations = {
       newPasswordNamed: "Great, {{name}}. Now a password.",
       closed: "This email has no account yet.",
       closedLead: "Sign-up is closed. Ask whoever manages your workspace for an invitation.",
+      expired: "This invitation expired.",
+      expiredLead: "Ask for a new one at {{email}}.",
+      expiredLeadAsk: "Ask whoever invited you for a new one.",
       otherEmail: "Use another email",
       forgot: "I'll send you a link to create a new password.",
       forgotLead: "Check the email:",
@@ -282,6 +289,8 @@ export const en: Translations = {
       namePlaceholder: "E.g. Acme",
       timezone: "Time zone",
       timezoneHelp: "For routines and reminders. Detected from your browser.",
+      inviteOnly: "New workspaces need an invitation for now.",
+      inviteOnlyAsk: "New workspaces need an invitation for now. Ask for one at {{email}}.",
     },
     vault: {
       title: "Already documented in Obsidian?",
@@ -547,7 +556,7 @@ export const en: Translations = {
       title: "Which AI will they use?",
       lead: "Sign in with your AI plan: no\u00a0API\u00a0key needed.",
       paid: "Your agentes.chat plan is active. Their computer is on its way.",
-      /** Back from paying, until the billing service lifts the workspace's hold (ADR 0078). */
+      /** Back from paying, until the billing service lifts the workspace's hold (ADR 0079). */
       confirming: "Payment received. Starting this workspace's agentes.chat plan.",
       leadNoComputer: "Your agents think with an API\u00a0key, or with your AI plan on a computer you connect.",
     },
@@ -669,6 +678,7 @@ export const en: Translations = {
     skip: "Skip this step",
     confirmation: {
       sent: "We sent a confirmation link to {{email}}.",
+      first: "Already invited? Confirm your email first.",
     },
   },
   // The desktop app's notifications while its window is in the background (lib/desktop.ts `desktopNotice`).
@@ -711,6 +721,11 @@ export const en: Translations = {
     updated: "Last updated {{date}}",
     contents: "On this page",
     home: "Go to the home page",
+    /** `/terms` and `/privacy` on a server that has no page of its own for them. */
+    none: {
+      terms: "This server has no terms page",
+      privacy: "This server has no privacy page",
+    },
   },
   shell: {
     // The Mac app's own title bar (ADR 0036).
@@ -6964,9 +6979,6 @@ export const en: Translations = {
     downloadOnly: "No preview for this type of file. Download it to open.",
   },
   errors: {
-    org: {
-      membersFull: "This workspace has no room for more people right now. Let whoever invited you know.",
-    },
     join: {
       linkClosed: "This link no longer works. Ask whoever sent it for a new one.",
       full: "This workspace has many requests waiting. Try again later, or ask someone there to invite you.",
@@ -6985,6 +6997,10 @@ export const en: Translations = {
     },
     invitation: {
       askToJoin: "This link goes through an admin now. Open it again to ask to join.",
+    },
+    org: {
+      createInviteOnly: "New workspaces need an invitation for now.",
+      membersFull: "This workspace has no room for more people right now. Let whoever invited you know.",
     },
     humanCheck: "We couldn't confirm you're a person. Try again.",
     humanCheckBlocked: "The check didn't load. Try another browser or network.",
@@ -8555,14 +8571,14 @@ export const en: Translations = {
       suspended: "The workspace was suspended",
       active: "The workspace is working again",
       agentHold: "{{name}} is paused",
-      /** A hold the billing service set (ADR 0078): its code, never shown as it comes. */
+      /** A hold the billing service set (ADR 0079): its code, never shown as it comes. */
       billing: {
         payment: "The workspace needs an agentes.chat plan",
         unpaid: "The agentes.chat plan payment didn't go through",
         ended: "The workspace's agentes.chat plan ended",
       },
     },
-    /** A hold the billing service set (ADR 0078), said in place of its code. */
+    /** A hold the billing service set (ADR 0079), said in place of its code. */
     billing: {
       payment: "This workspace doesn't have an agentes.chat plan yet. Its agents start working once it does.",
       unpaid: "This workspace's agentes.chat plan payment didn't go through, and its agents stopped.",
@@ -8601,7 +8617,7 @@ export const en: Translations = {
     writeAfter: ".",
     ask: "Need help? Ask the people who run this server.",
   },
-  /** The billing service (ADR 0078): this server shows no plan, price or currency, only the way there. */
+  /** The billing service (ADR 0079): this server shows no plan, price or currency, only the way there. */
   billing: {
     open: "Open plan and billing",
     opening: "Opening…",
@@ -8614,7 +8630,7 @@ export const en: Translations = {
     noLimit: "No limit",
     ownBucket: "On your own bucket, with no limit from us",
   },
-  /** A workspace's limits, set by the billing service (ADR 0078): people and files. */
+  /** A workspace's limits, set by the billing service (ADR 0079): people and files. */
   limits: {
     members: {
       full: "This workspace has {{members}} of {{limit}} people.",

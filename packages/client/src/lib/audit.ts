@@ -26,7 +26,7 @@ export function auditQueryOf(show: AuditShow, agentId: string | null): AuditQuer
 
 export const auditStr = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
 
-/** A row's reason as its panel says it: a billing hold's code in words (ADR 0078), never as it comes. */
+/** A row's reason as its panel says it: a billing hold's code in words (ADR 0079), never as it comes. */
 export function auditReason(t: TFunction, row: AuditRow): string | null {
   const reason = auditStr(row.details.reason);
   const billing =

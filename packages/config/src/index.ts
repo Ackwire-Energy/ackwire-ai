@@ -93,7 +93,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   if (OFFICIAL_HOSTS.has(site.hostname)) {
     config.TERMS_URL ??= `${site.origin}/terms`;
     config.PRIVACY_URL ??= `${site.origin}/privacy`;
-    config.EMAIL_FROM ??= "agentes.chat <ola@agentes.chat>";
+    config.EMAIL_FROM ??= "agentes.chat <ping@agentes.chat>";
   }
   return config;
 }

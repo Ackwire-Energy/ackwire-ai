@@ -65,6 +65,7 @@ import type {
   Health,
   HostComputer,
   ImportPlan,
+  Instance,
   Invitation,
   InvitationPreview,
   InvitationWithStatus,
@@ -324,6 +325,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           throw error;
         }
       },
+      instance: () => request<Instance>("/api/instance"),
       telemetry: () => nullOn(404, () => request<ServerTelemetry>("/api/app/telemetry")),
       setTelemetry: (enabled) => request<ServerTelemetry>("/api/app/telemetry", { method: "PUT", json: { enabled } }),
       jev: () => nullOn(404, () => request<JevKey>("/api/app/jev")),

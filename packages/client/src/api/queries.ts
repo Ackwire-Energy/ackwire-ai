@@ -122,6 +122,8 @@ export const meQuery = (api: ApiClient) =>
   });
 export const authConfigQuery = (api: ApiClient) =>
   queryOptions({ queryKey: keys.authConfig, queryFn: () => api.account.authConfig(), staleTime: 60_000 });
+export const instanceQuery = (api: ApiClient) =>
+  queryOptions({ queryKey: keys.instance, queryFn: () => api.system.instance(), staleTime: 60_000 });
 export const channelsQuery = (api: ApiClient, orgId: string) =>
   queryOptions({ queryKey: keys.channels(orgId), queryFn: () => api.chat.channels(orgId), staleTime: 30_000 });
 /** An invitation's preview (its page, and the sign-in that leads to it). */
@@ -1583,7 +1585,7 @@ export function useDecideProposal(orgId: string) {
   });
 }
 
-/** People, files and today's uploads against the workspace's limits (ADR 0078): any member. */
+/** People, files and today's uploads against the workspace's limits (ADR 0079): any member. */
 export const useWorkspaceLimits = (orgId: string, enabled = true) => {
   const api = useApi();
   return useQuery({ queryKey: keys.limits(orgId), queryFn: () => api.orgs.limits(orgId), enabled });
