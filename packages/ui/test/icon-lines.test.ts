@@ -224,10 +224,11 @@ describe("a picture beside lines, a bubble beside a face, a row of actions", () 
     const fallback = rise.indexOf("margin-block-start: calc(var(--cap-top) - 11px)");
     expect(fallback).toBeGreaterThan(-1);
     expect(rise.indexOf("margin-block-start: calc(var(--cap-top) - 0.5lh)")).toBeGreaterThan(fallback);
-    // The chat's name on a 20px line known in place, its capitals at the face's top: never a line as tall as the face.
+    // The chat's name on a 20px line whose box starts at the face's top, never raised to put its capitals there:
+    // capitals flush with the face's edge read as a face hanging under the name. Never a line as tall as the face.
     const head = await kitRule(".ac-msg__head");
     expect(head).toContain("line-height: 20px");
-    expect(head).toContain("margin-block-start: calc(var(--cap-top) - 10px)");
+    expect(head).not.toContain("margin-block-start");
     expect(await kitRule(".ac-msg__head > .ac-msg__aside")).toContain("align-self: center");
   });
 
