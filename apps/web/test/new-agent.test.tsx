@@ -64,12 +64,27 @@ describe("Criar agente: steps", () => {
     expect(railStep("Identidade").disabled).toBe(true);
     expect(screen().getByRole("link", { name: "Sair sem criar" }).getAttribute("href")).toBe(`/org/${ORG_ID}`);
     expect(screen().getByRole("link", { name: "Cancelar" }).getAttribute("href")).toBe(`/org/${ORG_ID}`);
-    expect(screen().getByRole("complementary", { name: "Prévia do agente" }).textContent).toContain("Seu agente");
-    // One short lead under the title; the preview is headed by its name alone.
+    // One short lead under the title.
     expect(document.querySelector(".onb__lead")?.textContent).toBe(
       "Escolha um ponto de partida: o resto a gente preenche.",
     );
+  });
+
+  test("the preview waits for a role: none before a pick, then the picked role's agent, on to the next steps", async () => {
+    await open();
+    const preview = () => screen().queryByRole("complementary", { name: "Prévia do agente" });
+    expect(preview()).toBeNull();
+    // A pick shows it on the role step itself: Do zero has no name yet, QA starts as Iris.
+    await click(screen().getByRole("button", { name: /^Do zero/ }));
+    expect(title()).toBe("Qual vai ser o papel?");
+    expect(preview()?.textContent).toContain("Seu agente");
+    await click(screen().getByRole("button", { name: /^QA/ }));
+    expect(preview()?.textContent).toContain("Iris");
+    // Headed by its name alone. It says which step it's on: a narrow screen keeps it out of the role step.
     expect(document.querySelector(".newag__cap")?.textContent).toBe("Prévia");
+    expect(preview()?.getAttribute("data-step")).toBe("role");
+    await proceed();
+    expect(preview()?.getAttribute("data-step")).toBe("identity");
   });
 
   test("what a step needs explained: the instructions' and the budget's ⓘ; the tools keep the approval line", async () => {
@@ -547,6 +562,8 @@ describe("Criar agente: what gets created", () => {
     expect(railStep("Papel").disabled).toBe(true);
     await click(screen().getByRole("button", { name: "Criar outro agente" }));
     expect(title()).toBe("Qual vai ser o papel?");
+    // The draft starts over, so the preview waits for a role again.
+    expect(screen().queryByRole("complementary", { name: "Prévia do agente" })).toBeNull();
     await startAs("Do zero");
     expect((screen().getByLabelText("Nome") as HTMLInputElement).value).toBe("");
   });
