@@ -131,8 +131,11 @@ describe("org storage", () => {
 
     const after = await createArtifact(f.artifactDeps, person(f.owner.id), f.org.id, doc("Depois"));
     const objects = [...(f.s3.buckets.get("acme-files")?.keys() ?? [])];
-    expect(objects).toEqual([`agentes/artifacts/${after.id}/v1`]);
-    expect(f.platformBlobs.objects.has(`orgs/${f.org.id}/artifacts/${before.id}/v1`)).toBe(true);
+    expect(objects).toHaveLength(1);
+    expect(objects[0]?.startsWith(`agentes/artifacts/${after.id}/v1-`)).toBe(true);
+    expect(
+      [...f.platformBlobs.objects.keys()].some((k) => k.startsWith(`orgs/${f.org.id}/artifacts/${before.id}/v1-`)),
+    ).toBe(true);
     expect((await getArtifact(f.artifactDeps, person(f.owner.id), f.org.id, before.id)).content).toEqual(
       doc("Antes").content,
     );
@@ -141,13 +144,15 @@ describe("org storage", () => {
     );
     // Downloads of bucket files are signed by the bucket (and the signature holds).
     const link = await artifactDownload(f.artifactDeps, f.owner.id, f.org.id, after.id);
-    expect(link.url.startsWith(`https://s3.example.com/acme-files/agentes/artifacts/${after.id}/v1?`)).toBe(true);
+    expect(link.url.startsWith(`https://s3.example.com/acme-files/agentes/artifacts/${after.id}/v1-`)).toBe(true);
     expect(await (await f.s3.fetch(link.url, { method: "GET" })).text()).toBe("# Depois");
 
     // Back to platform storage: new files go there; bucket files still read.
     await saveStorage(f.storage, f.owner.id, f.org.id, { kind: "agentes" });
     const back = await createArtifact(f.artifactDeps, person(f.owner.id), f.org.id, doc("De volta"));
-    expect(f.platformBlobs.objects.has(`orgs/${f.org.id}/artifacts/${back.id}/v1`)).toBe(true);
+    expect(
+      [...f.platformBlobs.objects.keys()].some((k) => k.startsWith(`orgs/${f.org.id}/artifacts/${back.id}/v1-`)),
+    ).toBe(true);
     expect((await getArtifact(f.artifactDeps, person(f.owner.id), f.org.id, after.id)).title).toBe("Depois");
   });
 
