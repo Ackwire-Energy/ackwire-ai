@@ -38,6 +38,7 @@ test("a hidden person reads as offline to everyone else, hidden to themselves", 
   expect(memberPresence({ availability: "auto" }, false, false)).toBe("offline");
   expect(memberPresence({ availability: "busy" }, true, false)).toBe("busy");
   expect(memberPresence({ availability: "busy" }, false, false)).toBe("offline");
+  expect(memberPresence({ availability: "away" }, true, false)).toBe("away");
   expect(memberPresence({ availability: "hidden" }, true, false)).toBe("offline");
   expect(memberPresence({ availability: "hidden" }, true, true)).toBe("hidden");
 });

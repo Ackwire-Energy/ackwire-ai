@@ -8,14 +8,14 @@ import { requirePermission } from "./organizations";
  * A person's status in an organization: what they chose to show (`availability`) and a line they
  * wrote about what they are doing. Whether they are connected comes from the `Presence` adapter.
  */
-export const AVAILABILITIES = ["auto", "busy", "hidden"] as const;
+export const AVAILABILITIES = ["auto", "away", "busy", "hidden"] as const;
 export type Availability = (typeof AVAILABILITIES)[number];
 
 /**
  * What a viewer sees. `hidden` only reaches the person themselves: everyone else sees `offline`,
  * so a hidden person can't be told apart from one who is away.
  */
-export type MemberPresence = "online" | "busy" | "hidden" | "offline";
+export type MemberPresence = "online" | "away" | "busy" | "hidden" | "offline";
 
 export const STATUS_TEXT_MAX = 100;
 export const STATUS_EMOJI_MAX = 16;
@@ -41,7 +41,7 @@ export function memberPresence(
 ): MemberPresence {
   if (row.availability === "hidden") return isSelf ? "hidden" : "offline";
   if (!connected) return "offline";
-  return row.availability === "busy" ? "busy" : "online";
+  return row.availability === "auto" ? "online" : row.availability;
 }
 
 /** The written status, or null when there is none or its time is up (cleared on read, no job needed). */
@@ -68,7 +68,7 @@ export async function setMyStatus(
   await requirePermission(deps.db, userId, orgId, "read");
   const set: Partial<StatusColumns> = {};
   if (input.availability !== undefined) {
-    if (!AVAILABILITIES.includes(input.availability)) throw new ValidationError("availability: auto, busy or hidden");
+    if (!AVAILABILITIES.includes(input.availability)) throw new ValidationError("availability: auto, away, busy or hidden");
     set.availability = input.availability;
   }
   if (input.status !== undefined) {

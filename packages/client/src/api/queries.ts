@@ -1168,22 +1168,18 @@ export function useSetMyStatus(orgId: string, userId: string | undefined) {
 
 /** Your own row with a status change applied, as the server will answer it. */
 function withStatus(p: Person, input: StatusInput): Person {
-  const presence =
-    input.availability === undefined
-      ? p.presence
-      : input.availability === "hidden"
-        ? "hidden"
-        : input.availability === "busy"
-          ? "busy"
-          : "online";
+  const presence = input.availability === undefined ? p.presence : AVAILABILITY_PRESENCE[input.availability];
   const status =
     input.status === undefined
       ? p.status
       : input.status?.text.trim()
         ? { text: input.status.text.trim(), emoji: input.status.emoji ?? null, until: input.status.until ?? null }
         : null;
-  return { ...p, presence, online: presence === "online" || presence === "busy", status };
+  return { ...p, presence, online: presence !== "offline" && presence !== "hidden", status };
 }
+
+/** How you appear for what you picked (to yourself: hidden stays hidden). */
+const AVAILABILITY_PRESENCE = { auto: "online", away: "away", busy: "busy", hidden: "hidden" } as const;
 
 /**
  * Each agent's presence and line (ADR 0081). Refetched on `agent.status`, and every 30 s: presence also follows
