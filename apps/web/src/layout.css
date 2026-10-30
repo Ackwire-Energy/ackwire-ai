@@ -2893,6 +2893,11 @@ p {
   font-family: var(--font-mono);
   font-size: 12.5px;
 }
+.skill-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
 /* Workspace header as a menu button; the account row stays at the bottom with the settings gear. */
 .sidebar__org-button {
   display: flex;
