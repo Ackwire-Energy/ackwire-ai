@@ -687,6 +687,11 @@ export const en: Translations = {
     updated: "Last updated {{date}}",
     contents: "On this page",
     home: "Go to the home page",
+    /** `/terms` and `/privacy` on a server that has no page of its own for them. */
+    none: {
+      terms: "This server has no terms page",
+      privacy: "This server has no privacy page",
+    },
   },
   shell: {
     // The Mac app's own title bar (ADR 0036).

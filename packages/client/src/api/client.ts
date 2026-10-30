@@ -80,6 +80,7 @@ import type {
   HostComputer,
   ImportInput,
   ImportPlan,
+  Instance,
   Invitation,
   InvitationPreview,
   InvitationWithStatus,
@@ -210,6 +211,7 @@ import type {
 export interface ApiClient {
   system: {
     health(): Promise<Health>;
+    instance(): Promise<Instance>;
     /** `null` unless I am the installation's owner (and not on agentes.chat itself). */
     telemetry(): Promise<ServerTelemetry | null>;
     setTelemetry(enabled: boolean): Promise<ServerTelemetry>;
