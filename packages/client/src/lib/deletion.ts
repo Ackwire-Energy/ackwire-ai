@@ -44,12 +44,29 @@ export function proofNeeded(
 export interface AccountDeletionLine {
   kind: "closes" | "leaves" | "computers" | "staysBehind" | "messages" | "serverOwner";
   text: string;
+  /** What stays behind (`staysBehind`), each with the settings section of its workspace where it is disconnected. */
+  links?: { label: string; orgId: string; section: "keys" | "connectors" }[];
 }
 
+/** Where a key, a connection, a mailbox or a database someone added is disconnected: its workspace's settings. */
+export const staysBehindSection = (kind: AccountDeletionPlan["staysBehind"][number]["kind"]) =>
+  kind === "key" ? ("keys" as const) : ("connectors" as const);
+
 /**
- * What deleting the account does, in the person's words, from its preflight: the workspaces that close with it and
- * those they leave, per workspace the computers removed and what stays behind, that their messages stay, and, on a
- * self-hosted server they set up, that its settings lose their owner here.
+ * The ways out of a workspace that keeps the account (`soleOwner`), as the web app's paths: make someone else an
+ * owner, or delete it. One still being set up has neither page yet: its onboarding is where it's finished, and where
+ * it's deleted.
+ */
+export const soleOwnerWaysOut = (orgId: string, settingUp: boolean) =>
+  settingUp
+    ? { people: "/onboarding", delete: "/onboarding?delete=1" }
+    : { people: `/org/${orgId}/settings/members`, delete: `/org/${orgId}/settings/general?delete=1` };
+
+/**
+ * What deleting the account does, in the person's words, from its preflight: the workspaces that close with it (one
+ * being deleted already on its own date) and those they leave, per workspace the computers removed and what stays
+ * behind with where to disconnect each, that their messages stay, and, on a self-hosted server they set up, that its
+ * settings lose their owner here.
  */
 export function accountDeletionLines(
   t: TFunction,
@@ -70,9 +87,17 @@ export function accountDeletionLines(
     return [...groups];
   };
   const lines: AccountDeletionLine[] = [];
-  if (plan.closes.length > 0) {
+  const closing = plan.closes.filter((o) => !o.deletion);
+  if (closing.length > 0) {
     const date = formatShortDate(locale, deletionDueFrom(now));
-    const text = t("deleteAccount.closes", { count: plan.closes.length, names: names(plan.closes), date });
+    const text = t("deleteAccount.closes", { count: closing.length, names: names(closing), date });
+    lines.push({ kind: "closes", text });
+  }
+  for (const { name, deletion } of plan.closes) {
+    if (!deletion) continue;
+    const text = deletion.dueAt
+      ? t("deleteAccount.closing", { name, date: formatShortDate(locale, deletion.dueAt) })
+      : t("deleteAccount.closingLate", { name });
     lines.push({ kind: "closes", text });
   }
   if (plan.leaves.length > 0)
@@ -88,7 +113,12 @@ export function accountDeletionLines(
   for (const [orgId, items] of byOrg(plan.staysBehind))
     lines.push({
       kind: "staysBehind",
-      text: t("deleteAccount.staysBehind", { name: orgName(orgId), items: names(items) }),
+      text: t("deleteAccount.staysBehind", { name: orgName(orgId) }),
+      links: items.map((item) => ({
+        label: t("deleteAccount.disconnect", { name: item.name }),
+        orgId,
+        section: staysBehindSection(item.kind),
+      })),
     });
   lines.push({ kind: "messages", text: t("deleteAccount.messages") });
   if (plan.serverOwner && !cloud) lines.push({ kind: "serverOwner", text: t("deleteAccount.serverOwner") });

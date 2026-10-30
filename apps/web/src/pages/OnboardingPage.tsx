@@ -112,6 +112,7 @@ import {
 } from "@/components/ai/ConnectAiSteps";
 import { JEV_KEY_MIN, JevSteps, JevWhy } from "@/components/ai/Jev";
 import { BillingLinkButton } from "@/components/BillingLinkButton";
+import { DeleteAccountEntry } from "@/components/DeleteAccount";
 import { DeleteWorkspaceDialog } from "@/components/DeleteWorkspace";
 import { ImportFlow, ImportReport, useImportFlow } from "@/components/ImportFlow";
 import { MembersFull } from "@/components/Limits";
@@ -1285,6 +1286,13 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
             {t("onboarding.deleteLink")}
           </button>
         )}
+        <DeleteAccountEntry
+          trigger={(open) => (
+            <button type="button" className="onb__signout" onClick={open}>
+              {t("deleteAccount.menu")}
+            </button>
+          )}
+        />
         <button
           type="button"
           className="onb__signout"

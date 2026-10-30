@@ -8735,11 +8735,20 @@ export const en: Translations = {
     messages: "Your messages stay in the workspaces without your name.",
     computers_one: "Your computer connected to {{name}} is removed from it: {{computers}}.",
     computers_other: "Your computers connected to {{name}} are removed from it: {{computers}}.",
-    staysBehind: "What you added to {{name}} stays there: {{items}}. Disconnect it first if it's yours.",
+    /** A workspace only they are in that an owner deleted already: it keeps its date. */
+    closing: "{{name}} is already being deleted. It goes for good on {{date}}.",
+    closingLate: "{{name}} is already being deleted.",
+    staysBehind: "What you added to {{name}} stays there. Disconnect what's yours first.",
+    /** Opens the settings where that key, connection or mailbox is disconnected. */
+    disconnect: "Disconnect {{name}}",
     serverOwner: "You set up this server. Its own settings will have no owner here, only in its environment.",
     blockers: "Before you can delete it",
     soleOwner: "You're the only owner of {{name}}. Make someone else an owner, or delete {{name}}.",
+    /** The same, for a workspace still in its onboarding: it has no People page yet. */
+    soleOwnerSettingUp:
+      "You're the only owner of {{name}}. Finish setting it up to make someone else an owner, or delete {{name}}.",
     openPeople: "Open People",
+    finishSetup: "Finish setup",
     deleteOrg: "Delete {{name}}",
     submit: "Delete account",
     deleted: "Account deleted",

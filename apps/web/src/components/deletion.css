@@ -36,7 +36,8 @@
   padding: 0;
   list-style: none;
 }
-.deletion-blockers__acts {
+/* Links under a line: a blocker's ways out, or where to disconnect what stays behind. */
+.deletion-acts {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;

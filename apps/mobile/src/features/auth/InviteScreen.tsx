@@ -102,6 +102,14 @@ export function InviteScreen({ token }: { token: string }) {
     );
   }
   if (invitation.kind === "link") return <AskToJoin token={token} preview={invitation} />;
+  // Its workspace is being deleted: it takes nobody, as a closed link says.
+  if (invitation.closed) {
+    return (
+      <AuthScaffold title={t("invite.ask.closedTitle")} subtitle={t("invite.ask.closedText")} expression="closed">
+        <LeaveButton />
+      </AuthScaffold>
+    );
+  }
 
   const org = invitation.orgName;
   const title = invitation.invitedBy

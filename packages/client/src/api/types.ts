@@ -181,8 +181,11 @@ export interface AccountDeletionPlan {
   password: boolean;
   /** Until when this session's own sign-in proves it with no password; null: sign in again, or the password. */
   freshUntil: string | null;
-  /** Only I am in them: they close now and are deleted for good 7 days later. */
-  closes: { id: string; name: string }[];
+  /**
+   * Only I am in them: they close now and are deleted for good 7 days later. One being deleted already keeps its date
+   * (`deletion.dueAt`, null once it passed).
+   */
+  closes: { id: string; name: string; deletion?: { dueAt: string | null } }[];
   /** Others are in them: I leave. */
   leaves: { id: string; name: string; role: Role }[];
   /** I'm their only owner, others are in them and they aren't being deleted: the account can't go yet (`sole_owner`). */
@@ -251,7 +254,10 @@ export interface InvitationPreview {
   agents?: { id: string; name: string; appearance: { color: string; eyes: string; accessory: string } | null }[];
   /** How many more agents work there than `agents` names ("… e mais 2 já trabalham lá"). */
   moreAgents?: number;
-  /** A link turned off, expired, or whose workspace is paused: nobody can ask with it (ADR 0068). */
+  /**
+   * A link turned off, expired, or whose workspace is paused, or an invitation to a workspace being deleted: nobody can
+   * ask or join with it (ADR 0068).
+   */
   closed?: true;
   /** A link opened signed in: where that person stands (on a link that no longer works, only a member's). */
   you?: JoinStatus;

@@ -2,8 +2,8 @@ import { useMe } from "@agenteschat/client";
 import { membershipIn, settingUp } from "@agenteschat/client/lib/guards";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Button, EmptyState } from "@agenteschat/ui";
-import { createFileRoute, Link, Outlet, redirect, useRouterState } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { requireUserIn } from "@/app/guards";
 import { ArtifactViewerProvider } from "@/components/artifacts/ArtifactViewer";
@@ -11,7 +11,7 @@ import { CommandMenu } from "@/components/CommandMenu";
 import { ConnectAiProvider } from "@/components/ConnectAi";
 import { ComputerDialogProvider } from "@/components/computer/ComputerDialog";
 import { MenuBarActions } from "@/components/DesktopMenus";
-import { DesktopTitleBar } from "@/components/DesktopTitleBar";
+import { DesktopDragStrip, DesktopTitleBar } from "@/components/DesktopTitleBar";
 import { RefetchBar } from "@/components/Loading";
 import { OutageNotices } from "@/components/MachineOutages";
 import { NavDrawerProvider, NavScrim, ShellBar } from "@/components/NavDrawer";
@@ -58,10 +58,22 @@ function OrgLayout() {
   useEffect(() => {
     if (membership) storage.set(STORAGE_KEYS.lastOrg, membership.id);
   }, [membership]);
+  // A workspace shown as being deleted that leaves `GET /me` was deleted for good: on to the person's start.
+  const closing = useRef<string | null>(null);
+  if (membership) closing.current = membership.deletion ? orgId : null;
+  const gone = !membership && closing.current === orgId;
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (gone) void navigate({ to: "/", replace: true });
+  }, [gone, navigate]);
+  // Outside the shell the app's window has no title bar: the page's top drags it.
+  const strip = inDesktopApp() && <DesktopDragStrip />;
 
+  if (gone) return strip || null;
   if (!membership) {
     return (
       <div className="page page--mid">
+        {strip}
         <header className="page__header">
           <h1 className="page-title">{t("empty.noOrgTitle")}</h1>
         </header>
@@ -84,6 +96,7 @@ function OrgLayout() {
     return (
       <OrgProvider org={membership} me={me}>
         <RealtimeProvider orgId={membership.id}>
+          {strip}
           <SuspendedScreen org={membership} me={me} />
         </RealtimeProvider>
       </OrgProvider>
@@ -92,7 +105,14 @@ function OrgLayout() {
 
   // Being deleted: its own screen, after the suspension, the stronger fact. Its socket is refused, so the screen asks
   // `GET /me` again instead.
-  if (membership.deletion) return <DeletingScreen org={membership} me={me} />;
+  if (membership.deletion) {
+    return (
+      <>
+        {strip}
+        <DeletingScreen org={membership} me={me} />
+      </>
+    );
+  }
 
   return (
     <OrgProvider org={membership} me={me}>

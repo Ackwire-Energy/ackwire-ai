@@ -17,6 +17,7 @@ import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/context";
 import { BillingLinkButton } from "@/components/BillingLinkButton";
+import { DeleteAccountEntry } from "@/components/DeleteAccount";
 import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
 
@@ -96,7 +97,7 @@ export function HoldBanner() {
   );
 }
 
-/** Closed for now, why when told, where to ask, the person's other workspaces, and Sair. */
+/** Closed for now, why when told, where to ask, the person's other workspaces, Sair and Apagar conta. */
 export function SuspendedScreen({ org, me }: { org: OrgSummary; me: Me }) {
   const { t } = useTranslation();
   return (
@@ -104,7 +105,16 @@ export function SuspendedScreen({ org, me }: { org: OrgSummary; me: Me }) {
       <header className="page__header">
         <h1 className="page-title">{t("standing.screen.title")}</h1>
       </header>
-      <EmptyState icon="lock" title={org.name} actions={<SignOutButton />}>
+      <EmptyState
+        icon="lock"
+        title={org.name}
+        actions={
+          <>
+            <SignOutButton />
+            <DeleteAccountButton />
+          </>
+        }
+      >
         {suspendedText(t, org.standing)}
         <SupportLine />
       </EmptyState>
@@ -115,8 +125,8 @@ export function SuspendedScreen({ org, me }: { org: OrgSummary; me: Me }) {
 
 /**
  * Being deleted: who deleted it and when, when it goes for good, and until then Restore for its owners (the others
- * read that only an owner can). Then their other workspaces, a new one, and Sair. Its socket is closed, so `GET /me`
- * is asked again meanwhile: a restore opens the workspace, and once it's gone it leaves the list.
+ * read that only an owner can). Then their other workspaces, a new one, Sair and Apagar conta. Its socket is closed,
+ * so `GET /me` is asked again meanwhile: a restore opens the workspace, and once it's gone it leaves the list.
  */
 export function DeletingScreen({ org, me }: { org: OrgSummary; me: Me }) {
   const { t, i18n } = useTranslation();
@@ -150,6 +160,7 @@ export function DeletingScreen({ org, me }: { org: OrgSummary; me: Me }) {
               </Button>
             )}
             <SignOutButton />
+            <DeleteAccountButton />
           </>
         }
       >
@@ -177,6 +188,20 @@ function SignOutButton() {
     >
       {t("auth.signOut")}
     </Button>
+  );
+}
+
+/** Apagar conta, from a workspace closed to its people: its account menu isn't there. */
+function DeleteAccountButton() {
+  const { t } = useTranslation();
+  return (
+    <DeleteAccountEntry
+      trigger={(open) => (
+        <Button variant="ghost" onClick={open}>
+          {t("deleteAccount.menu")}
+        </Button>
+      )}
+    />
   );
 }
 

@@ -776,8 +776,8 @@ function UnreadCount({ count }: { count: number }) {
  * The account button; under the name, the workspace's budget use this month
  * (a percentage, never money). It opens the account's full-screen menu:
  * profile, time zone, opening the phone app, theme, language, sounds, the budget,
- * deleting the account (its dialog kept in the address, `?account=delete`, so a sign-in again comes back to it)
- * and signing out.
+ * deleting the account and signing out. Adding a password and deleting the account keep their dialogs in the address
+ * (`?account=password`, `?account=delete`): both may ask for a sign-in again, which comes back to them.
  */
 function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const { t, i18n } = useTranslation();
@@ -793,7 +793,6 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const trigger = useRef<HTMLButtonElement>(null);
   const [profile, setProfile] = useState<"handle" | "timezone" | null>(null);
   const [phone, setPhone] = useState(false);
-  const [addPassword, setAddPassword] = useState(false);
   const [account, setAccount] = useOpenParam("account");
   // The app's "Show QR code" for this server (Preferences › Servers).
   useEffect(() => {
@@ -878,7 +877,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
             <MenuOverlayItem
               icon="key"
               description={t("shell.addPasswordHint")}
-              onSelect={pick(() => setAddPassword(true))}
+              onSelect={pick(() => setAccount("password"))}
             >
               {t("shell.addPassword")}
             </MenuOverlayItem>
@@ -972,7 +971,10 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
       </MenuOverlay>
       <ProfileDialog focus={profile} onClose={() => setProfile(null)} />
       <OpenOnPhoneDialog open={phone} onClose={() => setPhone(false)} />
-      <AddPasswordDialog open={addPassword} onClose={() => setAddPassword(false)} />
+      <AddPasswordDialog
+        open={account === "password" && me.user.hasPassword === false}
+        onClose={() => setAccount(null)}
+      />
       <DeleteAccountDialog open={account === "delete"} onClose={() => setAccount(null)} />
     </>
   );

@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { ApiError } from "@agenteschat/client";
 import { readDeleteResponse } from "../src/features/account/result";
+import { preflightMissing } from "../src/features/me/logic";
 import { chooseOrg, firstRunMounted, openOrgs, pushOpens, serverDownOf } from "../src/lib/org-choice";
 import { photoSource } from "../src/lib/photo";
 import { createHolder, deviceBody, devicePath, quietWhileOpen, readPushData } from "../src/lib/push-payload";
@@ -86,6 +88,11 @@ describe("account deletion", () => {
   });
   test("anything else failed", async () => {
     expect(await readDeleteResponse(res(500, "oops"))).toEqual({ ok: false, reason: "failed", status: 500 });
+  });
+  test("a server from before the preflight: deleting falls back to what it always did, only its 404 says so", () => {
+    expect(preflightMissing(new ApiError(404, "not_found", "Not found"))).toBe(true);
+    expect(preflightMissing(new ApiError(500, "http_500", "oops"))).toBe(false);
+    expect(preflightMissing(new Error("offline"))).toBe(false);
   });
 });
 

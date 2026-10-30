@@ -95,6 +95,19 @@ export function InvitePage({ token }: { token: string }) {
 
   const invitation = preview.data;
   if (invitation?.kind === "link") return <AskToJoin token={token} preview={invitation} />;
+  // Its workspace is being deleted: it takes nobody, as a closed link says.
+  if (invitation?.closed) {
+    return (
+      <CenteredLayout narrow>
+        <Card padded as="div" className="invite-card">
+          <OrgHead orgName={invitation.orgName} />
+          <Outcome expression="closed" title={t("invite.ask.closedTitle")}>
+            <p className="page-sub">{t("invite.ask.closedText")}</p>
+          </Outcome>
+        </Card>
+      </CenteredLayout>
+    );
+  }
   const orgName = invitation?.orgName ?? "";
   const user = me.data?.user;
   const passwordOk = passwordState(password) === "ok";

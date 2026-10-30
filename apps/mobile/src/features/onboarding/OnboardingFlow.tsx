@@ -95,9 +95,10 @@ import {
  * walking at its front. Workspace (logo optional, time zone from the phone) → Contexto → Trazer agentes
  * (optional; brought from the web) → Agentes → IA (optional: an AI plan or an API key, skipped when the agents
  * already think with one) → Pessoas (optional: type e-mails or share a link) → Pronto: the team's welcome and the
- * first message, offered by the agent best placed to start, sent to #general. No computer step.
+ * first message, offered by the agent best placed to start, sent to #general. No computer step. `onLeave`: opened
+ * over a workspace being deleted, its first step goes back to it until a new one is made.
  */
-export function OnboardingFlow() {
+export function OnboardingFlow({ onLeave }: { onLeave?: () => void } = {}) {
   const { t, i18n } = useTranslation();
   const api = useApi();
   const qc = useQueryClient();
@@ -490,7 +491,10 @@ export function OnboardingFlow() {
             />
           ) : null}
           {/* Until a workspace is set up this is the only screen: the ways out of the account, and of a workspace made
-              by mistake (deleted on the website), are on its first step. */}
+              by mistake, are on its first step (deleting either on the website). */}
+          {step === "workspace" && onLeave && !created ? (
+            <Button variant="ghost" wide label={t("mobile.common.back")} disabled={pending} onPress={onLeave} />
+          ) : null}
           {step === "workspace" && created ? (
             <Button
               variant="ghost"
@@ -507,6 +511,15 @@ export function OnboardingFlow() {
               label={t("mobile.org.signOut")}
               disabled={pending}
               onPress={() => void signOut()}
+            />
+          ) : null}
+          {step === "workspace" ? (
+            <Button
+              variant="ghost"
+              wide
+              label={t("deleteAccount.menu")}
+              disabled={pending}
+              onPress={() => openPage(`${serverUrl()}/onboarding?account=delete`)}
             />
           ) : null}
           {step === "import" ? (

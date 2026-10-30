@@ -860,10 +860,17 @@ export const featureKeysEn: FeatureTranslations = {
     intro: "There's no undo.",
     goes: {
       account: "Your account, your access and your sessions are gone.",
-      orgs: "Workspaces where you are the only member close now and are deleted after 7 days.",
+      /** A server from before the preflight, which says what it closes. */
+      orgs: "Workspaces where you are the only member are deleted.",
       phones: "This phone and the others stop getting alerts.",
     },
     stays: "Messages you wrote stay in the chats, without your name.",
+    /** A server from before the preflight: it refused for these workspaces. */
+    blocked:
+      "You're the only owner of {{names}}. On the website, in People, make someone else an owner, then come back.",
+    /** No password, and no way to sign in again here: the website adds one. */
+    addPasswordFirst: "Add a password to your account on the website first, then type it here.",
+    addPasswordWeb: "Add a password on the website",
     otherAccount: "You signed in to another account. Nothing was deleted.",
     hold: "Hold to delete",
     holding: "Keep holding…",
