@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
+import { schema } from "@agenteschat/db";
 import { browser, createTestServer, joinByInvitation, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
@@ -66,6 +67,50 @@ test("workspace logo: admins upload and remove it; members see it; strangers don
   expect((await owner(logoApi, { method: "DELETE" })).status).toBe(204);
   const after = (await (await owner(`/api/app/organizations/${orgId}`)).json()) as { logo: string | null };
   expect(after.logo).toBeNull();
+});
+
+test("the logo on an invitation's page: through its link or invitation only, while it works", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const anon = browser(t);
+  const preview = async (token: string) =>
+    (await (await anon(`/api/app/invitations/${token}`)).json()) as Record<string, unknown>;
+  const tokenOf = (url: string) => url.split("/invite/")[1] ?? "";
+  const link = (await (await owner(`/api/app/organizations/${orgId}/invite-links`, { json: {} })).json()) as {
+    id: string;
+    url: string;
+  };
+  const invited = await owner(`/api/app/organizations/${orgId}/invitations`, {
+    json: { email: "bia@example.com", role: "member" },
+  });
+  const tokens = { link: tokenOf(link.url), email: tokenOf(((await invited.json()) as { url: string }).url) };
+
+  // No logo: none on the page, nothing to serve.
+  expect(await preview(tokens.link)).not.toHaveProperty("logo");
+  expect((await anon(`/api/app/invitations/${tokens.link}/logo/0123456789abcdef.jpg`)).status).toBe(404);
+
+  const put = await owner(`/api/app/organizations/${orgId}/logo`, { method: "PUT", json: image });
+  const file = ((await put.json()) as { logo: string }).logo.split("/").pop();
+  for (const token of [tokens.link, tokens.email]) {
+    const logo = (await preview(token)).logo;
+    expect(logo).toBe(`/api/app/invitations/${token}/logo/${file}`);
+    const served = await anon(String(logo));
+    expect(served.status).toBe(200);
+    expect(served.headers.get("content-type")).toBe("image/jpeg");
+    expect(served.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(served.headers.get("content-security-policy")).toBe("sandbox");
+    expect(served.headers.get("cache-control")).toBe("private, max-age=31536000, immutable");
+  }
+  // Only the workspace's current file, only through a token that works.
+  expect((await anon(`/api/app/invitations/${tokens.link}/logo/0123456789abcdef.jpg`)).status).toBe(404);
+  expect((await anon(`/api/app/invitations/not-a-token/logo/${file}`)).status).toBe(404);
+  await t.db.update(schema.organizationInvitations).set({ expiresAt: new Date(Date.now() - 1000) });
+  expect((await anon(`/api/app/invitations/${tokens.email}/logo/${file}`)).status).toBe(404);
+  const off = await owner(`/api/app/organizations/${orgId}/invite-links/${link.id}`, { method: "DELETE" });
+  expect(off.status).toBe(204);
+  expect((await anon(`/api/app/invitations/${tokens.link}/logo/${file}`)).status).toBe(404);
+  expect(await preview(tokens.link)).not.toHaveProperty("logo");
 });
 
 test("the logo for a connected computer: machine token, ETag/304, 404 without one, 401 once removed", async () => {

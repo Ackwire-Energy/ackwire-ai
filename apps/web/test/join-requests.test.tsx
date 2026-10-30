@@ -388,6 +388,31 @@ describe("an invitation link asks to join", () => {
       cleanup();
     }
   });
+
+  test("the workspace's logo in place of its initial, on a link and an invitation alike; the initial without one", async () => {
+    const mark = () => document.querySelector<HTMLImageElement>(".invite-card img.org-mark");
+    const initial = () => document.querySelector(".invite-card .org-badge");
+    const logo = "/api/app/invitations/lnk/logo/0123456789abcdef.png";
+    await openLink({ ...LINK, logo });
+    expect(mark()?.getAttribute("src")).toBe(logo);
+    expect(initial()).toBeNull();
+    cleanup();
+
+    const invitation: InvitationPreview = { orgName: "Acme", email: "ana@acme.com.br", role: "member", kind: "email" };
+    const state = seedState({
+      me: null,
+      previews: { inv: { ...invitation, logo: "/api/app/invitations/inv/logo/a.png" } },
+    });
+    await renderApp("/invite/inv", { api: createFakeApi(state) });
+    await settle(4);
+    expect(mark()?.getAttribute("src")).toBe("/api/app/invitations/inv/logo/a.png");
+    expect(initial()).toBeNull();
+    cleanup();
+
+    await openLink(LINK);
+    expect(mark()).toBeNull();
+    expect(initial()?.textContent).toBe("A");
+  });
 });
 
 /** Mid-day: a request made 2 h ago is still today, so it reads "há 2 h" and never "ontem". */

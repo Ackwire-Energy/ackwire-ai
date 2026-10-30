@@ -13,6 +13,7 @@ import {
   deleteAccount,
   getOrganization,
   hasPassword,
+  invitationLogoFile,
   isEmailVerified,
   isValidTimeZone,
   joinStatus,
@@ -65,6 +66,18 @@ const tags = ["Account"];
 const SIGN_IN_OPTIONS_PER_IP = { limit: 30, windowMs: 10 * 60_000 };
 const Name = z.string().trim().min(1).max(100);
 const Context = z.string().max(20_000).openapi({ description: "Shared with every agent of the organization." });
+
+/** A stored image (a photo, a logo) as its file: named by its content hash, so cached for good; never run as a page. */
+const imageFile = (file: { body: Uint8Array; contentType: string }) =>
+  new Response(file.body, {
+    status: 200,
+    headers: {
+      "content-type": file.contentType,
+      "x-content-type-options": "nosniff",
+      "content-security-policy": "sandbox",
+      "cache-control": "private, max-age=31536000, immutable",
+    },
+  });
 
 /** Account, organizations, members and invitations. */
 export function accountRoutes(deps: AppDeps) {
@@ -222,6 +235,14 @@ export function accountRoutes(deps: AppDeps) {
             role: Role,
             kind: z.enum(["email", "link"]),
             invitedBy: z.string().nullable().openapi({ description: "Who invited (their name), when known." }),
+            logo: z
+              .string()
+              .optional()
+              .openapi({
+                description:
+                  "The workspace's logo, at an address that serves it for this invitation or link only, while " +
+                  "it works. Absent without one.",
+              }),
             agents: z
               .array(
                 z.object({
@@ -275,6 +296,13 @@ export function accountRoutes(deps: AppDeps) {
       const you = "closed" in invitation && !status?.member ? null : status;
       return c.json({ ...invitation, ...(you ? { you } : {}) }, 200);
     },
+  );
+
+  // The preview's `logo`: the workspace's current logo for whoever holds a working invitation or link, 404 otherwise.
+  app.get("/invitations/:token/logo/:file", async (c) =>
+    imageFile(
+      await invitationLogoFile({ db, blobs: deps.adapters.platformBlobs }, c.req.param("token"), c.req.param("file")),
+    ),
   );
 
   // ── Signed in ─────────────────────────────────────────────────────────────
@@ -572,44 +600,30 @@ export function accountRoutes(deps: AppDeps) {
     },
   );
 
-  // The logo file, for the org's members (content-hash names: cached for good).
-  app.get("/org-logos/:orgId/:file", async (c) => {
-    const file = await orgLogoFile(
-      { db, blobs: deps.adapters.platformBlobs },
-      c.get("user").id,
-      c.req.param("orgId"),
-      c.req.param("file"),
-    );
-    return new Response(file.body, {
-      status: 200,
-      headers: {
-        "content-type": file.contentType,
-        "x-content-type-options": "nosniff",
-        "content-security-policy": "sandbox",
-        "cache-control": "private, max-age=31536000, immutable",
-      },
-    });
-  });
+  // The logo file, for the org's members.
+  app.get("/org-logos/:orgId/:file", async (c) =>
+    imageFile(
+      await orgLogoFile(
+        { db, blobs: deps.adapters.platformBlobs },
+        c.get("user").id,
+        c.req.param("orgId"),
+        c.req.param("file"),
+      ),
+    ),
+  );
 
   // A person's photo, for people who share an organization with them. The file
   // name is a content hash, so a new photo gets a new URL and the old one can be cached.
-  app.get("/avatars/:userId/:file", async (c) => {
-    const file = await avatarFile(
-      { db, blobs: deps.adapters.platformBlobs },
-      c.get("user").id,
-      c.req.param("userId"),
-      c.req.param("file"),
-    );
-    return new Response(file.body, {
-      status: 200,
-      headers: {
-        "content-type": file.contentType,
-        "x-content-type-options": "nosniff",
-        "content-security-policy": "sandbox",
-        "cache-control": "private, max-age=31536000, immutable",
-      },
-    });
-  });
+  app.get("/avatars/:userId/:file", async (c) =>
+    imageFile(
+      await avatarFile(
+        { db, blobs: deps.adapters.platformBlobs },
+        c.get("user").id,
+        c.req.param("userId"),
+        c.req.param("file"),
+      ),
+    ),
+  );
 
   app.openapi(
     createRoute({

@@ -1122,10 +1122,15 @@ export async function inviteLink(db: Database, secret: string, actorId: string, 
   });
 }
 
-/** An invitation link by its token (or its id), with its workspace's name and standing; null when there is none. */
+/** An invitation link by its token (or its id), with its workspace's name, logo and standing; null when there is none. */
 export async function findInviteLink(db: Executor, by: string | { id: string }) {
   const [row] = await db
-    .select({ link: organizationInviteLinks, orgName: organizations.name, standing: STANDING_COLUMNS })
+    .select({
+      link: organizationInviteLinks,
+      orgName: organizations.name,
+      orgLogo: organizations.logo,
+      standing: STANDING_COLUMNS,
+    })
     .from(organizationInviteLinks)
     .innerJoin(organizations, eq(organizations.id, organizationInviteLinks.orgId))
     .where(
@@ -1161,8 +1166,17 @@ async function inviteAgents(db: Database, orgId: string) {
 }
 
 /**
- * What the invite page shows before signing in (`email` is empty for an org link): the organization, who
- * invited (their name), the role and its first agents. Only for a valid token, which reached the person.
+ * The workspace's logo on an invitation's page (`logo`, when it has one): its current file at an address of that
+ * token's own (`invitationLogoFile`), since the members' address serves members only.
+ */
+const inviteLogo = (token: string, logo: string | null) => {
+  const file = logo?.split("/").pop();
+  return file ? { logo: `/api/app/invitations/${encodeURIComponent(token)}/logo/${file}` } : {};
+};
+
+/**
+ * What the invite page shows before signing in (`email` is empty for an org link): the organization and its logo,
+ * who invited (their name), the role and its first agents. Only for a valid token, which reached the person.
  * A link that was turned off, expired, or whose workspace is paused says only that (`closed`), never why.
  */
 export async function previewInvitation(db: Database, token: string, now = new Date()) {
@@ -1170,6 +1184,7 @@ export async function previewInvitation(db: Database, token: string, now = new D
     .select({
       orgId: organizationInvitations.orgId,
       orgName: organizations.name,
+      orgLogo: organizations.logo,
       email: organizationInvitations.email,
       role: organizationInvitations.role,
       expiresAt: organizationInvitations.expiresAt,
@@ -1203,6 +1218,7 @@ export async function previewInvitation(db: Database, token: string, now = new D
       role: link.link.role,
       kind: "link" as const,
       invitedBy: creator?.name ?? null,
+      ...inviteLogo(token, link.orgLogo),
       ...(await inviteAgents(db, link.link.orgId)),
     };
   }
@@ -1213,8 +1229,24 @@ export async function previewInvitation(db: Database, token: string, now = new D
     role: row.role,
     kind: "email" as const,
     invitedBy: row.invitedBy ?? null,
+    ...inviteLogo(token, row.orgLogo),
     ...(await inviteAgents(db, row.orgId)),
   };
+}
+
+/** The workspace a token opens while it works (an invitation neither accepted nor expired, an open link), else null. */
+export async function invitedOrgId(db: Executor, token: string, now = new Date()): Promise<string | null> {
+  const [invitation] = await db
+    .select({
+      orgId: organizationInvitations.orgId,
+      acceptedAt: organizationInvitations.acceptedAt,
+      expiresAt: organizationInvitations.expiresAt,
+    })
+    .from(organizationInvitations)
+    .where(eq(organizationInvitations.tokenHash, sha256(token)));
+  if (invitation) return !invitation.acceptedAt && invitation.expiresAt > now ? invitation.orgId : null;
+  const link = await findInviteLink(db, token);
+  return link && inviteLinkOpen(link, now) ? link.link.orgId : null;
 }
 
 /**
