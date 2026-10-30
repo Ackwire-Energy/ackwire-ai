@@ -22,6 +22,7 @@ Requirement: provider-neutral. The same mechanism must work for the API (any pro
 - `presentTools(tools, sensitive, loaded)`: with `loaded`, the core and the loaded groups go as they are (big connectors still as their own directory); every other tool goes behind `find_tools` (BM25 over names, descriptions and inputs, no model call) and `use_tool` (runs one by its real name). Without `loaded`, everything is listed, as before.
 - The gateway runs `use_tool` as the real tool (scope, schema, call checks, approval, steps, chip), exactly like a big connector's directory. A tool on demand called by its own real name also runs: the gateway knows every granted tool.
 - `find_tools`'s description names every group with its count, so the model knows what it can reach.
+- `find_tools` also ranks the tools already listed, in the same BM25 pass: those that match open its answer, to call directly and not through `use_tool`. A model that searched for a tool it already had otherwise read the unrelated matches as all there was, and said it couldn't.
 
 ### 2. The judge picks the groups once per run
 

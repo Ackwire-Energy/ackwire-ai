@@ -66,6 +66,15 @@ test("tools on demand: core and loaded groups as they are, the rest behind find_
   ).toBe(false);
 });
 
+test("find_tools ranks the loaded tools too: those that match come first, to call directly, then the rest", async () => {
+  const find = presentTools(tools(), undefined, ["issues"]).find((t) => t.name === "find_tools");
+  const text = (await find?.execute({ query: "list issues" }, {} as ToolContext))?.content ?? "";
+  expect(text).toStartWith(
+    'Already in your tool list for "list issues": call them directly, not through use_tool.\n- list_issues: list issues.\n- create_issue: create issue.',
+  );
+  expect(text).toContain('\n\nother tools for "list issues" (call one with use_tool):\n- sentry_search_issues');
+});
+
 test("the prompt names the loaded tools only by name and the on-demand groups in one line", () => {
   const text = describeCapabilities(presentTools(tools(), undefined, []));
   expect(text).toContain("- On demand: Organization wiki (writing) (1), Issues (2), Browser (1), Sentry (1).");

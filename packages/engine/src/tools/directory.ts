@@ -156,7 +156,7 @@ export function presentTools(
     if (later.length === 0) return shown;
     const taken = new Set(shown.map((t) => t.name));
     if (taken.has(ON_DEMAND_FIND) || taken.has(ON_DEMAND_USE)) return [...shown, ...later];
-    return [...shown, ...onDemandTools(later, sensitive)];
+    return [...shown, ...onDemandTools(later, sensitive, shown)];
   }
   const byConnection = new Map<string, ToolDefinition[]>();
   for (const t of tools) {
@@ -256,9 +256,10 @@ export const ON_DEMAND_USE = "use_tool";
  * The directory of a run's tools not loaded yet: `find_tools` searches them
  * (BM25, no model call) and `use_tool` runs one by its name, through the
  * gateway like any direct call. Its description names every group, so the
- * model knows what it can reach.
+ * model knows what it can reach. The search ranks the run's `loaded` tools
+ * too: a model that searches for a tool it already has is told to call it.
  */
-function onDemandTools(tools: ToolDefinition[], sensitive: IsSensitive): ToolDefinition[] {
+function onDemandTools(tools: ToolDefinition[], sensitive: IsSensitive, loaded: ToolDefinition[]): ToolDefinition[] {
   const groups = deferrableGroups(tools);
   const areas = groups.map((g) => `${g.label} (${g.tools.length})`);
   const label = "other";
@@ -292,6 +293,7 @@ function onDemandTools(tools: ToolDefinition[], sensitive: IsSensitive): ToolDef
         sensitive,
         groups.map((g) => g.label),
         ON_DEMAND_USE,
+        loaded,
       ),
     }),
   };
@@ -370,6 +372,10 @@ export function compactSchema(schema: JsonSchema) {
   return text.length > SCHEMA_CHARS ? `${text.slice(0, SCHEMA_CHARS)}…` : text;
 }
 
+/**
+ * A search's answer. `loaded`: tools already in the model's list, ranked with the directory's in one pass;
+ * those that match come first, to call directly.
+ */
 function findTools(
   tools: ToolDefinition[],
   prefix: string,
@@ -378,16 +384,30 @@ function findTools(
   sensitive: IsSensitive,
   areas: string[] = areasOf(tools, prefix),
   useName = `${prefix}_use_tool`,
+  loaded: ToolDefinition[] = [],
 ) {
   const query = typeof input.query === "string" ? input.query : "";
   const limit = Math.min(Math.max(Number(input.limit) || FIND_DEFAULT, 1), FIND_MAX);
-  const matches = rankTools(tools, prefix, query).slice(0, limit);
+  const matches = rankTools([...loaded, ...tools], prefix, query).slice(0, limit);
   if (matches.length === 0) {
     return `No ${label} tool matches "${query}". Try other words (${areas.slice(0, 12).join(", ")}).`;
   }
-  const lines = matches.map(
-    (t) =>
-      `- ${t.name}${sensitive(t) ? " (asks a person's approval; its input includes why)" : ""}: ${t.description.slice(0, 300)}\n  input: ${compactSchema(t.inputSchema)}`,
-  );
-  return `${label} tools for "${query}" (call one with ${useName}):\n${lines.join("\n")}`;
+  const listed = new Set(loaded);
+  const ready = matches.filter((t) => listed.has(t));
+  const more = matches.filter((t) => !listed.has(t));
+  const parts: string[] = [];
+  if (ready.length > 0) {
+    const names = ready.map((t) => `- ${t.name}: ${t.description.slice(0, 300)}`);
+    parts.push(
+      `Already in your tool list for "${query}": call ${ready.length > 1 ? "them" : "it"} directly, not through ${useName}.\n${names.join("\n")}`,
+    );
+  }
+  if (more.length > 0) {
+    const lines = more.map(
+      (t) =>
+        `- ${t.name}${sensitive(t) ? " (asks a person's approval; its input includes why)" : ""}: ${t.description.slice(0, 300)}\n  input: ${compactSchema(t.inputSchema)}`,
+    );
+    parts.push(`${label} tools for "${query}" (call one with ${useName}):\n${lines.join("\n")}`);
+  }
+  return parts.join("\n\n");
 }
