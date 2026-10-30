@@ -1,4 +1,6 @@
-import type { Agent, AiStatus } from "../api/types";
+import type { TFunction } from "i18next";
+import type { Agent, AgentDraft, AgentProposalCard, AiStatus, SuggestedAi } from "../api/types";
+import type { Level } from "./access-levels";
 import { aiStateOf, PLAN_BRAIN } from "./no-ai";
 
 /**
@@ -25,7 +27,35 @@ export interface ConnectAiCard {
 
 const STEPS: ReadonlySet<string> = new Set<ConnectAiStep>(["claude", "chatgpt", "api_key"]);
 
-export function actionCardOf(meta: Record<string, unknown> | null | undefined): ConnectAiCard | null {
+export type ActionCard = ConnectAiCard | AgentProposalCard;
+
+/** An agent's proposal of a new agent (ADR 0081), or null. Unlike the Connect card, it keeps its state. */
+export function agentProposalOf(meta: Record<string, unknown> | null | undefined): AgentProposalCard | null {
+  const raw = meta?.actionCard as Partial<AgentProposalCard> | undefined;
+  return raw?.kind === "agent_proposal" && raw.params?.draft && typeof raw.expiresAt === "string"
+    ? (raw as AgentProposalCard)
+    : null;
+}
+
+/** Where a proposal stands: waiting for a person (also while someone creates it), expired, created or denied. */
+export function proposalStatus(card: AgentProposalCard, now = Date.now()): "open" | "expired" | "created" | "denied" {
+  if (card.state === "created" || card.state === "denied") return card.state;
+  return Date.parse(card.expiresAt) <= now ? "expired" : "open";
+}
+
+/** "Pensa com Claude Max", "Pensa com o modelo do workspace", "Sem IA ainda…": the AI a proposal suggests. */
+export const suggestedAiText = (t: TFunction, ai: SuggestedAi) =>
+  ai.kind === "account"
+    ? t("actionCard.agentProposal.aiAccount", { account: ai.label })
+    : t(ai.kind === "model" ? "actionCard.agentProposal.aiModel" : "actionCard.agentProposal.aiNone");
+
+/** The draft's connector levels as "Criar agente" keeps them (by connection; the rest none). */
+export const draftLevels = (draft: AgentDraft): Record<string, Level> =>
+  Object.fromEntries(draft.access.map((a) => [a.connectionId, a.level]));
+
+export function actionCardOf(meta: Record<string, unknown> | null | undefined): ActionCard | null {
+  const proposal = agentProposalOf(meta);
+  if (proposal) return proposal;
   const raw = meta?.actionCard;
   if (!raw || typeof raw !== "object") return null;
   const card = raw as { kind?: unknown; forUserId?: unknown; params?: unknown };

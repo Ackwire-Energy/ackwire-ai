@@ -153,6 +153,10 @@ p {
   line-height: 18px;
   color: var(--ink-muted);
 }
+/* What the person already has leads the picker: its line starts it, with no room over it. */
+.ai-picker__or:first-child {
+  margin-top: 0;
+}
 /* Its makers' marks lead its first line (an `.ac-iconline`), over the tiles' centring. */
 .grid-options--plans > .ai-picker__key {
   grid-column: 1 / -1;
@@ -969,16 +973,26 @@ p {
   color: var(--ink-muted);
   vertical-align: 1px;
 }
-/* "Adicionar pessoa ou agente": the last row of the channel's member list. */
+/*
+ * "Adicionar pessoa ou agente": the last row of the channel's member list. Light: a dashed key the avatars' size
+ * and the rows' weight; it darkens on hover. The list keeps some air under it.
+ */
 .member-row--add {
   width: calc(100% + 16px);
+  margin-top: 4px;
   border: 0;
   background: transparent;
   font: inherit;
-  font-weight: 600;
-  color: var(--ink2);
+  font-weight: 500;
+  color: var(--ink-muted);
   text-align: left;
   cursor: pointer;
+}
+.member-row--add:hover {
+  color: var(--ink);
+}
+.ac-dialog__list:has(> .member-row--add:last-child) {
+  padding-bottom: 16px;
 }
 .member-row--add:focus-visible {
   outline: none;
@@ -989,10 +1003,23 @@ p {
   place-items: center;
   width: 32px;
   height: 32px;
+  box-sizing: border-box;
   flex: none;
-  border-radius: 30%;
-  background: var(--surface-sunken);
-  box-shadow: inset 0 0 0 1px var(--line);
+  border: 1.5px dashed var(--line-strong);
+  border-radius: 30% 30% 30% 9%;
+  color: var(--ink-muted);
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+.member-row__plus .ac-icon {
+  width: 16px;
+  height: 16px;
+}
+.member-row--add:hover .member-row__plus {
+  border-style: solid;
+  border-color: var(--ink-muted);
+  color: var(--ink);
 }
 .member-group {
   display: flex;
@@ -2444,6 +2471,10 @@ p {
   overflow-y: auto;
   border-bottom: 1px solid var(--line);
 }
+/* Last in a dialog's body, the footer's line closes the list: one line there, not two. */
+.ac-dialog__body > .people-picker:last-child .people-picker__results {
+  border-bottom: 0;
+}
 
 /*
  * Markdown inside chat messages, styled for reading: line breaks
@@ -2861,6 +2892,11 @@ p {
 .skill-viewer > .row code {
   font-family: var(--font-mono);
   font-size: 12.5px;
+}
+.skill-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 /* Workspace header as a menu button; the account row stays at the bottom with the settings gear. */
 .sidebar__org-button {
@@ -3905,6 +3941,28 @@ p {
   display: flex;
   flex-direction: column;
   font-weight: 600;
+}
+/* "Todos os agentes": the main choice, raised over the agents' own rows, which line up with its content. */
+.cflow-agent--all {
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+}
+.cflow-agent--all + .cflow-agents > .cflow-agent {
+  padding-right: 14px;
+  padding-left: 14px;
+}
+.cflow-agent__all-icon {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-agent);
+  background: var(--sunken);
+  color: var(--ink2);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 .cflow__asks {
   display: flex;
@@ -8155,6 +8213,17 @@ a.machine-row__name:hover {
   width: 40px;
   height: 4px;
 }
+/* A plan's limits read like the facts beside them: the line, its small bar, then the state near the limit. */
+.agp-number .ac-planmeter--compact {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  font-size: inherit;
+}
+.agp-number .ac-planmeter__line {
+  color: inherit;
+}
 /* The sentence's dialogs: the note by the buttons (the plan, or what the choice does). */
 .agp-wdlg__note {
   color: var(--muted);
@@ -8228,10 +8297,11 @@ a.machine-row__name:hover {
   font-weight: 600;
 }
 /*
- * "Responde a todos" (`PlanReplies`), under a plan's account and at the end of a plan's panel: its label with the
- * switch at the end of its line, the switch's middle on the label's capitals' middle as an `.ac-iconline` lead's is;
- * under them the plan's terms with their ⓘ, under the switch too, so the few words keep one line on a phone. The
- * label is in the type of the switches beside it (a plan's panel gives its own).
+ * "Atende outras pessoas" (`PlanReplies`), under a plan's account and at the end of a plan's panel: its label with
+ * the switch at the end of its line, the switch's middle on the label's capitals' middle as an `.ac-iconline` lead's
+ * is; under them the line saying whom the agent answers, the plan's terms behind its ⓘ, under the switch too, so the
+ * sentence has the whole width on a phone. The label is in the type of the switches beside it (a plan's panel gives
+ * its own).
  */
 .plan-replies {
   display: grid;
@@ -9275,6 +9345,20 @@ a.machine-row__name:hover {
   color: var(--muted);
   font-size: 12.5px;
 }
+.agp-dz + .agp-dz {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+/* Deleting an agent: what goes and what stays, over the name to type. */
+.agp-delete {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+  color: var(--ink2);
+}
 /* The save bar and its list of changes */
 .agp-savebar {
   position: sticky;
@@ -9768,22 +9852,126 @@ html[data-menu-overlay] .shell {
   flex-direction: column;
   gap: 2px;
 }
-.sidebar__section[data-open="false"] .sidebar__section-body > :not([data-status="active"]) {
+.sidebar__section[data-open="false"]
+  .sidebar__section-body
+  > :not([data-status="active"], :has(> [data-status="active"])) {
   display: none;
 }
-/* The + on a category header shows on hover or focus (always on touch screens). */
+/* The + (or …) on a category header shows on hover or focus (always on touch screens). */
 .sidebar__section-add {
   opacity: 0;
   transition: opacity 0.15s;
 }
 .sidebar__section-head:hover .sidebar__section-add,
-.sidebar__section-add:focus-visible {
+.sidebar__section-add:focus-visible,
+.sidebar__section-add[data-state="open"] {
   opacity: 1;
+}
+/*
+ * Channel categories (ADR 0080). Closed, a category also keeps its unread channels in sight, not only the open
+ * one (the rule above hides the rest).
+ */
+.sidebar__section--category[data-open="false"] .sidebar__section-body > [data-unread="true"] {
+  display: flex;
+}
+.sidebar__new-category {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: var(--ink-muted);
+  text-align: left;
+  cursor: pointer;
+}
+.sidebar__new-category:hover {
+  color: var(--ink);
+}
+/* Dragging a channel or a category: a 2px line where it lands, or the header that takes it. */
+.sidebar [data-drop="before"] {
+  box-shadow: inset 0 2px 0 var(--ink);
+}
+.sidebar [data-drop="after"] {
+  box-shadow: inset 0 -2px 0 var(--ink);
+}
+.sidebar [data-drop="into"] {
+  background: var(--plate);
+}
+.channel-category__channel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.channel-category__channel .ac-icon {
+  color: var(--faint);
+}
+/* The fields above a list keep their height; the list is what scrolls. */
+.channel-category__fields {
+  flex: none;
+  overflow: visible;
+}
+.channel-category__add {
+  margin-top: 4px;
+}
+.channel-details__archive {
+  color: var(--danger);
 }
 @media (hover: none) {
   .sidebar__section-add {
     opacity: 1;
   }
+}
+/* An agent's row with its "…" (owners and admins: its group), over the row's end on hover or focus, where it
+   takes the place of the role or the count. Touch screens move agents from the agent's page. */
+.sidebar__row {
+  position: relative;
+  display: flex;
+}
+.sidebar__row > .sidebar__item {
+  flex: 1;
+  min-width: 0;
+}
+.sidebar__row-menu.ac-btn {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.sidebar__row:hover > .sidebar__row-menu,
+.sidebar__row-menu:focus-visible,
+.sidebar__row-menu[data-state="open"] {
+  opacity: 1;
+}
+.sidebar__row:hover:has(> .sidebar__row-menu) > .sidebar__item > :is(.sidebar__item-meta, .sidebar__unread),
+.sidebar__row:has(> .sidebar__row-menu:is(:focus-visible, [data-state="open"]))
+  > .sidebar__item
+  > :is(.sidebar__item-meta, .sidebar__unread) {
+  visibility: hidden;
+}
+@media (hover: none) {
+  .sidebar__row-menu.ac-btn {
+    display: none;
+  }
+}
+/* Dragging an agent: the category it would land in, and inside a group the line where it would go. */
+.sidebar__section[data-drop="true"] {
+  border-radius: var(--control-r-sm);
+  background: var(--plate-soft);
+}
+.sidebar__drop-line {
+  height: 3px;
+  margin: -2px 8px;
+  border-radius: 2px;
+  background: var(--ink);
+  opacity: 0.55;
+}
+/* An empty group, for whoever organizes: where its agents go, in the column of the agents' names. */
+.sidebar__drop-hint {
+  padding: 6px 8px 6px 36px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--faint);
 }
 /* More: the other tools in a panel beside the sidebar, each with a line on what it is for. */
 .sidebar__more {
@@ -10215,7 +10403,7 @@ html[data-menu-overlay] .shell {
     padding-bottom: calc(16px + var(--cap-top) - 2 * var(--cap-mid) - 0.5lh);
   }
 }
-/* Who the agents reply to ends a plan's panel, as its foot: the icon on the switch's line in the mark's column, the
+/* Who the agents answer ends a plan's panel, as its foot: the icon on the switch's line in the mark's column, the
    words in the panel's type on the text's. */
 .ai-panel__replies {
   font-size: 14px;

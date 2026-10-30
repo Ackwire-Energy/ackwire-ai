@@ -530,6 +530,18 @@ test("a coding plan's key: no sign-in page but the plan's key page, the key seal
   });
   // Someone else in the workspace: not theirs.
   expect((await listAiAccounts({ db: f.db }, bia.id, f.org.id)).computers[0]?.own).toEqual({});
+  // Claude Code saying it's signed out there wins over a usage read with that sign-in before.
+  await f.db
+    .update(schema.machines)
+    .set({
+      executors: {
+        claude: { version: "2.1.0", loggedIn: false },
+        ownUsage: { claude_code: usage },
+        detectedAt: new Date().toISOString(),
+      },
+    })
+    .where(eq(schema.machines.id, machineId));
+  expect((await listAiAccounts({ db: f.db }, f.owner.id, f.org.id)).computers[0]?.own).toEqual({});
   await f.db
     .update(schema.machines)
     .set({ execAllowed: before?.execAllowed ?? false, executors: before?.executors ?? {} })

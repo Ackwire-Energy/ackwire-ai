@@ -34,7 +34,8 @@ describe("route guards", () => {
 
   test("a workspace still being set up is its owner's onboarding, from / and from its pages; never for someone invited", async () => {
     const as = (role: "owner" | "member") => {
-      const state = seedState();
+      // At the agents' step, its team not made yet.
+      const state = seedState({ agents: [] });
       const onboarding = { step: "agents" as const, generalChannelId: GENERAL_ID };
       if (state.me) state.me.organizations = [{ id: ORG_ID, name: "Acme", role, onboarding }];
       return createFakeApi(state);

@@ -5,10 +5,12 @@ import {
   type RealtimeConnection,
   useAgents,
   useComputerSetup,
+  useFormerAgents,
   useMe,
   useMembers,
 } from "@agenteschat/client";
 import { computerEdition } from "@agenteschat/client/lib/computer";
+import { formerById } from "@agenteschat/client/lib/directory";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/providers/org";
@@ -34,6 +36,8 @@ export function useMeId(): string | null {
 export interface Directory {
   agents: Agent[];
   agentById: Map<string, Agent>;
+  /** The team's agent, or one no longer in it (archived or deleted): what it left still names it. */
+  anyAgent: (id: string) => Agent | undefined;
   memberById: Map<string, Member>;
   loading: boolean;
   /** A person's or an agent's name ("" when unknown). */
@@ -44,21 +48,25 @@ export interface Directory {
 export function useDirectory(): Directory {
   const orgId = useOrgId();
   const agents = useAgents(orgId);
+  const former = useFormerAgents(orgId);
   const members = useMembers(orgId);
   return useMemo(() => {
     const agentById = new Map((agents.data ?? []).map((a) => [a.id, a]));
+    const gone = formerById(former.data);
+    const anyAgent = (id: string) => agentById.get(id) ?? gone.get(id);
     const memberById = new Map((members.data ?? []).map((m) => [m.userId, m]));
     return {
       agents: agents.data ?? [],
       agentById,
+      anyAgent,
       memberById,
       loading: agents.isLoading || members.isLoading,
       nameOf: (who) => {
         if (!who?.id) return "";
-        return who.type === "agent" ? (agentById.get(who.id)?.name ?? "") : (memberById.get(who.id)?.name ?? "");
+        return who.type === "agent" ? (anyAgent(who.id)?.name ?? "") : (memberById.get(who.id)?.name ?? "");
       },
     };
-  }, [agents.data, members.data, agents.isLoading, members.isLoading]);
+  }, [agents.data, former.data, members.data, agents.isLoading, members.isLoading]);
 }
 
 /** Toasts and other places that only know an agent's id draw it from these looks (once, at the app's root). */

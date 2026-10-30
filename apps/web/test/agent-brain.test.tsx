@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
-import type { AgentBrain, BrowserUnavailableReason, Machine, MachineAccount, PlanUsage } from "@agenteschat/client";
+import type {
+  AgentBrain,
+  AiComputer,
+  BrowserUnavailableReason,
+  Machine,
+  MachineAccount,
+  PlanUsage,
+} from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
@@ -7,7 +14,16 @@ setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { type BrainChoice, changedKeys, type Saved, sameBrain } from "@/lib/agent-edit";
-import { ADA_ID, createFakeApi, fakeAgentBrain, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import {
+  ADA_ID,
+  createFakeApi,
+  fakeAgentBrain,
+  fakeBrowserOf,
+  fakeMachinesOf,
+  NOW,
+  ORG_ID,
+  seedState,
+} from "./fake-api";
 import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
@@ -51,6 +67,23 @@ const pick = async (d: HTMLElement, select: string, option: RegExp) => {
   await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
   await click(screen().getByRole("option", { name: option }));
 };
+/** The MacBook's row in the AI accounts: the own sign-ins its runner reported there. */
+const reportOwn = (api: ReturnType<typeof createFakeApi>, own: AiComputer["own"]) =>
+  fakeMachinesOf.get(api)?.setAiAccounts({
+    accounts: [],
+    computers: [
+      {
+        machineId: "machine_1",
+        name: "MacBook",
+        online: true,
+        mine: true,
+        canAdd: true,
+        keys: true,
+        brains: { claude_code: true, codex: true },
+        own,
+      },
+    ],
+  });
 /** A connected MacBook with Claude Code and Codex; its browser as given. */
 const pairMac = (api: ReturnType<typeof createFakeApi>, browser: boolean) =>
   fakeMachinesOf.get(api)?.pair({
@@ -246,12 +279,16 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     provider: null,
     keyHint: null,
   };
-  /** Ada thinks with Claude Code on the MacBook, which has the given accounts. */
-  async function onMac(patch: Partial<AgentBrain> = {}) {
+  /**
+   * Ada thinks with Claude Code on the MacBook, which has the given accounts; `own`: the MacBook's own sign-ins its
+   * runner reported, as its row of the AI accounts says them.
+   */
+  async function onMac(patch: Partial<AgentBrain> = {}, own?: AiComputer["own"]) {
     const state = seedState();
     const api = createFakeApi(state);
     pairMac(api, true);
     await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
+    if (own) reportOwn(api, own);
     api.agents.brain = async () =>
       fakeAgentBrain(ADA_ID, { brain: "claude_code", effectiveModel: "sonnet", accounts: [work], ...patch });
     return open(state, api);
@@ -312,7 +349,10 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
       usedBy: ["Ada"],
     };
     const other: MachineAccount = { ...hers, id: "acct_ana2", label: "Claude Team 3", usedBy: [] };
-    const { state, api } = await onMac({ account: "acct_ana", accounts: [work, theo, hers, other] });
+    const { state, api } = await onMac(
+      { account: "acct_ana", accounts: [work, theo, hers, other] },
+      { claude_code: { plan: "max" } },
+    );
     // Ada's own login of Pessoal, once Claude's page signs her in.
     fakeMachinesOf.get(api)?.endLogin("login_1", { state: "done", account: { ...theo, id: "acct_ada", usedBy: [] } });
     const d = await brainDialog();
@@ -539,13 +579,126 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
   });
 
   test("the computer's own sign-in, chosen again, is the account the agents share, as the Connect cards name it", async () => {
-    const { state } = await onMac({ account: "acct_work" });
+    const { state } = await onMac({ account: "acct_work" }, { claude_code: { plan: "max" } });
     const d = await brainDialog();
     await pick(d, "Conta do Claude", /^A conta que os seus agentes dividem/);
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
     expect(brainCalls(state).at(-1)).toMatchObject({ account: null });
     expect(document.body.textContent).toContain("Ada agora pensa com a conta que os seus agentes dividem.");
+  });
+
+  test("the computer's own sign-in is offered only once its runner says it's signed in there", async () => {
+    await onMac({ account: "acct_work" });
+    const d = await brainDialog();
+    const options = async () => {
+      const account = within(d).getByRole("combobox", { name: "Conta do Claude" });
+      account.focus();
+      await act(async () => fireEvent.keyDown(account, { key: "Enter" }));
+      const shown = screen()
+        .getAllByRole("option")
+        .map((o) => o.textContent);
+      await act(async () => fireEvent.keyDown(screen().getAllByRole("option")[0] as HTMLElement, { key: "Escape" }));
+      return shown;
+    };
+    // The MacBook said nothing of Claude Code's own sign-in: no account of its to choose.
+    expect(await options()).toEqual(["Trabalho · Teamwalt@acme.com", "Adicionar conta"]);
+    cleanup();
+    await onMac({ account: "acct_work" }, { claude_code: { plan: "max" } });
+    const signedIn = await brainDialog();
+    const account = within(signedIn).getByRole("combobox", { name: "Conta do Claude" });
+    account.focus();
+    await act(async () => fireEvent.keyDown(account, { key: "Enter" }));
+    expect(
+      screen()
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["A conta que os seus agentes dividem", "Trabalho · Teamwalt@acme.com", "Adicionar conta"]);
+  });
+
+  test("ChatGPT on the workspace's computer, which nobody connected: straight to its sign-in, never that computer's account", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    pairMac(api, true);
+    await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
+    // Even with its Codex reported signed in: on a computer nobody connected, no person signs in at its terminal.
+    reportOwn(api, { codex: { usage: { windows: [], source: "probe", at: NOW.toISOString() } } });
+    api.agents.brain = async () => fakeAgentBrain(ADA_ID, { ownSignIn: false });
+    await open(state, api);
+    const d = await brainDialog();
+    await click(card(d, /^Codex/));
+    await settle(4);
+    const block = within(d).getByRole("region", { name: "Adicionar conta do ChatGPT" });
+    expect(within(block).getByRole("button", { name: "Entrar com ChatGPT" })).toBeTruthy();
+    // Showing the steps starts nothing.
+    expect(state.calls.some((c) => c.method === "machines.beginAccountLogin")).toBe(false);
+    const use = () => within(d).getByRole("button", { name: "Usar meu plano do ChatGPT" }) as HTMLButtonElement;
+    expect(use().disabled).toBe(true);
+    // Back: the account starts at Adicionar conta, and Codex waits for one.
+    await click(within(block).getByRole("button", { name: "Voltar" }));
+    const account = within(d).getByRole("combobox", { name: "Conta do ChatGPT" });
+    expect(account.textContent).toBe("Adicionar conta");
+    expect(d.textContent).not.toMatch(/Conta deste|quem conectou/);
+    expect(use().disabled).toBe(true);
+    account.focus();
+    await act(async () => fireEvent.keyDown(account, { key: "Enter" }));
+    expect(
+      screen()
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["Adicionar conta"]);
+    await click(screen().getByRole("option", { name: "Adicionar conta" }));
+    expect(within(d).getByRole("region", { name: "Adicionar conta do ChatGPT" })).toBeTruthy();
+  });
+
+  test("a computer someone else connected, with no account of hers there: it says who signs a plan in, no empty list", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    fakeMachinesOf.get(api)?.pair({
+      id: "machine_1",
+      name: "MacBook",
+      os: "darwin",
+      access: { folders: [], tools: { claude: true, codex: true, commands: true, browser: true } },
+      browser: { available: true, version: "1", chrome: null, reason: null },
+      pairedBy: { id: "u-theo", name: "Theo Lima" },
+    });
+    await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
+    // Ada is Walter's: her plan would be his, and only Theo adds sign-ins on his MacBook.
+    api.agents.brain = async () => fakeAgentBrain(ADA_ID, { ownSignIn: false, canManageAccounts: false });
+    await open(state, api);
+    const d = await brainDialog();
+    await click(card(d, /^Codex/));
+    expect(within(d).queryByRole("combobox", { name: "Conta do ChatGPT" })).toBeNull();
+    expect(d.textContent).toContain("Só Theo conecta um plano no MacBook.");
+    expect((within(d).getByRole("button", { name: "Usar meu plano do ChatGPT" }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+  });
+
+  test("choosing a plan brain starts on what can think there: the computer's own sign-in, a free account, or the sign-in", async () => {
+    const plus: MachineAccount = { ...work, id: "acct_plus", kind: "codex", label: "Pessoal", plan: "Plus" };
+    const usage = { windows: [], source: "probe" as const, at: NOW.toISOString() };
+    const { state } = await onMac({ brain: "model", effectiveModel: null, accounts: [plus] }, { codex: { usage } });
+    let d = await brainDialog();
+    // Codex's own sign-in is reported on the MacBook its owner connected: the account the agents share.
+    await click(card(d, /^Codex/));
+    expect(within(d).getByRole("combobox", { name: "Conta do ChatGPT" }).textContent).toBe(
+      "A conta que os seus agentes dividem",
+    );
+    // Claude Code's isn't, and nothing of Claude's is there: its sign-in, right away.
+    await click(card(d, /^Claude Code/));
+    expect(within(d).getByRole("region", { name: "Adicionar conta do Claude" })).toBeTruthy();
+    await click(screen().getByRole("button", { name: "Cancelar" }));
+    cleanup();
+    // Without Codex's own sign-in reported, a ChatGPT account of hers that thinks for nobody.
+    const second = await onMac({ brain: "model", effectiveModel: null, accounts: [plus] });
+    d = await brainDialog();
+    await click(card(d, /^Codex/));
+    expect(within(d).getByRole("combobox", { name: "Conta do ChatGPT" }).textContent).toContain("Pessoal · Plus");
+    await click(within(d).getByRole("button", { name: "Usar meu plano do ChatGPT" }));
+    await settle(6);
+    expect(brainCalls(second.state).at(-1)).toMatchObject({ brain: "codex", account: "acct_plus" });
+    expect(brainCalls(state)).toEqual([]);
   });
 
   test("Adicionar conta: no address asked, Claude's page opens beside, Colar sends only this sign-in's code; Voltar stops it", async () => {
@@ -873,7 +1026,7 @@ describe("Quem pensa: a plan with a login per agent, and plans on the Cloud", ()
     expect(brainCalls(state).at(-1)).toMatchObject({ account: "acct_ada" });
   });
 
-  test("on the Cloud too, the plan's owner lets it reply to everyone: the switch, its line and ⓘ", async () => {
+  test("on the Cloud too, the plan's owner lets it answer other people: the switch, its line and ⓘ", async () => {
     const state = seedState();
     const api = createFakeApi(state);
     pairMac(api, true);
@@ -883,9 +1036,10 @@ describe("Quem pensa: a plan with a login per agent, and plans on the Cloud", ()
       fakeAgentBrain(ADA_ID, { brain: "claude_code", effectiveModel: "sonnet", onlyOwner: true });
     await open(state, api);
     const d = await brainDialog();
-    const replies = within(d).getByRole("switch", { name: "Responde a todos" });
+    const replies = within(d).getByRole("switch", { name: "Atende outras pessoas" });
     expect(replies.getAttribute("aria-checked")).toBe("false");
-    expect(hintOf("Zona cinzenta nos termos do Claude", d).text).toContain("Os termos do Claude dizem");
+    expect(shownText(d)).toContain("A Ada só atende você, pelo seu plano do Claude.");
+    expect(hintOf("os termos do plano", d).text).toContain("Os planos do Claude são para uso pessoal.");
     expect(shownText(d)).not.toContain("Um plano é pessoal");
     await click(replies);
     await click(within(d).getByRole("button", { name: "Usar" }));
@@ -1104,6 +1258,8 @@ describe("Quem pensa: Automático", () => {
     const api = createFakeApi(state);
     pairMac(api, true);
     await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
+    // Its own Claude Code sign-in is there: Claude Code starts on it, not on a sign-in.
+    reportOwn(api, { claude_code: { plan: "max" } });
     // New agents are created with the effort on auto too; the API brain doesn't show it.
     api.agents.brain = async () => fakeAgentBrain(ADA_ID, { effort: "auto" });
     await open(state, api);

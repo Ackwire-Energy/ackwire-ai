@@ -1,7 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, gt, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { aiConnectIntent, type ConnectIntent } from "./ai-intent";
-import { type AiStatusDeps, agentAiState, type NoAiReason, orgHasAi } from "./ai-status";
+import { type AgentAi, type AiStatusDeps, agentAiState, type NoAiReason, orgHasAi } from "./ai-status";
 import { audienceError, canTalkTo } from "./audience";
 import { recordAudit } from "./audit";
 import { runRequester } from "./cancel";
@@ -19,9 +19,14 @@ import { withWikiLinks } from "./wiki-links";
 
 const { agentRunSteps, agentRuns, agents, messages, routingDecisions } = schema;
 
-/** The card's English body (the apps show `chat.body.no_ai`, or `no_ai_signed_out` for a sign-in that ended). */
+/**
+ * The card's English body (the apps show `chat.body.no_ai`, `no_ai_signed_out` for a sign-in that ended, or
+ * `no_ai_not_signed_in` for the computer's own sign-in that isn't there).
+ */
 export const NO_AI_TEXT = "I can't answer yet: I have no AI connected.";
 const NO_AI_SIGNED_OUT_TEXT = "I can't answer yet: my AI is signed out.";
+const noAiNotSignedInText = (own: NonNullable<AgentAi["own"]>) =>
+  `I can't answer yet: ${own === "codex" ? "Codex" : "Claude Code"} isn't signed in on my computer.`;
 
 /** A conversation gets the card again only after this long (per agent; once while the organization has no AI). */
 export const NO_AI_CARD_EVERY_MS = 6 * 3600_000;
@@ -31,6 +36,8 @@ export interface NoAiCard extends ConnectIntent {
   agentId: string;
   forUserId: string | null;
   reason: NoAiReason;
+  /** With `not_signed_in`: the computer's own sign-in of this CLI isn't there, not an account's (`AgentAi.own`). */
+  own?: AgentAi["own"];
   /** The run that couldn't think (deleted when "Responder agora" starts it again). */
   runId: string;
 }
@@ -68,6 +75,7 @@ export async function postNoAiCard(
   deps: AiStatusDeps & { db: Database; pubsub: PubSub; judge?: Judge | null },
   run: AgentRun,
   reason: NoAiReason,
+  own?: AgentAi["own"],
 ): Promise<Message | null> {
   const { db } = deps;
   const threadId = replyThreadOf(run);
@@ -87,13 +95,20 @@ export async function postNoAiCard(
     // The agents of one message fail together: they take turns here, so the organization gets one card.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`no-ai-card:${run.channelId}:${threadId ?? ""}`}))`);
     if (repeated(await cardsPosted(tx, run, threadId))) return null;
-    const noAi: NoAiCard = { agentId: run.agentId, forUserId, reason, ...intent, runId: run.id };
+    const noAi: NoAiCard = {
+      agentId: run.agentId,
+      forUserId,
+      reason,
+      ...(own ? { own } : {}),
+      ...intent,
+      runId: run.id,
+    };
     return insertMessage(tx, {
       orgId: run.orgId,
       channelId: run.channelId,
       threadId,
       author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
-      body: reason === "not_signed_in" ? NO_AI_SIGNED_OUT_TEXT : NO_AI_TEXT,
+      body: own ? noAiNotSignedInText(own) : reason === "not_signed_in" ? NO_AI_SIGNED_OUT_TEXT : NO_AI_TEXT,
       meta: { ...bodyCode(NO_AI), noAi },
     });
   });
@@ -265,7 +280,7 @@ export async function answerNow(
     for (const r of allowed) if ((await agentAiState(deps, r.agent, r.run)).state !== "no_ai") ready.push(r);
     if (ready.length === 0) throw stillMissing();
     // Who the agent answers may have narrowed since (an agent moved onto a plan answers only its owner until they
-    // turn on Responde a todos, ADR 0059 §5):
+    // turn on Atende outras pessoas, ADR 0059 §5):
     // a run starts again only for someone it still answers.
     const heard = ready.filter((r) => canTalkTo(r.agent, r.requester));
     const [first] = ready;

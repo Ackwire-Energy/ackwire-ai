@@ -243,7 +243,8 @@ async function loadSkill(db: Database, orgId: string, id: string) {
 /** Where a version's files go and how each is kept, refused before the skill or any file is written. */
 async function planFiles(deps: SkillDeps, orgId: string, files: SkillFileInput[]) {
   if (files.length > SKILL_LIMITS.maxFiles) throw new ValidationError(`Too many files (max ${SKILL_LIMITS.maxFiles})`);
-  const total = files.reduce((n, f) => n + f.data.byteLength, 0);
+  // Ignored files (binaries such as images and videos) are only listed, never stored: they don't count.
+  const total = files.reduce((n, f) => n + (classifyFile(f.path).status === "ignored" ? 0 : f.data.byteLength), 0);
   if (total > SKILL_LIMITS.maxBytes) throw new ValidationError("The skill is too large (max 2 MB)");
   // Two entries that normalize to the same path would share one blob key: the second's bytes overwrite
   // the first on disk while its row insert is dropped on the unique key, so the stored size stops matching disk.
@@ -364,7 +365,11 @@ export async function saveSkill(
 
 /** Import from a zip of the skill folder (`SKILL.md` + files). */
 export async function importSkillZip(deps: SkillDeps, actorId: string, orgId: string, zip: Uint8Array) {
-  const entries = readZip(zip, { maxFiles: SKILL_LIMITS.maxFiles, maxBytes: SKILL_LIMITS.maxBytes });
+  const entries = readZip(
+    zip,
+    { maxFiles: SKILL_LIMITS.maxFiles, maxBytes: SKILL_LIMITS.maxBytes },
+    (path) => classifyFile(path).status === "ignored",
+  );
   const { skillMd, files } = splitSkillFolder(entries);
   return saveSkill(deps, actorId, orgId, { ...parseSkillMarkdown(skillMd), source: "upload", files });
 }
@@ -430,8 +435,9 @@ export function parseGithubUrl(url: string) {
 
 /**
  * Import from GitHub (a folder or a `SKILL.md`), fetched by the backend with
- * a 2 MB / 200 files limit; only GitHub hosts, and the SSRF guard on every
- * request. Importing the same skill again makes a new version.
+ * a 2 MB limit on the text and scripts it keeps (binaries are only listed) and
+ * 200 files; only GitHub hosts, and the SSRF guard on every request. Importing
+ * the same skill again makes a new version.
  */
 export async function importSkillFromUrl(deps: SkillDeps, actorId: string, orgId: string, url: string) {
   await requirePermission(deps.db, actorId, orgId, "manage_agents");
@@ -462,14 +468,11 @@ export async function importSkillFromUrl(deps: SkillDeps, actorId: string, orgId
       const relative = target.path ? item.path.slice(target.path.length + 1) : item.path;
       if (item.type === "dir") await walk(item.path, depth + 1);
       else if (item.type === "file") {
-        total += item.size;
+        // Binaries aren't downloaded (only listed), so only text and scripts count toward the size limit.
+        const kept = classifyFile(item.path).status !== "ignored";
+        if (kept) total += item.size;
         if (total > SKILL_LIMITS.maxBytes) throw new ValidationError("The skill is too large (max 2 MB)");
-        // Binaries aren't downloaded (only listed); text and scripts are.
-        const data =
-          classifyFile(item.path).status !== "ignored"
-            ? await fetchChecked(deps, raw(item.path), "*/*")
-            : new Uint8Array();
-        files.push({ path: relative, data });
+        files.push({ path: relative, data: kept ? await fetchChecked(deps, raw(item.path), "*/*") : new Uint8Array() });
       }
     }
   };

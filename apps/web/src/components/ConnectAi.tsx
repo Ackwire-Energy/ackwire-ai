@@ -1,15 +1,17 @@
 import type { ConnectIntent } from "@agenteschat/client";
-import { keys, useAddCredential, useAiStatus, useApi, useMachines } from "@agenteschat/client";
+import { keys, useAddCredential, useAiStatus, useApi, useCredentials, useMachines } from "@agenteschat/client";
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   type AgentAi,
   type AiChoice,
   agentAi,
+  agentPlan,
   aiStateOf,
   allAgents,
   defaultChoice,
   defaultTarget,
+  type ExistingSignIn,
   gateDims,
   type PlanChoice,
 } from "@agenteschat/client/lib/no-ai";
@@ -20,7 +22,16 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AiPicker, type KeyDraft, KeyPanel, PlanPanel, usePlanGates } from "@/components/ai/ConnectAiSteps";
+import {
+  AiPicker,
+  ExistingRows,
+  ExistingThinks,
+  type ExistingUsed,
+  type KeyDraft,
+  KeyPanel,
+  PlanPanel,
+  usePlanGates,
+} from "@/components/ai/ConnectAiSteps";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { lookOf } from "@/lib/look";
@@ -32,8 +43,8 @@ import "./no-ai.css";
  * "Conectar uma IA" (ADR 0061): one dialog for every place that says an agent has no AI (the banner, the agent's
  * card, the receipt under a message, its "Sem IA" chip, Settings › Contas de IA). The same picker as the setup's AI
  * step: the plans first (Claude chosen), each signing in on the agent's computer, then the workspace's API key; a
- * message that asked for one of them opens on it. Connected from a card or a message, the agent then answers it
- * by itself.
+ * message that asked for one of them opens on it. For one agent with no AI, what the person already has comes before
+ * them (`ExistingRows`). Connected from a card or a message, the agent then answers it by itself.
  */
 
 export interface ConnectAiRequest {
@@ -158,10 +169,12 @@ function ConnectAiDialog({
     initials: dir.agentInitials(a.id),
   }));
   const machines = useMachines(org.id);
-  // The agents a plan was connected for here, by plan: they think with it before the AI status says so.
-  const [linked, setLinked] = useState<Record<string, PlanChoice>>({});
+  // The agents a plan or a key was connected for here: they think with it before the AI status says so.
+  const [linked, setLinked] = useState<Record<string, AiChoice>>({});
   const aiOf = (id: string): AgentAi => linked[id] ?? agentAi(dir.agentById.get(id), aiStateOf(status.data, id));
   const hasAi = (id: string) => aiOf(id) !== null;
+  // By the AI status, as its "Sem IA" chip: an agent on a plan whose sign-in is gone has none either.
+  const noAi = (id: string) => !linked[id] && (aiStateOf(status.data, id) ?? "no_ai") === "no_ai";
   const machineOf = (id: string) => machines.data?.find((m) => m.agents.some((a) => a.id === id))?.id;
   const setOf = (c: AiChoice) => (c === "key" ? [] : allAgents({ choice: c, agents, aiOf, machineOf }));
   // Only a pick is kept; else whom it's for is worked out on each render (a link opens this before the agents load).
@@ -171,7 +184,16 @@ function ConnectAiDialog({
   const aimed = { agents, hasAi, asked: request.agentId, picked: pickedTarget };
   // With no set, the agent whose computer the panel reads, "All agents" too (they're on that one's computer).
   const reader = heldReader ?? defaultTarget({ ...aimed, set: [] });
-  const gates = usePlanGates(org.id, reader);
+  const theirs = one !== undefined && one.ownerUserId !== me.user.id;
+  // The one agent the dialog is for: what the person already has comes first for it while it has no AI. An admin sees
+  // the accounts of someone else's agent, locked, and may give it a workspace key (ADR 0041 §4).
+  const mayUseKeys = can(org.role, "manage_agents");
+  const forId = one?.id ?? (agents.length === 1 ? agents[0]?.id : undefined);
+  const forAgent = forId ? { id: forId, name: dir.agentById.get(forId)?.name ?? "" } : undefined;
+  const gates = usePlanGates(org.id, reader ?? (theirs && mayUseKeys ? one?.id : undefined));
+  const credentials = useCredentials(org.id, mayUseKeys && forId !== undefined);
+  const [used, setUsed] = useState<ExistingUsed | null>(null);
+  const [login, setLogin] = useState<ExistingSignIn | null>(null);
   const [picked, setPicked] = useState<AiChoice | null>(null);
   const choice =
     picked ??
@@ -181,6 +203,8 @@ function ConnectAiDialog({
       ownsAgents: agents.length > 0,
       mayAddKey,
       claudeGate: agents.length > 0 ? gates.gateOf("claude") : { state: "loading" },
+      // Signing in on Claude's panel would move a Codex agent onto Claude Code: one agent opens on its own plan.
+      plan: agentPlan(one),
     });
   const all = setOf(choice).map((a) => ({ ...a, done: aiOf(a.id) === choice }));
   const target = defaultTarget({ ...aimed, set: all });
@@ -209,7 +233,6 @@ function ConnectAiDialog({
     );
   };
 
-  const theirs = one !== undefined && one.ownerUserId !== me.user.id;
   // Someone else's agent, or no agent of theirs among those: who connects a plan instead.
   const owner = one?.ownerUserId ? dir.memberById.get(one.ownerUserId)?.name : undefined;
   const locked = theirs
@@ -238,11 +261,39 @@ function ConnectAiDialog({
         {/* A link opens this before the agents and their AI load, and what it opens on follows them. */}
         {dir.loading || status.isPending ? (
           <Spinner />
+        ) : used && forAgent ? (
+          <ExistingThinks agent={forAgent} used={used} />
         ) : (
           <AiPicker
-            choice={choice}
+            choice={login ? null : choice}
+            // Kept while a row's sign-in is open: its panel, under that row, says when it's done.
+            have={(held) =>
+              forAgent &&
+              (login || noAi(forAgent.id)) && (
+                <ExistingRows
+                  gates={gates}
+                  agent={forAgent}
+                  credentials={credentials.data ?? []}
+                  named={!one}
+                  signIn={login}
+                  panel={held}
+                  onSignIn={(next) => {
+                    setLogin(next);
+                    setPicked(next.choice);
+                    setPickedTarget(forAgent.id);
+                    setHeldReader(undefined);
+                  }}
+                  onUsed={(id, next) => {
+                    setLinked((l) => ({ ...l, [id]: next.choice }));
+                    setUsed(next);
+                    done();
+                  }}
+                />
+              )
+            }
             onPick={(next) => {
               setPicked(next);
+              setLogin(null);
               if (next === choice) return;
               setHeldReader(undefined);
               // Another plan moves on to whoever still has no AI once this one's agents think with a plan from here.
@@ -278,7 +329,11 @@ function ConnectAiDialog({
                     setHeldReader(reader);
                   }}
                   locked={locked}
-                  onKey={() => setPicked("key")}
+                  {...(login?.choice === choice ? { login } : {})}
+                  onKey={() => {
+                    setPicked("key");
+                    setLogin(null);
+                  }}
                   onComputer={() => {
                     onClose();
                     void navigate({
