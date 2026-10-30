@@ -900,7 +900,12 @@ export function useConnectWithKey(orgId: string) {
   return useMutation({
     mutationFn: (input: { connector: string; apiKey: string; serverUrl?: string; label?: string }) =>
       api.connectors.connectWithKey(orgId, input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.connections(orgId) }),
+    // A new connection is every agent's: their access trees change too.
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: keys.connections(orgId) }),
+        qc.invalidateQueries({ queryKey: keys.access(orgId) }),
+      ]),
   });
 }
 
@@ -921,11 +926,12 @@ export function useCompleteOAuth(orgId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: { state: string; code: string }) => api.connectors.completeOAuth(orgId, input),
-    // It may finish a catalog connection or a server connected by address (their own list).
+    // It may finish a catalog connection or a server connected by address (their own list), every agent's.
     onSuccess: () =>
       Promise.all([
         qc.invalidateQueries({ queryKey: keys.connections(orgId) }),
         qc.invalidateQueries({ queryKey: keys.customServers(orgId) }),
+        qc.invalidateQueries({ queryKey: keys.access(orgId) }),
       ]),
   });
 }
@@ -1586,7 +1592,8 @@ export function useCustomServerAction(orgId: string) {
     connect: useMutation({
       mutationFn: (input: { serverUrl: string; apiKey?: string; label?: string; returnTo: string }) =>
         api.customConnectors.connect(orgId, input),
-      onSuccess: done,
+      // A new server is every agent's: their access trees change too.
+      onSuccess: () => Promise.all([done(), qc.invalidateQueries({ queryKey: keys.access(orgId) })]),
     }),
     refresh: useMutation({ mutationFn: (id: string) => api.customConnectors.refresh(orgId, id), onSuccess: done }),
     save: useMutation({

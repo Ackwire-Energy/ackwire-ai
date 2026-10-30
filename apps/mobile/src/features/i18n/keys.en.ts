@@ -1381,6 +1381,7 @@ export const featureKeysEn: FeatureTranslations = {
     connectedSub: "Now check what agents can do on their own.",
     connectedDone: "Service connected.",
     levelFailed: "Couldn't change {{name}}'s access. Try again.",
+    everyoneFailed: "Couldn't change everyone's access. Try again.",
     disconnectFailed: "Couldn't disconnect {{name}}. Try again.",
     whoTitle: "Who uses it and how far",
     level: {

@@ -2029,7 +2029,17 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
   const threads = createFakeThreads(ctx, (method, ...args) => state.calls.push({ method, args }));
   state.openThread = threads.openByReply;
   const machines = createFakeMachines(ctx, (method, ...args) => state.calls.push({ method, args }));
-  const customConnectors = createMockCustomConnectors(ctx, (method, ...args) => state.calls.push({ method, args }));
+  const agentIds = async (orgId: string) => (await http.agents.list(orgId)).map((a) => a.id);
+  const customConnectors = createMockCustomConnectors(
+    ctx,
+    (method, ...args) => state.calls.push({ method, args }),
+    async (orgId, serverId) => access.connected(serverId, await agentIds(orgId)),
+  );
+  const access = createFakeAccess(
+    (orgId) => http.connectors.list(orgId),
+    (method, ...args) => state.calls.push({ method, args }),
+    (orgId) => customConnectors.list(orgId),
+  );
   const mail = createFakeMail((method, ...args) => state.calls.push({ method, args }), ctx.now);
   const databases = createFakeDatabases((method, ...args) => state.calls.push({ method, args }), ctx.now);
   const browser = createFakeBrowser((method, ...args) => state.calls.push({ method, args }), ctx.now);
@@ -2051,11 +2061,17 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
     threads,
     missions: createFakeMissions(ctx, (method, ...args) => state.calls.push({ method, args })),
     skills: createFakeSkills(ctx, (method, ...args) => state.calls.push({ method, args })),
-    access: createFakeAccess(
-      (orgId) => http.connectors.list(orgId),
-      (method, ...args) => state.calls.push({ method, args }),
-      (orgId) => customConnectors.list(orgId),
-    ),
+    access,
+    connectors: {
+      ...http.connectors,
+      // A first connection of a connector is every agent's (a new key for it keeps their grants).
+      connectWithKey: async (orgId, input) => {
+        const first = !(await http.connectors.list(orgId)).some((c) => c.connector === input.connector);
+        const connection = await http.connectors.connectWithKey(orgId, input);
+        if (first) access.connected(connection.id, await agentIds(orgId));
+        return connection;
+      },
+    },
     invites: {
       // The same link every time, like the server: a new one only when none can be shown.
       createLink: async (orgId) => {
