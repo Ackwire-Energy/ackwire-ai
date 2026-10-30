@@ -82,7 +82,8 @@ const stagedFile = (dir: string, requestId: string) => {
   if (!REQUEST_ID.test(requestId)) throw new RunnerError("bad_request", "Invalid request id");
   return path.join(dir, "staged", requestId);
 };
-const canceledFile = (dir: string, requestId: string) => path.join(dir, "canceled", path.basename(stagedFile(dir, requestId)));
+const canceledFile = (dir: string, requestId: string) =>
+  path.join(dir, "canceled", path.basename(stagedFile(dir, requestId)));
 const orderFile = (dir: string, name: string) => {
   if (!SECRET_NAME.test(name)) throw new RunnerError("bad_request", "Invalid secret name");
   return path.join(dir, "orders", name);
@@ -137,7 +138,9 @@ export async function handleSecret(
   const dir = dirOf(root, agent);
   const previous = secretQueues.get(dir) ?? Promise.resolve();
   let release!: () => void;
-  const current = new Promise<void>((resolve) => { release = resolve; });
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
   secretQueues.set(dir, current);
   await previous;
   try {
@@ -208,10 +211,16 @@ async function handleSecretLocked(
     case "activate": {
       if (!req.order || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z\|[a-zA-Z0-9-]{8,64}$/.test(req.order))
         throw new RunnerError("bad_request", "Invalid secret delivery order");
-      if (await stat(canceledFile(dir, req.requestId)).then(() => true, (err) => {
-        if (errnoCode(err) === "ENOENT") return false;
-        throw err;
-      })) return { superseded: true };
+      if (
+        await stat(canceledFile(dir, req.requestId)).then(
+          () => true,
+          (err) => {
+            if (errnoCode(err) === "ENOENT") return false;
+            throw err;
+          },
+        )
+      )
+        return { superseded: true };
       const staged = stagedFile(dir, req.requestId);
       let delivery: Staged;
       try {
@@ -256,7 +265,14 @@ async function handleSecretLocked(
       await writeOrder(dir, delivery.name, req.order);
       const before = await readStore(dir);
       const next = before.filter((s) => s.name !== delivery.name);
-      next.push({ name: delivery.name, target, value, deliveredAt: new Date().toISOString(), requestId: req.requestId, order: req.order });
+      next.push({
+        name: delivery.name,
+        target,
+        value,
+        deliveredAt: new Date().toISOString(),
+        requestId: req.requestId,
+        order: req.order,
+      });
       // A replacement can move a secret to another file or to the environment.
       // Keep every old file in the store (and therefore in file guards and
       // redaction) until its plaintext has been overwritten or removed.
@@ -296,8 +312,10 @@ async function handleSecretLocked(
       return {};
     case "remove": {
       const secrets = await readStore(dir);
-      const selected = (s: Stored) => s.name === req.name &&
-        (!req.requestIds || (s.requestId !== undefined && req.requestIds.includes(s.requestId)) ||
+      const selected = (s: Stored) =>
+        s.name === req.name &&
+        (!req.requestIds ||
+          (s.requestId !== undefined && req.requestIds.includes(s.requestId)) ||
           (req.throughOrder !== undefined && (s.order ?? "") <= req.throughOrder));
       const gone = secrets.filter(selected);
       const otherPaths = new Set(

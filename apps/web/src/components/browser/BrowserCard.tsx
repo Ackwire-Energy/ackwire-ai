@@ -922,7 +922,7 @@ export function BrowserCard({
           {inControl ? (
             <span className="brw-mf__acts">{controlActs}</span>
           ) : (
-            // biome-ignore lint/a11y/noNoninteractiveTabindex: focusable so the steps also open from the keyboard
+            // Focusable so the steps also open from the keyboard.
             <span className="brw-mf__now" tabIndex={steps.length > 0 ? 0 : -1}>
               {(live_ || reconnecting) && <PixelSpinner size={14} color={color} />}
               <span>{sub}</span>

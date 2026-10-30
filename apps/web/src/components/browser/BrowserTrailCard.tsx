@@ -19,8 +19,8 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { useOrg } from "../org-context";
 import { colorOf } from "../Sky";
 import { stepText, useHeldTakeover } from "./BrowserCard";
-import { screenIcon, screenT } from "./screen";
 import { SiteIcon } from "./SiteIcon";
+import { screenIcon, screenT } from "./screen";
 import "./browser.css";
 
 /** A step in the person's words, from the saved trail. */
