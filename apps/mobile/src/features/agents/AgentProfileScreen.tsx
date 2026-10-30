@@ -11,6 +11,7 @@ import {
   useUsage,
 } from "@agenteschat/client";
 import { brainLine } from "@agenteschat/client/lib/brain";
+import { formatPercent } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -486,7 +487,7 @@ function Profile({ id }: { id: string }) {
                     <Text variant="caption" tone="muted">
                       {spend.kind === "money"
                         ? `${money(spend.spentUsd)} ${t("mobile.agent.ofBudget", { budget: money(spend.budgetUsd) })}`
-                        : `${t("mobile.agent.percent", { percent: spend.percent })} ${t("mobile.agent.ofMonthBudget")}`}
+                        : `${formatPercent(i18n.language, spend.percent)} ${t("mobile.agent.ofMonthBudget")}`}
                     </Text>
                   ) : null}
                 </View>
@@ -507,7 +508,7 @@ function Profile({ id }: { id: string }) {
                     ) : (
                       <>
                         <Text variant="body" tone="ink2">
-                          {t("mobile.agent.percent", { percent: spend.percent })}
+                          {formatPercent(i18n.language, spend.percent)}
                         </Text>
                         <Text variant="small" tone="muted">
                           {t("mobile.agent.ofMonthBudget")}

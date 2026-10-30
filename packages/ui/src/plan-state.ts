@@ -80,15 +80,16 @@ const LINE_WINDOWS = 2;
 
 /**
  * The compact meter's words: the tightest windows by their short names ("semana 40% · 5h 12%"), every window
- * with its reset for the title, the tightest for its one bar, and only near or at the limit what matters then
+ * with its reset for the title, the tightest (`top`) for its one bar, and only near or at the limit what matters then
  * ("Quase no limite · renova às 14:00", "No limite até 14:00"). Null while no window is known: nothing, never 0%.
+ * A plan that refused a request before any window was known is still at the limit: no windows, no bar, only the alert.
  */
 export function planLine(usage: PlanMeterUsage, text: PlanMeterText, now = Date.now()) {
   const rows = planWindows(usage, now);
   const top = rows[0];
-  if (!top) return null;
   const { state, until } = planState(usage, now);
-  const reset = (w: PlanMeterWindow) => (w.resetsAt && !passed(w.resetsAt, now) ? text.resets(w.resetsAt) : null);
+  if (!top && state !== "limited") return null;
+  const reset = (w?: PlanMeterWindow) => (w?.resetsAt && !passed(w.resetsAt, now) ? text.resets(w.resetsAt) : null);
   const join = (parts: (string | null)[]) => parts.filter(Boolean).join(" · ");
   return {
     state,

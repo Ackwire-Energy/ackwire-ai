@@ -43,7 +43,8 @@ export function Meter({ value, part, label, mark }: { value: number; part?: numb
  * A plan's usage like the provider shows it (the web's `PlanMeter`): a bar per window, tightest first, with its
  * percentage and when it resets; "almost" from 80%, "at the limit until…" at 100%, and how old the numbers are.
  * `compact` (an agent's month, Contas de IA, Você): one line with the tightest windows ("semana 40% · 5h 12%",
- * after `label`), one bar for the fullest, and only near the limit when it renews; nothing while no window is known.
+ * after `label`), one bar for the fullest, and only near the limit when it renews; nothing while no window is known,
+ * unless the plan already refused a request ("No limite").
  */
 export function PlanMeter({ usage, compact = false, label }: { usage: MeterUsage; compact?: boolean; label?: string }) {
   const { t, i18n } = useTranslation();
@@ -53,12 +54,15 @@ export function PlanMeter({ usage, compact = false, label }: { usage: MeterUsage
   if (compact) {
     const shown = planLine(usage, text, now);
     if (!shown) return null;
+    const line = [label, shown.line].filter(Boolean).join(" · ");
     return (
       <View style={styles.meterCompact}>
-        <Text variant="caption" tone="muted" style={styles.tabular}>
-          {label ? `${label} · ${shown.line}` : shown.line}
-        </Text>
-        <Meter value={shown.top.used} label={text.window(shown.top)} mark={PLAN_ALMOST} />
+        {line ? (
+          <Text variant="caption" tone="muted" style={styles.tabular}>
+            {line}
+          </Text>
+        ) : null}
+        {shown.top ? <Meter value={shown.top.used} label={text.window(shown.top)} mark={PLAN_ALMOST} /> : null}
         {shown.alert ? (
           <Text variant="caption" style={[styles.bold, { color: c.attention }]}>
             {shown.alert}

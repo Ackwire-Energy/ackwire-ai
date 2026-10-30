@@ -24,7 +24,8 @@ const passed = (iso: string | undefined, now: number) => iso !== undefined && Da
  * said in words. `compact` (lists, an agent's facts, Contas de IA): one line
  * with the tightest windows ("semana 40% · 5h 12%", after `label`), one bar for
  * the fullest, every window on hover, and only near the limit when it renews;
- * nothing while no window is known.
+ * nothing while no window is known, unless the plan already refused a request
+ * ("No limite").
  */
 export function PlanMeter({
   usage,
@@ -45,14 +46,15 @@ export function PlanMeter({
   if (compact) {
     const shown = planLine(usage, text, now);
     if (!shown) return null;
+    const line = [label, shown.line].filter(Boolean).join(" · ");
     return (
       <div
         className={cx("ac-planmeter", "ac-planmeter--compact", className)}
         data-state={shown.state}
         title={shown.title}
       >
-        <span className="ac-planmeter__line">{label ? `${label} · ${shown.line}` : shown.line}</span>
-        <Meter value={shown.top.used} max={100} label={text.window(shown.top)} marks={[PLAN_ALMOST]} />
+        {line && <span className="ac-planmeter__line">{line}</span>}
+        {shown.top && <Meter value={shown.top.used} max={100} label={text.window(shown.top)} marks={[PLAN_ALMOST]} />}
         {shown.alert && <span className="ac-planmeter__state">{shown.alert}</span>}
       </div>
     );

@@ -666,7 +666,6 @@ export const featureKeysPtBR = {
     canUse: "Pode usar",
     month: "Este mês",
     ofBudget: "de {{budget}} por mês",
-    percent: "{{percent}}%",
     ofMonthBudget: "do orçamento do mês",
     exhaustedF: "A {{name}} usou todo o orçamento do mês.",
     exhaustedM: "O {{name}} usou todo o orçamento do mês.",

@@ -76,15 +76,17 @@ export function planMeterText(
 
 /**
  * What shows of an agent's month where its budget used to (ADR 0063 §5): on a plan, its account's limits while a
- * window is known, and its budget only once it spent through the API this month; on the API, its budget.
+ * window is known or the plan refused a request, and its budget only once it spent through the API this month; on
+ * the API, its budget.
  */
 export function usageShown(
   brain: Pick<AgentBrainLine, "kind" | "account" | "usage"> | undefined,
   budgetUsedPercent: number,
 ): { plan: { account: string | undefined; usage: PlanUsage } | null; budget: boolean } {
   if (!brain || brain.kind === "model") return { plan: null, budget: true };
+  const usage = brain.usage;
   return {
-    plan: brain.usage?.windows.length ? { account: brain.account, usage: brain.usage } : null,
+    plan: usage && (usage.windows.length > 0 || usage.limited) ? { account: brain.account, usage } : null,
     budget: budgetUsedPercent > 0,
   };
 }

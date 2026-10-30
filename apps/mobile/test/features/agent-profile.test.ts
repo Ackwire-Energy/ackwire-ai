@@ -313,6 +313,11 @@ describe("Perfil: o mês, com os limites do plano (ADR 0063 §5)", () => {
       "Quase no limite · renova às 16:30",
     );
     expect(planLine(usage([]), pt, NOW.getTime())).toBeNull();
+    // Refused before any window was known: no bar, only that it is at the limit.
+    expect(planLine({ ...usage([]), limited: true }, pt, NOW.getTime())).toMatchObject({
+      line: "",
+      alert: "No limite",
+    });
   });
 
   test("the screen: the plan's card with its account's name first, the budget only once it spent through the API", async () => {
@@ -324,6 +329,8 @@ describe("Perfil: o mês, com os limites do plano (ADR 0063 §5)", () => {
     const budget = screen.indexOf(") : spend && shown.budget ? (");
     expect(plan).toBeGreaterThan(0);
     expect(budget).toBeGreaterThan(plan);
+    // The budget's share as the web says it ("<1%" for a little spent), in the plan's card and the budget's.
+    expect(screen.match(/formatPercent\(i18n\.language, spend\.percent\)/g)).toHaveLength(2);
     // The phone's meter draws the same line as the web's (`planLine`).
     expect(parts).toContain("const shown = planLine(usage, text, now);");
     // The budget is never called a limit next to a plan's limits.

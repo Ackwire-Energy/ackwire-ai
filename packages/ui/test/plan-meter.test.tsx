@@ -174,6 +174,22 @@ test("compact with no window known yet shows nothing, never 0%", () => {
   expect(container.textContent).toBe("");
 });
 
+test("compact: a plan that refused a request before any window was known says it is at the limit, with no bar", () => {
+  const refused: PlanMeterUsage = { windows: [], limited: true, at: at(0) };
+  expect(planLine(refused, text, NOW)).toMatchObject({ state: "limited", line: "", alert: "No limite" });
+  const { container } = render(<PlanMeter usage={refused} text={text} now={NOW} compact label="Claude Max" />);
+  const el = container.querySelector(".ac-planmeter--compact") as HTMLElement;
+  expect(el.dataset.state).toBe("limited");
+  expect(el.querySelector(".ac-planmeter__line")?.textContent).toBe("Claude Max");
+  expect(el.querySelector(".ac-planmeter__state")?.textContent).toBe("No limite");
+  expect(el.querySelector("[role=meter]")).toBeNull();
+  cleanup();
+  // Without the account's name (Contas de IA): the state alone.
+  const bare = render(<PlanMeter usage={refused} text={text} now={NOW} compact />).container;
+  expect(bare.querySelector(".ac-planmeter__line")).toBeNull();
+  expect(bare.textContent).toBe("No limite");
+});
+
 test("an agent's part: in full ink inside its window's bar, with its words; none once the window reset", () => {
   const usage: PlanMeterUsage = {
     windows: [

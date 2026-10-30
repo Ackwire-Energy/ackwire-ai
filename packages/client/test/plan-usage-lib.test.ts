@@ -37,6 +37,14 @@ describe("what an agent's usage shows where its budget did (ADR 0063 §5)", () =
     expect(usageShown(onPlan({ usage: usage([]) }), 0)).toEqual({ plan: null, budget: false });
     expect(usageShown(onPlan({ usage: undefined }), 2)).toEqual({ plan: null, budget: true });
   });
+
+  test("a plan that refused a request before any window was known: its line, which says it is at the limit", () => {
+    const refused: PlanUsage = { ...usage([]), limited: true };
+    expect(usageShown(onPlan({ usage: refused }), 0)).toEqual({
+      plan: { account: "Claude Team", usage: refused },
+      budget: false,
+    });
+  });
 });
 
 test("the compact line names a window short; a provider's own window by its name", () => {

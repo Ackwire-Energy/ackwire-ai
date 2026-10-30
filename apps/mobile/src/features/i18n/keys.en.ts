@@ -661,7 +661,6 @@ export const featureKeysEn: FeatureTranslations = {
     canUse: "Can use",
     month: "This month",
     ofBudget: "of {{budget}} a month",
-    percent: "{{percent}}%",
     ofMonthBudget: "of this month's budget",
     exhaustedF: "{{name}} used all of this month's budget.",
     exhaustedM: "{{name}} used all of this month's budget.",

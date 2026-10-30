@@ -321,6 +321,20 @@ describe("agent page: a plan's limits where the budget was (ADR 0063 §5)", () =
       /^Quase no limite · renova (\S+ )?às \d\d:\d\d$/,
     );
   });
+
+  test("Atividade: the month's numbers leave the money out until it spends through the API", async () => {
+    const legend = () =>
+      screen()
+        .getByRole("region", { name: /^O mês de / })
+        .querySelector(".agp-month__legend")?.textContent ?? "";
+    await go("?tab=activity", onPlan(0));
+    expect(legend()).toContain("142");
+    expect(legend()).not.toMatch(/Gasto|Orçamento|US\$/);
+    cleanup();
+    await go("?tab=activity", onPlan(12.3));
+    expect(legend()).toContain("Gasto");
+    expect(legend()).toContain("US$ 12,30");
+  });
 });
 
 describe("agent page: who edits what", () => {
