@@ -98,6 +98,20 @@ export function webmailOf(
   return null;
 }
 
+/** A name as a person types it to confirm: NFKC, without Unicode format characters (Cf), trimmed, lower case. */
+const typedName = (text: string) =>
+  text
+    .normalize("NFKC")
+    .replace(/\p{Cf}/gu, "")
+    .trim()
+    .toLowerCase();
+
+/**
+ * Whether `typed` names `name`, to confirm an action on it (deleting a workspace). Pasted text works, and invisible
+ * characters put in the name can't make it untypeable: a name that is only those needs nothing typed.
+ */
+export const namesMatch = (typed: string, name: string) => typedName(typed) === typedName(name);
+
 /** The text ended as a sentence: a full stop added unless it already ends with one, "!", "?" or "…". */
 export const endSentence = (text: string) => (/[.!?…]$/.test(text) ? text : `${text}.`);
 

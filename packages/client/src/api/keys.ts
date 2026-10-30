@@ -8,6 +8,7 @@ export const keys = {
   jev: ["jev"] as const,
   authConfig: ["auth-config"] as const,
   me: ["me"] as const,
+  accountDeletion: ["account-deletion"] as const,
   phoneSignIn: ["phone-sign-in"] as const,
   /** The server's Web Push key (ADR 0071); `null` = Web Push off on this server. */
   webPushKey: ["push", "web-key"] as const,

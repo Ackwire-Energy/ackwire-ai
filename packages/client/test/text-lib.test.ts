@@ -1,6 +1,17 @@
 import { expect, test } from "bun:test";
 import { plainLines } from "../src/lib/markdown";
-import { around, emailTypoFix, excerpt, webmailOf } from "../src/lib/text";
+import { around, emailTypoFix, excerpt, namesMatch, webmailOf } from "../src/lib/text";
+
+test("a name typed to confirm: any case, spaces around, width forms and invisible characters ignored", () => {
+  expect(namesMatch("acme  ", "Acme")).toBe(true);
+  expect(namesMatch("Ａｃｍｅ", "Acme")).toBe(true);
+  // A co-owner's zero-width space or soft hyphen in the name can't make it untypeable.
+  expect(namesMatch("Acme Corp", "Ac​me Cor­p")).toBe(true);
+  expect(namesMatch("Acme", "Acme Corp")).toBe(false);
+  expect(namesMatch("", "Acme")).toBe(false);
+  // A name of nothing but those needs nothing typed.
+  expect(namesMatch("", "​⁠")).toBe(true);
+});
 
 test("a misspelled webmail domain gets one fix; anything else is left alone", () => {
   expect(emailTypoFix("Marina@Gmial.com ")).toBe("marina@gmail.com");

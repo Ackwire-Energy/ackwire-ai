@@ -27,6 +27,7 @@ import { withRead } from "../lib/seen";
 import { playSound } from "../lib/sounds";
 import { upsertMessage, withLocalCopies } from "../lib/timeline";
 import type { RealtimeConnection } from "../realtime/connection";
+import { setOrgDeletion } from "../realtime/machines";
 import type { ApiClient } from "./client";
 import { type AgentReactionEffect, useAgentReaction, useApi } from "./context";
 import { keys } from "./keys";
@@ -193,6 +194,64 @@ export function useCreateOrganization() {
   return useMutation({
     mutationFn: (input: { name: string; context?: string }) => api.orgs.create(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.me }),
+  });
+}
+
+/** How often a workspace's closing screen asks `GET /me` again: its socket is closed, so no event reaches it. */
+export const CLOSING_POLL_MS = 30_000;
+
+/**
+ * `GET /me` while a workspace's closing screen shows: every 30 s and whenever the app comes back to the front, so a
+ * restore opens the workspace again and a deletion done drops it from the list.
+ */
+export const useClosingMe = () =>
+  useQuery({ ...meQuery(useApi()), refetchInterval: CLOSING_POLL_MS, refetchOnWindowFocus: "always" });
+
+/** What deleting my account would do, and the proof it takes (`GET /account/deletion`): asked anew each time. */
+export const useAccountDeletionPlan = (enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.accountDeletion,
+    queryFn: () => api.account.deletionPlan(),
+    enabled,
+    staleTime: 0,
+    gcTime: 0,
+  });
+};
+
+/**
+ * Deletes the workspace (owners), with the password when the session alone doesn't prove it's them. Its closing
+ * screen shows here at once, and through `org.deleting` everywhere else. The dialog says its refusals.
+ */
+export function useDeleteWorkspace(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (password?: string) => api.orgs.deleteWorkspace(orgId, password ? { password } : {}),
+    meta: { silent: true },
+    onSuccess: ({ dueAt }) => {
+      const me = qc.getQueryData<Me | null>(keys.me);
+      setOrgDeletion(qc, orgId, {
+        dueAt,
+        requestedAt: new Date().toISOString(),
+        requestedBy: me ? { id: me.user.id, name: me.user.name } : null,
+      });
+      void qc.invalidateQueries({ queryKey: keys.me });
+    },
+  });
+}
+
+/** Restores a workspace being deleted (owners): it opens again for everyone. */
+export function useRestoreWorkspace(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.orgs.restore(orgId),
+    onSuccess: () => {
+      setOrgDeletion(qc, orgId, null);
+      // An unfinished one resumes its onboarding: `GET /me` says so again.
+      void qc.invalidateQueries({ queryKey: keys.me });
+    },
   });
 }
 

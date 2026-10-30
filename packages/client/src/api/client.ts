@@ -1,6 +1,7 @@
 import type { OnboardingStepId } from "../lib/onboarding";
 import type {
   AccessInput,
+  AccountDeletionPlan,
   AccountLoginStart,
   AccountLoginStatus,
   ActiveRun,
@@ -239,8 +240,18 @@ export interface ApiClient {
     updateMe(input: { locale: "pt-BR" | "en" }): Promise<void>;
     /** A one-time sign-in for the phone app, shown as a QR code. */
     phoneSignIn(): Promise<PhoneSignIn>;
-    /** A password for an account that has none (`password_set` 409 when it has one). */
+    /**
+     * A password for an account that has none (`password_set` 409 when it has one). `reauth.sign_in` (403) without a
+     * sign-in in the last 10 minutes.
+     */
     addPassword(password: string): Promise<void>;
+    /** What deleting my account would close, leave and remove, and whether this session proves it's me. */
+    deletionPlan(): Promise<AccountDeletionPlan>;
+    /**
+     * Deletes my account at once. Proof: a sign-in in the last 10 minutes, else `password` (`reauth.sign_in` or
+     * `reauth.password` 403, 429 after 5 tries). `sole_owner` (409, `params.orgIds`) while a workspace needs me.
+     */
+    delete(input?: { password?: string }): Promise<void>;
   };
   /** Where my pushes go: phones (ADR 0035) and browsers (ADR 0071). Per person, not per organization. */
   push: {
@@ -274,6 +285,13 @@ export interface ApiClient {
     ): Promise<{ step: OnboardingStepId; finished: boolean } | null>;
     get(orgId: string): Promise<Organization>;
     update(orgId: string, input: { name?: string; context?: string }): Promise<void>;
+    /**
+     * Owners: closes the workspace for everyone now and deletes it for good 7 days later (`dueAt`); already being
+     * deleted, its date. Proof as `account.delete`'s; 429 after 3 deletions of it in a day.
+     */
+    deleteWorkspace(orgId: string, input?: { password?: string }): Promise<{ dueAt: string }>;
+    /** Owners, before its date: it opens again. `org.not_restorable` (409) once the date passed. */
+    restore(orgId: string): Promise<void>;
     /** My handle and time zone in this organization (`timezone: null` = the organization's). */
     updateMe(orgId: string, input: { handle?: string; timezone?: string | null }): Promise<Person>;
     /** My profile photo: a square image (JSON only: base64), already cropped. */

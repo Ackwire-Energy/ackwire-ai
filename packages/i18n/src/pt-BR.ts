@@ -243,6 +243,7 @@ export const ptBR = {
   },
   onboarding: {
     stepsLabel: "Passos para começar",
+    deleteLink: "Apagar este workspace",
     optionalTag: "opcional",
     stepDone: "(concluído)",
     stepNames: {
@@ -756,6 +757,7 @@ export const ptBR = {
     addPasswordHint: "Para entrar por outros navegadores e aparelhos",
     addPasswordLabel: "Nova senha",
     addPasswordSaved: "Senha adicionada.",
+    addPasswordReauth: "Entre de novo para adicionar uma senha.",
     thisMonth: "Este mês",
     budgetOf: "Orçamento de {{name}}",
     yourWorkspaces: "Seus workspaces",
@@ -2219,6 +2221,7 @@ export const ptBR = {
         no_ai: "O agente não tem uma IA conectada.",
         org_paused: "Os agentes do workspace estão pausados.",
         org_suspended: "O workspace está indisponível.",
+        org_deleting: "O workspace está sendo apagado.",
         agent_paused: "O agente está pausado.",
         computer_busy: "O computador continuou ocupado com outras tarefas.",
         unknown: "Falhou.",
@@ -3372,6 +3375,7 @@ export const ptBR = {
       no_ai: "O agente não tem uma IA conectada",
       org_paused: "Não rodou: os agentes do workspace estavam pausados",
       org_suspended: "Não rodou: o workspace estava indisponível",
+      org_deleting: "Não rodou: o workspace estava sendo apagado",
       agent_paused: "Não rodou: o agente estava pausado",
       computer_busy: "O computador continuou ocupado com outras tarefas",
     },
@@ -7038,6 +7042,12 @@ export const ptBR = {
     org: {
       createInviteOnly: "Novos workspaces precisam de convite por enquanto.",
       membersFull: "Este workspace está sem lugar para mais pessoas agora. Avise quem convidou você.",
+      deleting: "Este workspace está sendo apagado.",
+      notRestorable: "Este workspace não pode mais ser restaurado.",
+    },
+    reauth: {
+      password: "Essa senha não está certa.",
+      signIn: "Entre de novo para confirmar que é você.",
     },
     humanCheck: "Não conseguimos confirmar que você é uma pessoa. Tente de novo.",
     humanCheckBlocked: "A verificação não carregou. Tente outro navegador ou outra rede.",
@@ -8668,6 +8678,69 @@ export const ptBR = {
     writeBefore: "Precisa de ajuda? Escreva para ",
     writeAfter: ".",
     ask: "Precisa de ajuda? Fale com quem cuida deste servidor.",
+  },
+  /** Deleting a workspace (owners): it closes for everyone now and is deleted for good 7 days later. */
+  deleteOrg: {
+    card: {
+      title: "Apagar workspace",
+      text: "Fecha {{name}} para todos agora. Ele é apagado de vez depois de 7 dias.",
+      button: "Apagar workspace…",
+    },
+    title: "Apagar {{name}}?",
+    goes: {
+      content: "As conversas, os arquivos, os agentes e a memória deles",
+      people: "Todos perdem o acesso agora e recebem um email",
+      peopleQuiet: "Todos perdem o acesso agora",
+      computer: "O computador dele para agora e é apagado",
+      computers:
+        "Os computadores conectados são desconectados. As pastas dos agentes ficam neles até o runner ser removido.",
+      connectors: "Os conectores e as caixas de email são desconectados",
+    },
+    undo: "Qualquer dono pode restaurar até {{date}} às {{time}}. Depois disso, não tem volta.",
+    /** `<export>` is the link that downloads the export. */
+    export:
+      "Quer guardar os agentes? <export>Exporte antes</export>. O arquivo tem agentes, skills e rotinas, sem conversas nem arquivos.",
+    bucket: "Os arquivos no seu próprio armazenamento continuam lá.",
+    github: "O app do GitHub continua instalado lá. Remova pelo GitHub.",
+    plan: "O plano dele para de renovar. Nada é reembolsado.",
+    type: "Digite {{name}} para confirmar",
+    submit: "Apagar workspace",
+  },
+  /** Proof that it's the person, before deleting: the password, or a sign-in in the last 10 minutes. */
+  proof: {
+    password: "Sua senha",
+    signIn: "Ou entre de novo para confirmar",
+    signInButton: "Entrar de novo",
+  },
+  /** A workspace being deleted: the screen in its place until it goes. */
+  deleting: {
+    title: "{{name}} está sendo apagado",
+    text: "{{by}} apagou em {{date}}. Ele some de vez em {{due}}.",
+    textLate: "{{by}} apagou em {{date}}.",
+    /** `{{by}}` once the account that deleted it is gone. */
+    someone: "Alguém",
+    restore: "Restaurar workspace",
+    membersOnly: "Só um dono pode restaurar.",
+    restored: "{{name}} voltou",
+  },
+  /** Deleting your account (the account menu): what goes, what stays, and what has to happen first. */
+  deleteAccount: {
+    menu: "Apagar conta",
+    title: "Apagar a sua conta?",
+    closes_one: "{{names}} fecha agora e é apagado de vez em {{date}}. Só você está lá.",
+    closes_other: "{{names}} fecham agora e são apagados de vez em {{date}}. Só você está lá.",
+    leaves: "Você sai de {{names}}.",
+    messages: "Suas mensagens ficam nos workspaces sem o seu nome.",
+    computers_one: "Seu computador conectado a {{name}} sai de lá: {{computers}}.",
+    computers_other: "Seus computadores conectados a {{name}} saem de lá: {{computers}}.",
+    staysBehind: "O que você adicionou em {{name}} continua lá: {{items}}. Desconecte antes se for seu.",
+    serverOwner: "Você instalou este servidor. As configurações dele vão ficar sem dono aqui, só no ambiente dele.",
+    blockers: "Antes de apagar",
+    soleOwner: "Você é a única pessoa dona de {{name}}. Torne outra pessoa dona, ou apague {{name}}.",
+    openPeople: "Abrir Pessoas",
+    deleteOrg: "Apagar {{name}}",
+    submit: "Apagar conta",
+    deleted: "Conta apagada",
   },
   /** The billing service (ADR 0079): this server shows no plan, price or currency, only the way there. */
   billing: {

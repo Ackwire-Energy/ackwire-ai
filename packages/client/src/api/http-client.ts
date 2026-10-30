@@ -6,6 +6,7 @@ import { steerStore } from "../realtime/steer";
 import type { HttpApi } from "./client";
 import { ApiError, createFileRequester, createRequester, enc, type TransportOptions } from "./http";
 import type {
+  AccountDeletionPlan,
   AccountLoginStart,
   AccountLoginStatus,
   ActiveRun,
@@ -342,6 +343,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       updateMe: (input) => request<void>("/api/app/me", { method: "PATCH", json: input }),
       phoneSignIn: () => request<PhoneSignIn>("/api/app/phone-sign-in", { json: {} }),
       addPassword: (password) => request<void>("/api/app/me/password", { json: { password } }),
+      deletionPlan: () => request<AccountDeletionPlan>("/api/app/account/deletion"),
+      delete: (input = {}) => request<void>("/api/app/account", { method: "DELETE", json: input }),
     },
     push: {
       webKey: async () =>
@@ -361,6 +364,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           }),
         ),
       get: (orgId) => request<Organization>(org(orgId)),
+      deleteWorkspace: async (orgId, input = {}) =>
+        (await request<{ deletion: { dueAt: string } }>(`${org(orgId)}/deletion`, { json: input })).deletion,
+      restore: (orgId) => request<void>(`${org(orgId)}/deletion`, { method: "DELETE" }),
       setAvatar: (orgId, input) =>
         request<{ avatarUrl: string }>(`${org(orgId)}/me/avatar`, { method: "PUT", json: input }),
       removeAvatar: (orgId) => request<void>(`${org(orgId)}/me/avatar`, { method: "DELETE" }),

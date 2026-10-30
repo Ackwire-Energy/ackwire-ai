@@ -1,4 +1,5 @@
 import type {
+  AccountDeletionPlan,
   ActiveRun,
   Agent,
   AgentAudience,
@@ -236,6 +237,10 @@ export interface FakeState {
   approval?: JoinApproval;
   /** Make `joinRequests.approve` and `deny` fail with this error (`join.answered`…). */
   answerError?: ApiError;
+  /** `account.deletionPlan`; unset = nothing to stop it, a password, no fresh sign-in. */
+  deletionPlan?: AccountDeletionPlan;
+  /** Make `orgs.deleteWorkspace` and `account.delete` fail with this error (`reauth.sign_in`…). */
+  deletionError?: ApiError;
 }
 
 /** A small in-memory backend with the design's demo data ("Acme"). */
@@ -843,6 +848,22 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("account.addPassword", { password });
         if (state.me) state.me.user.hasPassword = true;
       },
+      deletionPlan: async () =>
+        state.deletionPlan ?? {
+          password: true,
+          freshUntil: null,
+          closes: [],
+          leaves: [],
+          soleOwner: [],
+          computers: [],
+          staysBehind: [],
+          serverOwner: false,
+        },
+      delete: async (input) => {
+        log("account.delete", input);
+        if (state.deletionError) throw state.deletionError;
+        state.me = null;
+      },
       phoneSignIn: async () => {
         log("account.phoneSignIn");
         return {
@@ -909,6 +930,31 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return { step: onboarding?.step ?? "done", finished: onboarding === undefined };
       },
       get: async (orgId) => ({ id: orgId, name: "Acme", role: "owner", context: "" }),
+      deleteWorkspace: async (orgId, input) => {
+        log("orgs.deleteWorkspace", orgId, input);
+        const me = requireMe();
+        if (state.deletionError) throw state.deletionError;
+        // On the real clock: the closing screen compares the date with it.
+        const dueAt = new Date(Date.now() + 7 * 86_400_000).toISOString();
+        const deletion = {
+          dueAt,
+          requestedAt: new Date().toISOString(),
+          requestedBy: { id: me.user.id, name: me.user.name },
+        };
+        state.me = {
+          ...me,
+          organizations: me.organizations.map((o) => (o.id === orgId ? { ...o, deletion, onboarding: undefined } : o)),
+        };
+        return { dueAt };
+      },
+      restore: async (orgId) => {
+        log("orgs.restore", orgId);
+        const me = requireMe();
+        state.me = {
+          ...me,
+          organizations: me.organizations.map((o) => (o.id === orgId ? { ...o, deletion: undefined } : o)),
+        };
+      },
       update: async (orgId, input) => log("orgs.update", orgId, input),
       updateMe: async (orgId, input) => {
         log("orgs.updateMe", orgId, input);

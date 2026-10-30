@@ -145,6 +145,11 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     // (GET /api/app/jev is 404 elsewhere).
     "jev.",
     "onboarding.jev.",
+    // Deleting: computers people connected, and the person who set up the server, only a self-hosted server has.
+    "deleteOrg.goes.computers",
+    "deleteAccount.computers_one",
+    "deleteAccount.computers_other",
+    "deleteAccount.serverOwner",
   ],
   email: [
     "auth.newLinkSent",
@@ -156,6 +161,7 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "onboarding.team.emailsHint",
     "computerSetup.email.",
     "connectAi.wait.email",
+    "deleteOrg.goes.people",
   ],
   apiKey: ["agentPage.work.brain.fallbackTitle"],
   // A message nobody mentions still gets an agent: routing.mine (the chip and its help line), routing.by (Settings),

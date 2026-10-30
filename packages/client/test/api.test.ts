@@ -49,6 +49,26 @@ describe("requester", () => {
     expect(await request("/gone", { method: "DELETE" })).toBeUndefined();
   });
 
+  test("deleting: the proof rides in a DELETE's body when there is one; a restore goes bare", async () => {
+    const org = "/api/app/organizations/o1";
+    const { fetch, calls } = fakeFetch({
+      [`POST ${org}/deletion`]: { status: 202, body: { deletion: { dueAt: "2026-11-06T12:00:00.000Z" } } },
+      [`DELETE ${org}/deletion`]: { status: 204 },
+      "DELETE /api/app/account": { status: 204 },
+    });
+    const api = createHttpApi({ fetch });
+    expect(await api.orgs.deleteWorkspace("o1", { password: "pw" })).toEqual({ dueAt: "2026-11-06T12:00:00.000Z" });
+    await api.orgs.restore("o1");
+    await api.account.delete({ password: "pw" });
+    await api.account.delete();
+    const [deleting, restore, withProof, bare] = calls;
+    expect(deleting?.init.body).toBe('{"password":"pw"}');
+    expect(restore?.init).toMatchObject({ method: "DELETE", body: undefined });
+    expect(withProof?.init).toMatchObject({ method: "DELETE", body: '{"password":"pw"}' });
+    expect((withProof?.init.headers as Record<string, string> | undefined)?.["content-type"]).toBe("application/json");
+    expect(bare?.init.body).toBe("{}");
+  });
+
   test("query strings skip empty values", async () => {
     const { fetch, calls } = fakeFetch({});
     const request = createRequester({ fetch });

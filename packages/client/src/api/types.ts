@@ -162,6 +162,37 @@ export interface OrgSummary {
    * which resumes it, instead of the workspace. Absent: finished, not theirs to set up, or an older server.
    */
   onboarding?: OrgOnboarding;
+  /** From `GET /me` while an owner's deletion is pending, set at once by `org.deleting`: the workspace is closed. */
+  deletion?: OrgDeletion;
+}
+
+/** A workspace being deleted. Any owner restores it until `dueAt`. */
+export interface OrgDeletion {
+  /** When it goes for good; null once that date passed, while it is only being deleted. */
+  dueAt: string | null;
+  requestedAt: string | null;
+  /** Who deleted it; null once their account is gone. */
+  requestedBy: { id: string; name: string } | null;
+}
+
+/** `GET /account/deletion`: what deleting my account would close, leave and remove, and the proof it needs. */
+export interface AccountDeletionPlan {
+  /** The account signs in with a password, which proves it's them. */
+  password: boolean;
+  /** Until when this session's own sign-in proves it with no password; null: sign in again, or the password. */
+  freshUntil: string | null;
+  /** Only I am in them: they close now and are deleted for good 7 days later. */
+  closes: { id: string; name: string }[];
+  /** Others are in them: I leave. */
+  leaves: { id: string; name: string; role: Role }[];
+  /** I'm their only owner, others are in them and they aren't being deleted: the account can't go yet (`sole_owner`). */
+  soleOwner: { id: string; name: string }[];
+  /** Computers I connected in the workspaces I leave, not in system mode: removed with the account. */
+  computers: { orgId: string; id: string; name: string }[];
+  /** Keys, connections and mailboxes I added to the workspaces I leave: the workspace's, so they stay. */
+  staysBehind: { orgId: string; kind: "key" | "connection" | "mailbox"; name: string }[];
+  /** I set up this server: its own settings will have no owner here, only in its environment (ADR 0073). */
+  serverOwner: boolean;
 }
 
 /** Where a workspace's onboarding stands. */

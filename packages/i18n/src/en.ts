@@ -236,6 +236,7 @@ export const en: Translations = {
   },
   onboarding: {
     stepsLabel: "Steps to get started",
+    deleteLink: "Delete this workspace",
     optionalTag: "optional",
     stepDone: "(done)",
     stepNames: {
@@ -745,6 +746,7 @@ export const en: Translations = {
     addPasswordHint: "To sign in from other browsers and devices",
     addPasswordLabel: "New password",
     addPasswordSaved: "Password added.",
+    addPasswordReauth: "Sign in again to add a password.",
     thisMonth: "This month",
     budgetOf: "{{name}} budget",
     yourWorkspaces: "Your workspaces",
@@ -2197,6 +2199,7 @@ export const en: Translations = {
         no_ai: "The agent has no AI connected.",
         org_paused: "The workspace's agents are paused.",
         org_suspended: "The workspace is unavailable.",
+        org_deleting: "The workspace is being deleted.",
         agent_paused: "The agent is paused.",
         computer_busy: "The computer stayed busy with other tasks.",
         unknown: "Failed.",
@@ -3341,6 +3344,7 @@ export const en: Translations = {
       no_ai: "The agent has no AI connected",
       org_paused: "Didn't run: the workspace's agents were paused",
       org_suspended: "Didn't run: the workspace was unavailable",
+      org_deleting: "Didn't run: the workspace was being deleted",
       agent_paused: "Didn't run: the agent was paused",
       computer_busy: "The computer stayed busy with other tasks",
     },
@@ -7001,6 +7005,12 @@ export const en: Translations = {
     org: {
       createInviteOnly: "New workspaces need an invitation for now.",
       membersFull: "This workspace has no room for more people right now. Let whoever invited you know.",
+      deleting: "This workspace is being deleted.",
+      notRestorable: "This workspace can't be restored anymore.",
+    },
+    reauth: {
+      password: "That password isn't right.",
+      signIn: "Sign in again to confirm it's you.",
     },
     humanCheck: "We couldn't confirm you're a person. Try again.",
     humanCheckBlocked: "The check didn't load. Try another browser or network.",
@@ -8616,6 +8626,68 @@ export const en: Translations = {
     writeBefore: "Need help? Write to ",
     writeAfter: ".",
     ask: "Need help? Ask the people who run this server.",
+  },
+  /** Deleting a workspace (owners): it closes for everyone now and is deleted for good 7 days later. */
+  deleteOrg: {
+    card: {
+      title: "Delete workspace",
+      text: "Closes {{name}} for everyone now. It's deleted for good after 7 days.",
+      button: "Delete workspace…",
+    },
+    title: "Delete {{name}}?",
+    goes: {
+      content: "Its conversations, files, agents and their memory",
+      people: "Everyone loses access now and gets an email",
+      peopleQuiet: "Everyone loses access now",
+      computer: "Its computer stops now and is wiped",
+      computers: "Connected computers are disconnected. The agents' folders stay on them until the runner is removed.",
+      connectors: "Connectors and mailboxes are disconnected",
+    },
+    undo: "Any owner can restore it until {{date}} at {{time}}. After that, there's no undo.",
+    /** `<export>` is the link that downloads the export. */
+    export:
+      "Want to keep its agents? <export>Export them first</export>. The file has agents, skills and routines, not conversations or files.",
+    bucket: "Files in your own storage stay there.",
+    github: "The GitHub app stays installed on GitHub. Remove it there.",
+    plan: "Its plan stops renewing. Nothing is refunded.",
+    type: "Type {{name}} to confirm",
+    submit: "Delete workspace",
+  },
+  /** Proof that it's the person, before deleting: the password, or a sign-in in the last 10 minutes. */
+  proof: {
+    password: "Your password",
+    signIn: "Or sign in again to confirm",
+    signInButton: "Sign in again",
+  },
+  /** A workspace being deleted: the screen in its place until it goes. */
+  deleting: {
+    title: "{{name}} is being deleted",
+    text: "{{by}} deleted it on {{date}}. It goes for good on {{due}}.",
+    textLate: "{{by}} deleted it on {{date}}.",
+    /** `{{by}}` once the account that deleted it is gone. */
+    someone: "Someone",
+    restore: "Restore workspace",
+    membersOnly: "Only an owner can restore it.",
+    restored: "{{name}} is back",
+  },
+  /** Deleting your account (the account menu): what goes, what stays, and what has to happen first. */
+  deleteAccount: {
+    menu: "Delete account",
+    title: "Delete your account?",
+    closes_one: "{{names}} closes now and is deleted for good on {{date}}. You're the only one there.",
+    closes_other: "{{names}} close now and are deleted for good on {{date}}. You're the only one there.",
+    leaves: "You leave {{names}}.",
+    messages: "Your messages stay in the workspaces without your name.",
+    computers_one: "Your computer connected to {{name}} is removed from it: {{computers}}.",
+    computers_other: "Your computers connected to {{name}} are removed from it: {{computers}}.",
+    staysBehind: "What you added to {{name}} stays there: {{items}}. Disconnect it first if it's yours.",
+    serverOwner: "You set up this server. Its own settings will have no owner here, only in its environment.",
+    blockers: "Before you can delete it",
+    soleOwner: "You're the only owner of {{name}}. Make someone else an owner, or delete {{name}}.",
+    openPeople: "Open People",
+    deleteOrg: "Delete {{name}}",
+    submit: "Delete account",
+    deleted: "Account deleted",
   },
   /** The billing service (ADR 0079): this server shows no plan, price or currency, only the way there. */
   billing: {
