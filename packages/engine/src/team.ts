@@ -192,7 +192,7 @@ export function createFindAgentToolSource(deps: { machines?: Pick<MachineCaller,
         ownerIds.length
           ? db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, ownerIds))
           : Promise.resolve([]),
-        loadAgentStatuses(db, ctx.orgId),
+        loadAgentStatuses(db, ctx.orgId, new Date(), ids),
       ]);
       const statusOf = new Map(statuses.map((s) => [s.agentId, s]));
       const content = scored

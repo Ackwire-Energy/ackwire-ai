@@ -1224,6 +1224,8 @@ export interface Person {
   presence: MemberPresence;
   /** What the person wrote they are doing; null = nothing (or its time is up). */
   status: MemberStatus | null;
+  /** Only on your own row: what you picked (your `presence` reads offline while you aren't connected). */
+  availability?: Availability;
   handle: string;
   timezone: string;
 }

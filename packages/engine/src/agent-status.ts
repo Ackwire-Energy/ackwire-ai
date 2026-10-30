@@ -88,8 +88,19 @@ export async function agentStatuses(db: Database, actorId: string, orgId: string
   return loadAgentStatuses(db, orgId, now);
 }
 
-/** Every agent's presence and line in an organization, at `now` (no permission check). Checked on read, no job. */
-export async function loadAgentStatuses(db: Database, orgId: string, now = new Date()): Promise<AgentStatusView[]> {
+/**
+ * Every agent's presence and line in an organization, at `now` (no permission check), or only `ids`'. Checked on
+ * read, no job.
+ */
+export async function loadAgentStatuses(
+  db: Database,
+  orgId: string,
+  now = new Date(),
+  ids?: string[],
+): Promise<AgentStatusView[]> {
+  if (ids?.length === 0) return [];
+  const ofAgents = ids ? [inArray(agents.id, ids)] : [];
+  const ofRuns = ids ? [inArray(agentRuns.agentId, ids)] : [];
   const [list, open, last] = await Promise.all([
     db
       .select({
@@ -105,7 +116,7 @@ export async function loadAgentStatuses(db: Database, orgId: string, now = new D
         statusSubject: agents.statusSubject,
       })
       .from(agents)
-      .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt))),
+      .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt), ...ofAgents)),
     db
       .select({
         id: agentRuns.id,
@@ -119,11 +130,19 @@ export async function loadAgentStatuses(db: Database, orgId: string, now = new D
         waitingMachineId: agentRuns.waitingMachineId,
       })
       .from(agentRuns)
-      .where(and(eq(agentRuns.orgId, orgId), inArray(agentRuns.status, [...ACTIVE, ...WAITING]))),
+      .where(
+        and(eq(agentRuns.orgId, orgId), inArray(agentRuns.status, [...ACTIVE, ...WAITING]), ...ofRuns),
+      ),
     db
       .select({ agentId: agentRuns.agentId, at: sql<Date | string | null>`max(${agentRuns.finishedAt})` })
       .from(agentRuns)
-      .where(and(eq(agentRuns.orgId, orgId), gt(agentRuns.createdAt, new Date(now.getTime() - ACTIVITY_LOOKBACK_MS))))
+      .where(
+        and(
+          eq(agentRuns.orgId, orgId),
+          gt(agentRuns.createdAt, new Date(now.getTime() - ACTIVITY_LOOKBACK_MS)),
+          ...ofRuns,
+        ),
+      )
       .groupBy(agentRuns.agentId),
   ]);
   const ms = now.getTime();
@@ -180,11 +199,12 @@ interface StoredStatus {
   statusSubject: string | null;
 }
 
-/** The stored line while it holds: its run is still alive, or its end time hasn't come. */
+/** The stored line while it holds: its run is still alive, or (with `minutes`) its end time hasn't come. */
 function storedLine(a: StoredStatus, aliveRuns: Map<string, unknown>, now: Date) {
   const has = a.statusSource === "auto" ? Boolean(a.statusKind) : Boolean(a.statusText);
   if (!has) return null;
-  if (a.statusUntil ? a.statusUntil <= now : !a.statusRunId || !aliveRuns.has(a.statusRunId)) return null;
+  const runAlive = Boolean(a.statusRunId && aliveRuns.has(a.statusRunId));
+  if (!runAlive && !(a.statusUntil && a.statusUntil > now)) return null;
   const line: AgentStatusLine =
     a.statusSource === "auto"
       ? {
@@ -294,17 +314,17 @@ export async function statusCandidates(
   >,
   tools: ToolDefinition[],
 ): Promise<StatusCandidate[]> {
-  const [issue, mission, trigger, channel] = await Promise.all([
+  const [issue, mission, trigger] = await Promise.all([
     run.issueId
       ? db
-          .select({ title: issues.title })
+          .select({ title: issues.title, channelId: issues.channelId })
           .from(issues)
           .where(and(eq(issues.orgId, run.orgId), eq(issues.id, run.issueId)))
           .then((r) => r[0] ?? null)
       : null,
     run.threadRootId && run.threadRootId !== run.triggerMessageId
       ? db
-          .select({ title: missions.title, agentId: missions.agentId })
+          .select({ title: missions.title, agentId: missions.agentId, channelId: missions.channelId })
           .from(missions)
           .where(and(eq(missions.orgId, run.orgId), eq(missions.threadRootId, run.threadRootId)))
           .then((r) => r[0] ?? null)
@@ -314,15 +334,26 @@ export async function statusCandidates(
       .from(messages)
       .where(and(eq(messages.orgId, run.orgId), eq(messages.id, run.triggerMessageId)))
       .then((r) => r[0] ?? null),
-    db
-      .select({ name: channels.name, kind: channels.kind, visibility: channels.visibility })
-      .from(channels)
-      .where(and(eq(channels.orgId, run.orgId), eq(channels.id, run.channelId)))
-      .then((r) => r[0] ?? null),
   ]);
+  // A line is read by the whole workspace: a title or a name shows only where everyone may see it (a public channel;
+  // a task with no channel is the workspace's).
+  const channelIds = [run.channelId, issue?.channelId, mission?.channelId].filter((id): id is string => Boolean(id));
+  const publicChannels = new Map(
+    (
+      await db
+        .select({ id: channels.id, name: channels.name, kind: channels.kind, visibility: channels.visibility })
+        .from(channels)
+        .where(and(eq(channels.orgId, run.orgId), inArray(channels.id, channelIds)))
+    )
+      .filter((c) => c.kind === "channel" && c.visibility === "public")
+      .map((c) => [c.id, c.name] as const),
+  );
+  const here = publicChannels.get(run.channelId);
   const out: Omit<StatusCandidate, "key">[] = [];
-  if (issue) out.push({ kind: "task", subject: issue.title, text: `Working on the task "${issue.title}"` });
-  if (mission && mission.agentId === run.agentId) {
+  if (issue && (!issue.channelId || publicChannels.has(issue.channelId))) {
+    out.push({ kind: "task", subject: issue.title, text: `Working on the task "${issue.title}"` });
+  }
+  if (mission && mission.agentId === run.agentId && publicChannels.has(mission.channelId)) {
     out.push({ kind: "mission", subject: mission.title, text: `Working on the mission "${mission.title}"` });
   }
   const routine = (trigger?.meta as { routine?: { name?: unknown } } | undefined)?.routine;
@@ -330,8 +361,8 @@ export async function statusCandidates(
     out.push({ kind: "routine", subject: routine.name, text: `Running the routine "${routine.name}"` });
   }
   // Where it answers, only a public channel by name; a DM or a private channel says nothing worth a line.
-  if (!run.background && channel?.kind === "channel" && channel.visibility === "public") {
-    out.push({ kind: "channel", subject: channel.name, text: `Answering in #${channel.name}` });
+  if (!run.background && here) {
+    out.push({ kind: "channel", subject: here, text: `Answering in #${here}` });
   }
   const seen = new Set(out.map((c) => `${c.kind}:${c.subject}`));
   for (const tool of tools) {
@@ -345,9 +376,9 @@ export async function statusCandidates(
 }
 
 /**
- * Jev's questions for the start of a run (§8–9), asked in the tool-group request (`chooseToolGroups`): which line,
- * how heavy the work is, and, for each line, whether it is worth showing at all (they run in parallel, so every
- * candidate gets its own; code reads the chosen one's).
+ * Jev's questions for the start of a run (§8–9, `askRunStatus`): which line, how heavy the work is, and, for each
+ * line, whether it is worth showing at all (they run in parallel, so every candidate gets its own; code reads the
+ * chosen one's).
  */
 export function statusQuestions(candidates: StatusCandidate[]) {
   const worth = Object.fromEntries(
@@ -413,9 +444,52 @@ export async function startRunStatus(
     : candidates.find((c) => STICKY.has(c.kind));
   const busy = (pick?.heavy ?? 0) >= AGENT_HEAVY_PROBABILITY;
   await writeAutoLine(deps, run, chosen ?? null, { busy, now, keepOwn: true });
+  // Its run started: the presence moved even when the line stays (the agent's own words, another run's).
+  await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
 }
 
-/** Writes an automatic line for `run` unless the agent's own words hold (another live run's, or this one's). */
+/** Jev's pick for a run as it starts (§8–9): a request of its own, beside the run, never in its way. */
+export async function askRunStatus(
+  judge: Judge,
+  input: {
+    orgId: string;
+    agentId: string;
+    runId: string;
+    agent: { name: string; role: string; instructions: string };
+    message: string;
+    recent: string[];
+    candidates: StatusCandidate[];
+  },
+): Promise<StatusPick | null> {
+  if (input.candidates.length === 0) return null;
+  const answers = await judge.ask({
+    orgId: input.orgId,
+    agentId: input.agentId,
+    runId: input.runId,
+    kind: "agent_status",
+    calibrated: true,
+    state: {
+      agent: { name: input.agent.name, role: input.agent.role, instructions: input.agent.instructions.slice(0, 1500) },
+      message: input.message.slice(0, 2000),
+      recent: input.recent.map((m) => m.slice(0, 400)).join("\n"),
+    },
+    questions: statusQuestions(input.candidates),
+  });
+  const line = answers.status_line?.choice;
+  const picked = line && line !== "none" ? line : null;
+  const weight = answers.status_weight;
+  const levels = weight?.probabilities ?? {};
+  // P(several minutes or long work) by level; the expected level when Jev gives no distribution.
+  const heavy =
+    "2" in levels || "3" in levels ? (levels["2"] ?? 0) + (levels["3"] ?? 0) : (weight?.score ?? 0) >= 2 ? 1 : 0;
+  return { line: picked, heavy, worth: picked ? (answers[`status_worth_${picked}`]?.noul ?? null) : null };
+}
+
+/**
+ * Writes an automatic line for `run`, unless it would cover what the agent or another of its runs says: the agent's
+ * own words while they hold, another live run's task, mission or routine line, or another live run's line with
+ * nothing to put in its place. Returns whether it wrote.
+ */
 async function writeAutoLine(
   deps: { db: Database; pubsub?: PubSub },
   run: { id: string; orgId: string; agentId: string },
@@ -425,6 +499,9 @@ async function writeAutoLine(
   // The agent's own words hold: their end hasn't come, or the run that wrote them is still on.
   const liveRun = sql`exists (select 1 from ${agentRuns} where ${agentRuns.id} = ${agents.statusRunId} and ${agentRuns.status} in ('queued', 'running', 'waiting_approval', 'waiting_input'))`;
   const own = sql`${agents.statusSource} = 'self' and (${agents.statusUntil} > ${options.now.toISOString()}::timestamptz or ${liveRun})`;
+  // Another of its runs, still on, says what its work is for (or this one has nothing better to say).
+  const another = sql`${agents.statusRunId} is not null and ${agents.statusRunId} <> ${run.id} and ${liveRun}`;
+  const covers = line ? sql`${another} and ${agents.statusKind} in ('task', 'mission', 'routine')` : another;
   const [row] = await deps.db
     .update(agents)
     .set({
@@ -443,11 +520,10 @@ async function writeAutoLine(
         eq(agents.orgId, run.orgId),
         eq(agents.id, run.agentId),
         ...(options.keepOwn ? [sql`not coalesce((${own}), false)`] : []),
+        sql`not coalesce((${covers}), false)`,
       ),
     )
     .returning({ id: agents.id });
-  // Started or moved: the apps refresh even when the agent's own words stay.
-  await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
   return Boolean(row);
 }
 
@@ -496,8 +572,9 @@ export async function followWork(
       .where(and(eq(agents.orgId, ctx.orgId), eq(agents.id, ctx.agentId)));
     if (!deps.judge || !a.text) return;
     const still = await stillFits(deps.judge, ctx, a.text, act.text).catch(() => null);
-    if (still !== null && still < AGENT_LINE_STALE_BELOW) {
-      await writeAutoLine(deps, target, act, { now, keepOwn: false });
+    const stale = still !== null && still < AGENT_LINE_STALE_BELOW;
+    if (stale && (await writeAutoLine(deps, target, act, { now, keepOwn: false }))) {
+      await announceAgentStatus(deps.pubsub, ctx.orgId, ctx.agentId).catch(() => {});
     }
     return;
   }
@@ -512,7 +589,9 @@ export async function followWork(
   if (mine && a.kind && STICKY.has(a.kind)) return;
   if (mine && a.kind === act.kind && a.subject === act.subject) return;
   if (a.at && now.getTime() - a.at.getTime() < AGENT_LINE_EVERY_MS) return;
-  await writeAutoLine(deps, target, act, { now, keepOwn: true });
+  if (await writeAutoLine(deps, target, act, { now, keepOwn: true })) {
+    await announceAgentStatus(deps.pubsub, ctx.orgId, ctx.agentId).catch(() => {});
+  }
 }
 
 /** Jev: does the agent's own line still describe the step it is on? (P of yes; calibrated, so Jev only.) */
@@ -556,7 +635,7 @@ export function createSetStatusToolSource(deps: { pubsub?: PubSub } = {}): ToolS
   const tool: ToolDefinition = {
     name: SET_STATUS_TOOL,
     description:
-      "Show the team what you are doing, next to your name, in your own words: a short line in the language of the conversation (e.g. 'Revisando o PR #12'). A line is already picked for you from your task; use this only when your own words say it better, or to stay busy. Set `busy` when the work is heavy and you'd rather not be interrupted. It clears when you finish; `minutes` keeps it longer (up to a day). An empty `text` clears it now.",
+      "Show the team what you are doing, next to your name, in your own words: a short line in the language of the conversation (e.g. 'Revisando o PR #12'). A line is already picked for you from your task; use this only when your own words say it better, or to stay busy. Set `busy` when the work is heavy and you'd rather not be interrupted. It clears when you finish; `minutes` keeps it at least that long, even after you finish (up to a day). An empty `text` clears it now.",
     scope: "",
     inputSchema: {
       type: "object",
@@ -568,7 +647,7 @@ export function createSetStatusToolSource(deps: { pubsub?: PubSub } = {}): ToolS
           type: "integer",
           minimum: 1,
           maximum: AGENT_STATUS_MAX_MS / 60_000,
-          description: "Keep it this long after you finish; omit to clear it when you finish.",
+          description: "Keep it at least this long from now, even after you finish; omit to clear it when you finish.",
         },
       },
       required: ["text"],

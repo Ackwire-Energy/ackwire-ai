@@ -46,7 +46,7 @@ const draftOf = (mine: PersonPresence | null): Draft => ({
   text: mine?.status?.text ?? "",
   emoji: mine?.status?.emoji ?? null,
   until: mine?.status?.until ? "keep" : "never",
-  availability: availabilityOf(mine?.presence),
+  availability: mine?.person.availability ?? availabilityOf(mine?.presence),
 });
 
 /**
@@ -79,8 +79,9 @@ export function SetStatusDialog({ open, onClose }: { open: boolean; onClose: () 
       closeLabel={t("common.close")}
       width={460}
     >
-      {/* Mounted while open: each opening starts from the status as it is now. */}
-      <StatusForm mine={mine} onSave={save} onCancel={onClose} />
+      {/* Mounted while open, once your row is in: each opening starts from the status as it is (never from nothing,
+          which would save over it). */}
+      {mine && <StatusForm mine={mine} onSave={save} onCancel={onClose} />}
     </Dialog>
   );
 }

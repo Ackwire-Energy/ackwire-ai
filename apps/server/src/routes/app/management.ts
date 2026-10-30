@@ -79,6 +79,7 @@ const personView = (
     online: presence === "online" || presence === "away" || presence === "busy",
     presence,
     status: memberStatus({ statusText, statusEmoji, statusUntil }),
+    ...(m.userId === viewerId ? { availability } : {}),
   };
 };
 
@@ -111,6 +112,9 @@ const Person = z
       description: "`hidden` only for yourself; everyone else sees a hidden person as `offline`.",
     }),
     status: MemberStatus.nullable().openapi({ description: "What the person wrote they are doing; null = nothing." }),
+    availability: z.enum(["auto", "away", "busy", "hidden"]).optional().openapi({
+      description: "Only on your own row: what you picked (your `presence` reads offline while you aren't connected).",
+    }),
     handle: z.string().openapi({ description: "`@ana`: unique in the organization; mentions resolve by it." }),
     timezone: z
       .string()

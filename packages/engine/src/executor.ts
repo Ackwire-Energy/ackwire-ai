@@ -11,7 +11,7 @@ import {
 } from "@agenteschat/providers";
 import { pendingConnectors } from "./access";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
-import { announceAgentStatus, type StatusCandidate, startRunStatus, statusCandidates } from "./agent-status";
+import { announceAgentStatus, askRunStatus, startRunStatus, statusCandidates } from "./agent-status";
 import { type Agent, getAgentCached } from "./agents";
 import { agentAiState, type NoAiReason, noAiReasonOf } from "./ai-status";
 import { publishApproval } from "./approvals";
@@ -772,8 +772,6 @@ async function executeRunInner(
       .catch(() => fallbackChoice("error"));
   };
   const autoAsked = needsContext && autoWanted(agent) ? askAuto() : null;
-  // What the agent shows it is doing (ADR 0084 §8): lines from facts everyone may see, picked by Jev below.
-  const statusLines = needsContext ? await statusCandidates(db, run, granted).catch(() => [] as StatusCandidate[]) : [];
   if (needsContext && deps.toolsOnDemand && judge && granted.length > 0) {
     const [recent, keep] = await Promise.all([
       recentMessages(),
@@ -788,7 +786,6 @@ async function executeRunInner(
       recent,
       tools: granted,
       keep,
-      status: statusLines,
     });
     ctx.loadedGroups = toolChoice.groups;
     tools = presentTools(granted, isSensitive, ctx.loadedGroups);
@@ -796,8 +793,24 @@ async function executeRunInner(
       deps.warmBrowser?.({ orgId: run.orgId, agentId: agent.id, threadRootId: run.threadRootId });
     }
   }
+  // What the agent shows it is doing (ADR 0084 §8–9): lines from facts everyone may see, picked by Jev in a request
+  // of its own, beside the run and never in its way.
   if (needsContext) {
-    await startRunStatus({ db, pubsub: deps.pubsub }, run, statusLines, toolChoice?.status ?? null).catch(() => {});
+    void (async () => {
+      const lines = await statusCandidates(db, run, granted);
+      const pick = judge
+        ? await askRunStatus(judge, {
+            orgId: run.orgId,
+            agentId: agent.id,
+            runId: run.id,
+            agent: { name: agent.name, role: agent.role, instructions: agent.instructions },
+            message: trigger?.body ?? topTrigger?.body ?? "",
+            recent: await recentMessages(),
+            candidates: lines,
+          }).catch(() => null)
+        : null;
+      await startRunStatus({ db, pubsub: deps.pubsub }, run, lines, pick);
+    })().catch(() => {});
   }
 
   // Started by a routine: its answer carries the routine (the app shows a small tag on the

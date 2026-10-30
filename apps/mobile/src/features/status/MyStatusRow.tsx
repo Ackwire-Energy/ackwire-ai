@@ -14,7 +14,7 @@ export function MyStatusRow() {
   const { t, i18n } = useTranslation();
   const { colors: c, shadows } = useTheme();
   const me = useMyPerson();
-  const presence = presenceOfAvailability(availabilityOf(me?.presence));
+  const presence = presenceOfAvailability(me?.availability ?? availabilityOf(me?.presence));
   const status = me?.status ?? null;
   const title = presence === "online" && !status ? t("presence.setStatus") : t(`presence.${presence}`);
   const sub = status

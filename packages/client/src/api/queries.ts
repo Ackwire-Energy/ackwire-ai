@@ -1293,7 +1293,14 @@ function withStatus(p: Person, input: StatusInput): Person {
       : input.status?.text.trim()
         ? { text: input.status.text.trim(), emoji: input.status.emoji ?? null, until: input.status.until ?? null }
         : null;
-  return { ...p, presence, online: presence !== "offline" && presence !== "hidden", status };
+  const availability = input.availability ?? p.availability;
+  return {
+    ...p,
+    presence,
+    online: presence !== "offline" && presence !== "hidden",
+    status,
+    ...(availability ? { availability } : {}),
+  };
 }
 
 /** How you appear for what you picked (to yourself: hidden stays hidden). */

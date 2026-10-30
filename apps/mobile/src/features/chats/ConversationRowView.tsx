@@ -166,8 +166,9 @@ export const ConversationRowView = memo(function ConversationRowView({
         </Text>
       </View>
     );
-  } else if (agentLine) {
-    // Its own line, or the one picked for its run, in place of the last message while it works.
+  } else if (agentLine && working) {
+    // Its own line, or the one picked for its run, in place of the last message while it works (a line kept with
+    // `minutes` after the run ended doesn't hide its reply).
     label = agentLine.text;
     line = (
       <View style={styles.work}>

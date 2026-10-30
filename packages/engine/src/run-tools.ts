@@ -380,8 +380,8 @@ export async function invokeWithChip(
         (await artifactToolDetail(deps.db, ctx.orgId, ctx.channelId, use.name, input).catch(() => undefined)))
       : undefined;
   const code = builtIn ? toolCode(use.name, input) : undefined;
-  // The agent's line follows what it does now (ADR 0084 §10); never in the call's way.
-  if (def) await followWork(deps, ctx, def).catch(() => {});
+  // The agent's line follows what it does now (ADR 0084 §10), beside the call, never in its way.
+  if (def) void followWork(deps, ctx, def).catch(() => {});
   await publishChannelEvent(deps.pubsub, {
     type: "agent.tool",
     ...where,

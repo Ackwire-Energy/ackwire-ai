@@ -22,10 +22,12 @@ export interface StatusDraft {
   until: UntilPick;
 }
 
-/** The screen starts from your saved availability and line. */
-export function draftOf(me: { presence: MemberPresence; status: MemberStatus | null } | undefined): StatusDraft {
+/** The screen starts from your saved availability (the server's, on your own row) and line. */
+export function draftOf(
+  me: { presence: MemberPresence; status: MemberStatus | null; availability?: Availability } | undefined,
+): StatusDraft {
   return {
-    availability: availabilityOf(me?.presence),
+    availability: me?.availability ?? availabilityOf(me?.presence),
     emoji: me?.status?.emoji ?? null,
     text: me?.status?.text ?? "",
     until: { at: me?.status?.until ?? null },

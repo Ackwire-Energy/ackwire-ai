@@ -8,6 +8,7 @@ import {
   AGENT_LINE_EVERY_MS,
   agentStatuses,
   announcePresence,
+  askRunStatus,
   createFakeJudge,
   createSetStatusToolSource,
   followWork,
@@ -22,7 +23,6 @@ import {
   touchLastSeen,
   ValidationError,
 } from "../src";
-import { chooseToolGroups } from "../src/tool-loading";
 import { toolPolicy } from "../src/tools/run-policy";
 import type { ToolContext } from "../src/tools/types";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -289,9 +289,19 @@ test("the line follows real work (heavy or long, at most every 30 s, a task stay
   expect((await presenceOf(f))?.status).toMatchObject({ by: "auto", kind: "browsing" });
 });
 
-test("the tool-group request also asks for the line and the weight, in the same call", async () => {
+test("Jev's request of its own: the line, its worth and the weight; level probabilities, else the expected level", async () => {
   f = await setup();
-  const judge = createFakeJudge((kind, id) =>
+  const ask = (judge: ReturnType<typeof createFakeJudge>) =>
+    askRunStatus(judge, {
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: crypto.randomUUID(),
+      agent: { name: "Dev", role: "", instructions: "" },
+      message: "faz o deploy",
+      recent: [],
+      candidates: [{ key: "c0", kind: "coding", subject: null, text: "Coding" }],
+    });
+  const judge = createFakeJudge((_kind, id) =>
     id === "status_line"
       ? "c0"
       : id === "status_weight"
@@ -300,16 +310,58 @@ test("the tool-group request also asks for the line and the weight, in the same 
           ? 0.7
           : 0,
   );
-  const choice = await chooseToolGroups(judge, {
-    orgId: f.org.id,
-    agent: { name: "Dev", role: "", instructions: "" },
-    message: "faz o deploy",
-    recent: [],
-    tools: [],
-    status: [{ key: "c0", kind: "coding", subject: null, text: "Coding" }],
+  const pick = await ask(judge);
+  expect(judge.calls.map((c) => c.kind)).toEqual(["agent_status"]);
+  expect(pick?.line).toBe("c0");
+  expect(pick?.heavy).toBeCloseTo(0.8);
+  expect(pick?.worth).toBeCloseTo(0.7);
+  // No distribution: the expected level decides.
+  expect((await ask(createFakeJudge((_k, id) => (id === "status_weight" ? { score: 2.2 } : undefined))))?.heavy).toBe(1);
+});
+
+test("a task or mission title shows only where everyone may see it", async () => {
+  f = await setup();
+  const [secret] = await f.db
+    .insert(schema.channels)
+    .values({ orgId: f.org.id, name: "segredo", visibility: "private", createdByUserId: f.owner.id })
+    .returning();
+  const [issue] = await f.db
+    .insert(schema.issues)
+    .values({
+      orgId: f.org.id,
+      number: 1,
+      title: "Demissões de março",
+      channelId: secret?.id,
+      createdByType: "person",
+      createdById: f.owner.id,
+    })
+    .returning();
+  const run = await runOf(f, { issueId: issue?.id ?? null });
+  const lines = await statusCandidates(f.db, run, []);
+  expect(JSON.stringify(lines)).not.toContain("Demissões");
+  await f.db.update(schema.issues).set({ channelId: null }).where(eq(schema.issues.id, issue?.id ?? ""));
+  expect((await statusCandidates(f.db, run, [])).map((l) => l.kind)).toContain("task");
+});
+
+test("a quick run never wipes another live run's routine line; a timed own line holds while its run goes on", async () => {
+  f = await setup();
+  const routine = await runOf(f, { background: true });
+  await startRunStatus({ db: f.db }, routine, [{ key: "c0", kind: "routine", subject: "Relatório", text: "x" }], null);
+  const quick = await runOf(f);
+  await startRunStatus({ db: f.db }, quick, [{ key: "c0", kind: "channel", subject: "general", text: "x" }], {
+    line: "c0",
+    heavy: 0,
+    worth: 0.1,
   });
-  expect(judge.calls).toHaveLength(1);
-  expect(choice.status?.line).toBe("c0");
-  expect(choice.status?.heavy).toBeCloseTo(0.8);
-  expect(choice.status?.worth).toBeCloseTo(0.7);
+  expect((await presenceOf(f))?.status).toMatchObject({ kind: "routine", subject: "Relatório" });
+  await finish(f, routine.id);
+  await finish(f, quick.id);
+
+  const long = await runOf(f);
+  const [tool] = await createSetStatusToolSource().tools({} as ToolContext);
+  await tool?.execute({ text: "Deploy da v2", busy: true, minutes: 5 }, ctxOf(f, long.id));
+  // Past its 5 minutes, the run still going: the line and busy stay.
+  const later = new Date(Date.now() + 10 * 60_000);
+  await f.db.update(schema.agentRuns).set({ heartbeatAt: later }).where(eq(schema.agentRuns.id, long.id));
+  expect(await presenceOf(f, later)).toMatchObject({ presence: "busy", status: { text: "Deploy da v2" } });
 });

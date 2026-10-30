@@ -29,7 +29,7 @@ export const STATUS_EMOJI = "💬";
 const live = <T extends { until: string | null }>(line: T | null | undefined, now = Date.now()): T | null =>
   line && (!line.until || new Date(line.until).getTime() > now) ? line : null;
 
-/** What you picked, from how you appear to yourself (only you see your own `hidden`). */
+/** What you picked, from how you appear to yourself, when the server didn't say (`Person.availability`). */
 export const availabilityOf = (presence: MemberPresence | undefined): Availability =>
   presence === "away" || presence === "busy" || presence === "hidden" ? presence : "auto";
 
