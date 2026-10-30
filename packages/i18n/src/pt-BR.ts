@@ -1174,7 +1174,7 @@ export const ptBR = {
     },
     orPayGo: "Ou pague pelo uso",
     plan: {
-      claude: { title: "Seu plano do Claude", tiers: "Pro, Max, Team ou Enterprise" },
+      claude: { title: "Seu plano do Claude", tiers: "Pro, Max, Ultra, Team ou Enterprise" },
       chatgpt: { title: "Seu plano do ChatGPT", tiers: "Plus, Pro, Business ou Enterprise" },
       zai: { tiers: "Lite, Pro ou Max" },
       kimi: { tiers: "Plus, Pro, Max ou Ultra" },

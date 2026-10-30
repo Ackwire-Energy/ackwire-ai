@@ -1,6 +1,6 @@
 import type { AiAccounts as AiAccountsView, Credential } from "@agenteschat/client";
 import { keys, useAiAccounts, useApi, useCredentials, useSettings, useUpdateSettings } from "@agenteschat/client";
-import { ownSignIns, planWordOf } from "@agenteschat/client/lib/ai-accounts";
+import { accountTitle, ownSignIns, planWordOf } from "@agenteschat/client/lib/ai-accounts";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isPlanId, planOf } from "@agenteschat/client/lib/plans";
@@ -200,7 +200,7 @@ export function AiAccountsScreen() {
                 <Row
                   key={a.id}
                   leading={<ProviderLogo id={a.provider ?? a.kind} size="sm" off={out} />}
-                  title={a.label}
+                  title={accountTitle(a)}
                   subtitle={facts.join(" · ")}
                   chevron
                   onPress={() => actions(a)}

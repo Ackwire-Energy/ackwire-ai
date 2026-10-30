@@ -1,7 +1,9 @@
 import { spawnSync } from "node:child_process";
 import { accessSync, constants } from "node:fs";
+import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
 import type { RunnerInfo } from "@agenteschat/adapters/machine-protocol";
+import { readJsonNoFollow } from "./json-file";
 
 /**
  * Which coding CLIs this machine has (protocol 7, ADR 0029): `claude` and
@@ -43,20 +45,54 @@ const defaultRun: Run = (command, args) => {
   return { status: r.status, stdout: `${r.stdout ?? ""}`, error: r.error };
 };
 
+const word = (v: unknown) => (typeof v === "string" && /^[\w.-]{1,40}$/.test(v) ? v : undefined);
+
+/**
+ * The rate-limit tier of the plan Anthropic sold as Max 20x, called Ultra since 2026-10-30 (claude.com/pricing);
+ * the old Max 5x, now Max, is `default_claude_max_5x`.
+ */
+const ULTRA_TIER = "default_claude_max_20x";
+/** `.claude.json` also holds the CLI's projects: one larger than this isn't read. */
+const CLAUDE_CONFIG_MAX_BYTES = 4 * 1024 * 1024;
+
+/**
+ * Claude's plan as Anthropic names it (`pro`, `max`, `ultra`, `team`, `enterprise`): Claude Code's
+ * `subscriptionType`, which says `max` for both Max and Ultra, told apart by the organization's rate-limit tier
+ * (`tier`, read only for a `max`). A `max` whose tier is unknown stays `max`.
+ */
+export function claudePlan(subscriptionType: unknown, tier: () => unknown): string | undefined {
+  const plan = word(subscriptionType);
+  return plan === "max" && tier() === ULTRA_TIER ? "ultra" : plan;
+}
+
+/**
+ * The rate-limit tier of the organization Claude Code is signed in to, which `auth status` doesn't say: the CLI
+ * keeps it in its config folder's `.claude.json` (`oauthAccount`). Undefined until a session there wrote it.
+ */
+export function claudeTier(configDir: string): unknown {
+  const config = readJsonNoFollow(join(configDir, ".claude.json"), CLAUDE_CONFIG_MAX_BYTES) as {
+    oauthAccount?: { organizationRateLimitTier?: unknown };
+  } | null;
+  return config?.oauthAccount?.organizationRateLimitTier;
+}
+
 /**
  * Protocol 8: whether Claude Code is logged in (`claude auth status --json`:
- * `loggedIn`, `authMethod`, `subscriptionType`). Only these three leave the
- * machine (never the email or the organization). Unknown on any failure.
+ * `loggedIn`, `authMethod`, `subscriptionType`, the plan as `claudePlan` names
+ * it). Only these three leave the machine (never the email or the
+ * organization). Unknown on any failure.
  */
-export function claudeAuth(run: Run = defaultRun): { loggedIn?: boolean; authMethod?: string; plan?: string } {
+export function claudeAuth(
+  run: Run = defaultRun,
+  tier: () => unknown = () => claudeTier(process.env.CLAUDE_CONFIG_DIR || homedir()),
+): { loggedIn?: boolean; authMethod?: string; plan?: string } {
   try {
     const r = run("claude", ["auth", "status", "--json"]);
     if (r.error) return {};
     const json = JSON.parse(r.stdout.trim() || "null") as Record<string, unknown> | null;
     if (!json || typeof json !== "object") return r.status !== 0 ? { loggedIn: false } : {};
-    const word = (v: unknown) => (typeof v === "string" && /^[\w.-]{1,40}$/.test(v) ? v : undefined);
     const authMethod = word(json.authMethod);
-    const plan = word(json.subscriptionType);
+    const plan = claudePlan(json.subscriptionType, tier);
     return {
       ...(typeof json.loggedIn === "boolean" ? { loggedIn: json.loggedIn } : {}),
       ...(authMethod ? { authMethod } : {}),

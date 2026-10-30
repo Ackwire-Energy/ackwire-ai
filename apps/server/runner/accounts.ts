@@ -1,7 +1,7 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import type { EventEmitter } from "node:events";
 import { accessSync, constants, existsSync, readFileSync, statSync } from "node:fs";
-import { chmod, lchown, lstat, mkdir, open, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { chmod, lchown, lstat, mkdir, readdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { AGENT_WORKER_HOMES } from "@agenteschat/adapters/command-policy";
 import {
@@ -25,7 +25,8 @@ import { generateSecretKeyPair, openSecret } from "@agenteschat/adapters/secret-
 import { isPlanId, type PlanId, planKeyFits, planOf } from "@agenteschat/providers/plans";
 import { errnoCode, RunnerError } from "./errors";
 import { killTree } from "./exec";
-import { resolveCommand } from "./executors";
+import { claudePlan, claudeTier, resolveCommand } from "./executors";
+import { readJsonNoFollow } from "./json-file";
 import {
   codexUsage,
   fetchPlanKeyUsage,
@@ -48,8 +49,10 @@ import {
  * - `code` opens the sealed Claude code and writes it to the waiting CLI.
  * - When the CLI exits, its status command (`claude auth status --json`,
  *   `codex login status`) in that folder decides: `done` with the email and
- *   plan, or `failed` (folder removed). After `ACCOUNT_LOGIN_TTL_MS` the sign-in
- *   is killed and its folder removed (`expired`).
+ *   plan (a Claude Max's tier from the CLI's `.claude.json` there tells Ultra
+ *   apart, `claudePlan`), or `failed` (folder removed). After
+ *   `ACCOUNT_LOGIN_TTL_MS` the sign-in is killed and its folder removed
+ *   (`expired`).
  * - `list` asks each account's CLI (cached for `ACCOUNTS_TTL_MS`), but one a
  *   turn's endpoint refused reads as signed out until it signs in again
  *   (`refused`); `remove` signs out (best effort) and deletes the folder,
@@ -88,7 +91,6 @@ const STATUS_TIMEOUT_MS = 10_000;
 const MAX_CODE_CHARS = 2000;
 const OUTPUT_KEEP = 16_000;
 const EMAIL = /^[^\s@]+@[^\s@]+$/;
-const WORD = /^[\w.-]{1,40}$/;
 
 const LABEL: Record<AccountKind, string> = { claude_code: "Claude Code", codex: "Codex" };
 const ENV_VAR: Record<AccountKind, string> = { claude_code: "CLAUDE_CONFIG_DIR", codex: "CODEX_HOME" };
@@ -146,24 +148,10 @@ const MAX_KEY_CHARS = 2048;
 /** System mode: the account folders, outside root's home (its parents 711) so an agent's user reaches the one lent to it. */
 export const SYSTEM_ACCOUNTS_ROOT = path.join(AGENT_WORKER_HOMES, "accounts");
 
-/**
- * A key account's plan and key (`provider.json`); null when the folder isn't one. Never follows a link, and
- * never waits on a pipe an agent's user put there (root reads lent folders: a blocked open would hang it).
- */
+/** A key account's plan and key (`provider.json`); null when the folder isn't one. Never through a link or a pipe. */
 export async function planKeyOf(dir: string): Promise<{ provider: PlanId; key: string } | null> {
-  const flags = constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0);
-  const file = await open(path.join(dir, PROVIDER_FILE), flags).catch(() => null);
-  if (!file) return null;
-  try {
-    const st = await file.stat();
-    if (!st.isFile() || st.size > MAX_KEY_CHARS + 200) return null;
-    const o = JSON.parse(await file.readFile("utf8")) as Record<string, unknown> | null;
-    return isPlanId(o?.provider) && typeof o.key === "string" && o.key ? { provider: o.provider, key: o.key } : null;
-  } catch {
-    return null;
-  } finally {
-    await file.close().catch(() => undefined);
-  }
+  const o = readJsonNoFollow(path.join(dir, PROVIDER_FILE), MAX_KEY_CHARS + 200) as Record<string, unknown> | null;
+  return isPlanId(o?.provider) && typeof o.key === "string" && o.key ? { provider: o.provider, key: o.key } : null;
 }
 
 /** System mode, in an agent's worker: the account folders lent to this agent's user; any other is missing. */
@@ -283,10 +271,15 @@ export function parseCodexLogin(output: string, final = false): { url: string; u
 }
 
 /**
- * `claude auth status --json` → signed in, email and plan (short words only). Signed in means through
- * claude.ai: a folder that reports an API key isn't the account's own sign-in.
+ * `claude auth status --json` → signed in, email and plan (short words only, named by `claudePlan` with the
+ * folder's `tier`). Signed in means through claude.ai: a folder that reports an API key isn't the account's own
+ * sign-in.
  */
-export function parseClaudeStatus(status: number | null, stdout: string): Omit<RunnerAccountInfo, "id" | "kind"> {
+export function parseClaudeStatus(
+  status: number | null,
+  stdout: string,
+  tier: () => unknown = () => undefined,
+): Omit<RunnerAccountInfo, "id" | "kind"> {
   let json: unknown;
   try {
     json = JSON.parse(stdout.trim() || "null");
@@ -296,7 +289,7 @@ export function parseClaudeStatus(status: number | null, stdout: string): Omit<R
   if (!json || typeof json !== "object") return { loggedIn: false };
   const o = json as Record<string, unknown>;
   const email = typeof o.email === "string" && o.email.length <= 254 && EMAIL.test(o.email) ? o.email : undefined;
-  const plan = typeof o.subscriptionType === "string" && WORD.test(o.subscriptionType) ? o.subscriptionType : undefined;
+  const plan = claudePlan(o.subscriptionType, tier);
   return {
     loggedIn: o.loggedIn === true && status === 0 && o.authMethod === "claude.ai",
     ...(email ? { email } : {}),
@@ -872,7 +865,7 @@ export class AccountManager {
     // Codex says it on stderr.
     const status =
       kind === "claude_code"
-        ? parseClaudeStatus(r.status, r.stdout)
+        ? parseClaudeStatus(r.status, r.stdout, () => claudeTier(dir))
         : parseCodexStatus(r.status, `${r.stdout}\n${r.stderr}`);
     return { id, kind, ...status };
   }

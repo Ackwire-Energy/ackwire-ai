@@ -1,5 +1,5 @@
 import { useAiAccounts, useCredentials, useIssues, useJoinRequests, useMe } from "@agenteschat/client";
-import { groupPlans, ownSignIns, planWordOf } from "@agenteschat/client/lib/ai-accounts";
+import { accountTitle, groupPlans, ownSignIns, planWordOf } from "@agenteschat/client/lib/ai-accounts";
 import { can } from "@agenteschat/client/lib/permissions";
 import Constants from "expo-constants";
 import { router } from "expo-router";
@@ -215,7 +215,7 @@ export function MeScreen() {
           <PlanRow
             key={a.key}
             logo={first.provider ?? first.kind}
-            title={first.label}
+            title={accountTitle(first)}
             sub={t("aiAccounts.page.on", { computer: first.computer })}
             usage={a.usage}
             divider={own.length + i > 0}

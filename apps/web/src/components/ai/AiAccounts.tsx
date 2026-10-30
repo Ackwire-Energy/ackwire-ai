@@ -1,6 +1,12 @@
 import type { AiAccounts as AiAccountsView } from "@agenteschat/client";
 import { keys, useAiAccounts, useApi } from "@agenteschat/client";
-import { groupPlans, ownSignIns, type PlanAccount, planWordOf } from "@agenteschat/client/lib/ai-accounts";
+import {
+  accountTitle,
+  groupPlans,
+  ownSignIns,
+  type PlanAccount,
+  planWordOf,
+} from "@agenteschat/client/lib/ai-accounts";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { isPlanId, planOf } from "@agenteschat/client/lib/plans";
 import {
@@ -139,7 +145,7 @@ export function AiAccountsSection() {
               <div key={account.key} className="ac-list__row ai-accounts__row">
                 <ProviderLogo id={a.provider ?? a.kind} size="sm" off={allOut} />
                 <span className="list-col">
-                  <span className="ai-accounts__name ac-captop">{a.label}</span>
+                  <span className="ai-accounts__name ac-captop">{accountTitle(a)}</span>
                   <span className="small muted">{facts.join(" · ")}</span>
                   {signedOut.length > 0 && (
                     <SettingNote icon="alert">

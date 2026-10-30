@@ -128,7 +128,7 @@ export function createSetupToolSource(deps: {
             type: "string",
             enum: Object.keys(STEPS),
             description:
-              "A Claude plan (Pro, Max, Team, Enterprise), a ChatGPT plan (Plus, Pro, Business, Enterprise) or an API key. Gemini works only with an API key: Google's plans can't be used in other products. Leave it out when the person didn't say: the card offers them all.",
+              "A Claude plan (Pro, Max, Ultra, Team, Enterprise), a ChatGPT plan (Plus, Pro, Business, Enterprise) or an API key. Gemini works only with an API key: Google's plans can't be used in other products. Leave it out when the person didn't say: the card offers them all.",
           },
           provider: {
             type: "string",

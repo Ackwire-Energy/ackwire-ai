@@ -386,7 +386,7 @@ export interface RunnerAccountInfo {
   /** The CLI's status command says it is signed in. */
   loggedIn: boolean;
   email?: string;
-  /** `pro`, `max`, `team`, `plus`… as the CLI says. */
+  /** `pro`, `max`, `ultra`, `team`, `enterprise`… from what the CLI says. */
   plan?: string;
   /** Protocol 19: the plan's usage limits, as last seen. */
   usage?: PlanUsage;
@@ -927,7 +927,7 @@ export interface RunnerExecutorInfo {
   version: string;
   /** Protocol 8, `claude` only: `claude auth status` says it is logged in (absent: unknown). */
   loggedIn?: boolean;
-  /** Protocol 8, `claude` only: how it is logged in (`claude.ai`, `api_key`…) and the plan (`pro`, `max`, `team`…). */
+  /** Protocol 8, `claude` only: how it is logged in (`claude.ai`, `api_key`…) and the plan (`pro`, `max`, `ultra`…). */
   authMethod?: string;
   plan?: string;
 }

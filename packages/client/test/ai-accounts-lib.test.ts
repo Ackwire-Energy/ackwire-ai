@@ -3,6 +3,7 @@ import type { TFunction } from "i18next";
 import type { AiComputer, Credential, MachineAccount, PlanUsage } from "../src/api/types";
 import {
   accountChoices,
+  accountTitle,
   existingAi,
   groupPlans,
   ownSignInName,
@@ -205,10 +206,22 @@ describe("the computers' own sign-ins", () => {
     expect(ownSignIns(undefined)).toEqual([]);
   });
 
-  test("the plan's word", () => {
-    expect(planWordOf("max")).toBe("Max");
+  test("the plan's word: Claude's plans by Anthropic's names", () => {
+    expect(["pro", "max", "ultra", "team", "enterprise"].map(planWordOf)).toEqual([
+      "Pro",
+      "Max",
+      "Ultra",
+      "Team",
+      "Enterprise",
+    ]);
     expect(planWordOf("PRO")).toBe("Pro");
     expect(planWordOf(null)).toBeNull();
+  });
+
+  test("an account's title says its plan once, after its name", () => {
+    expect(accountTitle({ label: "Claude", plan: "max" })).toBe("Claude · Max");
+    expect(accountTitle({ label: "Claude 2", plan: "ultra" })).toBe("Claude 2 · Ultra");
+    expect(accountTitle({ label: "GLM Coding", plan: null })).toBe("GLM Coding");
   });
 
   test("the plan an agent's sign-in is on: its account's, or with none its computer's own sign-in's", () => {

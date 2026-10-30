@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentBrain, Credential, MachineAccount, PlanUsage } from "@agenteschat/client";
+import { accountTitle } from "@agenteschat/client/lib/ai-accounts";
 import { planOf, planReplies } from "@agenteschat/client/lib/plans";
 import type { TFunction } from "i18next";
 import {
@@ -352,5 +353,18 @@ describe("the agent's AI", () => {
         ["send", "starting", "sent", "startFailed"].map((k) => t(`agentPage.work.brain.add.${k}`, { computer })),
       ).toEqual(said[lang]);
     }
+  });
+
+  test("an account says its plan once, after its name, and Claude's plans go by Anthropic's names", async () => {
+    expect(accountTitle(account("Claude", { plan: "ultra" }))).toBe("Claude · Ultra");
+    expect(accountTitle(account("Claude 2"))).toBe("Claude 2 · Max");
+    expect(accountTitle(account("GLM Coding", { plan: null, provider: "zai" }))).toBe("GLM Coding");
+    // The agent's AI, Contas de IA and Você name accounts so.
+    for (const screen of ["ai/AgentAiScreen.tsx", "ai/AiAccountsScreen.tsx", "me/MeScreen.tsx"]) {
+      const source = await Bun.file(new URL(`../../src/features/${screen}`, import.meta.url).pathname).text();
+      expect(source).toContain("accountTitle(");
+    }
+    expect((await translator("pt-BR"))("connectAi.plan.claude.tiers")).toBe("Pro, Max, Ultra, Team ou Enterprise");
+    expect((await translator("en"))("connectAi.plan.claude.tiers")).toBe("Pro, Max, Ultra, Team or Enterprise");
   });
 });
