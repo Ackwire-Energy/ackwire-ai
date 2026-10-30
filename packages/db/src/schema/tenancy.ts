@@ -1,6 +1,8 @@
 import { sql } from "drizzle-orm";
 import {
   bigint,
+  boolean,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -10,6 +12,7 @@ import {
   smallint,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
@@ -70,14 +73,12 @@ export const organizations = pgTable("organizations", {
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });
 
-export const memberRoleEnum = pgEnum("member_role", ["owner", "admin", "member"]);
+export const memberRoleEnum = pgEnum("member_role", ["owner", "member"]);
 
 /**
- * People in an organization, and their role:
- * - `owner`: everything, including ownership changes and deleting the organization.
- * - `admin`: everything except ownership changes (agents, credentials, members).
- * - `member`: chat, create channels, read usage of their own agents.
- * An organization always keeps at least one owner.
+ * People in an organization (ADR 0081). `role` is only whether the person owns it: an `owner` may do everything,
+ * including what no role grants (ownership, deleting the organization); a `member` may do what the `everyone` role
+ * and their own roles (`organization_member_roles`) allow. An organization always keeps at least one owner.
  */
 export const organizationMembers = pgTable(
   "organization_members",
@@ -110,6 +111,62 @@ export const organizationMembers = pgTable(
 );
 
 /**
+ * A workspace's roles (ADR 0081), Discord-like: a person holds any number and may do what any of them allows.
+ * `everyone` is the base every member holds without a row in `organization_member_roles`; there is exactly one
+ * per organization, always below the others. `position` orders the rest, 0 the highest: whoever is higher
+ * manages the roles and the people below. `permissions` holds `RolePermission` keys
+ * (packages/engine/src/permissions.ts); `administrator` grants every one of them.
+ */
+export const orgRoles = pgTable(
+  "org_roles",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    kind: text().$type<"custom" | "everyone">().notNull().default("custom"),
+    /** As typed; the `everyone` role's own name is the apps' ("Todos"). */
+    name: text().notNull(),
+    /** One of the role icons the apps offer (`ROLE_ICONS`, packages/client/src/lib/roles.ts). */
+    icon: text().notNull().default("shield"),
+    /** One of the agents' colors except sky (`ROLE_COLORS`): the role's mark is drawn in it. */
+    color: text().notNull().default("graphite"),
+    position: integer().notNull().default(0),
+    permissions: text().array().notNull().default(sql`'{}'::text[]`),
+    /** Writing `@name` reaches every person who holds it. */
+    mentionable: boolean().notNull().default(true),
+    /** Its people are listed apart in the people list. */
+    hoist: boolean().notNull().default(false),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique().on(t.orgId, t.id),
+    uniqueIndex("org_roles_everyone").on(t.orgId).where(sql`${t.kind} = 'everyone'`),
+    index().on(t.orgId, t.position),
+  ],
+);
+
+/** Who holds which role. A person always holds `everyone` too, without a row. */
+export const organizationMemberRoles = pgTable(
+  "organization_member_roles",
+  {
+    orgId: uuid().notNull(),
+    userId: text().notNull(),
+    roleId: uuid().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.orgId, t.userId, t.roleId] }),
+    foreignKey({
+      columns: [t.orgId, t.userId],
+      foreignColumns: [organizationMembers.orgId, organizationMembers.userId],
+    }).onDelete("cascade"),
+    foreignKey({ columns: [t.orgId, t.roleId], foreignColumns: [orgRoles.orgId, orgRoles.id] }).onDelete("cascade"),
+    index().on(t.orgId, t.roleId),
+  ],
+);
+
+/**
  * Pending invitations. The link carries a random token; only its SHA-256 is
  * stored. Accepting requires signing in with the invited email address. A
  * pending invitation is the only thing that lets an email sign up when sign-up
@@ -125,6 +182,8 @@ export const organizationInvitations = pgTable(
     /** Lower-cased. */
     email: text().notNull(),
     role: memberRoleEnum().notNull(),
+    /** The roles (`org_roles`) the person gets on accepting; ids no longer there are skipped. */
+    roleIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
     tokenHash: text().notNull().unique(),
     invitedByUserId: text().references(() => users.id, { onDelete: "set null" }),
     expiresAt: timestamp({ withTimezone: true }).notNull(),
@@ -187,6 +246,8 @@ export const organizationJoinRequests = pgTable(
     locale: text(),
     status: text().$type<"pending" | "approved" | "denied" | "closed">().notNull().default("pending"),
     role: memberRoleEnum(),
+    /** The roles given at approval. */
+    roleIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
     /** Why it was denied, told to the person. */
     reason: text(),
     decidedByUserId: text().references(() => users.id, { onDelete: "set null" }),

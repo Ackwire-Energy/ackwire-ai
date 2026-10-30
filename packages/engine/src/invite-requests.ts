@@ -33,11 +33,11 @@ import {
   getMembership,
   inviteLinkOpen,
   joinOrganization,
-  type MemberRole,
   requirePermission,
   sendInvitation,
 } from "./organizations";
 import { enqueue, type OutboxJob } from "./outbox";
+import { givableRoleIds } from "./roles";
 
 const {
   organizationInvitations,
@@ -453,7 +453,7 @@ export async function fileJoinRequest(deps: Deps, payload: Record<string, unknow
 async function file(deps: Deps, publicUrl: string, ask: Ask, proven: boolean, now: Date, usedCode?: string) {
   const { db } = deps;
   const { orgId } = ask;
-  const admins = await adminIds(db, orgId);
+  const admins = await adminIds(db, orgId, "invite_people");
   const filed = await db.transaction(async (tx) => {
     await lockRequests(tx, orgId);
     const link = await findInviteLink(tx, { id: ask.linkId });
@@ -616,7 +616,7 @@ export async function joinStatus(db: Database, user: { id: string }, token: stri
  * `approveJoinRequest` decides.
  */
 export async function listWaitingJoinRequests(db: Database, actorId: string, orgId: string, now = new Date()) {
-  await requirePermission(db, actorId, orgId, "manage_members");
+  await requirePermission(db, actorId, orgId, "invite_people");
   const rows = await db
     .select({
       id: requests.id,
@@ -682,12 +682,14 @@ export async function approveJoinRequest(
   actorId: string,
   orgId: string,
   id: string,
-  role: MemberRole,
+  /** Roles (`org_roles`) the person gets, below the approver's own (ADR 0081). */
+  roleIds: string[] = [],
   now = new Date(),
 ): Promise<JoinApproval> {
-  const actor = await requirePermission(deps.db, actorId, orgId, "manage_members");
+  const actor = await requirePermission(deps.db, actorId, orgId, "invite_people");
   assertInviting(actor);
-  if (role !== "member" && role !== "admin") throw new ValidationError("role must be member or admin");
+  const role = "member" as const;
+  const given = await givableRoleIds(deps.db, actor, orgId, roleIds);
   const result = await deps.db.transaction(async (tx): Promise<JoinApproval> => {
     const row = await waitingRequest(tx, orgId, id, now);
     const context = await answerContext(tx, orgId, actorId, row);
@@ -698,14 +700,15 @@ export async function approveJoinRequest(
     let approval: JoinApproval = { outcome: "joined" };
     let invitationId: string | null = null;
     if (!already && context.joiner) {
-      await joinOrganization(tx, orgId, context.joiner, role);
+      await joinOrganization(tx, orgId, context.joiner, role, given);
     } else if (!already) {
       const sent = await sendInvitation(tx, {
         orgId,
         email: row.email,
         role,
+        roleIds: given,
         invitedBy: actorId,
-        ownersOk: can(actor.role, "manage_owners"),
+        ownersOk: can(actor, "manage_owners"),
         now,
         fromRequest: true,
       });
@@ -714,7 +717,7 @@ export async function approveJoinRequest(
     }
     await tx
       .update(requests)
-      .set({ status: "approved", role, decidedByUserId: actorId, decidedAt: now, invitationId })
+      .set({ status: "approved", role, roleIds: given, decidedByUserId: actorId, decidedAt: now, invitationId })
       .where(eq(requests.id, row.id));
     if (row.linkId) {
       await tx
@@ -727,7 +730,7 @@ export async function approveJoinRequest(
       actor: { type: "person", id: actorId },
       action: "join_request.approved",
       target: { type: "join_request", id: row.id },
-      details: { role, joined: approval.outcome === "joined" },
+      details: { roleIds: given, joined: approval.outcome === "joined" },
     });
     if (!already) {
       await queueEmail(tx, {
@@ -764,7 +767,7 @@ export async function denyJoinRequest(
   reason: string | null | undefined,
   now = new Date(),
 ) {
-  await requirePermission(deps.db, actorId, orgId, "manage_members");
+  await requirePermission(deps.db, actorId, orgId, "invite_people");
   const why = oneLine(reason ?? "", JOIN_REASON_MAX) || null;
   await deps.db.transaction(async (tx) => {
     const row = await waitingRequest(tx, orgId, id, now);
@@ -802,7 +805,7 @@ export async function denyJoinRequest(
  * (`inviteLinkToken`), null for a link made before that; who made it, and how many requests through it wait.
  */
 export async function listInviteLinks(db: Database, secret: string, actorId: string, orgId: string, now = new Date()) {
-  await requirePermission(db, actorId, orgId, "manage_members");
+  await requirePermission(db, actorId, orgId, "invite_people");
   const links = await db
     .select({ link: organizationInviteLinks, createdBy: users.name })
     .from(organizationInviteLinks)
@@ -850,7 +853,7 @@ export async function listInviteLinks(db: Database, secret: string, actorId: str
  * close without emailing anyone, which is how an admin cleans up after a link leaked.
  */
 export async function turnOffInviteLink(deps: Deps, actorId: string, orgId: string, linkId: string, now = new Date()) {
-  await requirePermission(deps.db, actorId, orgId, "manage_members");
+  await requirePermission(deps.db, actorId, orgId, "invite_people");
   const closed = await deps.db.transaction(async (tx) => {
     // The lock a request is filed under: one filed meanwhile either sees the link off or is closed here.
     await lockRequests(tx, orgId);
@@ -938,7 +941,7 @@ export async function requestNewInvitation(db: Database, publicUrl: string, toke
   const inviterId = invitation.invitedByUserId;
   const inviter = inviterId ? await getMembership(db, inviterId, invitation.orgId) : null;
   const recipientIds =
-    inviter && inviterId && can(inviter.role, "manage_members") ? [inviterId] : await adminIds(db, invitation.orgId);
+    inviter && inviterId && can(inviter, "invite_people") ? [inviterId] : await adminIds(db, invitation.orgId, "invite_people");
   const [org] = await db
     .select({ name: organizations.name })
     .from(organizations)

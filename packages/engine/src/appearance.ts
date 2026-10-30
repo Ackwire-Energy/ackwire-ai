@@ -63,7 +63,7 @@ export async function setAgentAppearance(
   const membership = await requirePermission(db, actorId, orgId, "read");
   const agent = await getAgent(db, orgId, agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  if (!can(membership.role, "manage_agents") && !(agent.ownerUserId && agent.ownerUserId === actorId)) {
+  if (!can(membership, "manage_agents") && !(agent.ownerUserId && agent.ownerUserId === actorId)) {
     throw new ForbiddenError("Only the agent's owner or an admin can change its look");
   }
   const look = appearance === null ? null : validateAppearance(appearance);

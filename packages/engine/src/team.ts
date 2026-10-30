@@ -1,13 +1,13 @@
 import { and, asc, type Database, desc, eq, gte, inArray, isNull, schema } from "@agenteschat/db";
 import type { AgentAppearance } from "./appearance";
-import { canTalkTo } from "./audience";
+import { canTalkTo, talksToAgents } from "./audience";
 import { agentBrowserStatus } from "./browser/status";
 import { BROWSER_SCOPE, DESKTOP_SCOPE } from "./browser/types";
 import { caches } from "./cache";
 import { capabilityKeys, summarizeScopes } from "./capabilities";
 import { agentDesktopUseStatus } from "./desktop/status";
 import type { MachineCaller, MachineStatus } from "./machine-hub";
-import { requirePermission } from "./organizations";
+import { can, requirePermission } from "./organizations";
 import { personBehindCall } from "./requester";
 import { getSandboxSettings, SANDBOX_SCOPE } from "./sandbox";
 import type { ToolDefinition, ToolSource } from "./tools/types";
@@ -164,7 +164,8 @@ export function createFindAgentToolSource(deps: { machines?: Pick<MachineCaller,
     async execute(input, ctx) {
       const { db } = ctx;
       const person = await personBehindCall(ctx);
-      const team = (await loadTeam(db, ctx.orgId)).filter((a) => a.id !== ctx.agentId && canTalkTo(a, person));
+      const talks = await talksToAgents(db, ctx.orgId, person);
+      const team = (await loadTeam(db, ctx.orgId)).filter((a) => a.id !== ctx.agentId && canTalkTo(a, person, talks));
       const query = words(String(input.query ?? ""));
       const scored = team
         .map((a) => {
@@ -233,7 +234,7 @@ export const TEAM_CONSULTATIONS_MS = 24 * 60 * 60_000;
  * a conversation between agents is private.
  */
 export async function getTeam(db: Database, actorId: string, orgId: string) {
-  await requirePermission(db, actorId, orgId, "read");
+  const talks = can(await requirePermission(db, actorId, orgId, "read"), "talk_to_agents");
   const list = await db
     .select({
       id: agents.id,
@@ -296,7 +297,7 @@ export async function getTeam(db: Database, actorId: string, orgId: string) {
       ownerUserId: a.ownerUserId,
       capabilities: capabilityKeys(scopes.filter((s) => s.agentId === a.id).map((s) => s.scope)),
       busy: busyIds.has(a.id),
-      canTalk: canTalkTo(a, actorId),
+      canTalk: canTalkTo(a, actorId, talks),
     })),
     people: owners.map((o) => ({ id: o.id, name: o.name, image: o.image ?? null })),
     // Only between agents still here (an archived one has no place in the sky).

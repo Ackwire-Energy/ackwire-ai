@@ -82,10 +82,13 @@ import type {
   NotificationCount,
   NotificationEvent,
   NotificationFilter,
+  OrgRoles,
   OrgSettings,
+  Person,
   ReactionCount,
   ReminderInput,
   Role,
+  RoleInput,
   RoutineInput,
   RoutinePatch,
   S3Input,
@@ -227,7 +230,114 @@ export function useChangeRole(orgId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ userId, role }: { userId: string; role: Role }) => api.orgs.changeRole(orgId, userId, role),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.members(orgId) }),
+    onSettled: () => refreshRoles(qc, orgId),
+  });
+}
+
+/** Roles changed: the roles, the people (their roles) and `me` (what you may do now) are read again. */
+export const refreshRoles = (qc: QueryClient, orgId: string) =>
+  Promise.all([
+    qc.invalidateQueries({ queryKey: keys.roles(orgId) }),
+    qc.invalidateQueries({ queryKey: keys.people(orgId) }),
+    qc.invalidateQueries({ queryKey: keys.members(orgId) }),
+    qc.invalidateQueries({ queryKey: keys.me }),
+  ]);
+
+/** The workspace's roles, top first, and the permission areas (ADR 0081). */
+export const useRoles = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.roles(orgId), queryFn: () => api.roles.list(orgId), staleTime: 30_000 });
+};
+
+export function useCreateRole(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: RoleInput) => api.roles.create(orgId, input),
+    onSettled: () => refreshRoles(qc, orgId),
+  });
+}
+
+/** Changes a role at once on screen (the toggles save by themselves), then reads the truth back. */
+export function useUpdateRole(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ roleId, patch }: { roleId: string; patch: Partial<RoleInput> }) =>
+      api.roles.update(orgId, roleId, patch),
+    onMutate: async ({ roleId, patch }) => {
+      await qc.cancelQueries({ queryKey: keys.roles(orgId) });
+      const before = qc.getQueryData<OrgRoles>(keys.roles(orgId));
+      if (before)
+        qc.setQueryData<OrgRoles>(keys.roles(orgId), {
+          ...before,
+          roles: before.roles.map((r) => (r.id === roleId ? { ...r, ...patch } : r)),
+        });
+      return { before };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.before) qc.setQueryData(keys.roles(orgId), ctx.before);
+    },
+    onSettled: () => refreshRoles(qc, orgId),
+  });
+}
+
+export function useDeleteRole(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (roleId: string) => api.roles.remove(orgId, roleId),
+    onSettled: () => refreshRoles(qc, orgId),
+  });
+}
+
+export function useReorderRoles(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => api.roles.reorder(orgId, ids),
+    onMutate: async (ids) => {
+      await qc.cancelQueries({ queryKey: keys.roles(orgId) });
+      const before = qc.getQueryData<OrgRoles>(keys.roles(orgId));
+      if (before) {
+        const at = new Map(ids.map((id, i) => [id, i]));
+        qc.setQueryData<OrgRoles>(keys.roles(orgId), {
+          ...before,
+          roles: [...before.roles]
+            .map((r) => (at.has(r.id) ? { ...r, position: at.get(r.id) ?? r.position } : r))
+            .sort((a, b) => (a.kind === "everyone" ? 1 : 0) - (b.kind === "everyone" ? 1 : 0) || a.position - b.position),
+        });
+      }
+      return { before };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.before) qc.setQueryData(keys.roles(orgId), ctx.before);
+    },
+    onSettled: () => refreshRoles(qc, orgId),
+  });
+}
+
+/** Sets a person's roles (exactly these). */
+export function useSetMemberRoles(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, roleIds }: { userId: string; roleIds: string[] }) =>
+      api.roles.setFor(orgId, userId, roleIds),
+    onMutate: async ({ userId, roleIds }) => {
+      await qc.cancelQueries({ queryKey: keys.people(orgId) });
+      const before = qc.getQueryData<Person[]>(keys.people(orgId));
+      if (before)
+        qc.setQueryData<Person[]>(
+          keys.people(orgId),
+          before.map((p) => (p.userId === userId ? { ...p, roleIds } : p)),
+        );
+      return { before };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.before) qc.setQueryData(keys.people(orgId), ctx.before);
+    },
+    onSettled: () => refreshRoles(qc, orgId),
   });
 }
 
@@ -240,7 +350,7 @@ export function useInvite(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { email: string; role: Role }) => api.orgs.invite(orgId, input),
+    mutationFn: (input: { email: string; role?: Role; roleIds?: string[] }) => api.orgs.invite(orgId, input),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.invitations(orgId) }),
   });
 }
@@ -1147,7 +1257,7 @@ export function useInviteMany(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { emails: string[]; role: Role }) => api.orgs.inviteMany(orgId, input),
+    mutationFn: (input: { emails: string[]; roleIds?: string[] }) => api.orgs.inviteMany(orgId, input),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.invitations(orgId) }),
   });
 }
@@ -1218,8 +1328,7 @@ export function useApproveJoinRequest(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { id: string; role: "member" | "admin" }) =>
-      api.joinRequests.approve(orgId, input.id, input.role),
+    mutationFn: (input: { id: string; roleIds?: string[] }) => api.joinRequests.approve(orgId, input.id, input.roleIds),
     onSettled: () => refreshAnswered(qc, orgId),
   });
 }

@@ -582,7 +582,7 @@ export async function setAgentSkills(
   const membership = await requirePermission(db, actorId, orgId, "read");
   const agent = await getAgent(db, orgId, agentId);
   if (!agent) throw new NotFoundError("Agent not found");
-  if (!can(membership.role, "manage_agents") && agent.ownerUserId !== actorId) {
+  if (!can(membership, "manage_agents") && agent.ownerUserId !== actorId) {
     throw new ForbiddenError("Only an admin or the agent's owner can change its skills");
   }
   const ids = [...new Set(input.map((i) => i.skillId))];

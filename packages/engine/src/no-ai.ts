@@ -11,7 +11,7 @@ import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishRouted } from "./events";
 import type { Judge } from "./judge";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
-import { can, type MemberRole } from "./organizations";
+import { can, type Membership } from "./organizations";
 import { type RouterDeps, routeMessage } from "./router";
 import { bodyCode } from "./run-tools";
 import { type AgentRun, NO_AI, replyThreadOf } from "./runs";
@@ -211,7 +211,7 @@ async function restartNoAiRun(deps: AnswerNowDeps, userId: string, failed: Agent
  * directly (enqueueing `message.posted` again would do nothing: its dedupe key is still in the outbox).
  * Null when there is no such decision (any more).
  */
-async function rerouteNoAiMessage(deps: AnswerNowDeps, userId: string, role: MemberRole, message: Message) {
+async function rerouteNoAiMessage(deps: AnswerNowDeps, userId: string, membership: Membership, message: Message) {
   if (!deps.router) return null;
   const noAiDecision = and(
     eq(routingDecisions.orgId, message.orgId),
@@ -220,7 +220,7 @@ async function rerouteNoAiMessage(deps: AnswerNowDeps, userId: string, role: Mem
   );
   const [decision] = await deps.db.select({ id: routingDecisions.id }).from(routingDecisions).where(noAiDecision);
   if (!decision) return null;
-  if (message.authorUserId !== userId && !can(role, "manage_agents")) throw forbidden();
+  if (message.authorUserId !== userId && !can(membership, "manage_agents")) throw forbidden();
   if (!(await orgHasAi(deps, message.orgId))) throw stillMissing();
   const deleted = await deps.db.delete(routingDecisions).where(noAiDecision).returning({ id: routingDecisions.id });
   if (deleted.length === 0) return null;
@@ -258,7 +258,7 @@ export async function answerNow(
   const failed = found.filter((r) => r.run.status === "failed" && r.run.error === NO_AI && !r.run.background);
   if (failed.length > 0) {
     const allowed = failed.filter(
-      (r) => r.requester === userId || r.agent.ownerUserId === userId || can(membership.role, "manage_agents"),
+      (r) => r.requester === userId || r.agent.ownerUserId === userId || can(membership, "manage_agents"),
     );
     if (allowed.length === 0) throw forbidden();
     const ready: AnsweringRun[] = [];
@@ -281,7 +281,7 @@ export async function answerNow(
     return { runs };
   }
   if (!card && message.authorType === "person") {
-    const rerouted = await rerouteNoAiMessage(deps, userId, membership.role, message);
+    const rerouted = await rerouteNoAiMessage(deps, userId, membership, message);
     if (rerouted) return { runs: rerouted };
   }
   return { runs: found.map((r) => ({ agentId: r.run.agentId, runId: r.run.id })) };

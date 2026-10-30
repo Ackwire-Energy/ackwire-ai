@@ -9,6 +9,7 @@ import { type MailPreview, parseMailDetail, withoutReplyPrefix } from "./mail/pr
 import { notifyApproval, resolveApprovalNotifications } from "./notification-producers";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
+import { maySql } from "./permissions";
 import type { Approval } from "./tools/gateway";
 import { REQUEST_PERMISSION_TOOL } from "./tools/permission";
 import type { ApprovalOrigin } from "./tools/run-policy";
@@ -315,7 +316,7 @@ export const approvalView = (a: Approval, canDecide = false): ApprovalView => ({
  */
 export const adminsDecide = (approval: Pick<Approval, "tool">) => approval.tool === REQUEST_PERMISSION_TOOL;
 
-/** People who may decide: the organization's admins and owners, and the agent's owner (`adminsDecide` aside). */
+/** People who may decide: whoever may approve actions (ADR 0081), and the agent's owner (`adminsDecide` aside). */
 export async function approverIds(
   db: Database,
   approval: Pick<Approval, "orgId" | "ownerUserId"> & Partial<Pick<Approval, "tool">>,
@@ -323,7 +324,12 @@ export async function approverIds(
   const admins = await db
     .select({ userId: organizationMembers.userId })
     .from(organizationMembers)
-    .where(and(eq(organizationMembers.orgId, approval.orgId), inArray(organizationMembers.role, ["owner", "admin"])));
+    .where(
+      and(
+        eq(organizationMembers.orgId, approval.orgId),
+        maySql(approval.orgId, organizationMembers.userId, "approve_actions"),
+      ),
+    );
   const ids = new Set(admins.map((a) => a.userId));
   if (approval.ownerUserId && !adminsDecide({ tool: approval.tool ?? "" })) {
     const [owner] = await db
@@ -370,7 +376,7 @@ async function enqueueResume(tx: Executor, row: Pick<Approval, "id" | "orgId" | 
 
 async function mayDecide(db: Database, actorId: string, approval: Approval) {
   const membership = await requirePermission(db, actorId, approval.orgId, "read");
-  return can(membership.role, "manage_agents") || (approval.ownerUserId === actorId && !adminsDecide(approval));
+  return can(membership, "approve_actions") || (approval.ownerUserId === actorId && !adminsDecide(approval));
 }
 
 /**
@@ -482,7 +488,7 @@ export async function listApprovals(
   options: { status?: "pending" | "decided"; agentId?: string; limit?: number } = {},
 ): Promise<ApprovalView[]> {
   const membership = await requirePermission(db, actorId, orgId, "read");
-  const admin = can(membership.role, "manage_agents");
+  const admin = can(membership, "approve_actions");
   const myChannels = db
     .select({ id: channelMembers.channelId })
     .from(channelMembers)

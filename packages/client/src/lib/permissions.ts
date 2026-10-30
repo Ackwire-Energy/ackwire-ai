@@ -1,35 +1,37 @@
-import type { Role } from "../api/types";
-
 /**
- * Mirror of the backend role table (packages/engine/src/organizations.ts).
- * The UI only hides what isn't allowed; the server checks every request.
+ * The keys of a workspace's permissions (ADR 0081, packages/engine/src/permissions.ts). The server sends each
+ * person's resolved `permissions` with their membership (`OrgSummary`); the UI only hides what isn't allowed, the
+ * server checks every request.
  */
-export type Permission =
-  | "read"
+export type RolePermission =
+  | "administrator"
   | "post"
   | "create_channels"
-  | "configure"
+  | "manage_channels"
+  | "talk_to_agents"
+  | "assign_work"
+  | "manage_routines"
+  | "approve_actions"
+  | "create_agents"
   | "manage_agents"
+  | "pair_computers"
+  | "control_computers"
+  | "manage_connectors"
   | "manage_credentials"
+  | "edit_wiki"
+  | "upload_files"
+  | "review_memory"
+  | "invite_people"
   | "view_usage"
+  | "view_audit"
+  | "configure"
   | "manage_members"
-  | "manage_billing"
-  | "manage_owners";
+  | "manage_roles"
+  | "manage_billing";
 
-const MEMBER: Permission[] = ["read", "post", "create_channels"];
-const ADMIN: Permission[] = [
-  ...MEMBER,
-  "configure",
-  "manage_agents",
-  "manage_credentials",
-  "view_usage",
-  "manage_members",
-  "manage_billing",
-];
-const TABLE: Record<Role, ReadonlySet<Permission>> = {
-  owner: new Set([...ADMIN, "manage_owners"]),
-  admin: new Set(ADMIN),
-  member: new Set(MEMBER),
-};
+/** `read`: any member; `manage_owners`: owners only. */
+export type Permission = RolePermission | "read" | "manage_owners";
 
-export const can = (role: Role | undefined, permission: Permission) => (role ? TABLE[role].has(permission) : false);
+/** Whether this membership (an `OrgSummary`) may `permission`. */
+export const can = (org: { permissions?: readonly string[] } | null | undefined, permission: Permission) =>
+  org?.permissions?.includes(permission) === true;

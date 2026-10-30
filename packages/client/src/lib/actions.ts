@@ -33,14 +33,14 @@ export function formatTimeLeft(ms: number) {
 }
 
 /**
- * Who sees the buttons (the server checks it again): the person the agent
- * worked for, an admin (or owner) of the organization, or the agent's owner.
+ * Who sees the buttons (the server checks it again): the person the agent worked for, whoever manages agents
+ * (`manage_agents`), or the agent's owner.
  */
 export function canUndoAction(
   a: Pick<AgentAction, "requestedByUserId">,
-  viewer: { userId: string; role: "owner" | "admin" | "member"; ownsAgent: boolean },
+  viewer: { userId: string; managesAgents: boolean; ownsAgent: boolean },
 ) {
-  return a.requestedByUserId === viewer.userId || viewer.role !== "member" || viewer.ownsAgent;
+  return a.requestedByUserId === viewer.userId || viewer.managesAgents || viewer.ownsAgent;
 }
 
 /** The receipts Desfazer tudo would undo now (shown when a message has more than one change). */

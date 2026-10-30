@@ -9,7 +9,20 @@ export const PreviewMeta = z.record(z.string(), z.unknown()).nullable().openapi(
     "For a body the server wrote (`bodyCode` + `bodyParams`, a cut-off run's notes, memory lines): show it in the reader's language, like the message itself. Null for a plain message.",
 });
 
-export const Role = z.enum(["owner", "admin", "member"]).openapi("Role");
+export const Role = z.enum(["owner", "member"]).openapi("Role", {
+  description:
+    "Whether the person owns the workspace (ADR 0081). What a member may do comes from their roles (`roleIds`, `GET …/roles`) and is sent resolved as `permissions`.",
+});
+
+/** One person's resolved permissions in a workspace (ADR 0081): the apps hide what's not there. */
+const Permissions = z.array(z.string()).openapi({
+  description:
+    "Everything this person may do here: their roles' keys and `everyone`'s, every key with `administrator`, all of them for an owner, plus `read` (any member) and `manage_owners` (owners).",
+});
+const Rank = z.number().int().nullable().openapi({
+  description: "Their highest role's position (0 the top), null with none. They manage roles and people below it.",
+});
+const RoleIds = z.array(z.string()).openapi({ description: "Their roles (`org_roles` ids), not `everyone`." });
 
 export const ProviderId = z.enum(PROVIDER_IDS).openapi("ProviderId");
 
@@ -18,6 +31,8 @@ export const Organization = z
     id: z.uuid(),
     name: z.string(),
     role: Role,
+    permissions: Permissions,
+    rank: Rank,
     context: z.string().optional(),
     logo: z
       .string()
@@ -58,6 +73,7 @@ export const Member = z
     image: z.string().nullable(),
     avatarUrl: z.string().nullable().openapi({ description: "The photo uploaded here; wins over `image`." }),
     role: Role,
+    roleIds: RoleIds,
     joinedAt: z.string(),
     handle: z.string(),
     timezone: z.string(),
@@ -65,7 +81,7 @@ export const Member = z
   .openapi("Member");
 
 export const Invitation = z
-  .object({ id: z.uuid(), email: z.string(), role: Role, expiresAt: z.string() })
+  .object({ id: z.uuid(), email: z.string(), role: Role, roleIds: RoleIds, expiresAt: z.string() })
   .openapi("Invitation");
 
 export const Credential = z

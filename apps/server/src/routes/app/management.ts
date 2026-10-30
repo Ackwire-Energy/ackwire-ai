@@ -74,6 +74,7 @@ const Person = z
     image: z.string().nullable(),
     avatarUrl: z.string().nullable().openapi({ description: "The photo uploaded here; wins over `image`." }),
     role: Role,
+    roleIds: z.array(z.string()).openapi({ description: "Their roles (`org_roles` ids), not `everyone`." }),
     joinedAt: z.string(),
     lastSeenAt: z.string().nullable(),
     online: z.boolean(),
@@ -89,6 +90,7 @@ const InvitationWithStatus = z
     id: z.uuid(),
     email: z.string(),
     role: Role,
+    roleIds: z.array(z.string()),
     status: z.enum(["pending", "expired"]),
     expiresAt: z.string(),
     createdAt: z.string(),
@@ -347,6 +349,7 @@ export function managementRoutes(deps: AppDeps) {
             id: i.id,
             email: i.email,
             role: i.role,
+            roleIds: i.roleIds,
             status: i.status,
             expiresAt: i.expiresAt.toISOString(),
             createdAt: i.createdAt.toISOString(),
@@ -368,7 +371,16 @@ export function managementRoutes(deps: AppDeps) {
         "One outcome per email. Links are returned once; only a hash of each token is stored (7-day expiry).",
       request: {
         params: OrgParams,
-        body: body(z.object({ emails: z.array(z.string().max(320)).min(1).max(100), role: Role })),
+        body: body(
+          z.object({
+            emails: z.array(z.string().max(320)).min(1).max(100),
+            roleIds: z
+              .array(z.string().uuid())
+              .max(50)
+              .optional()
+              .openapi({ description: "Roles they get on accepting, below your own (ADR 0081)." }),
+          }),
+        ),
       },
       responses: {
         200: json(
@@ -395,7 +407,7 @@ export function managementRoutes(deps: AppDeps) {
           orgId,
           invitationId: r.invitationId,
           email: r.email,
-          role: c.req.valid("json").role,
+          role: "member",
           url: inviteUrl(r.token),
           inviterId: c.get("user").id,
         });

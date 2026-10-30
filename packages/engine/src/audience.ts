@@ -6,7 +6,8 @@ import { isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
-import { can, requirePermission } from "./organizations";
+import { can, getMembership, requirePermission } from "./organizations";
+import { maySql } from "./permissions";
 
 const { agents, users, organizationMembers } = schema;
 
@@ -64,12 +65,23 @@ export function planSharing(
   );
 }
 
-/** Can this person's message start a run of the agent? (`null` = no person: routines and webhooks check their creator.) */
-export function canTalkTo(a: AudienceFields, userId: string | null): boolean {
+/**
+ * Can this person's message start a run of the agent? (`null` = no person: routines and webhooks check their
+ * creator.) Its owner always can; anyone else needs the agent's audience and, through their roles, to talk to
+ * agents at all (`talks`: `talk_to_agents`, ADR 0081; `talksToAgents` reads it).
+ */
+export function canTalkTo(a: AudienceFields, userId: string | null, talks = true): boolean {
+  if (userId && a.ownerUserId === userId) return true;
+  if (!talks) return false;
   if (a.audienceMode === "everyone") return true;
   if (!userId) return false;
-  if (a.ownerUserId === userId) return true;
   return a.audienceMode === "people" && a.audienceUserIds.includes(userId);
+}
+
+/** Whether a person's roles let them talk to agents (`talk_to_agents`); no person (a routine's run) passes. */
+export async function talksToAgents(db: Database, orgId: string, userId: string | null) {
+  if (!userId) return true;
+  return can(await getMembership(db, userId, orgId), "talk_to_agents");
 }
 
 /**
@@ -78,8 +90,10 @@ export function canTalkTo(a: AudienceFields, userId: string | null): boolean {
  */
 export function audienceSql(alias: string, userId: SQL): SQL {
   const a = sql.raw(alias);
-  return sql`coalesce(${a}.audience_mode = 'everyone' or (${userId} is not null and (${a}.owner_user_id = ${userId}
-    or (${a}.audience_mode = 'people' and ${userId} = any(${a}.audience_user_ids)))), false)`;
+  return sql`coalesce((${userId} is not null and ${a}.owner_user_id = ${userId})
+    or ((${a}.audience_mode = 'everyone'
+        or (${userId} is not null and ${a}.audience_mode = 'people' and ${userId} = any(${a}.audience_user_ids)))
+      and (${userId} is null or ${maySql(sql`${a}.org_id`, userId, "talk_to_agents")})), false)`;
 }
 
 /** The people it answers by name: its owner, then the people of its audience. */
@@ -176,7 +190,7 @@ export async function setAgentAudience(
   const membership = await requirePermission(db, actorId, orgId, "read");
   const agent = await getAgent(db, orgId, agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  if (!can(membership.role, "manage_agents") && !(agent.ownerUserId && agent.ownerUserId === actorId)) {
+  if (!can(membership, "manage_agents") && !(agent.ownerUserId && agent.ownerUserId === actorId)) {
     throw new ForbiddenError("Only the agent's owner or an admin can change who talks to it");
   }
   if (!AUDIENCE_MODES.includes(audience.mode)) throw new ValidationError("Unknown audience mode");

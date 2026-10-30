@@ -146,6 +146,7 @@ import type {
   Organization,
   OrgOverview,
   OrgPlanUsage,
+  OrgRoles,
   OrgSettings,
   Person,
   PhoneSignIn,
@@ -155,6 +156,7 @@ import type {
   Reminder,
   ReminderInput,
   Role,
+  RoleInput,
   RosterMember,
   Routine,
   RoutineInput,
@@ -294,10 +296,14 @@ export interface ApiClient {
     /** People, files and today's uploads against the workspace's limits (any member; ADR 0079). */
     limits(orgId: string): Promise<WorkspaceLimits>;
     members(orgId: string): Promise<Member[]>;
+    /** Makes a member an owner or not (owners only). What anyone may do is their roles (`roles.setFor`). */
     changeRole(orgId: string, userId: string, role: Role): Promise<void>;
     removeMember(orgId: string, userId: string): Promise<void>;
     invitations(orgId: string): Promise<Invitation[]>;
-    invite(orgId: string, input: { email: string; role: Role }): Promise<{ invitation: Invitation; url: string }>;
+    invite(
+      orgId: string,
+      input: { email: string; role?: Role; roleIds?: string[] },
+    ): Promise<{ invitation: Invitation; url: string }>;
     revokeInvitation(orgId: string, invitationId: string): Promise<void>;
     /** `null` when invalid or expired. */
     previewInvitation(token: string): Promise<InvitationPreview | null>;
@@ -309,7 +315,7 @@ export interface ApiClient {
     people(orgId: string): Promise<Person[]>;
     /** Invitations not accepted yet, pending or expired. */
     allInvitations(orgId: string): Promise<InvitationWithStatus[]>;
-    inviteMany(orgId: string, input: { emails: string[]; role: Role }): Promise<BatchInviteResult[]>;
+    inviteMany(orgId: string, input: { emails: string[]; roleIds?: string[] }): Promise<BatchInviteResult[]>;
     /** New link (the old one stops working), 7 more days. */
     resendInvitation(orgId: string, invitationId: string): Promise<{ url: string; expiresAt: string }>;
     usageReport(orgId: string, since?: string): Promise<UsageReport>;
@@ -317,6 +323,17 @@ export interface ApiClient {
     planUsage(orgId: string): Promise<OrgPlanUsage>;
     /** The audit log, newest first (admins): agents' tool calls and people's changes. `before`: `next`. */
     audit(orgId: string, query?: AuditQuery & { before?: string; limit?: number }): Promise<AuditPage>;
+  };
+  /** A workspace's roles (ADR 0081): every member reads them; who may manage roles changes those below theirs. */
+  roles: {
+    list(orgId: string): Promise<OrgRoles>;
+    create(orgId: string, input: RoleInput): Promise<{ id: string }>;
+    update(orgId: string, roleId: string, patch: Partial<RoleInput>): Promise<void>;
+    remove(orgId: string, roleId: string): Promise<void>;
+    /** Every role but `everyone`, top first. */
+    reorder(orgId: string, ids: string[]): Promise<void>;
+    /** A person's roles, exactly these. */
+    setFor(orgId: string, userId: string, roleIds: string[]): Promise<{ roleIds: string[] }>;
   };
   agents: {
     list(orgId: string): Promise<Agent[]>;
@@ -1045,7 +1062,7 @@ export interface ApiClient {
     /** Waiting ones, oldest first. */
     list(orgId: string): Promise<JoinRequest[]>;
     /** `join.answered` / `join.expired` (409) when someone answered first or it ran out. */
-    approve(orgId: string, requestId: string, role: "member" | "admin"): Promise<JoinApproval>;
+    approve(orgId: string, requestId: string, roleIds?: string[]): Promise<JoinApproval>;
     /** `reason` is told to the person by email. */
     deny(orgId: string, requestId: string, reason?: string): Promise<void>;
   };

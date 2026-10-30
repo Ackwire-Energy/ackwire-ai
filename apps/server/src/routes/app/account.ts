@@ -29,6 +29,7 @@ import {
   removeMember,
   removeOrgLogo,
   requirePermission,
+  resolvePermissions,
   revokeInvitation,
   saveOnboarding,
   setAvatar,
@@ -364,6 +365,8 @@ export function accountRoutes(deps: AppDeps) {
               id: m.orgId,
               name: m.orgName,
               role: m.role,
+              permissions: [...m.permissions],
+              rank: m.rank,
               logo: m.orgLogo ?? null,
               ...(m.standing
                 ? { standing: { state: m.standing.state, reason: toldReason(m.standing), ...cloudNotice() } }
@@ -664,6 +667,8 @@ export function accountRoutes(deps: AppDeps) {
           id: organization.id,
           name: organization.name,
           role: "owner" as const,
+          permissions: [...resolvePermissions(true, [])],
+          rank: null,
           context: organization.context,
         },
         generalChannelId: general.id,
@@ -726,6 +731,8 @@ export function accountRoutes(deps: AppDeps) {
           id: orgId,
           name: membership.orgName,
           role: membership.role,
+          permissions: [...membership.permissions],
+          rank: membership.rank,
           context: org?.context ?? "",
           logo: org?.logo ?? null,
         },
@@ -775,7 +782,8 @@ export function accountRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/members/{userId}",
       tags,
       security,
-      summary: "Change a member's role",
+      summary: "Make a member an owner, or not (owners)",
+      description: "Only an owner does it; the last owner stays one. What anyone may do is their roles (`PUT …/roles`).",
       request: { params: MemberParams, body: body(z.object({ role: Role })) },
       responses: { 204: noContent[204], ...errors },
     }),
@@ -817,7 +825,7 @@ export function accountRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId } = c.req.valid("param");
-      await requirePermission(db, c.get("user").id, orgId, "manage_members");
+      await requirePermission(db, c.get("user").id, orgId, "invite_people");
       const rows = await listInvitations(db, orgId);
       return c.json(
         {
@@ -825,6 +833,7 @@ export function accountRoutes(deps: AppDeps) {
             id: i.id,
             email: i.email,
             role: i.role,
+            roleIds: i.roleIds,
             expiresAt: i.expiresAt.toISOString(),
           })),
         },
@@ -841,7 +850,20 @@ export function accountRoutes(deps: AppDeps) {
       security,
       summary: "Invite someone by email",
       description: "Returns the invitation link to share. Only a hash of its token is stored.",
-      request: { params: OrgParams, body: body(z.object({ email: z.email(), role: Role })) },
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            email: z.email(),
+            role: Role.optional().openapi({ description: "`owner` invites an owner (owners only); else a member." }),
+            roleIds: z
+              .array(z.string().uuid())
+              .max(50)
+              .optional()
+              .openapi({ description: "Roles they get on accepting, below your own (ADR 0081)." }),
+          }),
+        ),
+      },
       responses: { 201: json(z.object({ invitation: Invitation, url: z.string() }), "Created"), ...errors },
     }),
     async (c) => {
@@ -867,6 +889,7 @@ export function accountRoutes(deps: AppDeps) {
             id: invitation.id,
             email: invitation.email,
             role: invitation.role,
+            roleIds: invitation.roleIds,
             expiresAt: iso(invitation.expiresAt) ?? "",
           },
           url,

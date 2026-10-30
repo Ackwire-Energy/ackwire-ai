@@ -276,7 +276,7 @@ async function agentBrainAccess(db: Database, userId: string, orgId: string, age
   const membership = await requirePermission(db, userId, orgId, "read");
   const agent = await getAgent(db, orgId, agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  const admin = can(membership.role, "manage_agents");
+  const admin = can(membership, "manage_agents");
   if (!admin && agent.ownerUserId !== userId) {
     throw new ForbiddenError("Only an admin or the agent's owner can see who thinks for it", "agent.not_owner");
   }
@@ -369,7 +369,7 @@ export async function newAgentBrainMachines(
   userId: string,
   orgId: string,
 ): Promise<BrainMachineOptions[]> {
-  await requirePermission(deps.db, userId, orgId, "manage_agents");
+  await requirePermission(deps.db, userId, orgId, "create_agents");
   return candidateMachines(deps.db, userId, orgId, true, null);
 }
 
@@ -836,7 +836,7 @@ export async function agentBrainSummaries(
   ]);
   const names = new Map(machines.filter((m) => !m.deletedAt).map((m) => [m.id, m.name]));
   const manages =
-    membership !== null && membership.standing?.state !== "suspended" && can(membership.role, "manage_agents");
+    membership !== null && membership.standing?.state !== "suspended" && can(membership, "manage_agents");
   for (const a of agents) {
     const kind = brainOf(a.brain);
     const computer = a.machineId && (manages || a.ownerUserId === viewerId) ? names.get(a.machineId) : undefined;

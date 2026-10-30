@@ -8,7 +8,7 @@ import { NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { type PreviewMeta, previewMeta } from "./message-preview";
 import { resolveNotifications } from "./notifications";
-import { getMembership, requirePermission } from "./organizations";
+import { can, getMembership, requirePermission } from "./organizations";
 
 const { channels, channelMembers, channelReads, messages, agents, users } = schema;
 
@@ -23,7 +23,7 @@ const keyOf = (participants: string[]) => [...new Set(participants)].sort().join
  * agent answers every message from the person (no router).
  */
 export async function openDm(db: Database, actorId: string, orgId: string, target: DmTarget) {
-  await requirePermission(db, actorId, orgId, "post");
+  const membership = await requirePermission(db, actorId, orgId, "post");
   let other: string;
   let blockedAgent: Agent | null = null;
   if ("userId" in target) {
@@ -37,7 +37,7 @@ export async function openDm(db: Database, actorId: string, orgId: string, targe
       .from(agents)
       .where(and(eq(agents.id, target.agentId), eq(agents.orgId, orgId), isNull(agents.archivedAt)));
     if (!agent) throw new NotFoundError("Agent not found");
-    if (!canTalkTo(agent, actorId)) blockedAgent = agent;
+    if (!canTalkTo(agent, actorId, can(membership, "talk_to_agents"))) blockedAgent = agent;
     other = `a:${target.agentId}`;
   }
   const dmKey = keyOf([`u:${actorId}`, other]);

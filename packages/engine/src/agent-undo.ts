@@ -474,7 +474,7 @@ async function requireMayUndo(db: Database, userId: string, a: Row) {
   const membership = await getMembership(db, userId, a.orgId);
   if (!membership) throw new NotFoundError("Action not found", "action.not_found");
   assertActiveMembership(membership);
-  if (a.requestedByUserId === userId || can(membership.role, "manage_agents")) return;
+  if (a.requestedByUserId === userId || can(membership, "manage_agents")) return;
   const agent = await getAgentCached(db, a.orgId, a.agentId);
   if (agent?.ownerUserId === userId) return;
   throw new ForbiddenError(

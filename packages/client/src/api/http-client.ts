@@ -116,6 +116,7 @@ import type {
   Organization,
   OrgOverview,
   OrgPlanUsage,
+  OrgRoles,
   OrgSettings,
   Person,
   PhoneSignIn,
@@ -409,6 +410,19 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
             before: query.before,
             limit: query.limit,
           },
+        }),
+    },
+    roles: {
+      list: (orgId) => request<OrgRoles>(`${org(orgId)}/roles`),
+      create: (orgId, input) => request<{ id: string }>(`${org(orgId)}/roles`, { json: input }),
+      update: (orgId, roleId, patch) =>
+        request<void>(`${org(orgId)}/roles/${enc(roleId)}`, { method: "PATCH", json: patch }),
+      remove: (orgId, roleId) => request<void>(`${org(orgId)}/roles/${enc(roleId)}`, { method: "DELETE" }),
+      reorder: (orgId, ids) => request<void>(`${org(orgId)}/roles/order`, { method: "PUT", json: { ids } }),
+      setFor: (orgId, userId, roleIds) =>
+        request<{ roleIds: string[] }>(`${org(orgId)}/members/${enc(userId)}/roles`, {
+          method: "PUT",
+          json: { roleIds },
         }),
     },
     agents: {
@@ -734,8 +748,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     },
     joinRequests: {
       list: async (orgId) => (await request<{ requests: JoinRequest[] }>(`${org(orgId)}/join-requests`)).requests,
-      approve: (orgId, id, role) =>
-        request<JoinApproval>(`${org(orgId)}/join-requests/${enc(id)}/approve`, { json: { role } }),
+      approve: (orgId, id, roleIds) =>
+        request<JoinApproval>(`${org(orgId)}/join-requests/${enc(id)}/approve`, { json: { roleIds: roleIds ?? [] } }),
       deny: (orgId, id, reason) =>
         request<void>(`${org(orgId)}/join-requests/${enc(id)}/deny`, { json: reason ? { reason } : {} }),
     },
