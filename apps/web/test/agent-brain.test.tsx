@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import type { AgentBrain, BrowserUnavailableReason, Machine, MachineAccount, PlanUsage } from "@agenteschat/client";
-import { ApiError, keys } from "@agenteschat/client";
+import { ApiError } from "@agenteschat/client";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -646,7 +646,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
       });
       await settle(6);
     };
-    return { state, block, paste, sealed: () => fakeMachinesOf.get(api)?.lastLogin()?.box ?? null };
+    return { state, api, block, paste, sealed: () => fakeMachinesOf.get(api)?.lastLogin()?.box ?? null };
   }
 
   test("Claude's code pasted into its field with ⌘V goes to the computer by itself, no click", async () => {
@@ -692,6 +692,31 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     expect(shownText(block)).toContain("Código enviado. O MacBook está terminando de entrar.");
   });
 
+  test("Claude's code sent while the server restarts: the computer didn't answer, not a wrong code; Enviar sends it again", async () => {
+    const { api, block, paste, sealed } = await codeField();
+    const sendCode = api.machines.sendAccountCode;
+    api.machines.sendAccountCode = async () => {
+      throw new ApiError(502, "http_502", "Bad Gateway");
+    };
+    await paste("c0de-from-claude#st4te");
+    expect(shownText(block)).toContain("O MacBook não respondeu. Tente de novo em instantes.");
+    expect(shownText(block)).not.toContain("Confira");
+    // The computer refusing it is still about the code.
+    api.machines.sendAccountCode = async () => {
+      throw new ApiError(400, "account.invalid_code", "The sealed code is malformed");
+    };
+    const send = within(block).getByRole("button", { name: "Enviar ao MacBook" });
+    await click(send);
+    await settle(6);
+    expect(shownText(block)).toContain("Não deu para enviar o código. Confira e tente de novo.");
+    expect(shownText(block)).not.toContain("não respondeu");
+    api.machines.sendAccountCode = sendCode;
+    await click(send);
+    await settle(6);
+    expect(sealed()).not.toBeNull();
+    expect(shownText(block)).toContain("Código enviado. O MacBook está terminando de entrar.");
+  });
+
   test("Adicionar conta (ChatGPT): its settings first, then the sign-in on its button; the account is chosen", async () => {
     const codex: MachineAccount = { ...work, id: "acct_codex", kind: "codex", label: "Pessoal", plan: "Plus" };
     const { state, api } = await onMac({ brain: "codex", effectiveModel: "gpt-6-sol", accounts: [] });
@@ -726,11 +751,18 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     expect(brainCalls(state).at(-1)).toEqual({ brain: "codex", model: null, fallback: true, account: "acct_codex" });
   });
 
-  test("Adicionar conta (ChatGPT) while the server restarts: Reconectando, never a failure, then the account, one sign-in", async () => {
+  test("Adicionar conta (ChatGPT) while the server restarts: Reconectando, never a failure or an offline computer, then the account, one sign-in", async () => {
     const codex: MachineAccount = { ...work, id: "acct_codex", kind: "codex", label: "Pessoal", plan: "Plus" };
     const start = Date.now();
     setSystemTime(new Date(start));
     const { state, api, services } = await onMac({ brain: "codex", effectiveModel: "gpt-6-sol", accounts: [] });
+    let online = true;
+    const viewOf = api.agents.brain;
+    api.agents.brain = async (orgId, agentId) => {
+      const view = await viewOf(orgId, agentId);
+      const on = <T extends { online: boolean }>(m: T) => ({ ...m, online });
+      return { ...view, computer: view.computer && on(view.computer), machines: view.machines.map(on) };
+    };
     const d = await brainDialog();
     await pick(d, "Conta do ChatGPT", /^Adicionar conta/);
     await settle(8);
@@ -751,11 +783,12 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
             throw error;
           }
         : read;
-      const poll = keys.accountLogin(ORG_ID, "machine_1", "login_1");
-      await act(() => services.queryClient.invalidateQueries({ queryKey: poll }));
+      await act(() => services.queryClient.invalidateQueries());
       await settle(6);
     };
-    // No answer, then only the proxy's, then the computer still reconnecting, for 20 s.
+    // The MacBook drops out with its runner: no answer, then only the proxy's, then the computer still
+    // reconnecting, for 20 s. The sign-in's block says so; no brain there reads as offline meanwhile.
+    online = false;
     for (const [after, error] of [
       [3_000, new TypeError("Failed to fetch")],
       [10_000, new ApiError(502, "http_502", "Bad Gateway")],
@@ -763,15 +796,21 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     ] as const) {
       await ask(after, error);
       expect(shownText(block)).toContain("Reconectando…");
-      expect(d.textContent).not.toMatch(/Não deu para entrar|não respondeu/);
+      expect(d.textContent).not.toMatch(/Não deu para entrar|não respondeu|está offline/);
+      expect(d.querySelector(".ac-brand--off")).toBeNull();
     }
     // The sign-in went on there meanwhile.
+    online = true;
     fakeMachinesOf.get(api)?.endLogin("login_1", { state: "done", account: codex });
     await ask(22_000);
     expect(d.textContent).toContain("A conta Pessoal entrou no MacBook. Clique em Usar para salvar.");
     expect(d.textContent).not.toMatch(/Não deu para entrar|não respondeu/);
     expect(state.calls.filter((c) => c.method === "machines.beginAccountLogin")).toHaveLength(1);
     expect(state.calls.some((c) => c.method === "machines.cancelAccountLogin")).toBe(false);
+    // With no sign-in under way, an offline computer says so again.
+    online = false;
+    await ask(30_000);
+    expect(d.textContent).toContain("O MacBook está offline");
   });
 });
 

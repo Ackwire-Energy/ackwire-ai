@@ -256,7 +256,11 @@ describe("connected computers helpers (ADR 0036)", () => {
     expect(otherThanHint("walt@pessoal.com", { email: null })).toBe(false);
   });
 
-  test("a sign-in's status that can't be read: reconnecting for a minute from the first failed read, if it passes", () => {
+  test("a sign-in's status that can't be read: reconnecting for 90 s from the first failed read, if it passes", () => {
+    // A restart that misses the runner's fifth dial (`backoffDelay`: 1, 2, 4, 8, 16, then 32 s after a drop, each up
+    // to 20 % late) has it back at the sixth: still waiting then, and for the next read 2 s on.
+    const sixthDial = [1, 2, 4, 8, 16, 32].reduce((at, s) => at + s * 1.2, 0) * 1000;
+    expect(LOGIN_RECONNECT_MS).toBeGreaterThan(sixthDial + 2_000);
     // The server restarting (no answer, or only the proxy's) or the computer reconnecting (offline, late).
     for (const error of [
       new TypeError("Failed to fetch"),

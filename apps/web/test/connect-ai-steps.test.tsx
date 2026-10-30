@@ -9,6 +9,7 @@ import type {
   MachineAccount,
 } from "@agenteschat/client";
 import { ApiError, keys } from "@agenteschat/client";
+import { LOGIN_RECONNECT_MS } from "@agenteschat/client/lib/machines";
 import { LOGIN_PER_AGENT } from "@agenteschat/client/lib/plans";
 import { en } from "@agenteschat/i18n";
 import { icons } from "@agenteschat/ui";
@@ -1456,7 +1457,7 @@ describe("A sign-in through a restart of the server or a reconnect of its comput
 
   /**
    * "Conectar uma IA" with the clock stopped; `ask(after, error)` asks everything again `after` ms later, each read of
-   * a sign-in failing with `error` (none: the computer's answer).
+   * a sign-in failing with `error`, or with what it gives for that login (none: the computer's answer).
    */
   async function reconnecting(options: Parameters<typeof connect>[0] = {}) {
     const start = Date.now();
@@ -1464,19 +1465,28 @@ describe("A sign-in through a restart of the server or a reconnect of its comput
     const env = await connect(options);
     const { api, services } = env;
     const read = api.machines.accountLogin;
-    const ask = async (after: number, error?: Error) => {
+    const ask = async (after: number, error?: Error | ((loginId: string) => Error | undefined)) => {
       setSystemTime(new Date(start + after));
-      api.machines.accountLogin = error
-        ? async () => {
-            throw error;
-          }
-        : read;
+      api.machines.accountLogin = async (orgId, machineId, loginId) => {
+        const failed = typeof error === "function" ? error(loginId) : error;
+        if (failed) throw failed;
+        return read(orgId, machineId, loginId);
+      };
       await act(() => services.queryClient.invalidateQueries());
       await settle(8);
     };
     return { ...env, ask };
   }
   const offline = new ApiError(409, "machine.offline", "The computer MacBook is offline.");
+  const proxy = new ApiError(502, "http_502", "Bad Gateway");
+  /** Ada's view says her computer is online only while `online()` does. */
+  const viewOnline = (api: ReturnType<typeof createFakeApi>, online: () => boolean) => {
+    const viewOf = api.agents.brain;
+    api.agents.brain = async (orgId, agentId) => {
+      const view = await viewOf(orgId, agentId);
+      return { ...view, computer: view.computer && { ...view.computer, online: online() } };
+    };
+  };
 
   test("reads failing for 20 s, then signed in: Reconectando meanwhile, never a failure, and the agent thinks with it", async () => {
     const { state, machines, dialog, tile, ask } = await reconnecting();
@@ -1503,21 +1513,20 @@ describe("A sign-in through a restart of the server or a reconnect of its comput
     expect(calls(state, "agents.setBrain").map((c) => c.args[2])).toEqual([{ brain: "codex", account: "acct_plus" }]);
   });
 
-  test("reads failing for a minute from the first: the computer didn't answer, with Tentar de novo, which starts nothing", async () => {
+  test("reads failing for the whole wait from the first: the computer didn't answer, with Tentar de novo, which starts nothing", async () => {
     const { state, dialog, ask } = await reconnecting();
     const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
     await withPopup(() => click(within(panel).getByRole("button", { name: "Entrar com Claude" })));
     await settle(6);
-    // The first failed read comes after five quiet minutes (a page in the background reads nothing): the minute
+    // The first failed read comes after five quiet minutes (a page in the background reads nothing): the wait
     // starts there.
     const quiet = 5 * 60_000;
-    const proxy = new ApiError(502, "http_502", "Bad Gateway");
     await ask(quiet, proxy);
     expect(shownText(panel)).toContain("Reconectando…");
-    await ask(quiet + 59_000, proxy);
+    await ask(quiet + LOGIN_RECONNECT_MS - 1_000, proxy);
     expect(shownText(panel)).toContain("Reconectando…");
     expect(within(panel).getByRole("textbox", { name: "Código do Claude" })).toBeTruthy();
-    await ask(quiet + 60_000, proxy);
+    await ask(quiet + LOGIN_RECONNECT_MS, proxy);
     expect(shownText(panel)).toContain("O MacBook não respondeu. Tente de novo em instantes.");
     expect(within(panel).queryByRole("textbox", { name: "Código do Claude" })).toBeNull();
     await click(within(panel).getByRole("button", { name: "Tentar de novo" }));
@@ -1544,11 +1553,7 @@ describe("A sign-in through a restart of the server or a reconnect of its comput
   test("its computer offline for a moment mid-sign-in: the steps stay, and the same sign-in ends it, never a second", async () => {
     const { state, api, machines, dialog, tile, ask } = await reconnecting();
     let online = true;
-    const viewOf = api.agents.brain;
-    api.agents.brain = async (orgId, agentId) => {
-      const view = await viewOf(orgId, agentId);
-      return { ...view, computer: view.computer && { ...view.computer, online } };
-    };
+    viewOnline(api, () => online);
     await click(tile("ChatGPT"));
     const panel = within(dialog).getByRole("region", { name: "Seu plano do ChatGPT" });
     await withPopup(() => click(within(panel).getByRole("button", { name: "Entrar com ChatGPT" })));
@@ -1593,5 +1598,80 @@ describe("A sign-in through a restart of the server or a reconnect of its comput
     expect(calls(state, "agents.setBrain").map((c) => c.args[1])).toEqual([ADA_ID, ATLAS_ID, LIA_ID]);
     expect(calls(state, "machines.beginAccountLogin")).toHaveLength(3);
     expect(calls(state, "machines.cancelAccountLogin")).toHaveLength(0);
+  });
+
+  test("not one read answered from the sign-in's start, for the whole wait: the computer didn't answer", async () => {
+    const { api, dialog, tile, ask } = await reconnecting();
+    await click(tile("ChatGPT"));
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do ChatGPT" });
+    api.machines.accountLogin = async () => {
+      throw proxy;
+    };
+    await withPopup(() => click(within(panel).getByRole("button", { name: "Entrar com ChatGPT" })));
+    await settle(6);
+    expect(shownText(panel)).toContain("Reconectando…");
+    await ask(LOGIN_RECONNECT_MS - 1_000, proxy);
+    expect(shownText(panel)).toContain("Reconectando…");
+    await ask(LOGIN_RECONNECT_MS, proxy);
+    expect(shownText(panel)).toContain("O MacBook não respondeu. Tente de novo em instantes.");
+  });
+
+  test("GLM for all: a login unanswered for the whole wait and one whose read fails once, both signed in after: each agent on its own login", async () => {
+    const { state, api, machines, dialog, tile, ask } = await reconnecting({ crew: true });
+    serverMoves(state, api, GLM);
+    machines?.endLogin("login_1", { state: "done", account: account({ id: "acct_1" }) });
+    await click(tile("GLM Coding"));
+    const panel = within(dialog).getByRole("region", { name: "GLM Coding Plan" });
+    // Atlas's login can't be read; Lia's first read gets the server's own error.
+    const fails: Record<string, Error> = { login_2: proxy, login_3: new ApiError(500, "internal", "Internal error") };
+    await ask(0, (loginId) => fails[loginId]);
+    await type(within(panel).getByLabelText("Chave do GLM Coding"), GLM_KEY);
+    await click(within(panel).getByRole("button", { name: "Enviar ao MacBook" }));
+    await settle(12);
+    expect(shownText(panel)).toContain("Não deu para entrar nessa conta. Tente de novo.");
+    await ask(LOGIN_RECONNECT_MS, (loginId) => (loginId === "login_2" ? proxy : undefined));
+    expect(shownText(panel)).toContain("O MacBook não respondeu. Tente de novo em instantes.");
+    // Both went on on the computer, and an answer picks each up again.
+    for (const n of [2, 3]) machines?.endLogin(`login_${n}`, { state: "done", account: account({ id: `acct_${n}` }) });
+    await ask(LOGIN_RECONNECT_MS + 2_000);
+    expect(shownText(panel)).toContain("Ada, Atlas e Lia agora pensam com GLM Coding.");
+    expect(calls(state, "agents.setBrain").map((c) => c.args[1])).toEqual([ADA_ID, ATLAS_ID, LIA_ID]);
+    expect(calls(state, "machines.beginAccountLogin")).toHaveLength(3);
+    expect(calls(state, "machines.cancelAccountLogin")).toHaveLength(0);
+  });
+
+  test("Claude's code pasted while its computer is offline mid-sign-in waits for Enviar: nothing blames the code, and it goes once the computer is back", async () => {
+    const { state, api, dialog, ask } = await reconnecting();
+    let online = true;
+    viewOnline(api, () => online);
+    const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
+    await withPopup(() => click(within(panel).getByRole("button", { name: "Entrar com Claude" })));
+    await settle(6);
+    online = false;
+    const sendCode = api.machines.sendAccountCode;
+    let tries = 0;
+    api.machines.sendAccountCode = async () => {
+      tries++;
+      throw offline;
+    };
+    await ask(10_000, offline);
+    expect(shownText(panel)).toContain("Reconectando…");
+    const field = within(panel).getByRole("textbox", { name: "Código do Claude" }) as HTMLInputElement;
+    await type(field, "c0de#st4te");
+    await settle(6);
+    expect(tries).toBe(0);
+    expect(field.value).toBe("c0de#st4te");
+    expect(shownText(panel)).not.toContain("Não deu para enviar o código");
+    const send = within(panel).getByRole("button", { name: "Enviar ao MacBook" }) as HTMLButtonElement;
+    expect(send.disabled).toBe(true);
+    online = true;
+    api.machines.sendAccountCode = sendCode;
+    await ask(20_000);
+    expect(send.disabled).toBe(false);
+    await click(send);
+    await settle(6);
+    expect(calls(state, "machines.sendAccountCode")).toHaveLength(1);
+    expect(shownText(panel)).toContain("Código enviado. O MacBook está terminando de entrar.");
+    expect(calls(state, "machines.beginAccountLogin")).toHaveLength(1);
   });
 });

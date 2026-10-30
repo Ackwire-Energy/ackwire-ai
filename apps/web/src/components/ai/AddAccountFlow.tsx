@@ -6,6 +6,7 @@ import {
   isSignInCode,
   type LoginRead,
   loginRead,
+  loginReadPasses,
   otherThanHint,
 } from "@agenteschat/client/lib/machines";
 import { type PlanId, planKeyFits, planOf } from "@agenteschat/client/lib/plans";
@@ -211,7 +212,8 @@ function AddAccountFlow({
   const [code, setCode] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
-  const [sendFailed, setSendFailed] = useState(false);
+  // The code or key didn't go: the computer away for now (`loginReadPasses`), or refused.
+  const [sendFailed, setSendFailed] = useState<"away" | "refused" | null>(null);
   const [pasteFailed, setPasteFailed] = useState(false);
   const [copied, setCopied] = useState(false);
   // Signed in, but not as the account it was for (the hint): theirs to use or not.
@@ -219,9 +221,8 @@ function AddAccountFlow({
   // The logins a key went to (`fanOut`), and the first of them that didn't end signed in.
   const [fan, setFan] = useState<{ id: string; loginId: string }[]>([]);
   const [fanFailed, setFanFailed] = useState<AccountLoginStatus | null>(null);
-  // Of those, the ones whose reads fail for now, and whether one went unanswered past waiting for it (`loginRead`).
-  const [fanAway, setFanAway] = useState<string[]>([]);
-  const [fanSilent, setFanSilent] = useState(false);
+  // What each of their latest reads says (`loginRead`): only an end on the computer ends one of them.
+  const [fanReads, setFanReads] = useState<Record<string, LoginRead>>({});
   const fanned = useRef<{ id: string; loginId: string }[]>([]);
   const fanEnded = useRef(new Set<string>());
   // The sign-ins still running and the computer each started on, where they're stopped when this block goes away:
@@ -295,13 +296,11 @@ function AddAccountFlow({
     }
   }, [result, login, hint, onAdded]);
 
-  /** One login a key went to (`fanOut`) ended on the computer, or its reads failed (`read`). */
-  const fanEnd = (loginId: string, end: AccountLoginStatus, read?: LoginRead) => {
+  /** One login a key went to (`fanOut`) ended on the computer. */
+  const fanEnd = (loginId: string, end: AccountLoginStatus) => {
     if (fanEnded.current.has(loginId)) return;
     fanEnded.current.add(loginId);
-    // Ended there: nothing left to stop. Unread, it may still run there, so leaving or "Tentar de novo" stops it.
-    if (!read) running.current = running.current.filter((r) => r.loginId !== loginId);
-    if (read === "noAnswer") setFanSilent(true);
+    running.current = running.current.filter((r) => r.loginId !== loginId);
     const target = fanned.current.find((f) => f.loginId === loginId)?.id;
     if (end.state === "done" && end.account) onAdded(end.account, target);
     else {
@@ -310,19 +309,16 @@ function AddAccountFlow({
     }
   };
 
-  /** What a `fanOut` login's reads say: its end on the computer, reads failing for now, or for good. */
+  /** A `fanOut` login's latest read: its end on the computer, or how its reads fail for now. */
   const fanRead = (loginId: string, end: AccountLoginStatus | undefined, read: LoginRead) => {
-    const away = read === "reconnecting";
-    setFanAway((ids) =>
-      ids.includes(loginId) === away ? ids : away ? [...ids, loginId] : ids.filter((id) => id !== loginId),
-    );
+    setFanReads((last) => ((last[loginId] ?? null) === read ? last : { ...last, [loginId]: read }));
     if (end && end.state !== "waiting") fanEnd(loginId, end);
-    else if (read === "noAnswer" || read === "failed") fanEnd(loginId, { state: "failed" }, read);
   };
 
+  const reads = [read, ...Object.values(fanReads)];
   const shown = fanFailed ?? result;
-  const noAnswer = startFailed || read === "noAnswer" || fanSilent;
-  const ended = noAnswer || read === "failed" || shown?.state === "failed" || shown?.state === "expired";
+  const noAnswer = startFailed || reads.includes("noAnswer");
+  const ended = noAnswer || reads.includes("failed") || shown?.state === "failed" || shown?.state === "expired";
 
   /** The code or the plan's key, sealed here to the computer's key for a sign-in. */
   const seal = async (l: AccountLoginStart | null, text: string) => {
@@ -337,7 +333,7 @@ function AddAccountFlow({
     const text = value.trim();
     if (!text || sending) return;
     setSending(true);
-    setSendFailed(false);
+    setSendFailed(null);
     try {
       if (plan && fanOut) {
         for (const target of fanOut.filter((x) => !fanned.current.some((f) => f.id === x.id))) {
@@ -358,19 +354,23 @@ function AddAccountFlow({
       setSent(true);
       setCode("");
       onSent?.();
-    } catch {
-      setSendFailed(true);
+    } catch (error) {
+      // Never sent again by itself: a call that got no answer may have reached the computer.
+      setSendFailed(loginReadPasses(error) ? "away" : "refused");
     } finally {
       setSending(false);
     }
   };
 
-  /** What the field holds now, however it got there: a code of this sign-in goes to the computer by itself. */
+  /**
+   * What the field holds now, however it got there: a code of this sign-in goes to the computer by itself, once the
+   * computer is ready. Before that it waits in the field for Send.
+   */
   const take = (text: string) => {
     setCode(text);
-    setSendFailed(false);
+    setSendFailed(null);
     setPasteFailed(false);
-    if (!plan && login && isSignInCode(text, login.url)) void send(text);
+    if (!plan && login && ready && !loading && isSignInCode(text, login.url)) void send(text);
   };
 
   const paste = async () => {
@@ -398,7 +398,7 @@ function AddAccountFlow({
   const waiting = (
     <span className="agp-addacct__wait" role="status">
       <Icon name="spinner" size={14} />
-      {read === "reconnecting" || fanAway.length > 0
+      {reads.includes("reconnecting")
         ? t("agentPage.work.brain.add.reconnecting")
         : t("agentPage.work.brain.add.waiting")}
     </span>
@@ -443,7 +443,11 @@ function AddAccountFlow({
       {pasteFailed && <SettingNote icon="alert">{t("aiAccounts.add.pasteFailed")}</SettingNote>}
       {sendFailed && (
         <SettingNote icon="alert">
-          {plan ? t("aiAccounts.add.keySendFailed") : t("agentPage.work.brain.add.sendFailed")}
+          {sendFailed === "away"
+            ? t("agentPage.work.brain.add.startFailed", { computer })
+            : plan
+              ? t("aiAccounts.add.keySendFailed")
+              : t("agentPage.work.brain.add.sendFailed")}
         </SettingNote>
       )}
     </>
@@ -671,7 +675,7 @@ function AddAccountFlow({
   );
 }
 
-/** One login a key went to, asked about every 2 s until it ends on the computer or its reads fail for good. */
+/** One login a key went to, asked about every 2 s until it ends on the computer, through failed reads too. */
 function LoginWatch({
   machineId,
   loginId,

@@ -165,7 +165,7 @@ describe("the agent's AI", () => {
     const [flow, parts] = await Promise.all([read("AddAccount.tsx"), read("parts.tsx")]);
     // Typed, pasted with the keyboard or by Colar: one path, and only this sign-in's code sends with no tap.
     expect(flow).toMatch(
-      /const take = \(text: string\) => \{[^}]*if \(!plan && login && isSignInCode\(text, login\.url\)\) void send\(text\);/,
+      /const take = \(text: string\) => \{[^}]*if \(!plan && login && ready && !loading && isSignInCode\(text, login\.url\)\) void send\(text\);/,
     );
     expect(flow).toContain("onChangeText={take}");
     expect(flow).toContain("onPasted={take}");
@@ -267,6 +267,13 @@ describe("the agent's AI", () => {
     expect(connect).toContain("onSigningIn={setSigningIn}");
     expect(flow).toMatch(
       /useEffect\(\(\) => \{\s*onSigningIn\?\.\(begun\);\s*return \(\) => onSigningIn\?\.\(false\);/,
+    );
+    // Claude's code meanwhile: Reconectando by its field, a code that lands there waits for Enviar (`take` sends only
+    // to a ready computer), and one that couldn't go says the computer didn't answer, never to check the code.
+    expect(flow).toContain('side={sent || read === "reconnecting" ? waiting : undefined}');
+    expect(flow).toContain('setSendFailed(loginReadPasses(error) ? "away" : "refused");');
+    expect(flow).toMatch(
+      /sendFailed === "away"\s*\?\s*t\("agentPage\.work\.brain\.add\.startFailed", \{ computer \}\)/,
     );
     expect((await translator("pt-BR"))("agentPage.work.brain.add.reconnecting")).toBe("Reconectando…");
     expect((await translator("en"))("agentPage.work.brain.add.reconnecting")).toBe("Reconnecting…");

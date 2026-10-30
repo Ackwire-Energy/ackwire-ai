@@ -1,6 +1,13 @@
 import type { AccountLoginStart, MachineAccount, MachineAccountKind } from "@agenteschat/client";
 import { keys, useAccountLogin, useApi } from "@agenteschat/client";
-import { beginLogin, freeDuplicate, isSignInCode, loginRead, otherThanHint } from "@agenteschat/client/lib/machines";
+import {
+  beginLogin,
+  freeDuplicate,
+  isSignInCode,
+  loginRead,
+  loginReadPasses,
+  otherThanHint,
+} from "@agenteschat/client/lib/machines";
 import { type PlanId, planKeyFits, planOf } from "@agenteschat/client/lib/plans";
 import { accountCodeAad } from "@agenteschat/client/lib/secret-box";
 import { useQueryClient } from "@tanstack/react-query";
@@ -94,7 +101,8 @@ function AddAccountFlow({
   const [code, setCode] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
-  const [sendFailed, setSendFailed] = useState(false);
+  // The code or key didn't go: the computer away for now (`loginReadPasses`), or refused.
+  const [sendFailed, setSendFailed] = useState<"away" | "refused" | null>(null);
   const [copied, setCopied] = useState(false);
   // Signed in, but not as the account it was for (the hint): theirs to use or not.
   const [other, setOther] = useState<MachineAccount | null>(null);
@@ -169,7 +177,7 @@ function AddAccountFlow({
     const text = value.trim();
     if (!text || sending) return;
     setSending(true);
-    setSendFailed(false);
+    setSendFailed(null);
     try {
       const l = login ?? (plan ? await begin() : null);
       if (!l?.publicKey) throw new Error("no key");
@@ -178,18 +186,22 @@ function AddAccountFlow({
       setSent(true);
       setCode("");
       void qc.invalidateQueries({ queryKey: keys.accountLogin(orgId, machineId, l.loginId) });
-    } catch {
-      setSendFailed(true);
+    } catch (error) {
+      // Never sent again by itself: a call that got no answer may have reached the computer.
+      setSendFailed(loginReadPasses(error) ? "away" : "refused");
     } finally {
       setSending(false);
     }
   };
 
-  /** What the field holds now, however it got there: a code of this sign-in goes to the computer by itself. */
+  /**
+   * What the field holds now, however it got there: a code of this sign-in goes to the computer by itself, once the
+   * computer is ready. Before that it waits in the field for Enviar.
+   */
   const take = (text: string) => {
     setCode(text);
-    setSendFailed(false);
-    if (!plan && login && isSignInCode(text, login.url)) void send(text);
+    setSendFailed(null);
+    if (!plan && login && ready && !loading && isSignInCode(text, login.url)) void send(text);
   };
 
   const copy = async () => {
@@ -231,7 +243,11 @@ function AddAccountFlow({
       </View>
       {sendFailed ? (
         <Note icon="x" live>
-          {plan ? t("aiAccounts.add.keySendFailed") : t("agentPage.work.brain.add.sendFailed")}
+          {sendFailed === "away"
+            ? t("agentPage.work.brain.add.startFailed", { computer })
+            : plan
+              ? t("aiAccounts.add.keySendFailed")
+              : t("agentPage.work.brain.add.sendFailed")}
         </Note>
       ) : null}
     </>
@@ -363,7 +379,12 @@ function AddAccountFlow({
           {starting ? <StepText>{t("agentPage.work.brain.add.starting", { computer })}</StepText> : null}
         </Step>
         {login && opened ? (
-          <Step n={2} divider title={t("agentPage.work.brain.add.stepTwo")} side={sent ? waiting : undefined}>
+          <Step
+            n={2}
+            divider
+            title={t("agentPage.work.brain.add.stepTwo")}
+            side={sent || read === "reconnecting" ? waiting : undefined}
+          >
             {pasteRow(
               t("agentPage.work.brain.add.codeLabel"),
               t("agentPage.work.brain.add.codeLabel"),
