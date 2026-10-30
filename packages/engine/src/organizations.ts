@@ -9,7 +9,7 @@ import {
   gt,
   inArray,
   isNull,
-  ne,
+  not,
   or,
   schema,
   sql,
@@ -30,12 +30,16 @@ import { enqueue } from "./outbox";
 import {
   assertCanWork,
   type BillingHold,
+  closedOrg,
+  closedRefusal,
   cloudNotice,
   isBillingHold,
   isUserBlocked,
-  OrgPausedError,
+  openOrg,
+  refusesNewWorkspace,
   STANDING_COLUMNS,
   type WorkspaceStanding,
+  workRefusal,
 } from "./standing";
 
 const {
@@ -151,9 +155,10 @@ export async function getMembership(
   return row ?? null;
 }
 
-/** Refuses a suspended workspace without changing membership/status lookups. */
+/** Refuses a closed workspace (suspended, or being deleted: `closedRefusal`) without changing membership lookups. */
 export function assertActiveMembership(membership: Membership): void {
-  if (membership.standing?.state === "suspended") throw new OrgPausedError(membership.standing);
+  const closed = closedRefusal(membership.standing);
+  if (closed) throw closed;
 }
 
 /** Requires an active organization member before acting on its resources. */
@@ -165,8 +170,8 @@ export async function requireActiveMembership(db: Database, userId: string, orgI
 }
 
 /**
- * Throws ForbiddenError unless the user is a member with `permission`, and `org.suspended` for anyone in a
- * suspended workspace. Returns the membership.
+ * Throws ForbiddenError unless the user is a member with `permission`, and `org.suspended` or `org.deleting` for
+ * anyone in a closed workspace. Returns the membership.
  */
 export async function requirePermission(db: Database, userId: string, orgId: string, permission: Permission) {
   const membership = await requireActiveMembership(db, userId, orgId);
@@ -174,9 +179,10 @@ export async function requirePermission(db: Database, userId: string, orgId: str
   return membership;
 }
 
-/** Invitations go out only from an active workspace (`standing.ts`). */
+/** Invitations go out only from an active workspace that isn't being deleted (`standing.ts`). */
 export function assertInviting(membership: Membership) {
-  if (membership.standing && membership.standing.state !== "active") throw new OrgPausedError(membership.standing);
+  const refusal = workRefusal(membership.standing);
+  if (refusal) throw refusal;
 }
 
 /**
@@ -184,7 +190,8 @@ export function assertInviting(membership: Membership) {
  * blocked or they are in a workspace suspended or on any hold but a billing one: they don't carry on in a new
  * one (`org.create_refused`, the same words whatever the cause, and how to contest it on agentes.chat Cloud).
  * Billing holds refuse nobody, but one person
- * owns at most one workspace waiting for its first plan (`org.create_unpaid`, with that workspace's id).
+ * owns at most one workspace waiting for its first plan (`org.create_unpaid`, with that workspace's id); one being
+ * deleted waits for none, so restoring it is what checks that.
  * With `needsAllowance` (`needsWorkspaceAllowance`) early access must have allowed the account, else
  * `org.create_invite_only` and nothing is made. An allowed account's first workspace is recorded on its invitation.
  * `holdForPayment`: the workspace starts on the `payment` hold (ADR 0079), with no audit row or notification.
@@ -201,13 +208,13 @@ export async function createOrganization(
   return db.transaction(async (tx) => {
     // One create at a time per person, checked after the lock: two at once would both start waiting for a plan.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-create:${userId}`}))`);
-    const held = await tx
+    const theirs = await tx
       .select({ id: organizations.id, role: organizationMembers.role, standing: STANDING_COLUMNS })
       .from(organizationMembers)
       .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
-      .where(and(eq(organizationMembers.userId, userId), ne(organizations.standing, "active")))
+      .where(eq(organizationMembers.userId, userId))
       .orderBy(asc(organizations.createdAt));
-    if (held.some((o) => !isBillingHold(o.standing)) || (await isUserBlocked(tx, userId)))
+    if (theirs.some((o) => refusesNewWorkspace(o.standing)) || (await isUserBlocked(tx, userId)))
       throw new ForbiddenError("You can't create a workspace right now", "org.create_refused", cloudNotice());
     if (options.needsAllowance && !(await hasWorkspaceAllowance(tx, userId)))
       throw new ForbiddenError("New workspaces need an invitation for now", "org.create_invite_only");
@@ -217,7 +224,10 @@ export async function createOrganization(
       const [open] = await unfinishedWorkspaces(tx, userId);
       if (open) return { ...open, existing: true };
     }
-    const unpaid = held.find((o) => o.role === "owner" && o.standing.reason === PAYMENT);
+    const unpaid = theirs.find(
+      (o) =>
+        o.role === "owner" && isBillingHold(o.standing) && o.standing.reason === PAYMENT && !o.standing.deletionDueAt,
+    );
     if (unpaid)
       throw new ForbiddenError("You already have a workspace waiting for a plan", "org.create_unpaid", {
         orgId: unpaid.id,
@@ -263,7 +273,8 @@ export const ONBOARDING_STEPS = schema.ONBOARDING_STEPS;
 
 /**
  * The workspaces `userId` owns whose onboarding isn't finished, oldest first, each with its #general (where the
- * onboarding puts the agents and posts the first message). A suspended one isn't among them: it shows as suspended.
+ * onboarding puts the agents and posts the first message). A closed one isn't among them: it shows as suspended or
+ * being deleted, and the onboarding starts a new one.
  */
 export async function unfinishedWorkspaces(db: Executor, userId: string) {
   return db
@@ -276,7 +287,7 @@ export async function unfinishedWorkspaces(db: Executor, userId: string) {
         eq(organizationMembers.userId, userId),
         eq(organizationMembers.role, "owner"),
         isNull(organizations.onboardedAt),
-        ne(organizations.standing, "suspended"),
+        not(closedOrg),
       ),
     )
     .orderBy(asc(organizations.createdAt));
@@ -405,9 +416,9 @@ export type SignupAdmission = "open" | "first" | "invitation" | "early_access";
  * Who may create an account (ADR 0006, ADR 0078): the first account may always register (there is no other way
  * in), unless the installation waits for its owner's link or key, which make it on their own path. After that,
  * anyone with `ALLOW_SIGNUP` or while the sign-up mode is `open` (`signupOpenToAll`); else only a pending workspace
- * invitation for that email, or an early-access link (`access`) sent to it. An invitation link never opens it
- * (ADR 0068): whoever holds one asks to join without an account. Open sign-up on a reachable server would let
- * anyone create organizations (and spend model credits) on it. Null: refused.
+ * invitation for that email (not into a workspace being deleted), or an early-access link (`access`) sent to it.
+ * An invitation link never opens it (ADR 0068): whoever holds one asks to join without an account. Open sign-up
+ * on a reachable server would let anyone create organizations (and spend model credits) on it. Null: refused.
  */
 export async function signupAdmission(
   db: Database,
@@ -423,11 +434,13 @@ export async function signupAdmission(
   const [invite] = await db
     .select({ id: organizationInvitations.id })
     .from(organizationInvitations)
+    .innerJoin(organizations, eq(organizations.id, organizationInvitations.orgId))
     .where(
       and(
         eq(organizationInvitations.email, stored),
         isNull(organizationInvitations.acceptedAt),
         gt(organizationInvitations.expiresAt, now),
+        isNull(organizations.deletionDueAt),
       ),
     )
     .limit(1);
@@ -521,11 +534,14 @@ export async function hasPassword(db: Database, userId: string): Promise<boolean
 /**
  * Runs after a user is created. The very first account of an installation
  * becomes owner of every organization that already exists, so a self-hoster
- * who seeded data first lands in it.
+ * who seeded data first lands in it. Not of one being deleted, which isn't theirs to restore.
  */
 export async function onUserCreated(db: Database, userId: string) {
   if ((await countUsers(db)) !== 1) return;
-  const existing = await db.select({ id: organizations.id }).from(organizations);
+  const existing = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(isNull(organizations.deletionDueAt));
   if (existing.length === 0) return;
   await db
     .insert(organizationMembers)
@@ -1122,10 +1138,10 @@ export async function inviteLink(db: Database, secret: string, actorId: string, 
   });
 }
 
-/** An invitation link by its token (or its id), with its workspace's name and standing; null when there is none. */
+/** An invitation link by its token (or its id), with its workspace's name and whether it is open; null when none. */
 export async function findInviteLink(db: Executor, by: string | { id: string }) {
   const [row] = await db
-    .select({ link: organizationInviteLinks, orgName: organizations.name, standing: STANDING_COLUMNS })
+    .select({ link: organizationInviteLinks, orgName: organizations.name, open: openOrg })
     .from(organizationInviteLinks)
     .innerJoin(organizations, eq(organizations.id, organizationInviteLinks.orgId))
     .where(
@@ -1136,11 +1152,11 @@ export async function findInviteLink(db: Executor, by: string | { id: string }) 
   return row ?? null;
 }
 
-/** A link people can still ask with: not turned off, not expired, and its workspace active. */
+/** A link people can still ask with: not turned off, not expired, and its workspace active and not being deleted. */
 export const inviteLinkOpen = (
-  found: { link: { revokedAt: Date | null; expiresAt: Date }; standing: WorkspaceStanding },
+  found: { link: { revokedAt: Date | null; expiresAt: Date }; open: boolean },
   now = new Date(),
-) => !found.link.revokedAt && found.link.expiresAt > now && found.standing.state === "active";
+) => !found.link.revokedAt && found.link.expiresAt > now && found.open;
 
 /** How many of the organization's agents an invitation names ("Theo, Ada, Lia e Atlas já trabalham lá"). */
 const INVITE_AGENTS = 4;
@@ -1219,8 +1235,8 @@ export async function previewInvitation(db: Database, token: string, now = new D
 
 /**
  * Accepts an invitation. The signed-in user's email must match the invited one. Joins `general`. Not for
- * a blocked account, nor into a workspace on hold or suspended. An invitation link only lets people ask
- * (`invitation.ask_to_join`, ADR 0068).
+ * a blocked account, nor into a workspace on hold, suspended or being deleted. An invitation link only lets people
+ * ask (`invitation.ask_to_join`, ADR 0068).
  */
 export async function acceptInvitation(
   db: Database,
@@ -1265,11 +1281,16 @@ export async function acceptInvitation(
 /**
  * Adds a person to an organization (keeping an existing role) and to `general`, in the caller's transaction. A
  * request to join that they or their address had waiting closes: whoever answers it next finds it answered. A
- * full workspace refuses a new member (`org.members_full`), under the lock role changes and removals take, so
- * two people taking the last seat at once can't both get in.
+ * full workspace refuses a new member (`org.members_full`), and a closed one (`closedRefusal`) anyone, under the
+ * lock role changes, removals and a deletion take, so two people taking the last seat at once can't both get in,
+ * and nobody gets in once a deletion committed.
  */
 export async function joinOrganization(tx: Executor, orgId: string, userId: string, role: MemberRole) {
   await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-members:${orgId}`}))`);
+  // The row as it is now: a check before the lock may have read a cached standing.
+  const [org] = await tx.select(STANDING_COLUMNS).from(organizations).where(eq(organizations.id, orgId));
+  const closed = closedRefusal(org);
+  if (closed) throw closed;
   const [member] = await tx
     .select({ userId: organizationMembers.userId })
     .from(organizationMembers)

@@ -37,7 +37,7 @@ import {
 import { can, getMembership } from "../organizations";
 import { resumeRunWithResult } from "../run-resume";
 import { bodyCode, runWhere } from "../run-tools";
-import { OrgPausedError } from "../standing";
+import { closedRefusal } from "../standing";
 import { grantedScopeKeys, isAllowed, toolAccess } from "../tools/scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
 import { agentBrowserStatus, browserUnavailableText } from "./status";
@@ -338,7 +338,8 @@ export async function requireBrowserAccess(
 ) {
   const membership = await getMembership(db, userId, orgId);
   if (!membership) throw new ForbiddenError("You are not a member of this organization");
-  if (membership.standing?.state === "suspended") throw new OrgPausedError(membership.standing);
+  const closed = closedRefusal(membership.standing);
+  if (closed) throw closed;
   const [agent] = await db
     .select({ owner: agents.ownerUserId, machineId: agents.machineId })
     .from(agents)

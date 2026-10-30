@@ -136,7 +136,7 @@ export function registerOperatorMachines(api: OpenAPIHono, { db, config, pubsub,
       tags,
       summary: "Workspaces waiting for their computer, oldest first",
       description:
-        "Active workspaces whose computer isn't ready (one on hold or suspended is never listed). Empty unless `MACHINE_PROVISIONING=external`.",
+        "Active workspaces whose computer isn't ready (one on hold, suspended or being deleted is never listed). Empty unless `MACHINE_PROVISIONING=external`.",
       request: {
         query: z.object({
           limit: z.coerce.number().int().min(1).max(200).default(100),
@@ -161,7 +161,7 @@ export function registerOperatorMachines(api: OpenAPIHono, { db, config, pubsub,
       tags,
       summary: "Say how far the workspace's computer is",
       description:
-        "Its people see it live, with the time left and the stage. The time `since` restarts only when the state, step or reason change. One wait counts down to the earliest ready time you gave it: a later one changes nothing they see, so a part running long reads as running over, until another state, a removal or a hold starts a new wait. A ready time over a minute ahead (the wait's earliest), `waiting` or `problem` tells the owners they'll get an email when it's ready (when this server sends email). Refused (409 `provisioning.ready`) once the computer is ready, until it is removed, and (403 `org.paused`, `org.suspended`) unless the workspace is active: one held or suspended waits for no computer, and what you last said of it is gone.",
+        "Its people see it live, with the time left and the stage. The time `since` restarts only when the state, step or reason change. One wait counts down to the earliest ready time you gave it: a later one changes nothing they see, so a part running long reads as running over, until another state, a removal or a hold starts a new wait. A ready time over a minute ahead (the wait's earliest), `waiting` or `problem` tells the owners they'll get an email when it's ready (when this server sends email). Refused (409 `provisioning.ready`) once the computer is ready, until it is removed, and (403 `org.paused`, `org.suspended`, `org.deleting`) unless the workspace is active and not being deleted: one held, suspended or being deleted waits for no computer, and what you last said of it is gone.",
       request: { params: OrgParams, body: body(ProvisioningInput) },
       responses: {
         204: noContent[204],
@@ -188,7 +188,7 @@ export function registerOperatorMachines(api: OpenAPIHono, { db, config, pubsub,
       tags,
       summary: "The workspace's computer, and a code for it to connect with",
       description:
-        "One per workspace: the first call makes it, every later one issues a new code for the same computer (an earlier unused code stops working), and one removed comes back. The code lives 10 minutes; once redeemed, the computer's first hello makes it ready and gives it the workspace's agents that have no computer. Refused (403 `org.paused`, `org.suspended`) unless the workspace is active.",
+        "One per workspace: the first call makes it, every later one issues a new code for the same computer (an earlier unused code stops working), and one removed comes back. The code lives 10 minutes; once redeemed, the computer's first hello makes it ready and gives it the workspace's agents that have no computer. Refused (403 `org.paused`, `org.suspended`, `org.deleting`) unless the workspace is active and not being deleted.",
       request: { params: OrgParams, body: body(z.object({ name: z.string().trim().max(80).optional() })) },
       responses: { 200: json(Issued), ...errors, 403: errorResponse("The workspace isn't active") },
     }),

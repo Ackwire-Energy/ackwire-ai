@@ -69,17 +69,20 @@ export const STANDING_COLUMNS = {
   state: organizations.standing,
   reason: organizations.standingReason,
   notice: organizations.standingNotice,
+  deletionDueAt: organizations.deletionDueAt,
 };
 
-/** All of it, the operator's note included: for the operator API only. */
+/** All of it, the operator's note included: for the operator API only. A deletion is never part of a standing. */
 export const OPERATOR_STANDING_COLUMNS = {
-  ...STANDING_COLUMNS,
+  state: organizations.standing,
+  reason: organizations.standingReason,
+  notice: organizations.standingNotice,
   note: organizations.standingNote,
   changedAt: organizations.standingChangedAt,
 };
 
-/** What the workspace may know of its standing: never the operator's note. */
-export type WorkspaceStanding = Pick<OrgStanding, "state" | "reason" | "notice">;
+/** What the workspace may know of its standing (never the operator's note), and when it goes while being deleted. */
+export type WorkspaceStanding = Pick<OrgStanding, "state" | "reason" | "notice"> & { deletionDueAt: Date | null };
 
 /**
  * Holds a billing service sets (ADR 0079): a shown hold whose reason is one of these codes, which the apps say in
@@ -92,7 +95,7 @@ export type BillingHold = (typeof BILLING_HOLDS)[number];
 export const isBillingHold = (s: Pick<OrgStanding, "state" | "reason" | "notice">) =>
   s.state === "hold" && s.notice === "shown" && (BILLING_HOLDS as readonly string[]).includes(s.reason ?? "");
 
-const ACTIVE: WorkspaceStanding = { state: "active", reason: null, notice: "shown" };
+const ACTIVE: WorkspaceStanding = { state: "active", reason: null, notice: "shown", deletionDueAt: null };
 
 /** The reason the workspace is told: only with the notice `shown`. */
 export const toldReason = (s: Pick<OrgStanding, "reason" | "notice">) => (s.notice === "shown" ? s.reason : null);
@@ -101,12 +104,13 @@ const PAUSED = "Agents in this workspace are paused for now.";
 const UNAVAILABLE = "This workspace is unavailable for now.";
 const ON_HOLD = "This workspace is on hold: ";
 const SUSPENDED = "This workspace is suspended: ";
+const DELETING = "This workspace is being deleted.";
 const AGENT_PAUSED = "This agent is paused for now.";
 /** On agentes.chat Cloud, followed by the hold's kind: a run keeps it in its error, so its line names the kind. */
 const AGENT_HELD = "This agent is paused: ";
 
 /** What the workspace reads when work is refused; silent, only that it is paused. */
-export function standingText(s: WorkspaceStanding): string {
+export function standingText(s: Pick<OrgStanding, "state" | "reason" | "notice">): string {
   const reason = toldReason(s);
   if (s.state === "suspended") return reason ? `${SUSPENDED}${reason}` : UNAVAILABLE;
   return reason ? `${ON_HOLD}${reason}` : PAUSED;
@@ -123,6 +127,8 @@ export function standingErrorDetail(error: string): { errorCode: string; errorPa
   };
   if (error === AGENT_PAUSED) return told("run.agent_paused");
   if (error.startsWith(AGENT_HELD)) return told("run.agent_paused", { kind: error.slice(AGENT_HELD.length) });
+  // Nothing to contest: an owner deleted it.
+  if (error === DELETING) return { errorCode: "run.org_deleting" };
   if (error === PAUSED) return told("run.org_paused");
   if (error === UNAVAILABLE) return told("run.org_suspended");
   if (error.startsWith(ON_HOLD)) return told("run.org_paused", { reason: error.slice(ON_HOLD.length) });
@@ -161,6 +167,48 @@ export class AgentHeldError extends ForbiddenError {
   }
 }
 
+/** Work refused because an owner is deleting the workspace (`org.deleting`, 403), with `dueAt` while it's ahead. */
+export class OrgDeletingError extends ForbiddenError {
+  /** Like `OrgPausedError`: a job that hits it fails at once. */
+  readonly retryable = false;
+
+  constructor(dueAt: Date | null, now = new Date()) {
+    super(DELETING, "org.deleting", dueAt && dueAt > now ? { dueAt: dueAt.toISOString() } : undefined);
+    this.name = "OrgDeletingError";
+  }
+}
+
+/**
+ * Why the workspace is closed to its people, or null while it is open: suspended (the operator's, which comes first),
+ * else being deleted. The one check behind every way in; only reading who you are, restoring it and leaving it
+ * stay open. `closedOrg` says the same in SQL.
+ */
+export function closedRefusal(standing: WorkspaceStanding | undefined): OrgPausedError | OrgDeletingError | null {
+  if (standing?.state === "suspended") return new OrgPausedError(standing);
+  if (standing?.deletionDueAt) return new OrgDeletingError(standing.deletionDueAt);
+  return null;
+}
+
+/** Why work in the workspace is refused now: `closedRefusal`, else a hold. Null while active. `openOrg` in SQL. */
+export function workRefusal(standing: WorkspaceStanding | undefined): OrgPausedError | OrgDeletingError | null {
+  const closed = closedRefusal(standing);
+  if (closed || !standing || standing.state === "active") return closed;
+  return new OrgPausedError(standing);
+}
+
+/** `closedRefusal` in SQL, for queries over `organizations`: suspended, or being deleted. */
+export const closedOrg = sql<boolean>`(${organizations.standing} = 'suspended'
+  or ${organizations.deletionDueAt} is not null)`;
+/** `workRefusal` in SQL, for queries over `organizations`: active, and not being deleted. */
+export const openOrg = sql<boolean>`(${organizations.standing} = 'active' and ${organizations.deletionDueAt} is null)`;
+
+/** An org broadcast that closes the workspace to its people (a suspension, its deletion): their sockets close. */
+export const closesWorkspace = (event: { type: string; state?: unknown }) =>
+  event.type === "org.deleting" || (event.type === "org.standing" && event.state === "suspended");
+
+/** A suspension, or a hold that isn't billing's: its people don't carry on in a new workspace. */
+export const refusesNewWorkspace = (s: WorkspaceStanding) => s.state !== "active" && !isBillingHold(s);
+
 /** A workspace's standing, cached 5 s per process. An unknown id reads as active: what needs the row fails on its own. */
 export async function orgStanding(db: Executor, orgId: string): Promise<WorkspaceStanding> {
   return (await caches.standing.getOrLoad(`${orgId}:`, async () => {
@@ -185,15 +233,15 @@ export async function standingRefusal(
   db: Executor,
   orgId: string,
   agentId?: string | null,
-): Promise<OrgPausedError | AgentHeldError | null> {
-  const standing = await orgStanding(db, orgId);
-  if (standing.state !== "active") return new OrgPausedError(standing);
+): Promise<OrgPausedError | OrgDeletingError | AgentHeldError | null> {
+  const refusal = workRefusal(await orgStanding(db, orgId));
+  if (refusal) return refusal;
   const hold = agentId ? await agentHold(db, orgId, agentId) : null;
   if (!hold) return null;
   return new AgentHeldError(cloudNotices ? agentHoldKind(hold.reason) : undefined);
 }
 
-/** Throws `OrgPausedError` unless the workspace is active, and `AgentHeldError` when the agent given is held. */
+/** Throws `standingRefusal`'s refusal: the workspace isn't active or is being deleted, or the agent given is held. */
 export async function assertCanWork(db: Executor, orgId: string, agentId?: string | null) {
   const refusal = await standingRefusal(db, orgId, agentId);
   if (refusal) throw refusal;

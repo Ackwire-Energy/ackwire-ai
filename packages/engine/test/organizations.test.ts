@@ -67,7 +67,7 @@ describe("permissions", () => {
         orgName: "Acme",
         role: "owner",
         orgLogo: null,
-        standing: { state: "active", reason: null, notice: "shown" },
+        standing: { state: "active", reason: null, notice: "shown", deletionDueAt: null },
       },
     ]);
     const members = await f.db

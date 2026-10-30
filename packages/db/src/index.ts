@@ -20,6 +20,7 @@ export {
   lt,
   lte,
   ne,
+  not,
   notInArray,
   or,
   type SQL,
