@@ -4,9 +4,11 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { AuthPage } from "@/pages/AuthPage";
 
 export const Route = createFileRoute("/login")({
-  validateSearch: (search: Record<string, unknown>): { redirect?: string; email?: string } => ({
+  // `error`: a provider sign-in the server refused comes back here with its code.
+  validateSearch: (search: Record<string, unknown>): { redirect?: string; email?: string; error?: string } => ({
     redirect: safeRedirect(search.redirect),
     email: typeof search.email === "string" ? search.email : undefined,
+    error: typeof search.error === "string" ? search.error : undefined,
   }),
   beforeLoad: async ({ context, search }) => {
     const goal = signInFor(search.redirect);
@@ -22,6 +24,6 @@ export const Route = createFileRoute("/login")({
   },
   component: function Login() {
     const search = Route.useSearch();
-    return <AuthPage start="in" redirect={search.redirect} email={search.email} />;
+    return <AuthPage start="in" redirect={search.redirect} email={search.email} refused={search.error} />;
   },
 });

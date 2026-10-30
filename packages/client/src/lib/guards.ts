@@ -39,6 +39,13 @@ export function webUrl(value: unknown): string | undefined {
   }
 }
 
+/** The password sign-up's header with an early-access link's token (mirrors `packages/engine/src/early-access.ts`). */
+export const EARLY_ACCESS_HEADER = "x-early-access";
+
+/** An early-access link's token (`/signup?access=`), only in the shape the server makes: 43 base64url characters. */
+export const earlyAccessToken = (value: unknown): string | undefined =>
+  typeof value === "string" && /^[A-Za-z0-9_-]{43}$/.test(value) ? value : undefined;
+
 /** The sign-in page that comes back to `redirect`, with the address the page before already knew filled in. */
 export const signInPath = (redirect: string, email?: string) =>
   `/login?${new URLSearchParams({ redirect, ...(email ? { email } : {}) })}`;

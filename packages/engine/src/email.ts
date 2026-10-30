@@ -108,6 +108,13 @@ export type EmailTemplate =
    * before it existed).
    */
   | { kind: "waitlist_confirm"; locale: EmailLocale; url: string; email?: string }
+  /**
+   * Early access (ADR 0078): `email` may now create an account and workspaces, through `url` (the sign-up page
+   * with the address filled in and the link's token), for `days` days.
+   */
+  | { kind: "early_access"; locale: EmailLocale; email: string; url: string; days: number }
+  /** Early access for the account `email` already has (ADR 0078): it may make workspaces now, from `url`. */
+  | { kind: "early_access_allowed"; locale: EmailLocale; email: string; url: string }
   | {
       kind: "budget";
       locale?: EmailLocale;
@@ -287,6 +294,32 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
           { small: c.small },
           fallback(t.url),
         ],
+        c.why,
+      );
+    }
+    case "early_access": {
+      const c = w.earlyAccess;
+      return doc(
+        c.subject,
+        c.preheader(t.days),
+        c.headline,
+        [
+          { p: c.body(inertText(t.email)) },
+          { p: c.what },
+          { button: c.button, url: t.url },
+          { small: c.small(t.days) },
+          fallback(t.url),
+        ],
+        c.why,
+      );
+    }
+    case "early_access_allowed": {
+      const c = w.earlyAccessAllowed;
+      return doc(
+        c.subject,
+        c.preheader,
+        c.headline,
+        [{ p: c.body(inertText(t.email)) }, { button: c.button, url: t.url }, fallback(t.url)],
         c.why,
       );
     }

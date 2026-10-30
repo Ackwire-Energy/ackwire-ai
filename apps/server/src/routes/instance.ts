@@ -1,6 +1,6 @@
 import { countUsers, isAgentesCloud } from "@agenteschat/engine";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
-import { authUiConfig, signupPolicy } from "../auth";
+import { authUiConfig, signupOpen } from "../auth";
 import type { AppDeps } from "./app/context";
 
 /**
@@ -52,8 +52,7 @@ export function registerInstance(api: OpenAPIHono, deps: AppDeps, version: strin
   api.openapi(route, async (c) => {
     const { config } = deps;
     const users = await countUsers(deps.db);
-    const ownerWaits = users === 0 && signupPolicy(config).ownerByLink;
-    const open = !ownerWaits && (config.ALLOW_SIGNUP || users === 0);
+    const open = await signupOpen(deps.db, config, users);
     return c.json(
       {
         name: "agentes.chat" as const,

@@ -225,10 +225,11 @@ export interface ApiClient {
   account: {
     authConfig(): Promise<AuthConfig>;
     /**
-     * Whether the e-mail has an account and how it signs in (rate limited: `rate_limited` 429). `humanCheck`: the
-     * bot check's token, when the server has one (`human_check` 403 without it).
+     * Whether the e-mail has an account and how it signs in (rate limited: `rate_limited` 429). `access`: the
+     * early-access link's token, when the page has one. `humanCheck`: the bot check's token, when the server has one
+     * (`human_check` 403 without it).
      */
-    signInOptions(input: { email: string }, humanCheck?: string): Promise<SignInOptions>;
+    signInOptions(input: { email: string; access?: string }, humanCheck?: string): Promise<SignInOptions>;
     /** `null` when signed out. */
     me(): Promise<Me | null>;
     /** My app language (emails and pushes are written in it). */

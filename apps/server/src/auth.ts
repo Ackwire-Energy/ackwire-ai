@@ -6,8 +6,11 @@ import {
   accountBlock,
   countUsers,
   deriveSecret,
+  EARLY_ACCESS_HEADER,
+  EARLY_ACCESS_TOKEN,
+  earlyAccessLink,
   emailLocale,
-  isSignupAllowed,
+  isAgentesCloud,
   onUserCreated,
   queueEmail,
   recordSession,
@@ -15,11 +18,15 @@ import {
   requestLocale,
   type SignupPolicy,
   sha256,
+  signupAdmission,
+  signupOpenToAll,
+  useEarlyAccess,
+  type WorkspacePolicy,
 } from "@agenteschat/engine";
 import { expo } from "@better-auth/expo";
 import { type BetterAuthPlugin, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError, createAuthEndpoint, createAuthMiddleware, formCsrfMiddleware } from "better-auth/api";
+import { APIError, createAuthEndpoint, createAuthMiddleware, formCsrfMiddleware, getOAuthState } from "better-auth/api";
 import { setSessionCookie } from "better-auth/cookies";
 import { z } from "zod";
 import { desktopSignIn } from "./desktop-sign-in";
@@ -59,19 +66,29 @@ export function createAuth(deps: {
     (await rateLimiter.consume(`${kind}:${sha256(email.toLowerCase())}`, EMAILS_PER_ADDRESS)).allowed;
 
   const policy = signupPolicy(config);
-  // An invitation link never opens sign-up (ADR 0068): only an email invitation to that address does.
-  const assertSignupAllowed = async (email: string) => {
-    if (!(await isSignupAllowed(db, email, policy))) {
-      if (policy.ownerByLink && (await countUsers(db)) === 0) {
-        throw new APIError("FORBIDDEN", {
-          code: OWNER_CLAIM_REQUIRED,
-          message: "This server waits for its owner: open its owner link.",
-        });
-      }
+  // An invitation link never opens sign-up (ADR 0068): only an email invitation to that address, or an early-access
+  // link sent to it (ADR 0078), does.
+  const assertSignupAllowed = async (email: string, access: string | null) => {
+    const admission = await signupAdmission(db, email, policy, { access });
+    if (admission) return admission;
+    if (policy.ownerByLink && (await countUsers(db)) === 0) {
       throw new APIError("FORBIDDEN", {
-        message: "Sign-up is closed on this server. If you were invited, open the link in the invitation email.",
+        code: OWNER_CLAIM_REQUIRED,
+        message: "This server waits for its owner: open its owner link.",
       });
     }
+    // Only whoever holds the link learns it is for another address, and never which one.
+    const link = await earlyAccessLink(db, access);
+    if (link && link.expiresAt > new Date() && link.email !== email.trim().toLowerCase()) {
+      throw new APIError("FORBIDDEN", {
+        code: EARLY_ACCESS_OTHER_EMAIL,
+        message: "This invitation is for another address. Sign up with the address it was sent to.",
+      });
+    }
+    throw new APIError("FORBIDDEN", {
+      code: SIGNUP_CLOSED,
+      message: "Sign-up is closed on this server. If you were invited, open the link in the invitation email.",
+    });
   };
 
   const devOrigins = config.NODE_ENV === "development" ? ["http://localhost:5173"] : [];
@@ -230,7 +247,7 @@ export function createAuth(deps: {
         if (ctx.path !== "/sign-up/email") return;
         const email = (ctx.body as { email?: unknown } | undefined)?.email;
         if (typeof email !== "string") return;
-        await assertSignupAllowed(email);
+        await assertSignupAllowed(email, await accessOf(ctx));
       }),
     },
     databaseHooks: {
@@ -238,16 +255,31 @@ export function createAuth(deps: {
         create: {
           // Social sign-up too (the phone's Apple sign-in from an invitation).
           before: async (user, context) => {
-            await assertSignupAllowed(user.email);
+            const admission = await assertSignupAllowed(user.email, await accessOf(context));
+            // An early-access link opens sign-up for one address: a provider must vouch for it.
+            if (admission === "early_access" && isSocial(context) && user.emailVerified !== true) {
+              throw new APIError("FORBIDDEN", {
+                code: EARLY_ACCESS_EMAIL_UNVERIFIED,
+                message:
+                  "Your sign-in provider hasn't confirmed this address. Confirm it there, or sign up with a password.",
+              });
+            }
             // The sign-up's own language from the start: the confirmation email goes out before any other choice.
             const locale = requestLocale(context?.headers?.get("accept-language"));
             return { data: { ...user, email: user.email.toLowerCase(), ...(locale ? { locale } : {}) } };
           },
-          after: async (user) => {
+          // After the account is committed: a failure is logged and never fails the sign-up.
+          after: async (user, context) => {
             try {
               await onUserCreated(db, user.id);
             } catch (error) {
               log.error("post-signup setup failed", { userId: user.id, error: String(error) });
+            }
+            const access = await accessOf(context);
+            if (access && (!isSocial(context) || user.emailVerified === true)) {
+              await useEarlyAccess(db, { access, email: user.email, userId: user.id }).catch((error) =>
+                log.error("early access not recorded", { userId: user.id, error: String(error) }),
+              );
             }
           },
         },
@@ -364,6 +396,30 @@ const EMAILS_PER_ADDRESS = { limit: 3, windowMs: 3600_000 };
 
 /** `APIError` code of a sign-up refused because the first account waits for its owner's link or key. */
 export const OWNER_CLAIM_REQUIRED = "OWNER_CLAIM_REQUIRED";
+/**
+ * `APIError` code of a sign-up refused because sign-up is closed, the same for an address invited to early access
+ * that came without its link. A provider's callback sends a refusal to `/login?error=` only when it has a code.
+ */
+export const SIGNUP_CLOSED = "SIGNUP_CLOSED";
+/** An early-access link used to sign up another address than the one it was sent to (ADR 0078). */
+export const EARLY_ACCESS_OTHER_EMAIL = "EARLY_ACCESS_OTHER_EMAIL";
+/** An early-access sign-up through a provider that hasn't confirmed the address (ADR 0078). */
+export const EARLY_ACCESS_EMAIL_UNVERIFIED = "EARLY_ACCESS_EMAIL_UNVERIFIED";
+
+/** Every sign-up but the password form's is through a provider (the redirect's callback, or the phone's id token). */
+const isSocial = (context: { path?: string } | null | undefined) => context?.path !== "/sign-up/email";
+
+/**
+ * The early-access link's token on a sign-up (ADR 0078): the password form's header, else what the web put in a
+ * provider sign-in's state. Untrusted either way, so only the token's shape is kept, and the rule checks the rest.
+ */
+async function accessOf(context: { headers?: Headers | null } | null | undefined): Promise<string | null> {
+  const value =
+    context?.headers?.get(EARLY_ACCESS_HEADER) ??
+    // Outside a request (the adapter called directly) there is no state to read.
+    (await getOAuthState().catch(() => null))?.earlyAccess;
+  return typeof value === "string" && EARLY_ACCESS_TOKEN.test(value) ? value : null;
+}
 
 /**
  * The confirmation link, landing on `/?email_confirmed=1`, where the web app says how it went
@@ -382,8 +438,24 @@ export function signupPolicy(config: Config): SignupPolicy {
   return {
     allowSignup: config.ALLOW_SIGNUP,
     ownerByLink: Boolean(config.OWNER_CLAIM_SHA256 || config.OWNER_KEY_SHA256),
+    hostComputer: Boolean(config.HOST_COMPUTER_TOKEN),
   };
 }
+
+/**
+ * Whether anyone may sign up now (`users`: how many accounts exist): the first account unless the owner's link or key
+ * makes it, then `ALLOW_SIGNUP` or the operator's live mode (ADR 0078).
+ */
+export async function signupOpen(db: Database, config: Config, users: number) {
+  const policy = signupPolicy(config);
+  return users === 0 ? !policy.ownerByLink : signupOpenToAll(db, policy);
+}
+
+/** Whether making a workspace needs an account early access allowed (ADR 0078 §4): only on agentes.chat Cloud. */
+export const workspacePolicy = (config: Config): WorkspacePolicy => ({
+  paidMachines: config.MACHINE_PROVISIONING === "external" && isAgentesCloud(config.PUBLIC_URL),
+  allowSignup: config.ALLOW_SIGNUP,
+});
 
 /** Sign-in options the login and sign-up pages need to render. */
 export function authUiConfig(config: Config) {

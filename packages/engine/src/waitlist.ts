@@ -1,5 +1,5 @@
 import { EmailError, type EmailSender } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, isNull, lt, or, schema, sql } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, isNull, lt, ne, or, schema, sql } from "@agenteschat/db";
 import { randomToken, sha256 } from "./crypto";
 import { queueEmail } from "./email";
 import { ValidationError } from "./errors";
@@ -129,6 +129,9 @@ function enqueueWaitlistContact(db: Executor, entryId: string, status: "pending"
   });
 }
 
+/** Where imported entries come from (`importWaitlist`): they are contacts there already, so they never sync. */
+export const WAITLIST_IMPORT_SOURCE = "import";
+
 /**
  * Queues `waitlist.contact` for every entry in its current status (run at
  * boot: catches up entries from before contacts were synced; the dedupe key
@@ -137,7 +140,8 @@ function enqueueWaitlistContact(db: Executor, entryId: string, status: "pending"
 export async function enqueueWaitlistContacts(db: Database): Promise<number> {
   const rows = await db
     .select({ id: waitlistEntries.id, confirmedAt: waitlistEntries.confirmedAt })
-    .from(waitlistEntries);
+    .from(waitlistEntries)
+    .where(ne(waitlistEntries.source, WAITLIST_IMPORT_SOURCE));
   for (const row of rows) await enqueueWaitlistContact(db, row.id, row.confirmedAt ? "confirmed" : "pending");
   return rows.length;
 }
@@ -153,7 +157,7 @@ export async function enqueueWaitlistContacts(db: Database): Promise<number> {
 export async function saveWaitlistContact(db: Database, email: EmailSender, entryId: string): Promise<void> {
   if (!email.saveContact) return;
   const [entry] = await db.select().from(waitlistEntries).where(eq(waitlistEntries.id, entryId));
-  if (!entry) return;
+  if (!entry || entry.source === WAITLIST_IMPORT_SOURCE) return;
   try {
     await email.saveContact({
       email: entry.email,

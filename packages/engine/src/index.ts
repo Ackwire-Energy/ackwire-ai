@@ -69,6 +69,7 @@ export * from "./desktop/tools";
 export * from "./dispatch";
 export * from "./dms";
 export * from "./docx";
+export * from "./early-access";
 export * from "./email";
 export * from "./errors";
 export * from "./events";

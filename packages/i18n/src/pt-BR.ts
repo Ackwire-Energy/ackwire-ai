@@ -94,6 +94,10 @@ export const ptBR = {
     privacy: "Política de privacidade",
     termsAfter: ".",
     signOut: "Sair",
+    earlyAccess: {
+      otherEmail: "Este convite é para outro endereço. Cadastre-se com o endereço que recebeu o convite.",
+      unverified: "Seu provedor de login não confirmou este endereço. Confirme lá, ou cadastre-se com uma senha.",
+    },
     flow: {
       email: "Oi. Qual é o seu e-mail?",
       emailLead: "Vale para entrar ou para criar uma conta.",
@@ -119,6 +123,9 @@ export const ptBR = {
       newPasswordNamed: "Boa, {{name}}. Agora uma senha.",
       closed: "Esse e-mail ainda não tem conta.",
       closedLead: "O cadastro está fechado. Peça um convite a quem administra a sua organização.",
+      expired: "Este convite expirou.",
+      expiredLead: "Peça um novo em {{email}}.",
+      expiredLeadAsk: "Peça um novo a quem convidou você.",
       otherEmail: "Usar outro e-mail",
       forgot: "Te mando um link para criar outra senha.",
       forgotLead: "Confira o e-mail:",
@@ -288,6 +295,8 @@ export const ptBR = {
       namePlaceholder: "Ex.: Acme",
       timezone: "Fuso horário",
       timezoneHelp: "Para rotinas e lembretes. Detectado pelo seu navegador.",
+      inviteOnly: "Novos workspaces precisam de convite por enquanto.",
+      inviteOnlyAsk: "Novos workspaces precisam de convite por enquanto. Peça um em {{email}}.",
     },
     vault: {
       title: "Já tem documentação no Obsidian?",
@@ -655,6 +664,7 @@ export const ptBR = {
     skip: "Pular esta etapa",
     confirmation: {
       sent: "Mandamos um link de confirmação para {{email}}.",
+      first: "Já tem convite? Confirme seu e-mail primeiro.",
     },
   },
   /** The desktop app's right click (lib/context-menu.ts). */
@@ -6995,6 +7005,9 @@ export const ptBR = {
     },
     invitation: {
       askToJoin: "Este link agora passa por um admin. Abra de novo para pedir para entrar.",
+    },
+    org: {
+      createInviteOnly: "Novos workspaces precisam de convite por enquanto.",
     },
     humanCheck: "Não conseguimos confirmar que você é uma pessoa. Tente de novo.",
     humanCheckBlocked: "A verificação não carregou. Tente outro navegador ou outra rede.",

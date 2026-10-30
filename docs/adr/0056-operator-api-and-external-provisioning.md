@@ -1,6 +1,6 @@
 # 0056. Operator API and external provisioning
 
-- Status: Accepted (2026-10-24). Amended 2026-10-25 by ADR 0065 (§10: the ready time and when the wait began, the ready email, no pairing with external provisioning, no approval step), 2026-10-26 (§10: a workspace on hold or suspended waits for no computer), and 2026-10-27 by ADR 0076 (§5, §6: screened sessions)
+- Status: Accepted (2026-10-24). Amended 2026-10-25 by ADR 0065 (§10: the ready time and when the wait began, the ready email, no pairing with external provisioning, no approval step), 2026-10-26 (§10: a workspace on hold or suspended waits for no computer), 2026-10-27 by ADR 0076 (§5, §6: screened sessions), and 2026-10-29 by ADR 0078 (the sign-up mode, the waiting list and early-access invitations)
 - Date: 2026-10-24
 - Extends: ADR 0002 (nothing private runs in the server process), ADR 0004 (configuration), ADR 0025 (connected computers)
 

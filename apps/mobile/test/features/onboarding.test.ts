@@ -217,6 +217,9 @@ test("a step that failed says why the server refused it, else that it didn't sav
     "Você não pode criar um workspace enquanto a sua conta ou um dos seus workspaces estiver com restrição. Para contestar, escreva para legal@agentes.chat.",
   );
   expect(stepFailedText(pt, refused())).toBe("Você não pode criar um workspace agora.");
+  const inviteOnly = new ApiError(403, "org.create_invite_only", "New workspaces need an invitation for now");
+  expect(stepFailedText(pt, inviteOnly)).toBe("Novos workspaces precisam de convite por enquanto.");
+  expect(stepFailedText(await translator("en"), inviteOnly)).toBe("New workspaces need an invitation for now.");
   expect(stepFailedText(pt, new ApiError(500, "internal", "x"))).toBe(pt("mobile.onb.failed"));
   expect(stepFailedText(pt, new TypeError("Network request failed"))).toBe(pt("mobile.onb.failed"));
 });

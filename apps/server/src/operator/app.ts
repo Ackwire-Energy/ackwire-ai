@@ -5,6 +5,7 @@ import { type MachineHub, type SessionScreening, safeEqual } from "@agenteschat/
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { apiError, domainErrorResponse, validationHook } from "../http/errors";
 import type { Logger } from "../logger";
+import { registerOperatorAccess } from "./access";
 import { registerOperatorEvents } from "./events";
 import { registerOperatorMachines } from "./machines";
 import { registerOperatorOrgs } from "./orgs";
@@ -22,7 +23,10 @@ export interface OperatorDeps {
   pubsub?: PubSub;
   /** Stops a suspended workspace's tasks on its computers. */
   hub?: MachineHub;
-  /** The server sends email: a workspace waiting long for its computer is told its owners will be emailed. */
+  /**
+   * The server sends email: a workspace waiting long for its computer is told its owners will be emailed, and
+   * early-access invitations can go out.
+   */
   emails?: boolean;
   /** The bot check (ADR 0075), reported by `/health`; absent: `off`. */
   humanCheck?: HumanCheck | null;
@@ -53,13 +57,14 @@ export function createOperatorApp(deps: OperatorDeps, token: string) {
   registerOperatorStanding(api, deps);
   registerOperatorEvents(api, deps);
   registerOperatorMachines(api, deps);
+  registerOperatorAccess(api, deps);
   api.doc31("/openapi.json", {
     openapi: "3.1.0",
     info: {
       title: "agentes.chat operator API",
       version: deps.version,
       description:
-        "Workspace and account lookups, workspace standing, the events feed and review blocks, and the workspaces' computers from an external provisioner, for the people who run this instance (ADR 0056).",
+        "Workspace and account lookups, workspace standing, the events feed and review blocks, the workspaces' computers from an external provisioner, and who may sign up (the waiting list and early-access invitations, ADR 0078), for the people who run this instance (ADR 0056).",
     },
     servers: [{ url: OPERATOR_API_PREFIX }],
     security: [{ operator: [] }],

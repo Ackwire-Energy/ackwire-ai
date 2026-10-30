@@ -6,7 +6,7 @@ import {
   useApi,
   useAuthConfig,
 } from "@agenteschat/client";
-import { authErrorText, knownErrorText } from "@agenteschat/client/lib/errors";
+import { authErrorText, EARLY_ACCESS_OTHER_EMAIL, knownErrorText } from "@agenteschat/client/lib/errors";
 import { signInFor } from "@agenteschat/client/lib/guards";
 import { type HumanAction, isHumanCheckRefusal, withHumanCheck } from "@agenteschat/client/lib/human-check";
 import { emailTypoFix, isEmail, passwordState, webmailOf } from "@agenteschat/client/lib/text";
@@ -51,6 +51,7 @@ type Step =
   | "name"
   | "newPassword"
   | "closed"
+  | "expired"
   | "forgot"
   | "sent"
   | "browser"
@@ -99,10 +100,16 @@ export function AuthPage({
   start,
   redirect,
   email: initialEmail,
+  access,
+  refused,
 }: {
   start: "in" | "up";
   redirect?: string;
   email?: string;
+  /** An early-access link's token (`/signup?access=`): it opens sign-up for the address it was sent to. */
+  access?: string;
+  /** The code of a provider sign-in the server refused (`/login?error=`): said when the app knows it. */
+  refused?: string;
 }) {
   const { t } = useTranslation();
   const api = useApi();
@@ -115,7 +122,9 @@ export function AuthPage({
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [options, setOptions] = useState<SignInOptions | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() =>
+    refused ? knownErrorText(t, new ApiError(403, refused, "")) : null,
+  );
   const [wrong, setWrong] = useState(false);
   const [pending, setPending] = useState(false);
   const [show, setShow] = useState(false);
@@ -192,12 +201,12 @@ export function AuthPage({
     setError(null);
     try {
       const found = await withHumanCheck(human.check, (token) =>
-        api.account.signInOptions({ email: value.trim() }, token),
+        api.account.signInOptions({ email: value.trim(), ...(access ? { access } : {}) }, token),
       );
       setOptions(found);
       setPassword("");
       if (found.account) go(found.password ? "password" : found.providers.length > 0 ? "social" : "noPassword");
-      else go(found.canSignUp ? "name" : "closed");
+      else go(found.canSignUp ? "name" : found.accessExpired ? "expired" : "closed");
     } catch (e) {
       fail(e);
     } finally {
@@ -237,12 +246,14 @@ export function AuthPage({
     setPending(true);
     setError(null);
     const result = await withHumanCheck(human.check, (token) =>
-      auth.signUp({ name: name.trim(), email: email.trim(), password }, token),
+      auth.signUp({ name: name.trim(), email: email.trim(), password, ...(access ? { access } : {}) }, token),
     );
     setPending(false);
     if (!result.ok) {
-      // The bot check's 403 says so by its code: only another 403 means sign-up is closed.
-      if (result.status === 403 && !isHumanCheckRefusal(result.code)) return go("closed");
+      // The bot check's 403 and an early-access link for another address say so by their codes: only another 403
+      // means sign-up is closed.
+      if (result.status === 403 && !isHumanCheckRefusal(result.code) && result.code !== EARLY_ACCESS_OTHER_EMAIL)
+        return go("closed");
       setError(authErrorText(t, result));
       return;
     }
@@ -347,6 +358,12 @@ export function AuthPage({
     name: [t("auth.flow.name"), t("auth.flow.nameLead")],
     newPassword: [first ? t("auth.flow.newPasswordNamed", { name: first }) : t("auth.flow.newPassword")],
     closed: [t("auth.flow.closed"), t("auth.flow.closedLead")],
+    expired: [
+      t("auth.flow.expired"),
+      config.data?.supportEmail
+        ? t("auth.flow.expiredLead", { email: config.data.supportEmail })
+        : t("auth.flow.expiredLeadAsk"),
+    ],
     forgot: [t("auth.flow.forgot"), t("auth.flow.forgotLead")],
     sent: [t("auth.flow.sent", { email: email.trim() }), t("auth.flow.sentLead")],
     browser: [
@@ -542,6 +559,7 @@ export function AuthPage({
                   callbackURL={redirect ?? "/"}
                   providers={allProviders}
                   onSocial={desktop ? (p) => void signInInBrowser(p) : undefined}
+                  earlyAccess={access}
                 />
               </>
             )}
@@ -584,7 +602,7 @@ export function AuthPage({
               </>
             )}
 
-            {(step === "closed" || step === "noPassword") && (
+            {(step === "closed" || step === "expired" || step === "noPassword") && (
               <Button type="button" size="lg" block onClick={() => go("email")}>
                 {t("auth.flow.otherEmail")}
               </Button>

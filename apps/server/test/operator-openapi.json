@@ -3,7 +3,7 @@
   "info": {
     "title": "agentes.chat operator API",
     "version": "test",
-    "description": "Workspace and account lookups, workspace standing, the events feed and review blocks, and the workspaces' computers from an external provisioner, for the people who run this instance (ADR 0056)."
+    "description": "Workspace and account lookups, workspace standing, the events feed and review blocks, the workspaces' computers from an external provisioner, and who may sign up (the waiting list and early-access invitations, ADR 0078), for the people who run this instance (ADR 0056)."
   },
   "servers": [
     {
@@ -595,6 +595,283 @@
           }
         },
         "required": ["id", "kind", "managed", "name", "online", "lastSeenAt", "runnerVersion", "protocol"]
+      },
+      "OperatorSignup": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": ["invite", "open"],
+            "description": "`invite`: only people with an invitation sign up (a workspace's, or early access). `open`: anyone. Always `invite` while this server is its agents' computer (`HOST_COMPUTER_TOKEN`)."
+          },
+          "forcedOpen": {
+            "type": "boolean",
+            "description": "`ALLOW_SIGNUP=true` on this server: sign-up is open whatever `mode` says."
+          },
+          "changedAt": {
+            "type": ["string", "null"],
+            "description": "When `mode` last changed; null: never."
+          },
+          "emails": {
+            "type": "boolean",
+            "description": "This server sends email, so invitations can go out."
+          }
+        },
+        "required": ["mode", "forcedOpen", "changedAt", "emails"]
+      },
+      "OperatorWaitlist": {
+        "type": "object",
+        "properties": {
+          "unconfirmed": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Entries that never confirmed their address."
+          },
+          "confirmed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "waiting": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Confirmed, with no invitation (in any state). Some may have an account: inviting one allows it."
+          },
+          "invited": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Confirmed, with an invitation."
+          },
+          "signedUp": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Confirmed, whose invitation made an account or allowed the one it had."
+          },
+          "workspaceCreated": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Confirmed, whose account made a workspace."
+          }
+        },
+        "required": ["unconfirmed", "confirmed", "waiting", "invited", "signedUp", "workspaceCreated"]
+      },
+      "OperatorWaitlistNext": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string"
+                },
+                "locale": {
+                  "$ref": "#/components/schemas/OperatorLocale"
+                },
+                "joinedAt": {
+                  "type": "string",
+                  "description": "When it joined the list (or the imported time)."
+                }
+              },
+              "required": ["email", "locale", "joinedAt"]
+            }
+          }
+        },
+        "required": ["entries"]
+      },
+      "OperatorLocale": {
+        "type": "string",
+        "enum": ["pt-BR", "en"],
+        "description": "The language of the email."
+      },
+      "OperatorWaitlistImport": {
+        "type": "object",
+        "properties": {
+          "added": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "confirmed": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Entries already there, unconfirmed until now."
+          },
+          "unchanged": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Already confirmed, or repeated in this call."
+          },
+          "invalid": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "required": ["added", "confirmed", "unchanged", "invalid"]
+      },
+      "OperatorInvitationResults": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string"
+                },
+                "outcome": {
+                  "type": "string",
+                  "enum": ["invited", "resent", "recent", "already_invited", "signed_up", "allowed", "invalid_email"]
+                },
+                "invitationId": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "required": ["email", "outcome"]
+            }
+          }
+        },
+        "required": ["results"]
+      },
+      "OperatorInvitationPage": {
+        "type": "object",
+        "properties": {
+          "invitations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperatorInvitation"
+            }
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "sent": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "expired": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "signedUp": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "workspaceCreated": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "revoked": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": ["sent", "expired", "signedUp", "workspaceCreated", "revoked"]
+          },
+          "next": {
+            "type": ["string", "null"],
+            "description": "`cursor` for the next page; null on the last one."
+          }
+        },
+        "required": ["invitations", "counts", "next"]
+      },
+      "OperatorInvitation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string"
+          },
+          "locale": {
+            "$ref": "#/components/schemas/OperatorLocale"
+          },
+          "state": {
+            "$ref": "#/components/schemas/OperatorInvitationState"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "sentAt": {
+            "type": "string",
+            "description": "The latest send."
+          },
+          "sends": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "14 days after the latest send."
+          },
+          "revokedAt": {
+            "type": ["string", "null"]
+          },
+          "usedAt": {
+            "type": ["string", "null"],
+            "description": "When an account was made with it, or the address's account was allowed."
+          },
+          "userId": {
+            "type": ["string", "null"],
+            "description": "That account; null once it is deleted."
+          },
+          "workspaceCreatedAt": {
+            "type": ["string", "null"],
+            "description": "When its account made its first workspace."
+          },
+          "workspaceId": {
+            "type": ["string", "null"],
+            "format": "uuid",
+            "description": "That workspace; null once it is deleted."
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "locale",
+          "state",
+          "createdAt",
+          "sentAt",
+          "sends",
+          "expiresAt",
+          "revokedAt",
+          "usedAt",
+          "userId",
+          "workspaceCreatedAt",
+          "workspaceId"
+        ]
+      },
+      "OperatorInvitationState": {
+        "type": "string",
+        "enum": ["sent", "expired", "signed_up", "workspace_created", "revoked"],
+        "description": "The first that holds: `revoked`, `workspace_created` (its account made a workspace), `signed_up` (its account exists: made with the link, or allowed), `expired` (the link no longer signs anyone up), else `sent`."
+      },
+      "OperatorInvitationResend": {
+        "type": "object",
+        "properties": {
+          "invitation": {
+            "$ref": "#/components/schemas/OperatorInvitation"
+          },
+          "sent": {
+            "type": "boolean"
+          }
+        },
+        "required": ["invitation", "sent"]
+      },
+      "OperatorInvitationRevoke": {
+        "type": "object",
+        "properties": {
+          "invitation": {
+            "$ref": "#/components/schemas/OperatorInvitation"
+          }
+        },
+        "required": ["invitation"]
       }
     },
     "parameters": {}
@@ -1651,6 +1928,546 @@
           },
           "404": {
             "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/signup": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "Who may sign up",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorSignup"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["Operator"],
+        "summary": "Open sign-up to everyone, or back to invitation only",
+        "description": "Takes effect at once, with no restart. Setting the current mode changes nothing. On agentes.chat Cloud, while it is `invite`, only the accounts early access allowed make workspaces, as many as they like; `open` lets every account make workspaces, each with its own computer. Refused (409 `signup.host_computer`) to open while this server is its agents' computer (`HOST_COMPUTER_TOKEN`).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": ["invite", "open"]
+                  }
+                },
+                "required": ["mode"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorSignup"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "This server is its agents' computer (`signup.host_computer`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/waitlist": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "The waiting list against the invitations",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorWaitlist"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/waitlist/next": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "The next confirmed entries still waiting, oldest first",
+        "description": "A read: invite exactly these (`POST /early-access/invitations`), so a retry never invites more than you saw. An address with an account is among them: inviting it allows the account. Skips addresses sign-up wouldn't take and those of blocked accounts; they still count as waiting.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorWaitlistNext"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/waitlist/import": {
+      "post": {
+        "tags": ["Operator"],
+        "summary": "Add confirmed addresses to the waiting list",
+        "description": "In one transaction, up to 5000 entries, deduplicated on the address in lower case. New ones join confirmed, at `joinedAt` (a future one reads as now) or else in the list's order; an unconfirmed entry is confirmed; anything else is `unchanged`, so a repeat changes nothing. `invalid` holds the indexes of the entries that aren't addresses (sign-up's own rule), never the addresses. Imported entries are never sent to the email provider's contacts.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "entries": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "email": {
+                          "type": "string",
+                          "maxLength": 320
+                        },
+                        "locale": {
+                          "allOf": [
+                            {
+                              "$ref": "#/components/schemas/OperatorLocale"
+                            },
+                            {
+                              "description": "pt-BR when absent."
+                            }
+                          ]
+                        },
+                        "joinedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": ["email"]
+                    },
+                    "minItems": 1,
+                    "maxItems": 5000
+                  }
+                },
+                "required": ["entries"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorWaitlistImport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/early-access/invitations": {
+      "post": {
+        "tags": ["Operator"],
+        "summary": "Invite addresses to create an account and make workspaces",
+        "description": "Each address, up to 200, gets an email with a link to sign up with that address only, valid 14 days, in the language of its invitation, else of its waiting-list entry, else `locale`, else pt-BR. An address that has an account gets no link: the account is allowed at once, and an email in its language says so (none to a blocked account). An allowed account makes workspaces once its address is confirmed. One invitation per address: inviting it again sends the same invitation a new link (the old one stops working), unless `resend` is false. Answers come in the request's order, once per address. Outcomes: `invalid_email`, `signed_up` (its invitation made an account or allowed one already, so nothing went out), `allowed`, `already_invited` (with `resend: false`), `recent` (sent in the last 2 minutes, so nothing went out), `resent`, `invited`. Refused (409 `early_access.no_email`) on a server that sends no email.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "emails": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 320
+                    },
+                    "minItems": 1,
+                    "maxItems": 200
+                  },
+                  "locale": {
+                    "$ref": "#/components/schemas/OperatorLocale"
+                  },
+                  "resend": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                },
+                "required": ["emails"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorInvitationResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "This server sends no email (`early_access.no_email`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": ["Operator"],
+        "summary": "The invitations, newest first",
+        "description": "`counts` count every invitation by state, whatever `state` and `q` say.",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/OperatorInvitationState"
+            },
+            "required": false,
+            "description": "The first that holds: `revoked`, `workspace_created` (its account made a workspace), `signed_up` (its account exists: made with the link, or allowed), `expired` (the link no longer signs anyone up), else `sent`.",
+            "name": "state",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 320,
+              "description": "Any part of the address, in any case."
+            },
+            "required": false,
+            "description": "Any part of the address, in any case.",
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorInvitationPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/early-access/invitations/{invitationId}/resend": {
+      "post": {
+        "tags": ["Operator"],
+        "summary": "Send an invitation again, with a new link",
+        "description": "The old link stops working, the invitation is no longer revoked and runs 14 days from now. Within 2 minutes of the previous send nothing goes out (`sent: false`). When the address has an account by now, no link goes: the account is allowed at once and an email says so (none to a blocked account), and the answer is the invitation, now `signed_up`, with `sent: false`. Refused (409) once it was used (`early_access.used`), and on a server that sends no email (`early_access.no_email`).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "invitationId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorInvitationResend"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No invitation with this id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Used, or no email (`early_access.*`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/early-access/invitations/{invitationId}/revoke": {
+      "post": {
+        "tags": ["Operator"],
+        "summary": "Revoke an invitation",
+        "description": "Its link stops working, and its account can make no more workspaces while sign-up is by invitation. The workspaces it made stay. Revoking again answers the same.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "invitationId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorInvitationRevoke"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No invitation with this id",
             "content": {
               "application/json": {
                 "schema": {
