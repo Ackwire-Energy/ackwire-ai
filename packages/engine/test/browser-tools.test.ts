@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { DESKTOP_PROTOCOL, type MachineRequest } from "@agenteschat/adapters";
+import { DESKTOP_PROTOCOL, type MachineRequest, SECRET_ACTIVATE_PROTOCOL } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
   agentBrowserStatus,
@@ -642,6 +642,7 @@ test("an agent with only the browser asks for a password bound to one site, made
   expect(noSite.isError).toBe(true);
   expect(b.calls).toHaveLength(0);
 
+  b.s.status = { protocol: SECRET_ACTIVATE_PROTOCOL };
   b.s.reply = { publicKey: "pk-browser" } as never;
   const r = await tools.invoke(b.ctx, {
     toolUseId: "tu_secret_browser",

@@ -21,7 +21,17 @@ describe("the browser, computer and desktop surfaces take their colors from the 
       }
     expect(found).toEqual([]);
     const tokens = await Bun.file(join(ROOT, "packages/ui/src/styles/tokens.css")).text();
-    for (const token of ["--site-paper", "--site-blank", "--mac-accent", "--mac-accent-ink", "--screen-bg"])
+    for (const token of [
+      "--site-paper",
+      "--site-blank",
+      "--site-ink",
+      "--frame-ink",
+      "--frame-control-a",
+      "--frame-control-b",
+      "--mac-accent",
+      "--mac-accent-ink",
+      "--screen-bg",
+    ])
       expect(tokens.match(new RegExp(`${token}: #[0-9a-f]+;`, "g"))).toHaveLength(1);
   });
 });

@@ -948,9 +948,9 @@ export const en: Translations = {
     unreadDivider: "New",
     /** Under my latest message in a DM with a person, once they read it. */
     seen: "Seen",
-    offline: "No internet. Whatever you send goes out on its own when it's back.",
+    offline: "No connection. Whatever you send goes out on its own when it's back.",
     backOnline: "Connected again",
-    sendingOffline: "goes out when the internet is back",
+    sendingOffline: "goes out when the connection is back",
     endOfReply: "End of reply",
     mentionSuggestions: "Mention suggestions",
   },
@@ -8392,7 +8392,6 @@ export const en: Translations = {
       noSite: "Before opening a page",
     },
     inCard: {
-      expandHint: "Click to expand",
       scrollHint: "Scrolling the page · Esc to leave",
       targetMarked: "Marked field",
       targetNone: "Click a field",
@@ -8413,7 +8412,6 @@ export const en: Translations = {
       subOther: "{{person}} is in control · you're watching",
       subReconnect: "Reconnecting… {{name}} waits 2 min",
       reconnectHelp: "If you leave, {{name}} waits 2 min.",
-      expand: "Watch live",
       collapse: "Collapse",
       takeover: "Take over",
       stop: "Stop",

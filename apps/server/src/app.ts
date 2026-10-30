@@ -214,6 +214,12 @@ export function createApp(options: AppOptions) {
     log.error("unhandled error", { method: c.req.method, path: c.req.path, error: String(error), stack: error.stack });
     return apiError(c, 500, "internal_error", "Something went wrong on our side");
   });
+  // A CDN in front may cache by the path's extension, whatever the type: without this, a private
+  // answer at a path that ends like a file (a skill's `data.csv`) would be served to anyone asking.
+  app.use("/api/*", async (c, next) => {
+    await next();
+    if (!c.res.headers.has("cache-control")) c.res.headers.set("cache-control", "no-store");
+  });
   app.route("/api", api);
   if (options.services) registerAppLinks(app, options.services.config);
   app.notFound((c) =>

@@ -9,7 +9,7 @@ import {
   userTopic,
 } from "@agenteschat/adapters";
 import type { Config } from "@agenteschat/config";
-import { and, eq, inArray, isNotNull, isNull, or, schema, type Database } from "@agenteschat/db";
+import { and, type Database, eq, inArray, isNotNull, isNull, or, schema } from "@agenteschat/db";
 import {
   type BrowserLive,
   ForbiddenError,
@@ -20,7 +20,7 @@ import {
   requireChannelAccess,
   touchLastSeen,
 } from "@agenteschat/engine";
-import { type Auth, type SessionUser } from "../auth";
+import type { Auth, SessionUser } from "../auth";
 import type { Logger } from "../logger";
 import { allowedOrigins, requestOriginAllowed } from "../routes/app/context";
 import {
@@ -400,13 +400,19 @@ export function createRealtime(deps: RealtimeDeps) {
               if (!(await liveSession(ws, true))) return;
               let timeout: ReturnType<typeof setTimeout> | undefined;
               const deadline = new Promise<never>((_, reject) => {
-                timeout = setTimeout(() => reject(new Error("membership check timed out")), MEMBERSHIP_CHECK_TIMEOUT_MS);
+                timeout = setTimeout(
+                  () => reject(new Error("membership check timed out")),
+                  MEMBERSHIP_CHECK_TIMEOUT_MS,
+                );
                 timeout.unref?.();
               });
               let allowed: Set<string> | null;
               try {
                 allowed = await Promise.race([
-                  currentSubscriptions(deps.db, user.id, orgId, [...ws.data.subscriptions.keys(), ...ws.data.pending.keys()]),
+                  currentSubscriptions(deps.db, user.id, orgId, [
+                    ...ws.data.subscriptions.keys(),
+                    ...ws.data.pending.keys(),
+                  ]),
                   deadline,
                 ]);
               } finally {
@@ -419,8 +425,7 @@ export function createRealtime(deps: RealtimeDeps) {
               }
               for (const channelId of ws.data.subscriptions.keys())
                 if (!allowed.has(channelId)) drop(channelId, "revoked");
-              for (const [channelId, pending] of ws.data.pending)
-                if (!allowed.has(channelId)) pending.revoked = true;
+              for (const [channelId, pending] of ws.data.pending) if (!allowed.has(channelId)) pending.revoked = true;
             } catch {
               // A failed durable check must not leave a private subscription open.
               if (ws.readyState === 1) ws.close(1011, "membership unavailable");

@@ -158,6 +158,16 @@ jobs:
           bun run db:generate ci-drift-check
           git status --porcelain -- packages/db/migrations
           test -z "$(git status --porcelain -- packages/db/migrations)"
+      # A deploy migrates while the previous version still serves, and a rollback runs that version on the
+      # migrated database: a new migration that drops, renames, retypes or sets NOT NULL needs its marker.
+      - name: Migrations keep the running version working
+        if: success() || failure()
+        run: |
+          bun test scripts/check-migrations.test.ts
+          bun run check:migrations
+      - name: Deploy and backup scripts
+        if: success() || failure()
+        run: bun test ./deploy/deploy.test.ts
       # GitHub's log storage sometimes loses logs; keep the errors as an artifact and in the summary.
       - name: Keep errors
         if: always()

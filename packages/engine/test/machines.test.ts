@@ -4,12 +4,14 @@ import { MACHINE_PROTOCOL_VERSION, orgTopic, type ServerFrame, sealSecret, secre
 import { eq, schema } from "@agenteschat/db";
 import {
   authenticateMachine,
+  cancelRun,
   createAgent,
   createMachineHub,
   declineSecret,
   deleteMachine,
   deliverSecret,
   drainOutbox,
+  executeRun,
   expireSecretRequests,
   ForbiddenError,
   getAgentComputer,
@@ -30,7 +32,7 @@ import {
   type ToolContext,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
-import { fakeRunner, pairMachine, RUNNER } from "./machine-fixtures";
+import { type FakeRunnerOptions, fakeRunner, pairMachine, RUNNER } from "./machine-fixtures";
 
 let f: Fixture;
 const hubs: MachineHub[] = [];
@@ -664,6 +666,7 @@ describe("secrets for a connected machine (ADR 0027)", () => {
   /** An agent that asks for NPM_TOKEN when told "publica", then says what it got. */
   async function asking(
     target: ({ target: "env" } | { target: "file"; path: string }) & { site?: string } = { target: "env" },
+    runnerOptions: FakeRunnerOptions = {},
   ) {
     f = await setup({
       machines: true,
@@ -683,7 +686,7 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     });
     await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
     const paired = await pair();
-    const runner = fakeRunner(f.machineHub as MachineHub);
+    const runner = fakeRunner(f.machineHub as MachineHub, runnerOptions);
     await runner.hello(paired.token);
     await setAgentComputerTarget(deps(), f.owner.id, f.org.id, f.agent.id, paired.machineId);
     await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
@@ -788,6 +791,436 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     expect(await listAgentSecrets(f.db, f.owner.id, f.org.id, f.agent.id)).toEqual([]);
   });
 
+  test("a decline during staging prevents activation and leaves no live secret", async () => {
+    let stagedWhilePending = false;
+    const { runner, row } = await asking(
+      { target: "env" },
+      {
+        onSecretStaged: async (requestId) => {
+          const [current] = await f.db
+            .select()
+            .from(schema.secretRequests)
+            .where(eq(schema.secretRequests.id, requestId));
+          stagedWhilePending = current?.status === "pending";
+          await declineSecret({ db: f.db, pubsub: f.pubsub, sandbox: f.sandboxDeps }, f.owner.id, f.org.id, requestId);
+        },
+      },
+    );
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
+    await expect(deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view))).rejects.toThrow(
+      "already answered",
+    );
+    expect(stagedWhilePending).toBe(true);
+    expect(runner.secrets.has("NPM_TOKEN")).toBe(false);
+    expect(runner.staged.has(row.id)).toBe(false);
+    const [closed] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.id, row.id));
+    expect(closed?.status).toBe("declined");
+  });
+
+  test("a request expiring during staging cannot commit delivery", async () => {
+    const { runner, row } = await asking(
+      { target: "env" },
+      {
+        onSecretStaged: async (requestId) => {
+          await f.db
+            .update(schema.secretRequests)
+            .set({ expiresAt: new Date(Date.now() - 1000) })
+            .where(eq(schema.secretRequests.id, requestId));
+        },
+      },
+    );
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
+    await expect(deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view))).rejects.toThrow(
+      "already answered or expired",
+    );
+    const [closed] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.id, row.id));
+    expect(closed?.status).toBe("pending");
+    expect(closed?.deliveredAt).toBeNull();
+    expect(runner.secrets.has(row.name)).toBe(false);
+    // A pending row may reflect an uncertain concurrent commit; wait for a terminal decision.
+    expect(runner.staged.has(row.id)).toBe(true);
+    expect(await expireSecretRequests({ db: f.db, pubsub: f.pubsub })).toBe(1);
+    await drainOutbox(f.db, f.handlers);
+    expect(runner.staged.has(row.id)).toBe(false);
+    expect(runner.keys.has(row.id)).toBe(false);
+  }, 60_000);
+
+  test("canceling a waiting run queues removal of its unused runner key", async () => {
+    const { runner, row } = await asking();
+    expect(runner.keys.has(row.id)).toBe(true);
+    await cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, row.runId);
+    const [job] = await f.db
+      .select()
+      .from(schema.outbox)
+      .where(eq(schema.outbox.dedupeKey, `secret.discard:${row.id}`));
+    expect(job?.status).toBe("pending");
+    await drainOutbox(f.db, f.handlers);
+    expect(runner.keys.has(row.id)).toBe(false);
+  }, 60_000);
+
+  test("identical concurrent deliveries keep the winning staged box until activation", async () => {
+    const gate = () => {
+      let release!: () => void;
+      const promise = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return { promise, release };
+    };
+    const firstStaged = gate();
+    const secondStaged = gate();
+    const firstCommit = gate();
+    const secondCommit = gate();
+    const firstActivation = gate();
+    const firstActivationReply = gate();
+    let stages = 0;
+    let activations = 0;
+    const { runner, row } = await asking(
+      { target: "env" },
+      {
+        onSecretStaged: async () => {
+          (stages++ === 0 ? firstStaged : secondStaged).release();
+        },
+        onSecretActivate: async () => {
+          if (activations++ === 0) {
+            firstActivation.release();
+            await firstActivationReply.promise;
+          }
+        },
+      },
+    );
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    const waitBeforeCommit = (until: Promise<void>) =>
+      new Proxy(f.db, {
+        get(target, property, receiver) {
+          if (property === "transaction") {
+            return async (callback: Parameters<typeof f.db.transaction>[0]) => {
+              await until;
+              return target.transaction(callback);
+            };
+          }
+          return Reflect.get(target, property, receiver);
+        },
+      });
+    const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
+    const box = await seal(view);
+    const first = deliverSecret(
+      { ...sandbox, db: waitBeforeCommit(firstCommit.promise) },
+      f.owner.id,
+      f.org.id,
+      row.id,
+      box,
+    );
+    await firstStaged.promise;
+    const second = deliverSecret(
+      { ...sandbox, db: waitBeforeCommit(secondCommit.promise) },
+      f.owner.id,
+      f.org.id,
+      row.id,
+      box,
+    );
+    try {
+      await secondStaged.promise;
+      firstCommit.release();
+      await firstActivation.promise; // The first delivery committed, but the runner has not activated it.
+      secondCommit.release();
+      expect((await second).status).toBe("delivered");
+      expect(runner.secrets.get(row.name)).toBe(VALUE);
+      firstActivationReply.release();
+      expect((await first).status).toBe("delivered");
+      expect(runner.staged.has(row.id)).toBe(false);
+      const [committed] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.id, row.id));
+      expect(committed?.status).toBe("delivered");
+    } finally {
+      firstCommit.release();
+      secondCommit.release();
+      firstActivationReply.release();
+      await Promise.allSettled([first, second]);
+    }
+  });
+
+  test("a lost commit reply recovers the committed delivery instead of discarding its box", async () => {
+    const { runner, row } = await asking();
+    let loseReply = true;
+    const uncertainDb = new Proxy(f.db, {
+      get(target, property, receiver) {
+        if (property === "transaction") {
+          return async (callback: Parameters<typeof f.db.transaction>[0]) => {
+            const result = await target.transaction(callback);
+            if (loseReply) {
+              loseReply = false;
+              throw new Error("commit reply lost");
+            }
+            return result;
+          };
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), db: uncertainDb, pubsub: f.pubsub };
+    const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
+    const delivered = await deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view));
+    expect(delivered.status).toBe("delivered");
+    expect(loseReply).toBe(false);
+    expect(runner.secrets.get(row.name)).toBe(VALUE);
+    expect(runner.staged.has(row.id)).toBe(false);
+  });
+
+  test("an unreadable or still-pending commit result preserves staged ciphertext for a safe retry", async () => {
+    const { runner, row } = await asking();
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
+    const box = await seal(view);
+    let failed = false;
+    const unreadableDb = new Proxy(f.db, {
+      get(target, property, receiver) {
+        if (property === "transaction")
+          return async () => {
+            failed = true;
+            throw new Error("commit outcome unknown");
+          };
+        if (property === "select" && failed)
+          return () => {
+            throw new Error("database read unavailable");
+          };
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    await expect(deliverSecret({ ...sandbox, db: unreadableDb }, f.owner.id, f.org.id, row.id, box)).rejects.toThrow(
+      "commit outcome unknown",
+    );
+    expect(runner.staged.has(row.id)).toBe(true);
+    expect(runner.keys.has(row.id)).toBe(true);
+
+    const pendingDb = new Proxy(f.db, {
+      get(target, property, receiver) {
+        if (property === "transaction")
+          return async () => {
+            throw new Error("commit did not start");
+          };
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    await expect(deliverSecret({ ...sandbox, db: pendingDb }, f.owner.id, f.org.id, row.id, box)).rejects.toThrow(
+      "commit did not start",
+    );
+    expect(runner.staged.has(row.id)).toBe(true);
+    expect(runner.keys.has(row.id)).toBe(true);
+
+    expect((await deliverSecret(sandbox, f.owner.id, f.org.id, row.id, box)).status).toBe("delivered");
+    expect(runner.secrets.get(row.name)).toBe(VALUE);
+  }, 60_000);
+
+  test("a delivered request cannot wake its run before activation", async () => {
+    const { row } = await asking();
+    await f.db
+      .update(schema.secretRequests)
+      .set({ status: "delivered", deliveredAt: new Date() })
+      .where(eq(schema.secretRequests.id, row.id));
+    await executeRun(f.jobDeps, row.runId, { finalAttempt: true });
+    const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, row.runId));
+    expect(run?.status).toBe("waiting_input");
+  });
+
+  test("a pause after staging still allows committed activation but blocks new keys", async () => {
+    let pauseRunner!: ReturnType<typeof fakeRunner>;
+    const { runner, row, paired } = await asking(
+      { target: "env" },
+      {
+        onSecretStaged: async () => {
+          await pauseRunner.frame({ type: "runner.state", paused: { paused: true, until: null } });
+        },
+      },
+    );
+    pauseRunner = runner;
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
+    const delivered = await deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view));
+    expect(delivered.status).toBe("delivered");
+    expect(runner.secrets.has(row.name)).toBe(true);
+    const hub = f.machineHub as MachineHub;
+    await expect(
+      hub.call(paired.machineId, {
+        agent: { id: f.agent.id, handle: "dev" },
+        op: "secret",
+        action: "keypair",
+        requestId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      }),
+    ).rejects.toThrow(/paused/i);
+    await removeAgentSecret(sandbox, f.owner.id, f.org.id, f.agent.id, row.name, row.machineId);
+    expect(runner.secrets.has(row.name)).toBe(false);
+  });
+
+  test("delivery generation stays monotonic after a previous replica clock ran ahead", async () => {
+    const { row } = await asking();
+    const ahead = new Date(Date.now() + 60_000);
+    await f.db.insert(schema.secretRequests).values({
+      ...row,
+      id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+      toolUseId: "prior-clock-delivery",
+      messageId: null,
+      status: "delivered",
+      deliveredAt: ahead,
+      removedAt: new Date(),
+    });
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
+    const result = await deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view));
+    expect(result.deliveredAt && new Date(result.deliveredAt).getTime()).toBeGreaterThan(ahead.getTime());
+  });
+
+  test("a delayed older activation cannot overwrite a newer secret of the same name", async () => {
+    let releaseOlder!: () => void;
+    let reachedOlder!: () => void;
+    const holdOlder = new Promise<void>((resolve) => {
+      releaseOlder = resolve;
+    });
+    const olderReached = new Promise<void>((resolve) => {
+      reachedOlder = resolve;
+    });
+    let olderId = "";
+    const {
+      runner,
+      row: older,
+      paired,
+    } = await asking(
+      { target: "env" },
+      {
+        onSecretActivate: async (id) => {
+          if (id === olderId) {
+            reachedOlder();
+            await holdOlder;
+          }
+        },
+      },
+    );
+    olderId = older.id;
+    const newerId = "ffffffff-ffff-ffff-ffff-ffffffffffff";
+    const hub = f.machineHub as MachineHub;
+    const key = (await hub.call(paired.machineId, {
+      agent: { id: f.agent.id, handle: "dev" },
+      op: "secret",
+      action: "keypair",
+      requestId: newerId,
+    })) as { publicKey: string };
+    await f.db.insert(schema.secretRequests).values({
+      ...older,
+      id: newerId,
+      toolUseId: "second-secret",
+      messageId: null,
+      publicKey: key.publicKey,
+      status: "pending",
+      deliveredAt: null,
+      deliveredSize: null,
+      removedAt: null,
+    });
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    const aad = (id: string) =>
+      secretAad({ requestId: id, orgId: f.org.id, name: "NPM_TOKEN", target: { kind: "env" } });
+    const olderValue = "older-secret-value";
+    const newerValue = "newer-secret-value";
+    const olderDelivery = deliverSecret(
+      sandbox,
+      f.owner.id,
+      f.org.id,
+      older.id,
+      await sealSecret(older.publicKey, olderValue, aad(older.id)),
+    );
+    await olderReached;
+    const newerView = await deliverSecret(
+      sandbox,
+      f.owner.id,
+      f.org.id,
+      newerId,
+      await sealSecret(key.publicKey, newerValue, aad(newerId)),
+    );
+    expect(newerView.removed).toBe(false);
+    expect(runner.secrets.get("NPM_TOKEN")).toBe(newerValue);
+    releaseOlder();
+    const olderView = await olderDelivery;
+    expect(olderView.removed).toBe(true);
+    expect(runner.secrets.get("NPM_TOKEN")).toBe(newerValue);
+    const [newerRow] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.id, newerId));
+    expect(newerRow?.removedAt).toBeNull();
+  });
+
+  test("removing a delivered request before activation cancels its runner value and resumes absent", async () => {
+    let release!: () => void;
+    let reached!: () => void;
+    const hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const atActivation = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    let targetId = "";
+    const { runner, row } = await asking(
+      { target: "env" },
+      {
+        onSecretActivate: async (id) => {
+          if (id === targetId) {
+            reached();
+            await hold;
+          }
+        },
+      },
+    );
+    targetId = row.id;
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
+    const delivery = deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view));
+    await atActivation;
+    await removeAgentSecret(sandbox, f.owner.id, f.org.id, f.agent.id, row.name, row.machineId);
+    release();
+    const result = await delivery;
+    expect(result.removed).toBe(true);
+    expect(runner.secrets.has(row.name)).toBe(false);
+    const [resume] = await f.db
+      .select()
+      .from(schema.outbox)
+      .where(eq(schema.outbox.dedupeKey, `agent_run.execute:${row.runId}:secret:${row.id}`));
+    expect(resume).toBeDefined();
+  });
+
+  test("removal after runner activation wins before a delayed DB finalization", async () => {
+    let release!: () => void;
+    let reached!: () => void;
+    const hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const activated = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    let targetId = "";
+    const { runner, row } = await asking(
+      { target: "env" },
+      {
+        onSecretActivated: async (id) => {
+          if (id === targetId) {
+            reached();
+            await hold;
+          }
+        },
+      },
+    );
+    targetId = row.id;
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
+    const delivery = deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view));
+    await activated;
+    expect(runner.secrets.has(row.name)).toBe(true);
+    await removeAgentSecret(sandbox, f.owner.id, f.org.id, f.agent.id, row.name, row.machineId);
+    release();
+    expect((await delivery).removed).toBe(true);
+    expect(runner.secrets.has(row.name)).toBe(false);
+    const [resume] = await f.db
+      .select()
+      .from(schema.outbox)
+      .where(eq(schema.outbox.dedupeKey, `agent_run.execute:${row.runId}:secret:${row.id}`));
+    expect(resume).toBeDefined();
+  });
+
   test("declined or expired: the run goes on without it, and the machine drops the key", async () => {
     const { runner, row } = await asking();
     await declineSecret({ db: f.db, pubsub: f.pubsub, sandbox: f.sandboxDeps }, f.owner.id, f.org.id, row.id);
@@ -816,6 +1249,30 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     expect(secretSite("https://a.example:8443/x")).toBe("https://a.example:8443");
     expect(secretSite("file:///etc/passwd")).toBeNull();
     expect(secretSite("not a site")).toBeNull();
+  });
+
+  test("owner removes a mixed browser and command secret from its original machine after code is disabled", async () => {
+    const { runner, row } = await asking({ target: "env", site: "dashboard.stripe.com/login" });
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    const view = { id: row.id, publicKey: row.publicKey, name: row.name, target: { kind: "env" as const } };
+    await deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view));
+    const [delivered] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.id, row.id));
+    if (!delivered) throw new Error("missing delivered request");
+    await f.db.insert(schema.secretRequests).values({
+      ...delivered,
+      id: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+      toolUseId: "mixed-command-secret",
+      messageId: null,
+      site: null,
+      deliveredAt: new Date((delivered.deliveredAt?.getTime() ?? 0) + 1),
+    });
+    await f.db
+      .insert(schema.orgSandboxSettings)
+      .values({ orgId: f.org.id, enabled: false })
+      .onConflictDoUpdate({ target: schema.orgSandboxSettings.orgId, set: { enabled: false } });
+    await removeAgentSecret(sandbox, f.owner.id, f.org.id, f.agent.id, row.name, row.machineId);
+    expect(runner.secrets.has(row.name)).toBe(false);
+    expect(await listAgentSecrets(f.db, f.owner.id, f.org.id, f.agent.id)).toEqual([]);
   });
 
   test("a runner older than protocol 3 is told to update", async () => {

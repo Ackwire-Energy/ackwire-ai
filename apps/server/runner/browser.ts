@@ -23,6 +23,7 @@ import {
 } from "@agenteschat/adapters/machine-protocol";
 import type { ControlBrowser, ControlBrowserDoing } from "@agenteschat/adapters/runner-control";
 import { SECRET_NAME } from "@agenteschat/adapters/secret-box";
+import type { BrowserPorts } from "./browser-ports";
 import { countChromeTraffic, type TrafficCounter } from "./browser-traffic";
 import { BROWSER_WM_CLASS } from "./desktop-look";
 import type { DesktopSessions } from "./desktop-session";
@@ -433,13 +434,14 @@ export function chromeLaunchArgs(
   lang: string | null = osLang(),
   headed = false,
   page = "about:blank",
+  debuggingPort = 0,
 ): string[] {
   const ua = chromeUserAgent(exe, platform);
   return [
     ...CHROME_ARGS,
     ...(headed ? HEADED_ARGS : HEADLESS_ARGS),
     ...secretStoreArgs(platform),
-    "--remote-debugging-port=0",
+    `--remote-debugging-port=${debuggingPort}`,
     `--user-data-dir=${profile}`,
     ...(ua ? [`--user-agent=${ua}`] : []),
     ...(lang ? [`--lang=${lang}`] : []),
@@ -561,8 +563,28 @@ export async function launchChrome(
   profile: string,
   env?: Record<string, string>,
   start: Spawn = spawn,
+  ownsPort: (port: number) => boolean = (port) => {
+    const uid = process.getuid?.();
+    if (uid === undefined) return false;
+    const result = spawnSync("ss", ["-Htln", "-e"], { encoding: "utf8", timeout: 1000 });
+    if (result.status !== 0) return false;
+    const rows = (result.stdout ?? "").split("\n").filter((line) => {
+      const cols = line.trim().split(/\s+/);
+      const local = cols[3] ?? "";
+      return (
+        cols[0] === "LISTEN" &&
+        (local.startsWith("127.0.0.1:") || local.startsWith("0.0.0.0:")) &&
+        Number(local.slice(local.lastIndexOf(":") + 1)) === port
+      );
+    });
+    return rows.length > 0 && rows.every((line) => Number(/\buid:(\d+)\b/.exec(line)?.[1]) === uid);
+  },
 ): Promise<OwnChrome> {
   const portFile = path.join(profile, "DevToolsActivePort");
+  const fixedPort = Number(args.find((arg) => arg.startsWith("--remote-debugging-port="))?.split("=")[1] ?? 0);
+  if (!Number.isInteger(fixedPort) || fixedPort < 0 || fixedPort > 65_535) {
+    throw new ChromeStartError("Invalid Chrome debugging port", "");
+  }
   await rm(portFile, { force: true });
   const child = start(exe, args, { stdio: ["ignore", "ignore", "pipe"], windowsHide: true, ...(env ? { env } : {}) });
   let output = "";
@@ -621,19 +643,46 @@ export async function launchChrome(
         detail,
       );
     }
-    const text = await readFile(portFile, "utf8").catch(() => "");
-    const [first = "", second = ""] = text.split("\n");
-    const port = Number(first);
-    if (Number.isInteger(port) && port > 0 && port < 65536) {
+    // Chromium writes DevToolsActivePort only for port 0. For a fixed, preguarded
+    // port, wait for its HTTP endpoint and retain the browser websocket path.
+    let port = fixedPort;
+    let wsPath = "";
+    if (fixedPort && ownsPort(fixedPort)) {
+      try {
+        const reply = await fetch(`http://127.0.0.1:${fixedPort}/json/version`, {
+          signal: AbortSignal.timeout(300),
+        });
+        if (reply.ok) {
+          const version = (await reply.json()) as { webSocketDebuggerUrl?: unknown };
+          if (typeof version.webSocketDebuggerUrl === "string") {
+            const url = new URL(version.webSocketDebuggerUrl);
+            if (url.hostname === "127.0.0.1" && Number(url.port) === fixedPort) wsPath = url.pathname;
+          }
+        }
+      } catch {
+        // Chrome has not opened the endpoint yet.
+      }
+    } else if (!fixedPort) {
+      const text = await readFile(portFile, "utf8").catch(() => "");
+      const [first = "", second = ""] = text.split("\n");
+      port = Number(first);
+      wsPath = second.trim();
+    }
+    const validPath = /^\/devtools\/browser\/[\w-]+$/.test(wsPath);
+    if (
+      Number.isInteger(port) &&
+      port > 0 &&
+      port < 65536 &&
+      (!fixedPort || (port === fixedPort && validPath && ownsPort(fixedPort)))
+    ) {
       if (!child.pid) break;
       started = true;
-      const wsPath = second.trim();
       return {
         pid: child.pid,
         port,
         kill,
         exited,
-        ...(/^\/devtools\/browser\/[\w-]+$/.test(wsPath) ? { wsPath } : {}),
+        ...(validPath ? { wsPath } : {}),
       };
     }
     await new Promise((r) => setTimeout(r, 100));
@@ -776,6 +825,8 @@ export interface BrowserManagerOptions {
   send: (frame: RunnerFrame) => boolean;
   /** A secret delivered to the agent (ADR 0027), by name, or null. */
   secret: (agent: AgentScope, name: string) => Promise<string | null>;
+  /** System mode: root preguards this UID's fixed CDP and stream listener ports. */
+  fixedPorts?: BrowserPorts;
   /** Tests: how to start `agent-browser` (default: the sidecar or the downloaded binary). */
   command?: string[];
   /** The runner's executable (the sidecar sits next to it). */
@@ -1513,7 +1564,15 @@ export class BrowserManager {
       const start = this.opts.startChrome ?? launchChrome;
       const launch = async (on: ChromeDisplay | null) => {
         if (on) prepareProfile(profile);
-        const args = chromeLaunchArgs(exe, profile, process.platform, osLang(), on !== null, page);
+        const args = chromeLaunchArgs(
+          exe,
+          profile,
+          process.platform,
+          osLang(),
+          on !== null,
+          page,
+          this.opts.fixedPorts?.cdp ?? 0,
+        );
         try {
           const started = await start(exe, args, profile, on ? chromeEnv(on) : undefined);
           if (on) started.display = on.display;
@@ -2173,7 +2232,11 @@ export class BrowserManager {
         await this.run(session, ["stream", "enable"], { timeoutMs: QUICK_TIMEOUT_MS });
         status = await this.run(session, ["stream", "status"], { timeoutMs: QUICK_TIMEOUT_MS });
       }
-      return isRecord(status.data) && typeof status.data.port === "number" ? status.data.port : null;
+      const reported = isRecord(status.data) && typeof status.data.port === "number" ? status.data.port : null;
+      if (this.opts.fixedPorts && reported !== this.opts.fixedPorts.stream) {
+        throw new RunnerError("browser_unavailable", "The browser's live view is outside its isolated port");
+      }
+      return reported;
     });
     if (port === null) throw new RunnerError("browser_closed", "The agent's browser isn't open");
     const url = `ws://127.0.0.1:${port}/?maxFps=${STREAM_FPS[mode]}`;
@@ -2435,6 +2498,7 @@ export class BrowserManager {
       if (k.startsWith("AGENT_BROWSER_") || k.startsWith("AI_GATEWAY_")) continue;
       env[k] = v;
     }
+    if (this.opts.fixedPorts) env.AGENT_BROWSER_STREAM_PORT = String(this.opts.fixedPorts.stream);
     const [bin, ...pre] = command as [string, ...string[]];
     return new Promise((resolve) => {
       const child = spawn(bin, [...pre, ...args], {

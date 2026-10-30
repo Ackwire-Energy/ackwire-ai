@@ -959,9 +959,9 @@ export const ptBR = {
     unreadDivider: "Novas",
     /** Under my latest message in a DM with a person, once they read it. */
     seen: "Visto",
-    offline: "Sem internet. O que você mandar sai sozinho quando voltar.",
+    offline: "Sem conexão. O que você mandar sai sozinho quando voltar.",
     backOnline: "Conectado de novo",
-    sendingOffline: "sai quando a internet voltar",
+    sendingOffline: "sai quando a conexão voltar",
     endOfReply: "Fim da resposta",
     mentionSuggestions: "Sugestões de menção",
   },
@@ -8442,7 +8442,6 @@ export const ptBR = {
       noSite: "Antes de abrir uma página",
     },
     inCard: {
-      expandHint: "Clique para expandir",
       scrollHint: "Rolando a página · Esc para sair",
       targetMarked: "Campo marcado",
       targetNone: "Clique num campo",
@@ -8463,7 +8462,6 @@ export const ptBR = {
       subOther: "{{person}} no controle · você só assiste",
       subReconnect: "Reconectando… {{article}} {{name}} espera 2 min",
       reconnectHelp: "Se você sair, {{article}} {{name}} espera 2 min.",
-      expand: "Ver ao vivo",
       collapse: "Recolher",
       takeover: "Assumir",
       stop: "Parar",

@@ -53,6 +53,7 @@ import { type AgentUser, AgentUsers, agentGid, readAgentUsers, systemLauncher } 
 import { BrainManager } from "./brain";
 import { CodexAppServers } from "./brain-codex-app";
 import { BrowserManager } from "./browser";
+import { ensureBrowserBindPolicy } from "./browser-bind-policy";
 import {
   configPath,
   connectUrl,
@@ -831,18 +832,45 @@ export class RunnerDaemon implements RequestObserver {
     let agentUser: Session["agentUser"] = null;
     if (config.mode === "system") {
       const users = new AgentUsers({ home, range: config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE });
-      agentUser = this.opts.workers?.user ?? ((agent) => users.ensure(agent));
+      const prepared = new Set<number>();
+      const prepare = (user: AgentUser) => {
+        if (prepared.has(user.uid)) return;
+        ensureBrowserBindPolicy(user, this.self.command);
+        prepared.add(user.uid);
+      };
+      // Desktops and terminals can start before a worker. The first use of a
+      // newly allocated UID installs its bind policy before returning it.
+      agentUser =
+        this.opts.workers?.user ??
+        ((agent) => {
+          const user = users.ensure(agent);
+          prepare(user);
+          return user;
+        });
       // Tests inject `workers`; a real guard (nft/ss as root) belongs only to the real supervisor. On the
       // server's own computer one guard covers every organization's agents (`host.ts`): a guard per runner
       // would replace the others' rules with its own.
       const guard =
         this.opts.workers || config.managedBy === "host"
           ? undefined
-          : new LoopbackGuard({ home, agentUids: () => readAgentUsers(home).map((u) => u.uid), log });
+          : new LoopbackGuard({
+              home,
+              agentUids: () => readAgentUsers(home).map((u) => u.uid),
+              uidRange: config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE,
+              log,
+            });
       supervisor = new Supervisor({
         home,
+        requireRootBroker: !this.opts.workers,
         user: agentUser,
         start: launchWorker(this.self.command),
+        ...(this.opts.workers || config.managedBy === "host"
+          ? {}
+          : {
+              prepareExisting: (existing: AgentUser[]) => {
+                for (const user of existing) prepare(user);
+              },
+            }),
         lend: (kind, accountId, uid) => this.accounts.lendTo(kind, accountId, uid),
         desktop: (agent, use) => this.workerDesktop(agent, use),
         desktopViewers: (agentId) => this.desktops.status({ id: agentId }).streams,

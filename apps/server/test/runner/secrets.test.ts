@@ -1,9 +1,10 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { MachineRequest } from "@agenteschat/adapters/machine-protocol";
 import { type SecretTarget, sealSecret, secretAad } from "@agenteschat/adapters/secret-box";
 import { describeRequest, handleRequest, type RequestScope } from "../../runner/handlers";
+import { handleSecret } from "../../runner/secrets";
 import { errorCode, removeDirs, tempDir } from "./helpers";
 
 const dirs: string[] = [];
@@ -21,15 +22,23 @@ function setup() {
   dirs.push(ws, home);
   const ctx = { workspaceReal: ws, exec: true, token: "agm_x", secretsDir: path.join(home, "secrets") };
   const call = (req: MachineRequest) => handleRequest(ctx, req, scope());
+  let deliveryNumber = 0;
   /** keypair on the machine → sealed like the browser does → deliver. */
   const give = async (agent: typeof dev, requestId: string, name: string, target: SecretTarget, value = VALUE) => {
     const { publicKey } = (await call({ agent, op: "secret", action: "keypair", requestId })) as { publicKey: string };
     const aad = secretAad({ requestId, orgId: ORG, name, target });
     const box = await sealSecret(publicKey, value, aad);
+    const order = `${new Date(++deliveryNumber).toISOString()}|${requestId}`;
     return {
       aad,
       box,
+      order,
       deliver: () => call({ agent, op: "secret", action: "deliver", requestId, name, target, aad, box }),
+      activate: () => call({ agent, op: "secret", action: "activate", requestId, order }),
+      commit: async () => {
+        await call({ agent, op: "secret", action: "deliver", requestId, name, target, aad, box });
+        await call({ agent, op: "secret", action: "activate", requestId, order });
+      },
     };
   };
   return { ws, home, ctx, call, give };
@@ -41,6 +50,12 @@ test("an env secret reaches the agent's commands, never their output; other agen
   const { call, give, home } = setup();
   const sent = await give(dev, "req-0001-aaaa", "AGENTES_DEMO_TOKEN", { kind: "env" });
   expect(await sent.deliver()).toEqual({ size: VALUE.length });
+  expect(existsSync(path.join(home, "secrets", "01a142cb", "store.json"))).toBe(false);
+  const stagedBox = readFileSync(path.join(home, "secrets", "01a142cb", "staged", "req-0001-aaaa"), "utf8");
+  expect(stagedBox).not.toContain(VALUE);
+  const staged = (await call({ agent: dev, ...exec('echo "[$AGENTES_DEMO_TOKEN]"') })) as { stdout: string };
+  expect(staged.stdout.trim()).toBe("[]");
+  expect(await sent.activate()).toEqual({ size: VALUE.length });
 
   const used = (await call({
     agent: dev,
@@ -79,7 +94,7 @@ test("a file secret is written 600 in the agent's folder and can't be read or up
     { kind: "file", path: ".npmrc" },
     "//registry/:_authToken=abc12345",
   );
-  await sent.deliver();
+  await sent.commit();
   const file = path.join(ws, "dev-01a142cb", ".npmrc");
   expect(readFileSync(file, "utf8")).toBe("//registry/:_authToken=abc12345");
   expect(statSync(file).mode & 0o777).toBe(0o600);
@@ -100,12 +115,18 @@ test("a file secret is written 600 in the agent's folder and can't be read or up
 test("replacing a file secret removes its old path before it becomes untracked", async () => {
   const { ws, call, give } = setup();
   const first = await give(dev, "req-0020-aaaa", "NPM_TOKEN", { kind: "file", path: ".npmrc" }, "old-secret-value");
-  await first.deliver();
+  await first.commit();
   const oldFile = path.join(ws, "dev-01a142cb", ".npmrc");
   expect(existsSync(oldFile)).toBe(true);
 
-  const second = await give(dev, "req-0021-bbbb", "NPM_TOKEN", { kind: "file", path: "config/token" }, "new-secret-value");
-  await second.deliver();
+  const second = await give(
+    dev,
+    "req-0021-bbbb",
+    "NPM_TOKEN",
+    { kind: "file", path: "config/token" },
+    "new-secret-value",
+  );
+  await second.commit();
   const newFile = path.join(ws, "dev-01a142cb", "config/token");
   const staleRead = (await call({ agent: dev, op: "read", path: ".npmrc", maxBytes: 1000 })) as {
     base64: string | null;
@@ -113,7 +134,9 @@ test("replacing a file secret removes its old path before it becomes untracked",
   expect(staleRead.base64 === null).toBe(true);
   expect(existsSync(oldFile)).toBe(false);
   expect(readFileSync(newFile, "utf8")).toBe("new-secret-value");
-  expect(await errorCode(() => call({ agent: dev, op: "read", path: "config/token", maxBytes: 1000 }))).toBe("bad_request");
+  expect(await errorCode(() => call({ agent: dev, op: "read", path: "config/token", maxBytes: 1000 }))).toBe(
+    "bad_request",
+  );
 
   await call({ agent: dev, op: "secret", action: "remove", name: "NPM_TOKEN" });
   expect(existsSync(newFile)).toBe(false);
@@ -121,11 +144,13 @@ test("replacing a file secret removes its old path before it becomes untracked",
 
 test("moving a file secret to the environment removes its old plaintext file", async () => {
   const { ws, call, give } = setup();
-  await (await give(dev, "req-0022-cccc", "API_KEY", { kind: "file", path: "private/key" }, "old-secret-value")).deliver();
+  await (
+    await give(dev, "req-0022-cccc", "API_KEY", { kind: "file", path: "private/key" }, "old-secret-value")
+  ).commit();
   const oldFile = path.join(ws, "dev-01a142cb", "private/key");
   expect(existsSync(oldFile)).toBe(true);
 
-  await (await give(dev, "req-0023-dddd", "API_KEY", { kind: "env" }, "new-secret-value")).deliver();
+  await (await give(dev, "req-0023-dddd", "API_KEY", { kind: "env" }, "new-secret-value")).commit();
   expect(existsSync(oldFile)).toBe(false);
   await call({ agent: dev, op: "secret", action: "remove", name: "API_KEY" });
 });
@@ -149,6 +174,105 @@ test("a box for another request, secret or target doesn't open; nothing is store
   expect(await errorCode(() => sent.deliver())).toBe("not_found");
 });
 
+test("discarding a staged file secret leaves no plaintext file or live store", async () => {
+  const { ws, home, call, give } = setup();
+  const sent = await give(dev, "req-0024-eeee", "NPM_TOKEN", { kind: "file", path: ".npmrc" });
+  await sent.deliver();
+  const file = path.join(ws, "dev-01a142cb", ".npmrc");
+  expect(existsSync(file)).toBe(false);
+  expect(existsSync(path.join(home, "secrets", "01a142cb", "store.json"))).toBe(false);
+  await call({ agent: dev, op: "secret", action: "discard", requestId: "req-0024-eeee" });
+  expect(await errorCode(() => sent.activate())).toBe("not_found");
+  expect(existsSync(file)).toBe(false);
+});
+
+test("retrying an identical stage reply is idempotent", async () => {
+  const { give } = setup();
+  const sent = await give(dev, "req-0025-ffff", "NPM_TOKEN", { kind: "env" });
+  expect(await sent.deliver()).toEqual({ size: VALUE.length });
+  expect(await sent.deliver()).toEqual({ size: VALUE.length });
+  expect(await sent.activate()).toEqual({ size: VALUE.length });
+  expect(await sent.activate()).toEqual({ size: VALUE.length });
+});
+
+test("a removed newer secret keeps an older delayed activation superseded", async () => {
+  const { home, call, give } = setup();
+  const older = await give(dev, "req-0026-aaaa", "NPM_TOKEN", { kind: "env" }, "old-value");
+  await older.deliver();
+  const newer = await give(dev, "req-0027-bbbb", "NPM_TOKEN", { kind: "env" }, "new-value");
+  await newer.commit();
+  await call({ agent: dev, op: "secret", action: "remove", name: "NPM_TOKEN", requestIds: ["req-0027-bbbb"] });
+  expect(await older.activate()).toEqual({ superseded: true });
+  expect(existsSync(path.join(home, "secrets", "01a142cb", "staged", "req-0026-aaaa"))).toBe(false);
+  expect(existsSync(path.join(home, "secrets", "01a142cb", "keys", "req-0026-aaaa"))).toBe(false);
+  expect(await older.activate()).toEqual({ superseded: true });
+  const env = (await call({ agent: dev, ...exec('echo "[$NPM_TOKEN]"') })) as { stdout: string };
+  expect(env.stdout.trim()).toBe("[]");
+});
+
+test("a delayed broker install cannot restore a secret after its request was removed", async () => {
+  const { ws, home, call, give } = setup();
+  const requestId = "req-0041-aaaa";
+  const name = "API_KEY";
+  const sent = await give(dev, requestId, name, { kind: "env" }, "removed-value");
+  await sent.commit();
+  await call({ agent: dev, op: "secret", action: "remove", name, throughOrder: sent.order });
+  const result = await handleSecret(path.join(home, "secrets"), dev, ws, {
+    action: "install",
+    requestId,
+    name,
+    target: { kind: "env" },
+    value: "removed-value",
+    order: sent.order,
+  });
+  expect(result).toEqual({ superseded: true });
+  expect(((await call({ agent: dev, ...exec('echo "[$API_KEY]"') })) as { stdout: string }).stdout.trim()).toBe("[]");
+});
+
+test("removal of an old request leaves a newer value in place", async () => {
+  const { call, give } = setup();
+  const older = await give(dev, "req-0028-aaaa", "NPM_TOKEN", { kind: "env" }, "old-value");
+  await older.commit();
+  const newer = await give(dev, "req-0029-bbbb", "NPM_TOKEN", { kind: "env" }, "new-value");
+  await newer.commit();
+  await call({
+    agent: dev,
+    op: "secret",
+    action: "remove",
+    name: "NPM_TOKEN",
+    requestIds: ["req-0028-aaaa"],
+    throughOrder: older.order,
+  });
+  const env = (await call({ agent: dev, ...exec('echo "$NPM_TOKEN"') })) as { stdout: string };
+  expect(env.stdout.trim()).toBe("[secret:NPM_TOKEN]");
+  expect(await newer.activate()).toEqual({ size: "new-value".length });
+});
+
+test("removing a newer delivery clears retained older file guards through its generation", async () => {
+  const { ws, home, call, give } = setup();
+  const older = await give(dev, "req-0030-aaaa", "NPM_TOKEN", { kind: "file", path: ".npmrc" }, "old-value");
+  await older.commit();
+  const storePath = path.join(home, "secrets", "01a142cb", "store.json");
+  const oldEntry = (JSON.parse(readFileSync(storePath, "utf8")) as { secrets: unknown[] }).secrets[0];
+  const newer = await give(dev, "req-0031-bbbb", "NPM_TOKEN", { kind: "env" }, "new-value");
+  await newer.commit();
+  const current = JSON.parse(readFileSync(storePath, "utf8")) as { secrets: unknown[] };
+  writeFileSync(storePath, JSON.stringify({ secrets: [oldEntry, ...current.secrets] }));
+  const oldPath = path.join(ws, "dev-01a142cb", ".npmrc");
+  writeFileSync(oldPath, "old-value");
+  await call({
+    agent: dev,
+    op: "secret",
+    action: "remove",
+    name: "NPM_TOKEN",
+    requestIds: ["req-0031-bbbb"],
+    throughOrder: newer.order,
+  });
+  const store = JSON.parse(readFileSync(storePath, "utf8")) as { secrets: unknown[] };
+  expect(store.secrets).toEqual([]);
+  expect(existsSync(oldPath)).toBe(false);
+});
+
 test("names that steer an AI CLI's sign-in or requests are never kept nor put in the env", async () => {
   const { call, give } = setup();
   const names = ["ANTHROPIC_BASE_URL", "CLAUDE_CONFIG_DIR", "HTTPS_PROXY", "NODE_OPTIONS", "OPENCODE_API_KEY"];
@@ -158,6 +282,7 @@ test("names that steer an AI CLI's sign-in or requests are never kept nor put in
   }
   const ok = await give(dev, "req-0019-rrrr", "GITHUB_TOKEN", { kind: "env" });
   expect(await ok.deliver()).toEqual({ size: VALUE.length });
+  await ok.activate();
   const env = (await call({ agent: dev, ...exec('test -n "$GITHUB_TOKEN" && echo "[$HTTPS_PROXY]"') })) as {
     stdout: string;
   };
@@ -180,7 +305,7 @@ test("the log line names the action, never the value", () => {
 
 test("live output never shows a value split between two chunks", async () => {
   const { ctx, give } = setup();
-  await (await give(dev, "req-0005-eeee", "AGENTES_DEMO_TOKEN", { kind: "env" })).deliver();
+  await (await give(dev, "req-0005-eeee", "AGENTES_DEMO_TOKEN", { kind: "env" })).commit();
   const live: string[] = [];
   const half = VALUE.length / 2;
   const reply = (await handleRequest(
