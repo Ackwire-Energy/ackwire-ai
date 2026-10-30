@@ -2,7 +2,9 @@ import {
   applyImport,
   attachmentDisposition,
   exportBundle,
+  IMPORT_KINDS,
   IMPORT_LIMITS,
+  importedSources,
   NEW_AGENT_DEFAULTS,
   NOTE_KINDS,
   readGithubImport,
@@ -138,7 +140,7 @@ const ImportPlan = z
   .object({
     items: z.array(
       z.object({
-        kind: z.enum(["agent", "skill", "channel", "routine", "note"]),
+        kind: z.enum(IMPORT_KINDS),
         key: z.string(),
         label: z.string(),
         action: z.enum(["create", "update", "unchanged", "skip"]),
@@ -168,6 +170,24 @@ const ImportPlan = z
     ),
   })
   .openapi("ImportPlan");
+
+const ImportedSources = z
+  .object({
+    sources: z.array(
+      z.object({
+        app: z.string().openapi({ description: "The app it came from (`openbotrun`, `openmausbot`, `agenteschat`…)." }),
+        ref: z.string().openapi({ description: "The package or workspace in that app." }),
+        counts: z.object({
+          agent: z.number().int(),
+          skill: z.number().int(),
+          channel: z.number().int(),
+          routine: z.number().int(),
+          note: z.number().int(),
+        }),
+      }),
+    ),
+  })
+  .openapi("ImportedSources");
 
 /**
  * Bring agents and what's around them from another app (or another
@@ -267,6 +287,24 @@ export function agentImportRoutes(deps: AppDeps) {
         NEW_AGENT_DEFAULTS,
       );
       return c.json(plan, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/imports",
+      tags,
+      security,
+      summary: "What this workspace brought from other apps (admins)",
+      description:
+        "One entry per source package, in the order they first came, with how many of each kind came. A channel that was here already isn't counted.",
+      request: { params: OrgParams },
+      responses: { 200: json(ImportedSources), ...errors },
+    }),
+    async (c) => {
+      const sources = await importedSources(deps.db, c.get("user").id, c.req.valid("param").orgId);
+      return c.json({ sources }, 200);
     },
   );
 

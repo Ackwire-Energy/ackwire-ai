@@ -1,5 +1,6 @@
 import type {
   BundleTodo,
+  ImportedSource,
   ImportItemKind,
   ImportItemResult,
   ImportSkipReason,
@@ -63,10 +64,12 @@ import {
   EXPORT_PROMPT_APPS,
   githubRoot,
   IMPORT_CARDS,
+  IMPORT_KINDS,
   type ImportCard,
   type ImportFailure,
   isGithubLink,
   itemId,
+  kindsLine,
   NOT_GITHUB,
   picksOf,
   type RequestCard,
@@ -76,7 +79,6 @@ import { hasFiles } from "@/lib/obsidian";
 import { useTheme } from "@/lib/theme";
 import "./import-flow.css";
 
-const KINDS: ImportItemKind[] = ["agent", "skill", "channel", "routine", "note"];
 const KIND_ICON: Record<ImportItemKind, IconName> = {
   agent: "agent",
   skill: "bulb",
@@ -139,6 +141,8 @@ export function useImportFlow(orgId: string | null) {
   const [skillsOn, setSkillsOn] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [report, setReport] = useState<ImportItemResult[] | null>(null);
+  // Something read, or the flow cleared, since it opened: what it shows is this page's doing.
+  const [touched, setTouched] = useState(false);
   const done = useRef(new Map<string, ImportItemResult>());
   const run = useRef(0);
   const last = useRef<ReadInput | null>(null);
@@ -146,6 +150,7 @@ export function useImportFlow(orgId: string | null) {
 
   const read = async (input: ReadInput) => {
     if (!orgId) return;
+    setTouched(true);
     const mine = ++run.current;
     const current = () => mine === run.current;
     const from: ImportFailure["from"] = "url" in input ? "link" : "text" in input ? "paste" : "files";
@@ -239,6 +244,7 @@ export function useImportFlow(orgId: string | null) {
     skillsOn,
     progress,
     report,
+    touched,
     focus,
     read,
     /** Reads the last input again (after a failure that wasn't about the input itself). */
@@ -253,6 +259,7 @@ export function useImportFlow(orgId: string | null) {
     toggle: (ids: string[], on: boolean) => toggle(ids, on),
     toggleSkill: (id: string, on: boolean) => toggle([id], on, setSkillsOn),
     reset: () => {
+      setTouched(true);
       run.current++;
       done.current = new Map();
       focus.current = "drop";
@@ -643,12 +650,7 @@ function Preview({
   const origin = bundleOrigin(bundle);
   const applying = flow.progress !== null;
   const picks = picksOf(items, flow.pick, blocked);
-  const summary = KINDS.map(
-    (kind) => [kind, items.filter((i) => i.kind === kind && i.action !== "skip").length] as const,
-  )
-    .filter(([, n]) => n > 0)
-    .map(([kind, count]) => t(`onboarding.import.report.kinds.${kind}`, { count }))
-    .join(" · ");
+  const summary = kindsLine(t, (kind) => items.filter((i) => i.kind === kind && i.action !== "skip").length);
   const left = groupLeftOut(bundle.leftOut);
   const sub = (level + 1) as 3 | 4;
 
@@ -676,7 +678,7 @@ function Preview({
 
       <fieldset className="imp-groups" disabled={applying}>
         <legend className="ac-visually-hidden">{t("onboarding.import.pickLegend")}</legend>
-        {KINDS.map((kind) => {
+        {IMPORT_KINDS.map((kind) => {
           const rows = items.filter((i) => i.kind === kind).sort((a, b) => RANK[a.action] - RANK[b.action]);
           return rows.length > 0 ? (
             <Group key={kind} kind={kind} rows={rows} flow={flow} blocked={blocked} index={index} level={sub} />
@@ -1198,7 +1200,7 @@ export function ImportReport({
       </header>
 
       <ul className="imp-made">
-        {KINDS.map((kind) => {
+        {IMPORT_KINDS.map((kind) => {
           const list = made.filter((i) => i.kind === kind);
           if (list.length === 0) return null;
           return (
@@ -1254,6 +1256,37 @@ export function ImportReport({
           </Button>
         </div>
       )}
+    </section>
+  );
+}
+
+/**
+ * What the workspace brought from other apps, once it's in and no file is in hand here (the onboarding opened again):
+ * each source by its mark with how much of each kind came, and the way to bring another file.
+ */
+export function ImportedSummary({ sources, onAnother }: { sources: ImportedSource[]; onAnother: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <section className="imp-report">
+      {sources.map((source) => {
+        const origin = bundleOrigin({ source });
+        return (
+          <header key={`${source.app}:${source.ref}`} className="imp-head">
+            <SourceMark card={origin.card} />
+            <div className="imp-head__text">
+              <h2 className="imp-head__title">
+                {origin.app ? t("onboarding.import.from", { app: origin.app }) : t("onboarding.import.fromOther")}
+              </h2>
+              <p className="imp-head__sub">{kindsLine(t, (kind) => source.counts[kind])}</p>
+            </div>
+          </header>
+        );
+      })}
+      <div>
+        <Button variant="ghost" icon="upload" onClick={onAnother}>
+          {t("onboarding.import.report.another")}
+        </Button>
+      </div>
     </section>
   );
 }

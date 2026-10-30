@@ -1,5 +1,12 @@
-import type { ApiClient, ImportItemResult, ImportSkipReason, MigrationBundle } from "@agenteschat/client";
+import type {
+  ApiClient,
+  ImportItemKind,
+  ImportItemResult,
+  ImportSkipReason,
+  MigrationBundle,
+} from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
+import type { TFunction } from "i18next";
 import { IMPORT_SOURCES, ImportError, type ImportSource, type PickedFile, SOURCE_NAME } from "@/lib/import";
 import { filesFromDrop } from "@/lib/obsidian";
 
@@ -12,6 +19,15 @@ import { filesFromDrop } from "@/lib/obsidian";
 
 /** Items one apply may create or update (`IMPORT_LIMITS.perApply` in packages/engine/src/imports.ts). */
 export const PER_APPLY = 200;
+
+/** What an import brings, in the order the screens list it. */
+export const IMPORT_KINDS: readonly ImportItemKind[] = ["agent", "skill", "channel", "routine", "note"];
+
+/** "3 agentes · 2 skills": how many of each kind, the kinds with none left out. */
+export const kindsLine = (t: TFunction, count: (kind: ImportItemKind) => number) =>
+  IMPORT_KINDS.filter((kind) => count(kind) > 0)
+    .map((kind) => t(`onboarding.import.report.kinds.${kind}`, { count: count(kind) }))
+    .join(" · ");
 
 /** Apps that answer `EXPORT_PROMPT`: the brand, and the `source.app` the prompt suggests it writes. */
 export const EXPORT_PROMPT_APPS = [
@@ -62,11 +78,14 @@ export const CARD_MARK: Record<Exclude<ImportCard, "other">, { icon: string; dar
 };
 
 /**
- * The card and app name of a bundle. One in our format names its app in
+ * The card and app name of a bundle (or of what one brought, `imports.sources`). One in our format names its app in
  * `source.ref` ("agenteschat:<org>" for our own export, "grok-bot:…" for a
  * reply to `EXPORT_PROMPT`); `app` is null for an app we don't know.
  */
-export function bundleOrigin(bundle: MigrationBundle): { card: ImportCard; app: string | null } {
+export function bundleOrigin(bundle: { source: Pick<MigrationBundle["source"], "app" | "ref"> }): {
+  card: ImportCard;
+  app: string | null;
+} {
   const source = IMPORT_SOURCES.find((s) => s === bundle.source.app);
   if (!source) return { card: "other", app: null };
   if (source !== "agenteschat" || bundle.source.ref.startsWith("agenteschat:")) {

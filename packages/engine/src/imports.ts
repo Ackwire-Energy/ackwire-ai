@@ -1,5 +1,5 @@
 import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
-import { and, type Database, eq, inArray, schema } from "@agenteschat/db";
+import { and, type Database, eq, inArray, schema, sql } from "@agenteschat/db";
 import { isKnownModel } from "@agenteschat/providers";
 import { isIdHandle } from "@agenteschat/ui/names";
 import { createAgent, HANDLE_PATTERN, updateAgent } from "./agents";
@@ -92,7 +92,8 @@ export interface BundleNote {
   content: string;
 }
 
-export type ImportItemKind = "agent" | "skill" | "channel" | "routine" | "note";
+export const IMPORT_KINDS = ["agent", "skill", "channel", "routine", "note"] as const;
+export type ImportItemKind = (typeof IMPORT_KINDS)[number];
 
 export type ImportSkipReason =
   | "exists"
@@ -879,4 +880,35 @@ export async function applyImport(
     },
   });
   return { items: plan.items.map(publicItem) };
+}
+
+/**
+ * What the workspace brought from other apps, one entry per source package in the order they first came: how many
+ * of each kind. A channel that was here already (`adopted`) didn't come. Admins only (`manage_agents`).
+ */
+export async function importedSources(db: Database, actorId: string, orgId: string) {
+  await requirePermission(db, actorId, orgId, "manage_agents");
+  const rows = await db
+    .select({
+      app: importItems.sourceApp,
+      ref: importItems.sourceRef,
+      kind: importItems.kind,
+      n: sql<number>`count(*)::int`,
+    })
+    .from(importItems)
+    .where(and(eq(importItems.orgId, orgId), eq(importItems.adopted, false)))
+    .groupBy(importItems.sourceApp, importItems.sourceRef, importItems.kind)
+    .orderBy(sql`min(${importItems.createdAt})`);
+  const sources = new Map<string, { app: string; ref: string; counts: Record<ImportItemKind, number> }>();
+  for (const row of rows) {
+    const key = JSON.stringify([row.app, row.ref]);
+    const source = sources.get(key) ?? {
+      app: row.app,
+      ref: row.ref,
+      counts: Object.fromEntries(IMPORT_KINDS.map((k) => [k, 0])) as Record<ImportItemKind, number>,
+    };
+    if (row.kind in source.counts) source.counts[row.kind as ImportItemKind] = row.n;
+    sources.set(key, source);
+  }
+  return [...sources.values()];
 }

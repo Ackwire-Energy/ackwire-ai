@@ -564,8 +564,8 @@ export const ptBR = {
       title: "Qual IA eles vão usar?",
       lead: "Entre com o seu plano de IA: sem\u00a0chave\u00a0de\u00a0API.",
       paid: "Seu plano do agentes.chat está ativo. O computador deles está a caminho.",
-      /** Back from paying, until the billing service lifts the workspace's hold (ADR 0079). */
-      confirming: "Pagamento recebido. Ativando o plano do agentes.chat deste workspace.",
+      /** Back from paying, for a minute at most, until the billing service lifts the workspace's hold (ADR 0079). */
+      confirming: "Confirmando o pagamento do plano do agentes.chat deste workspace.",
       leadNoComputer:
         "Os agentes pensam com uma chave\u00a0de\u00a0API, ou com o seu plano de IA num computador que você conectar.",
     },

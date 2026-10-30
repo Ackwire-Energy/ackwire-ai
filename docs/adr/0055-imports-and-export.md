@@ -59,6 +59,7 @@ One apply creates or updates at most 200 items (`import.too_many_items`). A big 
 - It is what tells an update which rows it may touch: only what the import made. Something with the same name that it didn't make is never changed.
 - `adopted`: a channel that already existed, which the import only joined its agents to. A future rollback must never delete it.
 - Known limit: if the process dies between creating an item and writing its row, a re-run sees a name it didn't make (`exists`, or a suffixed handle).
+- `GET /api/app/organizations/{orgId}/imports` reads it back as what the workspace brought, one entry per source package with how many of each kind came (adopted channels left out), admins only (`importedSources`). The onboarding's import step, passed already with no file in hand (the page opened again), opens on it instead of an empty picker.
 
 ### 4. Rules
 

@@ -5,6 +5,7 @@ setupDom();
 
 import type { ComputerSetup, Machine } from "@agenteschat/client";
 import { keys } from "@agenteschat/client";
+import type { OnboardingStepId } from "@agenteschat/client/lib/onboarding";
 import { en, ptBR } from "@agenteschat/i18n";
 import { icons } from "@agenteschat/ui";
 import type { QueryClient } from "@tanstack/react-query";
@@ -999,7 +1000,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect([...document.querySelectorAll(".onb__done-row")].map((row) => row.textContent).at(-1)).toBe("Ada criada");
   });
 
-  test("back from paying: the step it left from, the plan said active over it, the team's computer on its way", async () => {
+  test("back from paying: the first step still waiting for the person, the plan said active over it, the team's computer on its way", async () => {
     // The workspace the onboarding made: Ada and Atlas (seeded) and Theo, its context written.
     const state = seedState({ context: "Clínicas." });
     state.authConfig = { workspaceComputer: true };
@@ -1012,21 +1013,18 @@ describe("the onboarding where the workspace gets its own computer", () => {
       beingSetUp(state),
     );
     expect(r.router.state.location.pathname).toBe("/onboarding");
-    // The computer step, where the plan was offered.
-    expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
+    // Paid, the computer step has nothing left to ask: the AI step, the plan said active over it.
+    expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
     expect(document.querySelector(".onb__paid")?.textContent).toBe(
       "Seu plano do agentes.chat está ativo. O computador deles está a caminho.",
     );
-    // The computer step is Atlas's: its line is the one it says there.
-    expect(document.querySelector(".onb__intro")?.textContent).toContain("Atlas");
-    // Every step before it done, with what each has: the team in the workspace's order.
+    // Every step before it done, with what each has: the team in the workspace's order, the computer on its way.
     const rail = screen().getByRole("navigation", { name: "Passos para começar" });
-    expect(rail.querySelectorAll("li[data-done]")).toHaveLength(4);
+    expect(rail.querySelectorAll("li[data-done]")).toHaveLength(5);
     expect(within(rail).getByRole("button", { name: /^Workspace/ }).textContent).toContain("Acme");
     expect(within(rail).getByRole("button", { name: /^Agentes/ }).textContent).toContain("Ada, Atlas e Theo");
-    // On to the AI step: the computer being prepared in Claude's panel, the team's line over its steps.
-    await click(screen().getByRole("button", { name: "Continuar" }));
-    expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
+    expect(within(rail).getByRole("button", { name: /^Computador/ }).textContent).toContain("Sendo preparado");
+    // The computer being prepared in Claude's panel, the team's line over its steps.
     const panel = screen().getByRole("region", { name: "Seu plano do Claude" });
     expect(panel.querySelector(".setup-say[data-on]")?.textContent).toBe("O Atlas está colocando ele de pé");
     expect(panel.querySelector('.setup-progress [role="status"]')?.textContent).toBe("Passo 2 de 4 · Iniciando");
@@ -1057,7 +1055,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(lost.router.state.location.pathname).toMatch(new RegExp(`^/org/${ORG_ID}/c/`));
   });
 
-  test("back from paying before the billing service lifts the hold: the payment received, asked again every 5 s until it does", async () => {
+  test("back from paying before the billing service lifts the hold: the payment being confirmed, asked again every 5 s until it does", async () => {
     const state = beingSetUp(seedState({ context: "Clínicas." }));
     state.authConfig = { workspaceComputer: true };
     const me = state.me;
@@ -1071,7 +1069,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
     expect(screen().queryByRole("button", { name: "Agora não" })).toBeNull();
     const line = () => document.querySelector(".onb__paid");
-    expect(line()?.textContent).toBe("Pagamento recebido. Ativando o plano do agentes.chat deste workspace.");
+    expect(line()?.textContent).toBe("Confirmando o pagamento do plano do agentes.chat deste workspace.");
     expect(line()?.getAttribute("data-state")).toBe("confirming");
     // Its computer waits on the hold: both are asked about again, here and on every step after it.
     const qc = r.services.queryClient;
@@ -1120,19 +1118,182 @@ describe("the onboarding where the workspace gets its own computer", () => {
     }
   });
 
-  test("the way back from the billing service: the step this tab was on, even one before the furthest", async () => {
+  /**
+   * A workspace part way through its onboarding: Ada and Atlas (seeded), Theo and Lia, then the agents its import
+   * brought (`imported`, from OpenBot.run, with `skills`), its step saved as `step` (an older version's save, maybe).
+   */
+  const partWay = (step: OnboardingStepId, imported: string[], { unpaid = false, skills = 0 } = {}) => {
     const state = seedState({ context: "Clínicas." });
     state.authConfig = { workspaceComputer: true };
-    // This tab went back to the team before leaving; the server has the computer's step as the furthest.
-    sessionStorage.setItem(`agentes.onboarding.step.${ORG_ID}`, "agents");
+    const ada = state.agents[0];
+    if (!ada) throw new Error("no agent");
+    state.agents.push(
+      { ...ada, id: "agent-theo", name: "Theo", handle: "theo", role: "PM" },
+      { ...ada, id: "agent-lia", name: "Lia", handle: "lia", role: "Pesquisa" },
+      ...imported.map((name, i) => ({ ...ada, id: `agent-imported-${i}`, name, handle: `agente-${i}`, role: "" })),
+    );
+    const source = { app: "openbotrun", ref: "openbot-import" };
+    state.imported = [
+      ...imported.map(() => ({ ...source, kind: "agent" as const })),
+      ...Array.from({ length: skills }, () => ({ ...source, kind: "skill" as const })),
+    ];
+    const org = state.me?.organizations[0];
+    if (org) {
+      org.onboarding = { step, generalChannelId: GENERAL_ID };
+      if (unpaid) org.standing = { state: "hold", reason: "payment" };
+    }
+    return state;
+  };
+  const railStep = (name: RegExp) =>
+    within(screen().getByRole("navigation", { name: "Passos para começar" })).getByRole("button", { name });
+  const IMPORTED = ["Selma Sentinela", "Novo agente", "Bento"];
+
+  test("back from paying where an older version saved the import's step: never behind the step the person reached", async () => {
+    // The import ran and the team was made, the person reached the computer step and paid there, while the server's
+    // step still said the import (as an older version saved it) and the tab kept no step of its own.
+    const PREPARING = { state: "preparing", step: "starting", secondsLeft: 420, specs: SPECS } as const;
+    await open(`/org/${ORG_ID}/onboarding?paid=1`, PREPARING, partWay("import", IMPORTED));
+    // Never the import's step with an empty picker: the first step still waiting, the AI's, the plan said active.
+    expect(screen().queryByRole("heading", { name: "Já usa agentes em outro app?" })).toBeNull();
+    expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
+    expect(document.querySelector(".onb__paid")?.getAttribute("data-state")).toBe("paid");
+    const rail = screen().getByRole("navigation", { name: "Passos para começar" });
+    expect(rail.querySelectorAll("li[data-done]")).toHaveLength(5);
+    expect(railStep(/^Trazer seus agentes/).textContent).toContain("Selma Sentinela, Novo agente e Bento");
+    cleanup();
+
+    // Opened again without the way back (a reload, another tab): the same.
+    await open("/onboarding", PREPARING, partWay("import", IMPORTED));
+    expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
+    cleanup();
+
+    // Paid, its hold not lifted yet: the computer step it paid from, the payment being confirmed.
+    await open(`/org/${ORG_ID}/onboarding?paid=1`, { state: null }, partWay("import", IMPORTED, { unpaid: true }));
+    expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
+    expect(document.querySelector(".onb__paid")?.getAttribute("data-state")).toBe("confirming");
+  });
+
+  test("the import's step once passed opens on what came: its source and counts, Continue, another file a click away", async () => {
+    // Opened again at the computer step, then back to the import's on the rail.
+    await open("/onboarding", { state: null }, partWay("computer", IMPORTED, { unpaid: true, skills: 2 }));
+    await click(railStep(/^Trazer seus agentes/));
+    expect(screen().getByRole("heading", { name: "Já usa agentes em outro app?" })).toBeTruthy();
+    // Its summary: the app it came from, by its mark, and how much came. No empty picker.
+    const head = document.querySelector(".onb__answer .imp-head") as HTMLElement;
+    expect(head.querySelector(".imp-head__title")?.textContent).toBe("Veio do OpenBot.run");
+    expect(head.querySelector(".imp-head__sub")?.textContent).toBe("3 agentes · 2 skills");
+    expect(head.querySelector(".imp-mark img")?.getAttribute("src")).toBe("/brands/openbotrun.svg");
+    expect(document.querySelector(".imp-drop")).toBeNull();
+    // Done: Continue goes on to the agents.
+    expect(screen().getByRole("button", { name: "Continuar" }).hasAttribute("disabled")).toBe(false);
+    // Another file: the picker, as the first time, and Continue waits for it.
+    await click(screen().getByRole("button", { name: "Importar outro arquivo" }));
+    expect(document.querySelector(".imp-drop")).not.toBeNull();
+    expect(document.querySelector(".onb__answer .imp-head")).toBeNull();
+    expect(screen().getByRole("button", { name: "Continuar" }).hasAttribute("disabled")).toBe(true);
+  });
+
+  test("thirty agents: their faces in one line then +N, a few names then how many more, on every step and the rail", async () => {
+    const thirty = Array.from({ length: 26 }, (_, i) => `Agente ${i + 1}`);
+    const state = partWay("computer", thirty, { unpaid: true });
+    const r = await open("/onboarding", { state: null }, state);
+    // Atlas names three of the others, then how many more.
+    expect(
+      screen().getByRole("heading", {
+        name: "Ada, Theo, Lia e mais 26 e eu já chegamos. Só falta o nosso computador para a gente começar.",
+      }),
+    ).toBeTruthy();
+    // The checklist's row: four names, then how many; four faces, then +26, in one line beside the words.
+    const row = [...document.querySelectorAll(".onb__done-row")].at(-1) as HTMLElement;
+    expect(row.querySelector(".onb__done-what")?.textContent).toBe("Ada, Atlas, Theo, Lia e mais 26 criados");
+    const faces = row.querySelector(".onb__done-faces") as HTMLElement;
+    expect(faces.querySelectorAll(".ac-avatar")).toHaveLength(4);
+    expect(faces.querySelector(".onb__faces-more")?.textContent).toBe("+26");
+    const css = await Bun.file(new URL("../src/pages/onboarding.css", import.meta.url).pathname).text();
+    expect(css.split("\n.onb__faces-more {")[1]?.split("}")[0]).toContain("white-space: nowrap");
+    // The rail says them the same way.
+    expect(railStep(/^Agentes/).textContent).toContain("Ada, Atlas, Theo, Lia e mais 26");
+    expect(railStep(/^Trazer seus agentes/).textContent).toContain("Agente 1, Agente 2, Agente 3, Agente 4 e mais 22");
+
+    // Paid: on through the AI step to the team's, whose row of faces is one line too, and Done names four.
+    state.me = { ...(state.me as NonNullable<typeof state.me>) };
+    for (const o of state.me.organizations) o.standing = undefined;
+    r.machines.setSetup({ state: "preparing", step: "starting", secondsLeft: 420, specs: SPECS });
+    await act(async () => r.services.queryClient.refetchQueries({ type: "active" }));
+    await settle(6);
+    await click(screen().getByRole("button", { name: "Continuar" }));
+    // The workspace's key thinks for them already.
+    expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
+    await click(screen().getByRole("button", { name: "Continuar" }));
+    expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
+    const meet = [...document.querySelectorAll(".onb__answer .row")].find((x) => x.textContent?.includes("#general"));
+    expect(meet?.querySelectorAll(".ac-avatar")).toHaveLength(4);
+    expect(meet?.querySelector(".onb__faces-more")?.textContent).toBe("+26");
+    await click(screen().getByRole("button", { name: "Pular esta etapa" }));
+    expect(document.querySelector(".onb__welcome-lead")?.textContent).toStartWith(
+      "Ada, Atlas, Theo, Lia e mais 26 já estão no #general.",
+    );
+  });
+
+  test("a forged ?paid on a workspace still waiting for its plan: confirming for a minute at most, then its offer again", async () => {
+    const real = globalThis.setTimeout;
+    const minute: (() => void)[] = [];
+    const timers = spyOn(globalThis, "setTimeout").mockImplementation(((
+      run: () => void,
+      ms?: number,
+      ...args: unknown[]
+    ) => {
+      if (ms !== 60_000) return real(run, ms, ...args);
+      minute.push(run);
+      return 0;
+    }) as unknown as typeof setTimeout);
+    const line = () => document.querySelector(".onb__paid");
     try {
-      await open(`/org/${ORG_ID}/onboarding`, { state: null }, beingSetUp(state));
-      expect(screen().getByRole("heading", { name: "Fica com esse time?" })).toBeTruthy();
-      // The ones before it done.
-      const rail = screen().getByRole("navigation", { name: "Passos para começar" });
-      expect(rail.querySelectorAll("li[data-done]")).toHaveLength(3);
+      // The address says paid; the server says the workspace still waits for its plan.
+      await open(`/org/${ORG_ID}/onboarding?paid=true`, { state: null }, partWay("computer", [], { unpaid: true }));
+      expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
+      expect(line()?.textContent).toBe("Confirmando o pagamento do plano do agentes.chat deste workspace.");
+      expect(screen().queryByRole("button", { name: "Agora não" })).toBeNull();
+      // A minute on, still unpaid: the server's word, nothing claimed and its plan offered again.
+      await act(async () => minute.at(-1)?.());
+      await settle(4);
+      expect(line()).toBeNull();
+      expect(screen().getByRole("button", { name: "Agora não" })).toBeTruthy();
+      expect(document.querySelector(".onb__offer")).not.toBeNull();
+      cleanup();
+
+      // Paid from the computer step opened again from a later one: back at the furthest, the computer step holds its
+      // offer back for that minute too, then offers it again.
+      await open(`/org/${ORG_ID}/onboarding?paid=1`, { state: null }, partWay("team", [], { unpaid: true }));
+      expect(screen().getByRole("heading", { name: "Quem mais trabalha com você?" })).toBeTruthy();
+      expect(line()?.getAttribute("data-state")).toBe("confirming");
+      await click(railStep(/^Computador/));
+      expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
+      expect(document.querySelector(".onb__offer")).toBeNull();
+      expect(screen().queryByRole("button", { name: "Agora não" })).toBeNull();
+      expect(line()?.getAttribute("data-state")).toBe("confirming");
+      await act(async () => minute.at(-1)?.());
+      await settle(4);
+      expect(line()).toBeNull();
+      expect(document.querySelector(".onb__offer")).not.toBeNull();
     } finally {
-      sessionStorage.clear();
+      timers.mockRestore();
+    }
+  });
+
+  test("back from the billing service on any other hold: the plan never said active, the computer step that shows it", async () => {
+    for (const standing of [
+      { state: "hold", reason: "unpaid" },
+      { state: "hold", reason: "ended" },
+      { state: "hold", reason: null },
+    ] as const) {
+      const state = partWay("computer", []);
+      const org = state.me?.organizations[0];
+      if (org) org.standing = standing;
+      await open(`/org/${ORG_ID}/onboarding?paid=1`, { state: null }, state);
+      expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
+      expect(document.querySelector(".onb__paid")).toBeNull();
+      cleanup();
     }
   });
 
