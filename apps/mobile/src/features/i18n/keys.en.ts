@@ -814,7 +814,7 @@ export const featureKeysEn: FeatureTranslations = {
     on: "On",
     off: "Off",
     notificationsPhone: "Notifications on this phone",
-    notificationsOnHint: "They also arrive in the browser and the Mac app, if they're on there.",
+    notificationsOnHint: "They also arrive in the browser and the desktop app, if they're on there.",
     notificationsOffHint: "Turn them on to get notifications here. The kinds below apply to all your devices.",
     notificationsKindsHint: "Activity keeps everything. This applies to this workspace, on all your devices.",
     version: "agentes.chat · version {{version}}",
