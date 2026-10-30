@@ -12,6 +12,7 @@ import { endSentence } from "./text";
  */
 const KNOWN = {
   "agent_proposal.decided": "errors.agentProposal.decided",
+  "approval.always_unavailable": "errors.approval.alwaysUnavailable",
   "agent_proposal.expired": "errors.agentProposal.expired",
   "artifact.file_too_large": "errors.artifact.fileTooLarge",
   "artifact.file_required": "errors.artifact.fileRequired",

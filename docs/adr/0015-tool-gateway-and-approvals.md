@@ -25,3 +25,12 @@
 
 - A retried job continues from the saved transcript. A crash between running a non-sensitive tool and saving can repeat that tool; sensitive actions can't repeat (`executed_at`).
 - Tool results are capped at 50 000 characters for the model and 4 000 in steps.
+
+## Addendum (2026-10-30): "Aprovar sempre"
+
+A person who decides an agent's approvals may approve a kind of call for good, so the agent stops asking for it. The kind is the agent, the connection, the server's own tool name and, for a tool that runs other actions (Composio's executor, ADR 0016), each wrapped action; never the params. Rules live in `approval_rules (org_id, agent_id, connection_id, tool, action)`, `action = ''` for the tool itself, unique per kind.
+
+- **Offered** only where the gateway says so when it asks, stored on the request (`approvals.approve_always = { tool, actions }`, null = not offered): a person's run whose policy didn't force the ask (routines, unattended work and missions always ask, ADR 0053), a custom server's tool at the approval level that isn't sensitive by nature (`ToolDefinition.rememberAs`), with known wrapped actions none of them sensitive, and nothing in its names, scope or actions that matches merge, deploy or rollback or has a word starting with merge, deploy, rollback, promote or workflow. Never on built-ins (mail has its own switch), catalog connectors, the code runners, or a high-risk card that takes a hold.
+- **Deciding** is `POST …/approvals/{id}/approve` with `always: true`, by the same people as the approval (`mayDecide`). The rules are written in the decision's transaction, and the `approval.approved` audit row carries `always`. Where it isn't offered: 409 `approval.always_unavailable`.
+- **Honoured** in the approval branch after the scope, schema, credential and argument checks and before the "say why" refusal: a covered call (one fresh query, no cache) runs like an allowed one, with its team action and a `tool.call` audit row with `details.approvalRules`. A rule never grants access: losing the scope, a denial or a tool turned off or sensitive stops it before any rule is read.
+- **Undone** on the agent's page (Ferramentas e acesso, "Aprovado sempre", `GET`/`DELETE …/agents/{agentId}/approval-rules`), by admins and the agent's owner, audited as `agent.approval_rule_removed`. Disconnecting the server and deleting the agent delete its rules.

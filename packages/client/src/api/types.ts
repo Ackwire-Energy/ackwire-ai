@@ -1105,6 +1105,27 @@ export interface Approval {
   issue?: { id: string; number: number; title: string } | null;
   /** One approval only: what the agent said at each turn before asking. */
   trail?: { text: string; at: string }[];
+  /**
+   * "Aprovar sempre" is offered: approving with `always` lets the agent run this server tool (each of these wrapped
+   * actions; none: the tool itself) without asking again, with any values. Null or absent: not offered.
+   */
+  approveAlways?: { tool: string; actions: string[] } | null;
+}
+
+/** A kind of call the agent runs without asking, approved for good by someone who decides its approvals. */
+export interface ApprovalRule {
+  id: string;
+  connectionId: string;
+  /** The connection's name ("Composio"). */
+  server: string;
+  /** The server's own tool name. */
+  tool: string;
+  /** How the workspace labelled that tool. */
+  toolLabel: string;
+  /** The wrapped action (`GITHUB_CREATE_AN_ISSUE_COMMENT`); empty: the tool itself. */
+  action: string;
+  createdByUserId: string | null;
+  createdAt: string;
 }
 
 /** The email a mail approval writes (draft, send, reply, forward), as its card shows it. */

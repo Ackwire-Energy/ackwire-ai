@@ -5,15 +5,19 @@ import {
   approvalAction,
   approvalRisk,
   approvalTraits,
+  approveAlwaysOffered,
 } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalWhy } from "@agenteschat/client/lib/approval-origin";
-import { approvalTitle } from "@agenteschat/client/lib/approval-words";
+import { approvalTitle, approveAlwaysWords } from "@agenteschat/client/lib/approval-words";
 import { timeLeft, whenAt } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { ApprovalCard, Button } from "@agenteschat/ui";
+import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { Trans, useTranslation } from "react-i18next";
 import { EmailLetter } from "@/components/EmailLetter";
 import { CardSky, colorOf, prepareBurst } from "@/components/Sky";
+import { useToast } from "@/lib/toast";
 import { useOrg } from "./org-context";
 
 // Its title, what it wants to do, whether it only looks and its values: the phone's own rules too.
@@ -47,6 +51,61 @@ export function decisionLabel(
 function waitingFor(t: TFunction, agent: Agent | undefined, members: Map<string, Member>) {
   const owner = agent?.ownerUserId ? members.get(agent.ownerUserId) : undefined;
   return owner ? t("approval.waitingFor", { name: owner.name }) : t("approval.waitingAdmin");
+}
+
+/**
+ * "Aprovar sempre", where the request offers it: approves this one and the agent's next calls of its kind, with
+ * any values. The line under it says what that covers; the toast, where to undo it.
+ */
+export function ApproveAlways({ approval, agent }: { approval: Approval; agent: Agent | undefined }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const navigate = useNavigate();
+  const decide = useDecideApproval(org.id);
+  if (!approveAlwaysOffered(approval)) return null;
+  const g = agentGrammar(t, agent?.name ?? t("channel.unknownAgent"));
+  const kind = approval.approveAlways;
+  const open = () =>
+    void navigate({
+      to: "/org/$orgId/agents/$agentId",
+      params: { orgId: org.id, agentId: approval.agentId },
+      search: { tab: "access" },
+    });
+  const always = (el: HTMLElement) => {
+    const burst = prepareBurst(el);
+    decide.mutate(
+      { id: approval.id, decision: "approve", always: true },
+      {
+        onSuccess: () => {
+          burst();
+          toast.show(
+            t("approval.always.done", { name: g.name }),
+            "info",
+            { label: t("approval.always.open"), run: open },
+            t("approval.always.undoHere", { of: g.of, name: g.name }),
+          );
+        },
+      },
+    );
+  };
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        icon="check"
+        disabled={decide.isPending}
+        loading={decide.isPending}
+        onClick={(e) => always(e.currentTarget)}
+      >
+        {t("approval.always.button")}
+      </Button>
+      <p className="small muted ap-always" title={kind?.actions.join(", ") || kind?.tool}>
+        {t("approval.always.hint", { of: g.of, name: g.name, actions: approveAlwaysWords(t, approval) })}
+      </p>
+    </>
+  );
 }
 
 function Actions({ approval, secondary }: { approval: Approval; secondary?: React.ReactNode }) {

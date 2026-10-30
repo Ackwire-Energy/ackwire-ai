@@ -8,7 +8,7 @@ import { useColors, useDirectory, useNow, useOrgId } from "../shared/hooks";
 import { genderOf } from "../shared/logic";
 import { successHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
-import { approvalAction, approvalRisk } from "./logic";
+import { approvalAction, approvalRisk, approveAlwaysOffered, approveAlwaysToast } from "./logic";
 import {
   ApprovalDetails,
   ApprovalEmailLetter,
@@ -51,19 +51,29 @@ export function ApprovalSheet({
   const channel = a ? channels.data?.find((x) => x.id === a.channelId) : undefined;
   const origin = useOriginShort({ origin: a?.origin ?? null });
 
-  const done = (decision: "approve" | "refuse") => {
+  /** `always`: "Aprovar sempre", this one and the agent's next ones of its kind. */
+  const done = (decision: "approve" | "refuse", always = false) => {
     if (!a) return;
     decide.mutate(
-      { id: a.id, decision, ...(decision === "refuse" && reason.trim() ? { reason: reason.trim() } : {}) },
+      {
+        id: a.id,
+        decision,
+        ...(always ? { always } : {}),
+        ...(decision === "refuse" && reason.trim() ? { reason: reason.trim() } : {}),
+      },
       {
         onSuccess: () => {
           successHaptic();
           toast({
-            title: decision === "approve" ? t("mobile.approval.approved") : t("mobile.approval.refused"),
-            subtitle:
-              decision === "approve"
-                ? t(`mobile.approval.approvedSub${g}`, { name })
-                : t(`mobile.approval.refusedSub${g}`, { name }),
+            ...(always
+              ? approveAlwaysToast(t, name)
+              : {
+                  title: decision === "approve" ? t("mobile.approval.approved") : t("mobile.approval.refused"),
+                  subtitle:
+                    decision === "approve"
+                      ? t(`mobile.approval.approvedSub${g}`, { name })
+                      : t(`mobile.approval.refusedSub${g}`, { name }),
+                }),
             agentId: a.agentId,
           });
           onClose();
@@ -170,6 +180,15 @@ export function ApprovalSheet({
                         label={t("mobile.approval.refuse")}
                         onPress={() => setRefusing(true)}
                       />
+                      {approveAlwaysOffered(a) ? (
+                        <Button
+                          variant="ghost"
+                          wide
+                          label={t("approval.always.button")}
+                          disabled={decide.isPending}
+                          onPress={() => done("approve", true)}
+                        />
+                      ) : null}
                     </View>
                     <Text variant="caption" tone="faint" style={styles.note}>
                       {high ? t("mobile.approval.holdNote") : t("mobile.approval.tapNote")}

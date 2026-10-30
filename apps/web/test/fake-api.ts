@@ -13,6 +13,7 @@ import type {
   ApiClient,
   AppNotification,
   Approval,
+  ApprovalRule,
   AuditRow,
   AuthConfig,
   Availability,
@@ -170,6 +171,8 @@ export interface FakeState {
   invitations: InvitationWithStatus[];
   credentials: Credential[];
   approvals: Approval[];
+  /** What each agent runs without asking ("Aprovar sempre"), by agent id; unset = none. */
+  approvalRules?: Record<string, ApprovalRule[]>;
   connections: Connection[];
   /** GitHub App installations bound to the org (`githubApp.info`); undefined = none, app not installable. */
   githubApp?: { installable: boolean; installations: GitHubAppInstallation[] };
@@ -2002,8 +2005,40 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (!a) throw new ApiError(404, "not_found", "Approval not found");
         return structuredClone(a);
       },
-      approve: async (orgId, id, reason) => decide(orgId, id, "approved", reason),
+      approve: async (orgId, approvalId, reason, always) => {
+        if (!always) return decide(orgId, approvalId, "approved", reason);
+        const a = state.approvals.find((x) => x.id === approvalId);
+        const kind = a?.approveAlways;
+        if (!a || !kind)
+          throw new ApiError(409, "approval.always_unavailable", "This request can't be approved for good");
+        const decided = await decide(orgId, approvalId, "approved", reason, true);
+        const mine = state.approvalRules?.[a.agentId] ?? [];
+        state.approvalRules = { ...state.approvalRules, [a.agentId]: mine };
+        for (const action of kind.actions.length > 0 ? kind.actions : [""]) {
+          mine.push({
+            id: id("rule"),
+            connectionId: "conn-composio",
+            server: "Composio",
+            tool: kind.tool,
+            toolLabel: kind.tool,
+            action,
+            createdByUserId: state.me?.user.id ?? null,
+            createdAt: new Date().toISOString(),
+          });
+        }
+        return decided;
+      },
       refuse: async (orgId, id, reason) => decide(orgId, id, "refused", reason),
+      rules: async (orgId, agentId) => {
+        log("approvals.rules", orgId, agentId);
+        return structuredClone(state.approvalRules?.[agentId] ?? []);
+      },
+      removeRule: async (orgId, agentId, ruleId) => {
+        log("approvals.removeRule", orgId, agentId, ruleId);
+        const list = state.approvalRules?.[agentId] ?? [];
+        if (!list.some((r) => r.id === ruleId)) throw new ApiError(404, "not_found", "Rule not found");
+        if (state.approvalRules) state.approvalRules[agentId] = list.filter((r) => r.id !== ruleId);
+      },
     },
     connectors: {
       catalog: async () => CATALOG,
@@ -2325,8 +2360,14 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
     };
   }
 
-  function decide(orgId: string, approvalId: string, status: "approved" | "refused", reason?: string) {
-    log(`approvals.${status === "approved" ? "approve" : "refuse"}`, orgId, approvalId, reason);
+  function decide(orgId: string, approvalId: string, status: "approved" | "refused", reason?: string, always?: true) {
+    log(
+      `approvals.${status === "approved" ? "approve" : "refuse"}`,
+      orgId,
+      approvalId,
+      reason,
+      ...(always ? [always] : []),
+    );
     const a = state.approvals.find((x) => x.id === approvalId);
     if (!a) throw new ApiError(404, "not_found", "Approval not found");
     if (a.status !== "pending") throw new ApiError(409, "conflict", "Already decided");

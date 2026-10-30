@@ -1,4 +1,5 @@
 import type { Judge, JudgeQuestion } from "../judge";
+import { ALWAYS_SENSITIVE } from "../tools/gateway";
 
 /**
  * How a connector's tools come classified before a person looks at them.
@@ -179,6 +180,20 @@ export function classifyByRules(tool: ToolToClassify, readTools: readonly string
     return { level: "approval", source: "verb", reason: "verb_sensitive", sensitive: true };
   if (WRITE_VERBS.has(verb)) return { level: "write", source: "verb", reason: "verb_write", sensitive: false };
   return { level: "read", source: "verb", reason: "verb_read", sensitive: false };
+}
+
+/**
+ * What an action named by its slug does (`GITHUB_LIST_PULL_REQUESTS`), when a tool runs it for us (Composio's
+ * executor), by every word rather than the first verb: `sensitive` when any word is a sensitive verb; `read` only
+ * with a read verb and no other verb (`GITHUB_LIST_OPEN_ISSUES` opens nothing, but "open" keeps it a write) and
+ * nothing that always asks; anything else, a slug without a verb too, is a `write`. A wrong guess only asks a person.
+ */
+export function actionLevel(slug: string): "read" | "write" | "sensitive" {
+  const words = nameWords(slug);
+  if (words.some((w) => SENSITIVE_VERBS.has(w))) return "sensitive";
+  const reads = words.some((w) => READ_VERBS.has(w));
+  const acts = words.some((w) => WRITE_VERBS.has(w) || OTHER_VERBS.has(w));
+  return reads && !acts && !ALWAYS_SENSITIVE.test(slug) ? "read" : "write";
 }
 
 /** What we suggest when the judge can't answer: ask first. */

@@ -6,6 +6,8 @@ import {
   approvalSaid,
   approvalTable,
   approvalTraits,
+  approveAlwaysOffered,
+  approveAlwaysToast,
   waitingApprovals,
 } from "../../src/features/approvals/logic";
 import {
@@ -20,7 +22,7 @@ import {
   waitingCards,
   waitingCount,
 } from "../../src/features/missions/logic";
-import { approval, decision, mission } from "./fixtures";
+import { approval, decision, mission, translator } from "./fixtures";
 
 describe("requests to approve", () => {
   test("deploys, deletes and sends take a hold; merges are a tap", () => {
@@ -55,6 +57,40 @@ describe("requests to approve", () => {
     const gone = approval({ id: "gone", expiresAt: new Date(now - 60_000).toISOString() });
     const done = approval({ id: "done", status: "approved" });
     expect(waitingApprovals([later, notMine, soon, gone, done], now).map((a) => a.id)).toEqual(["soon", "later"]);
+  });
+});
+
+describe("Aprovar sempre on the phone", () => {
+  const offered = approval({
+    id: "always",
+    tool: "composio_COMPOSIO_MULTI_EXECUTE_TOOL",
+    scope: "custom:c1:write",
+    approveAlways: { tool: "COMPOSIO_MULTI_EXECUTE_TOOL", actions: ["GITHUB_CREATE_AN_ISSUE_COMMENT"] },
+  });
+
+  test("the quiet third button: only where the server offers it, to who decides, never on a hold", () => {
+    expect(approveAlwaysOffered(offered)).toBe(true);
+    expect(approveAlwaysOffered({ ...offered, canDecide: false })).toBe(false);
+    expect(approveAlwaysOffered({ ...offered, approveAlways: null })).toBe(false);
+    expect(approveAlwaysOffered({ ...offered, approveAlways: undefined })).toBe(false);
+    expect(approveAlwaysOffered({ ...offered, status: "approved" })).toBe(false);
+    // High risk takes a hold, never a tap: it isn't approved for good.
+    expect(approveAlwaysOffered({ ...offered, tool: "deploy_production", scope: "vercel:deploy" })).toBe(false);
+  });
+
+  test("its toast: it won't ask again, and where to undo it, in both languages", async () => {
+    const pt = await translator("pt-BR");
+    expect(approveAlwaysToast(pt, "Ada")).toEqual({
+      title: "Aprovado. Ada não pede mais para isso.",
+      subtitle: "Para desfazer, abra a página dela na web, em Ferramentas e acesso.",
+    });
+    expect(approveAlwaysToast(pt, "Theo").subtitle).toBe(
+      "Para desfazer, abra a página dele na web, em Ferramentas e acesso.",
+    );
+    expect(approveAlwaysToast(await translator("en"), "Ada")).toEqual({
+      title: "Approved. Ada won't ask for this again.",
+      subtitle: "To undo it, open her page on the web, in Tools and access.",
+    });
   });
 });
 

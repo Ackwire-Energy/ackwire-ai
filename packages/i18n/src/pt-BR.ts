@@ -1904,6 +1904,14 @@ export const ptBR = {
     seeEmail: "Ver o e-mail",
     seeDetails: "Ver detalhes",
     notNow: "Agora não",
+    /** "Aprovar sempre": the agent's next calls of this kind run without asking. */
+    always: {
+      button: "Aprovar sempre",
+      hint: "Aprova este e os próximos iguais {{of}} {{name}}: {{actions}}, com qualquer valor.",
+      done: "Aprovado. {{name}} não pede mais para isso.",
+      undoHere: "Para desfazer, vá em Ferramentas e acesso, na página {{of}} {{name}}.",
+      open: "Abrir",
+    },
     email: {
       from: "De",
       to: "Para",
@@ -2655,6 +2663,14 @@ export const ptBR = {
       clear: "Limpe a busca ou o filtro.",
       library: "Biblioteca de skills",
       fineTune: "O ajuste fino, ferramenta por ferramenta, fica no conector. Aqui é um nível por app.",
+      always: {
+        title: "Aprovado sempre",
+        help: "Roda sem pedir, com qualquer valor.",
+        by: "Aprovado por {{name}} · {{when}}",
+        byNobody: "Aprovado · {{when}}",
+        remove: "Voltar a pedir: {{what}}",
+        removed: "{{name}} volta a pedir para isso.",
+      },
     },
     memory: {
       counts: "O que tem na memória",
@@ -7577,6 +7593,9 @@ export const ptBR = {
     agentProposal: {
       decided: "Alguém já decidiu esta proposta.",
       expired: "Esta proposta expirou: ninguém decidiu em um dia.",
+    },
+    approval: {
+      alwaysUnavailable: "Este pedido não pode ser aprovado para sempre. Aprove só este.",
     },
     join: {
       linkClosed: "Este link não funciona mais. Peça um novo a quem mandou.",

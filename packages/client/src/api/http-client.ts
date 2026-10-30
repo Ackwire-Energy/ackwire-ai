@@ -32,6 +32,7 @@ import type {
   AiStatus,
   AppNotification,
   Approval,
+  ApprovalRule,
   Artifact,
   ArtifactDetail,
   ArtifactVersion,
@@ -622,10 +623,16 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       list: async (orgId, filter = {}) =>
         (await request<{ approvals: Approval[] }>(`${org(orgId)}/approvals`, { query: filter })).approvals,
       get: (orgId, id) => request<Approval>(`${org(orgId)}/approvals/${enc(id)}`),
-      approve: (orgId, id, reason) =>
-        request<Approval>(`${org(orgId)}/approvals/${enc(id)}/approve`, { json: reason ? { reason } : {} }),
+      approve: (orgId, id, reason, always) =>
+        request<Approval>(`${org(orgId)}/approvals/${enc(id)}/approve`, {
+          json: { ...(reason ? { reason } : {}), ...(always ? { always: true } : {}) },
+        }),
       refuse: (orgId, id, reason) =>
         request<Approval>(`${org(orgId)}/approvals/${enc(id)}/refuse`, { json: reason ? { reason } : {} }),
+      rules: async (orgId, agentId) =>
+        (await request<{ rules: ApprovalRule[] }>(`${org(orgId)}/agents/${enc(agentId)}/approval-rules`)).rules,
+      removeRule: (orgId, agentId, ruleId) =>
+        request<void>(`${org(orgId)}/agents/${enc(agentId)}/approval-rules/${enc(ruleId)}`, { method: "DELETE" }),
     },
     connectors: {
       catalog: () => request<ConnectorCatalog>("/api/app/connectors/catalog"),

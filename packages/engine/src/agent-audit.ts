@@ -106,6 +106,8 @@ export async function recordToolCall(
     approvalId?: string | null;
     /** A call waiting for a person's secret (`request_secret`): the request. */
     secretRequestId?: string | null;
+    /** A call that ran without asking under "Aprovar sempre": its rules (`approval_rules`). */
+    approvalRules?: string[] | null;
   },
 ) {
   await recordAudit(db, {
@@ -125,6 +127,7 @@ export async function recordToolCall(
       ...(call.reason ? { reason: masked(call.reason).slice(0, MAX_STRING) } : {}),
       ...(call.approvalId ? { approvalId: call.approvalId } : {}),
       ...(call.secretRequestId ? { secretRequestId: call.secretRequestId } : {}),
+      ...(call.approvalRules?.length ? { approvalRules: call.approvalRules } : {}),
     },
     runId: call.runId,
     channelId: call.channelId,
