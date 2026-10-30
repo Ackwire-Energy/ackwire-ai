@@ -83,6 +83,18 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
   creatingChannel: "channel",
   offeringConnectAi: "plug",
   findingTools: "search",
+  runningCommand: "code",
+  runningCommandAny: "code",
+  usingScreen: "computer",
+  cloningRepo: "repo",
+  openingPullRequest: "pullRequest",
+  handingOff: "routines",
+  recordingFindings: "flag",
+  deliveringMission: "flag",
+  suggestingForumTopic: "message",
+  requestingAccess: "key",
+  requestingSecret: "lock",
+  queryingDatabase: "database",
 };
 
 /** Apps of ours that aren't in the connector catalog (the org's mailboxes): their icon, not an initial. */

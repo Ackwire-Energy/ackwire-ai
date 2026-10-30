@@ -19,7 +19,7 @@ import {
 import { dayLabel } from "@agenteschat/client/lib/format";
 import { initialReveal, REVEAL_MAX_LAG_MS, rebaseReveal, revealStep, wordEnd } from "@agenteschat/client/lib/reveal";
 import { buildTimeline, groupsWith, messageKey } from "@agenteschat/client/lib/timeline";
-import { stepLabel } from "@agenteschat/client/lib/work";
+import { stepLabel, toolPhrase } from "@agenteschat/client/lib/work";
 import type { TFunction } from "i18next";
 import { createI18n } from "@/i18n";
 
@@ -194,6 +194,41 @@ describe("humanized activity", () => {
         entry("Marina", { kind: "typing" }, "person"),
       ]),
     ).toBe("Theo e Ada estão trabalhando · Marina está digitando…");
+  });
+
+  test("a computer command says what it ran; none of our tools reads as an app named after its first word", () => {
+    const step = (tool: string, detail?: string) => stepLabel(t, { ...toolActivity(tool, null, detail), tool });
+    expect(step("permission_prompt", "Rerun new unit tests after formatting")).toBe(
+      "Rodou: Rerun new unit tests after formatting",
+    );
+    expect(step("mcp__agentes__permission_prompt", "git commit")).toBe("Rodou: git commit");
+    expect(step("permission_prompt")).toBe("Rodou um comando");
+    expect(toolPhrase(t, { kind: "runningCommand", app: "rm /etc/x", tool: "permission_prompt", state: "fail" })).toBe(
+      "Recusado: rm /etc/x",
+    );
+    expect(activityText(t, [entry("Theo", toolActivity("permission_prompt", null, "npm test"))])).toBe(
+      "Theo está rodando: npm test…",
+    );
+    const ours: Record<string, string> = {
+      desktop_do: "Usou a tela",
+      desktop_read: "Usou a tela",
+      git_clone: "Clonou um repositório",
+      open_pull_request: "Abriu um pull request",
+      hand_off: "Entregou um relatório",
+      record_findings: "Anotou o que encontrou",
+      complete_mission: "Entregou a missão",
+      suggest_forum_topic: "Sugeriu um tópico no fórum",
+      request_permission: "Pediu acesso",
+      request_folder_access: "Pediu acesso",
+      request_secret: "Pediu um segredo",
+      use_tool: "Procurou ferramentas",
+      pg_producao_query: "Consultou o banco de dados",
+    };
+    expect(Object.fromEntries(Object.keys(ours).map((tool) => [tool, step(tool)]))).toEqual(ours);
+    // With the connection the event names, a database is that connection, as before.
+    expect(stepLabel(t, { ...toolActivity("pg_producao_query", "Produção"), tool: "pg_producao_query" })).toBe(
+      "Consultou o Produção",
+    );
   });
 
   test("runs carry the tool from `agent.tool`; writing runs leave the bar", () => {

@@ -1,7 +1,7 @@
 import type { TFunction } from "i18next";
 import type { Run, RunStep } from "../api/types";
 import type { LiveCode, LiveOutput, LiveWork } from "../realtime/streams";
-import { type ActivityKind, activityVerb, appLabel, toolActivity } from "./activity";
+import { type ActivityKind, activityVerb, appLabel, PERMISSION_TOOL, toolActivity } from "./activity";
 import { joinNames } from "./format";
 
 /** Fallback when a tool has no label: "github_merge_pull_request" → "github merge pull request". */
@@ -79,6 +79,8 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
   const items: WorkItem[] = [];
   const narration: WorkNarration[] = [];
   const connectors: string[] = [];
+  // Permission checks waiting on a person, by their request: the runner asking again brings the answer.
+  const waiting = new Map<string, { item: WorkItem; since: number }>();
   for (const s of steps) {
     if (s.kind === "model_call") {
       const text = typeof s.data.narration === "string" ? s.data.narration.trim() : "";
@@ -95,17 +97,32 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
     const name = typeof s.data.name === "string" ? s.data.name : "";
     const id = typeof s.data.toolUseId === "string" ? s.data.toolUseId : `${s.seq}`;
     const result = results.get(id);
-    const a = toolActivity(name);
+    const detail = typeof s.data.detail === "string" ? s.data.detail : null;
+    const a = toolActivity(name, null, detail);
     // A reaction already shows on the message it reacts to: never a step (the server's `meta.work` skips it too).
     if (a.kind === "reacting") continue;
     const app = a.kind === "consulting" ? a.app : DRIVE.includes(a.kind) ? "Drive" : undefined;
     if (app && !connectors.includes(app)) connectors.push(app);
     const input = (s.data.input ?? {}) as Record<string, unknown>;
+    const content = typeof result?.data.content === "string" ? result.data.content : "";
+    const check = name === PERMISSION_TOOL ? checkAnswer(content) : null;
+    // The runner asking again about a command waiting on a person: never a line, its answer is the first ask's.
+    if (check && typeof input.request_id === "string") {
+      const asked = waiting.get(input.request_id);
+      if (asked && result && !check.request) {
+        delete asked.item.held;
+        asked.item.ms = Math.max(0, time(result.createdAt) - asked.since);
+        if (check.refused) {
+          asked.item.failed = true;
+          asked.item.why = check.why;
+        }
+      }
+      continue;
+    }
     const source =
       typeof input.code === "string" ? input.code : typeof input.command === "string" ? input.command : null;
-    const content = typeof result?.data.content === "string" ? result.data.content : "";
-    const failed = result?.data.isError === true;
-    const detail = typeof s.data.detail === "string" ? s.data.detail : null;
+    const failed = result?.data.isError === true || check?.refused === true;
+    const why = !failed ? null : check?.refused ? check.why : firstLine(content);
     const ms = result ? Math.max(0, time(result.createdAt) - time(s.createdAt)) : null;
     // The same thing again, with nothing said in between and no code to show: one line, not five.
     const prev = items[items.length - 1];
@@ -119,10 +136,11 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
       prev.count += 1;
       prev.ms = prev.ms !== null && ms !== null ? prev.ms + ms : (prev.ms ?? ms);
       prev.failed ||= failed;
-      if (failed) prev.why = firstLine(content);
+      if (failed) prev.why = why;
+      if (check?.request) waiting.set(check.request, { item: prev, since: time(s.createdAt) });
       continue;
     }
-    items.push({
+    const item: WorkItem = {
       key: id,
       kind: a.kind,
       app: a.app,
@@ -131,10 +149,11 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
       failed,
       count: 1,
       hint: toolHint(name, a, detail),
-      why: failed ? firstLine(content) : null,
-      ...(result ? {} : { held: true }),
-      input: source === null ? shortJson(input) : null,
-      result: source === null && content ? clip(content) : null,
+      why,
+      ...(result && !check?.request ? {} : { held: true }),
+      // A permission check opens on the whole command it checked (recorded masked), not on its JSON.
+      input: source !== null ? null : typeof s.data.command === "string" ? s.data.command : shortJson(input),
+      result: source === null && content && !check ? clip(content) : null,
       ...(source !== null
         ? {
             code: {
@@ -149,7 +168,9 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
             output: content ? [{ stream: failed ? ("stderr" as const) : ("stdout" as const), text: content }] : [],
           }
         : {}),
-    });
+    };
+    items.push(item);
+    if (check?.request) waiting.set(check.request, { item, since: time(s.createdAt) });
   }
   const first = steps[0];
   const last = steps[steps.length - 1];
@@ -203,8 +224,30 @@ export function workHeader(t: TFunction, w: { steps: number; connectors: string[
 }
 
 /** "Consultou o Himetrica", "Atualizou o plano", and for an unknown tool "Usou a ferramenta send email". */
-export function stepLabel(t: TFunction, s: WorkItem) {
+export function stepLabel(t: TFunction, s: Pick<WorkItem, "kind" | "app" | "tool">) {
   return t(`chat.work.step.${s.kind}`, { app: appLabel(s), tool: toolLabel(s.tool) });
+}
+
+/** A step as one line: its phrase and what it worked on unless the phrase says it ("Atualizou uma tarefa · #131"). */
+export function stepPhrase(t: TFunction, step: { tool: string; detail?: string | null }) {
+  const a = toolActivity(step.tool, null, step.detail);
+  const label = stepLabel(t, { ...a, tool: step.tool });
+  const detail = step.detail?.trim();
+  return detail && detail !== a.app ? `${label} · ${detail}` : label;
+}
+
+/** Steps in a row that read the same, as one line: how many, and the last of them (its time). */
+export function foldSteps<T>(steps: T[], text: (step: T) => string): { step: T; text: string; count: number }[] {
+  const lines: { step: T; text: string; count: number }[] = [];
+  for (const step of steps) {
+    const line = text(step);
+    const prev = lines.at(-1);
+    if (prev?.text === line) {
+      prev.count += 1;
+      prev.step = step;
+    } else lines.push({ step, text: line, count: 1 });
+  }
+  return lines;
 }
 
 /**
@@ -256,13 +299,37 @@ export const firstLine = (text: string) => {
   return line ? clip(line, 160) : null;
 };
 
+/** A refusal's first sentence, the part that says why ("A person said no."); the rest tells the agent what to do. */
+const plainWhy = (text: string) => {
+  const line = firstLine(text);
+  return line ? (/^.+?[.!?](?=\s|$)/.exec(line)?.[0] ?? line) : null;
+};
+
+/** A permission check's answer (`permission_prompt`): refused and why, or waiting on a person (its request). */
+function checkAnswer(content: string) {
+  let answer: Record<string, unknown> = {};
+  try {
+    const value = JSON.parse(content) as unknown;
+    if (value && typeof value === "object") answer = value as Record<string, unknown>;
+  } catch {
+    // An error's text, not an answer.
+  }
+  const refused = answer.behavior === "deny";
+  return {
+    refused,
+    why: refused && typeof answer.message === "string" ? plainWhy(answer.message) : null,
+    request: answer.status === "pending" && typeof answer.request_id === "string" ? answer.request_id : null,
+  };
+}
+
 /**
  * The grey words after a line's phrase: a built-in tool's own short label (the skill, the issue, the file; the
  * engine's `toolDetail`), or a connector tool's own name without its app ("github_search_issues" → "search
  * issues"). Never a connector's input: the live event doesn't carry it either.
  */
 export function toolHint(tool: string, activity: { kind: ActivityKind; app?: string }, detail?: string | null) {
-  if (detail?.trim()) return detail.trim();
+  // Never what the phrase already says ("Abriu a skill relatorio", "Rodou: Rerun the tests").
+  if (detail?.trim()) return detail.trim() === activity.app ? null : detail.trim();
   if (activity.kind !== "consulting") return null;
   let name = tool.trim().replace(/^mcp__[^_]+(?:_[^_]+)*?__/, "");
   const app = (activity.app ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
@@ -343,8 +410,8 @@ export function toolItemsLive(work: LiveWork[], stopped = false): ToolItem[] {
         hint: toolHint(w.tool, a, w.detail),
         ms: w.ms ?? null,
         count: 1,
-        why: null,
-        input: null,
+        why: w.why ? plainWhy(w.why) : null,
+        input: w.command ?? null,
         result: null,
         ...(w.code ? { code: w.code } : {}),
         ...(w.output.length > 0 ? { output: w.output } : {}),
@@ -401,11 +468,14 @@ export const toolNow = (items: ToolItem[]) => linesOf(items).at(-1) ?? null;
 /**
  * A line's phrase: "Consultando o GitHub…" while it runs, "Consultou o GitHub" once done, "Deu erro
  * consultando o GitHub" when it failed, "Consultando o GitHub" (no dots) when the run stopped during it.
+ * A command the permission check refused says so: "Recusado: Rerun the tests".
  */
 export function toolPhrase(t: TFunction, l: Pick<ToolLine, "kind" | "app" | "tool" | "state">) {
   const verb = activityVerb(t, { kind: l.kind, app: l.app });
   if (l.state === "run") return `${capitalize(verb)}…`;
   if (l.state === "stop") return capitalize(verb);
+  if (l.state === "fail" && l.kind === "runningCommand") return t("chat.work.refused", { app: appLabel(l) });
+  if (l.state === "fail" && l.kind === "runningCommandAny") return t("chat.work.refusedAny");
   if (l.state === "fail") return t("chat.work.erred", { activity: verb });
   return t(`chat.work.step.${l.kind}`, { app: appLabel(l), tool: toolLabel(l.tool) });
 }

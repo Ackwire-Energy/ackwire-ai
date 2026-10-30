@@ -12,6 +12,7 @@ import {
   brainFor,
   brainModelFor,
   brainSessionId,
+  type ChannelEvent,
   COMPUTER_BUSY_RETRY_MS,
   COMPUTER_BUSY_WAIT_MS,
   COMPUTER_REACT_NOTE,
@@ -1179,6 +1180,91 @@ test("a routine's run: a bridged gated call posts its card and events in the mai
   const chips = events.filter((e) => e.type === "agent.tool") as { threadId?: string | null }[];
   expect(chips.length).toBeGreaterThan(0);
   expect(chips.every((e) => e.threadId === null)).toBe(true);
+});
+
+/** The computer's permission check, answering by the command: `rm` refused, `npm publish` waits on a person. */
+const permissionSource: ToolSource = {
+  name: "permission",
+  tools: async () => [
+    {
+      name: "permission_prompt",
+      description: "Claude Code's permission prompt",
+      scope: "",
+      inputSchema: { type: "object" },
+      execute: async (input) => {
+        const command = String((input.input as { command?: unknown } | undefined)?.command ?? "");
+        if (typeof input.request_id === "string")
+          return { content: JSON.stringify({ behavior: "deny", message: "A person said no. Don't try it again." }) };
+        if (command.startsWith("rm "))
+          return {
+            content: JSON.stringify({
+              behavior: "deny",
+              message:
+                "This command was refused because it changes files outside the mission folder. Do it another way.",
+            }),
+          };
+        if (command === "npm publish") return { content: JSON.stringify({ status: "pending", request_id: "req-1" }) };
+        return { content: JSON.stringify({ behavior: "allow" }) };
+      },
+    },
+  ],
+};
+
+test("a bridged permission check: its line says the command, opens on it masked, says why it was refused", async () => {
+  f = await setup({ toolSources: [permissionSource] });
+  const machineId = await computerAgent(f);
+  const run = await runningRun(f, await post(f, "Roda os testes"));
+  const events = f.listen(f.general.id);
+  const ask = (id: string, input: Record<string, unknown>) =>
+    invokeToolForRun(
+      { db: f.db, pubsub: f.pubsub, tools: f.tools },
+      { orgId: f.org.id, agentId: f.agent.id, runId: run.id, machineId },
+      { id, name: "permission_prompt", input },
+    );
+  const bash = (command: string, description?: string) => ({
+    tool_name: "Bash",
+    input: { command, ...(description ? { description } : {}) },
+  });
+  await ask("p1", bash("cd /w/app && npx jest src/a.test.ts --watch=false", "Rerun new unit tests after formatting"));
+  await ask(
+    "p2",
+    bash('curl -s -H "Authorization: Bearer sk-ant-api03-abcdefghijklmnop" https://api.example.com/v1/items?token=abc'),
+  );
+  await ask("p3", bash("rm -rf /etc/agentes"));
+  await ask("p4", bash("npm publish"));
+  // The runner asking again about the one waiting on a person: no line of its own.
+  await ask("p5", { request_id: "req-1" });
+
+  const chips = events.filter((e) => e.type === "agent.tool") as Extract<ChannelEvent, { type: "agent.tool" }>[];
+  const started = chips.filter((e) => e.tool !== null);
+  expect(started.map((e) => [e.toolUseId, e.detail])).toEqual([
+    ["p1", "Rerun new unit tests after formatting"],
+    ["p2", "curl api.example.com/v1/items"],
+    ["p3", "rm /etc/agentes"],
+    ["p4", "npm publish"],
+  ]);
+  expect(started[0]?.command).toBe("cd /w/app && npx jest src/a.test.ts --watch=false");
+  expect(started[1]?.command).toContain("curl -s -H");
+  expect(started[1]?.command).not.toContain("sk-ant-api03");
+  expect(started[1]?.command).not.toContain("token=abc");
+  const ends = chips.filter((e) => e.tool === null);
+  expect(ends.map((e) => [e.toolUseId, e.failed ?? false, e.held ?? false, e.why ?? null])).toEqual([
+    ["p1", false, false, null],
+    ["p2", false, false, null],
+    [
+      "p3",
+      true,
+      false,
+      "This command was refused because it changes files outside the mission folder. Do it another way.",
+    ],
+    ["p4", false, true, null],
+  ]);
+  // The steps keep the same label, and the command masked for the line's open view.
+  const steps = await f.db.select().from(schema.agentRunSteps).where(eq(schema.agentRunSteps.runId, run.id));
+  const call = (id: string) => steps.find((s) => s.kind === "tool_call" && s.data.toolUseId === id)?.data;
+  expect(call("p2")).toMatchObject({ detail: "curl api.example.com/v1/items" });
+  expect(String(call("p2")?.command)).not.toContain("sk-ant-api03");
+  expect(call("p5")?.detail).toBeUndefined();
 });
 
 test("bridged side effects reach the engine: a bridged react ends the turn silently (no Done.)", async () => {

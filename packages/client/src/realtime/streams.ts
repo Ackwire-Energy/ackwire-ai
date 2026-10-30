@@ -183,6 +183,10 @@ export type LiveWork =
       failed?: boolean;
       /** It didn't run: it waits on a person (an approval, a question, a secret). */
       held?: boolean;
+      /** A permission check: the whole command it checked (its line opens on it). */
+      command?: string;
+      /** A command the permission check refused: the policy's reason. */
+      why?: string;
     };
 
 /** The narration lines of a run (what it said between tool calls). */
@@ -253,11 +257,15 @@ export interface AgentToolEvent {
   detail?: string | null;
   /** The code it runs (`run_code`, skill scripts), expected from the backend. */
   code?: LiveCode | null;
+  /** `permission_prompt`: the whole command it checks (credentials masked). */
+  command?: string | null;
   toolUseId?: string;
   /** On the end (`tool: null`): the tool answered with an error. */
   failed?: boolean;
   /** On the end: it didn't run, it waits on a person. */
   held?: boolean;
+  /** On the end of a permission check that refused its command: the policy's reason. */
+  why?: string | null;
 }
 
 export interface StreamsState {
@@ -489,12 +497,16 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       const status: LiveStatus = said ? "thinking" : current?.text ? current.status : "thinking";
       let work = current?.work ?? [];
       if (said) work = say(work, said, current?.turn);
-      const end = (w: Extract<LiveWork, { kind: "call" }>, how: { failed?: boolean; held?: boolean } = {}) => ({
+      const end = (
+        w: Extract<LiveWork, { kind: "call" }>,
+        how: { failed?: boolean; held?: boolean; why?: string | null } = {},
+      ) => ({
         ...w,
         running: false,
         ...(w.since !== undefined ? { ms: Math.max(0, Date.now() - w.since) } : {}),
         ...(how.failed ? { failed: true } : {}),
         ...(how.held ? { held: true } : {}),
+        ...(how.why ? { why: how.why } : {}),
       });
       if (newCall) {
         // A new call means the previous ones ended.
@@ -508,6 +520,7 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
             connector: event.connector ?? null,
             detail: event.detail ?? null,
             code: event.code ?? null,
+            ...(event.command ? { command: event.command } : {}),
             output: [],
             running: true,
           },
@@ -519,7 +532,7 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
         work = [...work].reverse().map((w) => {
           if (!done && w.kind === "call" && w.running && (!named || w.id === event.toolUseId)) {
             done = true;
-            return end(w, { failed: event.failed === true, held: event.held === true });
+            return end(w, { failed: event.failed === true, held: event.held === true, why: event.why });
           }
           return w;
         });

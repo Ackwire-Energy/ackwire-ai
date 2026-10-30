@@ -1,7 +1,6 @@
 import type { Issue, IssueColumn, IssueStatus } from "@agenteschat/client";
-import { toolActivity } from "@agenteschat/client/lib/activity";
 import { BOARD, STATUSES } from "@agenteschat/client/lib/issues";
-import { toolLabel } from "@agenteschat/client/lib/work";
+import { stepPhrase } from "@agenteschat/client/lib/work";
 import { useTranslation } from "react-i18next";
 import { useActors } from "@/components/actors";
 import { lookOf } from "@/lib/look";
@@ -15,16 +14,10 @@ export function useAssigneeColor() {
     i.assignee?.type === "agent" ? (lookOf(dir.agentById.get(i.assignee.id))?.color ?? "sky") : null;
 }
 
-/** The step an agent is on, in the person's words ("Atualizou uma issue", "Consultou o github"). */
+/** The step an agent is on, in the person's words ("Atualizou uma tarefa · #131", "Rodou: Rerun the tests"). */
 export function useStepText() {
   const { t } = useTranslation();
-  return (step: { tool: string; detail?: string } | undefined) => {
-    if (!step) return "";
-    const a = toolActivity(step.tool, null, step.detail ?? null);
-    const tt = t as unknown as (k: string, o: Record<string, unknown>) => string;
-    const label = tt(`chat.work.step.${a.kind}`, { app: a.app ?? "", tool: toolLabel(step.tool) });
-    return step.detail ? `${label} · ${step.detail}` : label;
-  };
+  return (step: { tool: string; detail?: string } | undefined) => (step ? stepPhrase(t, step) : "");
 }
 
 // ── The board: one per org, custom columns, each in a fixed stage ───────────

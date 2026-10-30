@@ -15,7 +15,7 @@ import { notifyIssueChanged, notifyIssueComment } from "./notification-producers
 import { can, getMembership, requireActiveMembership } from "./organizations";
 import { fireRoutineEvent } from "./routines";
 import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./search";
-import { toolDetail } from "./tool-detail";
+import { promptPoll, toolDetail } from "./tool-detail";
 import { syncWikiLinks } from "./wiki-links";
 
 const { issues, issueActivity, issueCounters, channels, channelMembers, artifacts, agentRuns, agentRunSteps } = schema;
@@ -254,8 +254,9 @@ async function workOf(db: Database, rows: IssueRow[]): Promise<Map<string, Issue
   const stepsOf = new Map<string, IssueWork["steps"]>();
   for (const st of steps) {
     const name = typeof st.data.name === "string" ? st.data.name : "";
-    if (!name) continue;
-    const detail = toolDetail(name, st.data.input as Record<string, unknown> | undefined);
+    const input = st.data.input as Record<string, unknown> | undefined;
+    if (!name || promptPoll(name, input)) continue;
+    const detail = toolDetail(name, input);
     const list = stepsOf.get(st.runId) ?? [];
     list.push({ tool: name, ...(detail ? { detail } : {}), at: st.createdAt.toISOString() });
     stepsOf.set(st.runId, list);

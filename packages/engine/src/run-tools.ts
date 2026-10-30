@@ -1,4 +1,4 @@
-import type { PubSub } from "@agenteschat/adapters";
+import { PERMISSION_TOOL, type PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, inArray, type SQL, schema, sql } from "@agenteschat/db";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
 import { publishApproval } from "./approvals";
@@ -22,11 +22,11 @@ import { routineBriefOf } from "./routine-brief";
 import type { BridgeIdentity } from "./run-tool-tokens";
 import { type AgentRun, replyThreadOf } from "./runs";
 import { publishSecret, type SecretRequestRow, secretRequestView, syncSecretMessage } from "./secrets";
-import { artifactToolDetail, toolCode, toolDetail } from "./tool-detail";
+import { artifactToolDetail, promptPoll, toolCode, toolCommand, toolDetail } from "./tool-detail";
 import { directoryRole, ON_DEMAND_USE, resolveDirectoryTool } from "./tools/directory";
-import { type Approval, type InvokeResult, isSensitive, type ToolGateway } from "./tools/gateway";
+import { type Approval, type InvokeResult, isSensitive, promptAnswer, type ToolGateway } from "./tools/gateway";
 import { withWhy } from "./tools/run-policy";
-import type { ToolContext, ToolDefinition } from "./tools/types";
+import type { ToolContext, ToolDefinition, ToolOutput } from "./tools/types";
 import { withWikiLinks } from "./wiki-links";
 
 const { agentRuns, approvals, agentQuestions, secretRequests, machineTasks, messages } = schema;
@@ -339,6 +339,18 @@ export interface RunToolScope {
 }
 
 /**
+ * A permission check's end as the chat shows it: refused (with the policy's own reason), waiting on a person,
+ * or allowed. Only a `deny` carries its words: an error's text could hold anything.
+ */
+function promptEnd(output: ToolOutput): { failed?: boolean; held?: boolean; why?: string } {
+  if (output.isError) return { failed: true };
+  const answer = promptAnswer(output.content);
+  const why = typeof answer.message === "string" ? answer.message.slice(0, 500) : "";
+  if (answer.behavior === "deny") return { failed: true, ...(why ? { why } : {}) };
+  return answer.status === "pending" ? { held: true } : {};
+}
+
+/**
  * One tool call through the Tool Gateway, with the live tool chip
  * (`agent.tool` before and after). The gateway checks the scope, validates the
  * input, records the steps and gates sensitive calls (approval / question /
@@ -349,6 +361,10 @@ export async function invokeWithChip(
   use: { id: string; name: string; input: unknown },
 ): Promise<InvokeResult> {
   const { deps, ctx, where } = scope;
+  const input = use.input as Record<string, unknown> | undefined;
+  const call = { toolUseId: use.id, name: use.name, input: input ?? {} };
+  // The runner asking again about a command that waits on a person: no line of its own, the first ask has one.
+  if (promptPoll(use.name, input)) return scope.tools.invoke(ctx, call);
   const listed = scope.turnTools?.find((t) => t.name === use.name);
   // Through a big connector's directory: the chip shows the real tool (`use_tool` only points at it).
   const role = directoryRole(listed);
@@ -366,17 +382,21 @@ export async function invokeWithChip(
       : use.name);
   const connector = def?.connectorLabel;
   // A short label for the UI (skill, issue, file); built-in tools only, never connector inputs.
-  const input = use.input as Record<string, unknown> | undefined;
   const builtIn = scope.turnTools !== null && !(connector || def?.connectionId);
-  // The agent's browser and desktop are ours on every brain: a computer brain's open names its site too.
+  // The agent's browser and desktop are ours on every brain (a computer brain's open names its site too), and so
+  // is the computer's permission check, which only exists on the bridge: its line says the command it checked.
   const screen = screenTool(use.name)?.tool;
+  const prompt = use.name === PERMISSION_TOOL;
   const detail = screen
     ? toolDetail(screen, input)
-    : builtIn
-      ? (toolDetail(use.name, input) ??
-        (await artifactToolDetail(deps.db, ctx.orgId, ctx.channelId, use.name, input).catch(() => undefined)))
-      : undefined;
+    : prompt
+      ? toolDetail(use.name, input)
+      : builtIn
+        ? (toolDetail(use.name, input) ??
+          (await artifactToolDetail(deps.db, ctx.orgId, ctx.channelId, use.name, input).catch(() => undefined)))
+        : undefined;
   const code = builtIn ? toolCode(use.name, input) : undefined;
+  const command = toolCommand(use.name, input);
   await publishChannelEvent(deps.pubsub, {
     type: "agent.tool",
     ...where,
@@ -385,10 +405,11 @@ export async function invokeWithChip(
     ...(detail ? { detail } : {}),
     toolUseId: use.id,
     ...(code ? { code } : {}),
+    ...(command ? { command } : {}),
   });
   // The end names its call and whether the tool answered with an error, or didn't run because it waits on a
   // person (an approval, a question, a secret): the chat marks that line.
-  const ended = (end: { failed?: boolean; held?: boolean }) =>
+  const ended = (end: { failed?: boolean; held?: boolean; why?: string }) =>
     publishChannelEvent(deps.pubsub, {
       type: "agent.tool",
       ...where,
@@ -396,19 +417,24 @@ export async function invokeWithChip(
       toolUseId: use.id,
       ...(end.failed ? { failed: true } : {}),
       ...(end.held ? { held: true } : {}),
+      ...(end.why ? { why: end.why } : {}),
     });
-  return scope.tools
-    .invoke(ctx, { toolUseId: use.id, name: use.name, input: (use.input ?? {}) as Record<string, unknown> })
-    .then(
-      async (outcome) => {
-        await ended(outcome.type === "result" ? { failed: outcome.output.isError === true } : { held: true });
-        return outcome;
-      },
-      async (error: unknown) => {
-        await ended({ failed: true });
-        throw error;
-      },
-    );
+  return scope.tools.invoke(ctx, call).then(
+    async (outcome) => {
+      await ended(
+        outcome.type !== "result"
+          ? { held: true }
+          : prompt
+            ? promptEnd(outcome.output)
+            : { failed: outcome.output.isError === true },
+      );
+      return outcome;
+    },
+    async (error: unknown) => {
+      await ended({ failed: true });
+      throw error;
+    },
+  );
 }
 
 type Located = { ctx: ToolContext; run: AgentRun | null };

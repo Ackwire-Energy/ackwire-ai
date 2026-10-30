@@ -103,6 +103,18 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
   askingAgent: "agent",
   tellingAgent: "agent",
   findingTools: "search",
+  runningCommand: "code",
+  runningCommandAny: "code",
+  usingScreen: "laptop",
+  cloningRepo: "code",
+  openingPullRequest: "code",
+  handingOff: "clock",
+  recordingFindings: "flag",
+  deliveringMission: "flag",
+  suggestingForumTopic: "chat",
+  requestingAccess: "shield",
+  requestingSecret: "lock",
+  queryingDatabase: "server",
 };
 
 /** How many logos the closed line stacks (a phone has no room for more). */

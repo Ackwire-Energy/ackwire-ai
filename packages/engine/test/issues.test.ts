@@ -3,6 +3,7 @@ import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import {
   addChannelMember,
+  addRunStep,
   askAgentToImplement,
   commentIssue,
   createChannel,
@@ -282,6 +283,26 @@ describe("issues", () => {
     expect(reviewed.work).toBeNull();
     const last = (await listIssueActivity(f.db, person(f.owner.id), f.org.id, issue.id)).at(-1);
     expect(last).toMatchObject({ event: "status_changed", auto: true, textParams: { status: "in_review" } });
+  });
+
+  test("the agent's steps: a permission check says its command; the runner asking again about it adds none", async () => {
+    f = await setup({ issueTools: true });
+    await grantScopes(f.db, f.org.id, f.agent.id, ISSUES);
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const issue = await createIssue(deps, person(f.owner.id), f.org.id, { title: "Testes lentos" });
+    await askAgentToImplement(deps, f.owner.id, f.org.id, issue.id, f.agent.id);
+    const [run] = await f.db.select().from(schema.agentRuns);
+    if (!run) throw new Error("no run");
+    const check = (input: Record<string, unknown>) =>
+      addRunStep(f.db, run, "tool_call", { toolUseId: crypto.randomUUID(), name: "permission_prompt", input });
+    await check({ tool_name: "Bash", input: { command: "npm test", description: "Run the unit tests" } });
+    await check({ request_id: "req-1" });
+    await check({ tool_name: "Bash", input: { command: "git -C /w commit -m 'Add tests'" } });
+    const read = await getIssue(f.db, person(f.owner.id), f.org.id, { id: issue.id });
+    expect(read.work?.steps.map((s) => [s.tool, s.detail])).toEqual([
+      ["permission_prompt", "Run the unit tests"],
+      ["permission_prompt", "git commit"],
+    ]);
   });
 
   test("a comment can carry the author's Drive files; they link to the issue; someone else's can't be attached", async () => {

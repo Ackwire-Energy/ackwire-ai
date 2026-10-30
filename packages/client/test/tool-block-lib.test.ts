@@ -3,7 +3,9 @@ import type { TFunction } from "i18next";
 import type { LiveWork } from "../src/index";
 import { applyChannelEvent, emptyStreams } from "../src/index";
 import {
+  foldSteps,
   formatLineTime,
+  stepPhrase,
   toolApps,
   toolCalls,
   toolHint,
@@ -185,5 +187,96 @@ describe("the block's lines", () => {
       result: "timed out after 5s\nstack",
     });
     expect(item?.kind === "call" && item.line.input).toContain('"title": "X"');
+  });
+});
+
+describe("a computer command (its permission check)", () => {
+  const at = (s: number) => new Date(Date.UTC(2026, 9, 30, 10, 0, s)).toISOString();
+  const lines = (items: ReturnType<typeof toolItemsLive>) => items.flatMap((i) => (i.kind === "call" ? [i.line] : []));
+  const REFUSAL =
+    "This command was refused because it changes files outside the mission folder. Do it another way; if there is none, say so.";
+  const BECAUSE = "This command was refused because it changes files outside the mission folder.";
+
+  test("live: the line says the command it checked, opens on the whole command, a refusal says why in a sentence", () => {
+    let s = [
+      start("a", "permission_prompt", {
+        detail: "Rerun new unit tests after formatting",
+        command: "npx jest a.test.ts",
+      }),
+      start("b", "permission_prompt", { detail: "rm /etc/agentes", command: "rm -rf /etc/agentes" }),
+    ].reduce(applyChannelEvent, emptyStreams);
+    s = applyChannelEvent(s, { ...end("b", true), why: REFUSAL } as Ev);
+    const [ran, refused] = lines(toolItemsLive(s.runs.r1?.work ?? []));
+    expect(ran).toMatchObject({ kind: "runningCommand", state: "done", hint: null, input: "npx jest a.test.ts" });
+    expect(refused).toMatchObject({
+      kind: "runningCommand",
+      state: "fail",
+      input: "rm -rf /etc/agentes",
+      why: BECAUSE,
+    });
+    expect(ran && toolPhrase(t, ran)).toBe(
+      'chat.work.step.runningCommand|{"app":"Rerun new unit tests after formatting","tool":"permission prompt"}',
+    );
+    expect(refused && toolPhrase(t, refused)).toBe('chat.work.refused|{"app":"rm /etc/agentes"}');
+    expect(toolPhrase(t, { kind: "runningCommandAny", tool: "permission_prompt", state: "fail" })).toBe(
+      "chat.work.refusedAny",
+    );
+  });
+
+  test("saved: its recorded label and command; the same in a row once; asking again brings the person's answer", () => {
+    const check = (seq: number, id: string, input: Record<string, unknown>, more: Record<string, unknown> = {}) => ({
+      seq,
+      kind: "tool_call",
+      data: { toolUseId: id, name: "permission_prompt", input, ...more },
+      createdAt: at(seq),
+    });
+    const answer = (seq: number, id: string, content: unknown) => ({
+      seq,
+      kind: "tool_result",
+      data: { toolUseId: id, name: "permission_prompt", content: JSON.stringify(content) },
+      createdAt: at(seq),
+    });
+    const bash = (command: string, description?: string) => ({
+      tool_name: "Bash",
+      input: { command, ...(description ? { description } : {}) },
+    });
+    const work = workFromSteps([
+      check(1, "t1", bash("npm test", "Run the tests"), { detail: "Run the tests", command: "npm test" }),
+      answer(2, "t1", { behavior: "allow" }),
+      check(3, "t2", bash("npm test", "Run the tests"), { detail: "Run the tests", command: "npm test" }),
+      answer(4, "t2", { behavior: "allow" }),
+      check(5, "t3", bash("rm -rf /etc/x"), { detail: "rm /etc/x", command: "rm -rf /etc/x" }),
+      answer(6, "t3", { behavior: "deny", message: REFUSAL }),
+      check(7, "t4", bash("npm publish"), { detail: "npm publish", command: "npm publish" }),
+      answer(8, "t4", { status: "pending", request_id: "req-1" }),
+      check(9, "t5", { request_id: "req-1" }),
+      answer(10, "t5", { status: "pending", request_id: "req-1" }),
+      check(20, "t6", { request_id: "req-1" }),
+      answer(21, "t6", { behavior: "deny", message: "A person said no. Don't try this command again." }),
+    ]);
+    expect(lines(toolItemsSaved(work)).map((l) => [l.app, l.count, l.state, l.hint, l.input, l.result, l.why])).toEqual(
+      [
+        ["Run the tests", 2, "done", null, "npm test", null, null],
+        ["rm /etc/x", 1, "fail", null, "rm -rf /etc/x", null, BECAUSE],
+        ["npm publish", 1, "fail", null, "npm publish", null, "A person said no."],
+      ],
+    );
+    // From the ask to the person's answer.
+    expect(work.steps[2]?.ms).toBe(14_000);
+  });
+
+  test("the task's card: each step in words, the same words in a row once, with the last one's time", () => {
+    const steps = [
+      { tool: "permission_prompt", detail: "Run the tests", at: at(1) },
+      { tool: "permission_prompt", detail: "Run the tests", at: at(2) },
+      { tool: "create_issue", detail: "Corrigir login", at: at(3) },
+      { tool: "permission_prompt", detail: "Run the tests", at: at(4) },
+    ];
+    const ran = 'chat.work.step.runningCommand|{"app":"Run the tests","tool":"permission prompt"}';
+    expect(foldSteps(steps, (s) => stepPhrase(t, s)).map((l) => [l.text, l.count, l.step.at])).toEqual([
+      [ran, 2, at(2)],
+      ['chat.work.step.creatingIssue|{"app":"","tool":"create issue"} · Corrigir login', 1, at(3)],
+      [ran, 1, at(4)],
+    ]);
   });
 });
