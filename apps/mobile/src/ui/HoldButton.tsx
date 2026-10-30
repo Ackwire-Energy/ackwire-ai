@@ -26,13 +26,15 @@ export interface HoldButtonProps {
   onConfirm: () => void;
   /** How long to hold (default 1100 ms). */
   durationMs?: number;
+  /** Not yet: dimmed, and holding does nothing (as `Button`'s). */
+  disabled?: boolean;
 }
 
 /**
  * Hold to confirm (high-risk approvals): the button fills from the left while held, ticks a haptic,
  * confirms with a success haptic when full, and cancels when released early.
  */
-export function HoldButton({ label, holdLabel, onConfirm, durationMs = 1100 }: HoldButtonProps) {
+export function HoldButton({ label, holdLabel, onConfirm, durationMs = 1100, disabled = false }: HoldButtonProps) {
   const theme = useTheme();
   const { t } = useTranslation();
   const look = primaryLook(theme);
@@ -82,16 +84,24 @@ export function HoldButton({ label, holdLabel, onConfirm, durationMs = 1100 }: H
   return (
     <Animated.View
       style={[
-        { minHeight: s.height, borderRadius: s.radius, boxShadow: look.shadow, alignSelf: "stretch" },
+        {
+          minHeight: s.height,
+          borderRadius: s.radius,
+          boxShadow: look.shadow,
+          alignSelf: "stretch",
+          opacity: disabled ? 0.5 : 1,
+        },
         pressStyle,
       ]}
     >
       <Pressable
         onPressIn={start}
         onPressOut={stop}
+        disabled={disabled}
         accessibilityRole="button"
         accessibilityLabel={label}
         accessibilityHint={t("mobile.a11y.hold")}
+        accessibilityState={{ disabled }}
         style={[styles.face, { borderRadius: s.radius }]}
       >
         <LinearGradient colors={look.gradient} style={StyleSheet.absoluteFill} />

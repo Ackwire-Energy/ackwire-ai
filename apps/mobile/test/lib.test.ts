@@ -60,6 +60,30 @@ describe("account deletion", () => {
       await readDeleteResponse(res(409, { error: { code: "sole_owner", params: { organizations: ["Acme", 3] } } })),
     ).toEqual({ ok: false, reason: "sole_owner", organizations: ["Acme"] });
   });
+  test("403 reauth.*: which proof the server wants, a new sign-in or the right password; 429 too many tries", async () => {
+    expect(await readDeleteResponse(res(403, { error: { code: "reauth.sign_in", message: "Sign in again" } }))).toEqual(
+      {
+        ok: false,
+        reason: "reauth",
+        proof: "sign_in",
+      },
+    );
+    expect(await readDeleteResponse(res(403, { error: { code: "reauth.password", message: "Wrong" } }))).toEqual({
+      ok: false,
+      reason: "reauth",
+      proof: "password",
+    });
+    expect(await readDeleteResponse(res(429, { error: { code: "rate_limited" } }))).toEqual({
+      ok: false,
+      reason: "rate_limited",
+    });
+    // A blocked account's 403 is no proof to give.
+    expect(await readDeleteResponse(res(403, { error: { code: "forbidden" } }))).toEqual({
+      ok: false,
+      reason: "failed",
+      status: 403,
+    });
+  });
   test("anything else failed", async () => {
     expect(await readDeleteResponse(res(500, "oops"))).toEqual({ ok: false, reason: "failed", status: 500 });
   });

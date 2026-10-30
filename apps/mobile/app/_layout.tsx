@@ -12,11 +12,12 @@ import { markLaunched } from "@/features/launch/launched";
 import { OnboardingFlow } from "@/features/onboarding/OnboardingFlow";
 import { ServerDownPanel, useServerDown } from "@/features/server/ServerDown";
 import { keepLastCrash } from "@/lib/last-crash";
-import { firstRunMounted, suspendedOf } from "@/lib/org-choice";
+import { deletingOf, firstRunMounted, suspendedOf } from "@/lib/org-choice";
 import { AppProviders } from "@/providers/AppProviders";
 import { useAppFonts } from "@/providers/fonts";
 import { useOrgGate } from "@/providers/org";
 import { useSession } from "@/providers/session";
+import { DeletingWorkspace } from "@/ui/auth/DeletingWorkspace";
 import { SuspendedWorkspace } from "@/ui/auth/SuspendedWorkspace";
 import { useNavigationTheme } from "@/ui/navigation";
 import { useTheme } from "@/ui/theme";
@@ -55,6 +56,9 @@ function Gate() {
   const down = useServerDown(signedIn && !session.pending);
   const ready = fontsReady && !session.pending && (!signedIn || !org.loading) && down === null;
   const suspended = ready && signedIn && org.state ? suspendedOf(org.state.orgs, org.state.orgId) : null;
+  // Being deleted: its own screen, after the suspension, the stronger fact.
+  const deleting = ready && signedIn && org.state && !suspended ? deletingOf(org.state.orgs, org.state.orgId) : null;
+  const covered = suspended !== null || deleting !== null || down !== null;
 
   // Opening the app: the native launch image hands over to the animated splash on its first frame (they look
   // the same), which leaves once the app is ready. The fallback hide covers a splash that never lays out.
@@ -98,11 +102,12 @@ function Gate() {
     // The native bars (headers, back button tint, interface style) read React Navigation's theme: ours.
     <NavigationThemeProvider value={navigationTheme}>
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />
-      {/* Under the suspended screen or the waiting splash the app stays mounted, out of screen readers' reach. */}
+      {/* Under the suspended or deleting screen or the waiting splash the app stays mounted, out of screen
+          readers' reach. */}
       <View
         style={{ flex: 1 }}
-        accessibilityElementsHidden={suspended !== null || down !== null}
-        importantForAccessibility={suspended || down ? "no-hide-descendants" : "auto"}
+        accessibilityElementsHidden={covered}
+        importantForAccessibility={covered ? "no-hide-descendants" : "auto"}
       >
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
           <Stack.Protected guard={inApp} redirectTo="/sign-in">
@@ -122,6 +127,7 @@ function Gate() {
       ) : null}
       {entering ? <Entering org={org.state?.org?.name ?? null} /> : null}
       {org.state && suspended ? <SuspendedWorkspace state={org.state} suspended={suspended} /> : null}
+      {org.state && deleting ? <DeletingWorkspace state={org.state} deleting={deleting} /> : null}
       {launching ? (
         <LaunchSplash
           ready={ready}

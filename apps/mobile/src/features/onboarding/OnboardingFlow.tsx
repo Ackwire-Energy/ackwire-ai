@@ -30,6 +30,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { signOut } from "@/features/account";
 import { useConnectKey } from "@/features/ai/ConnectAi";
 import { authClient } from "@/lib/auth";
+import { serverUrl } from "@/lib/server";
 import { useOrgGate } from "@/providers/org";
 import { Dither } from "@/sky/Dither";
 import { softTones } from "@/sky/math";
@@ -46,6 +47,7 @@ import {
   Text,
   useTheme,
 } from "@/ui";
+import { openPage } from "../ai/parts";
 import { confirmationSentTo, forgetConfirmationSent } from "../auth/confirmation";
 import { chatHref } from "../links/logic";
 import { PHOTO_MAX_BASE64, photoContentType } from "../me/logic";
@@ -487,7 +489,17 @@ export function OnboardingFlow() {
               onPress={action.onPress}
             />
           ) : null}
-          {/* Until a workspace is set up this is the only screen: the way out of the account is on its first step. */}
+          {/* Until a workspace is set up this is the only screen: the ways out of the account, and of a workspace made
+              by mistake (deleted on the website), are on its first step. */}
+          {step === "workspace" && created ? (
+            <Button
+              variant="ghost"
+              wide
+              label={t("onboarding.deleteLink")}
+              disabled={pending}
+              onPress={() => openPage(`${serverUrl()}/onboarding?delete=1`)}
+            />
+          ) : null}
           {step === "workspace" ? (
             <Button
               variant="ghost"

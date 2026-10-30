@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import { deletingText, restorable } from "@agenteschat/client/lib/deletion";
 import { suspendedText } from "@agenteschat/client/lib/errors";
 import { type OutageTargetLike, targetOptions } from "@agenteschat/client/lib/machine-outages";
 import { computerIcon, type MachineOutage, targetText } from "../../src/features/outages/logic";
-import { suspendedOf } from "../../src/lib/org-choice";
+import { deletingOf, suspendedOf } from "../../src/lib/org-choice";
 import { translator } from "./fixtures";
 
 /** The workspace's own computer (ADR 0056 §10): the server names it ("Computador da Acme"), its system never said. */
@@ -39,6 +40,35 @@ describe("the workspace's own computer on the phone (the switch sheet's card)", 
     expect(computerIcon(option.platform)).toBe("computerLinux");
     const en = await translator("en");
     expect(targetText(en, option)).toMatchObject({ desc: "Just for this workspace · one user per agent" });
+  });
+});
+
+describe("an organization being deleted on the phone", () => {
+  const deletion = {
+    dueAt: new Date(Date.now() + 86_400_000).toISOString(),
+    requestedAt: new Date().toISOString(),
+    requestedBy: { id: "u2", name: "Bia" },
+  };
+  const orgs = [
+    { id: "a", name: "Acme", role: "member" as const, deletion },
+    { id: "b", name: "Beta", role: "owner" as const },
+    { id: "c", name: "Casa", role: "owner" as const, standing: { state: "suspended" as const, reason: null } },
+  ];
+
+  test("the chosen one: its screen, and where else to go (none suspended)", () => {
+    expect(deletingOf(orgs, "a")).toEqual({ org: orgs[0], others: [orgs[1]] });
+    expect(deletingOf(orgs, "b")).toBeNull();
+  });
+
+  test("who deleted it and when it goes; only owners restore it, and only before that", async () => {
+    const t = await translator("pt-BR");
+    expect(deletingText(t, "pt-BR", deletion)).toMatch(/^Bia apagou em .+\. Ele some de vez em .+\.$/);
+    expect(deletingText(t, "pt-BR", { ...deletion, dueAt: null, requestedBy: null })).toMatch(
+      /^Alguém apagou em .+\.$/,
+    );
+    expect(restorable(orgs[0])).toBe(false);
+    expect(restorable({ role: "owner", deletion })).toBe(true);
+    expect(restorable({ role: "owner", deletion: { ...deletion, dueAt: null } })).toBe(false);
   });
 });
 

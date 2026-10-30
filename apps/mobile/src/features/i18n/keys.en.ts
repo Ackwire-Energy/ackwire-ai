@@ -856,12 +856,11 @@ export const featureKeysEn: FeatureTranslations = {
     intro: "There's no undo.",
     goes: {
       account: "Your account, your access and your sessions are gone.",
-      orgs: "Workspaces where you are the only member are deleted.",
+      orgs: "Workspaces where you are the only member close now and are deleted after 7 days.",
       phones: "This phone and the others stop getting alerts.",
     },
     stays: "Messages you wrote stay in the chats, without your name.",
-    blocked:
-      "You're the only owner of {{names}}. On the website, in People, make someone else an owner, then come back.",
+    otherAccount: "You signed in to another account. Nothing was deleted.",
     hold: "Hold to delete",
     holding: "Keep holding…",
   },

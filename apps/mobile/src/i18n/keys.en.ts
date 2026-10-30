@@ -74,8 +74,6 @@ export const mobileEn: MobileTranslations = {
     signOut: "Sign out",
   },
   account: {
-    deleteSoleOwner:
-      "You're the only owner of a workspace with other members. On the website, in People, make someone else an owner, then come back.",
     deleteFailed: "Couldn't delete your account right now. Try again.",
     deleted: "Your account was deleted.",
     signedOut: "You signed out.",

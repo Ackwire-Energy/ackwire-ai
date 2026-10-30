@@ -861,12 +861,11 @@ export const featureKeysPtBR = {
     intro: "Isso não tem volta.",
     goes: {
       account: "Sua conta, seus acessos e suas sessões somem.",
-      orgs: "Workspaces em que só você está são apagados.",
+      orgs: "Workspaces em que só você está fecham agora e são apagados depois de 7 dias.",
       phones: "Este celular e os outros param de receber avisos.",
     },
     stays: "Mensagens que você escreveu ficam nas conversas, sem seu nome.",
-    blocked:
-      "Você é a única pessoa dona de {{names}}. No site, em Pessoas, torne outra pessoa dona e depois volte aqui.",
+    otherAccount: "Você entrou em outra conta. Nada foi apagado.",
     hold: "Segure para apagar",
     holding: "Segure…",
   },
