@@ -1,6 +1,6 @@
 # 0035. Mobile app: Expo + React Native with shared logic
 
-- Status: Accepted
+- Status: Accepted. Amended 2026-10-30 by ADR 0080 (§5: deleting an account takes proof that it's you and reads a preflight first, the web deletes accounts too, and the account's own workspaces close for 7 days)
 - Date: 2026-10-17
 - Extends: ADR 0007 (keys never reach clients), the in-app notifications (`packages/engine/src/notifications.ts`)
 
@@ -40,6 +40,7 @@ We want a phone app with the same identity and behavior as the web. Today all cl
 
 **5. Store requirements.**
 - `DELETE /api/app/account` deletes the person's account (App Store 5.1.1(v)). It returns 204, or 409 `sole_owner` (with `params.organizations`) while they are the only owner of an organization that has other members, and the app says what to do. Organizations where they are the only member are deleted with them; their messages stay without an author.
+  *Amended 2026-10-30 (ADR 0080):* it takes proof that it's the person: a sign-in in the last 10 minutes, else the password in an optional body (`{ password }`; 403 `reauth.sign_in` without one, `reauth.password` for a wrong one, 429 after 5 tries in 15 minutes). A session minted from another (`POST /api/app/phone-sign-in`) keeps that one's sign-in time, so it proves no fresher sign-in. The app reads the preflight first (`GET /api/app/account/deletion`): the workspaces that stop it, each with a button that opens the web page that unblocks it, or what closes, what they leave and what stays behind; then the password, or "Sign in again" with the account's provider, Apple included; then the hold to delete. `sole_owner` adds `params.orgIds` and no longer counts a workspace being deleted. The workspaces where they are the only member close at once and are deleted 7 days later. The web and the desktop app delete accounts too, from the account menu. Old builds send no body: they still delete within 10 minutes of a sign-in and otherwise show their generic failure, so the build that asks for the proof ships with the server. Deleting a workspace stays on the web: the app's row opens that page.
 - Sign in with Apple is a social provider when `APPLE_CLIENT_ID`/`APPLE_TEAM_ID`/`APPLE_KEY_ID`/`APPLE_PRIVATE_KEY` are set, and `authConfig` lists it (App Store 4.8, required because we offer Google).
 - The app sells nothing. Plans are bought on the web.
 
