@@ -89,7 +89,7 @@ import { ChannelMembersSheet } from "./ChannelMembers";
 import { DmComputerButton } from "./DmComputerButton";
 import { EventLine } from "./EventLine";
 import { FirstDay } from "./FirstDay";
-import { ConversationSwitcher, type SwitcherTouch } from "./ConversationSwitcher";
+import { ConversationSwitcher } from "./ConversationSwitcher";
 import { HeaderPill } from "./HeaderPill";
 import { composerSuggestions } from "./intent";
 import { IssueTakenLine } from "./issue-work";
@@ -176,6 +176,8 @@ const ENTER = FadeInDown.duration(220);
 const FRESH_MS = 800;
 /** How close to the end a scroll has to stop for a list held at a long message's start to follow again. */
 const READ_RELEASE_PX = 24;
+/** How long the sheet takes to slide away before the conversation it picked takes this one's place. */
+const SHEET_LEAVE_MS = 240;
 /** The composer's safe-area padding hides behind the open keyboard; this much stays between them. */
 const KEYBOARD_GAP = 8;
 const COMPOSER_INPUT_ID = "chat-composer";
@@ -1036,14 +1038,29 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             onMembers={channel && !dm ? openMembers : undefined}
           />,
         );
-  // Holding the pill: the conversation switcher, following the finger until it lets go.
-  const [switcher, setSwitcher] = useState<{ touch: SwitcherTouch | null } | null>(null);
+  // Holding the pill: "Trocar de conversa". The pick swaps the conversation in place (the route's params; the
+  // screen is keyed by them), not a new screen sliding in: the slide made the header's pill jump at its end.
+  // The swap waits for the sheet to finish closing (it lives in this screen, which the swap remounts).
   const hold = {
     onHold: () => {
-      Keyboard.dismiss();
-      setSwitcher({ touch: null });
+      let picked: string | null = null;
+      sheet.open(
+        <ConversationSwitcher
+          channelId={channelId}
+          onPick={(id) => {
+            picked = id === channelId ? null : id;
+            sheet.close();
+          }}
+        />,
+        {
+          onClose: () => {
+            const id = picked;
+            // `onClose` runs as the sheet starts leaving: the swap waits for it to slide away.
+            if (id) setTimeout(() => router.setParams({ channelId: id, thread: "", handoff: "" }), SHEET_LEAVE_MS);
+          },
+        },
+      );
     },
-    onHoldTouch: (touch: SwitcherTouch) => setSwitcher((s) => (s ? { touch } : s)),
     holdHint: t("mobile.chat.switchHint"),
   };
   const pill =
@@ -1547,14 +1564,6 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
           </View>
         </KeyboardStickyView>
       </KeyboardGestureArea>
-      {switcher ? (
-        <ConversationSwitcher
-          channelId={channelId}
-          top={headerHeight + 6}
-          touch={switcher.touch}
-          onClose={() => setSwitcher(null)}
-        />
-      ) : null}
     </View>
   );
 }
