@@ -1835,6 +1835,18 @@ describe("Onboarding", () => {
     expect(calls(state, "orgs.create")).toHaveLength(1);
   });
 
+  test("a reload opens the step this tab was on, one before the furthest too", async () => {
+    const { state, api } = await start();
+    await toComputer(state);
+    await skip();
+    expect(screen().getByRole("heading", { name: "Qual IA eles vão usar?" })).toBeTruthy();
+    await click(button("Voltar"), 4);
+    cleanup();
+    await renderApp("/onboarding", { api });
+    expect(screen().getByRole("heading", { name: "Onde a gente vai trabalhar?" })).toBeTruthy();
+    expect(progress()).toBe("Faltam 3 etapas");
+  });
+
   test("a tab left open follows the one that got further, with the team it made; once that one finishes, the workspace opens", async () => {
     const { state, api, services, router } = await start();
     await throughContext(state);

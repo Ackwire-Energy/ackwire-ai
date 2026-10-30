@@ -160,7 +160,7 @@ const HOST: Record<OnboardingStepId, Preset> = {
   team: "theo",
   done: "ada",
 };
-/** Where the onboarding resumes on the way back from paying for the workspace's plan. */
+/** Where the way back from the billing service resumes a workspace whose step the server doesn't keep. */
 const AI_STEP = ONBOARDING_STEPS.findIndex((s) => s.id === "ai");
 /** How long the guide keeps writing after a keystroke, and smiling after a step. */
 const TYPING_MS = 900;
@@ -193,8 +193,10 @@ interface CrewMember {
 interface ImportedCrew extends CrewMember {
   model: string | null;
 }
-/** A workspace's onboarding as the server has it, made up to its computer: where the way back from paying lands. */
+/** A workspace's onboarding as the server has it, where the way back from the billing service lands. */
 export interface ResumedOnboarding {
+  /** The furthest step the server has (`saveOnboarding`); the AI step for a workspace it keeps none for. */
+  at: number;
   created: { orgId: string; generalChannelId: string };
   org: string;
   zone: string;
@@ -211,12 +213,14 @@ export interface ResumedOnboarding {
  * onboarding gives them, and any other agent came with the import (in another tab, with its model no longer known).
  */
 export async function resumeOnboarding(api: ApiClient, orgId: string): Promise<ResumedOnboarding> {
-  const [channels, settings, agents, platform] = await Promise.all([
+  const [me, channels, settings, agents, platform] = await Promise.all([
+    api.account.me(),
     api.chat.channels(orgId),
     api.orgs.settings(orgId),
     api.agents.list(orgId),
     api.agents.platformKeyAvailable(orgId).catch(() => false),
   ]);
+  const saved = me?.organizations.find((o) => o.id === orgId)?.onboarding?.step;
   const general = channels.find((c) => c.name === "general") ?? channels[0];
   if (!general) throw new Error("onboarding: the workspace has no channel");
   let imported = new Map<string, string | null>();
@@ -247,6 +251,7 @@ export async function resumeOnboarding(api: ApiClient, orgId: string): Promise<R
     }
   }
   return {
+    at: saved ? stepIndex(saved) : AI_STEP,
     created: { orgId, generalChannelId: general.id },
     org: settings.name,
     zone: settings.timezone,
@@ -309,6 +314,12 @@ function useGuideMood() {
  * time); one big action under the answer, "Pular esta etapa" on optional steps. `resumed`: a workspace made already,
  * back from its plan, opened at the AI step; `paid`: back from paying for it.
  */
+/** The step this tab was on in `orgId`'s onboarding (`STORAGE_KEYS.onboardingStep`); null when it was on none. */
+function stepHere(orgId: string): number | null {
+  const at = stepIndex((sessionStore.get(`${STORAGE_KEYS.onboardingStep}.${orgId}`) ?? "") as OnboardingStepId);
+  return at >= 0 ? at : null;
+}
+
 export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnboarding | null; paid?: boolean }) {
   const { t, i18n } = useTranslation();
   const api = useApi();
@@ -318,16 +329,19 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
   const toast = useToast();
   const guide = useGuideMood();
 
-  const at = resumed ? AI_STEP : 0;
+  // Back from the billing service: the step this tab was on, else the furthest the server has; every one before the
+  // furthest stays done.
+  const [at] = useState(() => (resumed ? (stepHere(resumed.created.orgId) ?? resumed.at) : 0));
+  const passed = Math.max(at, resumed?.at ?? 0);
   const [index, setIndex] = useState(at);
-  const [reached, setReached] = useState(at);
+  const [reached, setReached] = useState(passed);
   const [done, setDone] = useState<Set<OnboardingStepId>>(
-    () => new Set(ONBOARDING_STEPS.slice(0, at).map((s) => s.id)),
+    () => new Set(ONBOARDING_STEPS.slice(0, passed).map((s) => s.id)),
   );
   // The step where each host agent first showed up (it introduces itself there only).
   const [metAt, setMetAt] = useState(() => {
     const met: Partial<Record<Preset, OnboardingStepId>> = {};
-    for (const s of ONBOARDING_STEPS.slice(0, at)) met[HOST[s.id]] ??= s.id;
+    for (const s of ONBOARDING_STEPS.slice(0, passed)) met[HOST[s.id]] ??= s.id;
     return met;
   });
   // Workspace
@@ -693,11 +707,11 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
   const hold = holdText(t, standing);
   // A new workspace waiting for its first plan (ADR 0079): its computer and its invitations come with the plan.
   const unpaid = billingHoldOf(standing) === "payment";
-  // Back at the AI step, the plan says active once its hold is gone. Back from paying, the billing service lifts it
-  // seconds later: until then the same line says the payment arrived.
-  const paidLine = !aiOpen || !resumed || !me.data ? null : !unpaid ? "paid" : paid ? "confirming" : null;
-  // Its computer step offers that plan, as the step's one action.
-  const computerOffer = step.id === "computer" && workspaceComputer !== null && unpaid;
+  // Back on the step it left for the billing service, the plan says active once its hold is gone. Back from paying,
+  // the billing service lifts it seconds later: until then the same line says the payment arrived.
+  const paidLine = !resumed || !me.data || index !== at ? null : !unpaid ? "paid" : paid ? "confirming" : null;
+  // Its computer step offers that plan, as the step's one action, unless it was just paid.
+  const computerOffer = step.id === "computer" && workspaceComputer !== null && unpaid && paidLine !== "confirming";
   // Creating another refused while one waits for its plan: the way to that one's plan.
   const refused = saveWorkspace.error;
   const unpaidElsewhere =
@@ -909,6 +923,7 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
     setIndex(next);
     setReached((r) => Math.max(r, next));
     setJev(onJev);
+    if (created) sessionStore.set(`${STORAGE_KEYS.onboardingStep}.${created.orgId}`, ONBOARDING_STEPS[next]?.id ?? "");
     if (typeof window !== "undefined" && typeof window.scrollTo === "function") {
       try {
         window.scrollTo({ top: 0 });
@@ -1073,15 +1088,18 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
       setComputer(r.machine.kind === "host" ? "host" : "machine");
       setMachine(r.machine);
     }
-    // Each host introduced itself where it first asked.
+    // Each host introduced itself where it first asked. Opened afresh (a reload), the page goes back to the step this
+    // tab was on, which can be one before the furthest (Voltar); left open, it follows the furthest.
+    const here = (created === null ? stepHere(r.created.orgId) : null) ?? r.at;
+    const passed = Math.max(here, r.at);
     const met: Partial<Record<Preset, OnboardingStepId>> = {};
-    for (const s of ONBOARDING_STEPS.slice(0, r.at)) met[HOST[s.id]] ??= s.id;
+    for (const s of ONBOARDING_STEPS.slice(0, passed)) met[HOST[s.id]] ??= s.id;
     setMetAt(met);
-    setDone(new Set(ONBOARDING_STEPS.slice(0, r.at).map((s) => s.id)));
-    setReached(r.at);
-    setIndex(r.at);
+    setDone(new Set(ONBOARDING_STEPS.slice(0, passed).map((s) => s.id)));
+    setReached(passed);
+    setIndex(here);
     setJev(false);
-  }, [resume.data, busy, reached]);
+  }, [resume.data, busy, reached, created]);
 
   // Finished in another tab or on another device: the workspace opens.
   useEffect(() => {
