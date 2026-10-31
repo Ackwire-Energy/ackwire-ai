@@ -2,6 +2,7 @@ import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import {
+  answerQuestion,
   continueRun,
   type createFakeJudge,
   createForumTopic,
@@ -149,6 +150,36 @@ describe("a run that goes in circles", () => {
     const posted = await agentMessages(run?.id ?? "");
     expect(posted.map((m) => [m.body, m.meta.stepLimit])).toEqual([[said, { stuck: true }]]);
     expect(run?.replyMessageId).toBe(posted[0]?.id ?? "");
+  });
+
+  test("a person's answer to its question starts it over: stuck again after it, a note, not the end", async () => {
+    const why = "I need a person's answer before I go on: this decides what I write next.";
+    const said = "Sem permissão para o deploy em prod: alguém precisa liberar.";
+    f = await setup({
+      askUser: true,
+      toolSources: [taskTools()],
+      judge: (kind) => (kind === "stuck_run" ? 0.9 : undefined),
+      reply: (_req, n) =>
+        n === 4
+          ? { chunks: [], toolUses: [{ name: "ask_user", input: { why, question: "Qual ambiente?" } }] }
+          : n <= 7
+            ? deploy
+            : { chunks: [said] },
+    });
+    await ask("@dev faz o deploy");
+    await drainOutbox(f.db, f.handlers);
+    const [question] = await f.db.select().from(schema.agentQuestions);
+    await answerQuestion(deps(), f.owner.id, f.org.id, question?.id ?? "", { text: "prod" });
+    await drainOutbox(f.db, f.handlers);
+
+    // Stuck at its 3rd call, it asks after the note; the same call 3 times after the answer is a first time again.
+    const [run] = await runs();
+    expect(await verdicts(run?.id ?? "")).toEqual([
+      { sign: "same_call", stuck: true, by: "fake", action: "note" },
+      { sign: "same_call", stuck: true, by: "fake", action: "note" },
+    ]);
+    const posted = await agentMessages(run?.id ?? "");
+    expect(posted.map((m) => [m.body, m.meta.stepLimit]).at(-1)).toEqual([said, undefined]);
   });
 
   test("with no Jev and no small model to ask, the repetition decides", async () => {

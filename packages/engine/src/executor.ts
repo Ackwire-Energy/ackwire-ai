@@ -1179,6 +1179,8 @@ async function executeRunInner(
     // Someone decided or answered what it waited on: it answers them now, it can't pass anymore.
     transcript.answerOwed = true;
     transcript.decided = decided.join("\n");
+    // As a person's message does (`oweAnswer`): what they decided may be what it lacked, unless it is already ending.
+    if (byPerson && transcript.stuck?.endAt === undefined) delete transcript.stuck;
     delete transcript.pending;
     await saveTranscript(db, transcript);
     // What it starts from here counts from zero.
