@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-10-31
 - Extends: ADR 0017 §6 (proposals with a human gate), ADR 0081 (agents propose, a person decides), ADR 0085 (workspace roles)
-- Code: `packages/engine/src/context/proposals.ts`, `packages/engine/src/context/tools.ts` (`propose_instruction_change`), `packages/engine/src/access.ts` (`resolveApps`, `withAccessLines`, `accessInputOf`), `packages/db/src/schema/context.ts`, `apps/server/src/routes/app/memory.ts`, `packages/client/src/lib/proposals.ts`, `apps/web/src/components/ChatCards.tsx`, `apps/web/src/pages/ProposalsPage.tsx`, `apps/mobile/src/features/agents/InstructionProposalCard.tsx`
+- Code: `packages/engine/src/context/proposals.ts`, `packages/engine/src/context/tools.ts` (`propose_instruction_change`), `packages/engine/src/access.ts` (`resolveApps`, `withAccessLines`, `accessInputOf`), `packages/db/src/schema/context.ts`, `apps/server/src/routes/app/memory.ts`, `packages/client/src/lib/proposals.ts`, `packages/client/src/api/queries.ts` (`useCardProposals`, `useDecideProposals`), `apps/web/src/components/ChatCards.tsx`, `apps/web/src/pages/ProposalsPage.tsx`, `apps/mobile/src/features/agents/InstructionProposalCard.tsx`
 
 ## Context
 
@@ -20,15 +20,16 @@ The owner decided on 2026-10-31 that the same card also changes teammates' roles
 - With `agents`, `agents` names whose instructions change (1 to 25 handles, the caller may be one). `roles` gives an agent a new role, and `access` turns an app on or off for it: a connected app by its name, catalog id or `connector:<id>`, or a built-in scope such as `browser:use`. That is `request_permission`'s unit, and mailboxes and databases stay on their own screens. The caller's own apps are never proposed here: it asks with `request_permission`.
 - `change` adds a rule under "Learned". With `replaces`, the exact text is swapped for `change`, or removed (with its line) when `change` is empty. A swap applies only where the text appears exactly once, and `$&` stays as written.
 - It needs a person behind the run (`personBehindCall`), and only names agents that person can talk to (the audience rule). One agent out of reach refuses the whole card, naming it, and nothing is posted.
-- The texts are checked once: `checkContent` for secrets, then one permission-text judge call for the rule and the roles together.
+- The rows are built first, then checked once across the card: `checkContent` for secrets on every line they add, then one permission-text judge call on those lines, each line they take out (marked "Removes:") and the new roles. A swap's own words are only a fragment, so they are never what is judged: "Nunca faça" → "Faça" is judged as the line it makes.
 - What can't be proposed is left off the card, and the tool result says why: the text to swap missing or repeated (with the agent's current text, up to 2,000 characters, to retry with), a rule already there, a text that would pass its editor's limit (instructions 50,000, the org context 20,000), a role already set, an app already on or off, or an app that would stay on through every tool being on or through its write scope.
-- The description tells the agent never to say only the person can make the change.
+- The description tells the agent never to say only the person can make the change, and who decides each kind of change. The result names whom each row the person who asked can't decide waits for.
+- The memory update's text (the message body when the model writes nothing after the call) names agents by bare handle, so it mentions nobody.
 
 ### 2. One row per agent and kind of change
 
 Each change is a `context_proposals` row: `agent_instructions`, `agent_role` or `agent_access` (new targets), or `org_context`. Every row keeps the agent that proposed it (`proposed_by_agent_id`, set null if that agent is deleted). A role row keeps the role in the diff and `proposed_text`; an access row keeps its lines (`access`: id, English label, on or off) and the hash of the agent's grants that `setAgentAccess` replaces (sorted keys, so their order doesn't matter).
 
-All rows go in in one insert. The memory update carries every id (`proposalIds`), and `proposalId` is still the first, for older apps.
+All rows go in in one insert. The memory update carries every id (`proposalIds`), and `proposalId` is still the first, for older apps. A card reads its rows by id (`GET /proposals?ids=`, a card of one row too), since the list holds only the newest 200, pending ones first. Deciding a row reads it back by id.
 
 ### 3. Deciding a row
 
@@ -45,13 +46,14 @@ Each row is decided by whoever may make that change on the agent's page today:
 - The row is stale when what it was made against changed (the text, the role or the grants), when the agent was archived or deleted, or when an app it turns on was disconnected since. Each row commits on its own, so a stale one never blocks the others.
 - A role or app row is taken as proposed or refused: only instructions and the org context can be edited before accepting.
 - Accepting writes `proposal.accepted` and refusing `proposal.refused` to the audit log, with the proposer.
-- A refusal's lesson ("don't propose this again") lands on the agent that proposed it, naming whose instructions, role or apps it was about.
+- A refusal's lesson ("don't propose this again") lands on the agent that proposed it. It is the change itself (the lines it adds or removes, the role, the apps), whichever agent it was for, so the rows of one card make one lesson.
+- An app turned off drops its scope with the tools turned on one by one (as the Access tab's "none"), or every grant on its connection. Denials stay either way, so the agent's owner may apply a row that only turns apps off.
 
 ### 4. The card
 
 - One row: the existing card ("Theo propõe · instruções da Ada", "papel da Ada", "acesso da Ada"), with Aceitar mudança and Recusar, and Editar for text only.
 - Several rows: "Theo propõe · instruções de 3 agentes" (or "mudanças em N agentes", or "mudanças para a Ada" when they are one agent's). Each text change shows once, over the agents it changes alike. Each row has the agent's face, name, its role as "Papel: Dev → Revisora" or its apps as chips ("Ligar: Linear", "Desligar: Usar um navegador", `request_permission`'s own words), and a switch. A row the viewer can't decide says whom it waits for, and its switch stays off.
-- "Aceitar para todos" while every open row is chosen, else "Aceitar para N", and Recusar, both on the chosen rows. The client sends one request per row and refreshes once (`useDecideProposals`). Rows that went stale meanwhile are counted in a toast.
+- "Aceitar para todos" while every open row is chosen, else "Aceitar para N", and Recusar, both on the chosen rows. The client sends one request per row and refreshes once (`useDecideProposals`), the accepted agents' role and apps too. Rows that went stale meanwhile are counted in a toast.
 - The diff is the design system's neutral one: added lines bold on a soft band, removed ones struck through.
 - The phone gets the same card (no Editar). Before, it showed these proposals as plain text.
 
