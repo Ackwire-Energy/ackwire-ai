@@ -1,4 +1,4 @@
-import { ApiError } from "@agenteschat/client";
+import { ApiError, type SignInProvider } from "@agenteschat/client";
 import {
   EARLY_ACCESS_OTHER_EMAIL,
   knownErrorText,
@@ -6,6 +6,7 @@ import {
   type RestrictionFacts,
   restrictionLine,
 } from "@agenteschat/client/lib/errors";
+import { earlyAccessHeaders, earlyAccessState } from "@agenteschat/client/lib/guards";
 import {
   type createHumanCheck,
   HUMAN_CHECK_BLOCKED,
@@ -188,3 +189,26 @@ export const signUpClosed = (refusal: { status: number; code?: string | null }) 
   refusal.status === 403 &&
   !isHumanCheckRefusal(refusal.code ?? undefined) &&
   refusal.code !== EARLY_ACCESS_OTHER_EMAIL;
+
+/**
+ * What the phone's sign-in requests carry of an early-access link's token (ADR 0078 §3), as the web's do: the e-mail
+ * lookup sends it as `access`, the password sign-up and Apple's native sign-in as the header, a provider's sign-in
+ * through the browser in its state. `access` is required, so a screen without a link says `undefined`.
+ */
+export function earlyAccessRequests(access: string | undefined) {
+  const headers = earlyAccessHeaders(access);
+  return {
+    lookUp: (email: string) => ({ email, ...(access ? { access } : {}) }),
+    headers,
+    browser: (provider: SignInProvider, callbackURL: string) => ({
+      provider,
+      callbackURL,
+      ...earlyAccessState(access),
+    }),
+    apple: (idToken: string) => ({
+      provider: "apple" as const,
+      idToken: { token: idToken },
+      fetchOptions: { headers },
+    }),
+  };
+}

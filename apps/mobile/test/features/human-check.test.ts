@@ -3,6 +3,7 @@ import { ApiError } from "@agenteschat/client";
 import { createHumanCheck, withHumanCheck } from "@agenteschat/client/lib/human-check";
 import {
   checkEvent,
+  earlyAccessRequests,
   FRESH_PAGE,
   failureText,
   humanCheckEvent,
@@ -269,5 +270,34 @@ describe("refusals in the phone's words", () => {
     });
     expect(refused).toBeNull();
     expect(sent).toEqual(["tok-1", "tok-2"]);
+  });
+});
+
+describe("an early-access link on the phone", () => {
+  test("its token rides on every sign-in request the phone makes, as the web's; without one, nothing does", () => {
+    const token = "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8S9t0U1v";
+    const link = earlyAccessRequests(token);
+    expect(link.lookUp("ana@acme.com")).toEqual({ email: "ana@acme.com", access: token });
+    expect(link.headers).toEqual({ "x-early-access": token });
+    expect(link.browser("google", "/")).toEqual({
+      provider: "google",
+      callbackURL: "/",
+      additionalData: { earlyAccess: token },
+    });
+    expect(link.apple("apple.id.token")).toEqual({
+      provider: "apple",
+      idToken: { token: "apple.id.token" },
+      fetchOptions: { headers: { "x-early-access": token } },
+    });
+
+    const none = earlyAccessRequests(undefined);
+    expect(none.lookUp("ana@acme.com")).toEqual({ email: "ana@acme.com" });
+    expect(none.headers).toEqual({});
+    expect(none.browser("github", "/")).toEqual({ provider: "github", callbackURL: "/" });
+    expect(none.apple("apple.id.token")).toEqual({
+      provider: "apple",
+      idToken: { token: "apple.id.token" },
+      fetchOptions: { headers: {} },
+    });
   });
 });

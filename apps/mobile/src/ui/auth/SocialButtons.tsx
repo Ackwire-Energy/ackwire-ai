@@ -1,11 +1,10 @@
 import { type SignInProvider, useAuthConfig } from "@agenteschat/client";
-import { earlyAccessHeaders, earlyAccessState } from "@agenteschat/client/lib/guards";
 import { jwtEmail } from "@agenteschat/client/lib/text";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Platform, View } from "react-native";
-import { socialRefusalText } from "@/features/auth/human-check";
+import { earlyAccessRequests, socialRefusalText } from "@/features/auth/human-check";
 import { authClient } from "@/lib/auth";
 import { readValueSync, writeValue } from "@/lib/storage";
 import { Button } from "../Button";
@@ -60,6 +59,7 @@ export function SocialButtons({
 }) {
   const { t } = useTranslation();
   const emails = useAuthConfig().data?.passwordReset === true;
+  const requests = earlyAccessRequests(earlyAccess);
   const { scheme } = useTheme();
   const [nativeApple, setNativeApple] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -78,7 +78,7 @@ export function SocialButtons({
     setBusy(true);
     rememberSignIn(provider);
     try {
-      const res = await authClient().signIn.social({ provider, callbackURL, ...earlyAccessState(earlyAccess) });
+      const res = await authClient().signIn.social(requests.browser(provider, callbackURL));
       if (res.error) onError(socialRefusalText(t, res.error, emails));
       else onSignedIn?.();
     } catch {
@@ -99,11 +99,7 @@ export function SocialButtons({
       if (!credential.identityToken) return onError(t("mobile.auth.social.failed"));
       setBusy(true);
       rememberSignIn("apple");
-      const res = await authClient().signIn.social({
-        provider: "apple",
-        idToken: { token: credential.identityToken },
-        fetchOptions: { headers: earlyAccessHeaders(earlyAccess) },
-      });
+      const res = await authClient().signIn.social(requests.apple(credential.identityToken));
       if (res.error) onError(socialRefusalText(t, res.error, emails), jwtEmail(credential.identityToken));
       else onSignedIn?.();
     } catch (e) {

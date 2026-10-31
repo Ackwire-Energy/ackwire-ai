@@ -1,5 +1,4 @@
 import { invitationQuery, type SignInOptions, useApi, useAuthConfig } from "@agenteschat/client";
-import { earlyAccessHeaders } from "@agenteschat/client/lib/guards";
 import { type HumanAction, humanCheckHeaders, withHumanCheck } from "@agenteschat/client/lib/human-check";
 import { emailTypoFix, isEmail, passwordState, webmailOf } from "@agenteschat/client/lib/text";
 import { useQuery } from "@tanstack/react-query";
@@ -24,7 +23,14 @@ import { Text } from "@/ui/Text";
 import { useTheme } from "@/ui/theme";
 import { rememberConfirmationSent } from "./confirmation";
 import { useHumanCheck } from "./HumanCheck";
-import { CheckCancelled, lookUpFailureText, refusalOf, refusalText, signUpClosed } from "./human-check";
+import {
+  CheckCancelled,
+  earlyAccessRequests,
+  lookUpFailureText,
+  refusalOf,
+  refusalText,
+  signUpClosed,
+} from "./human-check";
 import { pendingInvite } from "./invite";
 import { signInPurpose } from "./links";
 
@@ -95,6 +101,7 @@ export function AuthFlow({
   const linkedProviders = useSocialProviders(options?.providers);
   const allProviders = useSocialProviders();
   const canReset = config.data?.passwordReset === true;
+  const requests = earlyAccessRequests(access);
   // Where this sign-in leads, in place of the general line: the invitation opened before it (its workspace, by its
   // token), as the web's sign-in says it.
   const [waiting] = useState(pendingInvite);
@@ -118,7 +125,7 @@ export function AuthFlow({
     setError(null);
     try {
       const found = await withHumanCheck(human.check, (token) =>
-        api.account.signInOptions({ email: value.trim(), ...(access ? { access } : {}) }, token),
+        api.account.signInOptions(requests.lookUp(value.trim()), token),
       );
       setOptions(found);
       setPassword("");
@@ -215,7 +222,7 @@ export function AuthFlow({
             name: name.trim(),
             email: email.trim(),
             password,
-            fetchOptions: { headers: { ...humanCheckHeaders(token), ...earlyAccessHeaders(access) } },
+            fetchOptions: { headers: { ...humanCheckHeaders(token), ...requests.headers } },
           }),
         ),
       );
