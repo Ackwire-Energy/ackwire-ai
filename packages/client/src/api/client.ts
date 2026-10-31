@@ -1211,7 +1211,7 @@ export interface ApiClient {
     stop(orgId: string, agentId: string): Promise<void>;
     /**
      * "Tentar de novo" on a page that never came: the browser closes and opens again where it was (its logins
-     * stay), and every live view gets it again. Only who may drive it (403 otherwise).
+     * stay), and every live view gets it again. Resolves once it closed. Only who may drive it (403 otherwise).
      */
     restart(orgId: string, agentId: string): Promise<void>;
   };

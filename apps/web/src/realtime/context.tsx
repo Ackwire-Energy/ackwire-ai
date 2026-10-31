@@ -910,8 +910,11 @@ export function useBrowserLive(agentId: string, enabled = true) {
       // Shared per socket: the card, the bar and the full view of one agent are one watch.
       watcher: connection.browserWatcher,
       agentId,
-      onFrame: (frame) => setState((s) => ({ ...s, frame, unavailable: null, ended: false, endedBy: null })),
-      onStatus: (status) => setState((s) => ({ ...s, status, unavailable: null, ended: false, endedBy: null })),
+      // An answer means the watch went through: an earlier refusal (too many browsers) no longer holds.
+      onFrame: (frame) =>
+        setState((s) => ({ ...s, frame, unavailable: null, ended: false, endedBy: null, error: null })),
+      onStatus: (status) =>
+        setState((s) => ({ ...s, status, unavailable: null, ended: false, endedBy: null, error: null })),
       onUnavailable: (reason, message) =>
         setState((s) => ({ ...s, unavailable: { reason, ...(message ? { message } : {}) } })),
       onEnded: (reason, _message, by) =>

@@ -236,7 +236,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
   const checked = new Map<string, number>();
   /** Last keep-alive per open handoff. */
   const touched = new Map<string, number>();
-  /** Agents whose browser `restart` is closing now: the runner's "stopped" for them isn't a Parar. */
+  /** Agents whose browser `restart` closes and opens now: the runner's "stopped" for them isn't a Parar. */
   const restarting = new Set<string>();
 
   const broadcast = (state: AgentLive, message: BrowserLiveMessage) => {
@@ -324,6 +324,8 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       state.mode = null;
       // An older runner says `bad_request` for a closed browser: still `unavailable`, with its message.
       const closed = error instanceof MachineRequestError && error.code === "browser_closed";
+      // Closed by a restart that is opening it again: its end starts the stream, the views keep waiting.
+      if (closed && restarting.has(agentId)) return;
       broadcast(state, {
         type: "browser.unavailable",
         agentId,
@@ -745,7 +747,10 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     /**
      * Try again on a view whose page never came, by whoever may drive the agent's browser: it closes and opens
      * again on the page it showed, else it just starts (ADR 0040 §11, not while a person's turn is open: it
-     * stays closed, and the views say so); its logins stay. Every view of it then gets its stream again.
+     * stays closed, and the views say so); its logins stay. Answers once it closed: opening again can take a
+     * minute on a cold computer, longer than a request may wait behind a proxy. Every view of it then gets its
+     * stream again, also when the close or the open failed. The person in control pressing it is there: their
+     * control holds meanwhile.
      */
     async restart(userId: string, orgId: string, agentId: string) {
       await requireBrowserControl(deps.db, userId, orgId, agentId);
@@ -755,45 +760,63 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       if (!machineId) throw new ValidationError("This agent has no computer");
       const agent = await getAgentCached(deps.db, orgId, agentId);
       if (!agent) throw new NotFoundError("Agent not found");
+      // Already restarting here: its end brings every view the page.
+      if (restarting.has(agentId)) return;
+      // ponytail: only this server's views miss the stop's "stopped"; with several replicas, an event of its own.
+      restarting.add(agentId);
       const scope: AgentScope = { id: agentId, handle: agent.handle, ...(agent.name ? { name: agent.name } : {}) };
+      const hold = () =>
+        openHandoffOf(deps.db, orgId, agentId)
+          .then((open) => open && touchControl(deps.db, open.id, userId, new Date(), true))
+          .catch(() => {});
+      // Every replica's views of it (the one holding the computer's socket among them) start their streams again.
+      const streamsAgain = async () => {
+        const told = await deps.pubsub
+          ?.publish(BROWSER_HANDOFF_TOPIC, { type: "browser.opened", orgId, agentId })
+          .then(() => true)
+          .catch(() => false);
+        const now = live.get(agentId);
+        if (!told && now) await restartStream(agentId, now);
+      };
+      await hold();
       const state = live.get(agentId);
       const shown = state?.machineId === machineId ? state.page?.url : undefined;
       const page = webAddress(shown ?? (await askUrl(machineId, scope)) ?? "");
-      // ponytail: only this server's views miss the stop's "stopped"; with several replicas, an event of its own.
-      restarting.add(agentId);
       try {
         await deps.hub.call<"browser.stop">(machineId, { op: "browser.stop", agent: scope }, { timeoutMs: 30_000 });
-      } finally {
+      } catch (error) {
         restarting.delete(agentId);
+        await streamsAgain();
+        throw error;
       }
-      const desktop = (await browserOnDesktop(deps.db, orgId, agentId, machineId)) ? { desktop: true } : {};
-      try {
-        if (page) {
-          await deps.hub.call<"browser.act">(
-            machineId,
-            {
-              op: "browser.act",
-              agent: scope,
-              command: "open",
-              args: [page],
-              timeoutSeconds: 60,
-              ...(agent.browserAllowedDomains ? { allowedDomains: agent.browserAllowedDomains } : {}),
-              link: agentBrowserLink(orgId, agentId),
-              ...desktop,
-            },
-            { timeoutMs: 90_000 },
-          );
-        } else await deps.hub.call<"browser.warm">(machineId, { op: "browser.warm", agent: scope, ...desktop });
-      } catch {
-        // Not opened again (a site no longer allowed, an older computer): it stays closed, and the views say so.
-      }
-      // Every replica's views of it (the one holding the computer's socket among them) start their streams again.
-      const told = await deps.pubsub
-        ?.publish(BROWSER_HANDOFF_TOPIC, { type: "browser.opened", orgId, agentId })
-        .then(() => true)
-        .catch(() => false);
-      const now = live.get(agentId);
-      if (!told && now) await restartStream(agentId, now);
+      void (async () => {
+        try {
+          const desktop = (await browserOnDesktop(deps.db, orgId, agentId, machineId)) ? { desktop: true } : {};
+          if (page) {
+            await deps.hub.call<"browser.act">(
+              machineId,
+              {
+                op: "browser.act",
+                agent: scope,
+                command: "open",
+                args: [page],
+                timeoutSeconds: 60,
+                ...(agent.browserAllowedDomains ? { allowedDomains: agent.browserAllowedDomains } : {}),
+                link: agentBrowserLink(orgId, agentId),
+                ...desktop,
+              },
+              { timeoutMs: 90_000 },
+            );
+          } else await deps.hub.call<"browser.warm">(machineId, { op: "browser.warm", agent: scope, ...desktop });
+        } catch (error) {
+          // Not opened again (a site no longer allowed, an older computer): it stays closed, and the views say so.
+          deps.log?.warn("browser restart didn't open it again", { agentId, error: String(error) });
+        } finally {
+          restarting.delete(agentId);
+          await hold();
+          await streamsAgain();
+        }
+      })();
     },
 
     /** What the machine hub hands over: frames and the end of a stream, from the machine holding them. */

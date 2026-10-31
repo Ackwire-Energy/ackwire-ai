@@ -320,9 +320,12 @@ describe("a card whose page doesn't come never stays on Opening", () => {
     expect(cover()).toContain("Não deu para abrir o navegador da Ada.");
     expect(cover()).toContain("Tentar de novo reinicia o navegador. Os logins continuam salvos.");
     expect(card.querySelector(".brw-mf__top b")?.textContent).toBe("Entrar no painel com a conta de teste");
+    const before = watches(socket);
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Tentar de novo" })));
     await settle(3);
     expect(state.calls.filter((c) => c.method === "browser.restart").map((c) => c.args)).toEqual([[ORG_ID, ADA_ID]]);
+    // And it watches again: its own watch may be what the server refused.
+    expect(watches(socket)).toBe(before + 1);
     // It waits again, from the start, and the page shows when it comes.
     expect(cover()).toContain("Abrindo o navegador da Ada…");
     await act(async () => socket.push(page()));
@@ -402,6 +405,57 @@ describe("a card whose page doesn't come never stays on Opening", () => {
     await settle(2);
     expect(watches(socket)).toBe(before + 1);
     expect(state.calls.some((c) => c.method === "browser.restart")).toBe(false);
+    await act(async () =>
+      socket.push({ type: "browser.status", agentId: ADA_ID, mode: "watch", controllerUserId: null, handoff: null }),
+    );
+    await act(async () => socket.push(page()));
+    expect(card.querySelector(".brw-dim")).toBeNull();
+  });
+
+  test("off screen the wait doesn't count: shown after 75 s it's still opening; too many browsers says so", async () => {
+    // The card's observer, answered by the test: off screen until shown.
+    let show = () => {};
+    const native = globalThis.IntersectionObserver;
+    globalThis.IntersectionObserver = class {
+      constructor(readonly answer: IntersectionObserverCallback) {}
+      observe(target: Element) {
+        if (!target.matches(".brw-ac")) return;
+        show = () => this.answer([{ isIntersecting: true, target } as IntersectionObserverEntry], this as never);
+      }
+      unobserve() {}
+      disconnect() {}
+      takeRecords() {
+        return [];
+      }
+    } as unknown as typeof IntersectionObserver;
+    offScreen = () => {
+      globalThis.IntersectionObserver = native;
+    };
+    const state = seedState();
+    const api = createFakeApi(state);
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(5);
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
+    const run = { channelId: ENG_ID, threadId: null, runId: "r-off", agentId: ADA_ID };
+    await act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { type: "agent.thinking", ...run } }));
+    await act(async () =>
+      socket.push({ type: "event", channelId: ENG_ID, event: { type: "agent.tool", tool: "browser_open", ...run } }),
+    );
+    await settle(3);
+    const card = document.querySelector(".brw-ac") as HTMLElement;
+    const cover = () => card.querySelector(".brw-dim__box")?.textContent ?? "";
+    later();
+    await act(async () => show());
+    await settle(2);
+    expect(cover()).toContain("Abrindo o navegador da Ada…");
+    // Its watch refused (a fifth browser on this socket): that, not an opening that never ends.
+    await act(async () => socket.push({ type: "error", agentId: ADA_ID, code: "too_many_browsers" }));
+    expect(cover()).toContain("Muitos navegadores abertos ao mesmo tempo. Este aparece quando outro fechar.");
+    later();
+    await act(async () => socket.push({ type: "error", agentId: ADA_ID, code: "too_many_browsers" }));
+    expect(cover()).not.toContain("Não deu para abrir");
+    // Let in (another view left): the page shows.
     await act(async () =>
       socket.push({ type: "browser.status", agentId: ADA_ID, mode: "watch", controllerUserId: null, handoff: null }),
     );

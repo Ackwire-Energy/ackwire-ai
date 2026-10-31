@@ -249,6 +249,8 @@ export interface LiveState {
   sendInput: (events: BrowserInputEvent[]) => void;
   /** Watches again now (Try again for someone who only watches). */
   retry: () => void;
+  /** The app's own socket is open: only then can a page come (its "reconnecting" isn't the computer's). */
+  online: boolean;
 }
 
 /**
@@ -263,10 +265,12 @@ export function useLiveConnection(agentId: string, enabled: boolean): LiveState 
   const [controllerUserId, setControllerUserId] = useState<string | null>(null);
   const [handoff, setHandoff] = useState<{ controllerUserId: string | null } | null | undefined>(undefined);
   const [hidden, setHidden] = useState(false);
+  const [online, setOnline] = useState(false);
   const liveRef = useRef<ReturnType<typeof createBrowserLiveConnection> | null>(null);
 
   useEffect(() => {
     if (!connection || !enabled) return;
+    setOnline(connection.isOpen);
     const live = createBrowserLiveConnection({
       send: (frameOut) => connection.sendBrowserFrame(frameOut),
       // Shared per socket: one watch per agent however often the card re-renders or remounts.
@@ -289,12 +293,14 @@ export function useLiveConnection(agentId: string, enabled: boolean): LiveState 
       onEnded: () => setUnavailable("ended"),
       onError: (code) => {
         if (code === "forbidden" || code === "not_found") setUnavailable("forbidden");
+        else if (code === "too_many_browsers") setUnavailable("tooMany");
       },
     });
     liveRef.current = live;
     const offFrames = connection.onBrowserFrame((m) => live.handleMessage(m));
     // The server forgets the watch when the socket drops: watch again once it is back.
     const offStatus = connection.onStatus((status) => {
+      setOnline(status === "open");
       if (status === "open") {
         // A card that opened while the socket was down (a push opening the app) starts watching now.
         live.start();
@@ -320,7 +326,7 @@ export function useLiveConnection(agentId: string, enabled: boolean): LiveState 
     liveRef.current?.sendInput(events);
   }, []);
   const retry = useCallback(() => liveRef.current?.retry(), []);
-  return { frame, unavailable, controllerUserId, handoff, hidden, sendInput, retry };
+  return { frame, unavailable, controllerUserId, handoff, hidden, sendInput, retry, online };
 }
 
 const styles = StyleSheet.create({

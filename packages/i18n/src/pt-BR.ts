@@ -9089,6 +9089,7 @@ export const ptBR = {
       noComputer: "{{The}} {{name}} não tem um computador conectado.",
       noComputerCloud: "O computador {{of}} {{name}} está sendo preparado.",
       forbidden: "Você não pode ver este navegador.",
+      tooMany: "Muitos navegadores abertos ao mesmo tempo. Este aparece quando outro fechar.",
       unavailable: "O navegador não pode ser mostrado agora. Tentando de novo…",
       closed: "O navegador {{of}} {{name}} está fechado",
       closedHelp: "Os logins continuam salvos.",

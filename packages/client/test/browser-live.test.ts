@@ -178,6 +178,18 @@ describe("agent browser live connection (ADR 0040)", () => {
     again.start();
     again.handleMessage({ type: "browser.unavailable", agentId: AGENT, reason: "forbidden" });
     expect(t.pending).toHaveLength(0);
+    // Too many browsers watched on the socket: tried again the same way, for when another view leaves.
+    const crowded = createBrowserLiveConnection({
+      send: () => {},
+      agentId: AGENT,
+      onFrame: () => {},
+      onStatus: () => {},
+      timers: t.timers,
+      backoffMs: [100],
+    });
+    crowded.start();
+    crowded.handleMessage({ type: "error", agentId: AGENT, code: "too_many_browsers" });
+    expect(t.pending[0]?.ms).toBe(100);
   });
 
   test("an ended stream (the browser closed) is watched again after a backoff; a stop we asked for isn't", () => {

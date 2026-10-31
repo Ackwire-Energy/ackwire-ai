@@ -1331,6 +1331,8 @@ export const featureKeysPtBR = {
         offlineCloudM: "O computador do {{name}} não está respondendo agora.",
         stuckF: "Não deu para abrir o navegador da {{name}}.",
         stuckM: "Não deu para abrir o navegador do {{name}}.",
+        tooManyF: "Muitos navegadores abertos ao mesmo tempo. Este aparece quando outro fechar.",
+        tooManyM: "Muitos navegadores abertos ao mesmo tempo. Este aparece quando outro fechar.",
       },
     },
     done: {

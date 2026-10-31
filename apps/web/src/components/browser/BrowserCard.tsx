@@ -57,7 +57,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
-import { useBrowserLive, useStreams } from "@/realtime/context";
+import { useBrowserLive, useConnectionStatus, useStreams } from "@/realtime/context";
 import { DialogHead, FullButton, FullScreenButton, useDialogHead, useHandBack, useSayFailed } from "../computer/head";
 import { useOpenComputer } from "../computer/open";
 import { useOrg } from "../org-context";
@@ -349,7 +349,8 @@ export function BrowserCard({
     io.observe(el);
     return () => io.disconnect();
   }, []);
-  const live = useBrowserLive(agentId, !chat || visible || holding);
+  const watching = !chat || visible || holding;
+  const live = useBrowserLive(agentId, watching);
   const [still, setStill] = useState<typeof live.frame>(null);
   const [stoppedAt, setStoppedAt] = useState<string | null>(null);
   useEffect(() => {
@@ -611,15 +612,19 @@ export function BrowserCard({
         ? t(cloud ? "browser.inCard.noComputerCloud" : "browser.inCard.noComputer", g)
         : unavailable?.reason === "forbidden" || live.error === "forbidden" || live.error === "not_found"
           ? t("browser.inCard.forbidden")
-          : null;
+          : live.error === "too_many_browsers"
+            ? t("browser.inCard.tooMany")
+            : null;
   const starting = !frame && !blocker && !reconnecting && !closed && !opening && !hidden;
   // Opening or reconnecting for too long says so, with Try again: who may drive it restarts the browser, the
-  // others watch again.
+  // others watch again. Only while this view watches on an open socket: off screen or offline no page can come.
+  const online = useConnectionStatus() === "open";
   const [attempt, setAttempt] = useState(0);
-  const stuck = useBrowserStuck(!hidden && (starting || reconnecting || opening), attempt);
+  const stuck = useBrowserStuck(watching && online && !hidden && (starting || reconnecting || opening), attempt);
   const retry = () => {
     setAttempt((n) => n + 1);
-    if (mayDrive) actions.restart.mutate(agentId, { onError: didntWork });
+    // Watching again after the restart too: this view's own watch may be what the server refused.
+    if (mayDrive) actions.restart.mutate(agentId, { onError: didntWork, onSettled: () => live.retry() });
     else live.retry();
   };
 

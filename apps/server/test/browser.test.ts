@@ -191,7 +191,7 @@ describe("handoff routes", () => {
     expect([204, 409, 503]).toContain(stop.status);
   });
 
-  test("restart: only who may drive it; the browser closes and opens again on the page it showed", async () => {
+  test("restart: only who may drive it; the browser closes, answers, and opens again on the page it showed", async () => {
     const { org, api } = await seeded();
     const path = `/api/app/organizations/${org.orgId}/agents/${org.agentId}/browser/restart`;
     expect((await browser(t)(path, { json: {} })).status).toBe(401);
@@ -208,6 +208,8 @@ describe("handoff routes", () => {
     }) as typeof hub.call;
     try {
       expect((await api(`/agents/${org.agentId}/browser/restart`, { json: {} })).status).toBe(204);
+      // Opening again goes on after the answer.
+      for (let i = 0; i < 50 && asked.length < 3; i++) await Bun.sleep(2);
       expect(asked.map((r) => (r.op === "browser.act" ? `act:${r.command}` : r.op))).toEqual([
         "act:get",
         "browser.stop",

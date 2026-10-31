@@ -1294,6 +1294,9 @@ export async function expireBrowserHandoffs(deps: HandoffDeps, now = new Date())
         isNotNull(browserHandoffs.resolvedAt),
         gt(browserHandoffs.resolvedAt, new Date(now.getTime() - 24 * 60 * 60_000)),
         inArray(agentRuns.status, ["waiting_input", "waiting_approval"]),
+        // Only a run waiting on this one: a run that stopped waiting on it (`detachWaits`) got its notice when it
+        // ended, or needs none (it restarted the browser itself), and must not hear it during a later wait.
+        sql`${agentRuns.transcript} -> 'pending' -> 'calls' @> jsonb_build_array(jsonb_build_object('waitId', ${browserHandoffs.id}::text))`,
       ),
     )
     .limit(50);
@@ -1344,13 +1347,19 @@ const RESTARTED_TEXT =
   "Your browser was restarted (browser_close), so the person's turn in it ended. Open a page again (browser_open) and check where things are before going on.";
 
 /**
- * The agent restarts its browser (`browser_close`: a person asked, or it is stuck) while a person has it or
- * was asked to take it: that turn ends (cancelled), with nothing to read first (the page doesn't survive the
- * restart), a run waiting on it is told why, and the conversation hears whose control ended. Null: none was open.
+ * The agent restarts its browser (`browser_close`, a person asked) while a person has it or was asked to take
+ * it: that turn ends (cancelled), with nothing to read first (the page doesn't survive the restart), a run
+ * waiting on it is told why, and the conversation hears whose control ended. Only from the run the turn is
+ * bound to, or a run of the person whose turn it is: anyone else's run waits or is refused as before
+ * (`waitIfPersonInControl`). Null: none was open, or not this run's to end.
  */
 export async function endHandoffForRestart(deps: HandoffDeps, ctx: { orgId: string; agentId: string; runId: string }) {
   const open = await openHandoffOf(deps.db, ctx.orgId, ctx.agentId, "browser");
   if (!open) return null;
+  if (open.runId !== ctx.runId) {
+    const person = open.status === "active" ? open.controllerUserId : open.requestedForUserId;
+    if (!person || (await humanBehindRun({ db: deps.db }, ctx.orgId, ctx.runId)) !== person) return null;
+  }
   const now = new Date();
   const [row] = await deps.db.transaction(async (tx) => {
     const rows = await tx

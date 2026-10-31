@@ -122,7 +122,7 @@ describe("the page box with no page to show", () => {
       expect(waitsForPage(gap)).toBe(true);
     }
     // What waiting can't change keeps its own words, and a page someone else holds stays theirs.
-    for (const gap of ["closed", "offline", "no_computer", "forbidden", "ended"] as const) {
+    for (const gap of ["closed", "offline", "no_computer", "forbidden", "ended", "tooMany"] as const) {
       expect(pageNoteOf(gap, false, false, true).say).toBe(gap);
       expect(waitsForPage(gap)).toBe(false);
     }
@@ -139,6 +139,7 @@ describe("the page box with no page to show", () => {
       "unavailable",
       "forbidden",
       "ended",
+      "tooMany",
       "stuck",
     ];
     for (const keys of [featureKeysPtBR, featureKeysEn]) {

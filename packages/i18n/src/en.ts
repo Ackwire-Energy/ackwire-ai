@@ -9043,6 +9043,7 @@ export const en: Translations = {
       noComputer: "{{name}} has no connected computer.",
       noComputerCloud: "{{name}}'s computer is being prepared.",
       forbidden: "You can't see this browser.",
+      tooMany: "Too many browsers open at once. This one shows when another one closes.",
       unavailable: "The browser can't be shown right now. Trying again…",
       closed: "{{name}}'s browser is closed",
       closedHelp: "Its sign-ins stay saved.",

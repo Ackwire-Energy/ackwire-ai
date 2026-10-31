@@ -339,6 +339,8 @@ export function createBrowserLiveConnection(options: BrowserLiveOptions): Browse
           return;
         case "error":
           options.onError?.(m.code);
+          // Too many browsers watched on this socket: in again once another view leaves.
+          if (m.code === "too_many_browsers") retryLater();
           return;
       }
     },

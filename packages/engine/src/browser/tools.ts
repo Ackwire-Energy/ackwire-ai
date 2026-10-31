@@ -687,7 +687,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     extra: Partial<Pick<ToolDefinition, "checkCall" | "describe">> & {
       onThePage?: boolean;
       seesThePage?: boolean;
-      /** Restarts the browser: a person's turn in it ends first instead of making the agent wait. */
+      /** Restarts the browser: a person's turn in it ends first, when it is this run's to end. */
       restarts?: boolean;
     } = {},
   ): ToolDefinition => {
@@ -1100,7 +1100,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     ),
     tool(
       "browser_close",
-      `${BROWSER_TOOL_INFO.browser_close.description} To restart your browser (a person asks, or it seems stuck), close it and open the page again with browser_open. It works even while a person has your browser, and ends their turn. It also closes by itself after a while unused.`,
+      `${BROWSER_TOOL_INFO.browser_close.description} To restart your browser, close it and open the page again with browser_open. While a person has your browser, close it only when the person using it asks you to restart it: that ends their turn. It also closes by itself after a while unused.`,
       { type: "object", properties: {}, additionalProperties: false },
       (_input, ctx) => {
         seen.forget(seenKey(ctx));

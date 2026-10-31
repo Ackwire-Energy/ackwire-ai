@@ -88,8 +88,8 @@ export const NOTE_MAX = 1000;
 export const browserGranted = (access: Pick<AgentAccess, "builtins"> | null | undefined) =>
   Boolean(access?.builtins.some((s) => s.scope === BROWSER_TOOL_SCOPE && s.state === "granted"));
 
-/** Why the card has no live page: the server's reason, or the stream ended. */
-export type PageGap = BrowserLiveUnavailable | "ended";
+/** Why the card has no live page: the server's reason, the stream ended, or too many browsers on the socket. */
+export type PageGap = BrowserLiveUnavailable | "ended" | "tooMany";
 
 /** The words for why the page shows nothing; the Cloud's computer is always on, so offline there isn't answering. */
 export const pageGapKey = (gap: PageGap | "stuck", gender: "F" | "M", cloud: boolean) =>

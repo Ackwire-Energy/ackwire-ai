@@ -135,10 +135,11 @@ export function BrowserCard({
   const ready = watching && Boolean(live.frame) && !live.unavailable;
   const canTake = canTakeOver && (ready || (surface && closed));
   const goShown = surface && mine && (closed || !live.frame || isBlankPage(live.frame.metadata.url));
-  // Opening or reconnecting for too long says so, with Try again (as on the web).
+  // Opening or reconnecting for too long says so, with Try again (as on the web). Only while the app's socket is
+  // open: without a network no page can come, and the agent's browser isn't the one to blame.
   const [attempt, setAttempt] = useState(0);
   const waitingForPage =
-    watching && !live.hidden && waitsForPage(live.unavailable) && !(live.frame && !live.unavailable);
+    watching && live.online && !live.hidden && waitsForPage(live.unavailable) && !(live.frame && !live.unavailable);
   const stuck = useBrowserStuck(waitingForPage, attempt);
   const note = pageNoteOf(live.unavailable, live.hidden, mine, stuck);
   // Full screen its header says who is in control, so the page says only why it hides, as the web's does.
@@ -223,11 +224,12 @@ export function BrowserCard({
       },
     ]);
   };
-  // Who may drive it restarts the browser; someone who only watches watches again.
+  // Who may drive it restarts the browser, then watches again (this card's own watch may be what was refused);
+  // someone who only watches watches again.
   const retry = () => {
     tapHaptic();
     setAttempt((n) => n + 1);
-    if (mayDrive) void actions.restart(agentId).catch(failedToast);
+    if (mayDrive) void actions.restart(agentId).catch(failedToast).finally(live.retry);
     else live.retry();
   };
   const couldnt = () => {

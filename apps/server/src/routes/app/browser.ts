@@ -159,9 +159,9 @@ export function browserRoutes(deps: AppDeps) {
       security,
       summary: "Restart the agent's browser on the page it showed (its logins stay); every live view gets it again",
       description:
-        "Try again on a view whose page never came. Only who may drive the agent's browser (403 otherwise): someone who only watches watches again instead.",
+        "Try again on a view whose page never came. Only who may drive the agent's browser (403 otherwise): someone who only watches watches again instead. Answers once the browser closed; it opens again in the background.",
       request: { params: AgentParams },
-      responses: { 204: { description: "Restarted" }, ...errors },
+      responses: { 204: { description: "Closed, opening again" }, ...errors },
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
