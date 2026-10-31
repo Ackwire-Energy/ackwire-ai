@@ -275,7 +275,9 @@ describe("the questions inside the reply that asked (ConsultGroup)", () => {
     const c = consultation({ status: "answered", answer: ANSWER, answeredAt: ago(5) });
     await open(talkAfter(withTalk(withAsk([c], true), c), 3));
     expect(document.querySelectorAll(".ac-consult").length).toBe(0);
-    const line = screen().getByText(/Atlas respondeu à pergunta da Ada/).closest(".cn-line") as HTMLElement;
+    const line = screen()
+      .getByText(/Atlas respondeu à pergunta da Ada/)
+      .closest(".cn-line") as HTMLElement;
     expect(line).not.toBeNull();
     await act(async () => fireEvent.click(within(line).getByRole("button", { name: "Ver" })));
     await settle(3);

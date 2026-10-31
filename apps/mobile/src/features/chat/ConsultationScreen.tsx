@@ -66,9 +66,7 @@ function Consultation({ consultationId, channelId }: { consultationId: string; c
     <View style={[styles.screen, { backgroundColor: c.bg }]}>
       <PushedHeader
         title={q ? t("chat.consultPanel.title", { from: from.name, to: to.name }) : ""}
-        subtitle={
-          channelName ? t("chat.consultPanel.where", { channel: channelName }) : t("chat.consultPanel.whereDm")
-        }
+        subtitle={channelName ? t("chat.consultPanel.where", { channel: channelName }) : t("chat.consultPanel.whereDm")}
       />
       <ScrollView contentContainerStyle={styles.list}>
         {query.isLoading ? <ActivityIndicator color={c.muted} /> : null}

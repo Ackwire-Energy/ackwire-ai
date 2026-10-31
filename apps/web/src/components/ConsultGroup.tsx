@@ -232,7 +232,9 @@ export function ConsultGroup({
       head={{
         text: t("chat.consultGroup.asked", { count: summary.total }),
         state: summary.open ? "run" : undefined,
-        count: summary.open ? t("chat.consultGroup.progress", { done: summary.closed, total: summary.total }) : undefined,
+        count: summary.open
+          ? t("chat.consultGroup.progress", { done: summary.closed, total: summary.total })
+          : undefined,
       }}
       items={items}
       color={color}

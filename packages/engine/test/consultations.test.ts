@@ -440,7 +440,10 @@ describe("ask_agent", () => {
       expect.objectContaining({ type: "agent.consultation", runId: row?.askerRunId, consultationId: row?.id }),
     );
     // Another conversation's list doesn't have it.
-    const other = await f.db.select().from(schema.channels).where(eq(schema.channels.id, row?.channelId ?? ""));
+    const other = await f.db
+      .select()
+      .from(schema.channels)
+      .where(eq(schema.channels.id, row?.channelId ?? ""));
     expect(await consultationsIn(f.db, f.org.id, other[0]?.id ?? "")).toEqual([]);
   });
 

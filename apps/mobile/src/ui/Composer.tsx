@@ -1,6 +1,15 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Platform, Text as RNText, ScrollView, StyleSheet, TextInput, type TextStyle, View } from "react-native";
+import {
+  Platform,
+  Text as RNText,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  type TextInputInstance,
+  type TextStyle,
+  View,
+} from "react-native";
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -117,7 +126,7 @@ export function Composer({
   const [selection, setSelection] = useState<{ start: number; end: number } | undefined>(undefined);
   const [focused, setFocused] = useState(false);
   const [how, setHow] = useState<SendHow>("join");
-  const input = useRef<TextInput>(null);
+  const input = useRef<TextInputInstance | null>(null);
   const prefillAt = prefill?.at;
   // biome-ignore lint/correctness/useExhaustiveDependencies: once per request (its time), whatever the text
   useEffect(() => {

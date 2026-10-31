@@ -54,8 +54,8 @@ import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
-import { ApprovalInline, ConsultationCard, QuestionCard, ThreadLink } from "./cards";
 import { ConsultGroup } from "./ConsultGroup";
+import { ApprovalInline, ConsultationCard, QuestionCard, ThreadLink } from "./cards";
 import { IssueWorkCard } from "./issue-work";
 import { cacheContinued } from "./live";
 import {

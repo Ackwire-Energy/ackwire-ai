@@ -139,4 +139,3 @@ export function ConsultGroup({ message: m, color }: { message: Message; color: A
     />
   );
 }
-

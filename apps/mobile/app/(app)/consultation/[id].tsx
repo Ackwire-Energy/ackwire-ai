@@ -15,10 +15,6 @@ export function ErrorBoundary(props: ErrorBoundaryProps) {
 export default function ConsultationRoute() {
   const { id, channel } = useLocalSearchParams<{ id: string; channel?: string }>();
   return (
-    <ConsultationScreen
-      key={id}
-      consultationId={isSafeId(id) ? id : ""}
-      channelId={isSafeId(channel) ? channel : ""}
-    />
+    <ConsultationScreen key={id} consultationId={isSafeId(id) ? id : ""} channelId={isSafeId(channel) ? channel : ""} />
   );
 }

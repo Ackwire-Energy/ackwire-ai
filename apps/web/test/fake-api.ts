@@ -1348,7 +1348,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("agents.consultations", channelId);
         return state.consultations?.[channelId] ?? [];
       },
-      consultation: async (_orgId, channelId, consultationId) => {
+      consultation: async (_orgId, _channelId, consultationId) => {
         log("agents.consultation", consultationId);
         return state.consultationConversations?.[consultationId] ?? null;
       },
