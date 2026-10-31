@@ -1516,6 +1516,11 @@ textarea.ac-input {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+/* An item that opens a menu beside it (MenuSub): the chevron at its end. */
+.ac-menu__item > .ac-menu__chevron {
+  margin-left: auto;
+  color: var(--faint);
+}
 .ac-menu__item[aria-selected="true"],
 .ac-menu__item[data-state="checked"] {
   font-weight: 600;
@@ -4072,7 +4077,8 @@ a.ac-list__row:focus-visible {
 }
 .ac-menu__item:hover,
 .ac-menu__item[data-highlighted],
-.ac-menu__item[data-active] {
+.ac-menu__item[data-active],
+.ac-menu__item[data-state="open"] {
   background: rgba(127, 127, 127, 0.12);
 }
 /* A select's chosen option: its background (the others light only on hover). */
@@ -7686,12 +7692,6 @@ label.ac-setrow__title {
 .ac-mo__item:hover .ac-mo__kbd:not(:empty),
 .ac-mo__item:focus-visible .ac-mo__kbd:not(:empty) {
   visibility: visible;
-}
-.ac-mo__item--static {
-  cursor: default;
-}
-.ac-mo__item--static:hover {
-  background: transparent;
 }
 /* A workspace's mark where the icon goes, with the name lined up with the other labels. */
 .ac-mo__leading {

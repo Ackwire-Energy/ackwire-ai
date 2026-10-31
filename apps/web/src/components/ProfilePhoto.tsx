@@ -1,10 +1,11 @@
 import { keys } from "@agenteschat/client";
-import { Avatar, Button, cx, Dialog, DialogBody, DialogFooter, LogoMark } from "@agenteschat/ui";
+import { Avatar, type AvatarProps, Button, cx, Dialog, DialogBody, DialogFooter, LogoMark } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type PointerEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useOrg } from "@/components/org-context";
+import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 
 /** The crop square on screen and the size we upload. */
@@ -375,6 +376,13 @@ export function OrgLogoDialog({ open, onClose }: { open: boolean; onClose: () =>
       }}
     />
   );
+}
+
+/** My face as this workspace shows it: my photo, else my initials. */
+export function MyFace(props: Omit<AvatarProps, "name" | "imageUrl">) {
+  const { org, me } = useOrg();
+  const photo = useDirectory(org.id).memberById.get(me.user.id)?.image ?? me.user.image;
+  return <Avatar {...props} name={me.user.name} imageUrl={photo} />;
 }
 
 /** The workspace's mark: its logo when there is one, else the agent mark. */

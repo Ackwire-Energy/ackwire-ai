@@ -611,7 +611,7 @@ p {
   text-align: left;
   cursor: pointer;
 }
-/* A name alone centres on the face; with the budget under it the card is an `.ac-faceline`. */
+/* A name alone centres on the face; with the status line under it the card is an `.ac-faceline`. */
 .sidebar__user:not(.ac-faceline) {
   align-items: center;
 }
@@ -622,7 +622,7 @@ p {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-/* Two tight lines, as in the workspace header above: the name, then the budget. */
+/* Two tight lines, as in the workspace header above: the name, then the status line. */
 .sidebar__user-text {
   flex: 1;
   min-width: 0;
@@ -637,51 +637,6 @@ p {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-/* The workspace's budget use: a thin bar and the percentage (never money). */
-.sidebar__usage {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  line-height: 16px;
-}
-/* A track that shows even at 0% (the sunken fill vanished on the sidebar's sky). */
-.sidebar__usage-track {
-  flex: 1;
-  height: 5px;
-  border-radius: var(--radius-full);
-  background: var(--line2);
-  overflow: hidden;
-}
-.sidebar__usage-bar {
-  display: block;
-  height: 100%;
-  min-width: 2px;
-  border-radius: var(--radius-full);
-  background: var(--ink-muted);
-  transition: width 0.4s ease;
-}
-.sidebar__usage[data-level="high"] .sidebar__usage-bar {
-  background: var(--warn);
-}
-.sidebar__usage[data-level="full"] .sidebar__usage-bar {
-  background: var(--danger);
-}
-.sidebar__usage-value {
-  font-size: 11px;
-  color: var(--ink-muted);
-  font-variant-numeric: tabular-nums;
-}
-.sidebar__usage[data-level="high"] .sidebar__usage-value {
-  color: var(--warn);
-}
-.sidebar__usage[data-level="full"] .sidebar__usage-value {
-  color: var(--danger);
-}
-@media (prefers-reduced-motion: reduce) {
-  .sidebar__usage-bar {
-    transition: none;
-  }
 }
 
 /* Page container */
@@ -2619,6 +2574,16 @@ p {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+/* The account button's menu: you on top as on your profile card, the face's left edge on the items' icons. */
+.profile-menu {
+  width: 280px;
+}
+.profile-menu__head {
+  padding: 10px 10px 8px;
+}
+.profile-menu__line {
+  margin: 0 4px 6px;
 }
 
 /* "Ada não está no canal" after an @ pick */
@@ -10846,9 +10811,10 @@ html[data-menu-overlay] .shell {
   gap: 4px;
 }
 
-/* Configurações › Notificações (NoticePrefs.tsx, ADR 0071 §8): settings rows with the kind's icon before its name
-   and a switch or a chip at the end. The icon sits in the agent page cells' tile (`.agp-cell__key`). */
-.notice-prefs__icon {
+/* The person's own settings, Sua conta and Notificações (PrefRow in NoticePrefs.tsx): settings rows with an icon
+   before the name and a control at the end (a switch, a chip, a choice of several). The icon sits in the agent page
+   cells' tile (`.agp-cell__key`). */
+.settings-row__icon {
   display: grid;
   place-items: center;
   flex: none;
@@ -10861,8 +10827,62 @@ html[data-menu-overlay] .shell {
     inset 0 0 0 1px var(--line),
     var(--top);
 }
-.notice-prefs__control {
+.settings-row__end {
   flex: none;
   display: flex;
   align-items: center;
+}
+/* Configurações › Sua conta: a line that opens something is a button, its chevron at the end. Its hover stays inside
+   the card's corners. */
+.ac-card:has(> .settings-rows > .settings-row--open) {
+  overflow: hidden;
+}
+.settings-row--open {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.settings-row--open:hover {
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+}
+.settings-row--open:focus-visible {
+  outline: none;
+  box-shadow: inset var(--focus-ring);
+}
+.settings-row__chevron {
+  flex: none;
+  color: var(--faint);
+}
+/* The person's face where the other lines have their icon, as wide as it. */
+.settings-row__face.ac-avatar {
+  width: 30px;
+  height: 30px;
+  font-size: 12px;
+}
+/* On a phone the icon, the words and a switch or a chevron stay on one line. A choice of several goes under the
+   words, from their edge (the 30px icon and the 14px gap). */
+@media (max-width: 760px) {
+  .settings-row--lead {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+  }
+  .settings-row--lead > .settings-row__text {
+    flex: 1 1 160px;
+  }
+  .settings-row--lead > .settings-row__end {
+    margin-left: auto;
+  }
+  .settings-row--lead > .settings-row__end:has(> .ac-seg) {
+    flex-basis: 100%;
+    box-sizing: border-box;
+    padding-left: 44px;
+  }
 }

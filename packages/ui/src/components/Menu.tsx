@@ -10,6 +10,8 @@ export function Menu({
   align = "start",
   side = "bottom",
   label,
+  className,
+  onClosed,
 }: {
   /** A focusable element (usually a `Button`). */
   trigger: ReactNode;
@@ -17,17 +19,21 @@ export function Menu({
   align?: "start" | "center" | "end";
   side?: "top" | "bottom" | "left" | "right";
   label?: string;
+  className?: string;
+  /** Once it has closed, just before focus goes back to the trigger. */
+  onClosed?: () => void;
 }) {
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>{trigger}</DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
-          className="ac-menu ac-menu--dropdown"
+          className={cx("ac-menu ac-menu--dropdown", className)}
           align={align}
           side={side}
           sideOffset={4}
           aria-label={label}
+          onCloseAutoFocus={onClosed}
         >
           {children}
         </DropdownMenu.Content>
@@ -88,7 +94,8 @@ export function MenuRadioGroup({
   label: ReactNode;
   value: string;
   onValueChange: (value: string) => void;
-  options: { value: string; label: ReactNode }[];
+  /** `leading`: a mark after the check (a presence badge). */
+  options: { value: string; label: ReactNode; leading?: ReactNode }[];
 }) {
   return (
     <DropdownMenu.Group>
@@ -99,11 +106,39 @@ export function MenuRadioGroup({
             <svg className="ac-menu__check" viewBox="0 0 20 20" aria-hidden="true">
               <path d="m5.5 10.5 3 3 6-7" />
             </svg>
+            {o.leading && (
+              <span className="ac-menu__leading" aria-hidden="true">
+                {o.leading}
+              </span>
+            )}
             <span className="ac-menu__label">{o.label}</span>
           </DropdownMenu.RadioItem>
         ))}
       </DropdownMenu.RadioGroup>
     </DropdownMenu.Group>
+  );
+}
+
+/** An item that opens a menu of its own beside it (→, Enter or the pointer). ← goes back to the item. */
+export function MenuSub({ icon, label, children }: { icon?: IconName; label: ReactNode; children: ReactNode }) {
+  return (
+    <DropdownMenu.Sub>
+      <DropdownMenu.SubTrigger className="ac-menu__item">
+        {icon && <Icon name={icon} />}
+        <span className="ac-menu__label">{label}</span>
+        <Icon name="chevronRight" size={16} className="ac-menu__chevron" />
+      </DropdownMenu.SubTrigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.SubContent
+          className="ac-menu ac-menu--dropdown"
+          sideOffset={12}
+          alignOffset={-6}
+          collisionPadding={8}
+        >
+          {children}
+        </DropdownMenu.SubContent>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Sub>
   );
 }
 

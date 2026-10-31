@@ -56,20 +56,12 @@ const draftOf = (mine: PersonPresence | null): Draft => ({
  */
 export function SetStatusDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
-  const { org, me } = useOrg();
-  const toast = useToast();
+  const { me } = useOrg();
   const mine = usePersonPresence(me.user.id);
-  const setStatus = useSetMyStatus(org.id, me.user.id);
+  const saveStatus = useSaveStatus();
   const save = (input: StatusInput) => {
     onClose();
-    setStatus.mutate(input, {
-      onSuccess: (person) =>
-        toast.show(
-          person.status
-            ? t("presence.saved")
-            : t("presence.appearsAs", { presence: t(`presence.${person.presence}`).toLowerCase() }),
-        ),
-    });
+    saveStatus(input);
   };
   return (
     <Dialog
@@ -84,6 +76,23 @@ export function SetStatusDialog({ open, onClose }: { open: boolean; onClose: () 
       {mine && <StatusForm mine={mine} onSave={save} onCancel={onClose} />}
     </Dialog>
   );
+}
+
+/** Saves how you appear or your line, shown at once, then says so: the line saved, or how you appear now. */
+export function useSaveStatus() {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const toast = useToast();
+  const setStatus = useSetMyStatus(org.id, me.user.id);
+  return (input: StatusInput) =>
+    setStatus.mutate(input, {
+      onSuccess: (person) =>
+        toast.show(
+          person.status
+            ? t("presence.saved")
+            : t("presence.appearsAs", { presence: t(`presence.${person.presence}`).toLowerCase() }),
+        ),
+    });
 }
 
 function StatusForm({

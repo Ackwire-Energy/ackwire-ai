@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
+import { MyFace } from "@/components/ProfilePhoto";
 import { useDirectory } from "@/hooks/useDirectory";
 import { SETTINGS_SECTIONS } from "@/pages/settings-sections";
 
@@ -148,7 +149,7 @@ export function CommandMenu() {
         label: t(`settings.section.${s.id}`),
         sub: t("palette.settings"),
         keywords: s.id,
-        mark: <Icon name={s.icon} size={16} />,
+        mark: s.id === "account" ? <MyFace size="xs" /> : <Icon name={s.icon} size={16} />,
         onSelect: () => void navigate({ to: "/org/$orgId/settings/$section", params: { orgId, section: s.id } }),
       });
     }

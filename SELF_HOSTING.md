@@ -150,8 +150,8 @@ one's container (Caddy or Tailscale), which `docker compose up` alone would leav
    **Connected**.
 2. Install the agentes.chat app.
 3. Point the phone's camera at a QR code for your instance. The setup prints one at the end; in the
-   web app, **Open on your phone** (**Abrir no celular** in Portuguese) in the account menu shows
-   one that also signs you in. Or, on the app's sign-in screen, tap the server line
+   web app, **Open on your phone** (**Abrir no celular** in Portuguese) in **Settings › Your account**
+   shows one that also signs you in. Or, on the app's sign-in screen, tap the server line
    (**Server: agentes.chat · Change**, or **Servidor: agentes.chat · Trocar**), then
    **Scan QR code** (**Escanear QR code**), or type the address and tap **Use this server**
    (**Usar este servidor**).
@@ -488,8 +488,8 @@ computer and opens agentes.chat, signed in.
   If something else holds the port when it starts, it moves to a free one. With reach on, Tailscale
   shares it only while it runs.
 - **No password:** the app signs you in, and on its sign-in screen **Continue on this Mac** does it again
-  whenever your session ends. For a browser on another device, add one in your account menu, **Add a
-  password**.
+  whenever your session ends. For a browser on another device, add one in **Settings › Your account**, **Add
+  a password**.
 - **Preferences › Servers › agentes.chat on this Mac:** reach (Tailscale needs HTTPS turned on for your
   tailnet, which **Turn it on** opens; on Linux, connect Tailscale with `sudo tailscale up`, and run
   `sudo tailscale set --operator=$USER` once), the phone's QR code, usage statistics, **Back up now**
