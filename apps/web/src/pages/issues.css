@@ -170,7 +170,6 @@
   overscroll-behavior-x: contain;
   margin: 0 -6px;
   padding: 2px 6px 10px;
-  scrollbar-width: thin;
 }
 .issues-board {
   --cw: 248px;
@@ -937,6 +936,10 @@
     grid-template-columns: none;
     grid-auto-columns: minmax(78vw, 1fr);
     overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .issues-now__list::-webkit-scrollbar {
+    display: none;
   }
   .issue-list__row {
     grid-template-columns: 44px minmax(0, 1fr) auto;
