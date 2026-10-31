@@ -112,6 +112,20 @@ export type EmailTemplate =
    */
   | { kind: "join_code"; locale?: EmailLocale; orgName: string; code: string; url: string }
   /**
+   * A code to type before deleting (ADR 0088 §2): the workspace `orgName`, or without it the account `email`. No
+   * button: the dialog is already open. `support`: whom to write to if it wasn't them, as `account_deleted`'s. Its
+   * outbox row goes like `join_code`'s.
+   */
+  | {
+      kind: "deletion_code";
+      locale: EmailLocale;
+      code: string;
+      email: string;
+      orgName?: string;
+      support: string | null;
+      url: string;
+    }
+  /**
    * Double opt-in for the landing page's waiting list, in the language they
    * joined in. `email` is the address being confirmed (absent in jobs queued
    * before it existed).
@@ -516,6 +530,21 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
         c.headline,
         [{ p: c.body(org) }, { code: t.code }, { small: c.small }],
         c.why(org),
+      );
+    }
+    case "deletion_code": {
+      const c = w.deletionCode;
+      const org = t.orgName === undefined ? null : inertText(t.orgName);
+      return doc(
+        org === null ? c.subjectAccount(t.code) : c.subjectWorkspace(t.code),
+        c.preheader,
+        c.headline,
+        [
+          { p: org === null ? c.account(inertText(t.email)) : c.workspace(org) },
+          { code: t.code },
+          { small: t.support ? c.support(t.support) : c.noSupport },
+        ],
+        org === null ? c.whyAccount : c.whyWorkspace(org),
       );
     }
     case "workspace_deleting": {

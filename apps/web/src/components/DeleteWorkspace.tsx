@@ -1,18 +1,10 @@
-import {
-  type AccountDeletionPlan,
-  keys,
-  type Me,
-  type OrgSummary,
-  useAccountDeletionPlan,
-  useApi,
-  useAuthConfig,
-  useDeleteWorkspace,
-} from "@agenteschat/client";
+import { ApiError, type OrgSummary, useApi, useAuthConfig, useDeleteWorkspace, useMe } from "@agenteschat/client";
+import { formatTimeLeft } from "@agenteschat/client/lib/actions";
 import { computerEdition } from "@agenteschat/client/lib/computer";
-import { deletionDueFrom, type ProofNeeded, proofNeeded } from "@agenteschat/client/lib/deletion";
-import { errorCode, errorText, REAUTH_PASSWORD, REAUTH_SIGN_IN } from "@agenteschat/client/lib/errors";
+import { deletionDueFrom, deletionProof, proofToSend } from "@agenteschat/client/lib/deletion";
+import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { formatShortDate, formatTime } from "@agenteschat/client/lib/format";
-import { sendsEmail } from "@agenteschat/client/lib/join-requests";
+import { sendsEmail, typedCode } from "@agenteschat/client/lib/join-requests";
 import { namesMatch } from "@agenteschat/client/lib/text";
 import {
   Alert,
@@ -26,17 +18,18 @@ import {
   InfoHint,
   Input,
 } from "@agenteschat/ui";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
+import { AddPasswordDialog } from "@/components/AddPassword";
 import { saveExport } from "@/components/ImportFlow";
-import { useSignInAgain } from "@/hooks/useSignInAgain";
+import { useNow } from "@/hooks/useNow";
 import "./deletion.css";
 
 /**
  * Deleting a workspace (owners): what goes, until when any owner can restore it, its export, its name typed to
- * confirm and the proof that it's them. It closes for everyone at once and goes for good 7 days later; `onDeleted`
- * follows (the closing screen takes the workspace's place by itself).
+ * confirm, then the code emailed to them (or their password, where no email goes). It closes for everyone at once and
+ * goes for good 7 days later; `onDeleted` follows (the closing screen takes the workspace's place by itself).
  */
 export function DeleteWorkspaceDialog({
   org,
@@ -53,7 +46,7 @@ export function DeleteWorkspaceDialog({
   const api = useApi();
   const config = useAuthConfig().data;
   const del = useDeleteWorkspace(org.id);
-  const proof = useProof(open, errorCode(del.error));
+  const proof = useDeletionProof(open, org.id, del.error);
   const [name, setName] = useState("");
   const { reset } = del;
   useEffect(() => {
@@ -63,8 +56,8 @@ export function DeleteWorkspaceDialog({
   }, [open, reset]);
   const edition = computerEdition(undefined, config?.workspaceComputer);
   const due = deletionDueFrom();
-  const ready = namesMatch(name, org.name) && proof.ready && !del.isPending;
-  const submit = () => del.mutate(proof.password || undefined, { onSuccess: onDeleted });
+  const named = namesMatch(name, org.name);
+  const submit = () => del.mutate(proof.input, { onSuccess: onDeleted });
 
   return (
     <Dialog
@@ -82,7 +75,7 @@ export function DeleteWorkspaceDialog({
         style={{ display: "contents" }}
         onSubmit={(e) => {
           e.preventDefault();
-          if (ready) submit();
+          if (named && proof.ready && !del.isPending) submit();
         }}
       >
         <DialogBody>
@@ -116,29 +109,19 @@ export function DeleteWorkspaceDialog({
               }}
             />
           </p>
-          {proof.needs === "signIn" ? (
-            <SignInNeeded />
-          ) : (
-            <Field label={t("deleteOrg.type", { name: org.name })}>
-              <Input value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" spellCheck={false} />
-            </Field>
-          )}
-          {proof.needs === "password" && <PasswordProof {...proof.field} />}
+          <Field label={t("deleteOrg.type", { name: org.name })}>
+            <Input value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" spellCheck={false} />
+          </Field>
+          <DeletionProofField proof={proof} />
           {proof.alert && <Alert>{errorText(t, del.error)}</Alert>}
         </DialogBody>
         <DialogFooter>
           <Button type="button" onClick={onClose}>
             {t("common.cancel")}
           </Button>
-          {proof.needs === "signIn" ? (
-            <Button type="button" variant="primary" onClick={() => void proof.signInAgain()}>
-              {t("proof.signInButton")}
-            </Button>
-          ) : (
-            <Button type="submit" variant="danger" disabled={!ready} loading={del.isPending}>
-              {t("deleteOrg.submit")}
-            </Button>
-          )}
+          <ProofButton proof={proof} enabled={named} busy={del.isPending}>
+            {t("deleteOrg.submit")}
+          </ProofButton>
         </DialogFooter>
       </form>
     </Dialog>
@@ -155,78 +138,179 @@ export function DeletionLine({ icon, children }: { icon: IconName; children: Rea
   );
 }
 
+/** Codes of a refusal the proof's own field says (the rest show as an alert). */
+const PROOF_REFUSALS = new Set([
+  "reauth.code",
+  "reauth.code_wrong",
+  "reauth.code_expired",
+  "reauth.code_tries",
+  "reauth.password",
+]);
+
 /**
- * The proof a deletion takes, while its dialog is `open`: nothing while this session's sign-in is fresh, else the
- * password, else a new sign-in (the preflight says which, and a `reauth.*` refusal, `refused`, overrides it). `ready`
- * once it can be sent; `alert` when the refusal is one only an alert can say.
+ * The proof a deletion takes, while its dialog is `open` (ADR 0088 §2): the code emailed to the person, for deleting
+ * the workspace `orgId` (their account when null), or where the server sends no email their password, which an
+ * account without one adds first. `refused`: the deletion's error. `input` is what the deletion sends, once `ready`.
  */
-export function useProof(open: boolean, refused: string | undefined) {
-  // Read, not watched: these dialogs stay mounted, and the person is loaded wherever they open.
-  const me = useQueryClient().getQueryData<Me | null>(keys.me);
-  const plan = useAccountDeletionPlan(open);
+export function useDeletionProof(open: boolean, orgId: string | null, refused: unknown) {
+  const api = useApi();
+  const config = useAuthConfig().data;
+  const me = useMe().data;
+  const kind = deletionProof(config, me?.user.hasPassword);
   const [password, setPassword] = useState("");
-  // A refusal keeps its proof on screen while the next try is on its way.
-  const [proven, setProven] = useState<string>();
-  useEffect(() => {
-    if (refused?.startsWith("reauth.")) setProven(refused);
-  }, [refused]);
+  const [code, setCode] = useState("");
+  const [sent, setSent] = useState<{ email: string; resendAt: number } | null>(null);
+  const [adding, setAdding] = useState(false);
+  const codeOut = (email: string, resendIn: number) => setSent({ email, resendAt: Date.now() + resendIn * 1000 });
+  const send = useMutation({
+    mutationFn: () => (orgId ? api.orgs.deletionCode(orgId) : api.account.deletionCode()),
+    meta: { silent: true },
+    onSuccess: (r) => {
+      codeOut(r.email, r.resendIn);
+      setCode("");
+    },
+    // A code went out a moment ago (a reload, another tab): that one is still good.
+    onError: (e) => {
+      const retryIn = e instanceof ApiError && e.code === "reauth.code_wait" ? Number(e.params?.retryIn) : 0;
+      if (retryIn > 0) codeOut(me?.user.email ?? "", retryIn);
+    },
+  });
+  const { reset } = send;
   useEffect(() => {
     if (!open) return;
     setPassword("");
-    setProven(undefined);
-  }, [open]);
-  // Unread, the preflight leaves it to the account: its password, else a new sign-in.
-  const known: Pick<AccountDeletionPlan, "password" | "freshUntil"> | undefined =
-    plan.data ?? (plan.isError ? { password: me?.user.hasPassword !== false, freshUntil: null } : undefined);
-  const needs: ProofNeeded | null = known ? proofNeeded(known, refused ?? proven) : null;
-  const signInAgain = useSignInAgain(me?.user.email ?? "");
+    setCode("");
+    setSent(null);
+    reset();
+  }, [open, reset]);
+  const why = errorCode(refused);
+  // Each refusal of a code empties the field for the next try.
+  useEffect(() => {
+    if (errorCode(refused)?.startsWith("reauth.code")) setCode("");
+  }, [refused]);
   return {
-    needs,
-    password,
-    ready: needs === "none" || (needs === "password" && password !== ""),
-    alert: refused !== undefined && refused !== REAUTH_SIGN_IN && refused !== REAUTH_PASSWORD,
-    signInAgain,
-    field: { value: password, onChange: setPassword, wrong: refused === REAUTH_PASSWORD, signInAgain },
+    kind,
+    email: me?.user.email ?? "",
+    ...proofToSend(kind, { sent: sent !== null, code, password }),
+    sent,
+    send,
+    code: { value: code, onChange: (value: string) => setCode(typedCode(value)) },
+    password: { value: password, onChange: setPassword },
+    adding: { open: adding, set: setAdding },
+    // A code still good from a moment ago only waits: the countdown says it.
+    refused:
+      why && PROOF_REFUSALS.has(why) ? refused : errorCode(send.error) === "reauth.code_wait" ? null : send.error,
+    alert: why !== undefined && !PROOF_REFUSALS.has(why),
   };
 }
 
-/** The password, and signing in again as the other way to prove it's them. */
-export function PasswordProof({
-  value,
-  onChange,
-  wrong,
-  signInAgain,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  wrong: boolean;
-  signInAgain: () => Promise<void>;
-}) {
+type DeletionProofState = ReturnType<typeof useDeletionProof>;
+
+/**
+ * The proof's field: before a code goes out, where it will go; then the code, with another to ask for after its wait;
+ * the password; or why a password is needed first, with its dialog.
+ */
+export function DeletionProofField({ proof }: { proof: DeletionProofState }) {
   const { t } = useTranslation();
-  return (
-    <div className="deletion-proof">
-      <Field label={t("proof.password")} error={wrong ? t("errors.reauth.password") : undefined}>
+  const left = proof.sent ? Math.max(0, proof.sent.resendAt - Date.now()) : 0;
+  // A repaint every second while the countdown runs; the time itself is read just above.
+  useNow(left > 0 ? 1000 : false);
+  const said = proof.refused ? errorText(t, proof.refused) : undefined;
+  if (proof.kind === "addPassword")
+    return (
+      <>
+        <p className="ac-iconline deletion-note">
+          <Icon name="lock" size={16} />
+          <span>{t("proof.addPassword")}</span>
+        </p>
+        <AddPasswordDialog open={proof.adding.open} onClose={() => proof.adding.set(false)} />
+      </>
+    );
+  if (proof.kind === "password")
+    return (
+      <Field label={t("proof.password")} error={said}>
         <Input
           type="password"
           autoComplete="current-password"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
+          value={proof.password.value}
+          onChange={(e) => proof.password.onChange(e.target.value)}
         />
       </Field>
-      <button type="button" className="ac-link ac-link--muted small" onClick={() => void signInAgain()}>
-        {t("proof.signIn")}
-      </button>
-    </div>
+    );
+  if (!proof.sent)
+    return (
+      <>
+        <p className="ac-iconline deletion-note">
+          <Icon name="mail" size={16} />
+          <span>{t("proof.willSend", { email: proof.email })}</span>
+        </p>
+        {said && <Alert>{said}</Alert>}
+      </>
+    );
+  return (
+    <Field
+      label={t("proof.code")}
+      help={t("proof.sent", { email: proof.sent.email })}
+      error={said}
+      labelAside={
+        <button
+          type="button"
+          className="ac-link ac-link--muted small"
+          disabled={left > 0 || proof.send.isPending}
+          onClick={() => proof.send.mutate()}
+        >
+          {left > 0 ? t("proof.resendIn", { time: formatTimeLeft(left) }) : t("proof.resend")}
+        </button>
+      }
+    >
+      <Input
+        className="ac-input--code"
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        value={proof.code.value}
+        onChange={(e) => proof.code.onChange(e.target.value)}
+      />
+    </Field>
   );
 }
 
-/** An account without a password proves it's them with a new sign-in: the footer's button takes them there. */
-export function SignInNeeded() {
+/**
+ * The dialog's button: "Send code" until one went out, "Add a password" where one is needed first, then the deletion
+ * itself (`children`), once `enabled` (the dialog's own check) and the proof is ready.
+ */
+export function ProofButton({
+  proof,
+  enabled,
+  busy,
+  children,
+}: {
+  proof: DeletionProofState;
+  enabled: boolean;
+  busy: boolean;
+  children: ReactNode;
+}) {
   const { t } = useTranslation();
+  if (proof.kind === "addPassword")
+    return (
+      <Button type="button" variant="primary" onClick={() => proof.adding.set(true)}>
+        {t("shell.addPassword")}
+      </Button>
+    );
+  if (proof.kind === "code" && !proof.sent)
+    return (
+      <Button
+        type="button"
+        variant="primary"
+        disabled={!enabled}
+        loading={proof.send.isPending}
+        onClick={() => proof.send.mutate()}
+      >
+        {t("proof.send")}
+      </Button>
+    );
   return (
-    <p className="ac-iconline deletion-signin">
-      <Icon name="lock" size={16} />
-      <span>{t("errors.reauth.signIn")}</span>
-    </p>
+    <Button type="submit" variant="danger" disabled={!enabled || !proof.ready || busy} loading={busy}>
+      {children}
+    </Button>
   );
 }

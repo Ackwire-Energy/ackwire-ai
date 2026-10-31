@@ -7534,12 +7534,15 @@ export const en: Translations = {
       denied: "Your request wasn't approved. Ask someone there to invite you.",
       answered: "Someone already answered this request.",
       expired: "This request expired: nobody answered it in 14 days.",
-      codeWrong: "Wrong code. Try again.",
-      codeExpired: "This code expired. Get a new one.",
-      codeTries: "Too many tries. Get a new code.",
-      codeLimit: "Too many codes for this email. Try again later.",
-      codeWait: "Wait a minute before getting a new code.",
       codeNeeded: "Verify your email first.",
+    },
+    /** An emailed code refused: asking to join (ADR 0072) and deleting (ADR 0088) alike. */
+    code: {
+      wrong: "Wrong code. Try again.",
+      expired: "This code expired. Get a new one.",
+      tries: "Too many tries. Get a new code.",
+      limit: "Too many codes for this email. Try again later.",
+      wait: "Wait a minute before getting a new code.",
     },
     invitation: {
       askToJoin: "This link goes through an admin now. Open it again to ask to join.",
@@ -7551,6 +7554,7 @@ export const en: Translations = {
       notRestorable: "This workspace can't be restored anymore.",
     },
     reauth: {
+      code: "Type the code we emailed you.",
       password: "That password isn't right.",
       signIn: "Sign in again to confirm it's you.",
     },
@@ -9214,10 +9218,19 @@ export const en: Translations = {
     type: "Type {{name}} to confirm",
     submit: "Delete workspace",
   },
-  /** Proof that it's the person, before deleting: the password, or a sign-in in the last 10 minutes. */
+  /** Proof that it's the person, before deleting (ADR 0088 §2): a code emailed to them, or their password. */
   proof: {
+    /** `{{email}}`: the account's own address. */
+    willSend: "We'll email a code to {{email}} to confirm it's you.",
+    send: "Send code",
+    code: "Code from the email",
+    sent: "Sent to {{email}}. It works for 10 minutes.",
+    resend: "Send another",
+    /** `{{time}}`: what's left, as 0:42. */
+    resendIn: "Send another in {{time}}",
+    /** A self-hosted server with no email, and an account with no password yet. */
+    addPassword: "This server sends no email. Add a password to confirm it's you.",
     password: "Your password",
-    signIn: "Or sign in again to confirm",
     signInButton: "Sign in again",
   },
   /** A workspace being deleted: the screen in its place until it goes. */

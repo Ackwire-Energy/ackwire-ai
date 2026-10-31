@@ -8,11 +8,11 @@ import { withHumanCheck } from "@agenteschat/client/lib/human-check";
 import {
   ANSWER_POLL_MS,
   askView,
-  JOIN_CODE_LENGTH,
+  CODE_LENGTH,
   JOIN_NAME_MAX,
   JOIN_NOTE_MAX,
-  joinCode,
   sendsEmail,
+  typedCode,
 } from "@agenteschat/client/lib/join-requests";
 import { emailTypoFix, isEmail, passwordState } from "@agenteschat/client/lib/text";
 import { Alert, AvatarStack, Button, Card, Field, Icon, Input, Textarea } from "@agenteschat/ui";
@@ -357,9 +357,9 @@ function EmailProof({
   const slot = proven ? "verified" : !out ? "verify" : left > 0 ? "wait" : "resend";
   const shown = (s: typeof slot) => (slot === s ? undefined : ({ visibility: "hidden" } as const));
   const typed = (value: string) => {
-    const digits = joinCode(value);
+    const digits = typedCode(value);
     setCode(digits);
-    if (digits.length === JOIN_CODE_LENGTH && !check.isPending) check.mutate(digits);
+    if (digits.length === CODE_LENGTH && !check.isPending) check.mutate(digits);
   };
   const showCode = out && !proven;
   return (
@@ -422,7 +422,7 @@ function EmailProof({
         <Field label={t("invite.ask.code")} id="ask-code" error={said && <span role="alert">{said}</span>}>
           <Input
             ref={codeInput}
-            className="invite-ask__code"
+            className="ac-input--code"
             inputMode="numeric"
             autoComplete="one-time-code"
             enterKeyHint="done"
@@ -433,7 +433,7 @@ function EmailProof({
             onKeyDown={(e) => {
               if (e.key !== "Enter") return;
               e.preventDefault();
-              if (code.length === JOIN_CODE_LENGTH && !check.isPending) check.mutate(code);
+              if (code.length === CODE_LENGTH && !check.isPending) check.mutate(code);
             }}
           />
         </Field>

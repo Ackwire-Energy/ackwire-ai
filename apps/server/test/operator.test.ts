@@ -5,7 +5,7 @@ import { desc, eq, schema, sql } from "@agenteschat/db";
 import { enableOperatorEvents, purgeWorkspace, setRestrictionNotices } from "@agenteschat/engine";
 import { createLogger } from "../src/logger";
 import { createOperatorApp, type OperatorDeps, serveOperatorApi } from "../src/operator/app";
-import { type Browser, browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
+import { type Browser, browser, createTestServer, deletionCode, seedOrg, signUp, type TestServer } from "./harness";
 
 const TOKEN = "operator-test-token-".padEnd(48, "x");
 const BEARER = `Bearer ${TOKEN}`;
@@ -906,8 +906,11 @@ test("a workspace's deletion: its hold set and let go in silence, both in its de
       );
       return { deletion, deletionHold };
     };
-    const app = (method: "POST" | "DELETE") =>
-      owner(`/api/app/organizations/${orgId}/deletion`, method === "POST" ? { json: {} } : { method });
+    const app = async (method: "POST" | "DELETE") =>
+      owner(
+        `/api/app/organizations/${orgId}/deletion`,
+        method === "POST" ? { json: { code: await deletionCode(t, owner, orgId) } } : { method },
+      );
 
     expect(await body(await put(`/orgs/${orgId}/deletion-hold`, { held: true, reason: "legal_hold" }))).toEqual({
       held: true,

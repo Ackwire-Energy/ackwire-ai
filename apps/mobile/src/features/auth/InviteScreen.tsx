@@ -13,11 +13,11 @@ import { type HumanCheck, withHumanCheck } from "@agenteschat/client/lib/human-c
 import {
   ANSWER_POLL_MS,
   askView,
-  JOIN_CODE_LENGTH,
+  CODE_LENGTH,
   JOIN_NAME_MAX,
   JOIN_NOTE_MAX,
-  joinCode,
   sendsEmail,
+  typedCode,
 } from "@agenteschat/client/lib/join-requests";
 import { emailTypoFix, isEmail } from "@agenteschat/client/lib/text";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -639,9 +639,9 @@ function EmailProof({
   };
   const typed = (value: string) => {
     if (checking) return;
-    const digits = joinCode(value);
+    const digits = typedCode(value);
     setCode(digits);
-    if (digits.length === JOIN_CODE_LENGTH) void checkCode(digits);
+    if (digits.length === CODE_LENGTH) void checkCode(digits);
   };
 
   const errorLine = (text: string) => (
@@ -734,7 +734,7 @@ function EmailProof({
             autoComplete="one-time-code"
             returnKeyType="done"
             onSubmitEditing={() => {
-              if (code.length === JOIN_CODE_LENGTH && !checking) void checkCode(code);
+              if (code.length === CODE_LENGTH && !checking) void checkCode(code);
             }}
           />
           {said ? errorLine(said) : null}

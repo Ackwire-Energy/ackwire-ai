@@ -20,10 +20,11 @@ import { judgeOf } from "./context/summaries";
 import { dispatchDm, dispatchMentions, requesterOf } from "./dispatch";
 import { isAgentOnlyDm } from "./dms";
 import { type EmailArt, sendQueuedEmail } from "./email";
+import { forgetCodeEmail } from "./email-codes";
 import { type DecidedBy, publishRouted } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
 import { advanceForumTopic } from "./forum";
-import { FILE_JOIN_REQUEST_JOB, fileJoinRequest, forgetJoinCodeEmail } from "./invite-requests";
+import { FILE_JOIN_REQUEST_JOB, fileJoinRequest } from "./invite-requests";
 import type { JevKey, JevKeySource } from "./jev-key";
 import { mentionHandoffs } from "./judge";
 import { platformCapReached } from "./limits";
@@ -515,10 +516,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         if (!deps.email) throw new PermanentJobError("no email sender configured");
         await sendQueuedEmail(deps.email, job.payload, deps.emailArt);
       } catch (error) {
-        if (ctx.finalAttempt || error instanceof PermanentJobError) await forgetJoinCodeEmail(deps.db, job);
+        if (ctx.finalAttempt || error instanceof PermanentJobError) await forgetCodeEmail(deps.db, job);
         throw error;
       }
-      await forgetJoinCodeEmail(deps.db, job);
+      await forgetCodeEmail(deps.db, job);
     },
     "waitlist.contact": async (job) => {
       if (!deps.email) throw new PermanentJobError("no email sender configured");

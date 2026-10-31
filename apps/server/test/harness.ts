@@ -16,6 +16,7 @@ import {
   type WebPushSender,
 } from "@agenteschat/adapters";
 import { testConfig } from "@agenteschat/config";
+import { like, schema } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
 import {
   createFakeJudge,
@@ -273,6 +274,26 @@ export function browser(t: TestServer) {
 }
 
 export type Browser = ReturnType<typeof browser>;
+
+/** The code the last code email carries (its subject starts with it). */
+export const lastCode = (t: TestServer) =>
+  t.email.sent.flatMap((m) => /^(\d{6}) /.exec(m.subject)?.[1] ?? []).at(-1) ?? "";
+
+/**
+ * The code that deletes `orgId` (the account when null), emailed and read back as the person does (ADR 0088 §2). The
+ * last one is taken to have gone out a while ago, so a test asks for one after another without waiting their minute.
+ */
+export async function deletionCode(t: TestServer, b: Browser, orgId: string | null) {
+  await t.db
+    .update(schema.verifications)
+    .set({ createdAt: new Date(Date.now() - 120_000) })
+    .where(like(schema.verifications.identifier, "deletion-code:%"));
+  const path = orgId ? `/api/app/organizations/${orgId}/deletion/code` : "/api/app/account/deletion/code";
+  const sent = await b(path, { json: {} });
+  if (sent.status !== 202) throw new Error(`deletion code: ${sent.status} ${await sent.text()}`);
+  await t.drain();
+  return lastCode(t);
+}
 
 export async function signUp(b: Browser, email: string) {
   const res = await b("/api/auth/sign-up/email", {

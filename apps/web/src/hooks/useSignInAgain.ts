@@ -3,9 +3,8 @@ import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/auth/context";
 
 /**
- * "Sign in again": a fresh sign-in is the proof deleting takes from an account without a password. Out of this
- * session, then to the sign-in page with the address filled in, which comes back to this page as it is now (a
- * dialog kept in the address opens again).
+ * "Sign in again": a fresh sign-in is what adding a password takes. Out of this session, then to the sign-in page
+ * with the address filled in, which comes back to this page as it is now (a dialog kept in the address opens again).
  */
 export function useSignInAgain(email: string) {
   const auth = useAuth();

@@ -1,4 +1,5 @@
-import { ACCOUNTS_PROTOCOL, type MailAdapters, type PubSub } from "@agenteschat/adapters";
+import { randomUUID } from "node:crypto";
+import { ACCOUNTS_PROTOCOL, type MailAdapters, type PubSub, type RateLimiter } from "@agenteschat/adapters";
 import {
   and,
   asc,
@@ -9,6 +10,7 @@ import {
   inArray,
   isNotNull,
   isNull,
+  like,
   lte,
   ne,
   schema,
@@ -18,7 +20,20 @@ import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { stopOrgWork } from "./cancel";
 import { type ConnectorDeps, revokeAtProvider } from "./connectors/connections";
+import { sha256 } from "./crypto";
 import { emailLocale, queueEmail } from "./email";
+import {
+  CODE_LIMITS,
+  CODE_RESEND_SECONDS,
+  CODE_TRIES,
+  CODE_TTL_MS,
+  codeLimit,
+  codeRefusal,
+  codeVerdict,
+  codeWait,
+  codeWaitMs,
+  newCode,
+} from "./email-codes";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { type OrgDeletingEvent, publishOrgEvent } from "./events";
 import { forgetInstallationTokens } from "./git/github-app";
@@ -70,13 +85,14 @@ const {
   auditLog,
   providerCredentials,
   dbConnections,
+  verifications,
 } = schema;
 
 /*
- * Deleting a workspace: an owner asks, with proof that it's them (the route checks it), and the workspace closes to
- * everyone at once, like a suspended one (`closedRefusal`). Any owner may restore it until its date. At the date the
- * `org.delete` job deletes it for good: its computers' AI sign-ins first, then the grants it holds at Composio and
- * GitHub, then its rows in one transaction. The date is the point of no return, by the database's clock: restoring
+ * Deleting a workspace: an owner asks, with proof that it's them (a code emailed to them, `spendDeletionCode`), and
+ * the workspace closes to everyone at once, like a suspended one (`closedRefusal`). Any owner may restore it until its
+ * date. At the date the `org.delete` job deletes it for good: its computers' AI sign-ins first, then the grants it
+ * holds at Composio and GitHub, then its rows in one transaction. The date is the point of no return, by the database's clock: restoring
  * works only before it and the purge only after it, each checked under the workspace's `org-members` lock once it has
  * it, so neither can undo the other.
  */
@@ -85,8 +101,6 @@ const {
 export const WORKSPACE_DELETION_DAYS = 7;
 /** The job that deletes a workspace at its date (`purgeWorkspace`). */
 export const ORG_DELETE_JOB = "org.delete";
-/** How recent a sign-in proves the person is there: to delete, or to add a password that would prove it later. */
-export const DELETION_PROOF_FRESH_MS = 10 * 60_000;
 /**
  * Tables holding a workspace's rows that nothing cascades to from it (no foreign key to it, or only through a nullable
  * column): the purge deletes them itself.
@@ -158,6 +172,149 @@ export async function requireOwnerToDelete(db: Database, userId: string, orgId: 
   if (refusal instanceof OrgPausedError) throw refusal;
   if (!can(membership, "manage_owners")) throw new ForbiddenError("Only an owner can delete or restore the workspace");
   return membership;
+}
+
+const HOUR_MS = 3_600_000;
+const DAY_MS = 86_400_000;
+/** One per person and what it deletes, in Better Auth's `verifications`: a code proves only that deletion. */
+const deletionCodeId = (userId: string, orgId: string | null) =>
+  `deletion-code:${userId}:${orgId ? `workspace:${orgId}` : "account"}`;
+const deletionCodeHash = (id: string, code: string) => sha256(`${id}:${code}`);
+const lockDeletionCode = (tx: Executor, id: string) => tx.execute(sql`select pg_advisory_xact_lock(hashtext(${id}))`);
+/** A code waiting, in its row's `value`: its hash and wrong tries, never the code. */
+type WaitingCode = { hash: string; tries: number };
+const waitingCode = (value: string): WaitingCode | null => {
+  try {
+    const v = JSON.parse(value) as Partial<WaitingCode>;
+    return typeof v.hash === "string" && typeof v.tries === "number" ? { hash: v.hash, tries: v.tries } : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Emails `userId` a code that proves it's them before deleting the workspace `orgId`, or their account when it is null
+ * (ADR 0088 §2), with the rules of every emailed code (`email-codes.ts`): it works for 10 minutes, a new one replaces it
+ * after 60 s at the soonest, and an account gets `CODE_LIMITS` an hour and a day. The email says what it deletes and
+ * whom to write to if it wasn't them. Only where the server sends email: the routes check it.
+ */
+export async function sendDeletionCode(
+  deps: { db: Database; rateLimiter: RateLimiter; emails: { publicUrl: string; support?: string | null } },
+  userId: string,
+  orgId: string | null,
+  now = new Date(),
+) {
+  const { db } = deps;
+  const [account] = await db
+    .select({ email: users.email, locale: users.locale, blockedAt: users.blockedAt })
+    .from(users)
+    .where(eq(users.id, userId));
+  if (!account || account.blockedAt) throw new ForbiddenError();
+  const org = orgId ? await getOrganization(db, orgId) : null;
+  if (orgId && !org) throw new NotFoundError("This workspace no longer exists");
+  const id = deletionCodeId(userId, orgId);
+  return db.transaction(async (tx) => {
+    await lockDeletionCode(tx, id);
+    const [row] = await tx
+      .select({ sentAt: verifications.createdAt })
+      .from(verifications)
+      .where(eq(verifications.identifier, id));
+    const wait = codeWaitMs(row?.sentAt, now);
+    if (wait > 0) throw codeWait("reauth", wait);
+    // ponytail: counted in the rate limiter (in memory on a self-hosted server), so a restart resets them; count them
+    // in the database, as asking to join does, if that ever matters.
+    const caps = [
+      ["hour", CODE_LIMITS.hour, HOUR_MS],
+      ["day", CODE_LIMITS.day, DAY_MS],
+    ] as const;
+    for (const [span, limit, windowMs] of caps) {
+      const spent = await deps.rateLimiter.consume(`deletion-code:${span}:${userId}`, { limit, windowMs });
+      if (!spent.allowed) throw codeLimit("reauth");
+    }
+    const code = newCode();
+    await tx.delete(verifications).where(eq(verifications.identifier, id));
+    await tx.insert(verifications).values({
+      id: randomUUID(),
+      identifier: id,
+      value: JSON.stringify({ hash: deletionCodeHash(id, code), tries: 0 } satisfies WaitingCode),
+      expiresAt: new Date(now.getTime() + CODE_TTL_MS),
+      createdAt: now,
+      updatedAt: now,
+    });
+    await queueEmail(tx, {
+      orgId: null,
+      key: `deletion-code:${sha256(id)}:${now.getTime()}`,
+      to: [account.email],
+      template: {
+        kind: "deletion_code",
+        locale: emailLocale(account.locale),
+        code,
+        email: account.email,
+        ...(org ? { orgName: org.name } : {}),
+        support: deps.emails.support ?? null,
+        url: deps.emails.publicUrl.replace(/\/$/, ""),
+      },
+      maxAttempts: 3,
+      runAt: now,
+    });
+    return { email: account.email, resendIn: CODE_RESEND_SECONDS };
+  });
+}
+
+/**
+ * Spends the code that proves it's `userId` before deleting the workspace `orgId` (their account when null): right, it
+ * is used up, so it proves one deletion. A wrong one counts against it (`CODE_TRIES`). Every try counts against the
+ * account's day (`CODE_LIMITS.wrongDay`) before the check, so a guess past it learns nothing. A code sent for anything
+ * else, or to anyone else, is wrong here. Throws `reauth.code_wrong`, `reauth.code_expired` or `reauth.code_tries`.
+ */
+export async function spendDeletionCode(
+  deps: { db: Database; rateLimiter: RateLimiter },
+  userId: string,
+  orgId: string | null,
+  code: string,
+  now = new Date(),
+) {
+  const day = await deps.rateLimiter.consume(`deletion-code:tries:${userId}`, {
+    limit: CODE_LIMITS.wrongDay,
+    windowMs: DAY_MS,
+  });
+  if (!day.allowed) throw codeRefusal("reauth", "tries");
+  const id = deletionCodeId(userId, orgId);
+  const refused = await deps.db.transaction(async (tx) => {
+    await lockDeletionCode(tx, id);
+    const [row] = await tx.select().from(verifications).where(eq(verifications.identifier, id));
+    const waiting = row ? waitingCode(row.value) : null;
+    const verdict = codeVerdict(
+      waiting && row ? { ...waiting, expiresAt: row.expiresAt } : null,
+      deletionCodeHash(id, code),
+      now,
+    );
+    if (verdict === "right") {
+      await tx.delete(verifications).where(eq(verifications.identifier, id));
+      return null;
+    }
+    if (verdict === "none" || !waiting) return "wrong";
+    if (verdict !== "miss") return verdict;
+    const tries = waiting.tries + 1;
+    await tx
+      .update(verifications)
+      .set({ value: JSON.stringify({ ...waiting, tries } satisfies WaitingCode), updatedAt: now })
+      .where(eq(verifications.identifier, id));
+    return tries >= CODE_TRIES ? "tries" : "wrong";
+  });
+  if (refused) throw codeRefusal("reauth", refused);
+}
+
+/** Deletion codes that ran out a day ago: their rows go (the hourly `deletions` tick). */
+export async function pruneDeletionCodes(db: Database, now = new Date()) {
+  await db
+    .delete(verifications)
+    .where(
+      and(
+        like(verifications.identifier, "deletion-code:%"),
+        lte(verifications.expiresAt, new Date(now.getTime() - DAY_MS)),
+      ),
+    );
 }
 
 /**

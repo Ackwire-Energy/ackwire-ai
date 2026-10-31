@@ -62,19 +62,18 @@ describe("account deletion", () => {
       await readDeleteResponse(res(409, { error: { code: "sole_owner", params: { organizations: ["Acme", 3] } } })),
     ).toEqual({ ok: false, reason: "sole_owner", organizations: ["Acme"] });
   });
-  test("403 reauth.*: which proof the server wants, a new sign-in or the right password; 429 too many tries", async () => {
-    expect(await readDeleteResponse(res(403, { error: { code: "reauth.sign_in", message: "Sign in again" } }))).toEqual(
-      {
-        ok: false,
-        reason: "reauth",
-        proof: "sign_in",
-      },
-    );
-    expect(await readDeleteResponse(res(403, { error: { code: "reauth.password", message: "Wrong" } }))).toEqual({
-      ok: false,
-      reason: "reauth",
-      proof: "password",
-    });
+  test("a refused proof (`reauth.*`) carries its code to say why; 429 too many passwords", async () => {
+    for (const [status, code] of [
+      [403, "reauth.code"],
+      [400, "reauth.code_wrong"],
+      [409, "reauth.code_expired"],
+      [403, "reauth.password"],
+    ] as const) {
+      const result = await readDeleteResponse(res(status, { error: { code, message: "No" } }));
+      expect(
+        result.ok === false && result.reason === "proof" ? [result.error.status, result.error.code] : result,
+      ).toEqual([status, code]);
+    }
     expect(await readDeleteResponse(res(429, { error: { code: "rate_limited" } }))).toEqual({
       ok: false,
       reason: "rate_limited",

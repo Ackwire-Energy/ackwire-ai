@@ -77,6 +77,7 @@ export * from "./dms";
 export * from "./docx";
 export * from "./early-access";
 export * from "./email";
+export * from "./email-codes";
 export * from "./errors";
 export * from "./events";
 export * from "./executor";

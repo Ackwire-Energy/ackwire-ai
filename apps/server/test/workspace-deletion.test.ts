@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { randomBytes } from "node:crypto";
-import { and, eq, schema } from "@agenteschat/db";
+import { eq, like, schema } from "@agenteschat/db";
 import { publishOrgEvent, purgeWorkspace } from "@agenteschat/engine";
 import { desktopChallenge } from "../src/desktop-sign-in";
 import { currentSubscriptions } from "../src/realtime/ws";
@@ -8,7 +8,9 @@ import {
   type Browser,
   browser,
   createTestServer,
+  deletionCode,
   joinByInvitation,
+  lastCode,
   listen,
   ORIGIN,
   pairComputer,
@@ -45,6 +47,8 @@ const signedInAnHourAgo = (userId: string) =>
     .update(schema.sessions)
     .set({ createdAt: new Date(Date.now() - 3600_000) })
     .where(eq(schema.sessions.userId, userId));
+/** A code that isn't `code`. */
+const otherThan = (code: string) => (code === "000000" ? "111111" : "000000");
 
 test("a workspace being deleted: its sockets close and none opens; who you are and leaving still answer", async () => {
   const owner = browser(t);
@@ -93,63 +97,103 @@ test("a workspace being deleted: its sockets close and none opens; who you are a
   expect((await meOf(ana)).organizations).toEqual([]);
 });
 
-describe("proof that it's you", () => {
-  test("a password: five wrong ones in 15 minutes, then 429; without one, an old session must sign in again", async () => {
+describe("proof that it's you: a code emailed to you", () => {
+  test("it goes to your address for that deletion only, and works once; no code, a wrong one or a password won't do", async () => {
     const owner = browser(t);
     await signUp(owner, "owner@example.com");
     const { orgId } = await seedOrg(owner);
-    await signedInAnHourAgo((await meOf(owner)).user.id);
+    const path = `/api/app/organizations/${orgId}/deletion/code`;
+    const sent = await owner(path, { json: {} });
+    expect(sent.status).toBe(202);
+    expect(await sent.json()).toEqual({ email: "owner@example.com", resendIn: 60 });
+    await t.drain();
+    expect(t.email.sent.at(-1)?.to).toEqual(["owner@example.com"]);
+    const code = lastCode(t);
+    // Another goes only after a minute.
+    const again = await owner(path, { json: {} });
+    expect(again.status).toBe(429);
+    expect(await again.json()).toMatchObject({ error: { code: "reauth.code_wait", params: { retryIn: 60 } } });
+
+    expect(await answer(await deleteOrg(owner, orgId))).toEqual([403, "reauth.code"]);
+    // Where email goes, the password proves nothing.
+    expect(await answer(await deleteOrg(owner, orgId, { password: "correct horse battery" }))).toEqual([
+      403,
+      "reauth.code",
+    ]);
+    expect(await answer(await deleteOrg(owner, orgId, { code: otherThan(code) }))).toEqual([400, "reauth.code_wrong"]);
+    // The account's own code deletes no workspace.
+    const account = await deletionCode(t, owner, null);
+    expect(await answer(await deleteOrg(owner, orgId, { code: account }))).toEqual([400, "reauth.code_wrong"]);
+    expect((await deleteOrg(owner, orgId, { code })).status).toBe(202);
+    // Spent: restored and deleted again, it takes a new one.
+    expect((await restoreOrg(owner, orgId)).status).toBe(204);
+    expect(await answer(await deleteOrg(owner, orgId, { code }))).toEqual([400, "reauth.code_wrong"]);
+    expect((await deleteOrg(owner, orgId, { code: await deletionCode(t, owner, orgId) })).status).toBe(202);
+  });
+
+  test("five wrong tries use a code up, and one past its 10 minutes is refused", async () => {
+    const owner = browser(t);
+    await signUp(owner, "owner@example.com");
+    const { orgId } = await seedOrg(owner);
+    const code = await deletionCode(t, owner, orgId);
+    const tries = [];
+    for (let i = 0; i < 5; i++) tries.push(await answer(await deleteOrg(owner, orgId, { code: otherThan(code) })));
+    expect(tries).toEqual([...Array(4).fill([400, "reauth.code_wrong"]), [409, "reauth.code_tries"]]);
+    expect(await answer(await deleteOrg(owner, orgId, { code }))).toEqual([409, "reauth.code_tries"]);
+
+    const next = await deletionCode(t, owner, orgId);
+    await t.db
+      .update(schema.verifications)
+      .set({ expiresAt: new Date(Date.now() - 1000) })
+      .where(like(schema.verifications.identifier, "deletion-code:%"));
+    expect(await answer(await deleteOrg(owner, orgId, { code: next }))).toEqual([409, "reauth.code_expired"]);
+  });
+
+  test("a server that sends no email takes the password instead, 5 tries in 15 minutes, and sends no code", async () => {
+    const owner = browser(t);
+    await signUp(owner, "owner@example.com");
+    const { orgId } = await seedOrg(owner);
+    const bia = await joinByInvitation(t, owner, orgId, "bia@example.com");
+    const theirs = await workspace(bia, "Theirs");
+    Object.assign(t.email, { delivers: false });
+    expect(await answer(await owner(`/api/app/organizations/${orgId}/deletion/code`, { json: {} }))).toEqual([
+      409,
+      "reauth.no_email",
+    ]);
+    expect(await answer(await bia("/api/app/account/deletion/code", { json: {} }))).toEqual([409, "reauth.no_email"]);
+    expect(await answer(await deleteOrg(owner, orgId))).toEqual([403, "reauth.password"]);
     const answers = [];
     for (let i = 0; i < 6; i++)
       answers.push(await answer(await deleteOrg(owner, orgId, { password: "not my password" })));
     expect(answers).toEqual([...Array(5).fill([403, "reauth.password"]), [429, "rate_limited"]]);
-    expect(await answer(await deleteOrg(owner, orgId))).toEqual([403, "reauth.sign_in"]);
-
-    const bia = await joinByInvitation(t, owner, orgId, "bia@example.com");
-    const theirs = await seedOrg(bia);
+    // An old session with the right password: the password is the proof, not the sign-in.
     await signedInAnHourAgo((await meOf(bia)).user.id);
-    expect((await deleteOrg(bia, theirs.orgId, { password: "correct horse battery" })).status).toBe(202);
+    expect((await deleteOrg(bia, theirs, { password: "correct horse battery" })).status).toBe(202);
   });
 
-  test("past the limit, an old session can't try passwords on the sign-in service's own routes either", async () => {
+  test("past the limit, a session can't try passwords on the sign-in service's own routes either", async () => {
     const owner = browser(t);
     await signUp(owner, "owner@example.com");
-    await signedInAnHourAgo((await meOf(owner)).user.id);
     const right = { password: "correct horse battery" };
     expect((await owner("/api/auth/verify-password", { json: right })).status).toBe(404);
     const change = { currentPassword: right.password, newPassword: "another fake password" };
     expect((await owner("/api/auth/change-password", { json: change })).status).toBe(404);
   });
 
-  test("an account without a password signs in again: its old session can't delete nor add a password, a fresh one can", async () => {
+  test("adding a password takes a sign-in in the last 10 minutes; one minted from an old session, for the phone or the desktop app, is just as old", async () => {
     const owner = browser(t);
     await signUp(owner, "owner@example.com");
-    const { orgId } = await seedOrg(owner);
     const ownerId = (await meOf(owner)).user.id;
-    await t.db
-      .delete(schema.accounts)
-      .where(and(eq(schema.accounts.userId, ownerId), eq(schema.accounts.providerId, "credential")));
-    await signedInAnHourAgo(ownerId);
     const password = { password: "another fake password" };
-    expect(await answer(await deleteOrg(owner, orgId))).toEqual([403, "reauth.sign_in"]);
+    // Signed in just now: past the sign-in, to the account's own check (it has one).
+    expect(await answer(await owner("/api/app/me/password", { json: password }))).toEqual([409, "password_set"]);
+    await signedInAnHourAgo(ownerId);
     expect(await answer(await owner("/api/app/me/password", { json: password }))).toEqual([403, "reauth.sign_in"]);
 
-    await t.db.update(schema.sessions).set({ createdAt: new Date() }).where(eq(schema.sessions.userId, ownerId));
-    expect((await deleteOrg(owner, orgId)).status).toBe(202);
-    expect((await owner("/api/app/me/password", { json: password })).status).toBe(204);
-  });
-
-  test("a session minted from an old one, for the phone or the desktop app, is just as old", async () => {
-    const owner = browser(t);
-    await signUp(owner, "owner@example.com");
-    const { orgId } = await seedOrg(owner);
-    const ownerId = (await meOf(owner)).user.id;
-
-    await signedInAnHourAgo(ownerId);
     const { token } = (await (await owner("/api/app/phone-sign-in", { json: {} })).json()) as { token: string };
     const phone = browser(t);
     expect((await phone("/api/auth/sign-in/one-time-token", { json: { token } })).status).toBe(200);
-    expect(await answer(await deleteOrg(phone, orgId))).toEqual([403, "reauth.sign_in"]);
+    expect(await answer(await phone("/api/app/me/password", { json: password }))).toEqual([403, "reauth.sign_in"]);
 
     // The desktop app's window, handed a browser's sign-in that turns old before the window picks it up.
     const site = browser(t);
@@ -164,7 +208,7 @@ describe("proof that it's you", () => {
     expect(await (await window("/api/auth/desktop/redeem", { json: { verifier } })).json()).toEqual({
       signedIn: true,
     });
-    expect(await answer(await deleteOrg(window, orgId))).toEqual([403, "reauth.sign_in"]);
+    expect(await answer(await window("/api/app/me/password", { json: password }))).toEqual([403, "reauth.sign_in"]);
   });
 });
 
@@ -179,9 +223,14 @@ describe("deleting and restoring a workspace", () => {
 
     expect(await deletionOf(ana)).toBeUndefined();
     expect(await answer(await deleteOrg(ana, orgId))).toEqual([403, "forbidden"]);
-    const deleted = await deleteOrg(owner, orgId);
+    expect(await answer(await ana(`/api/app/organizations/${orgId}/deletion/code`, { json: {} }))).toEqual([
+      403,
+      "forbidden",
+    ]);
+    const deleted = await deleteOrg(owner, orgId, { code: await deletionCode(t, owner, orgId) });
     expect(deleted.status).toBe(202);
     const { deletion } = (await deleted.json()) as { deletion: { dueAt: string } };
+    // Again: its date, before any proof.
     expect(await (await deleteOrg(owner, orgId)).json()).toEqual({ deletion });
     expect(await deletionOf(ana)).toEqual({
       dueAt: deletion.dueAt,
@@ -207,7 +256,7 @@ describe("deleting and restoring a workspace", () => {
     const { orgId } = await seedOrg(owner);
     const statuses: unknown[] = [];
     for (let i = 0; i < 4; i++) {
-      statuses.push((await deleteOrg(owner, orgId)).status);
+      statuses.push((await deleteOrg(owner, orgId, { code: await deletionCode(t, owner, orgId) })).status);
       statuses.push((await restoreOrg(owner, orgId)).status);
       statuses.push((await owner(`/api/app/organizations/${orgId}`)).status);
     }
@@ -242,12 +291,12 @@ describe("deleting an account", () => {
     await joinByInvitation(t, bia, team, "owner@example.com", { as: owner });
     // One being deleted already keeps its own date.
     const old = await workspace(bia, "Old");
-    const { deletion } = (await (await deleteOrg(bia, old)).json()) as { deletion: { dueAt: string } };
+    const { deletion } = (await (await deleteOrg(bia, old, { code: await deletionCode(t, bia, old) })).json()) as {
+      deletion: { dueAt: string };
+    };
 
     const plan = await (await bia("/api/app/account/deletion")).json();
     expect(plan).toEqual({
-      password: true,
-      freshUntil: expect.any(String),
       closes: [
         { id: solo, name: "Solo" },
         { id: old, name: "Old", deletion },
@@ -264,11 +313,9 @@ describe("deleting an account", () => {
     expect(((await (await owner("/api/app/account/deletion")).json()) as { serverOwner: boolean }).serverOwner).toBe(
       true,
     );
-    await signedInAnHourAgo((await meOf(bia)).user.id);
-    expect(((await (await bia("/api/app/account/deletion")).json()) as { freshUntil: unknown }).freshUntil).toBeNull();
   });
 
-  test("the password proves it's you, as a fresh sign-in does; an old session without it signs in again; a workspace's only owner hears that first", async () => {
+  test("the emailed code proves it's you; a workspace's only owner hears that first, before any code goes", async () => {
     const revoked: unknown[] = [];
     await t.close();
     t = await createTestServer({
@@ -288,26 +335,32 @@ describe("deleting an account", () => {
       userId: biaId,
       refreshToken: "refresh-bia",
     });
-    await signedInAnHourAgo((await meOf(owner)).user.id);
-    await signedInAnHourAgo(biaId);
-
     const refused = await deleteAccount(owner);
     expect(refused.status).toBe(409);
     expect(await refused.json()).toMatchObject({
       error: { code: "sole_owner", params: { organizations: ["Acme"], orgIds: [orgId] } },
     });
-    expect(await answer(await deleteAccount(bia))).toEqual([403, "reauth.sign_in"]);
-    expect(await answer(await deleteAccount(bia, { password: "not my password" }))).toEqual([403, "reauth.password"]);
+    await t.drain();
+    const mails = t.email.sent.length;
+    expect(await answer(await owner("/api/app/account/deletion/code", { json: {} }))).toEqual([409, "sole_owner"]);
+    await t.drain();
+    expect(t.email.sent.length).toBe(mails);
+
+    // No body: how the phone's builds from before the code ask, which now delete nothing.
+    expect(await answer(await deleteAccount(bia))).toEqual([403, "reauth.code"]);
+    expect(await answer(await deleteAccount(bia, { password: "correct horse battery" }))).toEqual([403, "reauth.code"]);
+    // A workspace's code deletes no account.
+    const theirs = await workspace(bia, "Theirs");
+    expect(await answer(await deleteAccount(bia, { code: await deletionCode(t, bia, theirs) }))).toEqual([
+      400,
+      "reauth.code_wrong",
+    ]);
     expect(revoked).toEqual([]);
-    const deleted = await deleteAccount(bia, { password: "correct horse battery" });
+    const deleted = await deleteAccount(bia, { code: await deletionCode(t, bia, null) });
     expect(deleted.status).toBe(204);
     expect(deleted.headers.getSetCookie().some((c) => c.startsWith("better-auth.session_token=;"))).toBe(true);
     expect(revoked).toEqual([{ value: "refresh-bia", hint: "refresh_token" }]);
     expect(await t.db.select().from(schema.users).where(eq(schema.users.id, biaId))).toEqual([]);
-
-    // No body, signed in just now: how the phone's older builds delete.
-    const cy = await joinByInvitation(t, owner, orgId, "cy@example.com");
-    expect((await deleteAccount(cy)).status).toBe(204);
   });
 
   test("its other sessions: GET /me answers 401 and expires the cookies, and no workspace is made with them", async () => {
@@ -319,7 +372,7 @@ describe("deleting an account", () => {
     expect((await other("/api/app/me")).status).toBe(200);
     const cached = other.cookie();
 
-    expect((await deleteAccount(owner, signIn)).status).toBe(204);
+    expect((await deleteAccount(owner, { code: await deletionCode(t, owner, null) })).status).toBe(204);
     const me = await other("/api/app/me");
     expect(me.status).toBe(401);
     expect(me.headers.getSetCookie().some((c) => c.startsWith("better-auth.session_data=;"))).toBe(true);

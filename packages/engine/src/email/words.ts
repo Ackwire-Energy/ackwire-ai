@@ -234,6 +234,31 @@ const en = {
     why: (org: string) =>
       `You got this email because someone typed this address to ask to join ${org} on agentes.chat.`,
   },
+  deletionCode: {
+    subjectWorkspace: (code: string) => `${code} is your code to delete a workspace`,
+    subjectAccount: (code: string) => `${code} is your code to delete your account`,
+    preheader: "Type it in agentes.chat to confirm. It works for 10 minutes.",
+    headline: "Your code",
+    workspace: (org: string): Text => [
+      "Type this code to delete the workspace ",
+      { b: org },
+      ". It closes for everyone at once and is deleted for good 7 days later.",
+    ],
+    account: (email: string): Text => [
+      "Type this code to delete the account ",
+      { b: email },
+      ". It goes at once, and the workspaces only you are in close with it.",
+    ],
+    support: (address: string): Text => [
+      "It works for 10 minutes, and nothing is deleted without it. If it wasn't you, don't share it and write to ",
+      { mail: address },
+      ".",
+    ],
+    noSupport:
+      "It works for 10 minutes, and nothing is deleted without it. If it wasn't you, don't share it and tell the people who run this server." as Text,
+    whyWorkspace: (org: string) => `You got this email because your account asked to delete ${org} on agentes.chat.`,
+    whyAccount: "You got this email because your account asked to be deleted on agentes.chat.",
+  },
   deleting: {
     subject: (day: string) => `A workspace you're in will be deleted on ${day}`,
     preheader: "It's closed now. An owner can still restore it until then.",
@@ -481,6 +506,32 @@ const ptBR: Words = {
     small: ["Vale por 10 minutos. Se não foi você, ", { nobr: "ignore este e-mail." }],
     why: (org) =>
       `Você recebeu este e-mail porque alguém digitou este endereço para pedir para entrar na ${org} no agentes.chat.`,
+  },
+  deletionCode: {
+    subjectWorkspace: (code) => `${code} é seu código para apagar um workspace`,
+    subjectAccount: (code) => `${code} é seu código para apagar sua conta`,
+    preheader: "Digite no agentes.chat para confirmar. Vale por 10 minutos.",
+    headline: "Seu código",
+    workspace: (org) => [
+      "Digite este código para apagar o workspace ",
+      { b: org },
+      ". Ele fecha para todos na hora e é apagado de vez 7 dias depois.",
+    ],
+    account: (email) => [
+      "Digite este código para apagar a conta ",
+      { b: email },
+      ". Ela some na hora, e os workspaces em que só você está fecham com ela.",
+    ],
+    support: (address) => [
+      "Vale por 10 minutos, e nada é apagado sem ele. Se não foi você, não passe para ninguém e escreva para ",
+      { mail: address },
+      ".",
+    ],
+    noSupport:
+      "Vale por 10 minutos, e nada é apagado sem ele. Se não foi você, não passe para ninguém e avise quem cuida deste servidor.",
+    whyWorkspace: (org) =>
+      `Você recebeu este e-mail porque sua conta pediu para apagar o workspace ${org} no agentes.chat.`,
+    whyAccount: "Você recebeu este e-mail porque sua conta pediu para ser apagada no agentes.chat.",
   },
   deleting: {
     subject: (day) => `Um workspace em que você está vai ser apagado em ${day}`,

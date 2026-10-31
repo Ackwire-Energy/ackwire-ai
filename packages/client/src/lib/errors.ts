@@ -6,9 +6,9 @@ import { MAX_UPLOAD_MB } from "./files";
 import { limitRefusalText } from "./limits";
 import { endSentence } from "./text";
 
-/** No sign-in in the last 10 minutes, the proof deleting (or adding a password) takes when no password is given. */
+/** No sign-in in the last 10 minutes, which adding a password takes. */
 export const REAUTH_SIGN_IN = "reauth.sign_in";
-/** The password given to prove it's the person was wrong. */
+/** No password, or a wrong one, where it proves it's the person (deleting on a server that sends no email). */
 export const REAUTH_PASSWORD = "reauth.password";
 
 /**
@@ -103,12 +103,18 @@ const KNOWN = {
   "join.denied": "errors.join.denied",
   "join.answered": "errors.join.answered",
   "join.expired": "errors.join.expired",
-  "join.code_wrong": "errors.join.codeWrong",
-  "join.code_expired": "errors.join.codeExpired",
-  "join.code_tries": "errors.join.codeTries",
-  "join.code_limit": "errors.join.codeLimit",
-  "join.code_wait": "errors.join.codeWait",
+  "join.code_wrong": "errors.code.wrong",
+  "join.code_expired": "errors.code.expired",
+  "join.code_tries": "errors.code.tries",
+  "join.code_limit": "errors.code.limit",
+  "join.code_wait": "errors.code.wait",
   "join.code_needed": "errors.join.codeNeeded",
+  "reauth.code": "errors.reauth.code",
+  "reauth.code_wrong": "errors.code.wrong",
+  "reauth.code_expired": "errors.code.expired",
+  "reauth.code_tries": "errors.code.tries",
+  "reauth.code_limit": "errors.code.limit",
+  "reauth.code_wait": "errors.code.wait",
   "invitation.ask_to_join": "errors.invitation.askToJoin",
   "org.create_invite_only": "errors.org.createInviteOnly",
   "org.not_restorable": "errors.org.notRestorable",

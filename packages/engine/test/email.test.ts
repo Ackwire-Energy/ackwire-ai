@@ -121,6 +121,7 @@ describe("every email, in both languages", () => {
       join_request: true,
       join_answer: true,
       join_code: true,
+      deletion_code: true,
       workspace_deleting: true,
       workspace_restored: true,
       account_deleted: true,

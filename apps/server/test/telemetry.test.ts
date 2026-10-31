@@ -14,7 +14,7 @@ import {
   startTelemetry,
   type Timers,
 } from "../src/telemetry";
-import { browser, createTestServer, signUp, type TestServer } from "./harness";
+import { browser, createTestServer, deletionCode, signUp, type TestServer } from "./harness";
 
 const log = createLogger("error");
 const PROD = { NODE_ENV: "production" };
@@ -299,7 +299,7 @@ describe("the switch in Settings", () => {
     await signUp(owner, "owner@example.com");
     const other = browser(t);
     await signUp(other, "other@example.com");
-    return { owner, other, db: t.db };
+    return { owner, other, db: t.db, app: t };
   }
 
   test("only the installation's owner sees it; turning it off is stored", async () => {
@@ -317,22 +317,21 @@ describe("the switch in Settings", () => {
   });
 
   test("once the first account deletes itself, nobody inherits the switch", async () => {
-    const { owner, other } = await server();
-    expect(
-      (await owner("/api/app/account", { method: "DELETE", json: { password: "correct horse battery" } })).status,
-    ).toBe(204);
+    const { owner, other, app } = await server();
+    const code = await deletionCode(app, owner, null);
+    expect((await owner("/api/app/account", { method: "DELETE", json: { code } })).status).toBe(204);
     expect((await other("/api/app/telemetry")).status).toBe(404);
     expect((await other("/api/app/telemetry", { method: "PUT", json: { enabled: false } })).status).toBe(404);
   });
 
   test("once no account is left, the next first account has the switch", async () => {
-    t = await createTestServer({ env: { ALLOW_SIGNUP: "true" } });
-    const first = browser(t);
+    const app = await createTestServer({ env: { ALLOW_SIGNUP: "true" } });
+    t = app;
+    const first = browser(app);
     await signUp(first, "first@example.com");
     expect((await first("/api/app/telemetry")).status).toBe(200);
-    expect(
-      (await first("/api/app/account", { method: "DELETE", json: { password: "correct horse battery" } })).status,
-    ).toBe(204);
+    const code = await deletionCode(app, first, null);
+    expect((await first("/api/app/account", { method: "DELETE", json: { code } })).status).toBe(204);
     const next = browser(t);
     await signUp(next, "next@example.com");
     expect((await next("/api/app/telemetry")).status).toBe(200);

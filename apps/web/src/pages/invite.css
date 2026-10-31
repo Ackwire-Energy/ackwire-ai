@@ -67,13 +67,6 @@
   font-weight: 600;
 }
 /* Six digits, centred: the letter spacing trails the last one, so the left padding takes the same. */
-.invite-ask__code {
-  padding-left: calc(var(--control-px-md) + 0.3em);
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  letter-spacing: 0.3em;
-}
 /* With the bot check on the card, at phone width its padding gives way so Turnstile's checkbox (300px at least,
    ADR 0075) fits: 316px at 390. Narrower still, the widget takes its compact size. */
 @media (max-width: 480px) {

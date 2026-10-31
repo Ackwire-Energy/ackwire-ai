@@ -1,4 +1,3 @@
-import { randomInt } from "node:crypto";
 import type { PubSub, RateLimiter } from "@agenteschat/adapters";
 import {
   and,
@@ -20,6 +19,19 @@ import {
 import { recordAudit } from "./audit";
 import { inviteLinkToken, sha256 } from "./crypto";
 import { emailLocale, emailsByLocale, queueEmail } from "./email";
+import {
+  CODE_EMAILS,
+  CODE_LIMITS,
+  CODE_RESEND_SECONDS,
+  CODE_TRIES,
+  CODE_TTL_MS,
+  codeLimit,
+  codeRefusal,
+  codeVerdict,
+  codeWait,
+  codeWaitMs,
+  newCode,
+} from "./email-codes";
 import { ConflictError, ForbiddenError, NotFoundError, TooManyError, ValidationError } from "./errors";
 import { adminIds } from "./gateway";
 import { assertMemberRoom } from "./limits";
@@ -36,7 +48,7 @@ import {
   requirePermission,
   sendInvitation,
 } from "./organizations";
-import { enqueue, type OutboxJob } from "./outbox";
+import { enqueue } from "./outbox";
 import { givableRoleIds } from "./roles";
 import { closedOrg } from "./standing";
 
@@ -67,20 +79,13 @@ export const JOIN_REASON_MAX = 300;
 /** The outbox job that files a request whose address isn't proven (`fileJoinRequest`). */
 export const FILE_JOIN_REQUEST_JOB = "join_request.file";
 
-/** Digits in the code that proves an address (ADR 0072): mirrored in packages/client/src/lib/join-requests.ts. */
-export const JOIN_CODE_LENGTH = 6;
-/** Between two codes for one workspace and address; the apps count it down. */
-export const JOIN_CODE_RESEND_SECONDS = 60;
-/** To type a code, then, once typed right, to ask with it. */
-const JOIN_CODE_TTL_MS = 10 * 60_000;
+/** A code typed right proves the address this long, to ask with it (the code's own rules: `email-codes.ts`). */
 const JOIN_CODE_VERIFIED_MS = 30 * 60_000;
-/** Wrong tries per code. */
-const JOIN_CODE_TRIES = 5;
 /**
- * Per workspace and mailbox: codes an hour and a day, and wrong tries a day, after which no new code goes out and
- * none is checked. Per mailbox across workspaces: codes a day. The whole server: codes an hour.
+ * Per workspace and mailbox, `CODE_LIMITS`: after them no new code goes out and none is checked. Per mailbox across
+ * workspaces: codes a day. The whole server: codes an hour.
  */
-const JOIN_CODE_LIMITS = { hour: 5, day: 10, wrongDay: 10, mailboxDay: 20, serverHour: 500 };
+const JOIN_CODE_LIMITS = { ...CODE_LIMITS, mailboxDay: 20, serverHour: 500 };
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
@@ -179,14 +184,6 @@ const codeRow = (orgId: string, email: string) => and(eq(codes.orgId, orgId), eq
 // codes ever queue behind it.
 const lockCodes = (tx: Executor) => tx.execute(sql`select pg_advisory_xact_lock(hashtext('join-codes'))`);
 
-type CodeRefusal = "join.code_wrong" | "join.code_expired" | "join.code_tries";
-const codeRefused = (code: CodeRefusal) =>
-  code === "join.code_wrong"
-    ? new ValidationError("That code isn't right.", code)
-    : code === "join.code_expired"
-      ? new ConflictError("This code expired. Ask for a new one.", code)
-      : new ConflictError("Too many tries for this code. Ask for a new one.", code);
-
 /** The counts every code limit reads, from the events of the last day. */
 async function codeCounts(tx: Executor, orgId: string, mailbox: string, now: Date) {
   const hourAgo = new Date(now.getTime() - HOUR_MS);
@@ -246,23 +243,19 @@ export async function sendJoinCode(deps: Deps, publicUrl: string, input: JoinCod
   return deps.db.transaction(async (tx) => {
     await lockCodes(tx);
     const [row] = await tx.select({ sentAt: codes.sentAt }).from(codes).where(codeRow(orgId, email));
-    const wait = row ? row.sentAt.getTime() + JOIN_CODE_RESEND_SECONDS * 1000 - now.getTime() : 0;
-    if (wait > 0) {
-      throw new TooManyError("A code was just sent. Ask for a new one in a minute.", "join.code_wait", {
-        retryIn: Math.ceil(wait / 1000),
-      });
-    }
+    const wait = codeWaitMs(row?.sentAt, now);
+    if (wait > 0) throw codeWait("join", wait);
     const n = await codeCounts(tx, orgId, mailbox, now);
     const limits = JOIN_CODE_LIMITS;
     if (n.hour >= limits.hour || n.day >= limits.day || n.wrong >= limits.wrongDay || n.mailboxDay >= limits.mailboxDay)
-      throw new TooManyError("Too many codes for this email. Try again later.", "join.code_limit");
+      throw codeLimit("join");
     if (n.serverHour >= limits.serverHour) throw new TooManyError("Too many requests. Try again later.");
-    const code = String(randomInt(0, 10 ** JOIN_CODE_LENGTH)).padStart(JOIN_CODE_LENGTH, "0");
+    const code = newCode();
     const waiting = {
       codeHash: codeHash(orgId, email, code),
       tries: 0,
       sentAt: now,
-      expiresAt: new Date(now.getTime() + JOIN_CODE_TTL_MS),
+      expiresAt: new Date(now.getTime() + CODE_TTL_MS),
     };
     await tx
       .insert(codes)
@@ -278,7 +271,7 @@ export async function sendJoinCode(deps: Deps, publicUrl: string, input: JoinCod
       maxAttempts: 3,
       runAt: now,
     });
-    return { email, resendIn: JOIN_CODE_RESEND_SECONDS };
+    return { email, resendIn: CODE_RESEND_SECONDS };
   });
 }
 
@@ -294,27 +287,23 @@ async function tryCode(
   email: string,
   code: string,
   now: Date,
-): Promise<"verified" | "right" | CodeRefusal> {
+): Promise<"verified" | "right" | "wrong" | "expired" | "tries"> {
   const hash = codeHash(orgId, email, code);
   const [row] = await tx.select().from(codes).where(codeRow(orgId, email));
-  if (row?.verifiedHash === hash)
-    return row.verifiedUntil && row.verifiedUntil > now ? "verified" : "join.code_expired";
+  if (row?.verifiedHash === hash) return row.verifiedUntil && row.verifiedUntil > now ? "verified" : "expired";
   const mailbox = sha256(mailboxOf(email));
-  if ((await codeCounts(tx, orgId, mailbox, now)).wrong >= JOIN_CODE_LIMITS.wrongDay) return "join.code_tries";
+  if ((await codeCounts(tx, orgId, mailbox, now)).wrong >= JOIN_CODE_LIMITS.wrongDay) return "tries";
   const wrong = () => tx.insert(codeEvents).values({ orgId, mailbox, kind: "wrong", at: now });
-  if (!row?.codeHash) {
+  const verdict = codeVerdict(row && { hash: row.codeHash, tries: row.tries, expiresAt: row.expiresAt }, hash, now);
+  if (verdict === "none") {
     if (row) await wrong();
-    return "join.code_wrong";
+    return "wrong";
   }
-  if (row.tries >= JOIN_CODE_TRIES) return "join.code_tries";
-  if (row.expiresAt <= now) return "join.code_expired";
-  if (row.codeHash === hash) return "right";
-  await tx
-    .update(codes)
-    .set({ tries: row.tries + 1 })
-    .where(codeRow(orgId, email));
+  if (verdict !== "miss") return verdict;
+  const tries = (row?.tries ?? 0) + 1;
+  await tx.update(codes).set({ tries }).where(codeRow(orgId, email));
   await wrong();
-  return row.tries + 1 >= JOIN_CODE_TRIES ? "join.code_tries" : "join.code_wrong";
+  return tries >= CODE_TRIES ? "tries" : "wrong";
 }
 
 /**
@@ -341,7 +330,7 @@ export async function checkJoinCode(deps: Deps, input: JoinCodeInput & { code: s
     }
     return tried;
   });
-  if (result !== "right" && result !== "verified") throw codeRefused(result);
+  if (result !== "right" && result !== "verified") throw codeRefusal("join", result);
   return { verified: true as const };
 }
 
@@ -424,7 +413,7 @@ export async function askToJoin(
       await lockCodes(tx);
       return tryCode(tx, orgId, email, code, now);
     });
-    if (tried !== "right" && tried !== "verified") throw codeRefused(tried);
+    if (tried !== "right" && tried !== "verified") throw codeRefusal("join", tried);
     const created = await file(deps, publicUrl, ask, true, now, codeHash(orgId, email, code));
     return { status: "pending" as const, email, created };
   }
@@ -468,7 +457,7 @@ async function file(deps: Deps, publicUrl: string, ask: Ask, proven: boolean, no
         .where(and(codeRow(orgId, ask.email), or(eq(codes.verifiedHash, usedCode), eq(codes.codeHash, usedCode))))
         .returning({ email: codes.email });
       // Another ask used it a moment ago.
-      if (used.length === 0) throw codeRefused("join.code_expired");
+      if (used.length === 0) throw codeRefusal("join", "expired");
     }
     const [latest] = await tx
       .select()
@@ -900,7 +889,11 @@ export async function pruneJoinRequests(deps: Deps, now = new Date()) {
   await deps.db
     .delete(outbox)
     .where(
-      and(eq(outbox.kind, "email.send"), like(outbox.dedupeKey, "email:join-code:%"), lt(outbox.createdAt, dayAgo)),
+      and(
+        eq(outbox.kind, "email.send"),
+        or(...Object.values(CODE_EMAILS).map((key) => like(outbox.dedupeKey, `email:${key}:%`))),
+        lt(outbox.createdAt, dayAgo),
+      ),
     );
   const cutoff = new Date(now.getTime() - JOIN_REQUEST_KEEP_DAYS * DAY_MS);
   const gone = await deps.db
@@ -918,12 +911,6 @@ export async function pruneJoinRequests(deps: Deps, now = new Date()) {
     .where(and(eq(notifications.kind, "join_request"), isNull(notifications.doneAt)));
   for (const { orgId } of open) await settleJoinRequests(deps, orgId, now);
   return gone.length;
-}
-
-/** A join code's email holds the code and the address: its job's row goes once it can't be sent again. */
-export async function forgetJoinCodeEmail(db: Executor, job: OutboxJob) {
-  if ((job.payload.template as { kind?: unknown } | undefined)?.kind !== "join_code") return;
-  await db.delete(outbox).where(eq(outbox.id, job.id));
 }
 
 /**

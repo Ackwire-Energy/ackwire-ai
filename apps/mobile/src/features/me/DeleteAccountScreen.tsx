@@ -1,13 +1,16 @@
-import { useAccountDeletionPlan, useApi, useAuthConfig, useMe } from "@agenteschat/client";
+import { ApiError, useAccountDeletionPlan, useApi, useAuthConfig, useMe } from "@agenteschat/client";
+import { formatTimeLeft } from "@agenteschat/client/lib/actions";
 import {
   type AccountDeletionLine,
   accountDeletionLines,
-  proofNeeded,
+  deletionProof,
+  proofToSend,
   soleOwnerWaysOut,
 } from "@agenteschat/client/lib/deletion";
-import { REAUTH_PASSWORD, REAUTH_SIGN_IN } from "@agenteschat/client/lib/errors";
+import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { settingUp } from "@agenteschat/client/lib/guards";
+import { typedCode } from "@agenteschat/client/lib/join-requests";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
@@ -15,10 +18,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { deleteAccount } from "@/features/account";
 import { serverUrl } from "@/lib/server";
 import { Button, Card, HoldButton, Icon, type IconName, Text, useToast } from "@/ui";
+import { AuthField } from "@/ui/auth/AuthField";
 import { PasswordField } from "@/ui/auth/PasswordField";
-import { SocialButtons, useSocialProviders } from "@/ui/auth/SocialButtons";
 import { openPage } from "../ai/parts";
-import { useColors } from "../shared/hooks";
+import { useColors, useNow } from "../shared/hooks";
 import { PushedHeader } from "../shared/parts";
 import { preflightMissing } from "./logic";
 
@@ -35,10 +38,9 @@ const LINE_ICON: Record<AccountDeletionLine["kind"], IconName> = {
  * Apagar conta (App Store 5.1.1(v)): what goes and what stays, from the preflight (what closes, what they leave, the
  * computers removed, what stays behind with where to disconnect it on the website), then a hold. A workspace that
  * still needs this person as its only owner comes first, with its two ways out on the website (People, or deleting
- * it; its onboarding, while it's still being set up). Then the proof that it's them, unless this session signed in
- * lately: the password, or signing in again with a provider the server offers (Apple's included); with neither, the
- * website adds a password first. A server from before the preflight gets the fixed lines and the hold, as it always
- * did.
+ * it; its onboarding, while it's still being set up). Then the proof that it's them (ADR 0088 §2): a code emailed to
+ * them, or on a server that sends no email their password, which the website adds first to an account without one.
+ * A server from before the preflight gets the fixed lines and the hold, as it always did.
  */
 export function DeleteAccountScreen() {
   const { t, i18n } = useTranslation();
@@ -47,21 +49,29 @@ export function DeleteAccountScreen() {
   const api = useApi();
   const insets = useSafeAreaInsets();
   const plan = useAccountDeletionPlan();
-  const me = useMe().data;
+  const meQuery = useMe();
+  const me = meQuery.data;
   const config = useAuthConfig().data;
   // The account this screen is about: signing in again to another one deletes nothing.
   const account = useRef(me?.user.id);
   account.current ??= me?.user.id;
-  const providers = useSocialProviders();
   const [password, setPassword] = useState("");
-  const [refused, setRefused] = useState<string>();
+  const [code, setCode] = useState("");
+  const [sent, setSent] = useState<{ email: string; resendAt: number } | null>(null);
+  const [sending, setSending] = useState(false);
+  // Why the proof was refused, under its field.
+  const [refused, setRefused] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // An older server's own refusal: the workspaces it names.
   const [blockedBy, setBlockedBy] = useState<string[]>([]);
   const legacy = plan.isError && preflightMissing(plan.error);
-  const needs = legacy ? "none" : plan.data ? proofNeeded(plan.data, refused) : null;
+  const proof = legacy ? null : deletionProof(config, me?.user.hasPassword);
   const blockers = plan.data?.soleOwner ?? [];
-  const ready = needs === "none" || (needs === "password" && password !== "");
+  const left = sent ? Math.max(0, sent.resendAt - Date.now()) : 0;
+  // A repaint every second while the countdown runs; the time itself is read just above.
+  useNow(left > 0 ? 1000 : 60_000);
+  const toSend = proof ? proofToSend(proof, { sent: sent !== null, code, password }) : null;
+  const ready = toSend === null || toSend.ready;
   const web = (path: string) => openPage(`${serverUrl()}${path}`);
   const lines = plan.data
     ? accountDeletionLines(t, i18n.language, plan.data, { cloud: config?.workspaceComputer === true })
@@ -69,6 +79,26 @@ export function DeleteAccountScreen() {
   const inSetup = (id: string) => me?.organizations.some((o) => o.id === id && settingUp(o)) === true;
   // Where the website's account menu adds a password: a workspace of theirs that is open.
   const shell = me?.organizations.find((o) => !o.deletion && o.standing?.state !== "suspended" && !settingUp(o));
+
+  const codeOut = (email: string, resendIn: number) => setSent({ email, resendAt: Date.now() + resendIn * 1000 });
+  const sendCode = async () => {
+    if (sending) return;
+    setSending(true);
+    try {
+      const r = await api.account.deletionCode();
+      codeOut(r.email, r.resendIn);
+      setCode("");
+      setRefused(null);
+    } catch (e) {
+      // A code went out a moment ago (another try, another device): that one is still good.
+      const retryIn = e instanceof ApiError && e.code === "reauth.code_wait" ? Number(e.params?.retryIn) : 0;
+      if (retryIn > 0) codeOut(me?.user.email ?? "", retryIn);
+      else if (errorCode(e) === "sole_owner") void plan.refetch();
+      else setRefused(errorText(t, e));
+    } finally {
+      setSending(false);
+    }
+  };
 
   const confirm = async () => {
     if (busy || !ready) return;
@@ -79,15 +109,16 @@ export function DeleteAccountScreen() {
       toast({ title: t("mobile.delete.otherAccount"), icon: "x" });
       return;
     }
-    const result = await deleteAccount(needs === "password" ? password : undefined);
+    const result = await deleteAccount(toSend?.input);
     setBusy(false);
     // Deleted: the session ends and the gate shows sign-in.
     if (result.ok) toast({ title: t("mobile.account.deleted") });
     else if (result.reason === "sole_owner") {
       if (legacy) setBlockedBy(result.organizations);
       else void plan.refetch();
-    } else if (result.reason === "reauth") {
-      setRefused(result.proof === "password" ? REAUTH_PASSWORD : REAUTH_SIGN_IN);
+    } else if (result.reason === "proof") {
+      setRefused(errorText(t, result.error));
+      setCode("");
       setPassword("");
     } else
       toast({
@@ -188,34 +219,51 @@ export function DeleteAccountScreen() {
           </Card>
         ) : (
           <>
-            {needs === "password" ? (
-              <View style={styles.proof}>
-                <PasswordField label={t("proof.password")} value={password} onChangeText={setPassword} />
-                {refused === REAUTH_PASSWORD ? (
-                  <Text variant="small" tone="danger" accessibilityLiveRegion="polite">
-                    {t("errors.reauth.password")}
-                  </Text>
-                ) : null}
-              </View>
-            ) : null}
-            {needs === "signIn" && providers.length > 0 ? (
+            {proof === "code" && !sent ? (
               <View style={styles.proof}>
                 <Text variant="body" tone="ink2">
-                  {t("errors.reauth.signIn")}
+                  {t("proof.willSend", { email: me?.user.email ?? "" })}
                 </Text>
-                <SocialButtons
-                  providers={providers}
-                  divider={false}
-                  callbackURL="/account-delete"
-                  onError={(message) => toast({ title: message, icon: "x" })}
-                  onSignedIn={() => {
-                    setRefused(undefined);
-                    void plan.refetch();
-                  }}
+                <Button variant="secondary" label={t("proof.send")} loading={sending} onPress={() => void sendCode()} />
+              </View>
+            ) : null}
+            {proof === "code" && sent ? (
+              <View style={styles.proof}>
+                <AuthField
+                  code
+                  value={code}
+                  onChangeText={(value) => setCode(typedCode(value))}
+                  placeholder={t("proof.code")}
+                  accessibilityLabel={t("proof.code")}
+                  keyboardType="number-pad"
+                  textContentType="oneTimeCode"
+                  autoComplete="one-time-code"
+                  returnKeyType="done"
+                />
+                <Text variant="small" tone="muted">
+                  {t("proof.sent", { email: sent.email })}
+                </Text>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  label={left > 0 ? t("proof.resendIn", { time: formatTimeLeft(left) }) : t("proof.resend")}
+                  disabled={left > 0}
+                  loading={sending}
+                  onPress={() => void sendCode()}
                 />
               </View>
             ) : null}
-            {needs === "signIn" && providers.length === 0 ? (
+            {proof === "password" ? (
+              <View style={styles.proof}>
+                <PasswordField label={t("proof.password")} value={password} onChangeText={setPassword} />
+              </View>
+            ) : null}
+            {refused ? (
+              <Text variant="small" tone="danger" accessibilityLiveRegion="polite">
+                {refused}
+              </Text>
+            ) : null}
+            {proof === "addPassword" ? (
               <View style={styles.proof}>
                 <Text variant="body" tone="ink2">
                   {t("mobile.delete.addPasswordFirst")}
@@ -225,7 +273,7 @@ export function DeleteAccountScreen() {
                   label={t("mobile.delete.addPasswordWeb")}
                   onPress={() => web(shell ? `/org/${shell.id}?account=password` : "/")}
                 />
-                <Button variant="ghost" label={t("mobile.common.retry")} onPress={() => void plan.refetch()} />
+                <Button variant="ghost" label={t("mobile.common.retry")} onPress={() => void meQuery.refetch()} />
               </View>
             ) : null}
             <HoldButton

@@ -3,7 +3,16 @@ import { generateKeyPairSync, verify } from "node:crypto";
 import { eq, schema } from "@agenteschat/db";
 import { appleClientSecret } from "../src/auth";
 import type { SocketData } from "../src/realtime/ws";
-import { type Browser, browser, createTestServer, ORIGIN, seedOrg, signUp, type TestServer } from "./harness";
+import {
+  type Browser,
+  browser,
+  createTestServer,
+  deletionCode,
+  ORIGIN,
+  seedOrg,
+  signUp,
+  type TestServer,
+} from "./harness";
 
 /**
  * The phone app (ADR 0035): no `Origin`, `X-Agentes-Client: mobile`, the
@@ -20,7 +29,6 @@ afterEach(async () => {
 
 const MOBILE = { "x-agentes-client": "mobile" };
 /** The account's password, which the app sends to prove it's them (`DELETE /account`). */
-const PROOF = { password: "correct horse battery" };
 const TOKEN = "ExponentPushToken[phone-of-owner-01]";
 
 /** A request the way the app sends it: no Origin, the app header, the stored cookie. */
@@ -249,13 +257,14 @@ describe("account deletion", () => {
     const bia = await addPerson(owner, orgId, "bia@example.com");
     await fromApp(bia, "/api/app/push/devices", { json: { token: TOKEN, platform: "ios", locale: "en" } });
 
-    const refused = await fromApp(owner, "/api/app/account", { method: "DELETE", json: PROOF });
+    const refused = await fromApp(owner, "/api/app/account", { method: "DELETE", json: {} });
     expect(refused.status).toBe(409);
     expect(await refused.json()).toMatchObject({
       error: { code: "sole_owner", params: { organizations: ["Acme"], orgIds: [orgId] } },
     });
 
-    const deleted = await fromApp(bia, "/api/app/account", { method: "DELETE", json: PROOF });
+    const code = await deletionCode(t, bia, null);
+    const deleted = await fromApp(bia, "/api/app/account", { method: "DELETE", json: { code } });
     expect(deleted.status).toBe(204);
     expect(deleted.headers.getSetCookie().some((c) => c.startsWith("better-auth.session_token=;"))).toBe(true);
     expect(await t.db.select().from(schema.users).where(eq(schema.users.email, "bia@example.com"))).toEqual([]);
@@ -267,7 +276,8 @@ describe("account deletion", () => {
     expect(members.members).toHaveLength(1);
 
     // Alone in their org: the owner can go now, and the org closes with them, to go for good later.
-    expect((await fromApp(owner, "/api/app/account", { method: "DELETE", json: PROOF })).status).toBe(204);
+    const last = await deletionCode(t, owner, null);
+    expect((await fromApp(owner, "/api/app/account", { method: "DELETE", json: { code: last } })).status).toBe(204);
     expect(await t.db.select().from(schema.organizations)).toMatchObject([
       { id: orgId, deletionDueAt: expect.any(Date) },
     ]);

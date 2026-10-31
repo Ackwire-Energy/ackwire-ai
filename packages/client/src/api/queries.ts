@@ -60,6 +60,7 @@ import type {
   ComputerSetup,
   DatabaseActionName,
   DatabaseConnectionInput,
+  DeletionProofInput,
   DirectMessage,
   DmRead,
   ForumParticipantsInput,
@@ -217,7 +218,7 @@ export const CLOSING_POLL_MS = 30_000;
 export const useClosingMe = () =>
   useQuery({ ...meQuery(useApi()), refetchInterval: CLOSING_POLL_MS, refetchOnWindowFocus: "always" });
 
-/** What deleting my account would do, and the proof it takes (`GET /account/deletion`): asked anew each time. */
+/** What deleting my account would do (`GET /account/deletion`): asked anew each time. */
 export const useAccountDeletionPlan = (enabled = true) => {
   const api = useApi();
   return useQuery({
@@ -230,14 +231,14 @@ export const useAccountDeletionPlan = (enabled = true) => {
 };
 
 /**
- * Deletes the workspace (owners), with the password when the session alone doesn't prove it's them. Its closing
+ * Deletes the workspace (owners), with the proof that it's them (the emailed code, or the password). Its closing
  * screen shows here at once, and through `org.deleting` everywhere else. The dialog says its refusals.
  */
 export function useDeleteWorkspace(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (password?: string) => api.orgs.deleteWorkspace(orgId, password ? { password } : {}),
+    mutationFn: (proof: DeletionProofInput) => api.orgs.deleteWorkspace(orgId, proof),
     meta: { silent: true },
     onSuccess: ({ dueAt }) => {
       const me = qc.getQueryData<Me | null>(keys.me);

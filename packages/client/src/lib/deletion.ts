@@ -1,6 +1,7 @@
 import type { TFunction } from "i18next";
-import type { AccountDeletionPlan, OrgDeletion, OrgSummary } from "../api/types";
+import type { AccountDeletionPlan, AuthConfig, DeletionProofInput, OrgDeletion, OrgSummary } from "../api/types";
 import { formatShortDate, joinNames } from "./format";
+import { CODE_LENGTH, sendsEmail } from "./join-requests";
 
 /** Days a deleted workspace stays closed and restorable (the engine's `WORKSPACE_DELETION_DAYS`). */
 export const DELETION_DAYS = 7;
@@ -23,21 +24,25 @@ export function deletingText(t: TFunction, locale: string, deletion: OrgDeletion
     : t("deleting.textLate", { by, date });
 }
 
-/** What proves it's the person before deleting: nothing (a sign-in lately), the password, or a new sign-in. */
-export type ProofNeeded = "none" | "password" | "signIn";
+/** What proves it's the person before deleting: a code emailed to them, their password, or a password added first. */
+export type DeletionProof = "code" | "password" | "addPassword";
 
 /**
- * The proof deleting asks for, from the preflight (`password`, `freshUntil`), until the server refuses one: a
- * `reauth.*` code (`refused`) wins, since the session's sign-in got old meanwhile or the clocks disagree.
+ * The proof deleting takes (ADR 0088 §2): a code emailed to the person where the server sends email, else their
+ * password, which an account without one adds first.
  */
-export function proofNeeded(
-  plan: Pick<AccountDeletionPlan, "password" | "freshUntil">,
-  refused?: string,
-  now = Date.now(),
-): ProofNeeded {
-  const fresh = !refused?.startsWith("reauth.") && !!plan.freshUntil && Date.parse(plan.freshUntil) > now;
-  if (fresh) return "none";
-  return plan.password ? "password" : "signIn";
+export const deletionProof = (
+  config: Pick<AuthConfig, "passwordReset"> | undefined,
+  hasPassword: boolean | undefined,
+): DeletionProof => (sendsEmail(config) ? "code" : hasPassword === false ? "addPassword" : "password");
+
+/** What the deletion sends as its proof, and whether it can yet: all the code's digits once one went out, or a password. */
+export function proofToSend(kind: DeletionProof, typed: { sent: boolean; code: string; password: string }) {
+  const input: DeletionProofInput =
+    kind === "code" ? { code: typed.code } : kind === "password" ? { password: typed.password } : {};
+  const ready =
+    kind === "code" ? typed.sent && typed.code.length === CODE_LENGTH : kind === "password" && typed.password !== "";
+  return { input, ready };
 }
 
 /** One line of what deleting the account does, by what it is about (the apps pick an icon for each). */

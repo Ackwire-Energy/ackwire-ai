@@ -7570,12 +7570,15 @@ export const ptBR = {
       denied: "Seu pedido não foi aprovado. Peça a alguém de lá para convidar você.",
       answered: "Alguém já respondeu este pedido.",
       expired: "Este pedido expirou: ninguém respondeu em 14 dias.",
-      codeWrong: "Código errado. Tente de novo.",
-      codeExpired: "Este código expirou. Peça um novo.",
-      codeTries: "Muitas tentativas. Peça um código novo.",
-      codeLimit: "Muitos códigos para este e-mail. Tente de novo mais tarde.",
-      codeWait: "Espere um minuto para pedir outro código.",
       codeNeeded: "Verifique seu e-mail primeiro.",
+    },
+    /** An emailed code refused: asking to join (ADR 0072) and deleting (ADR 0088) alike. */
+    code: {
+      wrong: "Código errado. Tente de novo.",
+      expired: "Este código expirou. Peça um novo.",
+      tries: "Muitas tentativas. Peça um código novo.",
+      limit: "Muitos códigos para este e-mail. Tente de novo mais tarde.",
+      wait: "Espere um minuto para pedir outro código.",
     },
     invitation: {
       askToJoin: "Este link agora passa por um admin. Abra de novo para pedir para entrar.",
@@ -7587,6 +7590,7 @@ export const ptBR = {
       notRestorable: "Este workspace não pode mais ser restaurado.",
     },
     reauth: {
+      code: "Digite o código que mandamos por email.",
       password: "Essa senha não está certa.",
       signIn: "Entre de novo para confirmar que é você.",
     },
@@ -9266,10 +9270,19 @@ export const ptBR = {
     type: "Digite {{name}} para confirmar",
     submit: "Apagar workspace",
   },
-  /** Proof that it's the person, before deleting: the password, or a sign-in in the last 10 minutes. */
+  /** Proof that it's the person, before deleting (ADR 0088 §2): a code emailed to them, or their password. */
   proof: {
+    /** `{{email}}`: the account's own address. */
+    willSend: "Vamos mandar um código para {{email}} para confirmar que é você.",
+    send: "Enviar código",
+    code: "Código do email",
+    sent: "Mandamos para {{email}}. Vale por 10 minutos.",
+    resend: "Enviar outro",
+    /** `{{time}}`: what's left, as 0:42. */
+    resendIn: "Enviar outro em {{time}}",
+    /** A self-hosted server with no email, and an account with no password yet. */
+    addPassword: "Este servidor não manda email. Adicione uma senha para confirmar que é você.",
     password: "Sua senha",
-    signIn: "Ou entre de novo para confirmar",
     signInButton: "Entrar de novo",
   },
   /** A workspace being deleted: the screen in its place until it goes. */

@@ -47,6 +47,7 @@ import type {
   Channel,
   ChannelCategory,
   ChannelMember,
+  CodeSent,
   CommandApproval,
   ComputerSetup,
   ComputerTarget,
@@ -83,7 +84,6 @@ import type {
   IssueColumn,
   JevKey,
   JoinApproval,
-  JoinCodeSent,
   JoinRequest,
   Machine,
   MachineAccess,
@@ -352,6 +352,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       phoneSignIn: () => request<PhoneSignIn>("/api/app/phone-sign-in", { json: {} }),
       addPassword: (password) => request<void>("/api/app/me/password", { json: { password } }),
       deletionPlan: () => request<AccountDeletionPlan>("/api/app/account/deletion"),
+      deletionCode: () => request<CodeSent>("/api/app/account/deletion/code", { json: {} }),
       delete: (input = {}) => request<void>("/api/app/account", { method: "DELETE", json: input }),
     },
     push: {
@@ -372,6 +373,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           }),
         ),
       get: (orgId) => request<Organization>(org(orgId)),
+      deletionCode: (orgId) => request<CodeSent>(`${org(orgId)}/deletion/code`, { json: {} }),
       deleteWorkspace: async (orgId, input = {}) =>
         (await request<{ deletion: { dueAt: string } }>(`${org(orgId)}/deletion`, { json: input })).deletion,
       restore: (orgId) => request<void>(`${org(orgId)}/deletion`, { method: "DELETE" }),
@@ -779,7 +781,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       links: async (orgId) => (await request<{ links: InviteLink[] }>(`${org(orgId)}/invite-links`)).links,
       turnOff: (orgId, linkId) => request<void>(`${org(orgId)}/invite-links/${enc(linkId)}`, { method: "DELETE" }),
       sendCode: (token, input, humanCheck) =>
-        request<JoinCodeSent>(`/api/app/invitations/${enc(token)}/code`, {
+        request<CodeSent>(`/api/app/invitations/${enc(token)}/code`, {
           json: input,
           headers: humanCheckHeaders(humanCheck),
         }),

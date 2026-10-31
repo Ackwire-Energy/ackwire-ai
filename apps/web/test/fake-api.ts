@@ -265,10 +265,12 @@ export interface FakeState {
   approval?: JoinApproval;
   /** Make `joinRequests.approve` and `deny` fail with this error (`join.answered`…). */
   answerError?: ApiError;
-  /** `account.deletionPlan`; unset = nothing to stop it, a password, no fresh sign-in. */
+  /** `account.deletionPlan`; unset = nothing to stop it, close or leave. */
   deletionPlan?: AccountDeletionPlan;
-  /** Make `orgs.deleteWorkspace` and `account.delete` fail with this error (`reauth.sign_in`…). */
+  /** Make `orgs.deleteWorkspace` and `account.delete` fail with this error (`reauth.code_wrong`…). */
   deletionError?: ApiError;
+  /** Make `orgs.deletionCode` and `account.deletionCode` fail with this error (`reauth.code_wait`…). */
+  codeError?: ApiError;
   /** The workspace's roles (ADR 0085, `roles.*`); unset: a new workspace's (`seedRoles`). */
   roles?: OrgRole[];
 }
@@ -994,10 +996,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("account.addPassword", { password });
         if (state.me) state.me.user.hasPassword = true;
       },
+      deletionCode: async () => {
+        log("account.deletionCode");
+        if (state.codeError) throw state.codeError;
+        return { email: requireMe().user.email, resendIn: 60 };
+      },
       deletionPlan: async () =>
         state.deletionPlan ?? {
-          password: true,
-          freshUntil: null,
           closes: [],
           leaves: [],
           soleOwner: [],
@@ -1131,6 +1136,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return { step: onboarding?.step ?? "done", finished: onboarding === undefined };
       },
       get: async (orgId) => ({ id: orgId, name: "Acme", role: "owner", context: "" }),
+      deletionCode: async (orgId) => {
+        log("orgs.deletionCode", orgId);
+        if (state.codeError) throw state.codeError;
+        return { email: requireMe().user.email, resendIn: 60 };
+      },
       deleteWorkspace: async (orgId, input) => {
         log("orgs.deleteWorkspace", orgId, input);
         const me = requireMe();

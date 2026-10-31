@@ -1323,7 +1323,7 @@ function UnreadCount({ count }: { count: number }) {
  * "Definir status") and the workspace's budget use this month (a percentage, never money). It opens the account's
  * full-screen menu: your status (ADR 0084), profile, time zone, opening the phone app, theme, language, sounds, the
  * budget, deleting the account and signing out. Adding a password and deleting the account keep their dialogs in the
- * address (`?account=password`, `?account=delete`): both may ask for a sign-in again, which comes back to them.
+ * address (`?account=password`, `?account=delete`): adding a password may ask for a sign-in again, which comes back.
  */
 function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const { t, i18n } = useTranslation();

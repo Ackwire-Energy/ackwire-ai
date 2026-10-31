@@ -1,15 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { AccountDeletionPlan } from "../src/api/types";
-import { accountDeletionLines, soleOwnerWaysOut } from "../src/lib/deletion";
+import { accountDeletionLines, deletionProof, proofToSend, soleOwnerWaysOut } from "../src/lib/deletion";
 
 /** The key and its values, so a test sees which words were picked (the words themselves: packages/i18n). */
 const t = ((key: string, o?: Record<string, unknown>) =>
   o && Object.keys(o).length > 0 ? `${key} ${JSON.stringify(o)}` : key) as unknown as TFunction;
 
 const plan = (patch: Partial<AccountDeletionPlan>): AccountDeletionPlan => ({
-  password: true,
-  freshUntil: null,
   closes: [],
   leaves: [],
   soleOwner: [],
@@ -74,4 +72,23 @@ test("a workspace still being set up is finished or deleted in its onboarding, w
     delete: "/org/w/settings/general?delete=1",
   });
   expect(soleOwnerWaysOut("w", true)).toEqual({ people: "/onboarding", delete: "/onboarding?delete=1" });
+});
+
+test("the proof: a code where the server sends email, else the password, which an account without one adds first", () => {
+  expect(deletionProof({ passwordReset: true }, false)).toBe("code");
+  // Until the server says, it's taken to send email, as invitations do.
+  expect(deletionProof(undefined, true)).toBe("code");
+  expect(deletionProof({ passwordReset: false }, true)).toBe("password");
+  expect(deletionProof({ passwordReset: false }, undefined)).toBe("password");
+  expect(deletionProof({ passwordReset: false }, false)).toBe("addPassword");
+});
+
+test("what the proof sends: all six digits once a code went out, or a typed password; nothing to add a password", () => {
+  const typed = { sent: true, code: "48291", password: "" };
+  expect(proofToSend("code", typed)).toEqual({ input: { code: "48291" }, ready: false });
+  expect(proofToSend("code", { ...typed, code: "482913" })).toEqual({ input: { code: "482913" }, ready: true });
+  expect(proofToSend("code", { ...typed, code: "482913", sent: false }).ready).toBe(false);
+  expect(proofToSend("password", { ...typed, password: "pw" })).toEqual({ input: { password: "pw" }, ready: true });
+  expect(proofToSend("password", typed).ready).toBe(false);
+  expect(proofToSend("addPassword", { ...typed, password: "pw" })).toEqual({ input: {}, ready: false });
 });

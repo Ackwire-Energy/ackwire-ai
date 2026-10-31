@@ -5,7 +5,6 @@ import { type Database, schema } from "@agenteschat/db";
 import {
   accountBlock,
   countUsers,
-  DELETION_PROOF_FRESH_MS,
   deriveSecret,
   EARLY_ACCESS_HEADER,
   EARLY_ACCESS_TOKEN,
@@ -22,6 +21,7 @@ import {
   sha256,
   signupAdmission,
   signupOpenToAll,
+  spendDeletionCode,
   TooManyError,
   useEarlyAccess,
   type WorkspacePolicy,
@@ -32,7 +32,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthEndpoint, createAuthMiddleware, formCsrfMiddleware, getOAuthState } from "better-auth/api";
 import { setSessionCookie } from "better-auth/cookies";
 import { z } from "zod";
-import { desktopSignIn } from "./desktop-sign-in";
+import { desktopSignIn, FRESH_SIGN_IN_MS } from "./desktop-sign-in";
 import { humanCheckRefusal } from "./http/human-check";
 import type { Logger } from "./logger";
 import { ownerSignIn } from "./owner-claim";
@@ -105,9 +105,9 @@ export function createAuth(deps: {
     baseURL: config.PUBLIC_URL,
     basePath: "/api/auth",
     // Over HTTP each would tell any session whether a password is right, with none of the limit `deletionProof` keeps:
-    // a stolen session could guess the account's password there, then prove it's them with it. No app calls them,
-    // `deletionProof` calls `verifyPassword` in this process (which this leaves open), and a forgotten password is
-    // reset by email.
+    // a stolen session could guess the account's password there, then sign in with it anywhere, or delete with it on
+    // a server that sends no email. No app calls them, `deletionProof` calls `verifyPassword` in this process (which
+    // this leaves open), and a forgotten password is reset by email.
     disabledPaths: ["/verify-password", "/change-password"],
     // Derived from AGENTES_SECRET so self-hosters manage a single secret.
     secret: deriveSecret(config.AGENTES_SECRET, "sessions"),
@@ -340,40 +340,41 @@ export async function sessionUser(auth: Auth, headers: Headers): Promise<Session
 }
 
 /**
- * Until when this request's session, as `userId`, proves it's them by its sign-in (`DELETION_PROOF_FRESH_MS` after
- * it), or null once it doesn't. Read from the database: a cached cookie can't vouch for it. A session minted from
- * another keeps that one's sign-in time.
+ * Whether this request's session, as `userId`, signed in within `FRESH_SIGN_IN_MS`, as adding a password requires.
+ * Read from the database: a cached cookie can't vouch for it. A session minted from another keeps that one's sign-in
+ * time.
  */
-export async function signInFreshUntil(auth: Auth, headers: Headers, userId: string) {
+export async function signedInLately(auth: Auth, headers: Headers, userId: string) {
   const current = await auth.api.getSession({ headers, query: { disableCookieCache: true } });
-  if (current?.user.id !== userId) return null;
-  const until = new Date(new Date(current.session.createdAt).getTime() + DELETION_PROOF_FRESH_MS);
-  return until.getTime() > Date.now() ? until : null;
+  if (current?.user.id !== userId) return false;
+  return Date.now() - new Date(current.session.createdAt).getTime() < FRESH_SIGN_IN_MS;
 }
-
-/** Whether this request's session signed in, as `userId`, lately enough to prove it's them (`signInFreshUntil`). */
-export const signedInLately = async (auth: Auth, headers: Headers, userId: string) =>
-  (await signInFreshUntil(auth, headers, userId)) !== null;
 
 /** Passwords an account may try in 15 minutes to prove it's them. */
 const PROOF_TRIES = { limit: 5, windowMs: 15 * 60_000 };
 
 /**
- * Proof that the person at this session is the account's own, before deleting: a sign-in in the last 10 minutes, else
- * their `password`, with 5 tries per 15 minutes per account (429 after). Throws `reauth.sign_in` without a password and
- * `reauth.password` for a wrong one.
+ * Proof that the person at this session is the account's own, before deleting the workspace `orgId`, or their account
+ * when it is null (ADR 0088 §2): the code emailed to them (`spendDeletionCode`). On a server that sends no email, their
+ * password instead, with 5 tries per 15 minutes per account (429 after). Throws `reauth.code` without a code, and
+ * `reauth.password` without a password or with a wrong one.
  */
 export async function deletionProof(
   auth: Auth,
-  limiter: RateLimiter,
+  deps: { db: Database; rateLimiter: RateLimiter; emailDelivers: boolean },
   headers: Headers,
   userId: string,
-  password?: string,
+  orgId: string | null,
+  proof: { code?: string; password?: string },
 ) {
-  if (await signedInLately(auth, headers, userId)) return;
-  if (!password) throw new ForbiddenError("Sign in again to confirm it's you", "reauth.sign_in");
+  if (deps.emailDelivers) {
+    if (!proof.code) throw new ForbiddenError("Type the code we emailed you", "reauth.code");
+    return spendDeletionCode(deps, userId, orgId, proof.code);
+  }
+  const { password } = proof;
+  if (!password) throw new ForbiddenError("Give your password to confirm it's you", "reauth.password");
   // Counted before the check: a guess past the limit learns nothing.
-  if (!(await limiter.consume(`deletion-proof:${userId}`, PROOF_TRIES)).allowed) {
+  if (!(await deps.rateLimiter.consume(`deletion-proof:${userId}`, PROOF_TRIES)).allowed) {
     throw new TooManyError("Too many tries. Try again in a few minutes.");
   }
   const right = await auth.api.verifyPassword({ body: { password }, headers }).then(
@@ -575,7 +576,7 @@ const phoneSignIn = {
           }
         }
         if (!user) throw new APIError("UNAUTHORIZED", { message: "This code expired or was already used" });
-        // Minted from a session, it signed in when that one did: it proves no fresher sign-in (`deletionProof`).
+        // Minted from a session, it signed in when that one did: it proves no fresher sign-in (`signedInLately`).
         const session = signedIn
           ? await internalAdapter.createSession(user.id, undefined, { createdAt: signedIn }, true)
           : await internalAdapter.createSession(user.id);

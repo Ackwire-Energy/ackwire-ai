@@ -68,29 +68,39 @@ describe("deleting a workspace (Configurações › Geral)", () => {
     }
   });
 
-  test("the name, typed with its invisible characters ignored, then the proof, before it deletes", async () => {
+  test("the name, typed with its invisible characters ignored, then the code from the email, before it deletes", async () => {
     // A co-owner put a zero-width space in the name: typing it plainly still confirms.
     const { state, router } = await open(`/org/${ORG_ID}/settings`, { name: "Ac\u200bme" });
+    const email = state.me?.user.email ?? "";
     await click(screen().getByRole("button", { name: "Apagar workspace…" }));
     await settle(4);
     const dialog = screen().getByRole("dialog", { name: "Apagar Ac\u200bme?" });
     expect(dialog.textContent).toContain("Qualquer dono pode restaurar até");
     expect(dialog.textContent).toContain("Todos perdem o acesso agora e recebem um email");
+    expect(dialog.textContent).toContain(`Vamos mandar um código para ${email} para confirmar que é você.`);
+    const send = within(dialog).getByRole("button", { name: "Enviar código" });
+    expect(send.hasAttribute("disabled")).toBe(true);
+    await type(within(dialog).getByLabelText("Digite Ac\u200bme para confirmar"), "acm");
+    expect(send.hasAttribute("disabled")).toBe(true);
+    await type(within(dialog).getByLabelText("Digite Ac\u200bme para confirmar"), " ACME ");
+    await click(send);
+    await settle(4);
+    expect(state.calls.filter((c) => c.method === "orgs.deletionCode").map((c) => c.args)).toEqual([[ORG_ID]]);
+    expect(dialog.textContent).toContain(`Mandamos para ${email}. Vale por 10 minutos.`);
+    // Another code only after a minute.
+    expect(
+      within(dialog)
+        .getByRole("button", { name: /^Enviar outro em \d:\d\d$/ })
+        .hasAttribute("disabled"),
+    ).toBe(true);
     const submit = within(dialog).getByRole("button", { name: "Apagar workspace" });
     expect(submit.hasAttribute("disabled")).toBe(true);
-    await type(within(dialog).getByLabelText("Digite Ac\u200bme para confirmar"), "acm");
-    expect(submit.hasAttribute("disabled")).toBe(true);
-    await type(within(dialog).getByLabelText("Digite Ac\u200bme para confirmar"), " ACME ");
-    // No sign-in in the last 10 minutes: the password too.
-    expect(submit.hasAttribute("disabled")).toBe(true);
-    await type(within(dialog).getByLabelText("Sua senha"), "correct horse battery");
+    // Pasted with its space: the digits are what count.
+    await type(within(dialog).getByLabelText("Código do email"), "482 913");
     expect(submit.hasAttribute("disabled")).toBe(false);
     await click(submit);
     await settle(6);
-    expect(state.calls.find((c) => c.method === "orgs.deleteWorkspace")?.args).toEqual([
-      ORG_ID,
-      { password: "correct horse battery" },
-    ]);
+    expect(state.calls.find((c) => c.method === "orgs.deleteWorkspace")?.args).toEqual([ORG_ID, { code: "482913" }]);
     // Its closing screen takes its place at once.
     expect(screen().getByRole("heading", { name: "Ac\u200bme está sendo apagado" })).toBeTruthy();
     expect(screen().queryByRole("dialog")).toBeNull();
@@ -98,33 +108,51 @@ describe("deleting a workspace (Configurações › Geral)", () => {
     expect(router.state.location.search).not.toHaveProperty("delete");
   });
 
-  test("a fresh sign-in needs no password; an account without one and an old session signs in again", async () => {
-    const fresh = seedState({
-      deletionPlan: {
-        password: false,
-        freshUntil: new Date(Date.now() + 5 * 60_000).toISOString(),
-        closes: [],
-        leaves: [],
-        soleOwner: [],
-        computers: [],
-        staysBehind: [],
-        serverOwner: false,
-      },
-    });
-    await open(`/org/${ORG_ID}/settings/general?delete=1`, { state: fresh });
-    let dialog = screen().getByRole("dialog", { name: "Apagar Acme?" });
-    expect(within(dialog).queryByLabelText("Sua senha")).toBeNull();
+  test("a code refused says why under its field, which empties for the next one", async () => {
+    const state = seedState({ deletionError: new ApiError(400, "reauth.code_wrong", "That code isn't right.") });
+    await open(`/org/${ORG_ID}/settings/general?delete=1`, { state });
+    const dialog = screen().getByRole("dialog", { name: "Apagar Acme?" });
     await type(within(dialog).getByLabelText("Digite Acme para confirmar"), "Acme");
-    expect(within(dialog).getByRole("button", { name: "Apagar workspace" }).hasAttribute("disabled")).toBe(false);
+    await click(within(dialog).getByRole("button", { name: "Enviar código" }));
+    await settle(4);
+    await type(within(dialog).getByLabelText("Código do email"), "111111");
+    await click(within(dialog).getByRole("button", { name: "Apagar workspace" }));
+    await settle(6);
+    expect(dialog.textContent).toContain("Código errado. Tente de novo.");
+    expect((within(dialog).getByLabelText("Código do email") as HTMLInputElement).value).toBe("");
+    expect(within(dialog).queryByRole("alert", { name: /Código errado/ })).toBeNull();
+  });
+
+  test("a server that sends no email asks for the password; an account without one adds it first", async () => {
+    const state = seedState({ authConfig: { passwordReset: false } });
+    await open(`/org/${ORG_ID}/settings/general?delete=1`, { state });
+    let dialog = screen().getByRole("dialog", { name: "Apagar Acme?" });
+    expect(dialog.textContent).not.toContain("Vamos mandar um código");
+    expect(dialog.textContent).toContain("Todos perdem o acesso agora");
+    await type(within(dialog).getByLabelText("Digite Acme para confirmar"), "Acme");
+    const submit = within(dialog).getByRole("button", { name: "Apagar workspace" });
+    expect(submit.hasAttribute("disabled")).toBe(true);
+    await type(within(dialog).getByLabelText("Sua senha"), "correct horse battery");
+    await click(submit);
+    await settle(6);
+    expect(state.calls.find((c) => c.method === "orgs.deleteWorkspace")?.args).toEqual([
+      ORG_ID,
+      { password: "correct horse battery" },
+    ]);
 
     cleanup();
-    const old = seedState({ deletionError: new ApiError(403, "reauth.sign_in", "Sign in again to confirm it's you") });
-    old.deletionPlan = { ...(fresh.deletionPlan as NonNullable<typeof fresh.deletionPlan>), freshUntil: null };
-    await open(`/org/${ORG_ID}/settings/general?delete=1`, { state: old });
+    const none = seedState({ authConfig: { passwordReset: false } });
+    if (!none.me) throw new Error("signed in");
+    none.me.user = { ...none.me.user, hasPassword: false };
+    await open(`/org/${ORG_ID}/settings/general?delete=1`, { state: none });
     dialog = screen().getByRole("dialog", { name: "Apagar Acme?" });
-    expect(dialog.textContent).toContain("Entre de novo para confirmar que é você.");
+    expect(dialog.textContent).toContain(
+      "Este servidor não manda email. Adicione uma senha para confirmar que é você.",
+    );
     expect(within(dialog).queryByRole("button", { name: "Apagar workspace" })).toBeNull();
-    expect(within(dialog).getByRole("button", { name: "Entrar de novo" })).toBeTruthy();
+    await click(within(dialog).getByRole("button", { name: "Adicionar uma senha" }));
+    await settle(4);
+    expect(screen().getByRole("dialog", { name: "Adicionar uma senha" })).toBeTruthy();
   });
 });
 
@@ -211,8 +239,6 @@ describe("deleting your account (the account menu)", () => {
   test("a workspace that still needs you comes first, with its two ways out", async () => {
     const state = seedState({
       deletionPlan: {
-        password: true,
-        freshUntil: null,
         closes: [],
         leaves: [{ id: BETA_ID, name: "Beta", role: "owner" }],
         soleOwner: [{ id: BETA_ID, name: "Beta" }],
@@ -244,8 +270,6 @@ describe("deleting your account (the account menu)", () => {
   test("one still being set up has no People yet: its onboarding finishes it or deletes it", async () => {
     const state = seedState({
       deletionPlan: {
-        password: true,
-        freshUntil: null,
         closes: [],
         leaves: [{ id: BETA_ID, name: "Beta", role: "owner" }],
         soleOwner: [{ id: BETA_ID, name: "Beta" }],
@@ -298,11 +322,9 @@ describe("deleting your account (the account menu)", () => {
     await ask();
   });
 
-  test("what closes, what you leave, what stays; the password, then out to the sign-in", async () => {
+  test("what closes, what you leave, what stays; the code from the email, then out to the sign-in", async () => {
     const state = seedState({
       deletionPlan: {
-        password: true,
-        freshUntil: null,
         closes: [
           { id: ORG_ID, name: "Acme" },
           { id: "00000000-0000-4000-8000-0000000000c3", name: "Rascunho", deletion: { dueAt: soon(3) } },
@@ -337,14 +359,16 @@ describe("deleting your account (the account menu)", () => {
     expect(within(dialog).getByRole("link", { name: "Desconectar Chave da Ana" }).getAttribute("href")).toBe(
       `/org/${BETA_ID}/settings/keys`,
     );
+    expect(within(dialog).queryByRole("button", { name: "Apagar conta" })).toBeNull();
+    await click(within(dialog).getByRole("button", { name: "Enviar código" }));
+    await settle(4);
+    expect(state.calls.filter((c) => c.method === "account.deletionCode")).toHaveLength(1);
     const submit = within(dialog).getByRole("button", { name: "Apagar conta" });
     expect(submit.hasAttribute("disabled")).toBe(true);
-    await type(within(dialog).getByLabelText("Sua senha"), "correct horse battery");
+    await type(within(dialog).getByLabelText("Código do email"), "482913");
     await click(submit);
     await settle(8);
-    expect(state.calls.find((c) => c.method === "account.delete")?.args).toEqual([
-      { password: "correct horse battery" },
-    ]);
+    expect(state.calls.find((c) => c.method === "account.delete")?.args).toEqual([{ code: "482913" }]);
     expect(router.state.location.pathname).toBe("/login");
     expect(document.body.textContent).toContain("Conta apagada");
   });

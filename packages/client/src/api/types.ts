@@ -183,12 +183,14 @@ export interface OrgDeletion {
   requestedBy: { id: string; name: string } | null;
 }
 
-/** `GET /account/deletion`: what deleting my account would close, leave and remove, and the proof it needs. */
+/** What proves it's me before deleting (ADR 0088 §2): the code emailed to me, or my password where no email goes. */
+export interface DeletionProofInput {
+  code?: string;
+  password?: string;
+}
+
+/** `GET /account/deletion`: what deleting my account would close, leave and remove. */
 export interface AccountDeletionPlan {
-  /** The account signs in with a password, which proves it's them. */
-  password: boolean;
-  /** Until when this session's own sign-in proves it with no password; null: sign in again, or the password. */
-  freshUntil: string | null;
   /**
    * Only I am in them: they close now and are deleted for good 7 days later. One being deleted already keeps its date
    * (`deletion.dueAt`, null once it passed).
@@ -337,8 +339,11 @@ export interface AskToJoinResult {
   emailed: boolean;
 }
 
-/** `invites.sendCode` (ADR 0072): the code went to `email`; another can go after `resendIn` seconds. */
-export interface JoinCodeSent {
+/**
+ * A code emailed to `email` (ADR 0072's `invites.sendCode`, ADR 0088's deletion codes); another can go after `resendIn`
+ * seconds.
+ */
+export interface CodeSent {
   email: string;
   resendIn: number;
 }

@@ -15,7 +15,7 @@
   color: var(--ink-muted);
 }
 .deletion-export,
-.deletion-signin {
+.deletion-note {
   margin: 0;
 }
 .deletion-proof {

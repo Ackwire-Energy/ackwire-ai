@@ -235,6 +235,25 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     reason: "Só aceitamos pessoas do time de design por enquanto.",
   },
   "join_code.en": { kind: "join_code", locale: "en", orgName: "Souza Bakery", code: "482913", url: APP },
+  /** Before deleting a workspace, on a server with a support address. */
+  "deletion_code-workspace.en": {
+    kind: "deletion_code",
+    locale: "en",
+    code: "482913",
+    email: "ana@souzabakery.com",
+    orgName: "Souza Bakery",
+    support: "help@agentes.chat",
+    url: APP,
+  },
+  /** Before deleting an account; the server has no support address. */
+  "deletion_code-account.pt-BR": {
+    kind: "deletion_code",
+    locale: "pt-BR",
+    code: "482913",
+    email: "ana@padariasouza.com.br",
+    support: null,
+    url: APP,
+  },
   /** To an owner: a button to restore it. */
   "workspace_deleting-owner.en": {
     kind: "workspace_deleting",

@@ -34,8 +34,8 @@ export const REQUEST_PREFIX = "desktop-request:";
 const HANDOFF_TTL_MS = 10 * 60_000;
 /** How long a request stays open for the browser to confirm. */
 const REQUEST_TTL_MS = 10 * 60_000;
-/** How recent the browser's sign-in must be to hand it over. */
-const FRESH_SIGN_IN_MS = 10 * 60_000;
+/** How recent a sign-in must be to hand it over to the app, or to add a password (`signedInLately`). */
+export const FRESH_SIGN_IN_MS = 10 * 60_000;
 /** 32 random bytes and their SHA-256, both base64url (43 characters): challenge, verifier and request id. */
 const KEY = /^[A-Za-z0-9_-]{43}$/;
 /** Unambiguous code alphabet (no I/O/0/1) for the match the person reads off both screens. */
@@ -135,7 +135,7 @@ export function desktopSignIn() {
           const source = await ctx.context.internalAdapter.findSession(found.value);
           if (!source || source.session.expiresAt <= new Date()) return ctx.json({ signedIn: false });
           const { user } = source;
-          // It signed in when the browser's session did: it proves no fresher sign-in (`deletionProof`).
+          // It signed in when the browser's session did: it proves no fresher sign-in (`signedInLately`).
           const session = await ctx.context.internalAdapter.createSession(
             user.id,
             undefined,
