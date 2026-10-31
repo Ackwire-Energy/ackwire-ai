@@ -637,7 +637,7 @@ export async function maybeSendAgentMedia(
   if (await standingRefusal(db, reply.orgId, agentId)) return skip("standing");
   if (!deps.judge) return skip("no_judge");
 
-  const input: AgentMediaInput = {
+  const asked: AgentMediaInput = {
     agent: { name: agent.name, role: agent.role },
     where: channel.kind === "dm" ? "dm" : "channel",
     conversation: await conversationBefore(db, reply, now()),
@@ -647,7 +647,7 @@ export async function maybeSendAgentMedia(
   try {
     judged = await judgeAgentMedia(
       deps.judge,
-      { orgId: reply.orgId, agentId, runId, input },
+      { orgId: reply.orgId, agentId, runId, input: asked },
       { gif, timeoutMs: deps.judgeTimeoutMs },
     );
   } catch {
