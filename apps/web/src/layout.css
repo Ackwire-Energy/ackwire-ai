@@ -5497,34 +5497,70 @@ p {
   margin: -4px 0 0;
   color: var(--ink2);
 }
-/* The activity bar while someone works: a compact pill (avatar · words · dots | Parar). Solid: a blur
-   here would redo itself on every frame of the streaming text behind it. */
+/* The activity bar while someone works: one low pill of one width (orbit · faces · words · time | Ver ■), so a
+   turning phrase, a ticking clock or a control coming and going never moves its edge: the words take what the
+   rest leaves and end in "…". Solid: a blur here would redo itself on every frame of the streaming text behind
+   it. */
 .ac-typing[data-active="true"] {
-  width: fit-content;
-  max-width: 100%;
-  min-height: 32px;
-  padding: 2px 4px 2px 6px;
+  max-width: 440px;
+  height: 28px;
+  padding: 0 8px;
   border-radius: var(--radius-full);
   background: var(--glass-solid);
   box-shadow: var(--e1), var(--top);
 }
-/* An agent in its browser: the whole pill opens the live view; "No navegador" says so. */
+/* An agent in its browser: the whole pill opens the live view; the globe says so. */
 .ac-typing[data-browser="true"] {
   cursor: pointer;
 }
-.ac-typing__browser.ac-btn {
+/* The pill's buttons are round and fit it; the last one sits in its round end, 2px from the edge all around. */
+.ac-typing__browser.ac-btn,
+.ac-typing .stop-run {
   flex: none;
+  width: 24px;
   height: 24px;
-  margin-left: 2px;
-  padding-inline: 8px;
-  gap: 4px;
-  font-size: inherit;
+  padding: 0;
+  border-radius: var(--radius-full);
+}
+.ac-typing__browser.ac-btn {
   color: var(--ink2);
 }
+.ac-typing[data-active="true"] > :is(.stop-run-wrap, .ac-typing__browser):last-child {
+  margin-right: -6px;
+}
+/* Who is typing comes last and keeps its width: the agents' words before it end in "…" first, then the names,
+   never what they do ("Maria Fernan… está digitando…"). */
 .ac-typing[data-active="true"] .ac-typing__text {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+/* The agents' words and the " · " after them: the words give way first, the " · " goes with their last bit, so it
+   never opens the line. */
+.ac-typing__agents {
+  display: flex;
+  overflow: hidden;
+}
+.ac-typing__people {
+  display: flex;
+  flex: none;
+  max-width: 100%;
+}
+/* They open with a space (" · ", " está digitando…") that would collapse at the start of a box. */
+.ac-typing__and,
+.ac-typing__people {
+  white-space: pre;
+}
+.ac-typing__typers {
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ac-typing__people {
+    animation: ac-fade-in 160ms ease-out both;
+  }
 }
 
 /* ── Calendário: pages/calendar.css ── */

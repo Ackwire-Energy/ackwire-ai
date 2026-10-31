@@ -8440,8 +8440,8 @@ export const en: Translations = {
   chat: {
     doing_one: "{{names}} is {{doing}}",
     doing_other: "{{names}} are {{doing}}",
-    /** "Theo, Iris and 2 more" (3 or more names in the working line). */
-    namesMore: "{{first}}, {{second}} and {{count}} more",
+    /** "Theo and 2 more" (3 or more names in the working line). */
+    namesMore: "{{first}} and {{count}} more",
     /** The card above the box turns its phrase. */
     phrase: {
       thinking: {

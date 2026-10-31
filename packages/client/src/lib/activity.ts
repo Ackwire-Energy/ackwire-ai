@@ -351,27 +351,22 @@ export function barEntries(
   return out;
 }
 
-export interface ActivityGroup {
-  names: string[];
-  activity: Activity;
-  consult?: EntryConsult;
+/** How many small faces the bar stacks, however many are at work (the sentence says "e mais N"). */
+export const BAR_FACES = 3;
+
+/** The faces the bar stacks: agents first, and at least one person typing when someone is. */
+export function barFaces(entries: ActivityEntry[]): ActivityEntry[] {
+  const agents = entries.filter((e) => e.type === "agent");
+  const people = entries.filter((e) => e.type === "person");
+  const shown = agents.slice(0, people.length > 0 ? BAR_FACES - 1 : BAR_FACES);
+  return [...shown, ...people.slice(0, BAR_FACES - shown.length)];
 }
 
-/** People doing the same thing share a phrase: "Ada e Atlas estão trabalhando". A consultation is its own. */
-export function groupActivities(entries: ActivityEntry[]): ActivityGroup[] {
-  const groups: ActivityGroup[] = [];
-  for (const e of entries) {
-    if (e.consult) {
-      groups.push({ names: [e.name], activity: e.activity, consult: e.consult });
-      continue;
-    }
-    const same = groups.find(
-      (g) => !g.consult && g.activity.kind === e.activity.kind && g.activity.app === e.activity.app,
-    );
-    if (same) same.names.push(e.name);
-    else groups.push({ names: [e.name], activity: e.activity });
-  }
-  return groups;
+/** The question the bar tells and times: one agent's on its own (beside others, its reply tells it). */
+export function barAsking(entries: ActivityEntry[]): EntryConsult | undefined {
+  const agents = entries.filter((e) => e.type === "agent");
+  const consult = agents.length === 1 ? agents[0]?.consult : undefined;
+  return consult?.status === "asking" ? consult : undefined;
 }
 
 /** "trabalhando", "consultando o GitHub". */
@@ -387,14 +382,10 @@ export const appLabel = (a: { kind: string; app?: string }) => {
 export type MarkName = (name: string) => string;
 const plain: MarkName = (name) => name;
 
-/** "Theo", "Theo e Iris", "Theo, Iris e mais 2". */
+/** "Theo", "Theo e Iris", "Theo e mais 2". */
 export function listNames(t: TFunction, names: string[], mark: MarkName = plain) {
   if (names.length <= 2) return joinNames(names.map(mark), t("newAgent.and"));
-  return t("chat.namesMore", {
-    first: mark(names[0] ?? ""),
-    second: mark(names[1] ?? ""),
-    count: names.length - 2,
-  });
+  return t("chat.namesMore", { first: mark(names[0] ?? ""), count: names.length - 1 });
 }
 
 /** One consultation's phrase: "Dev está perguntando ao Infra", "Infra respondeu. Dev está escrevendo". */
@@ -405,23 +396,37 @@ function consultPhrase(t: TFunction, from: string, c: EntryConsult, mark: MarkNa
   return t("chat.consult.writing", { from: mark(from) });
 }
 
+/** "Theo e Iris estão trabalhando", "Marina está digitando". */
+const doingPhrase = (t: TFunction, names: string[], activity: Activity, mark: MarkName) =>
+  t("chat.doing", { count: names.length, names: listNames(t, names, mark), doing: activityVerb(t, activity) });
+
+/** The agents' part: one says what it does (or whom it asks); several just work, their blocks say the rest. */
+function agentsPhrase(t: TFunction, entries: ActivityEntry[], mark: MarkName) {
+  const agents = entries.filter((e) => e.type === "agent");
+  const only = agents.length === 1 ? agents[0] : undefined;
+  if (only?.consult) return consultPhrase(t, only.name, only.consult, mark);
+  if (agents.length === 0) return "";
+  const names = agents.map((e) => e.name);
+  return doingPhrase(t, names, only?.activity ?? { kind: "thinking" }, mark);
+}
+
+const typingNames = (entries: ActivityEntry[]) => entries.flatMap((e) => (e.type === "person" ? [e.name] : []));
+
+const PHRASES_SEP = " · ";
+
+/** "Marina está digitando"; "" when nobody types. */
+function typingPhrase(t: TFunction, entries: ActivityEntry[], mark: MarkName) {
+  const people = typingNames(entries);
+  return people.length > 0 ? doingPhrase(t, people, { kind: "typing" }, mark) : "";
+}
+
 /**
- * The bar's sentence: "Theo, Iris e mais 2 estão trabalhando · Marina está
- * digitando…"; "" when nobody. `mark` wraps each name (for bold).
+ * The bar's sentence, one short line however many are at work: "Theo e mais 2 estão trabalhando · Marina
+ * está digitando…"; "" when nobody. `mark` wraps each name (for bold).
  */
 export function activitySentence(t: TFunction, entries: ActivityEntry[], mark: MarkName = plain) {
-  const groups = groupActivities(entries);
-  if (groups.length === 0) return "";
-  const phrases = groups.map((g) =>
-    g.consult
-      ? consultPhrase(t, g.names[0] ?? "", g.consult, mark)
-      : t("chat.doing", {
-          count: g.names.length,
-          names: listNames(t, g.names, mark),
-          doing: activityVerb(t, g.activity),
-        }),
-  );
-  return `${phrases.join(" · ")}…`;
+  const phrases = [agentsPhrase(t, entries, mark), typingPhrase(t, entries, mark)].filter(Boolean);
+  return phrases.length > 0 ? `${phrases.join(PHRASES_SEP)}…` : "";
 }
 
 /** The bar's sentence as plain text (see `activitySentence`). */
@@ -478,4 +483,26 @@ export function barPhrase(
   const said = narrationOf(run).at(-1);
   if (said) pool.push(t("chat.phrase.said", { name: mark(only.name), text: said }));
   return pool[tick % pool.length] ?? sentence;
+}
+
+/**
+ * `barPhrase` in pieces, in the order they give way when the bar is short: the agents' words (then the " · "
+ * after them, so it never leads the line), the names of who is typing, and never what they do (" está
+ * digitando…"). Joined, they read as `barPhrase`; all but the first are "" when nobody types.
+ */
+export function barWords(
+  t: TFunction,
+  entries: ActivityEntry[],
+  runs: LiveRun[],
+  tick: number,
+  now: number,
+  mark: MarkName = plain,
+): [agents: string, sep: string, typers: string, typing: string] {
+  const typing = typingPhrase(t, entries, mark);
+  if (!typing) return [barPhrase(t, entries, runs, tick, now, mark), "", "", ""];
+  const agents = agentsPhrase(t, entries, mark);
+  // The names lead the phrase in pt-BR and en; a language that puts them later keeps the phrase whole.
+  const names = listNames(t, typingNames(entries), mark);
+  const at = typing.startsWith(names) ? names.length : 0;
+  return [agents, agents ? PHRASES_SEP : "", typing.slice(0, at), `${typing.slice(at)}…`];
 }

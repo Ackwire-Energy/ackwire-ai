@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { LiveConsult, LiveRun, LiveWork, Message, RunConsultation } from "@agenteschat/client";
+import { activitySentence, barFaces } from "@agenteschat/client/lib/activity";
 import { consultBlocksNearEnd, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { toolCalls, toolNow, toolPhrase, toolWhy } from "@agenteschat/client/lib/work";
@@ -213,6 +214,26 @@ describe("working line", () => {
   test("the tool step comes through (what it is doing, as on the web)", () => {
     const [e] = workingEntries([run({ runId: "r", agentId: "atlas", tool: "sentry_list_issues" })], [], name);
     expect(e?.activity).toEqual({ kind: "consulting", app: "Sentry" });
+  });
+
+  test("people typing join the one line after the agents, with three faces at most (as on the web)", async () => {
+    const t = await translator("pt-BR");
+    const people: Record<string, string> = { u1: "Marina", u2: "Bia", u3: "Caio" };
+    const personName = (id: string) => people[id];
+    const agents = ["atlas", "ada", "infra"].map((agentId) => run({ runId: `r-${agentId}`, agentId }));
+    // Someone the directory doesn't know (gone from the workspace) isn't named.
+    const entries = workingEntries(agents, [], name, ["u1", "u2", "u3", "gone"], personName);
+    expect(entries.map((e) => `${e.type}:${e.id}`)).toEqual([
+      "agent:atlas",
+      "agent:ada",
+      "agent:infra",
+      "person:u1",
+      "person:u2",
+      "person:u3",
+    ]);
+    expect(activitySentence(t, entries)).toBe("Atlas e mais 2 estão trabalhando · Marina e mais 2 estão digitando…");
+    expect(barFaces(entries).map((e) => e.id)).toEqual(["atlas", "ada", "u1"]);
+    expect(activitySentence(t, workingEntries([], [], name, ["u1"], personName))).toBe("Marina está digitando…");
   });
 
   test("Parar: real runs at work, also while they write (not a guess, not one waiting)", () => {

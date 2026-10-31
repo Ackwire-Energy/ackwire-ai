@@ -64,6 +64,13 @@ test("typing frames fan out to subscribers of the channel (throttled), never to 
   expect(
     b.frames.filter((f) => f.type === "event" && (f.event as { type: string }).type === "user.typing"),
   ).toHaveLength(1);
+  // Typed in a thread: the frame says which, so only that thread's view shows it.
+  const threadId = "0193a2b4-0000-7000-8000-0000000000aa";
+  b.send({ type: "typing", channelId, threadId });
+  const inThread = await a.until(
+    (f) => f.type === "event" && (f.event as { threadId?: unknown }).threadId === threadId,
+  );
+  expect(inThread.event).toMatchObject({ type: "user.typing", channelId, threadId, ttlMs: 5000 });
   a.ws.close();
   b.ws.close();
 });

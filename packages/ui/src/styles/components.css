@@ -2769,7 +2769,7 @@ a.ac-list__row:focus-visible {
   color: var(--ink-muted);
 }
 
-/* Typing bar above the composer: tiny avatars + "Theo está digitando…" + three dots */
+/* The bar above the composer: the orbit (or three dots while only people type), tiny avatars, "Theo está trabalhando…" */
 .ac-typing {
   display: flex;
   align-items: center;
@@ -2832,6 +2832,7 @@ a.ac-list__row:focus-visible {
 }
 .ac-typing__dots {
   display: inline-flex;
+  flex: none;
   gap: 3px;
   align-items: center;
 }

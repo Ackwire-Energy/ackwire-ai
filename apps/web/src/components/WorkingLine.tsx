@@ -2,7 +2,9 @@ import { elapsedClock, type LiveRun } from "@agenteschat/client";
 import {
   type ActivityEntry,
   activitySentence,
-  barPhrase,
+  barAsking,
+  barFaces,
+  barWords,
   type MarkName,
   PHRASE_TURN_MS,
 } from "@agenteschat/client/lib/activity";
@@ -16,12 +18,9 @@ import { useDirectory } from "@/hooks/useDirectory";
 /**
  * The working line's pieces: the
  * stacked live mini bodies of who is on it, the sentence with names in ink
- * ("Theo, Iris e mais 2 estão trabalhando…", "Dev está perguntando ao
- * Infra…") and the clock of a question that is out.
+ * ("Theo e mais 2 estão trabalhando · Marina está digitando…", "Dev está
+ * perguntando ao Infra…") and the clock of a question that is out.
  */
-
-/** How many mini bodies the stack shows (the sentence says "e mais N"). */
-export const STACK_MAX = 4;
 
 // Names travel through i18n wrapped in these, then come back as <b>.
 const OPEN = "\u0001";
@@ -52,6 +51,7 @@ export function WorkingWords({ entries }: { entries: ActivityEntry[] }) {
 /**
  * The card's phrase, turning: one agent on its own gets a light line
  * while it only thinks, then what it does, an aside on a long step and what it said last, in turn.
+ * Who is typing comes last, in a piece of its own that keeps its width (`barWords`).
  */
 export function BarPhrase({ entries, runs }: { entries: ActivityEntry[]; runs: LiveRun[] }) {
   const { t } = useTranslation();
@@ -62,7 +62,23 @@ export function BarPhrase({ entries, runs }: { entries: ActivityEntry[]; runs: L
     const timer = setInterval(() => setTick((n) => n + 1), PHRASE_TURN_MS);
     return () => clearInterval(timer);
   }, [turning]);
-  return <TurnText text={barPhrase(t, entries, runs, tick, Date.now(), mark)} />;
+  const [agents, sep, typers, typing] = barWords(t, entries, runs, tick, Date.now(), mark);
+  return (
+    <>
+      {agents && (
+        <span className="ac-typing__agents">
+          <TurnText text={agents} />
+          {sep && <span className="ac-typing__and">{sep}</span>}
+        </span>
+      )}
+      {typing && (
+        <span className="ac-typing__people">
+          <span className="ac-typing__typers">{boldNames(typers)}</span>
+          {typing}
+        </span>
+      )}
+    </>
+  );
 }
 
 /**
@@ -91,14 +107,13 @@ function TurnText({ text }: { text: string }) {
 }
 
 /**
- * The stacked mini bodies: each on a plate so overlaps stay readable. An
- * agent asking another shows both, with an arrow (the one asked is thinking).
+ * The stacked mini bodies, a few at most (`barFaces`): each on a plate so overlaps stay readable. An agent
+ * on its own asking another shows both, with an arrow (the one asked is thinking).
  */
 export function WorkingStack({ entries }: { entries: ActivityEntry[] }) {
   const { org } = useOrg();
   const dir = useDirectory(org.id);
-  const shown = entries.filter((e) => e.type === "agent").slice(0, STACK_MAX);
-  const people = entries.filter((e) => e.type === "person");
+  const asking = barAsking(entries);
   const tok = (key: string, node: ReactNode) => (
     <span key={key} className="ac-typing__tok">
       {node}
@@ -106,31 +121,32 @@ export function WorkingStack({ entries }: { entries: ActivityEntry[] }) {
   );
   return (
     <span className="ac-typing__avatars" aria-hidden="true">
-      {shown.map((e) => {
-        const c = e.consult;
-        if (c?.status === "asking")
+      {barFaces(entries).map((e) => {
+        if (e.type === "person")
+          return tok(`p:${e.id}`, <Avatar size="xs" name={e.name} imageUrl={dir.memberById.get(e.id)?.image} />);
+        if (asking && e.consult === asking)
           return (
             <Fragment key={`c:${e.id}`}>
               {tok(`a:${e.id}`, <AgentAvatar agentId={e.id} size="xs" name={e.name} state="idle" />)}
               <span className="ac-typing__to">
                 <Icon name="arrowRight" size={14} />
               </span>
-              {tok(`t:${c.to}`, <AgentAvatar agentId={c.to} size="xs" name={c.toName} state="thinking" />)}
+              {tok(
+                `t:${asking.to}`,
+                <AgentAvatar agentId={asking.to} size="xs" name={asking.toName} state="thinking" />,
+              )}
             </Fragment>
           );
         return tok(`a:${e.id}`, <AgentAvatar agentId={e.id} size="xs" name={e.name} state="writing" />);
       })}
-      {people.map((e) =>
-        tok(`p:${e.id}`, <Avatar size="xs" name={e.name} imageUrl={dir.memberById.get(e.id)?.image} />),
-      )}
     </span>
   );
 }
 
-/** "0:41" next to a question that is out (tabular figures); null when nobody is asking. */
+/** "0:41" next to the question the line tells (tabular figures); null when it tells none (`barAsking`). */
 export function ConsultClock({ entries, now }: { entries: ActivityEntry[]; now: number }) {
   const { t } = useTranslation();
-  const asking = entries.find((e) => e.consult?.status === "asking")?.consult;
+  const asking = barAsking(entries);
   if (!asking) return null;
   const time = elapsedClock(now - asking.since);
   return (
