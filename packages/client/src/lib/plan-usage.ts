@@ -125,8 +125,8 @@ export interface OwnPlanLine {
  * The viewer's plans that an agent thinks with and whose limits are known (Sua conta, and the profile menu near a
  * limit, ADR 0063 §5): their computers' own sign-ins, then their accounts, as "Seus planos" orders and names them.
  * An account names its agents (`usedBy`) and thinks for nobody once signed out everywhere; a computer's own sign-in
- * thinks for the pairer's agents there that have no account (ADR 0059 §3). With own sign-ins on several computers,
- * each says which.
+ * thinks for the pairer's agents there that have no account (ADR 0059 §3). Two of one name say which, as "Seus planos"
+ * tells them apart: their computers, or on the same computer an account's email (or its key's end).
  */
 export function ownPlanLines(
   t: TFunction,
@@ -136,9 +136,7 @@ export function ownPlanLines(
 ): OwnPlanLine[] {
   const groups = groupPlans(view?.accounts ?? []);
   const onAccounts = new Set(groups.flatMap((g) => g.usedBy));
-  const signIns = ownSignIns(view);
-  const several = new Set(signIns.map((o) => o.machineId)).size > 1;
-  const own = signIns
+  const own = ownSignIns(view)
     .filter((o) =>
       agents.some(
         ({ name, ownerUserId, brain }) =>
@@ -149,22 +147,39 @@ export function ownPlanLines(
           !onAccounts.has(name),
       ),
     )
-    .map((o) => {
-      const title = ownSignInTitle(t, o);
-      return {
-        key: o.key,
-        logo: o.kind,
-        name: several ? `${title} ${t("aiAccounts.page.on", { computer: o.computer })}` : title,
-        usage: o.usage,
-      };
-    });
+    .map((o) => ({
+      key: o.key,
+      logo: o.kind,
+      name: ownSignInTitle(t, o),
+      usage: o.usage,
+      computer: o.computer,
+      detail: null,
+    }));
   const accounts = groups.flatMap(({ key, logins, usedBy, usage, signedOut }) => {
     const a = logins[0];
     return a && usedBy.length > 0 && signedOut.length < logins.length
-      ? [{ key, logo: a.provider ?? a.kind, name: accountTitle(a), usage }]
+      ? [
+          {
+            key,
+            logo: a.provider ?? a.kind,
+            name: accountTitle(a),
+            usage,
+            computer: a.computer,
+            detail: a.email ?? (a.keyHint ? t("aiAccounts.page.keyEnds", { hint: a.keyHint }) : null),
+          },
+        ]
       : [];
   });
-  return [...own, ...accounts].flatMap((p) => (knownLimits(p.usage) ? [{ ...p, usage: p.usage }] : []));
+  const lines = [...own, ...accounts].flatMap((p) => (knownLimits(p.usage) ? [{ ...p, usage: p.usage }] : []));
+  return lines.map(({ computer, detail, ...p }) => {
+    const twins = lines.filter((l) => l.key !== p.key && l.name === p.name);
+    if (twins.length === 0) return p;
+    const here = twins.some((l) => l.computer === computer);
+    return {
+      ...p,
+      name: here && detail ? `${p.name} · ${detail}` : `${p.name} ${t("aiAccounts.page.on", { computer })}`,
+    };
+  });
 }
 
 /**

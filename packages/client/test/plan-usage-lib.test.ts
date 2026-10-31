@@ -209,21 +209,23 @@ describe("your plans with their limits (Sua conta, the profile menu near a limit
     expect(lines([onOwn("Ada", { kind: "codex" })])).toEqual(["a1"]);
   });
 
-  test("own sign-ins on more than one computer say which", () => {
-    const view = {
-      computers: [
-        computer({ claude_code: { plan: "max", usage: HOURS } }),
-        computer({ claude_code: { plan: "max", usage: HOURS } }, "m2", "iMac"),
-      ],
-      accounts: [],
-    };
+  test("two plans of one name say which: their computers, or on the same computer an account's email", () => {
+    const names = (view: AiAccounts, agents: ReturnType<typeof onOwn>[]) =>
+      ownPlanLines(t, view, agents, ME).map((p) => p.name);
+    const max = { claude_code: { plan: "max", usage: HOURS } };
+    const own = { computers: [computer(max), computer(max, "m2", "iMac")], accounts: [] };
     const agents = [onOwn(), onOwn("Bia", { computer: "iMac" })];
-    expect(ownPlanLines(t, view, agents, ME).map((p) => p.name)).toEqual([
-      "Claude · Max on MacBook",
-      "Claude · Max on iMac",
-    ]);
-    expect(ownPlanLines(t, { ...view, computers: view.computers.slice(0, 1) }, agents, ME)[0]?.name).toBe(
-      "Claude · Max",
-    );
+    expect(names(own, agents)).toEqual(["Claude · Max on MacBook", "Claude · Max on iMac"]);
+    expect(names({ ...own, computers: own.computers.slice(0, 1) }, agents)).toEqual(["Claude · Max"]);
+
+    // The MacBook's own sign-in on Max and an account named "Claude" on Max.
+    const claude = account("a1", { label: "Claude", plan: "max", email: "ana@work.com" });
+    const onMac = { computers: [computer(max)], accounts: [claude] };
+    expect(names(onMac, [onOwn()])).toEqual(["Claude · Max on MacBook", "Claude · Max · ana@work.com"]);
+    const onImac = { ...onMac, accounts: [{ ...claude, machineId: "m2", computer: "iMac" }] };
+    expect(names(onImac, [onOwn()])).toEqual(["Claude · Max on MacBook", "Claude · Max on iMac"]);
+    // The same account signed in on both computers.
+    const both = { computers: [], accounts: [claude, { ...claude, id: "a2", machineId: "m2", computer: "iMac" }] };
+    expect(names(both, [])).toEqual(["Claude · Max on MacBook", "Claude · Max on iMac"]);
   });
 });
