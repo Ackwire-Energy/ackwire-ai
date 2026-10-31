@@ -1,6 +1,5 @@
 import { planState, planWindows } from "@agenteschat/ui/plan-state";
 import { ago, zoneOf } from "./context";
-import { formatUsd } from "./format";
 import { defaultAccountLabel } from "./machine-accounts";
 import { type AgentPlanUsageView, type ApiAgentUsage, agentUsageFor, type PlanAccountUsage } from "./plan-usage";
 import { personBehindCall } from "./requester";
@@ -58,7 +57,7 @@ function planText(a: PlanAccountUsage, agentId: string, zone: string, now: Date)
     .join("\n");
 }
 
-/** This month's tokens, plans and API apart; with money, what the plans' would cost through the API. */
+/** This month's tokens, plans and API apart. */
 function tokensText(view: AgentPlanUsageView) {
   const plan = view.sources.filter((s) => s.type === "plan").reduce((n, s) => n + s.tokens, 0);
   const api = view.tokens - plan;
@@ -70,41 +69,33 @@ function tokensText(view: AgentPlanUsageView) {
         : api > 0
           ? " (all through the API)"
           : "";
-  const priced =
-    view.money && plan > 0 && view.equivalentUsd != null
-      ? ` Through the API the plans' tokens would have cost about ${formatUsd(view.equivalentUsd)}, but the plans already pay for them.`
-      : "";
-  return `Tokens this month (UTC): ${view.tokens.toLocaleString("en-US")}${split}.${priced}`;
+  return `Tokens this month (UTC): ${view.tokens.toLocaleString("en-US")}${split}.`;
 }
 
 function budgetText(api: ApiAgentUsage, zone: string, now: Date) {
   const resets = describeWhen(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)), zone, now);
-  const money =
-    api.costUsd !== undefined && api.budgetUsd !== undefined
-      ? `, ${formatUsd(api.costUsd)} of ${formatUsd(api.budgetUsd)}${api.budgetIsDefault ? " (the workspace's default per agent)" : ""}`
-      : "";
-  return `API budget this month: ${api.budgetPercent}% used${money}. It resets ${resets}.`;
+  return `API budget this month: ${api.budgetPercent}% used. It resets ${resets}.`;
 }
 
 /**
- * `get_my_usage`: the agent's own usage, as its page's Uso tab shows it to the person behind the run (ADR 0063 §6):
- * the windows of the plan it thinks with and its part of each, its tokens this month, and its API budget where it
- * thinks through the API (always on the model brain, on a plan once it spent through the API this month). Never
- * another agent's numbers nor an account's email; money only when that person may see it (`view_usage`), so never
- * in a run nobody is behind.
+ * `get_my_usage`: the agent's own usage as its page's Uso tab shows it (ADR 0063 §6): the windows of the plan it
+ * thinks with and its part of each, its tokens this month, and how much of its API budget it used where it thinks
+ * through the API (always on the model brain, on a plan once it spent through the API this month). Never another
+ * agent's numbers, an account's email or money, whoever asks: the result stays in the run, whose steps the agent's
+ * owner reads without `view_usage`, and the answer may go to a channel where not everyone may see costs.
  */
 export function createUsageToolSource(): ToolSource {
   const tool: ToolDefinition = {
     name: USAGE_TOOL,
     description:
-      "Your own usage: the limits of the AI plan you think with (5 hours, week, month: how much is used, your part and when each resets), your tokens this month, and your API budget and spend. Call it whenever someone asks about your limits, usage, quota, tokens or what you cost, instead of guessing or saying you can't check.",
+      "Your own usage: the limits of the AI plan you think with (5 hours, week, month: how much is used, your part and when each resets), your tokens this month, and how much of your API budget you used. Call it whenever someone asks about your limits, usage, quota, tokens or what you cost, instead of guessing or saying you can't check.",
     scope: "",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
     async execute(_input, ctx) {
       const now = new Date();
       const person = await personBehindCall(ctx);
       const [{ view, brain, api }, zone] = await Promise.all([
-        agentUsageFor(ctx.db, person, ctx.orgId, ctx.agentId, now),
+        agentUsageFor(ctx.db, null, ctx.orgId, ctx.agentId, now),
         zoneOf(ctx.db, ctx.orgId, person),
       ]);
       const onApi = brain === "model";
@@ -116,12 +107,7 @@ export function createUsageToolSource(): ToolSource {
             : "No plan thinks for you right now.",
         tokensText(view),
         api && (onApi || view.sources.some((s) => s.type === "api")) ? budgetText(api, zone, now) : "",
-        view.money
-          ? ""
-          : person
-            ? "The person you're answering can't see amounts in US$ (only people allowed to see the workspace's costs can): share percentages and tokens only."
-            : "No person is behind this run, so no amounts in US$.",
-        "People see the same on your page's Usage tab and in Settings › Budget and usage (in Portuguese, Uso and Configurações › Orçamento e uso).",
+        "People see the same on your page's Usage tab and in Settings › Budget and usage (in Portuguese, Uso and Configurações › Orçamento e uso). Amounts in US$ are there too, for people allowed to see the workspace's costs, never here.",
       ];
       return { content: parts.filter(Boolean).join("\n\n") };
     },

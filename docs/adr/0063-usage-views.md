@@ -46,13 +46,13 @@ The viewer's own plans' limits (`ownPlanLines`): the plans one of their agents t
 
 ### 6. The agent sees its own usage
 
-*Added 2026-10-31.* Asked "how is your usage limit?", an agent could only say it couldn't check. `get_my_usage` (`packages/engine/src/usage-tools.ts`) is a built-in tool with no scope: every agent has it in every run, listed from the first turn (the conversation group, ADR 0043). It reads the agent's own Uso tab as the person behind the run would see it (`agentUsageFor`, which also serves `GET …/agents/{agentId}/usage`):
+*Added 2026-10-31.* Asked "how is your usage limit?", an agent could only say it couldn't check. `get_my_usage` (`packages/engine/src/usage-tools.ts`) is a built-in tool with no scope: every agent has it in every run, listed from the first turn (the conversation group, ADR 0043). It reads the agent's own Uso tab as someone without `view_usage` sees it (`agentUsageFor` with no viewer, which also serves `GET …/agents/{agentId}/usage`):
 
-- the plan it thinks with (its name, maker, plan and owner), each window tightest first with its percentage, when it resets in that person's time zone and the agent's estimated part (§2), and near or at the limit what the apps say (`planWindows`, `planState`);
+- the plan it thinks with (its name, maker, plan and owner), each window tightest first with its percentage, when it resets in the time zone of the person behind the run and the agent's estimated part (§2), and near or at the limit what the apps say (`planWindows`, `planState`);
 - its tokens this month, plans and API apart;
-- its API budget where it uses the API: always on the model brain, on a plan once it spent through the API this month (§5).
+- how much of its API budget it used where it uses the API: always on the model brain, on a plan once it spent through the API this month (§5).
 
-Only its own numbers: never another agent's part, tokens or budget, nor an account's email. Money (the budget's amounts, what plan tokens would cost through the API) only when the person behind the run has `view_usage` (§4), so never in a routine's run or one nobody is behind. The run policy lists it as a read, so those runs still see percentages and tokens. The chat names the call "Conferiu o próprio uso" / "Checked its usage".
+Only its own numbers: never another agent's part, tokens or budget, nor an account's email. Never money (the budget's amounts, what plan tokens would cost through the API), even when an admin asks: the result stays in the run, whose steps the agent's owner reads without `view_usage` (`GET …/runs/{runId}`, §4), and the answer may go to a channel where not everyone may see costs. It says the amounts are in Configurações › Orçamento e uso, for those who may see them. The run policy lists it as a read, so a routine's run, with nobody behind it, calls it too. The chat names the call "Conferiu o próprio uso" / "Checked its usage".
 
 ## Consequences
 

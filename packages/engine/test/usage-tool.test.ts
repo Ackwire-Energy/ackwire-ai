@@ -11,14 +11,15 @@ import {
   type ToolContext,
   USAGE_TOOL,
 } from "../src";
-import { formatUsd } from "../src/format";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
 /**
- * `get_my_usage`: an agent's own numbers as its Uso tab shows them to the person behind the run (ADR 0063 §4):
- * the plan it thinks with, its part of each window, its tokens and its API budget; money only for `view_usage`.
+ * `get_my_usage`: an agent's own numbers as its Uso tab shows them (ADR 0063 §6): the plan it thinks with, its part
+ * of each window, its tokens and its API budget use, and never money, not even when an admin asks.
  */
+
+const money = /US\$ \d|would have cost/;
 
 let f: Fixture;
 afterEach(async () => {
@@ -115,7 +116,7 @@ async function onPlan() {
   return { atlas };
 }
 
-test("on a plan: its windows tightest first with its own part and renewal, its tokens; money for an admin", async () => {
+test("on a plan: its windows tightest first with its own part and renewal, its tokens; no money for an admin", async () => {
   await onPlan();
   const view = await agentPlanUsage(f.db, f.owner.id, f.org.id, f.agent.id);
   const part = (kind: string) =>
@@ -132,7 +133,8 @@ test("on a plan: its windows tightest first with its own part and renewal, its t
   expect(text).toContain(`Week: 30% used, resets `);
   expect(text).toContain(`Your part: about ${part("seven_day")}%.`);
   expect(text).toContain("Tokens this month (UTC): 22,000 (all on plans).");
-  expect(text).toContain(`would have cost about ${formatUsd(view.equivalentUsd ?? 0)},`);
+  // The result stays in the run, which the agent's owner reads without `view_usage`.
+  expect(text).not.toMatch(money);
   // On a plan with no API use this month: no budget line.
   expect(text).not.toContain("API budget");
   // Never another agent's numbers, nor the account's email.
@@ -145,14 +147,12 @@ test("on a plan: a member and a routine's run see the same limits and tokens, ne
   const member = await check(await runFor(f.agent.id, bia.id));
   expect(member).toContain("- 5 hours: 60% used, resets ");
   expect(member).toContain("Tokens this month (UTC): 22,000 (all on plans).");
-  expect(member).toContain("The person you're answering can't see amounts in US$");
-  expect(member).not.toMatch(/US\$ \d|would have cost/);
+  expect(member).not.toMatch(money);
 
-  // A routine's run reads too (it only looks), and nobody is behind it to see money.
+  // A routine's run reads too (it only looks), with nobody behind it.
   const routine = await check(await runFor(f.agent.id, f.owner.id, true));
   expect(routine).toContain("- 5 hours: 60% used, resets ");
-  expect(routine).toContain("No person is behind this run, so no amounts in US$.");
-  expect(routine).not.toMatch(/US\$ \d|would have cost/);
+  expect(routine).not.toMatch(money);
 });
 
 test("at the limit: the plan says until when; unknown windows say so instead of 0%", async () => {
@@ -172,7 +172,7 @@ test("at the limit: the plan says until when; unknown windows say so instead of 
   expect(unknown).not.toContain("0% used");
 });
 
-test("on the API: its budget and spend for an admin, the percentage for a member; another agent's spend stays out", async () => {
+test("on the API: how much of its budget it used, for an admin and a member alike; another agent's spend stays out", async () => {
   f = await setup({ toolSources: [createUsageToolSource()] });
   const atlas = await createAgent(
     f.db,
@@ -198,16 +198,15 @@ test("on the API: its budget and spend for an admin, the percentage for a member
 
   const admin = await check(await runFor(f.agent.id, f.owner.id));
   expect(admin).toContain("You think through the API");
-  expect(admin).toContain(
-    "API budget this month: 4% used, US$ 2.00 of US$ 50.00 (the workspace's default per agent). It resets ",
-  );
+  expect(admin).toContain("API budget this month: 4% used. It resets ");
   expect(admin).toContain("Tokens this month (UTC): 1,000 (all through the API).");
-  expect(admin).not.toMatch(/Atlas|9,000|US\$ 10\.00/);
+  expect(admin).not.toMatch(/Atlas|9,000/);
+  expect(admin).not.toMatch(money);
 
   const bia = await addMember(f.db, f.org.id, "member", "Bia");
   const member = await check(await runFor(f.agent.id, bia.id));
   expect(member).toContain("API budget this month: 4% used. It resets ");
-  expect(member).not.toMatch(/US\$ \d/);
+  expect(member).not.toMatch(money);
 });
 
 test("every agent has it, with no grant and before any tool group is loaded", async () => {
@@ -218,13 +217,4 @@ test("every agent has it, with no grant and before any tool group is loaded", as
   expect(listed?.map((t) => t.name)).toContain(USAGE_TOOL);
   const routine = await f.tools?.list(await runFor(f.agent.id, f.owner.id, true));
   expect(routine?.map((t) => t.name)).toContain(USAGE_TOOL);
-});
-
-test("money reads as the apps write it: two decimals, more for a tiny amount, never zero for a spend", () => {
-  expect(formatUsd(2)).toBe("US$ 2.00");
-  expect(formatUsd(1234.5)).toBe("US$ 1,234.50");
-  expect(formatUsd(0.004)).toBe("US$ 0.004");
-  expect(formatUsd(0.0003)).toBe("US$ 0.0003");
-  expect(formatUsd(0.00003)).toBe("<US$ 0.0001");
-  expect(formatUsd(0)).toBe("US$ 0.00");
 });
