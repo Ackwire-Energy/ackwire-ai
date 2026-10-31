@@ -151,6 +151,12 @@ export function AuthFlow({
     if (launched && step === "email" && !initialEmail) emailField.current?.focus();
   }, [launched]);
 
+  /** A provider refused: its words, and the address an unconfirmed account's refusal was for, in the field. */
+  const socialRefused = (text: string, address?: string) => {
+    setError(text);
+    if (address && text === t("auth.unconfirmed")) setEmail(address);
+  };
+
   /** Better Auth's refusal → the sentence to show (never the server's raw text). */
   const failed = (refusal: { status: number; code?: string }) =>
     setError(refusal.status ? refusalText(t, refusal) : t("mobile.auth.errors.network"));
@@ -426,7 +432,9 @@ export function AuthFlow({
         <Button variant="primary" wide label={submitLabel[step]} disabled={!ready || pending} onPress={submit} />
       ) : null}
 
-      {step === "email" ? <SocialButtons providers={allProviders} onError={setError} earlyAccess={access} /> : null}
+      {step === "email" ? (
+        <SocialButtons providers={allProviders} onError={socialRefused} earlyAccess={access} />
+      ) : null}
 
       {step === "password" && canReset ? <Quiet label={t("auth.forgotPassword")} onPress={() => go("forgot")} /> : null}
 

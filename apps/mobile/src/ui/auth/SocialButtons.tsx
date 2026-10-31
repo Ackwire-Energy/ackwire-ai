@@ -1,5 +1,6 @@
 import { type SignInProvider, useAuthConfig } from "@agenteschat/client";
 import { earlyAccessHeaders, earlyAccessState } from "@agenteschat/client/lib/guards";
+import { jwtEmail } from "@agenteschat/client/lib/text";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -48,7 +49,8 @@ export function SocialButtons({
 }: {
   providers: SignInProvider[];
   divider?: boolean;
-  onError: (message: string) => void;
+  /** `email`: the address Apple's native sign-in was refused for (its ID token's), which the field may not hold. */
+  onError: (message: string, email?: string) => void;
   /** Where the browser's sign-in comes back to: a screen that asked for it again stays open. */
   callbackURL?: string;
   /** Signed in, for a screen that asked for a new sign-in while signed in already. */
@@ -102,7 +104,7 @@ export function SocialButtons({
         idToken: { token: credential.identityToken },
         fetchOptions: { headers: earlyAccessHeaders(earlyAccess) },
       });
-      if (res.error) onError(socialRefusalText(t, res.error, emails));
+      if (res.error) onError(socialRefusalText(t, res.error, emails), jwtEmail(credential.identityToken));
       else onSignedIn?.();
     } catch (e) {
       // Closing Apple's sheet is not an error.
