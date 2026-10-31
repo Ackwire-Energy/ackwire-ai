@@ -14,6 +14,7 @@ import type {
   ToolDecision,
 } from "../api/types";
 import type { Level } from "./access-levels";
+import { webmailOf } from "./text";
 import type { ReviewTool } from "./tool-review";
 
 /** The cards in the catalog's "Email" group. */
@@ -57,6 +58,15 @@ const ADDRESS = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DOMAIN = /^@[^\s@]+\.[^\s@]+$/;
 
 export const isAddress = (value: string) => ADDRESS.test(value.trim());
+
+/**
+ * The webmail of an address that can't sign in to iCloud Mail ("Gmail"), even when it is the person's Apple
+ * Account: the iCloud form's hint. Null for Apple's own domains and custom ones (iCloud+ domains are custom).
+ */
+export function notIcloudMail(address: string): string | null {
+  const webmail = webmailOf(address);
+  return webmail && webmail.name !== "iCloud Mail" ? webmail.name : null;
+}
 
 /** An address (`ana@empresa.com`) or a whole domain (`@empresa.com`). */
 export const isAddressOrDomain = (value: string) => {
