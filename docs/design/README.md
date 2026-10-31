@@ -16,5 +16,5 @@ Fonte de verdade visual para o frontend.
 - Cards neutros; estado só em chip com ícone (nunca bolinha, nunca card tingido).
 - Mono só para código.
 - Controles sempre próprios (select, checkbox, radio, menu, diálogo); nada com visual nativo.
-- Barra de rolagem também é nossa com mouse ou trackpad: fina, arredondada, no tom da tinta, sem trilho nem setas (`packages/ui`, `components.css`). Na tela de toque fica o indicador do sistema, que só aparece rolando e não ocupa espaço. Faixas que rolam com o dedo (passos, chips, abas) escondem a sua em qualquer aparelho. `apps/web/test/scrollbars-css.test.ts` guarda as regras.
+- Barra de rolagem também é nossa com mouse ou trackpad: fina, arredondada, no tom da tinta, sem trilho nem setas (`packages/ui`, `components.css`). Na tela de toque fica o indicador do sistema, que só aparece rolando e não ocupa espaço. Faixas que rolam com o dedo (passos, chips, abas) escondem a sua em qualquer aparelho. O polegar para antes das pontas, dentro de qualquer canto arredondado. Uma lista que esmaece nas pontas com máscara termina a máscara com `var(--scroll-strip)`, para o esmaecido não apagar a barra. `apps/web/test/scrollbars-css.test.ts` guarda as regras.
 - Listas longas e edição detalhada vão para diálogos com lista e busca.
