@@ -122,7 +122,7 @@ export const organizationMembers = pgTable(
 );
 
 /**
- * A workspace's roles (ADR 0085), Discord-like: a person holds any number and may do what any of them allows.
+ * A workspace's roles (ADR 0085): a person holds any number and may do what any of them allows.
  * `everyone` is the base every member holds without a row in `organization_member_roles`; there is exactly one
  * per organization, always below the others. `position` orders the rest, 0 the highest: whoever is higher
  * manages the roles and the people below. `permissions` holds `RolePermission` keys

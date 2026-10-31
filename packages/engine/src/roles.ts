@@ -24,7 +24,7 @@ import {
 } from "./permissions";
 
 /**
- * A workspace's roles (ADR 0085): Discord-like, a person holds any number and may do what any allows; `everyone`
+ * A workspace's roles (ADR 0085): a person holds any number and may do what any allows; `everyone`
  * ("Todos") is the base every member holds; order is hierarchy. Two rules keep it from being climbed: anyone but
  * an owner only touches roles below their own highest one (and people whose highest role is below theirs), and
  * never gives a key they don't hold themselves.
