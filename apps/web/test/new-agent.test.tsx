@@ -553,6 +553,31 @@ describe("Criar agente: what gets created", () => {
     ]);
   });
 
+  test("the last setup still arriving when the role is picked: it starts there once it comes", async () => {
+    const state = seedState();
+    state.newAgentSetup = { brain: "model", model: "claude-opus-5-5", key: null, contextTokens: null };
+    const api = createFakeApi(state);
+    let arrive = () => {};
+    const arrived = new Promise<void>((resolve) => {
+      arrive = resolve;
+    });
+    const read = api.agents.newAgentSetup;
+    api.agents.newAgentSetup = async (orgId) => {
+      await arrived;
+      return read(orgId);
+    };
+    await open(state, api);
+    await startAs("Assistente");
+    arrive();
+    await settle(8);
+    await proceed(4);
+    expect(
+      screen()
+        .getByRole("button", { name: /^Claude Opus 5\.5/ })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+  });
+
   test("the last setup: the API's model and key as they were; someone else's plan leaves Automático", async () => {
     const state = seedState();
     state.newAgentSetup = { brain: "model", model: "claude-opus-5-5", key: "cred-1", contextTokens: null };
