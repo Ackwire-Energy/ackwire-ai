@@ -32,6 +32,11 @@ export interface ToolContext {
    * do is the run policy's (`run-policy.ts`), read from who is behind the run, never from this flag.
    */
   background?: boolean;
+  /**
+   * The call runs because a person approved it (`executeApproved`): the computer runs its command even
+   * when its command policy would hold it. Never set from a call's input.
+   */
+  approved?: boolean;
 }
 
 export interface ToolOutput {
@@ -75,6 +80,11 @@ export interface ToolDefinition {
   connectorLabel?: string;
   /** Needs a person's approval for every call. Merge, deploy and rollback always do. */
   sensitive?: boolean;
+  /**
+   * A call that carries `why` (in the tool's own schema) asks a person's approval first: how an agent asks for
+   * a command the computer held for a person (ADR 0053 §3, amended 2026-10-30).
+   */
+  whyAsks?: boolean;
   /**
    * The output is third-party content (an MCP server's answer: issues, pages,
    * messages anyone can write). The gateway hands it to the model inside an

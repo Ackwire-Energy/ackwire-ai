@@ -953,6 +953,11 @@ export interface TaskStart {
   commit?: { message: string };
   /** Protocol 14: answer how many commits `branch` has beyond `sha` (`task.start` `baseBehind`). */
   baseCheck?: { branch: string; sha: string };
+  /**
+   * A person approved starting this very task (an approval card): a `shell` task's command runs even when the
+   * command policy would hold it (`approval_needed`).
+   */
+  approved?: boolean;
 }
 
 /** A coding CLI on the machine, as `hello` reports it (protocol 7). */
@@ -1304,6 +1309,8 @@ export type MachineRequest = (
       timeoutSeconds: number;
       /** Send `output` frames while it runs. */
       stream: boolean;
+      /** A person approved this very command (an approval card): it runs even when the command policy would hold it. */
+      approved?: boolean;
     }
   | { op: "read"; path: string; maxBytes: number }
   | { op: "write"; path: string; base64: string }
@@ -1587,7 +1594,11 @@ export type MachineErrorCode =
   | "no_slot"
   /** Protocol 9: the owner paused this computer; nothing new starts until it resumes. */
   | "paused"
-  /** Protocol 10: the path is outside every folder this agent may use, or the tool is off on the machine. */
+  /**
+   * Protocol 10: the path is outside every folder this agent may use, or the tool is off on the machine. Also
+   * `exec` and a `shell` task's `task.start` that the command policy never runs here, approved or not (a push our
+   * git proxy refuses): the message says where to go instead (`policyRefusal`).
+   */
   | "not_allowed"
   /** Protocol 12: the agent browser can't run here (no binary, no Chrome, too many sessions); the message says why. */
   | "browser_unavailable"
@@ -1622,6 +1633,11 @@ export type MachineErrorCode =
    * stopping): it may have stopped partway. Older servers read it like `internal`.
    */
   | "dropped"
+  /**
+   * `exec` and a `shell` task's `task.start`: the command policy holds the command for a person's approval (a
+   * push to the default branch, a deploy); the message says why and what the agent can do. Nothing ran.
+   */
+  | "approval_needed"
   | "bad_request"
   | "internal";
 

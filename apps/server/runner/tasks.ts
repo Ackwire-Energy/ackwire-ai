@@ -18,6 +18,7 @@ import {
 } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { ASK_AGAIN, MISSION_DENY_RULES, PUSH_ASK_RULES } from "@agenteschat/adapters/command-policy";
 import {
   type AgentScope,
   commandOf,
@@ -35,6 +36,7 @@ import {
   type TaskStart,
 } from "@agenteschat/adapters/machine-protocol";
 import { yieldRoute } from "./accounts";
+import { commandApproval, ownBranches } from "./command-gate";
 import { RunnerError } from "./errors";
 import { shellCommand } from "./exec";
 import { readJson, writeJson } from "./json-file";
@@ -911,6 +913,25 @@ export class TaskManager {
       cwd = resolved.abs;
     }
     const missionTask = typeof req.mission?.id === "string" && TASK_ID.test(req.mission.id);
+    // The agent's own branches: its own prefix, and a mission's.
+    const own = ownBranches(
+      agent,
+      missionTask ? missionBranchPrefix(String(req.mission?.id), req.mission?.branchPrefix) : undefined,
+    );
+    // A shell task runs its command as is: the command policy reads it first, as the brain's own commands
+    // (ADR 0053 §3). A person's approval of this very task (`approved`) lets it through, unless our git proxy
+    // would refuse it anyway (`never`).
+    if (executor === "shell") {
+      const held = await commandApproval(String(req.command ?? ""), {
+        cwd,
+        own,
+        how: ASK_AGAIN,
+        script: true,
+        ...(typeof req.branch === "string" && req.branch.trim() ? { head: req.branch.trim() } : {}),
+      });
+      if (held?.never) throw new RunnerError("not_allowed", held.message);
+      if (held && req.approved !== true) throw new RunnerError("approval_needed", held.message);
+    }
     let branch: string | undefined;
     // Where an item works, told first in its prompt (the server's prompt doesn't know whether there is git).
     let where = "";
@@ -978,23 +999,20 @@ export class TaskManager {
           cwd,
           folders: [...new Set([cwd, missionRoot])],
           runnerHome: path.dirname(this.opts.root),
+          branches: own,
+          task: "mission",
         });
         writeFileSync(configFile, JSON.stringify(config), { mode: 0o600 });
         // What it may run without asking: item tasks work (the main session plans as an engine run, ADR 0032).
-        const prefix = missionBranchPrefix(missionId, req.mission?.branchPrefix);
         const allow = Array.isArray(req.mission?.allow) ? req.mission.allow.filter((r) => typeof r === "string") : [];
         // An item in its own worktree or subfolder: the mission folder too (its .agentes/, shared inputs).
         const away = missionTask && path.resolve(cwd) !== path.resolve(missionRoot);
         writeFileSync(
           settingsFile,
           JSON.stringify(
-            claudePermissionSettings(
-              readOnly ? "plan" : "work",
-              prefix,
-              allow,
-              away ? path.resolve(missionRoot) : undefined,
-              { runnerHome: path.dirname(this.opts.root) },
-            ),
+            claudePermissionSettings(readOnly ? "plan" : "work", allow, away ? path.resolve(missionRoot) : undefined, {
+              runnerHome: path.dirname(this.opts.root),
+            }),
           ),
           { mode: 0o600 },
         );
@@ -1017,6 +1035,37 @@ export class TaskManager {
       });
     } else if (missionId) {
       this.log(`task ${taskId} works for a mission, but this runner has no MCP endpoint`);
+    } else if (executor === "claude" && this.opts.mcp) {
+      // Outside a mission, Claude Code keeps the computer owner's own settings, plus the deny list, and every
+      // push asks our prompt tool, which answers on this computer alone (ADR 0053 §3).
+      const configFile = path.join(dir, "mcp.json");
+      const settingsFile = path.join(dir, "settings.json");
+      const config = claudeMcpConfig({
+        command: this.opts.mcp.command,
+        taskId,
+        socketPath: this.opts.mcp.socketPath,
+        token: newMcpToken(),
+        cwd,
+        folders: [cwd],
+        runnerHome: path.dirname(this.opts.root),
+        branches: own,
+        task: "local",
+      });
+      writeFileSync(configFile, JSON.stringify(config), { mode: 0o600 });
+      writeFileSync(
+        settingsFile,
+        JSON.stringify({ permissions: { ask: [...PUSH_ASK_RULES], deny: [...MISSION_DENY_RULES] } }),
+        { mode: 0o600 },
+      );
+      extra = missionExecutorArgs("claude", {
+        configFile,
+        command: this.opts.mcp.command,
+        taskId,
+        socketPath: this.opts.mcp.socketPath,
+        rules: "",
+        settingsFile,
+        promptTool: true,
+      });
     }
     const command = executorCommand(executor, {
       command: req.command,

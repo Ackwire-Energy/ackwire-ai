@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { MACHINE_PROTOCOL_VERSION, PERMISSION_TIMEOUT_MESSAGE, type ServerFrame } from "@agenteschat/adapters";
+import {
+  ASK_IN_CHAT,
+  approvalMessage,
+  MACHINE_PROTOCOL_VERSION,
+  PERMISSION_TIMEOUT_MESSAGE,
+  type ServerFrame,
+} from "@agenteschat/adapters";
 import { and, eq, schema, sql } from "@agenteschat/db";
 import {
   addChannelMember,
@@ -1164,8 +1170,13 @@ describe("missions (ADR 0029)", () => {
         const { view, main, prompt } = await working(judge);
         expect(view.commandApproval).toBe("low_risk_auto");
         risk = 0.99;
-        expect(await prompt(main.taskId, bash("npm publish"))).toMatchObject({ behavior: "deny" });
-        expect(await prompt(main.taskId, bash("git push origin main"))).toMatchObject({ behavior: "deny" });
+        // Refused with the kind it is, never judged (pushes are read on the computer, before they get here).
+        expect(await prompt(main.taskId, bash("npm publish"))).toEqual({
+          behavior: "deny",
+          message: approvalMessage("This publishes a package, an image or a release", ASK_IN_CHAT),
+          code: "never",
+        });
+        expect(await prompt(main.taskId, bash("gh pr merge 12"))).toMatchObject({ behavior: "deny" });
         for (const command of [
           "ls /System/Library/Fonts /Library/Fonts",
           "curl -sI https://commons.wikimedia.org/w/api.php",

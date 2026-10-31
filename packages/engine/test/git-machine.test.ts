@@ -379,7 +379,9 @@ describe("prompt text and permissions", () => {
     expect(ask("git clone https://github.com/acme/web ../web").behavior).toBe("allow");
     expect(ask("git pull --ff-only").behavior).toBe("allow");
     // A refusal carries a code, so the apps say why in the person's language.
-    expect(ask("git push origin main")).toMatchObject({ behavior: "deny", code: "never" });
+    // A push is read on the computer first (command-gate.ts); here it is one more command this brain may not run.
+    expect(ask("git push origin main")).toMatchObject({ behavior: "deny", code: "off" });
+    expect(ask("gh pr merge 12")).toMatchObject({ behavior: "deny", code: "never" });
     expect(ask("git clone https://github.com/acme/web /tmp/web")).toMatchObject({ behavior: "deny", code: "off" });
   });
 

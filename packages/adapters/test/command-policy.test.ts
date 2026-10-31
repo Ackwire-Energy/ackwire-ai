@@ -1,15 +1,28 @@
 import { describe, expect, test } from "bun:test";
 import {
   AGENT_WORKER_HOMES,
-  DENIED_MESSAGE,
+  ASK_AGAIN,
+  ASK_IN_CHAT,
+  approvalMessage,
+  approvalNeeded,
+  DELETE_BRANCHES_POINTER,
   deniedInMissions,
+  deniedMessage,
   forbiddenHint,
   forbiddenReason,
+  type GitPush,
+  gitPushes,
+  heldPush,
   INLINE_CODE_DENY_RULES,
   inlineCode,
+  isProxyUrl,
   localVerdict,
+  MISSION_DENY_RULES,
   normalizedCommand,
   PLAN_MESSAGE,
+  PUSH_ASK_RULES,
+  policyRefusal,
+  type RepoFacts,
   readOnlyCall,
   SECRET_BASH_DENY_RULES,
   SECRET_MESSAGE,
@@ -34,7 +47,7 @@ describe("shell parsing", () => {
     expect(shellWords("ls 'a b' \"c d\" e\\ f")?.map((w) => w.text)).toEqual(["ls", "a b", "c d", "e f"]);
     expect(simpleCommands("git status 2>&1 | head -3")).toEqual([
       { argv: ["git", "status"], writes: [], reads: [] },
-      { argv: ["head", "-3"], writes: [], reads: [] },
+      { argv: ["head", "-3"], writes: [], reads: [], piped: true },
     ]);
     expect(simpleCommands("ls > out.txt 2>/dev/null")?.[0]?.writes).toEqual(["out.txt"]);
     for (const line of [
@@ -278,17 +291,12 @@ describe("the deny list reads normalized arguments", () => {
       "gh --repo=acme/web pr merge 1 --squash",
       "gh pr merge 1 -R acme/web",
       "gh --hostname ghe.acme.dev pr merge 1",
-      "git -c core.hooksPath=/tmp push origin main",
-      "git --git-dir=/w/.git push origin main",
-      "git --git-dir /w/.git --work-tree /w push origin main",
-      "git -C /w -c x=y push origin master",
-      "git push origin refs/heads/main",
-      "git push origin HEAD:refs/heads/main",
       "git --no-pager merge feature",
-      "nice -n 5 git push origin main",
-      "env GIT_TRACE=1 git push origin main",
-      "/usr/bin/git push origin main",
-      "npm test && git -c x=y push origin main",
+      "git -c x=y -C /w merge feature",
+      "git --no-lazy-fetch --attr-source HEAD merge feature",
+      "git --attr-source=HEAD merge feature",
+      "nice -n 5 gh pr merge 1",
+      "npm test && /usr/bin/gh pr merge 1",
       // Printing the person's GitHub token.
       "gh auth token",
       "gh --hostname github.com auth token",
@@ -298,9 +306,12 @@ describe("the deny list reads normalized arguments", () => {
     ]) {
       expect([command, denied(command)]).toEqual([command, true]);
     }
+    // Pushes aren't on it: where one goes depends on the repository (`heldPush`).
     for (const command of [
       "git push origin agentes/dev/x",
       "git -C /w push -u origin agentes/dev/fix",
+      "git push origin main",
+      "git push --force origin main",
       "gh pr view 1 -R acme/web",
       "gh -R acme/web pr create --fill",
       "git -C /w status",
@@ -559,7 +570,10 @@ describe("what the computer decides by itself (`localVerdict`)", () => {
   const verdict = (command: string, profile: "plan" | "work" = "work") =>
     localVerdict("Bash", { command }, scope, profile);
   test("deny list and secrets refused, reads allowed; in a plan turn nothing else; in a work turn the server decides", () => {
-    expect(verdict("gh -R acme/web pr merge 1")).toEqual({ behavior: "deny", message: DENIED_MESSAGE });
+    expect(verdict("gh -R acme/web pr merge 1")).toEqual({
+      behavior: "deny",
+      message: approvalMessage("This is a merge", ASK_IN_CHAT),
+    });
     expect(verdict("cat ~/.aws/credentials")).toEqual({ behavior: "deny", message: SECRET_MESSAGE });
     expect(localVerdict("Read", { file_path: "/Users/w/.ssh/id_rsa" }, scope, "work")).toEqual({
       behavior: "deny",
@@ -582,5 +596,373 @@ describe("what the computer decides by itself (`localVerdict`)", () => {
       behavior: "deny",
       message: PLAN_MESSAGE,
     });
+  });
+});
+
+// ── ADR 0053 §3, amended 2026-10-30: what waits for a person, named exactly ──
+
+describe("the deny list names the kind it refuses", () => {
+  test("merges, deploys, rollbacks, infrastructure, publishing and the GitHub API; a token is a secret", () => {
+    const named = (command: string) => deniedMessage("Bash", { command }, ASK_AGAIN);
+    expect(named("gh pr merge 12 --squash")).toBe(approvalMessage("This is a merge", ASK_AGAIN));
+    expect(named("vercel deploy --prod")).toBe(approvalMessage("This is a deploy", ASK_AGAIN));
+    expect(named("helm rollback web 3")).toBe(approvalMessage("This is a rollout or a rollback", ASK_AGAIN));
+    expect(named("terraform destroy")).toBe(approvalMessage("This removes infrastructure", ASK_AGAIN));
+    expect(named("npm test && npm publish")).toBe(
+      approvalMessage("This publishes a package, an image or a release", ASK_AGAIN),
+    );
+    expect(named("gh api -X DELETE repos/a/b")).toContain("This calls the GitHub API directly");
+    expect(named("gh auth token")).toBe(SECRET_MESSAGE);
+    expect(named("npm test")).toBeNull();
+    // Never a generic list: one kind, and how to ask.
+    expect(named("fly deploy")).toBe(
+      "This is a deploy: a person approves it first. To ask them, make the same call again with why set to your reason: it waits for their decision in the chat.",
+    );
+  });
+
+  test("every push asks Claude Code's prompt tool, and no push is on the deny list", () => {
+    const asks = (command: string) => PUSH_ASK_RULES.some((r) => ruleMatches(r, "Bash", { command }));
+    for (const command of [
+      "git push",
+      "git push origin main",
+      "git push -u origin HEAD",
+      "git -C /w push origin main",
+      "git -c x=y push origin main",
+      "npm test && git push",
+      // Global options, a path to git, wrappers and shells too: an allow rule (a project's own) can't skip the prompt.
+      "git --no-pager push origin main",
+      "git -P push origin main",
+      "git --git-dir=.git push origin main",
+      "/usr/bin/git push origin main",
+      "env git push origin main",
+      "command git push origin main",
+      "nice -n 5 git push origin main",
+      "timeout 60 /usr/bin/git -C /w push origin main",
+      "sh -c 'git push origin main'",
+      "echo main | xargs git push origin",
+    ]) {
+      expect([command, asks(command)]).toEqual([command, true]);
+    }
+    expect(asks("git commit -m 'push fix'")).toBe(false);
+    expect(asks("git status")).toBe(false);
+    expect(MISSION_DENY_RULES.some((r) => r.includes("push") && r.startsWith("Bash(git"))).toBe(false);
+  });
+});
+
+describe("where a push goes, as written", () => {
+  const one = (command: string) => {
+    const pushes = gitPushes(command);
+    expect(pushes).toHaveLength(1);
+    return pushes?.[0] as GitPush;
+  };
+  test("remotes, refspecs, force, deletes and the folder it runs in", () => {
+    expect(one("git push origin pr-914:cursor/pap-582-fix")).toMatchObject({
+      dir: "",
+      remote: "origin",
+      refs: [{ branch: "cursor/pap-582-fix", force: false, delete: false }],
+    });
+    expect(one("git push").refs).toEqual([{ branch: null, force: false, delete: false }]);
+    expect(one("git push -u origin HEAD").refs).toEqual([{ branch: "HEAD", force: false, delete: false }]);
+    expect(one("git push origin HEAD:refs/heads/main").refs[0]?.branch).toBe("main");
+    expect(one("git push --force-with-lease origin fix").refs[0]?.force).toBe(true);
+    expect(one("git push -uf origin fix").refs[0]?.force).toBe(true);
+    expect(one("git push origin +fix").refs[0]).toEqual({ branch: "fix", force: true, delete: false });
+    expect(one("git push origin :old").refs[0]).toEqual({ branch: "old", force: false, delete: true });
+    expect(one("git push origin --delete old").refs[0]?.delete).toBe(true);
+    expect(one("git push --all origin").every).toBe(true);
+    expect(one("git push --mirror origin")).toMatchObject({ every: true, mirror: true });
+    expect(one("git push --prune origin 'refs/heads/*:refs/heads/*'")).toMatchObject({ every: true, prune: true });
+    expect(one("git push origin v1.2 tag v1.3").refs).toEqual([{ branch: "v1.2", force: false, delete: false }]);
+    // As git reads it: `--repo` only when no repository is written.
+    expect(one("git push --repo=upstream").remote).toBe("upstream");
+    expect(one("git push --repo=upstream origin fix").remote).toBe("origin");
+    expect(one("cd repos/acme/web && git push origin main").dir).toBe("repos/acme/web");
+    expect(one("git -C /w/app -c x=y push origin main").dir).toBe("/w/app");
+    expect(one("git --git-dir=/w/.git push origin main").dir).toBeNull();
+    expect(one("nice -n 5 git push origin main").refs[0]?.branch).toBe("main");
+    expect(one("timeout 60 /usr/bin/git push origin main").refs[0]?.branch).toBe("main");
+    // A script: comments skipped, `cd` followed line by line.
+    expect(gitPushes("# git push origin main someday\ncd app\ngit push origin main")?.map((p) => p.dir)).toEqual([
+      "app",
+    ]);
+  });
+
+  test("a dry run, tags alone and other commands push nothing; a push that can't be read is null", () => {
+    for (const command of [
+      "git push --dry-run origin main",
+      "git push -n origin main",
+      "git push --tags",
+      "git push origin refs/tags/v1",
+      "git status && git log -3",
+      "echo $(date)",
+    ]) {
+      expect([command, gitPushes(command)]).toEqual([command, []]);
+    }
+    for (const command of ["git push origin $BRANCH", "git push origin $(git branch --show-current)"]) {
+      expect([command, gitPushes(command)]).toEqual([command, null]);
+    }
+  });
+});
+
+describe("whether a push waits for a person", () => {
+  const facts = (
+    over: {
+      current?: string | null;
+      target?: { remote: string | null; branch: string | null } | null;
+      defaults?: Record<string, string | null>;
+      protected?: string[];
+      /** Remotes whose push URLs are our git proxy's. */
+      proxied?: string[];
+    } = {},
+  ): RepoFacts => ({
+    current: async () => (over.current === undefined ? "cursor/pap-582-fix" : over.current),
+    pushTarget: async () => (over.target === undefined ? { remote: null, branch: "cursor/pap-582-fix" } : over.target),
+    defaultBranch: async (remote) => (over.defaults ?? { origin: "develop" })[remote] ?? null,
+    protectedBranches: async () => over.protected ?? [],
+    viaProxy: async (remote) => over.proxied?.includes(remote) ?? false,
+  });
+  const own = ["agentes/ada/"];
+  const held = async (command: string, f = facts()) => {
+    const pushes = gitPushes(command) ?? [];
+    for (const push of pushes) {
+      const h = await heldPush(push, f, own);
+      if (h) return h.what;
+    }
+    return null;
+  };
+
+  test("the default branch read from the repository, never assumed: main is ordinary where develop is the default", async () => {
+    expect(await held("git push origin develop")).toBe("This push goes to the default branch develop");
+    expect(await held("git push origin main")).toBeNull();
+    expect(await held("git push origin pr-914:cursor/pap-582-fix")).toBeNull();
+    // A bare push goes where the branch's push target says.
+    expect(await held("git push")).toBeNull();
+    expect(await held("git push", facts({ target: { remote: null, branch: "develop" } }))).toBe(
+      "This push goes to the default branch develop",
+    );
+    expect(await held("git push -u origin HEAD", facts({ current: "develop" }))).toBe(
+      "This push goes to the default branch develop",
+    );
+    // The remote it names has its own default.
+    expect(await held("git push upstream trunk", facts({ defaults: { upstream: "trunk" } }))).toBe(
+      "This push goes to the default branch trunk",
+    );
+  });
+
+  test("when git can't tell, it waits", async () => {
+    expect(await held("git push origin fix", facts({ defaults: {} }))).toBe(
+      "git can't tell this repository's default branch, so this push may go to it",
+    );
+    expect(await held("git push", facts({ target: null }))).toBe("git can't tell which branch this push goes to");
+    expect(await held("git push origin HEAD", facts({ current: null }))).toBe(
+      "git can't tell which branch this push goes to",
+    );
+    // Its own branches never wait for the default: they are never it.
+    expect(await held("git push origin agentes/ada/fix", facts({ defaults: {} }))).toBeNull();
+  });
+
+  test("force pushes wait unless the branch is its own; deletes, --all, --mirror and --prune always wait", async () => {
+    expect(await held("git push --force origin cursor/pap-582-fix")).toBe(
+      "This is a force push to cursor/pap-582-fix, a branch others may share",
+    );
+    expect(await held("git push --force origin develop")).toBe("This push goes to the default branch develop");
+    expect(await held("git push --force-with-lease origin agentes/ada/fix")).toBeNull();
+    expect(await held("git push origin --delete agentes/ada/old")).toBe(
+      "This deletes the remote branch agentes/ada/old",
+    );
+    expect(await held("git push --all origin")).toBe("This push updates every branch, the default one too");
+    expect(await held("git push --mirror backup")).toBe(
+      "This is a mirror push: it can overwrite and delete any branch",
+    );
+    expect(await held("git push --prune origin fix")).toBe(
+      "This push deletes the remote branches that aren't here (--prune)",
+    );
+  });
+
+  /** Why a command waits, without how to ask (null: it runs). */
+  const reason = async (command: string, f = facts()) =>
+    (await approvalNeeded(command, ASK_AGAIN, { own, facts: () => f }))?.message.split(
+      ": a person approves it first.",
+    )[0] ?? null;
+  const unread = "This runs git push in a way the computer can't read, so where it goes is unknown";
+  const develop = "This push goes to the default branch develop";
+
+  test("short ref names, the matching refspec and every option read the way git reads them; what it can't read waits", async () => {
+    // `heads/<branch>` is git's short `refs/heads/<branch>`, alone or after a colon.
+    expect(await reason("git push origin heads/develop")).toBe(develop);
+    expect(await reason("git push origin HEAD:heads/develop")).toBe(develop);
+    expect(await reason("git push origin HEAD:heads/cursor/pap-582-fix")).toBeNull();
+    // `:` and `+:` push every branch both sides have, the default one too.
+    expect(await reason("git push origin :")).toBe("This push updates every branch, the default one too");
+    expect(await reason("git push origin +:")).toBe("This push updates every branch, the default one too");
+    // Options are read to the end and the last one wins, as in git: a dry run undone is a push.
+    expect(await reason("git push --dry-run --no-dry-run origin develop")).toBe(develop);
+    expect(await reason("git push -n --no-dry-run origin develop")).toBe(develop);
+    expect(await reason("git push --no-dry-run --dry-run origin develop")).toBeNull();
+    expect(await reason("git push --tags --no-tags", facts({ target: { remote: null, branch: "develop" } }))).toBe(
+      develop,
+    );
+    expect(await reason("git --no-lazy-fetch --attr-source=HEAD push origin develop")).toBe(develop);
+    // An abbreviated or unknown option, inline config that can change where a push goes, an inline alias.
+    for (const command of [
+      "git push --del origin fix",
+      "git push --mir origin",
+      "git push --al origin",
+      "git push -X origin fix",
+      "git --some-new-option push origin fix",
+      "git -c push.default=matching push",
+      "git -c remote.origin.push=refs/heads/fix:refs/heads/develop push origin fix",
+      "git --config-env=remote.origin.mirror=MIRROR push",
+      "git -c alias.p=push p origin develop",
+    ]) {
+      expect([command, await reason(command)]).toEqual([command, unread]);
+    }
+    expect(await reason("git -c core.quotePath=false push origin fix")).toBeNull();
+    expect(await reason("git --some-new-option status")).toBeNull();
+  });
+
+  test("a push another program runs: a shell's own script is read, anything else that runs one waits", async () => {
+    expect(await reason("sh -c 'git push origin develop'")).toBe(develop);
+    expect(await reason("bash -lc 'cd app && git push origin fix'")).toBeNull();
+    for (const command of [
+      "bash -o pipefail -c 'git push origin develop'",
+      "sudo sh -c 'git push origin develop'",
+      "echo 'git push origin develop' | sh",
+      "echo develop | xargs git push origin",
+      "eval 'git push origin develop'",
+      "env -S 'git push origin develop'",
+      `python3 -c 'import os; os.system("git push origin develop")'`,
+      "git submodule foreach 'git push origin develop'",
+      "git rebase --exec 'git push origin develop' HEAD~2",
+    ]) {
+      expect([command, await reason(command)]).toEqual([command, unread]);
+    }
+    // Reading or printing the words pushes nothing.
+    for (const command of [
+      "grep -rn 'git push' .github",
+      "echo 'git push origin develop'",
+      "gh pr create --title fix --body 'Run git push origin develop after'",
+      "git commit -m 'Explain git push origin develop'",
+      "bash scripts/check.sh && git push origin fix",
+      "node --version && git push origin fix",
+      "timeout 60 git push origin fix",
+    ]) {
+      expect([command, await reason(command)]).toEqual([command, null]);
+    }
+  });
+
+  test("after a checkout in the same command, git can't tell from here where a bare push or HEAD goes: it waits", async () => {
+    for (const command of [
+      "git checkout develop && git push",
+      "git switch develop && git push origin HEAD",
+      "git checkout -b x origin/develop; git push -u origin HEAD",
+      "git branch -M develop && git push origin HEAD",
+      "sh -c 'git checkout develop' && git push",
+    ]) {
+      expect([command, await reason(command)]).toEqual([command, unread]);
+    }
+    // A branch named, a push before the checkout, files restored: read as before.
+    expect(await reason("git checkout develop && git push origin fix")).toBeNull();
+    expect(await reason("git push && git checkout develop")).toBeNull();
+    expect(await reason("git checkout -- README.md && git push")).toBeNull();
+  });
+
+  test("branches the repository marks protected wait like the default one", async () => {
+    const marked = facts({ protected: ["release/*", "production"] });
+    expect(await held("git push origin release/2.1", marked)).toBe(
+      "This push goes to the protected branch release/2.1",
+    );
+    expect(await held("git push origin production", marked)).toBe("This push goes to the protected branch production");
+    expect(await held("git push origin release-notes", marked)).toBeNull();
+  });
+
+  test("the whole message: why, how to ask, and what to do instead", async () => {
+    const message = await approvalNeeded("git push origin develop", ASK_IN_CHAT, { own, facts: () => facts() });
+    expect(message).toEqual({
+      message:
+        "This push goes to the default branch develop: a person approves it first. To ask them, run the same command with run_code, with why set to your reason: it waits for their decision in the chat. Or push to a branch of your own (agentes/ada/…) and open a pull request.",
+      never: false,
+    });
+    expect(await approvalNeeded("git push origin fix", ASK_IN_CHAT, { own, facts: () => facts() })).toBeNull();
+    expect(
+      (await approvalNeeded("git push origin $BRANCH", ASK_AGAIN, { own, facts: () => facts() }))?.message,
+    ).toContain("This runs git push in a way the computer can't read");
+    // Code in another language: the commands it spells out, and any push in it waits.
+    const python = 'import subprocess\nsubprocess.run(["gh", "pr", "merge", "12"])\n';
+    expect(await approvalNeeded(python, ASK_AGAIN, { code: true, own, facts: () => facts() })).toEqual({
+      message: approvalMessage("This is a merge", ASK_AGAIN),
+      never: false,
+    });
+    expect(
+      (
+        await approvalNeeded('subprocess.run(["git", "push", "origin", "fix"])', ASK_AGAIN, {
+          code: true,
+          own,
+          facts: () => facts(),
+        })
+      )?.message,
+    ).toContain("This runs git push in a way the computer can't read");
+    expect(await approvalNeeded("print('hi')", ASK_AGAIN, { code: true, own, facts: () => facts() })).toBeNull();
+  });
+
+  test("through our git proxy, what it refuses whoever approves never runs here, and the refusal says where to go", async () => {
+    const proxied = facts({ proxied: ["origin"] });
+    const never = async (command: string, f = proxied) => approvalNeeded(command, ASK_IN_CHAT, { own, facts: () => f });
+    const toPr =
+      "our git proxy never lets it through. Push to a branch of your own (agentes/ada/…) and open a pull request; merging asks a person. Never give the person a terminal command to run.";
+    expect(await never("git push origin --delete cursor/pap-582-fix")).toEqual({
+      message: `This deletes the remote branch cursor/pap-582-fix: ${DELETE_BRANCHES_POINTER}`,
+      never: true,
+    });
+    expect(DELETE_BRANCHES_POINTER).toContain("Ask with delete_branches (repo, branches, why)");
+    expect(await never("git push origin develop")).toEqual({
+      message: `This push goes to the default branch develop: ${toPr}`,
+      never: true,
+    });
+    expect(
+      (await never("git push origin release/2.1", facts({ proxied: ["origin"], protected: ["release/*"] })))?.message,
+    ).toBe(`This push goes to the protected branch release/2.1: ${toPr}`);
+    for (const command of ["git push --all origin", "git push --mirror origin", "git push --prune origin fix"]) {
+      expect([command, (await never(command))?.never, (await never(command))?.message.endsWith(toPr)]).toEqual([
+        command,
+        true,
+        true,
+      ]);
+    }
+    expect(await never("git push --force origin cursor/pap-582-fix")).toEqual({
+      message:
+        "This is a force push to cursor/pap-582-fix, a branch others may share: our git proxy never lets it through. Push without force, after bringing in what changed there (git pull --rebase). Never give the person a terminal command to run.",
+      never: true,
+    });
+    // A bare push goes where its branch's push remote says.
+    const fork = facts({
+      proxied: ["fork"],
+      defaults: { fork: "develop" },
+      target: { remote: "fork", branch: "develop" },
+    });
+    expect((await never("git push", fork))?.never).toBe(true);
+    // Ordinary pushes stay ordinary; what git can't tell stays a person's call.
+    expect(await never("git push origin cursor/pap-582-fix")).toBeNull();
+    expect(await never("git push origin agentes/ada/fix")).toBeNull();
+    expect((await never("git push origin fix", facts({ proxied: ["origin"], defaults: {} })))?.never).toBe(false);
+    // Never outranks what a person could approve in the same command: no approval lets the delete through.
+    expect((await never("gh pr merge 12 && git push origin --delete old"))?.never).toBe(true);
+    expect((await never("git push backup develop && git push origin --delete old"))?.never).toBe(true);
+    // Another remote, or one only partly through the proxy (`viaProxy` false): as before, a person may approve it.
+    expect(await never("git push backup --delete old")).toMatchObject({ never: false });
+    expect((await never("git push origin --delete old", facts()))?.message).toContain("a person approves it first.");
+    expect(policyRefusal(`This deletes the remote branch old: ${DELETE_BRANCHES_POINTER}`)).toBe(true);
+    expect(policyRefusal(approvalMessage("This is a merge", ASK_IN_CHAT))).toBe(false);
+  });
+
+  test("our git proxy's URLs", () => {
+    const at =
+      "https://agentes.chat/api/git/0190a7b2-3c4d-7e5f-8a9b-0c1d2e3f4a5b/0190a7b2-3c4d-7e5f-8a9b-0c1d2e3f4a5c/";
+    expect(isProxyUrl(`${at}acme/app.git`)).toBe(true);
+    expect(isProxyUrl(`http://localhost:3000${at.slice("https://agentes.chat".length)}acme/app`)).toBe(true);
+    expect(isProxyUrl("https://github.com/acme/app.git")).toBe(false);
+    expect(isProxyUrl("git@github.com:acme/app.git")).toBe(false);
+    expect(isProxyUrl("https://agentes.chat/api/git/x/y/acme/app.git")).toBe(false);
+    expect(isProxyUrl(`https://evil.example/?u=${at}acme/app.git`)).toBe(false);
   });
 });

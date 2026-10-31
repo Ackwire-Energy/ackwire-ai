@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { mkdirSync, readFileSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { PUSH_ASK_RULES } from "@agenteschat/adapters/command-policy";
 import {
   BRAIN_PROFILES_PROTOCOL,
   BRAIN_PROTOCOL,
@@ -598,16 +599,20 @@ test.if(posix)(
     const wargs = work.spawns()[0]?.args ?? [];
     expect(wargs[wargs.indexOf("--permission-mode") + 1]).toBe("acceptEdits");
     const wsettings = JSON.parse(readFileSync(wargs[wargs.indexOf("--settings") + 1] as string, "utf8")) as {
-      permissions: { allow: string[]; deny: string[] };
+      permissions: { allow: string[]; ask: string[]; deny: string[] };
     };
     expect(wsettings.permissions.deny).toContain("Bash(python3 -c*)");
     expect(wsettings.permissions.deny).toContain("Bash(gh auth token*)");
     expect(wsettings.permissions.deny).not.toContain("Edit");
     expect(wsettings.permissions.allow).not.toContain("Bash(cat *)");
+    // Every push reaches the prompt tool, even past the owner's allow rules, which reads where it goes.
+    expect(wsettings.permissions.ask).toEqual([...PUSH_ASK_RULES]);
     const wconfig = JSON.parse(readFileSync(wargs[wargs.indexOf("--mcp-config") + 1] as string, "utf8")) as {
       mcpServers: { agentes: { env: Record<string, string> } };
     };
     expect(wconfig.mcpServers.agentes.env.AGENTES_MCP_PROFILE).toBeUndefined();
+    // Its own branches: a push there needs nobody.
+    expect(wconfig.mcpServers.agentes.env.AGENTES_MCP_BRANCHES).toBe("agentes/dev/,agentes/ffff0000/");
   },
 );
 

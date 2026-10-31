@@ -1,6 +1,6 @@
 # 0015. Tool Gateway, scopes and approvals; runs as resumable tool loops
 
-- Status: Accepted
+- Status: Accepted. Amended 2026-10-30: approvals a call asks for by saying why (`whyAsks`)
 - Date: 2026-10-14
 - Extends 0008.
 
@@ -16,6 +16,8 @@
 3. validate the input against the tool's JSON Schema (inputs stream eagerly, so the provider doesn't validate);
 4. sensitive tools (flagged by the source, or any tool whose name or scope says merge, deploy or rollback) create an `approvals` row and stop; others run, with exceptions turned into error results;
 5. record `tool_call`, `tool_result` and `approval` steps.
+
+*Amended 2026-10-30:* a tool may also ask per call. A `whyAsks` tool (the computer's `run_code`, `run_skill_script` and `start_task`) creates the approval when the call carries a `why`: that is how an agent asks for a command the computer's policy held for a person (ADR 0053 §3, amended 2026-10-30). `executeApproved` runs the stored call with `approved` in its context, never from the input, and these tools pass it to the computer, which then runs that exact command.
 
 **Approvals.** A row stores the tool, scope, connection, params and `action_hash = sha256(canonical JSON of all four)`, a title/detail for people, `expires_at` (24 h), and the agent's owner (snapshot). The agent's owner and org admins may decide (`decideApproval`), except a `request_permission` approval, which turns a connector or a built-in scope on for good: only admins (`manage_agents`) decide it (`adminsDecide`), as only they give an agent new access (ADR 0016); the decision and the job that resumes the run commit in one transaction. `executeApproved` re-checks the hash against the stored params, re-checks the scope (it may have been revoked while waiting), claims `executed_at` (never twice), and runs exactly the stored params. Refused or expired requests become an error tool result with the reason. A worker expires pending approvals every minute. Events `approval.created` / `approval.decided` go to the channel and to each approver's user topic.
 
