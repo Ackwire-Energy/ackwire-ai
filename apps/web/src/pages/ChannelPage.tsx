@@ -2216,6 +2216,7 @@ const Timeline = memo(function Timeline({
   );
   const rows: ReactElement<{ message?: MessageType }>[] = [];
   const afterUnshown = () => unshown.has(rows.at(-1)?.key ?? "");
+  const newestKey = items.findLast((i) => i.kind === "message")?.key;
   for (const item of items) {
     const grouped = item.kind === "message" && item.grouped && !afterUnshown();
     if (divider?.key === item.key) {
@@ -2251,6 +2252,7 @@ const Timeline = memo(function Timeline({
           contextMark={threadsView?.marks.has(m.id)}
           replyContext={item.context}
           lastOfRun={lastByRun.get(m.agentRunId) === item.key}
+          latest={item.key === newestKey}
         />
       ) : (
         <TimelineMessage
@@ -2265,6 +2267,7 @@ const Timeline = memo(function Timeline({
           dmPersonId={dmPersonId}
           seen={m.id === seenId}
           helping={m.agentRunId && !isMediaAfterReply(m.meta) ? consultGroups.helping.get(m.agentRunId) : undefined}
+          latest={item.key === newestKey}
         />
       ),
     );
@@ -2378,6 +2381,7 @@ function RunBlock({
   contextMark?: boolean;
   replyContext?: ReplyRef;
   lastOfRun?: boolean;
+  latest?: boolean;
 }) {
   const run = useStreams((s) => (message ? undefined : s.runs[runId]));
   const last = useRef<LiveRun | undefined>(undefined);
@@ -2888,6 +2892,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   seen = false,
   helping,
   readOnly = false,
+  latest = true,
 }: {
   message: MessageType;
   grouped: boolean;
@@ -2911,6 +2916,11 @@ export const TimelineMessage = memo(function TimelineMessage({
   helping?: RunConsultation;
   /** Shown where the person can't act on it (a question opened in the panel): no feedback, reactions or menu. */
   readOnly?: boolean;
+  /**
+   * The conversation's newest message: only it says in words that no agent will answer ("Nenhum agente vai
+   * responder sem @"); older ones keep the check, with the same words in its popover.
+   */
+  latest?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
@@ -3226,12 +3236,12 @@ export const TimelineMessage = memo(function TimelineMessage({
       aside={
         receipted || seenSlot ? (
           <>
-            {receipted && <MessageReceipts message={m} part="check" />}
+            {receipted && <MessageReceipts message={m} part="check" latest={latest} />}
             {seenSlot && <SeenMark personId={seen ? dmPersonId : undefined} />}
           </>
         ) : undefined
       }
-      foot={receipted ? <MessageReceipts message={m} part="line" /> : undefined}
+      foot={receipted ? <MessageReceipts message={m} part="line" latest={latest} /> : undefined}
       menu={
         barred && menu.touch.length > 0
           ? { label: t("channel.actions", { name }), items: <MenuEntries entries={menu.touch} /> }
