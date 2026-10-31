@@ -1693,6 +1693,7 @@ export const ptBR = {
     expandAll: "Abrir todas",
     newChannelHere: "Novo canal aqui",
     newChannelIn: "Novo canal em {{name}}",
+    options: "Opções de {{name}}",
     category: "Categoria",
     categoryHelp: "Onde o canal aparece na barra lateral de todo mundo.",
     newCategoryOption: "Nova categoria…",

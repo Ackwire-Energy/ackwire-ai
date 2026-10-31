@@ -412,7 +412,7 @@ p {
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 12px;
   padding: 16px 12px;
   background: var(--surface-sunken);
   color: var(--ink);
@@ -423,7 +423,7 @@ p {
   flex: none;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 .sidebar__scroll {
   position: relative;
@@ -2934,7 +2934,7 @@ p {
   flex: 1;
   min-width: 0;
   gap: var(--space-2);
-  padding: 6px 10px 6px 8px;
+  padding: 4px 10px 4px 8px;
   border-radius: inherit;
 }
 /* The person's face about as tall as its two lines (32px). */
@@ -4765,29 +4765,33 @@ p {
   font-size: 15.5px;
   letter-spacing: -0.015em;
 }
-/* "Ir para…" ⌘K: reads as a search field (a default field of the ruler: 40, r12, hairline). */
+/*
+ * "Ir para…" ⌘K: reads as a search field (a small field of the ruler: 32, r10, hairline). Its icon is centred on the
+ * rows' icons below and its words start where their names do (10px in, the 16px icon, 10px to the words).
+ */
 .sidebar__jump {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: var(--control-h-md);
+  height: var(--control-h-sm);
   flex: 1;
   min-width: 0;
-  padding: 0 10px 0 var(--control-px-md);
+  padding: 0 8px 0 10px;
   border: 0;
-  border-radius: var(--control-r-md);
+  border-radius: var(--control-r-sm);
   background: var(--side-active);
   box-shadow: inset 0 0 0 1px var(--line);
   font: inherit;
-  font-size: var(--control-fs-md);
+  font-size: var(--control-fs-sm);
   line-height: normal;
   color: var(--faint);
   cursor: pointer;
   text-align: left;
 }
 .sidebar__jump > .ac-icon {
-  width: var(--control-icon-md);
-  height: var(--control-icon-md);
+  width: var(--control-icon-sm);
+  height: var(--control-icon-sm);
+  margin-right: 2px;
 }
 .sidebar__jump .ac-kbd {
   min-width: 20px;
@@ -4809,12 +4813,12 @@ p {
   gap: 6px;
   margin-top: -8px;
 }
-/* The same 40px tile as the field beside it (a bare icon looked smaller than the field). */
+/* The same 32px tile as the field beside it (a bare icon looked smaller than the field). */
 .sidebar__collapse.ac-btn {
   flex: none;
-  width: var(--control-h-md);
-  height: var(--control-h-md);
-  border-radius: var(--control-r-md);
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
+  border-radius: var(--control-r-sm);
   background: var(--side-active);
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--muted);
@@ -5627,6 +5631,18 @@ p {
 .sidebar[data-rail="true"] .sidebar__jump {
   flex: none;
 }
+/* ⌘K and its toggle are the rail's 40px tiles, like its items. */
+.sidebar[data-rail="true"] .sidebar__jump,
+.sidebar[data-rail="true"] .sidebar__collapse.ac-btn {
+  height: var(--control-h-md);
+  width: var(--control-h-md);
+  border-radius: var(--control-r-md);
+}
+.sidebar[data-rail="true"] .sidebar__jump > .ac-icon {
+  width: var(--control-icon-md);
+  height: var(--control-icon-md);
+  margin-right: 0;
+}
 .sidebar[data-rail="true"] .sidebar__create.ac-btn {
   width: var(--control-h-md);
   padding: 0;
@@ -5999,7 +6015,7 @@ p {
 .sidebar__org {
   position: relative;
   overflow: hidden;
-  min-height: 48px;
+  min-height: 44px;
   /* The whole header is the menu button: no inset, so every pixel of it opens the menu. */
   padding: 0;
   color: var(--ink);
@@ -6011,7 +6027,7 @@ p {
 }
 .sidebar__org .sidebar__org-button {
   align-self: stretch;
-  padding: 6px 10px 6px 8px;
+  padding: 4px 10px 4px 8px;
   border-radius: inherit;
 }
 .sidebar__org .sidebar__org-meta {
@@ -6062,7 +6078,7 @@ p {
 }
 /*
  * The workspace's sky (Sky.tsx WorkspaceSky): behind the header, from the sidebar's top edge to the header's
- * foot (16px of the sidebar's padding + the 48px header), edge to edge but for the hairline against the page.
+ * foot (16px of the sidebar's padding + the 44px header), edge to edge but for the hairline against the page.
  */
 .sidebar__top {
   position: relative;
@@ -6078,7 +6094,7 @@ p {
   top: -16px;
   left: -12px;
   right: -11px;
-  height: 64px;
+  height: 60px;
 }
 /* The whole row is the account button (no inner margin it doesn't answer to); flat on the horizon. */
 .sidebar__me {
@@ -9857,23 +9873,33 @@ html[data-menu-overlay] .shell {
 
 /* ── Sidebar ──────────────────────────────────────────────────────
    The main tools are plain rows; the rest open beside the sidebar from More. Conversations sit in
-   categories that open and close; closed, one shows only the open page's row and a count.
+   categories that open and close, their rows a step in under the header; closed, one shows only the open
+   page's row and a count. Dense, so a small workspace fits a laptop's screen without scrolling.
    The icon rail ignores the headers. */
 .sidebar:not([data-rail="true"]) .sidebar__scroll {
   gap: 4px;
 }
-.sidebar__section {
-  gap: 2px;
+.sidebar:not([data-rail="true"]) :is(.sidebar__group, .sidebar__section-body) {
+  gap: 1px;
 }
-/* Rows: 36px, 14px text; 18px muted icons 9px in, the 24px
-   avatar (accessories need 24) 6px from the edge on three sides, centred on the icons, every name in
-   one column. */
+/* Rows: 30px, 14px text; 18px muted icons 9px in, the 24px avatar (accessories need 24) 6px in and centred
+   on the icons, every name in one column. */
 .sidebar:not([data-rail="true"]) .sidebar__item {
-  min-height: 36px;
+  min-height: 30px;
   padding: 0 8px 0 9px;
   gap: 9px;
   border-radius: var(--control-r-sm);
   font-size: 14px;
+}
+/* "Criar agente" is one of the rows: their height, its + in their icons' column. */
+.sidebar:not([data-rail="true"]) .sidebar__create.ac-btn {
+  height: 30px;
+  padding: 0 8px 0 9px;
+  gap: 9px;
+  border-radius: var(--control-r-sm);
+}
+.sidebar:not([data-rail="true"]) .sidebar__foot {
+  gap: 4px;
 }
 .sidebar:not([data-rail="true"]) .sidebar__item > .ac-icon {
   width: 18px;
@@ -9892,9 +9918,9 @@ html[data-menu-overlay] .shell {
 .sidebar__section-head {
   display: flex;
   align-items: center;
-  gap: 4px;
-  min-height: var(--control-h-sm);
-  padding-right: 4px;
+  gap: 2px;
+  min-height: 28px;
+  padding-right: 2px;
   border-radius: var(--control-r-sm);
   transition: background-color 0.15s;
 }
@@ -9907,7 +9933,7 @@ html[data-menu-overlay] .shell {
   display: flex;
   align-items: center;
   gap: 6px;
-  min-height: var(--control-h-sm);
+  min-height: 28px;
   padding: 0 8px;
   border: 0;
   border-radius: var(--control-r-sm);
@@ -9950,15 +9976,38 @@ html[data-menu-overlay] .shell {
   flex-direction: column;
   gap: 2px;
 }
+/* Rows a step in: a row's icon starts under its header's name (the toggle's 8px padding, 14px chevron and 6px gap,
+   less the row's own 9px), a face centred on it as everywhere. */
+.sidebar:not([data-rail="true"]) .sidebar__section-body {
+  padding-left: 19px;
+}
 .sidebar__section[data-open="false"]
   .sidebar__section-body
   > :not([data-status="active"], :has(> [data-status="active"])) {
   display: none;
 }
-/* The + (or …) on a category header shows on hover or focus (always on touch screens). */
+/* A row coming back into sight (its category opened, or it is new) slides in; closing is instant. */
+@media (prefers-reduced-motion: no-preference) {
+  .sidebar__section-body > :is(.sidebar__item, .sidebar__row) {
+    animation: sidebar-row-in 0.16s var(--out);
+  }
+}
+@keyframes sidebar-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
+/* The + (or …) on a category header shows on hover or focus (always on touch screens), inside its 28px. */
 .sidebar__section-add {
   opacity: 0;
   transition: opacity 0.15s;
+}
+.sidebar__section-add.ac-btn,
+.sidebar__row-menu.ac-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
 }
 .sidebar__section-head:hover .sidebar__section-add,
 .sidebar__section-add:focus-visible,
@@ -10115,8 +10164,19 @@ html[data-menu-overlay] .shell {
 }
 .sidebar__divider {
   height: 1px;
-  margin: 8px 8px;
+  margin: 4px 8px;
   background: var(--line);
+}
+/* Phones and touch screens keep the taller rows a finger hits. */
+@media (max-width: 760px), (pointer: coarse) {
+  .sidebar:not([data-rail="true"]) :is(.sidebar__item, .sidebar__create.ac-btn) {
+    height: auto;
+    min-height: 36px;
+  }
+  .sidebar__section-head,
+  .sidebar__section-toggle {
+    min-height: var(--control-h-sm);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .sidebar__section-chevron {
