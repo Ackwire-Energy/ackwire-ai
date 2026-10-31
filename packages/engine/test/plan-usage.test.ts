@@ -191,6 +191,51 @@ test("the agent's month: by account and day, the account it uses now, its own si
   expect(JSON.stringify(seen)).not.toMatch(/usd|cost|ana@example/i);
 });
 
+test("Jev's judgments and the router's calls for an agent are no API use of its own; the router on a plan is the plan's", async () => {
+  const { machineId, spend } = await scene();
+  await spend(f.agent.id, PESSOAL, "claude-sonnet-5-5", 1_000);
+  await recordPlanUsage(f.db, {
+    orgId: f.org.id,
+    agentId: f.agent.id,
+    kind: "router",
+    provider: "claude_code",
+    machineId,
+    accountId: PESSOAL,
+    model: "claude-haiku-5-5",
+    inputTokens: 500,
+    outputTokens: 0,
+  });
+  // Jev on the platform's key (its status line), the router on the workspace's key.
+  await f.gateway.recordExternalUsage({
+    orgId: f.org.id,
+    agentId: f.agent.id,
+    kind: "router",
+    provider: "typesafe",
+    model: "jev-latest",
+    inputTokens: 1_500,
+    outputTokens: 1,
+    costNanoUsd: 1_000_000,
+  });
+  await f.gateway.complete({
+    orgId: f.org.id,
+    agentId: f.agent.id,
+    kind: "router",
+    model: "claude-haiku-5-5",
+    system: "route",
+    messages: [{ role: "user", content: "hi" }],
+    maxTokens: 100,
+  });
+
+  const org = await orgPlanUsage(f.db, f.owner.id, f.org.id);
+  expect(org.api).toEqual([]);
+  expect(org.accounts.find((a) => a.accountId === PESSOAL)?.monthTokens).toBe(1_500);
+  const usage = await agentPlanUsage(f.db, f.owner.id, f.org.id, f.agent.id);
+  expect(usage.tokens).toBe(1_500);
+  expect(usage.sources.map((s) => [s.key, s.type, s.tokens])).toEqual([
+    [sourceKeyOf(machineId, "claude_code", PESSOAL), "plan", 1_500],
+  ]);
+});
+
 test("parts: a model's own week counts that model, a reset or unknown window has none; a removed account stays in the month", async () => {
   const { machineId, atlas, spend } = await scene();
   await spend(atlas.id, null, "claude-opus-5-5", 10_000);

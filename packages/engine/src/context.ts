@@ -31,6 +31,7 @@ import { noticeForOthers, noticeText } from "./notices";
 import { WHY_YOU_WERE_CALLED } from "./reply-policy";
 import { isRoutineRoomKey, type RoutineBrief, routineAccessOf, routineBriefOf, routineReportOf } from "./routine-brief";
 import { type AgentRun, replyThreadOf } from "./runs";
+import { stretchCardOf } from "./stretch";
 import { loadTeam, rosterScopeNames, teamPrompt } from "./team";
 import { rangeStillVisible, threadRunInfo } from "./threads";
 import { untrustedBlock } from "./untrusted";
@@ -703,7 +704,7 @@ export async function buildRunContext(
               ? `# Where you are\nA direct conversation. Participants: ${memberList}. Answer every message here; you don't need to be mentioned.`
               : `# Where you are\nChannel #${channel.name}${channel.topic ? ` (topic: ${channel.topic})` : ""}, replying ${flat ? "in the channel" : "in a thread"}. Members: ${memberList}.${
                   otherAgents
-                    ? `\nOther agents here and what they can do: ${otherAgents}. Never answer for another agent or guess its permissions: say what this list shows, or ask it yourself (ask_agent) when you need its help for the task, or leave it a note without waiting for an answer (tell_agent) when it should know or do something. Never relay to another agent what the person asked that agent directly: it got the message and answers it itself. Never name your tools to people.`
+                    ? `\nOther agents here and what they can do: ${otherAgents}. Never answer for another agent or guess its permissions: say what this list shows, or ask it yourself (ask_agent) when you need its help for the task, or leave it a note without waiting for an answer (tell_agent) when it should know or do something. Never relay to another agent what the person asked that agent directly: it got the message and answers it itself. An @mention of an agent wakes it: mention one only to hand it work or ask it something, never to thank or confirm${options.followUp ? ", and to wait for something use follow_up, not a mention" : ""}. Never name your tools to people.`
                     : ""
                 }${
                   alsoAnswering.length > 0
@@ -1248,6 +1249,15 @@ export function taskNotice(m: Pick<Message, "body" | "meta">, current = false): 
   // An event delivered to the agent (a routine's report, another agent's answer, a late wait result).
   const notice = noticeText(m.meta, current);
   if (notice) return notice;
+  // A stretch's pause card (ADR 0089): the agents stopped for the people here; the run a person let go on reads it.
+  const paused = stretchCardOf(m.meta);
+  if (paused) {
+    return `[Paused: you and the other agents did what you may do on your own since a person last wrote, and waited for the people here.]${
+      current && paused.state === "continued"
+        ? "\nA person let you go on: pick up the work where you stopped, with your tools, and tell them briefly."
+        : ""
+    }`;
+  }
   // Agent mode (ADR 0029): what the mission tells its agent (an answer, a request, a message from people).
   const inbox = m.meta?.missionInbox as { from?: unknown; text?: unknown } | undefined;
   if (inbox && typeof inbox === "object") {

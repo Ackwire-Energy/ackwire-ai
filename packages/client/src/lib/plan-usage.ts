@@ -1,13 +1,16 @@
 import type { TFunction } from "i18next";
 import type {
+  Agent,
   AgentBrainLine,
   AgentUsageSource,
+  AiAccounts,
+  AiStatus,
   PlanAccountInfo,
   PlanAccountUsage,
   PlanUsage,
   PlanWindowParts,
 } from "../api/types";
-import { ownSignInName } from "./ai-accounts";
+import { accountTitle, groupPlans, ownSignInName, ownSignIns, ownSignInTitle } from "./ai-accounts";
 import { daysBetween, formatPercent, formatShortDate, formatTime, relativeTime } from "./format";
 import { planOf } from "./plans";
 
@@ -74,6 +77,10 @@ export function planMeterText(
   };
 }
 
+/** A plan's limits are worth a line once a window is known or the plan refused a request: unknown is nothing. */
+const knownLimits = (usage: PlanUsage | null | undefined): usage is PlanUsage =>
+  usage != null && (usage.windows.length > 0 || usage.limited === true);
+
 /**
  * What shows of an agent's month where its budget used to (ADR 0063 §5): on a plan, its account's limits while a
  * window is known or the plan refused a request, and its budget only once it spent through the API this month; on
@@ -86,9 +93,93 @@ export function usageShown(
   if (!brain || brain.kind === "model") return { plan: null, budget: true };
   const usage = brain.usage;
   return {
-    plan: usage && (usage.windows.length > 0 || usage.limited) ? { account: brain.account, usage } : null,
+    plan: knownLimits(usage) ? { account: brain.account, usage } : null,
     budget: budgetUsedPercent > 0,
   };
+}
+
+/**
+ * The workspace's budget is worth a line (the Uso tile, the phone's workspace page) when its agents spent through the
+ * API this month or one of them thinks through it: the model brain with a key (`ai-status` ready). On plans alone, no
+ * 0% budget (ADR 0063 §5).
+ */
+export function workspaceUsesApi(
+  agents: readonly Pick<Agent, "id" | "brain">[],
+  ai: Pick<AiStatus, "agents"> | undefined,
+  budgetUsedPercent: number,
+) {
+  if (budgetUsedPercent > 0) return true;
+  const ready = new Set(ai?.agents.filter((a) => a.state === "ready").map((a) => a.agentId));
+  return agents.some((a) => (a.brain?.kind ?? "model") === "model" && ready.has(a.id));
+}
+
+/** One of the viewer's plans with its limits: its maker's mark (`ProviderLogo`), its name and its usage. */
+export interface OwnPlanLine {
+  key: string;
+  logo: string;
+  name: string;
+  usage: PlanUsage;
+}
+
+/**
+ * The viewer's plans that an agent thinks with and whose limits are known (Sua conta, and the profile menu near a
+ * limit, ADR 0063 §5): their computers' own sign-ins, then their accounts, as "Seus planos" orders and names them.
+ * An account names its agents (`usedBy`) and thinks for nobody once signed out everywhere; a computer's own sign-in
+ * thinks for the pairer's agents there that have no account (ADR 0059 §3). Two of one name say which, as "Seus planos"
+ * tells them apart: their computers, or on the same computer an account's email (or its key's end).
+ */
+export function ownPlanLines(
+  t: TFunction,
+  view: AiAccounts | undefined,
+  agents: readonly Pick<Agent, "name" | "ownerUserId" | "brain">[],
+  me: string,
+): OwnPlanLine[] {
+  const groups = groupPlans(view?.accounts ?? []);
+  const onAccounts = new Set(groups.flatMap((g) => g.usedBy));
+  const own = ownSignIns(view)
+    .filter((o) =>
+      agents.some(
+        ({ name, ownerUserId, brain }) =>
+          ownerUserId === me &&
+          brain?.kind === o.kind &&
+          brain.computer === o.computer &&
+          !brain.provider &&
+          !onAccounts.has(name),
+      ),
+    )
+    .map((o) => ({
+      key: o.key,
+      logo: o.kind,
+      name: ownSignInTitle(t, o),
+      usage: o.usage,
+      computer: o.computer,
+      detail: null,
+    }));
+  const accounts = groups.flatMap(({ key, logins, usedBy, usage, signedOut }) => {
+    const a = logins[0];
+    return a && usedBy.length > 0 && signedOut.length < logins.length
+      ? [
+          {
+            key,
+            logo: a.provider ?? a.kind,
+            name: accountTitle(a),
+            usage,
+            computer: a.computer,
+            detail: a.email ?? (a.keyHint ? t("aiAccounts.page.keyEnds", { hint: a.keyHint }) : null),
+          },
+        ]
+      : [];
+  });
+  const lines = [...own, ...accounts].flatMap((p) => (knownLimits(p.usage) ? [{ ...p, usage: p.usage }] : []));
+  return lines.map(({ computer, detail, ...p }) => {
+    const twins = lines.filter((l) => l.key !== p.key && l.name === p.name);
+    if (twins.length === 0) return p;
+    const here = twins.some((l) => l.computer === computer);
+    return {
+      ...p,
+      name: here && detail ? `${p.name} · ${detail}` : `${p.name} ${t("aiAccounts.page.on", { computer })}`,
+    };
+  });
 }
 
 /**

@@ -1,5 +1,5 @@
 import { ACCOUNT_KINDS, BRAIN_EFFORTS } from "@agenteschat/adapters";
-import { ONBOARDING_STEPS, STANDING_STATES } from "@agenteschat/engine";
+import { AGENT_ACTION_KINDS, ONBOARDING_STEPS, STANDING_STATES } from "@agenteschat/engine";
 import { CONTEXT_LIMITS, MODEL_TIERS, PROVIDER_IDS } from "@agenteschat/providers";
 import { z } from "@hono/zod-openapi";
 
@@ -295,23 +295,7 @@ export const AgentAction = z
   .object({
     id: z.uuid(),
     kind: z
-      .enum([
-        "issue.created",
-        "issue.updated",
-        "issue.assigned",
-        "memory.saved",
-        "memory.updated",
-        "memory.forgotten",
-        "routine.created",
-        "routine.updated",
-        "routine.deleted",
-        "channel.agent_added",
-        "channel.created",
-        "wiki.page_created",
-        "wiki.page_edited",
-        "thread.renamed",
-        "thread.closed",
-      ])
+      .enum(AGENT_ACTION_KINDS)
       .openapi({ description: "What the agent did; the app says it with `agentActions.{kind}` and `params`." }),
     agentId: z.uuid(),
     messageId: z.uuid().nullable(),

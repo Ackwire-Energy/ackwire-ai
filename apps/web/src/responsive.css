@@ -157,8 +157,8 @@
   }
   .channel__messages {
     padding: 12px 0 10px;
-    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 10px), transparent);
-    mask-image: linear-gradient(to bottom, #000 calc(100% - 10px), transparent);
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 10px), transparent), var(--scroll-strip);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 10px), transparent), var(--scroll-strip);
   }
   .channel__messages .ac-msg {
     --msg-inline: 12px;

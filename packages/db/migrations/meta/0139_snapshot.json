@@ -1,5 +1,5 @@
 {
-  "id": "66928ce4-158d-4d2a-a939-e69a3cdb3b04",
+  "id": "7370c9c5-68b3-4e46-b77d-1f97637b0b87",
   "prevId": "efde0308-b150-4d23-99b5-968a1a5346b9",
   "version": "7",
   "dialect": "postgresql",
@@ -216,13 +216,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "media_replies": {
-          "name": "media_replies",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
         },
         "context_tokens": {
           "name": "context_tokens",
@@ -525,34 +518,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'{}'::jsonb"
-        },
-        "gifs": {
-          "name": "gifs",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "gif_rating": {
-          "name": "gif_rating",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'g'"
-        },
-        "agent_stickers": {
-          "name": "agent_stickers",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "agent_media": {
-          "name": "agent_media",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'sometimes'"
         },
         "updated_at": {
           "name": "updated_at",
@@ -2143,6 +2108,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": 0
+        },
+        "stretch_id": {
+          "name": "stretch_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         },
         "agent_run_id": {
           "name": "agent_run_id",
@@ -10740,6 +10711,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "stretch_id": {
+          "name": "stretch_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "status": {
           "name": "status",
           "type": "agent_run_status",
@@ -10925,6 +10902,28 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "agent_runs_org_id_stretch_id_index": {
+          "name": "agent_runs_org_id_stretch_id_index",
+          "columns": [
+            {
+              "expression": "org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "stretch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"agent_runs\".\"stretch_id\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}

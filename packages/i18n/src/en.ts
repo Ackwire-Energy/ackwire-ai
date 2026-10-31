@@ -1039,6 +1039,7 @@ export const en: Translations = {
   shell: {
     // The Mac app's own title bar (ADR 0036).
     titleBar: { back: "Back", forward: "Forward" },
+    unshown: "Couldn't be shown",
     more: "More",
     moreGroups: { schedule: "Schedule", decisions: "Decisions" },
     moreWhat: {
@@ -1501,6 +1502,10 @@ export const en: Translations = {
     remove: "Remove it",
     send: "Send anyway",
   },
+  stretchCard: {
+    continued: "{{name}} let them go on · {{time}}",
+    continuedByYou: "You let them go on · {{time}}",
+  },
   actionCard: {
     connect_ai: {
       title: "Connect an AI for {{agents}}",
@@ -1580,6 +1585,7 @@ export const en: Translations = {
       renamed: "Renamed the conversation to <b>{{to}}</b>",
       closed: "Closed the conversation <b>{{title}}</b>",
     },
+    other: "Made a change",
     issueFields: {
       title: "the title",
       description: "the description",
@@ -6264,6 +6270,7 @@ export const en: Translations = {
     stoppedBy: "Stopped by {{name}}",
     stopped: "Stopped",
     continueRun: "Continue",
+    stepLimit: "At the step limit",
     steer: {
       waiting: "{{name}} reads it at the next pause",
       now: "{{name}} stopped to read it",
@@ -8297,6 +8304,7 @@ export const en: Translations = {
     },
     title: "Settings",
     account: {
+      plans: "Your plans' limits",
       device: "On this device",
     },
     orgTitle: "Workspace",
@@ -8602,6 +8610,8 @@ export const en: Translations = {
       helping: "helping {{name}}",
       see: "See conversation",
     },
+    unshown: "This message couldn't be shown",
+    unshownPart: "Part of this message couldn't be shown",
     /** Automatic lines: what reached an agent's conversation (`meta.notice`), a routine's background start. */
     notice: {
       routineHandoff: "Routine «{{routine}}» delivered a report",
@@ -8890,6 +8900,17 @@ export const en: Translations = {
       issue_work_start: "Please do task #{{number}}.",
       issue_taken: "Took task #{{number}}.",
       done: "Done.",
+      stretch_paused_runs_one: "{{agents}} stopped to check with you · {{steps}} steps without you since your request",
+      stretch_paused_runs_other:
+        "{{agents}} stopped to check with you · {{steps}} steps on their own since your request",
+      stretch_paused_spend_one:
+        "{{agents}} stopped to check with you · used {{percent}}% of the month's budget on this without you",
+      stretch_paused_spend_other:
+        "{{agents}} stopped to check with you · each used {{percent}}% of the month's budget on this without you",
+      stretch_paused_spend_cost_one:
+        "{{agents}} stopped to check with you · used {{amount}} ({{percent}}% of the month's budget) on this without you",
+      stretch_paused_spend_cost_other:
+        "{{agents}} stopped to check with you · each used {{amount}} ({{percent}}% of the month's budget) on this without you",
       memory: {
         proposed: "Proposal created: {{text}}",
         forgot: 'Memory updated: forgot "{{text}}".',
@@ -8897,6 +8918,7 @@ export const en: Translations = {
         remembered: "Memory updated: {{text}}",
       },
       interrupted: "Interrupted by a server restart. Ask again to continue.",
+      step_limit: "I ran out of steps before finishing.",
       forum_suggestion: 'Worth a forum? "{{title}}"',
       forum_concluded: 'The forum "{{title}}" is over. The synthesis is in the file below.',
       forum_concluded_issues:
@@ -9767,6 +9789,8 @@ export const en: Translations = {
     },
     retry: "Try again",
     takeover: "Take control",
+    /** Over the last picture while control opens. */
+    taking: "Taking control…",
     clipboard: {
       got: "Copied on {{name}}'s computer:",
       copy: "Copy",
@@ -9786,7 +9810,6 @@ export const en: Translations = {
       doneByYou: "Done by you at {{time}}. {{agent}} looked at the screen again and went on.",
     },
     control: {
-      keys: "Copy and paste as usual: {{copy}}, {{paste}}.",
       notice: "Programs on {{name}}'s computer can see the screen and what you type or paste.",
     },
     /** The ⓘ beside the control line, on agentes.chat Cloud only (ADR 0076). */

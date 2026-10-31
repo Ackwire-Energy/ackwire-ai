@@ -35,7 +35,7 @@ async function unwatchedRun(kind: "unattended" | RoutineAccess): Promise<ToolCon
     channelId: f.general.id,
     author: brief
       ? { type: "person", userId: f.owner.id }
-      : { type: "agent", agentId: f.agent.id, runId: null, hop: 1 },
+      : { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null },
     body: "Answer the new support mail.",
     meta: brief ? { routineBrief: brief } : undefined,
   });

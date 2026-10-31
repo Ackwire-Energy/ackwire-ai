@@ -118,10 +118,15 @@ describe("schedule phrases", () => {
       type: "once",
       at: new Date("2026-10-16T12:00:00Z"),
     });
-    // Without a reader only cron is read.
-    expect(
-      await parseSchedule(null, { orgId: "org", phrase: "toda segunda e quarta às 9h", timezone: sp }),
-    ).toMatchObject({ ok: false, code: "schedule.unreadable" });
+    // Without a reader only cron is read, and the refusal says so: an agent retries with cron, never the same words.
+    const unread = await parseSchedule(null, { orgId: "org", phrase: "weekdays at 9am", timezone: sp });
+    expect(unread).toMatchObject({ ok: false, code: "schedule.unreadable" });
+    expect(unread.ok ? "" : unread.error).toContain('"0 9 * * 1-5"');
+    expect(unread.ok ? "" : unread.error).not.toContain('Try "weekdays at 9am"');
+    expect(await parseSchedule(null, { orgId: "org", phrase: "0 9 * * 1-5", timezone: sp })).toMatchObject({
+      ok: true,
+      cron: "0 9 * * 1-5",
+    });
   });
 });
 

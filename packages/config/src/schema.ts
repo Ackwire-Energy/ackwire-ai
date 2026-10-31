@@ -329,7 +329,8 @@ export const envVars = {
   },
   AGENT_MAX_TOOL_TURNS: {
     schema: z.coerce.number().int().min(1).max(200).default(25),
-    description: "Maximum model calls in one agent run (each tool round trip is one). Stops runaway tool loops.",
+    description:
+      "Maximum model calls in one agent run (each tool round trip is one), plus up to twice as many browser or desktop steps that worked. Stops runaway tool loops: near it the agent wraps up, and a conversation run ends with Continuar.",
     section: "Agents",
   },
   AGENT_CONTEXT_MESSAGES: {
@@ -338,9 +339,9 @@ export const envVars = {
     section: "Agents",
   },
   AGENT_MAX_HOPS: {
-    schema: z.coerce.number().int().min(1).max(20).default(3),
+    schema: z.coerce.number().int().min(1).max(500).default(100),
     description:
-      "Maximum consecutive agent replies in one thread without a person posting. Stops agents from triggering each other forever.",
+      "Depth backstop: the most agent replies in a row along one chain without a person. The per-stretch limit (50 runs agents start on their own since a person last acted) stops them long before; reaching this means some path lost its stretch.",
     section: "Agents",
   },
   PLATFORM_ANTHROPIC_API_KEY: {

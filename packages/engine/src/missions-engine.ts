@@ -292,7 +292,7 @@ export async function tellMainSession(
       orgId: fresh.orgId,
       channelId: fresh.channelId,
       threadId: fresh.threadRootId,
-      author: { type: "agent", agentId: fresh.agentId, runId: null, hop: 0 },
+      author: { type: "agent", agentId: fresh.agentId, runId: null, hop: 0, stretchId: null },
       body: options.notice?.body ?? (noMentions(body).slice(0, 39_000) || "…"),
       meta: options.notice?.meta ?? {
         missionInbox: { missionId: fresh.id, from, text: noMentions(body), requestedBy: requester, kind },

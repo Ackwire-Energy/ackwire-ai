@@ -15,7 +15,15 @@ const { agentRuns } = schema;
  */
 export async function enqueueRunJob(
   tx: Executor,
-  message: { id: string; orgId: string; channelId: string; threadId: string | null; hop: number },
+  message: {
+    id: string;
+    orgId: string;
+    channelId: string;
+    threadId: string | null;
+    hop: number;
+    /** Its stretch (ADR 0089); none: it is its own (a mission's notice). */
+    stretchId?: string | null;
+  },
   agentId: string,
 ): Promise<{ run: typeof agentRuns.$inferSelect | null; steered: string | null }> {
   const threadRootId = message.threadId ?? message.id;
@@ -47,8 +55,10 @@ export async function enqueueRunJob(
       threadRootId,
       triggerMessageId: message.id,
       trigger: "mention",
-      // The notice is hop 0: inside an active mission its own wake-ups don't count toward the agent-to-agent limit.
+      // The notice is hop 0: inside an active mission its own wake-ups count toward no stretch's limit (the
+      // mission's stuck guard holds them).
       hop: message.hop + 1,
+      stretchId: message.stretchId ?? message.id,
     })
     .onConflictDoNothing()
     .returning();

@@ -350,6 +350,14 @@ async function ownRoutine(ctx: ToolContext, id: string) {
   return { row, error: "" };
 }
 
+const SCHEDULE_INPUT = {
+  type: "string",
+  minLength: 1,
+  maxLength: 300,
+  description:
+    'When it runs, in the workspace\'s time zone: words in any language ("dias úteis às 9h") or a 5-field cron expression ("0 9 * * 1-5"). Cron always works.',
+};
+
 const TRIGGER_SCHEMA = {
   type: "object",
   description:
@@ -466,7 +474,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
       inputSchema: {
         type: "object",
         properties: {
-          schedule: { type: "string", minLength: 1, maxLength: 300 },
+          schedule: SCHEDULE_INPUT,
           trigger: TRIGGER_SCHEMA,
           prompt: { type: "string", minLength: 1, maxLength: 10_000 },
           title: { type: "string", maxLength: 120 },
@@ -637,7 +645,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           id: { type: "string", minLength: 36, maxLength: 36 },
           channel: { type: "string", maxLength: 100 },
           prompt: { type: "string", minLength: 1, maxLength: 10_000 },
-          schedule: { type: "string", minLength: 1, maxLength: 300 },
+          schedule: SCHEDULE_INPUT,
           trigger: TRIGGER_SCHEMA,
           title: { type: "string", minLength: 1, maxLength: 120 },
           report: REPORT_SCHEMA,

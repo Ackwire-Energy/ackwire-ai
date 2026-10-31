@@ -1828,24 +1828,27 @@ export interface GifQuery {
 /**
  * Act with undo (ADR 0037 round 2): what an agent changed with its reply,
  * shown as a receipt under the message. Say it with `agentActions.{kind}`
- * (pt-BR and en) and `params`.
+ * (pt-BR and en) and `params`. The same list as the engine's `AGENT_ACTION_KINDS`
+ * (a test keeps them so), but a newer server can still send a kind this build doesn't know.
  */
-export type AgentActionKind =
-  | "issue.created"
-  | "issue.updated"
-  | "issue.assigned"
-  | "memory.saved"
-  | "memory.updated"
-  | "memory.forgotten"
-  | "routine.created"
-  | "routine.updated"
-  | "routine.deleted"
-  | "channel.agent_added"
-  | "channel.created"
-  | "wiki.page_created"
-  | "wiki.page_edited"
-  | "thread.renamed"
-  | "thread.closed";
+export const AGENT_ACTION_KINDS = [
+  "issue.created",
+  "issue.updated",
+  "issue.assigned",
+  "memory.saved",
+  "memory.updated",
+  "memory.forgotten",
+  "routine.created",
+  "routine.updated",
+  "routine.deleted",
+  "channel.agent_added",
+  "channel.created",
+  "wiki.page_created",
+  "wiki.page_edited",
+  "thread.renamed",
+  "thread.closed",
+] as const;
+export type AgentActionKind = (typeof AGENT_ACTION_KINDS)[number];
 
 /** What the change was made to (link it: issue → Issues, wiki_page → Wiki, routine → Rotinas…). */
 export interface AgentActionTarget {

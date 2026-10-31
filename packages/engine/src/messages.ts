@@ -225,6 +225,7 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
         candidates: schema.routingDecisions.candidates,
         error: schema.routingDecisions.error,
         strategy: schema.routingDecisions.strategy,
+        selected: schema.routingDecisions.selectedAgentIds,
       })
       .from(schema.routingDecisions)
       .where(and(eq(schema.routingDecisions.orgId, orgId), inArray(schema.routingDecisions.messageId, ids))),
@@ -250,6 +251,11 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
   const noAi = new Set(decisions.filter((d) => d.error === NO_AI).map((d) => d.messageId));
   const capped = new Set(decisions.filter((d) => d.error === PLATFORM_CAP).map((d) => d.messageId));
   const strategyOf = new Map(decisions.map((d) => [d.messageId, d.strategy]));
+  // An agent's mentions the judge read as no hand-off (`delegatedAgents`); the ones it picked that a stretch's limit
+  // held are its pause card's to explain.
+  const handedOff = new Map(
+    decisions.filter((d) => d.strategy.startsWith("mention-")).map((d) => [d.messageId, d.selected]),
+  );
   const steeredById = new Map(steeredRuns.map((r) => [r.id, r]));
   const answeredByQuestion = new Map(answeredRuns.map((r) => [r.questionId, r]));
   for (const m of list) {
@@ -263,7 +269,10 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
     const mine = all.filter((r, i) => all.findIndex((o) => o.agentId === r.agentId) === i);
     const picked = new Set(mine.map((r) => r.agentId));
     const seenBy = [...new Set([...(seen.get(m.id) ?? []), ...m.mentionedAgentIds, ...picked])];
-    const referenced = referencedOf(m.meta).filter((id) => !picked.has(id));
+    const selected = m.authorType === "agent" ? handedOff.get(m.id) : undefined;
+    const referenced = (
+      selected ? m.mentionedAgentIds.filter((id) => !selected.includes(id)) : referencedOf(m.meta)
+    ).filter((id) => !picked.has(id));
     out.set(m.id, {
       seenBy,
       pickedBy: [...picked],
@@ -315,9 +324,16 @@ export const THREAD_ASSESS_DELAY_MS = 2 * 60_000;
  */
 export const FLOOR_WINDOW_MS = 30 * 60_000;
 
+/**
+ * An agent's message written by a run takes that run's hop and stretch (ADR 0089) from its row in its own insert
+ * (`hop` only when the row is gone): a person may have rerooted the run since its caller read it. One no run wrote
+ * (a notice, a task's end, a follow-up line) says its stretch: the run's it belongs to, or null for a root (a
+ * routine's report, a line that wakes nobody).
+ */
 export type MessageAuthor =
   | { type: "person"; userId: string }
-  | { type: "agent"; agentId: string; runId: string | null; hop: number };
+  | { type: "agent"; agentId: string; runId: string; hop: number }
+  | { type: "agent"; agentId: string; runId: null; hop: number; stretchId: string | null };
 
 export interface NewMessage {
   orgId: string;
@@ -373,6 +389,7 @@ interface RawMessage {
   mentioned_agent_ids: string[] | string | null;
   mentioned_user_ids: string[] | string | null;
   hop: number;
+  stretch_id: string | null;
   agent_run_id: string | null;
   meta: Record<string, unknown> | string | null;
   edited_at: Date | string | null;
@@ -456,6 +473,8 @@ export async function insertMessageWithRuns(
   const agentId = input.author.type === "agent" ? input.author.agentId : null;
   const runId = input.author.type === "agent" ? input.author.runId : null;
   const hop = input.author.type === "agent" ? input.author.hop : 0;
+  const stretchId =
+    (input.author.type === "agent" && input.author.runId === null ? input.author.stretchId : null) ?? null;
   const threadId = input.threadId ?? null;
   const startRuns = options.startRuns && person && !mediaOnly;
   const deliver = person && options.deliver !== false && !mediaOnly;
@@ -609,9 +628,13 @@ export async function insertMessageWithRuns(
         returning r.id, r.agent_id
       ), m as (
         insert into ${messages} (id, created_at, org_id, channel_id, thread_id, author_type, author_user_id,
-          author_agent_id, agent_run_id, hop, body, mentioned_agent_ids, mentioned_user_ids, meta)
+          author_agent_id, agent_run_id, hop, stretch_id, body, mentioned_agent_ids, mentioned_user_ids, meta)
         select ${id}::uuid, coalesce(${input.createdAt?.toISOString() ?? null}::timestamptz, now()), ${input.orgId}::uuid, ${input.channelId}::uuid, ${threadId}::uuid,
-          ${input.author.type}::author_type, ${userId}, ${agentId}::uuid, ${runId}::uuid, ${hop}, ${body},
+          ${input.author.type}::author_type, ${userId}, ${agentId}::uuid, ${runId}::uuid,
+          coalesce((select sr.hop from ${agentRuns} sr where sr.id = ${runId}::uuid), ${hop}),
+          coalesce(${stretchId}::uuid, (select coalesce(sr.stretch_id, sr.trigger_message_id) from ${agentRuns} sr
+            where sr.id = ${runId}::uuid)),
+          ${body},
           coalesce((select array_agg(id) from mentioned), '{}'::uuid[]),
           coalesce((select array_agg(user_id) from mentioned_people), '{}'::text[]),
           ${JSON.stringify(input.meta ?? {})}::jsonb
@@ -640,9 +663,10 @@ export async function insertMessageWithRuns(
           and t.root_message_id = ${threadId}::uuid and t.state = 'closed' and exists (select 1 from m)
         returning t.id
       ), runs as (
-        insert into ${agentRuns} (id, org_id, agent_id, channel_id, thread_root_id, trigger_message_id, trigger, hop)
+        insert into ${agentRuns} (id, org_id, agent_id, channel_id, thread_root_id, trigger_message_id, trigger, hop,
+          stretch_id)
         select gen_random_uuid(), ${input.orgId}::uuid, an.agent_id, ${input.channelId}::uuid,
-          coalesce(${threadId}::uuid, ${id}::uuid), ${id}::uuid, an.trig::agent_run_trigger, ${hop} + 1
+          coalesce(${threadId}::uuid, ${id}::uuid), ${id}::uuid, an.trig::agent_run_trigger, ${hop} + 1, ${id}::uuid
         from (select agent_id, trig from answering
           union select agent_id, 'mention' from held where agent_id not in (select agent_id from answering)) an
         where exists (select 1 from m)
@@ -729,6 +753,7 @@ export async function insertMessageWithRuns(
     mentionedAgentIds: parseUuidArray(row.mentioned_agent_ids),
     mentionedUserIds: parseUuidArray(row.mentioned_user_ids),
     hop: row.hop,
+    stretchId: row.stretch_id,
     agentRunId: row.agent_run_id,
     meta: parseJson(row.meta, {}),
     editedAt: asDate(row.edited_at),
@@ -1369,10 +1394,11 @@ export const withMessageDetails = (db: Database, orgId: string, list: Message[])
 async function withReceipts(db: Database, orgId: string, list: Message[]): Promise<MessageView[]> {
   const agentMessageIds = list.flatMap((m) => (m.authorType === "agent" ? [m.id] : []));
   const [receipts, usage, reactions, memories, pinned, actions] = await Promise.all([
+    // A person's message, and an agent's that mentions agents (whom it handed work to, ADR 0089).
     receiptsFor(
       db,
       orgId,
-      list.filter((m) => m.authorType === "person"),
+      list.filter((m) => m.authorType === "person" || m.mentionedAgentIds.length > 0),
     ),
     usageFor(db, orgId, list),
     reactionsFor(

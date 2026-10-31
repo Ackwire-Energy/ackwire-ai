@@ -916,9 +916,9 @@ export function managementRoutes(deps: AppDeps) {
       tags: ["Usage"],
       security,
       summary:
-        "Continue a run a person stopped (same people as stopping it): a new run of the agent picks up where it stopped",
+        "Continue a run a person stopped, or one that reached its step limit (same people as stopping it): a new run of the agent picks up where it stopped",
       description:
-        "Only for a run stopped by a person while it worked; once per stopped reply (`meta.canceled.continuedRunId`). 409 `run.not_continuable` otherwise, 409 `run.agent_busy` while the agent already works in that conversation. The channel hears `run.continued`.",
+        "Only for a run stopped by a person while it worked, or one that ended at its step limit (its reply has `meta.stepLimit`); once per reply (`meta.canceled.continuedRunId`, `meta.stepLimit.continuedRunId`). 409 `run.not_continuable` otherwise, 409 `run.agent_busy` while the agent already works in that conversation. The channel hears `run.continued`.",
       request: { params: OrgParams.extend({ runId: z.uuid() }) },
       responses: { 200: json(z.object({ runId: z.uuid() })), ...errors },
     }),
