@@ -486,6 +486,9 @@
     gap: 0;
     white-space: normal;
   }
+  .outage__text b {
+    max-width: none;
+  }
   .outage__crew {
     display: none;
   }
@@ -495,6 +498,10 @@
   }
   .outage__acts {
     flex-basis: 100%;
+  }
+  /* A hold's button has a row of its own here: it takes its whole height. */
+  .hold-banner > .outage__acts {
+    margin-block: 0;
   }
   .outage__acts > .ac-btn:not(.ac-btn--icon) {
     flex: 1;
