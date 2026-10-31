@@ -4,9 +4,11 @@ import {
   desktopTrailOf,
   keys,
   type Message,
+  type RunConsultation,
   type ScreenKind,
   type ThreadInfo,
   useApi,
+  useConsultations,
   useContinuedRun,
   useReactions,
   useSteerState,
@@ -14,6 +16,7 @@ import {
   useWaiting,
 } from "@agenteschat/client";
 import { CONTINUE_ERRORS, errorCode, errorText } from "@agenteschat/client/lib/errors";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
 import { brainUnavailableOf } from "@agenteschat/client/lib/machine-outages";
 import { serverBody } from "@agenteschat/client/lib/message-body";
@@ -46,13 +49,14 @@ import { NoAiCard } from "../ai/NoAiCard";
 import { HandoffCard } from "../browser/HandoffCard";
 import { TrailCard } from "../browser/TrailCard";
 import { MessageFiles } from "../files/MessageFiles";
-import { routineHref } from "../links/logic";
+import { consultationHref, routineHref } from "../links/logic";
 import { DecisionCard, MissionCard, PlanCard, ReviewCard, SetupFailedCard } from "../missions/cards";
 import { BrainWait } from "../outages/WaitCard";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
+import { ConsultGroup } from "./ConsultGroup";
 import { ApprovalInline, ConsultationCard, QuestionCard, ThreadLink } from "./cards";
 import { IssueWorkCard } from "./issue-work";
 import { cacheContinued } from "./live";
@@ -92,14 +96,18 @@ export const MessageRow = memo(function MessageRow({
   thread,
   onLongPress,
   onRetry,
+  readOnly = false,
 }: {
   message: Message;
   grouped: boolean;
   meId: string | null;
   /** Its thread, when it is the root of one the conversation shows as a link. */
   thread?: ThreadInfo;
-  onLongPress: (m: Message) => void;
+  /** Absent where it is read only. */
+  onLongPress?: (m: Message) => void;
   onRetry?: (m: Message) => void;
+  /** Shown where the person can't act on it (two agents' conversation): no long press, reactions or block. */
+  readOnly?: boolean;
 }) {
   const { t } = useTranslation();
   // Mine and not sent for lack of a connection: it waits and goes by itself when the connection is back.
@@ -135,10 +143,24 @@ export const MessageRow = memo(function MessageRow({
   // What the server wrote itself is said in the person's language; a stopped reply drops the server's note.
   const body = hidesBody(m) ? "" : reminderBody(splitCanceled(serverBody(t, m.body, meta), meta).body, meta);
   const consulted = isAgent && m.author.id ? consultationsOf(meta) : [];
-  const steps = isAgent && m.agentRunId ? workStepsOf(meta) : null;
+  // A question to another agent (in their DM) carries the asking run: its work shows on that run's reply.
+  const ownWork = isAgent && Boolean(m.agentRunId) && !meta?.consultation;
+  const steps = ownWork ? workStepsOf(meta) : null;
+  // Posted by a run answering another agent's question from here (its approval, question, secret): whom it helps.
+  const consultations = useConsultations(orgId, m.channelId, isAgent && Boolean(m.agentRunId) && !readOnly);
+  const helping =
+    isAgent && m.agentRunId && !readOnly
+      ? consultations.data?.find((x) => x.consultedRunId === m.agentRunId)
+      : undefined;
+  const press = readOnly
+    ? undefined
+    : () => {
+        tapHaptic();
+        onLongPress?.(m);
+      };
   const stopped = isAgent && m.agentRunId ? stoppedOf(meta) : null;
   // This reply just took its live block's place here: the same tools (and the messages it read) stay.
-  const [kept] = useState(() => (isAgent && m.agentRunId ? recentTurn(m.agentRunId, Date.now()) : null));
+  const [kept] = useState(() => (ownWork && m.agentRunId ? recentTurn(m.agentRunId, Date.now()) : null));
   // The line its block opened with stays above the tools, where it was, instead of moving into them (`turnOpener`).
   const opened =
     kept && m.agentRunId ? turnOpener({ runId: m.agentRunId, status: "running", text: "" }, kept.items) : null;
@@ -197,9 +219,11 @@ export const MessageRow = memo(function MessageRow({
           {...(setup.reason === "branch_missing" ? { lostBranch: setup.branch ?? null } : {})}
         />
       ) : null}
-      <View style={mine ? styles.meEnd : undefined}>
-        <Reactions message={m} meId={meId} />
-      </View>
+      {readOnly ? null : (
+        <View style={mine ? styles.meEnd : undefined}>
+          <Reactions message={m} meId={meId} />
+        </View>
+      )}
       {m.local === "pending" || (m.local === "failed" && offline) ? (
         <Sending offline={offline} end={mine} />
       ) : m.local === "failed" ? (
@@ -215,13 +239,10 @@ export const MessageRow = memo(function MessageRow({
   if (mine)
     return (
       <Pressable
-        onLongPress={() => {
-          tapHaptic();
-          onLongPress(m);
-        }}
+        onLongPress={press}
         delayLongPress={380}
-        accessibilityHint={t("mobile.chat.longPressHint")}
-        style={({ pressed }) => [styles.me, grouped && styles.meCont, pressed && styles.mePressed]}
+        accessibilityHint={press ? t("mobile.chat.longPressHint") : undefined}
+        style={({ pressed }) => [styles.me, grouped && styles.meCont, pressed && press && styles.mePressed]}
       >
         {m.pinned ? (
           <View style={[styles.pinLine, styles.meEnd]}>
@@ -248,13 +269,10 @@ export const MessageRow = memo(function MessageRow({
 
   return (
     <Pressable
-      onLongPress={() => {
-        tapHaptic();
-        onLongPress(m);
-      }}
+      onLongPress={press}
       delayLongPress={380}
-      accessibilityHint={t("mobile.chat.longPressHint")}
-      style={({ pressed }) => [styles.msg, grouped && styles.cont, pressed && { backgroundColor: c.sunken }]}
+      accessibilityHint={press ? t("mobile.chat.longPressHint") : undefined}
+      style={({ pressed }) => [styles.msg, grouped && styles.cont, pressed && press && { backgroundColor: c.sunken }]}
     >
       <View style={styles.avslot}>{grouped ? null : <Face who={m.author} size={32} live={false} />}</View>
       <View style={styles.body}>
@@ -297,7 +315,8 @@ export const MessageRow = memo(function MessageRow({
                 {t("chat.notice.talker")}
               </Text>
             ) : null}
-            {!reminder && !routine && !talker && agent?.role ? (
+            {helping ? <HelpingTag consultation={helping} channelId={m.channelId} /> : null}
+            {!reminder && !routine && !talker && !helping && agent?.role ? (
               <Text variant="caption" tone="faint" numberOfLines={1} style={styles.shrink}>
                 {agent.role}
               </Text>
@@ -324,6 +343,9 @@ export const MessageRow = memo(function MessageRow({
         {consulted.map((cs) => (
           <ConsultationCard key={cs.consultationId} askerId={m.author.id ?? ""} consultation={cs} />
         ))}
+        {isAgent && m.agentRunId && !m.local && !readOnly && consulted.length === 0 ? (
+          <ConsultGroup message={m} color={color} />
+        ) : null}
         {opened?.said ? <MessageText body={opened.said} selectable={false} accent={accent} /> : null}
         {kept ? (
           <TurnTools
@@ -562,6 +584,30 @@ function Tag({
     >
       {chip}
     </Pressable>
+  );
+}
+
+/** On a card this agent posted while answering another agent's question: "ajudando o Theo · Ver conversa". */
+function HelpingTag({ consultation: c, channelId }: { consultation: RunConsultation; channelId: string }) {
+  const { t } = useTranslation();
+  const dir = useDirectory();
+  const from = agentGrammar(t, dir.agentById.get(c.agentId)?.name ?? t("mobile.chat.someone"));
+  return (
+    <>
+      <Text variant="caption" tone="faint" numberOfLines={1} style={styles.shrink}>
+        {t("chat.consultPanel.helping", { name: from.name, article: from.article })}
+      </Text>
+      <Pressable
+        onPress={() => router.push(consultationHref(c.id, channelId))}
+        accessibilityRole="button"
+        hitSlop={6}
+        style={styles.shrink}
+      >
+        <Text variant="caption" tone="muted" numberOfLines={1} style={styles.medium}>
+          {t("chat.consultPanel.see")}
+        </Text>
+      </Pressable>
+    </>
   );
 }
 
