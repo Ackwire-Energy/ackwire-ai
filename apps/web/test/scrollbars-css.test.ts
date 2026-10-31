@@ -31,6 +31,12 @@ const sides = (v: string) => {
   const [top = Number.NaN, right = top, bottom = top, left = right] = v.split(/\s+/).map(px);
   return { top, right, bottom, left };
 };
+/** How far the focus ring reaches outside its element, in px. */
+async function focusRing() {
+  const tokens = await read("packages/ui/src/styles/tokens.css");
+  const ring = tokens.match(/--focus-ring:([^;]+);/)?.[1] ?? "";
+  return Math.max(...[...ring.matchAll(/0 0 0 ([\d.]+)px/g)].map((m) => Number(m[1])));
+}
 /** `wide` matches whatever `selector` matches: the same, or its last part after a descendant or child combinator. */
 const covers = (wide: string, selector: string) =>
   selector === wide || selector.endsWith(` ${wide}`) || selector.endsWith(`>${wide}`);
@@ -169,9 +175,7 @@ describe("the collapsed sidebar", () => {
     const kit = atRule(await read(KIT), POINTER);
     const tokens = await read("packages/ui/src/styles/tokens.css");
     const item = px(tokens.match(/--control-h-md:\s*([\d.]+)px/)?.[1] ?? "");
-    const ring = Math.max(
-      ...[...(tokens.match(/--focus-ring:([^;]+);/)?.[1] ?? "").matchAll(/0 0 0 ([\d.]+)px/g)].map((m) => Number(m[1])),
-    );
+    const ring = await focusRing();
     const rail = { width: px(value(layout, RAIL, "width")), padding: sides(value(layout, RAIL, "padding")) };
     const list = `${RAIL} .sidebar__scroll`;
     const column = px(value(layout, list, "grid-template-columns"));
@@ -199,5 +203,26 @@ describe("the collapsed sidebar", () => {
     expect(declarations(layout, ".sidebar__scroll:not(:hover, :has(:focus-visible))")).toEqual([
       ["--scroll-thumb", "transparent"],
     ]);
+  });
+});
+
+describe("the open sidebar", () => {
+  test("its rows end where the header's and the foot's do, and keep their width when the list starts to scroll", async () => {
+    const source = await read("apps/web/src/layout.css");
+    const layout = topLevel(source);
+    const kit = atRule(await read(KIT), POINTER);
+    // Where the kit draws ours, and only there: elsewhere the scrollbar takes no room, or room of its own size.
+    const ours = atRule(atRule(source, POINTER), "@supports selector(::-webkit-scrollbar)");
+    const list = '.sidebar:not([data-rail="true"]) .sidebar__scroll';
+    const sidebar = sides(value(layout, ".sidebar", "padding"));
+    const padding = px(value(ours, list, "padding-right"));
+    // The list reaches the sidebar's edge, where its scrollbar sits…
+    expect(sides(value(layout, ".sidebar__scroll", "margin")).right).toBe(-sidebar.right);
+    // …in room kept whether it scrolls or not…
+    expect(value(ours, list, "scrollbar-gutter")).toBe("stable");
+    // …taken from the list's side padding, so its rows end as far from the edge as everything else in the sidebar…
+    expect(padding + px(value(kit, "::-webkit-scrollbar", "width"))).toBe(sidebar.right);
+    // …with what is left of it holding a row's focus ring, which the list would clip.
+    expect(padding).toBeGreaterThanOrEqual(await focusRing());
   });
 });

@@ -32,7 +32,7 @@ samp {
 
 /*
  * Scrollbars, ours wherever something scrolls under a mouse or a trackpad. A touch screen keeps the platform's
- * indicator, which shows while scrolling and takes no room: ours would take 10px there, and one shown only on hover
+ * indicator, which shows while scrolling and takes no room: ours would take 8px there, and one shown only on hover
  * (the sidebar's) would never show. WebKit and Blink draw ours from the pseudo-elements; the standard properties go
  * only to browsers without those (Firefox), since Chrome ignores the pseudo-elements on any element that sets them. A
  * strip that scrolls by swipe hides its own on every device: `scrollbar-width: none` and its
@@ -45,8 +45,8 @@ samp {
 }
 @media (hover: hover) and (pointer: fine) {
   ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
   }
   ::-webkit-scrollbar-track,
   ::-webkit-scrollbar-corner {
@@ -56,7 +56,7 @@ samp {
     display: none;
   }
   ::-webkit-scrollbar-thumb {
-    border: 3px solid transparent;
+    border: 2px solid transparent;
     border-radius: var(--radius-full);
     background: var(--scroll-thumb) padding-box;
   }
@@ -68,7 +68,7 @@ samp {
   }
   ::-webkit-scrollbar-thumb:hover,
   ::-webkit-scrollbar-thumb:active {
-    border-width: 2px;
+    border-width: 1px;
     background-color: var(--scroll-thumb-hover);
   }
   @supports not selector(::-webkit-scrollbar) {

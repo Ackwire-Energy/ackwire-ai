@@ -483,6 +483,17 @@ p {
 .sidebar__scroll:not(:hover, :has(:focus-visible)) {
   --scroll-thumb: transparent;
 }
+/* The kit's 8px scrollbar sits at the sidebar's edge, in room kept whether the list scrolls or not, and the 4px of the
+   list's 12px side padding left beside it hold a row's focus ring: the rows end where the header's and the foot's do,
+   and keep their width when opening a category makes the list scroll. */
+@media (hover: hover) and (pointer: fine) {
+  @supports selector(::-webkit-scrollbar) {
+    .sidebar:not([data-rail="true"]) .sidebar__scroll {
+      scrollbar-gutter: stable;
+      padding-right: 4px;
+    }
+  }
+}
 .sidebar__org {
   display: flex;
   align-items: center;
