@@ -256,7 +256,7 @@ export function ProposalGroup({ proposalIds }: { proposalIds: string[] }) {
     decide.mutate(
       { ids: chosen.map((p) => p.id), decision },
       {
-        onSuccess: (failed) => {
+        onSuccess: ({ failed }) => {
           const stale = staleCount(failed);
           const agentRows = failed.some((f) => rows.find((p) => p.id === f.id && !isText(p)));
           if (stale > 0)

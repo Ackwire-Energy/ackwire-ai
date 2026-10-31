@@ -91,6 +91,7 @@ import type {
   NotificationFilter,
   OrgRoles,
   Person,
+  Proposal,
   ReactionCount,
   ReminderInput,
   Role,
@@ -2095,6 +2096,23 @@ export function useCardProposals(orgId: string, ids: string[]) {
   return (query.data ?? []).filter((p) => ids.includes(p.id)).sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
 }
 
+/**
+ * What accepted proposals changed on their agents' pages, wherever they were accepted: the instructions and role
+ * (profile card, hero, team), and the apps (the Access tab and the matrix).
+ */
+function refreshAccepted(qc: QueryClient, orgId: string, decided: Proposal[]) {
+  const accepted = decided.filter((p) => p.status === "accepted" && p.target.type !== "org_context");
+  if (accepted.length === 0) return;
+  void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+  void qc.invalidateQueries({ queryKey: keys.team(orgId) });
+  for (const p of accepted) {
+    void qc.invalidateQueries({ queryKey: keys.agentDetail(orgId, p.agentId) });
+    if (p.target.type === "agent_access") void qc.invalidateQueries({ queryKey: keys.scopes(orgId, p.agentId) });
+  }
+  if (accepted.some((p) => p.target.type === "agent_access"))
+    void qc.invalidateQueries({ queryKey: keys.access(orgId) });
+}
+
 export function useDecideProposal(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
@@ -2105,30 +2123,35 @@ export function useDecideProposal(orgId: string) {
         : api.proposals.refuse(orgId, input.id),
     // The page explains a stale proposal (409) itself.
     meta: { silent: true },
+    onSuccess: (row) => refreshAccepted(qc, orgId, [row]),
     onSettled: () => qc.invalidateQueries({ queryKey: keys.proposals(orgId) }),
   });
 }
 
 /**
  * A card's rows accepted or refused at once: one request per row, so each applies on its own and a stale one
- * never stops the rest, then one refresh. Resolves with the rows that failed and why.
+ * never stops the rest, then one refresh. Resolves with the rows decided and the ones that failed and why.
  */
 export function useDecideProposals(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { ids: string[]; decision: "accept" | "refuse" }) => {
+      const decided: Proposal[] = [];
       const failed: { id: string; error: unknown }[] = [];
       for (const id of input.ids) {
         try {
-          await (input.decision === "accept" ? api.proposals.accept(orgId, id) : api.proposals.refuse(orgId, id));
+          decided.push(
+            await (input.decision === "accept" ? api.proposals.accept(orgId, id) : api.proposals.refuse(orgId, id)),
+          );
         } catch (error) {
           failed.push({ id, error });
         }
       }
-      return failed;
+      return { decided, failed };
     },
     meta: { silent: true },
+    onSuccess: ({ decided }) => refreshAccepted(qc, orgId, decided),
     onSettled: () => qc.invalidateQueries({ queryKey: keys.proposals(orgId) }),
   });
 }

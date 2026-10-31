@@ -148,6 +148,30 @@ describe("a change proposed for several agents in the chat", () => {
     );
   });
 
+  test("an accepted role or app reads the agents again, on a card of several rows or of one", async () => {
+    let reads = 0;
+    const counting = (api: ReturnType<typeof createFakeApi>) => {
+      const list = api.agents.list;
+      api.agents.list = async (orgId) => {
+        reads += 1;
+        return list(orgId);
+      };
+    };
+    await openCard([adaRole("p-role"), atlas("p-atlas")], counting);
+    let before = reads;
+    const card = screen().getByRole("group", { name: "Proposta de mudança de Atlas para 2 agentes" });
+    await click(within(card).getByRole("button", { name: "Aceitar para todos" }));
+    await settle(4);
+    expect(reads).toBeGreaterThan(before);
+    cleanup();
+
+    await openCard([adaRole("p-role")], counting);
+    before = reads;
+    await click(screen().getByRole("button", { name: "Aceitar mudança" }));
+    await settle(4);
+    expect(reads).toBeGreaterThan(before);
+  });
+
   test("one row alone keeps the single card: a new role is taken as proposed, with no Editar", async () => {
     const state = await openCard([adaRole("p-role")]);
     const card = screen().getByRole("group", { name: "Proposta de mudança de Atlas" });

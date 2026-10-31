@@ -1,5 +1,5 @@
 import type { Proposal } from "@agenteschat/client";
-import { ApiError, keys, useDecideProposal, useMemory, useProposals } from "@agenteschat/client";
+import { ApiError, useDecideProposal, useMemory, useProposals } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { proposalTitle } from "@agenteschat/client/lib/proposals";
 import {
@@ -17,7 +17,6 @@ import {
   Textarea,
   Toolbar,
 } from "@agenteschat/ui";
-import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -33,7 +32,6 @@ import { Cell } from "./Work";
 function ProposalCard({ proposal }: { proposal: Proposal }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const qc = useQueryClient();
   const toast = useToast();
   const { agent } = useAgentEdit();
   const decide = useDecideProposal(org.id);
@@ -48,15 +46,7 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
   const accept = () =>
     decide.mutate(
       { id: proposal.id, decision: "accept", text: editing && text !== proposal.after ? text : undefined },
-      {
-        onSuccess: () => {
-          // The instructions changed on the server.
-          void qc.invalidateQueries({ queryKey: keys.agents(org.id) });
-          void qc.invalidateQueries({ queryKey: keys.agentDetail(org.id, agent.id) });
-          toast.show(t("agentPage.memory.accepted"));
-        },
-        onError,
-      },
+      { onSuccess: () => toast.show(t("agentPage.memory.accepted")), onError },
     );
   const refuse = () =>
     decide.mutate(

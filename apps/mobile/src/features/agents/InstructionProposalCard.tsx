@@ -66,7 +66,7 @@ function InstructionProposalCard({ ids }: { ids: string[] }) {
     decide.mutate(
       { ids: chosen.map((p) => p.id), decision },
       {
-        onSuccess: (lost) => {
+        onSuccess: ({ failed: lost }) => {
           const stale = staleCount(lost);
           const ofAgent = lost.some((f) => rows.some((p) => p.id === f.id && !isTextRow(p)));
           if (stale > 0)
