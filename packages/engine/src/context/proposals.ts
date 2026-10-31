@@ -17,6 +17,7 @@ import { caches } from "../cache";
 import { sha256 } from "../crypto";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { publishUserEvent } from "../events";
+import { cutText } from "../format";
 import type { Judge } from "../judge";
 import { can, requirePermission } from "../organizations";
 import { enqueue } from "../outbox";
@@ -518,7 +519,7 @@ export async function proposeChange(
     const next = changedText(current, change, replaces);
     if (next === null) {
       const where = current.includes(replaces ?? "") ? "appears more than once in" : "isn't in";
-      skipped.push(`The text to swap ${where} ${what}. It reads: """${current.slice(0, CURRENT_CHARS)}"""`);
+      skipped.push(`The text to swap ${where} ${what}. It reads: """${cutText(current, CURRENT_CHARS)}"""`);
     } else if (next === current) skipped.push(`${what} already says this.`);
     else if (next.length > max) skipped.push(`${what} would pass ${max} characters: shorten them first.`);
     else return { baseHash: sha256(current), proposedText: next, diff: lineDiff(current, next) };
