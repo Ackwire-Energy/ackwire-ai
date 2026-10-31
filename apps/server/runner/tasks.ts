@@ -182,6 +182,8 @@ interface ExitFile {
 export interface TaskSecrets {
   env: Record<string, string>;
   redact: (text: string) => string;
+  /** The longest secret − 1: what streamed text holds back so a value split between batches is still caught. */
+  hold?: number;
 }
 
 /** A task as the desktop app sees it (running, or just ended). */

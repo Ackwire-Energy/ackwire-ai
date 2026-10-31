@@ -27,6 +27,7 @@ import {
   type MachineStatus,
   normalizeRef,
   setAgentBrowserDomains,
+  startTakeover,
   type ToolSideEffects,
   toolDenyScope,
   updateSandboxSettings,
@@ -905,4 +906,27 @@ test("browser_screenshot names its file a .png, so the browser writes the image 
   const shots = b.calls.filter((c): c is Act => c.op === "browser.act" && c.command === "screenshot");
   expect(shots.map((c) => c.args[0])).toEqual(["notes.png", "code.png"]);
   expect(b.calls.filter((c) => c.op === "push").map((c) => c.path)).toEqual(["notes.png"]);
+});
+
+test("browser_close restarts the browser even while a person has it: their turn ends, with a line, and the close goes", async () => {
+  const b = await browserSetup();
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  // Taken over from this run's card (a person asked the agent to restart its browser meanwhile).
+  await startTakeover({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.agent.id, b.ctx.runId);
+  const sent = b.since();
+  const out = await b.call("browser_close", {});
+  expect(out).toMatchObject({ content: "Closed. Logins stay saved." });
+  expect(sent().map((c) => c.command)).toEqual(["close"]);
+  const [h] = await f.db.select().from(schema.browserHandoffs);
+  expect(h?.status).toBe("cancelled");
+  // The line goes where the take over's card was: where this run answers.
+  const lines = (await f.db.select().from(schema.messages).where(eq(schema.messages.orgId, f.org.id))).filter(
+    (m) => (m.meta as { bodyCode?: string } | null)?.bodyCode === "browser_restarted",
+  );
+  expect(lines.map((m) => [m.channelId, m.body])).toEqual([
+    [b.ctx.channelId, `${f.agent.name} restarted its browser. ${f.owner.name}'s control ended.`],
+  ]);
+  // Opening it again works at once: nobody holds it, nothing to read first.
+  b.s.reply = page('- button "Entrar" [ref=e1]', "https://www.facebook.com/");
+  expect((await b.call("browser_open", { url: "https://www.facebook.com/" })).isError).toBeUndefined();
 });

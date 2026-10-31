@@ -1,11 +1,15 @@
 import { gunzipSync } from "node:zlib";
-import { DELETE_BRANCHES_POINTER, otherBranchPointer } from "@agenteschat/adapters/command-policy";
+import {
+  DELETE_BRANCHES_POINTER,
+  NO_TERMINAL_COMMANDS,
+  otherBranchPointer,
+} from "@agenteschat/adapters/command-policy";
 import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
 import { recordAudit } from "../audit";
 import { connectorScope } from "../connectors/catalog";
 import type { ConnectorDeps } from "../connectors/connections";
 import { standingRefusal } from "../standing";
-import { CONNECTOR_ALL, freshGrantedKeys, grantKey } from "../tools/scopes";
+import { CONNECTOR_ALL, freshGrantedKeys, grantKey, isAllowed, toolAccess } from "../tools/scopes";
 import {
   BRANCH_PUSH_TOOL,
   branchBlock,
@@ -14,8 +18,8 @@ import {
   githubHeaders,
   githubToken,
   type PushGrant,
-  pushGrant,
   pushGrantKey,
+  pushGrants,
   validBranch,
 } from "./branches";
 import { machineGitGen, verifyGitToken } from "./credential";
@@ -33,6 +37,8 @@ export const GIT_SCOPES = {
 export const GIT_LIMITS = {
   /** A push request (commands + pack). */
   pushBytes: 100 * 1024 * 1024,
+  /** Ref updates in one push, refused above before any is looked up. */
+  maxCommands: 100,
   /** What one fetch/clone may download through us. */
   fetchBytes: 2 * 1024 * 1024 * 1024,
   /** Wants/haves of a fetch. */
@@ -102,7 +108,7 @@ export function refRule(cmd: RefCommand, handle: string): RefVerdict {
 
 /**
  * The report git shows for a refused push (report-status, inside side-band when asked). `told`: what the person
- * running git reads as `remote: agentes: …`, each line once.
+ * running git reads as `remote: agentes: …`, each line once, ending with `NO_TERMINAL_COMMANDS` whatever was refused.
  */
 function refusal(commands: RefCommand[], reasons: Map<string, string>, told: Iterable<string>, capabilities: string[]) {
   let report = pkt("unpack ok\n");
@@ -114,7 +120,9 @@ function refusal(commands: RefCommand[], reasons: Map<string, string>, told: Ite
   const sideband = capabilities.includes("side-band-64k") || capabilities.includes("side-band");
   let body = report;
   if (sideband) {
-    const human = [...told].map((r) => pkt(`\x02agentes: ${r}\n`)).join("");
+    const lines = [...told];
+    if (!lines.some((r) => r.endsWith(NO_TERMINAL_COMMANDS))) lines.push(NO_TERMINAL_COMMANDS);
+    const human = lines.map((r) => pkt(`\x02agentes: ${r}\n`)).join("");
     body = `${human}${pkt(`\x01${report}`)}0000`;
   }
   return new Response(body, {
@@ -182,7 +190,7 @@ export async function readBody(req: Request, max: number) {
  *   grants on that connection (and repo list, when set); pushes to
  *   `agentes/{handle}/*`, or to another existing branch a person approved
  *   (`request_branch_push`) that GitHub says isn't the default or protected;
- *   fast-forward only, no tags or deletes; size limits.
+ *   fast-forward only, no tags or deletes; size limits and at most 100 refs.
  * - The request goes to GitHub with the org's token added here (a GitHub App
  *   installation token when configured), never logged, never sent back.
  * - Fetches and pushes are audited.
@@ -330,24 +338,42 @@ export async function handleGitProxy(
   } catch {
     return text(400, "agentes: unreadable push");
   }
+  if (request.commands.length > limits.maxCommands) {
+    return text(413, `agentes: a push may update at most ${limits.maxCommands} refs at once`);
+  }
   const reasons = new Map<string, string>();
   const told = new Set<string>();
-  /** Someone else's branches pushed with a grant, by ref; the ones without, named once to the agent. */
-  const granted = new Map<string, { branch: string; grant: PushGrant }>();
-  const ungranted: string[] = [];
-  const at = { orgId: claims.orgId, agentId: claims.agentId, connectionId: connection.id };
+  /** Someone else's branches by ref: pushed with a grant, or named once to the agent. */
+  const others = new Map<string, string>();
   for (const cmd of request.commands) {
     const verdict = refRule(cmd, agent.handle);
     if ("refused" in verdict) {
       reasons.set(cmd.ref, verdict.refused);
       told.add(verdict.kind === "delete" ? DELETE_BRANCHES_POINTER : verdict.refused);
-    } else if ("grant" in verdict) {
-      const grant = await pushGrant(deps.db, at, pushGrantKey(parsed, verdict.grant), now);
-      if (grant) granted.set(cmd.ref, { branch: verdict.grant, grant });
-      else {
-        reasons.set(cmd.ref, `not your branch (ask with ${BRANCH_PUSH_TOOL})`);
-        ungranted.push(verdict.grant);
-      }
+    } else if ("grant" in verdict) others.set(cmd.ref, verdict.grant);
+  }
+  const at = { orgId: claims.orgId, agentId: claims.agentId, connectionId: connection.id };
+  // A denied request_branch_push grants nothing: no rule or approval is read (ADR 0015).
+  const mayAsk = isAllowed(
+    toolAccess(keys, { name: BRANCH_PUSH_TOOL, scope: GIT_SCOPES.write, connectionId: connection.id }),
+  );
+  const grants =
+    others.size > 0 && mayAsk
+      ? await pushGrants(
+          deps.db,
+          at,
+          [...others.values()].map((b) => pushGrantKey(parsed, b)),
+          now,
+        )
+      : new Map<string, PushGrant>();
+  const granted = new Map<string, { branch: string; grant: PushGrant }>();
+  const ungranted: string[] = [];
+  for (const [ref, branch] of others) {
+    const grant = grants.get(pushGrantKey(parsed, branch));
+    if (grant) granted.set(ref, { branch, grant });
+    else {
+      reasons.set(ref, `not your branch (ask with ${BRANCH_PUSH_TOOL})`);
+      ungranted.push(branch);
     }
   }
   if (ungranted.length > 0) told.add(otherBranchPointer(ungranted, agent.handle));

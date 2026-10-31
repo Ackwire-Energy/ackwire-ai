@@ -15,7 +15,7 @@ export interface PreviewMeta {
   interrupted?: { text: string };
   brainInterrupted?: { brain?: string; text: string; tools?: string[] };
   memoryUpdates?: { action: string; text: string }[];
-  noAi?: { reason: string };
+  noAi?: { reason: string; own?: string };
 }
 
 export function previewMeta(meta: Record<string, unknown> | null | undefined): PreviewMeta | null {
@@ -25,8 +25,10 @@ export function previewMeta(meta: Record<string, unknown> | null | undefined): P
   if (meta.bodyParams && typeof meta.bodyParams === "object") {
     out.bodyParams = meta.bodyParams as Record<string, unknown>;
   }
-  const reason = (meta.noAi as { reason?: unknown } | undefined)?.reason;
-  if (out.bodyCode === "no_ai" && typeof reason === "string") out.noAi = { reason };
+  const noAi = meta.noAi as { reason?: unknown; own?: unknown } | undefined;
+  if (out.bodyCode === "no_ai" && typeof noAi?.reason === "string") {
+    out.noAi = { reason: noAi.reason, ...(typeof noAi.own === "string" ? { own: noAi.own } : {}) };
+  }
   const cut = (v: unknown) => (typeof v === "string" ? oneLine(v) : null);
   const interrupted = meta.interrupted as { text?: unknown } | undefined;
   const iText = interrupted && typeof interrupted === "object" ? cut(interrupted.text) : null;

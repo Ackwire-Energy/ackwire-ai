@@ -1321,6 +1321,27 @@ test.if(posix)("a page that repaints by itself gets no screenshot", async () => 
   await t.manager.streamStop(dev);
 });
 
+test.if(posix)(
+  "a start on a stream already running sends the page again: a server that lost it gets it even for an idle page",
+  async () => {
+    const t = setup({ firstFrameMs: 5 });
+    await t.act("open", ["https://facebook.com/login"]);
+    await t.manager.streamStart(dev, "watch");
+    const socket = t.sockets[0] as FakeSocket;
+    socket.push({ type: "status", connected: true, viewportWidth: 1280, viewportHeight: 720 });
+    const pages = () => t.frames.filter((f) => f.type === "browser.frame").length;
+    await waitFor(() => pages() === 1);
+    // The server asks again (a new process after a deploy, a watch again after its stop failed): same mode.
+    expect(await t.manager.streamStart(dev, "watch")).toEqual({ mode: "watch" });
+    await waitFor(() => pages() === 2);
+    // And when a person takes control.
+    expect(await t.manager.streamStart(dev, "control")).toEqual({ mode: "control" });
+    await waitFor(() => pages() === 3);
+    expect(t.sockets).toHaveLength(1);
+    await t.manager.streamStop(dev);
+  },
+);
+
 test.if(posix)("two starts at once open one socket; a stop sent meanwhile closes it", async () => {
   const t = setup();
   await t.act("open", ["https://shop.example.com"]);

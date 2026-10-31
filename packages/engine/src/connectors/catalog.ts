@@ -22,6 +22,11 @@ export interface ConnectorTool {
   title?: string;
   /** Outcome recorded when the call succeeds (ground truth for lessons); `subject` is a template. */
   onSuccess?: { kind: OutcomeKind; subject: string };
+  /**
+   * Served by agentes.chat under this exact name (the git tools), never taken from the vendor's MCP server: access
+   * lists and denies it by that name.
+   */
+  ours?: boolean;
 }
 
 /** Catalog groups (the app translates them, `connectors.category.*`): development, product, docs, data (analytics), payments, sales, support, marketing, automation. */
@@ -84,10 +89,10 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
       "actions.run": s("Run workflows", "Start GitHub Actions workflows (they may deploy). Always asks for approval."),
     },
     tools: {
-      git_clone: { scope: "git.read" },
-      open_pull_request: { scope: "pr.write" },
-      delete_branches: { scope: "git.write" },
-      request_branch_push: { scope: "git.write" },
+      git_clone: { scope: "git.read", ours: true },
+      open_pull_request: { scope: "pr.write", ours: true },
+      delete_branches: { scope: "git.write", ours: true },
+      request_branch_push: { scope: "git.write", ours: true },
       get_file_contents: { scope: "repo.read" },
       search_code: { scope: "repo.read" },
       list_commits: { scope: "repo.read" },

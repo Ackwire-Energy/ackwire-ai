@@ -385,6 +385,96 @@ test("a brain turn's account goes to its agent's user before the turn reaches th
   expect(lends).toHaveLength(1);
 });
 
+test("an account root keeps goes with each turn as root's own grant, never the server's; usage only for its turn", async () => {
+  const ACCOUNT = "0193ffff-0000-7000-8000-000000000001";
+  const OTHER = "0193ffff-0000-7000-8000-000000000002";
+  const TOKEN = "sk-ant-oat01-fake-token-for-tests-only";
+  const lends: string[] = [];
+  const usage: [string, string, unknown][] = [];
+  const t = setup({
+    grant: async (_kind, id) => (id === ACCOUNT ? { kind: "token", token: TOKEN } : null),
+    lend: async (_kind, id) => {
+      lends.push(id);
+    },
+    usage: (kind, id, info) => usage.push([kind, id, info]),
+  });
+  t.sup.boot();
+  t.sup.attach();
+  const turn = (account: string, runId: string) =>
+    ({
+      op: "brain.turn",
+      kind: "claude_code",
+      runId,
+      session: { id: "0193aaaa-0000-7000-8000-000000000001", resume: false },
+      prompt: "hi",
+      account,
+      // What the server can't give: only root hands an account over.
+      grant: { kind: "token", token: "sk-ant-oat01-forged-by-the-server" },
+      agent: BIA,
+    }) as unknown as MachineRequest;
+  const run = handleRequest(t.ctx, turn(ACCOUNT, "run-00000001"), scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const bia = t.last(BIA.id);
+  bia.hello();
+  const q = await requestOn(bia);
+  expect(q.grant).toEqual({ kind: "token", token: TOKEN });
+  expect(lends).toEqual([]);
+  // Usage for the account its turn thinks with is taken; for another, or another kind, it isn't.
+  const info = { status: "allowed", rateLimitType: "five_hour", utilization: 0.4 };
+  bia.send({ type: "usage", kind: "claude_code", account: OTHER, info });
+  bia.send({ type: "usage", kind: "codex", account: ACCOUNT, info });
+  bia.send({ type: "usage", kind: "claude_code", account: ACCOUNT, info });
+  await waitFor(() => usage.length === 1);
+  expect(usage).toEqual([["claude_code", ACCOUNT, info]]);
+  bia.send({
+    type: "result",
+    id: q.id,
+    ok: true,
+    data: { runId: "run-00000001", final: { type: "done", text: "ok" } },
+  });
+  await run;
+  // Its turn is over: nothing more is taken for it.
+  bia.send({ type: "usage", kind: "claude_code", account: ACCOUNT, info });
+  // One made for one agent: lent, and the server's grant still never passes.
+  const lent = handleRequest(t.ctx, turn(OTHER, "run-00000002"), scope().scope);
+  const q2 = await requestOn(bia, 2);
+  expect(q2.grant).toBeUndefined();
+  expect(lends).toEqual([OTHER]);
+  bia.send({
+    type: "result",
+    id: q2.id,
+    ok: true,
+    data: { runId: "run-00000002", final: { type: "done", text: "ok" } },
+  });
+  await lent;
+  expect(usage).toHaveLength(1);
+});
+
+test("each worker hears which account its own agent thinks with, and again when that changes", async () => {
+  const ACCOUNT = "0193ffff-0000-7000-8000-000000000001";
+  const accounts: Record<string, string> = {};
+  const t = setup({ account: (agentId) => accounts[agentId] ?? null });
+  t.sup.boot();
+  t.sup.attach();
+  const run = handleRequest(t.ctx, exec(ANA), scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  await requestOn(ana);
+  expect(ana.of("worker.state")).toEqual([{ type: "worker.state", ...STATE, account: null }]);
+  accounts[ANA.id] = ACCOUNT;
+  t.sup.stateChanged();
+  await waitFor(() => ana.of("worker.state").length === 2);
+  expect(ana.of("worker.state")[1]).toEqual({ type: "worker.state", ...STATE, account: ACCOUNT });
+  // Another agent's account is none of its business.
+  accounts[BIA.id] = "0193ffff-0000-7000-8000-000000000002";
+  t.sup.stateChanged();
+  await new Promise((r) => setTimeout(r, 50));
+  expect(ana.of("worker.state")).toHaveLength(2);
+  ana.crash();
+  expect(await errorCode(() => run)).toBe("dropped");
+});
+
 test("a cancel reaches only the worker that runs that request", async () => {
   const t = setup();
   t.sup.boot();
@@ -800,6 +890,8 @@ test("a worker that stops fails what it ran and starts again with a backoff", as
   // `dropped`: the server waits for the computer and sends an agent's cut turn again, instead of failing it.
   expect(await errorCode(() => first)).toBe("dropped");
   await waitFor(() => t.logs.some((l) => l === "[ag-a1b2c3d4] stopped (exit 1)"));
+  // The live view of Ana's browser ended with it: the server stops showing a stream nothing sends.
+  expect(t.up).toEqual([{ type: "browser.stream.ended", agentId: ANA.id, reason: "closed" }]);
   // Nothing waits for it and it has no task to watch: it stays stopped.
   await sleep(50);
   expect(t.workers).toHaveLength(1);
@@ -1284,6 +1376,89 @@ test.if(posix)(
     };
     expect(again.stdout).toBe("back\n");
     expect(t.started).toHaveLength(1);
+  },
+);
+
+test.if(posix)(
+  "a real worker: a turn on an account root keeps thinks in the agent's own folder for it, with root's token on a descriptor",
+  async () => {
+    const ACCOUNT = "0193ffff-0000-7000-8000-000000000001";
+    const TOKEN = "sk-ant-oat01-fake-token-for-tests-only";
+    const log = path.join(tempDir("worker-claude-"), "spawns.log");
+    dirs.push(path.dirname(log));
+    process.env.FAKE_CLAUDE_LOG = log;
+    const usage: [string, string, unknown][] = [];
+    const agentHome = tempDir("agent-home-");
+    const ownHome = tempDir("worker-home-");
+    dirs.push(agentHome, ownHome);
+    let thinksWith: string | null = ACCOUNT;
+    try {
+      const t = setup({
+        start: (user) => {
+          const stdin = new PassThrough();
+          const stdout = new PassThrough();
+          const done = runWorker({
+            agentId: user.id,
+            home: ownHome,
+            dir: agentHome,
+            input: stdin,
+            output: stdout,
+            log: () => {},
+            self: { command: [process.execPath, "/nonexistent/agentes-runner.mjs"], compiled: false },
+            claudeCommand: [process.execPath, path.join(import.meta.dir, "fake-claude.mjs")],
+          });
+          workerRuns.push(done);
+          return { stdin, stdout, exited: done, kill: () => stdin.end() };
+        },
+        grant: async () => ({ kind: "token", token: TOKEN }),
+        lend: async () => {
+          throw new Error("an account root keeps is never lent");
+        },
+        usage: (kind, id, info) => usage.push([kind, id, info]),
+        account: () => thinksWith,
+      });
+      t.sup.boot();
+      t.sup.attach();
+      const turn = {
+        op: "brain.turn",
+        kind: "claude_code",
+        runId: "run-00000001",
+        session: { id: "0193aaaa-0000-7000-8000-000000000001", resume: false },
+        prompt: "RATE",
+        account: ACCOUNT,
+        agent: ANA,
+      } as MachineRequest;
+      const out = (await handleRequest(t.ctx, turn, scope().scope)) as { final: { type: string } };
+      expect(out.final.type).toBe("done");
+      const [run] = readFileSync(log, "utf8")
+        .trim()
+        .split("\n")
+        .map(
+          (l) =>
+            JSON.parse(l) as { pid: number; configDir: string; oauthToken: string | null; oauthEnv: string | null },
+        );
+      expect(run?.configDir).toBe(path.join(ownHome, "accounts", "claude_code", ACCOUNT));
+      expect(run?.oauthToken).toBe(TOKEN);
+      expect(run?.oauthEnv).toBeNull();
+      // What the turn said about the plan's usage reached root, for that account.
+      await waitFor(() => usage.length > 0);
+      expect(usage[0]?.slice(0, 2)).toEqual(["claude_code", ACCOUNT]);
+      // The agent thinks with something else now: root says so, and the process that holds the token goes.
+      const alive = (pid: number) => {
+        try {
+          process.kill(pid, 0);
+          return true;
+        } catch {
+          return false;
+        }
+      };
+      expect(alive(run?.pid ?? 0)).toBe(true);
+      thinksWith = null;
+      t.sup.stateChanged();
+      await waitFor(() => !alive(run?.pid ?? 0), 10_000);
+    } finally {
+      delete process.env.FAKE_CLAUDE_LOG;
+    }
   },
 );
 

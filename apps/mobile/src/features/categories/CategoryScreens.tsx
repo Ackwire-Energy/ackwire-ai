@@ -17,7 +17,7 @@ import { GroupedField, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Te
 import { Gap, SettingsPage } from "../settings/parts";
 import { useColors, useMeId, useOrgId } from "../shared/hooks";
 import { successHaptic } from "../shared/parts";
-import { arrangesCategories, categoryHrefs, movesChannel, stepBefore } from "./logic";
+import { arrangesCategories, categoryHrefs, channelSteps, movesChannel, stepBefore } from "./logic";
 
 /** Names are at most this long (the server's CATEGORY_NAME_MAX). */
 const NAME_MAX = 40;
@@ -35,7 +35,8 @@ function channelLine(channels: Channel[], categoryId: string | null, except?: st
 /**
  * "Categoria" of a channel (ADR 0080), from its ⋯ sheet or a long press on the home: "Sem categoria" and the
  * categories, each with its channels, the current one checked; a tap moves it and goes back. Admins get
- * "Nova categoria", which takes the channel along.
+ * "Nova categoria", which takes the channel along. Below, its place among the channels next to it, one step
+ * up or down (the home lists channels by latest activity, the web's sidebar in this order).
  */
 export function PickCategoryScreen({ channelId }: { channelId: string }) {
   const { t } = useTranslation();
@@ -48,6 +49,10 @@ export function PickCategoryScreen({ channelId }: { channelId: string }) {
   const channel = channels.data?.find((c) => c.id === channelId);
   const current = channel?.categoryId ?? null;
   const all = channels.data ?? [];
+  const order = channelSteps(all, channelId);
+  const step = (move: typeof order.up) => {
+    if (move) place.mutate(move, { onError: (e) => toast({ title: failedText(e), icon: "x" }) });
+  };
   const pick = (categoryId: string | null, name: string) => {
     if (!channel || categoryId === current) return router.back();
     place.mutate(
@@ -97,6 +102,26 @@ export function PickCategoryScreen({ channelId }: { channelId: string }) {
         </>
       ) : null}
       <GroupedFooter>{t("mobile.categories.whereHelp")}</GroupedFooter>
+      {channel ? (
+        <>
+          <GroupedHeader>{t("mobile.categories.order")}</GroupedHeader>
+          <GroupedList>
+            <GroupedRow
+              label={t("mobile.categories.up")}
+              disabled={!order.up || place.isPending}
+              onPress={() => step(order.up)}
+            />
+            <GroupedRow
+              label={t("mobile.categories.down")}
+              disabled={!order.down || place.isPending}
+              onPress={() => step(order.down)}
+            />
+          </GroupedList>
+          <GroupedFooter>
+            {t("mobile.categories.channelPosition", { at: order.at + 1, count: order.count })}
+          </GroupedFooter>
+        </>
+      ) : null}
     </SettingsPage>
   );
 }

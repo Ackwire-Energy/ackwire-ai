@@ -106,6 +106,8 @@ export const issues = pgTable(
     index().on(t.orgId, t.status),
     index().on(t.orgId, t.dueDate),
     index().on(t.parentIssueId),
+    // Every run reads its agent's open tasks, latest activity first (`openTasksBrief`).
+    index().on(t.orgId, t.assigneeType, t.assigneeId, t.updatedAt),
   ],
 );
 

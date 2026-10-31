@@ -20,6 +20,7 @@ import {
   mailErrorOf,
   mailReviewTools,
   normalizePolicy,
+  notIcloudMail,
   splitEmails,
   toMailLevel,
 } from "@agenteschat/client/lib/mail";
@@ -285,6 +286,7 @@ export function ImapStep({
     t("mail.testing.almost"),
   ]);
   const addressError = touched && !isAddress(address) ? t("mail.addressInvalid") : undefined;
+  const webmail = choice === "icloud" ? notIcloudMail(address) : null;
   const passwordError = touched && !password.trim() ? t("mail.passwordInvalid") : undefined;
   const hostsMissing = custom && (!imapHost.trim() || !smtpHost.trim());
   const port = (v: string, fallback: number) => {
@@ -347,7 +349,12 @@ export function ImapStep({
             />
           </Field>
         )}
-        <Field label={t("mail.address")} id="mail-address" error={addressError}>
+        <Field
+          label={t("mail.address")}
+          id="mail-address"
+          help={webmail ? t("mail.icloudHint", { name: webmail }) : undefined}
+          error={addressError}
+        >
           <Input
             type="email"
             autoComplete="email"
@@ -408,7 +415,9 @@ export function ImapStep({
             </div>
           </details>
         )}
-        {error && <Alert>{t(`mail.error.${error}`)}</Alert>}
+        {error && (
+          <Alert>{t(error === "auth" && choice === "icloud" ? "mail.error.auth_icloud" : `mail.error.${error}`)}</Alert>
+        )}
       </DialogBody>
       <DialogFooter bar note={testing ?? t("connectFlow.nothingYet")}>
         <Button type="button" onClick={onClose}>

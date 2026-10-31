@@ -146,6 +146,7 @@ import type {
   SignInOptions,
   Skill,
   SkillDetail,
+  SkillPick,
   StorageConfig,
   StorageMigration,
   StorageTestResult,
@@ -317,6 +318,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       open: (orgId, agentId, url) =>
         request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/open`, { json: { url } }),
       stop: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/stop`, { json: {} }),
+      restart: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/restart`, { json: {} }),
     },
     desktop: {
       status: (orgId, agentId) => request<DesktopStatus>(`${org(orgId)}/agents/${enc(agentId)}/desktop`),
@@ -590,6 +592,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<{ runs: { agentId: string; runId: string }[] }>(`${org(orgId)}/messages/${enc(messageId)}/answer-now`, {
           json: {},
         }),
+      cancelFollowUp: (orgId, messageId) =>
+        request<void>(`${org(orgId)}/messages/${enc(messageId)}/cancel-follow-up`, { json: {} }),
       archive: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}`, { method: "DELETE" }),
       unarchive: (orgId, channelId) =>
         request<void>(`${org(orgId)}/channels/${enc(channelId)}/unarchive`, { json: {} }),
@@ -768,7 +772,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       list: async (orgId) => (await request<{ skills: Skill[] }>(`${org(orgId)}/skills`)).skills,
       get: (orgId, id) => request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}`),
       create: (orgId, input) => request<SkillDetail>(`${org(orgId)}/skills`, { json: input }),
-      import: (orgId, input) => request<SkillDetail>(`${org(orgId)}/skills/import`, { json: input }),
+      import: (orgId, input) => request<SkillDetail | SkillPick>(`${org(orgId)}/skills/import`, { json: input }),
+      importPicked: async (orgId, url, paths) =>
+        (await request<{ skills: SkillDetail[] }>(`${org(orgId)}/skills/import`, { json: { url, paths } })).skills,
       update: (orgId, id, patch) =>
         request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}`, { method: "PATCH", json: patch }),
       reimport: (orgId, id) => request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}/reimport`, { json: {} }),

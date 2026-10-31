@@ -1,10 +1,11 @@
-import { and, type Database, desc, type Executor, eq, gt, schema } from "@agenteschat/db";
+import { and, type Database, desc, type Executor, eq, gt, gte, inArray, schema } from "@agenteschat/db";
+import { RULE_REMOVED_AUDIT } from "../approval-rules";
 import { connectorScope } from "../connectors/catalog";
 import { type ConnectorConnection, type ConnectorDeps, connectionHeaders } from "../connectors/connections";
 import { appTokenForRepo, type GitHubAppConfig, type GitHubHttp } from "./github-app";
 import { parseRepo } from "./repos";
 
-const { approvalRules, approvals } = schema;
+const { approvalRules, approvals, auditLog } = schema;
 
 /**
  * Branches that aren't the agent's own (ADR 0024, addendum of 2026-10-31): a person approves deleting them
@@ -147,18 +148,21 @@ export function branchBlock(facts: BranchFacts, branch: string, deleting: boolea
 export type PushGrant = { approvalId: string } | { ruleId: string };
 
 /**
- * What lets an agent push to a branch that isn't its own through the proxy: a rule someone approved for good, or a
- * person's approval of `request_branch_push` decided in the last 24 h, its params read through the same key. The
- * proxy has no run, so any of the agent's runs may use it. Null: nothing does.
+ * What lets an agent push to branches that aren't its own through the proxy, by grant key: a rule someone approved
+ * for good, or a person's approval of `request_branch_push` decided in the last 24 h (its params read through the
+ * same key) and after that key's rule was last removed. The proxy has no run, so any of the agent's runs may use it.
+ * A key nothing grants is left out. Three queries at most, whatever the number of keys.
  */
-export async function pushGrant(
+export async function pushGrants(
   db: Executor,
   at: { orgId: string; agentId: string; connectionId: string },
-  key: string,
+  keys: readonly string[],
   now: Date,
-): Promise<PushGrant | null> {
-  const [rule] = await db
-    .select({ id: approvalRules.id })
+): Promise<Map<string, PushGrant>> {
+  const grants = new Map<string, PushGrant>();
+  if (keys.length === 0) return grants;
+  const rules = await db
+    .select({ id: approvalRules.id, action: approvalRules.action })
     .from(approvalRules)
     .where(
       and(
@@ -166,12 +170,14 @@ export async function pushGrant(
         eq(approvalRules.agentId, at.agentId),
         eq(approvalRules.connectionId, at.connectionId),
         eq(approvalRules.tool, BRANCH_PUSH_TOOL),
-        eq(approvalRules.action, key),
+        inArray(approvalRules.action, [...keys]),
       ),
     );
-  if (rule) return { ruleId: rule.id };
+  for (const rule of rules) grants.set(rule.action, { ruleId: rule.id });
+  const wanted = new Set(keys.filter((k) => !grants.has(k)));
+  if (wanted.size === 0) return grants;
   const recent = await db
-    .select({ id: approvals.id, params: approvals.params })
+    .select({ id: approvals.id, params: approvals.params, decidedAt: approvals.decidedAt })
     .from(approvals)
     .where(
       and(
@@ -185,6 +191,33 @@ export async function pushGrant(
       ),
     )
     .orderBy(desc(approvals.decidedAt));
-  const hit = recent.find((a) => pushGrantKeyOf(a.params) === key);
-  return hit ? { approvalId: hit.id } : null;
+  const hits = recent.flatMap((a) => {
+    const key = pushGrantKeyOf(a.params);
+    return key && wanted.has(key) && a.decidedAt ? [{ id: a.id, key, decidedAt: a.decidedAt }] : [];
+  });
+  const oldest = hits.at(-1);
+  if (!oldest) return grants;
+  // Removing an "Aprovar sempre" rule ends what was approved for that branch before, the approval it came from too.
+  const removals = await db
+    .select({ details: auditLog.details, createdAt: auditLog.createdAt })
+    .from(auditLog)
+    .where(
+      and(
+        eq(auditLog.orgId, at.orgId),
+        eq(auditLog.action, RULE_REMOVED_AUDIT),
+        eq(auditLog.targetId, at.agentId),
+        gte(auditLog.createdAt, oldest.decidedAt),
+      ),
+    );
+  const removedAt = new Map<string, Date>();
+  for (const { details: d, createdAt } of removals) {
+    if (d.tool !== BRANCH_PUSH_TOOL || d.connectionId !== at.connectionId || typeof d.action !== "string") continue;
+    const last = removedAt.get(d.action);
+    if (!last || createdAt > last) removedAt.set(d.action, createdAt);
+  }
+  for (const hit of hits) {
+    const removed = removedAt.get(hit.key);
+    if (!grants.has(hit.key) && (!removed || hit.decidedAt > removed)) grants.set(hit.key, { approvalId: hit.id });
+  }
+  return grants;
 }

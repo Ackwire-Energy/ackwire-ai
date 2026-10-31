@@ -49,6 +49,7 @@ import {
   doneFinishing,
   isHttpsUrl,
   markFinishing,
+  needsKeyText,
   stateOf,
 } from "./logic";
 import { Problem } from "./Problem";
@@ -456,7 +457,7 @@ function ConnectStep({
         if (res.status === "oauth") return void (await signInWith(res.authorizeUrl));
         if (res.status === "needs_key") {
           setMode("key");
-          return oops(t("mobile.connectors.needsKey"));
+          return oops(needsKeyText(t, res, shownName));
         }
         return connected(res.server.id, name || res.server.label);
       }

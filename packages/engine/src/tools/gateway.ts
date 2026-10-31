@@ -4,6 +4,7 @@ import { auditsCall, callTitle, recordToolCall } from "../agent-audit";
 import { coveringRules, type RememberedKind } from "../approval-rules";
 import { type RunAuthority, runAuthorityById } from "../authority";
 import { actionLevel, nameWords, openEnded } from "../connectors/classify";
+import { missingConnectors, type ServerCatalog } from "../connectors/listing";
 import { consultationOrigin } from "../consultations";
 import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
@@ -18,7 +19,7 @@ import {
   summarizeCall,
   type TeamCheck,
 } from "../team-actions";
-import { carriesCredential, toolDetail } from "../tool-detail";
+import { carriesCredential, promptAnswer, toolCommand, toolDetail } from "../tool-detail";
 import { untrustedBlock } from "../untrusted";
 import { checkToolCall } from "./checks";
 import {
@@ -108,6 +109,8 @@ export const actionHash = (action: {
 }) => sha256(canonicalJson(action));
 
 export const APPROVAL_TTL_MS = 24 * 3600_000;
+/** How much of a call's `describe().detail` an approval card keeps. */
+export const APPROVAL_DETAIL_CHARS = 2000;
 const TOOL_NAME = /^[a-zA-Z0-9_-]{1,64}$/;
 const MAX_RESULT_CHARS = 50_000;
 /** Server-owned Git tools have a connection ID only to use that connection's credential. */
@@ -166,16 +169,6 @@ function promptQuestion(input: Record<string, unknown>) {
       ? commandAction(input.tool_name, inner as Record<string, unknown>)
       : null;
   return { poll: null, action };
-}
-
-/** `permission_prompt`'s answer: `{behavior}` when decided, `{status: "pending", request_id}` while a person decides. */
-function promptAnswer(content: string): { behavior?: string; status?: string; request_id?: string } {
-  try {
-    const parsed = JSON.parse(content) as unknown;
-    return parsed && typeof parsed === "object" ? (parsed as Record<string, string>) : {};
-  } catch {
-    return {};
-  }
 }
 
 /**
@@ -244,7 +237,12 @@ export type InvokeResult =
  *    computer) is held once when the team already did it to the same target,
  *    and recorded for the team once it went out (ADR 0064, `team-actions.ts`).
  */
-export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Date }) {
+export function createToolGateway(deps: {
+  sources: ToolSource[];
+  now?: () => Date;
+  /** What this server can connect: `find_tools` names each connector a search asks for that the agent lacks. */
+  catalog?: ServerCatalog;
+}) {
   const now = deps.now ?? (() => new Date());
 
   async function allTools(ctx: ToolContext) {
@@ -373,10 +371,16 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       let unknownInDirectory: string | null = null;
       if (!all.has(call.name)) {
         const usable = await grantedFor(ctx, authority, all);
-        const blocked = async () => ({
-          tools: await notAllowed(ctx, authority, all).catch(() => []),
-          ask: usable.some((t) => t.name === REQUEST_PERMISSION_TOOL) ? REQUEST_PERMISSION_TOOL : null,
-        });
+        const blocked = async () => {
+          const [tools, connectors] = await Promise.all([
+            notAllowed(ctx, authority, all).catch(() => []),
+            deps.catalog
+              ? missingConnectors(ctx.db, ctx.orgId, deps.catalog, { usable, listed: all.values() }).catch(() => [])
+              : [],
+          ]);
+          const ask = usable.some((t) => t.name === REQUEST_PERMISSION_TOOL) ? REQUEST_PERMISSION_TOOL : null;
+          return { tools, ask, connectors };
+        };
         const listed = presentTools(usable, isSensitive, ctx.loadedGroups, blocked).find((t) => t.name === call.name);
         const role = directoryRole(listed);
         if (role?.kind === "find") directoryTool = listed;
@@ -404,13 +408,15 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       const record: typeof addRunStep = (db, run, kind, data) =>
         ctx.runId ? addRunStep(db, run, kind, data) : Promise.resolve();
       // The same short label the live chip shows (built-in tools only, never a connector's input): the chat's
-      // line of this call says it after the run too.
+      // line of this call says it after the run too. A permission check also keeps its command, masked, to open.
       const detail = toolDetail(call.name, call.input);
+      const command = toolCommand(call.name, call.input);
       await record(ctx.db, step, "tool_call", {
         toolUseId: call.toolUseId,
         name: call.name,
         input: call.input,
         ...(detail ? { detail } : {}),
+        ...(command ? { command } : {}),
       });
       let tool = unknownInDirectory ? undefined : (all.get(call.name) ?? directoryTool);
       /** The rules ("Aprovar sempre") this call ran under instead of asking. */
@@ -547,7 +553,9 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
         }).catch(() => UNCHECKED);
         if (!seen.proceed) {
           // A computer command is answered the way its prompt expects: a refusal with the notice.
-          const content = prompt ? JSON.stringify({ behavior: "deny", message: seen.notice }) : seen.notice;
+          const content = prompt
+            ? JSON.stringify({ behavior: "deny", message: seen.notice, code: "team" })
+            : seen.notice;
           return finish({ content, isError: !prompt, data: { code: "team.action_seen" } }, "refused");
         }
         teamReason = seen.reason;
@@ -596,7 +604,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
             params: call.input,
             actionHash: actionHash({ tool: tool.name, scope: tool.scope, connectionId, params: call.input }),
             title: described.title.slice(0, 300),
-            detail: (described.detail ?? "").slice(0, 2000),
+            detail: (described.detail ?? "").slice(0, APPROVAL_DETAIL_CHARS),
             why,
             origin: authority ? approvalOrigin(authority) : null,
             ownerUserId: owner,

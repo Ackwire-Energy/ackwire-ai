@@ -283,7 +283,7 @@ export async function orgToolCatalog(db: Database, orgId: string) {
         tools: Object.entries(def.tools)
           .filter(([, t]) => t.scope === id)
           .map(([name, t]) => {
-            const exposed = exposedToolName(def.id, name);
+            const exposed = t.ours ? name : exposedToolName(def.id, name);
             return {
               name: exposed,
               label: humanize(name),

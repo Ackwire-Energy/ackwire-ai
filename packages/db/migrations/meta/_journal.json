@@ -929,8 +929,36 @@
     {
       "idx": 132,
       "version": "7",
-      "when": 1793460843712,
-      "tag": "0132_approval_rules",
+      "when": 1793450903712,
+      "tag": "0132_imported_agent_handles",
+      "breakpoints": true
+    },
+    {
+      "idx": 133,
+      "version": "7",
+      "when": 1793450963712,
+      "tag": "0133_issues_assignee_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 134,
+      "version": "7",
+      "when": 1793451023712,
+      "tag": "0134_claude_account_names",
+      "breakpoints": true
+    },
+    {
+      "idx": 135,
+      "version": "7",
+      "when": 1793451083712,
+      "tag": "0135_shared_accounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 136,
+      "version": "7",
+      "when": 1793451143712,
+      "tag": "0136_approval_rules",
       "breakpoints": true
     }
   ]
