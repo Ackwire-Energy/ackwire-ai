@@ -8,6 +8,7 @@ import {
 } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
+  completeComposioConnect,
   createRoutine,
   deleteRoutine,
   drainOutbox,
@@ -206,6 +207,45 @@ test("Composio webhooks: bad signature refused; new mail fires the routine; expi
   if (remote) remote.status = "expired";
   await reconcileComposioAccounts(m.deps);
   expect((await halfway())?.revokedAt).not.toBeNull();
+});
+
+test("a Gmail reconnected: its routines watch again, with triggers on the new Composio account", async () => {
+  m = await mailSetup();
+  const gmail = await gmailAccount(m);
+  await giveMail(m, gmail.accountId, "read");
+  const routine = await emailRoutine(m, gmail.accountId, { subject: "ticket" });
+  const paused = await emailRoutine(m, gmail.accountId);
+  await setRoutineActive(routineDeps(m), m.f.owner.id, m.f.org.id, paused.id, false);
+  const oldTrigger = (await watchOf(m, routine.id))?.externalTriggerId;
+  const signed = new Headers({ "webhook-signature": FAKE_COMPOSIO_SIGNATURE });
+  const webhook = (event: unknown) => handleComposioWebhook(m.deps, signed, JSON.stringify(event));
+  await webhook({ type: "account.expired", connectedAccountId: gmail.connectedAccountId });
+  expect((await watchOf(m, routine.id))?.status).toBe("needs_reconnect");
+
+  const started = await startComposioConnect(m.deps, m.f.owner.id, m.f.org.id, {
+    provider: "gmail",
+    accountId: gmail.accountId,
+  });
+  const connectedAccountId = m.composio.state.links.at(-1)?.connectedAccountId ?? "";
+  m.composio.activate(connectedAccountId, "team@example.com");
+  await completeComposioConnect(m.deps, m.f.owner.id, started.accountId);
+
+  const watch = await watchOf(m, routine.id);
+  expect(watch).toMatchObject({ status: "active", lastError: null });
+  expect(m.composio.state.deletedTriggers).toContain(oldTrigger ?? "");
+  expect([...m.composio.state.triggers]).toEqual([
+    [watch?.externalTriggerId ?? "", { toolkit: "gmail", connectedAccountId, query: 'subject:"ticket"' }],
+  ]);
+  // A paused routine gets no trigger, and no longer asks for a reconnect.
+  expect(await watchOf(m, paused.id)).toMatchObject({ status: "active", externalTriggerId: null });
+  expect(
+    await webhook({
+      type: "mail.received",
+      triggerId: watch?.externalTriggerId,
+      connectedAccountId,
+      message: mail("t1", "a@b.com", "ticket"),
+    }),
+  ).toEqual({ type: "mail.received", fired: 1 });
 });
 
 test("IMAP polling starts from now, tracks UIDs, resets on UIDVALIDITY and stops on refused credentials", async () => {

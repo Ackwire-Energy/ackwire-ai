@@ -9,6 +9,7 @@ import {
   getAgentMail,
   listAgentScopes,
   listMailAccounts,
+  markNeedsReconnect,
   openMailProvider,
   revokeMailAccount,
   setAgentScopes,
@@ -259,6 +260,51 @@ test("the Composio callback reads again past an error that passes; a lasting one
   expect((await listMailAccounts(f.db, f.owner.id, f.org.id)).find((a) => a.id === down.accountId)).toMatchObject({
     status: "pending",
   });
+});
+
+test("Reconectar on a Gmail that needs it: the new sign-in takes the mailbox's place, and its agents stay", async () => {
+  m = await mailSetup();
+  const { f, deps, composio } = m;
+  const gmail = await gmailAccount(m);
+  await giveMail(m, gmail.accountId, "read_write");
+  await markNeedsReconnect(f.db, gmail.accountId, "composio_expired");
+  const signInAgain = async (address: string) => {
+    const started = await startComposioConnect(deps, f.owner.id, f.org.id, {
+      provider: "gmail",
+      accountId: gmail.accountId,
+    });
+    const link = composio.state.links.at(-1);
+    composio.activate(link?.connectedAccountId ?? "", address);
+    return { link, done: await completeComposioConnect(deps, f.owner.id, started.accountId) };
+  };
+
+  // Signed in to another mailbox: it doesn't take this one's place.
+  const other = await signInAgain("someone@example.com");
+  expect(other.done).toEqual({ orgId: f.org.id, ok: false });
+  expect(await listMailAccounts(f.db, f.owner.id, f.org.id)).toMatchObject([
+    { id: gmail.accountId, address: "team@example.com", status: "needs_reconnect", lastError: "other_mailbox" },
+  ]);
+
+  const same = await signInAgain("Team@Example.com");
+  expect(same.link?.callbackUrl).toBe(`${PUBLIC_URL}/api/app/mail/composio/callback?account=${gmail.accountId}`);
+  expect(same.done).toEqual({ orgId: f.org.id, ok: true });
+  expect(await listMailAccounts(f.db, f.owner.id, f.org.id)).toMatchObject([
+    {
+      id: gmail.accountId,
+      address: "team@example.com",
+      status: "active",
+      lastError: null,
+      agents: [{ agentId: f.agent.id, level: "read_write" }],
+    },
+  ]);
+  // Composio forgets the refused account and the other mailbox's, and nothing is revoked at Google.
+  expect(composio.state.deletedAccounts).toEqual([gmail.connectedAccountId, other.link?.connectedAccountId ?? ""]);
+  expect(composio.state.revokedAccounts).toEqual([]);
+
+  // Only a mailbox that needs it reconnects this way.
+  await expect(
+    startComposioConnect(deps, f.owner.id, f.org.id, { provider: "gmail", accountId: gmail.accountId }),
+  ).rejects.toBeInstanceOf(ConflictError);
 });
 
 test("without Composio configured, connecting Gmail is a conflict", async () => {

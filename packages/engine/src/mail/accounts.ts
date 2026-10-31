@@ -16,6 +16,7 @@ import { ConflictError, NotFoundError, ValidationError } from "../errors";
 import { isBlockedAddress, type ResolveHost, resolveHostDns } from "../net-guard";
 import { requirePermission } from "../organizations";
 import { isEmailAddress, normalizeAddress } from "./text";
+import { restartMailWatches } from "./watches";
 
 const { mailAccounts, mailAgentPolicies, mailWatches, agentScopes } = schema;
 
@@ -407,28 +408,36 @@ const composioOf = (deps: MailDeps) => deps.mail?.composio ?? null;
  * Starts connecting Gmail or Outlook through Composio (admins): a pending
  * row and Composio's link; the person signs in there and comes back to
  * `/api/app/mail/composio/callback?account=<id>`. `desktop`: started in the
- * desktop app's window, whose links open in the person's browser.
+ * desktop app's window, whose links open in the person's browser. With
+ * `accountId`, a mailbox that needs reconnecting signs in again: the new
+ * Composio account takes the refused one's place, and the mailbox keeps its
+ * agents, rules and routines.
  */
 export async function startComposioConnect(
   deps: MailDeps,
   actorId: string,
   orgId: string,
-  input: { provider: "gmail" | "outlook"; label?: string; desktop?: boolean },
+  input: { provider: "gmail" | "outlook"; label?: string; accountId?: string; desktop?: boolean },
 ): Promise<{ accountId: string; redirectUrl: string }> {
   await requirePermission(deps.db, actorId, orgId, "manage_connectors");
   const composio = composioOf(deps);
   if (!composio)
     throw new ConflictError("Gmail and Outlook are not configured on this server", "mail.composio_disabled");
-  const id = crypto.randomUUID();
-  await deps.db.insert(mailAccounts).values({
-    id,
-    orgId,
-    provider: input.provider,
-    via: "composio",
-    label: input.label?.trim().slice(0, 80) ?? "",
-    status: "pending",
-    createdByUserId: actorId,
-  });
+  const again = input.accountId ? await loadAccount(deps.db, orgId, input.accountId) : null;
+  if (again && (again.via !== "composio" || again.provider !== input.provider || again.status !== "needs_reconnect"))
+    throw new ConflictError("This mailbox doesn't need reconnecting", "mail.not_reconnectable");
+  const id = again?.id ?? crypto.randomUUID();
+  if (!again) {
+    await deps.db.insert(mailAccounts).values({
+      id,
+      orgId,
+      provider: input.provider,
+      via: "composio",
+      label: input.label?.trim().slice(0, 80) ?? "",
+      status: "pending",
+      createdByUserId: actorId,
+    });
+  }
   try {
     const link = await composio.client.createConnectLink({
       toolkit: input.provider,
@@ -439,9 +448,12 @@ export async function startComposioConnect(
       .update(mailAccounts)
       .set({ externalAccountId: link.connectedAccountId, updatedAt: new Date() })
       .where(eq(mailAccounts.id, id));
+    // Not revoked at Google/Microsoft: the person is signing in to the same app again.
+    if (again?.externalAccountId)
+      await composio.client.deleteConnectedAccount(again.externalAccountId, { revoke: false }).catch(() => {});
     return { accountId: id, redirectUrl: link.redirectUrl };
   } catch (error) {
-    await deps.db.delete(mailAccounts).where(eq(mailAccounts.id, id));
+    if (!again) await deps.db.delete(mailAccounts).where(eq(mailAccounts.id, id));
     throw error;
   }
 }
@@ -469,6 +481,16 @@ export async function applyComposioStateFor(
   const now = deps.now?.() ?? new Date();
   if (remote.status === "active" && remote.address) {
     const address = normalizeAddress(remote.address);
+    if (row.status === "needs_reconnect" && row.address && address !== row.address) {
+      // Signed in to another mailbox: it doesn't take this one's place (its agents and rules are for this
+      // address). Not revoked: that mailbox may be connected here on its own.
+      await composio.client.deleteConnectedAccount(row.externalAccountId, { revoke: false }).catch(() => {});
+      await deps.db
+        .update(mailAccounts)
+        .set({ externalAccountId: null, lastError: "other_mailbox", updatedAt: now })
+        .where(eq(mailAccounts.id, row.id));
+      return false;
+    }
     if (!(await assertAddressFree(deps.db, row.orgId, address, row.id))) {
       // The same mailbox is connected already: this second connection goes away. Not revoked: Google
       // revokes the app's whole grant, which would also end the connection that stays.
@@ -498,6 +520,7 @@ export async function applyComposioStateFor(
         details: { via: "composio", provider: row.provider, address },
       });
     }
+    if (row.status === "needs_reconnect") await restartMailWatches(deps, row.id);
     return "active";
   }
   if (remote.status === "pending") return "pending";

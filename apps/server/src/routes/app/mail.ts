@@ -198,13 +198,18 @@ export function mailRoutes(deps: AppDeps, log: Logger) {
       tags,
       security,
       summary: "Start connecting Gmail or Outlook (admins); open the returned URL",
-      description: "409 when Gmail and Outlook are not configured on this server.",
+      description:
+        "409 when Gmail and Outlook are not configured on this server, or when `accountId` isn't a mailbox of `provider` that needs reconnecting.",
       request: {
         params: OrgParams,
         body: body(
           z.object({
             provider: z.enum(["gmail", "outlook"]),
             label: z.string().max(80).optional(),
+            accountId: z.uuid().optional().openapi({
+              description:
+                "Reconnect this mailbox: the new sign-in takes its place, and its agents, rules and routines stay. It must be the same address.",
+            }),
             desktop: z.boolean().optional().openapi({
               description: "Started in the desktop app's window: the callback hands the return back to the app.",
             }),
