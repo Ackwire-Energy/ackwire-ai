@@ -50,6 +50,8 @@ export interface BrainTurn {
   account?: BrainAccount;
   /** How hard it thinks (absent: the CLI's or the API's default); the model brain only gets one from "Automático". */
   effort?: BrainEffort;
+  /** Computer brains: the agent's context limit in tokens (`agents.context_tokens`); absent: the model's window. */
+  contextTokens?: number;
   /** The text the person/system sent that starts this turn (also the last user message). */
   trigger: string;
 }

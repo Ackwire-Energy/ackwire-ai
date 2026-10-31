@@ -28,7 +28,15 @@ import {
 } from "@agenteschat/client";
 import { saveLevels } from "@agenteschat/client/lib/access-levels";
 import { accountChoices, ownSignInName, signInPlan } from "@agenteschat/client/lib/ai-accounts";
+import {
+  type Advanced,
+  advancedDefaults,
+  advancedSummary,
+  isAdvancedDefault,
+  isClaudeAlias,
+} from "@agenteschat/client/lib/brain-advanced";
 import { setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
+import { type ContextLimit, contextChoices, contextSize, isContextLimit } from "@agenteschat/client/lib/context-limits";
 import { lowerFirst } from "@agenteschat/client/lib/format";
 import { providerGrammar } from "@agenteschat/client/lib/grammar";
 import {
@@ -626,6 +634,10 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const [key, setKey] = useState(saved.key ?? DEFAULT_KEY);
   const [account, setAccount] = useState<string | null>(view.account);
   const [effort, setEffort] = useState<ShownEffort>(shownEffort(view.effort));
+  const savedContext = isContextLimit(view.contextTokens) ? view.contextTokens : null;
+  const [contextTokens, setContextTokens] = useState<ContextLimit | null>(savedContext);
+  // "Configuração avançada" open: what it edits, put on the form by "Pronto" (nothing saves before "Usar").
+  const [adv, setAdv] = useState<Advanced | null>(null);
   // Adding an account: any, or (an account) one more login of it for this agent.
   const [adding, setAdding] = useState<boolean | MachineAccount>(false);
   // Accounts that arrived while the dialog was open (saved with the rest on "Usar").
@@ -702,16 +714,32 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const shareChanged = kind !== "model" && onlyOwner !== savedOnlyOwner;
   // A plan brain not saved yet: the button says whose plan it is.
   const planKind = kind !== "model" && kind !== view.brain ? kind : null;
+  const all = models.data?.models ?? [];
+  // The context limits worth offering with the model chosen: under its window ("Automático": any of its line).
+  const contextOptions = contextChoices(
+    kind === "model"
+      ? isAuto(model)
+        ? undefined
+        : all.find((m) => m.id === model)
+      : isAuto(planModel)
+        ? undefined
+        : plan
+          ? { modelId: planModelOf(plan, planModel).id }
+          : option?.models.find((m) => m.value === (planModel ?? option?.defaultModel)),
+  );
+  // A limit past the model's window reads as its window: "Automático" (the server takes the smaller one too).
+  const shownContext = contextTokens !== null && contextOptions.includes(contextTokens) ? contextTokens : null;
+  const contextChanged = contextTokens !== savedContext;
   const unchanged =
     kind === view.brain &&
     fallback === view.fallback &&
     !accountChanged &&
     !effortChanged &&
     !shareChanged &&
+    !contextChanged &&
     (kind === "model"
       ? model === saved.model && key === (saved.key ?? DEFAULT_KEY)
       : planModel === view.effectiveModel);
-  const all = models.data?.models ?? [];
   const choices = modelChoices(all, credentials.data ?? [], platform.data ?? false);
   const modelName = (value: string | null) =>
     isAuto(value)
@@ -729,7 +757,13 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     setBusy(true);
     try {
       if (kind === "model") {
-        if (view.brain !== "model") await api.agents.setBrain(org.id, agent.id, { brain: "model", fallback });
+        if (view.brain !== "model" || contextChanged) {
+          await api.agents.setBrain(org.id, agent.id, {
+            brain: "model",
+            fallback,
+            ...(contextChanged ? { contextTokens } : {}),
+          });
+        }
         if (model !== saved.model || key !== (saved.key ?? DEFAULT_KEY)) {
           await update.mutateAsync({
             ...(model !== saved.model ? { model } : {}),
@@ -745,11 +779,16 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           ...(effortChanged ? { effort: effortToSave } : {}),
           ...(accountChanged && view.canUsePlans ? { account, ...(moving ? { moveAccount: true } : {}) } : {}),
           ...(shareChanged ? { onlyOwner } : {}),
+          ...(contextChanged ? { contextTokens } : {}),
         });
       }
       refresh();
       const same =
-        !effortChanged && kind === view.brain && fallback === view.fallback && planModel === view.effectiveModel;
+        !effortChanged &&
+        !contextChanged &&
+        kind === view.brain &&
+        fallback === view.fallback &&
+        planModel === view.effectiveModel;
       const onlyAccount = accountChanged && !shareChanged && same;
       const onlyShare = shareChanged && !accountChanged && same;
       if (kind === "model" && view.brain !== "model" && view.onlyOwner) {
@@ -918,66 +957,61 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   // A sign-in for one more login of the account picked (`also`), else for this agent's own signed-out one again.
   const again = !also && signedOut ? current : null;
   const signingIn = also ?? again;
+  // The model as a picker like the account's: Automático first, each model with its line ("O mais capaz…"). An alias
+  // the plan leaves out runs its main model: shown as that one.
+  const modelValue =
+    plan && !isAuto(shownModel) && !planAliases(plan).some((a) => a === shownModel) ? "sonnet" : shownModel;
+  const brainLogo = accountKind ? <BrainLogo kind={accountKind} size="sm" /> : null;
+  const planModelOptionsShown: SelectOption[] = [
+    {
+      value: AUTO,
+      label: t("brain.auto.label"),
+      description: t("brain.auto.hint"),
+      leading: (
+        <span className="newag__ib">
+          <Icon name="bulb" size={16} />
+        </span>
+      ),
+    },
+    ...(plan ? planModelOptions(plan) : (option?.models ?? []).map((m) => ({ value: m.value, label: m.label }))).map(
+      (m) => ({
+        ...m,
+        // Claude's own models say what each is for; a plan's or Codex's go by their names.
+        ...(!plan && kind === "claude_code" && isClaudeAlias(m.value)
+          ? { description: t(`agentPage.work.brain.modelLine.${m.value}`) }
+          : {}),
+        leading: brainLogo,
+      }),
+    ),
+  ];
+  // "Configuração avançada" says only what differs from the defaults (`ADVANCED_DEFAULTS`).
+  const advancedNow: Advanced = { effort, contextTokens: shownContext, onlyOwner, fallback };
+  const advancedLine = advancedSummary(t, i18n.language, {
+    kind,
+    autoModel: isAuto(planModel),
+    apiKey,
+    now: advancedNow,
+  });
+  const advancedRow = (
+    <AdvancedRow
+      line={advancedLine}
+      onOpen={() => setAdv(advancedNow)}
+      label={t("agentPage.work.brain.advanced.title")}
+    />
+  );
   const planRows = (
-    <>
-      <BrainField label={t("agentPage.work.brain.planModel")}>
-        <Segmented
-          className="agp-brainseg"
-          label={t("agentPage.work.brain.planModel")}
-          // An alias the plan leaves out runs its main model: shown as that one.
-          value={
-            plan && !isAuto(shownModel) && !planAliases(plan).some((a) => a === shownModel) ? "sonnet" : shownModel
-          }
-          onValueChange={setPlanModel}
-          options={[
-            { value: AUTO, label: t("brain.auto.label") },
-            ...(plan
-              ? planModelOptions(plan)
-              : (option?.models ?? []).map((m) => ({ value: m.value, label: m.label }))),
-          ]}
-        />
-        {isAuto(planModel) && (
-          <SettingNote icon="bulb" live>
-            {t("brain.auto.hint")}
-          </SettingNote>
-        )}
-      </BrainField>
-      {!isAuto(planModel) && (
-        <EffortPixels
-          label={t("agentPage.work.brain.effort")}
-          value={effort}
-          onValueChange={setEffort}
-          color={draft.look.color}
-          steps={EFFORTS.map((e) => ({ value: e, label: t(`agentPage.work.brain.efforts.${e}`) }))}
-          hint={(e) => t(`agentPage.work.brain.effortText.${e}`)}
-        />
-      )}
+    <div className="agp-brainpicks">
+      <Select
+        className="agp-brainsel"
+        aria-label={t("agentPage.work.brain.planModel")}
+        value={modelValue}
+        onValueChange={setPlanModel}
+        renderValue={pickerValue}
+        options={planModelOptionsShown}
+      />
       {accountField}
-      {agent.ownerUserId &&
-        accountKind &&
-        (view.canUsePlans ? (
-          <PlanReplies
-            agent={agent.name}
-            on={!onlyOwner}
-            onChange={(on) => setShare({ kind, onlyOwner: !on })}
-            brain={accountKind}
-            plan={signInPlan({ account, accounts }, row, accountKind)}
-            coding={plan}
-          />
-        ) : (
-          <PlanRepliesOf on={!onlyOwner} owner={ownerFirst ?? ""} agentName={agent.name} />
-        ))}
-      {apiKey && (
-        <div className="ac-optcard__foot">
-          <SwitchLabel
-            htmlFor={offId}
-            label={t("agentPage.work.brain.fallbackTitle", { computer: whereName })}
-            hint={t("agentPage.work.brain.fallbackHint", g)}
-          />
-          <Switch id={offId} aria-describedby={`${offId}-hint`} checked={fallback} onCheckedChange={setFallback} />
-        </div>
-      )}
-    </>
+      {advancedRow}
+    </div>
   );
   const orgRows = can("model") ? (
     <>
@@ -1026,6 +1060,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           options={keyChoices}
         />
       </BrainField>
+      {advancedRow}
     </>
   ) : (
     <SettingNote icon="lock">{t("agentPage.lock.admins")}</SettingNote>
@@ -1120,7 +1155,155 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         onClose={onClose}
         onUse={() => void use()}
       />
+      {adv && (
+        <Dialog
+          open
+          onOpenChange={(o) => !o && setAdv(null)}
+          title={t("agentPage.work.brain.advanced.title")}
+          description={t("agentPage.work.brain.advanced.sub", { brain: brainName(kind) })}
+          closeLabel={t("common.close")}
+          width={480}
+          className="agp-wdlg"
+        >
+          <DialogBody>
+            <section className="agp-advgroup">
+              <h3 className="agp-advgroup__title">{t("agentPage.work.brain.advanced.think")}</h3>
+              {kind !== "model" && !isAuto(planModel) && (
+                <EffortPixels
+                  label={t("agentPage.work.brain.effort")}
+                  value={adv.effort}
+                  onValueChange={(e) => setAdv({ ...adv, effort: e })}
+                  color={draft.look.color}
+                  steps={EFFORTS.map((e) => ({ value: e, label: t(`agentPage.work.brain.efforts.${e}`) }))}
+                  hint={(e) => t(`agentPage.work.brain.effortText.${e}`)}
+                />
+              )}
+              <ContextField
+                value={adv.contextTokens}
+                options={contextOptions}
+                onChange={(n) => setAdv({ ...adv, contextTokens: n })}
+              />
+            </section>
+            {kind !== "model" && (
+              <section className="agp-advgroup">
+                <h3 className="agp-advgroup__title">{t("agentPage.work.brain.advanced.answers")}</h3>
+                {agent.ownerUserId &&
+                  accountKind &&
+                  (view.canUsePlans ? (
+                    <PlanReplies
+                      agent={agent.name}
+                      on={!adv.onlyOwner}
+                      onChange={(on) => setAdv({ ...adv, onlyOwner: !on })}
+                      brain={accountKind}
+                      plan={signInPlan({ account, accounts }, row, accountKind)}
+                      coding={plan}
+                    />
+                  ) : (
+                    <PlanRepliesOf on={!adv.onlyOwner} owner={ownerFirst ?? ""} agentName={agent.name} />
+                  ))}
+                {apiKey && (
+                  <div className="agp-advswitch">
+                    <SwitchLabel
+                      htmlFor={offId}
+                      label={t("agentPage.work.brain.fallbackTitle", { computer: whereName })}
+                      hint={t("agentPage.work.brain.fallbackHint", g)}
+                    />
+                    <Switch
+                      id={offId}
+                      aria-describedby={`${offId}-hint`}
+                      checked={adv.fallback}
+                      onCheckedChange={(on) => setAdv({ ...adv, fallback: on })}
+                    />
+                  </div>
+                )}
+              </section>
+            )}
+          </DialogBody>
+          <DialogFooter
+            note={
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={isAdvancedDefault(kind, adv)}
+                onClick={() => setAdv(advancedDefaults(kind, adv))}
+              >
+                {t("agentPage.work.brain.advanced.defaults")}
+              </Button>
+            }
+          >
+            <Button onClick={() => setAdv(null)}>{t("common.cancel")}</Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                setEffort(adv.effort);
+                setContextTokens(adv.contextTokens);
+                setFallback(adv.fallback);
+                if (adv.onlyOwner !== onlyOwner) setShare({ kind, onlyOwner: adv.onlyOwner });
+                setAdv(null);
+              }}
+            >
+              {t("agentPage.work.brain.advanced.done")}
+            </Button>
+          </DialogFooter>
+        </Dialog>
+      )}
     </Dialog>
+  );
+}
+
+/** "Configuração avançada": shaped like the pickers above it, a chevron that opens a step instead of a list. */
+function AdvancedRow({ label, line, onOpen }: { label: string; line: string; onOpen: () => void }) {
+  return (
+    <div className="ac-select agp-brainsel agp-advrow">
+      <button type="button" className="ac-select__trigger" onClick={onOpen}>
+        <span className="ac-select__value">
+          {pickerValue({
+            value: "advanced",
+            label,
+            description: line,
+            leading: (
+              <span className="newag__ib">
+                <Icon name="settings" size={16} />
+              </span>
+            ),
+          })}
+        </span>
+        <Icon name="chevronRight" size={16} className="agp-advrow__chev" />
+      </button>
+    </div>
+  );
+}
+
+/** The context limit: Automático, then the sizes under the model's window, with what the chosen one means. */
+function ContextField({
+  value,
+  options,
+  onChange,
+}: {
+  value: ContextLimit | null;
+  options: readonly ContextLimit[];
+  onChange: (value: ContextLimit | null) => void;
+}) {
+  const { t } = useTranslation();
+  const label = t("agentPage.work.brain.context");
+  const shown = value !== null && options.includes(value) ? value : null;
+  return (
+    <div className="agp-brainfield">
+      <span className="ac-effort__head">
+        <span>{label}</span>
+        <span className="ac-effort__hint">{t(`agentPage.work.brain.contextText.${shown ?? "auto"}`)}</span>
+      </span>
+      <Segmented
+        className="agp-brainseg"
+        label={label}
+        value={shown === null ? AUTO : String(shown)}
+        onValueChange={(v) => onChange(v === AUTO ? null : (options.find((n) => String(n) === v) ?? null))}
+        options={[
+          { value: AUTO, label: t("brain.auto.label") },
+          ...options.map((n) => ({ value: String(n), label: contextSize(n) })),
+        ]}
+      />
+    </div>
   );
 }
 

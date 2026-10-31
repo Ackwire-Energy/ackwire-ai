@@ -142,6 +142,11 @@ export const agents = pgTable(
     brainAccountId: uuid(),
     /** How hard its computer brain thinks (`low`…`max`, ADR 0041); null = the CLI's default. */
     brainEffort: text(),
+    /**
+     * The most context its model reads, in tokens (`200000`, `400000`, `1000000`; validated in code): the API
+     * brain compacts past it, Claude Code and Codex compact there too. Null = the model's own window.
+     */
+    contextTokens: integer(),
     /** Sites its browser may open (ADR 0040, `*.example.com` matches the domain too); null = any site. */
     browserAllowedDomains: text().array(),
     /**
