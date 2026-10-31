@@ -204,17 +204,21 @@ describe("each call's service and its logo", () => {
   const lines = (items: ToolItem[]) => items.flatMap((i) => (i.kind === "call" ? [i.line] : []));
   const logo = (a: Activity | undefined) => (a ? callLogo(a, catalog) : null);
 
-  test("a mailbox goes by its maker: Gmail's mark, 'Consultou o Gmail', only the verb in grey", () => {
-    const [gmail, other, old] = lines(
+  test("a mailbox goes by its maker: Gmail's mark, 'Consultou o Gmail', which mailbox and the verb in grey", () => {
+    const [gmail, sales, other, old] = lines(
       toolItemsLive([
         call("1", "mail_wnogueira_search", { connector: "Email", service: "gmail" }),
+        { kind: "say", text: "Agora a de vendas." },
+        call("2", "mail_vendas_search", { connector: "Email", service: "gmail" }),
         { kind: "say", text: "Agora a outra caixa." },
-        call("2", "mail_contato_read", { connector: "Email", service: "custom" }),
+        call("3", "mail_contato_read", { connector: "Email", service: "custom" }),
         { kind: "say", text: "E a de antes." },
-        call("3", "mail_ana_read", { connector: "Email" }),
+        call("4", "mail_ana_read", { connector: "Email" }),
       ]),
     );
-    expect(gmail).toMatchObject({ kind: "consulting", app: "Gmail", service: "gmail", hint: "search" });
+    expect(gmail).toMatchObject({ kind: "consulting", app: "Gmail", service: "gmail", hint: "wnogueira search" });
+    // Two mailboxes of one maker: the same phrase and logo, the grey words say which.
+    expect(sales).toMatchObject({ app: "Gmail", service: "gmail", hint: "vendas search" });
     expect(gmail && toolPhrase(t, { ...gmail, state: "done" })).toBe(
       'chat.work.step.consulting|{"app":"Gmail","tool":"mail wnogueira search"}',
     );
@@ -225,11 +229,11 @@ describe("each call's service and its logo", () => {
       label: "Gmail",
     });
     // A mailbox on a server of its own, or one recorded before calls named their service: our envelope, "Email".
-    expect(other).toMatchObject({ app: "Email", service: "mail", hint: "read" });
-    expect(old).toMatchObject({ app: "Email", service: "mail", hint: "read" });
+    expect(other).toMatchObject({ app: "Email", service: "mail", hint: "contato read" });
+    expect(old).toMatchObject({ app: "Email", service: "mail", hint: "ana read" });
     expect(logo(other)).toEqual({ kind: "mail" });
     // A maker's name keeps its own capitals; a connector's slug gets one.
-    const [icloud] = lines(toolItemsLive([call("4", "mail_contato_read", { connector: "Email", service: "icloud" })]));
+    const [icloud] = lines(toolItemsLive([call("5", "mail_contato_read", { connector: "Email", service: "icloud" })]));
     expect(icloud && toolPhrase(t, { ...icloud, state: "done" })).toBe(
       'chat.work.step.consulting|{"app":"iCloud","tool":"mail contato read"}',
     );
@@ -312,7 +316,7 @@ describe("each call's service and its logo", () => {
       { seq: 4, kind: "tool_result", data: { toolUseId: "t2", content: "opened" }, createdAt: at(3) },
     ]);
     expect(work.steps.map((s) => [s.app, s.service, s.hint])).toEqual([
-      ["Gmail", "gmail", "search"],
+      ["Gmail", "gmail", "wnogueira search"],
       ["GitHub", "github", "open pull request"],
     ]);
     const meta = workMeta({

@@ -206,7 +206,7 @@ describe("the block's logos are the services' own", () => {
     const rows = [...block.querySelectorAll(".ac-tools__row")];
     expect(rows.map((r) => [r.querySelector("b")?.textContent, r.querySelector("small")?.textContent ?? null])).toEqual(
       [
-        ["Consultou o Gmail", "search"],
+        ["Consultou o Gmail", "wnogueira search"],
         ["Consultou o GitHub", "search issues"],
         ["Criou uma tarefa", null],
       ],
@@ -216,7 +216,28 @@ describe("the block's logos are the services' own", () => {
       "/connectors/github.svg",
       "ours",
     ]);
-    expect(block.textContent).not.toContain("wnogueira");
+  });
+
+  test("a server's icon that no longer loads leaves its monogram, not an empty tile", async () => {
+    const api = createFakeApi(seedState());
+    const icon = `/api/app/connector-icons/${ORG_ID}/00000000-0000-4000-8000-0000000000f1/0123456789abcdef.png`;
+    await renderPage(
+      <LiveTools
+        work={[call("1", "acme_find_orders", { connector: "Acme Tools", serviceIcon: icon })]}
+        agentName="Ada"
+        done
+      />,
+      { api, org: true },
+    );
+    await settle(4);
+    const logos = document.querySelector(".ac-tools__logos") as HTMLElement;
+    const img = logos.querySelector(".connector-icon__img") as HTMLImageElement;
+    expect(img.getAttribute("src")).toBe(icon);
+    await act(async () => {
+      img.dispatchEvent(new Event("error"));
+    });
+    expect(logos.querySelector(".connector-icon__img")).toBeNull();
+    expect(logos.querySelector(".connector-icon--initial")?.textContent).toBe("AT");
   });
 
   test("a saved reply's closed head shows its services' logos from meta.work, before any step loads", async () => {

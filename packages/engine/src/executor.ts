@@ -172,7 +172,7 @@ const {
 } = schema;
 /** A bridged call can land a moment after the text the brain streamed before it: its text up to this much later counts as before. */
 const ASKED_GRACE_MS = 250;
-/** How many tools a reply's `meta.work.calls` names: its closed block stacks only a few logos. */
+/** How many apps a reply's `meta.work.calls` names: its closed block stacks only a few logos. */
 const WORK_CALLS = 12;
 
 /**
@@ -878,13 +878,16 @@ async function executeRunInner(
         : body;
     // Team actions (ADR 0064): what the run didn't repeat because the team already did it rides on its reply.
     const teamChecks = note ? [] : await runChecksForReply(tx, run.orgId, run.id);
-    // "Ver o que ele fez" under the reply: how many tool calls so far, so the apps leave it out at 0, and each
-    // tool's first call (its app and service), for the logos of the closed block. A reaction already shows on the
+    // "Ver o que ele fez" under the reply: how many tool calls so far, so the apps leave it out at 0, and one call
+    // per logo of the closed block, in order of first use: per service, else app, else screen, else tool (a
+    // connector's dozens of tools would push the next apps past the few kept). A reaction already shows on the
     // message it reacts to: it isn't counted.
     const name = sql<string>`${agentRunSteps.data}->>'name'`;
+    const screen = sql`substring(${name} from '^(?:mcp__agentes__)?(browser|desktop)_')`;
+    const app = sql`coalesce(${agentRunSteps.data}->>'service', ${agentRunSteps.data}->>'connector', ${screen}, ${name})`;
     const tools = await tx
       .select({
-        name,
+        name: sql<string>`min(${name})`,
         connector: sql<string | null>`min(${agentRunSteps.data}->>'connector')`,
         service: sql<string | null>`min(${agentRunSteps.data}->>'service')`,
         serviceIcon: sql<string | null>`min(${agentRunSteps.data}->>'serviceIcon')`,
@@ -898,7 +901,7 @@ async function executeRunInner(
           sql`${name} is distinct from ${REACT_TOOL}`,
         ),
       )
-      .groupBy(name)
+      .groupBy(app)
       .orderBy(sql`min(${agentRunSteps.seq})`);
     const work = {
       steps: tools.reduce((n, t) => n + t.n, 0),

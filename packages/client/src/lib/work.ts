@@ -49,7 +49,7 @@ export interface Work {
   durationMs: number | null;
 }
 
-/** A tool's first call in a reply's `meta.work`: its name, app and service (as the `tool_call` step says them). */
+/** A call of one app in a reply's `meta.work`: its name, app and service (as the `tool_call` step says them). */
 export interface WorkCall {
   name: string;
   connector?: string;
@@ -60,7 +60,10 @@ export interface WorkCall {
 /** The compact form the backend puts on the message (`meta.work`), before the steps are loaded. */
 export interface WorkMeta {
   steps: number;
-  /** Each tool's first call, in order (a dozen at most): the closed block's logos. */
+  /**
+   * One call per service, app or screen (else per tool), in order of first use, a dozen at most: the closed block's
+   * logos.
+   */
   calls: WorkCall[];
   durationMs: number | null;
 }
@@ -276,16 +279,16 @@ export const firstLine = (text: string) => {
 /**
  * The grey words after a line's phrase: a built-in tool's own short label (the skill, the issue, the file; the
  * engine's `toolDetail`), or a connector tool's own name without its app ("github_search_issues" → "search
- * issues", a server's whole label too: "acme_tools_find_orders" → "find orders"; a mailbox's or a database's
- * without the account it names: "mail_ana_search" → "search"). Never a connector's input: the live event doesn't
- * carry it either.
+ * issues", a server's whole label too: "acme_tools_find_orders" → "find orders"; a mailbox's keeps which one,
+ * as its line names only the maker: "mail_vendas_search" → "vendas search"; a database's drops the name its line
+ * says: "pg_analytics_query" → "query"). Never a connector's input: the live event doesn't carry it either.
  */
 export function toolHint(tool: string, activity: Activity, detail?: string | null) {
   if (detail?.trim()) return detail.trim();
   if (activity.kind !== "consulting") return null;
   const name = tool.trim().replace(/^mcp__[^_]+(?:_[^_]+)*?__/, "");
   if (activity.service === "mail" || activity.service === "postgres" || MAIL_BRANDS[activity.service ?? ""])
-    return toolLabel(name.replace(/^(?:mail|pg)_[a-z0-9]+_/, "")) || null;
+    return toolLabel(name.replace(activity.service === "postgres" ? /^pg_[a-z0-9]+_/ : /^mail_/, "")) || null;
   const app = (activity.app ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
   const parts = name.split(/[_.:]/);
   let lead = 0;
