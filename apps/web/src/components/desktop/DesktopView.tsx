@@ -36,9 +36,10 @@ const SETTLED: DesktopViewState[] = ["live", "forbidden", "unavailable", "outdat
 
 /**
  * "Live" waits for the screen's first picture: one that just started is black for a few seconds, until its desktop
- * draws. How often it's looked at, and how long at most before it's shown as it is (a screen black for good).
+ * draws. How often it's looked at, and how long at most before it's shown as it is (a screen black for good). The
+ * cover over the screen takes the person's clicks until then: looked at often, it lifts as the picture comes.
  */
-const PICTURE_POLL_MS = 200;
+const PICTURE_POLL_MS = 50;
 const PICTURE_WAIT_MS = 10_000;
 /**
  * Handing back opens the screen again as a watcher, on a new socket. Its last picture stays over the new connection

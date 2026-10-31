@@ -400,6 +400,20 @@ describe("the agent's screen in the computer dialog", () => {
     }
   });
 
+  test("a picture that comes after noVNC connected lifts the cover within 50 ms: a first click on it isn't held back", async () => {
+    const pixels = screenPixels();
+    try {
+      await dialog();
+      await connected();
+      expect(screen().getByText("Abrindo o computador da Ada…")).toBeTruthy();
+      pixels.picture();
+      await act(() => new Promise((r) => setTimeout(r, 80)));
+      expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
+    } finally {
+      pixels.restore();
+    }
+  });
+
   test("a screen that stays one flat color for good is shown as it is after a while, not Opening forever", async () => {
     const pixels = screenPixels();
     try {
