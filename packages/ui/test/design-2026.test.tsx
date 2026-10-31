@@ -73,7 +73,7 @@ describe("buttons and kbd", () => {
     // At the hover's weight, after it, so a pressed button stays pushed in under the pointer; before the focus ring.
     const at = (selector: string) => css.lastIndexOf(`\n${selector} {`);
     expect(at(".ac-btn:hover")).toBeLessThan(at('.ac-btn[aria-pressed="true"]'));
-    expect(at('.ac-btn[aria-pressed="true"]')).toBeLessThan(at(".ac-btn:focus-visible"));
+    expect(at('.ac-btn[aria-pressed="true"]')).toBeLessThan(at("html:not([data-pointer]) .ac-btn:focus-visible"));
   });
 
   test("Kbd is a <kbd>", () => {

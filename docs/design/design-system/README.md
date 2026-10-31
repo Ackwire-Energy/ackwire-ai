@@ -27,7 +27,7 @@
 
 **Profundidade (2026-10).** Camadas com elevação `e1`/`e2`/`e3` e a luz de topo `top`: cards e botões secundários em e1, hover de card interativo e composer em e2, vidro (menus, popovers, select, toasts, ⌘K) e diálogos em e3. Vidro usa `glass` + `backdrop-filter`, com `glass-solid` de reserva. Raios: itens de menu 10, botões 12, cards 14, composer 18, seções 20. Movimento com `--out` e `--spring`, sempre desligado com `prefers-reduced-motion`. Especificação completa em `../refresh-2026-10.md`.
 
-**Foco e estados.** Todo controle focado por teclado mostra `focus-ring`: 2px da superfície e um anel sólido de 2px em tinta. Bordas de controle usam `line-strong` (3:1). Desabilitado é `ink-muted` sobre `surface`. Um agente trabalhando ganha um anel `agent` no avatar e, enquanto escreve, um cursor `agent` no fim do texto; ambos param com `prefers-reduced-motion`.
+**Foco e estados.** Todo controle focado por teclado mostra `focus-ring`: 1px da superfície e um anel cinza de 2px em `focus-color` (`line-strong`, 3:1). Só o teclado o desenha: um clique, um toque ou o que um script foca depois de alguém digitar não mostram anel (`trackInput` marca `<html data-pointer>`, e toda regra que desenha um anel começa com `html:not([data-pointer])`). Bordas de controle usam `line-strong` (3:1). Desabilitado é `ink-muted` sobre `surface`. Um agente trabalhando ganha um anel `agent` no avatar e, enquanto escreve, um cursor `agent` no fim do texto; ambos param com `prefers-reduced-motion`.
 
 ## Logo
 

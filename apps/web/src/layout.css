@@ -546,7 +546,7 @@ p {
 .sidebar__item:hover {
   background: var(--surface);
 }
-.sidebar__item:focus-visible {
+html:not([data-pointer]) .sidebar__item:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -618,7 +618,7 @@ p {
 .sidebar__user:hover {
   background: var(--surface);
 }
-.sidebar__user:focus-visible {
+html:not([data-pointer]) .sidebar__user:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -945,7 +945,7 @@ p {
 .ac-dialog__list:has(> .member-row--add:last-child) {
   padding-bottom: 16px;
 }
-.member-row--add:focus-visible {
+html:not([data-pointer]) .member-row--add:focus-visible {
   outline: none;
   box-shadow: var(--field-ring);
 }
@@ -1222,7 +1222,7 @@ p {
 .artifact-card:hover {
   border-color: var(--ink-muted);
 }
-.artifact-card:has(.artifact-card__open:focus-visible) {
+html:not([data-pointer]) .artifact-card:has(.artifact-card__open:focus-visible) {
   box-shadow: var(--focus-ring);
 }
 .artifact-card--loading {
@@ -1245,7 +1245,7 @@ p {
   text-align: left;
   cursor: pointer;
 }
-.artifact-card__open:focus-visible {
+html:not([data-pointer]) .artifact-card__open:focus-visible {
   outline: none;
 }
 /* The whole card opens the viewer. */
@@ -1478,7 +1478,7 @@ p {
   color: inherit;
   cursor: pointer;
 }
-.artifact-table__sort:focus-visible {
+html:not([data-pointer]) .artifact-table__sort:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: 4px;
@@ -2544,7 +2544,7 @@ p {
   cursor: pointer;
   border-radius: var(--radius-sm);
 }
-.profile-trigger:focus-visible {
+html:not([data-pointer]) .profile-trigger:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -2751,7 +2751,7 @@ p {
   width: 14px;
   height: 14px;
 }
-.level-pill:focus-visible {
+html:not([data-pointer]) .level-pill:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -2802,8 +2802,8 @@ p {
 .skill-row__name:hover {
   text-decoration: underline;
 }
-.skill-row__name:focus-visible,
-.skill-file--open:focus-visible {
+html:not([data-pointer]) .skill-row__name:focus-visible,
+html:not([data-pointer]) .skill-file--open:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: 4px;
@@ -2926,7 +2926,7 @@ p {
 .sidebar__org-button:hover {
   background: var(--surface-raised);
 }
-.sidebar__org-button:focus-visible {
+html:not([data-pointer]) .sidebar__org-button:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -3056,7 +3056,7 @@ p {
 .settings__link[aria-current="page"] > .ac-icon {
   color: var(--ink);
 }
-.settings__link:focus-visible {
+html:not([data-pointer]) .settings__link:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -3186,7 +3186,7 @@ p {
   color: var(--ink-muted);
   font-size: 13px;
 }
-.settings-tile:focus-visible {
+html:not([data-pointer]) .settings-tile:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring), var(--card-shadow);
 }
@@ -3303,7 +3303,7 @@ p {
 .catalog__cat:hover {
   background: var(--plate-soft);
 }
-.catalog__cat:focus-visible {
+html:not([data-pointer]) .catalog__cat:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -3407,8 +3407,8 @@ p {
 .catalog-tile:active {
   transform: scale(0.98);
 }
-.catalog-feat__card:focus-visible,
-.catalog-tile:focus-visible {
+html:not([data-pointer]) .catalog-feat__card:focus-visible,
+html:not([data-pointer]) .catalog-tile:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -3866,7 +3866,7 @@ p {
   width: fit-content;
   border-radius: var(--radius-sm);
 }
-.cflow__more summary:focus-visible {
+html:not([data-pointer]) .cflow__more summary:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -4100,7 +4100,7 @@ p {
   color: var(--ink2);
   border-radius: var(--radius-sm);
 }
-.mail-rules > summary:focus-visible {
+html:not([data-pointer]) .mail-rules > summary:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -4230,9 +4230,9 @@ p {
 .tr-subj__h:hover {
   background: var(--plate-soft);
 }
-.tr-subj__h:focus-visible,
-.tr-link:focus-visible,
-.tr-ok:focus-visible {
+html:not([data-pointer]) .tr-subj__h:focus-visible,
+html:not([data-pointer]) .tr-link:focus-visible,
+html:not([data-pointer]) .tr-ok:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -4848,7 +4848,7 @@ p {
   box-shadow: inset 0 0 0 1px var(--line-strong);
   color: var(--muted);
 }
-.sidebar__jump:focus-visible {
+html:not([data-pointer]) .sidebar__jump:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -4958,7 +4958,7 @@ p {
 .live-code-toggle__btn:hover {
   background: var(--plate);
 }
-.live-code-toggle__btn:focus-visible {
+html:not([data-pointer]) .live-code-toggle__btn:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5039,7 +5039,7 @@ p {
   border-color: var(--line-strong);
   background: var(--raised);
 }
-.photo-drop:focus-visible {
+html:not([data-pointer]) .photo-drop:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5098,7 +5098,7 @@ p {
 .wiki-link:hover {
   background: var(--plate);
 }
-.wiki-link:focus-visible {
+html:not([data-pointer]) .wiki-link:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5251,7 +5251,7 @@ p {
 .save-wiki__page:hover {
   background: var(--plate);
 }
-.save-wiki__page:focus-visible {
+html:not([data-pointer]) .save-wiki__page:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5281,7 +5281,7 @@ p {
   background: var(--plate);
   color: var(--ink);
 }
-.composer-reply__close:focus-visible {
+html:not([data-pointer]) .composer-reply__close:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5336,7 +5336,7 @@ p {
 .msg-quote:hover {
   color: var(--ink2);
 }
-.msg-quote:focus-visible {
+html:not([data-pointer]) .msg-quote:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5448,7 +5448,7 @@ p {
   background: color-mix(in srgb, var(--danger) 12%, transparent);
   color: var(--danger);
 }
-.stop-run:focus-visible {
+html:not([data-pointer]) .stop-run:focus-visible {
   outline: none;
   box-shadow: var(--field-ring);
 }
@@ -5489,7 +5489,7 @@ p {
 .run-continue:hover:not(:disabled) {
   transform: translateY(-1px);
 }
-.run-continue:focus-visible {
+html:not([data-pointer]) .run-continue:focus-visible {
   outline: none;
   box-shadow: var(--card-shadow), var(--focus-ring);
 }
@@ -5853,7 +5853,7 @@ p {
   padding-right: var(--ghost-plate);
   margin-right: calc(-1 * var(--ghost-plate));
 }
-.members-stack:focus-visible {
+html:not([data-pointer]) .members-stack:focus-visible {
   outline: none;
   box-shadow: var(--field-ring);
 }
@@ -5889,7 +5889,7 @@ p {
   text-align: left;
 }
 .members-pop__row.profile-trigger:hover,
-.members-pop__row.profile-trigger:focus-visible {
+html:not([data-pointer]) .members-pop__row.profile-trigger:focus-visible {
   background: var(--plate);
   outline: none;
 }
@@ -6035,7 +6035,8 @@ p {
   cursor: pointer;
   box-shadow: 0 0 0 1px var(--sky-line);
 }
-.sky-welcome__close:focus-visible {
+/* The sky's own ink on its light sky, in both themes. */
+html:not([data-pointer]) .sky-welcome__close:focus-visible {
   outline: none;
   box-shadow:
     0 0 0 2px #fff,
@@ -6299,7 +6300,7 @@ p {
   white-space: nowrap;
   font-weight: 600;
 }
-.file-thumb:focus-visible {
+html:not([data-pointer]) .file-thumb:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -6334,7 +6335,7 @@ p {
 .file-row:hover {
   box-shadow: var(--e2), var(--top);
 }
-.file-row:has(.file-row__open:focus-visible) {
+html:not([data-pointer]) .file-row:has(.file-row__open:focus-visible) {
   box-shadow: var(--focus-ring);
 }
 .file-row__open {
@@ -6348,7 +6349,7 @@ p {
   text-align: left;
   cursor: pointer;
 }
-.file-row__open:focus-visible {
+html:not([data-pointer]) .file-row__open:focus-visible {
   outline: none;
 }
 .file-row .file-summary__icon {
@@ -6578,7 +6579,7 @@ a.machine-row__name:hover {
 .machine-connect__toggle:hover {
   color: var(--ink);
 }
-.machine-connect__toggle:focus-visible {
+html:not([data-pointer]) .machine-connect__toggle:focus-visible {
   outline: none;
   border-radius: 4px;
   box-shadow: var(--focus-ring);
@@ -7069,7 +7070,7 @@ a.machine-row__name:hover {
   color: var(--ink);
   box-shadow: var(--card-shadow);
 }
-.onb__step:focus-visible {
+html:not([data-pointer]) .onb__step:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -7464,13 +7465,13 @@ a.machine-row__name:hover {
   box-shadow: var(--chosen-shadow);
   transform: var(--chosen-lift);
 }
-.newag__role:focus-visible,
-.newag__model:focus-visible,
-.newag__tip:focus-visible,
-.newag__opt:focus-visible,
-.newag__swatch:focus-visible,
-.newag__tog:focus-visible,
-.newag__addrow:focus-visible {
+html:not([data-pointer]) .newag__role:focus-visible,
+html:not([data-pointer]) .newag__model:focus-visible,
+html:not([data-pointer]) .newag__tip:focus-visible,
+html:not([data-pointer]) .newag__opt:focus-visible,
+html:not([data-pointer]) .newag__swatch:focus-visible,
+html:not([data-pointer]) .newag__tog:focus-visible,
+html:not([data-pointer]) .newag__addrow:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -7753,7 +7754,7 @@ a.machine-row__name:hover {
   background: var(--sunken);
   box-shadow: inset 0 0 0 1px var(--line);
 }
-.newag__sel .ac-select__trigger:focus-visible {
+html:not([data-pointer]) .newag__sel .ac-select__trigger:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -8239,7 +8240,7 @@ a.machine-row__name:hover {
 .agp-cell:hover:not(.agp-cell--ro) {
   background: color-mix(in srgb, var(--sunken) 80%, transparent);
 }
-.agp-cell:focus-visible {
+html:not([data-pointer]) .agp-cell:focus-visible {
   outline: none;
   box-shadow: var(--field-ring);
 }
@@ -8912,7 +8913,7 @@ a.machine-row__name:hover {
   color: var(--ink);
   text-decoration: underline;
 }
-.agp-asks__see:focus-visible {
+html:not([data-pointer]) .agp-asks__see:focus-visible {
   box-shadow: var(--focus-ring);
 }
 .agp-tools {
@@ -9127,7 +9128,7 @@ a.machine-row__name:hover {
 .agp-chipbtn:hover {
   color: var(--ink);
 }
-.agp-chipbtn:focus-visible {
+html:not([data-pointer]) .agp-chipbtn:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -9453,7 +9454,7 @@ a.machine-row__name:hover {
 .agp-subnav__item[data-danger] {
   color: var(--danger);
 }
-.agp-subnav__item:focus-visible {
+html:not([data-pointer]) .agp-subnav__item:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -9659,7 +9660,7 @@ a.machine-row__name:hover {
   text-align: left;
   cursor: pointer;
 }
-.agp-changes__jump:focus-visible {
+html:not([data-pointer]) .agp-changes__jump:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -9753,7 +9754,7 @@ a.machine-row__name:hover {
     inset 0 0 0 1px var(--line),
     0 4px 10px -4px rgba(0, 0, 0, 0.18);
 }
-.msg-mem:focus-visible {
+html:not([data-pointer]) .msg-mem:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -10035,7 +10036,7 @@ html[data-menu-overlay] .shell {
   text-align: left;
   cursor: pointer;
 }
-.sidebar__section-toggle:focus-visible {
+html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -10222,7 +10223,7 @@ html[data-menu-overlay] .shell {
   text-align: left;
   cursor: pointer;
 }
-.sidebar__more:focus-visible {
+html:not([data-pointer]) .sidebar__more:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -10370,7 +10371,7 @@ html[data-menu-overlay] .shell {
   opacity: 1;
   pointer-events: auto;
 }
-.channel__newpill:focus-visible {
+html:not([data-pointer]) .channel__newpill:focus-visible {
   outline: none;
   box-shadow: var(--card-shadow), var(--focus-ring);
 }
@@ -10438,7 +10439,7 @@ html[data-menu-overlay] .shell {
   text-decoration-color: var(--line2);
   cursor: pointer;
 }
-.ac-typing__see:focus-visible {
+html:not([data-pointer]) .ac-typing__see:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: 4px;
@@ -11073,7 +11074,7 @@ html[data-menu-overlay] .shell {
 .settings-row--open:hover {
   background: color-mix(in srgb, var(--ink) 3%, transparent);
 }
-.settings-row--open:focus-visible {
+html:not([data-pointer]) .settings-row--open:focus-visible {
   outline: none;
   box-shadow: inset var(--focus-ring);
 }
