@@ -2361,8 +2361,9 @@ export const en: Translations = {
       saved: {
         brain: "{{name}} now thinks with {{brain}}.",
         brainMoved: "{{name}} now works on {{computer}} and thinks with {{brain}}.",
-        /** From the API onto a plan: it answers only its owner from now on (ADR 0059 §5). */
-        brainOwner: "{{name}} now thinks with {{brain}} and answers only you.",
+        /** From the API onto a plan, it answers only its owner (ADR 0059 §5): "you", or their name. */
+        brainOwner: "{{name}} now thinks with {{brain}} and answers only {{owner}}.",
+        brainMovedOwner: "{{name}} now works on {{computer}}, thinks with {{brain}} and answers only {{owner}}.",
         account: "{{name}} now uses the {{account}} account.",
         computer: "{{name}} now works on {{computer}}.",
         none: "{{name}} now has no computer.",
@@ -2379,6 +2380,8 @@ export const en: Translations = {
         modelText: "Paid per use. It counts against {{name}}'s budget.",
         /** A plan's card: `plan` is its name ("Claude", "ChatGPT", "OpenCode Go"). */
         planText: "Uses your {{plan}} plan",
+        /** To anyone but the agent's owner: whose plan it is. */
+        planTextOf: "Uses {{owner}}'s {{plan}} plan",
         moves: "Moves to {{computer}}",
         off: "{{computer}} is offline",
         none: "No computer has it",

@@ -905,6 +905,14 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         planModel === view.effectiveModel;
       const onlyAccount = accountChanged && !shareChanged && same;
       const onlyShare = shareChanged && !accountChanged && same;
+      // Onto a plan it answers only its owner from now on (ADR 0059 §5): said, since it stops answering whoever it
+      // answered before, with that owner's name to anyone else.
+      const owner =
+        kind !== "model" && kind !== view.brain && onlyOwner && !view.onlyOwner
+          ? view.canUsePlans
+            ? t("common.you")
+            : ownerFirst
+          : null;
       if (kind === "model" && view.brain !== "model" && view.onlyOwner) {
         // Off the plan it still answers only its owner: one click lets back in whoever it answered before.
         toast.show(t("aiAccounts.share.backOnApi", g), "info", {
@@ -929,12 +937,17 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                   })
                 : t("agentPage.work.saved.account", { ...g, account: current?.label ?? "" })
               : moves
-                ? t("agentPage.work.saved.brainMoved", { ...g, brain: brainName, computer: moves.name })
-                : // Onto a plan it answers only its owner from now on (ADR 0059 §5): said, since it stops answering
-                  // whoever it answered before.
-                  kind !== "model" && kind !== view.brain && onlyOwner && !view.onlyOwner
-                  ? t("agentPage.work.saved.brainOwner", { ...g, brain: brainName })
-                  : t("agentPage.work.saved.brain", { ...g, brain: brainName }),
+                ? t(owner ? "agentPage.work.saved.brainMovedOwner" : "agentPage.work.saved.brainMoved", {
+                    ...g,
+                    brain: brainName,
+                    computer: moves.name,
+                    owner,
+                  })
+                : t(owner ? "agentPage.work.saved.brainOwner" : "agentPage.work.saved.brain", {
+                    ...g,
+                    brain: brainName,
+                    owner,
+                  }),
         );
       onClose();
     } catch {
@@ -1315,8 +1328,10 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                   ? t("agentPage.work.brain.modelText", g)
                   : !where
                     ? reason(c)
-                    : ownersOnly(c) && ownerFirst
-                      ? t("agentPage.work.brain.accountLocked", { name: ownerFirst })
+                    : !view.canUsePlans && ownerFirst
+                      ? ownersOnly(c)
+                        ? t("agentPage.work.brain.accountLocked", { name: ownerFirst })
+                        : t("agentPage.work.brain.planTextOf", { plan: planLabel(t, c), owner: ownerFirst })
                       : t("agentPage.work.brain.planText", { plan: planLabel(t, c) }),
               side: side(c),
               disabled: c !== "key" && (!where || ownersOnly(c)),

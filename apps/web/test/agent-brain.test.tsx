@@ -209,7 +209,7 @@ describe("Quem pensa (its dialog)", () => {
     expect(d.textContent).not.toMatch(/Pensa com\s/);
   });
 
-  test("Claude: the agent moves to the MacBook first, then thinks there; the toast says both", async () => {
+  test("Claude: the agent moves to the MacBook first, then thinks there; the toast says both, and whom it answers now", async () => {
     const { state } = await open();
     const d = await brainDialog();
     await click(card(d, /^Claude/));
@@ -236,7 +236,7 @@ describe("Quem pensa (its dialog)", () => {
     // Choosing a plan asks nothing: it answers only its owner until they say otherwise.
     expect(brainCalls(state)).toEqual([{ brain: "claude_code", model: "opus", fallback: false }]);
     expect(document.body.textContent).toContain(
-      "A Ada agora trabalha no MacBook e pensa com Opus pelo plano do Claude.",
+      "A Ada agora trabalha no MacBook, pensa com Opus pelo plano do Claude e só atende você.",
     );
     expect(screen().queryByRole("dialog", { name: "Quem pensa" })).toBeNull();
   });
@@ -254,6 +254,31 @@ describe("Quem pensa (its dialog)", () => {
     await settle(6);
     expect(brainCalls(state).at(-1)).toMatchObject({ brain: "claude_code" });
     expect(document.body.textContent).toContain("A Ada agora pensa com Sonnet pelo plano do Claude e só atende você.");
+  });
+
+  test("an admin who isn't its owner moves it from the API onto a plan: the cards and the toast say whose plan it is and whom it answers", async () => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.ownerUserId = "u-walter";
+    const api = createFakeApi(state);
+    pairMac(api, true);
+    await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
+    api.agents.brain = async () => fakeAgentBrain(ADA_ID, { canUsePlans: false, canManageAccounts: false });
+    await open(state, api);
+    const d = await brainDialog();
+    const rows = within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getAllByRole("radio");
+    expect(rows.map((r) => r.querySelector(".ac-optrow__desc")?.textContent)).toEqual([
+      "Pago por uso. Conta no orçamento da Ada.",
+      "Usa o plano do Claude de Walter",
+      "Usa o plano do ChatGPT de Walter",
+    ]);
+    await click(card(d, /^Claude/));
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toMatchObject({ brain: "claude_code" });
+    expect(document.body.textContent).toContain(
+      "A Ada agora pensa com Sonnet pelo plano do Claude e só atende Walter.",
+    );
   });
 
   test("no API key anywhere (the workspace's or the server's): no switch promising an answer through it", async () => {
@@ -1372,7 +1397,7 @@ describe("Quem pensa: a coding plan's models", () => {
     // Another program, or the API, stays theirs to choose.
     expect(card(d, /^ChatGPT/).hasAttribute("disabled")).toBe(false);
     expect(card(d, /^Chave de API/).hasAttribute("disabled")).toBe(false);
-    expect(card(d, /^OpenCode Go/).textContent).toContain("Usa o seu plano do OpenCode Go");
+    expect(card(d, /^OpenCode Go/).textContent).toContain("Usa o plano do OpenCode Go de João");
   });
 
   test("the cell names the plan's model it runs; models sold with words show them, a plan's only model too", async () => {

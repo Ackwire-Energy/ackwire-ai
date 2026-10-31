@@ -2375,8 +2375,9 @@ export const ptBR = {
       saved: {
         brain: "{{The}} {{name}} agora pensa com {{brain}}.",
         brainMoved: "{{The}} {{name}} agora trabalha no {{computer}} e pensa com {{brain}}.",
-        /** From the API onto a plan: it answers only its owner from now on (ADR 0059 §5). */
-        brainOwner: "{{The}} {{name}} agora pensa com {{brain}} e só atende você.",
+        /** From the API onto a plan, it answers only its owner (ADR 0059 §5): "você", or their name. */
+        brainOwner: "{{The}} {{name}} agora pensa com {{brain}} e só atende {{owner}}.",
+        brainMovedOwner: "{{The}} {{name}} agora trabalha no {{computer}}, pensa com {{brain}} e só atende {{owner}}.",
         account: "{{The}} {{name}} agora usa a conta {{account}}.",
         computer: "{{The}} {{name}} agora trabalha no {{computer}}.",
         none: "{{The}} {{name}} agora está sem computador.",
@@ -2393,6 +2394,8 @@ export const ptBR = {
         modelText: "Pago por uso. Conta no orçamento {{of}} {{name}}.",
         /** A plan's card: `plan` is its name ("Claude", "ChatGPT", "OpenCode Go"). */
         planText: "Usa o seu plano do {{plan}}",
+        /** To anyone but the agent's owner: whose plan it is. */
+        planTextOf: "Usa o plano do {{plan}} de {{owner}}",
         moves: "Vai para o {{computer}}",
         off: "O {{computer}} está offline",
         none: "Nenhum computador tem",
