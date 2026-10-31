@@ -32,11 +32,13 @@ import type { ModelGateway } from "./gateway";
 import { PLATFORM_CAP } from "./limits";
 import type { MachineCaller } from "./machine-hub";
 import { AGENT_CHIME_IN_MAX_HOP, getMessage, type Message } from "./messages";
+import { ACTIVE_RUN_STATUSES } from "./run-inbox";
 import { type AgentRun, NO_AI } from "./runs";
 import { OrgDeletingError, standingRefusal } from "./standing";
 
 const {
   agents,
+  agentRuns,
   agentScopes,
   channelMembers,
   connectorConnections,
@@ -807,8 +809,10 @@ export async function routeMessage(
         authorUserId: messages.authorUserId,
         mentionedAgentIds: messages.mentionedAgentIds,
         routable,
-        // Whom the router sent it to (null: it never decided on it).
+        // Whom the router sent it to (null: it never decided on it), and whether a run it started is still at work.
         routedTo: routingDecisions.selectedAgentIds,
+        working: sql<boolean>`exists (select 1 from ${agentRuns} r where r.org_id = ${messages.orgId}
+          and r.trigger_message_id = ${messages.id} and ${inArray(sql`r.status`, [...ACTIVE_RUN_STATUSES])})`,
         threadId: messages.threadId,
         // As text, which every driver reads the same way.
         replyTo: sql<string | null>`(${messages.meta}->'replyTo')::text`,
@@ -955,19 +959,25 @@ export async function routeMessage(
   const continuityHandle = candidates.find((c) => c.agentId === continuityAgentId)?.handle ?? null;
   // The agent this person last talked to here, among two or more agents, not in a reply to an agent and not when
   // they speak to a person: the one agent their latest message to an agent went to, within what the router reads
-  // (`ROUTER_SLICE`: 30 minutes, 12 messages). It went to whom it @mentioned, else to whom the router sent it
-  // (one still at work counts), else, never routed, to the first agent that answered it. Read newest first, so
-  // no other agent was addressed since; one that went to several agents is no one's. Within continuity's window
-  // it is the agent they are just talking to, or none: another agent that spoke since keeps today's follow-ups.
+  // (`ROUTER_SLICE`: 30 minutes, 12 messages). It went to whom it @mentioned, else to the agent the router sent it
+  // to once that agent answered or while it is still at work on it (one that passed or failed was never talked
+  // to: the message went to no agent, like a "valeu"), else, never routed, to the first agent that answered it.
+  // Read newest first, so no other agent was addressed since; one that went to several agents is no one's. Within
+  // continuity's window it is the agent they are just talking to, or none: another agent that spoke since keeps
+  // today's follow-ups.
   let lastTalkedTo: string | null = null;
   if (continues && !namesPerson && !repliedAgentId && candidates.length >= 2) {
+    const spoke = new Set<string>();
     let answeredBy: string | null = null;
     for (const m of [...before, ...(root ? [root] : [])]) {
       if (message.createdAt.getTime() - m.createdAt.getTime() > ROUTER_SLICE.maxAgeMs) break;
-      if (m.authorAgentId) answeredBy = m.authorAgentId;
+      if (m.authorAgentId) {
+        spoke.add(m.authorAgentId);
+        answeredBy = m.authorAgentId;
+      }
       if (m.authorUserId !== message.authorUserId) continue;
-      const to =
-        m.mentionedAgentIds.length > 0 ? m.mentionedAgentIds : (m.routedTo ?? (answeredBy ? [answeredBy] : []));
+      const routed = m.routedTo?.length === 1 ? m.routedTo.filter((id) => m.working || spoke.has(id)) : m.routedTo;
+      const to = m.mentionedAgentIds.length > 0 ? m.mentionedAgentIds : (routed ?? (answeredBy ? [answeredBy] : []));
       if (to.length === 0) continue;
       const [only] = to;
       lastTalkedTo = to.length === 1 && only && candidateIds.has(only) ? only : null;
