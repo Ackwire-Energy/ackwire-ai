@@ -1,3 +1,14 @@
+/**
+ * `US$ 2.00`, `US$ 1,234.50`, more decimals for a tiny amount (`US$ 0.004`), never zero for a spend: money in the
+ * English agents read, by the rule of the apps' `formatUsd` (packages/client/src/lib/format.ts).
+ */
+export function formatUsd(usd: number) {
+  if (usd > 0 && usd < 0.00005) return "<US$ 0.0001";
+  const abs = Math.abs(usd);
+  const digits = abs === 0 ? 2 : abs < 0.001 ? 4 : abs < 0.01 ? 3 : 2;
+  return `US$ ${usd.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
+}
+
 /** `2.3 MB`, `12 KB`, `512 bytes`, `50.0 GB`: sizes in the English agents read. */
 export function formatBytes(n: number) {
   if (n < 1024) return `${n} bytes`;

@@ -143,7 +143,7 @@ const QUIET_TOOLS = [
 ];
 
 /** "13 min ago", "2 h ago", "3 days ago". */
-function ago(at: Date, now = Date.now()) {
+export function ago(at: Date, now = Date.now()) {
   const minutes = Math.max(0, Math.round((now - at.getTime()) / 60_000));
   if (minutes < 60) return `${minutes} min ago`;
   const hours = Math.round(minutes / 60);
@@ -1035,7 +1035,7 @@ async function forSamePerson(db: Database, run: AgentRun, history: Message[], tr
 }
 
 /** The person's IANA zone in this organization, else the organization's ("UTC" without either). */
-async function zoneOf(db: Database, orgId: string, userId: string | null) {
+export async function zoneOf(db: Database, orgId: string, userId: string | null) {
   return (await caches.zones.getOrLoad(`${orgId}:${userId ?? ""}`, () => loadZone(db, orgId, userId))) as string;
 }
 
