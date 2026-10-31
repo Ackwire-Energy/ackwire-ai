@@ -3264,7 +3264,8 @@ export const useSidebarItems = (orgId: string) => {
 
 /**
  * Replaces my choices: the sidebar changes at once and goes back if the server refuses. The requests go one at a
- * time, each with every choice so far, so the last one is what stays.
+ * time, each with every choice so far, so the last one is what stays (`onMutate` still runs at once for one that
+ * waits its turn).
  */
 export function useSetSidebarItems(orgId: string) {
   const api = useApi();
@@ -3280,7 +3281,13 @@ export function useSetSidebarItems(orgId: string) {
       qc.setQueryData<SidebarItems>(keys.sidebarItems(orgId), items);
       return { before };
     },
-    onError: (_error, _items, context) => qc.setQueryData(keys.sidebarItems(orgId), context?.before),
+    onError: (_error, _items, context) => {
+      // A later choice still on its way carries this one too: its answer decides.
+      if (qc.isMutating({ mutationKey }) > 1) return;
+      qc.setQueryData(keys.sidebarItems(orgId), context?.before);
+      // `before` can hold an earlier choice the server refused as well: it says what stays.
+      void qc.invalidateQueries({ queryKey: keys.sidebarItems(orgId) });
+    },
     // A later choice still on its way keeps the screen until its own answer.
     onSuccess: (items) => {
       if (qc.isMutating({ mutationKey }) <= 1) qc.setQueryData(keys.sidebarItems(orgId), items);

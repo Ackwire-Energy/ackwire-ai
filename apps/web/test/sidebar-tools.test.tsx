@@ -137,6 +137,34 @@ describe("the tools on top", () => {
     expect(listed()).toEqual(["Aprovações", "Threads", "Tarefas", "Drive"]);
     expect(chosen(dialog, "Wiki")).toBe("Em Mais");
   });
+
+  test("two choices in a row, both refused: the sidebar ends as the server keeps it", async () => {
+    const state = seedState();
+    state.sidebarItemsError = new ApiError(500, "internal", "Não deu");
+    const api = createFakeApi(state);
+    const refuse = api.orgs.setSidebarItems;
+    let release = () => {};
+    const first = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let calls = 0;
+    api.orgs.setSidebarItems = async (orgId, items) => {
+      if (calls++ === 0) await first;
+      return refuse(orgId, items);
+    };
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(8);
+    const dialog = await openSetup();
+    await choose(dialog, "Wiki", "Sempre");
+    // The second waits for the first, and shows at once.
+    await choose(dialog, "Drive", "Em Mais");
+    expect(listed()).toEqual(["Aprovações", "Threads", "Tarefas", "Wiki"]);
+    await act(async () => release());
+    await settle(6);
+    expect(calls).toBe(2);
+    expect(listed()).toEqual(["Aprovações", "Threads", "Tarefas", "Drive"]);
+    expect(chosen(dialog, "Wiki")).toBe("Em Mais");
+  });
 });
 
 describe("the sidebar's parts", () => {

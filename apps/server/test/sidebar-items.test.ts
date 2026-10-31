@@ -1,8 +1,21 @@
 import { afterEach, expect, test } from "bun:test";
+import { SIDEBAR_COUNTED, SIDEBAR_ITEMS, type SidebarItem, sidebarPlaceAllowed } from "@agenteschat/engine";
+import {
+  SIDEBAR_COUNTED as APP_COUNTED,
+  SIDEBAR_ITEMS as APP_ITEMS,
+  SIDEBAR_DEFAULTS,
+} from "../../../packages/client/src/lib/sidebar-items";
 import { browser, createTestServer, joinByInvitation, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
 afterEach(() => t?.close());
+
+test("the sidebar's tools: the engine and the apps know the same ones, and the apps' defaults are places it takes", () => {
+  expect([...APP_ITEMS]).toEqual([...SIDEBAR_ITEMS]);
+  expect([...APP_COUNTED]).toEqual([...SIDEBAR_COUNTED]);
+  for (const [item, place] of Object.entries(SIDEBAR_DEFAULTS))
+    expect(sidebarPlaceAllowed(item as SidebarItem, place)).toBe(true);
+});
 
 /** A new workspace, set up (one still in its onboarding would come back instead of another). */
 async function workspace(b: ReturnType<typeof browser>, name: string) {
