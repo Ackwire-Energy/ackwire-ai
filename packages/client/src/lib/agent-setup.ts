@@ -1,5 +1,17 @@
 import type { TFunction } from "i18next";
-import type { AgentBrain, AgentBrainInput, AgentSetup, AgentSetupResult, NewAgentSetup } from "../api/types";
+import type {
+  AgentBrain,
+  AgentBrainInput,
+  AgentSetup,
+  AgentSetupResult,
+  BrainMachine,
+  Model,
+  NewAgentSetup,
+} from "../api/types";
+import { advancedParts, effortLevel } from "./brain-advanced";
+import { isContextLimit } from "./context-limits";
+import { planModel, planOf } from "./plans";
+import { isAuto } from "./providers";
 
 /*
  * One agent's "Quem pensa" on others (ADR 0089), the same on the web (a dialog over "Quem pensa") and the phone (a
@@ -110,4 +122,41 @@ export function newAgentStart(s: NewAgentSetup | null | undefined, ownerIsMe: bo
       fallback: s.fallback ?? true,
     },
   };
+}
+
+/**
+ * What a new agent starts with, in words: the API's model ("Claude Opus 5.5", "Automático"), or the plan with its
+ * model and what differs in its advanced settings ("Claude Code · Opus · Esforço alto").
+ */
+export function newAgentStartText(
+  t: TFunction,
+  language: string,
+  start: NewAgentStart,
+  o: { models: readonly Model[]; machines: readonly BrainMachine[]; provider?: string | null | undefined },
+): string {
+  if (start.brain === "model") {
+    return isAuto(start.model)
+      ? t("brain.auto.label")
+      : (o.models.find((m) => m.id === start.model)?.label ?? start.model);
+  }
+  const option = o.machines.find((m) => m.machineId === start.machineId)?.options.find((x) => x.kind === start.brain);
+  const value = start.input.model ?? option?.defaultModel ?? null;
+  const coding = planOf(o.provider);
+  const name = isAuto(value)
+    ? t("brain.auto.label")
+    : coding
+      ? planModel(coding, value).label
+      : (option?.models.find((m) => m.value === value)?.label ?? value);
+  const parts = advancedParts(t, language, {
+    kind: start.brain,
+    autoModel: isAuto(value),
+    apiKey: true,
+    now: {
+      effort: effortLevel(start.input.effort),
+      contextTokens: isContextLimit(start.input.contextTokens) ? start.input.contextTokens : null,
+      onlyOwner: true,
+      fallback: start.input.fallback ?? true,
+    },
+  });
+  return [t(`brain.card.${start.brain}`), name, ...parts].filter(Boolean).join(" · ");
 }

@@ -1,0 +1,168 @@
+import { keys, useAgentBrain, useAiStatus, useApi, useModels, useSetupPreview } from "@agenteschat/client";
+import { setupOfBrain, setupResultLine, sortedResults, takers } from "@agenteschat/client/lib/agent-setup";
+import { brainLine } from "@agenteschat/client/lib/brain";
+import { isAuto } from "@agenteschat/client/lib/providers";
+import { useQueryClient } from "@tanstack/react-query";
+import { router } from "expo-router";
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useOrg } from "@/providers/org";
+import { AgentAvatar, Button, GroupedList, GroupedRow, Text, useToast } from "@/ui";
+import { useColors, useDirectory } from "../shared/hooks";
+import { agentLook } from "../shared/logic";
+import { PushedHeader } from "../shared/parts";
+import { advancedOf } from "./AgentAdvancedScreen";
+import { setupWords } from "./logic";
+import { Note } from "./parts";
+
+/*
+ * "Usar em outros agentes" on the phone (ADR 0089), the web's dialog over "Quem pensa" as a screen of its own, from
+ * "Pensa com": every other agent with what the agent's setup would do to it (the server's preview), those that can
+ * take it first, "Todos" on top. "Usar" sends them in one call; the server checks each again.
+ */
+
+/** Opens "Usar em outros agentes" for an agent's saved setup. */
+export const openAgentSetup = (agentId: string) => router.push(`/agent-setup/${agentId}` as never);
+
+export function AgentSetupScreen({ agentId }: { agentId: string }) {
+  const { t, i18n } = useTranslation();
+  const { orgId } = useOrg();
+  const api = useApi();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const c = useColors();
+  const insets = useSafeAreaInsets();
+  const dir = useDirectory();
+  const brain = useAgentBrain(orgId, agentId);
+  const apiKey = useAiStatus(orgId).data?.apiKey !== false;
+  const models = useModels();
+  const view = brain.data;
+  const setup = view ? setupOfBrain(view) : null;
+  const others = dir.agents.filter((a) => a.id !== agentId);
+  const preview = useSetupPreview(
+    orgId,
+    setup,
+    others.map((a) => a.id),
+  );
+  const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const results = sortedResults(preview.data ?? []);
+  const can = takers(results);
+  const chosen = can.filter((id) => picked.has(id));
+  const setupText = view ? setupWords(t, i18n.language, view, { apiKey, now: advancedOf(view) }) : "";
+  const toggle = (id: string) =>
+    setPicked((p) => {
+      const next = new Set(p);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const use = async () => {
+    if (!setup || chosen.length === 0) return;
+    setBusy(true);
+    try {
+      const done = (await api.agents.applySetup(orgId, { setup, agentIds: chosen })).filter(
+        (r) => r.status === "applied",
+      ).length;
+      if (done > 0)
+        toast({ title: t("agentPage.work.brain.copy.done", { count: done, setup: setupText }), icon: "check" });
+      if (done < chosen.length) {
+        toast({ title: t("agentPage.work.brain.copy.missed", { count: chosen.length - done }), icon: "x" });
+      }
+      router.back();
+    } catch {
+      toast({ title: t("agentPage.work.failed"), icon: "x" });
+    } finally {
+      for (const key of [
+        ...chosen.map((id) => keys.agentBrain(orgId, id)),
+        keys.agents(orgId),
+        keys.aiStatus(orgId),
+        keys.newAgentSetup(orgId),
+      ])
+        void qc.invalidateQueries({ queryKey: key });
+      setBusy(false);
+    }
+  };
+
+  return (
+    <View style={[styles.screen, { backgroundColor: c.grouped }]}>
+      <PushedHeader title={t("agentPage.work.brain.copy.title")} solid={false} grouped />
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.in, { paddingBottom: 24 }]}>
+        {brain.isPending || preview.isPending ? (
+          <ActivityIndicator color={c.muted} style={styles.loading} />
+        ) : !setup || preview.isError ? (
+          <Note icon="x">{t("common.loadFailed")}</Note>
+        ) : (
+          <>
+            <Text variant="body" tone="muted" style={styles.lead}>
+              {t("agentPage.work.brain.copy.sub", { setup: setupText })}
+            </Text>
+            <GroupedList>
+              <GroupedRow
+                icon="members"
+                label={t("agentPage.work.brain.copy.all")}
+                sub={
+                  can.length === 0
+                    ? t("agentPage.work.brain.copy.none")
+                    : t("agentPage.work.brain.copy.allLine", { count: can.length })
+                }
+                checked={can.length > 0 && chosen.length === can.length}
+                disabled={busy || can.length === 0}
+                onPress={() => setPicked(new Set(chosen.length === can.length ? [] : can))}
+              />
+            </GroupedList>
+            <View style={styles.gap}>
+              <GroupedList>
+                {results.map((r) => {
+                  const a = dir.agentById.get(r.agentId);
+                  if (!a) return null;
+                  const owner = a.ownerUserId ? dir.memberById.get(a.ownerUserId)?.name.split(" ")[0] : undefined;
+                  const api = isAuto(a.model)
+                    ? t("brain.auto.label")
+                    : (models.data?.models.find((m) => m.id === a.model)?.label ?? a.model);
+                  const now = brainLine(t, a.brain, api).text;
+                  return (
+                    <GroupedRow
+                      key={a.id}
+                      leading={<AgentAvatar agent={{ ...agentLook(a), id: a.id }} size={32} live={false} />}
+                      label={a.name}
+                      sub={setupResultLine(t, r, { now, owner })}
+                      checked={r.status === "applied" && picked.has(a.id)}
+                      disabled={busy || r.status !== "applied"}
+                      onPress={() => toggle(a.id)}
+                    />
+                  );
+                })}
+              </GroupedList>
+            </View>
+          </>
+        )}
+      </ScrollView>
+      <View style={[styles.footer, { borderTopColor: c.line, paddingBottom: Math.max(insets.bottom, 12) }]}>
+        <Button
+          variant="primary"
+          wide
+          label={
+            chosen.length === 0
+              ? t("agentPage.work.brain.copy.pick")
+              : t("agentPage.work.brain.copy.use", { count: chosen.length })
+          }
+          disabled={busy || chosen.length === 0}
+          onPress={() => void use()}
+        />
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  in: { paddingHorizontal: 16, paddingTop: 8 },
+  loading: { marginTop: 16 },
+  lead: { paddingHorizontal: 4, paddingBottom: 14 },
+  // A list without a header keeps a header's room above it.
+  gap: { marginTop: 18 },
+  footer: { paddingHorizontal: 16, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
+});

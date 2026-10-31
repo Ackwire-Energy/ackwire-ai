@@ -11,6 +11,8 @@ import {
   modelInput,
   modelRows,
   modelSections,
+  newAgentAi,
+  setupWords,
   takenFrom,
   thinkingUsage,
 } from "../../src/features/ai/logic";
@@ -573,5 +575,56 @@ describe("the agent's AI", () => {
     );
     expect((await translator("pt-BR"))("agentPage.work.brain.add.reconnecting")).toBe("Reconectando…");
     expect((await translator("en"))("agentPage.work.brain.add.reconnecting")).toBe("Reconnecting…");
+  });
+
+  test("Usar em outros agentes says the setup as the web does: brain, the model it runs, what differs (ADR 0089)", async () => {
+    const t = await translator("pt-BR");
+    const claude: AgentBrain["options"][number] = {
+      kind: "claude_code",
+      available: true,
+      experimental: false,
+      models: [
+        { value: "opus", label: "Opus" },
+        { value: "sonnet", label: "Sonnet", recommended: true },
+      ],
+      defaultModel: "sonnet",
+    };
+    const view = {
+      brain: "claude_code" as const,
+      effectiveModel: "opus",
+      options: [claude],
+      accounts: [],
+      account: null,
+    };
+    const now = { effort: "high" as const, contextTokens: null, onlyOwner: true, fallback: true };
+    expect(setupWords(t, "pt-BR", view, { apiKey: true, now })).toBe("Claude Code · Opus · Esforço alto");
+    // On a coding plan, its own model; everything at its default says nothing more.
+    const glm = { ...view, effectiveModel: "sonnet", accounts: [account("glm", { provider: "zai" })], account: "glm" };
+    expect(setupWords(t, "pt-BR", glm, { apiKey: true, now: { ...now, effort: "medium" } })).toBe(
+      "Claude Code · GLM-5.3",
+    );
+    const screen = await Bun.file(new URL("../../src/features/ai/AgentAiScreen.tsx", import.meta.url).pathname).text();
+    expect(screen).toContain("onPress={() => openAgentSetup(agentId)}");
+    const route = await Bun.file(new URL("../../app/(app)/agent-setup/[id].tsx", import.meta.url).pathname).text();
+    expect(route).toContain("<AgentSetupScreen agentId={id");
+  });
+
+  test("Criar agente on the phone thinks with the last setup: the API's model and key, or a plan saved right after", () => {
+    expect(newAgentAi(null)).toEqual({ model: "auto", credentialId: null, plan: null });
+    expect(newAgentAi({ brain: "model", model: "claude-opus-5-5", key: "k1" })).toEqual({
+      model: "claude-opus-5-5",
+      credentialId: "k1",
+      plan: null,
+    });
+    const input = { brain: "claude_code" as const, account: "a1", model: "opus", effort: "high" as const };
+    expect(
+      newAgentAi({
+        brain: "claude_code",
+        machineId: "m1",
+        computer: "MacBook",
+        account: { id: "a1", label: "Claude" },
+        input,
+      }),
+    ).toEqual({ model: "auto", credentialId: null, plan: { machineId: "m1", input } });
   });
 });

@@ -22,6 +22,7 @@ import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { PushedHeader } from "../shared/parts";
 import { PlanMeter } from "../usage/parts";
 import { advancedOf, openAgentAdvanced } from "./AgentAdvancedScreen";
+import { openAgentSetup } from "./AgentSetupScreen";
 import {
   accountKindOf,
   accountRow,
@@ -270,6 +271,14 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                   chevron
                   onPress={() => openAgentAdvanced(agentId)}
                 />
+                {kind && view.canEdit && dir.agents.some((a) => a.id !== agentId) ? (
+                  <GroupedRow
+                    label={t("agentPage.work.brain.copy.row")}
+                    sub={t("agentPage.work.brain.copy.rowLine")}
+                    chevron
+                    onPress={() => openAgentSetup(agentId)}
+                  />
+                ) : null}
               </GroupedList>
             </View>
             {view.canUsePlans ? (

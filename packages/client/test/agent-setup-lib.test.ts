@@ -1,7 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
-import type { AgentBrain, AgentSetupResult, NewAgentSetup } from "../src/api/types";
-import { newAgentStart, setupOfBrain, setupResultLine, sortedResults, takers } from "../src/lib/agent-setup";
+import type { AgentBrain, AgentSetupResult, Model, NewAgentSetup } from "../src/api/types";
+import {
+  newAgentStart,
+  newAgentStartText,
+  setupOfBrain,
+  setupResultLine,
+  sortedResults,
+  takers,
+} from "../src/lib/agent-setup";
 
 /** Says the key and what it was given, so each line shows which words it picked. */
 const t = ((key: string, o?: Record<string, unknown>) =>
@@ -121,5 +128,21 @@ describe("a new agent starts with the last setup", () => {
       account: null,
       input: { account: null },
     });
+  });
+
+  test("said as it starts: the API's model by its label, a coding plan's by the plan's own", () => {
+    const models = [{ id: "claude-opus-5-5", label: "Claude Opus 5.5" }] as Model[];
+    const say = (start: Parameters<typeof newAgentStartText>[2], provider?: string) =>
+      newAgentStartText(t, "pt-BR", start, { models, machines: [], provider });
+    expect(say({ brain: "model", model: "claude-opus-5-5", key: null })).toBe("Claude Opus 5.5");
+    expect(say({ brain: "model", model: "auto", key: null })).toBe("brain.auto.label");
+    const glm = {
+      brain: "claude_code" as const,
+      machineId: "m1",
+      computer: "MacBook",
+      account: { id: "acc", label: "GLM Coding" },
+      input: { brain: "claude_code" as const, model: "sonnet", effort: "medium" as const },
+    };
+    expect(say(glm, "zai")).toBe("brain.card.claude_code · GLM-5.3");
   });
 });

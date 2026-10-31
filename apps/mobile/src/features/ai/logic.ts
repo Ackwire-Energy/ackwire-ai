@@ -7,6 +7,7 @@ import type {
   MachineAccountKind,
   PlanUsage,
 } from "@agenteschat/client";
+import type { NewAgentStart } from "@agenteschat/client/lib/agent-setup";
 import {
   type AccountChoice,
   accountAbout,
@@ -14,10 +15,10 @@ import {
   type ExistingAi,
   existingAi,
 } from "@agenteschat/client/lib/ai-accounts";
-import { isClaudeAlias } from "@agenteschat/client/lib/brain-advanced";
+import { type Advanced, advancedParts, isClaudeAlias } from "@agenteschat/client/lib/brain-advanced";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import type { PlanGate } from "@agenteschat/client/lib/no-ai";
-import { brainModelChoice, brainModelChoices, type CodingPlan } from "@agenteschat/client/lib/plans";
+import { brainModelChoice, brainModelChoices, brainPlan, type CodingPlan } from "@agenteschat/client/lib/plans";
 import { AUTO, isAuto, providerLabel } from "@agenteschat/client/lib/providers";
 import type { TFunction } from "i18next";
 
@@ -170,4 +171,37 @@ export function existingRows(
         }
       : { key: row.choice.login.id, row, ...accountRow(t, row.choice, agentName) },
   );
+}
+
+/**
+ * "Usar em outros agentes" on the phone (ADR 0089): the agent's saved setup in words, as the web's dialog says it
+ * ("Claude Code · Opus · Esforço alto"): its brain, the model it runs and what differs in its advanced settings.
+ */
+export function setupWords(
+  t: TFunction,
+  language: string,
+  view: Pick<AgentBrain, "brain" | "effectiveModel" | "options" | "accounts" | "account">,
+  o: { apiKey: boolean; now: Advanced },
+): string {
+  const model = modelRows(t, view, brainPlan(view)).find((r) => r.checked)?.label;
+  const parts = advancedParts(t, language, {
+    kind: view.brain,
+    autoModel: isAuto(view.effectiveModel),
+    apiKey: o.apiKey,
+    now: o.now,
+  });
+  return [t(`brain.card.${view.brain}`), model, ...parts].filter(Boolean).join(" · ");
+}
+
+/**
+ * What the phone's Criar agente sends for who thinks (ADR 0089): the last setup's API model and key at creation, or
+ * Automático there and the last setup's plan saved on it right after; with no setup, Automático on the API.
+ */
+export function newAgentAi(thinks: NewAgentStart | null) {
+  if (thinks?.brain === "model") return { model: thinks.model, credentialId: thinks.key, plan: null };
+  return {
+    model: AUTO,
+    credentialId: null,
+    plan: thinks ? { machineId: thinks.machineId, input: thinks.input } : null,
+  };
 }

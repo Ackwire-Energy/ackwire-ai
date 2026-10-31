@@ -20,17 +20,14 @@ import {
 } from "@agenteschat/client";
 import { LEVELS, type Level, saveLevels } from "@agenteschat/client/lib/access-levels";
 import { draftLevels } from "@agenteschat/client/lib/action-cards";
-import { type NewAgentStart, newAgentStart } from "@agenteschat/client/lib/agent-setup";
+import { type NewAgentStart, newAgentStart, newAgentStartText } from "@agenteschat/client/lib/agent-setup";
 import { ownSignInReady } from "@agenteschat/client/lib/ai-accounts";
-import { advancedParts, effortLevel } from "@agenteschat/client/lib/brain-advanced";
 import { type ConnectedItem, itemName } from "@agenteschat/client/lib/connected";
-import { isContextLimit } from "@agenteschat/client/lib/context-limits";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { choiceOf, defaultPolicy, MAIL_ACTIONS, toMailLevel } from "@agenteschat/client/lib/mail";
 import { planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import { planModel, planOf } from "@agenteschat/client/lib/plans";
 import { AUTO, isAuto, modelChoices } from "@agenteschat/client/lib/providers";
 import { scopeText } from "@agenteschat/client/lib/scopes";
 import {
@@ -320,36 +317,6 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
         : null,
     );
   };
-  /** What it starts with in words: "Claude Code · Opus · Esforço alto", or the API's model. */
-  const startText = (st: NewAgentStart) => {
-    if (st.brain === "model") {
-      return isAuto(st.model)
-        ? t("brain.auto.label")
-        : ((models.data?.models ?? []).find((m) => m.id === st.model)?.label ?? st.model);
-    }
-    const option = brainMachines.data
-      ?.find((m) => m.machineId === st.machineId)
-      ?.options.find((o) => o.kind === st.brain);
-    const value = st.input.model ?? option?.defaultModel ?? null;
-    const coding = planOf(lastSetup.data?.account?.provider);
-    const name = isAuto(value)
-      ? t("brain.auto.label")
-      : coding
-        ? planModel(coding, value).label
-        : (option?.models.find((m) => m.value === value)?.label ?? value);
-    const parts = advancedParts(t, locale, {
-      kind: st.brain,
-      autoModel: isAuto(value),
-      apiKey: true,
-      now: {
-        effort: effortLevel(st.input.effort),
-        contextTokens: isContextLimit(st.input.contextTokens) ? st.input.contextTokens : null,
-        onlyOwner: true,
-        fallback: st.input.fallback ?? true,
-      },
-    });
-    return [t(`brain.card.${st.brain}`), name, ...parts].filter(Boolean).join(" · ");
-  };
   // Until the person picks what it thinks with, it follows whose it is.
   const [aiPicked, setAiPicked] = useState(Boolean(from));
   const startsReady = lastSetup.isFetched && models.isFetched && credentials.isFetched && platform.isFetched;
@@ -422,7 +389,14 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
       ? !plan && model === start.model
       : plan?.kind === start.brain && plan.machineId === start.machineId && plan.accountId === start.account?.id
     : false;
-  const startLine = start && onStart ? startText(start) : null;
+  const startLine =
+    start && onStart
+      ? newAgentStartText(t, locale, start, {
+          models: models.data?.models ?? [],
+          machines: brainMachines.data ?? [],
+          provider: lastSetup.data?.account?.provider,
+        })
+      : null;
   const modelInfo = (models.data?.models ?? []).find((m) => m.id === model);
   const modelLabel = plan
     ? [t(`brain.card.${plan.kind}`), plan.label].filter(Boolean).join(" · ")
