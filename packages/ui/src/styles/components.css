@@ -1578,6 +1578,8 @@ textarea.ac-input {
   color: var(--ink-muted);
 }
 .ac-menu__separator {
+  /* Empty, so in a menu taller than its room the column would shrink it to nothing. */
+  flex: none;
   height: 1px;
   margin: var(--space-1) 0;
   background: var(--line);

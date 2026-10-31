@@ -2575,9 +2575,12 @@ p {
   flex-wrap: wrap;
   gap: 8px;
 }
-/* The account button's menu: you on top as on your profile card, the face's left edge on the items' icons. */
+/* The account button's menu: you on top as on your profile card, the face's left edge on the items' icons. It opens up
+   from the foot of the sidebar and takes all the room above it, past a dropdown's 520px: a phone's longer menu (the
+   status choices in it, touch-sized items) shows whole. */
 .profile-menu {
   width: 280px;
+  max-height: var(--radix-dropdown-menu-content-available-height);
 }
 .profile-menu__head {
   padding: 10px 10px 8px;
@@ -10813,7 +10816,7 @@ html[data-menu-overlay] .shell {
 
 /* The person's own settings, Sua conta and Notificações (PrefRow in NoticePrefs.tsx): settings rows with an icon
    before the name and a control at the end (a switch, a chip, a choice of several). The icon sits in the agent page
-   cells' tile (`.agp-cell__key`). */
+   cells' tile (`.agp-cell__key`), in the name's type so its `ex` is the name's. */
 .settings-row__icon {
   display: grid;
   place-items: center;
@@ -10826,6 +10829,24 @@ html[data-menu-overlay] .shell {
   box-shadow:
     inset 0 0 0 1px var(--line),
     var(--top);
+  font-size: 14px;
+}
+/* A face brings its own tile. */
+.settings-row__icon:has(> .ac-avatar) {
+  background: none;
+  box-shadow: none;
+}
+/* With a line under the name, the tile's top is on the name's capitals (an `.ac-faceline` picture's place) however far
+   that line wraps: 11px is half the name's 22px line. A name alone stays on the tile's middle. */
+.settings-row--lead:has(> .settings-row__text > .settings-row__help) {
+  align-items: flex-start;
+}
+.settings-row--lead:has(> .settings-row__text > .settings-row__help) > .settings-row__icon {
+  translate: 0 calc(11px - var(--cap-top));
+}
+.settings-row--lead > .settings-row__end,
+.settings-row--lead > .settings-row__chevron {
+  align-self: center;
 }
 .settings-row__end {
   flex: none;

@@ -136,11 +136,9 @@ export function PrefRow({
 }) {
   const body = (
     <>
-      {lead ?? (
-        <span className="settings-row__icon" aria-hidden="true">
-          {icon && <Icon name={icon} size={16} />}
-        </span>
-      )}
+      <span className="settings-row__icon" aria-hidden="true">
+        {lead ?? (icon && <Icon name={icon} size={16} />)}
+      </span>
       <span className="settings-row__text">
         <span className="settings-row__label">{label}</span>
         {help && (
