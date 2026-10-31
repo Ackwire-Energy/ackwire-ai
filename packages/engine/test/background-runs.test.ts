@@ -479,6 +479,28 @@ describe("a routine's background run never posts by itself", () => {
     expect(await agentMessages()).toEqual([]);
     expect(await routineRunById(routineRun.id)).toMatchObject({ status: "failed", code: "stuck" });
   });
+
+  test("going in circles, it does as told and ends with its record: the routine run still fails as stuck", async () => {
+    const record = "Olhei os PRs 6 vezes e nada mudou.";
+    f = await setup({
+      toolSources: [workTools()],
+      judge: (kind) => (kind === "stuck_run" ? 0.9 : undefined),
+      reply: (req) =>
+        lastText(req).includes(STUCK_END_NOTE)
+          ? { chunks: [record] }
+          : { chunks: [], toolUses: [{ name: "look", input: {} }] },
+    });
+    const { run, routine, routineRun } = await backgroundRun();
+    await drainOutbox(f.db, f.handlers);
+
+    expect(f.provider.calls).toHaveLength(7);
+    expect(await runById(run.id)).toMatchObject({ status: "failed", error: "stuck" });
+    expect(ends()).toEqual([{ runId: run.id, status: "failed", code: "stuck", detail: record }]);
+    expect(await routineRunById(routineRun.id)).toMatchObject({ status: "failed", code: "stuck", summary: record });
+    // A failure like any other: a routine stuck on every firing is paused as a failing one.
+    const [after] = await f.db.select().from(schema.routines).where(eq(schema.routines.id, routine.id));
+    expect(after?.failuresInRow).toBe(1);
+  });
 });
 
 describe("the brain a run thinks with", () => {

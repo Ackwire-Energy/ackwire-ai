@@ -4,13 +4,16 @@ import type { ModelRequest } from "@agenteschat/providers";
 import {
   continueRun,
   type createFakeJudge,
+  createForumTopic,
   createJevJudge,
   createJobHandlers,
   createLlmJudge,
   drainOutbox,
+  getForumTopic,
   noteStep,
   postPersonMessage,
   STUCK_END_REPLY_NOTE,
+  STUCK_FORUM_NOTE,
   STUCK_NOTE,
   type StuckState,
   type ToolSource,
@@ -121,10 +124,13 @@ describe("a run that goes in circles", () => {
       { sign: "same_call", stuck: true, by: "fake", action: "note" },
       { sign: "same_call", stuck: true, by: "fake", action: "end" },
     ]);
-    // Continuar picks up from there, once.
+    // Continuar picks up from there, once. Its trigger is that line: the judge still reads what the person asked.
     const { runId } = await continueRun(deps(), f.owner.id, f.org.id, run?.id ?? "");
     const [line] = await agentMessages(run?.id ?? "");
     expect(line?.meta.stepLimit).toMatchObject({ stuck: true, continuedRunId: runId });
+    await drainOutbox(f.db, f.handlers);
+    const asked = stuckChecks().filter((c) => c.runId === runId);
+    expect(asked.map((c) => c.state.request)).toEqual(["@dev faz o deploy", "@dev faz o deploy"]);
   });
 
   test("told to stop, it says what it did, what it tried and what is left: that reply carries Continuar", async () => {
@@ -162,6 +168,33 @@ describe("a run that goes in circles", () => {
     ]);
     const [line] = await agentMessages(run?.id ?? "");
     expect(line?.meta).toMatchObject({ bodyCode: "stuck", stepLimit: { stuck: true } });
+  });
+
+  test("a forum's turn is not told to say what blocks it (its words would be its post), then it fails as stuck", async () => {
+    f = await setup({
+      toolSources: [taskTools()],
+      artifactTools: true,
+      forumTools: true,
+      judge: (kind) => (kind === "stuck_run" ? 0.9 : undefined),
+      reply: () => deploy,
+    });
+    const topic = await createForumTopic(
+      { db: f.db, pubsub: f.pubsub, artifacts: f.artifactDeps },
+      { type: "person", userId: f.owner.id },
+      f.org.id,
+      { title: "Deploy de sexta", goal: "Decidir se o deploy sai na sexta.", agentIds: [f.agent.id], rounds: 1 },
+    );
+    await drainOutbox(f.db, f.handlers);
+
+    expect(requests()).toHaveLength(6);
+    const noted = lastText(requests()[3] as ModelRequest);
+    expect(noted).toContain(STUCK_FORUM_NOTE);
+    expect(noted).not.toContain(STUCK_NOTE);
+    expect(await runs()).toMatchObject([{ status: "failed", error: "stuck" }]);
+    expect(await getForumTopic(f.db, f.owner.id, f.org.id, topic.id)).toMatchObject({
+      status: "stalled",
+      stall: { reason: "failed", synthesis: false },
+    });
   });
 });
 
@@ -237,6 +270,36 @@ describe("a run that keeps going", () => {
     expect(posted.map((m) => [m.meta.bodyCode, m.meta.stepLimit])).toEqual([["step_limit", {}]]);
     expect(stuckChecks()).toEqual([]);
   });
+
+  test("a tool result with an emoji across its 300th unit: the step is kept without half of it, and the run answers", async () => {
+    const feed: ToolSource = {
+      name: "feed",
+      tools: async () => [
+        {
+          name: "read_feed",
+          description: "Read the feed",
+          scope: "context:read",
+          inputSchema: { type: "object", properties: { q: { type: "string" } } },
+          execute: async () => ({ content: `${"x".repeat(299)}🚀 lançamento de hoje` }),
+        },
+      ],
+    };
+    // Its input as the judge reads it, `{"q":"…"}`, has an emoji across its 200th unit.
+    const q = `${"x".repeat(193)}🚀`;
+    f = await setup({
+      toolSources: [feed],
+      reply: (_req, n) =>
+        n === 1 ? { chunks: [], toolUses: [{ name: "read_feed", input: { q } }] } : { chunks: ["Pronto."] },
+    });
+    await ask("@dev lê o feed");
+    await drainOutbox(f.db, f.handlers);
+
+    const [run] = await runs();
+    expect(run).toMatchObject({ status: "done", turns: 2 });
+    expect((await agentMessages(run?.id ?? "")).map((m) => m.body)).toEqual(["Pronto."]);
+    const kept = (run?.transcript as { stuck?: StuckState } | null)?.stuck?.steps[0]?.said;
+    expect(kept).toEqual([{ tool: "read_feed", input: `{"q":"${"x".repeat(193)}`, result: "x".repeat(299) }]);
+  });
 });
 
 describe("what counts as repetition", () => {
@@ -273,10 +336,31 @@ describe("what counts as repetition", () => {
     ]);
   });
 
-  test("five steps in a row that only got what it had seen: a two-step cycle at its 7th step", () => {
+  test("five steps in a row that only repeated earlier calls and got the same back: a two-step cycle at its 7th step", () => {
     const open = (url: string): Call => ({ name: "open", input: { url }, content: `Page ${url}` });
     const cycle = [open("a"), open("b"), open("a"), open("b"), open("a"), open("b"), open("a")];
     expect(signs(cycle)).toEqual([null, null, null, null, null, null, "nothing_new"]);
+  });
+
+  test("four steps in a row whose calls all failed, each error naming its own guess", () => {
+    const guess = (path: string): Call => ({
+      name: "read_file",
+      input: { path },
+      content: `ENOENT: no such file or directory, open '${path}'`,
+      isError: true,
+    });
+    const guesses = ["src/app.ts", "src/main.ts", "app/main.ts", "lib/main.ts"].map(guess);
+    expect(signs(guesses)).toEqual([null, null, null, "failing"]);
+  });
+
+  test("a new call that gets the same answer is new: a message sent to ten channels never repeats", () => {
+    const send = (channel: string): Call => ({
+      name: "send_message",
+      input: { channel, text: "Oi" },
+      content: "Sent.",
+    });
+    const sent = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"].map(send);
+    expect(signs(sent)).toEqual(sent.map(() => null));
   });
 
   test("after a verdict, only new steps count", () => {

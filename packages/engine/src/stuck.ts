@@ -1,3 +1,4 @@
+import { cutText } from "./format";
 import type { Judge, JudgeQuestion } from "./judge";
 import { canonicalJson } from "./tools/json-schema";
 
@@ -15,14 +16,17 @@ import { canonicalJson } from "./tools/json-schema";
  *   nothing changed between attempts. Polls and paging with a cursor kept elsewhere repeat too: the judge tells.
  * - `sameError`: two tries at fixing an error are normal; the third time the same error comes back (whatever the
  *   call), the changes aren't reaching its cause.
+ * - `failing`: errors that echo what was tried ("no such file 'src/a.ts'", "nothing matches 'button b'") never
+ *   match each other: four steps in a row where every call failed are variations that end the same way.
  * - `nothingNew`: going back to a page or a list is normal, and a short cycle (A, B, A, B) needs a few rounds to
- *   show: five steps in a row that only got results already seen catch a two-step cycle at its 7th step.
+ *   show: five steps in a row that only repeated earlier calls and got the same back catch a two-step cycle at its
+ *   7th step. A new call with the same answer ("Sent." to someone else, the next page of numbers) is new.
  * - `window`: the steps remembered (and the ones the judge reads), enough to see a three-step cycle come round twice.
  * - `verdict`: stuck when the judge gives it this much, as the other judgments that act (a stop, a promise).
  */
-export const STUCK = { sameCall: 3, sameError: 3, nothingNew: 5, window: 8, verdict: 0.6 } as const;
+export const STUCK = { sameCall: 3, sameError: 3, failing: 4, nothingNew: 5, window: 8, verdict: 0.6 } as const;
 
-export type StuckSign = "same_call" | "same_error" | "nothing_new";
+export type StuckSign = "same_call" | "same_error" | "failing" | "nothing_new";
 
 /** One step as remembered: fingerprints to compare, and what the judge reads. */
 export interface StepPrint {
@@ -30,11 +34,11 @@ export interface StepPrint {
   turn: number;
   /** The calls: tools and inputs. */
   call: string;
-  /** What each call returned, normalized. */
-  results: string[];
+  /** Each call with what it returned, normalized. */
+  outcomes: string[];
   /** What its failed calls returned, normalized, when any failed. */
   error?: string;
-  /** Every result was already seen in an earlier remembered step. */
+  /** Every call was made before in a remembered step, and got the same back. */
   stale: boolean;
   /** Each call's tool, input and the start of what came back. */
   said: { tool: string; input: string; result: string; failed?: true }[];
@@ -51,9 +55,11 @@ export interface StuckState {
   endAt?: number;
 }
 
-/** What a run found stuck reads once. */
-export const STUCK_NOTE =
-  "Your last steps repeat without getting you closer to done. Try a different approach. If something blocks you, stop and say plainly what it is.";
+/** What a forum's turn or synthesis found stuck reads once: never told to say what blocks it, its last words are its post. */
+export const STUCK_FORUM_NOTE = "Your last steps repeat without getting you closer to done. Try a different approach.";
+
+/** What any other run found stuck reads once. */
+export const STUCK_NOTE = `${STUCK_FORUM_NOTE} If something blocks you, stop and say plainly what it is.`;
 
 /** What a conversation run found stuck again reads: the run ends with its answer, and Continuar under it. */
 export const STUCK_END_REPLY_NOTE =
@@ -74,19 +80,19 @@ export function noteStep(
   calls: { name: string; input: unknown; content: string; isError: boolean }[],
 ): { state: StuckState; sign: StuckSign | null } {
   const before = state?.steps ?? [];
-  const seen = new Set(before.flatMap((s) => s.results));
-  const results = calls.map((c) => print(normalized(c.content)));
+  const seen = new Set(before.flatMap((s) => s.outcomes));
+  const outcomes = calls.map((c) => print(canonicalJson([c.name, c.input ?? null, normalized(c.content)])));
   const failed = calls.filter((c) => c.isError).map((c) => normalized(c.content));
   const step: StepPrint = {
     turn,
     call: print(canonicalJson(calls.map((c) => [c.name, c.input ?? null]))),
-    results,
+    outcomes,
     ...(failed.length > 0 ? { error: print(failed.sort().join("\n")) } : {}),
-    stale: results.every((r) => seen.has(r)),
+    stale: outcomes.every((o) => seen.has(o)),
     said: calls.map((c) => ({
       tool: c.name,
-      input: canonicalJson(c.input ?? {}).slice(0, 200),
-      result: c.content.slice(0, 300),
+      input: cutText(canonicalJson(c.input ?? {}), 200),
+      result: cutText(c.content, 300),
       ...(c.isError ? { failed: true as const } : {}),
     })),
   };
@@ -97,16 +103,19 @@ export function noteStep(
     ? "same_call"
     : step.error && fresh.filter((s) => s.error === step.error).length >= STUCK.sameError
       ? "same_error"
-      : tail(STUCK.nothingNew)?.every((s) => s.stale)
-        ? "nothing_new"
-        : null;
+      : tail(STUCK.failing)?.every((s) => s.said.every((c) => c.failed))
+        ? "failing"
+        : tail(STUCK.nothingNew)?.every((s) => s.stale)
+          ? "nothing_new"
+          : null;
   return { state: next, sign };
 }
 
 const REPEATED: Record<StuckSign, string> = {
   same_call: `the same call with the same input, ${STUCK.sameCall} times in a row`,
   same_error: `the same error, ${STUCK.sameError} times`,
-  nothing_new: `${STUCK.nothingNew} steps in a row that only got results it had already seen`,
+  failing: `${STUCK.failing} steps in a row whose calls all failed`,
+  nothing_new: `${STUCK.nothingNew} steps in a row that only repeated earlier calls and got the same back`,
 };
 
 export const STUCK_QUESTION: JudgeQuestion = {
@@ -136,7 +145,7 @@ export async function isStuck(
       runId: input.runId,
       kind: "stuck_run",
       state: {
-        request: input.request.slice(0, 1000),
+        request: cutText(input.request, 1000),
         repeated: REPEATED[input.sign],
         steps: input.steps.flatMap((s) => s.said),
       },

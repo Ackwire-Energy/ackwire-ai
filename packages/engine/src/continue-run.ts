@@ -37,6 +37,7 @@ export async function continueRun(
       run: agentRuns,
       ownerUserId: agents.ownerUserId,
       requester: runRequester,
+      request: messages.body,
       channelKind: channels.kind,
     })
     .from(agentRuns)
@@ -86,7 +87,10 @@ export async function continueRun(
 
   const [person] = await db.select({ name: users.name }).from(users).where(eq(users.id, userId));
   const line = `[${person?.name ?? "A person"} asked you to continue from where you stopped.]`;
-  const transcript = continuedTranscript(stopped.transcript as unknown as Transcript, line);
+  const carried = stopped.transcript as unknown as Transcript;
+  const transcript = continuedTranscript(carried, line);
+  const request = carried.request ?? row.request;
+  if (request) transcript.request = request;
   const newRunId = Bun.randomUUIDv7();
   const created = await db.transaction(async (tx) => {
     // One continuation per stopped reply: it is the new run's trigger, unique per agent.

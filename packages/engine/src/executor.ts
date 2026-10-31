@@ -162,7 +162,15 @@ import { secretResult } from "./secrets";
 import { enabledSkills } from "./skills";
 import { standingErrorDetail, standingRefusal } from "./standing";
 import { rerootRun } from "./stretch";
-import { isStuck, noteStep, STUCK_END_NOTE, STUCK_END_REPLY_NOTE, STUCK_NOTE, type StuckState } from "./stuck";
+import {
+  isStuck,
+  noteStep,
+  STUCK_END_NOTE,
+  STUCK_END_REPLY_NOTE,
+  STUCK_FORUM_NOTE,
+  STUCK_NOTE,
+  type StuckState,
+} from "./stuck";
 import { archivedAgentsPrompt, FIND_AGENT_TOOL } from "./team";
 import { linkRunChecks, runChecksForReply } from "./team-actions";
 import { carriesCredential, maskCredentials } from "./tool-detail";
@@ -323,6 +331,11 @@ export interface Transcript {
   wrapUpNoted?: boolean;
   /** Whether it goes in circles (`stuck.ts`): its latest steps and what was found. */
   stuck?: StuckState;
+  /**
+   * What the person asked, carried by Continuar (`continueRun`): the new run's trigger is its own stopped reply, so
+   * the judges read this as the request instead.
+   */
+  request?: string;
   /** The computer brain couldn't answer and the model brain did (ADR 0032 §5): the reply carries a quiet note. */
   fallback?: { from: BrainKind; code: string; message: string };
   /** The computer brain is unavailable and nothing can stand in: the run waits for the computer. */
@@ -2301,7 +2314,7 @@ async function executeRunInner(
                 orgId: run.orgId,
                 agentId: run.agentId,
                 runId: run.id,
-                request: triggerMessage?.body ?? triggerText,
+                request: transcript.request ?? triggerMessage?.body ?? triggerText,
                 sign,
                 steps: stuck.steps,
               });
@@ -2310,7 +2323,7 @@ async function executeRunInner(
               later(() => addRunStep(db, run, "context", { stuckCheck: { sign, ...verdict, action } }));
               if (action === "note") {
                 stuck.noted = true;
-                appendUserText(transcript, STUCK_NOTE);
+                appendUserText(transcript, forum ? STUCK_FORUM_NOTE : STUCK_NOTE);
               } else if (action === "end") {
                 // As near the cap: a couple of calls to say where it stands, then the run ends.
                 stuck.endAt = run.turns + WRAP_UP_TURNS;
@@ -2380,7 +2393,14 @@ async function executeRunInner(
       const sentinelOnly = isSentinelOnly(turnText);
       // Quiet on purpose: only the word, or a note it closes ("Nada novo desde ontem.\n\nNO_REPLY").
       const wantsQuiet = endsWithSentinel(turnText);
-      if (run.background) return finishBackground(wantsQuiet ? "" : said);
+      if (run.background) {
+        const record = wantsQuiet ? "" : said;
+        // Found stuck twice, it ended as told: the routine run failed all the same (a hand-off already made stays
+        // `reported`), so a routine that goes in circles on every firing is heard of and paused like any failing one.
+        if (transcript.stuck?.endAt !== undefined)
+          return fail(STUCK_ERROR, { code: STUCK_ERROR, ...(record ? { detail: record } : {}) });
+        return finishBackground(record);
+      }
       // Nobody called it by name: it passed, or ended with nothing to say. Nothing is posted.
       if (
         policy.mayPass &&
@@ -2471,7 +2491,7 @@ async function executeRunInner(
           orgId: run.orgId,
           agentId: run.agentId,
           runId: run.id,
-          request: triggerMessage?.body ?? triggerText,
+          request: t.request ?? triggerMessage?.body ?? triggerText,
           reply: said,
         }).catch(() => "done" as const);
         if (verdict === "unkept" && !(await wakesLater(db, run, detached).catch(() => false))) {
