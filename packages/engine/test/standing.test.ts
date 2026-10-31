@@ -764,6 +764,38 @@ describe("on agentes.chat Cloud: a restriction's kind and how to contest it, nev
     expect((silent as OrgPausedError).params).toEqual({ cloud: true });
   });
 
+  test("the automatic hold's category: its text says it in words, the apps get the code", async () => {
+    setRestrictionNotices("https://agentes.chat");
+    f = await setup({ reply: () => ({ chunks: ["On it."] }) });
+    const flagged = "automated checks flagged activity that seems to involve";
+    const reason = "review.phishing_impersonation";
+    await setOrgStanding({ db: f.db, pubsub: f.pubsub }, f.org.id, { state: "hold", reason, notice: "shown" });
+    await expect(assertCanWork(f.db, f.org.id)).rejects.toMatchObject({
+      message: `This workspace is on hold: ${flagged} phishing or impersonating a brand`,
+      params: { reason, cloud: true },
+    });
+    expect((await standingNotices()).map((n) => n.latest)).toEqual([{ statusTo: "hold", text: reason, cloud: true }]);
+    // A run keeps the words, and its values give the code back.
+    await post("@dev check the build");
+    await drainOutbox(f.db, f.handlers);
+    const [refused] = await runs();
+    expect(refused?.error).toBe(`This workspace is on hold: ${flagged} phishing or impersonating a brand`);
+    expect(runErrorDetail(refused?.error)).toEqual({
+      errorCode: "run.org_paused",
+      errorParams: { reason, cloud: "true" },
+    });
+    const suspended = new OrgPausedError({ state: "suspended", reason: "review.account_takeover", notice: "shown" });
+    expect(suspended.message).toBe(`This workspace is suspended: ${flagged} getting into other people's accounts`);
+    expect(runErrorDetail(suspended.message)?.errorParams).toEqual({
+      reason: "review.account_takeover",
+      cloud: "true",
+    });
+    // A category this server doesn't know is told as it came.
+    const unknown = new OrgPausedError({ state: "hold", reason: "review.spam", notice: "shown" });
+    expect(unknown.message).toBe("This workspace is on hold: review.spam");
+    expect(runErrorDetail(unknown.message)?.errorParams).toEqual({ reason: "review.spam", cloud: "true" });
+  });
+
   test("a self-hosted server: no kind, no cloud, and nobody told of an agent hold", async () => {
     setRestrictionNotices("https://chat.acme.com");
     f = await setup();

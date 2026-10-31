@@ -9152,6 +9152,15 @@ export const en: Translations = {
     cloud: {
       review:
         "Paused for a safety review, until our team looks at it. Our automated checks flagged activity that may break our Terms (section 5). To contest it, write to {{email}}.",
+      /** The same hold set with what was flagged (`review.<category>`): `what` is that category's `reviewWhat`. */
+      reviewFor:
+        "Paused for a safety review, until our team looks at it. Our automated checks flagged activity that seems to involve {{what}}, which our Terms don't allow (section 5). To contest it, write to {{email}}.",
+      reviewWhat: {
+        phishing_impersonation: "phishing or impersonating a brand",
+        account_takeover: "getting into other people's accounts",
+        fraud: "fraud",
+        illegal_content: "illegal content",
+      },
       blockedAbuse:
         "This account is blocked. Our checks linked it to an account closed for abuse (Terms, section 5). To contest it, write to {{email}}.",
       blockedLegal:
