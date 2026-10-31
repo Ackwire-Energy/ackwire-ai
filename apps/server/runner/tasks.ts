@@ -917,8 +917,9 @@ export class TaskManager {
       missionTask ? missionBranchPrefix(String(req.mission?.id), req.mission?.branchPrefix) : undefined,
     );
     // A shell task runs its command as is: the command policy reads it first, as the brain's own commands
-    // (ADR 0053 §3). A person's approval of this very task (`approved`) lets it through.
-    if (executor === "shell" && req.approved !== true) {
+    // (ADR 0053 §3). A person's approval of this very task (`approved`) lets it through, unless our git proxy
+    // would refuse it anyway (`never`).
+    if (executor === "shell") {
       const held = await commandApproval(String(req.command ?? ""), {
         cwd,
         own,
@@ -926,7 +927,8 @@ export class TaskManager {
         script: true,
         ...(typeof req.branch === "string" && req.branch.trim() ? { head: req.branch.trim() } : {}),
       });
-      if (held) throw new RunnerError("approval_needed", held);
+      if (held?.never) throw new RunnerError("not_allowed", held.message);
+      if (held && req.approved !== true) throw new RunnerError("approval_needed", held.message);
     }
     let branch: string | undefined;
     // Where an item works, told first in its prompt (the server's prompt doesn't know whether there is git).

@@ -3,6 +3,7 @@ import {
   type ExecRequest,
   type ExecResult,
   type PubSub,
+  policyRefusal,
   TASK_EXECUTORS,
   TASKS_PROTOCOL,
   type TaskExecutor,
@@ -166,10 +167,14 @@ const whyAsks = (requireApproval: boolean) =>
         },
       };
 
-/** The computer held the command for a person: nothing ran, and its message says why and how to ask them. */
+/**
+ * The computer held the command for a person (its message says why and how to ask them), or never runs it (a
+ * push our git proxy refuses whoever approves; its message says where to go instead). Nothing ran.
+ */
 const heldForApproval = (error: unknown, verb: string): ToolOutput | null =>
-  error instanceof MachineRequestError && error.code === "approval_needed"
-    ? { content: `${verb}: ${error.message}`, isError: true, data: { code: "command.approval_needed" } }
+  error instanceof MachineRequestError &&
+  (error.code === "approval_needed" || (error.code === "not_allowed" && policyRefusal(error.message)))
+    ? { content: `${verb}: ${error.message}`, isError: true, data: { code: `command.${error.code}` } }
     : null;
 const quote = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
 

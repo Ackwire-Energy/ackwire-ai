@@ -1,16 +1,22 @@
 import { afterEach, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { ASK_AGAIN } from "@agenteschat/adapters/command-policy";
-import { commandApproval, lonePush, pushesOwnBranches } from "../../runner/command-gate";
+import { ASK_AGAIN, DELETE_BRANCHES_POINTER } from "@agenteschat/adapters/command-policy";
+import { commandApproval, lonePush, pushesOwnBranches, pushThroughProxy, repoFacts } from "../../runner/command-gate";
 import { gitRepo, hasGit, removeDirs, tempDir } from "./helpers";
 
 const dirs: string[] = [];
 afterEach(() => removeDirs(dirs));
 
 const own = ["agentes/dev/"];
-const gate = (command: string, cwd: string | null, extra: { head?: string; script?: boolean } = {}) =>
+const hold = (command: string, cwd: string | null, extra: { head?: string; script?: boolean } = {}) =>
   commandApproval(command, { cwd, own, how: ASK_AGAIN, ...extra });
+/** Why it waits for a person, or never runs (null: it runs). */
+const gate = async (command: string, cwd: string | null, extra: { head?: string; script?: boolean } = {}) =>
+  (await hold(command, cwd, extra))?.message ?? null;
+/** Our git proxy's URL for acme/app (any host: the computer reads the shape). */
+const PROXY =
+  "https://agentes.test/api/git/0190a7b2-3c4d-7e5f-8a9b-0c1d2e3f4a5b/0190a7b2-3c4d-7e5f-8a9b-0c1d2e3f4a5c/acme/app.git";
 
 test.skipIf(!hasGit)(
   "the default branch is read from git (origin/HEAD, else the remote's HEAD), never assumed; unknown waits",
@@ -147,3 +153,63 @@ test("a push alone, and whether every ref it names is the agent's own", () => {
   expect(mine("git push origin HEAD")).toBe(false);
   expect(mine("git push origin --delete agentes/dev/a")).toBe(false);
 });
+
+test.skipIf(!hasGit)(
+  "whether a remote pushes through our git proxy: every push URL, as git rewrites it; unknown is no",
+  async () => {
+    const { work, git } = gitRepo(dirs);
+    const via = (remote: string) => repoFacts(work).viaProxy(remote);
+    expect(await via("origin")).toBe(false);
+    git("remote", "set-url", "--push", "origin", PROXY);
+    expect(await via("origin")).toBe(true);
+    // One more push URL elsewhere: not every push goes through it.
+    git("remote", "set-url", "--add", "--push", "origin", "https://backup.example/acme/app.git");
+    expect(await via("origin")).toBe(false);
+    git("config", "--unset-all", "remote.origin.pushurl");
+    // GitHub's address rewritten to the proxy (a cloud computer's insteadOf), and a pushInsteadOf away from it.
+    const base = PROXY.slice(0, PROXY.indexOf("acme/"));
+    git("remote", "add", "gh", "https://github.com/acme/app.git");
+    git("config", `url.${base}.insteadOf`, "https://github.com/");
+    expect(await via("gh")).toBe(true);
+    expect(await via("https://github.com/acme/app.git")).toBe(true);
+    expect(await via(PROXY)).toBe(true);
+    expect(await via("https://example.com/acme/app.git")).toBe(false);
+    git("config", "url.https://elsewhere.example/.pushInsteadOf", "https://github.com/");
+    expect(await via("gh")).toBe(false);
+    // A URL given as is: what pushInsteadOf makes of it isn't printed, so it is unknown.
+    expect(await via("https://github.com/acme/app.git")).toBe(false);
+    expect(await via("nope")).toBe(false);
+    expect(await via("--upload-pack=x")).toBe(false);
+  },
+);
+
+test.skipIf(!hasGit)(
+  "through our git proxy the computer never runs what it refuses, and says where to go; another push goes up to it",
+  async () => {
+    const { work, git } = gitRepo(dirs);
+    git("remote", "set-url", "--push", "origin", PROXY);
+    expect(await hold("git push origin --delete cursor/pap-582-fix", work)).toEqual({
+      message: `This deletes the remote branch cursor/pap-582-fix: ${DELETE_BRANCHES_POINTER}`,
+      never: true,
+    });
+    expect(await hold("git push origin develop", work)).toMatchObject({
+      never: true,
+      message: expect.stringContaining("Push to a branch of your own"),
+    });
+    expect(await hold("git push --force origin cursor/pap-582-fix", work)).toMatchObject({ never: true });
+    // A script it runs: the delete in it outranks a push a person could approve on the command line.
+    mkdirSync(path.join(work, ".agentes"));
+    writeFileSync(path.join(work, ".agentes", "clean.sh"), "git push origin --delete old\n");
+    expect((await hold("bash .agentes/clean.sh", work, { script: true }))?.never).toBe(true);
+    // Someone else's branch is ordinary work here: the proxy decides it with a person's grant.
+    expect(await hold("git push origin cursor/pap-582-fix", work)).toBeNull();
+    const push = lonePush("git push origin cursor/pap-582-fix");
+    if (!push) throw new Error("no push");
+    expect(await pushThroughProxy(push, work)).toBe(true);
+    expect(await pushThroughProxy(push, null)).toBe(false);
+    // Another remote: as before, a person may approve it with run_code.
+    git("config", "--unset-all", "remote.origin.pushurl");
+    expect(await hold("git push origin --delete cursor/pap-582-fix", work)).toMatchObject({ never: false });
+    expect(await pushThroughProxy(push, work)).toBe(false);
+  },
+);

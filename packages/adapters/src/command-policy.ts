@@ -16,9 +16,11 @@ import { commandParts, ruleMatches } from "./machine-protocol";
  *   with git on the computer (the remote's default branch, the protected
  *   ones, the agent's own): a push to the default branch, a force push to
  *   someone else's branch or a deletion waits for a person; any other push is
- *   ordinary work. Every path that runs a command on the computer (the
- *   brain's own commands, `run_code`, skill scripts, background tasks) asks
- *   `approvalNeeded` first.
+ *   ordinary work. Through our git proxy the server decides those instead,
+ *   so they never run from here and the refusal says where to go
+ *   (`delete_branches`, a pull request). Every path that runs a command on
+ *   the computer (the brain's own commands, `run_code`, skill scripts,
+ *   background tasks) asks `approvalNeeded` first.
  * - `secretRead`: a call that reads keys, tokens or env files, with any read
  *   tool (Read, Glob, Grep, a shell command): refused at once too. Only calls
  *   that reach a prompt are seen: Claude Code's own reads meet the same list
@@ -1370,12 +1372,32 @@ export interface RepoFacts {
   defaultBranch(remote: string): Promise<string | null>;
   /** The branches the repository marks protected (`git config agentes.protectedBranch`, `*` matches anything). */
   protectedBranches(): Promise<readonly string[]>;
+  /** Every push URL of the remote (or of a URL as git rewrites it) is our git proxy's; false when unknown. */
+  viaProxy(remote: string): Promise<boolean>;
 }
 
-/** Why a command waits for a person, and what the agent can do instead. */
+/** Our git proxy (ADR 0024): `…/api/git/<org>/<connection>/<owner>/<repo>.git`. */
+const PROXY_URL = /^https?:\/\/[^\s?#]*\/api\/git\/[0-9a-f-]{36}\/[0-9a-f-]{36}\//i;
+export const isProxyUrl = (url: string) => PROXY_URL.test(url.trim());
+
+/** The remote a push goes to: the one it names, else the branch's push remote, else origin. */
+export const pushRemote = async (push: Pick<GitPush, "remote">, facts: RepoFacts) =>
+  push.remote ?? (await facts.pushTarget())?.remote ?? "origin";
+
+/**
+ * Why a command waits for a person, and what the agent can do instead. `never`: it goes through our git proxy,
+ * which refuses it whoever approves, so it never runs from here: `what` is the whole refusal, pointing where to go.
+ */
 export interface Held {
   what: string;
   instead?: string;
+  never?: true;
+}
+
+/** What a command needs before it runs here: a person's approval (`message` says how to ask), or never (`never`). */
+export interface Hold {
+  message: string;
+  never: boolean;
 }
 
 const globMatches = (pattern: string, s: string) =>
@@ -1390,10 +1412,18 @@ const globMatches = (pattern: string, s: string) =>
  */
 export async function heldPush(push: GitPush, facts: RepoFacts, own: readonly string[]): Promise<Held | null> {
   const instead = `Or push to a branch of your own${own[0] ? ` (${own[0]}…)` : ""} and open a pull request.`;
-  if (push.mirror) return { what: "This is a mirror push: it can overwrite and delete any branch" };
-  if (push.every) return { what: "This push updates every branch, the default one too", instead };
-  if (push.prune) return { what: "This push deletes the remote branches that aren't here (--prune)" };
   let remote = push.remote;
+  /** The hold, or through our git proxy (which refuses it whoever approves) the refusal pointing where to go. */
+  const hold = async (what: string, otherwise: string | undefined, never: string): Promise<Held> =>
+    (await facts.viaProxy(await pushRemote({ remote }, facts)))
+      ? { what: `${what}: ${never}`, never: true }
+      : { what, ...(otherwise ? { instead: otherwise } : {}) };
+  const toPullRequest = `our git proxy never lets it through. Push to a branch of your own${own[0] ? ` (${own[0]}…)` : ""} and open a pull request; merging asks a person. ${NO_TERMINAL_COMMANDS}`;
+  if (push.mirror)
+    return hold("This is a mirror push: it can overwrite and delete any branch", undefined, toPullRequest);
+  if (push.every) return hold("This push updates every branch, the default one too", instead, toPullRequest);
+  if (push.prune)
+    return hold("This push deletes the remote branches that aren't here (--prune)", undefined, toPullRequest);
   for (const ref of push.refs) {
     let branch = ref.branch;
     if (branch === "HEAD") branch = await facts.current();
@@ -1403,21 +1433,22 @@ export async function heldPush(push: GitPush, facts: RepoFacts, own: readonly st
       remote ??= target?.remote ?? null;
     }
     if (branch === null) return { what: "git can't tell which branch this push goes to", instead };
-    if (ref.delete) return { what: `This deletes the remote branch ${branch}` };
+    if (ref.delete) return hold(`This deletes the remote branch ${branch}`, undefined, DELETE_BRANCHES_POINTER);
     if (own.some((prefix) => prefix && branch.startsWith(prefix))) continue;
     if ((await facts.protectedBranches()).some((p) => globMatches(p, branch))) {
-      return { what: `This push goes to the protected branch ${branch}`, instead };
+      return hold(`This push goes to the protected branch ${branch}`, instead, toPullRequest);
     }
     const main = await facts.defaultBranch(remote ?? "origin");
     if (main === null) {
       return { what: "git can't tell this repository's default branch, so this push may go to it", instead };
     }
-    if (branch === main) return { what: `This push goes to the default branch ${main}`, instead };
+    if (branch === main) return hold(`This push goes to the default branch ${main}`, instead, toPullRequest);
     if (ref.force) {
-      return {
-        what: `This is a force push to ${branch}, a branch others may share`,
-        instead: "Or push without force, after bringing in what changed there (git pull --rebase).",
-      };
+      return hold(
+        `This is a force push to ${branch}, a branch others may share`,
+        "Or push without force, after bringing in what changed there (git pull --rebase).",
+        `our git proxy never lets it through. Push without force, after bringing in what changed there (git pull --rebase). ${NO_TERMINAL_COMMANDS}`,
+      );
     }
   }
   return null;
@@ -1443,32 +1474,36 @@ function commandsInCode(code: string): string[] {
 
 /**
  * Why a command, a shell script or code (`code`: another language) waits for a person, as the refusal
- * tells the agent (`how`: what it can do to ask), or null: the deny list's kinds, then every push it makes
- * (`heldPush`, with `facts` for the folder each runs in). A push the policy can't read waits.
+ * tells the agent (`how`: what it can do to ask), or null: a push our git proxy would refuse never runs (it
+ * outranks the rest, so no approval lets the command through), then the deny list's kinds, then every push it
+ * makes (`heldPush`, with `facts` for the folder each runs in). A push the policy can't read waits.
  */
 export async function approvalNeeded(
   text: string,
   how: string,
   opts: { code?: boolean; own?: readonly string[]; facts: (dir: string | null) => RepoFacts },
-): Promise<string | null> {
+): Promise<Hold | null> {
   const own = opts.own ?? [];
+  const pushes = opts.code ? (PUSH_MENTION.test(text) ? null : []) : gitPushes(text);
+  let first: Held | null = null;
+  for (const push of pushes ?? []) {
+    const held = await heldPush(push, opts.facts(push.dir), own);
+    if (held?.never) return { message: held.what, never: true };
+    first ??= held;
+  }
   for (const command of opts.code ? commandsInCode(text) : [text]) {
     const denied = deniedMessage("Bash", { command }, how);
-    if (denied) return denied;
+    if (denied) return { message: denied, never: false };
   }
-  const pushes = opts.code ? (PUSH_MENTION.test(text) ? null : []) : gitPushes(text);
   if (pushes === null) {
-    return approvalMessage(
+    const message = approvalMessage(
       "This runs git push in a way the computer can't read, so where it goes is unknown",
       how,
       "Or run the push as a plain command of its own (git push origin <branch>).",
     );
+    return { message, never: false };
   }
-  for (const push of pushes) {
-    const held = await heldPush(push, opts.facts(push.dir), own);
-    if (held) return approvalMessage(held.what, how, held.instead);
-  }
-  return null;
+  return first ? { message: approvalMessage(first.what, how, first.instead), never: false } : null;
 }
 
 /** Interpreters and the options that run code given on the command line. */
@@ -1525,6 +1560,11 @@ export const PLAN_MESSAGE =
 
 /** The end of every refusal that names a way out: people decide in the chat, never at a terminal. */
 export const NO_TERMINAL_COMMANDS = "Never give the person a terminal command to run.";
+/**
+ * A computer's `not_allowed` that is the command policy's `never` (a push our git proxy refuses): it already says
+ * where to go instead, so it is shown as it is.
+ */
+export const policyRefusal = (message: string) => message.endsWith(NO_TERMINAL_COMMANDS);
 /** Said to an agent deleting a branch with git, by the computer and by the git proxy. */
 export const DELETE_BRANCHES_POINTER = `agents don't delete branches with git. Ask with delete_branches (repo, branches, why): a person approves them all on one card and they're deleted on GitHub. ${NO_TERMINAL_COMMANDS}`;
 /** Said by the git proxy to an agent pushing, with no person's approval, to branches that aren't its own. */

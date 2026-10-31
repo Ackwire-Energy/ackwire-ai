@@ -5,6 +5,7 @@ import {
   ASK_IN_CHAT,
   approvalMessage,
   approvalNeeded,
+  DELETE_BRANCHES_POINTER,
   deniedInMissions,
   deniedMessage,
   forbiddenHint,
@@ -14,11 +15,13 @@ import {
   heldPush,
   INLINE_CODE_DENY_RULES,
   inlineCode,
+  isProxyUrl,
   localVerdict,
   MISSION_DENY_RULES,
   normalizedCommand,
   PLAN_MESSAGE,
   PUSH_ASK_RULES,
+  policyRefusal,
   type RepoFacts,
   readOnlyCall,
   SECRET_BASH_DENY_RULES,
@@ -705,12 +708,15 @@ describe("whether a push waits for a person", () => {
       target?: { remote: string | null; branch: string | null } | null;
       defaults?: Record<string, string | null>;
       protected?: string[];
+      /** Remotes whose push URLs are our git proxy's. */
+      proxied?: string[];
     } = {},
   ): RepoFacts => ({
     current: async () => (over.current === undefined ? "cursor/pap-582-fix" : over.current),
     pushTarget: async () => (over.target === undefined ? { remote: null, branch: "cursor/pap-582-fix" } : over.target),
     defaultBranch: async (remote) => (over.defaults ?? { origin: "develop" })[remote] ?? null,
     protectedBranches: async () => over.protected ?? [],
+    viaProxy: async (remote) => over.proxied?.includes(remote) ?? false,
   });
   const own = ["agentes/ada/"];
   const held = async (command: string, f = facts()) => {
@@ -772,8 +778,9 @@ describe("whether a push waits for a person", () => {
 
   /** Why a command waits, without how to ask (null: it runs). */
   const reason = async (command: string, f = facts()) =>
-    (await approvalNeeded(command, ASK_AGAIN, { own, facts: () => f }))?.split(": a person approves it first.")[0] ??
-    null;
+    (await approvalNeeded(command, ASK_AGAIN, { own, facts: () => f }))?.message.split(
+      ": a person approves it first.",
+    )[0] ?? null;
   const unread = "This runs git push in a way the computer can't read, so where it goes is unknown";
   const develop = "This push goes to the default branch develop";
 
@@ -868,25 +875,91 @@ describe("whether a push waits for a person", () => {
 
   test("the whole message: why, how to ask, and what to do instead", async () => {
     const message = await approvalNeeded("git push origin develop", ASK_IN_CHAT, { own, facts: () => facts() });
-    expect(message).toBe(
-      "This push goes to the default branch develop: a person approves it first. To ask them, run the same command with run_code, with why set to your reason: it waits for their decision in the chat. Or push to a branch of your own (agentes/ada/…) and open a pull request.",
-    );
+    expect(message).toEqual({
+      message:
+        "This push goes to the default branch develop: a person approves it first. To ask them, run the same command with run_code, with why set to your reason: it waits for their decision in the chat. Or push to a branch of your own (agentes/ada/…) and open a pull request.",
+      never: false,
+    });
     expect(await approvalNeeded("git push origin fix", ASK_IN_CHAT, { own, facts: () => facts() })).toBeNull();
-    expect(await approvalNeeded("git push origin $BRANCH", ASK_AGAIN, { own, facts: () => facts() })).toContain(
-      "This runs git push in a way the computer can't read",
-    );
+    expect(
+      (await approvalNeeded("git push origin $BRANCH", ASK_AGAIN, { own, facts: () => facts() }))?.message,
+    ).toContain("This runs git push in a way the computer can't read");
     // Code in another language: the commands it spells out, and any push in it waits.
     const python = 'import subprocess\nsubprocess.run(["gh", "pr", "merge", "12"])\n';
-    expect(await approvalNeeded(python, ASK_AGAIN, { code: true, own, facts: () => facts() })).toBe(
-      approvalMessage("This is a merge", ASK_AGAIN),
-    );
+    expect(await approvalNeeded(python, ASK_AGAIN, { code: true, own, facts: () => facts() })).toEqual({
+      message: approvalMessage("This is a merge", ASK_AGAIN),
+      never: false,
+    });
     expect(
-      await approvalNeeded('subprocess.run(["git", "push", "origin", "fix"])', ASK_AGAIN, {
-        code: true,
-        own,
-        facts: () => facts(),
-      }),
+      (
+        await approvalNeeded('subprocess.run(["git", "push", "origin", "fix"])', ASK_AGAIN, {
+          code: true,
+          own,
+          facts: () => facts(),
+        })
+      )?.message,
     ).toContain("This runs git push in a way the computer can't read");
     expect(await approvalNeeded("print('hi')", ASK_AGAIN, { code: true, own, facts: () => facts() })).toBeNull();
+  });
+
+  test("through our git proxy, what it refuses whoever approves never runs here, and the refusal says where to go", async () => {
+    const proxied = facts({ proxied: ["origin"] });
+    const never = async (command: string, f = proxied) => approvalNeeded(command, ASK_IN_CHAT, { own, facts: () => f });
+    const toPr =
+      "our git proxy never lets it through. Push to a branch of your own (agentes/ada/…) and open a pull request; merging asks a person. Never give the person a terminal command to run.";
+    expect(await never("git push origin --delete cursor/pap-582-fix")).toEqual({
+      message: `This deletes the remote branch cursor/pap-582-fix: ${DELETE_BRANCHES_POINTER}`,
+      never: true,
+    });
+    expect(DELETE_BRANCHES_POINTER).toContain("Ask with delete_branches (repo, branches, why)");
+    expect(await never("git push origin develop")).toEqual({
+      message: `This push goes to the default branch develop: ${toPr}`,
+      never: true,
+    });
+    expect(
+      (await never("git push origin release/2.1", facts({ proxied: ["origin"], protected: ["release/*"] })))?.message,
+    ).toBe(`This push goes to the protected branch release/2.1: ${toPr}`);
+    for (const command of ["git push --all origin", "git push --mirror origin", "git push --prune origin fix"]) {
+      expect([command, (await never(command))?.never, (await never(command))?.message.endsWith(toPr)]).toEqual([
+        command,
+        true,
+        true,
+      ]);
+    }
+    expect(await never("git push --force origin cursor/pap-582-fix")).toEqual({
+      message:
+        "This is a force push to cursor/pap-582-fix, a branch others may share: our git proxy never lets it through. Push without force, after bringing in what changed there (git pull --rebase). Never give the person a terminal command to run.",
+      never: true,
+    });
+    // A bare push goes where its branch's push remote says.
+    const fork = facts({
+      proxied: ["fork"],
+      defaults: { fork: "develop" },
+      target: { remote: "fork", branch: "develop" },
+    });
+    expect((await never("git push", fork))?.never).toBe(true);
+    // Ordinary pushes stay ordinary; what git can't tell stays a person's call.
+    expect(await never("git push origin cursor/pap-582-fix")).toBeNull();
+    expect(await never("git push origin agentes/ada/fix")).toBeNull();
+    expect((await never("git push origin fix", facts({ proxied: ["origin"], defaults: {} })))?.never).toBe(false);
+    // Never outranks what a person could approve in the same command: no approval lets the delete through.
+    expect((await never("gh pr merge 12 && git push origin --delete old"))?.never).toBe(true);
+    expect((await never("git push backup develop && git push origin --delete old"))?.never).toBe(true);
+    // Another remote, or one only partly through the proxy (`viaProxy` false): as before, a person may approve it.
+    expect(await never("git push backup --delete old")).toMatchObject({ never: false });
+    expect((await never("git push origin --delete old", facts()))?.message).toContain("a person approves it first.");
+    expect(policyRefusal(`This deletes the remote branch old: ${DELETE_BRANCHES_POINTER}`)).toBe(true);
+    expect(policyRefusal(approvalMessage("This is a merge", ASK_IN_CHAT))).toBe(false);
+  });
+
+  test("our git proxy's URLs", () => {
+    const at =
+      "https://agentes.chat/api/git/0190a7b2-3c4d-7e5f-8a9b-0c1d2e3f4a5b/0190a7b2-3c4d-7e5f-8a9b-0c1d2e3f4a5c/";
+    expect(isProxyUrl(`${at}acme/app.git`)).toBe(true);
+    expect(isProxyUrl(`http://localhost:3000${at.slice("https://agentes.chat".length)}acme/app`)).toBe(true);
+    expect(isProxyUrl("https://github.com/acme/app.git")).toBe(false);
+    expect(isProxyUrl("git@github.com:acme/app.git")).toBe(false);
+    expect(isProxyUrl("https://agentes.chat/api/git/x/y/acme/app.git")).toBe(false);
+    expect(isProxyUrl(`https://evil.example/?u=${at}acme/app.git`)).toBe(false);
   });
 });

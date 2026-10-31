@@ -5,6 +5,9 @@ import {
   approvalNeeded,
   type GitPush,
   gitPushes,
+  type Hold,
+  isProxyUrl,
+  pushRemote,
   type RepoFacts,
   simpleCommands,
 } from "@agenteschat/adapters/command-policy";
@@ -52,6 +55,7 @@ const once = <T>(read: () => Promise<T>) => {
 export function repoFacts(dir: string): RepoFacts {
   const current = once(async () => (await git(dir, ["symbolic-ref", "--quiet", "--short", "HEAD"])) || null);
   const defaults = new Map<string, Promise<string | null>>();
+  const proxies = new Map<string, Promise<boolean>>();
   return {
     current,
     pushTarget: once(async () => {
@@ -94,6 +98,25 @@ export function repoFacts(dir: string): RepoFacts {
         .map((p) => p.trim())
         .filter(Boolean),
     ),
+    viaProxy(remote) {
+      let known = proxies.get(remote);
+      if (!known) {
+        known = (async () => {
+          if (remote.startsWith("-")) return false;
+          // A remote's push URLs, rewritten as git pushes (insteadOf, pushInsteadOf). A URL given as is: only
+          // insteadOf can be printed, so any pushInsteadOf leaves it unknown.
+          const urls =
+            (await git(dir, ["remote", "get-url", "--push", "--all", remote])) ??
+            ((await git(dir, ["config", "--get-regexp", "\\.pushinsteadof$"])) === null
+              ? await git(dir, ["ls-remote", "--get-url", remote])
+              : null);
+          const list = (urls ?? "").split("\n").filter((u) => u.trim());
+          return list.length > 0 && list.every(isProxyUrl);
+        })();
+        proxies.set(remote, known);
+      }
+      return known;
+    },
   };
 }
 
@@ -103,6 +126,7 @@ const UNKNOWN: RepoFacts = {
   pushTarget: async () => null,
   defaultBranch: async () => null,
   protectedBranches: async () => [],
+  viaProxy: async () => false,
 };
 
 /** Interpreters whose script `exec` reads to check it: shells read it as commands, the others as code. */
@@ -134,14 +158,15 @@ async function scriptOf(command: string, cwd: string): Promise<{ text: string; c
 
 /**
  * Why a command waits for a person before it runs here, as the agent reads it (`how`: what it does to ask
- * them), or null: the command itself and, for `<interpreter> <file>`, the script it runs. `cwd`: where it
- * runs (null: unknown, so every push waits); `own`: the agent's branch prefixes; `head`: the branch it runs
- * on when that isn't the folder's (a task's new worktree).
+ * them), or never runs (`never`: a push our git proxy refuses whoever approves), or null: the command itself
+ * and, for `<interpreter> <file>`, the script it runs. `cwd`: where it runs (null: unknown, so every push
+ * waits); `own`: the agent's branch prefixes; `head`: the branch it runs on when that isn't the folder's (a
+ * task's new worktree).
  */
 export async function commandApproval(
   command: string,
   opts: { cwd: string | null; own: readonly string[]; how: string; head?: string; script?: boolean },
-): Promise<string | null> {
+): Promise<Hold | null> {
   const cwd = opts.cwd;
   const facts = new Map<string, RepoFacts>();
   const factsAt = (dir: string | null): RepoFacts => {
@@ -159,9 +184,19 @@ export async function commandApproval(
     return known;
   };
   const held = await approvalNeeded(command, opts.how, { own: opts.own, facts: factsAt });
-  if (held || !opts.script || cwd === null) return held;
+  if (held?.never || !opts.script || cwd === null) return held;
   const script = await scriptOf(command, cwd);
-  return script ? approvalNeeded(script.text, opts.how, { code: script.code, own: opts.own, facts: factsAt }) : null;
+  const inScript = script
+    ? await approvalNeeded(script.text, opts.how, { code: script.code, own: opts.own, facts: factsAt })
+    : null;
+  return inScript?.never ? inScript : (held ?? inScript);
+}
+
+/** A push (nothing held) that goes through our git proxy, where the server decides it with a person's grant. */
+export async function pushThroughProxy(push: GitPush, cwd: string | null): Promise<boolean> {
+  if (cwd === null || push.dir === null) return false;
+  const facts = repoFacts(path.resolve(cwd, push.dir));
+  return facts.viaProxy(await pushRemote(push, facts));
 }
 
 /** git options that run another program or read another config: such a push is never let through by the computer alone. */

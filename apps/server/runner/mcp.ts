@@ -30,7 +30,7 @@ import {
   type RunnerFrame,
   type ServerFrame,
 } from "@agenteschat/adapters/machine-protocol";
-import { commandApproval, lonePush, pushesOwnBranches } from "./command-gate";
+import { commandApproval, lonePush, pushesOwnBranches, pushThroughProxy } from "./command-gate";
 import { RUNNER_VERSION } from "./errors";
 
 /**
@@ -688,7 +688,9 @@ export interface PromptContext {
  * curl in a work turn) are allowed at once, with no card and nothing posted;
  * in a `plan` turn everything else is refused. Then pushes, read with git
  * (`commandApproval`): one that waits for a person is refused here with why
- * and how to ask; one alone to the agent's own branches goes through. The
+ * and how to ask (or, through our git proxy, where to go instead); one alone
+ * to the agent's own branches, or to another branch through the proxy, goes
+ * through. The
  * rest goes to the server, which allows it by a mission rule or code's rules
  * for a run, or posts the command card in the thread. Then we ask the server
  * every `pollMs` (short calls; no request stays open) until someone answers
@@ -720,10 +722,15 @@ export async function permissionPrompt(
   if (verdict?.behavior === "allow") return { behavior: "allow", updatedInput: input };
   if (toolName === "Bash" && typeof input.command === "string") {
     const own = opts.branches ?? [];
-    const held = await commandApproval(input.command, { cwd: opts.scope?.cwd ?? null, own, how, script: true });
-    if (held) return { behavior: "deny", message: held };
+    const cwd = opts.scope?.cwd ?? null;
+    const held = await commandApproval(input.command, { cwd, own, how, script: true });
+    if (held) return { behavior: "deny", message: held.message };
+    // A push alone to its own branches, or through our git proxy (which decides someone else's branch with a
+    // person's grant, so no card here asks first).
     const push = lonePush(input.command);
-    if (push && (opts.local || pushesOwnBranches(push, own))) return { behavior: "allow", updatedInput: input };
+    if (push && (opts.local || pushesOwnBranches(push, own) || (await pushThroughProxy(push, cwd)))) {
+      return { behavior: "allow", updatedInput: input };
+    }
   }
   const now = opts.now ?? Date.now;
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));

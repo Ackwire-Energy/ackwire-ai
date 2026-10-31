@@ -289,11 +289,11 @@ async function doExec(
     cwd = resolved.abs;
   }
   // run_code and skill scripts: the command and the script it runs meet the command policy first, as the
-  // brain's own commands do (ADR 0053 §3). A person's approval of this very command lets it through.
-  if (req.approved !== true) {
-    const held = await commandApproval(command, { cwd, own: ownBranches(req.agent), how: ASK_AGAIN, script: true });
-    if (held) throw new RunnerError("approval_needed", held);
-  }
+  // brain's own commands do (ADR 0053 §3). A person's approval of this very command lets it through, unless
+  // our git proxy would refuse it anyway (`never`).
+  const held = await commandApproval(command, { cwd, own: ownBranches(req.agent), how: ASK_AGAIN, script: true });
+  if (held?.never) throw new RunnerError("not_allowed", held.message);
+  if (held && req.approved !== true) throw new RunnerError("approval_needed", held.message);
   return runCommand({
     command,
     cwd,

@@ -3,6 +3,7 @@ import {
   type ExecRequest,
   type ExecResult,
   MAX_INLINE_FILE_BYTES,
+  policyRefusal,
   type SandboxProvider,
   SECRET_ACTIVATE_PROTOCOL,
   SECRETS_PROTOCOL,
@@ -18,9 +19,11 @@ const MB = (n: number) => `${Math.round(n / 1024 / 1024)} MB`;
 /**
  * A runner's `not_allowed` (protocol 10): the path is outside every folder
  * this agent may use on the machine, or the tool is off there. Points the
- * agent at `request_folder_access` for a folder.
+ * agent at `request_folder_access` for a folder. The command policy's own
+ * (`policyRefusal`) already says where to go and stays as it is.
  */
 export function notAllowedMessage(name: string, detail: string, path?: string) {
+  if (policyRefusal(detail)) return detail;
   return `${detail || "Not allowed on this computer."} ${
     path && /^(\/|~|[A-Za-z]:)/.test(path)
       ? `${path} is outside the folders you may use on ${name}: ask its owner for it with request_folder_access (path and a short reason), or work inside your own folder.`
@@ -47,7 +50,8 @@ function explain(error: unknown, name: string, path?: string): Error {
     case "not_found":
       return new Error(`No file or folder ${path ?? ""} on ${name}.`.replace("  ", " "));
     case "not_allowed":
-      return new Error(notAllowedMessage(name, error.message, path));
+      // The command policy's `never` (a push our git proxy refuses): callers read its code, as below.
+      return policyRefusal(error.message) ? error : new Error(notAllowedMessage(name, error.message, path));
     case "paused":
       return new Error(
         `The owner paused the computer ${name}: nothing new can start there until they resume it. Tell the people.`,

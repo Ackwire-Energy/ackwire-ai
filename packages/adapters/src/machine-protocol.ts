@@ -1571,7 +1571,11 @@ export type MachineErrorCode =
   | "no_slot"
   /** Protocol 9: the owner paused this computer; nothing new starts until it resumes. */
   | "paused"
-  /** Protocol 10: the path is outside every folder this agent may use, or the tool is off on the machine. */
+  /**
+   * Protocol 10: the path is outside every folder this agent may use, or the tool is off on the machine. Also
+   * `exec` and a `shell` task's `task.start` that the command policy never runs here, approved or not (a push our
+   * git proxy refuses): the message says where to go instead (`policyRefusal`).
+   */
   | "not_allowed"
   /** Protocol 12: the agent browser can't run here (no binary, no Chrome, too many sessions); the message says why. */
   | "browser_unavailable"

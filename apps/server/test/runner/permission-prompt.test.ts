@@ -1,5 +1,10 @@
 import { afterEach, expect, test } from "bun:test";
-import { ASK_AFTER_TASK, ASK_IN_CHAT, approvalMessage } from "@agenteschat/adapters/command-policy";
+import {
+  ASK_AFTER_TASK,
+  ASK_IN_CHAT,
+  approvalMessage,
+  DELETE_BRANCHES_POINTER,
+} from "@agenteschat/adapters/command-policy";
 import {
   allowedBy,
   PERMISSION_PROMPT_TOOL,
@@ -327,6 +332,40 @@ test.skipIf(!hasGit)(
       task: true,
     });
     expect(mcpContextFromEnv({})).toEqual({});
+  },
+);
+
+test.skipIf(!hasGit)(
+  "through our git proxy: a delete or the default branch is refused here pointing to the server's way; a plain push to someone else's branch goes up to it",
+  async () => {
+    const { work, git } = gitRepo(dirs);
+    git(
+      "remote",
+      "set-url",
+      "--push",
+      "origin",
+      "https://agentes.test/api/git/0190a7b2-3c4d-7e5f-8a9b-0c1d2e3f4a5b/0190a7b2-3c4d-7e5f-8a9b-0c1d2e3f4a5c/acme/app.git",
+    );
+    // A mission's task: anything not decided here would go to the mission's command card.
+    const mission = { ...instant, scope: { cwd: work, folders: [work] }, branches: ["agentes/dev/"], task: true };
+    const s = server([]);
+    expect(await permissionPrompt(bash("git push origin --delete cursor/pap-582-fix"), s.call, mission)).toEqual({
+      behavior: "deny",
+      message: `This deletes the remote branch cursor/pap-582-fix: ${DELETE_BRANCHES_POINTER}`,
+    });
+    expect(await permissionPrompt(bash("git push origin develop"), s.call, mission)).toMatchObject({
+      behavior: "deny",
+      message: expect.stringContaining("our git proxy never lets it through"),
+    });
+    expect(await permissionPrompt(bash("git push origin cursor/pap-582-fix"), s.call, mission)).toEqual({
+      behavior: "allow",
+      updatedInput: { command: "git push origin cursor/pap-582-fix" },
+    });
+    expect(s.calls).toHaveLength(0);
+    // With anything else in the command, the push is no longer alone: the server decides, as before.
+    const more = server([{ behavior: "allow" }]);
+    await permissionPrompt(bash("npm test && git push origin cursor/pap-582-fix"), more.call, mission);
+    expect(more.calls).toHaveLength(1);
   },
   30_000,
 );

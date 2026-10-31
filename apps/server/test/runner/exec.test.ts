@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { DELETE_BRANCHES_POINTER } from "@agenteschat/adapters/command-policy";
 import { OutputBuffer, runCommand } from "../../runner/exec";
 import { handleRequest } from "../../runner/handlers";
 import { errorCode, gitRepo, hasGit, removeDirs, tempDir } from "./helpers";
@@ -143,6 +144,35 @@ test.skipIf(!posix || !hasGit)(
     expect(await errorCode(() => exec("sh -c 'git push origin develop'"))).toBe("approval_needed");
     expect(await errorCode(() => exec("bash .agentes/run-3.sh"))).toBe("approval_needed");
     expect(await errorCode(() => exec("git push origin HEAD:heads/develop"))).toBe("approval_needed");
+  },
+  30_000,
+);
+
+test.skipIf(!posix || !hasGit)(
+  "exec through our git proxy: a delete or a push to the default branch never runs, a person's approval or not",
+  async () => {
+    const { work, git } = gitRepo(dirs);
+    git(
+      "remote",
+      "set-url",
+      "--push",
+      "origin",
+      "https://agentes.test/api/git/0190a7b2-3c4d-7e5f-8a9b-0c1d2e3f4a5b/0190a7b2-3c4d-7e5f-8a9b-0c1d2e3f4a5c/acme/app.git",
+    );
+    const ctx = { workspaceReal: work, exec: true, token: "agm_x" };
+    const scope = { signal: new AbortController().signal, output: () => {} };
+    const exec = (command: string, approved: boolean) =>
+      handleRequest(ctx, { op: "exec", command, timeoutSeconds: 30, stream: false, approved }, scope);
+    for (const approved of [false, true]) {
+      expect(await errorCode(() => exec("git push origin --delete cursor/pap-582-fix", approved))).toBe("not_allowed");
+      expect(await errorCode(() => exec("git push origin develop", approved))).toBe("not_allowed");
+    }
+    expect(await exec("git push origin --delete cursor/pap-582-fix", true).catch((err: Error) => err.message)).toBe(
+      `This deletes the remote branch cursor/pap-582-fix: ${DELETE_BRANCHES_POINTER}`,
+    );
+    // Not through the proxy: a person's approval lets it run, as before.
+    git("config", "--unset-all", "remote.origin.pushurl");
+    expect(await errorCode(() => exec("git push origin --delete cursor/pap-582-fix", false))).toBe("approval_needed");
   },
   30_000,
 );

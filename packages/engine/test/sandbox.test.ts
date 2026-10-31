@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { DELETE_BRANCHES_POINTER } from "@agenteschat/adapters/command-policy";
 import { eq, schema } from "@agenteschat/db";
 import {
   createAgent,
@@ -11,6 +12,7 @@ import {
   importSkillZip,
   NO_COMPUTER_MESSAGE,
   NotFoundError,
+  notAllowedMessage,
   postPersonMessage,
   setAgentAccess,
   setAgentSkills,
@@ -315,6 +317,35 @@ describe("commands the computer holds for a person (ADR 0053 §3)", () => {
     // A why too short to tell the person anything is refused, with nothing asked.
     const short = await call(ctx, "run_code", { language: "bash", code: "git push origin main", why: "ship" });
     expect(short).toMatchObject({ isError: true, data: { code: "tool.why_missing" } });
+  });
+
+  test("what our git proxy refuses never runs, approved or not: the computer's refusal reads as it is", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    const NEVER = `This deletes the remote branch old: ${DELETE_BRANCHES_POINTER}`;
+    // Like the runner through the proxy: refused whoever approved, and a folder refusal keeps its advice.
+    let refusal = NEVER;
+    const { runner } = await connectedComputer(f, {
+      exec: () => ({ fail: { code: "not_allowed", message: refusal } }),
+    });
+    const ctx = await runCtx();
+    expect(await call(ctx, "run_code", { language: "bash", code: "git push origin --delete old" })).toEqual({
+      content: `Not run: ${NEVER}`,
+      isError: true,
+      data: { code: "command.not_allowed" },
+    });
+    const asked = await f.tools?.invoke(ctx, {
+      toolUseId: crypto.randomUUID(),
+      name: "run_code",
+      input: { language: "bash", code: "git push origin --delete old", why: WHY },
+    });
+    if (asked?.type !== "approval") throw new Error(`expected an approval, got ${asked?.type}`);
+    const ran = await f.tools?.executeApproved(ctx, { ...asked.approval, status: "approved" });
+    expect(ran).toMatchObject({ isError: true, content: `Not run: ${NEVER}` });
+    expect(runner.sent.filter((s) => s.type === "request" && s.op === "exec").at(-1)).toMatchObject({ approved: true });
+    expect(notAllowedMessage("Mac", NEVER)).toBe(NEVER);
+    refusal = "/etc is outside the folders this agent may use";
+    const folder = await call(ctx, "run_code", { language: "bash", code: "ls /etc" });
+    expect(folder.content).toContain("request_folder_access");
   });
 });
 

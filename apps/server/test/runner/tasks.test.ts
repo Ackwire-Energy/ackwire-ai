@@ -38,6 +38,8 @@ afterEach(() => {
 const posix = process.platform !== "win32";
 const AGENT = { id: "0193aaaa-bbbb-7ccc-8ddd-eeeeffff0000", handle: "dev" };
 const id = (n: number) => `0193aaaa-0000-7000-8000-${String(n).padStart(12, "0")}`;
+const PROXY_URL =
+  "https://agentes.test/api/git/0190a7b2-3c4d-7e5f-8a9b-0c1d2e3f4a5b/0190a7b2-3c4d-7e5f-8a9b-0c1d2e3f4a5c/acme/app.git";
 
 function setup(over: Partial<TaskManagerOptions> = {}) {
   const ws = tempDir("ws-");
@@ -526,6 +528,12 @@ test.skipIf(!posix || !hasGit)(
     await waitFor(() => Boolean(done(id(32)) && done(id(33))), 10_000);
     expect(done(id(32))).toMatchObject({ exitCode: 0 });
     expect(done(id(33))).toMatchObject({ exitCode: 0 });
+    // Through our git proxy a delete never starts, approved or not: delete_branches does it.
+    spawnSync("git", ["remote", "set-url", "--push", "origin", PROXY_URL], { cwd: path.join(folder, "repo") });
+    expect(await errorCode(() => start(36, "git push origin --delete main", { approved: true }))).toBe("not_allowed");
+    expect(await start(37, "git push origin --delete main").catch((err: Error) => err.message)).toContain(
+      "Ask with delete_branches",
+    );
   },
   30_000,
 );
