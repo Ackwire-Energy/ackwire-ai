@@ -1129,8 +1129,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       label={t("agentPage.work.brain.advanced.title")}
     />
   );
-  // Once it can be saved: a plan just picked needs what it thinks with first.
-  const copyRow = setup && hasOthers && !needsAccount && adding === false && (
+  // Once it can be saved and thinks with something: a plan just picked needs its account first.
+  const thinksWithNothing = accountsOn && account === null && !ownListed;
+  const copyRow = setup && hasOthers && !needsAccount && !thinksWithNothing && adding === false && (
     <AdvancedRow
       icon="copy"
       line={t("agentPage.work.brain.copy.rowLine")}

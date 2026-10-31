@@ -271,7 +271,10 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                   chevron
                   onPress={() => openAgentAdvanced(agentId)}
                 />
-                {kind && view.canEdit && dir.agents.some((a) => a.id !== agentId) ? (
+                {kind &&
+                view.canEdit &&
+                (view.account !== null || ownRow) &&
+                dir.agents.some((a) => a.id !== agentId) ? (
                   <GroupedRow
                     label={t("agentPage.work.brain.copy.row")}
                     sub={t("agentPage.work.brain.copy.rowLine")}

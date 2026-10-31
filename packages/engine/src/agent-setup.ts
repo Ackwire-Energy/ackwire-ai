@@ -359,7 +359,8 @@ function takesAccount(
     if (other >= 0) return skip("account_single", { agent: a.usedBy[other] ?? "" });
     return true;
   }
-  // The computer's own sign-in thinks only for the agents of whoever connected it.
+  // The computer's own sign-in thinks only for the agents of whoever connected it; on one nobody did, for none.
+  if (!machine.pairedByUserId) return skip("failed");
   if (machine.pairedByUserId !== userId)
     return skip("account_owner", c.pairerName ? { owner: c.pairerName } : undefined);
   if (t.ownerUserId !== userId) return skip("account_owner");

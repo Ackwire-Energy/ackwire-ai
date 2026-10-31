@@ -2630,6 +2630,8 @@ export const useSetupPreview = (orgId: string, setup: AgentSetup | null, agentId
     queryFn: () => api.agents.applySetup(orgId, { setup: setup as AgentSetup, agentIds: [...agentIds], preview: true }),
     enabled: setup !== null && agentIds.length > 0,
     retry: false,
+    // Each run walks every agent through its rules: once per opening is enough.
+    refetchOnWindowFocus: false,
   });
 };
 

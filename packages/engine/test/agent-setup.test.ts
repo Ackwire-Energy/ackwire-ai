@@ -1,7 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { ACCOUNTS_PROTOCOL } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
-import { applyAgentSetup, ForbiddenError, getNewAgentSetup, releaseAgents, setAgentBrain, updateAgent } from "../src";
+import {
+  applyAgentSetup,
+  ForbiddenError,
+  getNewAgentSetup,
+  releaseAgents,
+  type SetupResult,
+  setAgentBrain,
+  updateAgent,
+} from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
@@ -116,7 +124,7 @@ describe("Usar em outros agentes", () => {
     const w = await world();
     const { fx, deps } = w;
     const ids = [w.dev, w.theo, w.lia, w.zoe];
-    const expected = [
+    const expected: SetupResult[] = [
       { agentId: w.dev, status: "applied" },
       { agentId: w.theo, status: "applied" },
       { agentId: w.lia, status: "skipped", reason: "other_computer", params: { computer: "PC" } },
