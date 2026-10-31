@@ -120,24 +120,55 @@ export async function pauseStretch(tx: Executor, orgId: string, hold: StretchHol
   });
 }
 
-/** What `startOrJoinRun` holds: `agentId` woken by `message` (an agent's, at hop 1 or more) past its stretch. */
-export const holdOf = (
-  message: Pick<Message, "id" | "channelId" | "threadId" | "hop" | "stretchId" | "authorAgentId" | "agentRunId">,
+/**
+ * What `startOrJoinRun` holds: `agentId` woken by `message` (an agent's, at hop 1 or more) past its stretch. Held
+ * inside the agents' private DM, its card goes where the people of this work read: with the run that wrote the
+ * message, up the chain (`peopleRun`). Continuar still starts the held run in that DM.
+ */
+export async function holdOf(
+  tx: Executor,
+  message: Pick<
+    Message,
+    "id" | "orgId" | "channelId" | "threadId" | "hop" | "stretchId" | "authorAgentId" | "agentRunId"
+  >,
   agentId: string,
   trigger: RunTrigger,
   stop: StretchStop,
-): StretchHold => ({
-  stretchId: stretchOf(message),
-  channelId: message.channelId,
-  threadId: message.threadId,
-  authorAgentId: message.authorAgentId ?? agentId,
-  runId: message.agentRunId,
-  hop: message.hop,
-  agentId,
-  messageId: message.id,
-  trigger,
-  stop,
-});
+): Promise<StretchHold> {
+  const hold: StretchHold = {
+    stretchId: stretchOf(message),
+    channelId: message.channelId,
+    threadId: message.threadId,
+    authorAgentId: message.authorAgentId ?? agentId,
+    runId: message.agentRunId,
+    hop: message.hop,
+    agentId,
+    messageId: message.id,
+    trigger,
+    stop,
+  };
+  const [channel] = await tx
+    .select({ kind: channels.kind, dmKey: channels.dmKey })
+    .from(channels)
+    .where(and(eq(channels.orgId, message.orgId), eq(channels.id, message.channelId)));
+  const [writer] =
+    channel && isAgentOnlyDm(channel) && message.agentRunId
+      ? await tx
+          .select()
+          .from(agentRuns)
+          .where(and(eq(agentRuns.orgId, message.orgId), eq(agentRuns.id, message.agentRunId)))
+      : [];
+  if (!writer) return hold;
+  const at = await peopleRun(tx, writer);
+  return {
+    ...hold,
+    channelId: at.channelId,
+    threadId: replyThreadOf(at),
+    authorAgentId: at.agentId,
+    runId: at.id,
+    hop: at.hop,
+  };
+}
 
 type ToolRun = Pick<
   AgentRun,
@@ -174,7 +205,7 @@ export async function refusedAtLimit(db: Database, run: ToolRun, wakes: string):
  * The run whose conversation people read: this one, or for a run in the agents' private DM (answering another
  * agent's question or note) the run that asked, up the chain.
  */
-async function peopleRun(db: Database, run: ToolRun): Promise<ToolRun> {
+async function peopleRun(db: Executor, run: ToolRun): Promise<ToolRun> {
   let at = run;
   for (let i = 0; i < 3; i++) {
     const [channel] = await db
