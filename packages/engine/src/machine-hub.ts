@@ -26,6 +26,7 @@ import {
 } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, lt, schema } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
+import { cutText } from "./format";
 import { applyAccessDecided, storeMachineAccess } from "./machine-access";
 import {
   accountsToRemove,
@@ -756,7 +757,7 @@ export function createMachineHub(deps: MachineHubDeps) {
         ok: false as const,
         error: { code: "internal", message: error instanceof Error ? error.message : String(error) },
       }));
-      const kept = out.ok ? { ok: true as const, text: out.text.slice(0, 50_000) } : out;
+      const kept = out.ok ? { ok: true as const, text: cutText(out.text, 50_000) } : out;
       await db
         .update(machineMcpCalls)
         .set({ result: kept })

@@ -402,7 +402,7 @@ export const MessageRow = memo(function MessageRow({
             message={m}
             runId={m.agentRunId}
             stopped={stopped ?? { byUserId: null, continuedRunId: atLimit?.continuedRunId ?? null }}
-            limit={Boolean(atLimit)}
+            limit={atLimit ? (atLimit.stuck ? "stuck" : "steps") : undefined}
           />
         ) : null}
         {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
@@ -468,12 +468,13 @@ function StoppedLine({
   message: m,
   runId,
   stopped,
-  limit = false,
+  limit,
 }: {
   message: Message;
   runId: string;
   stopped: { byUserId: string | null; continuedRunId: string | null };
-  limit?: boolean;
+  /** It ended at its step limit, or because it got stuck: nobody stopped it. */
+  limit?: "steps" | "stuck";
 }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
@@ -489,7 +490,7 @@ function StoppedLine({
   const continued = useContinuedRun(m.id) ?? stopped.continuedRunId;
   const byMe = Boolean(meId) && stopped.byUserId === meId;
   const by = limit
-    ? t("mobile.chat.stopped.limit")
+    ? t(limit === "stuck" ? "mobile.chat.stopped.stuck" : "mobile.chat.stopped.limit")
     : byMe
       ? t("mobile.chat.stopped.byYou")
       : stopped.byUserId

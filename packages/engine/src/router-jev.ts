@@ -1,3 +1,4 @@
+import { cutText } from "./format";
 import { callJev, type JevKeySource, JevOffError } from "./jev-key";
 import {
   ROUTER_MESSAGE_CHARS,
@@ -71,7 +72,7 @@ export function createJevRouterStrategy(options: {
         latest_message: {
           from: input.message.author,
           names: input.message.names ?? [],
-          text: input.message.body.slice(0, ROUTER_MESSAGE_CHARS),
+          text: cutText(input.message.body, ROUTER_MESSAGE_CHARS),
         },
         agent_just_talking: input.continuityHandle ? `@${input.continuityHandle}` : null,
         alone_with: input.aloneWith ? `@${input.aloneWith}` : null,
@@ -136,7 +137,7 @@ export function createJevRouterStrategy(options: {
         const criteria: Record<string, string> = {};
         for (const c of input.candidates)
           criteria[c.handle] =
-            `${c.name}${c.role ? `, ${c.role}` : ""}${c.about ? `: ${c.about.slice(0, 200)}` : ""}${c.can ? ` (can use: ${c.can})` : ""}`;
+            `${c.name}${c.role ? `, ${c.role}` : ""}${c.about ? `: ${cutText(c.about, 200)}` : ""}${c.can ? ` (can use: ${c.can})` : ""}`;
         criteria[NONE] = "No agent should reply.";
         questions.best_agent = {
           type: "choice",

@@ -28,6 +28,7 @@ import { summarizeGrants } from "./capabilities";
 import { quotedLine } from "./context";
 import { createAgentRuns, requesterOf } from "./dispatch";
 import { type DecidedBy, MENTION_NEEDED } from "./events";
+import { cutText } from "./format";
 import type { ModelGateway } from "./gateway";
 import { PLATFORM_CAP } from "./limits";
 import type { MachineCaller } from "./machine-hub";
@@ -309,7 +310,7 @@ export function routerPrompt(input: RoutingInput) {
     history ? `<history>\n${history}\n</history>` : "",
     continuity,
     alone,
-    `<message>\n${line({ ...input.message, body: input.message.body.slice(0, ROUTER_MESSAGE_CHARS) })}\n</message>`,
+    `<message>\n${line({ ...input.message, body: cutText(input.message.body, ROUTER_MESSAGE_CHARS) })}\n</message>`,
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -683,7 +684,7 @@ export async function routeMessage(
     handle: r.handle,
     name: r.name,
     role: r.role,
-    about: r.instructions.slice(0, 300),
+    about: cutText(r.instructions, 300),
   }));
   if (candidates.length === 0) return { runs: [], skipped: "no_candidates" };
   // The team's coordinator (ADR 0093), when it is a candidate here: never for an agent's message.
@@ -1156,7 +1157,7 @@ async function continuedSoon(
 /** `lines` (oldest first) cut to `ROUTER_SLICE`: each to its share, the oldest dropped past `chars` in all. */
 function sliced(first: RoutingLine | null, lines: RoutingLine[], chars = ROUTER_SLICE.chars): RoutingLine[] {
   const max = ROUTER_SLICE.charsPerMessage;
-  const cut = (l: RoutingLine) => (l.body.length > max ? { ...l, body: `${l.body.slice(0, max - 1)}…` } : l);
+  const cut = (l: RoutingLine) => (l.body.length > max ? { ...l, body: `${cutText(l.body, max - 1)}…` } : l);
   const kept: RoutingLine[] = [];
   let total = 0;
   for (const l of lines.map(cut).reverse()) {

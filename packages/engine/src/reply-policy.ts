@@ -1,4 +1,5 @@
 import { and, asc, type Executor, eq, gt, isNull, ne, schema, sql } from "@agenteschat/db";
+import { cutText } from "./format";
 import type { Message } from "./messages";
 import type { AgentRun } from "./runs";
 import type { ToolDefinition, ToolSource } from "./tools/types";
@@ -220,7 +221,7 @@ export function createPassToolSource(): ToolSource {
       if (!policy?.mayPass) {
         return { content: "You were addressed directly: answer the person instead.", isError: true };
       }
-      const reason = typeof input.reason === "string" ? input.reason.trim().slice(0, 300) : "";
+      const reason = typeof input.reason === "string" ? cutText(input.reason.trim(), 300) : "";
       return {
         content: "Passed: nothing is posted. End your turn now without any text.",
         data: { passed: { reason } },
@@ -268,6 +269,6 @@ export async function repliesAfterTrigger(
     .limit(5);
   if (rows.length === 0) return null;
   return rows
-    .map((m) => `[Meanwhile ${m.name} (@${m.handle}) replied here]: ${stripSentinel(m.body).slice(0, 4000)}`)
+    .map((m) => `[Meanwhile ${m.name} (@${m.handle}) replied here]: ${cutText(stripSentinel(m.body), 4000)}`)
     .join("\n\n");
 }

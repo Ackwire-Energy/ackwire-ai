@@ -2739,6 +2739,7 @@ export const en: Translations = {
       errors: {
         budget_exceeded: "The monthly budget ran out.",
         too_many_tool_calls: "Went over the tool limit for one run.",
+        stuck: "Stopped because it got stuck.",
         empty_reply: "The model returned nothing.",
         model_refused: "The model refused to answer.",
         agent_archived: "The agent was archived.",
@@ -3929,6 +3930,7 @@ export const en: Translations = {
       model_refused: "The model refused to answer",
       runner_outdated: "The program on the computer needs an update",
       too_many_tool_calls: "Went over the step limit for one run",
+      stuck: "Stopped because it got stuck",
       missing_credential: "An API key is missing",
       credential_revoked: "The API key was revoked",
       credential_wrong_provider: "The API key is from another provider",
@@ -6242,6 +6244,7 @@ export const en: Translations = {
     stopped: "Stopped",
     continueRun: "Continue",
     stepLimit: "At the step limit",
+    stuck: "Stopped because it got stuck",
     steer: {
       waiting: "{{name}} reads it at the next pause",
       now: "{{name}} stopped to read it",
@@ -8862,6 +8865,7 @@ export const en: Translations = {
       },
       interrupted: "Interrupted by a server restart. Ask again to continue.",
       step_limit: "I ran out of steps before finishing.",
+      stuck: "I got stuck and stopped before finishing.",
       forum_suggestion: 'Worth a forum? "{{title}}"',
       forum_concluded: 'The forum "{{title}}" is over. The synthesis is in the file below.',
       forum_concluded_issues:
