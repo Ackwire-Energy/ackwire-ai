@@ -7013,6 +7013,8 @@ export const ptBR = {
     address: "Endereço de email",
     addressPlaceholder: "voce@empresa.com.br",
     addressInvalid: "Digite um email válido, como voce@empresa.com.br.",
+    icloudHint:
+      "Use o endereço do Mail do iCloud, como nome@icloud.com, mesmo que a sua Conta Apple use o {{name}}. No iPhone ele está em Ajustes\u00a0›\u00a0seu nome\u00a0›\u00a0iCloud\u00a0›\u00a0Mail do iCloud, ou veja em icloud.com/mail.",
     password: "Senha de app",
     passwordHelp: "Fica cifrada no servidor. Ninguém vê depois.",
     passwordInvalid: "Cole a senha de app.",
@@ -7041,6 +7043,8 @@ export const ptBR = {
     },
     error: {
       auth: "O email ou a senha de app não conferem. Confira e tente de novo.",
+      auth_icloud:
+        "O iCloud não aceitou. Confira se o endereço é o do Mail do iCloud, como nome@icloud.com, e se a senha é uma senha de app, não a da sua Conta Apple.",
       imap_unreachable: "Não conseguimos falar com o servidor de entrada. Confira o provedor ou o servidor.",
       smtp_unreachable: "Entramos no email, mas o servidor de saída não respondeu. Confira o servidor de saída.",
       tls: "O servidor não ofereceu uma conexão segura.",

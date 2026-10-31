@@ -6969,6 +6969,8 @@ export const en: Translations = {
     address: "Email address",
     addressPlaceholder: "you@company.com",
     addressInvalid: "Type a valid email, like you@company.com.",
+    icloudHint:
+      "Use your iCloud Mail address, like name@icloud.com, even if your Apple Account uses {{name}}. On an iPhone it's in Settings\u00a0›\u00a0your name\u00a0›\u00a0iCloud\u00a0›\u00a0iCloud Mail, or see icloud.com/mail.",
     password: "App password",
     passwordHelp: "Stored encrypted on the server. Nobody sees it again.",
     passwordInvalid: "Paste the app password.",
@@ -6997,6 +6999,8 @@ export const en: Translations = {
     },
     error: {
       auth: "The email or app password doesn't match. Check them and try again.",
+      auth_icloud:
+        "iCloud didn't accept it. Check that the address is your iCloud Mail one, like name@icloud.com, and that the password is an app password, not your Apple Account password.",
       imap_unreachable: "We couldn't reach the incoming server. Check the provider or the server.",
       smtp_unreachable: "We signed in, but the outgoing server didn't answer. Check the outgoing server.",
       tls: "The server didn't offer a secure connection.",
