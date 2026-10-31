@@ -32,7 +32,14 @@ import {
   updateOrgSettings,
   usageReport,
 } from "@agenteschat/engine";
-import { MODEL_CATALOG, nanoUsdToUsd, PROVIDERS, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
+import {
+  contextWindowOf,
+  MODEL_CATALOG,
+  nanoUsdToUsd,
+  PROVIDERS,
+  pricesAt,
+  usdToNanoUsd,
+} from "@agenteschat/providers";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, iso, json, OrgParams, requireSession, security } from "./context";
 import { AgentAppearance, AgentAudience, Credential, ProviderId, Role } from "./schemas";
@@ -607,6 +614,7 @@ export function managementRoutes(deps: AppDeps) {
                 id: z.string(),
                 label: z.string(),
                 provider: z.string(),
+                contextWindow: z.number().int().openapi({ description: "Its context window in tokens." }),
                 available: z.boolean(),
                 recommended: z.boolean().openapi({ description: "Suggested for new agents of an available provider." }),
                 cheap: z.boolean(),
@@ -634,6 +642,7 @@ export function managementRoutes(deps: AppDeps) {
             id,
             label: m.label,
             provider: m.provider,
+            contextWindow: contextWindowOf(id),
             available: usable(m.provider),
             recommended: usable(m.provider) && m.recommended === true,
             cheap: m.cheap === true,

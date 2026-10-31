@@ -1,13 +1,14 @@
 import type { AgentBrainInput, MachineAccount } from "@agenteschat/client";
-import { keys, useAgentBrain, useAiAccounts, useApi, useMachines } from "@agenteschat/client";
-import { accountChoices, ownSignInListed, ownSignInName, signInPlan } from "@agenteschat/client/lib/ai-accounts";
+import { keys, useAgentBrain, useAiAccounts, useAiStatus, useApi, useMachines } from "@agenteschat/client";
+import { accountChoices, ownSignInListed, ownSignInName } from "@agenteschat/client/lib/ai-accounts";
 import { brainLine } from "@agenteschat/client/lib/brain";
+import { advancedSummary } from "@agenteschat/client/lib/brain-advanced";
 import { lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { brainPlan, planOf } from "@agenteschat/client/lib/plans";
-import { providerLabel } from "@agenteschat/client/lib/providers";
+import { isAuto, providerLabel } from "@agenteschat/client/lib/providers";
 import { limitOffers, planState } from "@agenteschat/ui/plan-state";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -20,6 +21,7 @@ import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, ProviderLogo, Te
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { PushedHeader } from "../shared/parts";
 import { PlanMeter } from "../usage/parts";
+import { advancedOf, openAgentAdvanced } from "./AgentAdvancedScreen";
 import {
   accountKindOf,
   accountRow,
@@ -31,13 +33,14 @@ import {
   thinkingUsage,
 } from "./logic";
 import { openConnectAi } from "./NoAiCard";
-import { AiRow, Note, PlanReplies, PlanRepliesOf } from "./parts";
+import { AiRow, Note } from "./parts";
 
 /*
  * An agent's AI on the phone (the web's "Quem pensa" for a plan, ADR 0059), from "Pensa com" on its profile: the
- * account it thinks with on its computer (one of its owner's, or that computer's own sign-in), one row per account,
- * that plan's usage with, at its limit, the owner's other accounts that could think instead, and "Atende outras
- * pessoas". Each choice saves at once. Another AI, or one more login of an account other agents think with where it
+ * model, the account it thinks with on its computer (one of its owner's, or that computer's own sign-in), one row per
+ * account, that plan's usage with, at its limit, the owner's other accounts that could think instead, and
+ * "Configuração avançada" (ADR 0086: effort, context window, "Atende outras pessoas", the API when away, on a screen of
+ * its own). Each choice saves at once. Another AI, or one more login of an account other agents think with where it
  * may have one per agent ("Também usada por Theo"), goes through Connect an AI. Its owner and admins open it; only its
  * owner picks an account or lets other people talk to it on the plan (`canUsePlans`).
  */
@@ -100,7 +103,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
 
   const view = brain.data;
   const kind = accountKindOf(view?.brain);
-  // Its computer's row, where the computer's own sign-in's plan is (a seat has its own words).
+  // Its computer's row, where that computer's own sign-in shows once its CLI is signed in.
   const row = useAiAccounts(orgId, view?.canUsePlans === true && kind !== null).data?.computers.find(
     (c) => c.machineId === view?.computer?.machineId,
   );
@@ -132,11 +135,8 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
       { text: t("mobile.ai.moveHere"), onPress: () => void save({ account: a.id, moveAccount: true }, done) },
     ]);
   };
-  const replyToEveryone = (on: boolean) => {
-    if (busy) return;
-    void save({ onlyOwner: !on }, t(on ? "aiAccounts.share.savedEveryone" : "aiAccounts.share.savedOwner", g));
-  };
 
+  const apiKey = useAiStatus(orgId).data?.apiKey !== false;
   const usage = view && kind ? thinkingUsage(view, kind) : undefined;
   const limited = usage ? planState(usage).state === "limited" : false;
   const offers = limited && kind && view?.canUsePlans ? limitOffers(accounts, kind, view.account).slice(0, 2) : [];
@@ -175,6 +175,20 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
           <Note icon="x">{t("common.loadFailed")}</Note>
         ) : (
           <>
+            {kind ? (
+              <>
+                <GroupedHeader>{t("agentPage.work.brain.planModel")}</GroupedHeader>
+                <GroupedList>
+                  <GroupedRow
+                    label={model?.label ?? view.effectiveModel ?? ""}
+                    {...(model?.sub ? { sub: model.sub } : {})}
+                    {...(model?.note ? { belowText: model.note } : {})}
+                    chevron
+                    onPress={() => openAgentModel(agentId)}
+                  />
+                </GroupedList>
+              </>
+            ) : null}
             {kind && view.accountsSupported && view.computer ? (
               <>
                 <GroupedHeader>{t(`agentPage.work.brain.account.${kind}`)}</GroupedHeader>
@@ -213,20 +227,6 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                 {accountNote ? <GroupedFooter>{accountNote}</GroupedFooter> : null}
               </>
             ) : null}
-            {kind ? (
-              <>
-                <GroupedHeader>{t("agentPage.work.brain.planModel")}</GroupedHeader>
-                <GroupedList>
-                  <GroupedRow
-                    label={model?.label ?? view.effectiveModel ?? ""}
-                    {...(model?.sub ? { sub: model.sub } : {})}
-                    {...(model?.note ? { belowText: model.note } : {})}
-                    chevron
-                    onPress={() => openAgentModel(agentId)}
-                  />
-                </GroupedList>
-              </>
-            ) : null}
             {usage ? (
               <>
                 <GroupedHeader>{t("agentPage.tabs.usage")}</GroupedHeader>
@@ -257,24 +257,21 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                 </GroupedList>
               </>
             ) : null}
-            {kind && agent?.ownerUserId ? (
-              <>
-                <GroupedHeader>{t("mobile.ai.audience", g)}</GroupedHeader>
-                {view.canUsePlans ? (
-                  <PlanReplies
-                    agent={name}
-                    on={!view.onlyOwner}
-                    onChange={replyToEveryone}
-                    brain={kind}
-                    plan={signInPlan(view, row, kind)}
-                    coding={planOf(current?.provider)}
-                    disabled={busy}
-                  />
-                ) : (
-                  <PlanRepliesOf on={!view.onlyOwner} owner={ownerFirst ?? ""} agentName={name} />
-                )}
-              </>
-            ) : null}
+            <View style={styles.advanced}>
+              <GroupedList>
+                <GroupedRow
+                  label={t("agentPage.work.brain.advanced.title")}
+                  sub={advancedSummary(t, i18n.language, {
+                    kind: view.brain,
+                    autoModel: isAuto(view.effectiveModel),
+                    apiKey,
+                    now: advancedOf(view),
+                  })}
+                  chevron
+                  onPress={() => openAgentAdvanced(agentId)}
+                />
+              </GroupedList>
+            </View>
             {view.canUsePlans ? (
               <>
                 <GroupedHeader>{t("mobile.ai.another")}</GroupedHeader>
@@ -309,7 +306,10 @@ export function AgentModelScreen({ agentId }: { agentId: string }) {
   const brain = useAgentBrain(orgId, agentId);
   const { busy, save } = useSaveBrain(agentId);
   const view = brain.data;
-  const rows = view ? modelRows(t, view, brainPlan(view)) : [];
+  const plan = view ? brainPlan(view) : undefined;
+  const rows = view ? modelRows(t, view, plan) : [];
+  // A model without a maker of its own wears its plan's mark, else its brain's.
+  const mark = (plan && view?.accounts.find((a) => a.id === view.account)?.provider) || (view?.brain ?? "");
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
       <PushedHeader title={t("agentPage.work.brain.planModel")} solid={false} grouped />
@@ -332,9 +332,11 @@ export function AgentModelScreen({ agentId }: { agentId: string }) {
                     label={r.label}
                     {...(r.sub ? { sub: r.sub } : {})}
                     {...(r.note ? { belowText: r.note } : {})}
-                    {...(r.maker ? { leading: <ProviderLogo id={r.maker} size="sm" /> } : {})}
+                    {...(isAuto(r.value)
+                      ? { icon: "sparkle" as const }
+                      : { leading: <ProviderLogo id={r.maker ?? mark} size="sm" /> })}
                     checked={r.checked}
-                    disabled={busy}
+                    disabled={busy || !view.canEdit}
                     onPress={() => {
                       if (r.checked) return;
                       const done = t("agentPage.work.saved.brain", {
@@ -361,4 +363,6 @@ const styles = StyleSheet.create({
   center: { textAlign: "center" },
   loading: { marginTop: 16 },
   meter: { paddingHorizontal: 14, paddingVertical: 12 },
+  // A list without a header keeps a header's room above it.
+  advanced: { marginTop: 18 },
 });
