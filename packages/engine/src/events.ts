@@ -39,12 +39,15 @@ export type DecidedBy =
   | { step: "model"; model: string; provider: string }
   /** The author's own plan: `ownerId` is the author. */
   | { step: "plan"; brand: "claude" | "chatgpt"; ownerId: string }
-  | { step: "rule"; rule: "reply" | "only_agent" | "follow_up" };
+  /** `coordinator`: nobody else took it, so the team's coordinator did (ADR 0092). */
+  | { step: "rule"; rule: RouterRule };
+
+type RouterRule = "reply" | "only_agent" | "follow_up" | "coordinator";
 
 /** Why a routed message reached no agent: no step could read it, and no rule fit (`strategy` `none`). */
 export const MENTION_NEEDED = "mention_needed";
 
-const RULES = new Set(["reply", "only_agent", "follow_up"]);
+const RULES = new Set(["reply", "only_agent", "follow_up", "coordinator"]);
 
 /**
  * `DecidedBy` from a stored decision's `strategy` (`jev`, `llm:<model>`, `plan:<kind>`, `rule:<name>`). Undefined
@@ -57,7 +60,7 @@ export function decidedByOf(strategy: string, authorUserId: string | null): Deci
   if (step === "plan" && authorUserId && (rest === "claude_code" || rest === "codex")) {
     return { step: "plan", brand: rest === "codex" ? "chatgpt" : "claude", ownerId: authorUserId };
   }
-  if (step === "rule" && RULES.has(rest)) return { step: "rule", rule: rest as "reply" | "only_agent" | "follow_up" };
+  if (step === "rule" && RULES.has(rest)) return { step: "rule", rule: rest as RouterRule };
   return undefined;
 }
 

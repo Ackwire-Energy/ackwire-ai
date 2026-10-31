@@ -1,7 +1,16 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import { systemText } from "@agenteschat/providers";
-import { buildRunContext, insertMessage, type Message, nowLine, postPersonMessage, toTurns } from "../src";
+import {
+  buildRunContext,
+  createAgent,
+  insertMessage,
+  type Message,
+  nowLine,
+  postPersonMessage,
+  setCoordinator,
+  toTurns,
+} from "../src";
 import { type Fixture, setup } from "./fixtures";
 
 const msg = (over: Partial<Message>): Message =>
@@ -168,4 +177,32 @@ test("history is capped at maxMessages, keeping the most recent", async () => {
   const runs = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, trigger.id));
   const ctx = await buildRunContext(f.db, runs[0] as NonNullable<(typeof runs)[0]>, f.agent, { maxMessages: 3 });
   expect(ctx.messages[0]?.content).toBe("[ana]: m3\n\n[ana]: m4\n\n(current message) [ana]: @dev go");
+});
+
+test("the team's coordinator hears that what nobody took comes to it, only where other agents are (ADR 0092)", async () => {
+  const trigger = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev what do you think?",
+  });
+  const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, trigger.id));
+  if (!run) throw new Error("no run");
+  const prompt = async (agent: typeof f.agent) =>
+    systemText((await buildRunContext(f.db, run, agent, { maxMessages: 10 })).system);
+  const LINE = "\nYou coordinate the team. A message that needs an agent and that no other agent took comes to you";
+  const dev = await setCoordinator({ db: f.db }, f.owner.id, f.org.id, f.agent.id, true);
+  // Nobody to hand work to: alone with Ana.
+  expect(await prompt(dev)).not.toContain(LINE);
+  const ada = await createAgent(
+    f.db,
+    f.owner.id,
+    f.org.id,
+    { name: "Ada", handle: "ada" },
+    { model: "claude-sonnet-5-5" },
+  );
+  await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: ada.id });
+  expect(await prompt(dev)).toContain(
+    `${LINE}, so work nobody owns is in your area. Do what is yours. Hand the rest to the agent whose job it is: mention it with what you need, one agent per line, and leave that part to it.`,
+  );
+  // Another agent there doesn't.
+  await setCoordinator({ db: f.db }, f.owner.id, f.org.id, f.agent.id, false);
+  expect(await prompt(f.agent)).not.toContain(LINE);
 });

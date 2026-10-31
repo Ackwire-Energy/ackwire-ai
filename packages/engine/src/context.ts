@@ -705,6 +705,11 @@ export async function buildRunContext(
                     ? `\nOther agents here and what they can do: ${otherAgents}. Never answer for another agent or guess its permissions: say what this list shows, or ask it yourself (ask_agent) when you need its help for the task, or leave it a note without waiting for an answer (tell_agent) when it should know or do something. Never relay to another agent what the person asked that agent directly: it got the message and answers it itself. Never name your tools to people.`
                     : ""
                 }${
+                  // The team's coordinator (ADR 0092): what nobody else took comes to it.
+                  agent.coordinator && otherAgents
+                    ? "\nYou coordinate the team. A message that needs an agent and that no other agent took comes to you, so work nobody owns is in your area. Do what is yours. Hand the rest to the agent whose job it is: mention it with what you need, one agent per line, and leave that part to it."
+                    : ""
+                }${
                   alsoAnswering.length > 0
                     ? `\n${alsoAnswering.join(", ")} also got this message and ${alsoAnswering.length > 1 ? "are" : "is"} answering right now, each for their own part. Answer only yours; don't speak for them, mention them or say what they will answer.`
                     : ""

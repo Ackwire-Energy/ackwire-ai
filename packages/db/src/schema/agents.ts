@@ -10,6 +10,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { users } from "./auth";
@@ -166,6 +167,11 @@ export const agents = pgTable(
     /** Order inside its group. */
     groupPosition: integer().notNull().default(0),
     /**
+     * It coordinates the team (ADR 0092): a person's message that needs an agent and that no other agent took goes
+     * to it. One per workspace among its active agents (the index below).
+     */
+    coordinator: boolean().notNull().default(false),
+    /**
      * What it says it is doing (`set_status`, ADR 0084): a line, an optional emoji, and whether it asks not
      * to be interrupted. Tied to the run that wrote it (gone once that run ends) unless it set an end time.
      */
@@ -195,6 +201,7 @@ export const agents = pgTable(
   (t) => [
     unique().on(t.orgId, t.handle),
     unique().on(t.orgId, t.id),
+    uniqueIndex("agents_one_coordinator").on(t.orgId).where(sql`${t.coordinator} and ${t.archivedAt} is null`),
     // Machines are only soft-deleted (and `deleteMachine` clears this column first).
     foreignKey({ columns: [t.orgId, t.machineId], foreignColumns: [machines.orgId, machines.id] }),
     // No action (a composite SET NULL would null `org_id` too): code clears it before an account row goes.

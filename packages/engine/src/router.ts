@@ -200,6 +200,10 @@ export const DEFAULT_ROUTER_POLICY = {
   continuityWindowMs: 10 * 60_000,
 };
 
+/** Below this need-any-agent score a message is for nobody (lower in a channel with one agent). */
+const needGateOf = (policy: RouterPolicy, single: boolean) =>
+  single ? Math.min(policy.minScore, policy.singleAgentMinScore ?? policy.minScore) : policy.minScore;
+
 /**
  * Applies policy to a strategy's scores (all in code): candidates only, a
  * threshold per agent (lower for the agent the person was just talking to,
@@ -230,8 +234,8 @@ export function selectAgents(
   const continuing =
     context.continuityAgentId && (best.get(context.continuityAgentId) ?? 0) >= thresholdOf(context.continuityAgentId);
   const clearPick = [...best.values()].some((score) => score >= (policy.clearPickScore ?? Number.POSITIVE_INFINITY));
-  const needGate = single ? Math.min(policy.minScore, policy.singleAgentMinScore ?? policy.minScore) : policy.minScore;
-  if (result.needsAgent !== undefined && result.needsAgent < needGate && !continuing && !clearPick) return [];
+  if (result.needsAgent !== undefined && result.needsAgent < needGateOf(policy, single) && !continuing && !clearPick)
+    return [];
   return [...best]
     .filter(([agentId, score]) => score >= thresholdOf(agentId))
     .sort((a, b) => b[1] - a[1])
@@ -591,13 +595,16 @@ export { AGENT_CHIME_IN_MAX_HOP };
  * answer (`AGENT_CHIME_IN_MAX_HOP`). One decision per message (unique),
  * stored with every score. A person's message first waits `quietMs` for
  * their next one; when it comes and the router decides on it too
- * (`routable`), that one decides for both (`continued`).
+ * (`routable`), that one decides for both (`continued`). A person's message
+ * the policy gives to nobody goes to the team's coordinator when it needs an
+ * agent or the person is alone here with the agents (ADR 0092).
  *
  * When no step of the chain can read a person's message, rules in code pick
  * (ADR 0074 §4): R1 a reply to an agent, R2 the only agent when the author is
  * alone with it, R3 the agent of the author's own previous exchange when the
- * message names no other person. Else nobody (`mention_needed`), stored with
- * every candidate and what failed. Nothing is retried through the outbox.
+ * message names no other person, R4 the coordinator when the author is alone
+ * with the agents and names no person. Else nobody (`mention_needed`), stored
+ * with every candidate and what failed. Nothing is retried through the outbox.
  * With no AI in the organization (`hasAi`) nothing is asked: `no_ai`.
  */
 export async function routeMessage(
@@ -640,6 +647,7 @@ export async function routeMessage(
       name: agents.name,
       role: agents.role,
       instructions: agents.instructions,
+      coordinator: agents.coordinator,
     })
     .from(agents)
     .innerJoin(
@@ -667,6 +675,8 @@ export async function routeMessage(
     about: r.instructions.slice(0, 300),
   }));
   if (candidates.length === 0) return { runs: [], skipped: "no_candidates" };
+  // The team's coordinator (ADR 0092), when it is a candidate here: never for an agent's message.
+  const coordinatorId = byAgent ? null : (rows.find((r) => r.coordinator)?.agentId ?? null);
   // Routed to nobody without asking the strategy, and why (the receipts say it).
   const unrouted = async (reason: typeof NO_AI | typeof PLATFORM_CAP): Promise<RouteResult> => {
     const stored = await db
@@ -881,11 +891,15 @@ export async function routeMessage(
   const repliedAgentId = quotedAgentId ?? rootAgentId;
   if (repliedAgentId) continuityAgentId = repliedAgentId;
   const continuityHandle = candidates.find((c) => c.agentId === continuityAgentId)?.handle ?? null;
+  // No other person here (R2 and the coordinator ask it): read once, and only when one of them needs it.
+  let alone: Promise<boolean> | undefined;
+  const aloneHere = () => {
+    alone ??= aloneInChannel(db, message);
+    return alone;
+  };
   // R2: a person alone in the channel with its one agent.
   const onlyAgentId =
-    !byAgent && candidates.length === 1 && (await aloneInChannel(db, message))
-      ? (candidates[0]?.agentId ?? null)
-      : null;
+    !byAgent && candidates.length === 1 && (await aloneHere()) ? (candidates[0]?.agentId ?? null) : null;
 
   const lineOf = (m: (typeof history)[number]): RoutingLine => {
     const names = namesOf(m).map((n) => n.label);
@@ -939,13 +953,17 @@ export async function routeMessage(
   }
   // Nothing could read it: rules in code, for a person's message only.
   if (!result && !byAgent) {
-    const rule: { rule: "reply" | "only_agent" | "follow_up"; agentId: string } | null = repliedAgentId
+    const rule: { rule: Extract<DecidedBy, { step: "rule" }>["rule"]; agentId: string } | null = repliedAgentId
       ? { rule: "reply", agentId: repliedAgentId }
       : onlyAgentId
         ? { rule: "only_agent", agentId: onlyAgentId }
         : fromOwn && !namesPerson
           ? { rule: "follow_up", agentId: fromOwn }
-          : null;
+          : // R4: a person alone here with the agents, naming no person, goes to the coordinator. Not more: a rule
+            // for every message nobody could read would start a run for each.
+            coordinatorId && !namesPerson && (await aloneHere())
+            ? { rule: "coordinator", agentId: coordinatorId }
+            : null;
     if (rule) {
       result = {
         agents: [{ agentId: rule.agentId, score: 1 }],
@@ -1007,10 +1025,21 @@ export async function routeMessage(
     !(continuityAgentId !== null && picked.includes(continuityAgentId)) &&
     (decided.alreadyAnswered ?? 0) >= ALREADY_ANSWERED_THRESHOLD;
   const selected = followUp && continuityAgentId ? [continuityAgentId] : duplicate ? [] : picked;
-  const strategy = decided.strategy ?? deps.strategy.name;
+  // Nobody took a message that needs an agent, or one from a person alone here with the agents: the coordinator
+  // takes it (ADR 0092), as a router run it may pass. Not a message for a person, nor one already answered.
+  const coordinates =
+    coordinatorId !== null &&
+    selected.length === 0 &&
+    !duplicate &&
+    !toPerson &&
+    ((decided.needsAgent ?? 0) >= needGateOf(policy, candidates.length === 1) || (await aloneHere()));
+  const chosen = coordinates && coordinatorId ? [coordinatorId] : selected;
+  const stepName = decided.strategy ?? deps.strategy.name;
+  const strategy = coordinates ? "rule:coordinator" : stepName;
+  const decidedBy: DecidedBy | undefined = coordinates ? { step: "rule", rule: "coordinator" } : decided.decidedBy;
   // Code's markers first: `reply-policy.ts` reads a leading "follow-up" as "addressed", and a step's own
-  // words come only after its name, so no model can write that marker.
-  const words = decided.reason ? `${decided.decidedBy?.step ?? strategy}: ${decided.reason}` : null;
+  // words come only after its name, so no model can write a marker.
+  const words = decided.reason ? `${decided.decidedBy?.step ?? stepName}: ${decided.reason}` : null;
   const runs = await db.transaction(async (tx) => {
     const [decision] = await tx
       .insert(routingDecisions)
@@ -1024,9 +1053,14 @@ export async function routeMessage(
           score: decided.agents.find((a) => a.agentId === c.agentId)?.score ?? 0,
         })),
         needsAgentScore: decided.needsAgent ?? null,
-        selectedAgentIds: selected,
+        selectedAgentIds: chosen,
         reason:
-          [followUp ? FOLLOW_UP : null, duplicate ? "already answered by another agent" : null, words]
+          [
+            followUp ? FOLLOW_UP : null,
+            strategy === "rule:coordinator" ? "coordinator" : null,
+            duplicate ? "already answered by another agent" : null,
+            words,
+          ]
             .filter(Boolean)
             .join("; ")
             .slice(0, 1000) || null,
@@ -1036,15 +1070,15 @@ export async function routeMessage(
       .onConflictDoNothing()
       .returning({ id: routingDecisions.id });
     if (!decision) return null; // another worker routed it first
-    return createAgentRuns(tx, message, selected, "router", { joinChannelRun: message.authorType === "person" });
+    return createAgentRuns(tx, message, chosen, "router", { joinChannelRun: message.authorType === "person" });
   });
   if (!runs) return { runs: [], skipped: "already_routed" };
   return {
     runs,
-    selected,
+    selected: chosen,
     seenBy: candidates.map((c) => c.agentId),
     continuityAgentId,
-    ...(decided.decidedBy ? { decidedBy: decided.decidedBy } : {}),
+    ...(decidedBy ? { decidedBy } : {}),
   };
 }
 
