@@ -521,9 +521,19 @@ describe("the agent a person last talked to", () => {
     const theo = await make("Theo", "PM");
     const ada = await make("Ada", "Dev");
     let n = 0;
-    /** In a channel of their own: `before` (Ana's, or an agent's), then `body` by Ana (or `by`), routed on Jev's `answer`. */
-    async function talk(before: Said[], body: string, answer: Parameters<typeof fakeJev>[0], by: Said[0] = null) {
+    /**
+     * In a channel of their own: `before` (Ana's, or an agent's), then `body` by Ana (or `by`), routed on Jev's
+     * `answer` after the router's quiet wait (`quietMs`, none by default).
+     */
+    async function talk(
+      before: Said[],
+      body: string,
+      answer: Parameters<typeof fakeJev>[0],
+      by: Said[0] = null,
+      quietMs = 0,
+    ) {
       n += 1;
+      const now = Date.now();
       const channel = await createChannel(f.db, f.owner.id, f.org.id, { name: `private-${n}` });
       for (const a of [theo, ada]) await addChannelMember(f.db, f.owner.id, f.org.id, channel.id, { agentId: a.id });
       const say = async ([author, text, minutesAgo, routedTo, more]: Said) => {
@@ -534,7 +544,7 @@ describe("the agent a person last talked to", () => {
             ? { type: "agent", agentId: author.id, runId: author.runId ?? null, hop: 1, stretchId: null }
             : { type: "person", userId: f.owner.id },
           body: text,
-          createdAt: new Date(Date.now() - minutesAgo * 60_000),
+          createdAt: new Date(now - minutesAgo * 60_000),
         });
         if (routedTo) {
           const selectedAgentIds = routedTo.map((a) => a.id);
@@ -558,7 +568,10 @@ describe("the agent a person last talked to", () => {
         fetch: fakeJev(answer).fetcher,
       });
       const policy = { ...DEFAULT_ROUTER_POLICY, maxHops: 3 };
-      const { selected } = await routeMessage({ db: f.db, strategy, policy }, { orgId: f.org.id, messageId: m.id });
+      const { selected } = await routeMessage(
+        { db: f.db, strategy, policy, quietMs },
+        { orgId: f.org.id, messageId: m.id },
+      );
       const [decision] = await f.db
         .select()
         .from(schema.routingDecisions)
@@ -707,6 +720,31 @@ describe("the agent a person last talked to", () => {
       bomDia("ada", "theo"),
     );
     expect(selected).toEqual([t.ada.id]);
+  });
+
+  test("a message of theirs the router hasn't decided on yet leaves whom they talk to unknown", async () => {
+    const t = await privateRoom();
+    const talkWithAda: Said[] = [
+      [null, "ada quanto ta seu limite de uso?", 23.4, [t.ada]],
+      [t.ada, "Não consigo ver meu saldo por aqui.", 23],
+    ];
+    // Four seconds ago, past the quiet wait, and still being routed: the step decides, as it did that day.
+    const pending = await t.talk(
+      [...talkWithAda, [null, "cria uma task pra revisar o PR do checkout", 4 / 60]],
+      BOM_DIA,
+      bomDia("theo", "ada"),
+    );
+    expect(pending.selected).toEqual([t.theo.id]);
+    expect(pending.decision?.reason).toBe("jev: best @theo (confidence 0.83)");
+    // A thank-you in two messages, decided as one (on the second) and sent to nobody, doesn't end the talk.
+    const thanked = await t.talk(
+      [...talkWithAda, [null, "valeu", 20], [null, "ajudou muito", 20 - 1 / 600, []]],
+      BOM_DIA,
+      bomDia("theo", "ada"),
+      null,
+      500,
+    );
+    expect(thanked.selected).toEqual([t.ada.id]);
   });
 
   test("an agent's message is unchanged: only a clear pick, the best one, and it may pass", async () => {

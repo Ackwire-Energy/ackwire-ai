@@ -976,22 +976,37 @@ export async function routeMessage(
   // (`ROUTER_SLICE`: 30 minutes, 12 messages). It went to whom it @mentioned, else to the agent the router sent it
   // to once that agent answered or while it is still at work on it (one that passed or failed was never talked
   // to: the message went to no agent, like a "valeu"), else, never routed, to the first agent that answered it.
-  // Read newest first, so no other agent was addressed since; one that went to several agents is no one's. Within
-  // continuity's window it is the agent they are just talking to, or none: another agent that spoke since keeps
-  // today's follow-ups.
+  // One decided with their next message (`continued`) went where that one did. One the router hasn't decided on
+  // yet, still unanswered, leaves it unknown. Read newest first, so no other agent was addressed since; one that
+  // went to several agents is no one's. Within continuity's window it is the agent they are just talking to, or
+  // none: another agent that spoke since keeps today's follow-ups.
   let lastTalkedTo: string | null = null;
   if (continues && !namesPerson && !repliedAgentId && candidates.length >= 2) {
     const spoke = new Set<string>();
     let answeredBy: string | null = null;
+    let next: (typeof history)[number] | undefined;
     for (const m of [...before, ...(root ? [root] : [])]) {
       if (message.createdAt.getTime() - m.createdAt.getTime() > ROUTER_SLICE.maxAgeMs) break;
+      const after = next;
+      next = m;
       if (m.authorAgentId) {
         spoke.add(m.authorAgentId);
         answeredBy = m.authorAgentId;
       }
       if (m.authorUserId !== message.authorUserId) continue;
+      // `continuedSoon`'s test: the next message here is theirs, one the router decides on, within the quiet wait.
+      const continued =
+        m.routable &&
+        after?.authorUserId === m.authorUserId &&
+        after.routable &&
+        after.threadId === m.threadId &&
+        after.createdAt.getTime() - m.createdAt.getTime() <= quietMs;
+      if (m.routable && m.routedTo === null && !continued && !answeredBy) break;
       const routed = m.routedTo?.length === 1 ? m.routedTo.filter((id) => m.working || spoke.has(id)) : m.routedTo;
-      const to = m.mentionedAgentIds.length > 0 ? m.mentionedAgentIds : (routed ?? (answeredBy ? [answeredBy] : []));
+      const to =
+        m.mentionedAgentIds.length > 0
+          ? m.mentionedAgentIds
+          : (routed ?? (answeredBy && !continued ? [answeredBy] : []));
       if (to.length === 0) continue;
       const [only] = to;
       lastTalkedTo = to.length === 1 && only && candidateIds.has(only) ? only : null;
