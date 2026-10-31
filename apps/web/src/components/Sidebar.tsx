@@ -70,6 +70,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { useApi } from "@/api/context";
 import { useAuth } from "@/auth/context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { agentLine, availabilityOf, personLine, useAgentPresence, usePersonPresence } from "@/hooks/usePresence";
@@ -1474,14 +1475,18 @@ function AccountMenu() {
 /**
  * In the account menu, the one of your plans near or at its limit (from `PLAN_ALMOST`, 80%: "Quase no limite"), at
  * its limit first: its maker's mark, its name and its state, opening Configurações › Uso. Nothing otherwise. Your
- * accounts are read when the menu opens.
+ * accounts are read, and their usage looked up again (it comes back as `machine.updated`), when the menu opens.
  */
 function PlanNearLimitItem() {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
+  const api = useApi();
   const dir = useDirectory(org.id);
   const navigate = useNavigate();
   const plan = planNearLimit(ownPlanLines(t, useAiAccounts(org.id).data, dir.agents, me.user.id));
+  useEffect(() => {
+    void api.machines.refreshAccountUsage(org.id).catch(() => undefined);
+  }, [api, org.id]);
   if (!plan) return null;
   return (
     <MenuItem

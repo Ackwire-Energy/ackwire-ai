@@ -46,7 +46,12 @@ export function AccountSection() {
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const navigate = useNavigate();
+  const api = useApi();
   const plans = ownPlanLines(t, useAiAccounts(org.id).data, dir.agents, me.user.id);
+  // Looking at your plans: their usage is looked up again (it comes back as `machine.updated`).
+  useEffect(() => {
+    void api.machines.refreshAccountUsage(org.id).catch(() => undefined);
+  }, [api, org.id]);
   const theme = useTheme();
   const look = useSyncExternalStore(onMenuLookChange, menuLook, () => "ours" as const);
   const sounds = useSyncExternalStore(onSoundChoiceChange, soundChoice, soundChoice);

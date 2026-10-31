@@ -94,6 +94,9 @@ const names = (menu: HTMLElement) =>
 
 /** Sua conta's card of your plans, by its words (null: none). */
 const plansCard = () => screen().queryByRole("region", { name: "Limites dos seus planos" })?.textContent ?? null;
+/** Each time the app asked the computers to look your plans' usage up again. */
+const refreshes = (state: State) =>
+  state.calls.filter((c) => c.method === "machines.refreshAccountUsage").map((c) => c.args);
 
 /** The Uso tile on Settings: its line and whether it draws the budget's meter. */
 const usageTile = () => {
@@ -129,6 +132,12 @@ describe("Sua conta: your plans' limits", () => {
     await go("settings/account", onPlans(), [{ ...TEAM, usedBy: [] }]);
     expect(plansCard()).toBeNull();
   });
+
+  test("opening it asks your computers to look your plans' usage up again", async () => {
+    const state = onPlans();
+    await go("settings/account", state);
+    expect(refreshes(state)).toEqual([[ORG_ID]]);
+  });
 });
 
 describe("the Uso tile: the workspace's budget only where it uses the API", () => {
@@ -153,6 +162,14 @@ describe("the account menu: a plan near its limit", () => {
   test("under 80%: no line, the menu as it was", async () => {
     await go("settings", onPlans(), [{ ...TEAM, usage: used(12, 79) }]);
     expect(names(await openMenu())).toEqual(["Definir status", "Editar perfil", "Configurações", "Sair"]);
+  });
+
+  test("opening it asks your computers to look your plans' usage up again", async () => {
+    const state = onPlans();
+    await go("settings", state, [{ ...TEAM, usage: used(12, 79) }]);
+    expect(refreshes(state)).toEqual([]);
+    await openMenu();
+    expect(refreshes(state)).toEqual([[ORG_ID]]);
   });
 
   test("from 80%: one line under your status, the plan and how it stands, opening Uso", async () => {
