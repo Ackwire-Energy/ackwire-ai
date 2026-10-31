@@ -8,6 +8,7 @@ import type {
   MachineAccess,
   MachinePause,
   Me,
+  OrgDeletion,
   OrgStanding,
 } from "../api/types";
 
@@ -196,9 +197,10 @@ const SETUP_FIELDS = [
  * `GET …/computer-setup` but `mode`) replaces what the setup query holds, and the computer's first hello
  * (`ready`) refetches the computers; `org.standing` sets this workspace's standing in `GET /me`, so the banner
  * and the suspended screen follow without a reload, and asks for the setup again: a workspace on hold waits for no
- * computer, and one active again waits for one. `org.limits` (a new plan, ADR 0079) asks for the limits again, so a
- * full workspace's invitations open by themselves. `agent.groups` (ADR 0083) says the groups of agents changed: they
- * are read again. `member.status` and `agent.status` (ADR 0084) refetch the people and the agents' presence. Returns
+ * computer, and one active again waits for one. `org.deleting` (an owner deleted it) sets its deletion there, so the
+ * closing screen takes its place at once. `org.limits` (a new plan, ADR 0079) asks for the limits again, so a full
+ * workspace's invitations open by themselves. `agent.groups` (ADR 0083) says the groups of agents changed: they are
+ * read again. `member.status` and `agent.status` (ADR 0084) refetch the people and the agents' presence. Returns
  * whether the event was one of these.
  */
 export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { type: string }): boolean {
@@ -241,6 +243,18 @@ export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { typ
     void qc.invalidateQueries({ queryKey: keys.computerSetup(target) });
     return true;
   }
+  if (event.type === "org.deleting") {
+    const e = event as { orgId?: unknown; dueAt?: unknown; by?: unknown };
+    const by = isObject(e.by) ? e.by : {};
+    setOrgDeletion(qc, typeof e.orgId === "string" ? e.orgId : orgId, {
+      dueAt: typeof e.dueAt === "string" ? e.dueAt : null,
+      requestedAt: new Date().toISOString(),
+      requestedBy: typeof by.id === "string" && typeof by.name === "string" ? { id: by.id, name: by.name } : null,
+    });
+    // The socket closes right after it: the server's own record replaces this one.
+    void qc.invalidateQueries({ queryKey: keys.me });
+    return true;
+  }
   if (event.type === "org.limits") {
     void qc.invalidateQueries({ queryKey: keys.limits(orgId) });
     return true;
@@ -255,4 +269,24 @@ export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { typ
     return true;
   }
   return false;
+}
+
+/**
+ * A workspace's deletion in `GET /me`, as the server will say it: set when an owner deletes it (a workspace being
+ * deleted has no onboarding to resume), gone once restored.
+ */
+export function setOrgDeletion(qc: QueryClient, orgId: string, deletion: OrgDeletion | null) {
+  qc.setQueryData<Me | null>(keys.me, (me) =>
+    me
+      ? {
+          ...me,
+          organizations: me.organizations.map((o) => {
+            if (o.id !== orgId) return o;
+            const { deletion: _, onboarding, ...rest } = o;
+            if (deletion) return { ...rest, deletion };
+            return onboarding ? { ...rest, onboarding } : rest;
+          }),
+        }
+      : me,
+  );
 }

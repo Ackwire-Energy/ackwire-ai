@@ -228,8 +228,9 @@ export async function listConnections(db: Database, actorId: string, orgId: stri
 }
 
 /**
- * Best effort: tells the provider to drop our grant too (GitHub OAuth apps:
- * `DELETE /applications/{client_id}/grant`). Never blocks disconnecting.
+ * Best effort: tells the provider to drop this connection's token too (GitHub OAuth apps:
+ * `DELETE /applications/{client_id}/token`). Never the whole grant: that would also revoke the tokens the same
+ * GitHub account gave this server's app in its other workspaces. Never blocks disconnecting.
  */
 export async function revokeAtProvider(deps: ConnectorDeps, orgId: string, connectionId: string) {
   const [c] = await deps.db
@@ -241,7 +242,7 @@ export async function revokeAtProvider(deps: ConnectorDeps, orgId: string, conne
   const secret = await openConnectionSecret(deps.keyWrappers, c).catch(() => null);
   if (!app || !secret?.accessToken) return false;
   const res = await (deps.http ?? fetch)(
-    `https://api.github.com/applications/${encodeURIComponent(app.clientId)}/grant`,
+    `https://api.github.com/applications/${encodeURIComponent(app.clientId)}/token`,
     {
       method: "DELETE",
       headers: {

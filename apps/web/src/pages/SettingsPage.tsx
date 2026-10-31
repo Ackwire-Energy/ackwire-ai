@@ -62,6 +62,7 @@ import { WhoPicksSection } from "@/components/ai/Jev";
 import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { ComputersSection } from "@/components/Computers";
 import { ConnectorsSection } from "@/components/Connectors";
+import { DeleteWorkspaceDialog } from "@/components/DeleteWorkspace";
 import { ImportExportSection } from "@/components/ImportFlow";
 import { BillingMeters } from "@/components/Limits";
 import { ErrorState, LoadingLine, LoadingList } from "@/components/Loading";
@@ -76,6 +77,7 @@ import { SkillsSection } from "@/components/Skills";
 import { StorageSection } from "@/components/StorageSettings";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useCentreCurrent } from "@/hooks/useCentreCurrent";
+import { useOpenParam } from "@/lib/open-param";
 import { useToast } from "@/lib/toast";
 import { MembersPage } from "./MembersPage";
 import { SETTINGS_GROUPS, SETTINGS_SECTIONS, type SettingsSection } from "./settings-sections";
@@ -427,8 +429,35 @@ function GeneralSection() {
 
       <SettingsTiles />
       <UsageStatisticsCard />
+      {org.role === "owner" && <DeleteWorkspaceCard />}
       <OrgLogoDialog open={logo} onClose={() => setLogo(false)} />
     </>
+  );
+}
+
+/**
+ * Owners, at the bottom of Geral: deleting the workspace. Its dialog is kept in the address (`?delete=1`), which the
+ * phone, the account's blockers and a sign-in again open.
+ */
+function DeleteWorkspaceCard() {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const [open, setOpen] = useOpenParam("delete");
+  return (
+    <Card aria-labelledby="sec-delete" className="settings-danger">
+      <CardHeader
+        id="sec-delete"
+        icon="trash"
+        title={t("deleteOrg.card.title")}
+        subtitle={t("deleteOrg.card.text", { name: org.name })}
+        action={
+          <Button size="sm" variant="danger" onClick={() => setOpen(1)}>
+            {t("deleteOrg.card.button")}
+          </Button>
+        }
+      />
+      <DeleteWorkspaceDialog org={org} open={open !== null} onClose={() => setOpen(null)} />
+    </Card>
   );
 }
 

@@ -697,6 +697,18 @@ volume. With all four `S3_*` variables set they go to that bucket instead, and w
 Postgres. Choose before the first upload: a file stays in the store it was written to. An
 organization can also keep its files in a bucket of its own (**Settings → Storage**).
 
+**Deleting workspaces and accounts.** An owner deletes a workspace in **Settings → General**, with a
+code emailed to them (with no email set up, their password instead): it closes for everyone at once,
+its agents stop, and it is deleted for good 7 days later. Until then any owner can restore it. An
+account is deleted at once from the account menu, or the account page on the phone, with the same
+proof, and the workspaces where it was the only member close with it and go 7 days later. With Sign
+in with Apple, register `EMAIL_FROM`'s domain in Apple Developer › Sign in with Apple for Email
+Communication (SPF and DKIM passing): someone who hid their address gets mail only from senders
+registered there, so without it they would get no code. What lives outside the server stays:
+the agents' folders on connected computers until the runner is removed, files in a workspace's own
+bucket, a GitHub App installed on GitHub, and your database dumps until `BACKUP_RETENTION_DAYS` drops
+them. With email set up, the members hear when a workspace is deleted and when it comes back.
+
 **Operator API (optional).** For your own automation: look up any workspace or account on the
 instance. Off unless `OPERATOR_API_TOKEN` is set (at least 32 characters, `openssl rand -base64 48`);
 then a second listener on `OPERATOR_API_PORT` (3001) serves `/api/operator/v1`, called with
@@ -710,6 +722,8 @@ credentials masked; every such read is recorded as an event. `PUT /orgs/{orgId}/
 workspace on hold (its agents stop) or suspends it (nobody can use it, and what its agents are doing
 stops), and brings it back (with `SUPPORT_EMAIL` set, its people see where to write about it); `PUT /orgs/{orgId}/agents/{agentId}/hold` stops one agent, and
 `PUT /users/{userId}/block` signs an account out everywhere and keeps it out until you unblock it.
+`PUT /orgs/{orgId}/deletion-hold` keeps a workspace an owner deleted from going after its 7 days (a
+legal hold), closed, with everything in it, without telling it.
 `MACHINE_PROVISIONING=external` (with the token) is for giving every workspace a computer of its own
 from a provisioner you run: it lists the workspaces still waiting (`GET /machine-requests`), says how
 far each one is, and asks for a single-use code that the computer connects with
@@ -914,7 +928,9 @@ can. Give the runner a user of its own, or a VM. On a Linux server, the installe
 Testing once for all of them, in `/opt/agentes-runner/browser` (root's, each checked against the
 SHA-256 in the installer; running the installer again updates them), so an agent's first use of its
 browser downloads nothing. If the installer can't download them, it goes on, and each agent downloads
-what's missing at its browser's first use, which takes about a minute.
+what's missing at its browser's first use, which takes about a minute. Since its agents run as the
+person who connected it, a computer leaves the organization with them when they leave, are removed or
+delete their account; one installed with `--system` is the team's and stays.
 
 Mac and Windows computers get no agents' desktops: the agent's browser runs headless, and its card
 shows it live. A Mac connected with the command above opens terminals

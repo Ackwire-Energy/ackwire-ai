@@ -70,6 +70,16 @@ export const organizations = pgTable("organizations", {
   /** The month (`YYYY-MM`) and highest share (50, 100) of the platform's AI already told (`platform_ai.threshold`). */
   platformAlertMonth: text(),
   platformAlertPercent: smallint(),
+  /**
+   * Set while an owner's deletion is pending: when the workspace goes for good. It is closed meanwhile, like a
+   * suspended one (`closedRefusal`, `openOrg` in `standing.ts`), and restoring it clears the three.
+   */
+  deletionDueAt: timestamp({ withTimezone: true }),
+  deletionRequestedAt: timestamp({ withTimezone: true }),
+  deletionRequestedBy: text().references(() => users.id, { onDelete: "set null" }),
+  /** The operator's deletion hold (a legal hold): the deletion waits while it is set. Never shown to the workspace. */
+  deletionHoldAt: timestamp({ withTimezone: true }),
+  deletionHoldReason: text(),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });
 

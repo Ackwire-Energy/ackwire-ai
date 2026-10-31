@@ -6,6 +6,7 @@ import { steerStore } from "../realtime/steer";
 import type { HttpApi } from "./client";
 import { ApiError, createFileRequester, createRequester, enc, type TransportOptions } from "./http";
 import type {
+  AccountDeletionPlan,
   AccountLoginStart,
   AccountLoginStatus,
   ActiveRun,
@@ -47,6 +48,7 @@ import type {
   Channel,
   ChannelCategory,
   ChannelMember,
+  CodeSent,
   CommandApproval,
   ComputerSetup,
   ComputerTarget,
@@ -84,7 +86,6 @@ import type {
   IssueColumn,
   JevKey,
   JoinApproval,
-  JoinCodeSent,
   JoinRequest,
   Machine,
   MachineAccess,
@@ -355,6 +356,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       updateMe: (input) => request<void>("/api/app/me", { method: "PATCH", json: input }),
       phoneSignIn: () => request<PhoneSignIn>("/api/app/phone-sign-in", { json: {} }),
       addPassword: (password) => request<void>("/api/app/me/password", { json: { password } }),
+      deletionPlan: () => request<AccountDeletionPlan>("/api/app/account/deletion"),
+      deletionCode: () => request<CodeSent>("/api/app/account/deletion/code", { json: {} }),
+      delete: (input = {}) => request<void>("/api/app/account", { method: "DELETE", json: input }),
     },
     push: {
       webKey: async () =>
@@ -374,6 +378,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           }),
         ),
       get: (orgId) => request<Organization>(org(orgId)),
+      deletionCode: (orgId) => request<CodeSent>(`${org(orgId)}/deletion/code`, { json: {} }),
+      deleteWorkspace: async (orgId, input = {}) =>
+        (await request<{ deletion: { dueAt: string } }>(`${org(orgId)}/deletion`, { json: input })).deletion,
+      restore: (orgId) => request<void>(`${org(orgId)}/deletion`, { method: "DELETE" }),
       setAvatar: (orgId, input) =>
         request<{ avatarUrl: string }>(`${org(orgId)}/me/avatar`, { method: "PUT", json: input }),
       removeAvatar: (orgId) => request<void>(`${org(orgId)}/me/avatar`, { method: "DELETE" }),
@@ -800,7 +808,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       links: async (orgId) => (await request<{ links: InviteLink[] }>(`${org(orgId)}/invite-links`)).links,
       turnOff: (orgId, linkId) => request<void>(`${org(orgId)}/invite-links/${enc(linkId)}`, { method: "DELETE" }),
       sendCode: (token, input, humanCheck) =>
-        request<JoinCodeSent>(`/api/app/invitations/${enc(token)}/code`, {
+        request<CodeSent>(`/api/app/invitations/${enc(token)}/code`, {
           json: input,
           headers: humanCheckHeaders(humanCheck),
         }),

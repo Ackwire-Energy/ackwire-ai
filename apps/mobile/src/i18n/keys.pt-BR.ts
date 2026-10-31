@@ -76,8 +76,6 @@ export const mobilePtBR = {
     signOut: "Sair",
   },
   account: {
-    deleteSoleOwner:
-      "Você é a única pessoa dona de um workspace com outros membros. No site, em Pessoas, torne outra pessoa dona e depois volte aqui.",
     deleteFailed: "Não deu para apagar sua conta agora. Tente de novo.",
     deleted: "Sua conta foi apagada.",
     signedOut: "Você saiu.",

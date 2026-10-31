@@ -389,6 +389,34 @@ describe("live: machine.provisioning, org.standing and org.limits", () => {
     });
   });
 
+  test("a deleting event closes that workspace in /me at once, with who deleted it and when it goes", () => {
+    const qc = new QueryClient();
+    const me: Me = {
+      user: { id: "u1", name: "Walt", email: "w@x.co", image: null },
+      organizations: [
+        { id: "o1", name: "Acme", role: "member", onboarding: { step: "ai", generalChannelId: "c1" } },
+        { id: "o2", name: "Beta", role: "owner" },
+      ],
+    };
+    qc.setQueryData(keys.me, me);
+    expect(
+      applyWorkspaceEvent(qc, "o1", {
+        type: "org.deleting",
+        orgId: "o1",
+        dueAt: "2026-11-06T12:00:00.000Z",
+        by: { id: "u2", name: "Bia" },
+      } as { type: string }),
+    ).toBe(true);
+    const [acme, beta] = qc.getQueryData<Me>(keys.me)?.organizations ?? [];
+    expect(acme?.deletion).toMatchObject({ dueAt: "2026-11-06T12:00:00.000Z", requestedBy: { id: "u2", name: "Bia" } });
+    expect(Number.isNaN(Date.parse(acme?.deletion?.requestedAt ?? ""))).toBe(false);
+    // Being deleted, it resumes no onboarding: GET /me leaves that out.
+    expect(acme?.onboarding).toBeUndefined();
+    expect(beta?.deletion).toBeUndefined();
+    // The server's own record replaces it: the socket closes right after.
+    expect(qc.getQueryState(keys.me)?.isInvalidated).toBe(true);
+  });
+
   test("a limits event (a new plan, ADR 0079) asks for the workspace's limits again", () => {
     const qc = new QueryClient();
     qc.setQueryData(keys.limits("o1"), { members: { used: 1, limit: 1 } });

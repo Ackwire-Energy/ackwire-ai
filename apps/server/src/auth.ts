@@ -10,6 +10,7 @@ import {
   EARLY_ACCESS_TOKEN,
   earlyAccessLink,
   emailLocale,
+  ForbiddenError,
   isAgentesCloud,
   onUserCreated,
   queueEmail,
@@ -20,6 +21,8 @@ import {
   sha256,
   signupAdmission,
   signupOpenToAll,
+  spendDeletionCode,
+  TooManyError,
   useEarlyAccess,
   type WorkspacePolicy,
 } from "@agenteschat/engine";
@@ -29,7 +32,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthEndpoint, createAuthMiddleware, formCsrfMiddleware, getOAuthState } from "better-auth/api";
 import { setSessionCookie } from "better-auth/cookies";
 import { z } from "zod";
-import { desktopSignIn } from "./desktop-sign-in";
+import { desktopSignIn, FRESH_SIGN_IN_MS } from "./desktop-sign-in";
 import { humanCheckRefusal } from "./http/human-check";
 import type { Logger } from "./logger";
 import { ownerSignIn } from "./owner-claim";
@@ -101,6 +104,11 @@ export function createAuth(deps: {
     appName: "agentes.chat",
     baseURL: config.PUBLIC_URL,
     basePath: "/api/auth",
+    // Over HTTP each would tell any session whether a password is right, with none of the limit `deletionProof` keeps:
+    // a stolen session could guess the account's password there, then sign in with it anywhere, or delete with it on
+    // a server that sends no email. No app calls them, `deletionProof` calls `verifyPassword` in this process (which
+    // this leaves open), and a forgotten password is reset by email.
+    disabledPaths: ["/verify-password", "/change-password"],
     // Derived from AGENTES_SECRET so self-hosters manage a single secret.
     secret: deriveSecret(config.AGENTES_SECRET, "sessions"),
     // Apple posts the sign-in result back from its own origin (`response_mode=form_post`).
@@ -332,6 +340,51 @@ export async function sessionUser(auth: Auth, headers: Headers): Promise<Session
 }
 
 /**
+ * Whether this request's session, as `userId`, signed in within `FRESH_SIGN_IN_MS`, as adding a password requires.
+ * Read from the database: a cached cookie can't vouch for it. A session minted from another keeps that one's sign-in
+ * time.
+ */
+export async function signedInLately(auth: Auth, headers: Headers, userId: string) {
+  const current = await auth.api.getSession({ headers, query: { disableCookieCache: true } });
+  if (current?.user.id !== userId) return false;
+  return Date.now() - new Date(current.session.createdAt).getTime() < FRESH_SIGN_IN_MS;
+}
+
+/** Passwords an account may try in 15 minutes to prove it's them. */
+const PROOF_TRIES = { limit: 5, windowMs: 15 * 60_000 };
+
+/**
+ * Proof that the person at this session is the account's own, before deleting the workspace `orgId`, or their account
+ * when it is null (ADR 0088 §2): the code emailed to them (`spendDeletionCode`). On a server that sends no email, their
+ * password instead, with 5 tries per 15 minutes per account (429 after). Throws `reauth.code` without a code, and
+ * `reauth.password` without a password or with a wrong one.
+ */
+export async function deletionProof(
+  auth: Auth,
+  deps: { db: Database; rateLimiter: RateLimiter; emailDelivers: boolean },
+  headers: Headers,
+  userId: string,
+  orgId: string | null,
+  proof: { code?: string; password?: string },
+) {
+  if (deps.emailDelivers) {
+    if (!proof.code) throw new ForbiddenError("Type the code we emailed you", "reauth.code");
+    return spendDeletionCode(deps, userId, orgId, proof.code);
+  }
+  const { password } = proof;
+  if (!password) throw new ForbiddenError("Give your password to confirm it's you", "reauth.password");
+  // Counted before the check: a guess past the limit learns nothing.
+  if (!(await deps.rateLimiter.consume(`deletion-proof:${userId}`, PROOF_TRIES)).allowed) {
+    throw new TooManyError("Too many tries. Try again in a few minutes.");
+  }
+  const right = await auth.api.verifyPassword({ body: { password }, headers }).then(
+    () => true,
+    () => false,
+  );
+  if (!right) throw new ForbiddenError("That password isn't right", "reauth.password");
+}
+
+/**
  * The Expo plugin's `/expo-authorization-proxy` (the phone app's social sign-in, ADR 0035) redirects to any
  * https address and signs that address's `state` into the visitor's state cookie: an open redirect, and a way
  * to plant someone else's sign-in on a victim. It only goes on to a configured provider's own authorization
@@ -512,14 +565,21 @@ const phoneSignIn = {
         const { internalAdapter } = ctx.context;
         const minted = await internalAdapter.consumeVerificationValue(phoneSignInKey(ctx.body.token));
         let user: Awaited<ReturnType<typeof internalAdapter.findUserById>> = null;
+        let signedIn: Date | undefined;
         if (minted?.value.startsWith(FOR_USER))
           user = await internalAdapter.findUserById(minted.value.slice(FOR_USER.length));
         else if (minted) {
           const from = await internalAdapter.findSession(minted.value);
-          if (from && from.session.expiresAt >= new Date()) user = from.user;
+          if (from && from.session.expiresAt >= new Date()) {
+            user = from.user;
+            signedIn = from.session.createdAt;
+          }
         }
         if (!user) throw new APIError("UNAUTHORIZED", { message: "This code expired or was already used" });
-        const session = await internalAdapter.createSession(user.id);
+        // Minted from a session, it signed in when that one did: it proves no fresher sign-in (`signedInLately`).
+        const session = signedIn
+          ? await internalAdapter.createSession(user.id, undefined, { createdAt: signedIn }, true)
+          : await internalAdapter.createSession(user.id);
         await setSessionCookie(ctx, { session, user });
         return ctx.json({ user: { id: user.id, name: user.name, email: user.email } });
       },

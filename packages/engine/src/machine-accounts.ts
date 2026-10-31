@@ -1273,6 +1273,28 @@ export async function releaseMemberAccounts(
 }
 
 /**
+ * A workspace is about to be deleted: every account on its computers becomes a tombstone (ADR 0059 §1), and the
+ * machines are every one holding a tombstone of it, older ones included. Runs in the caller's transaction;
+ * `announceReleasedAccounts` afterwards.
+ */
+export async function releaseOrgAccounts(db: Executor, orgId: string): Promise<ReleasedAccounts> {
+  const live = await db
+    .select({ id: machineAccounts.id })
+    .from(machineAccounts)
+    .where(and(eq(machineAccounts.orgId, orgId), ne(machineAccounts.status, "removing")));
+  const agentIds = await tombstone(
+    db,
+    orgId,
+    live.map((r) => r.id),
+  );
+  const held = await db
+    .selectDistinct({ machineId: machineAccounts.machineId })
+    .from(machineAccounts)
+    .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.status, "removing")));
+  return { machines: held.map((m) => ({ orgId, machineId: m.machineId })), agents: [{ orgId, agentIds }] };
+}
+
+/**
  * An agent is being deleted (ADR 0082): its login (the account it thinks with, which serves only it) becomes a
  * tombstone like one a person removes; the account's other logins stay with their agents, and so does a login made
  * for all of its owner's agents (`shared`), which serves no agent alone. Runs in the caller's transaction;
@@ -1306,7 +1328,10 @@ export async function releaseAgentLogin(db: Executor, orgId: string, agentId: st
   return { machines: [{ orgId, machineId: login.machineId }], agents: [{ orgId, agentIds }] };
 }
 
-/** After `releaseMemberAccounts` or `releaseAgentLogin`: pages refetch, and the replica holding each machine's runner removes them. */
+/**
+ * After `releaseMemberAccounts`, `releaseOrgAccounts` or `releaseAgentLogin`: pages refetch, and the replica holding
+ * each machine's runner removes them.
+ */
 export async function announceReleasedAccounts(pubsub: PubSub | undefined, released: ReleasedAccounts) {
   for (const a of released.agents) forgetAgents(a.orgId, a.agentIds);
   for (const m of released.machines) {

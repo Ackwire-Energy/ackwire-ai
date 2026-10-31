@@ -89,6 +89,7 @@ export const RUN_CODES = [
   "no_ai",
   "org_paused",
   "org_suspended",
+  "org_deleting",
   "agent_paused",
   "computer_busy",
 ] as const;

@@ -1,6 +1,6 @@
 # 0019. File storage per organization, and artifacts
 
-- Status: Accepted
+- Status: Accepted. Amended 2026-10-30 by ADR 0088 (deleted workspaces go at the end of their 7 days; a deleted account's photos)
 - Date: 2026-10-14
 
 ## Decision
@@ -8,6 +8,8 @@
 **Blob stores.** Files go through a `BlobStore` (put, get, delete, list, signed GET URL). Implementations: S3-compatible buckets (a small SigV4 client over `fetch`, no SDK, so tests swap the transport for an in-process fake server), Postgres (fallback when the deployment has no bucket; can't sign, so downloads are streamed), and memory (tests). Platform storage is our bucket from `S3_*` (Cloudflare R2), one key prefix per org (`orgs/{orgId}/`); without `S3_*` it is Postgres. Objects are private.
 
 **Deleted workspaces.** A workspace deleted with its last member's account leaves platform storage through the job `org.files.purge`, enqueued with the deletion and without `org_id` (the row would go with the workspace): its keys under `orgs/{orgId}/` and its logo under `org-logos/{orgId}/`. On disk (`FILES_DIR`) each folder goes at once with the folders inside it (`deletePrefix`). Elsewhere a run deletes 1,000 keys of each, and the job runs again while a page comes back full. It keeps trying through a storage outage for about 30 days (240 attempts). A second pass a day after the deletion takes files that work under way stored after the first. It never touches a workspace that still exists. A bucket the workspace brought stays its own.
+
+*Amended 2026-10-30 (ADR 0088):* every workspace is deleted at the end of its 7 days by the `org.delete` job, whoever asked (an owner, or the account of its only member), and that job queues `org.files.purge` and its second pass in the transaction that deletes the row. A deleted account's photos (`avatars/{userId}/`) leave platform storage through `user.files.purge`, queued in the account's deletion with no `org_id`: one page of 1,000 keys holds them all, since a new photo replaces the last, it keeps trying as long as `org.files.purge` (240 attempts), and it never touches an account that still exists. The route also deletes them at once, best effort.
 
 **Per-org storage.** An org may bring its own S3-compatible bucket (R2, AWS S3, MinIO, Wasabi…): `storage_configs` keeps endpoint, region, bucket, prefix, path-style, the access key id, and the secret envelope-encrypted like provider keys (bound to org and row); only hints come back. Rows are immutable after the probe: new settings are a new row. Every blob read and write goes through `BlobStoreResolver.forOrg(orgId)` (where new objects go) and `forConfig(orgId, configId)` (where an existing object was written). Each artifact version records `storage_config_id` and its key, so switching storage never breaks old files; an admin-started job (`storage.migrate`) copies existing objects to the current storage and repoints them, saving progress after each object and resuming after a failure. Google Drive and OneDrive (OAuth into a folder) are planned behind the same interface (`storage_kind` already lists them).
 

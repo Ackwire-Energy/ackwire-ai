@@ -224,7 +224,11 @@ export interface ComposioClient {
     userId: string,
     options?: { readAddress?: boolean },
   ): Promise<{ status: "active" | "pending" | "failed" | "expired"; address: string | null }>;
-  /** Also revokes the grant at Google/Microsoft, unless `revoke: false` (Composio only forgets the account). */
+  /**
+   * Deletes a connected account. `revoke` (the default) also revokes its grant at Google or Microsoft, which every
+   * connection of the same mailbox to this server's Composio project shares. `revoke: false`: Composio only forgets
+   * the account.
+   */
   deleteConnectedAccount(id: string, options?: { revoke?: boolean }): Promise<void>;
   /** A "new message" trigger on the account; `query` is a Gmail search (Outlook: filtered on our side). */
   createMailTrigger(input: {

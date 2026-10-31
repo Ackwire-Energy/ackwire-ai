@@ -122,7 +122,10 @@ export interface EngineOptions {
   toolsOnDemand?: boolean;
   /** Where emails get their pictures (`emailArtFor` at boot); default: linked from `PUBLIC_URL`'s `/email/`. */
   emailArt?: EmailArt;
-  log?: { warn(message: string, data?: Record<string, unknown>): void };
+  log?: {
+    info(message: string, data?: Record<string, unknown>): void;
+    warn(message: string, data?: Record<string, unknown>): void;
+  };
 }
 
 /**
@@ -434,6 +437,10 @@ export function buildEngine(o: EngineOptions) {
     storage,
     artifacts,
     sandbox,
+    // A workspace's deletion revokes its grants at GitHub and Composio, and leaves a line in the log.
+    connectors: connectorDeps,
+    mail: adapters.mail,
+    log: o.log,
     maxToolTurns: config.AGENT_MAX_TOOL_TURNS,
     // Tools on demand (ADR 0043): each run lists what the judge expects it to need; the rest behind `find_tools`.
     toolsOnDemand: o.toolsOnDemand ?? true,

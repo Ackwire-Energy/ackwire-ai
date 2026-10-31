@@ -170,6 +170,42 @@ export interface OrgSummary {
    * which resumes it, instead of the workspace. Absent: finished, not theirs to set up, or an older server.
    */
   onboarding?: OrgOnboarding;
+  /** From `GET /me` while an owner's deletion is pending, set at once by `org.deleting`: the workspace is closed. */
+  deletion?: OrgDeletion;
+}
+
+/** A workspace being deleted. Any owner restores it until `dueAt`. */
+export interface OrgDeletion {
+  /** When it goes for good; null once that date passed, while it is only being deleted. */
+  dueAt: string | null;
+  requestedAt: string | null;
+  /** Who deleted it; null once their account is gone. */
+  requestedBy: { id: string; name: string } | null;
+}
+
+/** What proves it's me before deleting (ADR 0088 §2): the code emailed to me, or my password where no email goes. */
+export interface DeletionProofInput {
+  code?: string;
+  password?: string;
+}
+
+/** `GET /account/deletion`: what deleting my account would close, leave and remove. */
+export interface AccountDeletionPlan {
+  /**
+   * Only I am in them: they close now and are deleted for good 7 days later. One being deleted already keeps its date
+   * (`deletion.dueAt`, null once it passed).
+   */
+  closes: { id: string; name: string; deletion?: { dueAt: string | null } }[];
+  /** Others are in them: I leave. */
+  leaves: { id: string; name: string; role: Role }[];
+  /** I'm their only owner, others are in them and they aren't being deleted: the account can't go yet (`sole_owner`). */
+  soleOwner: { id: string; name: string }[];
+  /** Computers I connected in the workspaces I leave, not in system mode: removed with the account. */
+  computers: { orgId: string; id: string; name: string }[];
+  /** Keys, connections and mailboxes I added to the workspaces I leave: the workspace's, so they stay. */
+  staysBehind: { orgId: string; kind: "key" | "connection" | "mailbox"; name: string }[];
+  /** I set up this server: its own settings will have no owner here, only in its environment (ADR 0073). */
+  serverOwner: boolean;
 }
 
 /** Where a workspace's onboarding stands. */
@@ -269,13 +305,19 @@ export interface InvitationPreview {
   kind?: "email" | "link";
   /** Who invited (their name), when known. */
   invitedBy?: string | null;
-  /** The workspace's logo, served for this invitation or link only (absent without one, or while it is paused). */
+  /**
+   * The workspace's logo, served for this invitation or link only (absent without one, or while it is paused or
+   * being deleted).
+   */
   logo?: string;
   /** The organization's first agents ("Theo, Ada, Lia e Atlas já trabalham lá"). */
   agents?: { id: string; name: string; appearance: { color: string; eyes: string; accessory: string } | null }[];
   /** How many more agents work there than `agents` names ("… e mais 2 já trabalham lá"). */
   moreAgents?: number;
-  /** A link turned off, expired, or whose workspace is paused: nobody can ask with it (ADR 0068). */
+  /**
+   * A link turned off, expired, or whose workspace is paused, or an invitation to a workspace being deleted: nobody can
+   * ask or join with it (ADR 0068).
+   */
   closed?: true;
   /** A link opened signed in: where that person stands (on a link that no longer works, only a member's). */
   you?: JoinStatus;
@@ -297,8 +339,11 @@ export interface AskToJoinResult {
   emailed: boolean;
 }
 
-/** `invites.sendCode` (ADR 0072): the code went to `email`; another can go after `resendIn` seconds. */
-export interface JoinCodeSent {
+/**
+ * A code emailed to `email` (ADR 0072's `invites.sendCode`, ADR 0088's deletion codes); another can go after `resendIn`
+ * seconds.
+ */
+export interface CodeSent {
   email: string;
   resendIn: number;
 }

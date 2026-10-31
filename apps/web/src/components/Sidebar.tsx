@@ -94,6 +94,7 @@ import {
   setMenuLook,
 } from "@/lib/context-menu";
 import { inDesktopApp, onPhoneAsk, takePhoneAsk } from "@/lib/desktop";
+import { useOpenParam } from "@/lib/open-param";
 import { markOpen } from "@/lib/perf";
 import { onSoundChoiceChange, type SoundChoice, setSoundChoice, soundChoice } from "@/lib/sounds";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
@@ -113,6 +114,7 @@ import {
 } from "./AgentGroups";
 import { MoveChannelDialog, NewCategoryDialog, RenameCategoryDialog } from "./ChannelCategoryDialogs";
 import { openPalette } from "./CommandMenu";
+import { DeleteAccountDialog } from "./DeleteAccount";
 import { COMPACT_QUERY, useMediaQuery, useNavDrawer } from "./NavDrawer";
 import { NewChannelDialog } from "./NewChannelDialog";
 import { OpenOnPhoneDialog } from "./OpenOnPhone";
@@ -1330,7 +1332,8 @@ function UnreadCount({ count }: { count: number }) {
  * The account button: your face with your presence badge; under the name, your line (or how you appear, or
  * "Definir status") and the workspace's budget use this month (a percentage, never money). It opens the account's
  * full-screen menu: your status (ADR 0084), profile, time zone, opening the phone app, theme, language, sounds, the
- * budget and signing out.
+ * budget, deleting the account and signing out. Adding a password and deleting the account keep their dialogs in the
+ * address (`?account=password`, `?account=delete`): adding a password may ask for a sign-in again, which comes back.
  */
 function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const { t, i18n } = useTranslation();
@@ -1346,7 +1349,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const trigger = useRef<HTMLButtonElement>(null);
   const [profile, setProfile] = useState<"handle" | "timezone" | null>(null);
   const [phone, setPhone] = useState(false);
-  const [addPassword, setAddPassword] = useState(false);
+  const [account, setAccount] = useOpenParam("account");
   const [statusOpen, setStatusOpen] = useState(false);
   // The app's "Show QR code" for this server (Preferences › Servers).
   useEffect(() => {
@@ -1454,7 +1457,7 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
             <MenuOverlayItem
               icon="key"
               description={t("shell.addPasswordHint")}
-              onSelect={pick(() => setAddPassword(true))}
+              onSelect={pick(() => setAccount("password"))}
             >
               {t("shell.addPassword")}
             </MenuOverlayItem>
@@ -1538,6 +1541,9 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
             </MenuOverlayItem>
           )}
           <MenuOverlaySeparator />
+          <MenuOverlayItem icon="trash" danger onSelect={pick(() => setAccount("delete"))}>
+            {t("deleteAccount.menu")}
+          </MenuOverlayItem>
           <MenuOverlayItem icon="arrowRight" danger onSelect={pick(() => void signOut())}>
             {t("auth.signOut")}
           </MenuOverlayItem>
@@ -1546,7 +1552,11 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
       <ProfileDialog focus={profile} onClose={() => setProfile(null)} />
       <SetStatusDialog open={statusOpen} onClose={() => setStatusOpen(false)} />
       <OpenOnPhoneDialog open={phone} onClose={() => setPhone(false)} />
-      <AddPasswordDialog open={addPassword} onClose={() => setAddPassword(false)} />
+      <AddPasswordDialog
+        open={account === "password" && me.user.hasPassword === false}
+        onClose={() => setAccount(null)}
+      />
+      <DeleteAccountDialog open={account === "delete"} onClose={() => setAccount(null)} />
     </>
   );
 }

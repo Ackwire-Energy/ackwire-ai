@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { AppNotification, JoinStatus } from "../src/api/types";
-import { approvalNews, askedLabel, askView, joinCode, sendsEmail } from "../src/lib/join-requests";
+import { approvalNews, askedLabel, askView, sendsEmail, typedCode } from "../src/lib/join-requests";
 import { openTarget, sortWaiting } from "../src/lib/notifications";
 
 const you = (patch: Partial<JoinStatus> = {}): JoinStatus => ({
@@ -89,10 +89,10 @@ test("when a request came in reads as a sentence: just now, some time ago, yeste
 });
 
 test("a code that proves an address: its digits only, at most six, however it was typed or pasted", () => {
-  expect(joinCode("123 456")).toBe("123456");
-  expect(joinCode("123-456")).toBe("123456");
-  expect(joinCode(" 1234567")).toBe("123456");
-  expect(joinCode("abc")).toBe("");
+  expect(typedCode("123 456")).toBe("123456");
+  expect(typedCode("123-456")).toBe("123456");
+  expect(typedCode(" 1234567")).toBe("123456");
+  expect(typedCode("abc")).toBe("");
 });
 
 const waiting = (id: string, kind: AppNotification["kind"], updatedAt = "2026-10-26T10:00:00.000Z") =>

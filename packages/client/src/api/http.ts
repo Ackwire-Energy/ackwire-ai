@@ -70,7 +70,8 @@ export function createRequester(options: TransportOptions = {}) {
       ...options.headers,
       accept: "application/json",
     };
-    const hasBody = method !== "GET" && method !== "DELETE";
+    // A DELETE goes bare unless it carries something (the proof that deletes an account).
+    const hasBody = method !== "GET" && (method !== "DELETE" || options.json !== undefined);
     if (hasBody) headers["content-type"] = "application/json";
     let url = t.base + path;
     if (options.query) {

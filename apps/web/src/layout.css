@@ -6697,8 +6697,10 @@ a.machine-row__name:hover {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
-/* A suspended workspace's screen: where to ask on a line of its own, its other workspaces under the notice. */
-.suspended-page .support-line {
+/* A suspended workspace's screen: where to ask on a line of its own, its other workspaces under the notice. A
+   workspace being deleted: who may restore it, on a line of its own the same way. */
+.suspended-page .support-line,
+.suspended-page .deleting-page__members {
   display: block;
   margin-top: 6px;
 }

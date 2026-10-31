@@ -1,6 +1,7 @@
 import type { OnboardingStepId } from "../lib/onboarding";
 import type {
   AccessInput,
+  AccountDeletionPlan,
   AccountLoginStart,
   AccountLoginStatus,
   ActiveRun,
@@ -54,6 +55,7 @@ import type {
   Channel,
   ChannelCategory,
   ChannelMember,
+  CodeSent,
   CommandApproval,
   ComputerSetup,
   ComputerTarget,
@@ -67,6 +69,7 @@ import type {
   DatabaseConnection,
   DatabaseConnectionInput,
   DatabaseTable,
+  DeletionProofInput,
   DesktopRelease,
   DesktopStatus,
   DeviceRequest,
@@ -103,7 +106,6 @@ import type {
   IssueStatus,
   JevKey,
   JoinApproval,
-  JoinCodeSent,
   JoinRequest,
   Machine,
   MachineAccess,
@@ -255,8 +257,23 @@ export interface ApiClient {
     updateMe(input: { locale: "pt-BR" | "en" }): Promise<void>;
     /** A one-time sign-in for the phone app, shown as a QR code. */
     phoneSignIn(): Promise<PhoneSignIn>;
-    /** A password for an account that has none (`password_set` 409 when it has one). */
+    /**
+     * A password for an account that has none (`password_set` 409 when it has one). `reauth.sign_in` (403) without a
+     * sign-in in the last 10 minutes.
+     */
     addPassword(password: string): Promise<void>;
+    /** What deleting my account would close, leave and remove. */
+    deletionPlan(): Promise<AccountDeletionPlan>;
+    /**
+     * Emails me the code that deleting my account takes (`reauth.code_wait` 429 with `retryIn` right after another,
+     * `reauth.no_email` 409 on a server that sends none). `sole_owner` (409) while a workspace needs me.
+     */
+    deletionCode(): Promise<CodeSent>;
+    /**
+     * Deletes my account at once, with the emailed `code`, or `password` on a server that sends no email (`reauth.*`
+     * when refused, 429 after 5 passwords). `sole_owner` (409, `params.orgIds`) while a workspace needs me.
+     */
+    delete(input?: DeletionProofInput): Promise<void>;
   };
   /** Where my pushes go: phones (ADR 0035) and browsers (ADR 0071). Per person, not per organization. */
   push: {
@@ -290,6 +307,15 @@ export interface ApiClient {
     ): Promise<{ step: OnboardingStepId; finished: boolean } | null>;
     get(orgId: string): Promise<Organization>;
     update(orgId: string, input: { name?: string; context?: string }): Promise<void>;
+    /** Owners: emails me the code that deleting this workspace takes (as `account.deletionCode`). */
+    deletionCode(orgId: string): Promise<CodeSent>;
+    /**
+     * Owners: closes the workspace for everyone now and deletes it for good 7 days later (`dueAt`); already being
+     * deleted, its date. Proof as `account.delete`'s; 429 after 3 deletions of it in a day.
+     */
+    deleteWorkspace(orgId: string, input?: DeletionProofInput): Promise<{ dueAt: string }>;
+    /** Owners, before its date: it opens again. `org.not_restorable` (409) once the date passed. */
+    restore(orgId: string): Promise<void>;
     /** My handle and time zone in this organization (`timezone: null` = the organization's). */
     updateMe(orgId: string, input: { handle?: string; timezone?: string | null }): Promise<Person>;
     /** Your availability (auto, busy, hidden) and what you are doing (ADR 0084). */
@@ -1105,7 +1131,7 @@ export interface ApiClient {
      * Emails a code that proves the address (ADR 0072): signed out the one typed, signed in the account's own.
      * `join.code_wait` (429) with `retryIn` seconds right after another. `humanCheck`: the bot check's token.
      */
-    sendCode(token: string, input: { email?: string }, humanCheck?: string): Promise<JoinCodeSent>;
+    sendCode(token: string, input: { email?: string }, humanCheck?: string): Promise<CodeSent>;
     /** Checks the code from the email: right, the address can ask for 30 minutes. */
     checkCode(token: string, input: { email?: string; code: string }): Promise<{ verified: true }>;
     /**

@@ -967,6 +967,13 @@
       "when": 1793451203712,
       "tag": "0137_openrouter_auto_models",
       "breakpoints": true
+    },
+    {
+      "idx": 138,
+      "version": "7",
+      "when": 1793451263712,
+      "tag": "0138_workspace_deletion",
+      "breakpoints": true
     }
   ]
 }

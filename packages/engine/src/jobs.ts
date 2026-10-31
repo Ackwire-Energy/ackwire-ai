@@ -1,5 +1,6 @@
 import type {
   EmailSender,
+  MailAdapters,
   Presence,
   PushSender,
   SearchIndexResolver,
@@ -10,6 +11,7 @@ import { and, count, eq, inArray, queryTrace, schema } from "@agenteschat/db";
 import { aiConnectIntent, type ConnectIntent } from "./ai-intent";
 import { orgHasAi } from "./ai-status";
 import type { ArtifactDeps } from "./artifacts";
+import type { ConnectorDeps } from "./connectors/connections";
 import { getChannelCached } from "./context";
 import { consolidateOrg } from "./context/consolidate";
 import { applyReactionFeedback } from "./context/feedback";
@@ -18,11 +20,12 @@ import { judgeOf } from "./context/summaries";
 import { dispatchDm, dispatchMentions, requesterOf } from "./dispatch";
 import { isAgentOnlyDm } from "./dms";
 import { type EmailArt, sendQueuedEmail } from "./email";
+import { forgetCodeEmail } from "./email-codes";
 import { type DecidedBy, publishRouted } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
 import { FOLLOW_UP_JOB, wakeFollowUp } from "./follow-through";
 import { advanceForumTopic } from "./forum";
-import { FILE_JOIN_REQUEST_JOB, fileJoinRequest, forgetJoinCodeEmail } from "./invite-requests";
+import { FILE_JOIN_REQUEST_JOB, fileJoinRequest } from "./invite-requests";
 import type { JevKey, JevKeySource } from "./jev-key";
 import { mentionHandoffs } from "./judge";
 import { platformCapReached } from "./limits";
@@ -42,7 +45,7 @@ import { afterMachineTaskEnded, afterMissionRunEnded, startQueuedMissionTasks } 
 import { type MissionDeps, missionOfThread, missionRole, reactivateMission } from "./missions";
 import type { MissionEngine } from "./missions-engine";
 import { notifyMessage } from "./notification-producers";
-import { ORG_FILES_PURGE_ATTEMPTS, ORG_FILES_PURGE_JOB } from "./organizations";
+import { ORG_FILES_PURGE_ATTEMPTS, ORG_FILES_PURGE_JOB, USER_FILES_PURGE_JOB } from "./organizations";
 import { enqueue, type JobHandlers, type OutboxJob, PermanentJobError } from "./outbox";
 import { checkPushReceipts, deliverPush, pushTicketsOf } from "./push";
 import {
@@ -60,10 +63,11 @@ import { type AgentRun, NO_AI } from "./runs";
 import type { SandboxDeps } from "./sandbox";
 import { indexSource, reindexOrg } from "./search";
 import { activateDeliveredSecret, discardClosedSecret } from "./secrets";
-import { purgeOrgFiles, runMigration, type StorageDeps } from "./storage";
+import { purgeOrgFiles, purgeUserFiles, runMigration, type StorageDeps } from "./storage";
 import { isAgentesCloud } from "./telemetry";
 import { assessThread } from "./thread-assess";
 import { saveWaitlistContact } from "./waitlist";
+import { ORG_DELETE_JOB, purgeWorkspace } from "./workspace-deletion";
 
 /** A thread that grew by another `everyMessages` gets reflected on (capture), within the per-thread cap. */
 async function maybeEnqueueReflection(deps: JobDeps, orgId: string, threadId: string) {
@@ -98,6 +102,15 @@ export interface JobDeps extends RunExecutorDeps {
   presence?: Presence | null;
   /** Org storage (job `storage.migrate`). */
   storage?: StorageDeps;
+  /** Connectors: job `org.delete` revokes a workspace's GitHub OAuth grants at GitHub before its rows go. */
+  connectors?: ConnectorDeps;
+  /** People's mailboxes: job `org.delete` has Composio forget a workspace's mailboxes before its rows go. */
+  mail?: MailAdapters | null;
+  /** What a deleted workspace leaves in the server's log (job `org.delete`). */
+  log?: {
+    info(message: string, data?: Record<string, unknown>): void;
+    warn(message: string, data?: Record<string, unknown>): void;
+  };
   /** Drive (job `forum.advance` saves the forum synthesis). */
   artifacts?: ArtifactDeps;
   /** Agents' computers: the hub and public URL missions use. */
@@ -495,15 +508,27 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         maxAttempts: ORG_FILES_PURGE_ATTEMPTS,
       });
     },
+    [USER_FILES_PURGE_JOB]: async (job) => {
+      if (!deps.storage) throw new PermanentJobError("no storage configured");
+      await purgeUserFiles(deps.storage, String(job.payload.userId));
+    },
+    // A workspace whose deletion's date came (`purgeWorkspace`): a no-op once restored, kept or gone.
+    [ORG_DELETE_JOB]: async (job, ctx) => {
+      await purgeWorkspace(
+        { db: deps.db, pubsub: deps.pubsub, connectors: deps.connectors, mail: deps.mail, log: deps.log },
+        String(job.payload.orgId),
+        { finalAttempt: ctx.finalAttempt },
+      );
+    },
     "email.send": async (job, ctx) => {
       try {
         if (!deps.email) throw new PermanentJobError("no email sender configured");
         await sendQueuedEmail(deps.email, job.payload, deps.emailArt);
       } catch (error) {
-        if (ctx.finalAttempt || error instanceof PermanentJobError) await forgetJoinCodeEmail(deps.db, job);
+        if (ctx.finalAttempt || error instanceof PermanentJobError) await forgetCodeEmail(deps.db, job);
         throw error;
       }
-      await forgetJoinCodeEmail(deps.db, job);
+      await forgetCodeEmail(deps.db, job);
     },
     "waitlist.contact": async (job) => {
       if (!deps.email) throw new PermanentJobError("no email sender configured");

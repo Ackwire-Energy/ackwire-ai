@@ -118,6 +118,8 @@ import {
 } from "@/components/ai/ConnectAiSteps";
 import { JEV_KEY_MIN, JevSteps, JevWhy } from "@/components/ai/Jev";
 import { BillingLinkButton } from "@/components/BillingLinkButton";
+import { DeleteAccountEntry } from "@/components/DeleteAccount";
+import { DeleteWorkspaceDialog } from "@/components/DeleteWorkspace";
 import { ImportedSummary, ImportFlow, ImportReport, useImportFlow } from "@/components/ImportFlow";
 import { MembersFull } from "@/components/Limits";
 import { ErrorState } from "@/components/Loading";
@@ -137,6 +139,7 @@ import { sendNewLink } from "@/lib/email-confirmation";
 import { importedModel } from "@/lib/import";
 import { choosable, itemId } from "@/lib/import-flow";
 import { importVault } from "@/lib/obsidian";
+import { useOpenParam } from "@/lib/open-param";
 import { STORAGE_KEYS, sessionStore, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import "./onboarding.css";
@@ -364,6 +367,9 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
   const [logoDirty, setLogoDirty] = useState(false);
   const [logoOpen, setLogoOpen] = useState(false);
   const [created, setCreated] = useState(resumed?.created ?? null);
+  // "Apagar este workspace": the way out of one made by mistake, its dialog kept in the address (`?delete=1`, which
+  // the phone's onboarding opens).
+  const [deleting, setDeleting] = useOpenParam("delete");
   // Context
   const [context, setContext] = useState(resumed?.context ?? "");
   const [savedContext, setSavedContext] = useState(resumed?.context ?? "");
@@ -1348,7 +1354,19 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
               : {}),
           }))}
         />
-        {/* Until it's finished this is the only screen: the way out of the account is here. */}
+        {/* Until it's finished this is the only screen: the ways out of the workspace and of the account are here. */}
+        {created && (
+          <button type="button" className="onb__signout" onClick={() => setDeleting(1)}>
+            {t("onboarding.deleteLink")}
+          </button>
+        )}
+        <DeleteAccountEntry
+          trigger={(open) => (
+            <button type="button" className="onb__signout" onClick={open}>
+              {t("deleteAccount.menu")}
+            </button>
+          )}
+        />
         <button
           type="button"
           className="onb__signout"
@@ -1360,6 +1378,14 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
         >
           {t("auth.signOut")}
         </button>
+        {created && (
+          <DeleteWorkspaceDialog
+            org={{ id: created.orgId, name: orgSummary?.name ?? orgName }}
+            open={deleting !== null}
+            onClose={() => setDeleting(null)}
+            onDeleted={() => void navigate({ to: "/org/$orgId", params: { orgId: created.orgId } })}
+          />
+        )}
         <OnboardingHorizon progress={answered / toAnswer} />
       </aside>
 

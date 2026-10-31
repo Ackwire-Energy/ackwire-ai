@@ -892,6 +892,9 @@ export const featureKeysPtBR = {
     stays: "Mensagens que você escreveu ficam nas conversas, sem seu nome.",
     blocked:
       "Você é a única pessoa dona de {{names}}. No site, em Pessoas, torne outra pessoa dona e depois volte aqui.",
+    addPasswordFirst: "Adicione uma senha à sua conta no site antes, e digite ela aqui.",
+    addPasswordWeb: "Adicionar senha no site",
+    otherAccount: "Você entrou em outra conta. Nada foi apagado.",
     hold: "Segure para apagar",
     holding: "Segure…",
   },

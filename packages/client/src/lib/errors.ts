@@ -6,6 +6,11 @@ import { MAX_UPLOAD_MB } from "./files";
 import { limitRefusalText } from "./limits";
 import { endSentence } from "./text";
 
+/** No sign-in in the last 10 minutes, which adding a password takes. */
+export const REAUTH_SIGN_IN = "reauth.sign_in";
+/** No password, or a wrong one, where it proves it's the person (deleting on a server that sends no email). */
+export const REAUTH_PASSWORD = "reauth.password";
+
 /**
  * Server error codes the app says in the person's language (the server's
  * own message is English). Anything else falls back to that message.
@@ -102,14 +107,23 @@ const KNOWN = {
   "join.denied": "errors.join.denied",
   "join.answered": "errors.join.answered",
   "join.expired": "errors.join.expired",
-  "join.code_wrong": "errors.join.codeWrong",
-  "join.code_expired": "errors.join.codeExpired",
-  "join.code_tries": "errors.join.codeTries",
-  "join.code_limit": "errors.join.codeLimit",
-  "join.code_wait": "errors.join.codeWait",
+  "join.code_wrong": "errors.code.wrong",
+  "join.code_expired": "errors.code.expired",
+  "join.code_tries": "errors.code.tries",
+  "join.code_limit": "errors.code.limit",
+  "join.code_wait": "errors.code.wait",
   "join.code_needed": "errors.join.codeNeeded",
+  "reauth.code": "errors.reauth.code",
+  "reauth.code_wrong": "errors.code.wrong",
+  "reauth.code_expired": "errors.code.expired",
+  "reauth.code_tries": "errors.code.tries",
+  "reauth.code_limit": "errors.code.limit",
+  "reauth.code_wait": "errors.code.wait",
   "invitation.ask_to_join": "errors.invitation.askToJoin",
   "org.create_invite_only": "errors.org.createInviteOnly",
+  "org.not_restorable": "errors.org.notRestorable",
+  [REAUTH_PASSWORD]: "errors.reauth.password",
+  [REAUTH_SIGN_IN]: "errors.reauth.signIn",
   EARLY_ACCESS_OTHER_EMAIL: "auth.earlyAccess.otherEmail",
   EARLY_ACCESS_EMAIL_UNVERIFIED: "auth.earlyAccess.unverified",
   // A provider's sign-up on a closed server comes back to /login with this code.
@@ -172,10 +186,11 @@ export interface RestrictionFacts {
 }
 
 /**
- * A restriction in the person's words, the one place the apps pick it: a workspace on hold or suspended and a held
- * agent (the API's `org.paused`, `org.suspended` and `agent.paused`, or a run's `run.org_paused`…), a refused
- * workspace (`org.create_refused`) and a blocked account (`ACCOUNT_BLOCKED`). On agentes.chat Cloud the line of its
- * kind, with the Terms section and how to contest it. Elsewhere the words it always had. Null for any other code.
+ * A restriction in the person's words, the one place the apps pick it: a workspace on hold, suspended or being
+ * deleted and a held agent (the API's `org.paused`, `org.suspended`, `org.deleting` and `agent.paused`, or a run's
+ * `run.org_paused`…), a refused workspace (`org.create_refused`) and a blocked account (`ACCOUNT_BLOCKED`). On
+ * agentes.chat Cloud the line of its kind, with the Terms section and how to contest it. Elsewhere the words it always
+ * had. Null for any other code.
  */
 export function restrictionLine(
   t: TFunction,
@@ -202,6 +217,8 @@ export function restrictionLine(
     }
     case "org.suspended":
       return reason ? contested(t("standing.suspendedFor", { reason })) : t("standing.suspended");
+    case "org.deleting":
+      return t("errors.org.deleting");
     case "agent.paused":
       if (cloud && kind === "network") return t("standing.cloud.agentNetwork", email);
       if (cloud && kind === "operator") return t("standing.cloud.agentOperator", email);

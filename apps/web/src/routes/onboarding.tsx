@@ -4,10 +4,12 @@ import { requireUser } from "@/app/guards";
 import { OnboardingPage, resumeOnboarding } from "@/pages/OnboardingPage";
 
 export const Route = createFileRoute("/onboarding")({
-  // `?resume=<orgId>`: back from that workspace's plan (`/org/$orgId/onboarding`, ADR 0079), `paid` after paying.
-  validateSearch: (search: Record<string, unknown>): { resume?: string; paid?: true } => ({
+  // `?resume=<orgId>`: back from that workspace's plan (`/org/$orgId/onboarding`, ADR 0079), `paid` after paying;
+  // `?delete=1`: its dialog that deletes the workspace.
+  validateSearch: (search: Record<string, unknown>): { resume?: string; paid?: true; delete?: 1 } => ({
     ...(typeof search.resume === "string" ? { resume: search.resume } : {}),
     ...(isPaidReturn(search) ? { paid: true } : {}),
+    ...(search.delete === undefined ? {} : { delete: 1 as const }),
   }),
   beforeLoad: ({ context, location }) => requireUser(context, location.href),
   loaderDeps: ({ search }) => ({ resume: search.resume }),

@@ -48,6 +48,7 @@ import {
   requireOpen,
 } from "./missions";
 import { can, getMembership, requirePermission } from "./organizations";
+import { closedRefusal } from "./standing";
 
 /*
  * "Quem pensa" (ADR 0032 §5): the brain an agent thinks with, its model and
@@ -902,7 +903,7 @@ export async function agentBrainSummaries(
   ]);
   const live = new Map(machines.filter((m) => !m.deletedAt).map((m) => [m.id, m]));
   const accountById = new Map(accounts.map((r) => [r.id, r]));
-  const manages = membership !== null && membership.standing?.state !== "suspended" && can(membership, "manage_agents");
+  const manages = membership !== null && !closedRefusal(membership.standing) && can(membership, "manage_agents");
   for (const a of agents) {
     const kind = brainOf(a.brain);
     const machine = a.machineId ? live.get(a.machineId) : undefined;

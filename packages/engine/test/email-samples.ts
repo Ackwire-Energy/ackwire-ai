@@ -252,4 +252,85 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     reason: "Só aceitamos pessoas do time de design por enquanto.",
   },
   "join_code.en": { kind: "join_code", locale: "en", orgName: "Souza Bakery", code: "482913", url: APP },
+  /** Before deleting a workspace, on a server with a support address. */
+  "deletion_code-workspace.en": {
+    kind: "deletion_code",
+    locale: "en",
+    code: "482913",
+    email: "ana@souzabakery.com",
+    orgName: "Souza Bakery",
+    support: "help@agentes.chat",
+    url: APP,
+  },
+  /** Before deleting an account; the server has no support address. */
+  "deletion_code-account.pt-BR": {
+    kind: "deletion_code",
+    locale: "pt-BR",
+    code: "482913",
+    email: "ana@padariasouza.com.br",
+    support: null,
+    url: APP,
+  },
+  /** To an owner: a button to restore it. */
+  "workspace_deleting-owner.en": {
+    kind: "workspace_deleting",
+    locale: "en",
+    orgName: "Souza Bakery",
+    byName: "Ana Souza",
+    dueAt: "2026-11-06T18:42:00.000Z",
+    timeZone: "America/New_York",
+    owner: true,
+    url: `${APP}/org/${ORG}`,
+  },
+  /** To a member: only an owner can restore it. */
+  "workspace_deleting-member.pt-BR": {
+    kind: "workspace_deleting",
+    locale: "pt-BR",
+    orgName: "Padaria Souza",
+    byName: "Ana Souza",
+    dueAt: "2026-11-06T18:42:00.000Z",
+    timeZone: "America/Sao_Paulo",
+    owner: false,
+    url: `${APP}/org/${ORG}`,
+  },
+  "workspace_restored.en": {
+    kind: "workspace_restored",
+    locale: "en",
+    orgName: "Souza Bakery",
+    byName: "Ana Souza",
+    url: `${APP}/org/${ORG}`,
+  },
+  /** Two workspaces closed with it, on a server with a support address. */
+  "account_deleted.en": {
+    kind: "account_deleted",
+    locale: "en",
+    email: "ana@souzabakery.com",
+    orgNames: ["Souza Bakery", "Ana's drafts"],
+    dueAt: "2026-11-06T18:42:00.000Z",
+    timeZone: "America/New_York",
+    support: "help@agentes.chat",
+    url: APP,
+  },
+  /** One workspace closed with it; the server has no support address. */
+  "account_deleted-one.pt-BR": {
+    kind: "account_deleted",
+    locale: "pt-BR",
+    email: "ana@padariasouza.com.br",
+    orgNames: ["Padaria Souza"],
+    dueAt: "2026-11-06T18:42:00.000Z",
+    timeZone: "America/Sao_Paulo",
+    support: null,
+    url: APP,
+  },
+  /** Nothing closed with it: they were only in workspaces with others. */
+  "account_deleted-none.en": {
+    kind: "account_deleted",
+    locale: "en",
+    email: "ana@souzabakery.com",
+    orgNames: [],
+    dueAt: null,
+    timeZone: "UTC",
+    support: "help@agentes.chat",
+    url: APP,
+  },
 };

@@ -6,6 +6,7 @@ import { announceMessageMemories } from "../message-memories";
 import { can, getMembership } from "../organizations";
 import { personBehindCall } from "../requester";
 import { agentSearchChannels, agentVisibleChannels, indexSource, searchVisible } from "../search";
+import { closedRefusal } from "../standing";
 import type { ToolContext, ToolDefinition, ToolSource } from "../tools/types";
 import { type ContextItem, checkPermissionText, consolidateItem, getContextItems, supersede } from "./items";
 import { kindFamily, overlap } from "./judgments";
@@ -393,7 +394,7 @@ async function changeableItem(ctx: ToolContext, id: string, requester: string): 
   if (item.agentId && item.agentId !== ctx.agentId) return "That memory belongs to another agent.";
   if (!item.agentId) {
     const membership = await getMembership(ctx.db, requester, ctx.orgId);
-    if (!membership || membership.standing?.state === "suspended" || !can(membership, "review_memory")) {
+    if (!membership || closedRefusal(membership.standing) || !can(membership, "review_memory")) {
       return "Only an admin can change what the whole organization knows; suggest asking one.";
     }
   }

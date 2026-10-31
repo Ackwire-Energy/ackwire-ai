@@ -8,6 +8,7 @@ import {
   MissingCredentialError,
   NotFoundError,
   TooManyError,
+  UnauthorizedError,
   ValidationError,
 } from "@agenteschat/engine";
 import type { Hook } from "@hono/zod-openapi";
@@ -59,6 +60,7 @@ export function validationHook<E extends Env>(): Hook<unknown, E, string, unknow
 
 /** Maps domain errors from `@agenteschat/engine` to HTTP responses. Returns null for unknown errors. */
 export function domainErrorResponse(error: unknown, c: Context) {
+  if (error instanceof UnauthorizedError) return apiError(c, 401, error.code, error.message);
   if (error instanceof ForbiddenError) return apiError(c, 403, error.code, error.message, error.params);
   if (error instanceof NotFoundError) return apiError(c, 404, error.code, error.message, error.params);
   if (error instanceof ConflictError) return apiError(c, 409, error.code, error.message, error.params);

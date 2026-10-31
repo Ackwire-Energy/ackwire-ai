@@ -33,7 +33,7 @@ import { PLATFORM_CAP } from "./limits";
 import type { MachineCaller } from "./machine-hub";
 import { AGENT_CHIME_IN_MAX_HOP, getMessage, type Message } from "./messages";
 import { type AgentRun, NO_AI } from "./runs";
-import { standingRefusal } from "./standing";
+import { OrgDeletingError, standingRefusal } from "./standing";
 
 const {
   agents,
@@ -559,6 +559,7 @@ export interface RouteResult {
     | "no_candidates"
     | "already_routed"
     | "org_paused"
+    | "org_deleting"
     /** The same person's next message right after it is one the router decides on too: that one decides for both. */
     | "continued";
   selected?: string[];
@@ -604,8 +605,9 @@ export async function routeMessage(
   input: { orgId: string; messageId: string },
 ): Promise<RouteResult> {
   const { db } = deps;
-  // A workspace on hold or suspended asks no strategy (Jev bills the server): nobody answers there now.
-  if (await standingRefusal(db, input.orgId)) return { runs: [], skipped: "org_paused" };
+  // A workspace on hold, suspended or being deleted asks no strategy (Jev bills the server): nobody answers there now.
+  const refusal = await standingRefusal(db, input.orgId);
+  if (refusal) return { runs: [], skipped: refusal instanceof OrgDeletingError ? "org_deleting" : "org_paused" };
   const message = await getMessage(db, input.orgId, input.messageId);
   if (!message) return { runs: [], skipped: "message_missing" };
   const byAgent = message.authorType === "agent" && message.authorAgentId !== null;
