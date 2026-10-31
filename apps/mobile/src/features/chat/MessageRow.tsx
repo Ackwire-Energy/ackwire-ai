@@ -54,6 +54,7 @@ import {
   artifactsOf,
   consultationsOf,
   hidesBody,
+  mayStopRun,
   missionCardRef,
   missionLinkOf,
   missionPlanOf,
@@ -66,7 +67,7 @@ import { MessageText } from "./MessageText";
 import { Receipts } from "./Receipts";
 import { TeamChecks } from "./TeamChecks";
 import { SavedTools, TurnTools } from "./ToolCalls";
-import { recentTurn, stoppedOf, turnOpener } from "./turn";
+import { recentTurn, stepLimitOf, stoppedOf, turnOpener } from "./turn";
 
 /** A run's message asks whether a take over still holds its browser only this recently (older: events only). */
 const TRAIL_RECENT_MS = 12 * 60 * 60_000;
@@ -158,6 +159,8 @@ export const MessageRow = memo(function MessageRow({
         onLongPress?.(m);
       };
   const stopped = isAgent && m.agentRunId ? stoppedOf(meta) : null;
+  // The reply of a run that reached its step limit: the same line, with Continuar.
+  const atLimit = isAgent && m.agentRunId && !stopped ? stepLimitOf(meta) : null;
   // This reply just took its live block's place here: the same tools (and the messages it read) stay.
   const [kept] = useState(() => (ownWork && m.agentRunId ? recentTurn(m.agentRunId, Date.now()) : null));
   // The line its block opened with stays above the tools, where it was, instead of moving into them (`turnOpener`).
@@ -392,7 +395,14 @@ export const MessageRow = memo(function MessageRow({
         ) : body ? (
           <MessageText body={body} muted={m.local === "pending"} selectable={false} accent={accent} />
         ) : null}
-        {stopped && m.agentRunId ? <StoppedLine message={m} runId={m.agentRunId} stopped={stopped} /> : null}
+        {(stopped || atLimit) && m.agentRunId ? (
+          <StoppedLine
+            message={m}
+            runId={m.agentRunId}
+            stopped={stopped ?? { byUserId: null, continuedRunId: atLimit?.continuedRunId ?? null }}
+            limit={Boolean(atLimit)}
+          />
+        ) : null}
         {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
         {isAgent ? <TeamChecks message={m} /> : null}
         {isAgent ? <NoAiCard message={m} /> : null}
@@ -446,17 +456,20 @@ function Sending({ offline, end }: { offline: boolean; end: boolean }) {
 }
 
 /**
- * A reply someone stopped: what it wrote stays, with "Parado por você · Continuar"; the
- * button picks up from where it stopped (a new run) and goes away once it did, for everyone.
+ * A reply someone stopped: what it wrote stays, with "Parado por você · Continuar" ("No limite de passos ·
+ * Continuar" under the reply of a run that reached its step limit); the button picks up from where it stopped
+ * (a new run) and goes away once it did, for everyone.
  */
 function StoppedLine({
   message: m,
   runId,
   stopped,
+  limit = false,
 }: {
   message: Message;
   runId: string;
   stopped: { byUserId: string | null; continuedRunId: string | null };
+  limit?: boolean;
 }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
@@ -471,14 +484,25 @@ function StoppedLine({
   // Continued here or on another device (`run.continued`), or already in the message's meta.
   const continued = useContinuedRun(m.id) ?? stopped.continuedRunId;
   const byMe = Boolean(meId) && stopped.byUserId === meId;
-  const by = byMe
-    ? t("mobile.chat.stopped.byYou")
-    : stopped.byUserId
-      ? t("mobile.chat.stopped.by", { name: dir.nameOf({ type: "person", id: stopped.byUserId }) })
-      : t("mobile.chat.stopped.plain");
+  const by = limit
+    ? t("mobile.chat.stopped.limit")
+    : byMe
+      ? t("mobile.chat.stopped.byYou")
+      : stopped.byUserId
+        ? t("mobile.chat.stopped.by", { name: dir.nameOf({ type: "person", id: stopped.byUserId }) })
+        : t("mobile.chat.stopped.plain");
   const owner = m.author.id ? dir.agentById.get(m.author.id)?.ownerUserId : null;
-  // Same people who may stop it (the server checks again).
-  const may = byMe || can(org, "manage_agents") || (Boolean(meId) && owner === meId);
+  const loaded = [
+    ...(qc.getQueryData<Message[]>(keys.messages(orgId, m.channelId)) ?? []),
+    ...((m.threadId && qc.getQueryData<Message[]>(keys.thread(orgId, m.channelId, m.threadId))) || []),
+  ];
+  // Same people who may stop it (the server checks again): an admin, the agent's owner, or who asked.
+  const may =
+    byMe ||
+    mayStopRun(
+      { agentId: m.author.id ?? "", threadId: m.threadId ?? m.id, triggerMessageId: null },
+      { meId, manageAgents: can(org, "manage_agents"), agentOwnerId: owner, messages: loaded },
+    );
   const open = may && !continued && !busy;
   const onContinue = () => {
     setBusy(true);

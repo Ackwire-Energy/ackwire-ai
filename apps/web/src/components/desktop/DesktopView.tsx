@@ -12,7 +12,7 @@ import {
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { quoteExcerpt } from "@agenteschat/client/lib/reply";
-import { Button, cx, Icon, InfoHint, onScreenKeyboard, shortcut, Textarea } from "@agenteschat/ui";
+import { Button, cx, Icon, InfoHint, onScreenKeyboard, Textarea } from "@agenteschat/ui";
 import type RFB from "@novnc/novnc";
 import { type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -42,12 +42,13 @@ const PICTURE_WAIT_MS = 10_000;
 /**
  * Handing back opens the screen again as a watcher, on a new socket. Its last picture stays over the new connection
  * until that one draws (`holdPicture`), so the hand back shows no "Abrindo…" and the head says watching as soon as
- * the server does. A connection that hasn't drawn by this long is said to be opening. Taking control holds nothing:
- * noVNC drops keys and pastes until its connection opens, and a held picture would look ready meanwhile.
+ * the server does. A connection that hasn't drawn by this long is said to be opening. Taking control holds the picture
+ * too, frosted under "Assumindo o controle…" for as long as control takes to open: noVNC drops keys and pastes until
+ * its connection opens, so the picture must never look ready meanwhile.
  */
 const HOLD_MS = 3_000;
 
-/** A phone or tablet: no keys hint, and a Keyboard button raises its keyboard. */
+/** A phone or tablet: a Keyboard button raises its keyboard. */
 const TOUCH = "(pointer: coarse)";
 
 /**
@@ -97,6 +98,8 @@ export function DesktopView({
   const [round, setRound] = useState(0);
   const [gaveUp, setGaveUp] = useState(false);
   const [handingBack, setHandingBack] = useState(false);
+  // Control opening over the last picture it watched (`HOLD_MS`).
+  const [taking, setTaking] = useState(false);
   const [backNote, setBackNote] = useState("");
   const screenRef = useRef<HTMLDivElement>(null);
   const rfbRef = useRef<RFB | null>(null);
@@ -166,23 +169,27 @@ export function DesktopView({
   useEffect(() => {
     const el = screenRef.current;
     if (!el) return;
-    // Control opens behind "Abrindo…", never over a held picture (`HOLD_MS`).
-    if (!connect || inControl) heldPicture(el)?.remove();
-    if (!connect) return;
-    // While it retries, the cover keeps saying why; a picture held over a hand back stays live; anything else is a
-    // fresh start.
+    if (!connect) {
+      heldPicture(el)?.remove();
+      setTaking(false);
+      return;
+    }
+    // While it retries, the cover keeps saying why; a picture held over a hand back stays live, and over control
+    // opening it stays under "Assumindo o controle…"; anything else is a fresh start.
     const holding = heldPicture(el) !== null;
+    setTaking(holding && inControl);
     setView((v) => (holding || v === "offline" || v === "busy" || v === "paused" || v === "held" ? v : "connecting"));
     let cancelled = false;
     let closed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let looking: ReturnType<typeof setInterval> | undefined;
-    const stale = holding
-      ? setTimeout(() => {
-          heldPicture(el)?.remove();
-          setView("connecting");
-        }, HOLD_MS)
-      : undefined;
+    const stale =
+      holding && !inControl
+        ? setTimeout(() => {
+            heldPicture(el)?.remove();
+            setView("connecting");
+          }, HOLD_MS)
+        : undefined;
     let ws: WebSocket | null = null;
     let rfb: RFB | null = null;
     void import("@novnc/novnc").then(
@@ -203,6 +210,7 @@ export function DesktopView({
           // A close that arrives after the next connection took over (watching turned control) leaves that one be.
           if (rfbRef.current === rfb) rfbRef.current = null;
           if (cancelled) return;
+          setTaking(false);
           const next = desktopCloseState(e.code, e.reason);
           // Control ended (handed back): it opens again as a watcher over the picture it had; any other close says why.
           if (e.code !== DESKTOP_CLOSE.controlEnded || !holdPicture(el)) {
@@ -219,6 +227,8 @@ export function DesktopView({
         });
         rfb = new Rfb(el, socket, { shared: true });
         rfb.viewOnly = !inControl;
+        // In control, a screen that draws no pointer of its own shows noVNC's dot, never none (watching, desktop.css).
+        rfb.showDotCursor = inControl;
         rfb.qualityLevel = inControl ? 6 : 3;
         rfb.compressionLevel = 2;
         rfb.scaleViewport = true;
@@ -237,7 +247,9 @@ export function DesktopView({
             clearInterval(looking);
             clearTimeout(stale);
             heldPicture(el)?.remove();
-            if (!cancelled) setView("live");
+            if (cancelled) return;
+            setTaking(false);
+            setView("live");
           };
           looking = setInterval(look, PICTURE_POLL_MS);
           look();
@@ -260,8 +272,8 @@ export function DesktopView({
       if (rfbRef.current === rfb) rfbRef.current = null;
       if (closed) return;
       closed = true;
-      // Handed back: the picture stays over the watching connection that replaces this one.
-      if (inControl && modeNow.current === "watch") holdPicture(el);
+      // Handed back or taken: the picture stays over the connection that replaces this one.
+      if (inControl !== (modeNow.current === "control")) holdPicture(el);
       if (rfb) rfb.disconnect();
       else ws?.close();
     };
@@ -361,8 +373,8 @@ export function DesktopView({
         : "";
   const retrying = <span>{t("desktop.state.retrying")}</span>;
   const notice = <span className="muted">{t("desktop.control.notice", g)}</span>;
-  // What programs there can see comes first: the window keeps the line to one line, and the keys follow only where it
-  // has room for them (desktop.css). agentes.chat Cloud may screen the session (ADR 0076): said behind an ⓘ after it.
+  // What programs there can see, kept to one line in the window (desktop.css). agentes.chat Cloud may screen the
+  // session (ADR 0076): said behind an ⓘ after it.
   const controlLine = (
     <span className="dsk-words">
       {edition === "cloud" ? (
@@ -374,12 +386,6 @@ export function DesktopView({
         </span>
       ) : (
         notice
-      )}
-      {!touch && (
-        <>
-          {" "}
-          <span className="muted">{t("desktop.control.keys", { copy: shortcut("C"), paste: shortcut("V") })}</span>
-        </>
       )}
     </span>
   );
@@ -514,7 +520,7 @@ export function DesktopView({
             onBlur={() => setTyping(false)}
           />
         )}
-        {shown !== "live" && cover[shown]}
+        {shown !== "live" ? cover[shown] : taking && <Cover color={color} spinner text={t("desktop.taking")} />}
       </div>
       {inControl &&
         (handingBack ? (
@@ -593,7 +599,7 @@ export function DesktopView({
           </div>
         ))}
       {/* Watching, under the screen and the covers it opens from by itself, so the window's foot is as deep as its
-          sides and the screen opens in place. The ⓘ (what may be checked in control) and the keys come with control;
+          sides and the screen opens in place. The ⓘ (what may be checked in control) comes with control;
           full screen keeps no line. */}
       {!inControl && !final && !head?.full && <ScreenNotice name={name} />}
     </div>

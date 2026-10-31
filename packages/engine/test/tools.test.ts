@@ -590,6 +590,7 @@ describe("approval flow (end to end)", () => {
     await post(f, "@dev loop forever");
     await drainOutbox(f.db, { ...f.handlers });
     const [run] = await f.db.select().from(schema.agentRuns);
-    expect([run?.status, run?.error, run?.turns]).toEqual(["failed", "too_many_tool_calls", 25]);
+    // It ends saying it ran out of steps, with Continuar, never as a failure (step-limit.test.ts).
+    expect([run?.status, run?.error, run?.turns]).toEqual(["done", null, 25]);
   });
 });

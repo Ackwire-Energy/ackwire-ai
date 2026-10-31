@@ -145,6 +145,30 @@ describe("in the channel", () => {
     expect(within(msg).queryByRole("button", { name: "Continuar" })).toBeNull();
   });
 
+  test("a reply at the step limit says so in my language, with Continuar", async () => {
+    const state = seedState();
+    state.messages.push({
+      id: "m-limit",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ADA_ID },
+      body: "I ran out of steps before finishing.",
+      mentionedAgentIds: [],
+      agentRunId: "r-limit",
+      meta: { bodyCode: "step_limit", stepLimit: {} },
+      createdAt: new Date().toISOString(),
+    } as Message);
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(5);
+    const msg = screen().getByText("Meus passos acabaram antes de eu terminar.").closest(".ac-msg") as HTMLElement;
+    const line = msg.querySelector(".run-canceled") as HTMLElement;
+    expect(line.textContent).toContain("No limite de passos");
+    await act(async () => fireEvent.click(within(line).getByRole("button", { name: "Continuar" })));
+    await settle(3);
+    expect(state.calls.find((c) => c.method === "agents.continueRun")?.args).toEqual([ORG_ID, "r-limit"]);
+    expect(within(msg).queryByRole("button", { name: "Continuar" })).toBeNull();
+  });
+
   test("Parar on a run that already finished (409 run_finished): the row just goes away", async () => {
     const state = seedState();
     const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });

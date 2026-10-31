@@ -6203,6 +6203,7 @@ export const en: Translations = {
     stoppedBy: "Stopped by {{name}}",
     stopped: "Stopped",
     continueRun: "Continue",
+    stepLimit: "At the step limit",
     steer: {
       waiting: "{{name}} reads it at the next pause",
       now: "{{name}} stopped to read it",
@@ -8810,6 +8811,7 @@ export const en: Translations = {
         remembered: "Memory updated: {{text}}",
       },
       interrupted: "Interrupted by a server restart. Ask again to continue.",
+      step_limit: "I ran out of steps before finishing.",
       forum_suggestion: 'Worth a forum? "{{title}}"',
       forum_concluded: 'The forum "{{title}}" is over. The synthesis is in the file below.',
       forum_concluded_issues:
@@ -9680,6 +9682,8 @@ export const en: Translations = {
     },
     retry: "Try again",
     takeover: "Take control",
+    /** Over the last picture while control opens. */
+    taking: "Taking control…",
     clipboard: {
       got: "Copied on {{name}}'s computer:",
       copy: "Copy",
@@ -9699,7 +9703,6 @@ export const en: Translations = {
       doneByYou: "Done by you at {{time}}. {{agent}} looked at the screen again and went on.",
     },
     control: {
-      keys: "Copy and paste as usual: {{copy}}, {{paste}}.",
       notice: "Programs on {{name}}'s computer can see the screen and what you type or paste.",
     },
     /** The ⓘ beside the control line, on agentes.chat Cloud only (ADR 0076). */

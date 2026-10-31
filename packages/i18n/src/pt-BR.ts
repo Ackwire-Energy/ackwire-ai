@@ -6242,6 +6242,7 @@ export const ptBR = {
     stoppedBy: "Parado por {{name}}",
     stopped: "Parado",
     continueRun: "Continuar",
+    stepLimit: "No limite de passos",
     steer: {
       waiting: "{{name}} lê na próxima pausa",
       now: "{{name}} parou para ler",
@@ -8869,6 +8870,7 @@ export const ptBR = {
         remembered: "Memória atualizada: {{text}}",
       },
       interrupted: "Interrompida porque o servidor reiniciou. Peça de novo para continuar.",
+      step_limit: "Meus passos acabaram antes de eu terminar.",
       forum_suggestion: 'Vale um fórum? "{{title}}"',
       forum_concluded: 'O fórum "{{title}}" terminou. A síntese está no arquivo abaixo.',
       forum_concluded_issues:
@@ -9738,6 +9740,8 @@ export const ptBR = {
     },
     retry: "Tentar de novo",
     takeover: "Assumir o controle",
+    /** Over the last picture while control opens. */
+    taking: "Assumindo o controle…",
     clipboard: {
       got: "Copiado no computador {{of}} {{name}}:",
       copy: "Copiar",
@@ -9757,7 +9761,6 @@ export const ptBR = {
       doneByYou: "Feito por você às {{time}}. {{The}} {{agent}} olhou a tela de novo e seguiu.",
     },
     control: {
-      keys: "Copiar e colar como sempre: {{copy}}, {{paste}}.",
       notice: "Os programas do computador {{of}} {{name}} veem a tela e o que você digita ou cola.",
     },
     /** The ⓘ beside the control line, on agentes.chat Cloud only (ADR 0076). */

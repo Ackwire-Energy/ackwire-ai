@@ -305,6 +305,7 @@ export const featureKeysEn: FeatureTranslations = {
       byYou: "Stopped by you",
       by: "Stopped by {{name}}",
       plain: "Stopped",
+      limit: "At the step limit",
       continue: "Continue",
       failed: "Couldn't continue. Try again.",
     },

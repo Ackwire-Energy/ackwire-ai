@@ -159,10 +159,11 @@ export function listenForRunCancels(pubsub: PubSub) {
 }
 
 /**
- * Who asked for the run: the trigger's author, or, for a run that continues a stopped one
- * (its trigger is the stopped reply), who pressed "Continuar".
+ * Who asked for the run: the trigger's author, or, for a run that continues a stopped one or one at its step
+ * limit (its trigger is that reply), who pressed "Continuar".
  */
-const continuedBy = sql`${messages.meta}->'canceled'->>'continuedByUserId'`;
+const continuedBy = sql`coalesce(${messages.meta}->'canceled'->>'continuedByUserId',
+  ${messages.meta}->'stepLimit'->>'continuedByUserId')`;
 export const runRequester = sql<string | null>`coalesce(${messages.authorUserId}, ${continuedBy})`;
 
 /** Who canceled (stored on the run as `canceled_by:{userId}`). */
