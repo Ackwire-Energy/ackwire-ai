@@ -13,6 +13,7 @@ import { SetupNotice } from "../computer/SetupWait";
 import { OutageNotices } from "../outages/OutageNotice";
 import { useMachineOutages } from "../outages/queries";
 import { useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
+import { SheetHostProvider } from "../shared/SheetHost";
 import { useActiveWork, useConversations, useWorkingNow } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
 import { ConversationRowView } from "./ConversationRowView";
@@ -46,6 +47,14 @@ export const openKindList = (kind: ListKind | `category-${string}`) => router.pu
  * it says so (`HomeServerError`), over the kept rows as a card, and tries again on its own.
  */
 export function ChatsScreen() {
+  return (
+    <SheetHostProvider>
+      <Home />
+    </SheetHostProvider>
+  );
+}
+
+function Home() {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const qc = useQueryClient();
