@@ -1,4 +1,5 @@
 import { type AiRouting, keys, type RosterMember, useAiStatus, useApi, useRoster } from "@agenteschat/client";
+import { listsAgent } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
@@ -275,6 +276,7 @@ function AddChannelMembers({ channelId, channelName }: { channelId: string; chan
   const sheet = useSheet();
   const toast = useToast();
   const dir = useDirectory();
+  const role = useOrg().org?.role;
   const c = useColors();
   const roster = useRoster(orgId, channelId);
   const refresh = useRefresh(channelId);
@@ -282,7 +284,9 @@ function AddChannelMembers({ channelId, channelName }: { channelId: string; chan
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const inChannel = new Set((roster.data ?? []).map((m) => `${m.type === "agent" ? "agent" : "person"}:${m.id}`));
   const candidates = [
-    ...dir.agents.map((a) => ({ kind: "agent" as const, id: a.id, name: a.name, line: `@${a.handle}` })),
+    ...dir.agents
+      .filter((a) => listsAgent(role, a))
+      .map((a) => ({ kind: "agent" as const, id: a.id, name: a.name, line: `@${a.handle}` })),
     ...[...dir.memberById.values()].map((m) => ({
       kind: "person" as const,
       id: m.userId,

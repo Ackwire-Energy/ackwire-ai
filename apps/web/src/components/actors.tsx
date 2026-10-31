@@ -1,4 +1,5 @@
 import type { Actor } from "@agenteschat/client";
+import { listsAgent } from "@agenteschat/client/lib/audience";
 import type { SelectOption } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar } from "@/components/AgentAvatar";
@@ -18,14 +19,17 @@ export function useActors() {
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const name = (a: Actor) => dir.authorName({ type: a.type, id: a.id } as Parameters<typeof dir.authorName>[0]);
-  const options = (withNone: boolean): SelectOption[] => [
+  /** `current` (the value picked now) stays an option even when my lists leave that agent out. */
+  const options = (withNone: boolean, current?: string): SelectOption[] => [
     ...(withNone ? [{ value: NO_ACTOR, label: t("issues.noAssignee") }] : []),
     ...dir.members.map((m) => ({ value: `person:${m.userId}`, label: m.name })),
-    ...dir.agents.map((a) => ({
-      value: `agent:${a.id}`,
-      label: a.name,
-      description: a.role ? t("issues.agentRole", { role: a.role }) : undefined,
-    })),
+    ...dir.agents
+      .filter((a) => listsAgent(org.role, a) || `agent:${a.id}` === current)
+      .map((a) => ({
+        value: `agent:${a.id}`,
+        label: a.name,
+        description: a.role ? t("issues.agentRole", { role: a.role }) : undefined,
+      })),
   ];
   const avatar = (a: Actor, size: "xs" | "sm" = "xs") => <ActorAvatar size={size} actor={a} name={name(a)} />;
   return { dir, name, options, avatar, meId: me.user.id };

@@ -841,6 +841,7 @@ export const ptBR = {
     agents: "Agentes",
     directMessages: "Mensagens diretas",
     createAgent: "Criar agente",
+    importAgents: "Trazer agentes de outro app",
     budgetUsed: "{{percent}} do orçamento dos agentes usado este mês",
     budgetUsedHint: "O workspace usou {{percent}} do orçamento dos agentes este mês",
     budget: "Orçamento",

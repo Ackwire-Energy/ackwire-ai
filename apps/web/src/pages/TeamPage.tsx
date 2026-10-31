@@ -194,12 +194,19 @@ export function TeamPage() {
             </p>
           )}
         </div>
-        {can(org.role, "manage_agents") && (
-          <Button asChild variant="primary" icon="plus">
-            <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }}>
-              {t("shell.createAgent")}
-            </Link>
-          </Button>
+        {admin && (
+          <div className="row team-head__actions">
+            <Button asChild icon="archiveBox">
+              <Link to="/org/$orgId/settings/$section" params={{ orgId: org.id, section: "import" }}>
+                {t("shell.importAgents")}
+              </Link>
+            </Button>
+            <Button asChild variant="primary" icon="plus">
+              <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }}>
+                {t("shell.createAgent")}
+              </Link>
+            </Button>
+          </div>
         )}
       </header>
       {team.isLoading && <LoadingCards count={2} />}

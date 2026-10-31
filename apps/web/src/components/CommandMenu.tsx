@@ -1,5 +1,5 @@
 import { useAuthConfig, useChannels, useForumTopics, useWikiTree } from "@agenteschat/client";
-import { canTalk } from "@agenteschat/client/lib/audience";
+import { canTalk, listsAgent } from "@agenteschat/client/lib/audience";
 import { setDraftFor } from "@agenteschat/client/lib/drafts";
 import { Avatar, CommandPalette, Icon, type PaletteItem } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
@@ -64,6 +64,7 @@ export function CommandMenu() {
       });
     }
     for (const a of dir.agents) {
+      if (!listsAgent(org.role, a)) continue;
       list.push({
         key: `a:${a.id}`,
         group: goTo,

@@ -27,6 +27,7 @@ import {
   ROLE_GROUPS,
   type RoleId,
 } from "@agenteschat/client/lib/new-agent";
+import { can } from "@agenteschat/client/lib/permissions";
 import { AUTO } from "@agenteschat/client/lib/providers";
 import { router, usePreventRemove } from "expo-router";
 import { type ReactNode, useMemo, useRef, useState } from "react";
@@ -34,6 +35,7 @@ import { useTranslation } from "react-i18next";
 import { Alert, Pressable, ScrollView, type ScrollViewInstance, StyleSheet, TextInput, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useOrg } from "@/providers/org";
 import { AgentAvatar, Button, Card, fieldText, Icon, Row, Text, Toggle, useToast } from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
@@ -99,6 +101,7 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
   const api = useApi();
   const insets = useSafeAreaInsets();
   const orgId = useOrgId();
+  const mayImport = can(useOrg().org?.role, "manage_agents");
   const meId = useMeId();
   const dir = useDirectory();
   const create = useCreateAgent(orgId);
@@ -311,6 +314,15 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
     role: () => (
       <>
         {head(t("newAgent.steps.role.title"), t("newAgent.steps.role.lead"))}
+        {mayImport && !proposed ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            icon="archive"
+            label={t("shell.importAgents")}
+            onPress={() => router.push("/settings/import")}
+          />
+        ) : null}
         {ROLE_GROUPS.map((group) => (
           <View key={group.id} style={styles.group}>
             <Text variant="footnote" tone="faint" style={styles.groupTitle}>

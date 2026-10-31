@@ -7,11 +7,13 @@ import {
   useThreadList,
   useWorkingRuns,
 } from "@agenteschat/client";
+import { listsAgent } from "@agenteschat/client/lib/audience";
 import { useMemo } from "react";
+import { useOrg } from "@/providers/org";
 import { busyChannels, workingNow } from "../agents/logic";
 import { waitingApprovals } from "../approvals/logic";
 import { buildConversations, unreadConversationCount, unreadThreadCount } from "../chats/logic";
-import { useNow, useOrgId } from "./hooks";
+import { useDirectory, useNow, useOrgId } from "./hooks";
 
 /**
  * Reads several screens share: who is working, the conversation list, what
@@ -38,6 +40,13 @@ export function useWorkingNow() {
 /** My threads and missions, the latest 50 (Conversas' rows and the Threads tab). */
 const THREAD_LIST = { tab: "all", mine: true, limit: 50 } as const;
 
+/** The agents my lists leave out (`listsAgent`, from the server's `canTalk`): for a member, the ones not answering. */
+function useHiddenAgents() {
+  const role = useOrg().org?.role;
+  const dir = useDirectory();
+  return useMemo(() => new Set(dir.agents.filter((a) => !listsAgent(role, a)).map((a) => a.id)), [dir.agents, role]);
+}
+
 /** Conversas: channels, DMs and my threads and missions, newest first (agent DMs say who is working). */
 export function useConversations() {
   const orgId = useOrgId();
@@ -45,6 +54,7 @@ export function useConversations() {
   const dms = useDms(orgId);
   const threads = useThreadList(orgId, THREAD_LIST);
   const work = useWorkingNow();
+  const hidden = useHiddenAgents();
   const rows = useMemo(
     () =>
       buildConversations({
@@ -52,8 +62,9 @@ export function useConversations() {
         dms: dms.data ?? [],
         threads: threads.data?.pages.flatMap((p) => p.threads) ?? [],
         workingChannels: busyChannels(work),
+        hiddenAgents: hidden,
       }),
-    [channels.data, dms.data, threads.data, work],
+    [channels.data, dms.data, threads.data, work, hidden],
   );
   const lists = [channels, dms];
   return {
@@ -71,9 +82,10 @@ export function useUnreadConversations() {
   const orgId = useOrgId();
   const channels = useChannels(orgId);
   const dms = useDms(orgId);
+  const hidden = useHiddenAgents();
   return useMemo(
-    () => unreadConversationCount({ channels: channels.data ?? [], dms: dms.data ?? [] }),
-    [channels.data, dms.data],
+    () => unreadConversationCount({ channels: channels.data ?? [], dms: dms.data ?? [], hiddenAgents: hidden }),
+    [channels.data, dms.data, hidden],
   );
 }
 

@@ -8,6 +8,7 @@ import {
   useIssueColumns,
   useWikiTree,
 } from "@agenteschat/client";
+import { canTalk } from "@agenteschat/client/lib/audience";
 import { relativeTime, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { webUrl } from "@agenteschat/client/lib/guards";
@@ -414,11 +415,12 @@ function WorkBox({ issue: i }: { issue: Issue }) {
   );
 }
 
-/** The agents offered by "Pedir a um agente": a developer first, then the others. */
+/** The agents offered by "Pedir a um agente", the ones that answer me (as the server asks): a developer first. */
 function useAgentChoices() {
   const { dir } = useActors();
-  const dev = dir.agents.find((a) => /dev|engenh|program|cód/i.test(`${a.role} ${a.name}`)) ?? dir.agents[0];
-  return dev ? [dev, ...dir.agents.filter((a) => a.id !== dev.id)] : [];
+  const agents = dir.agents.filter(canTalk);
+  const dev = agents.find((a) => /dev|engenh|program|cód/i.test(`${a.role} ${a.name}`)) ?? agents[0];
+  return dev ? [dev, ...agents.filter((a) => a.id !== dev.id)] : [];
 }
 
 function AskAgent({ issue }: { issue: Issue }) {
@@ -645,7 +647,7 @@ function Details({ issue: i, bare = false }: { issue: Issue; bare?: boolean }) {
           size="sm"
           value={actorKey(i.assignee)}
           onValueChange={(v) => action.mutate({ type: "update", id: i.id, patch: { assignee: actorFromKey(v) } })}
-          options={actors.options(true)}
+          options={actors.options(true, actorKey(i.assignee))}
         />
       </Field>
       <Field label={t("issues.form.priority")} id={`is-pri-${i.id}`}>

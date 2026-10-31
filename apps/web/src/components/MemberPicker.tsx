@@ -1,3 +1,4 @@
+import { listsAgent } from "@agenteschat/client/lib/audience";
 import { Checkbox, InfoHint, SearchField, Token, TokenList } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -15,8 +16,11 @@ export interface PickRow {
   sub: string;
 }
 
-/** People and agents of the org as pickable rows, minus `exclude`, filtered by `query`. */
-export function useMemberRows(query: string, exclude: Set<PickKey> = new Set()) {
+/**
+ * People and agents of the org as pickable rows, minus `exclude`, filtered by `query`. Agents only as far as my lists
+ * show them (`listsAgent`), plus the ones in `keep` (already picked), so they can still be taken out.
+ */
+export function useMemberRows(query: string, exclude: Set<PickKey> = new Set(), keep?: Set<PickKey>) {
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const q = query.trim().toLowerCase();
@@ -30,13 +34,15 @@ export function useMemberRows(query: string, exclude: Set<PickKey> = new Set()) 
         name: m.name,
         sub: m.email,
       })),
-    ...dir.agents.map((a) => ({
-      key: `agent:${a.id}` as PickKey,
-      kind: "agent" as const,
-      id: a.id,
-      name: a.name,
-      sub: `@${a.handle}`,
-    })),
+    ...dir.agents
+      .filter((a) => listsAgent(org.role, a) || keep?.has(`agent:${a.id}`))
+      .map((a) => ({
+        key: `agent:${a.id}` as PickKey,
+        kind: "agent" as const,
+        id: a.id,
+        name: a.name,
+        sub: `@${a.handle}`,
+      })),
   ];
   return rows.filter((r) => !exclude.has(r.key) && (!q || `${r.name} ${r.sub}`.toLowerCase().includes(q)));
 }
@@ -99,8 +105,8 @@ export function PeoplePicker({
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
-  const rows = useMemberRows(query);
-  const all = useMemberRows("");
+  const rows = useMemberRows(query, undefined, selected);
+  const all = useMemberRows("", undefined, selected);
   const picked = all.filter((r) => selected.has(r.key));
   const toggle = (key: PickKey, on: boolean) => {
     const next = new Set(selected);

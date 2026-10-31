@@ -7,6 +7,7 @@ import {
   useFormerAgents,
   useWorkingRuns,
 } from "@agenteschat/client";
+import { listsAgent } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { waitingComputerByAgent } from "@agenteschat/client/lib/machine-outages";
 import { previewBody } from "@agenteschat/client/lib/message-body";
@@ -56,14 +57,16 @@ export function AgentsScreen() {
   const outages = useMachineOutages();
   const groups = useAgentGroups(orgId);
   const offline = useMemo(() => waitingComputerByAgent(outages.outages), [outages.outages]);
-  const { waiting, working, free } = teamLines(dir.agents, work, dms.data ?? [], asking, offline);
+  const role = useOrg().org?.role;
+  const agents = dir.agents.filter((a) => listsAgent(role, a));
+  const { waiting, working, free } = teamLines(agents, work, dms.data ?? [], asking, offline);
   const busy = waiting.length + working.length;
   const pull = usePullRefresh(() =>
     Promise.allSettled([runs.refetch(), dms.refetch(), approvals.refetch(), outages.refetch(), groups.refetch()]),
   );
-  const total = dir.agents.length;
+  const total = agents.length;
   // Archived agents have no profile: admins delete them for good from here (ADR 0082).
-  const admin = can(useOrg().org?.role, "manage_agents");
+  const admin = can(role, "manage_agents");
   const archived = (useFormerAgents(orgId).data ?? []).filter((a) => admin && !a.deleted);
   return (
     <LargeTitleScreen

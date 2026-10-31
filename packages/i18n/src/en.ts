@@ -830,6 +830,7 @@ export const en: Translations = {
     agents: "Agents",
     directMessages: "Direct messages",
     createAgent: "Create agent",
+    importAgents: "Bring agents from another app",
     budgetUsed: "{{percent}} of the agents' budget used this month",
     budgetUsedHint: "The workspace used {{percent}} of its agents' budgets this month",
     budget: "Budget",

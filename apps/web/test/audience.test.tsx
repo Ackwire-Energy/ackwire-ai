@@ -4,7 +4,13 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { Agent } from "@agenteschat/client";
-import { audienceNotice, audienceSummary, canEditAudience, canTalk } from "@agenteschat/client/lib/audience";
+import {
+  audienceNotice,
+  audienceSummary,
+  canEditAudience,
+  canTalk,
+  listsAgent,
+} from "@agenteschat/client/lib/audience";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createI18n } from "@/i18n";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
@@ -143,6 +149,16 @@ describe("audience rules", () => {
     expect(canEditAudience("member", theo({}), "u1")).toBe(true);
     expect(canEditAudience("member", theo({}), "u2")).toBe(false);
     expect(canEditAudience("admin", theo({}), "u2")).toBe(true);
+  });
+
+  test("whose lists show it: a member's while it answers them, always owners' and admins'", () => {
+    const locked = theo({ canTalk: false });
+    expect(listsAgent("member", theo({}))).toBe(true);
+    expect(listsAgent("member", locked)).toBe(false);
+    expect(listsAgent("admin", locked)).toBe(true);
+    expect(listsAgent("owner", locked)).toBe(true);
+    // An older server says nothing: it answers everyone.
+    expect(listsAgent("member", theo({ canTalk: undefined }))).toBe(true);
   });
 
   test("agent.unavailable: the notice shows for me and the 'pensando…' goes away", async () => {

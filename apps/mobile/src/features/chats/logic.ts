@@ -91,6 +91,10 @@ export function isListedThread(t: Pick<ThreadInfo, "mission" | "title" | "contex
 
 export const threadTitle = (t: Pick<ThreadInfo, "title" | "rootText">) => t.title?.trim() || previewOf(t.rootText);
 
+/** A DM with one of `hiddenAgents`, the agents my lists leave out (`listsAgent`): off the home and its badge. */
+const hiddenDm = (d: Pick<DirectMessage, "with">, hiddenAgents: ReadonlySet<string> | undefined) =>
+  d.with.type === "agent" && hiddenAgents?.has(d.with.id) === true;
+
 /**
  * One list: threads and missions, DMs and channels, by the latest activity (channels without any last, by
  * name). `workingChannels`: conversations where an agent has a run in progress (who is working now).
@@ -100,6 +104,7 @@ export function buildConversations(input: {
   dms: DirectMessage[];
   threads: ThreadInfo[];
   workingChannels?: ReadonlySet<string>;
+  hiddenAgents?: ReadonlySet<string>;
 }): ConversationRow[] {
   const rows: ConversationRow[] = [];
   const dmWith = new Map(input.dms.map((d) => [d.channelId, d.with]));
@@ -141,6 +146,7 @@ export function buildConversations(input: {
     });
   }
   for (const d of input.dms) {
+    if (hiddenDm(d, input.hiddenAgents)) continue;
     rows.push({
       kind: "dm",
       key: `d:${d.channelId}`,
@@ -227,10 +233,11 @@ export const unreadConversations = (rows: ConversationRow[]) => rows.filter((r) 
  */
 export function unreadConversationCount(input: {
   channels: Pick<Channel, "isMember" | "unreadCount">[];
-  dms: Pick<DirectMessage, "unread">[];
+  dms: Pick<DirectMessage, "unread" | "with">[];
+  hiddenAgents?: ReadonlySet<string>;
 }): number {
   const channels = input.channels.filter((c) => c.isMember && (c.unreadCount ?? 0) > 0).length;
-  const dms = input.dms.filter((d) => d.unread > 0).length;
+  const dms = input.dms.filter((d) => d.unread > 0 && !hiddenDm(d, input.hiddenAgents)).length;
   return channels + dms;
 }
 
