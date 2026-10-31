@@ -18,6 +18,7 @@ import {
   CONNECTOR_ALL,
   grantKey,
   impliedByWrite,
+  isBuiltinScope,
   mailConnectionIds,
   NOT_IN_ALL,
   notMailGrant,
@@ -430,7 +431,7 @@ export async function setAgentAccess(
     if (grant.connectionId) {
       const problem = await connectorGrantValidator(db, orgId, grant);
       if (problem) throw new ValidationError(problem);
-    } else if (!BUILTIN_SCOPES[grant.scope]) {
+    } else if (!isBuiltinScope(grant.scope)) {
       throw new ValidationError(`Unknown scope ${grant.scope}`);
     }
     rows.push(grant);
@@ -607,7 +608,7 @@ export async function resolveApps(db: Executor, orgId: string, names: string[]) 
   const unknown: string[] = [];
   for (const name of new Set(names)) {
     const key = name.trim();
-    const builtin = BUILTIN_SCOPES[key];
+    const builtin = isBuiltinScope(key) ? BUILTIN_SCOPES[key] : undefined;
     if (builtin) {
       found.set(name, { id: key, label: builtin.label });
       continue;
