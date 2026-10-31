@@ -1,6 +1,15 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Platform, Text as RNText, ScrollView, StyleSheet, TextInput, type TextStyle, View } from "react-native";
+import {
+  Platform,
+  Text as RNText,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  type TextInputInstance,
+  type TextStyle,
+  View,
+} from "react-native";
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -72,6 +81,11 @@ export interface ComposerProps {
     token: { start: number; query: string },
     handle: string,
   ) => { text: string; caret: number };
+  /**
+   * Text handed in from another screen ("Falar com o Theo" leaves "@theo " here): put in the field when it is
+   * empty, and the field focused. Once per request (`at`).
+   */
+  prefill?: { text: string; at: number } | null;
 }
 
 /** The pill's height, the "+" and the send button's. */
@@ -102,6 +116,7 @@ export function Composer({
   mention,
   mentionAt,
   insertMention,
+  prefill,
 }: ComposerProps) {
   const theme = useTheme();
   const { colors, shadows, reducedMotion } = theme;
@@ -111,6 +126,15 @@ export function Composer({
   const [selection, setSelection] = useState<{ start: number; end: number } | undefined>(undefined);
   const [focused, setFocused] = useState(false);
   const [how, setHow] = useState<SendHow>("join");
+  const input = useRef<TextInputInstance | null>(null);
+  const prefillAt = prefill?.at;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per request (its time), whatever the text
+  useEffect(() => {
+    if (!prefill) return;
+    const handed = prefill.text;
+    setText((current) => (current.trim() ? current : handed));
+    input.current?.focus();
+  }, [prefillAt]);
   const has = text.trim().length > 0;
   const token = focused && mention && mentionAt ? mentionAt(text, caret) : null;
   const stopMode = Boolean(working?.stop) && !has;
@@ -249,6 +273,7 @@ export function Composer({
             </Animated.View>
           ) : null}
           <TextInput
+            ref={input}
             {...(inputNativeID ? { nativeID: inputNativeID } : {})}
             value={text}
             onChangeText={setText}

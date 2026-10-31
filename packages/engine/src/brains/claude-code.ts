@@ -6,6 +6,7 @@ import {
   BRAIN_PROTOCOL,
   type BrainTurnRequest,
   brainTopic,
+  CONTEXT_LIMIT_PROTOCOL,
   type PubSub,
   parseBrainEvent,
   STEER_PROTOCOL,
@@ -210,6 +211,15 @@ export function accountFields(
   };
 }
 
+/** The agent's context limit, sent only to a runner that knows it (`CONTEXT_LIMIT_PROTOCOL`). */
+export function contextFields(
+  protocol: number | undefined,
+  turn: Pick<BrainTurn, "contextTokens">,
+): Pick<BrainTurnRequest, "contextTokens"> {
+  if (!turn.contextTokens || (protocol !== undefined && protocol < CONTEXT_LIMIT_PROTOCOL)) return {};
+  return { contextTokens: turn.contextTokens };
+}
+
 /** Why the turn can't go to this machine now (null: it can). With an account, the account decides the sign-in. */
 export function claudeCodeAvailability(status: MachineStatus | null, account?: BrainAccount): BrainEvent | null {
   if (!status) return err("machine_offline", "The agent's computer is not connected to the organization.", true);
@@ -393,6 +403,7 @@ export function createClaudeCodeBrain(deps: ClaudeCodeBrainDeps): Brain {
           personalMcp,
           ...(permissions ? { permissions } : {}),
           ...accountFields(status?.protocol, turn),
+          ...contextFields(status?.protocol, turn),
         };
         deps.hub
           .call<"brain.turn">(

@@ -1,6 +1,7 @@
 import {
   type ContentBlock,
   contextWindowOf,
+  contextWindowWithin,
   type ModelMessage,
   type SystemBlock,
   type ToolSpec,
@@ -76,12 +77,15 @@ export function estimateRequestTokens(request: {
   return Math.ceil(chars / CHARS_PER_TOKEN);
 }
 
-/** Past this, old results go even when the window has room: every turn resends the whole context (cost). */
+/**
+ * Past this, old results go even when the window has room: every turn resends the whole context (cost). An
+ * agent's own limit (`agents.context_tokens`) takes its place: whoever chose 1M chose to pay for it.
+ */
 export const MAX_CONTEXT_TOKENS = 500_000;
 
-/** Input tokens a request may have: the window minus the output tokens and the margin, at most `MAX_CONTEXT_TOKENS`. */
-export const contextBudgetTokens = (windowTokens: number, maxOutputTokens: number) =>
-  Math.min(MAX_CONTEXT_TOKENS, Math.max(0, windowTokens - maxOutputTokens - Math.ceil(windowTokens * CONTEXT_MARGIN)));
+/** Input tokens a request may have: the window minus the output tokens and the margin, at most `maxTokens`. */
+export const contextBudgetTokens = (windowTokens: number, maxOutputTokens: number, maxTokens = MAX_CONTEXT_TOKENS) =>
+  Math.min(maxTokens, Math.max(0, windowTokens - maxOutputTokens - Math.ceil(windowTokens * CONTEXT_MARGIN)));
 
 /** A tool result that may be removed. `position`: its order in the run (0 = oldest). */
 export interface ToolResultCandidate {
@@ -280,6 +284,8 @@ export async function fitContextWindow(
     model: string;
     /** Overrides the catalog's window (tests). */
     windowTokens?: number;
+    /** The agent's limit (`agents.context_tokens`): the window when smaller, and no `MAX_CONTEXT_TOKENS` cap. */
+    limitTokens?: number | null;
     maxOutputTokens: number;
     system: SystemBlock[];
     messages: ModelMessage[];
@@ -289,8 +295,12 @@ export async function fitContextWindow(
     timeoutMs?: number;
   },
 ): Promise<{ messages: ModelMessage[]; report: ContextBudgetReport } | null> {
-  const windowTokens = input.windowTokens ?? contextWindowOf(input.model);
-  const budgetTokens = contextBudgetTokens(windowTokens, input.maxOutputTokens);
+  const windowTokens = contextWindowWithin(input.windowTokens ?? contextWindowOf(input.model), input.limitTokens);
+  const budgetTokens = contextBudgetTokens(
+    windowTokens,
+    input.maxOutputTokens,
+    input.limitTokens ? Number.POSITIVE_INFINITY : MAX_CONTEXT_TOKENS,
+  );
   const estimatedTokens = estimateRequestTokens(input);
   if (estimatedTokens <= budgetTokens) return null;
   const candidates = removableToolResults(input.messages);
