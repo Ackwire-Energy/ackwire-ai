@@ -554,6 +554,8 @@ export const featureKeysEn: FeatureTranslations = {
     computerOn: "{{name}} · on",
     computerOff: "{{name}} · off",
     computerNotAnswering: "{{name}} · not answering",
+    computerOffPlain: "Computer off",
+    computerNotAnsweringPlain: "Computer not answering",
     running_one: "{{count}} item in progress",
     running_other: "{{count}} items in progress",
     conversation: "Mission chat",

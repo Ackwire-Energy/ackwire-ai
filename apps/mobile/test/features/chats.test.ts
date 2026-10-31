@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Channel, DirectMessage, OrgSummary } from "@agenteschat/client";
-import { previewBody } from "@agenteschat/client/lib/message-body";
+import { previewBody, serverBody } from "@agenteschat/client/lib/message-body";
 import { resources } from "@agenteschat/i18n";
 import i18next from "i18next";
 import {
@@ -577,5 +577,25 @@ describe("last-message previews in the reader's language", () => {
       "Claude Code can't answer right now. I'll answer when it's back.",
     );
     expect(previewBody(i18n.t, "Feito! Já anotei.", null)).toBe("Feito! Já anotei.");
+  });
+
+  test("a task's end names its computer only where the workspace has more than one; a preview never does", async () => {
+    const i18n = i18next.createInstance();
+    await i18n.init({ lng: "pt-BR", fallbackLng: "pt-BR", resources });
+    const done = {
+      bodyCode: "machine_task_done",
+      bodyParams: { title: "Rodar os testes", computer: "Computador da Acme", seconds: "120" },
+    };
+    const english = "Task \"Rodar os testes\" finished on Computador da Acme.";
+    expect(serverBody(i18n.t, english, done)).toBe("“Rodar os testes” terminou.");
+    expect(serverBody(i18n.t, english, done, true)).toBe("“Rodar os testes” terminou no Computador da Acme.");
+    expect(previewBody(i18n.t, english, done)).toBe("“Rodar os testes” terminou.");
+    const plan = { bodyCode: "mission_plan", bodyParams: { title: "App", computer: "Computador da Acme" } };
+    expect(serverBody(i18n.t, "Plan for \"App\"", plan)).toBe("Plano para “App”");
+    // A computer that is the news itself keeps its name.
+    const back = { bodyCode: "machine_task_resumed", bodyParams: { title: "App", computer: "MacBook" } };
+    expect(serverBody(i18n.t, "…", back)).toBe("MacBook voltou: “App” retomou de onde parou.");
+    await i18n.changeLanguage("en");
+    expect(serverBody(i18n.t, english, done)).toBe("“Rodar os testes” finished.");
   });
 });

@@ -5,7 +5,7 @@ setupDom();
 
 import type { MissionEligibleAgent } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -32,16 +32,51 @@ describe("Missões", () => {
   });
 
   test("a mission's card: title, agent, state, the plan as items, the computer, Abrir thread", async () => {
-    const api = createFakeApi(seedState());
-    await api.missions.create(ORG_ID, { agentId: ADA_ID, goal: "Construir o app mobile", channelId: ENG_ID });
-    await renderApp(`/org/${ORG_ID}/threads?tab=missions`, { api });
-    await settle(6);
-    const card = screen().getByRole("article", { name: /Missão Construir o app mobile/ });
-    expect(within(card).getByText("Plano proposto")).toBeTruthy();
-    // No plan yet (the executor is still exploring): no "0 de 0" count.
-    expect(within(card).getByText("Sem itens ainda")).toBeTruthy();
-    expect(within(card).getAllByText(/MacBook/).length).toBeGreaterThan(0);
-    expect(within(card).getAllByRole("button", { name: /Abrir thread/ }).length).toBeGreaterThan(0);
+    for (const computers of [["MacBook", "Mac mini"], ["MacBook"]]) {
+      const api = createFakeApi(seedState());
+      for (const name of computers) fakeMachinesOf.get(api)?.pair({ name });
+      await api.missions.create(ORG_ID, { agentId: ADA_ID, goal: "Construir o app mobile", channelId: ENG_ID });
+      const view = await renderApp(`/org/${ORG_ID}/threads?tab=missions`, { api });
+      await settle(6);
+      const card = screen().getByRole("article", { name: /Missão Construir o app mobile/ });
+      expect(within(card).getByText("Plano proposto")).toBeTruthy();
+      // No plan yet (the executor is still exploring): no "0 de 0" count.
+      expect(within(card).getByText("Sem itens ainda")).toBeTruthy();
+      // Who programs, and the computer only where the workspace has more than one.
+      const chip = card.querySelector(".mi-exec") as HTMLElement;
+      expect(chip.textContent).toBe(computers.length > 1 ? "Claude Code no MacBook" : "Claude Code");
+      expect(within(card).getAllByRole("button", { name: /Abrir thread/ }).length).toBeGreaterThan(0);
+      view.unmount();
+    }
+  });
+
+  test("a task's end in the chat names its computer only where the workspace has more than one", async () => {
+    for (const computers of [["MacBook", "Mac mini"], ["MacBook"]]) {
+      const state = seedState();
+      const api = createFakeApi(state);
+      for (const name of computers) fakeMachinesOf.get(api)?.pair({ name });
+      state.messages.push({
+        id: "m-task",
+        channelId: ENG_ID,
+        threadId: null,
+        author: { type: "agent", id: ADA_ID },
+        body: "Task done",
+        mentionedAgentIds: [],
+        agentRunId: null,
+        meta: {
+          bodyCode: "machine_task_done",
+          bodyParams: { title: "Rodar os testes", computer: "MacBook", seconds: "120" },
+        },
+        createdAt: new Date().toISOString(),
+      });
+      const view = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+      await settle(8);
+      const line = document.querySelector('[data-message-id="m-task"]') as HTMLElement;
+      expect(line.textContent).toStartWith(
+        computers.length > 1 ? "“Rodar os testes” terminou em 2 min no MacBook ·" : "“Rodar os testes” terminou em 2 min ·",
+      );
+      view.unmount();
+    }
   });
 
   test("a thread with a mission (Todas): the mission header's look in the row — agent, Missão · N de M itens, its state", async () => {
@@ -133,16 +168,39 @@ describe("Missões", () => {
 
   test("Nova missão: two agents on one computer are both selectable; the first eligible is chosen", async () => {
     const api = createFakeApi(seedState());
+    for (const name of ["mac", "mini"]) fakeMachinesOf.get(api)?.pair({ name });
     api.missions.eligibleAgents = async () => [pick(ADA_ID, "Ada"), pick(ATLAS_ID, "Atlas")];
     await renderApp(`/org/${ORG_ID}/threads?tab=missions`, { api });
     await settle(6);
-    const { trigger } = await openAgents();
+    const { dialog, trigger } = await openAgents();
     expect(trigger.textContent).toContain("Ada");
     const ada = screen().getByRole("option", { name: /^Ada/ });
     const atlas = screen().getByRole("option", { name: /^Atlas/ });
     expect(ada.getAttribute("aria-disabled")).not.toBe("true");
     expect(atlas.getAttribute("aria-disabled")).not.toBe("true");
-    expect(atlas.textContent).toContain("No mac");
+    // The workspace has two computers: each agent says on which, and so does the Computador field.
+    expect(atlas.textContent).toContain("No mac · online");
+    expect(dialog.querySelector(".mi-pill--field")?.textContent).toBe("maconline");
+  });
+
+  test("Nova missão: with one computer, no 'No …' under the agents and no Computador field; one offline says so", async () => {
+    const api = createFakeApi(seedState());
+    fakeMachinesOf.get(api)?.pair({ name: "Computador da Acme" });
+    const acme = { id: "machine_1", name: "Computador da Acme", online: true };
+    api.missions.eligibleAgents = async () => [
+      pick(ADA_ID, "Ada", { machine: acme }),
+      pick(ATLAS_ID, "Atlas", { machine: { ...acme, online: false } }),
+    ];
+    await renderApp(`/org/${ORG_ID}/threads?tab=missions`, { api });
+    await settle(6);
+    const { dialog } = await openAgents();
+    const ada = screen().getByRole("option", { name: /^Ada/ });
+    const atlas = screen().getByRole("option", { name: /^Atlas/ });
+    expect(ada.textContent).not.toContain("Computador da Acme");
+    expect(ada.textContent).not.toContain("online");
+    expect(atlas.textContent).toContain("O computador está offline");
+    expect(atlas.textContent).not.toContain("Computador da Acme");
+    expect(dialog.querySelector(".mi-pill--field")).toBeNull();
   });
 
   test("Nova missão: Autonomia starts at 'Só o que é arriscado' (low-risk ones allowed automatically)", async () => {

@@ -32,9 +32,9 @@ import { Button, CHROME_MAX_SCALE, Count, Icon, Text, useToast } from "@/ui";
 import { useMovesChannel } from "../categories/CategoryScreens";
 import { categoryHrefs } from "../categories/logic";
 import { chatHref } from "../links/logic";
-import { missionComputerKey } from "../missions/logic";
+import { missionComputerText } from "../missions/logic";
 import { AgentFace, Face } from "../shared/Face";
-import { useColors, useDirectory, useEdition, useMeId, useOrgId } from "../shared/hooks";
+import { useColors, useDirectory, useEdition, useMeId, useNamesComputers, useOrgId } from "../shared/hooks";
 import { genderOf, previewOf } from "../shared/logic";
 import { SheetTitle } from "../shared/PromptForm";
 import { ActionList, copyText, successHaptic, Tile, tapHaptic, useSurface } from "../shared/parts";
@@ -606,6 +606,7 @@ export function NewMissionForm({
   // On the Cloud missions wait for the workspace's own computer: nobody connects one.
   const waitCloud = useCloudMissionWait();
   const cloud = useEdition() === "cloud";
+  const names = useNamesComputers();
   const create = useCreateMission(orgId);
   const [goal, setGoal] = useState(initialGoal);
   const [picked, setPicked] = useState<string | null>(null);
@@ -653,7 +654,7 @@ export function NewMissionForm({
               key: a.agentId,
               leading: <AgentFace agentId={a.agentId} size={26} live={false} />,
               label: a.name,
-              hint: waitCloud && !a.machine ? waitCloud : whereText(t, a, cloud),
+              hint: (waitCloud && !a.machine ? waitCloud : whereText(t, a, { cloud, names })) ?? undefined,
               disabled: a.eligible === false,
               trailing: a.agentId === agentId ? <Icon name="check" size={18} color={c.ink} /> : undefined,
               onPress: a.eligible === false ? undefined : () => setPicked(a.agentId),
@@ -686,11 +687,14 @@ function useCloudMissionWait() {
   return t("missions.waitingCloud", { computer: t("computerSetup.title", { org: org?.name ?? "" }) });
 }
 
-/** "MacBook do Walter · ligado", or why it can't do a mission for you; the Cloud's computer is never off. */
-function whereText(t: TFunction, a: MissionEligibleAgent, cloud: boolean) {
+/**
+ * "MacBook do Walter · ligado" (`missionComputerText`: by name only where the workspace has more than one), or why
+ * it can't do a mission for you; the Cloud's computer is never off.
+ */
+function whereText(t: TFunction, a: MissionEligibleAgent, where: { cloud: boolean; names: boolean }) {
   if (a.eligible === false && a.reason) return t(`mobile.newMission.reason.${a.reason}`);
   if (!a.machine) return t("mobile.newMission.reason.no_computer");
-  return t(missionComputerKey(a.machine.online, cloud), { name: a.machine.name });
+  return missionComputerText(t, a.machine, where);
 }
 
 // ── /summary of a mission ────────────────────────────────────────────────────

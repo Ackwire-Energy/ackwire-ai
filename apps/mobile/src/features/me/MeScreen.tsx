@@ -1,5 +1,11 @@
 import { useAiAccounts, useCredentials, useIssues, useJoinRequests, useMe } from "@agenteschat/client";
-import { accountTitle, groupPlans, ownSignIns, ownSignInTitle } from "@agenteschat/client/lib/ai-accounts";
+import {
+  accountTitle,
+  groupPlans,
+  onSeveralComputers,
+  ownSignIns,
+  ownSignInTitle,
+} from "@agenteschat/client/lib/ai-accounts";
 import { can } from "@agenteschat/client/lib/permissions";
 import Constants from "expo-constants";
 import { router } from "expo-router";
@@ -51,6 +57,8 @@ export function MeScreen() {
   const own = ownSignIns(ai.data);
   const accounts = groupPlans(ai.data?.accounts ?? []);
   const plans = own.length + accounts.length;
+  // On which computer, as "Contas de IA" says it: only where the accounts sit on more than one.
+  const several = onSeveralComputers(ai.data?.accounts ?? []);
   const c = useColors();
   // Membros, for who invites people or manages members (the requests to join and the invitation link live there).
   const manager = can(org.org, "invite_people") || can(org.org, "manage_members");
@@ -228,7 +236,7 @@ export function MeScreen() {
             key={a.key}
             logo={first.provider ?? first.kind}
             title={accountTitle(first)}
-            sub={t("aiAccounts.page.on", { computer: first.computer })}
+            sub={several ? t("aiAccounts.page.on", { computer: first.computer }) : null}
             usage={a.usage}
             divider={own.length + i > 0}
             onPress={() => open("/ai-accounts")}
@@ -301,7 +309,7 @@ export function MeScreen() {
   );
 }
 
-/** A plan the agents think with: its maker's mark, its name, its usage in pixels and where it is. */
+/** A plan the agents think with: its maker's mark, its name, its usage in pixels and where it is (`sub`), if said. */
 function PlanRow({
   logo,
   title,
@@ -312,7 +320,7 @@ function PlanRow({
 }: {
   logo: string;
   title: string;
-  sub: string;
+  sub: string | null;
   usage: Parameters<typeof PlanMeter>[0]["usage"] | null;
   divider: boolean;
   onPress: () => void;
@@ -328,16 +336,20 @@ function PlanRow({
       divider={divider}
       onPress={onPress}
       below={
-        <>
-          {usage ? (
-            <View style={styles.meter}>
-              <PlanMeter usage={usage} compact />
-            </View>
-          ) : null}
-          <Text variant="footnote" tone="muted" numberOfLines={1}>
-            {sub}
-          </Text>
-        </>
+        usage || sub ? (
+          <>
+            {usage ? (
+              <View style={styles.meter}>
+                <PlanMeter usage={usage} compact />
+              </View>
+            ) : null}
+            {sub ? (
+              <Text variant="footnote" tone="muted" numberOfLines={1}>
+                {sub}
+              </Text>
+            ) : null}
+          </>
+        ) : undefined
       }
     />
   );

@@ -560,6 +560,8 @@ export const featureKeysPtBR = {
     computerOn: "{{name}} · ligado",
     computerOff: "{{name}} · desligado",
     computerNotAnswering: "{{name}} · sem resposta",
+    computerOffPlain: "Computador desligado",
+    computerNotAnsweringPlain: "Computador sem resposta",
     running_one: "{{count}} item em andamento",
     running_other: "{{count}} itens em andamento",
     conversation: "Conversa da missão",
