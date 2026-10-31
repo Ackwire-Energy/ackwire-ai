@@ -96,6 +96,12 @@ test("the prompt names the loaded tools only by name and the on-demand groups in
   expect(text).toContain("Your browser (`browser_*`)");
 });
 
+test("the prompt tells the agent to guide a person to connect an app it lacks, never to say it doesn't exist", () => {
+  expect(describeCapabilities(presentTools(tools(), undefined, []))).toContain(
+    "Search before saying you can't do something. For an app you have no tools for (Google Drive, Gmail…), `find_tools` also says how to get it: guide the person to connect it instead of saying it doesn't exist.",
+  );
+});
+
 async function ctxOf(fx: Fixture, loadedGroups: string[]): Promise<ToolContext> {
   const msg = await postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, fx.general.id, {
     body: "hi",
