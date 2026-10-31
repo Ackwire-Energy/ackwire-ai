@@ -995,6 +995,22 @@ describe("the team's coordinator (ADR 0093)", () => {
     expect((await route(scored({}, { needsAgent: 0.3 }), chat.id)).selected).toEqual([]);
   });
 
+  test("a person alone with the coordinator as the channel's only agent: the strategy was told so, and its nobody stands", async () => {
+    f = await setup();
+    await setCoordinator({ db: f.db }, f.owner.id, f.org.id, f.agent.id, true);
+    const told: (string | null | undefined)[] = [];
+    const low: RouterStrategy = {
+      name: "fixed",
+      async decide(input) {
+        told.push(input.aloneWith);
+        return { agents: [{ agentId: f.agent.id, score: 0.05 }], needsAgent: 0.05 };
+      },
+    };
+    const thanks = await post("valeu!");
+    expect(await route(low, thanks.id)).toMatchObject({ selected: [], runs: [] });
+    expect(told).toEqual(["dev"]);
+  });
+
   test("when no step can read it: a reply and a talk with an agent first, then the coordinator only for a person alone here", async () => {
     const { theo, ada, walter } = await coordinated({ people: true });
     const crowded = await post("alguém viu o relatório?");

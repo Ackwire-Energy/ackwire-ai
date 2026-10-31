@@ -609,7 +609,7 @@ export { AGENT_CHIME_IN_MAX_HOP };
  * their next one; when it comes and the router decides on it too
  * (`routable`), that one decides for both (`continued`). A person's message
  * the policy gives to nobody goes to the team's coordinator when it needs an
- * agent or the person is alone here with the agents (ADR 0093).
+ * agent or the person is alone here with several agents (ADR 0093).
  *
  * When no step of the chain can read a person's message, rules in code pick
  * (ADR 0074 §4): R1 a reply to an agent, R2 the only agent when the author is
@@ -1037,14 +1037,15 @@ export async function routeMessage(
     !(continuityAgentId !== null && picked.includes(continuityAgentId)) &&
     (decided.alreadyAnswered ?? 0) >= ALREADY_ANSWERED_THRESHOLD;
   const selected = followUp && continuityAgentId ? [continuityAgentId] : duplicate ? [] : picked;
-  // Nobody took a message that needs an agent, or one from a person alone here with the agents: the coordinator
+  // Nobody took a message that needs an agent, or one from a person alone here with a team: the coordinator
   // takes it (ADR 0093), as a router run it may pass. Not a message for a person, nor one already answered.
+  // Alone with it as the one agent, the strategy was told so (R2's `aloneWith`) and its "nobody" stands.
   const coordinates =
     coordinatorId !== null &&
     selected.length === 0 &&
     !duplicate &&
     !toPerson &&
-    ((decided.needsAgent ?? 0) >= needGateOf(policy, candidates.length === 1) || (await aloneHere()));
+    ((decided.needsAgent ?? 0) >= needGateOf(policy, candidates.length === 1) || (!onlyAgentId && (await aloneHere())));
   const chosen = coordinates && coordinatorId ? [coordinatorId] : selected;
   const stepName = decided.strategy ?? deps.strategy.name;
   const strategy = coordinates ? "rule:coordinator" : stepName;
