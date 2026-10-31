@@ -34,6 +34,8 @@ export interface SelectProps<V extends string = string> {
    * list keeps the row's edge.
    */
   align?: "start" | "end";
+  /** The list closed and focus goes back to the trigger (`preventDefault()` keeps it where it is). */
+  onCloseAutoFocus?: (event: Event) => void;
 }
 
 function renderItem<V extends string>(o: SelectOption<V>) {
@@ -81,6 +83,7 @@ export function Select<V extends string = string>({
   listLabel,
   renderValue,
   align = "start",
+  onCloseAutoFocus,
   ...rest
 }: SelectProps<V>) {
   const wiring = useFieldControl({ id });
@@ -111,6 +114,7 @@ export function Select<V extends string = string>({
             sideOffset={4}
             align={align}
             aria-label={listLabel ?? rest["aria-label"]}
+            onCloseAutoFocus={onCloseAutoFocus}
           >
             <RSelect.Viewport>
               {groupOptions(options).map(([group, items]) =>

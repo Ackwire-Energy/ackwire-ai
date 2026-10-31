@@ -81,3 +81,59 @@ describe("the channels' order in the sidebar (ADR 0080)", () => {
     expect(row("eng").getAttribute("draggable")).toBe("false");
   });
 });
+
+describe("Criar canal in a category made there (ADR 0080)", () => {
+  const click = (el: Element) => act(async () => fireEvent.click(el));
+  const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
+  const pick = async (combobox: HTMLElement, option: string) => {
+    combobox.focus();
+    await act(async () => fireEvent.keyDown(combobox, { key: "Enter" }));
+    await act(async () => fireEvent.click(screen().getByRole("option", { name: option })));
+    await settle();
+  };
+  const created = (state: ReturnType<typeof seedState>) =>
+    state.calls.filter((c) => c.method === "chat.createChannel").map((c) => c.args[1]);
+
+  test("the new channel lands in the category made from its picker, not before it exists", async () => {
+    const state = await go();
+    await click(within(nav()).getByRole("button", { name: "Criar canal" }));
+    const dialog = screen().getByRole("dialog", { name: "Criar canal" });
+    await type(within(dialog).getByLabelText("Nome"), "vendas");
+    await pick(within(dialog).getByRole("combobox", { name: "Categoria" }), "Nova categoria…");
+
+    // Typing goes to its Nome, not to the Categoria left under it.
+    const inner = screen().getByRole("dialog", { name: "Nova categoria" });
+    expect(document.activeElement).toBe(within(inner).getByLabelText("Nome"));
+    await type(within(inner).getByLabelText("Nome"), "Produto");
+    await click(within(inner).getByRole("button", { name: "Criar categoria" }));
+    await settle(6);
+
+    // Making the category only picks it: the channel waits for its own Criar.
+    expect(created(state)).toEqual([]);
+    const category = state.channelCategories?.find((c) => c.name === "Produto");
+    expect(category).toBeDefined();
+    const still = screen().getByRole("dialog", { name: "Criar canal" });
+    const picker = within(still).getByRole("combobox", { name: "Categoria" });
+    expect(picker.textContent).toContain("Produto");
+    expect(document.activeElement).toBe(picker);
+
+    await click(within(still).getByRole("button", { name: "Criar #vendas" }));
+    await settle(6);
+    expect(created(state)).toEqual([{ name: "vendas", visibility: "public", categoryId: category?.id }]);
+    expect(state.channels.find((c) => c.name === "vendas")?.categoryId).toBe(category?.id ?? "");
+  });
+
+  test("from a category's '+', it starts chosen and the channel lands there", async () => {
+    const seeded = seedState();
+    seeded.channelCategories = [{ id: "cat-produto", name: "Produto", position: 0 }];
+    for (const c of seeded.channels) if (c.id === ENG_ID) c.categoryId = "cat-produto";
+    const state = await go(seeded);
+    await click(within(nav()).getByRole("button", { name: "Novo canal em Produto" }));
+    const dialog = screen().getByRole("dialog", { name: "Criar canal" });
+    expect(within(dialog).getByRole("combobox", { name: "Categoria" }).textContent).toContain("Produto");
+    await type(within(dialog).getByLabelText("Nome"), "roadmap");
+    await click(within(dialog).getByRole("button", { name: "Criar #roadmap" }));
+    await settle(6);
+    expect(created(state)).toEqual([{ name: "roadmap", visibility: "public", categoryId: "cat-produto" }]);
+  });
+});

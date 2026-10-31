@@ -4,7 +4,7 @@ import { setupDom } from "../testing/dom";
 setupDom();
 
 import { act, fireEvent, render, within } from "@testing-library/react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button, Dialog, DialogBody, DialogFooter, DialogSearchList, InfoHint, Input } from "../src";
 
 function Harness() {
@@ -159,6 +159,26 @@ describe("Dialog", () => {
       el.classList.contains("ac-dialog__scrim") ? "scrim" : el.querySelector(".ac-dialog__title")?.textContent,
     );
     expect(order).toEqual(["scrim", "Adicionar conector", "scrim", "GitHub"]);
+  });
+
+  test("one opened over another starts on its initialFocus field", async () => {
+    function Nested() {
+      const [inner, setInner] = useState(false);
+      const name = useRef<HTMLInputElement>(null);
+      return (
+        <Dialog open onOpenChange={() => {}} title="Criar canal" closeLabel="Fechar">
+          <Button onClick={() => setInner(true)}>Nova categoria</Button>
+          <Dialog open={inner} onOpenChange={setInner} title="Nova categoria" closeLabel="Fechar" initialFocus={name}>
+            <Input ref={name} aria-label="Nome" />
+          </Dialog>
+        </Dialog>
+      );
+    }
+    render(<Nested />);
+    const open = body().getByRole("button", { name: "Nova categoria" });
+    open.focus();
+    await act(async () => fireEvent.click(open));
+    expect(document.activeElement).toBe(body().getByRole("textbox", { name: "Nome" }));
   });
 
   test("an ⓘ at the end of the description's line stays out of it: the dialog is described by the sentence alone", () => {
