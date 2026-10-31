@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { schema } from "@agenteschat/db";
+import { eq, schema } from "@agenteschat/db";
 import { insertMessage, openAgentDm } from "@agenteschat/engine";
 import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
 
@@ -10,7 +10,7 @@ beforeEach(async () => {
 afterEach(() => t.close());
 
 type Opened = {
-  consultation: { id: string; consultedRunId: string | null; status: string; waiting: string | null };
+  consultation: { id: string; kind: string; consultedRunId: string | null; status: string; waiting: string | null };
   messages: { body: string; channelId: string }[];
 };
 
@@ -99,6 +99,7 @@ test("an opened question: its part of the agents' DM, to whoever reads the conve
   const opened = (await res.json()) as Opened;
   expect(opened.consultation).toMatchObject({
     id: consultationId,
+    kind: "question",
     consultedRunId: target?.id,
     status: "open",
     waiting: null,
@@ -113,6 +114,28 @@ test("an opened question: its part of the agents' DM, to whoever reads the conve
     consultations: { id: string; consultedRunId: string | null }[];
   };
   expect(list.consultations[0]).toMatchObject({ id: consultationId, consultedRunId: target?.id });
+  // Its part done, Infra waits on what it handed to Dev: the list says so (ADR 0094).
+  await t.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, target.id));
+  await t.db.insert(schema.agentConsultations).values({
+    orgId,
+    kind: "note",
+    askerRunId: target.id,
+    askerAgentId: infra.id,
+    targetAgentId: agentId,
+    channelId: dm.id,
+    messageId: crypto.randomUUID(),
+    waitId: "w2",
+    question: "Confere o deploy.sh na main.",
+    chain: [agentId, infra.id],
+    expiresAt: new Date(Date.now() + 60_000),
+  });
+  const handed = (await (
+    await owner(`/api/app/organizations/${orgId}/channels/${channelId}/consultations`)
+  ).json()) as { consultations: { id: string; kind: string; waiting: string | null }[] };
+  expect(handed.consultations.find((c) => c.id === consultationId)).toMatchObject({
+    kind: "question",
+    waiting: "agents",
+  });
   // A question that wasn't asked from here: not found.
   const missing = `/api/app/organizations/${orgId}/channels/${channelId}/consultations/${crypto.randomUUID()}`;
   const other = await owner(missing);

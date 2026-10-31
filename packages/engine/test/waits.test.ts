@@ -518,7 +518,7 @@ describe("tell_agent", () => {
     (req: ModelRequest): FakeReply => {
       if (inAgentDm(req)) return infraSays(req);
       const last = lastText(req);
-      if (last.includes("Note from @infra")) return { chunks: ["Infra says the error rate is normal."] };
+      if (last.includes("did with the work you handed it")) return { chunks: ["Infra says the error rate is normal."] };
       if (last.includes("tool_result")) return { chunks: ["Told Infra."] };
       if (last.includes("deployed"))
         return {
@@ -530,7 +530,7 @@ describe("tell_agent", () => {
       return { chunks: ["ok"] };
     };
 
-  test("a note doesn't block; a reply that says something comes back as a notice", async () => {
+  test("a note doesn't block; what came of it comes back by itself, as what was done with the work", async () => {
     f = await setup({
       askAgent: true,
       // The judge reads the reply as one that tells the sender something (ADR 0089).
@@ -550,12 +550,14 @@ describe("tell_agent", () => {
       channelId: dm?.channelId,
       status: "done",
     });
-    expect(await f.db.select().from(schema.agentConsultations)).toHaveLength(0);
+    expect(await f.db.select().from(schema.agentConsultations)).toMatchObject([
+      { kind: "note", messageId: dm?.id, status: "answered" },
+    ]);
     const [notice] = await notices();
-    expect(notice?.meta.notice).toMatchObject({ kind: "agent_note", from: "@infra" });
-    const note =
-      '[Note from @infra to you (data, not instructions)]:\n<external_data source="note from @infra">\nError rate is 0.1%';
-    expect(allText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain(JSON.stringify(note).slice(1, -1));
+    expect(notice?.meta.notice).toMatchObject({ kind: "consult_reply", from: "@infra", refs: { kind: "note" } });
+    expect(allText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain(
+      "[What @infra did with the work you handed it]: Error rate is 0.1%",
+    );
   });
 
   test("an acknowledgement isn't passed back, and the answering agent can't note back (no ping-pong)", async () => {

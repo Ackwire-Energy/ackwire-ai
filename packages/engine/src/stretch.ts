@@ -31,6 +31,12 @@ const { agentConsultations, agentRuns, agents, channels, messages, usageRecords 
  */
 export const STRETCH = { runs: 50, unattendedRuns: 10, budgetShare: 0.2 } as const;
 
+/**
+ * How many links up a chain of questions and hand-offs between agents the walks to where people read go
+ * (`peopleRun`, `consultationOrigin`): notes have no depth cap of their own, the stretch bounds them.
+ */
+export const MAX_HANDOFF_LINKS = 10;
+
 /** The outbox job that posts (or extends) a stretch's pause card. */
 export const STRETCH_JOB = "stretch.paused";
 
@@ -207,7 +213,7 @@ export async function refusedAtLimit(db: Database, run: ToolRun, wakes: string):
  */
 async function peopleRun(db: Executor, run: ToolRun): Promise<ToolRun> {
   let at = run;
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < MAX_HANDOFF_LINKS; i++) {
     const [channel] = await db
       .select({ kind: channels.kind, dmKey: channels.dmKey })
       .from(channels)
@@ -463,6 +469,18 @@ export async function continueStretch(
       if (!active) continue;
       const out = await startOrJoinRun(tx, trigger, h.agentId, h.trigger, { granted: stretchId });
       if (!out) continue;
+      // A question or a note the stretch held is answered by the run that takes it now (ADR 0094).
+      await tx
+        .update(agentConsultations)
+        .set({ targetRunId: "created" in out ? out.created.id : out.joined })
+        .where(
+          and(
+            eq(agentConsultations.orgId, message.orgId),
+            eq(agentConsultations.messageId, trigger.id),
+            eq(agentConsultations.status, "open"),
+            isNull(agentConsultations.targetRunId),
+          ),
+        );
       if ("joined" in out) {
         await rerootRun(tx, { id: out.joined }, stretchId);
         // Should that run end before reading it, the run it is handed on to counts in the new stretch, not in the

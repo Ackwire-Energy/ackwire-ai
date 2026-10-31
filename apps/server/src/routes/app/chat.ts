@@ -34,9 +34,12 @@ import { Channel, Message } from "./schemas";
 const tags = ["Chat"];
 const ChannelParams = OrgParams.extend({ channelId: z.uuid() });
 
-/** A question an agent asked another from a conversation (`consultationsIn`). */
+/** A question an agent asked another from a conversation, or work it handed one (`consultationsIn`). */
 const Consultation = z.object({
   id: z.uuid(),
+  kind: z
+    .enum(["question", "note"])
+    .openapi({ description: "`question`: `ask_agent`. `note`: work or news handed off with `tell_agent`." }),
   runId: z.uuid().openapi({ description: "The asking run: its reply (`agentRunId`) shows the list." }),
   agentId: z.uuid(),
   consultedAgentId: z.uuid(),
@@ -45,9 +48,9 @@ const Consultation = z.object({
     .nullable()
     .openapi({ description: "The consulted agent's run: the cards it posts here carry it (`agentRunId`)." }),
   status: z.enum(["open", "answered", "expired", "failed"]),
-  waiting: z.enum(["approval", "input", "computer"]).nullable().openapi({
+  waiting: z.enum(["approval", "input", "computer", "agents"]).nullable().openapi({
     description:
-      "Open, and the consulted agent waits: on a person (`approval`; `input`: an answer or a secret), or for its computer to come back online (`computer`).",
+      "Open, and the consulted agent waits: on a person (`approval`; `input`: an answer or a secret), for its computer to come back online (`computer`), or, its part done, on agents it handed some to (`agents`).",
   }),
   question: z.string(),
   answer: z.string().nullable().openapi({ description: "The answer once answered; why it couldn't once failed." }),
@@ -329,7 +332,8 @@ export function chatRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/channels/{channelId}/consultations",
       tags,
       security,
-      summary: "Questions agents asked other agents from here, latest first (drawn inside the reply that asked)",
+      summary:
+        "Questions agents asked other agents from here, and work they handed them, latest first (drawn inside the reply that asked)",
       request: { params: ChannelParams },
       responses: {
         200: json(

@@ -1,18 +1,24 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { sealSecret, secretAad } from "@agenteschat/adapters";
-import { eq, schema } from "@agenteschat/db";
+import { asc, eq, inArray, ne, schema, sql } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import { systemText } from "@agenteschat/providers";
+import type { FakeReply } from "@agenteschat/providers/testing";
 import {
+  type AgentRun,
+  answerNow,
   answerQuestion,
   CONSULTATION_TTL_MS,
   cancelRun,
   consultationConversation,
   consultationsIn,
   createAgent,
+  createAgentRuns,
   decideApproval,
+  deleteAgent,
   deliverSecret,
   drainOutbox,
+  enqueue,
   expireConsultations,
   grantScopes,
   insertMessage,
@@ -20,9 +26,17 @@ import {
   listDms,
   listMessages,
   type MachineHub,
+  onConsultedRunFinished,
+  openAgentDm,
   postPersonMessage,
   recoverStaleRuns,
+  reportHandOffs,
+  runAuthority,
+  STRETCH,
   setAgentComputerTarget,
+  startOrJoinRun,
+  stretchCardOf,
+  type ToolContext,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
 import { fakeRunner, pairMachine, RUNNER } from "./machine-fixtures";
@@ -290,14 +304,16 @@ describe("ask_agent", () => {
     expect(resumed).toBeLessThan(later.findIndex((e) => e.type === "agent.consulted"));
   });
 
-  test("a note's run asks no person: it answers no consultation", async () => {
+  test("work handed off asks the person behind it, where they asked, and their answer resumes it", async () => {
     f = await setup({
       askAgent: true,
       askUser: true,
+      judge: (kind) => (kind === "note_reply" ? 0.9 : undefined),
       reply: (req) => {
         const last = lastText(req);
         if (inAgentDm(req)) {
-          if (last.includes("tool_result")) return answer("Noted.");
+          const picked = /The person answered: (\w+)/.exec(last);
+          if (picked) return answer(`Watching the ${picked[1]} metrics.`);
           return {
             chunks: [],
             toolUses: [
@@ -306,26 +322,36 @@ describe("ask_agent", () => {
                 input: {
                   why: "The note doesn't say which deploy finished, and the metrics to watch depend on it.",
                   question: "Which deploy?",
+                  choices: ["staging", "production"],
                 },
               },
             ],
           };
         }
+        if (last.includes("did with the work you handed it")) return answer("Infra is watching the metrics.");
         if (last.includes("tool_result")) return answer("Told Infra.");
         return {
           chunks: [],
-          toolUses: [{ name: "tell_agent", input: { agent: "@infra", message: "The deploy to staging finished." } }],
+          toolUses: [{ name: "tell_agent", input: { agent: "@infra", message: "The deploy finished." } }],
         };
       },
     });
-    await addInfra();
+    const infra = await addInfra();
     await post("@dev tell infra the deploy finished");
     await drainOutbox(f.db, f.handlers);
-    expect(await f.db.select().from(schema.agentQuestions)).toHaveLength(0);
-    const refused = f.provider.calls
-      .map((c) => c.request)
-      .find((r) => inAgentDm(r) && lastText(r).includes("tool_result"));
-    expect(lastText(refused as ModelRequest)).toContain("No person reads this conversation");
+    const [q] = await f.db.select().from(schema.agentQuestions);
+    expect(q).toMatchObject({ agentId: infra.id, channelId: f.general.id, threadId: null, status: "open" });
+    expect((await consultationsIn(f.db, f.org.id, f.general.id))[0]).toMatchObject({ kind: "note", waiting: "input" });
+
+    await answerQuestion({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, q?.id ?? "", { choice: "staging" });
+    await drainOutbox(f.db, f.handlers);
+    expect((await consultations())[0]).toMatchObject({
+      kind: "note",
+      status: "answered",
+      answer: "Watching the staging metrics.",
+    });
+    const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(timeline.at(-1)?.body).toBe("Infra is watching the metrics.");
   });
 
   test("a consulted agent's secret request goes to the person behind it, where they asked", async () => {
@@ -695,7 +721,7 @@ describe("ask_agent", () => {
     ]);
   });
 
-  test("no answer in time: the asker hears it, as a notice", async () => {
+  test("a question waits as long as its colleague's run is queued; once that run is gone it expires and the asker hears it", async () => {
     f = await setup({ askAgent: true, reply: consultReply(() => answer("never sent")) });
     const infra = await addInfra();
     // @infra never runs: its execute jobs are dropped.
@@ -716,14 +742,18 @@ describe("ask_agent", () => {
     const asker = (await runs()).find((r) => r.agentId === f.agent.id);
     expect(asker?.status).toBe("done");
 
-    expect(await expireConsultations({ db: f.db }, new Date(Date.now() + CONSULTATION_TTL_MS + 1000))).toBe(1);
+    const later = new Date(Date.now() + CONSULTATION_TTL_MS + 1000);
+    expect(await expireConsultations({ db: f.db }, later)).toBe(0);
+    const [kept] = await consultations();
+    expect(kept?.status).toBe("open");
+    expect(kept?.expiresAt.getTime()).toBeGreaterThan(later.getTime());
+    expect((await runs()).find((r) => r.agentId === infra.id)?.status).toBe("queued");
+
+    // Its run ended without a word (a lost close): nobody is at it anymore.
+    await f.db.update(schema.agentRuns).set({ status: "failed" }).where(eq(schema.agentRuns.agentId, infra.id));
+    expect(await expireConsultations({ db: f.db }, new Date(later.getTime() + CONSULTATION_TTL_MS + 1000))).toBe(1);
     await drainOutbox(f.db, handlers);
     expect((await consultations())[0]?.status).toBe("expired");
-    // Nobody waits for @infra anymore: its run stops instead of holding the DM.
-    expect((await runs()).find((r) => r.agentId === infra.id)).toMatchObject({
-      status: "canceled",
-      error: "consultation_expired",
-    });
     expect((await runs()).filter((r) => r.agentId === f.agent.id).every((r) => r.status === "done")).toBe(true);
     expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("didn't answer within 15 minutes");
   });
@@ -878,39 +908,602 @@ describe("ask_agent", () => {
   });
 });
 
-describe("a reply to a note (tell_agent) goes back when the judge reads something in it, in any language", () => {
-  /** @dev tells @infra the deploy finished; @infra replies `infraSays`; the judge reads it as `score`. */
-  async function noteFlow(infraSays: string, score: number) {
-    f = await setup({
-      askAgent: true,
-      judge: (kind) => (kind === "note_reply" ? score : undefined),
-      reply: (req) => {
-        if (inAgentDm(req)) return answer(infraSays);
-        const last = lastText(req);
-        if (last.includes("Note from @infra")) return answer("ok");
-        if (last.includes("tool_result")) return answer("Told Infra.");
-        return {
-          chunks: [],
-          toolUses: [{ name: "tell_agent", input: { agent: "@infra", message: "The deploy to staging finished." } }],
-        };
+describe("tell_agent: what comes of work handed off comes back by itself (ADR 0094)", () => {
+  /** The judge reads each note's reply as one its sender needs (a result), unless told otherwise. */
+  const notesMatter = (kind: string) => (kind === "note_reply" ? 0.9 : undefined);
+  /** Whose model call it is: its prompt says which agent it is, never what anyone wrote. */
+  const youAre = (req: ModelRequest, name: string) =>
+    systemText(req.system).includes(`You are ${name} (@${name.toLowerCase()})`);
+  /** What came of work handed off, as it reaches the sender's conversation. */
+  const notesBack = async () =>
+    (await f.db.select().from(schema.messages).orderBy(asc(schema.messages.createdAt), asc(schema.messages.id))).filter(
+      (m) => {
+        const n = m.meta.notice as { kind?: string; refs?: Record<string, string> } | undefined;
+        return n?.kind === "consult_reply" && n.refs?.kind === "note";
       },
-    });
-    await addInfra();
-    await post("@dev tell infra the deploy finished");
-    await drainOutbox(f.db, f.handlers);
-    return (await f.db.select().from(schema.messages)).filter(
-      (m) => (m.meta.notice as { kind?: string } | undefined)?.kind === "agent_note",
+    );
+  const refsOf = (m: { meta: Record<string, unknown> }) => (m.meta.notice as { refs: Record<string, string> }).refs;
+  const runsOf = async (agentId: string) => (await runs()).filter((r) => r.agentId === agentId);
+  const ended = (runId: string) =>
+    f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, runId));
+
+  async function addAgent(name: string) {
+    return createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name, handle: name.toLowerCase(), role: "Operations", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
     );
   }
 
-  test("a short Japanese question back, ending in a full-width ？, reaches the sender", async () => {
-    const [notice, ...more] = await noteFlow("どのブランチ？", 0.9);
-    expect(more).toEqual([]);
-    expect(notice?.channelId).toBe(f.general.id);
-    expect(notice?.meta.notice).toMatchObject({ kind: "agent_note", text: "どのブランチ？", from: "@infra" });
+  /** A run of @dev in #general on Ana's message, and the context its tools get. */
+  async function devRun(body: string) {
+    const trigger = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "person", userId: f.owner.id },
+      body,
+    });
+    const [run] = await f.db
+      .insert(schema.agentRuns)
+      .values({
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        channelId: f.general.id,
+        threadRootId: trigger.id,
+        triggerMessageId: trigger.id,
+        trigger: "mention",
+        hop: 1,
+        stretchId: trigger.id,
+      })
+      .returning();
+    if (!run) throw new Error("no run");
+    return run;
+  }
+  const ctxOf = (run: AgentRun): ToolContext => ({
+    db: f.db,
+    orgId: run.orgId,
+    agentId: run.agentId,
+    runId: run.id,
+    channelId: run.channelId,
+    threadRootId: run.threadRootId,
+    triggerMessageId: run.triggerMessageId,
+  });
+  const tell = (run: AgentRun, agent: string, message: string) => {
+    if (!f.tools) throw new Error("no tools");
+    return f.tools.invoke(ctxOf(run), {
+      toolUseId: `tu_${crypto.randomUUID()}`,
+      name: "tell_agent",
+      input: { agent, message },
+    });
+  };
+  /** The run another agent's note started (or joined). */
+  const runFor = async (c: { targetRunId: string | null } | undefined) => {
+    const [run] = await f.db
+      .select()
+      .from(schema.agentRuns)
+      .where(eq(schema.agentRuns.id, c?.targetRunId ?? ""));
+    if (!run) throw new Error("no run for the note");
+    return run;
+  };
+  /** `agent` answered `run`'s note with `body`: its last message there, and its run ends. */
+  const answered = async (run: AgentRun, body: string) => {
+    const said = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: run.channelId,
+      author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
+      body,
+    });
+    await f.db
+      .update(schema.agentRuns)
+      .set({ status: "done", replyMessageId: said.id })
+      .where(eq(schema.agentRuns.id, run.id));
+    return onConsultedRunFinished({ db: f.db, pubsub: f.pubsub, judge: f.context.judge }, run, "done");
+  };
+
+  /**
+   * @dev hands `notes` off in one turn when a person asks, says so in a line, and once what came of them is back,
+   * tells the person; each colleague answers with `says[name]`.
+   */
+  const handing =
+    (notes: { agent: string; message: string }[], says: Record<string, (req: ModelRequest) => FakeReply>) =>
+    (req: ModelRequest): FakeReply => {
+      for (const [name, say] of Object.entries(says)) if (youAre(req, name)) return say(req);
+      const last = lastText(req);
+      if (last.includes("did with the work you handed it")) return answer("Pronto, voltou tudo.");
+      if (last.includes("tool_result")) return answer("Passei adiante; te conto quando voltar.");
+      return { chunks: [], toolUses: notes.map((n) => ({ name: "tell_agent", input: n })) };
+    };
+
+  /** These agents' runs wait (their jobs are kept) until `release` lets them go, one agent at a time. */
+  function holding(...agentIds: string[]) {
+    const released = new Set<string>();
+    const held = new Map<string, string>();
+    const handlers: JobHandlers = {
+      ...f.handlers,
+      "agent_run.execute": async (job, ctx) => {
+        const runId = String(job.payload.runId);
+        const [run] = await f.db
+          .select({ agentId: schema.agentRuns.agentId })
+          .from(schema.agentRuns)
+          .where(eq(schema.agentRuns.id, runId));
+        if (run && agentIds.includes(run.agentId) && !released.has(runId)) {
+          held.set(runId, run.agentId);
+          return;
+        }
+        await f.handlers["agent_run.execute"]?.(job, ctx);
+      },
+    };
+    const release = async (agentId: string) => {
+      for (const [runId, of] of held) {
+        if (of !== agentId || released.has(runId)) continue;
+        released.add(runId);
+        await enqueue(f.db, {
+          orgId: f.org.id,
+          kind: "agent_run.execute",
+          payload: { runId },
+          dedupeKey: `test:release:${runId}`,
+        });
+      }
+      await drainOutbox(f.db, handlers);
+    };
+    return { handlers, release };
+  }
+
+  test("a note is a row on the run it starts and on the run at work it joins; the conversation hears it as a note", async () => {
+    f = await setup({ askAgent: true });
+    const infra = await addInfra();
+    const events = f.listen(f.general.id);
+    const dev = await devRun("@dev avisa o infra do deploy");
+    await tell(dev, "@infra", "O deploy de staging terminou: confere a taxa de erro.");
+    const [first] = await consultations();
+    const [started] = await runsOf(infra.id);
+    expect(first).toMatchObject({
+      kind: "note",
+      askerRunId: dev.id,
+      targetAgentId: infra.id,
+      targetRunId: started?.id,
+      status: "open",
+      question: "O deploy de staging terminou: confere a taxa de erro.",
+      chain: [f.agent.id],
+    });
+    // Its run there for Ana takes the next note at its next step: that row waits on it too.
+    await tell(dev, "@infra", "E confere a fila de jobs.");
+    const second = (await consultations()).find((c) => c.id !== first?.id);
+    expect(second).toMatchObject({ kind: "note", targetRunId: started?.id });
+    expect(await runsOf(infra.id)).toHaveLength(1);
+    await Bun.sleep(5);
+    expect(events.filter((e) => e.type === "agent.consulting")).toEqual([
+      expect.objectContaining({ kind: "note", runId: dev.id, consultedAgentId: infra.id }),
+      expect.objectContaining({ kind: "note", runId: dev.id, consultedAgentId: infra.id }),
+    ]);
   });
 
-  test("a bare acknowledgement doesn't", async () => {
-    expect(await noteFlow("了解。", 0.1)).toEqual([]);
+  test("what came of it wakes the sender once, as the person's work, which may hand work on again", async () => {
+    f = await setup({
+      askAgent: true,
+      judge: notesMatter,
+      reply: handing([{ agent: "@infra", message: "O deploy terminou: confere a taxa de erro." }], {
+        Infra: () => answer("Taxa de erro em 0,1%, normal."),
+      }),
+    });
+    const infra = await addInfra();
+    await post("@dev avisa o infra que o deploy terminou");
+    await drainOutbox(f.db, f.handlers);
+
+    const [row] = await consultations();
+    expect(row).toMatchObject({ kind: "note", status: "answered", answer: "Taxa de erro em 0,1%, normal." });
+    expect(row?.reportedAt).toBeInstanceOf(Date);
+    const [back, ...more] = await notesBack();
+    expect(more).toEqual([]);
+    expect(back).toMatchObject({ channelId: f.general.id, authorAgentId: f.agent.id });
+    expect(back?.meta.notice).toMatchObject({
+      kind: "consult_reply",
+      from: "@infra",
+      refs: { kind: "note", wake: "1", status: "answered", consultationId: row?.id, runId: row?.askerRunId },
+    });
+    const woken = (await runsOf(f.agent.id)).find((r) => r.triggerMessageId === back?.id);
+    if (!woken) throw new Error("the sender wasn't woken");
+    expect(woken.status).toBe("done");
+    expect(await runsOf(f.agent.id)).toHaveLength(2);
+    expect(await runAuthority(f.db, woken)).toEqual({ kind: "person", personId: f.owner.id });
+    const read = f.provider.calls
+      .map((c) => c.request)
+      .find((r) => lastText(r).includes("[What @infra did with the work you handed it]: Taxa de erro em 0,1%"));
+    if (!read) throw new Error("the result wasn't read");
+    expect(read.tools?.map((t) => t.name)).toContain("tell_agent");
+    expect(lastText(read)).toContain("Everything you handed off in that turn is back");
+    // Nothing woke Infra again to read anything.
+    expect(await runsOf(infra.id)).toHaveLength(1);
+  });
+
+  test("a bare acknowledgement closes as told: no notice and no run", async () => {
+    f = await setup({
+      askAgent: true,
+      judge: (kind) => (kind === "note_reply" ? 0.1 : undefined),
+      reply: handing([{ agent: "@infra", message: "O deploy terminou." }], { Infra: () => answer("Combinado.") }),
+    });
+    await addInfra();
+    await post("@dev avisa o infra que o deploy terminou");
+    await drainOutbox(f.db, f.handlers);
+    const [row] = await consultations();
+    expect(row).toMatchObject({ status: "answered", answer: "Combinado." });
+    expect(row?.reportedAt).toBeInstanceOf(Date);
+    expect(await notesBack()).toEqual([]);
+    expect(await runsOf(f.agent.id)).toHaveLength(1);
+  });
+
+  test("two notes of one turn come back together: the first close writes nothing, the second wakes once with both", async () => {
+    f = await setup({
+      askAgent: true,
+      judge: notesMatter,
+      reply: handing(
+        [
+          { agent: "@infra", message: "Confere a taxa de erro do deploy." },
+          { agent: "@ops", message: "Confere a fila de jobs." },
+        ],
+        { Infra: () => answer("Taxa de erro normal."), Ops: () => answer("Fila vazia.") },
+      ),
+    });
+    const infra = await addInfra();
+    const ops = await addAgent("Ops");
+    const { handlers, release } = holding(infra.id, ops.id);
+    await post("@dev confere o deploy com o infra e o ops");
+    await drainOutbox(f.db, handlers);
+    expect((await consultations()).map((c) => c.status)).toEqual(["open", "open"]);
+
+    await release(infra.id);
+    // Infra is back, Ops still on it: nothing goes out yet.
+    expect((await consultations()).find((c) => c.targetAgentId === infra.id)?.status).toBe("answered");
+    expect(await notesBack()).toEqual([]);
+    expect(await runsOf(f.agent.id)).toHaveLength(1);
+
+    await release(ops.id);
+    const back = await notesBack();
+    expect(back.map((m) => [refsOf(m).agentId, refsOf(m).wake ?? null])).toEqual([
+      [infra.id, null],
+      [ops.id, "1"],
+    ]);
+    const devRuns = await runsOf(f.agent.id);
+    expect(devRuns).toHaveLength(2);
+    expect(devRuns.some((r) => r.triggerMessageId === back[1]?.id)).toBe(true);
+    const read = f.provider.calls.map((c) => JSON.stringify(c.request.messages)).find((m) => m.includes("[What @ops"));
+    expect(read).toContain("[What @infra did with the work you handed it]: Taxa de erro normal.");
+    expect(read).toContain("[What @ops did with the work you handed it]: Fila vazia.");
+    expect(read?.match(/Everything you handed off in that turn is back/g)).toHaveLength(1);
+  });
+
+  test("closes and claims interleaved: both closes commit before either claim, and the sender still wakes once", async () => {
+    f = await setup({ askAgent: true });
+    await addInfra();
+    await addAgent("Ops");
+    const dev = await devRun("@dev confere com o infra e o ops");
+    await ended(dev.id);
+    await tell(dev, "@infra", "Confere a taxa de erro.");
+    await tell(dev, "@ops", "Confere a fila.");
+    await f.db
+      .update(schema.agentConsultations)
+      .set({ status: "answered", answer: "Tudo certo.", answeredAt: new Date() });
+    await f.db.update(schema.agentRuns).set({ status: "done" }).where(ne(schema.agentRuns.agentId, f.agent.id));
+    const [asker] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, dev.id));
+    if (!asker) throw new Error("no run");
+    const first = await reportHandOffs({ db: f.db, pubsub: f.pubsub }, asker);
+    const second = await reportHandOffs({ db: f.db, pubsub: f.pubsub }, asker);
+    expect(first).toHaveLength(2);
+    expect(first.flatMap((d) => d.runs)).toHaveLength(1);
+    expect(second).toEqual([]);
+    expect(await notesBack()).toHaveLength(2);
+  });
+
+  test("a colleague waiting on a person holds up no other result: entering the wait lets them come back", async () => {
+    const github = fakeGithub();
+    f = await setup({
+      askAgent: true,
+      judge: notesMatter,
+      toolSources: [github.source],
+      reply: handing(
+        [
+          { agent: "@infra", message: "Faz o merge do PR #7." },
+          { agent: "@ops", message: "Confere a fila de jobs." },
+        ],
+        {
+          Infra: (req) =>
+            lastText(req).includes("tool_result")
+              ? answer("Merged.")
+              : {
+                  chunks: [],
+                  toolUses: [
+                    {
+                      name: "github_merge_pr",
+                      input: {
+                        repo: "acme/app",
+                        pr: 7,
+                        why: "The checks passed and the change was reviewed: this action finishes what was asked.",
+                      },
+                    },
+                  ],
+                },
+          Ops: () => answer("Fila vazia."),
+        },
+      ),
+    });
+    const infra = await addInfra();
+    const ops = await addAgent("Ops");
+    await grantScopes(f.db, f.org.id, infra.id, ALL_GITHUB_SCOPES);
+    const { handlers, release } = holding(infra.id, ops.id);
+    await post("@dev faz o deploy com o infra e o ops");
+    await drainOutbox(f.db, handlers);
+    await release(ops.id);
+    // Ops is back and Infra hasn't started: Ops's result waits.
+    expect(await notesBack()).toEqual([]);
+
+    await release(infra.id);
+    expect((await runsOf(infra.id))[0]?.status).toBe("waiting_approval");
+    const back = await notesBack();
+    expect(back.map((m) => refsOf(m).agentId)).toEqual([ops.id]);
+    expect((await consultations()).find((c) => c.targetAgentId === infra.id)?.status).toBe("open");
+    // Its approval card is where the person asked.
+    const [approval] = await f.db.select().from(schema.approvals);
+    expect(approval).toMatchObject({ agentId: infra.id, channelId: f.general.id, status: "pending" });
+  });
+
+  test("an agent that handed part on answers once with both parts, and no run starts between agents to read it", async () => {
+    f = await setup({
+      askAgent: true,
+      judge: notesMatter,
+      reply: handing([{ agent: "@infra", message: "Cuida do deploy de staging." }], {
+        Infra: (req) =>
+          lastText(req).includes("tool_result")
+            ? answer("Deploy ok; passei a fila ao Ops.")
+            : {
+                chunks: [],
+                toolUses: [
+                  { name: "tell_agent", input: { agent: "@ops", message: "Limpa a fila de jobs de staging." } },
+                ],
+              },
+        Ops: () => answer("Fila limpa."),
+      }),
+    });
+    const infra = await addInfra();
+    const ops = await addAgent("Ops");
+    const { handlers, release } = holding(ops.id);
+    await post("@dev pede ao infra para cuidar do deploy");
+    await drainOutbox(f.db, handlers);
+    const parent = (await consultations()).find((c) => c.targetAgentId === infra.id);
+    expect((await runsOf(infra.id))[0]?.status).toBe("done");
+    expect(parent).toMatchObject({ status: "open", answer: "Deploy ok; passei a fila ao Ops." });
+    expect((await consultationsIn(f.db, f.org.id, f.general.id)).find((c) => c.id === parent?.id)?.waiting).toBe(
+      "agents",
+    );
+    expect(await notesBack()).toEqual([]);
+
+    await release(ops.id);
+    expect((await consultations()).find((c) => c.id === parent?.id)).toMatchObject({
+      status: "answered",
+      answer: "Deploy ok; passei a fila ao Ops.\n\n[@ops, to whom @infra handed part of it]: Fila limpa.",
+    });
+    const back = await notesBack();
+    expect(back.map((m) => [m.channelId, refsOf(m).agentId])).toEqual([[f.general.id, infra.id]]);
+    expect(await runsOf(infra.id)).toHaveLength(1);
+    expect(await runsOf(ops.id)).toHaveLength(1);
+    expect(await runsOf(f.agent.id)).toHaveLength(2);
+  });
+
+  test("what comes back while the agent that handed it on still works is read by that run, at its next step", async () => {
+    f = await setup({ askAgent: true, judge: notesMatter });
+    const infra = await addInfra();
+    await addAgent("Ops");
+    const dev = await devRun("@dev pede ao infra");
+    await tell(dev, "@infra", "Cuida do deploy de staging.");
+    const toInfra = (await consultations())[0];
+    const infraRun = await runFor(toInfra);
+    await f.db.update(schema.agentRuns).set({ status: "running" }).where(eq(schema.agentRuns.id, infraRun.id));
+    await tell(infraRun, "@ops", "Limpa a fila de jobs.");
+    const toOps = (await consultations()).find((c) => c.askerRunId === infraRun.id);
+    await answered(await runFor(toOps), "Fila limpa.");
+
+    const [after] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, infraRun.id));
+    const pending = await f.db
+      .select()
+      .from(schema.messages)
+      .where(inArray(schema.messages.id, after?.pendingMessageIds ?? []));
+    expect(pending.map((m) => (m.meta.notice as { kind?: string } | undefined)?.kind)).toEqual(["consult_reply"]);
+    expect((await consultations()).find((c) => c.id === toInfra?.id)).toMatchObject({ status: "open", answer: null });
+    expect(await runsOf(infra.id)).toHaveLength(1);
+  });
+
+  test("an agent that fails after handing part on: what it owed fails at once, and what comes back later wakes nobody", async () => {
+    f = await setup({ askAgent: true, judge: notesMatter });
+    const infra = await addInfra();
+    await addAgent("Ops");
+    const dev = await devRun("@dev pede ao infra");
+    await ended(dev.id);
+    await tell(dev, "@infra", "Cuida do deploy de staging.");
+    const toInfra = (await consultations())[0];
+    const infraRun = await runFor(toInfra);
+    await tell(infraRun, "@ops", "Limpa a fila de jobs.");
+    const toOps = (await consultations()).find((c) => c.askerRunId === infraRun.id);
+    await f.db.update(schema.agentRuns).set({ status: "failed" }).where(eq(schema.agentRuns.id, infraRun.id));
+    await onConsultedRunFinished({ db: f.db, pubsub: f.pubsub }, infraRun, "failed", "model_error");
+    expect((await consultations()).find((c) => c.id === toInfra?.id)).toMatchObject({
+      status: "failed",
+      answer: "model_error",
+    });
+    const [failed] = await notesBack();
+    expect(failed?.meta.notice).toMatchObject({ refs: { status: "failed" } });
+    expect(failed?.meta.notice).toMatchObject({ text: expect.stringMatching(/^It couldn't finish \(model_error;/) });
+    expect(await runsOf(f.agent.id)).toHaveLength(2);
+
+    await answered(await runFor(toOps), "Fila limpa.");
+    expect(await runsOf(infra.id)).toHaveLength(1);
+    expect(await runsOf(f.agent.id)).toHaveLength(2);
+  });
+
+  test("nothing expires while a colleague is at it, waiting on a person or on what it handed on; one nobody started does", async () => {
+    f = await setup({ askAgent: true });
+    const infra = await addInfra();
+    const ops = await addAgent("Ops");
+    const qa = await addAgent("QA");
+    const max = await addAgent("Max");
+    const events = f.listen(f.general.id);
+    const dev = await devRun("@dev confere tudo do deploy");
+    await ended(dev.id);
+    for (const handle of ["@infra", "@ops", "@qa", "@max"]) await tell(dev, handle, `Confere o deploy (${handle}).`);
+    const rowOf = async (agentId: string) => (await consultations()).find((c) => c.targetAgentId === agentId);
+    const status = (run: AgentRun, s: AgentRun["status"]) =>
+      f.db.update(schema.agentRuns).set({ status: s }).where(eq(schema.agentRuns.id, run.id));
+    await status(await runFor(await rowOf(infra.id)), "running");
+    await status(await runFor(await rowOf(ops.id)), "waiting_approval");
+    const qaRun = await runFor(await rowOf(qa.id));
+    await tell(qaRun, "@infra", "Quanto tempo o deploy levou?");
+    await status(qaRun, "done");
+    // Max's run was held by the stretch: nobody started it.
+    await f.db
+      .update(schema.agentConsultations)
+      .set({ targetRunId: null })
+      .where(eq(schema.agentConsultations.targetAgentId, max.id));
+    await Bun.sleep(5);
+    const mark = events.length;
+
+    const later = new Date(Date.now() + CONSULTATION_TTL_MS + 1000);
+    expect(await expireConsultations({ db: f.db, pubsub: f.pubsub }, later)).toBe(1);
+    for (const agentId of [infra.id, ops.id, qa.id]) {
+      const row = await rowOf(agentId);
+      expect(row?.status).toBe("open");
+      expect(row?.expiresAt.getTime()).toBeGreaterThan(later.getTime());
+    }
+    expect((await rowOf(max.id))?.status).toBe("expired");
+    expect((await runs()).some((r) => r.status === "canceled")).toBe(false);
+    await Bun.sleep(5);
+    expect(events.slice(mark)).toContainEqual(expect.objectContaining({ type: "agent.consultation", runId: dev.id }));
+    // QA still waits on what it handed on: Max's "never got to it" waits to go out with the rest.
+    expect(await notesBack()).toEqual([]);
+  });
+
+  test("a note the stretch held is taken by the run Continuar starts, and its result comes back", async () => {
+    f = await setup({
+      askAgent: true,
+      judge: notesMatter,
+      reply: (req) => (youAre(req, "Infra") ? answer("Feito: fila limpa.") : answer("ok")),
+    });
+    const infra = await addInfra();
+    const dev = await devRun("@dev pede ao infra para limpar a fila");
+    // Ana's stretch is at its limit: agents already started 50 runs on their own.
+    await f.db.insert(schema.agentRuns).values(
+      Array.from({ length: STRETCH.runs }, () => ({
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        channelId: f.general.id,
+        threadRootId: dev.threadRootId,
+        triggerMessageId: Bun.randomUUIDv7(),
+        trigger: "mention" as const,
+        hop: 2,
+        stretchId: dev.stretchId,
+        status: "done" as const,
+      })),
+    );
+    const dm = await openAgentDm(f.db, f.org.id, f.agent.id, infra.id);
+    const id = Bun.randomUUIDv7();
+    // Past the tool's own check, the wake-up is held (another wake-up took the last run meanwhile).
+    await f.db.transaction(async (tx) => {
+      const note = await insertMessage(tx, {
+        orgId: f.org.id,
+        channelId: dm.id,
+        author: { type: "agent", agentId: f.agent.id, runId: dev.id, hop: dev.hop },
+        body: "Limpa a fila de jobs.",
+        meta: { agentNote: { runId: dev.id }, consultation: { id } },
+      });
+      expect(await startOrJoinRun(tx, note, infra.id, "dm")).toBeNull();
+      await tx.insert(schema.agentConsultations).values({
+        id,
+        orgId: f.org.id,
+        kind: "note",
+        askerRunId: dev.id,
+        askerAgentId: f.agent.id,
+        targetAgentId: infra.id,
+        channelId: dm.id,
+        messageId: note.id,
+        targetRunId: null,
+        waitId: `async:${Bun.randomUUIDv7()}`,
+        question: note.body,
+        chain: [f.agent.id],
+        expiresAt: new Date(Date.now() + CONSULTATION_TTL_MS),
+      });
+    });
+    await drainOutbox(f.db, f.handlers);
+    const card = (await f.db.select().from(schema.messages)).find((m) => stretchCardOf(m.meta));
+    if (!card) throw new Error("no card");
+    const go = await answerNow({ db: f.db, pubsub: f.pubsub, gateway: f.gateway }, f.owner.id, f.org.id, card.id);
+    expect((await consultations())[0]?.targetRunId).toBe(go.runs[0]?.runId ?? "");
+    await drainOutbox(f.db, f.handlers);
+    expect((await consultations())[0]).toMatchObject({ status: "answered", answer: "Feito: fila limpa." });
+  });
+
+  test("a note sent before notes were rows still comes back as before; one with a row never comes back that way", async () => {
+    f = await setup({
+      askAgent: true,
+      judge: notesMatter,
+      reply: (req) => (youAre(req, "Infra") ? answer("Taxa de erro normal.") : answer("ok")),
+    });
+    const infra = await addInfra();
+    const dev = await devRun("@dev avisa o infra");
+    await ended(dev.id);
+    const dm = await openAgentDm(f.db, f.org.id, f.agent.id, infra.id);
+    const legacy = () =>
+      f.db.select().from(schema.messages).where(sql`${schema.messages.meta}->'notice'->>'kind' = 'agent_note'`);
+    await f.db.transaction(async (tx) => {
+      const m = await insertMessage(tx, {
+        orgId: f.org.id,
+        channelId: dm.id,
+        author: { type: "agent", agentId: f.agent.id, runId: dev.id, hop: dev.hop },
+        body: "O deploy terminou.",
+        meta: { agentNote: { runId: dev.id } },
+      });
+      await createAgentRuns(tx, m, [infra.id], "dm");
+    });
+    await drainOutbox(f.db, f.handlers);
+    expect((await legacy()).map((m) => m.channelId)).toEqual([f.general.id]);
+
+    // A note with a row whose row is already closed (it expired): its run's end adds nothing.
+    await tell(dev, "@infra", "E a fila?");
+    await f.db
+      .update(schema.agentConsultations)
+      .set({ status: "expired", answeredAt: new Date(), reportedAt: new Date() });
+    await drainOutbox(f.db, f.handlers);
+    expect(await legacy()).toHaveLength(1);
+  });
+
+  test("stopping or deleting the agent at work closes what it owed as failed, and the sender hears it once", async () => {
+    f = await setup({
+      askAgent: true,
+      judge: notesMatter,
+      reply: handing(
+        [
+          { agent: "@infra", message: "Confere a taxa de erro." },
+          { agent: "@ops", message: "Confere a fila." },
+        ],
+        {},
+      ),
+    });
+    const infra = await addInfra();
+    const ops = await addAgent("Ops");
+    const { handlers } = holding(infra.id, ops.id);
+    await post("@dev confere o deploy com o infra e o ops");
+    await drainOutbox(f.db, handlers);
+    const [infraRun] = await runsOf(infra.id);
+    await cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, infraRun?.id ?? "");
+    // Ops is still on its part: nothing goes out yet.
+    expect(await notesBack()).toEqual([]);
+    await deleteAgent({ db: f.db, pubsub: f.pubsub, hub: f.machineHub }, f.owner.id, f.org.id, ops.id);
+    expect((await consultations()).map((c) => [c.status, c.answer])).toEqual([
+      ["failed", "stopped by a person"],
+      ["failed", "agent_archived"],
+    ]);
+    await drainOutbox(f.db, handlers);
+    expect(await expireConsultations({ db: f.db }, new Date(Date.now() + CONSULTATION_TTL_MS + 1000))).toBe(0);
+    await drainOutbox(f.db, handlers);
+    expect((await notesBack()).map((m) => refsOf(m).status)).toEqual(["failed", "failed"]);
+    expect(await runsOf(f.agent.id)).toHaveLength(2);
   });
 });
