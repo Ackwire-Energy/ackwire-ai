@@ -13,6 +13,16 @@ paths = [
   '''\.test\.tsx?$''',
 ]
 
+# The curl-header rule stays on in tests: it is the only one that catches keys with no rule of their own
+# (OpenRouter's sk-or-v1-, DeepSeek's, Gemini's AQ.). Only the made-up tokens of the test that checks a
+# command's label never shows what the command hides are let through, by value.
+[[allowlists]]
+description = "Made-up curl header tokens of the command label test"
+targetRules = ["curl-auth-header"]
+condition = "AND"
+paths = ['''(^|/)test/''']
+regexes = ['''^(abc123def456ghi789|9f8e7d6c5b4a3210|sk-ant-api03-abcdefghijklmnop)$''']
+
 # A Himetrica site key only names the site to the analytics tracker, which sends it from every page.
 [[allowlists]]
 description = "Himetrica site keys (public by design)"

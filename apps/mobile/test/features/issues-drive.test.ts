@@ -18,8 +18,9 @@ import {
   minutesSince,
   passesFilter,
   waitsOnYou,
+  workLines,
 } from "../../src/features/issues/logic";
-import { at } from "./fixtures";
+import { at, translator } from "./fixtures";
 
 const NOW = new Date(2026, 9, 17, 15, 0);
 
@@ -237,6 +238,39 @@ describe("issue row details", () => {
     expect(currentStep({ ...w, state: "stalled" })).toBeNull();
     expect(minutesSince(at(6, NOW), NOW.getTime())).toBe(6);
     expect(minutesSince(at(-3, NOW), NOW.getTime())).toBe(0);
+  });
+
+  test("the work card's steps: the same words in a row once with how many, refused or waiting never 'Rodou'", async () => {
+    const pt = await translator("pt-BR");
+    const en = await translator("en");
+    const check = (detail: string, minutes: number, outcome?: "refused" | "waiting") => ({
+      tool: "permission_prompt",
+      detail,
+      at: at(minutes, NOW),
+      ...(outcome ? { outcome } : {}),
+    });
+    const steps = [
+      check("Run the unit tests", 6),
+      check("Run the unit tests", 5),
+      check("Run the unit tests", 4),
+      check("rm /etc/agentes", 3, "refused"),
+      { tool: "update_issue", detail: "#129", at: at(2, NOW) },
+    ];
+    // The last one goes on while the run works ("…").
+    expect(workLines(pt, steps, true).map((l) => [l.text, l.step.at, l.last, l.going])).toEqual([
+      ["Rodou: Run the unit tests ×3", at(4, NOW), false, false],
+      ["Recusado: rm /etc/agentes", at(3, NOW), false, false],
+      ["Atualizou uma tarefa · #129…", at(2, NOW), true, true],
+    ]);
+    expect(workLines(en, steps, false).map((l) => l.text)).toEqual([
+      "Ran: Run the unit tests ×3",
+      "Refused: rm /etc/agentes",
+      "Updated a task · #129",
+    ]);
+    // One waiting on a person isn't going on by itself: its words without "…".
+    expect(workLines(pt, [check("npm publish", 1, "waiting")], true).map((l) => l.text)).toEqual([
+      "Rodando: npm publish",
+    ]);
   });
 
   test("late only while open", () => {

@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import type { LiveConsult, LiveRun, Message, RunConsultation } from "@agenteschat/client";
+import type { LiveConsult, LiveRun, LiveWork, Message, RunConsultation } from "@agenteschat/client";
 import { consultBlocksNearEnd, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
-import { toolCalls, toolNow } from "@agenteschat/client/lib/work";
+import { toolCalls, toolNow, toolPhrase, toolWhy } from "@agenteschat/client/lib/work";
 import {
   artifactsOf,
   buildRows,
@@ -46,7 +46,7 @@ import {
   withContinued,
   withOpacity,
 } from "../../src/features/chat/turn";
-import { at, message } from "./fixtures";
+import { at, message, translator } from "./fixtures";
 
 describe("timeline", () => {
   test("top-level messages and loaded thread replies, in time order, no duplicates", () => {
@@ -564,6 +564,43 @@ describe("an agent's turn as one block", () => {
     );
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({ kind: "call", line: { state: "run", count: 2 } });
+  });
+
+  test("a computer command in the phone's words: what it ran, a refusal and why", async () => {
+    const pt = await translator("pt-BR");
+    const en = await translator("en");
+    const check = (id: string, detail: string, more: Partial<Extract<LiveWork, { kind: "call" }>> = {}) => ({
+      ...call(id, "permission_prompt", false),
+      detail,
+      ...more,
+    });
+    const items = turnItems(
+      run({
+        runId: "r",
+        work: [
+          check("1", "Rerun new unit tests after formatting", { command: "npx jest a.test.ts" }),
+          check("2", "rm /etc/agentes", {
+            failed: true,
+            why: "This command was refused because it changes files outside the mission folder. Do it another way.",
+            refusal: "outside",
+          }),
+        ],
+      }),
+    );
+    const lines = items.flatMap((x) => (x.kind === "call" ? [x.line] : []));
+    expect(lines.map((l) => toolPhrase(pt, l))).toEqual([
+      "Rodou: Rerun new unit tests after formatting",
+      "Recusado: rm /etc/agentes",
+    ]);
+    expect(lines.map((l) => toolPhrase(en, l))).toEqual([
+      "Ran: Rerun new unit tests after formatting",
+      "Refused: rm /etc/agentes",
+    ]);
+    expect(lines[0]?.input).toBe("npx jest a.test.ts");
+    expect(lines.map((l) => [toolWhy(pt, l), toolWhy(en, l)])).toEqual([
+      [null, null],
+      ["Mexe em arquivos fora da pasta do agente", "It changes files outside the agent's folder"],
+    ]);
   });
 
   test("it opens as if it had answered: a generic phrase, then the first thing it said", () => {

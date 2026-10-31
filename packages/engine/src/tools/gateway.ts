@@ -16,7 +16,7 @@ import {
   summarizeCall,
   type TeamCheck,
 } from "../team-actions";
-import { carriesCredential, toolDetail } from "../tool-detail";
+import { carriesCredential, promptAnswer, toolCommand, toolDetail } from "../tool-detail";
 import { untrustedBlock } from "../untrusted";
 import { checkToolCall } from "./checks";
 import {
@@ -112,16 +112,6 @@ function promptQuestion(input: Record<string, unknown>) {
       ? commandAction(input.tool_name, inner as Record<string, unknown>)
       : null;
   return { poll: null, action };
-}
-
-/** `permission_prompt`'s answer: `{behavior}` when decided, `{status: "pending", request_id}` while a person decides. */
-function promptAnswer(content: string): { behavior?: string; status?: string; request_id?: string } {
-  try {
-    const parsed = JSON.parse(content) as unknown;
-    return parsed && typeof parsed === "object" ? (parsed as Record<string, string>) : {};
-  } catch {
-    return {};
-  }
 }
 
 /**
@@ -346,13 +336,15 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       const record: typeof addRunStep = (db, run, kind, data) =>
         ctx.runId ? addRunStep(db, run, kind, data) : Promise.resolve();
       // The same short label the live chip shows (built-in tools only, never a connector's input): the chat's
-      // line of this call says it after the run too.
+      // line of this call says it after the run too. A permission check also keeps its command, masked, to open.
       const detail = toolDetail(call.name, call.input);
+      const command = toolCommand(call.name, call.input);
       await record(ctx.db, step, "tool_call", {
         toolUseId: call.toolUseId,
         name: call.name,
         input: call.input,
         ...(detail ? { detail } : {}),
+        ...(command ? { command } : {}),
       });
       const tool = unknownInDirectory ? undefined : (all.get(call.name) ?? directoryTool);
       // The audit (agent-audit.ts): every call that matters, with how it ended. A routine's belongs where it
@@ -464,7 +456,9 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
         }).catch(() => UNCHECKED);
         if (!seen.proceed) {
           // A computer command is answered the way its prompt expects: a refusal with the notice.
-          const content = prompt ? JSON.stringify({ behavior: "deny", message: seen.notice }) : seen.notice;
+          const content = prompt
+            ? JSON.stringify({ behavior: "deny", message: seen.notice, code: "team" })
+            : seen.notice;
           return finish({ content, isError: !prompt, data: { code: "team.action_seen" } }, "refused");
         }
         teamReason = seen.reason;

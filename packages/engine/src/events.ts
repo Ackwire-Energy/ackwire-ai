@@ -172,16 +172,30 @@ export type ChannelEvent =
       runId: string;
       tool: string | null;
       connector?: string;
-      /** A short label (≤ 80 chars): the skill, the issue (#131 or title) or the Drive file. Built-in tools only. */
+      /**
+       * A short label (≤ 80 chars): the skill, the issue (#131 or title), the Drive file, or the command a permission
+       * check is about (Claude Code's own description of it, else its program and main argument). Built-in tools only.
+       */
       detail?: string;
       /** The model's id of this call (live output refers to it). */
       toolUseId?: string;
       /** `run_code`: the code being run (≤ 4 KB, secrets masked). */
       code?: { language: string; source: string };
+      /** `permission_prompt`: the whole command it checks, as one line (≤ 1000 chars, credentials masked). */
+      command?: string;
       /** On the end (`tool: null`): the tool answered with an error. Never the error itself (it can carry data). */
       failed?: boolean;
       /** On the end: it didn't run, it waits on a person (an approval, a question, a secret). */
       held?: boolean;
+      /** On the end of a permission check it refused (`failed`): the policy's own reason, to the agent. */
+      why?: string;
+      /** With `why`: the refusal's code (`person`, `outside`…), which the apps say in the person's words. */
+      refusal?: string;
+      /**
+       * A permission check waiting on a person: on its `held` end, its request; with no `toolUseId`, the person's
+       * answer to that request (`failed` when they said no), which ends the line that waited for it.
+       */
+      requestId?: string;
     }
   /** What a computer command prints while it runs (throttled, ≤ 64 KB per call). */
   | {

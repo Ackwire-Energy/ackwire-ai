@@ -1,5 +1,5 @@
 import { setTimeout as sleep } from "node:timers/promises";
-import type { PubSub } from "@agenteschat/adapters";
+import { PERMISSION_TOOL, type PubSub } from "@agenteschat/adapters";
 import {
   and,
   count,
@@ -873,7 +873,8 @@ async function executeRunInner(
     // Team actions (ADR 0064): what the run didn't repeat because the team already did it rides on its reply.
     const teamChecks = note ? [] : await runChecksForReply(tx, run.orgId, run.id);
     // "Ver o que ele fez" under the reply: how many tool calls so far, so the apps leave it out at 0. A reaction
-    // already shows on the message it reacts to: it isn't counted.
+    // already shows on the message it reacts to, and the runner asking again about a command waiting on a person
+    // is that command's line (`promptPoll`): neither is counted, as the apps leave them out of the opened block.
     const [calls] = await tx
       .select({ n: count() })
       .from(agentRunSteps)
@@ -882,6 +883,7 @@ async function executeRunInner(
           eq(agentRunSteps.runId, run.id),
           eq(agentRunSteps.kind, "tool_call"),
           sql`${agentRunSteps.data}->>'name' is distinct from ${REACT_TOOL}`,
+          sql`(${agentRunSteps.data}->>'name' is distinct from ${PERMISSION_TOOL} or ${agentRunSteps.data}->'input'->>'request_id' is null)`,
         ),
       );
     const work = { steps: calls?.n ?? 0, durationMs: Math.max(0, Date.now() - run.createdAt.getTime()) };

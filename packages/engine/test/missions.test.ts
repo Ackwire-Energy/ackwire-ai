@@ -1080,6 +1080,7 @@ describe("missions (ADR 0029)", () => {
         JSON.parse(ok(await runner.mcp(taskId, "permission_prompt", args))) as {
           behavior?: string;
           message?: string;
+          code?: string;
           status?: string;
           request_id?: string;
         };
@@ -1263,7 +1264,8 @@ describe("missions (ADR 0029)", () => {
       const a = (await prompt(main.taskId, { tool_name: "Bash", input: { command: "brew install imagemagick" } }))
         .request_id as string;
       await decideCommand(md(), f.owner.id, f.org.id, view.id, a, "deny");
-      expect(await prompt(main.taskId, { request_id: a })).toMatchObject({ behavior: "deny" });
+      // Each refusal carries a code, so the apps say why in the person's language.
+      expect(await prompt(main.taskId, { request_id: a })).toMatchObject({ behavior: "deny", code: "person" });
       const b = (await prompt(main.taskId, { tool_name: "WebFetch", input: { url: "https://example.com/x" } }))
         .request_id as string;
       await f.db.execute(sql`update mission_events set created_at = now() - interval '31 minutes'
@@ -1271,6 +1273,7 @@ describe("missions (ADR 0029)", () => {
       expect(await prompt(main.taskId, { request_id: b })).toEqual({
         behavior: "deny",
         message: PERMISSION_TIMEOUT_MESSAGE,
+        code: "expired",
       });
       await expect(decideCommand(md(), f.owner.id, f.org.id, view.id, b, "allow")).rejects.toMatchObject({
         code: "mission.command_expired",
@@ -1281,7 +1284,7 @@ describe("missions (ADR 0029)", () => {
         answers.push(await prompt(main.taskId, { tool_name: "Bash", input: { command: `tool${i} --run` } }));
       }
       expect(answers.slice(0, 29).every((x) => x.status === "pending")).toBe(true);
-      expect(answers[29]).toMatchObject({ behavior: "deny" });
+      expect(answers[29]).toMatchObject({ behavior: "deny", code: "tooMany" });
       expect(answers[29]?.message).toContain("Too many");
     });
 
