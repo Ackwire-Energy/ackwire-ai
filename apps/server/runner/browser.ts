@@ -5,6 +5,7 @@ import { existsSync, lstatSync, mkdirSync, readdirSync, statSync } from "node:fs
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { cgroupCounters } from "@agenteschat/adapters/host-stats";
 import {
   AGENT_BROWSER_SHA256,
   AGENT_BROWSER_VERSION,
@@ -25,7 +26,7 @@ import {
 import type { ControlBrowser, ControlBrowserDoing } from "@agenteschat/adapters/runner-control";
 import { SECRET_NAME } from "@agenteschat/adapters/secret-box";
 import type { BrowserPorts } from "./browser-ports";
-import { countChromeTraffic, type TrafficCounter } from "./browser-traffic";
+import { type CrashedPage, countChromeTraffic, type TrafficCounter } from "./browser-traffic";
 import { BROWSER_WM_CLASS } from "./desktop-look";
 import type { DesktopSessions } from "./desktop-session";
 import { RunnerError } from "./errors";
@@ -94,6 +95,11 @@ import type { Spawn } from "./scope-gate";
  * - Browser on the agent's desktop (`desktop-browser.ts`, `show`): a person's
  *   click brings that same Chrome there, started, moved or in front, and is
  *   answered once its window shows there.
+ * - A page that dies (its renderer crashed or ran out of memory: Chrome's sad
+ *   tab) is opened again at once, and the agent's next command is answered
+ *   with what happened instead of running on a page that changed under it. One
+ *   that dies again before the agent heard of it shows our own notice there,
+ *   never a reload loop (`pageCrashed`).
  */
 
 /** A session with no command for this long is closed (its Chrome stops; the profile stays). */
@@ -275,6 +281,48 @@ export function agentBrowserTarget(
   if (platform === "linux" && (arch === "arm64" || arch === "x64")) return `linux-${arch}`;
   if (platform === "win32" && arch === "x64") return "win32-x64";
   return null;
+}
+
+/** The counters in the agent's `memory.events` that rise when it runs out of memory (`max`: it reached its limit). */
+const OUT_OF_MEMORY = ["max", "oom", "oom_kill"];
+
+/** How a tab's page died (`pageCrashed`): `again` before the agent heard of the first time, so it was left on our notice. */
+export interface PageCrash {
+  memory: boolean;
+  again: boolean;
+}
+
+/**
+ * What the agent is told about its page dying, as the answer to the command it died under (`ran`) or to the next
+ * one, which didn't run.
+ */
+export function crashNotice({ memory, again }: PageCrash, ran: boolean): string {
+  const what = memory ? "ran out of memory" : "crashed";
+  if (again) return `The page ${what} again, so it wasn't reloaded a second time. Open it again only if you need it.`;
+  return ran
+    ? `The page ${what} while this ran, and was reloaded. Read it again before you go on.`
+    : `The page ${what} and was reloaded, so this wasn't done. Read it again before you go on.`;
+}
+
+/** Our look (the app's tokens), in place of Chrome's sad tab. */
+const CRASH_STYLE = [
+  "body{margin:0;min-height:100vh;display:grid;place-items:center;background:#fbfbfa;color:#151514;",
+  'font:15px/1.45 Onest,"Segoe UI",system-ui,sans-serif}',
+  "main{max-width:400px;margin:16px;padding:24px;background:#fff;border-radius:14px;",
+  "box-shadow:0 1px 1px rgba(23,23,22,.04),0 6px 16px -4px rgba(23,23,22,.1),0 0 0 1px rgba(23,23,22,.07)}",
+  "h1{margin:0;font-size:17px;font-weight:600}p{margin:4px 0 0;color:#5c5c58}p+h1{margin-top:16px}",
+].join("");
+
+/** The page a tab that died again shows to the people watching: both languages, since the runner can't tell whose. */
+export function crashPage(memory: boolean): string {
+  const [pt, en] = memory
+    ? ["A página ficou sem memória", "The page ran out of memory"]
+    : ["A página parou de funcionar", "The page stopped working"];
+  const html =
+    `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${pt}</title><style>${CRASH_STYLE}</style>` +
+    `</head><body><main><h1>${pt}</h1><p>O agente será avisado.</p>` +
+    `<h1 lang="en">${en}</h1><p lang="en">The agent will be told.</p></main></body></html>`;
+  return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
 }
 
 /** Live browsers this computer takes: a quarter of its memory at ~300 MB each, 1 to 8. */
@@ -874,6 +922,10 @@ export interface BrowserManagerOptions {
   now?: () => number;
   /** Tests: opens the session's stream socket. */
   connectStream?: (url: string) => StreamSocket;
+  /** Tests: opens a Chrome's browser endpoint (its traffic and its pages that die). */
+  connectDevtools?: (url: string) => StreamSocket;
+  /** The agent's slice's `memory.events` (system mode): whether a page that died ran out of memory. */
+  memoryEvents?: string;
   /** Tests: how long a new stream waits for Chrome's first frame (`FIRST_FRAME_MS`). */
   firstFrameMs?: number;
   /** Tests: starts the agent's Chrome (default: `launchChrome`). */
@@ -938,6 +990,12 @@ interface Session {
   link?: string;
   /** When its desktop last failed to start for it (`desktopFor`). */
   desktopFailedAt?: number;
+  /** How its page died since the agent's last command (`pageCrashed`), for its next answer. */
+  crash?: PageCrash;
+  /** Tabs opened again after their page died, since the agent last heard of it. */
+  reopened: Set<string>;
+  /** Its `memory.events` when Chrome started or a page last died. */
+  memory?: Record<string, number> | null;
 }
 
 /** One Chrome in `chromes.json`. */
@@ -1334,9 +1392,13 @@ export class BrowserManager {
     const session = await this.timedSession(agent, folder, setup);
     const desktop = req.desktop === true;
     const queuedAt = this.now();
-    const answer = await this.enqueue(session, () => {
+    const answer = await this.enqueue(session, async () => {
       this.mark(setup, "queued", queuedAt);
-      return this.perform(agent, session, prepared, allowed, req.link, desktop, signal, setup);
+      // A page that died since the last command, or while this one ran, is the answer: the page changed under it.
+      const before = this.takeCrash(session, false);
+      if (before) return before;
+      const done = await this.perform(agent, session, prepared, allowed, req.link, desktop, signal, setup);
+      return this.takeCrash(session, true) ?? done;
     });
     return { ...answer, ...withSetup(setup) };
   }
@@ -1364,6 +1426,8 @@ export class BrowserManager {
     const queuedAt = this.now();
     return this.enqueue(session, async (): Promise<MachineReplies["browser.batch"]> => {
       this.mark(setup, "queued", queuedAt);
+      const before = this.takeCrash(session, false);
+      if (before) return { answers: [before], ...withSetup(setup) };
       const answers: BrowserAnswer[] = [];
       for (const p of prepared) {
         if (signal?.aborted) break;
@@ -1379,6 +1443,12 @@ export class BrowserManager {
             data: null,
             error: (err instanceof Error ? err.message : String(err)).slice(0, 2000),
           });
+          break;
+        }
+        // The page died meanwhile: nothing more runs on it. The server shows an action's failure, not a wait's
+        // or a look's, so only an action's answer says so; otherwise the next request is answered with it.
+        if (session.crash) {
+          answers.push((!p.tolerate && !READS.has(p.command) && this.takeCrash(session, true)) || answer);
           break;
         }
         answers.push(answer);
@@ -1677,6 +1747,7 @@ export class BrowserManager {
       queue: Promise.resolve(),
       lastUsed: this.now(),
       aliveAt: null,
+      reopened: new Set(),
     };
     this.sessions.set(agentId, session);
     this.sweepTimer ??= setInterval(() => void this.sweep(), SWEEP_MS);
@@ -1765,6 +1836,7 @@ export class BrowserManager {
       }
       session.chrome = chrome;
       session.aliveAt = null;
+      session.memory = this.memoryCounters();
       await this.rememberChrome(chrome.pid, profile, chrome.display);
       void chrome.exited.then(() => {
         void this.forgetChrome(chrome.pid);
@@ -1774,7 +1846,7 @@ export class BrowserManager {
         session.aliveAt = null;
         this.changed();
       });
-      await this.countTraffic(chrome);
+      await this.countTraffic(session, chrome);
       this.mark(setup, "launch", startedAt);
       return chrome;
     })();
@@ -1787,9 +1859,13 @@ export class BrowserManager {
   }
 
   /** A new Chrome's traffic is counted from its first command on: the counter attaches first (1 s at most). */
-  private async countTraffic(chrome: OwnChrome) {
+  private async countTraffic(session: Session, chrome: OwnChrome) {
     if (!chrome.wsPath) return;
-    const counter = countChromeTraffic(`ws://127.0.0.1:${chrome.port}${chrome.wsPath}`);
+    const counter = countChromeTraffic(
+      `ws://127.0.0.1:${chrome.port}${chrome.wsPath}`,
+      this.opts.connectDevtools,
+      (page) => this.pageCrashed(session, chrome, page),
+    );
     this.counters.set(chrome, counter);
     void chrome.exited.then(() => {
       const last = counter.take();
@@ -1801,6 +1877,42 @@ export class BrowserManager {
     let timer: ReturnType<typeof setTimeout> | undefined;
     await Promise.race([counter.attached, new Promise((r) => (timer = setTimeout(r, TRAFFIC_ATTACH_MS)))]);
     clearTimeout(timer);
+  }
+
+  /**
+   * A tab's page died: opened again once, and the agent's next answer says so. One that dies again before the
+   * agent heard of it shows our notice instead, so nothing reloads in a loop while the agent isn't there. It ran
+   * out of memory when the agent's slice reached its limit since its Chrome started or a page last died.
+   */
+  private pageCrashed(session: Session, chrome: OwnChrome, page: CrashedPage) {
+    if (session.chrome !== chrome) return;
+    const before = session.memory;
+    const now = this.memoryCounters();
+    session.memory = now;
+    const memory = !!before && !!now && OUT_OF_MEMORY.some((k) => (now[k] ?? 0) > (before[k] ?? 0));
+    const again = session.reopened.has(page.targetId);
+    if (again) page.show(crashPage(memory));
+    else {
+      session.reopened.add(page.targetId);
+      page.reopen();
+    }
+    session.crash = { memory, again };
+    this.opts.log(
+      `the browser of ${session.name}: a page ${memory ? "ran out of memory" : "crashed"}, ${again ? "left on our notice" : "reloaded"}`,
+    );
+  }
+
+  private memoryCounters() {
+    return this.opts.memoryEvents ? cgroupCounters(this.opts.memoryEvents) : null;
+  }
+
+  /** How the agent's page died since its last command, said once: after it, a page that dies is reloaded again. */
+  private takeCrash(session: Session, ran: boolean): BrowserAnswer | null {
+    const crash = session.crash;
+    if (!crash) return null;
+    session.crash = undefined;
+    session.reopened.clear();
+    return { success: false, data: null, error: crashNotice(crash, ran) };
   }
 
   /** What the agents' Chromes sent and received since the last call, those that are gone included (protocol 23). */

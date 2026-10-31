@@ -1,6 +1,6 @@
 // A fake `agent-browser` for browser tests: answers `--json` like the real one.
 // Each run appends `{ args, stdin }` to $FAKE_AB_LOG (one JSON line). The page
-// lives in $FAKE_AB_STATE: `{ open, url, attrs: { "@e3": { type } }, clickTo, tabTo, noHistory, port }`.
+// lives in $FAKE_AB_STATE: `{ open, url, attrs: { "@e3": { type } }, clickTo, tabTo, noHistory, port, delayMs }`.
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const argv = process.argv.slice(2);
@@ -43,6 +43,9 @@ const out = (o) => {
   process.stdout.write(`${JSON.stringify(o)}\n`);
   save();
 };
+
+// `delayMs`: every command takes that long (a page busy under it).
+if (state.delayMs) await new Promise((resolve) => setTimeout(resolve, state.delayMs));
 
 const [command, ...args] = rest;
 switch (command) {
