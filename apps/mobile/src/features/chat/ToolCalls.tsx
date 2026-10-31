@@ -13,6 +13,7 @@ import {
   toolItemsSaved,
   toolNow,
   toolPhrase,
+  toolWhy,
   workFromSteps,
   workMeta,
 } from "@agenteschat/client/lib/work";
@@ -74,6 +75,8 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
   schedulingReminder: "bell",
   cancelingReminder: "bell",
   listingReminders: "bell",
+  followingUp: "clock",
+  cancelingFollowUp: "clock",
   creatingRoutine: "clock",
   updatingRoutine: "clock",
   listingRoutines: "clock",
@@ -103,6 +106,18 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
   askingAgent: "agent",
   tellingAgent: "agent",
   findingTools: "search",
+  runningCommand: "code",
+  runningCommandAny: "code",
+  usingScreen: "laptop",
+  cloningRepo: "code",
+  openingPullRequest: "code",
+  handingOff: "clock",
+  recordingFindings: "flag",
+  deliveringMission: "flag",
+  suggestingForumTopic: "chat",
+  requestingAccess: "shield",
+  requestingSecret: "lock",
+  queryingDatabase: "server",
 };
 
 /** How many logos the closed line stacks (a phone has no room for more). */
@@ -443,7 +458,7 @@ function lineDetail(t: TFunction, l: ToolLine): ReactNode | undefined {
       </>
     );
   if (printed) return <Plate rows={[{ text: printed, danger: l.state === "fail" }]} />;
-  const answer = l.result ?? l.why;
+  const answer = l.result ?? toolWhy(t, l);
   if (!l.input && !answer) return undefined;
   return (
     <Plate
@@ -483,7 +498,7 @@ function blockLine(t: TFunction, locale: string, l: ToolLine, logo: ReactNode): 
     hint: l.code ? null : l.hint,
     time: l.ms !== null && l.state !== "run" ? formatLineTime(locale, l.ms) : undefined,
     count: l.count > 1 ? t("chat.work.times", { count: l.count }) : undefined,
-    why: l.state === "fail" ? l.why : null,
+    why: l.state === "fail" ? toolWhy(t, l) : null,
     detail: lineDetail(t, l),
     defaultOpen: l.state === "run" && Boolean(l.code),
   };

@@ -123,7 +123,11 @@ export async function resumeRunWithResult(
  * again, two results racing). Looked up on the messages: the run's own
  * transcript may be rewritten by its executor meanwhile.
  */
-async function lateNoticeSent(tx: Executor, run: AgentRun, waitId: string) {
+export async function lateNoticeSent(
+  tx: Executor,
+  run: Pick<AgentRun, "orgId" | "channelId" | "agentId">,
+  waitId: string,
+) {
   const [sent] = await tx
     .select({ id: messages.id })
     .from(messages)

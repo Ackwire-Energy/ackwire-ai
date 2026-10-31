@@ -54,6 +54,8 @@ export type ActivityKind =
   | "uploadingArtifact"
   | "gettingContext"
   | "cancelingReminder"
+  | "followingUp"
+  | "cancelingFollowUp"
   | "listingReminders"
   | "listingRoutines"
   | "checkingComputer"
@@ -67,7 +69,22 @@ export type ActivityKind =
   | "askingAgent"
   | "tellingAgent"
   | "findingTools"
+  | "runningCommand"
+  | "runningCommandAny"
+  | "usingScreen"
+  | "cloningRepo"
+  | "openingPullRequest"
+  | "handingOff"
+  | "recordingFindings"
+  | "deliveringMission"
+  | "suggestingForumTopic"
+  | "requestingAccess"
+  | "requestingSecret"
+  | "queryingDatabase"
   | "usingTool";
+
+/** The computer's own permission check before a command (`PERMISSION_TOOL` in `@agenteschat/adapters`). */
+export const PERMISSION_TOOL = "permission_prompt";
 
 export interface Activity {
   kind: ActivityKind;
@@ -146,6 +163,19 @@ const BUILTIN: Record<string, ActivityKind> = {
   // Another agent of the team (the consultation card says who and what it answered).
   ask_agent: "askingAgent",
   tell_agent: "tellingAgent",
+  // Ours, though their first word reads like an app's name.
+  git_clone: "cloningRepo",
+  open_pull_request: "openingPullRequest",
+  hand_off: "handingOff",
+  record_findings: "recordingFindings",
+  complete_mission: "deliveringMission",
+  suggest_forum_topic: "suggestingForumTopic",
+  request_permission: "requestingAccess",
+  request_folder_access: "requestingAccess",
+  request_secret: "requestingSecret",
+  use_tool: "findingTools",
+  follow_up: "followingUp",
+  cancel_follow_up: "cancelingFollowUp",
 };
 
 /** Catalog connectors (packages/engine/src/connectors/catalog.ts): tools are exposed as `<id>_<tool>`. */
@@ -215,17 +245,23 @@ export function toolActivity(
   }
   if (name === "load_skill")
     return detail?.trim() ? { kind: "openingSkill", app: detail.trim() } : { kind: "consultingSkill" };
+  // "Rodou: Rerun the tests": the command it checked, by the engine's label (`toolDetail`).
+  if (name === PERMISSION_TOOL)
+    return detail?.trim() ? { kind: "runningCommand", app: detail.trim() } : { kind: "runningCommandAny" };
   const builtin = BUILTIN[name];
   if (builtin) return { kind: builtin };
   // The tools on demand: looking one up (a big connector's own directory too) is ours, not an app.
   if (name === "find_tools" || name.endsWith("_find_tools")) return { kind: "findingTools" };
-  // The agent's own browser (ADR 0040): not an app called "browser".
+  // The agent's own browser (ADR 0040) and screen (ADR 0062): not apps called "browser" and "desktop".
   if (name.startsWith("browser_")) return { kind: "browsing" };
+  if (name.startsWith("desktop_")) return { kind: "usingScreen" };
   const label = connector?.trim();
   if (label) {
     if (isDrive(label.toLowerCase().replace(/\s+/g, "_"))) return { kind: "readingDrive" };
     return { kind: "consulting", app: label };
   }
+  // The org's databases (`pg_<slug>_query`, ADR 0039) when the event names no connection.
+  if (name.startsWith("pg_")) return { kind: "queryingDatabase" };
   const prefix = name.split(/[_.:]/)[0] ?? "";
   if (isDrive(prefix)) return { kind: "readingDrive" };
   const known = CONNECTORS[prefix];

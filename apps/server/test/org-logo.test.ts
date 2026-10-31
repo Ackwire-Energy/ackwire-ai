@@ -51,6 +51,14 @@ test("workspace logo: admins upload and remove it; members see it; strangers don
   expect((await ana(logo)).status).toBe(200);
   expect((await ana(logoApi, { method: "PUT", json: image })).status).toBe(403);
   expect((await ana(logoApi, { method: "DELETE" })).status).toBe(403);
+  // Closed, it still marks the workspace in its people's list of workspaces.
+  const set = (to: Partial<typeof schema.organizations.$inferInsert>) =>
+    t.db.update(schema.organizations).set(to).where(eq(schema.organizations.id, orgId));
+  for (const closed of [{ deletionDueAt: new Date(Date.now() + 86_400_000) }, { standing: "suspended" as const }]) {
+    await set(closed);
+    expect((await ana(logo)).status).toBe(200);
+  }
+  await set({ deletionDueAt: null, standing: "active" });
 
   // Signed-out people and people outside the organization can't fetch it.
   expect((await t.app.request(logo)).status).toBe(401);
@@ -117,6 +125,26 @@ test("the logo on an invitation's page: through its link or invitation only, whi
       expect((await anon(`/api/app/invitations/${token}/logo/${file}`)).status).toBe(404);
   }
   await standing("active");
+  expect((await anon(`/api/app/invitations/${tokens.email}/logo/${file}`)).status).toBe(200);
+  // Nor one being deleted, until it is restored.
+  const deleting = (dueAt: Date | null) =>
+    t.db.update(schema.organizations).set({ deletionDueAt: dueAt }).where(eq(schema.organizations.id, orgId));
+  await deleting(new Date(Date.now() + 86_400_000));
+  for (const token of [tokens.link, tokens.email]) {
+    expect(await preview(token)).not.toHaveProperty("logo");
+    expect((await anon(`/api/app/invitations/${token}/logo/${file}`)).status).toBe(404);
+  }
+  // Its invitations read as closed, as its links do: no inviter, no agents, no form to join.
+  expect(await preview(tokens.email)).toEqual({
+    orgName: "Acme",
+    email: "",
+    role: "member",
+    kind: "email",
+    invitedBy: null,
+    agents: [],
+    closed: true,
+  });
+  await deleting(null);
   expect((await anon(`/api/app/invitations/${tokens.email}/logo/${file}`)).status).toBe(200);
   await t.db.update(schema.organizationInvitations).set({ expiresAt: new Date(Date.now() - 1000) });
   expect((await anon(`/api/app/invitations/${tokens.email}/logo/${file}`)).status).toBe(404);

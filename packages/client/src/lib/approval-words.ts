@@ -1,7 +1,8 @@
 import type { TFunction } from "i18next";
-import type { Approval } from "../api/types";
+import type { Approval, ApprovalRule } from "../api/types";
 import { approvalAction, emailTitleWords } from "./approval-kind";
 import { humanize } from "./custom-tools";
+import { agentGrammar } from "./grammar";
 import { partsOf, toolName } from "./tool-review";
 
 /**
@@ -11,8 +12,19 @@ import { partsOf, toolName } from "./tool-review";
 
 type Tt = (key: string, options?: Record<string, unknown>) => string;
 
+/** The git tool whose grants "Aprovar sempre" keeps by target (`owner/repo:branch`, engine `git/branches.ts`). */
+const BRANCH_PUSH = "request_branch_push";
+
 /** The app's own tools whose approval title it says in the person's language (`approval.titles.*`). */
-const OWN_TITLES = new Set(["run_code", "upload_file", "run_skill_script", "post_message", "request_permission"]);
+const OWN_TITLES = new Set([
+  "run_code",
+  "upload_file",
+  "run_skill_script",
+  "post_message",
+  "request_permission",
+  "delete_branches",
+  BRANCH_PUSH,
+]);
 
 /**
  * The approval's title: in the person's language for the app's own tools, for email ("Salvar um
@@ -38,6 +50,9 @@ export function approvalTitle(
     skill: s(p.skill),
     channel: s(p.channel).replace(/^#/, ""),
     permission: permissionLabel(t, s(p.permission), approval.title),
+    repo: s(p.repo),
+    branch: s(p.branch),
+    ...(Array.isArray(p.branches) ? { count: p.branches.length } : {}),
     defaultValue: approval.title,
   });
 }
@@ -116,15 +131,67 @@ export function approvalValues(
   if (approval.email) return [];
   const skip = innerTool(approval) ? "name" : null;
   const out: [string, string][] = [];
+  const plain = (v: unknown) => typeof v === "string" || typeof v === "number" || typeof v === "boolean";
   const walk = (obj: Record<string, unknown>, top: boolean) => {
     for (const [k, v] of Object.entries(obj)) {
       if (top && k === skip) continue;
-      if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+      if (plain(v)) {
         const text = String(v).trim();
         if (text && (long || text.length <= 60)) out.push([humanize(k), text]);
+      } else if (Array.isArray(v) && v.length > 0 && v.every(plain)) {
+        // A list of names (the branches to delete) is one value; on a card it is cut, never left out.
+        const text = v.map(String).join(", ");
+        out.push([humanize(k), long || text.length <= 60 ? text : `${text.slice(0, 59)}…`]);
       } else if (top && v && typeof v === "object" && !Array.isArray(v)) walk(v as Record<string, unknown>, false);
     }
   };
   walk(approval.params ?? {}, true);
   return out.slice(0, max);
 }
+
+/** Articles in an action's slug (`GITHUB_CREATE_AN_ISSUE_COMMENT`) that only make its words longer. */
+const SLUG_ARTICLES = new Set(["a", "an", "the"]);
+
+/**
+ * An action a tool runs for the agent (Composio's slugs), in words: what it does, then its app ("Criar issue
+ * comment (Github)"). The slug itself is for a title on hover.
+ */
+export function actionName(t: TFunction, slug: string) {
+  const [app = "", ...rest] = slug.toLowerCase().split("_");
+  const name = rest.filter((w) => !SLUG_ARTICLES.has(w)).join("_");
+  return name ? `${toolName(t, partsOf(name), name)} (${humanize(app)})` : humanize(slug);
+}
+
+/** A remembered push (`owner/repo:branch`) in words: "enviar para ana/fix em acme/app". */
+function pushWords(t: TFunction, target: string) {
+  const at = target.indexOf(":");
+  return t("approval.always.pushTo", { repo: target.slice(0, at), branch: target.slice(at + 1) });
+}
+
+/** What "Aprovar sempre" covers on a card, in words: each action the tool runs, else the tool itself. */
+export function approveAlwaysWords(t: TFunction, approval: Pick<Approval, "approveAlways">) {
+  const kind = approval.approveAlways;
+  if (!kind) return "";
+  if (kind.tool === BRANCH_PUSH) return kind.actions.map((target) => pushWords(t, target)).join(", ");
+  return kind.actions.length > 0
+    ? kind.actions.map((slug) => actionName(t, slug)).join(", ")
+    : toolName(t, partsOf(kind.tool), kind.tool);
+}
+
+/**
+ * The line under "Aprovar sempre", on every card that offers it: what approving for good covers, with any values
+ * (a remembered push covers that one branch, so it says no more).
+ */
+export function approveAlwaysHint(t: TFunction, approval: Pick<Approval, "approveAlways">, agentName: string) {
+  const g = agentGrammar(t, agentName);
+  const key = approval.approveAlways?.tool === BRANCH_PUSH ? "approval.always.hintTarget" : "approval.always.hint";
+  return t(key, { of: g.of, name: g.name, actions: approveAlwaysWords(t, approval) });
+}
+
+/** A rule the agent runs without asking, in words: a push by its branch, its action, else the tool as labelled. */
+export const approvalRuleWords = (t: TFunction, rule: Pick<ApprovalRule, "tool" | "action" | "toolLabel">) =>
+  rule.tool === BRANCH_PUSH && rule.action
+    ? pushWords(t, rule.action)
+    : rule.action
+      ? actionName(t, rule.action)
+      : rule.toolLabel;

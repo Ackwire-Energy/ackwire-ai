@@ -4,6 +4,7 @@ import { approvalTitle } from "@agenteschat/client/lib/approval-words";
 import { Button, ExpiryFuse } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ApproveAlways } from "@/components/ApprovalItem";
 import { colorOf } from "@/components/Sky";
 import { ApproveButton, ConnectorMark, ExactAction, expiryText, RefuseBox } from "@/pages/ApprovalsPage";
 
@@ -13,7 +14,8 @@ const DAY_MS = 24 * 3_600_000;
 /**
  * A request waiting in the conversation, as the agent asking: what it said in its own words,
  * the exact action in one line with the app's mark, "Ver o e-mail" / "Ver detalhes" opening it whole, then
- * Approve (held for high risk), "Agora não" (which asks why, kept as a lesson) and the fuse to its expiry.
+ * Approve (held for high risk), "Agora não" (which asks why, kept as a lesson), "Aprovar sempre" where it is
+ * offered, and the fuse to its expiry.
  * No card: it reads as the agent's next line. Who can't decide sees who it waits for.
  */
 export function ApprovalAsk({
@@ -76,6 +78,7 @@ export function ApprovalAsk({
           <Button size="sm" onClick={() => setRefusing(true)}>
             {t("approval.notNow")}
           </Button>
+          <ApproveAlways approval={approval} agent={agent} />
           {fuse}
         </div>
       )}

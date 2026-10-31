@@ -270,6 +270,23 @@ describe("the author's own plan", () => {
     expect((await decisionOf(again.id))?.strategy).not.toStartWith("plan");
   });
 
+  test("an account that thinks for two of the author's agents is one sign-in: one route to it, never one per agent", async () => {
+    const hub = fakeHub({ reply: () => ({ busy: true }) });
+    const { machineId, accountId, handlers } = await plansOnly(hub);
+    await f.db.update(schema.machineAccounts).set({ shared: true }).where(eq(schema.machineAccounts.id, accountId));
+    const ops = await createAgent(f.db, f.owner.id, f.org.id, { name: "Ops", handle: "ops" }, { model: "auto" });
+    await f.db
+      .update(schema.agents)
+      .set({ brain: "claude_code", machineId, brainAccountId: accountId })
+      .where(eq(schema.agents.id, ops.id));
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: ops.id });
+    const m = await post(f.owner.id, "alguém viu o relatório?");
+    await drain(handlers);
+    // Busy is busy for every agent on it: nothing asks the same sign-in again for Ops.
+    expect(hub.calls).toHaveLength(1);
+    expect(await decisionOf(m.id)).toMatchObject({ error: "plan: every sign-in is busy" });
+  });
+
   test("a plan that doesn't answer in time leaves it to the rules", async () => {
     const hub = fakeHub({
       reply: () => new MachineRequestError("timeout", "the computer MacBook did not answer within 30 s"),

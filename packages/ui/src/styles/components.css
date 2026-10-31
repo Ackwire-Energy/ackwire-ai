@@ -417,6 +417,15 @@ samp {
   background: var(--sunken);
   color: var(--muted);
 }
+/* An emailed code's digits, spaced and centered (asking to join, deleting): the letter spacing trails the last one,
+   so the left padding takes the same. */
+.ac-input--code {
+  padding-left: calc(var(--control-px-md) + 0.3em);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+}
 textarea.ac-input {
   height: auto;
   padding: 10px 12px;
@@ -5931,6 +5940,14 @@ button.ac-tools__row:focus-visible {
   margin: 10px 12px;
   font-size: 13px;
   color: var(--muted);
+}
+.ac-tz__option[aria-disabled="true"] {
+  color: var(--ink-muted);
+  cursor: not-allowed;
+}
+/* SearchSelect's own rows: a mark, then the name over its description, as a menu draws them. */
+.ac-search__option {
+  align-items: center;
 }
 .ac-recur__period {
   display: grid;

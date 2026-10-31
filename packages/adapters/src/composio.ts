@@ -339,8 +339,8 @@ export function createComposioClient(options: ComposioClientOptions): ComposioRe
     },
 
     async deleteConnectedAccount(id, options) {
-      const revoke = options?.revoke === false ? "" : "?revoke_on_delete=true";
-      await request("DELETE", `/connected_accounts/${encodeURIComponent(id)}${revoke}`, undefined, {
+      const revoke = options?.revoke !== false;
+      await request("DELETE", `/connected_accounts/${encodeURIComponent(id)}?revoke_on_delete=${revoke}`, undefined, {
         allowNotFound: true,
       });
     },

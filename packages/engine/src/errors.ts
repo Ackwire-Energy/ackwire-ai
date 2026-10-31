@@ -16,6 +16,17 @@ export class ForbiddenError extends Error {
   }
 }
 
+/** No account to act for (HTTP 401): it was deleted while a cached session cookie still names it. */
+export class UnauthorizedError extends Error {
+  constructor(
+    message = "Sign in to continue",
+    readonly code: string = "unauthorized",
+  ) {
+    super(message);
+    this.name = "UnauthorizedError";
+  }
+}
+
 export class NotFoundError extends Error {
   constructor(
     message = "Not found",

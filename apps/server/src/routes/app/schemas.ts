@@ -1,6 +1,6 @@
 import { ACCOUNT_KINDS, BRAIN_EFFORTS } from "@agenteschat/adapters";
 import { ONBOARDING_STEPS, STANDING_STATES } from "@agenteschat/engine";
-import { CONTEXT_LIMITS, PROVIDER_IDS } from "@agenteschat/providers";
+import { CONTEXT_LIMITS, MODEL_TIERS, PROVIDER_IDS } from "@agenteschat/providers";
 import { z } from "@hono/zod-openapi";
 
 /** A last-message preview's `meta`: what the app needs to show a server-written body in the reader's language. */
@@ -25,6 +25,8 @@ const Rank = z.number().int().nullable().openapi({
 const RoleIds = z.array(z.string()).openapi({ description: "Their roles (`org_roles` ids), not `everyone`." });
 
 export const ProviderId = z.enum(PROVIDER_IDS).openapi("ProviderId");
+
+export const ModelTier = z.enum(MODEL_TIERS as ["small", "medium", "large"]);
 
 export const Organization = z
   .object({
@@ -61,6 +63,22 @@ export const Organization = z
       .openapi({
         description:
           "In `GET /me`, to its owner only, while the workspace's onboarding isn't finished: the apps open the onboarding, which resumes it, instead of the workspace (`PATCH …/onboarding` saves it). Absent: finished, or not theirs to set up.",
+      }),
+    deletion: z
+      .object({
+        dueAt: z.string().nullable().openapi({
+          description: "When it goes for good; null once that date passed, when it is only being deleted.",
+        }),
+        requestedAt: z.string().nullable(),
+        requestedBy: z
+          .object({ id: z.string(), name: z.string() })
+          .nullable()
+          .openapi({ description: "Who deleted it; null once their account is gone." }),
+      })
+      .optional()
+      .openapi({
+        description:
+          "In `GET /me`, while an owner's deletion is pending: the workspace is closed (`org.deleting`), and any owner can restore it until `dueAt` (`DELETE …/deletion`). Absent: not being deleted.",
       }),
   })
   .openapi("Organization");
@@ -467,6 +485,12 @@ export const Model = z
     contextWindow: z.number().int().openapi({ description: "Its context window in tokens." }),
     inputUsdPerMTok: z.number(),
     outputUsdPerMTok: z.number(),
+    pick: z.boolean().optional().openapi({
+      description: "In OpenRouter's long list (ADR 0087): a good pick, shown first. Absent: a catalog model.",
+    }),
+    tier: ModelTier.optional().openapi({
+      description: "The size Automático uses it for on its provider's key, by default.",
+    }),
   })
   .openapi("Model");
 
@@ -521,17 +545,27 @@ export const MachineAccount = z
     kind: AccountKind,
     label: z.string(),
     email: z.string().nullable().openapi({ description: "Only for its owner." }),
-    plan: z.string().nullable().openapi({ description: "`pro`, `max`, `team`, `plus`… as the CLI says." }),
+    plan: z
+      .string()
+      .nullable()
+      .openapi({ description: "`pro`, `max`, `ultra`, `team`, `enterprise`… from what the CLI says." }),
     status: z.enum(["active", "signed_out"]),
     ownerId: z.string().nullable().openapi({ description: "Whose account it is; null: nobody's." }),
     ownerName: z.string().nullable(),
     mine: z.boolean().openapi({ description: "The caller owns it: only they rename it or choose it for an agent." }),
-    usedBy: z.array(z.string()).openapi({ description: "Names of the agents that think with it (one at most)." }),
+    usedBy: z.array(z.string()).openapi({
+      description: "Names of the agents that think with it (one at most, unless `shared`).",
+    }),
+    usedByIds: z.array(z.uuid()).openapi({ description: "Their ids, in the same order." }),
     usage: PlanUsage.nullable().openapi({ description: "Its plan's usage limits; null: not known yet." }),
     provider: z.string().nullable().openapi({
       description: "A key account's coding plan (`zai`, `kimi`, `minimax`, `opencode`); null: the CLI's own sign-in.",
     }),
     keyHint: z.string().nullable().openapi({ description: "The last 4 of a key account's key; only for its owner." }),
+    shared: z.boolean().openapi({
+      description:
+        "It thinks for every agent its owner gives it on that computer, with no new sign-in (runner protocol 29); else for one.",
+    }),
   })
   .openapi("MachineAccount", {
     description:

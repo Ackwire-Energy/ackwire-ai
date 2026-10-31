@@ -15,6 +15,7 @@ import {
 import { LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { SkillPicker } from "@/components/Skills";
+import { ApprovalRulesCard } from "./ApprovalRulesCard";
 import { CardHead, ChangedTag, useAgentEdit, WasLine } from "./context";
 import { DatabaseAccessCard } from "./DatabaseAccess";
 import { MailAccessCard } from "./MailAccess";
@@ -203,6 +204,7 @@ export function AccessTab() {
               {ownerFirst ? t("newAgent.approverOwner", { name: ownerFirst }) : t("newAgent.approverAdmins")}
             </span>
           </p>
+          <ApprovalRulesCard />
           <Card
             as="section"
             className="agp-card"

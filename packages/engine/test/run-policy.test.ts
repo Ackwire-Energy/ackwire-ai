@@ -340,7 +340,7 @@ describe("the gateway applies the run policy", () => {
     const custom: ToolSource = {
       name: "connectors",
       tools: async () =>
-        ["git_clone", "open_pull_request"].map((name) => ({
+        ["git_clone", "open_pull_request", "delete_branches", "request_branch_push"].map((name) => ({
           name,
           description: `External ${name}`,
           inputSchema: { type: "object" },
@@ -355,6 +355,8 @@ describe("the gateway applies the run policy", () => {
         [
           { name: "git_clone", scope: "github:git.read" },
           { name: "open_pull_request", scope: "github:pr.write" },
+          { name: "delete_branches", scope: "github:git.write" },
+          { name: "request_branch_push", scope: "github:git.write" },
         ].map(({ name, scope }) => ({
           name,
           description: `Server ${name}`,
@@ -368,6 +370,8 @@ describe("the gateway applies the run policy", () => {
     const names = new Map((await gateway.list(ctx)).map((tool) => [tool.name, tool.description]));
     expect(names.get("git_clone")).toBe("Server git_clone");
     expect(names.get("open_pull_request")).toBe("Server open_pull_request");
+    expect(names.get("delete_branches")).toBe("Server delete_branches");
+    expect(names.get("request_branch_push")).toBe("Server request_branch_push");
   });
 
   test("routine, read: refused tools aren't listed, and a call is refused anyway with the reason", async () => {
@@ -418,6 +422,61 @@ describe("the gateway applies the run policy", () => {
       origin: { kind: "routine", routineId: brief?.routineId, routineName: "Pedidos do dia" },
     });
     expect(executed).toEqual([]);
+  });
+
+  test("a command the computer held asks in the chat the same way for a routine: with why, where it reports, with its origin", async () => {
+    await gatewaySetup();
+    await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "sandbox:run" }]);
+    const ran: { input: Record<string, unknown>; approved: boolean }[] = [];
+    // A computer tool like run_code: a call that says why asks a person first.
+    const computer: ToolSource = {
+      name: "computer",
+      tools: async () => [
+        {
+          name: "run_code",
+          description: "Run code on the computer.",
+          inputSchema: {
+            type: "object",
+            properties: { code: { type: "string" }, why: { type: "string" } },
+            required: ["code"],
+            additionalProperties: false,
+          },
+          scope: "sandbox:run",
+          whyAsks: true,
+          describe: (input) => ({ title: "Run bash code", detail: String(input.code) }),
+          execute: async (input, c) => {
+            ran.push({ input, approved: c.approved === true });
+            return { content: "ran" };
+          },
+        },
+      ],
+    };
+    const gateway = createToolGateway({ sources: [computer] });
+    const push = (ctx: ToolContext, why?: string) =>
+      gateway.invoke(ctx, {
+        toolUseId: `tu_${crypto.randomUUID()}`,
+        name: "run_code",
+        input: { code: "git push origin main", ...(why ? { why } : {}) },
+      });
+    const { ctx, brief } = await runAs("act");
+    expect(await push(ctx)).toMatchObject({ type: "result", output: { content: "ran" } });
+    const result = await push(ctx, WHY);
+    if (result.type !== "approval") throw new Error(`expected an approval, got ${JSON.stringify(result)}`);
+    expect(result.approval).toMatchObject({
+      tool: "run_code",
+      why: WHY,
+      channelId: f.general.id,
+      origin: { kind: "routine", routineId: brief?.routineId, routineName: "Pedidos do dia" },
+    });
+    expect(ran).toEqual([{ input: { code: "git push origin main" }, approved: false }]);
+    await gateway.executeApproved(ctx, { ...result.approval, status: "approved" });
+    expect(ran.at(-1)).toEqual({ input: { code: "git push origin main", why: WHY }, approved: true });
+    // A routine that only reads runs no command at all.
+    const read = await runAs("read");
+    expect(await push(read.ctx, WHY)).toMatchObject({
+      type: "result",
+      output: { isError: true, content: REFUSALS.routineReadOnly },
+    });
   });
 
   test("unattended: posting elsewhere refused, the reply here allowed, connector writes ask", async () => {

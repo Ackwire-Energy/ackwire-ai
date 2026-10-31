@@ -6,6 +6,7 @@ import { steerStore } from "../realtime/steer";
 import type { HttpApi } from "./client";
 import { ApiError, createFileRequester, createRequester, enc, type TransportOptions } from "./http";
 import type {
+  AccountDeletionPlan,
   AccountLoginStart,
   AccountLoginStatus,
   ActiveRun,
@@ -32,6 +33,7 @@ import type {
   AiStatus,
   AppNotification,
   Approval,
+  ApprovalRule,
   Artifact,
   ArtifactDetail,
   ArtifactVersion,
@@ -46,6 +48,7 @@ import type {
   Channel,
   ChannelCategory,
   ChannelMember,
+  CodeSent,
   CommandApproval,
   ComputerSetup,
   ComputerTarget,
@@ -83,7 +86,6 @@ import type {
   IssueColumn,
   JevKey,
   JoinApproval,
-  JoinCodeSent,
   JoinRequest,
   Machine,
   MachineAccess,
@@ -145,6 +147,7 @@ import type {
   SignInOptions,
   Skill,
   SkillDetail,
+  SkillPick,
   StorageConfig,
   StorageMigration,
   StorageTestResult,
@@ -316,6 +319,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       open: (orgId, agentId, url) =>
         request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/open`, { json: { url } }),
       stop: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/stop`, { json: {} }),
+      restart: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/restart`, { json: {} }),
     },
     desktop: {
       status: (orgId, agentId) => request<DesktopStatus>(`${org(orgId)}/agents/${enc(agentId)}/desktop`),
@@ -352,6 +356,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       updateMe: (input) => request<void>("/api/app/me", { method: "PATCH", json: input }),
       phoneSignIn: () => request<PhoneSignIn>("/api/app/phone-sign-in", { json: {} }),
       addPassword: (password) => request<void>("/api/app/me/password", { json: { password } }),
+      deletionPlan: () => request<AccountDeletionPlan>("/api/app/account/deletion"),
+      deletionCode: () => request<CodeSent>("/api/app/account/deletion/code", { json: {} }),
+      delete: (input = {}) => request<void>("/api/app/account", { method: "DELETE", json: input }),
     },
     push: {
       webKey: async () =>
@@ -371,6 +378,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           }),
         ),
       get: (orgId) => request<Organization>(org(orgId)),
+      deletionCode: (orgId) => request<CodeSent>(`${org(orgId)}/deletion/code`, { json: {} }),
+      deleteWorkspace: async (orgId, input = {}) =>
+        (await request<{ deletion: { dueAt: string } }>(`${org(orgId)}/deletion`, { json: input })).deletion,
+      restore: (orgId) => request<void>(`${org(orgId)}/deletion`, { method: "DELETE" }),
       setAvatar: (orgId, input) =>
         request<{ avatarUrl: string }>(`${org(orgId)}/me/avatar`, { method: "PUT", json: input }),
       removeAvatar: (orgId) => request<void>(`${org(orgId)}/me/avatar`, { method: "DELETE" }),
@@ -589,6 +600,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<{ runs: { agentId: string; runId: string }[] }>(`${org(orgId)}/messages/${enc(messageId)}/answer-now`, {
           json: {},
         }),
+      cancelFollowUp: (orgId, messageId) =>
+        request<void>(`${org(orgId)}/messages/${enc(messageId)}/cancel-follow-up`, { json: {} }),
       archive: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}`, { method: "DELETE" }),
       unarchive: (orgId, channelId) =>
         request<void>(`${org(orgId)}/channels/${enc(channelId)}/unarchive`, { json: {} }),
@@ -622,10 +635,16 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       list: async (orgId, filter = {}) =>
         (await request<{ approvals: Approval[] }>(`${org(orgId)}/approvals`, { query: filter })).approvals,
       get: (orgId, id) => request<Approval>(`${org(orgId)}/approvals/${enc(id)}`),
-      approve: (orgId, id, reason) =>
-        request<Approval>(`${org(orgId)}/approvals/${enc(id)}/approve`, { json: reason ? { reason } : {} }),
+      approve: (orgId, id, reason, always) =>
+        request<Approval>(`${org(orgId)}/approvals/${enc(id)}/approve`, {
+          json: { ...(reason ? { reason } : {}), ...(always ? { always: true } : {}) },
+        }),
       refuse: (orgId, id, reason) =>
         request<Approval>(`${org(orgId)}/approvals/${enc(id)}/refuse`, { json: reason ? { reason } : {} }),
+      rules: async (orgId, agentId) =>
+        (await request<{ rules: ApprovalRule[] }>(`${org(orgId)}/agents/${enc(agentId)}/approval-rules`)).rules,
+      removeRule: (orgId, agentId, ruleId) =>
+        request<void>(`${org(orgId)}/agents/${enc(agentId)}/approval-rules/${enc(ruleId)}`, { method: "DELETE" }),
     },
     connectors: {
       catalog: () => request<ConnectorCatalog>("/api/app/connectors/catalog"),
@@ -761,7 +780,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       list: async (orgId) => (await request<{ skills: Skill[] }>(`${org(orgId)}/skills`)).skills,
       get: (orgId, id) => request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}`),
       create: (orgId, input) => request<SkillDetail>(`${org(orgId)}/skills`, { json: input }),
-      import: (orgId, input) => request<SkillDetail>(`${org(orgId)}/skills/import`, { json: input }),
+      import: (orgId, input) => request<SkillDetail | SkillPick>(`${org(orgId)}/skills/import`, { json: input }),
+      importPicked: async (orgId, url, paths) =>
+        (await request<{ skills: SkillDetail[] }>(`${org(orgId)}/skills/import`, { json: { url, paths } })).skills,
       update: (orgId, id, patch) =>
         request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}`, { method: "PATCH", json: patch }),
       reimport: (orgId, id) => request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}/reimport`, { json: {} }),
@@ -787,7 +808,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       links: async (orgId) => (await request<{ links: InviteLink[] }>(`${org(orgId)}/invite-links`)).links,
       turnOff: (orgId, linkId) => request<void>(`${org(orgId)}/invite-links/${enc(linkId)}`, { method: "DELETE" }),
       sendCode: (token, input, humanCheck) =>
-        request<JoinCodeSent>(`/api/app/invitations/${enc(token)}/code`, {
+        request<CodeSent>(`/api/app/invitations/${enc(token)}/code`, {
           json: input,
           headers: humanCheckHeaders(humanCheck),
         }),

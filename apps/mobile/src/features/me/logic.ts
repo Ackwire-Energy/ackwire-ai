@@ -1,5 +1,4 @@
-import type { TFunction } from "i18next";
-import { joinNames } from "../shared/logic";
+import { ApiError } from "@agenteschat/client";
 
 /**
  * Você's pure logic: the Conta form (what changed, what is wrong with it, the server's error as our
@@ -79,11 +78,8 @@ export function openIssuesWithMe(
 }
 
 /**
- * Apagar conta refused while this person is the only owner of organizations with other people: one line, which ones
- * (when the server says) and what to do.
+ * A server from before account deletion had a preflight (`GET /account/deletion` answers 404): it deletes with no
+ * proof within 10 minutes of a sign-in and says the rest itself, so the screen falls back to its fixed lines and the
+ * hold (pure).
  */
-export function deleteBlockedText(t: TFunction, organizations: string[]): string {
-  return organizations.length > 0
-    ? t("mobile.delete.blocked", { names: joinNames(organizations, t("newAgent.and")) })
-    : t("mobile.account.deleteSoleOwner");
-}
+export const preflightMissing = (error: unknown) => error instanceof ApiError && error.status === 404;

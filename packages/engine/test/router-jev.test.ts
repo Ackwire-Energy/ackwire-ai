@@ -164,6 +164,32 @@ describe("Jev's questions", () => {
       expect(questions.agent_0.instructions.question).toContain(`"${phrase}"`);
     }
   });
+
+  test("read who each message names and a person's messages in a row as one, and say who those are for", async () => {
+    const jev = fakeJev(() => ({ nouls: {}, needs: 0.1 }));
+    await createJevRouterStrategy({ key: "k", recordUsage: async () => {}, fetch: jev.fetcher }).decide({
+      orgId: "o",
+      channel: { id: "c", name: "geral", topic: "" },
+      message: { id: "m", author: "ana", body: "boa tarde walter\ncomo esta hoje", names: ["Walter"] },
+      thread: [{ author: "@ada", body: "Campanha publicada." }],
+      candidates: [cand("ada")],
+      aloneWith: "ada",
+    });
+    const body = jev.requests[0]?.body as {
+      state: Record<string, unknown>;
+      questions: { needs_agent: { instructions: string }; agent_0: { instructions: { question: string } } };
+    };
+    expect(body.state).toMatchObject({
+      latest_message: { from: "ana", names: ["Walter"], text: "boa tarde walter\ncomo esta hoje" },
+      recent_messages: [{ from: "@ada", names: [], text: "Campanha publicada." }],
+      alone_with: "@ada",
+    });
+    for (const text of [body.questions.needs_agent.instructions, body.questions.agent_0.instructions.question]) {
+      expect(text).toContain("Messages a person sends in a row continue the same address");
+      expect(text).toContain("A message to a person, by @ or by name, is for that person, not for an agent.");
+      expect(text).toContain("Greetings and small talk between people get no agent.");
+    }
+  });
 });
 
 describe("Jev strategy end to end", () => {

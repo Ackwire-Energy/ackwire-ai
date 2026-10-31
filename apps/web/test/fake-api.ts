@@ -1,4 +1,5 @@
 import type {
+  AccountDeletionPlan,
   ActiveRun,
   Agent,
   AgentAudience,
@@ -13,6 +14,7 @@ import type {
   ApiClient,
   AppNotification,
   Approval,
+  ApprovalRule,
   AuditRow,
   AuthConfig,
   Availability,
@@ -46,7 +48,10 @@ import type {
   MemberStatus,
   Memory,
   Message,
+  Model,
+  ModelTier,
   OrgRole,
+  OrgSettings,
   Person,
   PlanAccountUsage,
   Proposal,
@@ -169,7 +174,13 @@ export interface FakeState {
   messages: Message[];
   invitations: InvitationWithStatus[];
   credentials: Credential[];
+  /** Models after the fake's catalog ones (OpenRouter's list), as `GET /models` sends them. */
+  extraModels?: Model[];
+  /** The code a new key is refused with, as a provider's own check refuses it (`provider_key_invalid`). */
+  keyRefusal?: string;
   approvals: Approval[];
+  /** What each agent runs without asking ("Aprovar sempre"), by agent id; unset = none. */
+  approvalRules?: Record<string, ApprovalRule[]>;
   connections: Connection[];
   /** GitHub App installations bound to the org (`githubApp.info`); undefined = none, app not installable. */
   githubApp?: { installable: boolean; installations: GitHubAppInstallation[] };
@@ -211,6 +222,8 @@ export interface FakeState {
   audit?: AuditRow[];
   /** The workspace switch "Agentes conferem o que o time já fez" (on when unset). */
   actionCheck?: boolean;
+  /** Automático's models per provider and tier (Settings › Chaves); none when unset. */
+  autoModels?: OrgSettings["autoModels"];
   /** What agents did outside (search kind `action`), as the search returns it. */
   teamActions?: SearchHit[];
   /** My inbox (`notifications.*`); empty unless a test fills it. */
@@ -270,6 +283,12 @@ export interface FakeState {
   approval?: JoinApproval;
   /** Make `joinRequests.approve` and `deny` fail with this error (`join.answered`…). */
   answerError?: ApiError;
+  /** `account.deletionPlan`; unset = nothing to stop it, close or leave. */
+  deletionPlan?: AccountDeletionPlan;
+  /** Make `orgs.deleteWorkspace` and `account.delete` fail with this error (`reauth.code_wrong`…). */
+  deletionError?: ApiError;
+  /** Make `orgs.deletionCode` and `account.deletionCode` fail with this error (`reauth.code_wait`…). */
+  codeError?: ApiError;
   /** The workspace's roles (ADR 0085, `roles.*`); unset: a new workspace's (`seedRoles`). */
   roles?: OrgRole[];
 }
@@ -352,6 +371,71 @@ const PERMISSION_AREAS = [
     ],
   },
 ];
+
+/** Some of OpenRouter's models as `GET /models` sends them (a workspace has its key): the good picks, then the rest. */
+export const OPENROUTER_MODELS: Model[] = [
+  {
+    id: "~z-ai/glm-latest",
+    label: "Z.ai: GLM Latest",
+    provider: "openrouter",
+    inputUsdPerMTok: 0.104,
+    outputUsdPerMTok: 2.769,
+    pick: true,
+    tier: "medium",
+  },
+  {
+    id: "~deepseek/deepseek-flash-latest",
+    label: "DeepSeek: DeepSeek Flash Latest",
+    provider: "openrouter",
+    inputUsdPerMTok: 0.3,
+    outputUsdPerMTok: 1.2,
+    pick: true,
+    tier: "small",
+  },
+  {
+    id: "~anthropic/claude-sonnet-latest",
+    label: "Claude Sonnet Latest",
+    provider: "openrouter",
+    inputUsdPerMTok: 2,
+    outputUsdPerMTok: 10,
+    pick: true,
+    tier: "large",
+  },
+  {
+    id: "z-ai/glm-5.3",
+    label: "Z.ai: GLM 5.3",
+    provider: "openrouter",
+    inputUsdPerMTok: 0.104,
+    outputUsdPerMTok: 2.769,
+    pick: false,
+  },
+  {
+    id: "tencent/hy3-preview",
+    label: "Tencent: Hy3 preview",
+    provider: "openrouter",
+    inputUsdPerMTok: 0.18,
+    outputUsdPerMTok: 0.6,
+    pick: false,
+  },
+  {
+    id: "nvidia/nemotron-3-ultra-550b-a55b:free",
+    label: "NVIDIA: Nemotron 3 Ultra (free)",
+    provider: "openrouter",
+    inputUsdPerMTok: 0,
+    outputUsdPerMTok: 0,
+    pick: false,
+  },
+];
+
+/** The workspace's OpenRouter key, for a test that adds it to `credentials`. */
+export const OPENROUTER_KEY: Credential = {
+  id: "cred-or",
+  provider: "openrouter",
+  label: "OpenRouter",
+  keyHint: "c0de",
+  createdAt: "2026-10-30T12:00:00.000Z",
+  revokedAt: null,
+};
 
 /** A small in-memory backend with the design's demo data ("Acme"). */
 export function seedState(overrides: Partial<FakeState> = {}): FakeState {
@@ -995,6 +1079,25 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("account.addPassword", { password });
         if (state.me) state.me.user.hasPassword = true;
       },
+      deletionCode: async () => {
+        log("account.deletionCode");
+        if (state.codeError) throw state.codeError;
+        return { email: requireMe().user.email, resendIn: 60 };
+      },
+      deletionPlan: async () =>
+        state.deletionPlan ?? {
+          closes: [],
+          leaves: [],
+          soleOwner: [],
+          computers: [],
+          staysBehind: [],
+          serverOwner: false,
+        },
+      delete: async (input) => {
+        log("account.delete", input);
+        if (state.deletionError) throw state.deletionError;
+        state.me = null;
+      },
       phoneSignIn: async () => {
         log("account.phoneSignIn");
         return {
@@ -1116,6 +1219,36 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return { step: onboarding?.step ?? "done", finished: onboarding === undefined };
       },
       get: async (orgId) => ({ id: orgId, name: "Acme", role: "owner", context: "" }),
+      deletionCode: async (orgId) => {
+        log("orgs.deletionCode", orgId);
+        if (state.codeError) throw state.codeError;
+        return { email: requireMe().user.email, resendIn: 60 };
+      },
+      deleteWorkspace: async (orgId, input) => {
+        log("orgs.deleteWorkspace", orgId, input);
+        const me = requireMe();
+        if (state.deletionError) throw state.deletionError;
+        // On the real clock: the closing screen compares the date with it.
+        const dueAt = new Date(Date.now() + 7 * 86_400_000).toISOString();
+        const deletion = {
+          dueAt,
+          requestedAt: new Date().toISOString(),
+          requestedBy: { id: me.user.id, name: me.user.name },
+        };
+        state.me = {
+          ...me,
+          organizations: me.organizations.map((o) => (o.id === orgId ? { ...o, deletion, onboarding: undefined } : o)),
+        };
+        return { dueAt };
+      },
+      restore: async (orgId) => {
+        log("orgs.restore", orgId);
+        const me = requireMe();
+        state.me = {
+          ...me,
+          organizations: me.organizations.map((o) => (o.id === orgId ? { ...o, deletion: undefined } : o)),
+        };
+      },
       update: async (orgId, input) => log("orgs.update", orgId, input),
       updateMe: async (orgId, input) => {
         log("orgs.updateMe", orgId, input);
@@ -1217,6 +1350,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         summaryModel: null,
         timezone: "America/Sao_Paulo",
         actionCheck: state.actionCheck ?? true,
+        autoModels: state.autoModels ?? {},
         // Money: admins only, like the backend.
         ...(seesCost() ? { defaultAgentBudgetUsd: state.defaultAgentBudgetUsd ?? 50 } : {}),
       }),
@@ -1226,6 +1360,14 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (input.defaultCredentialId !== undefined) state.defaultCredentialId = input.defaultCredentialId;
         if (input.defaultAgentBudgetUsd !== undefined) state.defaultAgentBudgetUsd = input.defaultAgentBudgetUsd;
         if (input.actionCheck !== undefined) state.actionCheck = input.actionCheck;
+        for (const [provider, tiers] of Object.entries(input.autoModels ?? {})) {
+          const next = { ...state.autoModels?.[provider] };
+          for (const [tier, model] of Object.entries(tiers ?? {}) as [ModelTier, string | null][]) {
+            if (model === null) delete next[tier];
+            else next[tier] = model;
+          }
+          state.autoModels = { ...state.autoModels, [provider]: next };
+        }
         return {
           name: input.name ?? "Acme",
           context: state.context ?? "",
@@ -1234,6 +1376,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           summaryModel: null,
           timezone: input.timezone ?? "America/Sao_Paulo",
           actionCheck: state.actionCheck ?? true,
+          autoModels: state.autoModels ?? {},
         };
       },
       overview: async () => ({
@@ -1518,11 +1661,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
             outputUsdPerMTok: 0.5,
           },
           { id: "gpt-5", label: "GPT-5", provider: "openai", inputUsdPerMTok: 1.25, outputUsdPerMTok: 10 },
+          ...(state.extraModels ?? []),
         ],
       }),
       credentials: async () => state.credentials,
       addCredential: async (orgId, input) => {
         log("agents.addCredential", orgId, { ...input, apiKey: "[redacted]" });
+        if (state.keyRefusal) throw new ApiError(400, state.keyRefusal, "The provider didn't accept this key.");
         const cred: Credential = {
           id: id("cred"),
           provider: input.provider,
@@ -1898,6 +2043,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (state.answerNowError) throw state.answerNowError;
         return { runs: [] };
       },
+      cancelFollowUp: async (orgId, messageId) => {
+        log("chat.cancelFollowUp", orgId, messageId);
+        const line = state.messages.find((m) => m.id === messageId);
+        const notice = line?.meta?.notice as { refs?: Record<string, string> } | undefined;
+        if (notice?.refs) notice.refs = { ...notice.refs, state: "canceled" };
+      },
       roster: async (_orgId, channelId) =>
         (state.channelMembers[channelId] ?? []).map((m) =>
           m.type === "agent"
@@ -2007,8 +2158,40 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (!a) throw new ApiError(404, "not_found", "Approval not found");
         return structuredClone(a);
       },
-      approve: async (orgId, id, reason) => decide(orgId, id, "approved", reason),
+      approve: async (orgId, approvalId, reason, always) => {
+        if (!always) return decide(orgId, approvalId, "approved", reason);
+        const a = state.approvals.find((x) => x.id === approvalId);
+        const kind = a?.approveAlways;
+        if (!a || !kind)
+          throw new ApiError(409, "approval.always_unavailable", "This request can't be approved for good");
+        const decided = await decide(orgId, approvalId, "approved", reason, true);
+        const mine = state.approvalRules?.[a.agentId] ?? [];
+        state.approvalRules = { ...state.approvalRules, [a.agentId]: mine };
+        for (const action of kind.actions.length > 0 ? kind.actions : [""]) {
+          mine.push({
+            id: id("rule"),
+            connectionId: "conn-composio",
+            server: "Composio",
+            tool: kind.tool,
+            toolLabel: kind.tool,
+            action,
+            createdByUserId: state.me?.user.id ?? null,
+            createdAt: new Date().toISOString(),
+          });
+        }
+        return decided;
+      },
       refuse: async (orgId, id, reason) => decide(orgId, id, "refused", reason),
+      rules: async (orgId, agentId) => {
+        log("approvals.rules", orgId, agentId);
+        return structuredClone(state.approvalRules?.[agentId] ?? []);
+      },
+      removeRule: async (orgId, agentId, ruleId) => {
+        log("approvals.removeRule", orgId, agentId, ruleId);
+        const list = state.approvalRules?.[agentId] ?? [];
+        if (!list.some((r) => r.id === ruleId)) throw new ApiError(404, "not_found", "Rule not found");
+        if (state.approvalRules) state.approvalRules[agentId] = list.filter((r) => r.id !== ruleId);
+      },
     },
     connectors: {
       catalog: async () => CATALOG,
@@ -2330,8 +2513,14 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
     };
   }
 
-  function decide(orgId: string, approvalId: string, status: "approved" | "refused", reason?: string) {
-    log(`approvals.${status === "approved" ? "approve" : "refuse"}`, orgId, approvalId, reason);
+  function decide(orgId: string, approvalId: string, status: "approved" | "refused", reason?: string, always?: true) {
+    log(
+      `approvals.${status === "approved" ? "approve" : "refuse"}`,
+      orgId,
+      approvalId,
+      reason,
+      ...(always ? [always] : []),
+    );
     const a = state.approvals.find((x) => x.id === approvalId);
     if (!a) throw new ApiError(404, "not_found", "Approval not found");
     if (a.status !== "pending") throw new ApiError(409, "conflict", "Already decided");

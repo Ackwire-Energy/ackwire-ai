@@ -221,9 +221,51 @@
           },
           "meters": {
             "$ref": "#/components/schemas/OperatorMeters"
+          },
+          "deletion": {
+            "type": ["object", "null"],
+            "properties": {
+              "dueAt": {
+                "type": "string",
+                "description": "When it is deleted for good, unless a hold keeps it longer."
+              },
+              "requestedAt": {
+                "type": ["string", "null"]
+              },
+              "requestedBy": {
+                "type": ["string", "null"],
+                "description": "Who asked; null once their account is gone."
+              }
+            },
+            "required": ["dueAt", "requestedAt", "requestedBy"],
+            "description": "Its deletion, asked by an owner or with its only member's account: closed until `dueAt`. Null when it isn't being deleted."
+          },
+          "deletionHold": {
+            "type": ["object", "null"],
+            "properties": {
+              "heldAt": {
+                "type": "string"
+              },
+              "reason": {
+                "type": ["string", "null"]
+              }
+            },
+            "required": ["heldAt", "reason"],
+            "description": "The operator's deletion hold (`PUT /orgs/{orgId}/deletion-hold`); null when none."
           }
         },
-        "required": ["id", "name", "createdAt", "standing", "admins", "counts", "limits", "meters"]
+        "required": [
+          "id",
+          "name",
+          "createdAt",
+          "standing",
+          "admins",
+          "counts",
+          "limits",
+          "meters",
+          "deletion",
+          "deletionHold"
+        ]
       },
       "OperatorStanding": {
         "type": "object",
@@ -425,6 +467,22 @@
         },
         "required": ["held", "heldAt", "reason"]
       },
+      "OperatorDeletionHold": {
+        "type": "object",
+        "properties": {
+          "held": {
+            "type": "boolean"
+          },
+          "heldAt": {
+            "type": ["string", "null"]
+          },
+          "reason": {
+            "type": ["string", "null"],
+            "description": "The operator's own reason: never shown to the workspace."
+          }
+        },
+        "required": ["held", "heldAt", "reason"]
+      },
       "OperatorUserBlock": {
         "type": "object",
         "properties": {
@@ -490,7 +548,7 @@
           },
           "type": {
             "type": "string",
-            "description": "`user.signed_up`, `session.created`, `user.deleted`, `organization.created`, `organization.deleted`, `invitation.created`, `agent.created`, `agent.deleted`, `mail.sent`, `run.finished`, `task.finished`, `desktop_control.ended`, `content.viewed` or `platform_ai.threshold` (ADR 0056 §5 lists each one's `data`). Ignore types you don't know: new ones keep v1."
+            "description": "`user.signed_up`, `session.created`, `user.deleted`, `organization.created`, `organization.deletion_requested`, `organization.deletion_canceled`, `organization.deleted`, `invitation.created`, `agent.created`, `agent.deleted`, `mail.sent`, `run.finished`, `task.finished`, `desktop_control.ended`, `content.viewed` or `platform_ai.threshold` (ADR 0056 §5 lists each one's `data`). Ignore types you don't know: new ones keep v1."
           },
           "orgId": {
             "type": ["string", "null"],
@@ -1394,6 +1452,87 @@
         }
       }
     },
+    "/orgs/{orgId}/deletion-hold": {
+      "put": {
+        "tags": ["Operator"],
+        "summary": "Hold a workspace's deletion (a legal hold), or let it go",
+        "description": "While held, a workspace whose deletion was asked for (by an owner, or with its only member's account) waits past its date instead of being deleted: it stays closed, with everything in it. Nothing is refused and the workspace is told nothing: no audit row, no notice. Restoring the workspace never lifts it. Let go, a deletion past its date goes ahead within an hour.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "orgId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "held": {
+                    "type": "boolean"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                },
+                "required": ["held"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorDeletionHold"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/users/{userId}/block": {
       "put": {
         "tags": ["Operator"],
@@ -1782,7 +1921,7 @@
       "get": {
         "tags": ["Operator"],
         "summary": "Workspaces waiting for their computer, oldest first",
-        "description": "Active workspaces whose computer isn't ready (one on hold or suspended is never listed). Empty unless `MACHINE_PROVISIONING=external`.",
+        "description": "Active workspaces whose computer isn't ready (one on hold, suspended or being deleted is never listed). Empty unless `MACHINE_PROVISIONING=external`.",
         "parameters": [
           {
             "schema": {
@@ -1843,7 +1982,7 @@
       "put": {
         "tags": ["Operator"],
         "summary": "Say how far the workspace's computer is",
-        "description": "Its people see it live, with the time left and the stage. The time `since` restarts only when the state, step or reason change. One wait counts down to the earliest ready time you gave it: a later one changes nothing they see, so a part running long reads as running over, until another state, a removal or a hold starts a new wait. A ready time over a minute ahead (the wait's earliest), `waiting` or `problem` tells the owners they'll get an email when it's ready (when this server sends email). Refused (409 `provisioning.ready`) once the computer is ready, until it is removed, and (403 `org.paused`, `org.suspended`) unless the workspace is active: one held or suspended waits for no computer, and what you last said of it is gone.",
+        "description": "Its people see it live, with the time left and the stage. The time `since` restarts only when the state, step or reason change. One wait counts down to the earliest ready time you gave it: a later one changes nothing they see, so a part running long reads as running over, until another state, a removal or a hold starts a new wait. A ready time over a minute ahead (the wait's earliest), `waiting` or `problem` tells the owners they'll get an email when it's ready (when this server sends email). Refused (409 `provisioning.ready`) once the computer is ready, until it is removed, and (403 `org.paused`, `org.suspended`, `org.deleting`) unless the workspace is active and not being deleted: one held, suspended or being deleted waits for no computer, and what you last said of it is gone.",
         "parameters": [
           {
             "schema": {
@@ -1970,7 +2109,7 @@
       "post": {
         "tags": ["Operator"],
         "summary": "The workspace's computer, and a code for it to connect with",
-        "description": "One per workspace: the first call makes it, every later one issues a new code for the same computer (an earlier unused code stops working), and one removed comes back. The code lives 10 minutes; once redeemed, the computer's first hello makes it ready and gives it the workspace's agents that have no computer. Refused (403 `org.paused`, `org.suspended`) unless the workspace is active.",
+        "description": "One per workspace: the first call makes it, every later one issues a new code for the same computer (an earlier unused code stops working), and one removed comes back. The code lives 10 minutes; once redeemed, the computer's first hello makes it ready and gives it the workspace's agents that have no computer. Refused (403 `org.paused`, `org.suspended`, `org.deleting`) unless the workspace is active and not being deleted.",
         "parameters": [
           {
             "schema": {

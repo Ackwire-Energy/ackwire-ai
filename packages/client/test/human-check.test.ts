@@ -154,6 +154,6 @@ test("a limit with no words of its own reads as too many tries, never the server
   );
   expect(errorText(t, new ApiError(429, "http_429", "Too Many Requests"))).toBe("common.tooMany");
   expect(knownErrorText(t, new ApiError(409, "rate_limited", "Slow down"))).toBe("common.tooMany");
-  expect(errorText(t, new ApiError(429, "join.code_limit", "x"))).toBe("errors.join.codeLimit");
+  expect(errorText(t, new ApiError(429, "join.code_limit", "x"))).toBe("errors.code.limit");
   expect(knownErrorText(t, new ApiError(409, "conflict", "Reload and try again."))).toBeNull();
 });

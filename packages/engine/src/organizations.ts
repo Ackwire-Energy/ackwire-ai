@@ -10,6 +10,7 @@ import {
   inArray,
   isNull,
   ne,
+  not,
   or,
   schema,
   sql,
@@ -19,26 +20,31 @@ import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { inviteLinkToken, randomToken, sha256 } from "./crypto";
 import { earlyAccessLink, hasWorkspaceAllowance, recordFirstWorkspace, signupMode } from "./early-access";
-import { ConflictError, ForbiddenError, ValidationError } from "./errors";
+import { ConflictError, ForbiddenError, UnauthorizedError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
 import { deleteJevKey } from "./jev-key";
 import { assertMemberRoom } from "./limits";
 import { followWorkspaceName } from "./machine-provisioning";
 import { addressDomain } from "./mail/text";
-import { type OperatorEvent, recordOperatorEvent } from "./operator-events";
+import { recordOperatorEvent } from "./operator-events";
 import { enqueue } from "./outbox";
 import { memberKeysSql, memberRankSql, type Permission, resolvePermissions } from "./permissions";
 import { addMemberRolesInTx, createDefaultRoles, givableRoleIds, rolesStillThere } from "./roles";
 import {
   assertCanWork,
   type BillingHold,
+  closedOrg,
+  closedRefusal,
   cloudNotice,
-  isBillingHold,
   isUserBlocked,
-  OrgPausedError,
+  openOrg,
+  refusesNewWorkspace,
   STANDING_COLUMNS,
   type WorkspaceStanding,
+  waitsForPlan,
+  workRefusal,
 } from "./standing";
+import type { Closed, DeletionDeps } from "./workspace-deletion";
 
 const {
   organizations,
@@ -150,9 +156,10 @@ export async function getMembership(
   return row ? withPermissions(row) : null;
 }
 
-/** Refuses a suspended workspace without changing membership/status lookups. */
+/** Refuses a closed workspace (suspended, or being deleted: `closedRefusal`) without changing membership lookups. */
 export function assertActiveMembership(membership: Membership): void {
-  if (membership.standing?.state === "suspended") throw new OrgPausedError(membership.standing);
+  const closed = closedRefusal(membership.standing);
+  if (closed) throw closed;
 }
 
 /** Requires an active organization member before acting on its resources. */
@@ -164,8 +171,8 @@ export async function requireActiveMembership(db: Database, userId: string, orgI
 }
 
 /**
- * Throws ForbiddenError unless the user is a member with `permission`, and `org.suspended` for anyone in a
- * suspended workspace. Returns the membership.
+ * Throws ForbiddenError unless the user is a member with `permission`, and `org.suspended` or `org.deleting` for
+ * anyone in a closed workspace. Returns the membership.
  */
 export async function requirePermission(db: Database, userId: string, orgId: string, permission: Permission) {
   const membership = await requireActiveMembership(db, userId, orgId);
@@ -173,9 +180,10 @@ export async function requirePermission(db: Database, userId: string, orgId: str
   return membership;
 }
 
-/** Invitations go out only from an active workspace (`standing.ts`). */
+/** Invitations go out only from an active workspace that isn't being deleted (`standing.ts`). */
 export function assertInviting(membership: Membership) {
-  if (membership.standing && membership.standing.state !== "active") throw new OrgPausedError(membership.standing);
+  const refusal = workRefusal(membership.standing);
+  if (refusal) throw refusal;
 }
 
 /**
@@ -183,13 +191,14 @@ export function assertInviting(membership: Membership) {
  * blocked or they are in a workspace suspended or on any hold but a billing one: they don't carry on in a new
  * one (`org.create_refused`, the same words whatever the cause, and how to contest it on agentes.chat Cloud).
  * Billing holds refuse nobody, but one person
- * owns at most one workspace waiting for its first plan (`org.create_unpaid`, with that workspace's id).
+ * owns at most one workspace waiting for its first plan (`org.create_unpaid`, with that workspace's id); one being
+ * deleted waits for none, so restoring it is what checks that.
  * With `needsAllowance` (`needsWorkspaceAllowance`) early access must have allowed the account, else
  * `org.create_invite_only` and nothing is made. An allowed account's first workspace is recorded on its invitation.
  * `holdForPayment`: the workspace starts on the `payment` hold (ADR 0079), with no audit row or notification.
  * With `onboarding` (the app's), its owner sets it up in the onboarding, already past its first step; while they
  * have one they haven't finished, that one comes back (`existing`) instead of a new one, even one waiting for its
- * first plan.
+ * first plan. `UnauthorizedError` once their account is gone.
  */
 export async function createOrganization(
   db: Database,
@@ -198,25 +207,28 @@ export async function createOrganization(
   options: { holdForPayment?: boolean; needsAllowance?: boolean; onboarding?: boolean } = {},
 ) {
   return db.transaction(async (tx) => {
-    // One create at a time per person, checked after the lock: two at once would both start waiting for a plan.
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-create:${userId}`}))`);
-    const held = await tx
+    // One create at a time per person, checked after the lock: two at once would both start waiting for a plan. A
+    // deletion of the account waits for this workspace, or this finds the account gone (a cached session cookie
+    // outlives it).
+    await lockWorkspacesOf(tx, userId);
+    const [me] = await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for("update");
+    if (!me) throw new UnauthorizedError();
+    const theirs = await tx
       .select({ id: organizations.id, role: organizationMembers.role, standing: STANDING_COLUMNS })
       .from(organizationMembers)
       .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
-      .where(and(eq(organizationMembers.userId, userId), ne(organizations.standing, "active")))
+      .where(eq(organizationMembers.userId, userId))
       .orderBy(asc(organizations.createdAt));
-    if (held.some((o) => !isBillingHold(o.standing)) || (await isUserBlocked(tx, userId)))
+    if (theirs.some((o) => refusesNewWorkspace(o.standing)) || (await isUserBlocked(tx, userId)))
       throw new ForbiddenError("You can't create a workspace right now", "org.create_refused", cloudNotice());
     if (options.needsAllowance && !(await hasWorkspaceAllowance(tx, userId)))
       throw new ForbiddenError("New workspaces need an invitation for now", "org.create_invite_only");
     if (options.onboarding) {
-      // Locked first, so a second create at the same time (a double submit, another tab) waits and finds this one.
-      await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for("update");
+      // A second create at the same time (a double submit, another tab) waited on the lock and finds this one.
       const [open] = await unfinishedWorkspaces(tx, userId);
       if (open) return { ...open, existing: true };
     }
-    const unpaid = held.find((o) => o.role === "owner" && o.standing.reason === PAYMENT);
+    const unpaid = theirs.find((o) => o.role === "owner" && waitsForPlan(o.standing));
     if (unpaid)
       throw new ForbiddenError("You already have a workspace waiting for a plan", "org.create_unpaid", {
         orgId: unpaid.id,
@@ -263,7 +275,8 @@ export const ONBOARDING_STEPS = schema.ONBOARDING_STEPS;
 
 /**
  * The workspaces `userId` owns whose onboarding isn't finished, oldest first, each with its #general (where the
- * onboarding puts the agents and posts the first message). A suspended one isn't among them: it shows as suspended.
+ * onboarding puts the agents and posts the first message). A closed one isn't among them: it shows as suspended or
+ * being deleted, and the onboarding starts a new one.
  */
 export async function unfinishedWorkspaces(db: Executor, userId: string) {
   return db
@@ -276,7 +289,7 @@ export async function unfinishedWorkspaces(db: Executor, userId: string) {
         eq(organizationMembers.userId, userId),
         eq(organizationMembers.role, "owner"),
         isNull(organizations.onboardedAt),
-        ne(organizations.standing, "suspended"),
+        not(closedOrg),
       ),
     )
     .orderBy(asc(organizations.createdAt));
@@ -405,9 +418,9 @@ export type SignupAdmission = "open" | "first" | "invitation" | "early_access";
  * Who may create an account (ADR 0006, ADR 0078): the first account may always register (there is no other way
  * in), unless the installation waits for its owner's link or key, which make it on their own path. After that,
  * anyone with `ALLOW_SIGNUP` or while the sign-up mode is `open` (`signupOpenToAll`); else only a pending workspace
- * invitation for that email, or an early-access link (`access`) sent to it. An invitation link never opens it
- * (ADR 0068): whoever holds one asks to join without an account. Open sign-up on a reachable server would let
- * anyone create organizations (and spend model credits) on it. Null: refused.
+ * invitation for that email (not into a workspace being deleted), or an early-access link (`access`) sent to it.
+ * An invitation link never opens it (ADR 0068): whoever holds one asks to join without an account. Open sign-up
+ * on a reachable server would let anyone create organizations (and spend model credits) on it. Null: refused.
  */
 export async function signupAdmission(
   db: Database,
@@ -423,11 +436,13 @@ export async function signupAdmission(
   const [invite] = await db
     .select({ id: organizationInvitations.id })
     .from(organizationInvitations)
+    .innerJoin(organizations, eq(organizations.id, organizationInvitations.orgId))
     .where(
       and(
         eq(organizationInvitations.email, stored),
         isNull(organizationInvitations.acceptedAt),
         gt(organizationInvitations.expiresAt, now),
+        isNull(organizations.deletionDueAt),
       ),
     )
     .limit(1);
@@ -521,11 +536,14 @@ export async function hasPassword(db: Database, userId: string): Promise<boolean
 /**
  * Runs after a user is created. The very first account of an installation
  * becomes owner of every organization that already exists, so a self-hoster
- * who seeded data first lands in it.
+ * who seeded data first lands in it. Not of one being deleted, which isn't theirs to restore.
  */
 export async function onUserCreated(db: Database, userId: string) {
   if ((await countUsers(db)) !== 1) return;
-  const existing = await db.select({ id: organizations.id }).from(organizations);
+  const existing = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(isNull(organizations.deletionDueAt));
   if (existing.length === 0) return;
   await db
     .insert(organizationMembers)
@@ -697,10 +715,13 @@ export function requestLocale(acceptLanguage: string | null | undefined): UserLo
   return appLocale(tags.map((l) => l.tag));
 }
 
-/** Whether the person opened the link that confirms their email, read here: a session's cached copy can lag. */
-export async function isEmailVerified(db: Database, userId: string) {
+/**
+ * Whether the person opened the link that confirms their email, read here: a session's cached copy can lag. Null when
+ * the account is gone, which a cached session cookie outlives for minutes.
+ */
+export async function isEmailVerified(db: Database, userId: string): Promise<boolean | null> {
   const [row] = await db.select({ verified: users.emailVerified }).from(users).where(eq(users.id, userId));
-  return row?.verified === true;
+  return row ? row.verified === true : null;
 }
 
 async function ownerCount(db: Pick<Database, "select">, orgId: string) {
@@ -710,6 +731,20 @@ async function ownerCount(db: Pick<Database, "select">, orgId: string) {
     .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.role, "owner")));
   return row?.n ?? 0;
 }
+
+/**
+ * The lock on who is in a workspace: role changes, joins, removals, account deletions, and a workspace's deletion,
+ * restore and purge take it, so each sees the others' commits.
+ */
+export const lockOrgMembers = (tx: Executor, orgId: string) =>
+  tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-members:${orgId}`}))`);
+
+/**
+ * The lock on what workspaces a person has: creating one, restoring one and deleting their account take it first, so
+ * each sees the others' commits (a workspace made in another tab closes with the account, or finds it gone).
+ */
+export const lockWorkspacesOf = (tx: Executor, userId: string) =>
+  tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-create:${userId}`}))`);
 
 /** Someone joined or left, or a role changed: the members' open apps read the people and the counts again. */
 export const announceMembers = (pubsub: PubSub | undefined, orgId: string) =>
@@ -753,7 +788,7 @@ export async function changeMemberRole(
   const target = await getMembership(db, targetUserId, orgId, { includeBlocked: true });
   if (!target) throw new ConflictError("That user is not a member");
   await db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-members:${orgId}`}))`);
+    await lockOrgMembers(tx, orgId);
     if (target.role === "owner" && role !== "owner" && (await ownerCount(tx, orgId)) <= 1) {
       throw new ConflictError("An organization needs at least one owner");
     }
@@ -768,7 +803,10 @@ export async function changeMemberRole(
   await announceMembers(options.pubsub, orgId);
 }
 
-/** Removes a member (or lets a member leave). The last owner can't leave. */
+/**
+ * Removes a member (or lets a member leave). The last owner can't leave. The computers they connected here go with
+ * them (`personalMachines`).
+ */
 export async function removeMember(
   db: Database,
   actorId: string,
@@ -786,10 +824,11 @@ export async function removeMember(
     // Only someone above them (ADR 0085): their highest role below the actor's.
     if (!outranks(actor, target.rank)) throw new ForbiddenError("Only someone above them can remove them");
   }
-  // Loaded here: the accounts module builds on this one.
+  // Loaded here: these modules build on this one.
   const { announceReleasedAccounts, releaseMemberAccounts } = await import("./machine-accounts");
-  const released = await db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-members:${orgId}`}))`);
+  const { announceRemovedMachine, detachMachine, personalMachines } = await import("./machines");
+  const { released, removed } = await db.transaction(async (tx) => {
+    await lockOrgMembers(tx, orgId);
     if (target.role === "owner" && (await ownerCount(tx, orgId)) <= 1) {
       throw new ConflictError("An organization needs at least one owner. Transfer ownership first.");
     }
@@ -803,9 +842,17 @@ export async function removeMember(
     const action = actorId === targetUserId ? "member.left" : "member.removed";
     await auditMember(tx, orgId, actorId, action, targetUserId, { role: target.role });
     // Their AI accounts on the organization's computers are signed out and removed (ADR 0059 §1).
-    return releaseMemberAccounts(tx, targetUserId, orgId);
+    const released = await releaseMemberAccounts(tx, targetUserId, orgId);
+    const removed = [];
+    for (const computer of await personalMachines(tx, targetUserId, [orgId])) {
+      removed.push({ computer, freed: await detachMachine(tx, computer) });
+    }
+    return { released, removed };
   });
   await announceReleasedAccounts(options.pubsub, released);
+  for (const { computer, freed } of removed) {
+    await announceRemovedMachine({ db, pubsub: options.pubsub }, computer, { type: "person", id: actorId }, freed);
+  }
   // Their open WebSocket connections lose every subscription now, not on reconnect.
   await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId: targetUserId });
   await announceMembers(options.pubsub, orgId);
@@ -819,98 +866,96 @@ export async function removeMember(
 export const ORG_FILES_PURGE_JOB = "org.files.purge";
 /** The backoff tops out at 3 h: a purge keeps trying through a storage outage for about 30 days. */
 export const ORG_FILES_PURGE_ATTEMPTS = 240;
+/** A deleted account's photos leave platform storage (`purgeUserFiles`). */
+export const USER_FILES_PURGE_JOB = "user.files.purge";
 
 /**
- * Deletes a person's account (App Store 5.1.1(v), ADR 0035). Refused while
- * they are the only owner of an organization that has other members
- * (`sole_owner`, with the organizations' names: make someone else an owner
- * first). Organizations where they are the only member go with them, with
- * everything in them (their files on platform storage through the job
- * `org.files.purge`, ADR 0019). Their AI accounts on computers are signed
- * out and removed, never inherited (ADR 0059 §1). The rest follows the foreign keys:
- * sessions, sign-in methods, memberships, channel memberships, notifications
- * and phones are deleted; messages and records they authored stay without an
- * author (the same as any deleted user). Not for a blocked account: it can't
- * act, and its workspaces would go with it.
+ * Queues the purge of a workspace's files, in the transaction that deletes it. No org_id on the job: the outbox row
+ * would be deleted with the workspace (cascade). A second pass a day later takes files that work under way stored after
+ * the first (an agent's upload stores its file, then its row is refused).
  */
-export async function deleteAccount(
-  db: Database,
-  userId: string,
-  options: { pubsub?: PubSub } = {},
-): Promise<{ deletedOrgIds: string[] }> {
+export async function queueOrgFilesPurge(tx: Executor, orgId: string) {
+  const purge = { orgId: null, kind: ORG_FILES_PURGE_JOB, payload: { orgId }, maxAttempts: ORG_FILES_PURGE_ATTEMPTS };
+  await enqueue(tx, purge);
+  const late = { runAt: new Date(Date.now() + 86_400_000), dedupeKey: `${ORG_FILES_PURGE_JOB}:${orgId}:late` };
+  await enqueue(tx, { ...purge, ...late });
+}
+
+/**
+ * Deletes a person's account at once (App Store 5.1.1(v), ADR 0035), as `accountDeletionPlan` reads it under the
+ * `org-members` locks. Refused for a blocked account (it can't act) and with `sole_owner` (`soleOwnerRefusal`).
+ * Workspaces only they are in close and go later, as any deletion, whatever their standing (`closeForDeletion`,
+ * `via: "account"`): a hold makes their purge wait, never the account. They leave the others, and the computers they
+ * connected there go (`personalMachines`); what they added there stays. Their AI accounts on computers are signed out
+ * and removed, never inherited (ADR 0059 §1). The rest follows the foreign keys: sessions, sign-in methods,
+ * memberships, channel memberships, notifications and phones are deleted; messages and records they authored stay
+ * without an author. With `emails` they are told (`account_deleted`). Their photos leave platform storage
+ * (`user.files.purge`). The caller checks that it's them.
+ */
+export async function deleteAccount(db: Database, userId: string, options: Omit<DeletionDeps, "db"> = {}) {
   if (await isUserBlocked(db, userId)) throw new ForbiddenError();
   // Before any account goes: the first one stays the owner even once it is gone.
   const owner = await pinnedOwner(db);
+  // Loaded here: these modules build on this one.
   const { announceReleasedAccounts, releaseMemberAccounts } = await import("./machine-accounts");
-  const { left, deleted, released } = await db.transaction(async (tx) => {
+  const { announceRemovedMachine, detachMachine } = await import("./machines");
+  const { accountDeletionPlan, afterClosing, closeForDeletion, queueAccountDeletedEmail, soleOwnerRefusal } =
+    await import("./workspace-deletion");
+  const { plan, closed, released, removed } = await db.transaction(async (tx) => {
+    // First, as creating a workspace does: one made in another tab meanwhile is in the plan below and closes with them.
+    await lockWorkspacesOf(tx, userId);
     const mine = await tx
-      .select({ orgId: organizations.id, orgName: organizations.name, role: organizationMembers.role })
+      .select({ orgId: organizationMembers.orgId })
       .from(organizationMembers)
-      .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
       .where(eq(organizationMembers.userId, userId))
-      .orderBy(asc(organizations.id));
-    // Same lock as role changes and removals, in a fixed order.
-    for (const m of mine) await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-members:${m.orgId}`}))`);
-    const alone: string[] = [];
-    const leaving: string[] = [];
-    const blocking: string[] = [];
-    for (const m of mine) {
-      const [row] = await tx
-        .select({
-          members: sql<number>`count(*)::int`,
-          owners: sql<number>`(count(*) filter (where ${organizationMembers.role} = 'owner'))::int`,
-        })
-        .from(organizationMembers)
-        .where(eq(organizationMembers.orgId, m.orgId));
-      if (Number(row?.members ?? 0) <= 1) alone.push(m.orgId);
-      else {
-        if (m.role === "owner" && Number(row?.owners ?? 0) <= 1) blocking.push(m.orgName);
-        leaving.push(m.orgId);
-      }
-    }
-    if (blocking.length > 0) {
-      throw new ConflictError(
-        "You are the only owner of an organization that has other members. Make someone else an owner first.",
-        "sole_owner",
-        { organizations: blocking },
-      );
+      .orderBy(asc(organizationMembers.orgId));
+    // The lock of role changes, removals and a workspace's deletion, in a fixed order. Every workspace row is written
+    // before the user row, as the purge writes them.
+    for (const m of mine) await lockOrgMembers(tx, m.orgId);
+    const plan = await accountDeletionPlan(tx, userId);
+    const refusal = soleOwnerRefusal(plan);
+    if (refusal) throw refusal;
+    const closed: Closed[] = [];
+    for (const org of plan.closes) {
+      // One already being deleted keeps its date, and is no news.
+      const scheduled = await closeForDeletion(tx, { actorId: userId, orgId: org.id, via: "account" });
+      if (scheduled.closed) closed.push(scheduled.closed);
     }
     // Before the user row: `created_by` would turn null, and a null owner is nobody's.
     const released = await releaseMemberAccounts(tx, userId, null);
-    if (alone.length > 0) await tx.delete(organizations).where(inArray(organizations.id, alone));
-    // No org_id on the job: the outbox row would be deleted with the workspace (cascade). A second pass a day
-    // later takes files that work under way stored after the first (an agent's upload stores its file, then its
-    // row is refused).
-    for (const orgId of alone) {
-      const purge = {
-        orgId: null,
-        kind: ORG_FILES_PURGE_JOB,
-        payload: { orgId },
-        maxAttempts: ORG_FILES_PURGE_ATTEMPTS,
-      };
-      await enqueue(tx, purge);
-      const late = { runAt: new Date(Date.now() + 86_400_000), dedupeKey: `${ORG_FILES_PURGE_JOB}:${orgId}:late` };
-      await enqueue(tx, { ...purge, ...late });
+    for (const org of plan.leaves) {
+      await auditMember(tx, org.id, userId, "member.left", userId, { role: org.role, accountDeleted: true });
     }
+    const removed = [];
+    for (const computer of plan.computers) {
+      removed.push({ computer, freed: await detachMachine(tx, { ...computer, kind: "connected" }) });
+    }
+    if (options.emails) await queueAccountDeletedEmail(tx, userId, closed, options.emails);
     await tx.delete(users).where(eq(users.id, userId));
     // The owner's own TypeSafe account would go on getting, and paying for, every workspace's Jev calls.
     if (userId === owner) await deleteJevKey(tx, { type: "system", id: null });
     // With nobody left, the next first account owns the server again.
     await tx.update(instanceTelemetry).set({ ownerUserId: null }).where(sql`not exists (select 1 from ${users})`);
-    const gone = alone.map((orgId): OperatorEvent => ({ type: "organization.deleted", orgId, userId }));
-    await recordOperatorEvent(tx, ...gone, { type: "user.deleted", userId });
-    return { left: leaving, deleted: alone, released };
+    await recordOperatorEvent(tx, { type: "user.deleted", userId });
+    // No org_id: the job outlives every workspace.
+    await enqueue(tx, {
+      orgId: null,
+      kind: USER_FILES_PURGE_JOB,
+      payload: { userId },
+      maxAttempts: ORG_FILES_PURGE_ATTEMPTS,
+    });
+    return { plan, closed, released, removed };
   });
-  await announceReleasedAccounts(options.pubsub, {
-    machines: released.machines.filter((m) => left.includes(m.orgId)),
-    agents: released.agents.filter((a) => left.includes(a.orgId)),
-  });
-  // Their open WebSocket connections lose every subscription now.
-  for (const orgId of left) {
-    await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId });
-    await announceMembers(options.pubsub, orgId);
+  await announceReleasedAccounts(options.pubsub, released);
+  for (const { computer, freed } of removed) {
+    await announceRemovedMachine({ db, pubsub: options.pubsub }, computer, { type: "person", id: userId }, freed);
   }
-  return { deletedOrgIds: deleted };
+  // Their open WebSocket connections lose every subscription now.
+  for (const org of [...plan.closes, ...plan.leaves]) {
+    await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId: org.id, userId });
+  }
+  for (const org of plan.leaves) await announceMembers(options.pubsub, org.id);
+  for (const one of closed) await afterClosing({ ...options, db }, one);
 }
 
 /**
@@ -1144,14 +1189,14 @@ export async function inviteLink(db: Database, secret: string, actorId: string, 
   });
 }
 
-/** An invitation link by its token (or its id), with its workspace's name, logo and standing; null when there is none. */
+/** An invitation link by its token (or its id), with its workspace's name, logo and whether it is open; null when none. */
 export async function findInviteLink(db: Executor, by: string | { id: string }) {
   const [row] = await db
     .select({
       link: organizationInviteLinks,
       orgName: organizations.name,
       orgLogo: organizations.logo,
-      standing: STANDING_COLUMNS,
+      open: openOrg,
     })
     .from(organizationInviteLinks)
     .innerJoin(organizations, eq(organizations.id, organizationInviteLinks.orgId))
@@ -1163,11 +1208,11 @@ export async function findInviteLink(db: Executor, by: string | { id: string }) 
   return row ?? null;
 }
 
-/** A link people can still ask with: not turned off, not expired, and its workspace active. */
+/** A link people can still ask with: not turned off, not expired, and its workspace active and not being deleted. */
 export const inviteLinkOpen = (
-  found: { link: { revokedAt: Date | null; expiresAt: Date }; standing: WorkspaceStanding },
+  found: { link: { revokedAt: Date | null; expiresAt: Date }; open: boolean },
   now = new Date(),
-) => !found.link.revokedAt && found.link.expiresAt > now && found.standing.state === "active";
+) => !found.link.revokedAt && found.link.expiresAt > now && found.open;
 
 /** How many of the organization's agents an invitation names ("Theo, Ada, Lia e Atlas já trabalham lá"). */
 const INVITE_AGENTS = 4;
@@ -1199,7 +1244,8 @@ const inviteLogo = (token: string, logo: string | null) => {
 /**
  * What the invite page shows before signing in (`email` is empty for an org link): the organization and its logo,
  * who invited (their name), the role and its first agents. Only for a valid token, which reached the person.
- * A link that was turned off, expired, or whose workspace is paused says only that (`closed`), never why.
+ * A link that was turned off, expired, or whose workspace is paused or being deleted, and an email invitation to a
+ * workspace being deleted, say only that (`closed`), never why.
  */
 export async function previewInvitation(db: Database, token: string, now = new Date()) {
   const [row] = await db
@@ -1207,7 +1253,8 @@ export async function previewInvitation(db: Database, token: string, now = new D
       orgId: organizationInvitations.orgId,
       orgName: organizations.name,
       orgLogo: organizations.logo,
-      standing: organizations.standing,
+      open: openOrg,
+      deleting: sql<boolean>`${organizations.deletionDueAt} is not null`,
       email: organizationInvitations.email,
       role: organizationInvitations.role,
       expiresAt: organizationInvitations.expiresAt,
@@ -1246,6 +1293,18 @@ export async function previewInvitation(db: Database, token: string, now = new D
     };
   }
   if (row.acceptedAt || row.expiresAt <= now) return null;
+  // Nobody joins a workspace being deleted: its name only, and that it's closed, as for a link.
+  if (row.deleting) {
+    return {
+      orgName: row.orgName,
+      email: "",
+      role: "member" as const,
+      kind: "email" as const,
+      invitedBy: null,
+      agents: [],
+      closed: true as const,
+    };
+  }
   return {
     orgName: row.orgName,
     email: row.email,
@@ -1253,14 +1312,14 @@ export async function previewInvitation(db: Database, token: string, now = new D
     kind: "email" as const,
     invitedBy: row.invitedBy ?? null,
     // Only while it can be accepted, as `invitedOrgId` serves it.
-    ...(row.standing === "active" ? inviteLogo(token, row.orgLogo) : {}),
+    ...(row.open ? inviteLogo(token, row.orgLogo) : {}),
     ...(await inviteAgents(db, row.orgId)),
   };
 }
 
 /**
  * The workspace a token opens while it works, else null: an invitation neither accepted nor expired into an active
- * workspace (`acceptInvitation` refuses any other), or an open link.
+ * workspace that isn't being deleted (`acceptInvitation` refuses any other), or an open link.
  */
 export async function invitedOrgId(db: Executor, token: string, now = new Date()): Promise<string | null> {
   const [invitation] = await db
@@ -1268,13 +1327,13 @@ export async function invitedOrgId(db: Executor, token: string, now = new Date()
       orgId: organizationInvitations.orgId,
       acceptedAt: organizationInvitations.acceptedAt,
       expiresAt: organizationInvitations.expiresAt,
-      standing: organizations.standing,
+      open: openOrg,
     })
     .from(organizationInvitations)
     .innerJoin(organizations, eq(organizations.id, organizationInvitations.orgId))
     .where(eq(organizationInvitations.tokenHash, sha256(token)));
   if (invitation) {
-    const works = !invitation.acceptedAt && invitation.expiresAt > now && invitation.standing === "active";
+    const works = !invitation.acceptedAt && invitation.expiresAt > now && invitation.open;
     return works ? invitation.orgId : null;
   }
   const link = await findInviteLink(db, token);
@@ -1283,8 +1342,8 @@ export async function invitedOrgId(db: Executor, token: string, now = new Date()
 
 /**
  * Accepts an invitation. The signed-in user's email must match the invited one. Joins `general`. Not for
- * a blocked account, nor into a workspace on hold or suspended. An invitation link only lets people ask
- * (`invitation.ask_to_join`, ADR 0068).
+ * a blocked account, nor into a workspace on hold, suspended or being deleted. An invitation link only lets people
+ * ask (`invitation.ask_to_join`, ADR 0068).
  */
 export async function acceptInvitation(
   db: Database,
@@ -1329,10 +1388,10 @@ export async function acceptInvitation(
 
 /**
  * Adds a person to an organization (keeping an existing role), with `roleIds` (those still there), and to
- * `general`, in the caller's transaction. A
- * request to join that they or their address had waiting closes: whoever answers it next finds it answered. A
- * full workspace refuses a new member (`org.members_full`), under the lock role changes and removals take, so
- * two people taking the last seat at once can't both get in.
+ * `general`, in the caller's transaction. A request to join that they or their address had waiting closes: whoever
+ * answers it next finds it answered. A full workspace refuses a new member (`org.members_full`), and a closed one
+ * (`closedRefusal`) anyone, under the lock role changes, removals and a deletion take, so two people taking the last
+ * seat at once can't both get in, and nobody gets in once a deletion committed.
  */
 export async function joinOrganization(
   tx: Executor,
@@ -1341,7 +1400,11 @@ export async function joinOrganization(
   role: MemberRole,
   roleIds: readonly string[] = [],
 ) {
-  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-members:${orgId}`}))`);
+  await lockOrgMembers(tx, orgId);
+  // The row as it is now: a check before the lock may have read a cached standing.
+  const [org] = await tx.select(STANDING_COLUMNS).from(organizations).where(eq(organizations.id, orgId));
+  const closed = closedRefusal(org);
+  if (closed) throw closed;
   const [member] = await tx
     .select({ userId: organizationMembers.userId })
     .from(organizationMembers)

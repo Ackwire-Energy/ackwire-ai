@@ -23,6 +23,8 @@ export interface FakeReply {
   stopReason?: StopReason;
   /** Report a different answering model (simulates a server-side fallback). */
   model?: string;
+  /** What the provider says the call cost (OpenRouter's reported cost). */
+  costNanoUsd?: number;
   /**
    * Fail after streaming `chunks`. `inputTokens` simulates the start-of-stream
    * usage event (null = the stream died before it).
@@ -111,6 +113,7 @@ export function createFakeProvider(reply?: (request: ModelRequest, call: number)
           cacheReadTokens: r.usage?.cacheReadTokens ?? 0,
           cacheWriteTokens: r.usage?.cacheWriteTokens ?? 0,
         },
+        ...(r.costNanoUsd !== undefined ? { costNanoUsd: r.costNanoUsd } : {}),
       };
     },
     async countTokens(request) {

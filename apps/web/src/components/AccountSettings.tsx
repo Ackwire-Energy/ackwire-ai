@@ -18,7 +18,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { AddPasswordDialog } from "@/components/AddPassword";
 import { PrefRow } from "@/components/NoticePrefs";
 import { OpenOnPhoneDialog } from "@/components/OpenOnPhone";
 import { useOrg } from "@/components/org-context";
@@ -28,6 +27,7 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { type LocaleCode, locales, setLocale } from "@/i18n";
 import { type MenuLook, menuLook, onMenuLookChange, setMenuLook } from "@/lib/context-menu";
 import { inDesktopApp } from "@/lib/desktop";
+import { useOpenParam } from "@/lib/open-param";
 import { onSoundChoiceChange, type SoundChoice, setSoundChoice, soundChoice } from "@/lib/sounds";
 import { type ThemePreference, useTheme } from "@/lib/theme";
 import { useToast } from "@/lib/toast";
@@ -46,7 +46,8 @@ export function AccountSection() {
   const sounds = useSyncExternalStore(onSoundChoiceChange, soundChoice, soundChoice);
   const [profile, setProfile] = useState<"handle" | "timezone" | null>(null);
   const [phone, setPhone] = useState(false);
-  const [addPassword, setAddPassword] = useState(false);
+  // Its dialog is the account button's, kept in the address so a sign-in again comes back to it.
+  const [, setAccount] = useOpenParam("account");
   const mine = dir.memberById.get(me.user.id);
   const zone = mine?.timezone || browserTimezone() || "UTC";
   return (
@@ -80,7 +81,7 @@ export function AccountSection() {
               icon="key"
               label={t("shell.addPassword")}
               help={t("shell.addPasswordHint")}
-              onOpen={() => setAddPassword(true)}
+              onOpen={() => setAccount("password")}
             />
           )}
         </div>
@@ -162,7 +163,6 @@ export function AccountSection() {
       </Card>
       <ProfileDialog focus={profile} onClose={() => setProfile(null)} />
       <OpenOnPhoneDialog open={phone} onClose={() => setPhone(false)} />
-      <AddPasswordDialog open={addPassword} onClose={() => setAddPassword(false)} />
     </>
   );
 }

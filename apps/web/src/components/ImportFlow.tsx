@@ -1,4 +1,5 @@
 import type {
+  ApiClient,
   BundleTodo,
   ImportedSource,
   ImportItemKind,
@@ -1260,6 +1261,10 @@ export function ImportReport({
   );
 }
 
+/** Downloads the workspace as a file: its agents, skills, routines and shared memory, never conversations or files. */
+export const saveExport = (api: ApiClient, orgId: string) =>
+  fileSaver.save(api.imports.exportUrl(orgId), `agentes-chat-${new Date().toISOString().slice(0, 10)}.json`);
+
 /**
  * What the workspace brought from other apps, once it's in and no file is in hand here (the onboarding opened again):
  * each source by its mark with how much of each kind came, and the way to bring another file.
@@ -1301,8 +1306,7 @@ export function ImportExportSection() {
   const api = useApi();
   const flow = useImportFlow(org.id);
   if (!can(org, "create_agents")) return null;
-  const download = () =>
-    fileSaver.save(api.imports.exportUrl(org.id), `agentes-chat-${new Date().toISOString().slice(0, 10)}.json`);
+  const download = () => saveExport(api, org.id);
   return (
     <>
       <Card aria-labelledby="imp-import-title">

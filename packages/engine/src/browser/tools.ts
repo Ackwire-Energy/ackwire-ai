@@ -44,6 +44,7 @@ import { SHARE_HINT, SHARE_INPUT, shareSavedFile } from "../uploads";
 import {
   agentUsesScreen,
   browserOnDesktop,
+  endHandoffForRestart,
   handedBackSince,
   markPageRead,
   openHandoffOn,
@@ -686,9 +687,11 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     extra: Partial<Pick<ToolDefinition, "checkCall" | "describe">> & {
       onThePage?: boolean;
       seesThePage?: boolean;
+      /** Restarts the browser: a person's turn in it ends first, when it is this run's to end. */
+      restarts?: boolean;
     } = {},
   ): ToolDefinition => {
-    const { onThePage, seesThePage, ...rest } = extra;
+    const { onThePage, seesThePage, restarts, ...rest } = extra;
     return {
       name,
       description,
@@ -697,6 +700,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
       // A person in control of this browser, or asked to take it, makes the agent wait; after
       // they had it, only reading (or opening a page) works until the agent has seen the page again.
       execute: async (input, ctx) => {
+        if (restarts) await endHandoffForRestart({ db: ctx.db, pubsub: deps.pubsub }, ctx);
         const waiting = await waitIfPersonInControl(ctx.db, ctx, deps.pubsub);
         if (waiting) return waiting;
         if (onThePage) {
@@ -1096,7 +1100,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     ),
     tool(
       "browser_close",
-      `${BROWSER_TOOL_INFO.browser_close.description} It also closes by itself after a while unused.`,
+      `${BROWSER_TOOL_INFO.browser_close.description} To restart your browser, close it and open the page again with browser_open. While a person has your browser, close it only when the person using it asks you to restart it: that ends their turn. It also closes by itself after a while unused.`,
       { type: "object", properties: {}, additionalProperties: false },
       (_input, ctx) => {
         seen.forget(seenKey(ctx));
@@ -1106,6 +1110,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
           () => "Closed. Logins stay saved.",
         );
       },
+      { restarts: true },
     ),
   ];
 

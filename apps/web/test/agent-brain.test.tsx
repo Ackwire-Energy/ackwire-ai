@@ -21,6 +21,8 @@ import {
   fakeBrowserOf,
   fakeMachinesOf,
   NOW,
+  OPENROUTER_KEY,
+  OPENROUTER_MODELS,
   ORG_ID,
   seedState,
 } from "./fake-api";
@@ -348,6 +350,41 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     });
   });
 
+  test("an account made for all of the person's agents there: picked as it is, Also used by Theo, no sign-in, no move", async () => {
+    const shared: MachineAccount = {
+      ...work,
+      id: "acct_all",
+      label: "Pessoal",
+      email: "walt@pessoal.com",
+      plan: "Max",
+      usedBy: ["Theo"],
+      shared: true,
+    };
+    const { state } = await onMac({ accounts: [work, shared] });
+    const d = await brainDialog();
+    const account = within(d).getByRole("combobox", { name: "Conta do Claude" });
+    account.focus();
+    await act(async () => fireEvent.keyDown(account, { key: "Enter" }));
+    expect(
+      screen()
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual([
+      "A conta que os seus agentes dividem",
+      "Trabalho · Teamwalt@acme.com",
+      "Pessoal · MaxTambém usada por Theo",
+      "Adicionar conta",
+    ]);
+    await click(screen().getByRole("option", { name: /^Pessoal · Max/ }));
+    await settle(4);
+    expect(within(d).queryByRole("region", { name: "Adicionar conta do Claude" })).toBeNull();
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toMatchObject({ account: "acct_all" });
+    expect(brainCalls(state).at(-1)).not.toHaveProperty("moveAccount");
+    expect(state.calls.find((c) => c.method === "machines.beginAccountLogin")).toBeUndefined();
+  });
+
   test("each person's own: a Claude account another agent thinks with signs in again for this one; someone else's only shows while it's this one's", async () => {
     const theo: MachineAccount = {
       ...work,
@@ -383,7 +420,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
       ["A conta que os seus agentes dividem", false],
       ["Trabalho · Teamwalt@acme.com", false],
       ["Pessoal · MaxTambém usada por Theo", false],
-      ["Claude Team 2 · TeamDe Ana", true],
+      ["Claude Team 2De Ana", true],
       ["Adicionar conta", false],
     ]);
     await click(screen().getByRole("option", { name: /^Pessoal · Max/ }));
@@ -1508,5 +1545,58 @@ describe("Quem pensa: Automático", () => {
     await settle(6);
     expect(state.calls.filter((c) => c.method === "agents.update").map((c) => c.args[2])).toEqual([{ model: "auto" }]);
     expect(document.body.textContent).toContain("A Ada agora pensa com Automático.");
+  });
+
+  test("OpenRouter's models: a search over them, its good picks before the rest, each with its price", async () => {
+    const seeded = seedState({ extraModels: OPENROUTER_MODELS });
+    seeded.credentials.push(OPENROUTER_KEY);
+    const { state } = await open(seeded);
+    const d = await brainDialog();
+    await click(within(d).getByRole("combobox", { name: "Modelo" }));
+    const list = screen().getByRole("listbox", { name: "Modelos" });
+    const groups = within(list)
+      .getAllByRole("group")
+      .map((g) => g.getAttribute("aria-label"));
+    expect(groups).toEqual(["Claude", "OpenAI", "OpenRouter · Boas escolhas", "OpenRouter"]);
+    const search = screen().getByRole("combobox", { name: "Buscar modelos" });
+    await act(async () => fireEvent.change(search, { target: { value: "glm" } }));
+    expect(
+      within(list)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual([
+      "Z.ai: GLM LatestUS$ 0,1 / US$ 2,77 por milhão de tokens",
+      "Z.ai: GLM 5.3US$ 0,1 / US$ 2,77 por milhão de tokens",
+    ]);
+    // The maker's name and the id find them too; a free one says so.
+    await act(async () => fireEvent.change(search, { target: { value: "nvidia free" } }));
+    expect(
+      within(list)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["NVIDIA: Nemotron 3 Ultra (free)Grátis, com limite diário"]);
+    await act(async () => fireEvent.change(search, { target: { value: "glm" } }));
+    await act(async () => fireEvent.keyDown(search, { key: "Enter" }));
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(state.calls.filter((c) => c.method === "agents.update").map((c) => c.args[2])).toEqual([
+      { model: "~z-ai/glm-latest" },
+    ]);
+  });
+
+  test("without an OpenRouter key its good picks show, each saying a key opens it, and not the rest of its list", async () => {
+    await open(seedState({ extraModels: OPENROUTER_MODELS }));
+    const d = await brainDialog();
+    await click(within(d).getByRole("combobox", { name: "Modelo" }));
+    const list = screen().getByRole("listbox", { name: "Modelos" });
+    const picks = within(within(list).getByRole("group", { name: "OpenRouter · Boas escolhas" })).getAllByRole(
+      "option",
+    );
+    expect(picks.map((o) => [o.textContent, o.getAttribute("aria-disabled")])).toEqual([
+      ["Z.ai: GLM LatestPrecisa de uma chave da OpenRouter", "true"],
+      ["DeepSeek: DeepSeek Flash LatestPrecisa de uma chave da OpenRouter", "true"],
+      ["Claude Sonnet LatestPrecisa de uma chave da OpenRouter", "true"],
+    ]);
+    expect(within(list).queryByRole("group", { name: "OpenRouter" })).toBeNull();
   });
 });

@@ -11,12 +11,24 @@ import { canonicalResource } from "./oauth-mcp";
  * classification (read tools free, writes approved, destructive ones need
  * approval) is applied at once, and admins can change it.
  *
+ * On 2026-10-31 each one was asked to register agentes.chat as the Cloud does
+ * (redirect URI https://app.agentes.chat/api/app/connectors/oauth/callback,
+ * client_name "agentes.chat", token_endpoint_auth_method none). The ones
+ * marked `soon` refused, and stay `soon` until their vendor approves
+ * agentes.chat: Asana, Square, Intercom, Mercado Pago, Semrush and Gamma
+ * don't allow our redirect URI (400), Dropbox registers only its trusted
+ * partners (403 registration_not_supported), Meta Ads has no dynamic
+ * registration for us (400 invalid_client_metadata) and RevenueCat answers
+ * 400 invalid_client. Vercel and Figma joined that day as `soon` too: Vercel
+ * takes only the clients it approved through its review form, and Figma
+ * answers 403 at registration. Calendly refused only the name (letters,
+ * digits, hyphens and spaces): `ensureOAuthClient` registers it again
+ * without the dot.
+ *
  * Left out: HubSpot (its authorization server has no dynamic registration:
- * it needs an app registered with HubSpot); Vercel (only clients Vercel
- * reviewed and approved may connect). Slack, Zendesk, Box, Render,
+ * it needs an app registered with HubSpot). Slack, Zendesk, Box, Render,
  * PagerDuty, Front, Pipedrive, Shopify and Microsoft 365 also need an app
- * registered with them; Figma's server registers clients but only lets
- * approved ones through.
+ * registered with them.
  */
 export interface McpPreset {
   id: string;
@@ -33,6 +45,8 @@ export interface McpPreset {
    * Postgres user). Every other tool keeps our usual suggestion.
    */
   readTools?: readonly string[];
+  /** The vendor hasn't approved agentes.chat yet: listed greyed out ("Em breve"), not connectable in one click. */
+  soon?: true;
 }
 
 export const MCP_PRESETS: readonly McpPreset[] = [
@@ -75,6 +89,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
     description: "Asana tasks, projects and teams.",
     icon: "asana",
     serverUrl: "https://mcp.asana.com/mcp",
+    soon: true,
   },
   {
     id: "stripe",
@@ -127,6 +142,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
     description: "Intercom conversations and contacts (US accounts).",
     icon: "intercom",
     serverUrl: "https://mcp.intercom.com/mcp",
+    soon: true,
   },
   {
     id: "paypal",
@@ -143,6 +159,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
     description: "Square payments, orders and catalog.",
     icon: "square",
     serverUrl: "https://mcp.squareup.com/mcp",
+    soon: true,
   },
   {
     id: "webflow",
@@ -199,6 +216,15 @@ export const MCP_PRESETS: readonly McpPreset[] = [
     description: "Netlify sites, deploys and settings.",
     icon: "netlify",
     serverUrl: "https://netlify-mcp.netlify.app/mcp",
+  },
+  {
+    id: "vercel",
+    category: "dev",
+    label: "Vercel",
+    description: "Vercel projects, deployments and logs.",
+    icon: "vercel",
+    serverUrl: "https://mcp.vercel.com",
+    soon: true,
   },
   {
     id: "railway",
@@ -281,6 +307,15 @@ export const MCP_PRESETS: readonly McpPreset[] = [
     serverUrl: "https://ai.todoist.net/mcp",
   },
   {
+    id: "figma",
+    category: "product",
+    label: "Figma",
+    description: "Figma designs, components and variables.",
+    icon: "figma",
+    serverUrl: "https://mcp.figma.com/mcp",
+    soon: true,
+  },
+  {
     id: "airtable",
     category: "docs",
     label: "Airtable",
@@ -295,6 +330,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
     description: "Dropbox files and folders.",
     icon: "dropbox",
     serverUrl: "https://mcp.dropbox.com/mcp",
+    soon: true,
   },
   {
     id: "miro",
@@ -311,6 +347,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
     description: "Gamma presentations, documents and sites.",
     icon: "gamma",
     serverUrl: "https://mcp.gamma.app/mcp",
+    soon: true,
   },
   {
     id: "granola",
@@ -335,6 +372,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
     description: "Mercado Pago payments, documentation and integration checks.",
     icon: "mercadopago",
     serverUrl: "https://mcp.mercadopago.com/mcp",
+    soon: true,
   },
   {
     id: "revenuecat",
@@ -343,6 +381,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
     description: "RevenueCat in-app subscriptions, products, offerings and revenue.",
     icon: "revenuecat",
     serverUrl: "https://mcp.revenuecat.ai/mcp",
+    soon: true,
   },
   {
     id: "superwall",
@@ -431,6 +470,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
     description: "Meta (Facebook and Instagram) ad campaigns and results.",
     icon: "meta",
     serverUrl: "https://mcp.facebook.com/ads",
+    soon: true,
   },
   {
     id: "klaviyo",
@@ -455,6 +495,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
     description: "Semrush keyword, domain and backlink data.",
     icon: "semrush",
     serverUrl: "https://mcp.semrush.com/v1/mcp",
+    soon: true,
   },
   {
     id: "ahrefs",

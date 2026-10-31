@@ -1,6 +1,6 @@
 # 0079. Billing hooks: billing holds, limits and a signed link
 
-- Status: Accepted
+- Status: Accepted. Amended 2026-10-30 by ADR 0088 (§2: a workspace being deleted waits for no plan, and restoring one keeps the rule)
 - Date: 2026-10-27
 - Extends: ADR 0002 (the core knows no plans), ADR 0056 (operator API, standing, external provisioning)
 - Code: `packages/engine/src/standing.ts` (`BILLING_HOLDS`, `setBillingHold`), `packages/engine/src/organizations.ts` (`createOrganization`, `manage_billing`), `packages/engine/src/billing-link.ts`, `packages/engine/src/limits.ts`, `apps/server/src/routes/app/billing.ts`, `apps/server/src/operator/limits.ts`, `packages/client/src/lib/billing.ts`, `apps/web/src/components/BillingLinkButton.tsx`, `apps/web/src/routes/org.$orgId.onboarding.tsx`
@@ -25,6 +25,7 @@ ADR 0056 already gives every hook but one: a hold stops a workspace's agents and
 - Billing holds on a person's workspaces never stop them creating another, with one exception: owning a workspace on a `payment` hold refuses a new one with `org.create_unpaid` (403, `params.orgId` the oldest such workspace), so a person has at most one workspace waiting for its first plan. The check runs in the create's transaction under a lock per person, so two creates at once start one. The web app sends them to that workspace's plan instead, and the phone app only says that workspace isn't active yet.
 - A trust hold or a suspension on any workspace they are in still refuses (`org.create_refused`), and so does a blocked account.
 - With `BILLING_HOLD_NEW_WORKSPACES=true` a new workspace starts on a `payment` hold, written in the row's insert: no audit row and no notification, since nothing moved. The server refuses to start with it unless `BILLING_URL`, `BILLING_LINK_SECRET` and `OPERATOR_API_TOKEN` are set, because only the billing service lifts it. The computer provisioning keeps one reason (`capacity`): a workspace waiting for payment simply isn't a request.
+- *Amended 2026-10-30 (ADR 0088):* a workspace being deleted waits for no plan. `org.create_unpaid` ignores it, so deleting the workspace that waits lets its owner make another at once. Restoring a workspace that waits for its first plan is refused with `org.create_unpaid` (`params.orgId`, the other one) while the person restoring owns another that waits, under the same lock per person as a create, so a person still has at most one. A trust hold or a suspension on a workspace being deleted still refuses a new one (`org.create_refused`). Billing holds never keep a deletion waiting past its date, and the billing service reads the deletion's events (ADR 0056 §5): on agentes.chat Cloud the plan stops renewing when the deletion is asked for and renews again at a restore.
 
 ### 3. A signed link to the billing service
 

@@ -101,6 +101,8 @@ export const featureKeysEn: FeatureTranslations = {
     refused: "Declined",
     refusedSubF: "{{name}} will remember next time.",
     refusedSubM: "{{name}} will remember next time.",
+    alwaysUndoF: "To undo it, open her profile, in Always approved.",
+    alwaysUndoM: "To undo it, open his profile, in Always approved.",
     via: "Through",
     why: "{{name}} said before: “{{text}}”",
     saidText: "“{{text}}”",
@@ -650,6 +652,8 @@ export const featureKeysEn: FeatureTranslations = {
     created: "{{name}} joined the team",
     createFailed: "Couldn't create the agent. Maybe that name is taken.",
     empty: "No agents yet.",
+    noneForYou: "No agent works with you yet.",
+    noneForYouHint: "Ask an admin for access.",
     freeSection: "Free",
     noGroupSection: "No group",
   },
@@ -877,12 +881,18 @@ export const featureKeysEn: FeatureTranslations = {
     intro: "There's no undo.",
     goes: {
       account: "Your account, your access and your sessions are gone.",
+      /** A server from before the preflight, which says what it closes. */
       orgs: "Workspaces where you are the only member are deleted.",
       phones: "This phone and the others stop getting alerts.",
     },
     stays: "Messages you wrote stay in the chats, without your name.",
+    /** A server from before the preflight: it refused for these workspaces. */
     blocked:
       "You're the only owner of {{names}}. On the website, in People, make someone else an owner, then come back.",
+    /** No password, and no way to sign in again here: the website adds one. */
+    addPasswordFirst: "Add a password to your account on the website first, then type it here.",
+    addPasswordWeb: "Add a password on the website",
+    otherAccount: "You signed in to another account. Nothing was deleted.",
     hold: "Hold to delete",
     holding: "Keep holding…",
   },
@@ -1297,6 +1307,8 @@ export const featureKeysEn: FeatureTranslations = {
       graceM: "If you leave, {{name}} waits 2 min.",
       closedHelpF: "Its sign-ins stay saved.",
       closedHelpM: "Its sign-ins stay saved.",
+      stuckHelpF: "Try again restarts the browser. Its sign-ins stay saved.",
+      stuckHelpM: "Try again restarts the browser. Its sign-ins stay saved.",
       hidden: "{{name}} is in control · screen hidden",
       key: {
         Tab: "Tab",
@@ -1321,6 +1333,10 @@ export const featureKeysEn: FeatureTranslations = {
         closedM: "{{name}}'s browser is closed.",
         offlineCloudF: "{{name}}'s computer isn't answering right now.",
         offlineCloudM: "{{name}}'s computer isn't answering right now.",
+        stuckF: "Couldn't open {{name}}'s browser.",
+        stuckM: "Couldn't open {{name}}'s browser.",
+        tooManyF: "Too many browsers open at once. This one shows when another one closes.",
+        tooManyM: "Too many browsers open at once. This one shows when another one closes.",
       },
     },
     done: {

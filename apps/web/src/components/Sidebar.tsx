@@ -21,7 +21,7 @@ import {
   useSkills,
 } from "@agenteschat/client";
 import { agentSections } from "@agenteschat/client/lib/agent-groups";
-import { audienceChip, audienceNotice } from "@agenteschat/client/lib/audience";
+import { audienceChip, audienceNotice, listsAgent } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { waitingAgents } from "@agenteschat/client/lib/outages";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -74,12 +74,14 @@ import { agentLine, availabilityOf, personLine, useAgentPresence, usePersonPrese
 import { requestChannelDetails } from "@/lib/channel-details";
 import { contextMenuHandler, copyText, type MenuEntry } from "@/lib/context-menu";
 import { onPhoneAsk, takePhoneAsk } from "@/lib/desktop";
+import { useOpenParam } from "@/lib/open-param";
 import { markOpen } from "@/lib/perf";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import type { SettingsSection } from "@/pages/settings-sections";
 import { useLiveStore, useStreams } from "@/realtime/context";
 import { ProfileDialog } from "./AccountSettings";
+import { AddPasswordDialog } from "./AddPassword";
 import { AgentAvatar } from "./AgentAvatar";
 import {
   AgentGroupMenu,
@@ -91,6 +93,7 @@ import {
 } from "./AgentGroups";
 import { MoveChannelDialog, NewCategoryDialog, RenameCategoryDialog } from "./ChannelCategoryDialogs";
 import { openPalette } from "./CommandMenu";
+import { DeleteAccountDialog } from "./DeleteAccount";
 import { COMPACT_QUERY, useMediaQuery, useNavDrawer } from "./NavDrawer";
 import { NewChannelDialog } from "./NewChannelDialog";
 import { OpenOnPhoneDialog } from "./OpenOnPhone";
@@ -215,8 +218,16 @@ export function Sidebar() {
   const peopleUnread = people.reduce((n, m) => n + (unreadWith.get(m.userId) ?? 0), 0);
   const sections = useSidebarSections();
   // The workspace's groups of agents (ADR 0083): the agents in none stay under "Agentes", each group is a category.
+  // Who manages agents sees them all, to arrange them; everyone else, the agents that answer them and the groups
+  // holding one.
+  const arranges = can(org, "manage_agents");
   const groups = useAgentGroups(orgId).data ?? [];
-  const byGroup = agentSections(dir.agents, groups, (a) => a.id);
+  const byGroup = agentSections(
+    dir.agents.filter((a) => listsAgent(org, a)),
+    groups,
+    (a) => a.id,
+  );
+  const shownGroups = arranges ? byGroup.groups : byGroup.groups.filter((g) => g.items.length > 0);
   const drag = useAgentDrag(groups);
   const [groupDialog, setGroupDialog] = useState<GroupDialogFor | null>(null);
   const [deletingGroup, setDeletingGroup] = useState<AgentGroup | null>(null);
@@ -235,7 +246,7 @@ export function Sidebar() {
   const [collapsed, toggleCollapsed] = useSidebarCollapsed();
   const rail = !compact && (tablet || collapsed);
   // Owners and admins organize the groups, with the full sidebar (the rail shows faces only).
-  const organize = can(org, "manage_agents") && !rail;
+  const organize = arranges && !rail;
   const agentRow = (a: Agent) => (
     <AgentRow
       key={a.id}
@@ -444,7 +455,7 @@ export function Sidebar() {
           </SidebarSection>
         )}
         {dir.agents.length > 0 &&
-          byGroup.groups.map(({ group, items }, i) => {
+          shownGroups.map(({ group, items }, i) => {
             // Where a dragged row would land: a line before the row at that place among the others.
             const others = items.filter((a) => a.id !== drag.dragging);
             const lineAt = drag.over?.groupId === group.id ? drag.over.index : null;
@@ -461,7 +472,7 @@ export function Sidebar() {
                     <GroupMenu
                       group={group}
                       index={i}
-                      count={byGroup.groups.length}
+                      count={shownGroups.length}
                       onRename={() => setGroupDialog({ mode: "rename", group })}
                       onDelete={() => setDeletingGroup(group)}
                     />
@@ -685,7 +696,9 @@ function SidebarChannels({
   const categoryOf = (c: Channel) => (c.categoryId && known.has(c.categoryId) ? c.categoryId : null);
   const loose = channels.filter((c) => categoryOf(c) === null);
   const inCategory = (id: string) => channels.filter((c) => categoryOf(c) === id);
-  const categoryIds = list.map((c) => `${CATEGORY_KEY}${c.id}` as SectionId);
+  // A category shows while it holds a channel I can see; who manages channels keeps the empty ones to drop channels in.
+  const shown = manages ? list : list.filter((c) => inCategory(c.id).length > 0);
+  const categoryIds = shown.map((c) => `${CATEGORY_KEY}${c.id}` as SectionId);
 
   // ── Dragging: a channel onto a channel (before/after) or a header (into); a header onto a header ──
   const endDrag = () => {
@@ -933,7 +946,7 @@ function SidebarChannels({
     </button>
   );
 
-  if (list.length === 0) {
+  if (shown.length === 0) {
     return (
       <>
         <SidebarSection
@@ -963,7 +976,7 @@ function SidebarChannels({
       >
         {loose.map(row)}
       </div>
-      {list.map((category) => {
+      {shown.map((category) => {
         const actions = categoryActions(category);
         return (
           <SidebarSection
@@ -1295,7 +1308,9 @@ function UnreadCount({ count }: { count: number }) {
 /**
  * The account button: your face with your presence badge; under the name, your line (or how you appear). It opens a
  * menu right above it: you on top (face, name, @ and how you appear, your line in a well), then your status (how you
- * appear, or what you're up to), your profile, your settings (Configurações › Sua conta) and signing out.
+ * appear, or what you're up to), your profile, your settings (Configurações › Sua conta), deleting the account and
+ * signing out. Adding a password (in Sua conta) and deleting the account keep their dialogs in the address
+ * (`?account=password`, `?account=delete`) on any page: adding a password may ask for a sign-in again, which comes back.
  */
 function AccountMenu() {
   const { t, i18n } = useTranslation();
@@ -1308,6 +1323,7 @@ function AccountMenu() {
   const saveStatus = useSaveStatus();
   const [profile, setProfile] = useState(false);
   const [phone, setPhone] = useState(false);
+  const [account, setAccount] = useOpenParam("account");
   const [statusOpen, setStatusOpen] = useState(false);
   // The app's "Show QR code" for this server (Preferences › Servers).
   useEffect(() => {
@@ -1434,6 +1450,9 @@ function AccountMenu() {
           </MenuItem>
         )}
         <MenuSeparator />
+        <MenuItem icon="trash" danger onSelect={openAfter(() => setAccount("delete"))}>
+          {t("deleteAccount.menu")}
+        </MenuItem>
         <MenuItem icon="arrowRight" danger onSelect={() => void signOut()}>
           {t("auth.signOut")}
         </MenuItem>
@@ -1441,6 +1460,11 @@ function AccountMenu() {
       <ProfileDialog focus={profile ? "handle" : null} onClose={() => setProfile(false)} />
       <SetStatusDialog open={statusOpen} onClose={() => setStatusOpen(false)} />
       <OpenOnPhoneDialog open={phone} onClose={() => setPhone(false)} />
+      <AddPasswordDialog
+        open={account === "password" && me.user.hasPassword === false}
+        onClose={() => setAccount(null)}
+      />
+      <DeleteAccountDialog open={account === "delete"} onClose={() => setAccount(null)} />
     </>
   );
 }

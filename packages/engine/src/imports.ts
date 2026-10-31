@@ -1,6 +1,6 @@
 import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, schema, sql } from "@agenteschat/db";
-import { isKnownModel } from "@agenteschat/providers";
+import { isKnownModel, isOpenRouterModel } from "@agenteschat/providers";
 import { isIdHandle } from "@agenteschat/ui/names";
 import { createAgent, HANDLE_PATTERN, updateAgent } from "./agents";
 import { type AgentAppearance, setAgentAppearance, validateAppearance } from "./appearance";
@@ -408,7 +408,8 @@ export function planImport(input: ImportInput, state: ImportState): { items: Pla
       skip(item, "secret_like");
       continue;
     }
-    const model = a.model && isKnownModel(a.model) ? a.model : null;
+    // An OpenRouter model would need the workspace's OpenRouter key: an import keeps catalog models only.
+    const model = a.model && !isOpenRouterModel(a.model) && isKnownModel(a.model) ? a.model : null;
     const step = compare("agent", a.key, hash);
     const handle = step.action === "create" ? newHandles.get(a.key) : (made("agent", a.key)?.handle ?? r.wanted);
     if (!handle) {

@@ -64,10 +64,14 @@ export function EventLine({
   // An answer from another agent that carries the consultation (who asked whom, the question and the
   // answer apart): the same card as a reply that waited for it, not the text written for the agent.
   const consulted = consultationOfNotice(message.meta);
-  const line = eventLineOf(message, {
-    author: dir.nameOf(message.author) || t("channel.unknownAgent"),
-    agentByHandle: (handle) => dir.agents.find((a) => a.handle.toLowerCase() === handle.toLowerCase())?.name ?? null,
-  });
+  const line = eventLineOf(
+    message,
+    {
+      author: dir.nameOf(message.author) || t("channel.unknownAgent"),
+      agentByHandle: (handle) => dir.agents.find((a) => a.handle.toLowerCase() === handle.toLowerCase())?.name ?? null,
+    },
+    when,
+  );
   if (consulted)
     return (
       <View style={styles.line}>

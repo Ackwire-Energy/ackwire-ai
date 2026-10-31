@@ -4,10 +4,13 @@
 // `signed-in` in that folder is the sign-in.
 // $FAKE_ACCOUNT_MODE: "silent" prints nothing and waits; "fail" refuses.
 // $FAKE_ACCOUNT_CODE: the Claude code it accepts (default "good-code").
-// $FAKE_ACCOUNT_LOG: one JSON line per run (args, the folder). `auth login --email <address>`
-// signs in like `auth login` (the address is only the account to offer). With
-// $ANTHROPIC_API_KEY set, `auth status` says it is signed in with that key, as
-// Claude Code does whatever the folder holds.
+// $FAKE_ACCOUNT_LOG: one JSON line per run (args, the folder, `terminal` when it runs in one).
+// `auth login --email <address>` signs in like `auth login` (the address is only the account
+// to offer). With $ANTHROPIC_API_KEY set, `auth status` says it is signed in with that key, as
+// Claude Code does whatever the folder holds. `setup-token` draws Claude Code 2.1.314's screen
+// in its terminal (words apart by cursor moves, the link in an OSC 8 hyperlink), takes the code
+// as a terminal pastes it, and on success shows a token drawn in two pieces, as a screen that
+// redraws only what changed does; "notoken" signs in but shows none.
 import { appendFileSync, existsSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline";
@@ -15,11 +18,12 @@ import { createInterface } from "node:readline";
 const args = process.argv.slice(2).join(" ");
 // Each reads only its own variable, as the real CLIs do (`auth …` is Claude Code, the rest Codex): a
 // CLAUDE_CONFIG_DIR inherited from the shell (set when tests run inside Claude Code) must not move Codex's folder.
-const home = (args.startsWith("auth ") ? process.env.CLAUDE_CONFIG_DIR : process.env.CODEX_HOME) ?? "";
+const claude = args.startsWith("auth ") || args === "setup-token";
+const home = (claude ? process.env.CLAUDE_CONFIG_DIR : process.env.CODEX_HOME) ?? "";
 const marker = path.join(home, "signed-in");
 const mode = process.env.FAKE_ACCOUNT_MODE ?? "";
 const log = process.env.FAKE_ACCOUNT_LOG;
-if (log) appendFileSync(log, `${JSON.stringify({ args, home })}\n`);
+if (log) appendFileSync(log, `${JSON.stringify({ args, home, ...(process.stdin.isTTY ? { terminal: true } : {}) })}\n`);
 
 const ESC = "\x1b";
 const CLAUDE_URL =
@@ -27,8 +31,77 @@ const CLAUDE_URL =
 
 const end = (code, text = "", stream = process.stdout) => stream.write(text, () => process.exit(code));
 const waitForever = () => setInterval(() => {}, 1000);
+/** Words at their columns, as the real screen draws them (`ESC[<n>G` between words). */
+const drawn = (text, from = 2) => {
+  let col = from;
+  return text
+    .split(" ")
+    .map((word) => {
+      const at = `${ESC}[${col}G${word}`;
+      col += word.length + 1;
+      return at;
+    })
+    .join("");
+};
+const FAKE_TOKEN = "sk-ant-oat01-fake-token-for-tests-only";
 
 switch (args.replace(/^auth login --email \S+$/, "auth login")) {
+  case "setup-token": {
+    if (mode === "silent") {
+      waitForever();
+      break;
+    }
+    const url = CLAUDE_URL.replace("org%3Acreate_api_key+user%3Ainference", "user%3Ainference");
+    process.stdout.write(
+      [
+        `${ESC}7${ESC}[r${ESC}8${ESC}[?25l${ESC}[38;5;174m${drawn("Welcome to Claude Code", 1)}${ESC}[39m`,
+        "",
+        `${ESC}[1m${drawn("This will guide you through long-lived (1-year) auth token setup for your Claude account.")}${ESC}[22m`,
+        "",
+        `${ESC}[38;5;246mBrowser didn't open? Use the url below to sign in (c to copy)${ESC}[39m`,
+        "",
+        `${ESC}]8;id=1n4uec;${url}\x07${ESC}[38;5;246m${url}${ESC}[39m${ESC}]8;;\x07`,
+        "",
+        `${drawn("Paste code here if prompted >")}`,
+      ].join("\r\n"),
+    );
+    const rl = createInterface({ input: process.stdin });
+    rl.on("line", (line) => {
+      // The terminal's paste markers, and the echo the terminal adds, aside.
+      const code = line.replaceAll(`${ESC}[200~`, "").replaceAll(`${ESC}[201~`, "").trim();
+      if (mode === "fail" || code !== (process.env.FAKE_ACCOUNT_CODE ?? "good-code")) {
+        end(1, `\r\n${drawn("OAuth error: Invalid code")} ${code}\r\n`);
+        return;
+      }
+      if (mode === "notoken") {
+        end(0, `\r\n${drawn("Long-lived authentication token created successfully!")}\r\n`);
+        return;
+      }
+      const cut = 20;
+      const screen = [
+        "",
+        `${ESC}[32m${drawn("✓ Long-lived authentication token created successfully!")}${ESC}[39m`,
+        "",
+        drawn("Your OAuth token (valid for 1 year):"),
+        "",
+        `${ESC}[33m${ESC}[2G${FAKE_TOKEN.slice(0, cut)}${ESC}[${2 + cut}G${FAKE_TOKEN.slice(cut)}${ESC}[39m`,
+        "",
+        `${ESC}[2m${drawn("Store this token securely. You won't be able to see it again.")}${ESC}[22m`,
+        "",
+        `${ESC}[2m${drawn("Use this token by setting: export CLAUDE_CODE_OAUTH_TOKEN=<token>")}${ESC}[22m`,
+        "",
+      ].join("\r\n");
+      // In two writes, cut inside the token's line: what was read so far shows half a token.
+      const half = screen.indexOf(FAKE_TOKEN.slice(cut));
+      process.stdout.write(screen.slice(0, half));
+      setTimeout(() => {
+        process.stdout.write(screen.slice(half));
+        // The screen goes away as the CLI ends.
+        setTimeout(() => end(0, `${ESC}[2J${ESC}[H`), 100);
+      }, 100);
+    });
+    break;
+  }
   case "auth login": {
     if (mode === "silent") {
       waitForever();

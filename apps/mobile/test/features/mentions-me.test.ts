@@ -3,13 +3,11 @@ import { insertMention, mentionOptions, mentionQuery, splitMatch } from "../../s
 import {
   accountChanges,
   accountProblem,
-  deleteBlockedText,
   handleErrorKey,
   normalizeHandle,
   openIssuesWithMe,
   photoContentType,
 } from "../../src/features/me/logic";
-import { translator } from "./fixtures";
 
 const agents = [
   { id: "a1", name: "Theo", handle: "theo", role: "Marketing" },
@@ -114,22 +112,5 @@ describe("Conta", () => {
     ];
     expect(openIssuesWithMe(issues, "me")).toBe(2);
     expect(openIssuesWithMe(issues, null)).toBe(0);
-  });
-});
-
-describe("Apagar conta", () => {
-  test("refused while the only owner: one line, which organizations and what to do on the website", async () => {
-    const pt = await translator("pt-BR");
-    expect(deleteBlockedText(pt, ["Acme", "Beta"])).toBe(
-      "Você é a única pessoa dona de Acme e Beta. No site, em Pessoas, torne outra pessoa dona e depois volte aqui.",
-    );
-    const en = await translator("en");
-    expect(deleteBlockedText(en, ["Acme"])).toBe(
-      "You're the only owner of Acme. On the website, in People, make someone else an owner, then come back.",
-    );
-    // The server didn't say which: the same line, without names.
-    expect(deleteBlockedText(en, [])).toBe(
-      "You're the only owner of a workspace with other members. On the website, in People, make someone else an owner, then come back.",
-    );
   });
 });

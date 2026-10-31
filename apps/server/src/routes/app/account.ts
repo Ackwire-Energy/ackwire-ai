@@ -1,15 +1,18 @@
 import {
   acceptInvitation,
+  accountDeletionPlan,
   addHostComputer,
   announceMembers,
   appleSignInTokens,
   avatarFile,
+  CODE_LENGTH,
   canCreateWorkspace,
   changeMemberRole,
   cloudNotice,
   countUsers,
   createInvitation,
   createOrganization,
+  type DeletionDeps,
   deleteAccount,
   getOrganization,
   hasPassword,
@@ -23,28 +26,44 @@ import {
   needsWorkspaceAllowance,
   ONBOARDING_STEPS,
   orgLogoFile,
+  pinnedOwner,
   previewInvitation,
   queueInvitationEmail,
   removeAvatar,
   removeMember,
   removeOrgLogo,
+  requireOwnerToDelete,
   requirePermission,
   resolvePermissions,
+  restoreWorkspace,
   revokeInvitation,
   saveOnboarding,
+  scheduleDeletion,
+  sendDeletionCode,
   setAvatar,
   setMyLocale,
   setOrgLogo,
   settleJoinRequests,
   signInOptions,
+  soleOwnerRefusal,
   toldReason,
   USER_LOCALES,
   unfinishedWorkspaces,
   updateOrganization,
   updateOrgSettings,
+  workspaceDeletions,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
-import { authUiConfig, mintPhoneSignIn, sessionUser, signupOpen, signupPolicy, workspacePolicy } from "../../auth";
+import {
+  authUiConfig,
+  deletionProof,
+  mintPhoneSignIn,
+  sessionUser,
+  signedInLately,
+  signupOpen,
+  signupPolicy,
+  workspacePolicy,
+} from "../../auth";
 import { requestLimitIp } from "../../http/client-ip";
 import { apiError, errorResponse } from "../../http/errors";
 import { humanCheckRefusal } from "../../http/human-check";
@@ -66,6 +85,27 @@ import { Invitation, Member, Organization, Role } from "./schemas";
 const tags = ["Account"];
 /** E-mail lookups on the sign-in screen: enough for typos and a few accounts, not for listing who has one. */
 const SIGN_IN_OPTIONS_PER_IP = { limit: 30, windowMs: 10 * 60_000 };
+/** A workspace's deletions in a day: deleting and restoring it over and over can't email its people all day. */
+const DELETIONS_PER_DAY = { limit: 3, windowMs: 86_400_000 };
+/** Workspaces a person makes in a day: making and deleting them over and over can't churn the Cloud's computers. */
+const WORKSPACES_PER_DAY = { limit: 10, windowMs: 86_400_000 };
+/** What proves it's you before deleting (ADR 0088 §2): the code emailed to you, or your password where no email goes. */
+const Proof = z.object({
+  code: z
+    .string()
+    .regex(new RegExp(`^\\d{${CODE_LENGTH}}$`))
+    .optional(),
+  password: z.string().min(1).max(128).optional(),
+});
+const PROOF_TEXT =
+  "Proof that it's you: the `code` emailed by `POST …/deletion/code` (403 `reauth.code` without one; `reauth.code_wrong`, `reauth.code_expired` or `reauth.code_tries` when refused, and 429 `reauth.code_limit` for every code once the account's 10 wrong tries of the day are spent; it works once, for this deletion only). On a server that sends no email, `password` instead (403 `reauth.password` without it or wrong, 429 after 5 in 15 minutes).";
+const Sent = json(
+  z.object({
+    email: z.string().openapi({ description: "Where it went: the account's own address." }),
+    resendIn: z.number().int().openapi({ description: "Seconds before another can go." }),
+  }),
+  "Sent",
+);
 /** A join page loads its logo once (cached for good): room for an office opening a link at once, not for hosting it. */
 const INVITE_LOGO_PER_IP = { limit: 60, windowMs: 60_000 };
 const Name = z.string().trim().min(1).max(100);
@@ -76,11 +116,33 @@ export function accountRoutes(deps: AppDeps) {
   const { db, config } = deps;
   const app = createAppRouter(deps);
   const session = requireSession(deps.auth);
+  const deletion: DeletionDeps = {
+    db,
+    pubsub: deps.adapters.pubsub,
+    hub: deps.extras?.sandbox?.machines?.hub,
+    emails: deps.adapters.email.delivers ? { publicUrl: config.PUBLIC_URL, support: config.SUPPORT_EMAIL } : null,
+  };
+  const codes = {
+    db,
+    rateLimiter: deps.adapters.rateLimiter,
+    emails: { publicUrl: config.PUBLIC_URL, support: config.SUPPORT_EMAIL },
+  };
+  /** The proof a deletion takes (`deletionProof`), read when it's asked: whether this server sends email now. */
+  const prove = (c: { req: { raw: Request } }, userId: string, orgId: string | null, proof: z.infer<typeof Proof>) =>
+    deletionProof(
+      deps.auth,
+      { db, rateLimiter: deps.adapters.rateLimiter, emailDelivers: deps.adapters.email.delivers === true },
+      c.req.raw.headers,
+      userId,
+      orgId,
+      proof,
+    );
   for (const path of [
     "/me",
     "/me/password",
     "/phone-sign-in",
     "/account",
+    "/account/*",
     "/avatars/*",
     "/org-logos/*",
     "/organizations",
@@ -233,7 +295,7 @@ export function accountRoutes(deps: AppDeps) {
               .openapi({
                 description:
                   "The workspace's logo, at an address that serves it for this invitation or link only, while " +
-                  "it works. Absent without one, and while the workspace is paused.",
+                  "it works. Absent without one, and while the workspace is paused or being deleted.",
               }),
             agents: z
               .array(
@@ -253,7 +315,11 @@ export function accountRoutes(deps: AppDeps) {
             closed: z
               .literal(true)
               .optional()
-              .openapi({ description: "A link turned off, expired, or whose workspace is paused: nobody can ask." }),
+              .openapi({
+                description:
+                  "A link turned off, expired, or whose workspace is paused, or an invitation to a workspace being " +
+                  "deleted: nobody can ask or join.",
+              }),
             you: z
               .object({
                 member: z.boolean(),
@@ -312,6 +378,8 @@ export function accountRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "The signed-in person and their organizations",
+      description:
+        "401 with the session cookies expired once the account is deleted: a cached session cookie outlives it for minutes.",
       responses: {
         200: json(
           z.object({
@@ -347,7 +415,17 @@ export function accountRoutes(deps: AppDeps) {
         canCreateWorkspace(db, user.id, workspacePolicy(config)),
         unfinishedWorkspaces(db, user.id),
       ]);
+      // A deleted account's session lives on in a cached cookie for minutes: its other tabs and devices learn it here.
+      if (verified === null) {
+        for (const cookie of expiredSessionCookies()) c.header("set-cookie", cookie, { append: true });
+        return apiError(c, 401, "unauthorized", "Sign in to continue");
+      }
       const onboardingOf = (orgId: string) => unfinished.find((u) => u.organization.id === orgId);
+      const deletions = await workspaceDeletions(
+        db,
+        memberships.flatMap((m) => (m.standing?.deletionDueAt ? [m.orgId] : [])),
+      );
+      const now = Date.now();
       return c.json(
         {
           user: {
@@ -361,6 +439,7 @@ export function accountRoutes(deps: AppDeps) {
           },
           organizations: memberships.map((m) => {
             const setup = onboardingOf(m.orgId);
+            const deleting = deletions.get(m.orgId);
             return {
               id: m.orgId,
               name: m.orgName,
@@ -373,6 +452,15 @@ export function accountRoutes(deps: AppDeps) {
                 : {}),
               ...(setup
                 ? { onboarding: { step: setup.organization.onboardingStep, generalChannelId: setup.general.id } }
+                : {}),
+              ...(deleting
+                ? {
+                    deletion: {
+                      dueAt: deleting.dueAt.getTime() > now ? deleting.dueAt.toISOString() : null,
+                      requestedAt: iso(deleting.requestedAt),
+                      requestedBy: deleting.requestedBy,
+                    },
+                  }
                 : {}),
             };
           }),
@@ -407,11 +495,14 @@ export function accountRoutes(deps: AppDeps) {
       security,
       summary: "Add a password to an account that has none",
       description:
-        "For an account that signs in another way (Google, Apple, or the desktop app that runs this server), so it can also sign in with its email from other browsers. Refused with `password_set` when it has one: changing a password is the reset flow.",
+        "For an account that signs in another way (Google, Apple, or the desktop app that runs this server), so it can also sign in with its email from other browsers. Needs a sign-in in the last 10 minutes (403 `reauth.sign_in`): a password proves it's the person, so a session alone can't add one. Refused with `password_set` when it has one: changing a password is the reset flow.",
       request: { body: body(z.object({ password: z.string().min(8).max(128) })) },
       responses: { 204: noContent[204], ...errors, 409: errorResponse("Already has a password (`password_set`)") },
     }),
     async (c) => {
+      if (!(await signedInLately(deps.auth, c.req.raw.headers, c.get("user").id))) {
+        return apiError(c, 403, "reauth.sign_in", "Sign in again to add a password");
+      }
       if (await hasPassword(db, c.get("user").id)) {
         return apiError(c, 409, "password_set", "This account already has a password");
       }
@@ -463,25 +554,142 @@ export function accountRoutes(deps: AppDeps) {
 
   app.openapi(
     createRoute({
+      method: "get",
+      path: "/account/deletion",
+      tags,
+      security,
+      summary: "What deleting your account would do",
+      description:
+        "Everything `DELETE /account` would refuse, close, leave and remove, so the page can show it before anyone confirms.",
+      responses: {
+        200: json(
+          z.object({
+            closes: z
+              .array(
+                z.object({
+                  id: z.uuid(),
+                  name: z.string(),
+                  deletion: z
+                    .object({
+                      dueAt: z
+                        .string()
+                        .nullable()
+                        .openapi({ description: "When it goes for good; null once that date passed." }),
+                    })
+                    .optional()
+                    .openapi({ description: "It is being deleted already, and keeps its date." }),
+                }),
+              )
+              .openapi({
+                description:
+                  "Workspaces only they are in: they close now and are deleted for good 7 days later, or on their own date when already being deleted.",
+              }),
+            leaves: z
+              .array(z.object({ id: z.uuid(), name: z.string(), role: Role }))
+              .openapi({ description: "Workspaces with others in them, which they leave." }),
+            soleOwner: z.array(z.object({ id: z.uuid(), name: z.string() })).openapi({
+              description:
+                "Workspaces they are the only owner of, with others in them and not being deleted: make someone else an owner, or delete the workspace, first (`sole_owner`).",
+            }),
+            computers: z.array(z.object({ orgId: z.uuid(), id: z.uuid(), name: z.string() })).openapi({
+              description:
+                "Computers they connected in the workspaces they leave, not in system mode: removed with the account.",
+            }),
+            staysBehind: z
+              .array(z.object({ orgId: z.uuid(), kind: z.enum(["key", "connection", "mailbox"]), name: z.string() }))
+              .openapi({
+                description:
+                  "Keys, connections and mailboxes they added to the workspaces they leave: the workspace's, so they stay. Disconnect one first if it's theirs.",
+              }),
+            serverOwner: z.boolean().openapi({
+              description:
+                "They set up this server: its own settings will have no owner here, only in its environment (ADR 0073).",
+            }),
+          }),
+        ),
+        401: errors[401],
+      },
+    }),
+    async (c) => {
+      const user = c.get("user");
+      const [plan, owner] = await Promise.all([accountDeletionPlan(db, user.id), pinnedOwner(db)]);
+      const now = Date.now();
+      return c.json(
+        {
+          ...plan,
+          // As `GET /me` says it: no date once it passed.
+          closes: plan.closes.map(({ dueAt, ...org }) =>
+            dueAt ? { ...org, deletion: { dueAt: dueAt.getTime() > now ? dueAt.toISOString() : null } } : org,
+          ),
+          serverOwner: owner === user.id,
+        },
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/account/deletion/code",
+      tags,
+      security,
+      summary: "Email a code to delete your account",
+      description:
+        "To your own address: the proof `DELETE /account` takes, for that only. It works for 10 minutes, and once. Refused with `sole_owner` first, as `DELETE /account` is. 60 s between two (`reauth.code_wait` with `retryIn`), 5 an hour and 10 a day per account, and none once its 10 wrong tries of the day are spent (`reauth.code_limit`). 409 `reauth.no_email` on a server that sends no email: the password is the proof there.",
+      responses: {
+        202: Sent,
+        401: errors[401],
+        403: errors[403],
+        409: errorResponse(
+          "Only owner of a workspace with others in it (`sole_owner`), or no email (`reauth.no_email`)",
+        ),
+        429: errorResponse("Too many codes (`reauth.code_wait`, `reauth.code_limit`)"),
+      },
+    }),
+    async (c) => {
+      const user = c.get("user");
+      const refusal = soleOwnerRefusal(await accountDeletionPlan(db, user.id));
+      if (refusal) throw refusal;
+      if (deps.adapters.email.delivers !== true)
+        return apiError(c, 409, "reauth.no_email", "This server doesn't send email. Give your password.");
+      const sent = await sendDeletionCode(codes, user.id, null);
+      deps.wakeWorkers?.();
+      return c.json(sent, 202);
+    },
+  );
+
+  app.openapi(
+    createRoute({
       method: "delete",
       path: "/account",
       tags,
       security,
       summary: "Delete your account",
-      description:
-        "Deletes the signed-in person, their sessions, phones and memberships, and the organizations where they are the only member. Messages they wrote stay without an author. Refused with `sole_owner` (params: `organizations`, their names) while they are the only owner of an organization that has other members.",
+      description: `Deletes the signed-in person at once: their sessions, phones and memberships. Workspaces only they are in close now and are deleted for good 7 days later. They leave the others, and the computers they connected there are removed (not in system mode). Messages they wrote stay without an author. What it would do: \`GET /account/deletion\`. Refused with \`sole_owner\` (params: \`organizations\`, their names, and \`orgIds\`) while they are the only owner of a workspace that has others in it and isn't being deleted, before the proof. ${PROOF_TEXT}`,
+      request: { body: { ...body(Proof), required: false } },
       responses: {
         204: { description: "Deleted; the session cookies are cleared" },
+        400: errorResponse("A malformed code, or a wrong one (`reauth.code_wrong`)"),
         401: errors[401],
-        409: errorResponse("Only owner of an organization with other members (`sole_owner`)"),
+        403: errorResponse("Blocked, or no proof that it's you (`reauth.code`, `reauth.password`)"),
+        409: errorResponse(
+          "Only owner of a workspace with others in it (`sole_owner`), or a code refused (`reauth.code_expired`, `reauth.code_tries`)",
+        ),
+        429: errorResponse("Too many tries today (`reauth.code_limit`), or password tries (`rate_limited`)"),
       },
     }),
     async (c) => {
       const user = c.get("user");
+      // Before the proof: a code would be spent for nothing while a workspace still needs its owner.
+      const refusal = soleOwnerRefusal(await accountDeletionPlan(db, user.id));
+      if (refusal) throw refusal;
+      await prove(c, user.id, null, c.req.valid("json"));
       // Read before the account goes (its sign-in rows are deleted with it).
       const revoke = deps.extras?.appleRevoke;
       const appleTokens = revoke ? await appleSignInTokens(db, user.id) : [];
-      await deleteAccount(db, user.id, { pubsub: deps.adapters.pubsub });
+      await deleteAccount(db, user.id, deletion);
+      deps.wakeWorkers?.();
       // Apple wants its tokens revoked when the account is deleted (best effort: the account is already gone).
       if (revoke) await Promise.all(appleTokens.map((token) => revoke(token).catch(() => undefined)));
       // Their photo files (best effort: the account is already gone).
@@ -634,7 +842,7 @@ export function accountRoutes(deps: AppDeps) {
       security,
       summary: "Create an organization (you become its owner)",
       description:
-        "Its owner sets it up in the onboarding, already past its first step (`onboarding` in `GET /me` until `PATCH …/onboarding` says it's finished). While they have one they haven't finished, that one comes back (200) instead of a new one, so a stale tab or a second press makes no other, even one waiting for its first plan. 403 `org.create_refused` while your account is blocked or you are in a workspace suspended or on a hold the billing service didn't set; 403 `org.create_unpaid` (`params.orgId`) while you own a workspace waiting for its first plan; 403 `org.create_invite_only` on agentes.chat Cloud while sign-up is by invitation, unless early access allowed the person's account and its address is confirmed (ADR 0078). With BILLING_HOLD_NEW_WORKSPACES it starts on the `payment` hold (ADR 0079).",
+        "Its owner sets it up in the onboarding, already past its first step (`onboarding` in `GET /me` until `PATCH …/onboarding` says it's finished). While they have one they haven't finished, that one comes back (200) instead of a new one, so a stale tab or a second press makes no other, even one waiting for its first plan. 403 `org.create_refused` while your account is blocked or you are in a workspace suspended or on a hold the billing service didn't set; 403 `org.create_unpaid` (`params.orgId`) while you own a workspace waiting for its first plan; 403 `org.create_invite_only` on agentes.chat Cloud while sign-up is by invitation, unless early access allowed the person's account and its address is confirmed (ADR 0078). With BILLING_HOLD_NEW_WORKSPACES it starts on the `payment` hold (ADR 0079). 429 after 10 tries in a day; 401 once your account is deleted.",
       request: {
         body: body(
           z.object({
@@ -652,11 +860,15 @@ export function accountRoutes(deps: AppDeps) {
           "The workspace they are still setting up, as it is",
         ),
         ...errors,
+        429: errorResponse("More than 10 in a day (`rate_limited`)"),
       },
     }),
     async (c) => {
       const { teamSize, timezone, ...input } = c.req.valid("json");
       const userId = c.get("user").id;
+      if (!(await deps.adapters.rateLimiter.consume(`new-workspace:${userId}`, WORKSPACES_PER_DAY)).allowed) {
+        return apiError(c, 429, "rate_limited", "Too many new workspaces today. Try again tomorrow.");
+      }
       const { organization, general, existing } = await createOrganization(db, userId, input, {
         holdForPayment: config.BILLING_HOLD_NEW_WORKSPACES,
         needsAllowance: await needsWorkspaceAllowance(db, userId, workspacePolicy(config)),
@@ -753,6 +965,92 @@ export function accountRoutes(deps: AppDeps) {
     }),
     async (c) => {
       await updateOrganization(db, c.get("user").id, c.req.valid("param").orgId, c.req.valid("json"));
+      return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/deletion",
+      tags,
+      security,
+      summary: "Delete a workspace (owners)",
+      description: `It closes to everyone now, like a suspended workspace: requests answer 403 \`org.deleting\`, and its people's apps hear an \`org.deleting\` org event. Its work stops, and it is deleted for good 7 days later. Until then any owner can restore it (\`DELETE …/deletion\`). ${PROOF_TEXT} A workspace takes 3 deletions a day (429). Already being deleted, it answers 202 with its date before any proof, and nobody is told again. 403 \`forbidden\` for anyone but an owner, \`org.suspended\` while suspended.`,
+      request: { params: OrgParams, body: body(Proof) },
+      responses: {
+        202: json(
+          z.object({
+            deletion: z.object({ dueAt: z.string().openapi({ description: "When it goes for good." }) }),
+          }),
+          "Being deleted",
+        ),
+        ...errors,
+        429: errorResponse(
+          "Too many tries today (`reauth.code_limit`), or password tries or deletions of it today (`rate_limited`)",
+        ),
+      },
+    }),
+    async (c) => {
+      const user = c.get("user");
+      const { orgId } = c.req.valid("param");
+      const due = (await requireOwnerToDelete(db, user.id, orgId)).standing?.deletionDueAt;
+      if (due) return c.json({ deletion: { dueAt: due.toISOString() } }, 202);
+      await prove(c, user.id, orgId, c.req.valid("json"));
+      if (!(await deps.adapters.rateLimiter.consume(`org-deletion:${orgId}`, DELETIONS_PER_DAY)).allowed) {
+        return apiError(c, 429, "rate_limited", "This workspace was deleted too many times today. Try again tomorrow.");
+      }
+      const { dueAt } = await scheduleDeletion(deletion, user.id, orgId, "owner");
+      deps.wakeWorkers?.();
+      return c.json({ deletion: { dueAt: dueAt.toISOString() } }, 202);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/deletion/code",
+      tags,
+      security,
+      summary: "Email a code to delete a workspace (owners)",
+      description:
+        "To your own address: the proof `POST …/deletion` takes, for this workspace only. It works for 10 minutes, and once. 60 s between two (`reauth.code_wait` with `retryIn`), 5 an hour and 10 a day per account, and none once its 10 wrong tries of the day are spent (`reauth.code_limit`). 409 `reauth.no_email` on a server that sends no email: the password is the proof there. 403 `forbidden` for anyone but an owner, `org.suspended` while suspended.",
+      request: { params: OrgParams },
+      responses: {
+        202: Sent,
+        ...errors,
+        429: errorResponse("Too many codes (`reauth.code_wait`, `reauth.code_limit`)"),
+      },
+    }),
+    async (c) => {
+      const user = c.get("user");
+      const { orgId } = c.req.valid("param");
+      await requireOwnerToDelete(db, user.id, orgId);
+      if (deps.adapters.email.delivers !== true)
+        return apiError(c, 409, "reauth.no_email", "This server doesn't send email. Give your password.");
+      const sent = await sendDeletionCode(codes, user.id, orgId);
+      deps.wakeWorkers?.();
+      return c.json(sent, 202);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/deletion",
+      tags,
+      security,
+      summary: "Restore a workspace being deleted (owners)",
+      description:
+        "Any owner, before its date; it opens again and its members are told. 409 `org.not_restorable` when it isn't being deleted or its date passed; 403 `forbidden` for anyone but an owner, `org.suspended` while suspended, `org.create_unpaid` (`params.orgId`) when it waits for its first plan and you own another that does; 404 once it is gone.",
+      request: { params: OrgParams },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      await requireOwnerToDelete(db, c.get("user").id, orgId);
+      await restoreWorkspace(deletion, c.get("user").id, orgId);
+      deps.wakeWorkers?.();
       return c.body(null, 204);
     },
   );

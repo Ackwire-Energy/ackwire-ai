@@ -77,10 +77,18 @@ function ticketsMcp() {
 /**
  * Fake HTTP for MCP-native OAuth: the MCP endpoint answers 401 pointing at its
  * protected-resource metadata; the authorization server has RFC 8414 metadata,
- * dynamic registration and a token endpoint that checks PKCE and `resource`.
+ * dynamic registration (`register` answers it instead, `registration: false`
+ * leaves it out) and a token endpoint that checks PKCE and `resource`.
  */
-function oauthServer(options: { metadata?: boolean; tokenHost?: string } = {}) {
-  const seen = { registrations: 0, tokenForms: [] as URLSearchParams[], challenge: "" };
+function oauthServer(
+  options: {
+    metadata?: boolean;
+    tokenHost?: string;
+    registration?: boolean;
+    register?: (body: { client_name: string }) => Response;
+  } = {},
+) {
+  const seen = { registrations: 0, names: [] as string[], tokenForms: [] as URLSearchParams[], challenge: "" };
   const http = (async (input: string | URL, init?: RequestInit) => {
     const url = new URL(String(input));
     const method = init?.method ?? "GET";
@@ -108,16 +116,21 @@ function oauthServer(options: { metadata?: boolean; tokenHost?: string } = {}) {
         issuer: "https://auth.example.com",
         authorization_endpoint: "https://auth.example.com/authorize",
         token_endpoint: `https://${options.tokenHost ?? "auth.example.com"}/token`,
-        registration_endpoint: "https://auth.example.com/register",
+        ...(options.registration === false ? {} : { registration_endpoint: "https://auth.example.com/register" }),
         code_challenge_methods_supported: ["S256"],
       });
     }
     if (url.toString() === "https://auth.example.com/register") {
       seen.registrations++;
-      const body = JSON.parse(String(init?.body)) as { redirect_uris: string[]; token_endpoint_auth_method: string };
+      const body = JSON.parse(String(init?.body)) as {
+        client_name: string;
+        redirect_uris: string[];
+        token_endpoint_auth_method: string;
+      };
+      seen.names.push(body.client_name);
       expect(body.token_endpoint_auth_method).toBe("none");
       expect(body.redirect_uris).toEqual(["https://chat.example.com/api/app/connectors/oauth/callback"]);
-      return Response.json({ client_id: "dcr-client-1" }, { status: 201 });
+      return options.register?.(body) ?? Response.json({ client_id: "dcr-client-1" }, { status: 201 });
     }
     if (url.pathname === "/token") {
       const form = new URLSearchParams(String(init?.body));
@@ -378,6 +391,7 @@ describe("custom MCP servers", () => {
     // The registered client is reused for the next server of the same issuer.
     await connectCustomServer(deps, f.owner.id, f.org.id, { serverUrl: SERVER });
     expect(auth.seen.registrations).toBe(1);
+    expect(auth.seen.names).toEqual(["agentes.chat"]);
     // The token is about to expire: refreshed at the issuer's token endpoint.
     const headers = await connectionHeaders(deps, connection);
     expect(headers).toEqual({ authorization: "Bearer at-2" });
@@ -389,6 +403,100 @@ describe("custom MCP servers", () => {
     await connectCustomServer(deps, f.owner.id, f.org.id, { serverUrl: SERVER });
     expect(auth.seen.registrations).toBe(2);
     expect(await f.db.select().from(schema.oauthClients)).toHaveLength(1);
+  });
+
+  test("a name it won't take (Calendly: letters, digits, hyphens and spaces) is sent once more without the dot", async () => {
+    f = await setup();
+    const auth = oauthServer({
+      register: (body) =>
+        /^[a-z0-9 -]+$/i.test(body.client_name)
+          ? Response.json({ client_id: "calendly-client" }, { status: 201 })
+          : Response.json(
+              {
+                error: "invalid_client_metadata",
+                errors: { name: ["may only contain alphanumeric characters, hyphens, and spaces."] },
+              },
+              { status: 400 },
+            ),
+    });
+    const deps = depsOf(f, { connect: ticketsMcp().connect, http: auth.http });
+    const started = await connectCustomServer(deps, f.owner.id, f.org.id, { serverUrl: SERVER });
+    if (started.status !== "oauth") throw new Error(`expected oauth, got ${started.status}`);
+    expect(new URL(started.authorizeUrl).searchParams.get("client_id")).toBe("calendly-client");
+    expect(auth.seen.names).toEqual(["agentes.chat", "agentes chat"]);
+  });
+
+  test("OAuth that only lets in apps it approved says so, not 'no OAuth' (an outage doesn't); a key still connects", async () => {
+    f = await setup();
+    const mcp = ticketsMcp();
+    const refusals = [
+      // Asana, Square, Intercom, Mercado Pago, Semrush, Gamma: our redirect URI isn't on their list.
+      () =>
+        Response.json(
+          { error: "invalid_redirect_uri", error_description: "redirect_uri not allowed" },
+          { status: 400 },
+        ),
+      // Dropbox: trusted partners only.
+      () =>
+        Response.json(
+          {
+            error: "registration_not_supported",
+            error_description: "Only pre-registered MCP trusted partners are allowed.",
+          },
+          { status: 403 },
+        ),
+      // RevenueCat.
+      () =>
+        Response.json({ error: "invalid_client", error_description: "The client is not registered." }, { status: 400 }),
+      // Meta Ads.
+      () =>
+        Response.json(
+          {
+            error: "invalid_client_metadata",
+            error_description: "Dynamic registration is not available for this client.",
+          },
+          { status: 400 },
+        ),
+      // Figma.
+      () => new Response("Forbidden", { status: 403 }),
+    ];
+    for (const register of refusals) {
+      const auth = oauthServer({ register });
+      const deps = depsOf(f, { connect: mcp.connect, http: auth.http });
+      expect(await connectCustomServer(deps, f.owner.id, f.org.id, { serverUrl: SERVER })).toEqual({
+        status: "needs_key",
+        reason: "not_approved",
+      });
+      // Nothing about the name: asked once.
+      expect(auth.seen.names).toEqual(["agentes.chat"]);
+    }
+    // An outage at registration isn't a refusal: just a key, never "only apps it approved".
+    const outages = [
+      () => new Response("", { status: 503 }),
+      () => {
+        throw new TypeError("fetch failed");
+      },
+    ];
+    for (const register of outages) {
+      const auth = oauthServer({ register });
+      const deps = depsOf(f, { connect: mcp.connect, http: auth.http });
+      expect(await connectCustomServer(deps, f.owner.id, f.org.id, { serverUrl: SERVER })).toEqual({
+        status: "needs_key",
+      });
+      expect(auth.seen.names).toEqual(["agentes.chat"]);
+    }
+    // No registration offered (an app registered with it, as HubSpot asks): not approved either.
+    const closed = depsOf(f, { connect: mcp.connect, http: oauthServer({ registration: false }).http });
+    expect(await connectCustomServer(closed, f.owner.id, f.org.id, { serverUrl: SERVER })).toEqual({
+      status: "needs_key",
+      reason: "not_approved",
+    });
+    const keyed = await connectCustomServer(closed, f.owner.id, f.org.id, {
+      serverUrl: SERVER,
+      apiKey: "tk_live_12345",
+    });
+    expect(keyed.status).toBe("connected");
+    expect(await f.db.select().from(schema.oauthClients)).toHaveLength(0);
   });
 
   test("without OAuth metadata the server needs a key; private addresses are refused", async () => {

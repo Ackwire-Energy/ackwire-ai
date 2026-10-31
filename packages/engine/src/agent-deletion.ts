@@ -20,6 +20,7 @@ const {
   agentScopes,
   agentSkills,
   agents,
+  approvalRules,
   approvals,
   browserHandoffs,
   budgetReservations,
@@ -63,7 +64,13 @@ export async function deleteAgent(deps: AgentDeletionDeps, actorId: string, orgI
     await concludeMission(deps, mission, actorId, true, { outcome: "canceled" }).catch(() => null);
   }
   await deleteAgentRoutines(deps, actorId, orgId, agentId);
-  await stopOrgWork({ db, pubsub: deps.pubsub, hub: deps.hub ?? undefined }, orgId, "agent_archived", agentId);
+  await stopOrgWork(
+    { db, pubsub: deps.pubsub, hub: deps.hub ?? undefined },
+    orgId,
+    "agent_archived",
+    "deleted",
+    agentId,
+  );
   // Before the tombstone: the runner finds a secret's file by the agent's handle.
   await removeAgentSecrets({ db, machines: deps.hub ? { hub: deps.hub } : null }, actorId, orgId, agentId);
 
@@ -112,6 +119,7 @@ export async function deleteAgent(deps: AgentDeletionDeps, actorId: string, orgI
       outcomes,
       agentSkills,
       agentScopes,
+      approvalRules,
       agentRepositories,
       mailAgentPolicies,
       dbAgentPolicies,

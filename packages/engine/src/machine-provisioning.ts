@@ -12,7 +12,7 @@ import { cleanMachineName, type MachineRow, machineOnline, removeMachine, sha256
 import { notifyComputerReady } from "./notification-producers";
 import { OrgCursor, orgCreatedAtMs } from "./operator";
 import { requirePermission, USER_LOCALES } from "./organizations";
-import { assertCanWork, OrgPausedError, STANDING_COLUMNS } from "./standing";
+import { openOrg, orgStanding, STANDING_COLUMNS, workRefusal } from "./standing";
 
 const { organizations, organizationMembers, users, machines, machineProvisioning, machineDeviceCodes, agents } = schema;
 
@@ -71,7 +71,7 @@ export function provisioningStatus(row: ProvisioningRow | null, orgCreatedAt: Da
   };
 }
 
-/** No computer on its way to tell of: where people connect their own (`pair`), or a workspace that isn't active. */
+/** No computer on its way to tell of: where people connect their own (`pair`), or a workspace that isn't open. */
 const NO_WAIT = {
   state: null,
   step: null,
@@ -86,7 +86,7 @@ const NO_WAIT = {
 } as const;
 
 /** What `setupStatus` reads of the workspace, and the size its managed computer's runner reported. */
-type SetupOrg = { createdAt: Date; standing: string; size?: schema.MachineSizeRecord | null };
+type SetupOrg = { createdAt: Date; open: boolean; size?: schema.MachineSizeRecord | null };
 
 /** The workspace's managed computer, still in it. */
 const managedComputer = and(
@@ -109,11 +109,11 @@ function setupSpecs(row: ProvisioningRow | null, size: schema.MachineSizeRecord 
 /**
  * What the apps show (`GET …/computer-setup`, `machine.provisioning`): the status, the seconds left and the
  * seconds since `requestedAt`, both counted here (a wrong clock on someone's device doesn't matter), and
- * whether the owners get the ready email. A workspace on hold or suspended waits for no computer
+ * whether the owners get the ready email. A workspace on hold, suspended or being deleted waits for no computer
  * (`setOrgStanding`): no state at all, unless its computer is ready.
  */
 function setupStatus(row: ProvisioningRow | null, org: SetupOrg, emails: boolean, now = Date.now()) {
-  if (org.standing !== "active" && row?.state !== "ready") return { ...NO_WAIT, notifyByEmail: emails };
+  if (!org.open && row?.state !== "ready") return { ...NO_WAIT, notifyByEmail: emails };
   const readyAt = row?.expectedReadyAt ?? null;
   return {
     ...provisioningStatus(row, org.createdAt),
@@ -132,7 +132,7 @@ async function publishProvisioning(
   machineId: string | null,
 ) {
   const [org] = await deps.db
-    .select({ createdAt: organizations.createdAt, standing: organizations.standing, size: machines.size })
+    .select({ createdAt: organizations.createdAt, open: openOrg, size: machines.size })
     .from(organizations)
     .leftJoin(machines, managedComputer)
     .where(eq(organizations.id, orgId));
@@ -145,8 +145,8 @@ async function publishProvisioning(
 }
 
 /**
- * Workspaces waiting for their computer, oldest first, in keyset pages: active ones (one on hold or
- * suspended is never listed) whose computer isn't ready. Empty unless provisioning is external.
+ * Workspaces waiting for their computer, oldest first, in keyset pages: active ones (one on hold, suspended or
+ * being deleted is never listed) whose computer isn't ready. Empty unless provisioning is external.
  */
 export async function listMachineRequests(
   db: Database,
@@ -166,7 +166,7 @@ export async function listMachineRequests(
     .leftJoin(machineProvisioning, eq(machineProvisioning.orgId, organizations.id))
     .where(
       and(
-        eq(organizations.standing, "active"),
+        openOrg,
         sql`${machineProvisioning.state} is distinct from 'ready'`,
         after
           ? sql`(${orgCreatedAtMs}, ${organizations.id}) > (${after[0]}::timestamptz, ${after[1]}::uuid)`
@@ -236,9 +236,9 @@ export interface ProvisioningInput {
  * ready or another state) counts down to the earliest ready time it was told: a part running long moves the
  * provisioner's time later with the clock, so a later time is kept out and people see the wait run over, never a
  * countdown that goes back up. A wait said to take over a minute (a ready time that far ahead, `waiting` or
- * `problem`) promises the owners the ready email, until it is ready. Only an active workspace waits for one
- * (`OrgPausedError` otherwise): a report sent as it was held would say again that a computer is on its way. False:
- * no such workspace.
+ * `problem`) promises the owners the ready email, until it is ready. Only an active workspace that isn't being
+ * deleted waits for one (`workRefusal` otherwise): a report sent as it was held would say again that a computer is
+ * on its way. False: no such workspace.
  */
 export async function setProvisioning(
   deps: ProvisioningDeps,
@@ -255,7 +255,8 @@ export async function setProvisioning(
     // wait in the same transaction): a hold set first refuses this report, one set meanwhile drops it.
     const [org] = await tx.select(STANDING_COLUMNS).from(organizations).where(eq(organizations.id, orgId)).for("share");
     if (!org) return null;
-    if (org.state !== "active") throw new OrgPausedError(org);
+    const refusal = workRefusal(org);
+    if (refusal) throw refusal;
     const [before] = await tx.select().from(machineProvisioning).where(eq(machineProvisioning.orgId, orgId));
     const same = before?.state === input.state && before.step === step && currentReason(before.reason) === reason;
     const reported =
@@ -347,7 +348,7 @@ async function supersedeCodes(tx: Executor, machineId: string, now: Date) {
  * made the first time, the same row every time after, brought back when it was removed) and a confirmed
  * device code for it, single use, `DEVICE_CODE_TTL_MS`. The computer redeems it like any other
  * (`POST /api/machines/device/token`); an earlier code still unused stops working. Only for an active
- * workspace (`OrgPausedError` otherwise). Null: no such workspace.
+ * workspace that isn't being deleted (`workRefusal` otherwise). Null: no such workspace.
  */
 export async function issueManagedMachine(
   deps: { db: Database; now?: () => Date },
@@ -356,11 +357,12 @@ export async function issueManagedMachine(
 ) {
   const { db } = deps;
   const [org] = await db
-    .select({ id: organizations.id, name: organizations.name })
+    .select({ id: organizations.id, name: organizations.name, standing: STANDING_COLUMNS })
     .from(organizations)
     .where(eq(organizations.id, orgId));
   if (!org) return null;
-  await assertCanWork(db, orgId);
+  const refusal = workRefusal(org.standing);
+  if (refusal) throw refusal;
   const [owner] = await db
     .select({ locale: users.locale })
     .from(organizationMembers)
@@ -435,8 +437,8 @@ export async function operatorMachines(db: Database, orgId: string) {
 /**
  * Takes the workspace's computer away (the provisioner wipes or retires it): its token and unused codes stop
  * working, its socket closes, its agents are left with no computer, and an active workspace is back to waiting
- * for one from now (a request again); one held or suspended waits for none until it is active again. False: the
- * workspace has no such managed computer.
+ * for one from now (a request again); one held, suspended or being deleted waits for none until it is open again.
+ * False: the workspace has no such managed computer.
  */
 export async function revokeManagedMachine(deps: ProvisioningDeps, orgId: string, machineId: string) {
   const [machine] = await deps.db
@@ -468,11 +470,11 @@ export async function revokeManagedMachine(deps: ProvisioningDeps, orgId: string
     await supersedeCodes(tx, machine.id, now);
     // Locked as a report locks it (`setProvisioning`): a hold set meanwhile drops the wait this starts.
     const [org] = await tx
-      .select({ state: organizations.standing })
+      .select({ open: openOrg })
       .from(organizations)
       .where(eq(organizations.id, orgId))
       .for("share");
-    if (org?.state !== "active") {
+    if (!org?.open) {
       await tx.delete(machineProvisioning).where(eq(machineProvisioning.orgId, orgId));
       return;
     }
@@ -496,21 +498,21 @@ export interface ReadyEmailDeps {
 
 /**
  * What the ready email says, read before the transaction that queues it (`orgHasAi` asks the computers).
- * Null: nothing to send now, because the computer is ready already (a reconnect), the workspace isn't active
- * (its agents can't take a first task), or it has no owner.
+ * Null: nothing to send now, because the computer is ready already (a reconnect), the workspace isn't active or is
+ * being deleted (its agents can't take a first task), or it has no owner.
  */
 async function readyEmailDraft(db: Database, email: ReadyEmailDeps, orgId: string) {
   const [org] = await db
     .select({
       name: organizations.name,
       createdAt: organizations.createdAt,
-      standing: organizations.standing,
+      open: openOrg,
       state: machineProvisioning.state,
     })
     .from(organizations)
     .leftJoin(machineProvisioning, eq(machineProvisioning.orgId, organizations.id))
     .where(eq(organizations.id, orgId));
-  if (!org || org.state === "ready" || org.standing !== "active") return null;
+  if (!org || org.state === "ready" || !org.open) return null;
   const owners = await db
     .select({ email: users.email, locale: users.locale })
     .from(organizationMembers)
@@ -564,7 +566,8 @@ async function queueReadyEmail(
  * A managed computer said hello (the hub calls this for every machine). The first time since it was issued
  * it becomes the workspace's ready computer: the agents with no computer get it (later reconnects leave
  * whatever people chose since), its members hear it, and its owners are told (and emailed after a long
- * wait, when the server sends email: `readyEmail`).
+ * wait, when the server sends email: `readyEmail`). Not while the workspace is being deleted, which asks for no
+ * computer: one restored gets its computer back, which says hello again.
  */
 export async function onManagedMachineHello(
   deps: { db: Database; pubsub?: PubSub; readyEmail?: ReadyEmailDeps | null },
@@ -572,6 +575,7 @@ export async function onManagedMachineHello(
 ) {
   if (machine.kind !== "managed") return;
   const { orgId } = machine;
+  if ((await orgStanding(deps.db, orgId)).deletionDueAt) return;
   const draft = deps.readyEmail ? await readyEmailDraft(deps.db, deps.readyEmail, orgId) : null;
   const now = new Date();
   const ready = {
@@ -646,7 +650,7 @@ export async function computerSetup(
       machineId: machines.id,
       size: machines.size,
       createdAt: organizations.createdAt,
-      standing: organizations.standing,
+      open: openOrg,
     })
     .from(organizations)
     .leftJoin(machineProvisioning, eq(machineProvisioning.orgId, organizations.id))
@@ -654,7 +658,7 @@ export async function computerSetup(
     .where(eq(organizations.id, orgId));
   return {
     mode: "external" as const,
-    ...setupStatus(row?.provisioning ?? null, row ?? { createdAt: new Date(), standing: "active" }, emails),
+    ...setupStatus(row?.provisioning ?? null, row ?? { createdAt: new Date(), open: true }, emails),
     machineId: row?.machineId ?? null,
   };
 }

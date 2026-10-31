@@ -245,6 +245,7 @@ export {
   WorkSweep,
 } from "./components/RunPixels";
 export { AgentSearching } from "./components/SearchPixels";
+export { SearchSelect, type SearchSelectLabels, type SearchSelectProps } from "./components/SearchSelect";
 export { Segmented, type SegmentedOption, SplitButton } from "./components/Segmented";
 export { Select, type SelectOption, type SelectProps } from "./components/Select";
 export { SettingNote, SettingRow, SettingsMore, SettingsSection } from "./components/Settings";
@@ -348,6 +349,7 @@ export {
   weekdayPosition,
   zonedInstant,
 } from "./recurrence";
+export { fold, matchesWords } from "./search";
 export { pixelBurst } from "./sky/burst";
 export { ditherCells, ditherSvg, ditherTones, ditherUrl } from "./sky/dither";
 export {
