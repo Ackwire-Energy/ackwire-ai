@@ -316,6 +316,7 @@ export function homeLayout(
   rows: ConversationRow[],
   categories: readonly { id: string; name: string }[],
   max = SECTION_MAX,
+  starters: ConversationRow[] = [],
 ): HomeBlock[] {
   const known = new Set(categories.map((c) => c.id));
   const categoryOf = (r: ConversationRow) =>
@@ -330,7 +331,10 @@ export function homeLayout(
   });
   const channels = rowsOfKind(rows, "channels");
   return [
-    block("agents", rowsOfKind(rows, "agents")),
+    // No conversation with an agent yet: the team's agents, to start one ("Ver todos" would list none).
+    rowsOfKind(rows, "agents").length > 0
+      ? block("agents", rowsOfKind(rows, "agents"))
+      : { ...block("agents", starters), more: false },
     block(
       "channels",
       channels.filter((r) => categoryOf(r) === null),
@@ -344,6 +348,28 @@ export function homeLayout(
     ),
     block("people", rowsOfKind(rows, "people")),
   ].filter((b) => b.total > 0);
+}
+
+/**
+ * The agents to start a conversation with, as rows of the home's Agentes section while there is no agent DM yet:
+ * each a DM with no channel (`channelId: ""`), opened on press. Agents hidden from me are left out.
+ */
+export function agentStarters(
+  agents: readonly { id: string; name: string; handle: string }[],
+  hidden: ReadonlySet<string> = new Set(),
+): ConversationRow[] {
+  return agents
+    .filter((a) => !hidden.has(a.id))
+    .map((a) => ({
+      kind: "dm" as const,
+      key: `a:${a.id}`,
+      channelId: "",
+      with: { type: "agent" as const, id: a.id, name: a.name, handle: a.handle },
+      last: null,
+      at: null,
+      unread: 0,
+      working: false,
+    }));
 }
 
 /** The home's closed sections as remembered: any keys (categories come and go), anything unreadable: none. */
