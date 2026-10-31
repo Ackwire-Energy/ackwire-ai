@@ -782,19 +782,30 @@ export interface InputState {
 
 /** The longest gap a drag keeps between two of its events: a pause longer than this plays shorter. */
 export const DRAG_GAP_MAX_MS = 100;
+/** The furthest a drag's gaps may put an event behind the time its batch reached the computer. */
+export const DRAG_LAG_MAX_MS = 1000;
 
 /**
  * How long to wait before `e` goes to the page so a drag keeps the gaps the person made between its
  * events: the server sends input in batches and a slow link bunches them, and a slider handed a whole
- * drag at once jumps to its end. Notes `e` as sent once that wait is over. Clicks and anything else go at once.
+ * drag at once jumps to its end. Never past `until`: the sender writes `at`, and 100 ms gaps alone would
+ * let one batch hold the queue for seconds. Notes `e` as sent once that wait is over. Clicks and anything
+ * else go at once.
  */
-export function dragDelay(e: BrowserInputEvent, state: InputState, now: number): number {
+export function dragDelay(
+  e: BrowserInputEvent,
+  state: InputState,
+  now: number,
+  until = Number.POSITIVE_INFINITY,
+): number {
   if (e.kind !== "mouse" || e.type === "mouseWheel") return 0;
   const drag = state.drag;
-  const wait =
+  const wait = Math.min(
     drag && e.at !== undefined && e.type !== "mousePressed"
       ? Math.max(0, drag.sent + Math.min(Math.max(e.at - drag.at, 0), DRAG_GAP_MAX_MS) - now)
-      : 0;
+      : 0,
+    Math.max(0, until - now),
+  );
   // A press starts a drag and a release ends it; a move with no press before it is the pointer hovering.
   state.drag =
     e.at === undefined || e.type === "mouseReleased" || (e.type === "mouseMoved" && !drag)
@@ -2662,8 +2673,8 @@ export class BrowserManager {
   /**
    * `browser.input`: a person's input during a take over, in order, through
    * the daemon's command relay (the active tab, each one confirmed before the
-   * next), a drag with the gaps the person made (`dragDelay`). The stream
-   * socket only carries frames.
+   * next), a drag with the gaps the person made (`dragDelay`), never more
+   * than `DRAG_LAG_MAX_MS` behind. The stream socket only carries frames.
    */
   async input(agent: AgentScope, events: unknown[]): Promise<MachineReplies["browser.input"]> {
     const session = this.sessions.get(String(agent.id ?? ""));
@@ -2673,15 +2684,18 @@ export class BrowserManager {
       throw new RunnerError("bad_request", `At most ${BROWSER_LIMITS.inputEvents} events at once`);
     }
     session.lastUsed = this.now();
+    const until = this.now() + DRAG_LAG_MAX_MS;
     const parsed = events.map((raw) => parseBrowserInputEvent(raw)).filter((e) => e !== null);
+    // Nothing queued reaches the page once the stream ended (the browser closed under it) or is back to watching:
+    // the person's control ended, and the server checks control only as it forwards a batch.
+    const driving = () => session.stream === stream && stream.mode === "control";
     const run = stream.inputQueue.then(async () => {
       let accepted = 0;
       let failed = 0;
       for (const e of parsed) {
-        const wait = session.stream === stream ? dragDelay(e, stream.input, this.now()) : 0;
+        const wait = driving() ? dragDelay(e, stream.input, this.now(), until) : 0;
         if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-        // The stream ended (the browser closed under it): nothing is sent to a browser that isn't there.
-        if (session.stream !== stream) {
+        if (!driving()) {
           failed += 1;
           continue;
         }
