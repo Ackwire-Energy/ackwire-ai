@@ -618,6 +618,11 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
             : `${org(orgId)}/channels/${enc(channelId)}/members/people/${enc(member.userId)}`,
           { method: "DELETE" },
         ),
+      setAutoReply: (orgId, channelId, agentId, autoReply) =>
+        request<void>(`${org(orgId)}/channels/${enc(channelId)}/members/agents/${enc(agentId)}`, {
+          method: "PATCH",
+          json: { autoReply },
+        }),
       messages: async (orgId, channelId, options = {}) => {
         const path = `${org(orgId)}/channels/${enc(channelId)}/messages`;
         const query = { threadId: options.threadId, before: options.before, limit: options.limit };
