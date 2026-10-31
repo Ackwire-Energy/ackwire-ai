@@ -904,7 +904,7 @@ function SidebarChannels({
         title={`#${c.name}`}
         data-unread={unread > 0}
         data-drop={dropMark(`channel:${c.id}`)}
-        draggable={list.length > 0 && mayMove(c)}
+        draggable={mayMove(c)}
         onDragStart={(e) => startDrag(e, { kind: "channel", id: c.id })}
         onDragEnd={endDrag}
         onDragOver={(e) => overChannel(e, c)}
