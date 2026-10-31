@@ -1,6 +1,6 @@
 # 0034. Agents talk to each other: private consultations and chiming in
 
-- Status: Accepted (built; UI pending a prototype). Amended 2026-10-31 by ADR 0089: an agent's mention of another agent is no longer limited to once in a row (the judge reads every one, with the message it answers; the stretch limits stop a loop); §4's chime-in rule stays
+- Status: Accepted (built; UI pending a prototype). Amended 2026-10-31 by ADR 0089: an agent's mention of another agent is no longer limited to once in a row (the judge reads every one, with the message it answers; the stretch limits stop a loop); §4's chime-in rule stays. Amended 2026-10-31 by ADR 0094: notes are tracked like questions, nothing expires while a colleague works, and what an agent hands on rolls up into its answer (addendum below)
 - Date: 2026-10-17
 - Extends: ADR 0013 (router), ADR 0015 (approvals), ADR 0032 (agent engine)
 
@@ -108,3 +108,10 @@ Archiving an agent (`archiveAgent`) keeps its channel memberships, history and m
 **4. Unchanged.** A mention of an archived agent already started nothing (the message insert, the mention dispatch and the router skip archived agents), and the "@" pickers on the web and the phone list only active agents (`GET …/agents`).
 
 Not done: restoring an archived agent (there is no restore, so the refusal points to none). Issue assignees and calendar participants, where one field takes people and agents, still answer that nobody has the name. A computer brain's session keeps the "# Your team" it started with, so an agent archived since can stay listed there until the session ends; `ask_agent` and `tell_agent` still refuse it with the archived answer.
+
+## Addendum (2026-10-31): hand-offs are tracked and come back (ADR 0094)
+
+- **Notes are rows.** `tell_agent` writes a row in `agent_consultations` with `kind` `note`, in the same transaction as its message and `startOrJoinRun`, with its `chain`. What comes of it goes back to the sender's conversation as a `consult_reply` notice (`refs.kind` `note`), for the person behind it; the notes of one turn come back together (`reportHandOffs`). `MAX_CONSULTATION_CHAIN` counts note links too.
+- **No expiry while a colleague works.** A question or note whose run is queued, running, waiting on a person or its computer, or waiting on what it handed on gets 15 more minutes each time, and that run is never stopped. Only one nobody started, or whose run is gone, expires.
+- **Roll-up.** An agent that answers a question or note and hands part of it on keeps its answer open, and what comes back joins it before it goes back. Nothing starts a run in an agents' DM to read a result.
+- **Cards.** A note's recipient answers the person behind it: its approval, question and secret cards land where that person asked.
