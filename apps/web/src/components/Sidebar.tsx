@@ -4,6 +4,7 @@ import {
   runningAgents,
   useAgentGroups,
   useAgentStatuses,
+  useAiAccounts,
   useChannelCategories,
   useChannels,
   useConnections,
@@ -48,6 +49,7 @@ import {
   modKey,
   Popover,
   PresenceBadge,
+  ProviderLogo,
   Skeleton,
   SkeletonGroup,
   selectionSkyUrl,
@@ -76,6 +78,7 @@ import { contextMenuHandler, copyText, type MenuEntry } from "@/lib/context-menu
 import { onPhoneAsk, takePhoneAsk } from "@/lib/desktop";
 import { useOpenParam } from "@/lib/open-param";
 import { markOpen } from "@/lib/perf";
+import { ownPlanLines, planNearLimit, planWord } from "@/lib/plan-usage";
 import { STORAGE_KEYS, storage, storedStrings } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import type { SettingsSection } from "@/pages/settings-sections";
@@ -1305,11 +1308,11 @@ function UnreadCount({ count }: { count: number }) {
 
 /**
  * The account button: your face with your presence badge; under the name, your line (or how you appear). It opens a
- * menu right above it: you on top (face, name, @ and how you appear, your line in a well), then your status (how you
- * appear, or what you're up to), your profile, your settings (Configurações › Sua conta) and signing out. Deleting the
- * account starts at the bottom of Sua conta, not here beside Sair, where a slip would open it. It and adding a password
- * keep their dialogs here, in the address (`?account=delete`, `?account=password`) on any page: adding a password may
- * ask for a sign-in again, which comes back.
+ * menu right above it: you on top (face, name, @ and how you appear, your line in a well, a plan near its limit), then
+ * your status (how you appear, or what you're up to), your profile, your settings (Configurações › Sua conta) and
+ * signing out. Deleting the account starts at the bottom of Sua conta, not here beside Sair, where a slip would open
+ * it. It and adding a password keep their dialogs here, in the address (`?account=delete`, `?account=password`) on any
+ * page: adding a password may ask for a sign-in again, which comes back.
  */
 function AccountMenu() {
   const { t, i18n } = useTranslation();
@@ -1420,6 +1423,7 @@ function AccountMenu() {
             </span>
           </div>
         )}
+        <PlanNearLimitItem />
         <MenuSeparator />
         {/* A phone has no room beside the menu for another one: there the choices are in it. */}
         {compact ? (
@@ -1462,6 +1466,31 @@ function AccountMenu() {
       />
       <DeleteAccountDialog open={account === "delete"} onClose={() => setAccount(null)} />
     </>
+  );
+}
+
+/**
+ * In the account menu, the one of your plans near or at its limit (from `PLAN_ALMOST`, 80%: "Quase no limite"), at
+ * its limit first: its maker's mark, its name and its state, opening Configurações › Uso. Nothing otherwise. Your
+ * accounts are read when the menu opens.
+ */
+function PlanNearLimitItem() {
+  const { t, i18n } = useTranslation();
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
+  const navigate = useNavigate();
+  const plan = planNearLimit(ownPlanLines(t, useAiAccounts(org.id).data, dir.agents, me.user.id));
+  if (!plan) return null;
+  return (
+    <MenuItem
+      leading={<ProviderLogo id={plan.logo} size="xs" />}
+      hint={planWord(t, i18n.language, plan.usage)}
+      onSelect={() =>
+        void navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section: "usage" } })
+      }
+    >
+      <span className="profile-menu__plan">{plan.name}</span>
+    </MenuItem>
   );
 }
 

@@ -8272,6 +8272,7 @@ export const ptBR = {
     },
     title: "Configurações",
     account: {
+      plans: "Limites dos seus planos",
       device: "Neste aparelho",
     },
     orgTitle: "Workspace",

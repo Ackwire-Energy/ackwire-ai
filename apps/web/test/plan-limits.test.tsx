@@ -1,0 +1,193 @@
+import { afterEach, describe, expect, test } from "bun:test";
+import { setupDom } from "@agenteschat/ui/testing/dom";
+
+setupDom();
+
+import type { AiAccounts, AiComputer, PlanUsage } from "@agenteschat/client";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { ADA_ID, ATLAS_ID, createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import { renderApp, screen, settle } from "./render";
+
+/*
+ * Your plans' limits where the workspace's budget was (ADR 0063 §5): in Sua conta, in the account menu near a limit,
+ * the budget only where the workspace uses the API.
+ */
+
+afterEach(() => cleanup());
+
+const LATER = "2099-01-01T15:40:00.000Z";
+const used = (fiveHour: number, week: number): PlanUsage => ({
+  windows: [
+    { kind: "five_hour", usedPercent: fiveHour, resetsAt: LATER },
+    { kind: "seven_day", usedPercent: week, resetsAt: LATER },
+  ],
+  source: "turn",
+  at: new Date().toISOString(),
+});
+const MAC: AiComputer = {
+  machineId: "machine_1",
+  name: "MacBook",
+  online: true,
+  mine: true,
+  canAdd: true,
+  keys: true,
+  brains: { claude_code: true, codex: true },
+};
+const TEAM: AiAccounts["accounts"][number] = {
+  id: "acct_team",
+  kind: "claude_code",
+  label: "Claude Team",
+  email: "walt@acme.com",
+  plan: "team",
+  status: "active",
+  ownerId: "u-walter",
+  ownerName: "Walter",
+  mine: true,
+  usedBy: ["Ada", "Atlas"],
+  usage: used(12, 40),
+  provider: null,
+  keyHint: null,
+  machineId: "machine_1",
+  computer: "MacBook",
+};
+
+type State = ReturnType<typeof seedState>;
+
+/** Ada and Atlas think with Walter's Claude Team, and nothing went through the API this month. */
+function onPlans(state: State = seedState()) {
+  state.spentUsd = { [ADA_ID]: 0, [ATLAS_ID]: 0 };
+  for (const a of state.agents)
+    a.brain = { kind: "claude_code", model: "Sonnet", account: "Claude Team", usage: used(12, 40) };
+  return state;
+}
+
+/** The app at `path` (under the workspace) with Walter's accounts. */
+async function go(path: string, state: State, accounts: AiAccounts["accounts"] = [TEAM]) {
+  const api = createFakeApi(state);
+  fakeMachinesOf.get(api)?.setAiAccounts({ accounts, computers: [MAC] });
+  const r = await renderApp(`/org/${ORG_ID}/${path}`, { api });
+  await settle(6);
+  return r;
+}
+
+const click = async (el: Element) => {
+  await act(async () => fireEvent.click(el));
+  await settle(4);
+};
+const account = () => screen().getByRole("button", { name: /^Conta: / });
+/** Radix menus open from the keyboard here (a pointer press, not a click, opens them with a mouse). */
+const openMenu = async () => {
+  account().focus();
+  await act(async () => {
+    fireEvent.keyDown(account(), { key: "Enter" });
+    fireEvent.keyUp(account(), { key: "Enter" });
+  });
+  await settle(4);
+  return screen().getAllByRole("menu")[0] as HTMLElement;
+};
+const names = (menu: HTMLElement) =>
+  within(menu)
+    .getAllByRole("menuitem")
+    .map((i) => i.textContent);
+
+/** Sua conta's card of your plans, by its words (null: none). */
+const plansCard = () => screen().queryByRole("region", { name: "Limites dos seus planos" })?.textContent ?? null;
+
+/** The Uso tile on Settings: its line and whether it draws the budget's meter. */
+const usageTile = () => {
+  const tile = document.querySelector('a.settings-tile[href$="/settings/usage"]');
+  return {
+    line: tile?.querySelector(".settings-tile__state")?.textContent,
+    meter: Boolean(tile?.querySelector('[role="meter"]')),
+  };
+};
+
+describe("Sua conta: your plans' limits", () => {
+  test("each plan your agents think with: its mark, its name and its compact line, opening Uso", async () => {
+    const { router } = await go("settings/account", onPlans());
+    const card = screen().getByRole("region", { name: "Limites dos seus planos" });
+    const plan = within(card).getByRole("button", { name: /^Claude Team/ });
+    expect(plan.querySelector(".settings-row__icon .ac-brand")?.getAttribute("data-mark")).toBeTruthy();
+    expect(plan.querySelector(".settings-row__label")?.textContent).toBe("Claude Team");
+    // Its tightest windows and one bar for the fullest: the line the agents' facts and AI accounts draw.
+    expect(plan.querySelector(".ac-planmeter__line")?.textContent).toBe("semana 40% · 5h 12%");
+    expect(
+      within(plan)
+        .getAllByRole("meter")
+        .map((m) => m.getAttribute("aria-valuenow")),
+    ).toEqual(["40"]);
+    await click(plan);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/usage`);
+  });
+
+  test("no window known yet, or no agent thinks with it: no card, never 0%", async () => {
+    await go("settings/account", onPlans(), [{ ...TEAM, usage: null }]);
+    expect(plansCard()).toBeNull();
+    cleanup();
+    await go("settings/account", onPlans(), [{ ...TEAM, usedBy: [] }]);
+    expect(plansCard()).toBeNull();
+  });
+});
+
+describe("the Uso tile: the workspace's budget only where it uses the API", () => {
+  test("on plans alone: no budget line and no meter", async () => {
+    await go("settings", onPlans());
+    expect(usageTile()).toEqual({ line: "\u00a0", meter: false });
+  });
+
+  test("an agent on the API with a key: the budget, even at 0%", async () => {
+    const state = seedState();
+    state.spentUsd = { [ADA_ID]: 0, [ATLAS_ID]: 0 };
+    // Ada stays on the API (her key is the workspace's); Atlas thinks with Claude Team.
+    const atlas = state.agents.find((a) => a.id === ATLAS_ID);
+    if (atlas) atlas.brain = { kind: "claude_code", model: "Sonnet", account: "Claude Team", usage: used(12, 40) };
+    await go("settings", state, []);
+    expect(usageTile().line).toBe("0% do orçamento usado este mês");
+    expect(usageTile().meter).toBe(true);
+  });
+});
+
+describe("the account menu: a plan near its limit", () => {
+  test("under 80%: no line, the menu as it was", async () => {
+    await go("settings", onPlans(), [{ ...TEAM, usage: used(12, 79) }]);
+    expect(names(await openMenu())).toEqual(["Definir status", "Editar perfil", "Configurações", "Sair"]);
+  });
+
+  test("from 80%: one line under your status, the plan and how it stands, opening Uso", async () => {
+    const { router } = await go("settings", onPlans(), [{ ...TEAM, usage: used(86, 40) }]);
+    const menu = await openMenu();
+    expect(names(menu)).toEqual([
+      "Claude TeamQuase no limite",
+      "Definir status",
+      "Editar perfil",
+      "Configurações",
+      "Sair",
+    ]);
+    const plan = within(menu).getByRole("menuitem", { name: /^Claude Team/ });
+    expect(plan.querySelector(".ac-menu__leading .ac-brand--xs")).toBeTruthy();
+    expect(plan.querySelector(".ac-menu__hint")?.textContent).toBe("Quase no limite");
+    // Under you, before the menu's first separator.
+    expect(plan.previousElementSibling?.matches(".profile-menu__head, .profile-menu__line")).toBe(true);
+    await click(plan);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/usage`);
+  });
+
+  test("a plan at its limit before a fuller one almost there; when it's back, if known", async () => {
+    const work = {
+      ...TEAM,
+      id: "acct_work",
+      label: "Trabalho",
+      email: "work@acme.com",
+      usedBy: ["Atlas"],
+      // It refused a request before any window was known.
+      usage: { windows: [], limited: true, source: "turn" as const, at: new Date().toISOString() },
+    };
+    await go("settings", onPlans(), [{ ...TEAM, usage: used(95, 40) }, work]);
+    const menu = await openMenu();
+    expect(names(menu)[0]).toBe("Trabalho · TeamNo limite");
+    expect(names(menu).filter((n) => n?.startsWith("Claude Team"))).toEqual([]);
+    cleanup();
+    await go("settings", onPlans(), [{ ...TEAM, usage: used(100, 40) }]);
+    expect(names(await openMenu())[0]).toMatch(/^Claude TeamNo limite até /);
+  });
+});

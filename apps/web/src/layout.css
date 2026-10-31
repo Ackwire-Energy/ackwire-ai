@@ -2609,6 +2609,11 @@ p {
 .profile-menu__line {
   margin: 0 4px 6px;
 }
+/* A plan near its limit: a long name gives way to its state. */
+.profile-menu__plan {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* "Ada não está no canal" after an @ pick */
 .mention-offer {
@@ -11015,8 +11020,8 @@ html[data-menu-overlay] .shell {
     var(--top);
   font-size: 14px;
 }
-/* A face brings its own tile. */
-.settings-row__icon:has(> .ac-avatar) {
+/* A face, or a plan maker's mark, brings its own tile. */
+.settings-row__icon:has(> .ac-avatar, > .ac-brand) {
   background: none;
   box-shadow: none;
 }
