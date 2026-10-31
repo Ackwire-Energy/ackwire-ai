@@ -202,8 +202,10 @@ export function inviteRoutes(deps: AppDeps) {
       security,
       summary: "Suggest someone to the people who may invite (any member, ADR 0089)",
       description:
-        "Waits among the requests to join, with who suggested it. Approving it sends an email invitation. " +
-        "`join.member`, `join.invited` (an invitation waits), `join.waiting` (already asked for), `join.full`.",
+        "Waits among the requests to join, with who suggested it. Approving it sends the person an email " +
+        "invitation; denying it tells them nothing (they never asked). `join.member`, `join.invited` (an " +
+        "invitation waits), `join.waiting` (already asked for), `join.full` (20 suggestions wait in the workspace, " +
+        "or 5 of yours: apart from the asks through a link).",
       request: {
         params: OrgParams,
         body: body(z.object({ email: z.email().max(254), note: z.string().max(JOIN_NOTE_MAX).optional() })),
@@ -296,8 +298,10 @@ export function inviteRoutes(deps: AppDeps) {
       summary: "Approve a request to join, with roles (who may invite people)",
       description:
         "A confirmed account with this address joins at once when the address was proven (a code from its " +
-        "mailbox, or that account asking). Anyone else gets an email invitation to the address. `emailed: false` " +
-        "on a server that doesn't send email: hand them `url` yourself.",
+        "mailbox, or that account asking), and so does a proven ask with a password and no account, whose account " +
+        "this makes (ADR 0089). Anyone else gets an email invitation to the address: in the answer to their ask, " +
+        "or, for a member's suggestion, as the invitation email itself. `emailed: false` on a server that doesn't " +
+        "send email: hand them `url` yourself.",
       request: {
         params: RequestParams,
         body: body(
@@ -349,7 +353,9 @@ export function inviteRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Deny a request to join (admins)",
-      description: "The person is told by email, with the reason when one is given.",
+      description:
+        "The person is told by email, with the reason when one is given. A member's suggestion is denied " +
+        "quietly: nobody at that address asked (ADR 0089).",
       request: {
         params: RequestParams,
         body: body(z.object({ reason: z.string().max(JOIN_REASON_MAX).optional() })),
@@ -532,9 +538,10 @@ export function inviteRoutes(deps: AppDeps) {
       summary: "Where the request this page made stands, and its sign-in once approved (ADR 0089)",
       description:
         "Public: the `key` the ask answered is the proof. `in` once, with `signIn` for " +
-        "`POST /api/auth/sign-in/one-time-token`, when the approval made the account; after that the key is spent. " +
-        "`closed` also for an approval of an address that already had an account: it signs in as it always did. " +
-        "404 for a key that matches nothing.",
+        "`POST /api/auth/sign-in/one-time-token`, when the approval made the account; after that the key is spent " +
+        "and reads `closed`. `closed` also for an approval of an address that already had an account (it signs in " +
+        "as it always did), and for a request run out, turned off or closed by joining another way. 404 for a key " +
+        "that matches nothing, and once the daily cleanup forgets a key, a day after the answer.",
       request: { params: Token, body: body(z.object({ key: z.string().min(10).max(200) })) },
       responses: {
         200: json(

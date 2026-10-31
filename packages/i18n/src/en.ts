@@ -3306,6 +3306,9 @@ export const en: Translations = {
       copiedNoEmail: "Link to {{email}}'s invitation copied.",
       resent: "Sent to {{email}} again. The link is the same and works until {{date}}.",
       resentNoEmail: "{{email}}'s invitation works until {{date}}. The link is the same.",
+      // One sent before links lasted gets a lasting one when sent again: the old link stops opening (ADR 0089).
+      newLink: "Sent to {{email}} again, with a new link that works until {{date}}. The old link no longer opens.",
+      newLinkNoEmail: "{{email}}'s invitation works until {{date}}, with a new link. Copy it and send it to them.",
       renew: "Renew",
       renewed: "Invitation renewed and sent to {{email}} again.",
       renewedNoEmail: "{{email}}'s invitation renewed. The link is the same.",
@@ -3314,6 +3317,8 @@ export const en: Translations = {
       more: "More for {{email}}",
       changeRole: "Change the role",
       cancel: "Cancel invitation",
+      // Under Cancel invitation: sending again keeps the link, so one that leaked stops only by cancelling (ADR 0089).
+      linkStays: "Resending keeps the link. If it reached the wrong person, cancel and invite again.",
       cancelled: "{{email}}'s invitation cancelled.",
       roleTitle: "{{email}}'s role",
       roleText: "Changes what they get when they join. The link stays the same.",

@@ -42,6 +42,12 @@ export function webUrl(value: unknown): string | undefined {
 /** The password sign-up's header with an early-access link's token (mirrors `packages/engine/src/early-access.ts`). */
 export const EARLY_ACCESS_HEADER = "x-early-access";
 
+/**
+ * The password sign-up's header with an email invitation's token (mirrors `packages/engine/src/organizations.ts`):
+ * whoever holds it proved the invited address, so the server sends no "confirm your email" (ADR 0089 §6).
+ */
+export const INVITATION_TOKEN_HEADER = "x-invitation-token";
+
 /** An early-access link's token (`/signup?access=`), only in the shape the server makes: 43 base64url characters. */
 export const earlyAccessToken = (value: unknown): string | undefined =>
   typeof value === "string" && /^[A-Za-z0-9_-]{43}$/.test(value) ? value : undefined;

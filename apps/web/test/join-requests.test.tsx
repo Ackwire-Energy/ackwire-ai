@@ -3,7 +3,14 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { InvitationPreview, JoinRequest, JoinStatus, Member, NotificationLatest } from "@agenteschat/client";
+import type {
+  ApiClient,
+  InvitationPreview,
+  JoinRequest,
+  JoinStatus,
+  Member,
+  NotificationLatest,
+} from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { icons } from "@agenteschat/ui";
@@ -44,6 +51,7 @@ const you = (patch: Partial<JoinStatus> = {}): JoinStatus => ({
   ...patch,
 });
 type Fake = ReturnType<typeof seedState>;
+type Claim = ApiClient["invites"]["claim"];
 /** The key the fake's ask answers when it carries a password, and where the page keeps it (ADR 0089). */
 const KEY = "00000000-0000-4000-8000-000000000001.page-secret";
 const ASKED = "agentes.join.asked.lnk";
@@ -61,6 +69,8 @@ async function openLink(
     sendCodeError?: ApiError;
     emails?: boolean;
     claims?: Fake["claims"];
+    /** In place of the fake's `invites.claim`, given it: a server that fails for a moment, or refuses the key. */
+    claim?: (fake: Claim) => Claim;
     reload?: boolean;
     auth?: (state: Fake) => ReturnType<typeof createFakeAuth>["auth"];
   } = {},
@@ -75,7 +85,9 @@ async function openLink(
   });
   if (!options.signedIn) state.me = null;
   else if (state.me) state.me.user.emailVerified = !options.unconfirmed;
-  const r = await renderApp("/invite/lnk", { api: createFakeApi(state), auth: options.auth?.(state) });
+  const api = createFakeApi(state);
+  if (options.claim) api.invites.claim = options.claim(api.invites.claim);
+  const r = await renderApp("/invite/lnk", { api, auth: options.auth?.(state) });
   await settle(4);
   return { ...r, state };
 }
@@ -254,6 +266,58 @@ describe("an invitation link asks to join", () => {
       await settle(4);
       expect(router.state.location.pathname).toBe("/login");
       expect(router.state.location.search).toEqual({ redirect: "/invite/lnk", email: "ana@acme.com" });
+      cleanup();
+    }
+  });
+
+  test("checks that fail for a moment keep it waiting, however many; a refused key ends it", async () => {
+    // What each check meets before the fake answers, in turn: an error, or nothing (the fake's own answer).
+    let meets: (Error | undefined)[] = [];
+    let checks = 0;
+    const failing =
+      (fake: Claim): Claim =>
+      async (token, key) => {
+        checks += 1;
+        const error = meets.shift();
+        if (error) throw error;
+        return fake(token, key);
+      };
+    const offline = () => new TypeError("Failed to fetch");
+    const { services } = await openLink(LINK, { claims: [{ status: "pending" }], claim: failing });
+    await askThrough();
+    expect(heading()).toBe("Pronto. Seu pedido chegou na Acme.");
+    const check = async () => {
+      await act(() => services.queryClient.invalidateQueries());
+      await settle(4);
+    };
+    // No connection, the server restarting, too many checks from here: still waiting, the key kept.
+    meets = [
+      offline(),
+      new ApiError(503, "http_503", "Service Unavailable"),
+      undefined,
+      offline(),
+      new ApiError(429, "rate_limited", "Too many requests from here."),
+    ];
+    for (let i = 0; i < 5; i++) await check();
+    expect(heading()).toBe("Pronto. Seu pedido chegou na Acme.");
+    expect(sessionStorage.getItem(ASKED)).not.toBeNull();
+    // A deploy's minute of failures in a row: still waiting, the key kept for when the server is back.
+    meets = [offline(), new ApiError(502, "http_502", "Bad Gateway"), offline(), offline()];
+    for (let i = 0; i < 4; i++) await check();
+    expect(heading()).toBe("Pronto. Seu pedido chegou na Acme.");
+    expect(sessionStorage.getItem(ASKED)).not.toBeNull();
+    cleanup();
+
+    // A key the server can't read or no longer knows: ended at the first check, opened again in this tab.
+    for (const refusal of [
+      new ApiError(400, "validation_error", "Invalid key"),
+      new ApiError(404, "not_found", "Nothing waits for this page"),
+    ]) {
+      meets = [refusal];
+      sessionStorage.setItem(ASKED, JSON.stringify({ key: KEY, name: "Ana Souza", email: "ana@acme.com" }));
+      await openLink(LINK, { reload: true, claims: [{ status: "pending" }], claim: failing });
+      expect(heading()).toBe("Seu pedido terminou.");
+      expect(sessionStorage.getItem(ASKED)).toBeNull();
       cleanup();
     }
   });

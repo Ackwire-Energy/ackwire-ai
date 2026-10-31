@@ -524,12 +524,49 @@ test("an ask with a password: approval makes the account, and the asking page si
   };
   expect(me.user).toMatchObject({ email: "rafa@example.com", emailVerified: true });
   expect(me.organizations.map((o) => o.id)).toContain(orgId);
-  // Spent: the key signs in once.
-  expect((await claim()).status).toBe(404);
+  // Spent: the key signs in once, and the page reads it closed from then on.
+  expect(await (await claim()).json()).toEqual({ status: "closed" });
   // The password they chose is the account's.
   const later = browser(t);
   const signIn = await later("/api/auth/sign-in/email", {
     json: { email: "rafa@example.com", password: "correct horse battery" },
   });
   expect(signIn.status).toBe(200);
+});
+
+test("sign-up with the invitation's token: no 'confirm your email'; without it, it goes (ADR 0089)", async () => {
+  const { owner, orgId } = await start();
+  const invite = async (email: string) => {
+    const res = await owner(`/api/app/organizations/${orgId}/invitations`, { json: { email } });
+    return ((await res.json()) as { url: string }).url.split("/invite/")[1] ?? "";
+  };
+  const ana = await invite("ana@example.com");
+  await invite("bia@example.com");
+  await invite("caio@example.com");
+  await t.drain();
+  t.email.sent.length = 0;
+  const signUpWith = (email: string, token?: string) =>
+    browser(t)("/api/auth/sign-up/email", {
+      json: { email, password: "correct horse battery", name: email.split("@")[0] },
+      ...(token ? { headers: { "x-invitation-token": token } } : {}),
+    });
+  // Ana's own link: accepting confirms her address, so no message asks her to.
+  expect((await signUpWith("ana@example.com", ana)).status).toBe(200);
+  // Another address's link, or none: the message goes as always.
+  expect((await signUpWith("bia@example.com", ana)).status).toBe(200);
+  expect((await signUpWith("caio@example.com")).status).toBe(200);
+  await t.drain();
+  const confirmations = t.email.sent.filter((m) => m.subject === "Confirme seu e-mail no agentes.chat");
+  expect(confirmations.map((m) => m.to[0]).sort()).toEqual(["bia@example.com", "caio@example.com"]);
+});
+
+test("a batch of invitations takes `emails` or `invites`, never both nor neither", async () => {
+  const { owner, orgId } = await start();
+  const path = `/api/app/organizations/${orgId}/invitations/batch`;
+  const batch = (json: Record<string, unknown>) => owner(path, { json });
+  const both = await batch({ emails: ["a@example.com"], invites: [{ email: "b@example.com" }] });
+  expect(both.status).toBe(400);
+  expect(await errorCode(both)).toBe("invalid_request");
+  expect((await batch({})).status).toBe(400);
+  expect((await batch({ invites: [{ email: "b@example.com" }] })).status).toBe(200);
 });

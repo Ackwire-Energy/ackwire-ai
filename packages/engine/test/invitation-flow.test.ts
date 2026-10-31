@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createMemoryRateLimiter } from "@agenteschat/adapters";
-import { and, eq, schema } from "@agenteschat/db";
+import { and, eq, schema, sql } from "@agenteschat/db";
 import {
   acceptInvitation,
   approveJoinRequest,
@@ -9,13 +9,18 @@ import {
   claimJoinRequest,
   denyJoinRequest,
   type EmailTemplate,
+  holdsInvitation,
   invitationState,
   invitationToken,
   inviteLink,
   inviteMany,
+  joinStatus,
   listInvitationsWithStatus,
   listMySuggestions,
   listWaitingJoinRequests,
+  MAX_PENDING_JOIN_REQUESTS,
+  MAX_PENDING_SUGGESTIONS,
+  MAX_SUGGESTIONS_PER_MEMBER,
   NotFoundError,
   noticeInvitationAccepted,
   previewInvitation,
@@ -26,6 +31,7 @@ import {
   sendJoinCode,
   setInvitationRoles,
   sha256,
+  spentClaimHash,
   suggestPerson,
 } from "../src";
 import { addMember, adminRoleId, type Fixture, SECRET, setup } from "./fixtures";
@@ -96,6 +102,21 @@ const memberOf = async (userId: string) =>
       .where(and(eq(schema.organizationMembers.orgId, fx().org.id), eq(schema.organizationMembers.userId, userId)))
   )[0];
 
+/** `n` requests waiting, as they are filed: through the link, or suggested by a member. */
+async function insertWaiting(n: number, prefix: string, by: { linkId?: string; suggestedByUserId?: string }) {
+  await fx()
+    .db.insert(schema.organizationJoinRequests)
+    .values(
+      Array.from({ length: n }, (_, i) => ({
+        orgId: fx().org.id,
+        email: `${prefix}${i}@example.com`,
+        name: `${prefix}${i}`,
+        expiresAt: at(14),
+        ...by,
+      })),
+    );
+}
+
 describe("asking through a link with a password (ADR 0089)", () => {
   test("approval makes the confirmed account with it and lets the page that asked in, once", async () => {
     const { token } = await start();
@@ -131,8 +152,12 @@ describe("asking through a link with a password (ADR 0089)", () => {
       userId: made?.id ?? "",
       orgId: fx().org.id,
     });
-    // Spent: a second page with the same key gets nothing.
-    await expect(claimJoinRequest(fx().db, token, key, NOW)).rejects.toBeInstanceOf(NotFoundError);
+    // Spent: the page (or a second one with the same key) reads it closed from then on, and signs in no one.
+    expect((await requestOf(id ?? ""))?.claimHash).toBe(spentClaimHash(sha256("page-secret")));
+    expect(await claimJoinRequest(fx().db, token, key, NOW)).toEqual({ status: "closed" });
+    // Not even with the live hash itself, as someone who saw the row before could hand it in.
+    const seen = `${id}.${sha256("page-secret")}`;
+    await expect(claimJoinRequest(fx().db, token, seen, NOW)).rejects.toBeInstanceOf(NotFoundError);
   });
 
   test("an address with an account signs in as always; a denial keeps nothing of what they chose", async () => {
@@ -145,8 +170,9 @@ describe("asking through a link with a password (ADR 0089)", () => {
     await approveJoinRequest(deps(), PUBLIC, fx().owner.id, fx().org.id, id, [], NOW);
     expect(await memberOf("u_bia")).toBeTruthy();
     expect(await fx().db.select().from(schema.accounts).where(eq(schema.accounts.userId, "u_bia"))).toEqual([]);
-    expect(await requestOf(id)).toMatchObject({ passwordHash: null, claimHash: null });
-    await expect(claimJoinRequest(fx().db, token, `${id}.bia-secret`, NOW)).rejects.toBeInstanceOf(NotFoundError);
+    // The page's key is spent, not dropped: the page hears it closed instead of waiting on.
+    expect(await requestOf(id)).toMatchObject({ passwordHash: null, claimHash: spentClaimHash(sha256("bia-secret")) });
+    expect(await claimJoinRequest(fx().db, token, `${id}.bia-secret`, NOW)).toEqual({ status: "closed" });
 
     const other = await askWithPassword(token, "caio@example.com", "hash:caio", "caio-secret");
     const otherId = "requestId" in other ? (other.requestId ?? "") : "";
@@ -158,16 +184,21 @@ describe("asking through a link with a password (ADR 0089)", () => {
     });
   });
 
-  test("joining another way closes the request and drops what it kept; a key is good for a day", async () => {
+  test("joining another way closes the request, its page told so; a key is good for a day", async () => {
     const { token } = await start();
     const asked = await askWithPassword(token, "gabi@example.com", "hash:gabi", "gabi-secret");
     const id = "requestId" in asked ? (asked.requestId ?? "") : "";
-    // An email invitation to the same address, accepted: the request closes, keeping nothing.
+    // An email invitation to the same address, accepted: the request closes, its password gone, its key spent.
     const [invited] = await inviteMany(fx().db, fx().owner.id, fx().org.id, { emails: ["gabi@example.com"] }, NOW);
     if (invited?.status !== "invited") throw new Error("expected an invitation");
     await fx().db.insert(schema.users).values({ id: "u_gabi", name: "Gabi", email: "gabi@example.com" });
     await acceptInvitation(fx().db, { id: "u_gabi", email: "gabi@example.com" }, invited.token, NOW);
-    expect(await requestOf(id)).toMatchObject({ status: "closed", passwordHash: null, claimHash: null });
+    expect(await requestOf(id)).toMatchObject({
+      status: "closed",
+      passwordHash: null,
+      claimHash: spentClaimHash(sha256("gabi-secret")),
+    });
+    expect(await claimJoinRequest(fx().db, token, `${id}.gabi-secret`, NOW)).toEqual({ status: "closed" });
 
     // Approved and made, but the page never came back: a day later its key signs in no one.
     const other = await askWithPassword(token, "hugo@example.com", "hash:hugo", "hugo-secret");
@@ -196,6 +227,45 @@ describe("asking through a link with a password (ADR 0089)", () => {
       .from(schema.organizationInviteLinks)
       .where(eq(schema.organizationInviteLinks.id, link.id));
     expect(row?.tokenHash).toBe(sha256(token));
+  });
+
+  test("a page that took over an account's request never signs that account in", async () => {
+    const { token } = await start();
+    await fx()
+      .db.insert(schema.users)
+      .values({ id: "u_tom", name: "Tom", email: "tom@example.com", emailVerified: true });
+    // The account asks; then a page signed out asks for its address, proven, with a password of its own.
+    await askToJoin(deps(), PUBLIC, { token, user: { id: "u_tom" } }, NOW);
+    const asked = await askWithPassword(token, "tom@example.com", "hash:tom", "tom-secret");
+    const id = "requestId" in asked ? (asked.requestId ?? "") : "";
+    expect(await requestOf(id)).toMatchObject({ userId: "u_tom", claimHash: sha256("tom-secret") });
+    const approval = await approveJoinRequest(deps(), PUBLIC, fx().owner.id, fx().org.id, id, [], NOW);
+    expect(approval).toEqual({ outcome: "joined" });
+    // Tom signs in as he always did: the page only hears it closed.
+    expect(await claimJoinRequest(fx().db, token, `${id}.tom-secret`, NOW)).toEqual({ status: "closed" });
+    expect(await fx().db.select().from(schema.accounts).where(eq(schema.accounts.userId, "u_tom"))).toEqual([]);
+  });
+
+  test("an account signed up for the address while the approval runs is never written over", async () => {
+    const { token } = await start();
+    const asked = await askWithPassword(token, "iris@example.com", "hash:iris", "iris-secret");
+    const id = "requestId" in asked ? (asked.requestId ?? "") : "";
+    // Someone signs up with the address just as the approval makes the account: theirs lands first.
+    await fx().db.execute(
+      sql.raw(
+        "create function race() returns trigger language plpgsql as $$ begin if new.id <> 'u_iris' then " +
+          "insert into users (id, name, email) values ('u_iris', 'Iris', new.email); end if; return new; end $$",
+      ),
+    );
+    await fx().db.execute(sql.raw("create trigger race before insert on users for each row execute function race()"));
+    const approval = await approveJoinRequest(deps(), PUBLIC, fx().owner.id, fx().org.id, id, [], NOW);
+    // Not confirmed: it gets an invitation, as any account already there, and nothing of it changes.
+    expect(approval.outcome).toBe("invited");
+    const iris = await fx().db.select().from(schema.users).where(eq(schema.users.email, "iris@example.com"));
+    expect(iris).toEqual([expect.objectContaining({ id: "u_iris", name: "Iris", emailVerified: false })]);
+    expect(await fx().db.select().from(schema.accounts).where(eq(schema.accounts.userId, "u_iris"))).toEqual([]);
+    expect(await requestOf(id)).toMatchObject({ status: "approved", passwordHash: null });
+    expect(await claimJoinRequest(fx().db, token, `${id}.iris-secret`, NOW)).toEqual({ status: "closed" });
   });
 });
 
@@ -246,6 +316,77 @@ describe("members suggest someone (ADR 0089)", () => {
     const [invitation] = await listInvitationsWithStatus(fx().db, fx().owner.id, fx().org.id, NOW, SECRET);
     expect(approval.outcome === "invited" && approval.url).toBe(`${PUBLIC}/invite/${invitation?.token}`);
   });
+
+  test("a suggested address never asked: approving sends just the invitation, denying sends nothing", async () => {
+    const { token } = await start();
+    const carla = await addMember(fx().db, fx().org.id, "member", "carla");
+    const lu = await suggestPerson(deps(), carla.id, fx().org.id, { email: "lu@example.com" }, NOW);
+    const mo = await suggestPerson(deps(), carla.id, fx().org.id, { email: "mo@example.com" }, NOW);
+    const approval = await approveJoinRequest(
+      { ...deps(), secret: SECRET },
+      PUBLIC,
+      fx().owner.id,
+      fx().org.id,
+      lu.id,
+      [],
+      NOW,
+    );
+    await denyJoinRequest(deps(), fx().owner.id, fx().org.id, mo.id, "Já temos design", NOW);
+    const sent = await outboxEmails();
+    expect(sent.filter((e) => e.template.kind === "join_answer")).toEqual([]);
+    expect(sent.filter((e) => e.to.includes("mo@example.com"))).toEqual([]);
+    const [toLu, ...more] = sent.filter((e) => e.to.includes("lu@example.com"));
+    const url = approval.outcome === "invited" ? approval.url : "";
+    expect(toLu?.template).toMatchObject({ kind: "invitation", inviterName: "ana", url });
+    expect(more).toEqual([]);
+
+    // Turned down, the suggestion isn't Mo's: Mo hears nothing of it and may still ask through the link.
+    await fx()
+      .db.insert(schema.users)
+      .values({ id: "u_mo", name: "Mo", email: "mo@example.com", emailVerified: true });
+    expect(await joinStatus(fx().db, { id: "u_mo" }, token, NOW)).toMatchObject({ request: null });
+    expect(await askToJoin(deps(), PUBLIC, { token, user: { id: "u_mo" } }, NOW)).toMatchObject({ created: true });
+  });
+
+  test("someone suggested who asks through the link makes it their own ask, answered to them", async () => {
+    const { token, link } = await start();
+    const carla = await addMember(fx().db, fx().org.id, "member", "carla");
+    const { id } = await suggestPerson(deps(), carla.id, fx().org.id, { email: "rafael@example.com" }, NOW);
+    const asked = await askWithPassword(token, "rafael@example.com", "hash:rafael", "rafa-secret");
+    expect(asked).toMatchObject({ created: false, requestId: id });
+    expect(await requestOf(id)).toMatchObject({ linkId: link.id, suggestedByUserId: null, name: "Rafael Costa" });
+    expect(await listMySuggestions(fx().db, carla.id, fx().org.id, NOW)).toEqual([]);
+    const approval = await approveJoinRequest(deps(), PUBLIC, fx().owner.id, fx().org.id, id, [], NOW);
+    expect(approval).toEqual({ outcome: "joined" });
+    const answers = (await outboxEmails()).filter((e) => e.template.kind === "join_answer");
+    expect(answers).toEqual([expect.objectContaining({ to: ["rafael@example.com"] })]);
+    // Through the link it asked with, its page signs in.
+    expect(await claimJoinRequest(fx().db, token, `${id}.rafa-secret`, NOW)).toMatchObject({ status: "in" });
+  });
+
+  test("suggestions wait apart from the asks: 20 in a workspace, 5 from one member", async () => {
+    const { token, link } = await start();
+    const carla = await addMember(fx().db, fx().org.id, "member", "carla");
+    const dani = await addMember(fx().db, fx().org.id, "member", "dani");
+    const eli = await addMember(fx().db, fx().org.id, "member", "eli");
+    const suggest = (by: { id: string }, email: string) => suggestPerson(deps(), by.id, fx().org.id, { email }, NOW);
+    // The asks through the link are full: a member still suggests.
+    await insertWaiting(MAX_PENDING_JOIN_REQUESTS, "ask", { linkId: link.id });
+    for (let i = 0; i < MAX_SUGGESTIONS_PER_MEMBER; i++) await suggest(carla, `carla${i}@example.com`);
+    // Five of one member's wait: the sixth waits for one of them, while the workspace has room.
+    await expect(suggest(carla, "sixth@example.com")).rejects.toMatchObject({ code: "join.full" });
+    await suggest(dani, "dani0@example.com");
+    // Twenty wait: nobody suggests more.
+    const rest = MAX_PENDING_SUGGESTIONS - MAX_SUGGESTIONS_PER_MEMBER - 1;
+    await insertWaiting(rest, "eli", { suggestedByUserId: eli.id });
+    await expect(suggest(dani, "dani1@example.com")).rejects.toMatchObject({ code: "join.full" });
+    // Nor do suggestions fill the asks' room: one ask answered, the next is filed.
+    await expect(askWithPassword(token, "l@example.com", "hash:l", "l")).rejects.toMatchObject({ code: "join.full" });
+    await fx()
+      .db.delete(schema.organizationJoinRequests)
+      .where(eq(schema.organizationJoinRequests.email, "ask0@example.com"));
+    expect(await askWithPassword(token, "n@example.com", "hash:n", "n")).toMatchObject({ created: true });
+  });
 });
 
 describe("email invitations (ADR 0089)", () => {
@@ -285,7 +426,7 @@ describe("email invitations (ADR 0089)", () => {
     // Sending it again keeps its link.
     const again = await resendInvitation(fx().db, fx().owner.id, fx().org.id, rita.invitationId, at(1), SECRET);
     expect(again.token).toBe(rita.token);
-    await setInvitationRoles(fx().db, fx().owner.id, fx().org.id, rita.invitationId, []);
+    await setInvitationRoles(fx().db, fx().owner.id, fx().org.id, rita.invitationId, [], at(1));
     expect(
       (await listInvitationsWithStatus(fx().db, fx().owner.id, fx().org.id, NOW, SECRET)).find(
         (i) => i.email === "rita@example.com",
@@ -370,5 +511,92 @@ describe("email invitations (ADR 0089)", () => {
     if (result?.status !== "invited") throw new Error("expected an invitation");
     await fx().db.update(schema.organizations).set({ limitMembers: 2 }).where(eq(schema.organizations.id, fx().org.id));
     expect(await previewInvitation(fx().db, result.token, NOW)).toMatchObject({ full: true });
+  });
+
+  test("a batch takes `emails` or `invites`, never both", async () => {
+    await start();
+    const both = { emails: ["a@example.com"], invites: [{ email: "b@example.com" }] };
+    await expect(inviteMany(fx().db, fx().owner.id, fx().org.id, both, NOW)).rejects.toMatchObject({
+      code: "invalid_request",
+    });
+    expect(await fx().db.select().from(schema.organizationInvitations)).toEqual([]);
+  });
+
+  test("an invitation's roles change only while it works, from a workspace that may invite", async () => {
+    await start();
+    const admin = await adminRoleId(fx().db, fx().org.id);
+    const [sent] = await inviteMany(fx().db, fx().owner.id, fx().org.id, { emails: ["nina@example.com"] }, NOW);
+    if (sent?.status !== "invited") throw new Error("expected an invitation");
+    const { invitationId } = sent;
+    const setRoles = (roleIds: string[], now: Date) =>
+      setInvitationRoles(fx().db, fx().owner.id, fx().org.id, invitationId, roleIds, now);
+    expect(await setRoles([admin], at(1))).toEqual({ roleIds: [admin] });
+    // Run out: sending it again is what brings it back.
+    await expect(setRoles([], at(8))).rejects.toMatchObject({ code: "conflict" });
+    // A workspace on hold changes no invitation.
+    const acme = eq(schema.organizations.id, fx().org.id);
+    await fx().db.update(schema.organizations).set({ standing: "hold" }).where(acme);
+    await expect(setRoles([], at(1))).rejects.toMatchObject({ code: "org.paused" });
+  });
+
+  test("a private channel goes with an invitation only while whoever sent it is still in it", async () => {
+    await start();
+    const channel = async (name: string, visibility: "public" | "private") => {
+      const [row] = await fx()
+        .db.insert(schema.channels)
+        .values({ orgId: fx().org.id, name, visibility, createdByUserId: fx().owner.id })
+        .returning();
+      return row?.id ?? "";
+    };
+    const produto = await channel("produto", "public");
+    const diretoria = await channel("diretoria", "private");
+    const ownerIn = { orgId: fx().org.id, channelId: diretoria, userId: fx().owner.id };
+    await fx().db.insert(schema.channelMembers).values(ownerIn);
+    const invite = async (email: string) => {
+      const channelIds = [produto, diretoria];
+      const [sent] = await inviteMany(fx().db, fx().owner.id, fx().org.id, { emails: [email], channelIds }, NOW);
+      if (sent?.status !== "invited") throw new Error("expected an invitation");
+      return sent.token;
+    };
+    const accept = async (id: string, email: string, token: string) => {
+      await fx().db.insert(schema.users).values({ id, name: id, email });
+      await acceptInvitation(fx().db, { id, email }, token, NOW);
+      const rows = await fx()
+        .db.select({ channelId: schema.channelMembers.channelId })
+        .from(schema.channelMembers)
+        .where(eq(schema.channelMembers.userId, id));
+      return rows.map((r) => r.channelId);
+    };
+
+    // Ana left #diretoria before Olga accepted: it is no longer hers to give, #produto still is.
+    const olga = await invite("olga@example.com");
+    const ownerRow = eq(schema.channelMembers.userId, fx().owner.id);
+    await fx().db.delete(schema.channelMembers).where(and(eq(schema.channelMembers.channelId, diretoria), ownerRow));
+    const olgaIn = await accept("u_olga", "olga@example.com", olga);
+    expect(olgaIn).toContain(produto);
+    expect(olgaIn).not.toContain(diretoria);
+
+    // An invitation whose sender is gone gives no private channel either.
+    await fx().db.insert(schema.channelMembers).values(ownerIn);
+    const pia = await invite("pia@example.com");
+    await fx()
+      .db.update(schema.organizationInvitations)
+      .set({ invitedByUserId: null })
+      .where(eq(schema.organizationInvitations.email, "pia@example.com"));
+    const piaIn = await accept("u_pia", "pia@example.com", pia);
+    expect(piaIn).toContain(produto);
+    expect(piaIn).not.toContain(diretoria);
+  });
+
+  test("a sign-up holds an invitation only with its link, to its own address, while it can be accepted", async () => {
+    await start();
+    const emails = ["nina@example.com", "olga@example.com"];
+    const [nina, olga] = await inviteMany(fx().db, fx().owner.id, fx().org.id, { emails }, NOW);
+    if (nina?.status !== "invited" || olga?.status !== "invited") throw new Error("expected invitations");
+    expect(await holdsInvitation(fx().db, " Nina@Example.com", nina.token, NOW)).toBe(true);
+    // Another address's link, none, or one run out: the sign-up holds nothing.
+    expect(await holdsInvitation(fx().db, "nina@example.com", olga.token, NOW)).toBe(false);
+    expect(await holdsInvitation(fx().db, "nina@example.com", "", NOW)).toBe(false);
+    expect(await holdsInvitation(fx().db, "nina@example.com", nina.token, at(8))).toBe(false);
   });
 });

@@ -13,7 +13,14 @@ import {
   whenAt,
 } from "@agenteschat/client/lib/format";
 import { agentGrammar, isFeminineName, providerGrammar, runErrorGrammar } from "@agenteschat/client/lib/grammar";
-import { landingFor, membershipIn, safeRedirect, settingUp, webUrl } from "@agenteschat/client/lib/guards";
+import {
+  INVITATION_TOKEN_HEADER,
+  landingFor,
+  membershipIn,
+  safeRedirect,
+  settingUp,
+  webUrl,
+} from "@agenteschat/client/lib/guards";
 import {
   addInvites,
   aheadOf,
@@ -482,6 +489,32 @@ describe("the confirmation email", () => {
         language: "pt-BR",
         body: { email: "bia@example.com" },
       });
+    } finally {
+      globalThis.fetch = real;
+    }
+  });
+
+  test("an email invitation's sign-up carries its token in a header, never in the body (ADR 0089)", async () => {
+    const sent: { path: string; invitation: string | null; body: Record<string, unknown> | null }[] = [];
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      sent.push({
+        path: new URL(String(url)).pathname,
+        invitation: new Headers(init?.headers).get(INVITATION_TOKEN_HEADER),
+        body: typeof init?.body === "string" ? JSON.parse(init.body) : null,
+      });
+      return Response.json({ token: null, user: { id: "u", name: "Bia", email: "bia@example.com" } });
+    }) as typeof fetch;
+    try {
+      const auth = createBetterAuthClient("http://localhost:3000");
+      const bia = { name: "Bia", email: "bia@example.com", password: "senha-longa" };
+      await auth.signUp({ ...bia, invitation: "inv-token" });
+      await auth.signUp(bia);
+      const signUps = sent.filter((r) => r.path === "/api/auth/sign-up/email");
+      expect(INVITATION_TOKEN_HEADER).toBe("x-invitation-token");
+      expect(signUps.map((r) => r.invitation)).toEqual(["inv-token", null]);
+      expect(signUps[0]?.body).toMatchObject(bia);
+      expect(signUps[0]?.body).not.toHaveProperty("invitation");
     } finally {
       globalThis.fetch = real;
     }

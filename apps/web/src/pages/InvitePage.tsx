@@ -524,10 +524,11 @@ function EmailInvitation({ token, preview, join }: { token: string; preview: Inv
     }
   };
 
+  // With the invitation's token, which proves the address: the new account gets no "confirm your email" (ADR 0089 §6).
   const signUp = () =>
     run(async () => {
       const result = await withHumanCheck(human.check, (humanCheck) =>
-        auth.signUp({ name: name.trim(), email: invited, password }, humanCheck),
+        auth.signUp({ name: name.trim(), email: invited, password, invitation: token }, humanCheck),
       );
       if (!result.ok) {
         setError(authErrorText(t, result));
@@ -1409,9 +1410,18 @@ type Answer =
   | { state: "ended" };
 
 /**
+ * A check that failed for a moment and may answer the next time: no connection, the server restarting, too many
+ * checks from here. Any other refusal is the server's last word on the key.
+ */
+const transient = (error: unknown) =>
+  !(error instanceof ApiError) || error.status >= 500 || error.status === 408 || error.status === 429;
+
+/**
  * Asked: the page waits for an admin, checking every 15 s with the key the ask answered (ADR 0089). Approved, it
  * signs in with the one-time sign-in the answer carries and opens the workspace; turned down, the admin's note;
- * ended (run out, its link turned off, or approved for an account that was already there), signing in as always.
+ * ended (run out, its link turned off, approved for an account that was already there, or a key the server no
+ * longer knows), signing in as always. A check that fails for a moment (no connection, a deploy) never ends it: the
+ * key stays and the next check tries again.
  */
 function Waiting({ token, preview, asked }: { token: string; preview: InvitationPreview; asked: Asked }) {
   const { t } = useTranslation();
@@ -1424,7 +1434,16 @@ function Waiting({ token, preview, asked }: { token: string; preview: Invitation
   const [answer, setAnswer] = useState<Answer | null>(null);
   const claim = useQuery({
     queryKey: [...keys.invitation(token), "claim", asked.key],
-    queryFn: () => api.invites.claim(token, asked.key),
+    // null ends the wait: a key that matches nothing (404) or a check the server refused. A failure for a moment
+    // leaves the page waiting for the next check, however long it lasts: ending would lose the key.
+    queryFn: async () => {
+      try {
+        return await api.invites.claim(token, asked.key);
+      } catch (error) {
+        if (transient(error)) throw error;
+        return null;
+      }
+    },
     enabled: answer === null,
     refetchInterval: ANSWER_POLL_MS,
     retry: false,
@@ -1446,7 +1465,8 @@ function Waiting({ token, preview, asked }: { token: string; preview: Invitation
   // biome-ignore lint/correctness/useExhaustiveDependencies: each answer once; signing in starts on the first
   useEffect(() => {
     if (answer !== null || got === undefined || got?.status === "pending") return;
-    // Whatever it says, it's the last word: a reload no longer waits.
+    // Whatever it says (null: nothing more to learn with this key), it's the last word: the checks stop, and a
+    // reload no longer waits.
     forgetAsked(token);
     if (got?.status === "in") {
       setAnswer({ state: "in", orgId: got.orgId });

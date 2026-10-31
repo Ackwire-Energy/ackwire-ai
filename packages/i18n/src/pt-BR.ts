@@ -3333,6 +3333,9 @@ export const ptBR = {
       copiedNoEmail: "Link do convite de {{email}} copiado.",
       resent: "Mandei de novo para {{email}}. O link é o mesmo e vale até {{date}}.",
       resentNoEmail: "O convite de {{email}} vale até {{date}}. O link é o mesmo.",
+      // One sent before links lasted gets a lasting one when sent again: the old link stops opening (ADR 0089).
+      newLink: "Mandei de novo para {{email}}, com um link novo que vale até {{date}}. O link anterior não abre mais.",
+      newLinkNoEmail: "O convite de {{email}} vale até {{date}}, com um link novo. Copie e mande para a pessoa.",
       renew: "Renovar",
       renewed: "Convite renovado e mandado de novo para {{email}}.",
       renewedNoEmail: "Convite de {{email}} renovado. O link é o mesmo.",
@@ -3341,6 +3344,8 @@ export const ptBR = {
       more: "Mais ações para {{email}}",
       changeRole: "Mudar o papel",
       cancel: "Cancelar convite",
+      // Under Cancelar convite: sending again keeps the link, so one that leaked stops only by cancelling (ADR 0089).
+      linkStays: "O link não muda ao reenviar. Se ele foi parar com quem não devia, cancele e convide de novo.",
       cancelled: "Convite de {{email}} cancelado.",
       roleTitle: "Papel de {{email}}",
       roleText: "Muda o que a pessoa recebe ao entrar. O link continua o mesmo.",

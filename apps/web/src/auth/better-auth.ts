@@ -1,4 +1,4 @@
-import { EARLY_ACCESS_HEADER } from "@agenteschat/client/lib/guards";
+import { EARLY_ACCESS_HEADER, INVITATION_TOKEN_HEADER } from "@agenteschat/client/lib/guards";
 import { humanCheckHeaders } from "@agenteschat/client/lib/human-check";
 import { createAuthClient } from "better-auth/client";
 import type { AuthClient, AuthResult } from "./client";
@@ -37,7 +37,7 @@ export function createBetterAuthClient(origin = window.location.origin, language
         (await client.signIn.email({ email, password, fetchOptions: { headers: humanCheckHeaders(humanCheck) } }))
           .error,
       ),
-    signUp: async ({ name, email, password, access }, humanCheck) =>
+    signUp: async ({ name, email, password, access, invitation }, humanCheck) =>
       toResult(
         (
           await client.signUp.email({
@@ -45,7 +45,11 @@ export function createBetterAuthClient(origin = window.location.origin, language
             email,
             password,
             fetchOptions: {
-              headers: { ...humanCheckHeaders(humanCheck), ...(access ? { [EARLY_ACCESS_HEADER]: access } : {}) },
+              headers: {
+                ...humanCheckHeaders(humanCheck),
+                ...(access ? { [EARLY_ACCESS_HEADER]: access } : {}),
+                ...(invitation ? { [INVITATION_TOKEN_HEADER]: invitation } : {}),
+              },
             },
           })
         ).error,

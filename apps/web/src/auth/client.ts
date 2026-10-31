@@ -20,10 +20,11 @@ export interface AuthClient {
   signIn(input: { email: string; password: string }, humanCheck?: string): Promise<AuthResult>;
   /**
    * Creates the account, signed in; a server that sends e-mail sends the address a link that confirms it. `access`:
-   * the early-access link's token, which opens sign-up for the address it was sent to (ADR 0078).
+   * the early-access link's token, which opens sign-up for the address it was sent to (ADR 0078). `invitation`: the
+   * email invitation's token, which proves the address it was sent to, so no link to confirm it goes (ADR 0089 §6).
    */
   signUp(
-    input: { name: string; email: string; password: string; access?: string },
+    input: { name: string; email: string; password: string; access?: string; invitation?: string },
     humanCheck?: string,
   ): Promise<AuthResult>;
   /** A new link confirming the signed-in person's own address (`email`). */

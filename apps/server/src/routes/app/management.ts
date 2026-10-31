@@ -454,9 +454,9 @@ export function managementRoutes(deps: AppDeps) {
       security,
       summary: "Invite several emails at once",
       description:
-        "One outcome per email: `invites`, each address with its own roles (ADR 0089), or `emails`, all with " +
-        "`roleIds`. `channelIds` and `note` go with every one. Only a hash of each token is stored (7-day expiry); " +
-        "the link can be copied again from the list.",
+        "One outcome per email: exactly one of `invites`, each address with its own roles (ADR 0089), or `emails`, " +
+        "all with `roleIds`. `channelIds` and `note` go with every one. Only a hash of each token is stored " +
+        "(7-day expiry); the link can be copied again from the list.",
       request: {
         params: OrgParams,
         body: body(
@@ -489,8 +489,11 @@ export function managementRoutes(deps: AppDeps) {
                 .optional()
                 .openapi({ description: "Your words, in the invitation email (ADR 0089)." }),
             })
-            .refine((b) => (b.emails?.length ?? 0) + (b.invites?.length ?? 0) > 0, {
+            .refine((b) => b.emails !== undefined || b.invites !== undefined, {
               message: "Send `emails` or `invites`",
+            })
+            .refine((b) => b.emails === undefined || b.invites === undefined, {
+              message: "Send `emails` or `invites`, not both",
             }),
         ),
       },

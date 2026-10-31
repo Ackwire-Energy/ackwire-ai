@@ -8,17 +8,19 @@ import {
   eq,
   gt,
   inArray,
+  isNotNull,
   isNull,
   like,
   lt,
   ne,
   or,
+  type SQL,
   schema,
   sql,
 } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { inviteLinkToken, safeEqual, sha256 } from "./crypto";
-import { emailCrew, emailLocale, emailsByLocale, queueEmail } from "./email";
+import { emailCrew, emailLocale, emailsByLocale, queueEmail, queueInvitationEmail } from "./email";
 import {
   CODE_EMAILS,
   CODE_LIMITS,
@@ -50,6 +52,7 @@ import {
   onUserCreated,
   requirePermission,
   sendInvitation,
+  spentClaimHash,
 } from "./organizations";
 import { enqueue } from "./outbox";
 import { givableRoleIds } from "./roles";
@@ -71,8 +74,15 @@ const {
 
 /** Requests nobody answers close after this (ADR 0068). */
 export const JOIN_REQUEST_TTL_DAYS = 14;
-/** At most this many wait in one workspace; the next ask is refused (`join.full`). */
+/** At most this many asks through a link wait in one workspace; the next ask is refused (`join.full`). */
 export const MAX_PENDING_JOIN_REQUESTS = 50;
+/**
+ * Members' suggestions waiting in one workspace (ADR 0089), counted apart from the asks so neither crowds out the
+ * other; the next is refused (`join.full`).
+ */
+export const MAX_PENDING_SUGGESTIONS = 20;
+/** One member's suggestions waiting at once (ADR 0089); the next is refused as a full workspace (`join.full`). */
+export const MAX_SUGGESTIONS_PER_MEMBER = 5;
 /** Answered or expired requests are deleted after this; a denial blocks asking again through a link until then. */
 export const JOIN_REQUEST_KEEP_DAYS = 90;
 /** What a person types: mirrored in packages/client/src/lib/join-requests.ts for the apps' fields. */
@@ -109,9 +119,14 @@ type RequestRow = typeof requests.$inferSelect;
 /** Waiting for an answer: pending and not past its 14 days. */
 const isWaiting = (r: Pick<RequestRow, "status" | "expiresAt">, now: Date) =>
   r.status === "pending" && r.expiresAt > now;
-/** A denial still kept: the address can't ask again through a link until it is deleted. */
-const isKeptDenial = (r: Pick<RequestRow, "status" | "decidedAt" | "createdAt">, now: Date) =>
-  r.status === "denied" && (r.decidedAt ?? r.createdAt).getTime() > now.getTime() - JOIN_REQUEST_KEEP_DAYS * DAY_MS;
+/**
+ * A denial still kept: the address can't ask again through a link until it is deleted. Not a member's suggestion
+ * turned down (ADR 0089): nobody at the address asked, so it isn't theirs to hear, nor to be held to.
+ */
+const isKeptDenial = (r: Pick<RequestRow, "status" | "decidedAt" | "createdAt" | "suggestedByUserId">, now: Date) =>
+  r.status === "denied" &&
+  !r.suggestedByUserId &&
+  (r.decidedAt ?? r.createdAt).getTime() > now.getTime() - JOIN_REQUEST_KEEP_DAYS * DAY_MS;
 
 const base = (publicUrl: string) => publicUrl.replace(/\/$/, "");
 /** Where an admin answers a request: Members, with it in view (`do` focuses Approve or opens Deny). */
@@ -135,11 +150,16 @@ async function addressIsMember(db: Executor, orgId: string, email: string) {
   return row !== undefined;
 }
 
-async function waitingCount(db: Executor, orgId: string, now: Date) {
+/** Members' suggestions (ADR 0089), and the asks: every other request, made through a link. */
+const suggestions = isNotNull(requests.suggestedByUserId);
+const asks = isNull(requests.suggestedByUserId);
+
+/** Requests waiting in a workspace: all of them, or only those `which` picks (`asks`, `suggestions`). */
+async function waitingCount(db: Executor, orgId: string, now: Date, which?: SQL) {
   const [row] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(requests)
-    .where(and(eq(requests.orgId, orgId), eq(requests.status, "pending"), gt(requests.expiresAt, now)));
+    .where(and(eq(requests.orgId, orgId), eq(requests.status, "pending"), gt(requests.expiresAt, now), which));
   return Number(row?.n ?? 0);
 }
 
@@ -437,7 +457,7 @@ export async function askToJoin(
     const filed = await file(deps, publicUrl, ask, true, now, codeHash(orgId, email, code), keep);
     return { status: "pending" as const, email, created: filed.created, requestId: filed.id };
   }
-  if ((await waitingCount(db, orgId, now)) >= MAX_PENDING_JOIN_REQUESTS) throw fullError();
+  if ((await waitingCount(db, orgId, now, asks)) >= MAX_PENDING_JOIN_REQUESTS) throw fullError();
   await spendLinkRequest(deps, found.link.id);
   await enqueue(db, { orgId, kind: FILE_JOIN_REQUEST_JOB, payload: { ...ask, publicUrl } });
   return { status: "pending" as const, email, created: true };
@@ -534,9 +554,21 @@ async function file(
         throw new ConflictError("You're already in this workspace", "join.member");
       if (denied) throw new ConflictError("Your request wasn't approved", "join.denied");
       if (waiting) {
+        // A member's suggestion becomes the person's own ask (ADR 0089): through this link, answered to them,
+        // and its page signs in once approved, as any ask's.
+        const own = waiting.suggestedByUserId
+          ? { linkId: ask.linkId, suggestedByUserId: null, locale: ask.locale ?? waiting.locale }
+          : {};
         await tx
           .update(requests)
-          .set({ userId: ask.userId ?? waiting.userId, name: ask.name, note: ask.note, verifiedAt: now, ...kept })
+          .set({
+            userId: ask.userId ?? waiting.userId,
+            name: ask.name,
+            note: ask.note,
+            verifiedAt: now,
+            ...own,
+            ...kept,
+          })
           .where(eq(requests.id, waiting.id));
         tookOver = waiting.id;
         return null;
@@ -544,7 +576,7 @@ async function file(
     } else if (waiting || denied || (await addressIsMember(tx, orgId, ask.email))) {
       return null;
     }
-    if ((await waitingCount(tx, orgId, now)) >= MAX_PENDING_JOIN_REQUESTS) {
+    if ((await waitingCount(tx, orgId, now, asks)) >= MAX_PENDING_JOIN_REQUESTS) {
       if (proven) throw fullError();
       return null;
     }
@@ -729,17 +761,24 @@ async function answerContext(tx: Executor, orgId: string, actorId: string, row: 
 /**
  * The account an approved request makes (ADR 0089): the address its code proved, confirmed, with the name and the
  * password the person chose, written as Better Auth writes one. The sign-up hooks' work follows the transaction
- * (`welcomeAccount`).
+ * (`welcomeAccount`); the sign-up policy (`isSignupAllowed`) doesn't run, on purpose, as an invitation's doesn't. Null
+ * when the address got an account meanwhile (a sign-up a moment ago): that one is never written over, and the
+ * approval takes it as an account that was already there.
  */
 async function makeAskedAccount(tx: Executor, row: RequestRow, passwordHash: string) {
   const id = crypto.randomUUID();
-  await tx.insert(users).values({
-    id,
-    name: row.name,
-    email: row.email,
-    emailVerified: true,
-    ...(row.locale ? { locale: row.locale } : {}),
-  });
+  const [made] = await tx
+    .insert(users)
+    .values({
+      id,
+      name: row.name,
+      email: row.email,
+      emailVerified: true,
+      ...(row.locale ? { locale: row.locale } : {}),
+    })
+    .onConflictDoNothing({ target: users.email })
+    .returning({ id: users.id });
+  if (!made) return null;
   await tx.insert(accounts).values({
     id: crypto.randomUUID(),
     accountId: id,
@@ -762,7 +801,8 @@ export type JoinApproval = { outcome: "joined" } | { outcome: "invited"; url: st
  * Approves a request with a role (member or admin, ADR 0068, 0072). Only whoever controls the address gets in: a
  * confirmed account with it joins at once when the address was proven; a proven ask with no account made with the
  * password it chose (ADR 0089) is made and joins at once; any other request gets an email invitation to it
- * (7 days), which opens sign-up for that address. The person is told by email either way.
+ * (7 days), which opens sign-up for that address. A person who asked is told by email either way; a member's
+ * suggestion gets the invitation email itself, since nobody at that address asked (ADR 0089).
  */
 export async function approveJoinRequest(
   /** `secret`: `AGENTES_SECRET`, so an invitation an approval sends has a link that can be copied again. */
@@ -782,18 +822,21 @@ export async function approveJoinRequest(
   let made: string | null = null;
   const result = await deps.db.transaction(async (tx): Promise<JoinApproval> => {
     const row = await waitingRequest(tx, orgId, id, now);
-    const context = await answerContext(tx, orgId, actorId, row);
+    let context = await answerContext(tx, orgId, actorId, row);
     // Someone with this address got in meanwhile: nothing to send.
     const already = await addressIsMember(tx, orgId, row.email);
     // Full: nobody joins, and no invitation goes out that couldn't be accepted.
     if (!already) await assertMemberRoom(tx, orgId);
+    if (!already && !context.hasAccount && row.passwordHash && row.verifiedAt) {
+      made = await makeAskedAccount(tx, row, row.passwordHash);
+      // Someone signed up with the address a moment ago: theirs is read again, as an account already there.
+      if (!made) context = await answerContext(tx, orgId, actorId, row);
+    }
+    const joining = made ?? context.joiner;
     let approval: JoinApproval = { outcome: "joined" };
     let invitationId: string | null = null;
-    if (!already && context.joiner) {
-      await joinOrganization(tx, orgId, context.joiner, role, given);
-    } else if (!already && !context.hasAccount && row.passwordHash && row.verifiedAt) {
-      made = await makeAskedAccount(tx, row, row.passwordHash);
-      await joinOrganization(tx, orgId, made, role, given);
+    if (!already && joining) {
+      await joinOrganization(tx, orgId, joining, role, given);
     } else if (!already) {
       const sent = await sendInvitation(tx, {
         orgId,
@@ -818,9 +861,13 @@ export async function approveJoinRequest(
         decidedByUserId: actorId,
         decidedAt: now,
         invitationId,
-        // The page that asked signs in only to an account this approval made (`claimJoinRequest`): an account that
-        // was already there signs in as it always does. The password went into the new account, or nowhere.
-        ...(made ? { userId: made, claimHash: row.claimHash } : { claimHash: null }),
+        // The page that asked signs in only to an account this approval made (`claimJoinRequest`): its key stays live
+        // only then. Any other approval spends it, whoever the request names, so the page reads `closed` and an
+        // account that was already there signs in as it always does. The password went into the new account, or
+        // nowhere.
+        ...(made
+          ? { userId: made, claimHash: row.claimHash }
+          : { claimHash: row.claimHash === null ? null : spentClaimHash(row.claimHash) }),
         passwordHash: null,
       })
       .where(eq(requests.id, row.id));
@@ -837,7 +884,19 @@ export async function approveJoinRequest(
       target: { type: "join_request", id: row.id },
       details: { roleIds: given, joined: approval.outcome === "joined" },
     });
-    if (!already) {
+    if (!already && row.suggestedByUserId) {
+      // Nobody at the address asked (ADR 0089): no answer, only the invitation, as anyone invited gets it.
+      if (approval.outcome === "invited" && invitationId) {
+        await queueInvitationEmail(tx, {
+          orgId,
+          invitationId,
+          email: row.email,
+          role,
+          url: approval.url,
+          inviterId: actorId,
+        });
+      }
+    } else if (!already) {
       await queueEmail(tx, {
         orgId,
         key: `join-answer:${row.id}`,
@@ -864,7 +923,8 @@ export async function approveJoinRequest(
 
 /**
  * Denies a request (`manage_members`), with an optional reason the person reads in the email (ADR 0068). Allowed
- * while the workspace is on hold too: it lets nobody in.
+ * while the workspace is on hold too: it lets nobody in. A member's suggestion is denied quietly: nobody at that
+ * address asked, so nothing is sent to it (ADR 0089).
  */
 export async function denyJoinRequest(
   deps: Deps,
@@ -891,6 +951,7 @@ export async function denyJoinRequest(
       target: { type: "join_request", id: row.id },
       details: { withReason: why !== null },
     });
+    if (row.suggestedByUserId) return;
     await queueEmail(tx, {
       orgId,
       key: `join-answer:${row.id}`,
@@ -985,8 +1046,9 @@ export async function renewInviteLink(db: Database, actorId: string, orgId: stri
 /**
  * Where the page that asked stands (ADR 0089), by the key it kept (`{requestId}.{secret}`), through the link it
  * asked with: waiting; `in` once, for an account the approval made (the caller signs that page in, and the key is
- * spent); denied, with the reason; or closed (run out, turned off, or approved for an address that signs in as it
- * always did). Anything else answers 404, as a key that matches nothing.
+ * spent); denied, with the reason; or closed (run out, turned off, joined another way, approved for an address that
+ * signs in as it always did, or its key already traded). A spent key (`spentClaimHash`) still finds its request and
+ * reads `closed`, never `in`; anything else answers 404, as a key that matches nothing.
  */
 export async function claimJoinRequest(db: Database, token: string, key: string, now = new Date()) {
   const [id, secret] = key.split(".");
@@ -995,17 +1057,23 @@ export async function claimJoinRequest(db: Database, token: string, key: string,
   const link = await findInviteLink(db, token);
   const [row] = await db.select().from(requests).where(eq(requests.id, id));
   if (!link || !row || row.linkId !== link.link.id || !row.claimHash) throw nothing();
-  if (!safeEqual(row.claimHash, sha256(secret))) throw nothing();
+  const live = sha256(secret);
+  if (!safeEqual(row.claimHash, live)) {
+    if (safeEqual(row.claimHash, spentClaimHash(live))) return { status: "closed" as const };
+    throw nothing();
+  }
   if (isWaiting(row, now)) return { status: "pending" as const };
   // The page checks every 15 s while open: a key nobody came back with for a day signs in no one.
   if ((row.decidedAt?.getTime() ?? 0) < now.getTime() - DAY_MS) return { status: "closed" as const };
+  // Live after an approval only when it made the account (`approveJoinRequest` spends it otherwise).
   if (row.status === "approved" && row.userId) {
-    const [spent] = await db
+    const [traded] = await db
       .update(requests)
-      .set({ claimHash: null })
-      .where(and(eq(requests.id, row.id), eq(requests.claimHash, row.claimHash)))
+      .set({ claimHash: spentClaimHash(live) })
+      .where(and(eq(requests.id, row.id), eq(requests.claimHash, live)))
       .returning({ id: requests.id });
-    if (!spent) throw nothing();
+    // Another page with the same key traded it a moment ago.
+    if (!traded) return { status: "closed" as const };
     return { status: "in" as const, userId: row.userId, orgId: row.orgId };
   }
   if (row.status === "denied") return { status: "denied" as const, reason: row.reason };
@@ -1016,7 +1084,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * A member who may not invite suggests someone (ADR 0089): a request with no link and no proof, from them, which the
- * people who may invite answer as any other. Approving it sends an email invitation: nobody proved the address.
+ * people who may invite answer as any other. Approving it sends an email invitation: nobody proved the address. At
+ * most 20 suggestions wait in a workspace and 5 from one member (`join.full`), apart from the asks through a link.
  */
 export async function suggestPerson(
   deps: Deps,
@@ -1062,7 +1131,11 @@ export async function suggestPerson(
     if (latest && isWaiting(latest, now)) {
       throw new ConflictError("Someone already asked for this person", "join.waiting");
     }
-    if ((await waitingCount(tx, orgId, now)) >= MAX_PENDING_JOIN_REQUESTS) throw fullError();
+    // Suggestions have room of their own, apart from the asks, and one member fills only part of it.
+    if ((await waitingCount(tx, orgId, now, suggestions)) >= MAX_PENDING_SUGGESTIONS) throw fullError();
+    if ((await waitingCount(tx, orgId, now, eq(requests.suggestedByUserId, actorId))) >= MAX_SUGGESTIONS_PER_MEMBER) {
+      throw new ConflictError("You have many suggestions waiting. Try again once some are answered.", "join.full");
+    }
     const values = {
       linkId: null,
       userId: null,
@@ -1226,24 +1299,21 @@ export async function pruneJoinRequests(deps: Deps, now = new Date()) {
         lt(outbox.createdAt, dayAgo),
       ),
     );
-  // A password nobody approved in time goes the day its request runs out (ADR 0089), and so does the page's key;
-  // an answered request keeps no password, and its key goes a day after the answer.
+  // What a request kept for its approval goes once nothing can use it (ADR 0089): a password nobody approved in time
+  // the day its request runs out, with the page's key; an answered request's password at once, and its key a day
+  // after the answer (the page checks every 15 s while open).
+  const pending = eq(requests.status, "pending");
+  const keyGoes = or(pending, lt(requests.decidedAt, dayAgo));
   await deps.db
     .update(requests)
-    .set({ passwordHash: null, claimHash: null })
+    .set({ passwordHash: null, claimHash: sql`case when ${keyGoes} then null else ${requests.claimHash} end` })
     .where(
-      and(
-        or(
-          and(eq(requests.status, "pending"), lt(requests.expiresAt, now)),
-          and(ne(requests.status, "pending"), lt(requests.decidedAt, dayAgo)),
-        ),
-        or(sql`${requests.passwordHash} is not null`, sql`${requests.claimHash} is not null`),
+      or(
+        and(pending, lt(requests.expiresAt, now), or(isNotNull(requests.passwordHash), isNotNull(requests.claimHash))),
+        and(ne(requests.status, "pending"), isNotNull(requests.passwordHash)),
+        and(ne(requests.status, "pending"), lt(requests.decidedAt, dayAgo), isNotNull(requests.claimHash)),
       ),
     );
-  await deps.db
-    .update(requests)
-    .set({ passwordHash: null })
-    .where(and(ne(requests.status, "pending"), sql`${requests.passwordHash} is not null`));
   const cutoff = new Date(now.getTime() - JOIN_REQUEST_KEEP_DAYS * DAY_MS);
   const gone = await deps.db
     .delete(requests)

@@ -53,6 +53,7 @@ import {
   List,
   Menu,
   MenuItem,
+  MenuNote,
   PlanMeter,
   Textarea,
 } from "@agenteschat/ui";
@@ -547,10 +548,13 @@ function WaitingRequests({ focus, action }: { focus?: string; action?: string })
   );
 }
 
-/** What a sent invitation's toasts say: a server that sends no email sends nothing again, the same link for longer. */
+/**
+ * What a sent invitation's toasts say: a server that sends no email sends nothing again, the same link for longer.
+ * One sent before links lasted (nothing to copy) gets a new link instead, and its old one stops opening (ADR 0089).
+ */
 const SENT_WORDS = {
-  email: { copied: "copied", resent: "resent", renewed: "renewed" },
-  link: { copied: "copiedNoEmail", resent: "resentNoEmail", renewed: "renewedNoEmail" },
+  email: { copied: "copied", resent: "resent", renewed: "renewed", newLink: "newLink" },
+  link: { copied: "copiedNoEmail", resent: "resentNoEmail", renewed: "renewedNoEmail", newLink: "newLinkNoEmail" },
 } as const;
 
 /** Pending first, then expired; the newest first in each. */
@@ -565,8 +569,8 @@ function roleWords(t: TFunction, ids: readonly string[] | undefined, roles: read
 
 /**
  * Convites enviados (ADR 0089): every invitation not accepted yet, with its link to copy at any time (the same as
- * the email's), Reenviar (the same link, 7 more days), its role to change and Cancelar with Desfazer; an expired
- * one is renewed or taken off the list.
+ * the email's), Reenviar (the same link, 7 more days: its menu says a link that leaked stops only by cancelling), its
+ * role to change and Cancelar with Desfazer; an expired one is renewed or taken off the list.
  */
 function SentInvitations() {
   const { t, i18n } = useTranslation();
@@ -614,16 +618,16 @@ function SentInvitations() {
       },
     });
   };
-  /** Sends it again with the same link (ADR 0089): `renewing` an expired one, or reminding them of a pending one. */
+  /**
+   * Sends it again with the same link (ADR 0089), or a lasting one for an invitation sent before links lasted:
+   * `renewing` an expired one, or reminding them of a pending one.
+   */
   const sendAgain = (inv: InvitationWithStatus, renewing: boolean) =>
     resend.mutate(inv.id, {
       onSuccess: (res) => {
         setResent((prev) => ({ ...prev, [inv.id]: res.expiresAt }));
-        toast.show(
-          renewing
-            ? t(`members.invitations.${words.renewed}`, { email: inv.email })
-            : t(`members.invitations.${words.resent}`, { email: inv.email, date: date(res.expiresAt) }),
-        );
+        const said = !inv.url ? words.newLink : renewing ? words.renewed : words.resent;
+        toast.show(t(`members.invitations.${said}`, { email: inv.email, date: date(res.expiresAt) }));
       },
     });
 
@@ -751,6 +755,8 @@ function SentInvitations() {
                       <MenuItem icon="trash" danger onSelect={() => takeOff(inv, "cancelled")}>
                         {t("members.invitations.cancel")}
                       </MenuItem>
+                      {/* Sending again keeps a lasting link: one that reached the wrong person stops only here. */}
+                      {inv.url && <MenuNote>{t("members.invitations.linkStays")}</MenuNote>}
                     </Menu>
                   </>
                 )}

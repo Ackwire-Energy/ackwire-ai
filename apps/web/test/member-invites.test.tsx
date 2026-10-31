@@ -348,6 +348,49 @@ describe("Members › Convites enviados", () => {
     await settle(4);
     expect(state.calls.filter((c) => c.method === "orgs.revokeInvitation").at(-1)?.args).toEqual([ORG_ID, "inv-old"]);
   });
+
+  test("the menu says Reenviar keeps the link, so cancel a leaked one; an older one gets a new link", async () => {
+    const state = seedState();
+    state.invitations.push(
+      invitation({ id: "inv-rafa", email: "rafael@acme.com" }),
+      // Sent before links lasted: nothing to copy, and sending it again changes its link.
+      invitation({ id: "inv-before", email: "before@acme.com", url: null }),
+    );
+    await members(state);
+    const sent = () => screen().getByRole("region", { name: "Convites enviados" });
+    const row = (email: string) => within(sent()).getByRole("group", { name: `Convite para ${email}` });
+    /** The row's "⋯" menu, open; the note under Cancelar convite, if any; then closed again. */
+    const noteIn = async (email: string) => {
+      await openFrom(within(row(email)).getByRole("button", { name: `Mais ações para ${email}` }));
+      const menu = screen().getByRole("menu");
+      const note = menu.querySelector(".ac-menu__note")?.textContent ?? null;
+      await act(async () => fireEvent.keyDown(menu, { key: "Escape" }));
+      await settle(2);
+      return note;
+    };
+    const lasts = "O link não muda ao reenviar. Se ele foi parar com quem não devia, cancele e convide de novo.";
+
+    // A link that lasts: where Cancelar convite is, the menu says resending won't stop one that reached someone else.
+    expect(await noteIn("rafael@acme.com")).toBe(lasts);
+    await click(within(row("rafael@acme.com")).getByRole("button", { name: "Reenviar" }));
+    await settle(4);
+    expect(text()).toMatch(/Mandei de novo para rafael@acme\.com\. O link é o mesmo e vale até \d+ \S+\./);
+
+    // One sent before: no such note, and Reenviar says its link is new and the old one stops opening.
+    expect(await noteIn("before@acme.com")).toBeNull();
+    await click(within(row("before@acme.com")).getByRole("button", { name: "Reenviar" }));
+    await settle(4);
+    expect(text()).toMatch(/Mandei de novo para before@acme\.com, com um link novo que vale até \d+ \S+\./);
+    expect(text()).toContain("O link anterior não abre mais.");
+    expect(text()).not.toMatch(/before@acme\.com\. O link é o mesmo/);
+    // From then on it lasts like the others: a link to copy, and the note.
+    expect(within(row("before@acme.com")).getByRole("button", { name: "Copiar link" })).toBeTruthy();
+    expect(await noteIn("before@acme.com")).toBe(lasts);
+    // In English too.
+    expect(createI18n("en").t("members.invitations.linkStays")).toBe(
+      "Resending keeps the link. If it reached the wrong person, cancel and invite again.",
+    );
+  });
 });
 
 describe("Members › a member who may not invite", () => {

@@ -1149,8 +1149,30 @@ export async function createInvitation(
   assertInviting(actor);
   const roleIds = await givableRoleIds(db, actor, orgId, input.roleIds ?? []);
   const channelIds = await invitableChannelIds(db, actorId, orgId, input.channelIds ?? []);
-  const email = input.email.trim().toLowerCase();
+  return inviteChecked(db, actor, actorId, orgId, { ...input, roleIds, channelIds }, now);
+}
 
+/**
+ * One invitation from a sender whose standing, roles and channels the caller checked (`createInvitation`, and
+ * `inviteMany` once for its whole batch): refused for an address already in (`conflict`) and while the workspace is
+ * full (`org.members_full`).
+ */
+async function inviteChecked(
+  db: Database,
+  actor: Membership,
+  actorId: string,
+  orgId: string,
+  input: {
+    email: string;
+    role?: MemberRole;
+    roleIds: string[];
+    channelIds: string[];
+    note?: string | null;
+    secret?: string;
+  },
+  now: Date,
+) {
+  const email = input.email.trim().toLowerCase();
   const [alreadyMember] = await db
     .select({ id: users.id })
     .from(users)
@@ -1158,30 +1180,34 @@ export async function createInvitation(
     .where(and(eq(users.email, email), eq(organizationMembers.orgId, orgId)));
   if (alreadyMember) throw new ConflictError(`${email} is already a member`);
   await assertMemberRoom(db, orgId);
-  const ownersOk = can(actor, "manage_owners");
   return sendInvitation(db, {
     orgId,
     email,
     role: input.role ?? "member",
-    roleIds,
-    channelIds,
+    roleIds: input.roleIds,
+    channelIds: input.channelIds,
     ...(input.note !== undefined ? { note: input.note?.slice(0, INVITE_NOTE_MAX) ?? null } : {}),
     invitedBy: actorId,
-    ownersOk,
+    ownersOk: can(actor, "manage_owners"),
     secret: input.secret,
     now,
   });
 }
 
-/** Changes the roles a pending invitation gives (ADR 0089): its link stays the same and nothing is sent. */
+/**
+ * Changes the roles a pending invitation gives (ADR 0089): its link stays the same and nothing is sent. Only while it
+ * still works (sending it again is what brings back one that ran out), and from a workspace that may invite.
+ */
 export async function setInvitationRoles(
   db: Database,
   actorId: string,
   orgId: string,
   invitationId: string,
   roleIdsIn: string[],
+  now = new Date(),
 ) {
   const actor = await requirePermission(db, actorId, orgId, "invite_people");
+  assertInviting(actor);
   const roleIds = await givableRoleIds(db, actor, orgId, roleIdsIn);
   const [row] = await db
     .update(organizationInvitations)
@@ -1191,6 +1217,7 @@ export async function setInvitationRoles(
         eq(organizationInvitations.id, invitationId),
         eq(organizationInvitations.orgId, orgId),
         isNull(organizationInvitations.acceptedAt),
+        gt(organizationInvitations.expiresAt, now),
       ),
     )
     .returning({ email: organizationInvitations.email });
@@ -1538,8 +1565,15 @@ export async function acceptInvitation(
     }
     await assertCanWork(tx, invitation.orgId);
     await joinOrganization(tx, invitation.orgId, user.id, invitation.role, invitation.roleIds);
-    // The channels it named, besides `general` (ADR 0089): those still there.
+    // The channels it named, besides `general` (ADR 0089): those still there. A private one only while whoever sent
+    // the invitation is still in it, as when it was sent (`invitableChannelIds`): leaving it, or the workspace, takes
+    // back what they could give.
     if (invitation.channelIds.length > 0) {
+      const inviter = invitation.invitedByUserId;
+      const inviterIn = inviter
+        ? sql`exists (select 1 from ${channelMembers}
+            where ${channelMembers.channelId} = ${channels.id} and ${channelMembers.userId} = ${inviter})`
+        : undefined;
       const still = await tx
         .select({ id: channels.id })
         .from(channels)
@@ -1549,6 +1583,7 @@ export async function acceptInvitation(
             inArray(channels.id, invitation.channelIds),
             isNull(channels.archivedAt),
             ne(channels.kind, "dm"),
+            or(eq(channels.visibility, "public"), inviterIn),
           ),
         );
       for (const channel of still) {
@@ -1576,24 +1611,38 @@ export async function acceptInvitation(
   });
 }
 
+/** The header a sign-up from an email invitation's page carries its token in (ADR 0089, `holdsInvitation`). */
+export const INVITATION_TOKEN_HEADER = "x-invitation-token";
+
 /**
- * Whether an address has an email invitation waiting (ADR 0089): its sign-up skips the "confirm your email" message,
- * since accepting confirms the address.
+ * Whether a sign-up holds an email invitation to its own address (ADR 0089): `token` is the link of one to `email`
+ * that can still be accepted (`invitedOrgId`). Such a sign-up skips the "confirm your email" message, since accepting
+ * confirms the address; an invited address signed up for without its link gets the message as always.
  */
-export async function hasWaitingInvitation(db: Database, email: string, now = new Date()) {
+export async function holdsInvitation(db: Database, email: string, token: string, now = new Date()) {
+  if (!token || token.length > 200) return false;
   const [row] = await db
     .select({ id: organizationInvitations.id })
     .from(organizationInvitations)
+    .innerJoin(organizations, eq(organizations.id, organizationInvitations.orgId))
     .where(
       and(
+        eq(organizationInvitations.tokenHash, sha256(token)),
         eq(organizationInvitations.email, email.trim().toLowerCase()),
         isNull(organizationInvitations.acceptedAt),
         gt(organizationInvitations.expiresAt, now),
+        openOrg,
       ),
-    )
-    .limit(1);
+    );
   return row !== undefined;
 }
+
+/**
+ * A request's page key once it signs in no one (ADR 0089): kept so the page that holds the key still finds its request
+ * and reads `closed`. Marked, not only hashed again: no key's hash can equal it, so even someone who saw the live hash
+ * can't hand it in as a key.
+ */
+export const spentClaimHash = (claimHash: string) => `spent:${sha256(claimHash)}`;
 
 /**
  * Adds a person to an organization (keeping an existing role), with `roleIds` (those still there), and to
@@ -1621,10 +1670,11 @@ export async function joinOrganization(
   if (!member) await assertMemberRoom(tx, orgId);
   await tx.insert(organizationMembers).values({ orgId, userId, role }).onConflictDoNothing();
   await addMemberRolesInTx(tx, orgId, userId, roleIds);
-  // Nothing a closed request kept stays: the password it chose, the page's key (ADR 0089).
-  await tx
-    .update(organizationJoinRequests)
-    .set({ status: "closed", decidedAt: new Date(), passwordHash: null, claimHash: null })
+  // Nothing a closed request kept stays (ADR 0089): the password it chose goes, and the page's key is spent, so that
+  // page reads it closed and signs in no one.
+  const closing = await tx
+    .select({ id: organizationJoinRequests.id, claimHash: organizationJoinRequests.claimHash })
+    .from(organizationJoinRequests)
     .where(
       and(
         eq(organizationJoinRequests.orgId, orgId),
@@ -1635,6 +1685,17 @@ export async function joinOrganization(
         ),
       ),
     );
+  for (const request of closing) {
+    await tx
+      .update(organizationJoinRequests)
+      .set({
+        status: "closed",
+        decidedAt: new Date(),
+        passwordHash: null,
+        claimHash: request.claimHash === null ? null : spentClaimHash(request.claimHash),
+      })
+      .where(eq(organizationJoinRequests.id, request.id));
+  }
   await assignHandle(tx, orgId, userId);
   const [general] = await tx
     .select({ id: channels.id })
@@ -1672,8 +1733,8 @@ const EMAIL = /^[^\s@,;:<>()[\]"]+@[^\s@,;:<>()[\]"]+\.[^\s@,;:<>()[\]"]+$/;
 
 /**
  * Invites several people at once: `invites`, each address with its own roles (the invite dialog, ADR 0089), or
- * `emails` all with `roleIds`. `channelIds` and `note` go with every one. Each address gets its own outcome; pending
- * invitations are not duplicated (resend them instead).
+ * `emails` all with `roleIds`, never both. `channelIds` and `note` go with every one. Each address gets its own
+ * outcome; pending invitations are not duplicated (resend them instead).
  */
 export async function inviteMany(
   db: Database,
@@ -1691,10 +1752,12 @@ export async function inviteMany(
   now = new Date(),
 ): Promise<InviteOutcome[]> {
   const actor = await requirePermission(db, actorId, orgId, "invite_people");
+  assertInviting(actor);
+  if (input.emails && input.invites) throw new ValidationError("Send `emails` or `invites`, not both");
   const asked = input.invites ?? (input.emails ?? []).map((email) => ({ email, roleIds: input.roleIds }));
   // Checked once for the batch: a role or a channel the sender may not give refuses it all.
   await givableRoleIds(db, actor, orgId, [...new Set(asked.flatMap((i) => i.roleIds ?? []))]);
-  await invitableChannelIds(db, actorId, orgId, input.channelIds ?? []);
+  const channelIds = await invitableChannelIds(db, actorId, orgId, input.channelIds ?? []);
   const rolesOf = new Map<string, string[]>();
   for (const i of asked) {
     const email = i.email.trim().toLowerCase();
@@ -1723,14 +1786,16 @@ export async function inviteMany(
       continue;
     }
     try {
-      const { invitation, token } = await createInvitation(
+      const roleIds = [...new Set(rolesOf.get(email) ?? [])];
+      const { invitation, token } = await inviteChecked(
         db,
+        actor,
         actorId,
         orgId,
         {
           email,
-          roleIds: rolesOf.get(email),
-          channelIds: input.channelIds,
+          roleIds,
+          channelIds,
           ...(input.note !== undefined ? { note: input.note } : {}),
           secret: input.secret,
         },
