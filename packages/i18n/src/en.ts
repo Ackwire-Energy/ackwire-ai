@@ -8476,28 +8476,45 @@ export const en: Translations = {
       answered: "{{name}} answered",
       expired: "{{name}} didn't answer in time",
       failed: "{{name}} couldn't answer",
+      /** Work handed off (`tell_agent`) that its agent couldn't finish. */
+      failedNote: "{{name}} couldn't finish",
       waited: "Waited {{minutes}} min",
       wentOn: "Went on without the answer",
       asked: "{{name}} asked",
+      /** Over the work an agent handed off, as it went to the other agent. */
+      wrote: "{{name}} wrote",
       answerOf: "{{name}}'s answer",
       answer: "Answer",
       noAnswer: "No answer in {{minutes}} min. {{from}} answered without it.",
       couldNot: "{{to}} couldn't answer. {{from}} went on without it.",
       private: "A talk only between {{from}} and {{to}}",
     },
-    /** Inside the reply that asked: the questions the agent asked other agents in that turn, one line each. */
+    /**
+     * Inside the reply that asked: the questions the agent asked other agents in that turn, and the work it handed
+     * them, one line each.
+     */
     consultGroup: {
       asked_one: "Asked {{count}} teammate",
       asked_other: "Asked {{count}} teammates",
+      /** Only work handed off (`tell_agent`). */
+      handed_one: "Handed off to {{count}} teammate",
+      handed_other: "Handed off to {{count}} teammates",
+      /** Questions and work handed off together. */
+      brought_one: "Brought in {{count}} teammate",
+      brought_other: "Brought in {{count}} teammates",
       progress: "{{done}} of {{total}}",
       label: "{{name}}'s questions to other agents",
+      labelRequests: "{{name}}'s requests to other agents",
       working: "{{name}} is working",
       waitingApproval: "{{name}} is waiting for an approval",
       waitingInput: "{{name}} is waiting for an answer",
       /** The consulted agent's computer is away: paused, not on a person (as the computer screen says it). */
       waitingComputer: "{{name}} is waiting for the computer",
+      /** Its part done, the agent waits on what it handed to other agents. */
+      waitingAgents: "{{name}} handed part of it on and is waiting to hear back",
       /** An answer whose question is in a reply farther up: one line where it arrived, "See" goes to that reply. */
       answeredFar: "{{to}} answered {{from}}'s question",
+      answeredRequestFar: "{{to}} answered {{from}}'s request",
       see: "See",
     },
     /** A question opened in the panel over the conversation ("Theo ⇄ Iris"): what the two agents said, read only. */
@@ -8511,6 +8528,8 @@ export const en: Translations = {
       messages_other: "{{count}} messages",
       origin: "{{from}} asked {{to}} in #{{channel}} · {{time}}",
       originDm: "{{from}} asked {{to}} · {{time}}",
+      originNote: "{{from}} handed {{to}} work in #{{channel}} · {{time}}",
+      originNoteDm: "{{from}} handed {{to}} work · {{time}}",
       readOnly: "Read only.",
       steer: "To change course, talk to {{name}}.",
       talk: "Talk to {{name}}",

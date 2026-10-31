@@ -326,7 +326,6 @@ export const featureKeysEn: FeatureTranslations = {
       expiredM: "{{name}} didn't answer in time",
       failedF: "{{name}} couldn't answer",
       failedM: "{{name}} couldn't answer",
-      asked: "{{name}} asked",
       answerOfF: "{{name}}'s answer",
       answerOfM: "{{name}}'s answer",
       noAnswer: "No answer.",

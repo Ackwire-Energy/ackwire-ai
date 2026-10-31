@@ -332,7 +332,6 @@ export const featureKeysPtBR = {
       expiredM: "O {{name}} não respondeu a tempo",
       failedF: "A {{name}} não conseguiu responder",
       failedM: "O {{name}} não conseguiu responder",
-      asked: "{{name}} perguntou",
       answerOfF: "Resposta da {{name}}",
       answerOfM: "Resposta do {{name}}",
       noAnswer: "Sem resposta.",

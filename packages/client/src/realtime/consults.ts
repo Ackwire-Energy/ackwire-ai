@@ -6,7 +6,8 @@ import type { ChannelEvent, ConsultationStatus, OpenConsult } from "../api/types
  * respondeu. Dev está escrevendo…". Kept apart from the runs: `ask_agent` never
  * waits, so the asking turn says what it asked and ends while the question is
  * still out; the line stays until the answer (or the server says it's gone:
- * `reconcileConsults`, on load and reconnect).
+ * `reconcileConsults`, on load and reconnect). Work handed off (`tell_agent`) isn't on the line: the reply that
+ * handed it shows where it is.
  */
 export type LiveConsultStatus = "asking" | ConsultationStatus;
 
@@ -28,7 +29,10 @@ export interface LiveConsult {
 /** By the asking run's id. */
 export type ConsultsState = Record<string, LiveConsult>;
 
-/** The server gives up after 15 min; a question still "out" well past that missed its event. */
+/**
+ * A question still "out" this long since the last word of it missed its event: the server gives a question more
+ * time every 15 min while its colleague is at it, and says so (`agent.consultation`).
+ */
 export const CONSULT_ASKING_MAX_MS = 20 * 60_000;
 /** "Infra respondeu. Dev está escrevendo…" until the first words; gone if nothing came for this long. */
 export const CONSULT_BACK_MAX_MS = 3 * 60_000;
@@ -72,6 +76,7 @@ export function applyConsultEvent(
   switch (e.type) {
     case "agent.consulting": {
       const ev = event as Extract<ChannelEvent, { type: "agent.consulting" }>;
+      if (ev.kind === "note") return state;
       return {
         ...state,
         [ev.runId]: {
@@ -88,6 +93,7 @@ export function applyConsultEvent(
     }
     case "agent.consulted": {
       const ev = event as Extract<ChannelEvent, { type: "agent.consulted" }>;
+      if (ev.kind === "note") return state;
       const before = state[ev.runId];
       return {
         ...state,
@@ -102,6 +108,11 @@ export function applyConsultEvent(
           at: now,
         },
       };
+    }
+    // Still out, and its colleague still at it: the line stays.
+    case "agent.consultation": {
+      const before = typeof e.runId === "string" ? state[e.runId] : undefined;
+      return before?.status === "asking" ? { ...state, [before.runId]: { ...before, at: now } } : state;
     }
     case "message.created": {
       const message = (event as Extract<ChannelEvent, { type: "message.created" }>).message;
