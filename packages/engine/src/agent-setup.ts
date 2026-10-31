@@ -155,7 +155,8 @@ const sameModel = (kind: BrainKind, a: string | null, b: string | null) =>
   (a ?? defaultBrainModel(kind)) === (b ?? defaultBrainModel(kind));
 
 type Plan =
-  | { status: "same" }
+  /** `ownAccount`: it thinks so with an account of its own, not the setup's. */
+  | { status: "same"; ownAccount?: true }
   | { status: "skipped"; reason: SetupReason; params?: Record<string, string> }
   | { status: "applied"; brain: AgentBrainInput; patch?: Partial<AgentInput>; keeps?: { account: string | null } };
 
@@ -264,14 +265,21 @@ export async function applyAgentSetup(
       // A preview's changed rows stay locked until it rolls back: it gives up on a row someone else holds rather
       // than keep the others locked while it waits.
       if (input.preview) await tx.execute(sql`set local lock_timeout = '1s'`);
+      // What new agents start with: the first one that took the AI whole or already thought so, as saved.
+      let whole: string | undefined;
       for (const t of targets) {
         const p = plan(t);
+        // Its result says what it does with the AI, not how (the plan's brain, patch and own account).
+        const ai: Omit<SetupResult, "agentId"> =
+          p.status === "skipped"
+            ? p
+            : { status: p.status, ...(p.status === "applied" && p.keeps ? { keeps: p.keeps } : {}) };
         const from = agentMissionApproval(t);
         // Its Autonomia wherever the person may set it by hand, whatever its AI can take.
         const mayManage = admin || t.ownerUserId === userId;
         const autonomy = mayManage && setup.autonomy && setup.autonomy !== from ? setup.autonomy : null;
         if (p.status !== "applied" && !autonomy) {
-          results.set(t.id, { agentId: t.id, ...p });
+          results.set(t.id, { agentId: t.id, ...ai });
           continue;
         }
         try {
@@ -288,18 +296,14 @@ export async function applyAgentSetup(
             }
           });
           applied.push(t.id);
-          const ai = p.status === "applied" ? { status: p.status, ...(p.keeps ? { keeps: p.keeps } : {}) } : p;
           results.set(t.id, { agentId: t.id, ...ai, ...(autonomy ? { autonomy: { from, to: autonomy } } : {}) });
+          // Not one that kept its own account (even one that already thought so), nor one that took only the Autonomia.
+          if (p.status === "applied" ? !p.keeps : p.status === "same" && !p.ownAccount) whole ??= t.id;
         } catch (error) {
           results.set(t.id, { agentId: t.id, status: "skipped", ...refusal(error) });
         }
       }
       if (input.preview) throw new PreviewOnly();
-      // What one of them took whole, as saved (not one that kept its own account or took only the Autonomia).
-      const whole = applied.find((id) => {
-        const r = results.get(id);
-        return r?.status !== "skipped" && !r?.keeps;
-      });
       const [saved] = whole
         ? await tx
             .select()
@@ -392,7 +396,7 @@ function planFor(
         model: brainModelLabel(kind, how.model, c.sourcePlan) ?? "",
       });
     }
-    if (thinksSo(t.brainAccountId)) return { status: "same" };
+    if (thinksSo(t.brainAccountId)) return { status: "same", ownAccount: true };
     return { status: "applied", brain: how, keeps: { account: own?.label ?? null } };
   }
   return takes;

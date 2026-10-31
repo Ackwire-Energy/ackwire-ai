@@ -447,6 +447,22 @@ describe("the Autonomia goes with the setup", () => {
     expect(await getNewAgentSetup(deps, fx.owner.id, fx.org.id)).toMatchObject({ autonomy: null });
   });
 
+  test("one that already thinks so on its own account takes the Autonomia, and new agents don't start with it", async () => {
+    const w = await world();
+    const { fx, deps } = w;
+    // Zoe already thinks this way, on Bia's plan; Dev takes all of it.
+    const setup = { ...ANA_CLAUDE(w.mac), model: null, effort: null, autonomy: "never" };
+    expect(await applyAgentSetup(deps, fx.owner.id, fx.org.id, { setup, agentIds: [w.zoe, w.dev] })).toEqual([
+      { agentId: w.zoe, status: "same", autonomy: { from: "low_risk_auto", to: "never" } },
+      { agentId: w.dev, status: "applied", autonomy: { from: "low_risk_auto", to: "never" } },
+    ]);
+    expect(await w.stored()).toMatchObject({ account: ANAS, autonomy: "never" });
+    // Zoe alone: her Autonomia changes, the setup new agents start with doesn't.
+    await applyAgentSetup(deps, fx.owner.id, fx.org.id, { setup: { ...setup, autonomy: "always" }, agentIds: [w.zoe] });
+    expect(await w.row(w.zoe)).toMatchObject({ brainAccountId: BIAS, missionCommandApproval: "always" });
+    expect(await w.stored()).toMatchObject({ account: ANAS, autonomy: "never" });
+  });
+
   test("only where the person may set it by hand: a member on their own agents, an admin on anyone's", async () => {
     const w = await world();
     const { fx, deps, bia, caio } = w;
