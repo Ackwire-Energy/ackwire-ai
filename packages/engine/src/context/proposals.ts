@@ -348,7 +348,13 @@ async function applied(db: Database, actorId: string, p: Proposal, agent: Agent,
   }
   const grants = await replaceableGrants(db, p.orgId, agent.id);
   if (grantsHash(grants) !== p.baseHash) return false;
-  await setAgentAccess(db, actorId, p.orgId, agent.id, accessInputOf(withAccessLines(grants, p.access ?? [])));
+  try {
+    await setAgentAccess(db, actorId, p.orgId, agent.id, accessInputOf(withAccessLines(grants, p.access ?? [])));
+  } catch (error) {
+    // An app disconnected since (the editor checks before it writes anything): the row went stale like any other.
+    if (error instanceof ValidationError) return false;
+    throw error;
+  }
   return true;
 }
 

@@ -41,6 +41,7 @@ import {
   recordOutcome,
   reflectThread,
   retrieveForRun,
+  revokeConnection,
   similarity,
   type ToolContext,
   updateAgent,
@@ -1313,5 +1314,19 @@ describe("proposals for teammates (one card, a row per agent and kind of change)
     const grants = await f.db.select().from(schema.agentScopes).where(eq(schema.agentScopes.agentId, ada.id));
     expect(grants.some((g) => g.connectionId === linear?.id && g.scope === "connector:*")).toBe(true);
     expect(grants.map((g) => g.scope)).not.toContain("browser:use");
+
+    // An app disconnected after the proposal can't be turned on: the row goes stale instead of failing.
+    const lia = await teammate("lia");
+    const later = await proposeFor({
+      target: "agent_instructions",
+      agentIds: [],
+      change: "",
+      access: [{ agentId: lia.id, lines: [{ id: `connector:${linear?.id}`, label: "Linear", on: true }] }],
+    });
+    await revokeConnection(f.db, f.owner.id, f.org.id, linear?.id ?? "");
+    await expect(
+      decideProposal(f.db, f.owner.id, f.org.id, later.proposals[0]?.id ?? "", "accept"),
+    ).rejects.toBeInstanceOf(ConflictError);
+    expect((await rows()).find((r) => r.agentId === lia.id)?.status).toBe("stale");
   });
 });
