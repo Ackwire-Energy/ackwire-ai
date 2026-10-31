@@ -1,6 +1,6 @@
 # 0063. Usage views: each plan account by computer, an agent's month, and its part of a limit
 
-- Status: Accepted. Amended 2026-10-30: §5 (a plan's limits where the budget was)
+- Status: Accepted. Amended 2026-10-30: §5 (a plan's limits where the budget was). Amended 2026-10-31: §5 (your plans' limits in Sua conta and, near a limit, in the account menu; the workspace's budget only where it uses the API; a budget counts only its agent's own calls)
 - Date: 2026-10-24
 - Extends: ADR 0026 (budget visibility), ADR 0059 (AI accounts belong to people; §7 usage limits)
 
@@ -40,6 +40,10 @@ Everyone in the workspace sees tokens, percentages, windows and an account's nam
 
 The agent list (`GET …/agents`, and the agent an edit returns) carries it in `brain`: `account`, the account's name (a computer's own sign-in by its plan, "Claude Max", only where that sign-in can think for the agent, ADR 0059 §3), and `usage`, the windows the runner last reported (absent while unknown). Everyone sees both, as §4 allows; the computer's name stays admins' and the owner's. The apps refetch the list when a computer's accounts change (`machine.updated` with `accounts`, sent only when a window moved a point or more). No migration and no protocol change. One rule (`usageShown`, `packages/client/src/lib/plan-usage.ts`) and one line (`planLine`, `packages/ui/src/plan-state.ts`, drawn by `PlanMeter compact` on the web and its twin on the phone) serve every place.
 
+*Amended 2026-10-31.* The workspace's budget read "0%" in a workspace that thinks only on plans (the account menu before it became a short menu, the Uso tile of the web's Settings, the phone's workspace page). It shows only where the workspace uses the API: an agent on the model brain has a key to think with (the AI status says it is ready, ADR 0061), or the agents spent through the API this month (the overview's `budgetUsedPercent` above 0). One rule, `workspaceUsesApi` in `packages/client/src/lib/plan-usage.ts`, reads what the apps already hold (the agent list's `brain`, the AI status, the overview): no new request. A budget counts only its agent's own calls (`usage_records.kind = 'agent'`, in `agentBudgetsThisMonth` and the agent page's `agentDetail`): Jev's judgments (an agent's status line, its tool groups) and the router's calls are recorded with the agent's id but never billed to its budget, and on plans alone they crossed 0.1% after a few hundred runs, which brought the budget back.
+
+The viewer's own plans' limits (`ownPlanLines`): the plans one of their agents thinks with whose limits are known, their computers' own sign-ins first (while one of their agents on that computer thinks with no account, ADR 0059 §3), then their accounts (while `usedBy` names an agent and one of its logins is signed in), named as "Seus planos" names them, with the computer when own sign-ins are on several. Configurações › Sua conta lists them with the compact line above, each opening Uso, and shows nothing while no window is known. The account menu stays short: one line under the viewer's status only while one of those plans is at its limit or from 80% (`PLAN_ALMOST`, where the compact line already says "Quase no limite"), at its limit first, then the fullest: its maker's mark, its name and its state ("Quase no limite", "No limite até 15:40"), opening Uso. The menu reads the accounts when it opens. Members without `view_usage` see their own plans' limits too: percentages, never money.
+
 ## Consequences
 
 - Positive: one place answers who spent what, where, for plans and the API together, and an agent's page tells which account carried its month.
@@ -54,3 +58,4 @@ The agent list (`GET …/agents`, and the agent an edit returns) carries it in `
 - **Inferring the account from the agent's current choice.** Wrong as soon as an agent moves accounts or several agents share a computer's own sign-in. Rejected.
 - **The usage views' own request for a list's lines (§5)** (`GET …/usage/plans`). It reads the month's usage rows to answer what the account rows already hold. Rejected.
 - **No budget at all for an agent on a plan (§5).** Its fallback and a month that began on the API spend real money. Rejected: the budget shows once it spent.
+- **Every plan in the account menu (§5).** A short menu grows a line per plan for a number that matters near a limit. Rejected: they are in Sua conta, and the menu shows one only from 80%.
