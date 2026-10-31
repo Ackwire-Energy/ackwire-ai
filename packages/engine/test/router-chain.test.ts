@@ -88,7 +88,7 @@ const byAgent = (agentId: string, body: string, minutesAgo = 0) =>
   insertMessage(f.db, {
     orgId: f.org.id,
     channelId: f.general.id,
-    author: { type: "agent", agentId, runId: null, hop: 1 },
+    author: { type: "agent", agentId, runId: null, hop: 1, stretchId: null },
     body,
     createdAt: new Date(Date.now() - minutesAgo * 60_000),
   });
@@ -341,7 +341,7 @@ describe("rules, when nothing can read the message", () => {
       orgId: f.org.id,
       channelId: f.general.id,
       threadId: backup.id,
-      author: { type: "agent", agentId: ops.id, runId: null, hop: 1 },
+      author: { type: "agent", agentId: ops.id, runId: null, hop: 1, stretchId: null },
       body: "Aqui o backup do banco falhou.",
     });
     const miss = await post(f.owner.id, "e agora?", { threadId: backup.id });

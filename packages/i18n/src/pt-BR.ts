@@ -1040,6 +1040,8 @@ export const ptBR = {
   shell: {
     // The Mac app's own title bar (ADR 0036).
     titleBar: { back: "Voltar", forward: "Avançar" },
+    /** In place of a sidebar row (an agent, a person) that failed to draw. */
+    unshown: "Não pôde ser exibido",
     more: "Mais",
     moreGroups: { schedule: "Agenda", decisions: "Decisões" },
     moreWhat: {
@@ -1514,6 +1516,11 @@ export const ptBR = {
     send: "Enviar mesmo assim",
   },
   /** An agent's card whose button opens the app's own dialog, filled in (`meta.actionCard`). */
+  /** A stretch's pause card once someone pressed Continuar (ADR 0089). */
+  stretchCard: {
+    continued: "{{name}} deixou continuar · {{time}}",
+    continuedByYou: "Você deixou continuar · {{time}}",
+  },
   actionCard: {
     connect_ai: {
       title: "Conectar uma IA para {{agents}}",
@@ -1593,6 +1600,8 @@ export const ptBR = {
       renamed: "Renomeei a conversa para <b>{{to}}</b>",
       closed: "Encerrei a conversa <b>{{title}}</b>",
     },
+    /** A kind this app doesn't know yet (a newer server's). */
+    other: "Fiz uma mudança",
     issueFields: {
       title: "o título",
       description: "a descrição",
@@ -8273,6 +8282,7 @@ export const ptBR = {
     },
     title: "Configurações",
     account: {
+      plans: "Limites dos seus planos",
       device: "Neste aparelho",
     },
     orgTitle: "Workspace",
@@ -8564,6 +8574,10 @@ export const ptBR = {
       helping: "ajudando {{article}} {{name}}",
       see: "Ver conversa",
     },
+    /** In place of a row of the conversation that failed to draw (the rest keeps working). */
+    unshown: "Esta mensagem não pôde ser exibida",
+    /** In place of a part of a message (a card, its receipts) that failed to draw (the text and the rest stay). */
+    unshownPart: "Parte desta mensagem não pôde ser exibida",
     /** Automatic lines: what reached an agent's conversation (`meta.notice`), a routine's background start. */
     notice: {
       routineHandoff: "Rotina «{{routine}}» entregou um relatório",
@@ -8855,6 +8869,20 @@ export const ptBR = {
       issue_work_start: "Pode fazer a tarefa #{{number}}.",
       issue_taken: "Peguei a tarefa #{{number}}.",
       done: "Pronto.",
+      /**
+       * A stretch's pause card (ADR 0089): `agents` their names, `count` how many, `steps` the steps agents may start on
+       * their own; `percent` the share of each one's monthly budget, and with `_cost` it in money (`amount`).
+       */
+      stretch_paused_runs_one: "{{agents}} parou para te consultar · {{steps}} passos sem você desde o seu pedido",
+      stretch_paused_runs_other: "{{agents}} pararam para te consultar · {{steps}} passos sozinhos desde o seu pedido",
+      stretch_paused_spend_one:
+        "{{agents}} parou para te consultar · usou {{percent}}% do orçamento do mês nisso sem você",
+      stretch_paused_spend_other:
+        "{{agents}} pararam para te consultar · usaram {{percent}}% do orçamento do mês nisso sem você",
+      stretch_paused_spend_cost_one:
+        "{{agents}} parou para te consultar · usou {{amount}} ({{percent}}% do orçamento do mês) nisso sem você",
+      stretch_paused_spend_cost_other:
+        "{{agents}} pararam para te consultar · usaram {{amount}} ({{percent}}% do orçamento do mês) nisso sem você",
       memory: {
         proposed: "Proposta criada: {{text}}",
         forgot: 'Memória atualizada: esqueci "{{text}}".',

@@ -27,7 +27,7 @@ async function runContext(fx: Fixture, author: "person" | "agent" = "person"): P
     author:
       author === "person"
         ? { type: "person", userId: fx.owner.id }
-        : { type: "agent", agentId: fx.agent.id, runId: null, hop: 0 },
+        : { type: "agent", agentId: fx.agent.id, runId: null, hop: 0, stretchId: null },
     body: "rotinas, por favor",
   });
   const [run] = await fx.db

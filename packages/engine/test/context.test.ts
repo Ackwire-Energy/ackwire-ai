@@ -136,7 +136,7 @@ test("a new top-level message reads the replies shown under earlier messages, no
     orgId: f.org.id,
     channelId: f.general.id,
     threadId: earlier.id,
-    author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1 },
+    author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null },
     body: "The clone hung.",
   });
   // That run answered: it ended (a new message in the channel would otherwise join it while it works).

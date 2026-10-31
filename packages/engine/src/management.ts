@@ -265,7 +265,8 @@ export async function agentDetail(db: Database, actorId: string, orgId: string, 
   const since = monthStartUtc(now);
   const [usage] = await db
     .select({
-      cost: sql<string>`coalesce(sum(${usageRecords.costNanoUsd}), 0)`,
+      // What its budget paid: its own calls, as `agentBudgetsThisMonth` counts them.
+      cost: sql<string>`coalesce(sum(${usageRecords.costNanoUsd}) filter (where ${usageRecords.kind} = 'agent'), 0)`,
       tokens: sql<string>`coalesce(sum(${usageRecords.inputTokens} + ${usageRecords.outputTokens} + ${usageRecords.cacheReadTokens} + ${usageRecords.cacheWriteTokens}), 0)`,
     })
     .from(usageRecords)

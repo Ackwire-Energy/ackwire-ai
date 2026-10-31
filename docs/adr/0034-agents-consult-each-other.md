@@ -1,6 +1,6 @@
 # 0034. Agents talk to each other: private consultations and chiming in
 
-- Status: Accepted (built; UI pending a prototype)
+- Status: Accepted (built; UI pending a prototype). Amended 2026-10-31 by ADR 0089: an agent's mention of another agent is no longer limited to once in a row (the judge reads every one, with the message it answers; the stretch limits stop a loop); §4's chime-in rule stays
 - Date: 2026-10-17
 - Extends: ADR 0013 (router), ADR 0015 (approvals), ADR 0032 (agent engine)
 

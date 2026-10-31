@@ -1,6 +1,6 @@
 # 0056. Operator API and external provisioning
 
-- Status: Accepted (2026-10-24). Amended 2026-10-25 by ADR 0065 (§10: the ready time and when the wait began, the ready email, no pairing with external provisioning, no approval step), 2026-10-26 (§10: a workspace on hold or suspended waits for no computer), 2026-10-27 by ADR 0079 (§4: limits and meters; §5: `platform_ai.threshold`; §8: billing holds, limits and the create refusal) and ADR 0076 (§5, §6: screened sessions), 2026-10-29 by ADR 0078 (the sign-up mode, the waiting list and early-access invitations), and 2026-10-30 by ADR 0082 (§5: `agent.deleted`) and ADR 0088 (§4: a workspace's deletion and deletion hold; §5: the deletion's events; §8: a deletion is no standing; §9: the deletion hold; §10: a workspace being deleted waits for no computer)
+- Status: Accepted (2026-10-24). Amended 2026-10-25 by ADR 0065 (§10: the ready time and when the wait began, the ready email, no pairing with external provisioning, no approval step), 2026-10-26 (§10: a workspace on hold or suspended waits for no computer), 2026-10-27 by ADR 0079 (§4: limits and meters; §5: `platform_ai.threshold`; §8: billing holds, limits and the create refusal) and ADR 0076 (§5, §6: screened sessions), 2026-10-29 by ADR 0078 (the sign-up mode, the waiting list and early-access invitations), 2026-10-30 by ADR 0082 (§5: `agent.deleted`) and ADR 0088 (§4: a workspace's deletion and deletion hold; §5: the deletion's events; §8: a deletion is no standing; §9: the deletion hold; §10: a workspace being deleted waits for no computer), and 2026-10-31 by ADR 0089 (§5: `run.hop_limit`)
 - Date: 2026-10-24
 - Extends: ADR 0002 (nothing private runs in the server process), ADR 0004 (configuration), ADR 0025 (connected computers)
 
@@ -59,6 +59,7 @@ The reads live in `packages/engine/src/operator.ts` and pick every field by name
 | `agent.deleted` | an agent is deleted for good (ADR 0082) | `agentId` |
 | `mail.sent` | an agent sends, replies to or forwards an email | `agentId`, `runId`, `kind`, `recipients` (how many), `domains` |
 | `run.finished` | an agent's run ends (done, failed or canceled) | `runId`, `agentId`, `brain`, `status`, `toolCalls` |
+| `run.hop_limit` | the depth backstop (`AGENT_MAX_HOPS`) stopped an agent's hand-off: the per-stretch limits stop agents long before, so some path lost its stretch (ADR 0089) | `messageId`, `hop` |
 | `task.finished` | a task on a computer ends (done, failed, canceled, or interrupted for good) | `taskId`, `agentId`, `executor`, `status` |
 | `desktop_control.ended` | a screened segment of a person's control of an agent's screen ends, having read something (ADR 0076; only with `SESSION_SCREENING`); `userId` is who was in control | `agentId`, `segmentId`, `startedAt`, `endedAt`, `screens` (how many) |
 | `content.viewed` | a review block is read (§6) | `ref` (`run:<id>`, `task:<id>` or `session:<id>`), `reason`, `operator` |

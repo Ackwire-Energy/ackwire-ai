@@ -661,6 +661,11 @@ describe("an agent's question (ask_user)", () => {
     expect(hidesBody(message({ id: "a2", author: { type: "agent", id: "dev" }, meta: { actionCard: connect } }))).toBe(
       false,
     );
+    // A stretch's pause card says who stopped and why itself (ADR 0089).
+    const paused = { kind: "stretch_paused", state: "paused", reason: "runs", limit: 50, agentIds: ["ada"] };
+    expect(hidesBody(message({ id: "a3", author: { type: "agent", id: "dev" }, meta: { actionCard: paused } }))).toBe(
+      true,
+    );
     const rows = buildRows([message({ id: "p", author: { type: "agent", id: "dev" }, createdAt: at(11) }), asked]);
     expect(rows.filter((r) => r.kind === "message").map((r) => r.kind === "message" && r.grouped)).toEqual([
       false,

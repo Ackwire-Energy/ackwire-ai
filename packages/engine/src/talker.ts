@@ -8,6 +8,7 @@ import { insertMessage, type Message, messageView } from "./messages";
 import type { Notice } from "./notices";
 import { holdsMessages } from "./run-hold";
 import { type AgentRun, addRunStep, isTerminal, replyThreadOf } from "./runs";
+import { runStretchOf } from "./stretch";
 import { loadTalkerSnapshot, type TalkerSnapshot } from "./talker-snapshot";
 import type { WaitMessageOutcome } from "./waits";
 import { withWikiLinks } from "./wiki-links";
@@ -352,7 +353,7 @@ async function postReply(
       orgId: run.orgId,
       channelId: run.channelId,
       threadId: replyThreadOf(run),
-      author: { type: "agent", agentId: agent.id, runId: null, hop: run.hop },
+      author: { type: "agent", agentId: agent.id, runId: null, hop: run.hop, stretchId: runStretchOf(locked) },
       body: text,
       meta: { talker: { runId: run.id, inReplyTo: message.id }, notice },
     });
