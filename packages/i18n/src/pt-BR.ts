@@ -8495,10 +8495,9 @@ export const ptBR = {
       stickersHelp: "Feitas do visual de cada agente, sem upload.",
       agentsTitle: "Agentes",
       level: "Agentes mandam por conta própria",
-      levelHelp:
-        "Só em conversa leve, numa mensagem logo depois da resposta. Nunca em aprovação, erro, relatório ou e-mail. Quando alguém pede, eles mandam mesmo com Nunca.",
+      levelHelp: "Só em conversa leve. Se alguém pedir, mandam mesmo em Nunca.",
       levelUnavailable: "Ainda não disponível neste servidor.",
-      levels: { never: "Nunca", sometimes: "De vez em quando", often: "Mais à vontade" },
+      levels: { never: "Nunca", sometimes: "Às vezes", often: "Bastante" },
       agentOn: "{{name}} manda GIFs e figurinhas",
       agentsNever: "Com Nunca, nenhum agente manda por conta própria. Quando alguém pede, os ligados aqui mandam.",
       noAgents: "Nenhum agente no workspace ainda.",

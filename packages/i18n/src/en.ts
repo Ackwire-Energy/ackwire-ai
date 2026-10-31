@@ -8435,10 +8435,9 @@ export const en: Translations = {
       stickersHelp: "Made from each agent's look, nothing to upload.",
       agentsTitle: "Agents",
       level: "Agents send one on their own",
-      levelHelp:
-        "Only in a light conversation, in a message right after the reply. Never in an approval, an error, a report or an email. When someone asks for one, they send it even at Never.",
+      levelHelp: "Only in a light conversation. If someone asks, they send one even at Never.",
       levelUnavailable: "Not available on this server yet.",
-      levels: { never: "Never", sometimes: "Now and then", often: "More freely" },
+      levels: { never: "Never", sometimes: "Sometimes", often: "Often" },
       agentOn: "{{name}} sends GIFs and stickers",
       agentsNever: "With Never, no agent sends one on its own. When someone asks, the ones switched on here do.",
       noAgents: "No agents in the workspace yet.",
