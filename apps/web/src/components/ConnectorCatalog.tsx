@@ -144,7 +144,7 @@ const OTHER = "other";
  * category list beside the grid (a row on phones), three suggestions on top, then every service as an even
  * tile (no tags: a check on the icon when connected). A tile opens the service over the catalog (what agents
  * could do, how it connects, Conectar); "Não achou?" connects any service by its address. A search with no match
- * (or an empty category) is an agent searching with a magnifier, in the middle, with the same way in by address.
+ * (or an empty category) is an agent searching with a magnifier, with the same way in by address.
  */
 export function ConnectorCatalogDialog({
   open,

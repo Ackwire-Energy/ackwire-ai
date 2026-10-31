@@ -98,7 +98,7 @@ describe("Adicionar conector: one catalog", () => {
     expect(names(dialog)).toEqual(["Notion", "Não achou?"]);
   });
 
-  test("nothing found: one of our agents searching, in the middle, with the way in by address", async () => {
+  test("nothing found: one of our agents searching, with the way in by address", async () => {
     const { dialog } = await open();
     const search = within(dialog).getByRole("searchbox", { name: "Buscar conector" });
     const empty = () => dialog.querySelector<HTMLElement>(".catalog__empty");
@@ -107,7 +107,7 @@ describe("Adicionar conector: one catalog", () => {
     expect(names(dialog)).toEqual([]);
     const box = empty() as HTMLElement;
     expect(box.querySelector(".ac-empty__art[aria-hidden='true'] canvas.ac-searchpx")).not.toBeNull();
-    expect(box.querySelector(".ac-empty__title")?.textContent).toBe("Nenhum conector chamado “zzz”");
+    expect(box.querySelector(".ac-empty__title")?.textContent).toBe("Nenhum conector com “zzz”");
     expect(box.querySelector(".ac-empty__text")?.textContent).toBe(
       "Você pode conectar qualquer serviço pelo endereço dele.",
     );

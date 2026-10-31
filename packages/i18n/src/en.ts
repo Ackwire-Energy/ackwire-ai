@@ -6640,7 +6640,7 @@ export const en: Translations = {
     otherText: "Connect any service by its address.",
     search: "Search connectors",
     searchPlaceholder: "Search by name or what it does",
-    empty: "No connector called “{{q}}”",
+    empty: "No connector matches “{{q}}”",
     emptyText: "You can connect any service by its address.",
     none: "No connectors yet.",
     connectedFilter: "Connected",

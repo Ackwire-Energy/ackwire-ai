@@ -3649,6 +3649,11 @@ p {
   .catalog__search {
     max-width: none;
   }
+  /* At the top, above the search's keyboard: iOS lays it over the sheet's lower half without resizing the page. */
+  .catalog__empty {
+    margin: 0 0 auto;
+    padding-top: 8px;
+  }
   .catalog-svc__act {
     flex-direction: column;
     align-items: stretch;

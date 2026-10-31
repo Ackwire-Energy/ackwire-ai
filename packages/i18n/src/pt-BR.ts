@@ -6671,7 +6671,7 @@ export const ptBR = {
     otherText: "Conecte qualquer serviço pelo endereço dele.",
     search: "Buscar conector",
     searchPlaceholder: "Buscar por nome ou o que faz",
-    empty: "Nenhum conector chamado “{{q}}”",
+    empty: "Nenhum conector com “{{q}}”",
     emptyText: "Você pode conectar qualquer serviço pelo endereço dele.",
     none: "Nenhum conector ainda.",
     connectedFilter: "Conectados",
