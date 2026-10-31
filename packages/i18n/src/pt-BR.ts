@@ -2453,6 +2453,7 @@ export const ptBR = {
           deviceCodeText: "Digite este código na página que abrir.",
           starting: "Pedindo ao {{computer}}…",
           waiting: "Esperando",
+          reconnecting: "Reconectando…",
           failed: "Não deu para entrar nessa conta. Tente de novo.",
           expired: "O tempo para entrar acabou. Tente de novo.",
           duplicate: {

@@ -649,6 +649,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   // Accounts that arrived while the dialog was open (saved with the rest on "Usar").
   const [added, setAdded] = useState<MachineAccount[]>([]);
   const [arrived, setArrived] = useState<MachineAccount | null>(null);
+  const [signInBegun, setSignInBegun] = useState(false);
   const [busy, setBusy] = useState(false);
   // "Atende outras pessoas" (ADR 0059 §5): moved onto a plan, the agent answers only its owner until they turn it on.
   const [share, setShare] = useState<{ kind: BrainKind; onlyOwner: boolean } | null>(null);
@@ -663,6 +664,12 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     useIsThisMac(org.id, view.computer?.machineId ?? "") && view.options.some((o) => o.reason === "tool_off");
   const machines = view.machines;
   const homeOf = (k: BrainKind) => (k === "model" ? null : homeFor(k, work.machineId, machines));
+  // While a sign-in is under way on the agent's computer, no brain there reads as offline: the sign-in's block says
+  // how it stands (Reconnecting while that computer is away a moment).
+  const away = (k: BrainKind) => {
+    const where = homeOf(k);
+    return !where?.online && !(signInBegun && where?.machineId === view.computer?.machineId);
+  };
   const home = homeOf(kind);
   const moves = home && home.machineId !== work.machineId ? home : null;
   const option = (home?.options ?? view.options).find((o) => o.kind === kind);
@@ -863,7 +870,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           {t("agentPage.work.brain.none")}
         </>
       );
-    if (!where.online)
+    if (away(k))
       return (
         <>
           <Icon name="alert" size={14} />
@@ -1124,7 +1131,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           disabled={!can("brain")}
           options={(["model", "claude_code", "codex"] as const).map((k) => {
             const where = homeOf(k);
-            const off = k !== "model" && !where?.online;
+            const off = k !== "model" && away(k);
             return {
               value: k,
               // The computer brains by their makers' marks; thinking through the organization, the agent itself.
@@ -1163,6 +1170,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                       setAccount(a.id);
                       setAdding(false);
                     }}
+                    onSigningIn={setSignInBegun}
                   />
                 ) : (
                   planRows

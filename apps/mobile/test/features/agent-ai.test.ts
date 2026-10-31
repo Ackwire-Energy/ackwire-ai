@@ -222,7 +222,7 @@ describe("the agent's AI", () => {
     const [flow, parts] = await Promise.all([read("AddAccount.tsx"), read("parts.tsx")]);
     // Typed, pasted with the keyboard or by Colar: one path, and only this sign-in's code sends with no tap.
     expect(flow).toMatch(
-      /const take = \(text: string\) => \{[^}]*if \(!plan && login && isSignInCode\(text, login\.url\)\) void send\(text\);/,
+      /const take = \(text: string\) => \{[^}]*if \(!plan && login && ready && !loading && isSignInCode\(text, login\.url\)\) void send\(text\);/,
     );
     expect(flow).toContain("onChangeText={take}");
     expect(flow).toContain("onPasted={take}");
@@ -420,5 +420,38 @@ describe("the agent's AI", () => {
         ["send", "starting", "sent", "startFailed"].map((k) => t(`agentPage.work.brain.add.${k}`, { computer })),
       ).toEqual(said[lang]);
     }
+  });
+
+  test("a sign-in through a restart or a reconnect: Reconectando while reads fail, the same sign-in kept, then a failure", async () => {
+    // The flow and its panel are components the tests can't render: what they wire in, as text. How long reads may
+    // fail, and which failures pass, are the client's `loginRead` (its tests pin them).
+    const read = (file: string) => Bun.file(new URL(`../../src/features/ai/${file}`, import.meta.url).pathname).text();
+    const [flow, connect] = await Promise.all([read("AddAccount.tsx"), read("ConnectAiSteps.tsx")]);
+    expect(flow).toContain("const read = loginRead(status);");
+    expect(flow).not.toContain("status.isError");
+    expect(flow).toMatch(/read === "reconnecting" \? t\("agentPage\.work\.brain\.add\.reconnecting"\)/);
+    // Past the wait, the computer that didn't answer; what the computer says still shows at once.
+    expect(flow).toContain('const noAnswer = startFailed || read === "noAnswer";');
+    expect(flow).toMatch(/: noAnswer\s*\?\s*t\("agentPage\.work\.brain\.add\.startFailed", \{ computer \}\)/);
+    expect(flow).toContain('result?.state === "failed" || result?.state === "expired"');
+    // Its computer offline mid-sign-in: the steps stay, with no offline card or key over them, and nothing restarts.
+    expect(connect).toContain(
+      'const steps = ready || gate.state === "preparing" || (gate.state === "offline" && signingIn);',
+    );
+    expect(connect).toContain('} else if (gate.state === "offline" && !signingIn) {');
+    expect(connect).toContain("offersKeyNow(gate, hold !== null) && !signingIn");
+    expect(connect).toContain("onSigningIn={setSigningIn}");
+    expect(flow).toMatch(
+      /useEffect\(\(\) => \{\s*onSigningIn\?\.\(begun\);\s*return \(\) => onSigningIn\?\.\(false\);/,
+    );
+    // Claude's code meanwhile: Reconectando by its field, a code that lands there waits for Enviar (`take` sends only
+    // to a ready computer), and one that couldn't go says the computer didn't answer, never to check the code.
+    expect(flow).toContain('side={sent || read === "reconnecting" ? waiting : undefined}');
+    expect(flow).toContain('setSendFailed(loginReadPasses(error) ? "away" : "refused");');
+    expect(flow).toMatch(
+      /sendFailed === "away"\s*\?\s*t\("agentPage\.work\.brain\.add\.startFailed", \{ computer \}\)/,
+    );
+    expect((await translator("pt-BR"))("agentPage.work.brain.add.reconnecting")).toBe("Reconectando…");
+    expect((await translator("en"))("agentPage.work.brain.add.reconnecting")).toBe("Reconnecting…");
   });
 });

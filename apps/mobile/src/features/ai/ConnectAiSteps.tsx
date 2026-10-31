@@ -665,6 +665,8 @@ function PlanSteps({
   const [failedAccount, setFailedAccount] = useState<MachineAccount | null>(null);
   const [saving, setSaving] = useState(false);
   const [other, setOther] = useState(false);
+  // A sign-in begun here keeps its steps while its computer is offline: they say Reconectando, and it goes on.
+  const [signingIn, setSigningIn] = useState(false);
   // It turned ready while the person watched (here or on another plan's page), or they came because it did.
   const waited = gates.waited || justReady === true;
 
@@ -742,7 +744,7 @@ function PlanSteps({
         <InfoCard icon="clock">{t(coding ? "connectAi.wait.key" : "connectAi.wait.signIn")}</InfoCard>
       </View>
     );
-  } else if (gate.state === "offline") {
+  } else if (gate.state === "offline" && !signingIn) {
     wait = (
       <InfoCard icon="laptop">
         {edition === "cloud"
@@ -792,7 +794,7 @@ function PlanSteps({
   }
 
   // The steps stay in view while they wait (their computer actions off); a reason alone otherwise.
-  const steps = ready || gate.state === "preparing";
+  const steps = ready || gate.state === "preparing" || (gate.state === "offline" && signingIn);
   // The sign-in asked for: a row's, or one more login of the account with `email`; never the agent's own then.
   const hint: Pick<ExistingSignIn, "again" | "email"> | undefined = login ?? (email ? { email } : undefined);
   const ownable = ready && !hint && ownSignInFor(choice, view, gates.row);
@@ -806,7 +808,7 @@ function PlanSteps({
   return (
     <View style={styles.gap}>
       {wait}
-      {offersKeyNow(gate, hold !== null) ? useKey : null}
+      {offersKeyNow(gate, hold !== null) && !signingIn ? useKey : null}
       {ready && waited ? (
         // A card of its own, where the wait's was: never read as the head of the account choice under it.
         <InfoCard icon="check" live>
@@ -841,6 +843,7 @@ function PlanSteps({
           loading={gates.catching}
           onAdded={(a) => void assign(a)}
           onUse={(a) => void assign(a)}
+          onSigningIn={setSigningIn}
         />
       ) : null}
       {steps || ownable ? repliesRow : null}
