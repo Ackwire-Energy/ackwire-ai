@@ -9260,6 +9260,8 @@ export const en: Translations = {
     staysBehind: "What you added to {{name}} stays there. Disconnect what's yours first.",
     /** Opens the settings where that key, connection or mailbox is disconnected. */
     disconnect: "Disconnect {{name}}",
+    /** Where plans are billed: what the person pays for, in the workspaces that close and those they leave. */
+    plan: "Plans you pay for stop renewing. Nothing is refunded.",
     serverOwner: "You set up this server. Its own settings will have no owner here, only in its environment.",
     blockers: "Before you can delete it",
     soleOwner: "You're the only owner of {{name}}. Make someone else an owner, or delete {{name}}.",

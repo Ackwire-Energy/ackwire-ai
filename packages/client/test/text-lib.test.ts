@@ -1,16 +1,19 @@
 import { expect, test } from "bun:test";
 import { plainLines } from "../src/lib/markdown";
-import { around, emailTypoFix, excerpt, matchesName, namesMatch, webmailOf } from "../src/lib/text";
+import { around, emailTypoFix, excerpt, matchesName, webmailOf } from "../src/lib/text";
 
-test("a name typed to confirm: any case, spaces around, width forms and invisible characters ignored", () => {
-  expect(namesMatch("acme  ", "Acme")).toBe(true);
-  expect(namesMatch("Ａｃｍｅ", "Acme")).toBe(true);
-  // A co-owner's zero-width space or soft hyphen in the name can't make it untypeable.
-  expect(namesMatch("Acme Corp", "Ac​me Cor­p")).toBe(true);
-  expect(namesMatch("Acme", "Acme Corp")).toBe(false);
-  expect(namesMatch("", "Acme")).toBe(false);
+test("a name typed to confirm: case, extra spaces, width forms and invisible characters aside, never a part", () => {
+  expect(matchesName(" new  AGENT ", "New agent")).toBe(true);
+  expect(matchesName("Jose\u0301", "José")).toBe(true);
+  expect(matchesName("Ａｃｍｅ", "Acme")).toBe(true);
+  // A zero-width space or a soft hyphen put in the name can't make it untypeable.
+  expect(matchesName("Acme Corp", "Ac\u200Bme Cor\u00ADp")).toBe(true);
+  expect(matchesName("Acme \u200B Corp", "acme corp")).toBe(true);
+  expect(matchesName("New", "New agent")).toBe(false);
+  expect(matchesName("New agent 2", "New agent")).toBe(false);
+  expect(matchesName("", "Acme")).toBe(false);
   // A name of nothing but those needs nothing typed.
-  expect(namesMatch("", "​⁠")).toBe(true);
+  expect(matchesName("", "\u200B\u2060")).toBe(true);
 });
 
 test("a misspelled webmail domain gets one fix; anything else is left alone", () => {
@@ -101,12 +104,4 @@ test("instructions in Markdown read as plain words: past headings and rules, wit
       "> Run `pg_query` on my_table, see ![the map](map.png) and [[Processos/Onboarding|o onboarding]].\n\n```\nrm -rf /\n```\n\n| a | b |\n| --- | --- |\n| 1 | 2 |",
     ),
   ).toEqual(["Run pg_query on my_table, see the map and o onboarding."]);
-});
-
-test("a name typed to confirm: case and extra spaces aside, never a part or a blank", () => {
-  expect(matchesName(" new  AGENT ", "New agent")).toBe(true);
-  expect(matchesName("Jose\u0301", "José")).toBe(true);
-  expect(matchesName("New", "New agent")).toBe(false);
-  expect(matchesName("New agent 2", "New agent")).toBe(false);
-  expect(matchesName("", " ")).toBe(false);
 });

@@ -98,7 +98,7 @@ const Proof = z.object({
   password: z.string().min(1).max(128).optional(),
 });
 const PROOF_TEXT =
-  "Proof that it's you: the `code` emailed by `POST …/deletion/code` (403 `reauth.code` without one; `reauth.code_wrong`, `reauth.code_expired` or `reauth.code_tries` when refused; it works once, for this deletion only). On a server that sends no email, `password` instead (403 `reauth.password` without it or wrong, 429 after 5 in 15 minutes).";
+  "Proof that it's you: the `code` emailed by `POST …/deletion/code` (403 `reauth.code` without one; `reauth.code_wrong`, `reauth.code_expired` or `reauth.code_tries` when refused, and 429 `reauth.code_limit` for every code once the account's 10 wrong tries of the day are spent; it works once, for this deletion only). On a server that sends no email, `password` instead (403 `reauth.password` without it or wrong, 429 after 5 in 15 minutes).";
 const Sent = json(
   z.object({
     email: z.string().openapi({ description: "Where it went: the account's own address." }),
@@ -636,7 +636,7 @@ export function accountRoutes(deps: AppDeps) {
       security,
       summary: "Email a code to delete your account",
       description:
-        "To your own address: the proof `DELETE /account` takes, for that only. It works for 10 minutes, and once. Refused with `sole_owner` first, as `DELETE /account` is. 60 s between two (`reauth.code_wait` with `retryIn`), 5 an hour and 10 a day per account (`reauth.code_limit`). 409 `reauth.no_email` on a server that sends no email: the password is the proof there.",
+        "To your own address: the proof `DELETE /account` takes, for that only. It works for 10 minutes, and once. Refused with `sole_owner` first, as `DELETE /account` is. 60 s between two (`reauth.code_wait` with `retryIn`), 5 an hour and 10 a day per account, and none once its 10 wrong tries of the day are spent (`reauth.code_limit`). 409 `reauth.no_email` on a server that sends no email: the password is the proof there.",
       responses: {
         202: Sent,
         401: errors[401],
@@ -676,7 +676,7 @@ export function accountRoutes(deps: AppDeps) {
         409: errorResponse(
           "Only owner of a workspace with others in it (`sole_owner`), or a code refused (`reauth.code_expired`, `reauth.code_tries`)",
         ),
-        429: errorResponse("Too many password tries (`rate_limited`)"),
+        429: errorResponse("Too many tries today (`reauth.code_limit`), or password tries (`rate_limited`)"),
       },
     }),
     async (c) => {
@@ -986,7 +986,9 @@ export function accountRoutes(deps: AppDeps) {
           "Being deleted",
         ),
         ...errors,
-        429: errorResponse("Too many tries, or too many deletions of it today (`rate_limited`)"),
+        429: errorResponse(
+          "Too many tries today (`reauth.code_limit`), or password tries or deletions of it today (`rate_limited`)",
+        ),
       },
     }),
     async (c) => {
@@ -1012,7 +1014,7 @@ export function accountRoutes(deps: AppDeps) {
       security,
       summary: "Email a code to delete a workspace (owners)",
       description:
-        "To your own address: the proof `POST …/deletion` takes, for this workspace only. It works for 10 minutes, and once. 60 s between two (`reauth.code_wait` with `retryIn`), 5 an hour and 10 a day per account (`reauth.code_limit`). 409 `reauth.no_email` on a server that sends no email: the password is the proof there. 403 `forbidden` for anyone but an owner, `org.suspended` while suspended.",
+        "To your own address: the proof `POST …/deletion` takes, for this workspace only. It works for 10 minutes, and once. 60 s between two (`reauth.code_wait` with `retryIn`), 5 an hour and 10 a day per account, and none once its 10 wrong tries of the day are spent (`reauth.code_limit`). 409 `reauth.no_email` on a server that sends no email: the password is the proof there. 403 `forbidden` for anyone but an owner, `org.suspended` while suspended.",
       request: { params: OrgParams },
       responses: {
         202: Sent,

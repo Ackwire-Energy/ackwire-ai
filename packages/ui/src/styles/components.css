@@ -417,7 +417,8 @@ samp {
   background: var(--sunken);
   color: var(--muted);
 }
-/* An emailed code's digits, spaced and centered (asking to join, deleting). */
+/* An emailed code's digits, spaced and centered (asking to join, deleting): the letter spacing trails the last one,
+   so the left padding takes the same. */
 .ac-input--code {
   padding-left: calc(var(--control-px-md) + 0.3em);
   text-align: center;

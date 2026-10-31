@@ -18,6 +18,7 @@ const LINE_ICON: Record<AccountDeletionLine["kind"], IconName> = {
   leaves: "arrowRight",
   computers: "computer",
   staysBehind: "key",
+  plan: "coin",
   messages: "message",
   serverOwner: "settings",
 };
@@ -26,8 +27,8 @@ const LINE_ICON: Record<AccountDeletionLine["kind"], IconName> = {
  * Deleting my account (the account menu), from its preflight: a workspace that still needs me as its only owner
  * comes first, as a checklist with its two ways out (one still being set up is finished or deleted in its
  * onboarding). Otherwise what closes, what I leave, the computers removed, what stays behind with where to disconnect
- * it, and that my messages stay without my name, then the code emailed to me (or my password, where no email goes)
- * and the button. Deleted: to the sign-in.
+ * it, where plans are billed that mine stop renewing, and that my messages stay without my name, then the code emailed
+ * to me (or my password, where no email goes) and the button. Deleted: to the sign-in.
  */
 export function DeleteAccountDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t, i18n } = useTranslation();
@@ -58,7 +59,12 @@ export function DeleteAccountDialog({ open, onClose }: { open: boolean; onClose:
   }, [open, reset]);
   const data = plan.data;
   const blockers = data?.soleOwner ?? [];
-  const lines = data ? accountDeletionLines(t, i18n.language, data, { cloud: config?.workspaceComputer === true }) : [];
+  const lines = data
+    ? accountDeletionLines(t, i18n.language, data, {
+        cloud: config?.workspaceComputer === true,
+        billing: Boolean(config?.billingUrl),
+      })
+    : [];
   const ready = data !== undefined && blockers.length === 0;
   const inSetup = (orgId: string) => me?.organizations.some((o) => o.id === orgId && settingUp(o)) === true;
 

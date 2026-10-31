@@ -150,6 +150,8 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "deleteAccount.computers_one",
     "deleteAccount.computers_other",
     "deleteAccount.serverOwner",
+    // Where no email goes, which the Cloud always sends, a password proves it's you (`deletionProof`).
+    "proof.addPassword",
   ],
   email: [
     "auth.newLinkSent",
@@ -162,6 +164,10 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "computerSetup.email.",
     "connectAi.wait.email",
     "deleteOrg.goes.people",
+    // Deleting's emailed code (`deletionProof`): asked for, sent and refused only where the server sends email.
+    "proof.willSend",
+    "proof.sent",
+    "errors.reauth.code",
   ],
   apiKey: ["agentPage.work.brain.fallbackTitle"],
   // A message nobody mentions still gets an agent: routing.mine (the chip and its help line), routing.by (Settings),

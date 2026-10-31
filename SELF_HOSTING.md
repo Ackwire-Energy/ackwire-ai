@@ -701,7 +701,10 @@ organization can also keep its files in a bucket of its own (**Settings → Stor
 code emailed to them (with no email set up, their password instead): it closes for everyone at once,
 its agents stop, and it is deleted for good 7 days later. Until then any owner can restore it. An
 account is deleted at once from the account menu, or the account page on the phone, with the same
-proof, and the workspaces where it was the only member close with it and go 7 days later. What lives outside the server stays:
+proof, and the workspaces where it was the only member close with it and go 7 days later. With Sign
+in with Apple, register `EMAIL_FROM`'s domain in Apple Developer › Sign in with Apple for Email
+Communication (SPF and DKIM passing): someone who hid their address gets mail only from senders
+registered there, so without it they would get no code. What lives outside the server stays:
 the agents' folders on connected computers until the runner is removed, files in a workspace's own
 bucket, a GitHub App installed on GitHub, and your database dumps until `BACKUP_RETENTION_DAYS` drops
 them. With email set up, the members hear when a workspace is deleted and when it comes back.

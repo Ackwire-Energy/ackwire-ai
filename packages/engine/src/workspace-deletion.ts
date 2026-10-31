@@ -180,7 +180,35 @@ const DAY_MS = 86_400_000;
 const deletionCodeId = (userId: string, orgId: string | null) =>
   `deletion-code:${userId}:${orgId ? `workspace:${orgId}` : "account"}`;
 const deletionCodeHash = (id: string, code: string) => sha256(`${id}:${code}`);
-const lockDeletionCode = (tx: Executor, id: string) => tx.execute(sql`select pg_advisory_xact_lock(hashtext(${id}))`);
+/** A person's codes are sent and checked one at a time, whatever they delete: their wrong tries are counted together. */
+const lockDeletionCodes = (tx: Executor, userId: string) =>
+  tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`deletion-code:${userId}`}))`);
+/** The account's wrong tries in its day (`CODE_LIMITS.wrongDay`): one `verifications` row, the count till the day ends. */
+const wrongTriesId = (userId: string) => `deletion-code:${userId}:wrong`;
+async function wrongTries(tx: Executor, userId: string, now: Date) {
+  const [row] = await tx
+    .select()
+    .from(verifications)
+    .where(eq(verifications.identifier, wrongTriesId(userId)));
+  return row && row.expiresAt > now
+    ? { count: Number(row.value), until: row.expiresAt }
+    : { count: 0, until: new Date(now.getTime() + DAY_MS) };
+}
+const triesSpent = async (tx: Executor, userId: string, now: Date) =>
+  (await wrongTries(tx, userId, now)).count >= CODE_LIMITS.wrongDay;
+async function countWrongTry(tx: Executor, userId: string, now: Date) {
+  const id = wrongTriesId(userId);
+  const { count, until } = await wrongTries(tx, userId, now);
+  await tx.delete(verifications).where(eq(verifications.identifier, id));
+  await tx.insert(verifications).values({
+    id: randomUUID(),
+    identifier: id,
+    value: String(count + 1),
+    expiresAt: until,
+    createdAt: now,
+    updatedAt: now,
+  });
+}
 /** A code waiting, in its row's `value`: its hash and wrong tries, never the code. */
 type WaitingCode = { hash: string; tries: number };
 const waitingCode = (value: string): WaitingCode | null => {
@@ -195,8 +223,9 @@ const waitingCode = (value: string): WaitingCode | null => {
 /**
  * Emails `userId` a code that proves it's them before deleting the workspace `orgId`, or their account when it is null
  * (ADR 0088 §2), with the rules of every emailed code (`email-codes.ts`): it works for 10 minutes, a new one replaces it
- * after 60 s at the soonest, and an account gets `CODE_LIMITS` an hour and a day. The email says what it deletes and
- * whom to write to if it wasn't them. Only where the server sends email: the routes check it.
+ * after 60 s at the soonest, and an account gets `CODE_LIMITS` an hour and a day, and none once its wrong tries for the
+ * day are spent, since no code would be taken then. The email says what it deletes and whom to write to if it wasn't
+ * them. Only where the server sends email: the routes check it.
  */
 export async function sendDeletionCode(
   deps: { db: Database; rateLimiter: RateLimiter; emails: { publicUrl: string; support?: string | null } },
@@ -214,7 +243,8 @@ export async function sendDeletionCode(
   if (orgId && !org) throw new NotFoundError("This workspace no longer exists");
   const id = deletionCodeId(userId, orgId);
   return db.transaction(async (tx) => {
-    await lockDeletionCode(tx, id);
+    await lockDeletionCodes(tx, userId);
+    if (await triesSpent(tx, userId, now)) throw codeLimit("reauth");
     const [row] = await tx
       .select({ sentAt: verifications.createdAt })
       .from(verifications)
@@ -263,25 +293,22 @@ export async function sendDeletionCode(
 
 /**
  * Spends the code that proves it's `userId` before deleting the workspace `orgId` (their account when null): right, it
- * is used up, so it proves one deletion. A wrong one counts against it (`CODE_TRIES`). Every try counts against the
- * account's day (`CODE_LIMITS.wrongDay`) before the check, so a guess past it learns nothing. A code sent for anything
- * else, or to anyone else, is wrong here. Throws `reauth.code_wrong`, `reauth.code_expired` or `reauth.code_tries`.
+ * is used up, so it proves one deletion. A wrong one counts against it (`CODE_TRIES`) and against the account's day
+ * (`CODE_LIMITS.wrongDay`): once that is spent, every code is refused unread until the day ends, so a guess past it
+ * learns nothing. A code sent for anything else, or to anyone else, is wrong here. Throws `reauth.code_wrong`,
+ * `reauth.code_expired`, `reauth.code_tries` or, for the day's, `reauth.code_limit`.
  */
 export async function spendDeletionCode(
-  deps: { db: Database; rateLimiter: RateLimiter },
+  deps: { db: Database },
   userId: string,
   orgId: string | null,
   code: string,
   now = new Date(),
 ) {
-  const day = await deps.rateLimiter.consume(`deletion-code:tries:${userId}`, {
-    limit: CODE_LIMITS.wrongDay,
-    windowMs: DAY_MS,
-  });
-  if (!day.allowed) throw codeRefusal("reauth", "tries");
   const id = deletionCodeId(userId, orgId);
   const refused = await deps.db.transaction(async (tx) => {
-    await lockDeletionCode(tx, id);
+    await lockDeletionCodes(tx, userId);
+    if (await triesSpent(tx, userId, now)) return "limit";
     const [row] = await tx.select().from(verifications).where(eq(verifications.identifier, id));
     const waiting = row ? waitingCode(row.value) : null;
     const verdict = codeVerdict(
@@ -300,8 +327,10 @@ export async function spendDeletionCode(
       .update(verifications)
       .set({ value: JSON.stringify({ ...waiting, tries } satisfies WaitingCode), updatedAt: now })
       .where(eq(verifications.identifier, id));
+    await countWrongTry(tx, userId, now);
     return tries >= CODE_TRIES ? "tries" : "wrong";
   });
+  if (refused === "limit") throw codeLimit("reauth");
   if (refused) throw codeRefusal("reauth", refused);
 }
 

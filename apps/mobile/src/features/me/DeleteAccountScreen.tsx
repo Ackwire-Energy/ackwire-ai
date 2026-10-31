@@ -30,13 +30,15 @@ const LINE_ICON: Record<AccountDeletionLine["kind"], IconName> = {
   leaves: "out",
   computers: "laptop",
   staysBehind: "lock",
+  plan: "clock",
   messages: "chat",
   serverOwner: "server",
 };
 
 /**
  * Apagar conta (App Store 5.1.1(v)): what goes and what stays, from the preflight (what closes, what they leave, the
- * computers removed, what stays behind with where to disconnect it on the website), then a hold. A workspace that
+ * computers removed, what stays behind with where to disconnect it on the website, and where plans are billed that
+ * theirs stop renewing), then a hold. A workspace that
  * still needs this person as its only owner comes first, with its two ways out on the website (People, or deleting
  * it; its onboarding, while it's still being set up). Then the proof that it's them (ADR 0088 §2): a code emailed to
  * them, or on a server that sends no email their password, which the website adds first to an account without one.
@@ -74,7 +76,10 @@ export function DeleteAccountScreen() {
   const ready = toSend === null || toSend.ready;
   const web = (path: string) => openPage(`${serverUrl()}${path}`);
   const lines = plan.data
-    ? accountDeletionLines(t, i18n.language, plan.data, { cloud: config?.workspaceComputer === true })
+    ? accountDeletionLines(t, i18n.language, plan.data, {
+        cloud: config?.workspaceComputer === true,
+        billing: Boolean(config?.billingUrl),
+      })
     : [];
   const inSetup = (id: string) => me?.organizations.some((o) => o.id === id && settingUp(o)) === true;
   // Where the website's account menu adds a password: a workspace of theirs that is open.

@@ -339,6 +339,7 @@ describe("deleting your account (the account menu)", () => {
         serverOwner: false,
       },
     });
+    state.authConfig = { ...state.authConfig, billingUrl: "https://billing.example.com" };
     // Kept in the address: a sign-in again comes back to it.
     const { router } = await open(`/org/${ORG_ID}/issues?account=delete`, { state });
     const dialog = screen().getByRole("dialog", { name: "Apagar a sua conta?" });
@@ -349,6 +350,8 @@ describe("deleting your account (the account menu)", () => {
       "Você sai de Beta.",
       "Seu computador conectado a Beta sai de lá: MacBook.",
       "O que você adicionou em Beta continua lá. Desconecte antes o que for seu.",
+      // Where plans are billed.
+      "Os planos que você paga param de renovar. Nada é reembolsado.",
       "Suas mensagens ficam nos workspaces sem o seu nome.",
     ])
       expect(dialog.textContent).toContain(line);

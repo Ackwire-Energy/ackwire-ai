@@ -9310,6 +9310,7 @@ export const ptBR = {
     closingLate: "{{name}} já está sendo apagado.",
     staysBehind: "O que você adicionou em {{name}} continua lá. Desconecte antes o que for seu.",
     disconnect: "Desconectar {{name}}",
+    plan: "Os planos que você paga param de renovar. Nada é reembolsado.",
     serverOwner: "Você instalou este servidor. As configurações dele vão ficar sem dono aqui, só no ambiente dele.",
     blockers: "Antes de apagar",
     soleOwner: "Você é a única pessoa dona de {{name}}. Torne outra pessoa dona, ou apague {{name}}.",

@@ -85,7 +85,7 @@ describe("the code that proves it's you before deleting (ADR 0088 §2)", () => {
     expect(await f.db.select().from(schema.verifications)).toEqual([]);
   });
 
-  test("five wrong tries use a code up, and an account gets ten tries a day", async () => {
+  test("five wrong tries use a code up, and an account gets ten wrong tries a day", async () => {
     const c = clock();
     const deps = await codes(c);
     await sendDeletionCode(deps, f.owner.id, f.org.id, c.now());
@@ -96,18 +96,25 @@ describe("the code that proves it's you before deleting (ADR 0088 §2)", () => {
     expect(tries).toEqual([...Array(4).fill("reauth.code_wrong"), "reauth.code_tries"]);
     expect(await answer(spendDeletionCode(deps, f.owner.id, f.org.id, right, c.now()))).toBe("reauth.code_tries");
 
-    // A new code works, until the day's ten tries are spent: right or wrong, a try past them is refused unread.
+    // A new code works, and a right one counts against nothing: 8 wrong tries so far today.
     c.pass(61_000);
     await sendDeletionCode(deps, f.owner.id, f.org.id, c.now());
     const next = await lastCode();
     const other = next === "000000" ? "111111" : "000000";
     for (let i = 0; i < 3; i++) await spendDeletionCode(deps, f.owner.id, f.org.id, other, c.now()).catch(() => null);
     expect(await answer(spendDeletionCode(deps, f.owner.id, f.org.id, next, c.now()))).toBe("ok");
+
+    // The tenth, on another deletion's code: past it a right code is refused unread, and no code goes out.
     c.pass(61_000);
     await sendDeletionCode(deps, f.owner.id, null, c.now());
-    expect(await answer(spendDeletionCode(deps, f.owner.id, null, await lastCode(), c.now()))).toBe(
-      "reauth.code_tries",
-    );
+    const account = await lastCode();
+    const miss = account === "000000" ? "111111" : "000000";
+    for (let i = 0; i < 2; i++)
+      expect(await answer(spendDeletionCode(deps, f.owner.id, null, miss, c.now()))).toBe("reauth.code_wrong");
+    expect(await answer(spendDeletionCode(deps, f.owner.id, null, account, c.now()))).toBe("reauth.code_limit");
+    const mails = (await sentMail()).length;
+    expect(await answer(sendDeletionCode(deps, f.owner.id, null, c.now()))).toBe("reauth.code_limit");
+    expect(await sentMail()).toHaveLength(mails);
     c.pass(86_400_000);
     await sendDeletionCode(deps, f.owner.id, null, c.now());
     expect(await answer(spendDeletionCode(deps, f.owner.id, null, await lastCode(), c.now()))).toBe("ok");

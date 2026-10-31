@@ -5,7 +5,7 @@ import { deletionDueFrom, deletionProof, proofToSend } from "@agenteschat/client
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { formatShortDate, formatTime } from "@agenteschat/client/lib/format";
 import { sendsEmail, typedCode } from "@agenteschat/client/lib/join-requests";
-import { namesMatch } from "@agenteschat/client/lib/text";
+import { matchesName } from "@agenteschat/client/lib/text";
 import {
   Alert,
   Button,
@@ -56,7 +56,7 @@ export function DeleteWorkspaceDialog({
   }, [open, reset]);
   const edition = computerEdition(undefined, config?.workspaceComputer);
   const due = deletionDueFrom();
-  const named = namesMatch(name, org.name);
+  const named = matchesName(name, org.name);
   const submit = () => del.mutate(proof.input, { onSuccess: onDeleted });
 
   return (

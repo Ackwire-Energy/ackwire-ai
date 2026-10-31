@@ -64,6 +64,17 @@ describe("what deleting an account does, line by line", () => {
       ],
     });
   });
+
+  test("where plans are billed, those they pay for stop renewing: said once, only with a workspace to have one", () => {
+    const kinds = (patch: Partial<AccountDeletionPlan>, billing: boolean) =>
+      accountDeletionLines(t, "en", plan(patch), { cloud: true, billing, now }).map((l) => l.kind);
+    const leaves = { leaves: [{ id: "w", name: "Team", role: "member" as const }] };
+    const closes = { closes: [{ id: "a", name: "Solo" }] };
+    expect(kinds(leaves, true)).toEqual(["leaves", "plan", "messages"]);
+    expect(kinds({ ...closes, ...leaves }, true)).toEqual(["closes", "leaves", "plan", "messages"]);
+    expect(kinds({ ...closes, ...leaves }, false)).not.toContain("plan");
+    expect(kinds({}, true)).toEqual(["messages"]);
+  });
 });
 
 test("a workspace still being set up is finished or deleted in its onboarding, which has no People yet", () => {

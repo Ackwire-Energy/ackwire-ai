@@ -47,7 +47,7 @@ export function proofToSend(kind: DeletionProof, typed: { sent: boolean; code: s
 
 /** One line of what deleting the account does, by what it is about (the apps pick an icon for each). */
 export interface AccountDeletionLine {
-  kind: "closes" | "leaves" | "computers" | "staysBehind" | "messages" | "serverOwner";
+  kind: "closes" | "leaves" | "computers" | "staysBehind" | "plan" | "messages" | "serverOwner";
   text: string;
   /** What stays behind (`staysBehind`), each with the settings section of its workspace where it is disconnected. */
   links?: { label: string; orgId: string; section: "keys" | "connectors" }[];
@@ -70,14 +70,15 @@ export const soleOwnerWaysOut = (orgId: string, settingUp: boolean) =>
 /**
  * What deleting the account does, in the person's words, from its preflight: the workspaces that close with it (one
  * being deleted already on its own date) and those they leave, per workspace the computers removed and what stays
- * behind with where to disconnect each, that their messages stay, and, on a self-hosted server they set up, that its
- * settings lose their owner here.
+ * behind with where to disconnect each, where plans are billed (`billing`) that those they pay for stop renewing with
+ * nothing refunded, that their messages stay, and, on a self-hosted server they set up, that its settings lose their
+ * owner here.
  */
 export function accountDeletionLines(
   t: TFunction,
   locale: string,
   plan: AccountDeletionPlan,
-  { cloud, now = new Date() }: { cloud: boolean; now?: Date },
+  { cloud, billing = false, now = new Date() }: { cloud: boolean; billing?: boolean; now?: Date },
 ): AccountDeletionLine[] {
   const and = t("newAgent.and");
   const names = (items: { name: string }[]) =>
@@ -125,6 +126,8 @@ export function accountDeletionLines(
         section: staysBehindSection(item.kind),
       })),
     });
+  if (billing && plan.closes.length + plan.leaves.length > 0)
+    lines.push({ kind: "plan", text: t("deleteAccount.plan") });
   lines.push({ kind: "messages", text: t("deleteAccount.messages") });
   if (plan.serverOwner && !cloud) lines.push({ kind: "serverOwner", text: t("deleteAccount.serverOwner") });
   return lines;
