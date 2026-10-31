@@ -3420,8 +3420,8 @@ function ChannelDetails({
   // What "on its own" means for my messages: who reads the ones that mention nobody.
   const routing = useAiStatus(org.id, open).data?.routing;
   const update = useUpdateChannel(org.id, channel.id);
-  // The channel's creator may too, but the API doesn't say who created it yet: admins only.
-  const editable = can(org.role, "configure");
+  // Who manages channels, and the channel's creator (as the server allows).
+  const editable = can(org, "manage_channels") || channel.createdByUserId === me.user.id;
   const navigate = useNavigate();
   const toast = useToast();
   const categories = useChannelCategories(org.id);
@@ -3900,7 +3900,7 @@ function AddToChannelOffer({ channelId, agentId, onDone }: { channelId: string; 
   const add = useAddChannelMember(org.id);
   const toast = useToast();
   const name = dir.agentById.get(agentId)?.name ?? t("channel.unknownAgent");
-  const admin = can(org.role, "configure");
+  const admin = can(org, "manage_channels");
   return (
     <div className="mention-offer" role="status">
       <span className="small">{t("mentions.offer", { name })}</span>

@@ -221,6 +221,7 @@ export {
   RecurrencePicker,
   type RecurrencePickerProps,
 } from "./components/RecurrencePicker";
+export { RoleMark } from "./components/RoleMark";
 export {
   BrowserMark,
   type BrowserPixelKind,

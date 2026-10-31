@@ -202,7 +202,7 @@ export async function cancelRun(
     .leftJoin(channels, eq(channels.id, agentRuns.channelId))
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.orgId, orgId)));
   if (!row) throw new NotFoundError("Run not found");
-  const allowed = row.requester === userId || row.ownerUserId === userId || can(membership.role, "manage_agents");
+  const allowed = row.requester === userId || row.ownerUserId === userId || can(membership, "manage_agents");
   if (!allowed)
     throw new ForbiddenError("Only who asked, the agent's owner or an admin can stop it", "run.cancel_forbidden");
 

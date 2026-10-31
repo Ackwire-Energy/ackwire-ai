@@ -789,7 +789,6 @@ export const featureKeysEn: FeatureTranslations = {
     title: "You",
     role: {
       owner: "owner",
-      admin: "admin",
       member: "member",
     },
     appearance: "Appearance",
@@ -1423,7 +1422,8 @@ export const featureKeysEn: FeatureTranslations = {
   },
   joinRequests: {
     share: "Share the link",
-    rolesHint: "Members chat, create tasks and approve their own agents. Admins also manage members, agents and keys.",
+    roles: "Roles",
+    rolesHint: "They join with the roles turned on. With none, they may do what Everyone may.",
   },
   humanCheck: {
     title: "Quick check",

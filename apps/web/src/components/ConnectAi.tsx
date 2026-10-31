@@ -153,7 +153,7 @@ function ConnectAiDialog({
   const navigate = useNavigate();
   const add = useAddCredential(org.id);
   // An API key is the organization's (admins); a plan thinks only for its owner's agents (ADR 0059 §3).
-  const mayAddKey = can(org.role, "manage_credentials");
+  const mayAddKey = can(org, "manage_credentials");
   const mine = dir.agents.filter((a) => a.ownerUserId === me.user.id);
   // An agent's card names whom to choose from. Opened for one agent, it is for that agent alone: the title names it,
   // so no For offers another. Anywhere else every agent of the viewer's stays a choice.
@@ -186,7 +186,7 @@ function ConnectAiDialog({
   const theirs = one !== undefined && one.ownerUserId !== me.user.id;
   // The one agent the dialog is for: what the person already has comes first for it while it has no AI. An admin sees
   // the accounts of someone else's agent, locked, and may give it a workspace key (ADR 0041 §4).
-  const mayUseKeys = can(org.role, "manage_agents");
+  const mayUseKeys = can(org, "manage_agents");
   const forId = one?.id ?? (agents.length === 1 ? agents[0]?.id : undefined);
   const forAgent = forId ? { id: forId, name: dir.agentById.get(forId)?.name ?? "" } : undefined;
   const gates = usePlanGates(org.id, reader ?? (theirs && mayUseKeys ? one?.id : undefined));

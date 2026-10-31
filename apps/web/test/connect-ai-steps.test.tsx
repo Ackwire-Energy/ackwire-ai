@@ -17,7 +17,16 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, ATLAS_ID, createFakeApi, fakeAgentBrain, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import {
+  ADA_ID,
+  ATLAS_ID,
+  createFakeApi,
+  fakeAgentBrain,
+  fakeMachinesOf,
+  meAsAdmin,
+  ORG_ID,
+  seedState,
+} from "./fake-api";
 import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
@@ -99,14 +108,15 @@ async function connect({
   crew?: boolean;
   /** Where the dialog opens: Settings' button, or a link that asks for it. */
   path?: string;
-  /** Walter's role in the workspace, when he isn't its owner. */
+  /** Walter's role in the workspace, when he isn't its owner ("admin": a member with the "Admin" role). */
   role?: "admin" | "member";
   /** Over Ada's row (what she thinks with, whom she replies to). */
   ada?: Partial<Agent>;
 } = {}) {
   const state = seedState();
   const workspace = state.me?.organizations[0];
-  if (role && workspace) workspace.role = role;
+  if (role === "admin") meAsAdmin(state);
+  else if (role && workspace) workspace.role = role;
   const ada = state.agents[0];
   if (crew && ada) {
     state.agents.push({ ...ada, id: LIA_ID, name: "Lia", handle: "lia" });

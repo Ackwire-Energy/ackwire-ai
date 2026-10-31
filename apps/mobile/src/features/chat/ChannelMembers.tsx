@@ -1,4 +1,12 @@
-import { type AiRouting, keys, type RosterMember, useAiStatus, useApi, useRoster } from "@agenteschat/client";
+import {
+  type AiRouting,
+  keys,
+  type RosterMember,
+  useAiStatus,
+  useApi,
+  useChannels,
+  useRoster,
+} from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
@@ -63,8 +71,9 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
   const c = useColors();
   const roster = useRoster(orgId, channelId);
   const routing = useAiStatus(orgId).data?.routing;
-  // The channel's creator may too, but the API doesn't say who created it yet: admins only (as on the web).
-  const editable = can(org?.role, "configure");
+  // Who manages channels, or the channel's creator (ADR 0085; the server checks it again).
+  const creator = useChannels(orgId).data?.find((x) => x.id === channelId)?.createdByUserId ?? null;
+  const editable = can(org, "manage_channels") || (meId !== null && creator === meId);
   const [q, setQ] = useState("");
   const all: Who[] = (roster.data ?? []).map((m: RosterMember) => ({
     kind: m.type === "agent" ? "agent" : "person",

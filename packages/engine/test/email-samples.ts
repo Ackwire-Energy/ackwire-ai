@@ -26,7 +26,7 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     inviterName: "Ana Souza",
     inviterEmail: "ana@padariasouza.com.br",
     url: `${APP}/invite/T7xQ2mVb9KpL`,
-    role: "admin",
+    role: "owner",
   },
   "invite_request.en": {
     kind: "invite_request",

@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { Agent } from "@agenteschat/client";
+import type { Agent, OrgSummary } from "@agenteschat/client";
 import { audienceNotice, audienceSummary, canEditAudience, canTalk } from "@agenteschat/client/lib/audience";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createI18n } from "@/i18n";
@@ -140,9 +140,11 @@ describe("audience rules", () => {
   test("who can talk and who can edit", () => {
     expect(canTalk(theo({}))).toBe(true);
     expect(canTalk(theo({ canTalk: false }))).toBe(false);
-    expect(canEditAudience("member", theo({}), "u1")).toBe(true);
-    expect(canEditAudience("member", theo({}), "u2")).toBe(false);
-    expect(canEditAudience("admin", theo({}), "u2")).toBe(true);
+    const member: OrgSummary = { id: ORG_ID, name: "Acme", role: "member", permissions: ["read", "post"] };
+    const admin: OrgSummary = { ...member, permissions: ["read", "post", "manage_agents"] };
+    expect(canEditAudience(member, theo({}), "u1")).toBe(true);
+    expect(canEditAudience(member, theo({}), "u2")).toBe(false);
+    expect(canEditAudience(admin, theo({}), "u2")).toBe(true);
   });
 
   test("agent.unavailable: the notice shows for me and the 'pensando…' goes away", async () => {

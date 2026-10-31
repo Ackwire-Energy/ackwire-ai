@@ -101,7 +101,7 @@ function SkillRow({ skill, users, onOpen }: { skill: Skill; users: number | null
 export function SkillsSection() {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const admin = can(org.role, "configure");
+  const admin = can(org, "manage_agents");
   const skills = useSkills(org.id, admin);
   const [installing, setInstalling] = useState(false);
   const [all, setAll] = useState(false);

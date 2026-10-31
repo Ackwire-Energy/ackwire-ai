@@ -149,7 +149,7 @@ describe("a code proves the address", () => {
     const [account] = await fx().db.select().from(schema.users).where(eq(schema.users.id, "u_cris"));
     expect(account?.emailVerified).toBe(false);
     // Whoever holds that account may not own the mailbox: approving sends an invitation to it.
-    const approved = await approveJoinRequest(deps(), PUBLIC, fx().owner.id, fx().org.id, row?.id ?? "", "member", NOW);
+    const approved = await approveJoinRequest(deps(), PUBLIC, fx().owner.id, fx().org.id, row?.id ?? "", [], NOW);
     expect(approved.outcome).toBe("invited");
 
     // A confirmed account asks as itself, with no code.
@@ -372,7 +372,7 @@ describe("approving a proven request", () => {
         fx().owner.id,
         fx().org.id,
         list.find((r) => r.email === email)?.id ?? "",
-        "member",
+        [],
         NOW,
       );
     expect(await approve("bia@example.com")).toEqual({ outcome: "joined" });
@@ -400,7 +400,7 @@ describe("approving a proven request", () => {
       });
     const [row] = await listWaitingJoinRequests(fx().db, fx().owner.id, fx().org.id, NOW);
     expect(row).toMatchObject({ email: "gil@example.com", verified: true, confirmed: true });
-    expect(await approveJoinRequest(deps(), PUBLIC, fx().owner.id, fx().org.id, row?.id ?? "", "member", NOW)).toEqual({
+    expect(await approveJoinRequest(deps(), PUBLIC, fx().owner.id, fx().org.id, row?.id ?? "", [], NOW)).toEqual({
       outcome: "joined",
     });
     const [member] = await fx()

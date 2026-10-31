@@ -16,6 +16,7 @@ import {
 } from "@agenteschat/db";
 import type { ModelMessage, SystemBlock } from "@agenteschat/providers";
 import type { Agent } from "./agents";
+import { talksToAgents } from "./audience";
 import { personOfMessage, runAuthority } from "./authority";
 import { caches } from "./cache";
 import { summarizeScopes } from "./capabilities";
@@ -507,7 +508,13 @@ export async function buildRunContext(
   // The rest of the org's agents: channel members are described in "Where you are".
   const team =
     options.team && channel.kind !== "forum"
-      ? teamPrompt(await loadTeam(db, run.orgId), agent.id, requester, new Set(others.map((m) => m.agentId as string)))
+      ? teamPrompt(
+          await loadTeam(db, run.orgId),
+          agent.id,
+          requester,
+          new Set(others.map((m) => m.agentId as string)),
+          await talksToAgents(db, run.orgId, requester),
+        )
       : "";
   const memberList = members
     .map((m) => (m.agentHandle ? `${m.agentName} (@${m.agentHandle}, agent)` : `${m.userName ?? "unknown"} (person)`))

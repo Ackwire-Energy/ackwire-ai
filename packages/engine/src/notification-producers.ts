@@ -10,7 +10,7 @@ import {
   notify,
   resolveNotifications,
 } from "./notifications";
-import type { MemberRole } from "./organizations";
+import { maySql, type RolePermission } from "./permissions";
 
 /**
  * Where notifications come from: each flow calls one of these after
@@ -711,13 +711,20 @@ export async function resolveRoutinePaused(deps: NotificationDeps, orgId: string
   await resolveNotifications(deps, orgId, { groupKeyPrefix: `routine_paused:${routineId}:` });
 }
 
-/** The organization's owners and admins (or only the roles given). */
-const adminsOf = async (deps: NotificationDeps, orgId: string, roles: MemberRole[] = ["owner", "admin"]) =>
+/** Who in the organization may `permission` (ADR 0085), or only its owners. */
+const adminsOf = async (deps: NotificationDeps, orgId: string, permission: RolePermission | "owners") =>
   (
     await deps.db
       .select({ userId: organizationMembers.userId })
       .from(organizationMembers)
-      .where(and(eq(organizationMembers.orgId, orgId), inArray(organizationMembers.role, roles)))
+      .where(
+        and(
+          eq(organizationMembers.orgId, orgId),
+          permission === "owners"
+            ? eq(organizationMembers.role, "owner")
+            : maySql(orgId, organizationMembers.userId, permission),
+        ),
+      )
   ).map((a) => a.userId);
 
 // ── Connected computers ───────────────────────────────────────────────────────
@@ -734,7 +741,7 @@ export async function notifyMachineConnected(
 ) {
   await notify(deps, {
     orgId: machine.orgId,
-    userIds: await adminsOf(deps, machine.orgId),
+    userIds: await adminsOf(deps, machine.orgId, "configure"),
     kind: "machine_connected",
     groupKey: `machine_connected:${machine.id}`,
     actor: person(actorId),
@@ -754,7 +761,7 @@ export async function notifyComputerReady(
 ) {
   await notify(deps, {
     orgId: machine.orgId,
-    userIds: await adminsOf(deps, machine.orgId, ["owner"]),
+    userIds: await adminsOf(deps, machine.orgId, "owners"),
     kind: "computer_ready",
     groupKey: `computer_ready:${machine.id}:${readyAt.getTime()}`,
     source: { machineId: machine.id, label: machine.name },
@@ -782,7 +789,7 @@ export async function notifyOrgStanding(
       : {};
   await notify(deps, {
     orgId,
-    userIds: await adminsOf(deps, orgId),
+    userIds: await adminsOf(deps, orgId, "configure"),
     kind: "org_standing",
     groupKey: `org_standing:${orgId}:${standing.changedAt?.getTime() ?? 0}`,
     source: {},
@@ -803,7 +810,7 @@ export async function notifyAgentHold(
 ) {
   await notify(deps, {
     orgId: hold.orgId,
-    userIds: [await agentOwner(deps, hold.agentId), ...(await adminsOf(deps, hold.orgId))],
+    userIds: [await agentOwner(deps, hold.agentId), ...(await adminsOf(deps, hold.orgId, "manage_agents"))],
     kind: "org_standing",
     groupKey: `${agentHoldGroup(hold.agentId)}${hold.at.getTime()}:${hold.kind}`,
     source: { agentId: hold.agentId, label: hold.name },

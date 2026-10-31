@@ -89,8 +89,7 @@ export function NoAiCard({ message }: { message: Message }) {
   const state = aiStateOf(status.data, card.agentId);
   const ready = state !== undefined && state !== "no_ai" && answer !== "still_missing";
   // The same people as "Continuar": who asked, the agent's owner or an admin.
-  const mayAnswer =
-    card.forUserId === me.user.id || agent?.ownerUserId === me.user.id || can(org.role, "manage_agents");
+  const mayAnswer = card.forUserId === me.user.id || agent?.ownerUserId === me.user.id || can(org, "manage_agents");
   const title = answering
     ? t("noAi.card.answering", { name })
     : ready
@@ -171,7 +170,7 @@ export function KeyGuardDialog({
   const { t } = useTranslation();
   const { org } = useOrg();
   const connect = useConnectAi();
-  const admin = connect !== null && can(org.role, "manage_credentials");
+  const admin = connect !== null && can(org, "manage_credentials");
   return (
     <Dialog
       open={ask !== null}

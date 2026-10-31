@@ -612,7 +612,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const { agent, g, saved, can, draft, ownerFirst } = useAgentEdit();
   const work = useWork();
   const models = useModels();
-  const credentials = useCredentials(org.id, canDo(org.role, "manage_credentials"));
+  const credentials = useCredentials(org.id, canDo(org, "manage_credentials"));
   const platform = usePlatformKey(org.id);
   const settings = useSettings(org.id);
   // Answering through the API needs a key: the workspace's own, or the server's.
@@ -1153,7 +1153,7 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
   // from here and pick it (ADR 0036).
   const thisMac = useThisMac(org.id);
   const agentsHere = useAgentsHere();
-  const thisMacFree = agentsHere && canDo(org.role, "post") && thisMac.isSuccess && !thisMac.data;
+  const thisMacFree = agentsHere && canDo(org, "pair_computers") && thisMac.isSuccess && !thisMac.data;
   const [busy, setBusy] = useState(false);
   const view = work.brain.data;
   const brain = view?.brain ?? "model";
@@ -1476,7 +1476,7 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
             </SettingNote>
           )}
           {blocked && inDesktopApp() && (
-            <ThisMacButton orgId={org.id} canPair={canDo(org.role, "post")} folders={false} />
+            <ThisMacButton orgId={org.id} canPair={canDo(org, "pair_computers")} folders={false} />
           )}
           {on && (moveTo ? !ready(moveTo) : work.browser.data?.reason === "switched_off") && (
             <BrowserSteps

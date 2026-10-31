@@ -49,7 +49,7 @@ export function NoAiCard({ message: m }: { message: Message }) {
   const state = aiStateOf(status.data, card.agentId);
   const ready = state !== undefined && state !== "no_ai" && answer !== "still_missing";
   const mayAnswer =
-    card.forUserId === meId || (meId !== null && agent?.ownerUserId === meId) || can(org?.role, "manage_agents");
+    card.forUserId === meId || (meId !== null && agent?.ownerUserId === meId) || can(org, "manage_agents");
   const answering = answer === "answering";
   const title = answering
     ? t("noAi.card.answering", { name })

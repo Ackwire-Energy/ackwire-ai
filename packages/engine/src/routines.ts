@@ -16,7 +16,7 @@ import {
 } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import type { ArtifactDeps } from "./artifacts";
-import { audienceError, canTalkTo } from "./audience";
+import { audienceError, canTalkTo, talksToAgents } from "./audience";
 import { recordAudit } from "./audit";
 import { brainOf } from "./brain-settings";
 import type { BrainKind } from "./brains/types";
@@ -43,6 +43,7 @@ import { getMessage, insertMessageWithRuns, messageView, replyExcerpt } from "./
 import { resolveRoutinePaused } from "./notification-producers";
 import { can, getMembership, requirePermission } from "./organizations";
 import { PermanentJobError } from "./outbox";
+import { maySql } from "./permissions";
 import {
   type RoutineAccess,
   type RoutineBrief,
@@ -504,7 +505,7 @@ async function viewerRights(
   const [member, owners, channelRows, joined] = await Promise.all([
     lookup(viewerId ? [viewerId] : [], () =>
       db
-        .select({ role: organizationMembers.role })
+        .select({ may: maySql(orgId, viewerId ?? "", "manage_routines") })
         .from(organizationMembers)
         .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, viewerId ?? ""))),
     ),
@@ -532,7 +533,7 @@ async function viewerRights(
     ),
   ]);
   const [me] = member;
-  const admin = me ? can(me.role, "manage_agents") : false;
+  const admin = me?.may === true;
   const ownerOf = new Map(owners.map((a) => [a.id, a.ownerUserId]));
   const publicChannels = new Set(
     channelRows.filter((c) => c.kind === "channel" && c.visibility === "public").map((c) => c.id),
@@ -875,7 +876,7 @@ async function resolveTrigger(
 /** Admins, or the agent's owner. */
 async function requireRoutineManager(db: Database, actorId: string, orgId: string, agentId: string) {
   const membership = await requirePermission(db, actorId, orgId, "read");
-  if (can(membership.role, "manage_agents")) return;
+  if (can(membership, "manage_routines")) return;
   const agent = await getAgent(db, orgId, agentId);
   if (agent?.ownerUserId !== actorId) throw new ForbiddenError("Only an admin or the agent's owner can do this");
 }
@@ -911,7 +912,7 @@ async function checkTarget(
     );
   if (!creatorId) return;
   const access = await requireChannelAccess(db, creatorId, orgId, target.channelId).catch(() => null);
-  if (!access || !can(access.membership.role, "post")) {
+  if (!access || !can(access.membership, "post")) {
     throw new ValidationError(
       "Who created the routine must be in that conversation and able to post there",
       "routine.creator_cannot_post",
@@ -989,7 +990,7 @@ export async function createRoutine(
   const agent = await getAgent(db, orgId, input.agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
   // A routine asks the agent on its creator's behalf: only people who can talk to it create one.
-  if (!canTalkTo(agent, actorId)) throw await audienceError(db, agent);
+  if (!canTalkTo(agent, actorId, await talksToAgents(db, orgId, actorId))) throw await audienceError(db, agent);
   const prompt = input.prompt.trim().slice(0, 10_000);
   if (!prompt) throw new ValidationError("Say what the agent should do", "routine.prompt_required");
   await checkTarget(db, orgId, agent.id, input.target, actorId);
@@ -1068,7 +1069,7 @@ async function loadRoutine(db: Database, orgId: string, id: string, options: { d
 /** Edit: its creator, admins, or the agent's owner. */
 async function requireRoutineEditor(db: Database, actorId: string, orgId: string, routine: RoutineRow) {
   const membership = await requirePermission(db, actorId, orgId, "read");
-  if (routine.createdByUserId === actorId || can(membership.role, "manage_agents")) return;
+  if (routine.createdByUserId === actorId || can(membership, "manage_routines")) return;
   const agent = await getAgent(db, orgId, routine.agentId);
   if (agent?.ownerUserId !== actorId) {
     throw new ForbiddenError(
@@ -1117,7 +1118,8 @@ export async function updateRoutine(
   }
   const agent = await getAgent(db, orgId, agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  if (set.agentId && !canTalkTo(agent, actorId)) throw await audienceError(db, agent);
+  if (set.agentId && !canTalkTo(agent, actorId, await talksToAgents(db, orgId, actorId)))
+    throw await audienceError(db, agent);
   if (patch.name !== undefined) {
     const name = patch.name.trim().slice(0, 120);
     if (!name) throw new ValidationError("Give the routine a name", "routine.name_required");
@@ -1260,7 +1262,7 @@ export async function duplicateRoutine(
   await requireRoutineManager(db, actorId, orgId, current.agentId);
   const agent = await getAgent(db, orgId, current.agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  if (!canTalkTo(agent, actorId)) throw await audienceError(db, agent);
+  if (!canTalkTo(agent, actorId, await talksToAgents(db, orgId, actorId))) throw await audienceError(db, agent);
   // Whoever copies it becomes its creator: they must be able to post where it reports.
   await checkTarget(db, orgId, agent.id, targetOf(current), actorId);
   const { id: _id, createdAt: _c, updatedAt: _u, lastRunAt: _l, deletedAt: _d, ...copy } = current;
@@ -1533,7 +1535,7 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
   const agent = await getAgent(db, routine.orgId, routine.agentId);
   if (!agent || agent.archivedAt) return paused("agent_archived");
   // Its creator can no longer talk to the agent.
-  if (!canTalkTo(agent, creator)) return paused("audience");
+  if (!canTalkTo(agent, creator, can(membership, "talk_to_agents"))) return paused("audience");
   const once = routine.triggerType === "once";
   // It ran: a one-off is done (it stays listed, inactive).
   const ran = () =>
@@ -1631,7 +1633,7 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
     if (!member) return paused("agent_not_in_channel");
     deliverTo = { channelId: target.channelId, threadId: target.type === "conversation" ? target.threadId : null };
   } else {
-    if (!can(membership.role, "post")) return paused("creator_no_access");
+    if (!can(membership, "post")) return paused("creator_no_access");
     deliverTo = { channelId: (await openDm(db, creator, routine.orgId, { agentId: agent.id })).id, threadId: null };
   }
 
@@ -1711,7 +1713,7 @@ export async function takeOverRoutine(
   await requireRoutineManager(db, actorId, orgId, current.agentId);
   const agent = await getAgent(db, orgId, current.agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  if (!canTalkTo(agent, actorId)) throw await audienceError(db, agent);
+  if (!canTalkTo(agent, actorId, await talksToAgents(db, orgId, actorId))) throw await audienceError(db, agent);
   const target = targetOf(current);
   if (
     (target.type === "channel" || target.type === "conversation") &&
@@ -1793,10 +1795,10 @@ export async function createReminder(
   },
 ): Promise<ReminderView> {
   const { db } = deps;
-  await requirePermission(db, requesterId, orgId, "post");
+  const membership = await requirePermission(db, requesterId, orgId, "post");
   const agent = await getAgent(db, orgId, input.agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  if (!canTalkTo(agent, requesterId)) throw await audienceError(db, agent);
+  if (!canTalkTo(agent, requesterId, can(membership, "talk_to_agents"))) throw await audienceError(db, agent);
   const message = input.message.trim().slice(0, 2000);
   if (!message) throw new ValidationError("Say what to remind", "reminder.text_required");
   if (input.forUserId && input.forUserId !== requesterId) {
@@ -1919,7 +1921,7 @@ export async function createReminderFromApp(
   const { db } = deps;
   const { channel, membership } = await requireChannelAccess(db, requesterId, orgId, input.channelId);
   if (channel.kind === "forum") throw new NotFoundError("Channel not found");
-  if (!can(membership.role, "post")) throw new ForbiddenError();
+  if (!can(membership, "post")) throw new ForbiddenError();
   if (Number.isNaN(input.at.getTime()) || input.at.getTime() <= now.getTime()) {
     throw new ValidationError("That time has already passed.", "when.past");
   }
@@ -1959,9 +1961,10 @@ export async function createReminderFromApp(
   } else if (message?.authorType === "agent" && message.authorAgentId && here.includes(message.authorAgentId)) {
     agentId = message.authorAgentId;
   } else {
+    const talks = await talksToAgents(db, orgId, requesterId);
     for (const id of here) {
       const agent = await getAgent(db, orgId, id);
-      if (agent && !agent.archivedAt && canTalkTo(agent, requesterId)) {
+      if (agent && !agent.archivedAt && canTalkTo(agent, requesterId, talks)) {
         agentId = agent.id;
         break;
       }

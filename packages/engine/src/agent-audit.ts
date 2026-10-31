@@ -199,7 +199,7 @@ export async function listAudit(
   orgId: string,
   filter: AuditFilter = {},
 ): Promise<{ rows: AuditRow[]; next: string | null }> {
-  await requirePermission(db, actorId, orgId, "configure");
+  await requirePermission(db, actorId, orgId, "view_audit");
   const limit = Math.min(Math.max(filter.limit ?? AUDIT_PAGE, 1), AUDIT_PAGE_MAX);
   const found = await db
     .select()

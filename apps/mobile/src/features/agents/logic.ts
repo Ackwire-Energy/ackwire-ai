@@ -8,8 +8,8 @@ import type {
   DirectMessage,
   Memory,
   Mission,
+  OrgSummary,
   PreviewMeta,
-  Role,
   WorkingRun,
 } from "@agenteschat/client";
 import { asksAt, levelOf, resourcesOf } from "@agenteschat/client/lib/access-levels";
@@ -296,13 +296,13 @@ export function plainRole(instructions: string | null | undefined): string | nul
   return null;
 }
 
-/** Only the agent's owner or an admin may correct or forget its memories (the server checks it again). */
+/** Only the agent's owner or who reviews memory may correct or forget its memories (the server checks it again). */
 export function canEditMemories(
   agent: Pick<Agent, "ownerUserId"> | undefined,
-  viewer: { id: string | null; role: Role | null | undefined },
+  viewer: { id: string | null; org: Pick<OrgSummary, "permissions"> | null | undefined },
 ): boolean {
   if (!viewer.id) return false;
-  if (can(viewer.role ?? undefined, "configure")) return true;
+  if (can(viewer.org, "review_memory")) return true;
   return Boolean(agent?.ownerUserId && agent.ownerUserId === viewer.id);
 }
 

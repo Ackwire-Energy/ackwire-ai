@@ -40,8 +40,8 @@ const LIVE_ROWS = 8;
  * "Esperando você" (the exact request and since when), "Trabalhando agora" (what each one is on, since when,
  * with the pixel orbit), then "Livres" (its role in plain words, and when you last talked; first, dozing, the
  * ones waiting for their offline computer: "Esperando o MacBook Air"), split by the workspace's groups of agents
- * when it has some. Tapping an agent opens its profile (Conversar is one tap there); "Novo agente" at the end.
- * Agents move between groups on the web.
+ * when it has some. Tapping an agent opens its profile (Conversar is one tap there); "Novo agente" at the end, for who
+ * may create one. Agents move between groups on the web.
  */
 export function AgentsScreen() {
   const { t } = useTranslation();
@@ -49,6 +49,7 @@ export function AgentsScreen() {
   const c = useColors();
   const header = useTabHeader();
   const orgId = useOrgId();
+  const createsAgents = can(useOrg().org, "create_agents");
   const runs = useWorkingRuns(orgId);
   const dms = useDms(orgId);
   const approvals = useApprovals(orgId);
@@ -64,7 +65,7 @@ export function AgentsScreen() {
   );
   const total = dir.agents.length;
   // Archived agents have no profile: admins delete them for good from here (ADR 0082).
-  const admin = can(useOrg().org?.role, "manage_agents");
+  const admin = can(useOrg().org, "manage_agents");
   const archived = (useFormerAgents(orgId).data ?? []).filter((a) => admin && !a.deleted);
   return (
     <LargeTitleScreen
@@ -110,16 +111,18 @@ export function AgentsScreen() {
           ))}
         </>
       ) : null}
-      <Pressable
-        onPress={() => router.push("/new-agent")}
-        accessibilityRole="button"
-        style={({ pressed }) => [styles.newRow, pressed && { backgroundColor: c.sunken }]}
-      >
-        <Tile icon="plus" size={36} />
-        <Text variant="callout" tone="ink2" style={styles.bold}>
-          {t("mobile.agents.new")}
-        </Text>
-      </Pressable>
+      {createsAgents ? (
+        <Pressable
+          onPress={() => router.push("/new-agent")}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.newRow, pressed && { backgroundColor: c.sunken }]}
+        >
+          <Tile icon="plus" size={36} />
+          <Text variant="callout" tone="ink2" style={styles.bold}>
+            {t("mobile.agents.new")}
+          </Text>
+        </Pressable>
+      ) : null}
     </LargeTitleScreen>
   );
 }

@@ -4388,6 +4388,21 @@ a.ac-list__row:focus-visible {
   background: var(--ink);
 }
 
+/* A role's mark (RoleMark, ADR 0085): the role's color in the agents' dither, on the people tile's shape, its icon in white. */
+.ac-rolemark {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--radius-agent);
+  background: var(--plate) center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+  color: #fff;
+}
+.ac-rolemark .ac-icon {
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.22));
+}
+
 /* People: the tile (a rounded square, radius 30% of the side) in a neutral gradient with initials or a photo; presence badge on the corner */
 .ac-avatar {
   background: linear-gradient(160deg, var(--person-a), var(--person-b));

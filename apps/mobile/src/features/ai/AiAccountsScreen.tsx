@@ -261,7 +261,7 @@ export function AiAccountsScreen() {
             onPress={() => openConnectAi()}
           />
         </View>
-        {can(org?.role, "manage_credentials") ? <KeysSection locale={i18n.language} /> : null}
+        {can(org, "manage_credentials") ? <KeysSection locale={i18n.language} /> : null}
       </ScrollView>
     </View>
   );

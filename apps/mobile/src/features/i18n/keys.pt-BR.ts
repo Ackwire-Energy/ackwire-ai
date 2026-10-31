@@ -794,7 +794,6 @@ export const featureKeysPtBR = {
     title: "Você",
     role: {
       owner: "dono",
-      admin: "admin",
       member: "membro",
     },
     appearance: "Aparência",
@@ -1428,8 +1427,8 @@ export const featureKeysPtBR = {
   },
   joinRequests: {
     share: "Compartilhar o link",
-    rolesHint:
-      "Membros conversam, criam tarefas e aprovam os próprios agentes. Admins também gerenciam membros, agentes e chaves.",
+    roles: "Papéis",
+    rolesHint: "A pessoa entra com os papéis ligados. Sem nenhum, ela pode o mesmo que Todos.",
   },
   humanCheck: {
     title: "Verificação rápida",

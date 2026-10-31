@@ -43,10 +43,10 @@ describe("receipts", () => {
   });
 
   test("who sees the buttons", () => {
-    expect(canUndoAction(action(), { userId: "u1", role: "member", ownsAgent: false })).toBe(true);
-    expect(canUndoAction(action(), { userId: "u2", role: "member", ownsAgent: false })).toBe(false);
-    expect(canUndoAction(action(), { userId: "u2", role: "admin", ownsAgent: false })).toBe(true);
-    expect(canUndoAction(action(), { userId: "u2", role: "member", ownsAgent: true })).toBe(true);
+    expect(canUndoAction(action(), { userId: "u1", managesAgents: false, ownsAgent: false })).toBe(true);
+    expect(canUndoAction(action(), { userId: "u2", managesAgents: false, ownsAgent: false })).toBe(false);
+    expect(canUndoAction(action(), { userId: "u2", managesAgents: true, ownsAgent: false })).toBe(true);
+    expect(canUndoAction(action(), { userId: "u2", managesAgents: false, ownsAgent: true })).toBe(true);
   });
 
   test("Desfazer tudo takes only the undoable ones; i18n keys", () => {
