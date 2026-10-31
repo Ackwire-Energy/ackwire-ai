@@ -1665,6 +1665,11 @@ p {
   overflow-x: auto;
   max-height: 420px;
 }
+/* The rest of a longer block scrolls into its 420px in a message too, where the kit keeps code from scrolling up and
+   down. */
+.ac-msg__text .code-card__code {
+  overflow-y: auto;
+}
 .md .code-card code,
 .md .code-viewer code {
   padding: 0;

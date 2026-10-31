@@ -218,6 +218,13 @@ describe("our scrollbars, never the browser's", () => {
       /^rgba\(128,\s*128,\s*128,\s*\.\d+\) padding-box$/,
     );
   });
+
+  test("a code card's longer code scrolls into its height in a message too, where the kit keeps code from scrolling up and down", async () => {
+    const layout = topLevel(await read("apps/web/src/layout.css"));
+    expect(value(topLevel(await read(KIT)), ".ac-msg__text pre", "overflow-y")).toBe("hidden");
+    expect(value(layout, ".code-card__code", "max-height")).toBe("420px");
+    expect(value(layout, ".ac-msg__text .code-card__code", "overflow-y")).toBe("auto");
+  });
 });
 
 describe("the collapsed sidebar", () => {
