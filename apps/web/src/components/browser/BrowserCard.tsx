@@ -495,11 +495,13 @@ export function BrowserCard({
     if (!inControl) return;
     const p = { x: e.clientX, y: e.clientY };
     if (e.pointerType === "touch") {
-      onFingers(fingers.down(e.pointerId, p));
+      // The first finger of a touch: no other is down, whatever the fingers before it missed.
+      const stale = e.isPrimary ? fingers.cancel() : [];
+      onFingers([...stale, ...fingers.down(e.pointerId, p)]);
       if (fingers.mode === "pending") landed.current = p;
       return;
     }
-    if (e.button !== 0 || press.current) return;
+    if (e.button !== 0) return;
     const at = toPage(p);
     if (!at) return;
     // The moves and the release outside the page still come here: a drag past its edge stays at the edge.
@@ -580,10 +582,16 @@ export function BrowserCard({
     if (inControl) return;
     setCapturing(false);
     setHandingBack(false);
+  }, [inControl]);
+  // Control ending, or the page going (closed, opening, someone else's) before its pointers lifted, lets go of them:
+  // the next press starts fresh.
+  const pointing = inControl && Boolean(frame);
+  useEffect(() => {
+    if (pointing) return;
     press.current = null;
     fingers.cancel();
     setSliding(false);
-  }, [inControl, fingers]);
+  }, [pointing, fingers]);
   useEffect(() => {
     if (handingBack) backRef.current?.focus();
   }, [handingBack]);

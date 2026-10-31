@@ -297,6 +297,12 @@ describe("the card in the message", () => {
     await act(async () => fireEvent.pointerUp(page, pointer(2, 100, 70, "touch")));
     await act(async () => fireEvent.pointerUp(page, pointer(3, 200, 70, "touch")));
     expect(sentToPage()).toHaveLength(5);
+
+    // A finger whose lift never came doesn't make the next touch a second finger: that one drags.
+    await act(async () => fireEvent.pointerDown(page, { ...pointer(4, 100, 100, "touch"), isPrimary: true }));
+    await act(async () => fireEvent.pointerDown(page, { ...pointer(5, 100, 100, "touch"), isPrimary: true }));
+    await act(async () => fireEvent.pointerMove(page, pointer(5, 130, 100, "touch")));
+    expect(sentToPage().slice(5)).toEqual(["moved+none@200,200", "pressed@200,200", "moved+left@260,200"]);
   });
 
   test("its Chrome on the agent's desktop: Ver a tela inteira over the page, and in the frame's top in control", async () => {
