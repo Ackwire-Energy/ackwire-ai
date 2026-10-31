@@ -41,6 +41,7 @@ import {
 } from "@agenteschat/client/lib/consult-group";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
+import { isMediaAfterReply, messageMediaOf, textOrMedia } from "@agenteschat/client/lib/media";
 import { isEventLine } from "@agenteschat/client/lib/notices";
 import { can } from "@agenteschat/client/lib/permissions";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
@@ -172,6 +173,9 @@ const rowKey = (r: Row) => r.key;
 const rowType = (r: Row) => {
   if (r.kind === "run" || (r.kind === "message" && r.key.startsWith("turn-"))) return "turn";
   if (r.kind !== "message") return r.kind;
+  // A GIF or a sticker alone (ADR 0091) is about its picture's size, not a text's.
+  const media = r.message.body.trim() ? null : messageMediaOf(r.message.meta);
+  if (media) return `message-${media.kind}`;
   const n = r.message.body.length;
   const size = n < 80 ? "s" : n < 320 ? "m" : n < 1200 ? "l" : "xl";
   return r.message.meta && Object.keys(r.message.meta).length > 0 ? `message-${size}-card` : `message-${size}`;
@@ -428,9 +432,9 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     const registry = turnKeysRef.current;
     return (runId: string) => registry.get(runId)?.key;
   }, [shownRuns]);
-  // The messages an agent read while working (its "Leu seu recado" wells quote them).
+  // The messages an agent read while working (its "Leu seu recado" wells quote them; a GIF or a sticker by its word).
   const bodiesRef = useRef(new Map<string, string>());
-  bodiesRef.current = useMemo(() => new Map(list.map((m) => [m.id, m.body])), [list]);
+  bodiesRef.current = useMemo(() => new Map(list.map((m) => [m.id, textOrMedia(t, m.body, m.meta)])), [list, t]);
   const bodyOf = useCallback((id: string) => bodiesRef.current.get(id), []);
   const [openBrowsers, setOpenBrowsers] = useState<ReadonlySet<string>>(() => new Set());
   const toggleBrowser = useCallback((agentId: string, open: boolean) => {
@@ -543,6 +547,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         key: r.key,
         kind: r.kind === "message" ? "message" : r.kind === "run" ? "run" : "other",
         mine: r.kind === "message" && r.message.author.type === "person" && r.message.author.id === meId,
+        // An agent's sticker or GIF after its reply (ADR 0091) is never news of its own.
+        silent: r.kind === "message" && isMediaAfterReply(r.message.meta),
         ...(r.kind === "message" && r.message.author.id
           ? { who: `${r.message.author.type}:${r.message.author.id}` }
           : r.kind === "run"
@@ -1288,8 +1294,15 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
           // An agent took an issue made from this conversation: one quiet line, not a voice.
           if (issueTakenOf(item.message.meta)) return <IssueTakenLine message={item.message} />;
           return (
-            // A finished reply replaces its streaming row in place: it doesn't rise in again.
-            <Animated.View entering={isFresh(item.key) && !item.message.agentRunId ? ENTER : undefined}>
+            // A finished reply replaces its streaming row in place: it doesn't rise in again. An agent's sticker or
+            // GIF after its reply (ADR 0091) replaces nothing: it rises in.
+            <Animated.View
+              entering={
+                isFresh(item.key) && (!item.message.agentRunId || isMediaAfterReply(item.message.meta))
+                  ? ENTER
+                  : undefined
+              }
+            >
               <MessageRow
                 message={item.message}
                 grouped={item.grouped}

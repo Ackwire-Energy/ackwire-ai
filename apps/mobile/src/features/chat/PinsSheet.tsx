@@ -1,4 +1,5 @@
 import { type MessagePin, usePins } from "@agenteschat/client";
+import { textOrMedia } from "@agenteschat/client/lib/media";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet } from "react-native";
@@ -37,7 +38,10 @@ export function PinsSheet({ channelId, onPick }: { channelId: string; onPick: (p
               key={p.messageId}
               leading={<Face who={p.message.author} size={30} live={false} />}
               title={dir.nameOf(p.message.author) || t("mobile.chat.someone")}
-              subtitle={previewOf(p.message.body) || t("mobile.chat.approvalPreview")}
+              // A pinned GIF or sticker says which (ADR 0091).
+              subtitle={
+                previewOf(textOrMedia(t, p.message.body, p.message.meta)) || t("mobile.chat.approvalPreview")
+              }
               meta={
                 <Text variant="caption" tone="faint">
                   {when.short(p.message.createdAt)}

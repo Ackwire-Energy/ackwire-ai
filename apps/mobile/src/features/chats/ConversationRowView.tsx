@@ -59,7 +59,7 @@ export const ConversationRowView = memo(function ConversationRowView({
   const lastText = (last: LastLine | null) => {
     if (!last) return { who: "", text: "" };
     const who = last.name || (last.author ? dir.nameOf(last.author) : "");
-    return { who, text: previewBody(t, last.text, last.meta ?? null) };
+    return { who, text: previewBody(t, last.text, last.meta ?? null, last.mediaKind) };
   };
   const agentDm = r.kind === "dm" && r.with.type === "agent";
   /** A DM with nothing in it yet: who the agent is (as its first conversation says), or a word to start. */

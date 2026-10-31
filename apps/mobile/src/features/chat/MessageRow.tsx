@@ -19,6 +19,7 @@ import { CONTINUE_ERRORS, errorCode, errorText } from "@agenteschat/client/lib/e
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
 import { brainUnavailableOf } from "@agenteschat/client/lib/machine-outages";
+import { isMediaAfterReply, messageMediaOf } from "@agenteschat/client/lib/media";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import { missionSetupOf } from "@agenteschat/client/lib/missions";
 import { isTalkerReply, routineReportText } from "@agenteschat/client/lib/notices";
@@ -45,6 +46,7 @@ import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/h
 import { agentLook } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
 import { ReceiptMark } from "./AgentReceipts";
+import { ChatMedia } from "./ChatMedia";
 import { ConsultGroup } from "./ConsultGroup";
 import { ApprovalInline, ConsultationCard, QuestionCard, ThreadLink } from "./cards";
 import { IssueWorkCard } from "./issue-work";
@@ -142,13 +144,22 @@ export const MessageRow = memo(function MessageRow({
   // What the server wrote itself is said in the person's language; a stopped reply drops the server's note.
   const body = hidesBody(m) ? "" : reminderBody(splitCanceled(serverBody(t, m.body, meta), meta).body, meta);
   const consulted = isAgent && m.author.id ? consultationsOf(meta) : [];
+  // A GIF or a sticker (ADR 0091); with no words, the message is the picture alone (no empty bubble).
+  const media = messageMediaOf(meta);
+  // The one an agent adds after its own reply carries the reply's run: the run's tools, questions and stop line
+  // stay on the reply, never shown twice.
+  const mediaAfter = isAgent && isMediaAfterReply(meta);
   // A question to another agent (in their DM) carries the asking run: its work shows on that run's reply.
-  const ownWork = isAgent && Boolean(m.agentRunId) && !meta?.consultation;
+  const ownWork = isAgent && Boolean(m.agentRunId) && !meta?.consultation && !mediaAfter;
   const steps = ownWork ? workStepsOf(meta) : null;
   // Posted by a run answering another agent's question from here (its approval, question, secret): whom it helps.
-  const consultations = useConsultations(orgId, m.channelId, isAgent && Boolean(m.agentRunId) && !readOnly);
+  const consultations = useConsultations(
+    orgId,
+    m.channelId,
+    isAgent && Boolean(m.agentRunId) && !readOnly && !mediaAfter,
+  );
   const helping =
-    isAgent && m.agentRunId && !readOnly
+    isAgent && m.agentRunId && !readOnly && !mediaAfter
       ? consultations.data?.find((x) => x.consultedRunId === m.agentRunId)
       : undefined;
   const press = readOnly
@@ -157,7 +168,7 @@ export const MessageRow = memo(function MessageRow({
         tapHaptic();
         onLongPress?.(m);
       };
-  const stopped = isAgent && m.agentRunId ? stoppedOf(meta) : null;
+  const stopped = isAgent && m.agentRunId && !mediaAfter ? stoppedOf(meta) : null;
   // This reply just took its live block's place here: the same tools (and the messages it read) stay.
   const [kept] = useState(() => (ownWork && m.agentRunId ? recentTurn(m.agentRunId, Date.now()) : null));
   // The line its block opened with stays above the tools, where it was, instead of moving into them (`turnOpener`).
@@ -236,10 +247,15 @@ export const MessageRow = memo(function MessageRow({
   );
 
   if (mine) {
-    // The bubble, or the files of a message with no words, leads; the receipt's mark stands beside it.
+    // The bubble, or the GIF or sticker or the files of a message with no words, leads; the receipt's mark stands
+    // beside it.
     const lead = body ? (
       <View style={[styles.bubble, styles.lead, { backgroundColor: c.bubble }]}>
         <MessageText body={body} muted={m.local === "pending"} selectable={false} accent={accent} />
+      </View>
+    ) : media ? (
+      <View style={styles.grow}>
+        <ChatMedia media={media} align="end" />
       </View>
     ) : files.length > 0 ? (
       <View style={styles.grow}>
@@ -269,7 +285,12 @@ export const MessageRow = memo(function MessageRow({
             {lead}
           </View>
         ) : null}
-        {body && files.length > 0 ? (
+        {body && media ? (
+          <View style={styles.meFiles}>
+            <ChatMedia media={media} align="end" />
+          </View>
+        ) : null}
+        {(body || media) && files.length > 0 ? (
           <View style={styles.meFiles}>
             <MessageFiles files={files} align="end" />
           </View>
@@ -360,7 +381,7 @@ export const MessageRow = memo(function MessageRow({
         {consulted.map((cs) => (
           <ConsultationCard key={cs.consultationId} askerId={m.author.id ?? ""} consultation={cs} />
         ))}
-        {isAgent && m.agentRunId && !m.local && !readOnly && consulted.length === 0 ? (
+        {isAgent && m.agentRunId && !m.local && !readOnly && !mediaAfter && consulted.length === 0 ? (
           <ConsultGroup message={m} color={color} />
         ) : null}
         {opened?.said ? <MessageText body={opened.said} selectable={false} accent={accent} /> : null}
@@ -392,6 +413,7 @@ export const MessageRow = memo(function MessageRow({
         ) : body ? (
           <MessageText body={body} muted={m.local === "pending"} selectable={false} accent={accent} />
         ) : null}
+        {media ? <ChatMedia media={media} /> : null}
         {stopped && m.agentRunId ? <StoppedLine message={m} runId={m.agentRunId} stopped={stopped} /> : null}
         {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
         {isAgent ? <TeamChecks message={m} /> : null}

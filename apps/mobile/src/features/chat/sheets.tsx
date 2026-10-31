@@ -21,6 +21,7 @@ import {
   useThreadMutation,
   useToggleReaction,
 } from "@agenteschat/client";
+import { textOrMedia } from "@agenteschat/client/lib/media";
 import { summaryParts } from "@agenteschat/client/lib/missions";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -108,7 +109,7 @@ export function MessageActions({
       <View style={[styles.preview, surface]}>
         <Face who={m.author} size={24} live={false} />
         <Text variant="small" tone="ink2" numberOfLines={3} style={styles.grow}>
-          {text || t("mobile.chat.approvalPreview")}
+          {text || previewOf(textOrMedia(t, m.body, m.meta)) || t("mobile.chat.approvalPreview")}
         </Text>
       </View>
       {m.local ? null : (
