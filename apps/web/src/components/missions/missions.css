@@ -1475,7 +1475,7 @@ a.mi-pr:hover {
 
 /* ── The mission's link card, in the conversation where it was asked ─────── */
 .mi-linkcard {
-  max-width: 560px;
+  max-width: var(--msg-card-w);
   padding: 14px 16px;
 }
 .mi-linkcard__foot {
@@ -1494,7 +1494,7 @@ a.mi-pr:hover {
 
 /* ── Command approvals (MissionCommandCard): the executor asks to run a command ── */
 .mi-cmd {
-  max-width: 600px;
+  max-width: var(--msg-card-w);
 }
 .mi-cmd__line {
   margin: 0;

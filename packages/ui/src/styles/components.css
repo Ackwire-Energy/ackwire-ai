@@ -818,6 +818,20 @@ textarea.ac-input {
 .ac-msg--grouped {
   padding-top: 2px;
 }
+/*
+ * The cards in a message (its tools, what it changed, a request, a file): one width, short of the text's. The row's
+ * hover plate must never match what sits on it: a card's face is a step up (`--raised-2`, white in light), a well
+ * (code, a quote) is `--msg-well`, darker than the row whether it is hovered or not.
+ */
+:root {
+  --msg-card-w: 560px;
+}
+.ac-msg > * {
+  --raised: var(--raised-2);
+  --surface-raised: var(--raised-2);
+  --sunken: var(--msg-well);
+  --surface-sunken: var(--msg-well);
+}
 /* The face is 32px in the feed. */
 .ac-msg__avatar,
 .ac-msg__gutter {
@@ -1076,7 +1090,7 @@ textarea.ac-input {
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   border-bottom-left-radius: var(--radius-cut);
-  max-width: 520px;
+  max-width: var(--msg-card-w);
   box-sizing: border-box;
   position: relative;
 }
@@ -3616,6 +3630,8 @@ a.ac-list__row:focus-visible {
   --card-key: none;
   --card-well: #f6f6f3;
   --card-well-shadow: inset 0 1px 2px rgba(23, 23, 22, 0.07), inset 0 0 0 1px rgba(23, 23, 22, 0.05), 0 1px 0 #ffffff;
+  /* A well in a message (code, a table's band): a tint over the row, so the row's hover plate darkens it too. */
+  --msg-well: var(--plate-soft);
 }
 [data-theme="dark"] {
   --person-a: #3a3a37;
@@ -3630,6 +3646,8 @@ a.ac-list__row:focus-visible {
   --card-well: #121211;
   --card-well-shadow:
     inset 0 1px 3px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 1px 0 rgba(255, 255, 255, 0.05);
+  /* Darker than the row and than its hover plate as it is. */
+  --msg-well: var(--sunken);
 }
 
 /* Buttons: b1 (primary), b2 (default), ghost. Sizes follow the control ruler (tokens.css --control-*). */
@@ -4591,7 +4609,7 @@ a.ac-list__row:focus-visible {
    the steps open in a hairline card below it. */
 .ac-work {
   margin-top: 16px;
-  max-width: 560px;
+  max-width: var(--msg-card-w);
 }
 .ac-work__head {
   display: inline-flex;
@@ -5455,7 +5473,7 @@ a.ac-list__row:focus-visible {
  */
 .ac-tools {
   margin: 10px 0 12px;
-  max-width: 560px;
+  max-width: var(--msg-card-w);
   border-radius: var(--radius-item) var(--radius-item) var(--radius-item) 4px;
   background: var(--surface-raised);
   box-shadow: var(--card-shadow);
@@ -7394,7 +7412,7 @@ label.ac-setrow__title {
 /* What the other agent said, folded into one neutral line at the top of the reply; it opens to the exchange. */
 .ac-consult {
   margin: 6px 0 8px;
-  max-width: 520px;
+  max-width: var(--msg-card-w);
   border-radius: 12px;
   background: var(--raised);
   box-shadow: var(--e1), var(--top);

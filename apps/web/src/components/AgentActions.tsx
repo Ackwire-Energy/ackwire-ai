@@ -236,6 +236,10 @@ function Receipt({
     schedule: (rule) => ruleSentence(t, i18n.language, fromApiRule(rule, toYmd(new Date())), new Date()),
   });
   const struck = Boolean(a.undoneAt);
+  // Once it had a button, its room stays: Desfazer turning into Refazer, or leaving when its time is up, never
+  // rewraps the sentence.
+  const hadButton = useRef(false);
+  if (button) hadButton.current = true;
   return (
     <div className={cx(single ? "ag-rc" : "ag-rcg__it", struck && "is-undone")} data-phase={phase}>
       {single ? (
@@ -256,7 +260,19 @@ function Receipt({
         </span>
         {undoneBy && <span className="ag-rc__by">{t("agentActions.undoneBy", { name: undoneBy })}</span>}
       </span>
-      {button}
+      {hadButton.current && (
+        <span className="ag-rc__act">
+          {button}
+          <span className="ag-rc__room" aria-hidden="true">
+            <span className="ag-rc__btn">
+              {single && <Icon name="undo" size={14} />}
+              {t("agentActions.undo")}
+              {single && <span className="ag-rc__time ac-num">{formatTimeLeft(0)}</span>}
+            </span>
+            <span className="ag-rc__btn">{t("agentActions.redo")}</span>
+          </span>
+        </span>
+      )}
     </div>
   );
 }
