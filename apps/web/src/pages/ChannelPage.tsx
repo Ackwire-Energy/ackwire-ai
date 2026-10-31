@@ -3589,17 +3589,8 @@ function ChannelDetails({
     },
   });
   const autoReply = useMutation({
-    mutationFn: async ({ agentId, on }: { agentId: string; on: boolean }) => {
-      // PUT replaces the agent's channel list: keep the others as they are.
-      const current = await api.agents.channels(org.id, agentId);
-      const next = current.some((c) => c.id === channel.id)
-        ? current.map((c) => ({ channelId: c.id, autoReply: c.id === channel.id ? on : c.autoReply }))
-        : [
-            ...current.map((c) => ({ channelId: c.id, autoReply: c.autoReply })),
-            { channelId: channel.id, autoReply: on },
-          ];
-      return api.agents.setChannels(org.id, agentId, next);
-    },
+    mutationFn: ({ agentId, on }: { agentId: string; on: boolean }) =>
+      api.chat.setAutoReply(org.id, channel.id, agentId, on),
     onSuccess: refresh,
   });
   const needle = q.trim().toLowerCase();
@@ -3611,6 +3602,8 @@ function ChannelDetails({
     handle: m.handle ?? "",
     email: m.type === "person" ? (dir.memberById.get(m.id)?.email ?? "") : "",
     autoReply: Boolean(m.autoReply),
+    // Its owner picks how it replies here too, as the server allows, but doesn't manage the channel.
+    owned: m.type === "agent" && dir.agentById.get(m.id)?.ownerUserId === me.user.id,
   }));
   const shown = all.filter((r) => !needle || `${r.name} ${r.handle} ${r.email}`.toLowerCase().includes(needle));
   const agents = shown.filter((r) => r.kind === "agent");
@@ -3720,7 +3713,7 @@ function ChannelDetails({
                       : t(replyAloneKey(routing), agentGrammar(t, r.name))}
                 </span>
               </span>
-              {editable && (
+              {(editable || r.owned) && (
                 <Menu
                   align="end"
                   label={t("channelMembers.actions", { name: r.name })}
@@ -3762,10 +3755,18 @@ function ChannelDetails({
                       },
                     ]}
                   />
-                  <MenuSeparator />
-                  <MenuItem icon="close" danger onSelect={() => setRemoving({ kind: "agent", id: r.id, name: r.name })}>
-                    {t("channelMembers.remove")}
-                  </MenuItem>
+                  {editable && (
+                    <>
+                      <MenuSeparator />
+                      <MenuItem
+                        icon="close"
+                        danger
+                        onSelect={() => setRemoving({ kind: "agent", id: r.id, name: r.name })}
+                      >
+                        {t("channelMembers.remove")}
+                      </MenuItem>
+                    </>
+                  )}
                 </Menu>
               )}
             </div>

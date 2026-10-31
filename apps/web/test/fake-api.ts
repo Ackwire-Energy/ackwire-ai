@@ -2074,6 +2074,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const id = "agentId" in member ? member.agentId : member.userId;
         state.channelMembers[channelId] = (state.channelMembers[channelId] ?? []).filter((m) => m.id !== id);
       },
+      setAutoReply: async (orgId, channelId, agentId, autoReply) => {
+        log("chat.setAutoReply", orgId, channelId, agentId, autoReply);
+        state.autoReply[`${agentId}:${channelId}`] = autoReply;
+      },
       addMember: async (orgId, channelId, member) => {
         log("chat.addMember", orgId, channelId, member);
         const list = state.channelMembers[channelId] ?? [];

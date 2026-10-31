@@ -527,6 +527,8 @@ export interface ApiClient {
     members(orgId: string, channelId: string): Promise<ChannelMember[]>;
     addMember(orgId: string, channelId: string, member: { userId: string } | { agentId: string }): Promise<void>;
     removeMember(orgId: string, channelId: string, member: { userId: string } | { agentId: string }): Promise<void>;
+    /** "Quando responde" for an agent in this channel (its creator, an admin or the agent's owner). */
+    setAutoReply(orgId: string, channelId: string, agentId: string, autoReply: boolean): Promise<void>;
     messages(
       orgId: string,
       channelId: string,

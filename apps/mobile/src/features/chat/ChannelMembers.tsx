@@ -35,6 +35,7 @@ interface Who {
   handle: string;
   email: string;
   autoReply: boolean;
+  owned: boolean;
 }
 
 /** Refreshes who is in the channel after a change (the header's faces, the "@" picker, this list). */
@@ -60,7 +61,7 @@ const lineOf = (t: TFunction, w: Who, routing: AiRouting | undefined) =>
 /**
  * Who is in a channel, as the web's channel details: agents and people in groups, each agent with how it
  * replies here. Admins open a member for its options (how an agent replies, "Tirar do canal") and add
- * people or agents; everyone else reads the list.
+ * people or agents; an agent's owner opens it for how it replies; everyone else reads the list.
  */
 export function ChannelMembersSheet({ channelId, channelName }: { channelId: string; channelName: string }) {
   const { t } = useTranslation();
@@ -83,6 +84,7 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
     handle: m.handle ?? "",
     email: m.type === "agent" ? "" : (dir.memberById.get(m.id)?.email ?? ""),
     autoReply: Boolean(m.autoReply),
+    owned: m.type === "agent" && meId !== null && dir.agentById.get(m.id)?.ownerUserId === meId,
   }));
   const needle = q.trim().toLowerCase();
   const shown = all.filter((w) => !needle || `${w.name} ${w.handle} ${w.email}`.toLowerCase().includes(needle));
@@ -92,7 +94,7 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
 
   const open = (w: Who) => {
     tapHaptic();
-    sheet.open(<MemberOptions channelId={channelId} channelName={channelName} who={w} />);
+    sheet.open(<MemberOptions channelId={channelId} channelName={channelName} who={w} removable={editable} />);
   };
   const group = (label: string, count: number, list: Who[]) =>
     list.length > 0 ? (
@@ -116,7 +118,7 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
                 subtitle={lineOf(t, w, routing)}
                 subtitleLines={w.kind === "agent" ? 2 : 1}
                 // Not on my own row: taking myself out of my own list reads as a mistake (as on the web).
-                {...(editable && !mine
+                {...((editable && !mine) || w.owned
                   ? {
                       onPress: () => open(w),
                       meta: <Icon name="more" size={18} color={c.faint} />,
@@ -174,8 +176,18 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
   );
 }
 
-/** One member's options (admins): how an agent replies here, and "Tirar do canal" (asked first). */
-function MemberOptions({ channelId, channelName, who }: { channelId: string; channelName: string; who: Who }) {
+/** One member's options: how an agent replies here, and "Tirar do canal" (asked first) for admins. */
+function MemberOptions({
+  channelId,
+  channelName,
+  who,
+  removable,
+}: {
+  channelId: string;
+  channelName: string;
+  who: Who;
+  removable: boolean;
+}) {
   const { t } = useTranslation();
   const g = agentGrammar(t, who.name);
   const orgId = useOrgId();
@@ -190,14 +202,7 @@ function MemberOptions({ channelId, channelName, who }: { channelId: string; cha
   const failed = () => toast({ title: t("mobile.app.failed"), icon: "x" });
 
   const reply = useMutation({
-    mutationFn: async (on: boolean) => {
-      // PUT replaces the agent's channel list: keep the others as they are (as on the web).
-      const current = await api.agents.channels(orgId, who.id);
-      const next = current.some((ch) => ch.id === channelId)
-        ? current.map((ch) => ({ channelId: ch.id, autoReply: ch.id === channelId ? on : ch.autoReply }))
-        : [...current.map((ch) => ({ channelId: ch.id, autoReply: ch.autoReply })), { channelId, autoReply: on }];
-      return api.agents.setChannels(orgId, who.id, next);
-    },
+    mutationFn: (on: boolean) => api.chat.setAutoReply(orgId, channelId, who.id, on),
     onMutate: (on) => setAutoReply(on),
     onSuccess: refresh,
     onError: () => {
@@ -260,18 +265,20 @@ function MemberOptions({ channelId, channelName, who }: { channelId: string; cha
           />
         </View>
       ) : null}
-      <ActionList
-        items={[
-          {
-            key: "remove",
-            icon: "x",
-            danger: true,
-            label: t("channelMembers.remove"),
-            disabled: remove.isPending,
-            onPress: askRemove,
-          },
-        ]}
-      />
+      {removable ? (
+        <ActionList
+          items={[
+            {
+              key: "remove",
+              icon: "x",
+              danger: true,
+              label: t("channelMembers.remove"),
+              disabled: remove.isPending,
+              onPress: askRemove,
+            },
+          ]}
+        />
+      ) : null}
       <Button variant="ghost" wide label={t("common.back")} onPress={back} />
     </>
   );
