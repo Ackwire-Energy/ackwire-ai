@@ -140,7 +140,7 @@ export function clickEvents(at: Point, modifiers?: BrowserModifiers): BrowserInp
 }
 
 /** A finger that moves this far (pixels of the shown frame) before it lifts drags; one that doesn't taps. */
-export const TOUCH_DRAG_SLOP = 8;
+const TOUCH_DRAG_SLOP = 8;
 
 /** What the fingers on the frame are doing: `over` waits for the rest of them to lift. */
 export type TouchMode = "idle" | "pending" | "drag" | "scroll" | "over";
@@ -228,8 +228,6 @@ export function createTouchInput(toPage: (p: Point, clamp: boolean) => Point | n
     },
   };
 }
-
-export type TouchInput = ReturnType<typeof createTouchInput>;
 
 /** Scrolling over the page (the wheel, or two fingers). */
 export function wheelEvent(at: { x: number; y: number }, deltaX: number, deltaY: number): BrowserInputEvent {
