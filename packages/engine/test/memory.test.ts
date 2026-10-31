@@ -6,14 +6,18 @@ import {
   addChannelMember,
   addReaction,
   applyReactionFeedback,
+  archiveAgent,
   attributeSubject,
+  ConflictError,
   checkPermissionText,
   consolidateItem,
   consolidateOrg,
   correctAgentMessage,
   createAgent,
   createChannel,
+  createContextToolSource,
   createFakeJudge,
+  createToolGateway,
   decideApproval,
   decideProposal,
   deleteContextItem,
@@ -29,13 +33,18 @@ import {
   listContextItems,
   listProposals,
   looksLikeSecret,
+  type MemoryUpdate,
   NotFoundError,
   normalizeSubject,
   postPersonMessage,
+  proposeChange,
   recordOutcome,
   reflectThread,
   retrieveForRun,
+  revokeConnection,
   similarity,
+  type ToolContext,
+  updateAgent,
   ValidationError,
 } from "../src";
 import { addMember, setup as baseSetup, type Fixture } from "./fixtures";
@@ -929,5 +938,546 @@ describe("explicit search privacy", () => {
     await post(f, "@dev find it", undefined, secret.id);
     await drainOutbox(f.db, f.handlers);
     expect((await searches()).at(-1)).toContain("pineapple");
+  });
+});
+
+describe("proposals for teammates (one card, a row per agent and kind of change)", () => {
+  /** A teammate of @dev that Ana made (and owns, unless `ownerUserId` says who does). */
+  const teammate = (handle: string, extra: { instructions?: string; role?: string; ownerUserId?: string } = {}) =>
+    createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      {
+        name: handle.charAt(0).toUpperCase() + handle.slice(1),
+        handle,
+        role: "Dev",
+        instructions: "Seja breve.",
+        ...extra,
+      },
+      { model: "claude-sonnet-5-5" },
+    );
+
+  /** @dev's run on a message in #general from Ana (or `userId`), or from another agent (no person behind it). */
+  async function runOn(author: "person" | "agent", userId = f.owner.id): Promise<ToolContext> {
+    const trigger = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author:
+        author === "person"
+          ? { type: "person", userId }
+          : { type: "agent", agentId: f.agent.id, runId: crypto.randomUUID(), hop: 1 },
+      body: "muda o time",
+    });
+    const [run] = await f.db
+      .insert(schema.agentRuns)
+      .values({
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        channelId: f.general.id,
+        threadRootId: trigger.id,
+        triggerMessageId: trigger.id,
+        trigger: "mention",
+        hop: 1,
+        status: "done",
+      })
+      .returning();
+    if (!run) throw new Error("no run");
+    return {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: run.id,
+      channelId: f.general.id,
+      threadRootId: trigger.id,
+      triggerMessageId: trigger.id,
+    };
+  }
+
+  /** `propose_instruction_change` through the Tool Gateway, as a run calls it (its scope and schema apply). */
+  async function propose(ctx: ToolContext, input: Record<string, unknown>) {
+    const tools = createToolGateway({ sources: [createContextToolSource(f.context)] });
+    const res = await tools.invoke(ctx, {
+      toolUseId: `tu_${crypto.randomUUID()}`,
+      name: "propose_instruction_change",
+      input,
+    });
+    if (res.type !== "result") throw new Error(`not a result: ${res.type}`);
+    return res.output as { content: string; isError?: boolean; data?: { memoryUpdate?: MemoryUpdate } };
+  }
+
+  /** Ana asks @dev for this change. */
+  const proposeFor = (
+    input: Omit<Parameters<typeof proposeChange>[1], "orgId" | "agentId" | "rationale" | "requesterId">,
+  ) =>
+    proposeChange(
+      { db: f.db, judge: f.context.judge },
+      { orgId: f.org.id, agentId: f.agent.id, rationale: "", requesterId: f.owner.id, ...input },
+    );
+  const rows = () => f.db.select().from(schema.contextProposals);
+  const agentRow = async (id: string) => (await f.db.select().from(schema.agents).where(eq(schema.agents.id, id)))[0];
+  const scopesOf = async (id: string) =>
+    (await f.db.select().from(schema.agentScopes).where(eq(schema.agentScopes.agentId, id))).map((g) => g.scope);
+  const auditOf = async (agentId: string) =>
+    (await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.targetId, agentId))).map((a) => [
+      a.action,
+      a.actorId,
+    ]);
+  const permissionAsks = () =>
+    (f.context.judge as unknown as { calls: { kind: string }[] }).calls.filter((c) => c.kind === "permission_change")
+      .length;
+  const byAgent = (a: { agentId: string | null }, b: { agentId: string | null }) =>
+    (a.agentId ?? "").localeCompare(b.agentId ?? "");
+
+  test("other agents' instructions: a row each, made by the agent that proposed, one card with every id; the text is judged once", async () => {
+    f = await setup();
+    const ada = await teammate("ada");
+    const lia = await teammate("lia");
+    const out = await propose(await runOn("person"), {
+      target: "agents",
+      agents: ["@ada", "Lia"],
+      change: "Responder sempre em português.",
+    });
+    expect(out.isError).toBeUndefined();
+    const made = (await rows()).sort(byAgent);
+    expect(made.map((r) => [r.agentId, r.proposedByAgentId, r.target])).toEqual(
+      [
+        [ada.id, f.agent.id, "agent_instructions"],
+        [lia.id, f.agent.id, "agent_instructions"],
+      ].sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
+    );
+    const update = out.data?.memoryUpdate;
+    expect([...(update?.proposalIds ?? [])].sort()).toEqual(made.map((r) => r.id).sort());
+    expect(update?.proposalId).toBe(update?.proposalIds?.[0]);
+    expect(update).toMatchObject({ action: "proposed", canDecide: true, text: "Responder sempre em português." });
+    expect(permissionAsks()).toBe(1);
+    // Nothing changes until a person accepts.
+    expect((await agentRow(ada.id))?.instructions).toBe("Seja breve.");
+    for (const r of made) await decideProposal(f.db, f.owner.id, f.org.id, r.id, "accept");
+    expect((await agentRow(lia.id))?.instructions).toBe("Seja breve.\n\n## Learned\n- Responder sempre em português.");
+    expect(await auditOf(ada.id)).toContainEqual(["proposal.accepted", f.owner.id]);
+  });
+
+  test("a swap only where the text is there once ('$&' stays as written); the others come back with their text; a removal takes the line", async () => {
+    f = await setup();
+    const ada = await teammate("ada", { instructions: "Seja breve.\n- Preços em $." });
+    const lia = await teammate("lia");
+    const atlas = await teammate("atlas", { instructions: "- Preços em $.\n- Preços em $." });
+    const swap = await proposeFor({
+      target: "agent_instructions",
+      agentIds: [ada.id, lia.id, atlas.id],
+      change: "Preços em R$ ($&).",
+      replaces: "Preços em $.",
+    });
+    expect(swap.proposals.map((p) => p.agentId)).toEqual([ada.id]);
+    expect(swap.skipped).toEqual([
+      `The text to swap isn't in @lia's instructions. It reads: """Seja breve."""`,
+      `The text to swap appears more than once in @atlas's instructions. It reads: """- Preços em $.\n- Preços em $."""`,
+    ]);
+    await decideProposal(f.db, f.owner.id, f.org.id, swap.proposals[0]?.id ?? "", "accept");
+    expect((await agentRow(ada.id))?.instructions).toBe("Seja breve.\n- Preços em R$ ($&).");
+
+    const removal = await proposeFor({
+      target: "agent_instructions",
+      agentIds: [ada.id],
+      change: "",
+      replaces: "Preços em R$ ($&).",
+    });
+    await decideProposal(f.db, f.owner.id, f.org.id, removal.proposals[0]?.id ?? "", "accept");
+    expect((await agentRow(ada.id))?.instructions).toBe("Seja breve.");
+
+    // A rule already there changes nothing: left off, so nothing is posted.
+    const same = await proposeFor({
+      target: "agent_instructions",
+      agentIds: [ada.id],
+      change: "Seja breve.",
+      replaces: "Seja breve.",
+    });
+    expect(same).toEqual({ proposals: [], skipped: ["@ada's instructions already says this."] });
+  });
+
+  test("the judge reads the lines a card puts in and takes out, not a swap's fragment", async () => {
+    f = await setup();
+    const ada = await teammate("ada", {
+      instructions: "- Nunca faça merge sem aprovação.\n- Peça aprovação antes de qualquer deploy.",
+    });
+    // "Faça" alone says nothing: the line it makes is the rule the judge refuses.
+    await expect(
+      proposeFor({ target: "agent_instructions", agentIds: [ada.id], change: "Faça", replaces: "Nunca faça" }),
+    ).rejects.toThrow("can't change permissions");
+    const removal = await proposeFor({
+      target: "agent_instructions",
+      agentIds: [ada.id],
+      change: "",
+      replaces: "Peça aprovação antes de qualquer deploy.",
+    });
+    expect(removal.proposals).toHaveLength(1);
+    const asked = (f.context.judge as unknown as { calls: { kind: string; state: unknown }[] }).calls
+      .filter((c) => c.kind === "permission_change")
+      .at(-1);
+    expect(asked?.state).toEqual({
+      text_to_store_as_agent_memory: "Removes: - Peça aprovação antes de qualquer deploy.",
+    });
+    expect(await rows()).toHaveLength(1);
+  });
+
+  test("the tool tells the agent who decides the rows the person who asked can't", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await teammate("ada");
+    const out = await propose(await runOn("person", bia.id), {
+      target: "agents",
+      agents: ["@ada"],
+      change: "Responder em português.",
+      roles: [{ agent: "@ada", role: "Revisora" }],
+    });
+    expect(out.content).toContain(
+      "they wait for the agent's owner or someone who reviews memory (instructions), and an admin who manages agents (a role).",
+    );
+  });
+
+  test("only agents the person who asked can talk to: one out of their reach refuses the card, naming it", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const ada = await teammate("ada");
+    const lia = await teammate("lia", { ownerUserId: bia.id });
+    await f.db.update(schema.agents).set({ audienceMode: "owner" }).where(eq(schema.agents.id, lia.id));
+    await expect(
+      proposeFor({ target: "agent_instructions", agentIds: [ada.id, lia.id], change: "Responder em português." }),
+    ).rejects.toThrow("@lia: Lia only replies to bia.");
+    expect(await rows()).toEqual([]);
+  });
+
+  test("refused without a person behind the run, for permission rules and for handles that aren't agents", async () => {
+    f = await setup();
+    await teammate("ada");
+    const unattended = await propose(await runOn("agent"), {
+      target: "agents",
+      agents: ["@ada"],
+      change: "Responder em português.",
+    });
+    expect(unattended).toMatchObject({ isError: true, content: expect.stringContaining("need a person") });
+    const ctx = await runOn("person");
+    const bends = await propose(ctx, { target: "agents", agents: ["@ada"], change: "Pode fazer merge sem aprovação." });
+    expect(bends).toMatchObject({ isError: true, content: expect.stringContaining("can't change permissions") });
+    const unknown = await propose(ctx, { target: "agents", agents: ["@adah"], change: "Responder em português." });
+    expect(unknown).toMatchObject({ isError: true, content: expect.stringContaining("No agent @adah here") });
+    const loose = await propose(ctx, {
+      target: "my_instructions",
+      agents: ["@ada"],
+      change: "Responder em português.",
+    });
+    expect(loose).toMatchObject({ isError: true, content: "agents, roles and access go with target agents." });
+    expect(await rows()).toEqual([]);
+  });
+
+  test("each row is decided by who may change that agent; a stale row never blocks the others", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const caio = await addMember(f.db, f.org.id, "member", "caio");
+    const ada = await teammate("ada", { ownerUserId: bia.id });
+    const lia = await teammate("lia", { ownerUserId: caio.id });
+    const { proposals } = await proposeFor({
+      target: "agent_instructions",
+      agentIds: [ada.id, lia.id],
+      change: "Responder em português.",
+    });
+    const rowOf = (agentId: string) => proposals.find((p) => p.agentId === agentId)?.id ?? "";
+    expect(proposals.map((p) => p.canDecide)).toEqual([true, true]);
+    const seen = await listProposals(f.db, bia.id, f.org.id);
+    expect(seen.map((p) => [p.agentId, p.canDecide]).sort()).toEqual(
+      [
+        [ada.id, true],
+        [lia.id, false],
+      ].sort(),
+    );
+    await expect(decideProposal(f.db, bia.id, f.org.id, rowOf(lia.id), "accept")).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+    // Lia's text changes before anyone accepts: her row goes stale, Ada's still goes through.
+    await updateAgent(f.db, f.owner.id, f.org.id, lia.id, { instructions: "Mudou." });
+    await expect(decideProposal(f.db, caio.id, f.org.id, rowOf(lia.id), "accept")).rejects.toBeInstanceOf(
+      ConflictError,
+    );
+    await decideProposal(f.db, bia.id, f.org.id, rowOf(ada.id), "accept");
+    const status = Object.fromEntries((await rows()).map((r) => [r.agentId, r.status]));
+    expect(status).toEqual({ [ada.id]: "accepted", [lia.id]: "stale" });
+    expect((await agentRow(lia.id))?.instructions).toBe("Mudou.");
+  });
+
+  test("an archived agent's row goes stale; a refusal teaches the agent that proposed it", async () => {
+    f = await setup();
+    const ada = await teammate("ada");
+    const lia = await teammate("lia");
+    const { proposals } = await proposeFor({
+      target: "agent_instructions",
+      agentIds: [ada.id, lia.id],
+      change: "Responder em português.",
+    });
+    const rowOf = (agentId: string) => proposals.find((p) => p.agentId === agentId)?.id ?? "";
+    await archiveAgent(f.db, f.owner.id, f.org.id, lia.id);
+    await expect(decideProposal(f.db, f.owner.id, f.org.id, rowOf(lia.id), "accept")).rejects.toThrow("changed since");
+    await decideProposal(f.db, f.owner.id, f.org.id, rowOf(ada.id), "reject");
+    const lessons = await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.kind, "lesson"));
+    expect(lessons.map((l) => l.agentId)).toEqual([f.agent.id]);
+    expect(lessons[0]?.content).toBe("A person refused this change; don't propose it again: - Responder em português.");
+    expect(await auditOf(ada.id)).toContainEqual(["proposal.refused", f.owner.id]);
+  });
+
+  test("refusing a card teaches the agent that proposed it one lesson for the change, not one per agent", async () => {
+    f = await setup();
+    const ada = await teammate("ada");
+    const lia = await teammate("lia");
+    const atlas = await teammate("atlas", { instructions: "Seja breve.\n\n## Learned\n- Outra." });
+    const { proposals } = await proposeFor({
+      target: "agent_instructions",
+      agentIds: [ada.id, lia.id, atlas.id],
+      change: "Responder sempre em português.",
+    });
+    for (const p of proposals) await decideProposal(f.db, f.owner.id, f.org.id, p.id, "reject");
+    const lessons = await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.kind, "lesson"));
+    expect(lessons.map((l) => [l.agentId, l.content])).toEqual([
+      [f.agent.id, "A person refused this change; don't propose it again: - Responder sempre em português."],
+    ]);
+  });
+
+  test("a new role: decided by who manages agents, applied as them through the agent page's editor; stale once the role changed", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const ada = await teammate("ada", { ownerUserId: bia.id });
+    const {
+      proposals: [row],
+    } = await proposeFor({
+      target: "agent_instructions",
+      agentIds: [],
+      change: "",
+      roles: [{ agentId: ada.id, role: "Revisora de código" }],
+    });
+    expect(row).toMatchObject({
+      target: "agent_role",
+      agentId: ada.id,
+      proposedByAgentId: f.agent.id,
+      proposedText: "Revisora de código",
+    });
+    expect(permissionAsks()).toBe(1);
+    // Her owner isn't an admin: on her page she can't change the role either.
+    await expect(decideProposal(f.db, bia.id, f.org.id, row?.id ?? "", "accept")).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+    await expect(
+      decideProposal(f.db, f.owner.id, f.org.id, row?.id ?? "", "accept", { finalText: "Outra" }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    await decideProposal(f.db, f.owner.id, f.org.id, row?.id ?? "", "accept");
+    expect((await agentRow(ada.id))?.role).toBe("Revisora de código");
+    expect(await auditOf(ada.id)).toEqual(
+      expect.arrayContaining([
+        ["agent.updated", f.owner.id],
+        ["proposal.accepted", f.owner.id],
+      ]),
+    );
+
+    const again = await proposeFor({
+      target: "agent_instructions",
+      agentIds: [],
+      change: "",
+      roles: [{ agentId: ada.id, role: "QA" }],
+    });
+    await updateAgent(f.db, f.owner.id, f.org.id, ada.id, { role: "Designer" });
+    await expect(
+      decideProposal(f.db, f.owner.id, f.org.id, again.proposals[0]?.id ?? "", "accept"),
+    ).rejects.toBeInstanceOf(ConflictError);
+    expect((await agentRow(ada.id))?.role).toBe("Designer");
+  });
+
+  test("apps on or off: the owner only takes them away, as on the Access tab; applied as the person; never the proposer's own", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const ada = await teammate("ada", { ownerUserId: bia.id });
+    const lia = await teammate("lia", { ownerUserId: bia.id });
+    const issues = { id: "issues:write", label: "Issues", on: true };
+    const { proposals, skipped } = await proposeFor({
+      target: "agent_instructions",
+      agentIds: [],
+      change: "",
+      access: [
+        { agentId: ada.id, lines: [{ id: "wiki:write", label: "Write to the wiki", on: false }] },
+        { agentId: lia.id, lines: [issues, { id: "drive:read", label: "Read files", on: false }] },
+        { agentId: f.agent.id, lines: [issues] },
+      ],
+    });
+    expect(skipped).toEqual([
+      "@lia would keep Read files through drive:write: that is changed on its Access tab.",
+      "Your own apps aren't proposed here: ask for one with request_permission.",
+    ]);
+    const rowOf = (agentId: string) => proposals.find((p) => p.agentId === agentId);
+    expect(rowOf(lia.id)).toMatchObject({ target: "agent_access", access: [issues] });
+    expect(proposals.map((p) => p.agentId).sort()).toEqual([ada.id, lia.id].sort());
+    expect(permissionAsks()).toBe(0);
+
+    // Bia owns both: she may take Ada's wiki away, not give Lia issues.
+    await expect(decideProposal(f.db, bia.id, f.org.id, rowOf(lia.id)?.id ?? "", "accept")).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+    await decideProposal(f.db, bia.id, f.org.id, rowOf(ada.id)?.id ?? "", "accept");
+    expect(await scopesOf(ada.id)).not.toContain("wiki:write");
+    expect(await scopesOf(ada.id)).toContain("wiki:read");
+    expect(await auditOf(ada.id)).toContainEqual(["agent.access_changed", bia.id]);
+
+    // Lia's access changed on her page since: her row goes stale, and nothing is granted.
+    await grantScopes(f.db, f.org.id, lia.id, [{ connectionId: null, scope: "calendar:read" }]);
+    await expect(decideProposal(f.db, f.owner.id, f.org.id, rowOf(lia.id)?.id ?? "", "accept")).rejects.toBeInstanceOf(
+      ConflictError,
+    );
+    expect(await scopesOf(lia.id)).not.toContain("issues:write");
+  });
+
+  test("the tool names apps as request_permission does (a connection by its name, a built-in scope) and posts one card", async () => {
+    f = await setup();
+    const ada = await teammate("ada");
+    const [linear] = await f.db
+      .insert(schema.connectorConnections)
+      .values({
+        orgId: f.org.id,
+        connector: "linear",
+        label: "Linear",
+        serverUrl: "https://linear.example.com/mcp",
+        authType: "none",
+      })
+      .returning();
+    const ctx = await runOn("person");
+    const unknown = await propose(ctx, { target: "agents", access: [{ agent: "@ada", app: "Jira", on: true }] });
+    expect(unknown).toMatchObject({
+      isError: true,
+      content: expect.stringContaining(`Unknown app: Jira. Apps you can name: connector:${linear?.id} (Linear),`),
+    });
+    const out = await propose(ctx, {
+      target: "agents",
+      roles: [{ agent: "@ada", role: "Revisora" }],
+      access: [
+        { agent: "@ada", app: "linear", on: true },
+        { agent: "ada", app: "browser:use", on: false },
+      ],
+    });
+    expect(out.isError).toBeUndefined();
+    expect(out.data?.memoryUpdate?.text).toBe("ada → Revisora, ada +Linear, ada −Use a browser");
+    const made = await rows();
+    expect(made.map((r) => r.target).sort()).toEqual(["agent_access", "agent_role"]);
+    const access = made.find((r) => r.target === "agent_access");
+    expect(access?.access).toEqual([
+      { id: `connector:${linear?.id}`, label: "Linear", on: true },
+      { id: "browser:use", label: "Use a browser", on: false },
+    ]);
+    await decideProposal(f.db, f.owner.id, f.org.id, access?.id ?? "", "accept");
+    const grants = await f.db.select().from(schema.agentScopes).where(eq(schema.agentScopes.agentId, ada.id));
+    expect(grants.some((g) => g.connectionId === linear?.id && g.scope === "connector:*")).toBe(true);
+    expect(grants.map((g) => g.scope)).not.toContain("browser:use");
+
+    // An app disconnected after the proposal can't be turned on: the row goes stale instead of failing.
+    const lia = await teammate("lia");
+    const later = await proposeFor({
+      target: "agent_instructions",
+      agentIds: [],
+      change: "",
+      access: [{ agentId: lia.id, lines: [{ id: `connector:${linear?.id}`, label: "Linear", on: true }] }],
+    });
+    await revokeConnection(f.db, f.owner.id, f.org.id, linear?.id ?? "");
+    await expect(
+      decideProposal(f.db, f.owner.id, f.org.id, later.proposals[0]?.id ?? "", "accept"),
+    ).rejects.toBeInstanceOf(ConflictError);
+    expect((await rows()).find((r) => r.agentId === lia.id)?.status).toBe("stale");
+  });
+
+  test("an app turned off keeps its connection's denials, so the agent's owner may take it away", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const ada = await teammate("ada", { ownerUserId: bia.id });
+    const [linear] = await f.db
+      .insert(schema.connectorConnections)
+      .values({
+        orgId: f.org.id,
+        connector: "linear",
+        label: "Linear",
+        serverUrl: "https://linear.example.com/mcp",
+        authType: "none",
+      })
+      .returning();
+    const connectionId = linear?.id ?? "";
+    await grantScopes(f.db, f.org.id, ada.id, [
+      { connectionId, scope: "connector:*" },
+      { connectionId, scope: "deny:linear_delete_issue" },
+    ]);
+    const {
+      proposals: [row],
+    } = await proposeFor({
+      target: "agent_instructions",
+      agentIds: [],
+      change: "",
+      access: [{ agentId: ada.id, lines: [{ id: `connector:${connectionId}`, label: "Linear", on: false }] }],
+    });
+    await decideProposal(f.db, bia.id, f.org.id, row?.id ?? "", "accept");
+    const left = await f.db.select().from(schema.agentScopes).where(eq(schema.agentScopes.agentId, ada.id));
+    expect(left.filter((g) => g.connectionId === connectionId).map((g) => g.scope)).toEqual([
+      "deny:linear_delete_issue",
+    ]);
+  });
+
+  test("a built-in app turned off takes its tools turned on one by one too, as the Access tab's 'none'", async () => {
+    f = await setup();
+    const ada = await teammate("ada");
+    const lia = await teammate("lia");
+    for (const id of [ada.id, lia.id]) await f.db.delete(schema.agentScopes).where(eq(schema.agentScopes.agentId, id));
+    // Ada has only one of the Issues tools; Lia has Issues, one of its tools again and a denial.
+    await grantScopes(f.db, f.org.id, ada.id, [{ connectionId: null, scope: "tool:create_issue" }]);
+    await grantScopes(f.db, f.org.id, lia.id, [
+      { connectionId: null, scope: "issues:write" },
+      { connectionId: null, scope: "tool:comment_issue" },
+      { connectionId: null, scope: "deny:update_issue" },
+    ]);
+    const off = [{ id: "issues:write", label: "Issues", on: false }];
+    const { proposals, skipped } = await proposeFor({
+      target: "agent_instructions",
+      agentIds: [],
+      change: "",
+      access: [
+        { agentId: ada.id, lines: off },
+        { agentId: lia.id, lines: off },
+      ],
+    });
+    expect(skipped).toEqual([]);
+    for (const p of proposals) await decideProposal(f.db, f.owner.id, f.org.id, p.id, "accept");
+    expect(await scopesOf(ada.id)).toEqual([]);
+    expect(await scopesOf(lia.id)).toEqual(["deny:update_issue"]);
+  });
+
+  test("the list's cap leaves out decided rows before a pending one, and a card's rows are read by id past it", async () => {
+    f = await setup();
+    const ada = await teammate("ada");
+    const {
+      proposals: [waiting],
+    } = await proposeFor({ target: "agent_instructions", agentIds: [ada.id], change: "Responder em português." });
+    // 201 refused ones came after it.
+    const later = await f.db
+      .insert(schema.contextProposals)
+      .values(
+        Array.from({ length: 201 }, (_, i) => ({
+          orgId: f.org.id,
+          target: "org_context" as const,
+          baseHash: "x",
+          proposedText: `v${i}`,
+          diff: "",
+          rationale: "",
+          status: "rejected" as const,
+          createdAt: new Date(Date.now() + 1000 + i),
+        })),
+      )
+      .returning();
+    const listed = await listProposals(f.db, f.owner.id, f.org.id);
+    expect(listed).toHaveLength(200);
+    expect(listed[0]).toMatchObject({ id: waiting?.id, canDecide: true });
+    const oldest = later[0]?.id ?? "";
+    expect(listed.map((p) => p.id)).not.toContain(oldest);
+    const ids = [oldest, waiting?.id ?? ""];
+    const card = await listProposals(f.db, f.owner.id, f.org.id, { ids });
+    expect(card.map((p) => p.id).sort()).toEqual(ids.sort());
   });
 });

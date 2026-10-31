@@ -32,6 +32,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { CHROME_MAX_SCALE, Count, Icon, InkOrbit, PixelStopped, PressScale, Text, useTheme, useToast } from "@/ui";
+import { InstructionProposals } from "../agents/InstructionProposalCard";
 import { ProposalCard } from "../agents/ProposalCard";
 import { NoAiCard } from "../ai/NoAiCard";
 import { StretchCard } from "../ai/StretchCard";
@@ -409,6 +410,7 @@ export const MessageRow = memo(function MessageRow({
         {isAgent ? <NoAiCard message={m} /> : null}
         {isAgent ? <StretchCard message={m} /> : null}
         {isAgent ? <ProposalCard message={m} /> : null}
+        {isAgent ? <InstructionProposals message={m} /> : null}
         {files.length > 0 ? <MessageFiles files={files} /> : null}
         {approvalId ? <ApprovalInline approvalId={approvalId} /> : null}
         {handoff ? <HandoffCard handoff={handoff} /> : null}

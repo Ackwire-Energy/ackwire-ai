@@ -1,5 +1,7 @@
 import { and, arrayContained, type Database, desc, eq, inArray, isNull, or, type SQL, schema } from "@agenteschat/db";
+import { resolveApps } from "../access";
 import { recordAgentActions } from "../agent-actions";
+import { agentsByHandle, handleOf } from "../agents";
 import { caches } from "../cache";
 import type { MemoryUpdate } from "../events";
 import { announceMessageMemories } from "../message-memories";
@@ -7,10 +9,11 @@ import { can, getMembership } from "../organizations";
 import { personBehindCall } from "../requester";
 import { agentSearchChannels, agentVisibleChannels, indexSource, searchVisible } from "../search";
 import { closedRefusal } from "../standing";
+import { noAgentText } from "../team";
 import type { ToolContext, ToolDefinition, ToolSource } from "../tools/types";
 import { type ContextItem, checkPermissionText, consolidateItem, getContextItems, supersede } from "./items";
 import { kindFamily, overlap } from "./judgments";
-import { proposeChange } from "./proposals";
+import { CARD_MAX_AGENTS, ownerDecides, type Proposal, proposeChange } from "./proposals";
 import { type ContextDeps, ensureThreadSummary, judgeOf, memoryJudging } from "./summaries";
 
 const { contextItems, messages, outcomes } = schema;
@@ -324,42 +327,130 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
     {
       name: "propose_instruction_change",
       description:
-        "When a person asks you to change how you work (your instructions) or something the whole organization should know (org context): create a proposal. You can't edit them yourself; the agent's owner or an admin accepts it. Not for routines: a change to what a routine does ('a rotina', 'when a new error comes in…') is `update_routine`.",
+        "When a person asks to change how agents work, propose it: your instructions (my_instructions), other agents' (agents: with their handles, all on one card), or what every agent should know now and later (org_context). Add a rule with change. To change or remove existing text, put the exact text in replaces and the new text in change (empty removes it). With target agents you can also give an agent a new role (roles) and turn an app on or off for it (access: a connected app by its name, or a built-in area such as browser:use; your own apps go through request_permission). Nothing changes until a person who may make that change accepts it. Instructions: the agent's owner or someone who reviews memory. A role or an app: an admin who manages agents, or the agent's owner for an app only turned off. The org context: someone who reviews memory. Never tell the person only they can make the change: propose it. Not for routines: a change to what a routine does ('a rotina', 'when a new error comes in…') is `update_routine`.",
       scope: "memory:write",
       inputSchema: {
         type: "object",
         properties: {
-          target: { type: "string", enum: ["my_instructions", "org_context"] },
-          change: { type: "string", minLength: 3, maxLength: 2000 },
+          target: { type: "string", enum: ["my_instructions", "agents", "org_context"] },
+          agents: {
+            type: "array",
+            items: { type: "string", minLength: 1, maxLength: 40 },
+            minItems: 1,
+            maxItems: CARD_MAX_AGENTS,
+            description: "With target agents: whose instructions get the change, by @handle (you may be one of them).",
+          },
+          change: { type: "string", maxLength: 2000 },
+          replaces: { type: "string", minLength: 1, maxLength: 2000 },
+          roles: {
+            type: "array",
+            maxItems: CARD_MAX_AGENTS,
+            items: {
+              type: "object",
+              properties: {
+                agent: { type: "string", minLength: 1, maxLength: 40 },
+                role: { type: "string", minLength: 1, maxLength: 200 },
+              },
+              required: ["agent", "role"],
+              additionalProperties: false,
+            },
+          },
+          access: {
+            type: "array",
+            maxItems: 50,
+            items: {
+              type: "object",
+              properties: {
+                agent: { type: "string", minLength: 1, maxLength: 40 },
+                app: { type: "string", minLength: 1, maxLength: 200 },
+                on: { type: "boolean" },
+              },
+              required: ["agent", "app", "on"],
+              additionalProperties: false,
+            },
+          },
           reason: { type: "string", maxLength: 500 },
         },
-        required: ["target", "change"],
+        required: ["target"],
         additionalProperties: false,
       },
       async execute(input, ctx) {
         const requester = await personRequester(ctx);
         if (!requester) return notRequested;
+        const fail = (content: string) => ({ content, isError: true });
         try {
-          const { proposal, canDecide } = await proposeChange(deps, {
+          const target = str(input.target);
+          const change = str(input.change);
+          const replaces = typeof input.replaces === "string" ? input.replaces : undefined;
+          const handles = Array.isArray(input.agents) ? input.agents.map(handleOf) : [];
+          const roles = (Array.isArray(input.roles) ? input.roles : []) as { agent: string; role: string }[];
+          const access = (Array.isArray(input.access) ? input.access : []) as {
+            agent: string;
+            app: string;
+            on: boolean;
+          }[];
+          const changesText = target !== "agents" || handles.length > 0;
+          if (target !== "agents" && (handles.length > 0 || roles.length > 0 || access.length > 0))
+            return fail("agents, roles and access go with target agents.");
+          if (target === "agents" && !changesText && roles.length === 0 && access.length === 0)
+            return fail("Name the agents whose instructions change (agents), or give roles or access.");
+          if (changesText && replaces === undefined && change.trim().length < 3)
+            return fail("change needs the rule to add (at least 3 characters).");
+          const named = await agentsByHandle(ctx.db, ctx.orgId, [
+            ...handles,
+            ...roles.map((r) => r.agent),
+            ...access.map((a) => a.agent),
+          ]);
+          if (named.missing.length > 0) return fail(await noAgentText(ctx, named.missing));
+          const idOf = (raw: unknown) => named.rows.find((r) => r.handle === handleOf(raw))?.id ?? "";
+          const apps = await resolveApps(
+            ctx.db,
+            ctx.orgId,
+            access.map((a) => a.app),
+          );
+          if (apps.unknown.length > 0)
+            return fail(`Unknown app: ${apps.unknown.join(", ")}. Apps you can name: ${apps.choices.join(", ")}.`);
+          const lines = access.map((a) => ({
+            agent: a.agent,
+            line: { ...(apps.found.get(a.app) as { id: string; label: string }), on: a.on === true },
+          }));
+          const { proposals, skipped } = await proposeChange(deps, {
             orgId: ctx.orgId,
             agentId: ctx.agentId,
-            target: str(input.target) === "org_context" ? "org_context" : "agent_instructions",
-            change: str(input.change),
+            target: target === "org_context" ? "org_context" : "agent_instructions",
+            agentIds: target === "agents" ? handles.map(idOf) : undefined,
+            change,
+            replaces,
+            roles: roles.map((r) => ({ agentId: idOf(r.agent), role: r.role })),
+            access: lines.map((l) => ({ agentId: idOf(l.agent), lines: [l.line] })),
             rationale: str(input.reason),
             requesterId: requester,
           });
+          const [first] = proposals;
+          if (!first) return fail(`Nothing to propose. ${skipped.join(" ")}`);
+          const decides = proposals.filter((p) => p.canDecide).length;
+          const made =
+            proposals.length === 1
+              ? `Proposal ${first.id} created`
+              : `${proposals.length} changes proposed on one card`;
+          const rest = [...new Set(proposals.filter((p) => !p.canDecide).map(decidedBy))].join(", and ");
+          const who =
+            decides === proposals.length
+              ? `the person who asked can accept ${proposals.length === 1 ? "it" : "them"} right here.`
+              : decides === 0
+                ? `${proposals.length === 1 ? "it waits" : "they wait"} for ${rest}.`
+                : `the person who asked can accept some right here, the rest wait for ${rest}.`;
           return memoryResult(
             ctx,
-            canDecide
-              ? `Proposal ${proposal.id} created; the person who asked can accept it right here.`
-              : `Proposal ${proposal.id} created; the agent's owner or an admin will decide.`,
+            `${made}; ${who}${skipped.length ? ` Left off the card: ${skipped.join(" ")}` : ""}`,
             {
               action: "proposed",
-              itemId: proposal.id,
-              text: str(input.change),
+              itemId: first.id,
+              text: proposalSummary(replaces === undefined || change.trim() ? change : `− ${replaces}`, roles, lines),
               requestedByUserId: requester,
-              proposalId: proposal.id,
-              canDecide,
+              proposalId: first.id,
+              proposalIds: proposals.map((p) => p.id),
+              canDecide: decides > 0,
             },
           );
         } catch (error) {
@@ -370,6 +461,16 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
   ];
   return { name: "context", tools: async () => tools };
 }
+
+/** Who accepts a row the person who asked can't, for the agent to tell them (`deciders` in proposals.ts). */
+const decidedBy = (p: Proposal) =>
+  p.target === "org_context"
+    ? "someone who reviews memory (the org context)"
+    : p.target === "agent_instructions"
+      ? "the agent's owner or someone who reviews memory (instructions)"
+      : ownerDecides(p)
+        ? "an admin who manages agents or the agent's owner (apps turned off)"
+        : `an admin who manages agents (${p.target === "agent_role" ? "a role" : "apps"})`;
 
 /** Memory tools only act on a person's request in the current turn (never on tool, webhook or document text). */
 /** The person behind the run (`authority.ts`); null for a routine's work and unattended runs. */
@@ -428,6 +529,25 @@ function memoryResult(ctx: ToolContext, content: string, update: MemoryUpdate) {
       },
     },
   };
+}
+
+/**
+ * A proposal card in a line, in no language (the "memory" body the apps translate around it, previews): the rule,
+ * then each new role and each app turned on (+) or off (−) by handle. No "@": with no reply from the model this is
+ * the message's body, where a mention would call those agents in.
+ */
+function proposalSummary(
+  change: string,
+  roles: { agent: string; role: string }[],
+  apps: { agent: string; line: { label: string; on: boolean } }[],
+) {
+  return [
+    change.trim(),
+    ...roles.map((r) => `${handleOf(r.agent)} → ${r.role.trim()}`),
+    ...apps.map((a) => `${handleOf(a.agent)} ${a.line.on ? "+" : "−"}${a.line.label}`),
+  ]
+    .filter(Boolean)
+    .join(", ");
 }
 
 /** Channels whose content may be injected into a run in `channelId`: that channel and public channels the agent is in. */
