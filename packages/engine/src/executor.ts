@@ -20,6 +20,7 @@ import {
   ensureOpenRouterModels,
   isAutoModel,
   type ModelMessage,
+  type ModelResult,
   ProviderError,
   type StopReason,
   type SystemBlock,
@@ -2122,6 +2123,7 @@ async function executeRunInner(
           usageRecordId: result.usageRecordId,
           costNanoUsd: result.costNanoUsd,
           ...result.usage,
+          thinking: result.thinking,
           turn,
           ...(narration ? { narration: narration.slice(0, 4000) } : {}),
         }),
@@ -2574,6 +2576,7 @@ interface BrainStep {
   usageRecordId?: string;
   costNanoUsd?: number;
   usage?: Partial<Record<"inputTokens" | "outputTokens" | "cacheReadTokens" | "cacheWriteTokens", number>>;
+  thinking?: ModelResult["thinking"];
 }
 
 /**
@@ -2653,6 +2656,7 @@ async function thinkOnce(
       usageRecordId: r.usageRecordId,
       costNanoUsd: r.costNanoUsd,
       usage: r.usage,
+      thinking: r.thinking,
       executedCount,
     };
   }
