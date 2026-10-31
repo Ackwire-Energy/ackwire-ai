@@ -32,7 +32,7 @@ export function SkillsScreen() {
   const { t } = useTranslation();
   const c = useColors();
   const { orgId, org } = useOrg();
-  const admin = can(org?.role, "configure");
+  const admin = can(org, "manage_agents");
   const skills = useSkills(orgId, admin);
   const list = skills.data ?? [];
   const usage = useSkillUsage(orgId, admin && list.length > 0);
@@ -118,7 +118,7 @@ export function SkillScreen({ id }: { id: string }) {
   const c = useColors();
   const toast = useToast();
   const { orgId, org } = useOrg();
-  const admin = can(org?.role, "configure");
+  const admin = can(org, "manage_agents");
   const skill = useSkill(orgId, id || null);
   const action = useSkillAction(orgId);
   const usage = useSkillUsage(orgId, admin);

@@ -3,6 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import { join } from "node:path";
 import { modelChoices } from "@agenteschat/client/lib/providers";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { channelNameError, toChannelName } from "@/components/NewChannelDialog";
@@ -66,6 +67,66 @@ describe("sidebar: no agent twice", () => {
 });
 
 describe("Criar canal", () => {
+  /** Opens "Criar canal" in a workspace with `count` agents. */
+  const openWith = async (count: number) => {
+    const state = seedState();
+    const [first] = state.agents;
+    for (let i = state.agents.length; first && i < count; i++) {
+      state.agents.push({ ...first, id: `agent-${i}`, name: `Agente ${i}`, handle: `agente${i}` });
+    }
+    await go(`c/${ENG_ID}`, state);
+    await click(within(nav()).getByRole("button", { name: "Criar canal" }));
+    return screen().getByRole("dialog", { name: "Criar canal" });
+  };
+  const sheet = (path: string) => Bun.file(join(import.meta.dir, path)).text();
+  const rule = (css: string, selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
+
+  for (const count of [2, 30]) {
+    test(`one column with ${count} agents: name, description, then the members; the footer outside the scroll`, async () => {
+      const dialog = await openWith(count);
+      const [body, ...more] = dialog.querySelectorAll(".ac-dialog__body");
+      expect(more).toEqual([]);
+      const list = within(dialog).getByRole("region", { name: "Buscar pessoa ou agente" });
+      const column = [
+        within(dialog).getByLabelText("Nome"),
+        within(dialog).getByLabelText("Descrição"),
+        within(dialog).getByText("Membros iniciais"),
+        within(dialog).getByRole("searchbox", { name: "Buscar pessoa ou agente" }),
+        list,
+      ];
+      for (const el of column) expect(body?.contains(el)).toBe(true);
+      for (const [i, el] of column.slice(1).entries()) {
+        expect((column[i]?.compareDocumentPosition(el) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      }
+      // Every agent and the other person, in the list's own scroll box under the search.
+      expect(within(list).getAllByRole("checkbox")).toHaveLength(count + 1);
+      expect(list.className).toBe("people-picker__results");
+      // The footer is the dialog's own, outside the scroll: the count, Cancelar and Criar stay in view.
+      const foot = dialog.querySelector(".ac-dialog__foot") as HTMLElement;
+      expect(body?.contains(foot)).toBe(false);
+      expect(foot.closest(".ac-dialog__body, .ac-dialog__list")).toBeNull();
+      expect(foot.textContent).toContain("0 selecionado");
+      expect(within(foot).getByRole("button", { name: "Cancelar" })).toBeTruthy();
+      expect(within(foot).getByRole("button", { name: "Criar #canal" })).toBeTruthy();
+      // The column scrolls when the screen is short (a phone's sheet too); the list scrolls in its box; the footer
+      // never shrinks.
+      const ui = await sheet("../../../packages/ui/src/styles/components.css");
+      const app = await sheet("../src/layout.css");
+      expect(rule(ui, ".ac-dialog__body")).toContain("overflow-y: auto;");
+      expect(rule(ui, ".ac-dialog__body")).toContain("flex-direction: column;");
+      expect(rule(app, ".people-picker__results")).toMatch(/max-height: \d+px;[\s\S]*overflow-y: auto;/);
+      expect(ui).toMatch(/\.ac-dialog__foot \{\n {2}flex: none;/);
+      // The list ends the body, right over the footer's line: it drops its own, so one line shows there, not two.
+      expect(body?.lastElementChild?.classList.contains("people-picker")).toBe(true);
+      expect(foot.classList.contains("ac-dialog__foot--bar")).toBe(true);
+      expect(rule(ui, ".ac-dialog__foot--bar")).toContain("border-top: 1px solid");
+      expect(rule(app, ".people-picker__results")).toContain("border-bottom: 1px solid");
+      expect(rule(app, ".ac-dialog__body > .people-picker:last-child .people-picker__results")).toContain(
+        "border-bottom: 0;",
+      );
+    });
+  }
+
   test("name rules", () => {
     expect(toChannelName("Marketing Brasil")).toBe("marketing-brasil");
     expect(toChannelName("Ação!")).toBe("acao");

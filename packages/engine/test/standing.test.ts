@@ -11,7 +11,6 @@ import {
   agentHoldKind,
   assertCanWork,
   type BillingHold,
-  changeMemberRole,
   cloudNotice,
   createAgent,
   createFakeJudge,
@@ -37,12 +36,13 @@ import {
   runErrorDetail,
   setAgentHold,
   setBillingHold,
+  setMemberRoles,
   setOrgStanding,
   setRestrictionNotices,
   setUserBlocked,
   standingJudge,
 } from "../src";
-import { addMember, addUser, type Fixture, SECRET, setup } from "./fixtures";
+import { addMember, addUser, adminRoleId, type Fixture, SECRET, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 import { channelRoutine, fire, routineRow } from "./routine-fixtures";
 
@@ -476,16 +476,19 @@ describe("user block", () => {
     // Nor erase their workspaces with their account.
     await expect(deleteAccount(f.db, bia.id)).rejects.toBeInstanceOf(ForbiddenError);
     // The workspace still manages them; they can't act, not even to leave.
-    await changeMemberRole(f.db, f.owner.id, f.org.id, bia.id, "admin");
+    await setMemberRoles(f.db, f.owner.id, f.org.id, bia.id, [await adminRoleId(f.db, f.org.id)]);
     await removeMember(f.db, bia.id, f.org.id, bia.id);
-    expect(await getMembership(f.db, bia.id, f.org.id, { includeBlocked: true })).toMatchObject({ role: "admin" });
+    expect(await getMembership(f.db, bia.id, f.org.id, { includeBlocked: true })).toMatchObject({ rank: 0 });
 
     expect(await setUserBlocked({ db: f.db }, bia.id, { blocked: false, reason: null })).toEqual({
       blockedAt: null,
       reason: null,
       sessionsRevoked: 0,
     });
-    expect(await requirePermission(f.db, bia.id, f.org.id, "manage_members")).toMatchObject({ role: "admin" });
+    expect(await requirePermission(f.db, bia.id, f.org.id, "manage_members")).toMatchObject({
+      role: "member",
+      rank: 0,
+    });
     expect((await createOrganization(f.db, bia.id, { name: "Bia's" })).organization.name).toBe("Bia's");
 
     await setUserBlocked({ db: f.db }, bia.id, { blocked: true, reason: null });

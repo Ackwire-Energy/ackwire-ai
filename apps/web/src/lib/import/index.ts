@@ -1,4 +1,5 @@
 import type { MigrationBundle } from "@agenteschat/client";
+import { excerpt } from "@agenteschat/client/lib/text";
 import * as agenteschat from "./agenteschat";
 import * as hermes from "./hermes";
 import * as openbot from "./openbot";
@@ -112,6 +113,8 @@ const DETECTION: ImportSource[] = [
 
 /** What one import may carry (IMPORT_LIMITS in packages/engine/src/imports.ts); the rest is listed. */
 const LIMITS = { agents: 200, skills: 300, channels: 300, routines: 1000, notes: 5000 };
+/** The longest to-do or left-out label the server takes (`Bundle` in apps/server/src/routes/app/agent-imports.ts). */
+const LABEL_MAX = 500;
 /** Files about a package rather than in it: never listed as left behind. */
 const NOISE = /(^|\/)(\.[^/]*|__MACOSX\/.*|(README|LICEN[CS]E|NOTICE|CHANGELOG|CONTRIBUTING)(\.[a-z]+)?)$/i;
 
@@ -154,6 +157,11 @@ function finish(d: Draft, app: ImportSource, files: ImportFile[]): MigrationBund
     return r.text;
   };
   const label = (text: string) => scrubSecrets(text).text;
+  // Another app's agent may write these as paragraphs: shortened to what the server takes, so one can't refuse the file.
+  const shortLabel = (text: string) => {
+    const scrubbed = label(text);
+    return scrubbed.length <= LABEL_MAX ? scrubbed : excerpt(scrubbed, LABEL_MAX, Number.POSITIVE_INFINITY);
+  };
   const capped = <T>(items: T[], max: number, kind: LeftOutKind, name: (item: T) => string) => {
     for (const item of items.slice(max)) left(kind, name(item));
     return items.slice(0, max);
@@ -218,7 +226,11 @@ function finish(d: Draft, app: ImportSource, files: ImportFile[]): MigrationBund
   });
   if (notes.length > LIMITS.notes) left("notes", `+${notes.length - LIMITS.notes}`);
 
-  const todo = d.todo.map((t) => ({ ...t, label: label(t.label), agents: t.agents.filter((k) => agentKeys.has(k)) }));
+  const todo = d.todo.map((t) => ({
+    ...t,
+    label: shortLabel(t.label),
+    agents: t.agents.filter((k) => agentKeys.has(k)),
+  }));
 
   // Credential stores were never read; other files nobody used are listed by folder.
   const unread = new Map<string, number>();
@@ -260,7 +272,7 @@ function finish(d: Draft, app: ImportSource, files: ImportFile[]): MigrationBund
     notes: notes.slice(0, LIMITS.notes),
     todo,
     leftOut: leftOut
-      .map((l) => ({ kind: l.kind, label: label(l.label) }))
+      .map((l) => ({ kind: l.kind, label: shortLabel(l.label) }))
       .filter((l) => {
         const k = `${l.kind}\u0000${l.label}`;
         if (seen.has(k)) return false;

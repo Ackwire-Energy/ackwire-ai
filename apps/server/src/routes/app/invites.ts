@@ -184,12 +184,23 @@ export function inviteRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/join-requests/{requestId}/approve",
       tags,
       security,
-      summary: "Approve a request to join with a role (admins)",
+      summary: "Approve a request to join, with roles (who may invite people)",
       description:
         "A confirmed account with this address joins at once when the address was proven (a code from its " +
         "mailbox, or that account asking). Anyone else gets an email invitation to the address. `emailed: false` " +
         "on a server that doesn't send email: hand them `url` yourself.",
-      request: { params: RequestParams, body: body(z.object({ role: z.enum(["member", "admin"]) })) },
+      request: {
+        params: RequestParams,
+        body: body(
+          z.object({
+            roleIds: z
+              .array(z.string().uuid())
+              .max(50)
+              .optional()
+              .openapi({ description: "Roles the person gets, below the approver's own (ADR 0085)." }),
+          }),
+        ),
+      },
       responses: {
         200: json(
           z.discriminatedUnion("outcome", [
@@ -212,7 +223,7 @@ export function inviteRoutes(deps: AppDeps) {
         c.get("user").id,
         orgId,
         requestId,
-        c.req.valid("json").role,
+        c.req.valid("json").roleIds ?? [],
       );
       deps.wakeWorkers?.();
       return c.json(

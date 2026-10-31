@@ -1,4 +1,5 @@
 import { useUpdateAgent } from "@agenteschat/client";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { router, usePreventRemove } from "expo-router";
 import { useMemo, useRef, useState } from "react";
@@ -6,11 +7,12 @@ import { useTranslation } from "react-i18next";
 import { Alert, StyleSheet, TextInput, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useOrg } from "@/providers/org";
-import { AgentAvatar, EmptyState, fieldText, Text, useToast } from "@/ui";
+import { AgentAvatar, EmptyState, fieldText, GroupedList, GroupedRow, Text, useToast } from "@/ui";
 import { useFailed } from "../routines/hooks";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { PushedHeader, successHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
+import { openAgentDelete } from "./DeleteAgentScreen";
 import { type AgentDraft, agentChanges, editableFields, fullLook } from "./edit";
 import { LookPicker } from "./LookPicker";
 
@@ -28,11 +30,12 @@ export function AgentEditScreen({ id }: { id: string }) {
   const failed = useFailed();
   const dir = useDirectory();
   const meId = useMeId();
-  const role = useOrg().org?.role;
+  const org = useOrg().org;
   const agent = dir.agentById.get(id);
   const update = useUpdateAgent(useOrgId(), id);
+  const admin = can(org, "manage_agents");
   const fields = editableFields({
-    admin: can(role, "manage_agents"),
+    admin,
     owner: Boolean(meId && agent?.ownerUserId === meId),
   });
   const saved = useMemo<AgentDraft | null>(
@@ -186,6 +189,23 @@ export function AgentEditScreen({ id }: { id: string }) {
             </Text>
           ) : null}
         </View>
+
+        {/* Deleting for good asks for its name on a screen of its own (ADR 0082). */}
+        {admin ? (
+          <View style={styles.section}>
+            <GroupedList>
+              <GroupedRow
+                icon="x"
+                label={t("agentPage.delete.action", agentGrammar(t, agent.name))}
+                sub={t("agentPage.delete.help")}
+                subLines={2}
+                danger
+                chevron
+                onPress={() => openAgentDelete(id)}
+              />
+            </GroupedList>
+          </View>
+        ) : null}
       </KeyboardAwareScrollView>
     </View>
   );

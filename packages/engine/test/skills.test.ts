@@ -339,7 +339,7 @@ describe("import", () => {
     const md = (name: string, description: string) => `---\nname: ${name}\ndescription: ${description}\n---\n# ${name}`;
     const archive = zip({
       "skills-main/fonts/SKILL.md": md("fonts", "Desenha com as fontes da marca."),
-      "skills-main/fonts/brand.ttf": "x".repeat(SKILL_LIMITS.maxBytes),
+      "skills-main/fonts/brand.svg": "x".repeat(SKILL_LIMITS.maxBytes),
       "skills-main/good/SKILL.md": md("good", "Funciona."),
       "skills-main/long/SKILL.md": md("long", "x".repeat(1100)),
     });
@@ -422,6 +422,51 @@ describe("import", () => {
     const reset = String(Math.floor(Date.now() / 1000) + 290);
     const spent = fakeGithub({ limited: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": reset }, status: 403 });
     expect(await refusal("https://github.com/acme/skills", spent)).toMatchObject({ params: { count: 5 } });
+  });
+
+  test("images and videos are only listed, so they don't count toward 2 MB; text past 2 MB is still refused", async () => {
+    f = await setup();
+    // A repository shaped like a real one: a video and screenshots past 2 MB next to a little Markdown.
+    const url = "https://github.com/acme/skills";
+    const media = zip({
+      "skills-main/SKILL.md": SKILL_MD,
+      "skills-main/assets/demo.mp4": "x".repeat(2_200_000),
+      "skills-main/assets/shot.jpg": "x".repeat(670_000),
+      "skills-main/references/pricing.md": "# Pricing",
+    });
+    const skill = await importSkillFromUrl(
+      { ...skillDeps(), fetch: fakeGithub({ archive: media }).fetch },
+      f.owner.id,
+      f.org.id,
+      url,
+    );
+    expect("files" in skill && skill.files.map((x) => [x.path, x.status])).toEqual([
+      ["assets/demo.mp4", "ignored"],
+      ["assets/shot.jpg", "ignored"],
+      ["references/pricing.md", "stored"],
+    ]);
+
+    const book = zip({ "skills-main/SKILL.md": SKILL_MD, "skills-main/book.md": "x".repeat(2_200_000) });
+    await expect(
+      importSkillFromUrl({ ...skillDeps(), fetch: fakeGithub({ archive: book }).fetch }, f.owner.id, f.org.id, url),
+    ).rejects.toThrow("too large");
+
+    // The same in a zip: a big image is listed and never inflated, a big text file is refused.
+    const zipped = await importSkillZip(
+      skillDeps(),
+      f.owner.id,
+      f.org.id,
+      zip({ "SKILL.md": SKILL_MD, "assets/shot.png": "x".repeat(2_200_000) }),
+    );
+    expect(zipped.files.map((x) => [x.path, x.status])).toEqual([["assets/shot.png", "ignored"]]);
+    await expect(
+      importSkillZip(
+        skillDeps(),
+        f.owner.id,
+        f.org.id,
+        zip({ "SKILL.md": SKILL_MD, "book.md": "x".repeat(2_200_000) }),
+      ),
+    ).rejects.toThrow("too large");
   });
 });
 

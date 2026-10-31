@@ -62,7 +62,7 @@ export async function readGithubImport(
   orgId: string,
   url: string,
 ): Promise<{ files: ImportedFile[]; skipped?: string[] }> {
-  await requirePermission(deps.db, actorId, orgId, "manage_agents");
+  await requirePermission(deps.db, actorId, orgId, "create_agents");
   let target: ReturnType<typeof parseGithubUrl>;
   try {
     target = parseGithubUrl(url);

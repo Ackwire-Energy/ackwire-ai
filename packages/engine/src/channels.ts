@@ -8,6 +8,7 @@ import { followsThreadSql } from "./follows";
 import { type PreviewMeta, previewMeta } from "./message-preview";
 import { notificationSnippet } from "./notifications";
 import { can, getMembership, type Membership, requireActiveMembership, requirePermission } from "./organizations";
+import { memberKeysSql, memberRankSql, resolvePermissions } from "./permissions";
 import { OrgPausedError, STANDING_COLUMNS } from "./standing";
 
 const { channels, channelMembers, agents, organizationMembers, organizations, users } = schema;
@@ -213,6 +214,8 @@ export async function requireChannelAccess(db: Database, userId: string, orgId: 
   const [row] = await db
     .select({
       role: organizationMembers.role,
+      keys: memberKeysSql({ orgId: organizationMembers.orgId, userId: organizationMembers.userId }),
+      rank: memberRankSql({ orgId: organizationMembers.orgId, userId: organizationMembers.userId }),
       orgName: organizations.name,
       standing: STANDING_COLUMNS,
       channel: channels,
@@ -233,7 +236,14 @@ export async function requireChannelAccess(db: Database, userId: string, orgId: 
   if (!channel || channel.archivedAt) throw new NotFoundError("Channel not found");
   // Forum topics are readable by the whole organization (ADR 0022); writing goes through the forum.
   if (!row.memberId && channel.kind !== "forum") throw new ForbiddenError("Join this channel first");
-  const membership: Membership = { orgId, orgName: row.orgName, role: row.role, standing: row.standing };
+  const membership: Membership = {
+    orgId,
+    orgName: row.orgName,
+    role: row.role,
+    permissions: resolvePermissions(row.role === "owner", row.keys),
+    rank: row.rank,
+    standing: row.standing,
+  };
   return { channel, membership };
 }
 
@@ -274,7 +284,7 @@ export async function addChannelMember(
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId), isNull(channels.archivedAt)));
   if (!channel) throw new NotFoundError("Channel not found");
   if (channel.kind === "dm") throw new ValidationError("A direct conversation keeps its participants");
-  if (channel.createdByUserId !== actorId && !can(membership.role, "manage_members")) {
+  if (channel.createdByUserId !== actorId && !can(membership, "manage_channels")) {
     throw new ForbiddenError("Only the channel's creator or an admin can add members");
   }
   if ("userId" in member) {
@@ -297,7 +307,7 @@ export async function addChannelMember(
     .from(agents)
     .where(and(eq(agents.id, member.agentId), eq(agents.orgId, orgId), isNull(agents.archivedAt)));
   if (!agent) throw new ValidationError("That agent does not exist in this organization");
-  if (agent.ownerUserId !== actorId && !can(membership.role, "manage_agents")) {
+  if (agent.ownerUserId !== actorId && !can(membership, "manage_agents")) {
     throw new ForbiddenError("Only an admin or the agent's owner can add this agent to a channel");
   }
   const autoReply = member.autoReply ?? true;
@@ -341,7 +351,7 @@ export async function setChannelAgentAutoReply(
       ),
     );
   if (!row) throw new NotFoundError("That agent is not in this channel");
-  if (row.createdBy !== actorId && row.ownerUserId !== actorId && !can(membership.role, "manage_members")) {
+  if (row.createdBy !== actorId && row.ownerUserId !== actorId && !can(membership, "manage_channels")) {
     throw new ForbiddenError("Only the channel's creator, an admin or the agent's owner can change this");
   }
   await db
@@ -387,7 +397,7 @@ export async function removeChannelMember(
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId)));
   if (!channel) throw new NotFoundError("Channel not found");
   const self = "userId" in member && member.userId === actorId;
-  if (!self && channel.createdByUserId !== actorId && !can(membership.role, "manage_members")) {
+  if (!self && channel.createdByUserId !== actorId && !can(membership, "manage_channels")) {
     throw new ForbiddenError("Only the channel's creator or an admin can remove members");
   }
   await db
@@ -425,7 +435,7 @@ async function archivableChannel(db: Database, actorId: string, orgId: string, c
     .from(channels)
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId)));
   if (!channel) throw new NotFoundError("Channel not found");
-  if (channel.createdByUserId !== actorId && !can(membership.role, "manage_members")) {
+  if (channel.createdByUserId !== actorId && !can(membership, "manage_channels")) {
     throw new ForbiddenError("Only the channel's creator or an admin can archive it");
   }
   return channel;

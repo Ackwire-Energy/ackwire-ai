@@ -93,6 +93,18 @@ test("a resume opens the workspace where the server has it, with the team made t
   expect(presetsMade(t, [{ id: "x", name: "Ada", handle: "ada", appearance: null }]).ids).toEqual({ ada: "x" });
 });
 
+test("a resume never opens behind what the workspace shows was passed, whatever step an older app saved", async () => {
+  const t = await translator("pt-BR");
+  const saved = { orgId: "o", generalChannelId: "g", step: "import" as const };
+  const theo = { id: "t", name: "Theo", handle: "theo", appearance: PRESET_LOOK.theo };
+  const ada = { id: "a", name: "Ada", handle: "ada", appearance: PRESET_LOOK.ada };
+  // The team made and the import in, while the server still says the import: the web's computer step, its agents here.
+  expect(resumeOf(t, saved, [theo, ada], true)).toMatchObject({ reached: 4, step: "agents" });
+  // An import picked and never applied, or a create cut short before the guide: where it was, to be made whole.
+  expect(resumeOf(t, saved, [theo, ada], false)).toMatchObject({ reached: 2, step: "import" });
+  expect(resumeOf(t, { ...saved, step: "agents" }, [theo], false)).toMatchObject({ reached: 3, step: "agents" });
+});
+
 test("a create that gives back the workspace being set up on the web: past its first steps, nothing is written over it", () => {
   const org = (step: "context" | "agents") => [
     { id: "o", name: "Acme", role: "owner" as const, onboarding: { step, generalChannelId: "g" } },

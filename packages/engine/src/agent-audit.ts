@@ -1,9 +1,8 @@
-import { redactCommon } from "@agenteschat/adapters/redact";
 import { and, type Database, desc, type Executor, eq, inArray, lt, ne, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import type { RunAuthority } from "./authority";
 import { requirePermission } from "./organizations";
-import { maskCredentials } from "./tool-detail";
+import { redactCredentials as masked } from "./tool-detail";
 
 const { auditLog, agents, approvals, channels, secretRequests, users } = schema;
 
@@ -21,8 +20,6 @@ const MAX_STRING = 500;
 const MAX_ITEMS = 20;
 const MAX_DEPTH = 4;
 const MAX_INPUT = 4000;
-
-const masked = (text: string) => redactCommon(maskCredentials(text));
 
 /**
  * A call's input as the audit keeps it: values under secret-looking keys
@@ -67,7 +64,7 @@ export function auditsCall(
 ): boolean {
   if (outcome === "refused" || outcome === "failed") return kind !== "directory";
   if (kind === "read") return Boolean(tool.connectionId);
-  return kind !== "directory" && kind !== "pass" && kind !== "here";
+  return kind !== "directory" && kind !== "pass" && kind !== "self" && kind !== "here";
 }
 
 const MAX_TITLE = 200;
@@ -199,7 +196,7 @@ export async function listAudit(
   orgId: string,
   filter: AuditFilter = {},
 ): Promise<{ rows: AuditRow[]; next: string | null }> {
-  await requirePermission(db, actorId, orgId, "configure");
+  await requirePermission(db, actorId, orgId, "view_audit");
   const limit = Math.min(Math.max(filter.limit ?? AUDIT_PAGE, 1), AUDIT_PAGE_MAX);
   const found = await db
     .select()

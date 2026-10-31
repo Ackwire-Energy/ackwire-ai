@@ -18,6 +18,8 @@ import {
 import { listMembers } from "./organizations";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
+export const UPDATE_ISSUE_TOOL = "update_issue";
+
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 const actorOf = (ctx: ToolContext): IssueActor => ({
   type: "agent",
@@ -237,7 +239,7 @@ export function createIssueToolSource(deps: IssueDeps): ToolSource {
       },
     },
     {
-      name: "update_issue",
+      name: UPDATE_ISSUE_TOOL,
       description:
         "Change an issue's status, priority, title, description, assignee, labels or due date, check acceptance criteria you met, or link a pull request to it. Linking a PR moves the issue to review on its own. No permission needed: the person sees the change with Undo.",
       scope: "issues:write",

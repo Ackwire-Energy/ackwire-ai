@@ -84,12 +84,17 @@ export function inflateZipEntry(buffer: Uint8Array, entry: ZipListing): Uint8Arr
 /**
  * Reads a zip archive (stored or deflated entries; no zip64, no encryption)
  * within limits, checked before inflating so a zip bomb can't get through.
+ * Entries `skip` names come back with no data: never inflated, and not counted toward `maxBytes`.
  */
-export function readZip(buffer: Uint8Array, limits: { maxFiles: number; maxBytes: number }): ZipEntry[] {
+export function readZip(
+  buffer: Uint8Array,
+  limits: { maxFiles: number; maxBytes: number },
+  skip: (path: string) => boolean = () => false,
+): ZipEntry[] {
   const files = listZip(buffer);
   if (files.length > limits.maxFiles) throw new ValidationError(`Too many files (max ${limits.maxFiles})`);
-  if (files.reduce((n, f) => n + f.size, 0) > limits.maxBytes) {
+  if (files.reduce((n, f) => n + (skip(f.path) ? 0 : f.size), 0) > limits.maxBytes) {
     throw new ValidationError(`The skill is too large (max ${limits.maxBytes} bytes)`);
   }
-  return files.map((f) => ({ path: f.path, data: inflateZipEntry(buffer, f) }));
+  return files.map((f) => ({ path: f.path, data: skip(f.path) ? new Uint8Array() : inflateZipEntry(buffer, f) }));
 }

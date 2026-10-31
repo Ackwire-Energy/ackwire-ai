@@ -240,14 +240,17 @@ async function loadSkill(db: Database, orgId: string, id: string) {
   return s;
 }
 
-/** A skill whose files have these sizes within the limits, refused as an upload is. */
-function assertSkillSize(sizes: number[]) {
-  if (sizes.length > SKILL_LIMITS.maxFiles) {
+/**
+ * A skill whose files have these paths and sizes within the limits, refused as an upload is. Ignored files (binaries
+ * such as images and videos) are only listed, never stored: they count as files, not toward the size.
+ */
+function assertSkillSize(files: { path: string; size: number }[]) {
+  if (files.length > SKILL_LIMITS.maxFiles) {
     throw new ValidationError(`Too many files (max ${SKILL_LIMITS.maxFiles})`, "skill.too_many_files", {
       max: SKILL_LIMITS.maxFiles,
     });
   }
-  if (sizes.reduce((n, size) => n + size, 0) > SKILL_LIMITS.maxBytes) {
+  if (files.reduce((n, f) => n + (classifyFile(f.path).status === "ignored" ? 0 : f.size), 0) > SKILL_LIMITS.maxBytes) {
     throw new ValidationError("The skill is too large (max 2 MB)", "skill.too_large", {
       max: SKILL_LIMITS.maxBytes / 1024 / 1024,
     });
@@ -256,7 +259,7 @@ function assertSkillSize(sizes: number[]) {
 
 /** Where a version's files go and how each is kept, refused before the skill or any file is written. */
 async function planFiles(deps: SkillDeps, orgId: string, files: SkillFileInput[]) {
-  assertSkillSize(files.map((f) => f.data.byteLength));
+  assertSkillSize(files.map((f) => ({ path: f.path, size: f.data.byteLength })));
   // Two entries that normalize to the same path would share one blob key: the second's bytes overwrite
   // the first on disk while its row insert is dropped on the unique key, so the stored size stops matching disk.
   const normalized = files.map((f) => ({ path: safePath(f.path), data: f.data }));
@@ -376,7 +379,11 @@ export async function saveSkill(
 
 /** Import from a zip of the skill folder (`SKILL.md` + files). */
 export async function importSkillZip(deps: SkillDeps, actorId: string, orgId: string, zip: Uint8Array) {
-  const entries = readZip(zip, { maxFiles: SKILL_LIMITS.maxFiles, maxBytes: SKILL_LIMITS.maxBytes });
+  const entries = readZip(
+    zip,
+    { maxFiles: SKILL_LIMITS.maxFiles, maxBytes: SKILL_LIMITS.maxBytes },
+    (path) => classifyFile(path).status === "ignored",
+  );
   const { skillMd, files } = splitSkillFolder(entries);
   return saveSkill(deps, actorId, orgId, { ...parseSkillMarkdown(skillMd), source: "upload", files });
 }
@@ -635,7 +642,7 @@ async function readGithubLink(deps: SkillDeps, url: string) {
   const skillIn = (dir: string) => {
     const skill = found.get(dir);
     if (!skill) throw new ValidationError(`That link holds no skill at ${dir}`);
-    assertSkillSize(skill.files.map(([, entry]) => entry.size));
+    assertSkillSize(skill.files.map(([path, entry]) => ({ path, size: entry.size })));
     return skill;
   };
   /** The skill at `dir` from its SKILL.md alone, refused as installing it would be for its limits or its text. */
@@ -659,10 +666,11 @@ export interface SkillPick {
 
 /**
  * Import from a GitHub link, read by the backend from the repository's archive (only GitHub hosts, the SSRF guard
- * on every request, 2 MB and 200 files a skill): the skill folder it points at (a file's folder), or the one skill
- * below it. A link that holds several answers with them to pick from (`importPickedSkills`), nothing installed, and
- * with those that can't be installed (past the limits, or a SKILL.md that doesn't parse) apart, each with why.
- * Installing a skill whose name is already installed makes a new version.
+ * on every request, 200 files a skill and 2 MB of the text and scripts it keeps, binaries only listed): the skill
+ * folder it points at (a file's folder), or the one skill below it. A link that holds several answers with them to
+ * pick from (`importPickedSkills`), nothing installed, and with those that can't be installed (past the limits, or a
+ * SKILL.md that doesn't parse) apart, each with why. Installing a skill whose name is already installed makes a new
+ * version.
  */
 export async function importSkillFromUrl(
   deps: SkillDeps,
@@ -821,7 +829,7 @@ export async function setAgentSkills(
   const membership = await requirePermission(db, actorId, orgId, "read");
   const agent = await getAgent(db, orgId, agentId);
   if (!agent) throw new NotFoundError("Agent not found");
-  if (!can(membership.role, "manage_agents") && agent.ownerUserId !== actorId) {
+  if (!can(membership, "manage_agents") && agent.ownerUserId !== actorId) {
     throw new ForbiddenError("Only an admin or the agent's owner can change its skills");
   }
   const ids = [...new Set(input.map((i) => i.skillId))];

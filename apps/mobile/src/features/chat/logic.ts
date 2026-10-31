@@ -7,10 +7,12 @@ import type {
   MessagePin,
   ReactionCount,
 } from "@agenteschat/client";
+import { agentProposalOf } from "@agenteschat/client/lib/action-cards";
 import { type ActivityEntry, barEntries } from "@agenteschat/client/lib/activity";
 import { type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
 import {
   answeredNotices,
+  followUpLine,
   isAnsweredNotice,
   isEventLine,
   isTalkerReply,
@@ -131,11 +133,14 @@ const NOTICE_ICON: Record<string, EventLineView["icon"]> = {
   consult_reply: "agent",
   agent_note: "chat",
   wait_result: "check",
+  follow_up: "clock",
 };
 
 export function eventLineOf(
   m: Pick<Message, "body" | "meta">,
   names: { author: string; agentByHandle: (handle: string) => string | null },
+  /** A follow-up's time for the reader ("18:30"), and the reader's locale for its day. */
+  when: { time: (iso: string) => string; locale: string } = { time: (iso) => iso, locale: "pt-BR" },
 ): EventLineView | null {
   const notice = noticeOf(m.meta);
   if (!notice) return null;
@@ -161,6 +166,10 @@ export function eventLineOf(
       return from ? line("chat.notice.agentNote", { from }) : line("chat.notice.agentNoteAnon");
     case "wait_result":
       return line("chat.notice.waitResult", { name: names.author });
+    case "follow_up": {
+      const followUp = followUpLine(notice, names.author, when);
+      return followUp ? line(followUp.key, followUp.values) : null;
+    }
     default:
       return line("chat.notice.other", { name: names.author });
   }
@@ -267,6 +276,7 @@ export function questionOf(meta: Message["meta"]): AgentQuestion | null {
 export const hidesBody = (m: Message) =>
   Boolean(
     approvalIdOf(m.meta) ||
+      agentProposalOf(m.meta) ||
       m.meta?.missionStart ||
       m.meta?.threadStart ||
       m.meta?.issueWork ||
@@ -452,7 +462,9 @@ export function threadFaces<T extends { type: string; id: string | null }>(parti
 
 // ── Markdown (what agents write) ─────────────────────────────────────────────
 
-export type Inline = { kind: "text" | "bold" | "italic" | "code" | "mention"; text: string };
+export type Inline =
+  | { kind: "text" | "bold" | "italic" | "code" | "mention"; text: string }
+  | { kind: "link"; text: string; href: string };
 export type Block =
   | { kind: "paragraph"; inline: Inline[] }
   | { kind: "heading"; inline: Inline[] }
@@ -475,25 +487,48 @@ function mentions(text: string, out: Inline[], kind: "text" | "bold" | "italic")
   if (last < text.length) out.push({ kind, text: text.slice(last) });
 }
 
-/** Inline marks: `code`, **bold**, *italic* / _italic_, links as their text, @mentions. */
+/** Only these open from a message; anything else stays plain text. */
+const SAFE_HREF = /^(https?:\/\/|mailto:)/i;
+/** A bare address ends before trailing punctuation, and before a ")" it did not open. */
+function trimUrl(url: string) {
+  let end = url.length;
+  const count = (ch: string) => url.slice(0, end).split(ch).length - 1;
+  while (end > 0) {
+    const ch = url[end - 1] ?? "";
+    if (/[.,;:!?'"]/.test(ch) || (ch === ")" && count("(") < count(")"))) end--;
+    else break;
+  }
+  return url.slice(0, end);
+}
+
+/** Inline marks: `code`, [links](https://…) and bare https:// addresses, **bold**, *italic* / _italic_, @mentions. */
 export function parseInline(text: string): Inline[] {
   const out: Inline[] = [];
-  const clean = text.replace(/!?\[([^\]]*)\]\(([^)]*)\)/g, "$1");
-  const re = /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(\*[^*\n]+\*)|(\b_[^_\n]+_\b)/g;
+  const re =
+    /(`[^`\n]+`)|(!?\[([^\]]*)\]\(([^)\s]*)\))|(\bhttps?:\/\/[^\s<>`]+)|(\*\*[^*\n]+\*\*)|(\*[^*\n]+\*)|(\b_[^_\n]+_\b)/g;
   let last = 0;
-  for (const m of clean.matchAll(re)) {
+  for (const m of text.matchAll(re)) {
     const at = m.index ?? 0;
-    if (at > last) mentions(clean.slice(last, at), out, "text");
-    const tok = m[0];
+    let tok = m[0];
+    if (m[5]) tok = trimUrl(tok);
+    if (at > last) mentions(text.slice(last, at), out, "text");
     if (m[1]) out.push({ kind: "code", text: tok.slice(1, -1) });
-    else if (m[2]) mentions(tok.slice(2, -2), out, "bold");
+    else if (m[2]) {
+      // An image shows its words; a link to anything but the web or e-mail is just its words.
+      const label = m[3] ?? "";
+      const href = m[4] ?? "";
+      if (!tok.startsWith("!") && SAFE_HREF.test(href)) out.push({ kind: "link", text: label || href, href });
+      else mentions(label, out, "text");
+    } else if (m[5]) out.push({ kind: "link", text: tok, href: tok });
+    else if (m[6]) mentions(tok.slice(2, -2), out, "bold");
     else mentions(tok.slice(1, -1), out, "italic");
     last = at + tok.length;
   }
-  if (last < clean.length) mentions(clean.slice(last), out, "text");
+  if (last < text.length) mentions(text.slice(last), out, "text");
   return out.reduce<Inline[]>((acc, tok) => {
     const prev = acc[acc.length - 1];
-    if (prev && prev.kind === tok.kind && tok.kind !== "mention" && tok.kind !== "code") prev.text += tok.text;
+    if (prev && prev.kind === tok.kind && (tok.kind === "text" || tok.kind === "bold" || tok.kind === "italic"))
+      prev.text += tok.text;
     else if (tok.text) acc.push({ ...tok });
     return acc;
   }, []);

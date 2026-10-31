@@ -1,18 +1,21 @@
-import { and, asc, type Database, desc, eq, gte, inArray, isNull, schema } from "@agenteschat/db";
+import { and, asc, type Database, desc, eq, gte, inArray, isNotNull, isNull, schema, sql } from "@agenteschat/db";
+import { type AgentStatusView, lineInEnglish, loadAgentStatuses } from "./agent-status";
 import type { AgentAppearance } from "./appearance";
-import { canTalkTo } from "./audience";
+import { canTalkTo, talksToAgents } from "./audience";
 import { agentBrowserStatus } from "./browser/status";
 import { BROWSER_SCOPE, DESKTOP_SCOPE } from "./browser/types";
 import { caches } from "./cache";
 import { capabilityKeys, summarizeScopes } from "./capabilities";
 import { agentDesktopUseStatus } from "./desktop/status";
+import { editDistance } from "./format";
 import type { MachineCaller, MachineStatus } from "./machine-hub";
-import { requirePermission } from "./organizations";
+import { parseMentionHandles } from "./messages";
+import { can, requirePermission } from "./organizations";
 import { personBehindCall } from "./requester";
 import { getSandboxSettings, SANDBOX_SCOPE } from "./sandbox";
-import type { ToolDefinition, ToolSource } from "./tools/types";
+import type { ToolContext, ToolDefinition, ToolSource } from "./tools/types";
 
-const { agentConsultations, agentRuns, agentScopes, agents, connectorConnections, users } = schema;
+const { agentConsultations, agentRuns, agentScopes, agents, connectorConnections, organizationMembers, users } = schema;
 
 /**
  * Each agent's scopes, with a whole-connection grant (`connector:*`) named
@@ -117,14 +120,87 @@ export function loadTeam(db: Database, orgId: string): Promise<Teammate[]> {
 
 export const forgetTeam = (orgId: string) => caches.agents.delete(`${orgId}:team`);
 
+/** Handles of the org's archived agents (per-process cache; archiving drops it). */
+function loadArchived(db: Database, orgId: string): Promise<string[]> {
+  return caches.agents.getOrLoad(`${orgId}:archived`, async () =>
+    (
+      await db
+        .select({ handle: agents.handle })
+        .from(agents)
+        .where(
+          and(
+            eq(agents.orgId, orgId),
+            isNotNull(agents.archivedAt),
+            // A person may hold that handle now (people's handles don't check agents'): the @ is theirs.
+            sql`not exists (select 1 from ${organizationMembers} om
+              where om.org_id = ${orgId}::uuid and om.handle = ${agents.handle})`,
+          ),
+        )
+    ).map((r) => r.handle),
+  ) as Promise<string[]>;
+}
+
+/** Handles offered for one that no agent here has. */
+const CLOSEST_HANDLES = 3;
+
+/**
+ * A tool's answer for `@handles` (lower case, without the @) that reach no agent here: an archived one says so,
+ * so the run stops trying it and tells the person; any other gets the closest handles among the agents the
+ * person behind the run can talk to (the ones `find_agent` lists).
+ */
+export async function noAgentText(ctx: ToolContext, handles: string[]): Promise<string> {
+  const person = await personBehindCall(ctx);
+  const [archived, team, talks] = await Promise.all([
+    loadArchived(ctx.db, ctx.orgId),
+    loadTeam(ctx.db, ctx.orgId),
+    talksToAgents(ctx.db, ctx.orgId, person),
+  ]);
+  const others = team.filter((a) => a.id !== ctx.agentId && canTalkTo(a, person, talks)).map((a) => a.handle);
+  return handles
+    .map((h) => {
+      if (archived.includes(h)) {
+        return `@${h} is archived: nothing you send reaches it. Don't try it again. If the work needs it, tell the person.`;
+      }
+      const closest = others
+        .map((o) => ({ o, d: editDistance(h, o) }))
+        .sort((x, y) => x.d - y.d)
+        .slice(0, CLOSEST_HANDLES)
+        .map((x) => `@${x.o}`);
+      return `No agent @${h} here.${closest.length > 0 ? ` Closest handles: ${closest.join(", ")}.` : ""}`;
+    })
+    .join(" ");
+}
+
+/**
+ * "# Archived agents": the archived agents that what a run reads still names (its instructions, its notes, the
+ * conversation), so it neither asks nor mentions them and tells the person when its work counted on one. Empty
+ * when it names none.
+ */
+export async function archivedAgentsPrompt(db: Database, orgId: string, texts: string[]): Promise<string> {
+  const named = new Set(texts.flatMap((t) => parseMentionHandles(t)));
+  if (named.size === 0) return "";
+  const gone = (await loadArchived(db, orgId)).filter((h) => named.has(h)).map((h) => `@${h}`);
+  if (gone.length === 0) return "";
+  const one = gone.length === 1;
+  const them = one ? "it" : "them";
+  return `# Archived agents\n${gone.join(", ")} ${one ? "is" : "are"} archived: nothing you send reaches ${them}. Don't ask or mention ${them}. If your instructions, notes or this conversation count on ${one ? "it" : "one"}, tell the person.`;
+}
+
 /**
  * "# Your team" for the system prompt: the other agents the person
  * behind the run can talk to, one short line each, so an agent knows who
  * exists even in a DM. Details stay behind `find_agent`. Agents already
  * described in "Where you are" (channel members) are left out.
  */
-export function teamPrompt(team: Teammate[], selfId: string, requester: string | null, skip: Set<string>) {
-  const others = team.filter((a) => a.id !== selfId && !skip.has(a.id) && canTalkTo(a, requester));
+export function teamPrompt(
+  team: Teammate[],
+  selfId: string,
+  requester: string | null,
+  skip: Set<string>,
+  /** Whether the requester's roles let them talk to agents (`talksToAgents`). */
+  talks = true,
+) {
+  const others = team.filter((a) => a.id !== selfId && !skip.has(a.id) && canTalkTo(a, requester, talks));
   if (others.length === 0) return "";
   const lines =
     others.length > TEAM_IN_PROMPT
@@ -164,7 +240,8 @@ export function createFindAgentToolSource(deps: { machines?: Pick<MachineCaller,
     async execute(input, ctx) {
       const { db } = ctx;
       const person = await personBehindCall(ctx);
-      const team = (await loadTeam(db, ctx.orgId)).filter((a) => a.id !== ctx.agentId && canTalkTo(a, person));
+      const talks = await talksToAgents(db, ctx.orgId, person);
+      const team = (await loadTeam(db, ctx.orgId)).filter((a) => a.id !== ctx.agentId && canTalkTo(a, person, talks));
       const query = words(String(input.query ?? ""));
       const scored = team
         .map((a) => {
@@ -186,29 +263,20 @@ export function createFindAgentToolSource(deps: { machines?: Pick<MachineCaller,
       }
       const ids = scored.map((x) => x.a.id);
       const ownerIds = [...new Set(scored.map((x) => x.a.ownerUserId).filter((id): id is string => !!id))];
-      const [scopes, owners, busy] = await Promise.all([
+      const [scopes, owners, statuses] = await Promise.all([
         rosterScopeNames(db, deps.machines, ctx.orgId, ids),
         ownerIds.length
           ? db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, ownerIds))
           : Promise.resolve([]),
-        db
-          .select({ agentId: agentRuns.agentId })
-          .from(agentRuns)
-          .where(
-            and(
-              eq(agentRuns.orgId, ctx.orgId),
-              inArray(agentRuns.agentId, ids),
-              inArray(agentRuns.status, ["running", "waiting_approval", "waiting_input"]),
-            ),
-          ),
+        loadAgentStatuses(db, ctx.orgId, new Date(), ids),
       ]);
-      const busyIds = new Set(busy.map((r) => r.agentId));
+      const statusOf = new Map(statuses.map((s) => [s.agentId, s]));
       const content = scored
         .map(({ a }) => {
           const about = a.instructions.trim().replace(/\s+/g, " ");
           const owner = owners.find((o) => o.id === a.ownerUserId)?.name;
           return [
-            `@${a.handle}: ${a.name}${a.role ? `, ${a.role}` : ""}${busyIds.has(a.id) ? " (working now)" : ""}`,
+            `@${a.handle}: ${a.name}${a.role ? `, ${a.role}` : ""}${presenceNote(statusOf.get(a.id))}`,
             `  Can: ${summarizeScopes(scopes.filter((s) => s.agentId === a.id).map((s) => s.scope))}`,
             owner ? `  Responsible person: ${owner}` : "",
             about ? `  About: ${about.length > 240 ? `${about.slice(0, 237)}…` : about}` : "",
@@ -223,6 +291,14 @@ export function createFindAgentToolSource(deps: { machines?: Pick<MachineCaller,
   return { name: "team", tools: async () => [tool] };
 }
 
+/** " (busy: Revisando o PR #12)" after an agent's name in `find_agent`; its line is its own words. */
+function presenceNote(s: AgentStatusView | undefined) {
+  if (!s) return "";
+  const what = { online: "online", busy: "busy, on heavy work", away: "away", offline: "paused" }[s.presence];
+  const line = s.status ? lineInEnglish(s.status) : null;
+  return ` (${what}${line ? `: ${line.replace(/[()\n]/g, " ")}` : ""})`;
+}
+
 /** Consultations shown on the team screen: the last day. */
 export const TEAM_CONSULTATIONS_MS = 24 * 60 * 60_000;
 
@@ -233,7 +309,7 @@ export const TEAM_CONSULTATIONS_MS = 24 * 60 * 60_000;
  * a conversation between agents is private.
  */
 export async function getTeam(db: Database, actorId: string, orgId: string) {
-  await requirePermission(db, actorId, orgId, "read");
+  const talks = can(await requirePermission(db, actorId, orgId, "read"), "talk_to_agents");
   const list = await db
     .select({
       id: agents.id,
@@ -296,7 +372,7 @@ export async function getTeam(db: Database, actorId: string, orgId: string) {
       ownerUserId: a.ownerUserId,
       capabilities: capabilityKeys(scopes.filter((s) => s.agentId === a.id).map((s) => s.scope)),
       busy: busyIds.has(a.id),
-      canTalk: canTalkTo(a, actorId),
+      canTalk: canTalkTo(a, actorId, talks),
     })),
     people: owners.map((o) => ({ id: o.id, name: o.name, image: o.image ?? null })),
     // Only between agents still here (an archived one has no place in the sky).

@@ -263,7 +263,10 @@ describe("Membros", () => {
     const people = screen().getByRole("region", { name: "Pessoas" });
     expect(people.textContent).toContain("Walter (você)");
     expect(people.textContent).toContain("Ativo agora");
-    expect(within(people).getByRole("combobox", { name: "Papel de João" }).textContent).toContain("Admin");
+    // Each person's roles as chips (ADR 0085), and a "+" to give or take them.
+    const joao = within(people).getByText("João").closest(".ac-list__row") as HTMLElement;
+    expect(joao.querySelector(".members-roles")?.textContent).toContain("Admin");
+    expect(within(joao).getByRole("button", { name: "Papéis de João" })).toBeTruthy();
     const agents = screen().getByRole("region", { name: "Agentes" });
     expect(agents.textContent).toContain("Ada · Dev");
     expect(agents.textContent).toContain("Responsável: João");
@@ -271,12 +274,40 @@ describe("Membros", () => {
     expect(agents.textContent).not.toContain("US$");
   });
 
+  test("an agent on a plan: its limits where the budget was, the budget under them only once it spent through the API", async () => {
+    const state = seedState();
+    const [ada, atlas] = state.agents;
+    if (!ada || !atlas) throw new Error("seed");
+    ada.brain = {
+      kind: "claude_code",
+      model: "Sonnet",
+      account: "Claude Team",
+      usage: {
+        windows: [
+          { kind: "five_hour", usedPercent: 12 },
+          { kind: "seven_day", usedPercent: 40 },
+        ],
+        source: "probe",
+        at: new Date().toISOString(),
+      },
+    };
+    // Atlas thinks with a plan whose windows aren't known yet, and spent nothing through the API: nothing, never 0%.
+    atlas.brain = { kind: "codex", model: "GPT", account: "ChatGPT Plus" };
+    state.spentUsd = { [ATLAS_ID]: 0 };
+    await go("members", state);
+    const [adaRow, atlasRow] = screen().getByRole("region", { name: "Agentes" }).querySelectorAll("a.ac-list__row");
+    expect(adaRow?.querySelector(".ac-planmeter__line")?.textContent).toBe("Claude Team · semana 40% · 5h 12%");
+    expect(adaRow?.textContent).toMatch(/Claude Team · semana 40% · 5h 12%31% do orçamento de \S+$/);
+    expect(atlasRow?.querySelector(".ac-planmeter")).toBeNull();
+    expect(atlasRow?.textContent).not.toMatch(/orçamento|%/);
+  });
+
   test("batch invites: one result per email; resend and revoke; expired status", async () => {
     const state = seedState();
     state.invitations.push({
       id: "inv-old",
       email: "rafa@acme.com.br",
-      role: "admin",
+      role: "member",
       status: "expired",
       expiresAt: new Date(Date.now() - 86_400_000).toISOString(),
       createdAt: new Date(Date.now() - 8 * 86_400_000).toISOString(),
@@ -294,7 +325,7 @@ describe("Membros", () => {
     await settle(6);
     expect(state.calls.find((c) => c.method === "orgs.inviteMany")?.args[1]).toEqual({
       emails: ["carla@acme.com.br", "joao@acme.com.br"],
-      role: "member",
+      roleIds: [],
     });
     expect(document.body.textContent).toContain("joao@acme.com.br já faz parte do workspace.");
     expect((input as HTMLInputElement).value).toBe("joao@acme.com.br");

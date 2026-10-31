@@ -16,7 +16,7 @@ import { useToast } from "@/lib/toast";
 export function GitHubAppPanel() {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const admin = can(org.role, "configure");
+  const admin = can(org, "manage_connectors");
   const toast = useToast();
   const info = useGitHubApp(org.id);
   const install = useInstallGitHubApp(org.id);
