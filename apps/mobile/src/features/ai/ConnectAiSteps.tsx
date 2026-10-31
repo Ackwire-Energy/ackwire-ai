@@ -84,8 +84,15 @@ import { AiRow, Note, OpenPage, PasteField, PlanReplies, Step, StepsCard } from 
  * current there).
  */
 export function usePlanGates(orgId: string, agentId: string | undefined, poll: number | false = false) {
-  const brain = useAgentBrain(orgId, agentId ?? "", agentId !== undefined, poll);
-  const ai = useAiAccounts(orgId, agentId !== undefined, poll);
+  const api = useApi();
+  const asks = agentId !== undefined;
+  const brain = useAgentBrain(orgId, agentId ?? "", asks, poll);
+  const ai = useAiAccounts(orgId, asks, poll);
+  // Codex's own sign-in is known only by a usage read with it: looked up again here (it comes back as
+  // `machine.updated`, or with the next poll), so a computer's own ChatGPT sign-in shows before any turn ran.
+  useEffect(() => {
+    if (asks) void api.machines.refreshAccountUsage(orgId).catch(() => undefined);
+  }, [api, orgId, asks]);
   const setupQ = useComputerSetup(orgId, true, poll);
   const edition = computerEdition(setupQ.data);
   const setup = setupView(setupQ.data, setupQ.dataUpdatedAt);
@@ -115,9 +122,9 @@ export function usePlanGates(orgId: string, agentId: string | undefined, poll: n
           choice,
           edition,
           setup,
-          // A coding plan also needs to know whether that computer takes a plan's key, and Claude on a computer the
-          // person connected whether its own sign-in is there (`ownSignInFor`).
-          brain: view && (ai.data || !(isPlanId(choice) || (choice === "claude" && view.ownSignIn))) ? view : undefined,
+          // A coding plan also needs to know whether that computer takes a plan's key, and Claude or ChatGPT on a
+          // computer the person connected whether its own sign-in is there (`ownSignInFor`).
+          brain: view && (ai.data || !(isPlanId(choice) || view.ownSignIn)) ? view : undefined,
           computer: row,
         });
   // A poll that fails once keeps the last view: a sign-in in progress goes on.

@@ -1397,6 +1397,12 @@ export const ptBR = {
     agent: "{{name}} não vai responder porque não tem uma IA\u00a0conectada.",
     /** Its plan's sign-in ended (`reason: not_signed_in`). */
     signedOut: "{{name}} não vai responder porque a IA {{hers}} saiu da\u00a0conta.",
+    /** The computer's own sign-in of that CLI isn't there, and the agent has no account (`own` on the card). */
+    notSignedIn: {
+      claude_code:
+        "O Claude Code está sem login neste computador. Conecte uma conta do Claude na página {{of}}\u00a0{{name}}.",
+      codex: "O Codex está sem login neste computador. Conecte uma conta do ChatGPT na página {{of}}\u00a0{{name}}.",
+    },
     card: {
       connected: "Pronto: {{name}} já tem uma IA.",
       answerNow: "Responder agora",
@@ -5117,7 +5123,6 @@ export const ptBR = {
       backOnApi: "{{The}} {{name}} voltou a pensar pela API e ainda só atende você.",
       letEveryone: "Deixar {{article}} {{name}} atender todos",
       letPeople: "Deixar {{article}} {{name}} atender outras pessoas",
-      hereNotYours: "Só para agentes de quem conectou o {{computer}}",
     },
     errors: {
       planOwnerOnly:
@@ -8658,6 +8663,8 @@ export const ptBR = {
       brain_interrupted: "O {{brain}} parou antes de terminar. Já feito, sem repetir: {{tools}}.",
       no_ai: "Ainda não consigo responder: não tenho uma IA conectada.",
       no_ai_signed_out: "Ainda não consigo responder: minha IA saiu da conta.",
+      /** The computer's own sign-in of that CLI isn't there (`meta.noAi.own`); `brain`: Codex or Claude Code. */
+      no_ai_not_signed_in: "Ainda não consigo responder: o {{brain}} está sem login no meu computador.",
       action_connect_ai: "Conectar uma IA",
       agent_proposal: "Propôs um novo agente: {{name}}",
       approval_request: "Pedido de aprovação: {{title}}",

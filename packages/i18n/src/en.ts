@@ -1391,6 +1391,10 @@ export const en: Translations = {
     },
     agent: "{{name}} won't reply because {{she}} has no AI\u00a0connected.",
     signedOut: "{{name}} won't reply because {{hers}} AI is signed\u00a0out.",
+    notSignedIn: {
+      claude_code: "Claude Code isn't signed in on this computer. Connect a Claude account on {{name}}'s\u00a0page.",
+      codex: "Codex isn't signed in on this computer. Connect a ChatGPT account on {{name}}'s\u00a0page.",
+    },
     card: {
       connected: "Done: {{name}} has an AI now.",
       answerNow: "Answer now",
@@ -5083,7 +5087,6 @@ export const en: Translations = {
       backOnApi: "{{name}} is back on the API and still answers only you.",
       letEveryone: "Let {{pronoun}} answer everyone",
       letPeople: "Let {{pronoun}} answer other people",
-      hereNotYours: "Only for agents of whoever connected {{computer}}",
     },
     errors: {
       planOwnerOnly:
@@ -8609,6 +8612,7 @@ export const en: Translations = {
       brain_interrupted: "{{brain}} stopped before finishing. Already done, not repeated: {{tools}}.",
       no_ai: "I can't answer yet: I have no AI connected.",
       no_ai_signed_out: "I can't answer yet: my AI is signed out.",
+      no_ai_not_signed_in: "I can't answer yet: {{brain}} isn't signed in on my computer.",
       action_connect_ai: "Connect an AI",
       agent_proposal: "Proposed a new agent: {{name}}",
       approval_request: "Approval request: {{title}}",

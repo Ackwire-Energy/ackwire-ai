@@ -1,10 +1,11 @@
 import type { AgentBrainInput, BrainEffortSetting, MachineAccount } from "@agenteschat/client";
-import { keys, useAgentBrain, useAiStatus, useApi } from "@agenteschat/client";
-import { accountChoices, ownSignInName } from "@agenteschat/client/lib/ai-accounts";
+import { keys, useAgentBrain, useAiAccounts, useAiStatus, useApi, useMachines } from "@agenteschat/client";
+import { accountChoices, ownSignInListed, ownSignInName } from "@agenteschat/client/lib/ai-accounts";
 import { brainLine } from "@agenteschat/client/lib/brain";
 import { advancedSummary, effortLevel, isClaudeAlias } from "@agenteschat/client/lib/brain-advanced";
 import { lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { planAliases, planModelOptions, planOf } from "@agenteschat/client/lib/plans";
 import { AUTO, isAuto } from "@agenteschat/client/lib/providers";
@@ -35,9 +36,6 @@ import { AiRow, Note } from "./parts";
  * owner picks an account or lets other people talk to it on the plan (`canUsePlans`).
  */
 
-/** The plan's page Connect an AI opens on for another account of that kind. */
-const PLAN_INTENT = { claude_code: "claude", codex: "chatgpt" } as const;
-
 /** Opens an agent's AI. */
 export const openAgentAi = (agentId: string) => router.push(`/agent-ai/${agentId}` as never);
 
@@ -66,6 +64,10 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
 
   const view = brain.data;
   const kind = accountKindOf(view?.brain);
+  // Its computer's row, where that computer's own sign-in shows once its CLI is signed in.
+  const row = useAiAccounts(orgId, view?.canUsePlans === true && kind !== null).data?.computers.find(
+    (c) => c.machineId === view?.computer?.machineId,
+  );
   const thinks = brainLine(t, agent?.brain, t("brain.model"));
   const refresh = () => {
     for (const key of [
@@ -95,7 +97,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
   const connect = (a: MachineAccount | undefined, also = false) =>
     openConnectAi({
       agentId,
-      ...(kind && !planOf(a?.provider) ? { intent: PLAN_INTENT[kind] } : {}),
+      ...(kind && !planOf(a?.provider) ? { intent: planOfKind(kind) } : {}),
       ...(also && a?.email ? { email: a.email } : {}),
     });
   const computer = view?.computer?.name ?? "";
@@ -158,6 +160,13 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
     : view && !view.canUsePlans && ownerFirst
       ? t("agentPage.work.brain.accountLocked", { name: ownerFirst })
       : null;
+  const ownRow = view !== undefined && kind !== null && ownSignInListed(view, row, kind);
+  const choices = view ? accountChoices(accounts, [view.account]) : [];
+  const adds = view?.canUsePlans === true && view.canManageAccounts;
+  // On someone else's computer only whoever connected it adds a sign-in: with nothing of the owner's there, why, in
+  // place of the list.
+  const lockedHere = view !== undefined && kind !== null && !ownRow && choices.length === 0 && !adds;
+  const pairer = useMachines(orgId, lockedHere).data?.find((m) => m.id === view?.computer?.machineId)?.pairedBy;
 
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
@@ -207,16 +216,16 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
               <>
                 <GroupedHeader>{t(`agentPage.work.brain.account.${kind}`)}</GroupedHeader>
                 <GroupedList>
-                  <GroupedRow
-                    leading={<ProviderLogo id={kind} size="sm" />}
-                    label={ownSignInName(t, view.ownSignIn && view.canUsePlans, computer)}
-                    {...(view.ownSignIn ? {} : { sub: t("aiAccounts.share.hereNotYours", { computer }), subLines: 2 })}
-                    checked={view.account === null}
-                    // The computer's own sign-in thinks only for agents of whoever connected it (ADR 0059 §3).
-                    disabled={!mayPick || (!view.ownSignIn && view.account !== null)}
-                    onPress={() => choose(null)}
-                  />
-                  {accountChoices(accounts, [view.account]).map((c) => (
+                  {ownRow ? (
+                    <GroupedRow
+                      leading={<ProviderLogo id={kind} size="sm" />}
+                      label={ownSignInName(t, view.ownSignIn && view.canUsePlans, computer)}
+                      checked={view.account === null}
+                      disabled={!mayPick}
+                      onPress={() => choose(null)}
+                    />
+                  ) : null}
+                  {choices.map((c) => (
                     <AiRow
                       key={c.login.id}
                       row={accountRow(t, c, name)}
@@ -225,7 +234,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                       onPress={() => (c.also ? connect(c.login, true) : choose(c.login))}
                     />
                   ))}
-                  {view.canUsePlans && view.canManageAccounts ? (
+                  {adds ? (
                     <GroupedRow
                       icon="plus"
                       label={signedOut ? t("agentPage.work.brain.signInAgain") : t("agentPage.work.brain.addAccount")}
@@ -233,6 +242,11 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                     />
                   ) : null}
                 </GroupedList>
+                {lockedHere ? (
+                  <Note icon="lock">
+                    {t("connectAi.accountsLocked", { name: pairer?.name.split(" ")[0] ?? "", computer })}
+                  </Note>
+                ) : null}
                 {accountNote ? <GroupedFooter>{accountNote}</GroupedFooter> : null}
               </>
             ) : null}

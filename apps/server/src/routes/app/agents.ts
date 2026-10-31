@@ -356,7 +356,7 @@ export function agentRoutes(deps: AppDeps) {
       security,
       summary: "Whether each agent has an AI to think with, whether the organization has any, and who picks the agents",
       description:
-        "Per agent: `ready`; `no_ai` with why (`no_key`, `not_signed_in`, `no_computer`, `cli_missing`: nothing to think with, and no fallback); `waiting` (its computer is away for now). `any`: an agent that isn't archived is ready or waiting. `routing` (ADR 0074): who picks the agents for a message nobody mentioned, for the workspace (`by`) and for the caller's own messages (`mine`): Jev, the organization's small model (`model`), people's own plans (only for their own messages), rules, or `off` (only mentions). `noSmallModel`: with `rules`, the default key's provider, which has no small model. `apiKey`: a key of its own, or the server's own Claude key. Computed on each request; no key is read.",
+        "Per agent: `ready`; `no_ai` with why (`no_key`, `not_signed_in`, `no_computer`, `cli_missing`: nothing to think with, and no fallback; `own`: with `not_signed_in`, the CLI whose own sign-in isn't there on the computer, where the agent has no account); `waiting` (its computer is away for now). `any`: an agent that isn't archived is ready or waiting. `routing` (ADR 0074): who picks the agents for a message nobody mentioned, for the workspace (`by`) and for the caller's own messages (`mine`): Jev, the organization's small model (`model`), people's own plans (only for their own messages), rules, or `off` (only mentions). `noSmallModel`: with `rules`, the default key's provider, which has no small model. `apiKey`: a key of its own, or the server's own Claude key. Computed on each request; no key is read.",
       request: { params: OrgParams },
       responses: {
         200: json(
@@ -367,6 +367,7 @@ export function agentRoutes(deps: AppDeps) {
                 agentId: z.uuid(),
                 state: z.enum(["ready", "no_ai", "waiting"]),
                 reason: z.enum(["no_key", "not_signed_in", "no_computer", "cli_missing"]).optional(),
+                own: z.enum(["claude_code", "codex"]).optional(),
               }),
             ),
             routing: z.object({
