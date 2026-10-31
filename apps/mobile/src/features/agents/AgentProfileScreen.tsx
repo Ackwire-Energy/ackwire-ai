@@ -170,8 +170,9 @@ function Profile({ id }: { id: string }) {
   const memories = knownAboutMe(knows.data);
   const uses = usesOf(access.data);
   const connected = useConnectedById();
-  // A computer brain: its maker's mark and line ("Claude Code · Sonnet no MacBook"; where only for its owner and admins).
-  const thinks = agent?.brain && agent.brain.kind !== "model" ? brainLine(t, agent.brain, "") : null;
+  // A computer brain: its maker's mark and line ("Claude Code · Sonnet"; its computer only where it tells two apart).
+  const thinks =
+    agent?.brain && agent.brain.kind !== "model" ? brainLine(t, agent.brain, "", { agents: dir.agents }) : null;
   const spend = detail.data
     ? spendOf({
         budgetUsedPercent: detail.data.budgetUsedPercent,

@@ -141,16 +141,30 @@ describe("profile card", () => {
     expect(screen().getByRole("complementary", { name: "Perfil da Ada" })).toBeTruthy();
   });
 
-  test("agent thinking with Claude Code: the card says so instead of the API model", async () => {
-    const state = seedState();
-    const ada = state.agents.find((a) => a.id === ADA_ID);
-    if (ada) ada.brain = { kind: "claude_code", model: "Opus", computer: "MacBook" };
-    await go(`c/${ENG_ID}`, state);
-    await click(screen().getAllByRole("button", { name: "Perfil de Ada" })[0] as HTMLElement);
-    await settle(6);
-    const c = card();
-    expect(c.textContent).toContain("Claude Code · Opus no MacBook");
-    expect(c.textContent).not.toContain("sonnet 5.5");
+  test("agent thinking with Claude Code: the card says so instead of the API model, its computer only beside another", async () => {
+    type Brain = NonNullable<ReturnType<typeof seedState>["agents"][number]["brain"]>;
+    const model = async (brains: Record<string, Brain>) => {
+      const state = seedState();
+      for (const a of state.agents) if (brains[a.id]) a.brain = brains[a.id];
+      await go(`c/${ENG_ID}`, state);
+      await click(screen().getAllByRole("button", { name: "Perfil de Ada" })[0] as HTMLElement);
+      await settle(6);
+      const line = card().querySelector(".profile-card__brain")?.textContent;
+      expect(card().textContent).not.toContain("sonnet 5.5");
+      cleanup();
+      return line;
+    };
+    // The workspace's one computer tells nothing apart.
+    expect(await model({ [ADA_ID]: { kind: "claude_code", model: "Opus", computer: "MacBook" } })).toBe(
+      "Claude Code · Opus",
+    );
+    // Beside an agent on another computer it does; nobody chose Ada's model, so the brain alone.
+    expect(
+      await model({
+        [ADA_ID]: { kind: "claude_code", model: "auto", computer: "MacBook" },
+        [ATLAS_ID]: { kind: "codex", model: "GPT-6 Sol", computer: "Servidor" },
+      }),
+    ).toBe("Claude Code no MacBook");
   });
 
   test("agent on a plan: its plan's limits and no budget until it spends through the API, then the budget after them", async () => {

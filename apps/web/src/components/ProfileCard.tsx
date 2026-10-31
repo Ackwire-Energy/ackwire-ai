@@ -239,7 +239,9 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
     ? t("brain.auto.label")
     : (models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model);
   const thinks =
-    agent.brain && agent.brain.kind !== "model" ? brainLine(t, agent.brain, model, owner?.split(" ")[0]) : null;
+    agent.brain && agent.brain.kind !== "model"
+      ? brainLine(t, agent.brain, model, { owner: owner?.split(" ")[0], agents: dir.agents })
+      : null;
   // Its presence from its work and its line (ADR 0084): its own words or what it is doing now.
   const shown = useAgentPresence(agent.id);
   const line = agentLine(t, shown?.line ?? null);

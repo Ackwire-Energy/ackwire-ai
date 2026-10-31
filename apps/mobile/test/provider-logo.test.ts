@@ -44,16 +44,24 @@ describe("Pensa com: the brain by its maker's mark", () => {
     for (const id of Object.keys(PROVIDER_MARKS)) expect(markOf(id)).toBe(id as keyof typeof PROVIDER_MARKS);
   });
 
-  test("the owner and admins also read where it runs; everyone else, the brain and its model", async () => {
+  test("the brain and its model; where it runs only when the agents think on two computers", async () => {
     const pt = await translator("pt-BR");
     const en = await translator("en");
     // The server sends `computer` only to the agent's owner and the admins.
     const owner: AgentBrainLine = { kind: "claude_code", model: "Sonnet", computer: "MacBook do Walter" };
     const others: AgentBrainLine = { kind: "claude_code", model: "Sonnet" };
-    expect(brainLine(pt, owner, "").text).toBe("Claude Code · Sonnet no MacBook do Walter");
-    expect(brainLine(pt, others, "").text).toBe("Claude Code · Sonnet");
-    expect(brainLine(en, owner, "").text).toBe("Claude Code · Sonnet on MacBook do Walter");
-    expect(brainLine(pt, { kind: "codex", model: "auto" }, "").text).toBe("Codex · Automático");
+    const one = [{ brain: owner }, { brain: { kind: "codex", model: "GPT-6 Sol", computer: "MacBook do Walter" } }];
+    const two = [...one, { brain: { kind: "codex", model: "GPT-6 Sol", computer: "Servidor" } }];
+    // The workspace's one computer (the Cloud's, or a server's only one) tells nothing apart.
+    expect(brainLine(pt, owner, "", { agents: one }).text).toBe("Claude Code · Sonnet");
+    expect(brainLine(pt, owner, "", { agents: two }).text).toBe("Claude Code · Sonnet no MacBook do Walter");
+    expect(brainLine(en, owner, "", { agents: two }).text).toBe("Claude Code · Sonnet on MacBook do Walter");
+    expect(brainLine(pt, others, "", { agents: two }).text).toBe("Claude Code · Sonnet");
+    // Nobody chose a model: the brain alone.
+    expect(brainLine(pt, { kind: "codex", model: "auto" }, "").text).toBe("Codex");
+    expect(brainLine(en, { ...owner, model: "auto" }, "", { agents: two }).text).toBe(
+      "Claude Code on MacBook do Walter",
+    );
     expect(pt("mobile.intentAgents.thinks")).toBe("Pensa com");
     expect(en("mobile.intentAgents.thinks")).toBe("Thinks with");
   });
