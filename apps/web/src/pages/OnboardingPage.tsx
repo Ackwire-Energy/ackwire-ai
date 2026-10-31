@@ -1,4 +1,4 @@
-import type { AiStatus, ApiClient, Machine, MachineAccount, Role } from "@agenteschat/client";
+import type { AiStatus, ApiClient, Machine, MachineAccount } from "@agenteschat/client";
 import {
   ApiError,
   keys,
@@ -12,7 +12,7 @@ import {
   useMachines,
   useSaveJevKey,
 } from "@agenteschat/client";
-import { billingHoldOf } from "@agenteschat/client/lib/billing";
+import { billingHoldOf, standingActive } from "@agenteschat/client/lib/billing";
 import {
   computerEdition,
   computerName,
@@ -24,7 +24,7 @@ import {
   WORKSPACE_COMPUTER_KIND,
 } from "@agenteschat/client/lib/computer";
 import { errorCode, errorText, holdText } from "@agenteschat/client/lib/errors";
-import { joinNames } from "@agenteschat/client/lib/format";
+import { joinNames, NAMES_SHOWN, namesText } from "@agenteschat/client/lib/format";
 import { isFeminineName } from "@agenteschat/client/lib/grammar";
 import { settingUp } from "@agenteschat/client/lib/guards";
 import { sendsEmail } from "@agenteschat/client/lib/join-requests";
@@ -43,11 +43,13 @@ import {
   allAgents,
   defaultChoice,
   defaultTarget,
+  type ExistingSignIn,
   gateDims,
   kindOf,
   ownSignInFor,
   type PlanChoice,
   planLabel,
+  planOfAccount,
 } from "@agenteschat/client/lib/no-ai";
 import {
   addInvites,
@@ -57,6 +59,7 @@ import {
   type InviteDraft,
   ONBOARDING_STEPS,
   type OnboardingStepId,
+  resumeAt,
   stepIndex,
   validInvites,
 } from "@agenteschat/client/lib/onboarding";
@@ -103,6 +106,7 @@ import { OnlyYouNote } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import {
   AiPicker,
+  ExistingRows,
   type KeyDraft,
   KeyPanel,
   PlanPanel,
@@ -114,7 +118,7 @@ import { JEV_KEY_MIN, JevSteps, JevWhy } from "@/components/ai/Jev";
 import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { DeleteAccountEntry } from "@/components/DeleteAccount";
 import { DeleteWorkspaceDialog } from "@/components/DeleteWorkspace";
-import { ImportFlow, ImportReport, useImportFlow } from "@/components/ImportFlow";
+import { ImportedSummary, ImportFlow, ImportReport, useImportFlow } from "@/components/ImportFlow";
 import { MembersFull } from "@/components/Limits";
 import { ErrorState } from "@/components/Loading";
 import { ConnectComputer, osOf, PAIR_POLL_MS } from "@/components/Machines";
@@ -165,6 +169,10 @@ const HOST: Record<OnboardingStepId, Preset> = {
 };
 /** Where the way back from the billing service resumes a workspace whose step the server doesn't keep. */
 const AI_STEP = ONBOARDING_STEPS.findIndex((s) => s.id === "ai");
+/** How long `?paid` (the address's word, not the server's) has the payment said as being confirmed. */
+const CONFIRMING_MS = 60_000;
+/** A row of the team's faces shows this many, then "+N". */
+const FACES = 4;
 /** How long the guide keeps writing after a keystroke, and smiling after a step. */
 const TYPING_MS = 900;
 const HAPPY_MS = 1600;
@@ -198,7 +206,7 @@ interface ImportedCrew extends CrewMember {
 }
 /** A workspace's onboarding as the server has it, where the way back from the billing service lands. */
 export interface ResumedOnboarding {
-  /** The furthest step the server has (`saveOnboarding`); the AI step for a workspace it keeps none for. */
+  /** Where it opens (`resumeAt`); the AI step for a workspace the server keeps no step for. */
   at: number;
   created: { orgId: string; generalChannelId: string };
   org: string;
@@ -216,14 +224,16 @@ export interface ResumedOnboarding {
  * onboarding gives them, and any other agent came with the import (in another tab, with its model no longer known).
  */
 export async function resumeOnboarding(api: ApiClient, orgId: string): Promise<ResumedOnboarding> {
-  const [me, channels, settings, agents, platform] = await Promise.all([
+  const [me, channels, settings, agents, platform, config] = await Promise.all([
     api.account.me(),
     api.chat.channels(orgId),
     api.orgs.settings(orgId),
     api.agents.list(orgId),
     api.agents.platformKeyAvailable(orgId).catch(() => false),
+    api.account.authConfig().catch(() => null),
   ]);
-  const saved = me?.organizations.find((o) => o.id === orgId)?.onboarding?.step;
+  const mine = me?.organizations.find((o) => o.id === orgId);
+  const saved = mine?.onboarding?.step;
   const general = channels.find((c) => c.name === "general") ?? channels[0];
   if (!general) throw new Error("onboarding: the workspace has no channel");
   let imported = new Map<string, string | null>();
@@ -253,8 +263,15 @@ export async function resumeOnboarding(api: ApiClient, orgId: string): Promise<R
       });
     }
   }
+  const importCame = saved === "import" && (await api.imports.sources(orgId).catch(() => [])).length > 0;
   return {
-    at: saved ? stepIndex(saved) : AI_STEP,
+    at: saved
+      ? resumeAt(saved, {
+          guide: agentIds[GUIDE] !== undefined,
+          imported: importCame,
+          computerDone: config?.workspaceComputer === true && standingActive(mine?.standing),
+        })
+      : AI_STEP,
     created: { orgId, generalChannelId: general.id },
     org: settings.name,
     zone: settings.timezone,
@@ -310,19 +327,13 @@ function useGuideMood() {
   };
 }
 
-/** The step this tab was on in `orgId`'s onboarding (`STORAGE_KEYS.onboardingStep`); null when it was on none. */
-function stepHere(orgId: string): number | null {
-  const at = stepIndex((sessionStore.get(`${STORAGE_KEYS.onboardingStep}.${orgId}`) ?? "") as OnboardingStepId);
-  return at >= 0 ? at : null;
-}
-
 /**
  * The onboarding: the steps on a rail (the pixel sky
  * on top fills as they get done); each step is one calm screen hosted by an
  * agent of the team, who asks in a speech bubble (introducing itself the first
  * time); one big action under the answer, "Pular esta etapa" on optional steps. `resumed`: a workspace made already,
- * back from the billing service, opened at the step this tab was on, else the furthest the server has; `paid`: back
- * from paying for it.
+ * back from the billing service, opened at the first step that waits for the person (`resumeAt`); `paid`: back from
+ * paying for it, as the address says.
  */
 export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnboarding | null; paid?: boolean }) {
   const { t, i18n } = useTranslation();
@@ -333,19 +344,17 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
   const toast = useToast();
   const guide = useGuideMood();
 
-  // Back from the billing service: the step this tab was on, else the furthest the server has; every one before the
-  // furthest stays done.
-  const [at] = useState(() => (resumed ? (stepHere(resumed.created.orgId) ?? resumed.at) : 0));
-  const passed = Math.max(at, resumed?.at ?? 0);
+  // Back from the billing service: every step before the one it opens at stays done.
+  const [at] = useState(() => resumed?.at ?? 0);
   const [index, setIndex] = useState(at);
-  const [reached, setReached] = useState(passed);
+  const [reached, setReached] = useState(at);
   const [done, setDone] = useState<Set<OnboardingStepId>>(
-    () => new Set(ONBOARDING_STEPS.slice(0, passed).map((s) => s.id)),
+    () => new Set(ONBOARDING_STEPS.slice(0, at).map((s) => s.id)),
   );
   // The step where each host agent first showed up (it introduces itself there only).
   const [metAt, setMetAt] = useState(() => {
     const met: Partial<Record<Preset, OnboardingStepId>> = {};
-    for (const s of ONBOARDING_STEPS.slice(0, passed)) met[HOST[s.id]] ??= s.id;
+    for (const s of ONBOARDING_STEPS.slice(0, at)) met[HOST[s.id]] ??= s.id;
     return met;
   });
   // Workspace
@@ -369,8 +378,12 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
   const flow = useImportFlow(created?.orgId ?? null);
   const [importedCrew, setImportedCrew] = useState<ImportedCrew[]>(resumed?.importedCrew ?? []);
   // Agents: who joins, created when that step is left. AI: what they think with, then (the server's owner, once an
-  // AI is connected) Jev's key, on a screen of its own (`jev`).
-  const [chosen, setChosen] = useState(() => new Set(resumed ? (Object.keys(resumed.agentIds) as Preset[]) : PRESETS));
+  // AI is connected) Jev's key, on a screen of its own (`jev`). A team kept already keeps those it has (the guide
+  // always), and no other.
+  const [chosen, setChosen] = useState(() => {
+    const kept = Object.keys(resumed?.agentIds ?? {}) as Preset[];
+    return new Set(kept.length > 0 ? [GUIDE, ...kept] : PRESETS);
+  });
   const [jev, setJev] = useState(false);
   const [agentIds, setAgentIds] = useState<Partial<Record<Preset, string>>>(resumed?.agentIds ?? {});
   const [handles, setHandles] = useState<Partial<Record<Preset, string>>>(resumed?.handles ?? {});
@@ -378,13 +391,15 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
   // far (by agent).
   const [aiPicked, setAiPicked] = useState<AiChoice | null>(null);
   const [aiTarget, setAiTarget] = useState<string | undefined>(undefined);
+  // An account already on the computer, signed in once more for an agent from its row (its plan's panel).
+  const [aiLogin, setAiLogin] = useState<ExistingSignIn | null>(null);
   const [planned, setPlanned] = useState<Record<string, { label: string; mark: string; choice: PlanChoice }>>({});
   // Agents a plan's panel moved onto it one at a time ("All agents"), until it says done: shown again (another tile and
   // back, another step and back), it goes on from the next one.
   const [signedIn, setSignedIn] = useState<typeof planned>({});
   // A computer the person connected: its own sign-in thinks for every agent, unless they pick another account.
   const [own, setOwn] = useState(true);
-  // "Responde a todos" for the agents on a plan: off, each replies only to the person (ADR 0059 §5).
+  // "Atende outras pessoas" for the agents on a plan: off, each answers only the person (ADR 0059 §5).
   const [replyAll, setReplyAll] = useState(false);
   // The workspace key: a provider's key, or the platform key where the server offers one.
   const [draft, setDraft] = useState<KeyDraft>({ provider: "anthropic", apiKey: "" });
@@ -435,6 +450,14 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
     return agent ? [{ id: itemId(i), agent, handle: i.renamedTo ?? agent.handle }] : [];
   });
   const pickedImports = importAgents.filter((x) => flow.pick.has(x.id)).map((x) => x.agent);
+  // The import step passed with no file in hand here (opened again): it says what the workspace brought, with another
+  // file one click away, rather than an empty picker.
+  const sources = useQuery({
+    queryKey: ["onboarding", "imports", created?.orgId],
+    queryFn: () => api.imports.sources(created?.orgId ?? ""),
+    enabled: Boolean(created) && step.id === "import" && done.has("import") && !flow.touched,
+  });
+  const importedFrom = flow.touched ? [] : (sources.data ?? []);
   const crew: CrewMember[] = [
     ...createdPresets.map((p) => ({
       key: p,
@@ -717,11 +740,27 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
   const hold = holdText(t, standing);
   // A new workspace waiting for its first plan (ADR 0079): its computer and its invitations come with the plan.
   const unpaid = billingHoldOf(standing) === "payment";
-  // Back on the step it left for the billing service, the plan says active once its hold is gone. Back from paying,
-  // the billing service lifts it seconds later: until then the same line says the payment arrived.
-  const paidLine = !resumed || !me.data || index !== at ? null : !unpaid ? "paid" : paid ? "confirming" : null;
+  // Back on the step it opens at from the billing service, the plan says active once nothing is held over the
+  // workspace. Back from paying, the billing service lifts its hold seconds later: until then, for a minute at most,
+  // the same line says the payment is being confirmed, there and on the computer step, whose offer waits; then the
+  // server's word stands (its offer again while it says unpaid).
+  const [confirming, setConfirming] = useState(paid);
+  useEffect(() => {
+    if (!confirming) return;
+    const timer = setTimeout(() => setConfirming(false), CONFIRMING_MS);
+    return () => clearTimeout(timer);
+  }, [confirming]);
+  const claimed = resumed != null && confirming && unpaid;
+  const paidLine =
+    !resumed || !me.data
+      ? null
+      : claimed && (index === at || step.id === "computer")
+        ? "confirming"
+        : index === at && standingActive(standing)
+          ? "paid"
+          : null;
   // Its computer step offers that plan, as the step's one action, unless it was just paid.
-  const computerOffer = step.id === "computer" && workspaceComputer !== null && unpaid && paidLine !== "confirming";
+  const computerOffer = step.id === "computer" && workspaceComputer !== null && unpaid && !claimed;
   // Creating another refused while one waits for its plan: the way to that one's plan.
   const refused = saveWorkspace.error;
   const unpaidElsewhere =
@@ -757,10 +796,13 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
     c === "key" ? [] : allAgents({ choice: c, agents: crewAgents, aiOf, machineOf: () => null });
   // The step's host asks which AI they use: the plan is for it first, as its face, the "For" select and the foot say.
   const aimed = { agents: crewAgents, hasAi, picked: aiTarget, host: agentIds[HOST.ai] };
-  // With no set, the agent whose computer the panel reads, "All agents" too.
+  // With no set, the agent whose computer the panel reads, "All agents" too. What the person already has there comes
+  // first for that agent.
+  const reader = aiOpen ? defaultTarget({ ...aimed, set: [] }) : undefined;
+  const readerAgent = crewAgents.find((a) => a.id === reader);
   const gates = usePlanGates(
     created?.orgId ?? "",
-    aiOpen ? defaultTarget({ ...aimed, set: [] }) : undefined,
+    reader,
     aiOpen && Object.keys(planned).length === 0 && !keySaved ? COMPUTER_POLL_MS : false,
   );
   const choice =
@@ -779,6 +821,7 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
   const target = defaultTarget({ ...aimed, set: aiAll });
   const pickAi = (next: AiChoice) => {
     setAiPicked(next);
+    setAiLogin(null);
     // Another plan moves on to whoever still has no AI once a plan thinks for someone.
     if (next !== "key" && next !== choice && Object.keys(planned).length > 0)
       setAiTarget(defaultTarget({ agents: crewAgents, hasAi, host: aimed.host, set: setOf(next) }));
@@ -816,9 +859,15 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
     mutationFn: async () => {
       if (!created) return;
       const next = new Set(sent);
+      // "Admin" invites get the workspace's administrator role (ADR 0085): the first one this person may give.
+      const roles = toSend.some((i) => i.admin) ? (await api.roles.list(created.orgId)).roles : [];
+      const adminRoleId = roles.find((r) => r.givable && r.permissions.includes("administrator"))?.id;
       for (const invite of toSend) {
         try {
-          await api.orgs.invite(created.orgId, { email: invite.email, role: invite.role });
+          await api.orgs.invite(created.orgId, {
+            email: invite.email,
+            roleIds: invite.admin && adminRoleId ? [adminRoleId] : [],
+          });
           next.add(invite.email);
         } catch (err) {
           toast.show(`${invite.email}: ${errorText(t, err)}`, "error");
@@ -938,7 +987,6 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
     setIndex(next);
     setReached((r) => Math.max(r, next));
     setJev(onJev);
-    if (created) sessionStore.set(`${STORAGE_KEYS.onboardingStep}.${created.orgId}`, ONBOARDING_STEPS[next]?.id ?? "");
     if (typeof window !== "undefined" && typeof window.scrollTo === "function") {
       try {
         window.scrollTo({ top: 0 });
@@ -1000,11 +1048,12 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
       flow.reset();
       flow.setCard(null);
     }
-    // Creating the workspace passed the first step on the server. An import picked is applied with the team: until
-    // then the server keeps its step, where a resume reads the file again.
+    // Creating the workspace passed the first step on the server. An import picked is applied with the team: leaving
+    // its step, the server keeps that step, where a resume reads the file again. Read before any await: `flow` is
+    // this render's, and the team's step applies the import (or nothing, with nothing picked) before it saves.
     const next = ONBOARDING_STEPS[index + 1];
     if (created && next) {
-      const saving = flow.planned && !flow.report ? "import" : next.id;
+      const saving = !skip && step.id === "import" && flow.planned && !flow.report ? "import" : next.id;
       const at = await saveStep.mutateAsync(saving);
       // Further on, or finished, in another window or on another device: `me` again, which the page follows.
       if (at && aheadOf(at, saving)) await qc.invalidateQueries({ queryKey: keys.me });
@@ -1036,11 +1085,14 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
     queryFn: async () => {
       if (!saved) return null;
       const { orgId } = saved;
-      const [settings, agents, machines, platformKey] = await Promise.all([
+      const fresh = created === null;
+      const [settings, agents, machines, platformKey, config, sources] = await Promise.all([
         api.orgs.settings(orgId),
         api.agents.list(orgId),
         api.machines.list(orgId).catch(() => [] as Machine[]),
         api.agents.platformKeyAvailable(orgId).catch(() => false),
+        api.account.authConfig().catch(() => null),
+        fresh && saved.step === "import" ? api.imports.sources(orgId).catch(() => []) : [],
       ]);
       const crewNow = crewOf(agents, PRESETS, presetMark);
       const ids: Partial<Record<Preset, string>> = {};
@@ -1050,7 +1102,15 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
         named[p] = crewNow.presets[p]?.handle;
       }
       return {
-        at: stepIndex(saved.step),
+        // Opened afresh (a reload, another tab), what the workspace has says how far the person got, past a step saved
+        // behind them; left open, the page follows the step another tab or device saved.
+        at: fresh
+          ? resumeAt(saved.step, {
+              guide: ids[GUIDE] !== undefined,
+              imported: sources.length > 0,
+              computerDone: config?.workspaceComputer === true && standingActive(mine?.standing),
+            })
+          : stepIndex(saved.step),
         created: { orgId, generalChannelId: saved.generalChannelId },
         settings,
         ids,
@@ -1103,18 +1163,15 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
       setComputer(r.machine.kind === "host" ? "host" : "machine");
       setMachine(r.machine);
     }
-    // Each host introduced itself where it first asked. Opened afresh (a reload), the page goes back to the step this
-    // tab was on, which can be one before the furthest (Voltar); left open, it follows the furthest.
-    const here = (created === null ? stepHere(r.created.orgId) : null) ?? r.at;
-    const passed = Math.max(here, r.at);
+    // Each host introduced itself where it first asked.
     const met: Partial<Record<Preset, OnboardingStepId>> = {};
-    for (const s of ONBOARDING_STEPS.slice(0, passed)) met[HOST[s.id]] ??= s.id;
+    for (const s of ONBOARDING_STEPS.slice(0, r.at)) met[HOST[s.id]] ??= s.id;
     setMetAt(met);
-    setDone(new Set(ONBOARDING_STEPS.slice(0, passed).map((s) => s.id)));
-    setReached(passed);
-    setIndex(here);
+    setDone(new Set(ONBOARDING_STEPS.slice(0, r.at).map((s) => s.id)));
+    setReached(r.at);
+    setIndex(r.at);
     setJev(false);
-  }, [resume.data, busy, reached, created]);
+  }, [resume.data, busy, reached]);
 
   // Finished in another tab or on another device: the workspace opens.
   useEffect(() => {
@@ -1132,7 +1189,7 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
       ((keyPending ? draft.provider === "platform" || !keyLooksValid(draft.provider, draft.apiKey) : !aiDone) ||
         (choice === "key" && !budgetOk))) ||
     (jevOpen && jevSaves && jevTyped.length < JEV_KEY_MIN) ||
-    (step.id === "import" && !flow.planned) ||
+    (step.id === "import" && !flow.planned && importedFrom.length === 0) ||
     (step.id === "computer" && !workspaceComputer && (computer === null || (computer === "machine" && !machine))) ||
     // Its one action is the plan; "Agora não" goes on, never Enter.
     computerOffer;
@@ -1144,9 +1201,10 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
     workspace: org.trim() || undefined,
     context: context.trim() ? t("onboarding.railValue.context") : undefined,
     import: brought.length
-      ? joinNames(
+      ? namesText(
+          t,
           brought.map((a) => a.name),
-          t("newAgent.and"),
+          NAMES_SHOWN,
         )
       : t("onboarding.railValue.skipped"),
     computer: workspaceComputer
@@ -1157,17 +1215,20 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
           ? machine.name
           : t("onboarding.railValue.skipped"),
     agents: crew.length
-      ? joinNames(
+      ? namesText(
+          t,
           crew.map((c) => c.name),
-          t("newAgent.and"),
+          NAMES_SHOWN,
         )
       : undefined,
     ai: aiDone ? undefined : t("onboarding.railValue.later"),
     team: sent.size ? t("onboarding.railValue.invites", { count: sent.size }) : t("onboarding.railValue.later"),
   };
 
-  // The team the computer step's host names beside itself ("Theo, Ada and I are here").
+  // The team the computer step's host names beside itself ("Theo, Ada and I are here"), three at most with itself the
+  // fourth ("Theo, Ada, Lia and 23 more and I").
   const hostsTeam = crew.filter((c) => c.key !== HOST.computer).map((c) => c.name);
+  const besideHost = NAMES_SHOWN - 1;
   // The question: the step's, the AI's, or Jev's on the AI step's second screen.
   const ask: { title: string; tag?: string; lead: ReactNode } | null =
     step.id === "done"
@@ -1191,7 +1252,10 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
         : computerOffer
           ? {
               title: hostsTeam.length
-                ? t("onboarding.computer.payment.title", { names: joinNames(hostsTeam, ", ") })
+                ? t("onboarding.computer.payment.title", {
+                    names:
+                      hostsTeam.length > besideHost ? namesText(t, hostsTeam, besideHost) : joinNames(hostsTeam, ", "),
+                  })
                 : t("onboarding.computer.payment.titleAlone"),
               lead: t("onboarding.computer.payment.lead"),
             }
@@ -1503,7 +1567,13 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
 
           {step.id === "import" && created && (
             <div className="onb__answer">
-              <ImportFlow flow={flow} orgId={created.orgId} />
+              {importedFrom.length > 0 ? (
+                <ImportedSummary sources={importedFrom} onAnother={flow.reset} />
+              ) : sources.isLoading ? (
+                <Spinner />
+              ) : (
+                <ImportFlow flow={flow} orgId={created.orgId} />
+              )}
             </div>
           )}
 
@@ -1636,8 +1706,31 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
                 // The workspace exists: its panels read it like any of its pages.
                 <OrgProvider org={orgSummary} me={me.data}>
                   <AiPicker
-                    choice={choice}
+                    choice={aiLogin ? null : choice}
                     onPick={pickAi}
+                    // Kept while a row's sign-in is open: its panel, under that row, says when it's done.
+                    have={(held) =>
+                      readerAgent &&
+                      (aiLogin || !hasAi(readerAgent.id)) && (
+                        <ExistingRows
+                          gates={gates}
+                          agent={readerAgent}
+                          credentials={[]}
+                          named
+                          signIn={aiLogin}
+                          panel={held}
+                          toEveryone={replyAll}
+                          onSignIn={(next) => {
+                            setAiLogin(next);
+                            setAiPicked(next.choice);
+                            setAiTarget(readerAgent.id);
+                          }}
+                          onUsed={(id, { account }) => {
+                            if (account) setPlanned((p) => ({ ...p, [id]: thinksOf(account, planOfAccount(account)) }));
+                          }}
+                        />
+                      )
+                    }
                     dims={(c) => noComputer || gateDims(gates.gateOf(c))}
                     panel={
                       choice === "key" ? (
@@ -1653,6 +1746,7 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
                           onTarget={setAiTarget}
                           own={{ chosen: own, onChoose: setOwn }}
                           replies={{ on: replyAll, onChange: setReplyAll }}
+                          {...(aiLogin?.choice === choice ? { login: aiLogin } : {})}
                           hostConnecting={computer === "host"}
                           said={railSaysComputer}
                           onKey={() => pickAi("key")}
@@ -1881,6 +1975,18 @@ function HostAsk({
         <p className="onb__lead">{lead}</p>
       </div>
     </header>
+  );
+}
+
+/** The team's faces in one line: the first few, then how many more. */
+function Faces({ agents }: { agents: CrewMember[] }) {
+  return (
+    <>
+      {agents.slice(0, FACES).map((a) => (
+        <AgentAvatar key={a.key} name={a.name} initials={a.initials} appearance={a.appearance} size="sm" />
+      ))}
+      {agents.length > FACES && <span className="onb__faces-more">+{agents.length - FACES}</span>}
+    </>
   );
 }
 
@@ -2157,7 +2263,7 @@ function ComputerOffer({
   billing: boolean;
 }) {
   const { t } = useTranslation();
-  // At most three on each side of the computer: the checklist names all of them.
+  // At most three on each side of the computer: the checklist counts the rest.
   const scene = agents.slice(0, 6);
   const half = Math.ceil(scene.length / 2);
   const figure = (a: CrewMember) => (
@@ -2197,16 +2303,15 @@ function ComputerOffer({
                 : "onboarding.computer.payment.agentsM",
               {
                 count: agents.length,
-                names: joinNames(
+                names: namesText(
+                  t,
                   agents.map((a) => a.name),
-                  t("newAgent.and"),
+                  NAMES_SHOWN,
                 ),
               },
             ),
             <span className="onb__done-faces">
-              {agents.map((a) => (
-                <AgentAvatar key={a.key} name={a.name} initials={a.initials} appearance={a.appearance} size="sm" />
-              ))}
+              <Faces agents={agents} />
             </span>,
           )}
       </ul>
@@ -2309,9 +2414,10 @@ function TeamStep({
     staleTime: Number.POSITIVE_INFINITY,
     retry: false,
   });
+  // Invited as a member, or with the workspace's administrator role (`InviteDraft.admin`).
   const roleOptions = [
-    { value: "member" as Role, label: t("roles.member"), description: t("roles.memberDesc") },
-    { value: "admin" as Role, label: t("roles.admin"), description: t("roles.adminDesc") },
+    { value: "member" as const, label: t("roles.member"), description: t("roles.memberDesc") },
+    { value: "admin" as const, label: t("roles.admin"), description: t("roles.adminDesc") },
   ];
   const commit = (text: string) => {
     if (!text.trim()) return;
@@ -2372,10 +2478,12 @@ function TeamStep({
                 ) : (
                   <Select
                     size="sm"
-                    value={i.role}
+                    value={i.admin ? "admin" : "member"}
                     aria-label={t("onboarding.team.roleOf", { email: i.email })}
                     options={roleOptions}
-                    onValueChange={(role) => onChange(invites.map((x) => (x.email === i.email ? { ...x, role } : x)))}
+                    onValueChange={(v) =>
+                      onChange(invites.map((x) => (x.email === i.email ? { ...x, admin: v === "admin" } : x)))
+                    }
                   />
                 )}
                 {!sent.has(i.email) && (
@@ -2441,9 +2549,7 @@ function TeamStep({
       {agents.length > 0 && (
         <div className="row small muted" style={{ gap: 8 }}>
           <span>{t("onboarding.team.meet")}</span>
-          {agents.map((a) => (
-            <AgentAvatar key={a.key} name={a.name} initials={a.initials} appearance={a.appearance} size="sm" />
-          ))}
+          <Faces agents={agents} />
         </div>
       )}
     </>
@@ -2471,9 +2577,10 @@ function DoneStep({
   const { t } = useTranslation();
   const text = useRef<HTMLDivElement>(null);
   const crew = useRef<HTMLDivElement>(null);
-  const names = joinNames(
+  const names = namesText(
+    t,
     agents.map((a) => a.name),
-    t("newAgent.and"),
+    NAMES_SHOWN,
   );
   const lead = [
     agents.length === 1

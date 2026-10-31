@@ -253,7 +253,7 @@ describe("deleting an account", () => {
         { id: old, name: "Old", deletion },
       ],
       leaves: [
-        { id: orgId, name: "Acme", role: "admin" },
+        { id: orgId, name: "Acme", role: "member" },
         { id: team, name: "Team", role: "owner" },
       ],
       soleOwner: [{ id: team, name: "Team" }],

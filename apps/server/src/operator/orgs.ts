@@ -2,10 +2,15 @@ import { operatorListOrgs, operatorOrg, operatorUser } from "@agenteschat/engine
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { apiError, errorResponse } from "../http/errors";
 import { iso, json, OrgParams } from "../routes/app/context";
-import { Role } from "../routes/app/schemas";
 import type { OperatorDeps } from "./app";
 import { LimitsState, limitsJson, Meters } from "./limits";
 import { Standing, StandingState, standingJson, UserParams } from "./standing";
+
+/**
+ * A person's place in a workspace, as the operator API has always named it: an owner, someone holding
+ * `administrator` (ADR 0085), or a member.
+ */
+const Role = z.enum(["owner", "admin", "member"]).openapi("Role");
 
 const tags = ["Operator"];
 const errors = {

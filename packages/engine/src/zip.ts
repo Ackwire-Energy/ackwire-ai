@@ -9,8 +9,13 @@ export interface ZipEntry {
 /**
  * Reads a zip archive (stored or deflated entries; no zip64, no encryption)
  * within limits, checked before inflating so a zip bomb can't get through.
+ * Entries `skip` names come back with no data: never inflated, and not counted toward `maxBytes`.
  */
-export function readZip(buffer: Uint8Array, limits: { maxFiles: number; maxBytes: number }): ZipEntry[] {
+export function readZip(
+  buffer: Uint8Array,
+  limits: { maxFiles: number; maxBytes: number },
+  skip: (path: string) => boolean = () => false,
+): ZipEntry[] {
   const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
   let eocd = -1;
   for (let i = buffer.length - 22; i >= Math.max(0, buffer.length - 65_557); i--) {
@@ -42,8 +47,12 @@ export function readZip(buffer: Uint8Array, limits: { maxFiles: number; maxBytes
     offset += 46 + nameLength + extraLength + commentLength;
     if (path.endsWith("/")) continue; // a folder
     if (flags & 0x1) throw new ValidationError("Encrypted zips are not supported");
-    total += size;
     if (entries.length + 1 > limits.maxFiles) throw new ValidationError(`Too many files (max ${limits.maxFiles})`);
+    if (skip(path)) {
+      entries.push({ path, data: new Uint8Array() });
+      continue;
+    }
+    total += size;
     if (total > limits.maxBytes) throw new ValidationError(`The skill is too large (max ${limits.maxBytes} bytes)`);
     if (view.getUint32(local, true) !== 0x04034b50) throw new ValidationError("Corrupt zip (local header)");
     const start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);

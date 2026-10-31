@@ -1,6 +1,6 @@
 # 0006. Better Auth for people; our own organizations, roles and agents
 
-- Status: Accepted. Revised by ADR 0068: a workspace's invitation link only lets people ask to join, an admin approves each person, and only an email invitation opens sign-up. Amended by ADR 0078: a live sign-up mode, and early-access invitations that open sign-up for one address
+- Status: Accepted. Revised by ADR 0068: a workspace's invitation link only lets people ask to join, an admin approves each person, and only an email invitation opens sign-up. Amended by ADR 0078: a live sign-up mode, and early-access invitations that open sign-up for one address. Revised by ADR 0085: the fixed owner / admin / member table became roles that add up (owner stays a flag), and permissions are resolved per person
 - Date: 2026-10-14
 
 ## Decision

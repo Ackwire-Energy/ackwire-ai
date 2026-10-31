@@ -222,7 +222,7 @@ export function LevelRow({
 export function AccessMatrixSection() {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const admin = can(org.role, "configure");
+  const admin = can(org, "manage_agents");
   const agents = useAgents(org.id);
   const list = agents.data ?? [];
   const access = useAgentsAccess(list, admin);

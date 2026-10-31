@@ -17,7 +17,7 @@ const Event = z
     at: z.string(),
     type: z.string().openapi({
       description:
-        "`user.signed_up`, `session.created`, `user.deleted`, `organization.created`, `organization.deletion_requested`, `organization.deletion_canceled`, `organization.deleted`, `invitation.created`, `agent.created`, `mail.sent`, `run.finished`, `task.finished`, `desktop_control.ended`, `content.viewed` or `platform_ai.threshold` (ADR 0056 §5 lists each one's `data`). Ignore types you don't know: new ones keep v1.",
+        "`user.signed_up`, `session.created`, `user.deleted`, `organization.created`, `organization.deletion_requested`, `organization.deletion_canceled`, `organization.deleted`, `invitation.created`, `agent.created`, `agent.deleted`, `mail.sent`, `run.finished`, `task.finished`, `desktop_control.ended`, `content.viewed` or `platform_ai.threshold` (ADR 0056 §5 lists each one's `data`). Ignore types you don't know: new ones keep v1.",
     }),
     orgId: z.uuid().nullable(),
     userId: z.string().nullable().openapi({ description: "The person the event is about or who acted." }),

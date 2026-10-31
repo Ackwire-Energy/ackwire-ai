@@ -880,8 +880,64 @@
     {
       "idx": 125,
       "version": "7",
-      "when": 1793386069347,
-      "tag": "0125_workspace_deletion",
+      "when": 1793390843712,
+      "tag": "0125_channel_categories",
+      "breakpoints": true
+    },
+    {
+      "idx": 126,
+      "version": "7",
+      "when": 1793393736459,
+      "tag": "0126_agent_deleted",
+      "breakpoints": true
+    },
+    {
+      "idx": 127,
+      "version": "7",
+      "when": 1793393974159,
+      "tag": "0127_agent_groups",
+      "breakpoints": true
+    },
+    {
+      "idx": 128,
+      "version": "7",
+      "when": 1793420843712,
+      "tag": "0128_presence_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 129,
+      "version": "7",
+      "when": 1793430843712,
+      "tag": "0129_agent_status_source",
+      "breakpoints": true
+    },
+    {
+      "idx": 130,
+      "version": "7",
+      "when": 1793440843712,
+      "tag": "0130_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 131,
+      "version": "7",
+      "when": 1793440903712,
+      "tag": "0131_imported_agent_handles",
+      "breakpoints": true
+    },
+    {
+      "idx": 132,
+      "version": "7",
+      "when": 1793440963712,
+      "tag": "0132_issues_assignee_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 133,
+      "version": "7",
+      "when": 1793441023712,
+      "tag": "0133_workspace_deletion",
       "breakpoints": true
     }
   ]

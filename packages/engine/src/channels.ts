@@ -1,12 +1,14 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, isNull, rowsOf, schema, sql } from "@agenteschat/db";
 import { caches } from "./cache";
+import { endOfCategory, requireCategoryInOrg } from "./channel-categories";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishOrgEvent, publishUserEvent } from "./events";
 import { followsThreadSql } from "./follows";
 import { type PreviewMeta, previewMeta } from "./message-preview";
 import { notificationSnippet } from "./notifications";
 import { can, getMembership, type Membership, requireActiveMembership, requirePermission } from "./organizations";
+import { memberKeysSql, memberRankSql, resolvePermissions } from "./permissions";
 import { closedRefusal, STANDING_COLUMNS } from "./standing";
 
 const { channels, channelMembers, agents, organizationMembers, organizations, users } = schema;
@@ -19,9 +21,12 @@ export async function createChannel(
   db: Database,
   actorId: string,
   orgId: string,
-  input: { name: string; topic?: string; visibility?: "public" | "private" },
+  input: { name: string; topic?: string; visibility?: "public" | "private"; categoryId?: string | null },
 ): Promise<Channel> {
   await requirePermission(db, actorId, orgId, "create_channels");
+  // Whoever may create a channel may put it in an existing category (arranging categories is for admins).
+  const categoryId = input.categoryId ?? null;
+  if (categoryId) await requireCategoryInOrg(db, orgId, categoryId);
   const name = input.name.trim().toLowerCase();
   if (name.startsWith("dm-")) throw new ValidationError("Channel names can't start with dm-");
   if (!CHANNEL_NAME_PATTERN.test(name)) {
@@ -37,6 +42,8 @@ export async function createChannel(
           topic: input.topic ?? "",
           visibility: input.visibility ?? "public",
           createdByUserId: actorId,
+          categoryId,
+          position: await endOfCategory(tx, orgId, categoryId),
         })
         .returning();
       if (!channel) throw new Error("channel insert returned nothing");
@@ -75,6 +82,10 @@ export interface ChannelListItem {
   visibility: "public" | "private";
   createdByUserId: string | null;
   createdAt: Date;
+  /** Its sidebar category; null: on top, with none. */
+  categoryId: string | null;
+  /** Order inside its category. */
+  position: number;
   isMember: boolean;
   /**
    * Messages since I last read it (from when I joined, if never), not mine;
@@ -97,6 +108,8 @@ interface ChannelListRow {
   visibility: "public" | "private";
   created_by_user_id: string | null;
   created_at: Date | string;
+  category_id: string | null;
+  position: number | string;
   is_member: boolean;
   unread_count: number | string | null;
   last_id: string | null;
@@ -113,13 +126,14 @@ const asDate = (v: Date | string) => (v instanceof Date ? v : new Date(v));
 
 /**
  * Channels the user can see: every public channel plus private ones they
- * belong to, by name, with their unread count and last message, in one
+ * belong to, in sidebar order (then by name), with their unread count and last message, in one
  * query (a lateral read per channel on `(channel_id, created_at)`).
  */
 export async function listChannels(db: Database, userId: string, orgId: string): Promise<ChannelListItem[]> {
   await requirePermission(db, userId, orgId, "read");
   const rows = rowsOf<ChannelListRow>(
     await db.execute(sql`select c.id, c.org_id, c.name, c.topic, c.visibility, c.created_by_user_id, c.created_at,
+        c.category_id, c.position,
         (cm.id is not null) as is_member, coalesce(un.n, 0) as unread_count,
         lm.id as last_id, lm.body as last_body, lm.meta as last_meta, lm.created_at as last_at, lm.author_type as last_author_type,
         lm.author_user_id as last_user_id, lm.author_agent_id as last_agent_id,
@@ -150,7 +164,7 @@ export async function listChannels(db: Database, userId: string, orgId: string):
       ) un on true
       where c.org_id = ${orgId}::uuid and c.archived_at is null and c.kind = 'channel'
         and (c.visibility = 'public' or cm.id is not null)
-      order by c.name asc`),
+      order by c.position asc, c.name asc`),
   );
   return rows.map((r) => ({
     id: r.id,
@@ -160,6 +174,8 @@ export async function listChannels(db: Database, userId: string, orgId: string):
     visibility: r.visibility,
     createdByUserId: r.created_by_user_id,
     createdAt: asDate(r.created_at),
+    categoryId: r.category_id,
+    position: Number(r.position),
     isMember: r.is_member === true,
     unreadCount: Number(r.unread_count ?? 0),
     lastMessage:
@@ -198,6 +214,8 @@ export async function requireChannelAccess(db: Database, userId: string, orgId: 
   const [row] = await db
     .select({
       role: organizationMembers.role,
+      keys: memberKeysSql({ orgId: organizationMembers.orgId, userId: organizationMembers.userId }),
+      rank: memberRankSql({ orgId: organizationMembers.orgId, userId: organizationMembers.userId }),
       orgName: organizations.name,
       standing: STANDING_COLUMNS,
       channel: channels,
@@ -219,7 +237,14 @@ export async function requireChannelAccess(db: Database, userId: string, orgId: 
   if (!channel || channel.archivedAt) throw new NotFoundError("Channel not found");
   // Forum topics are readable by the whole organization (ADR 0022); writing goes through the forum.
   if (!row.memberId && channel.kind !== "forum") throw new ForbiddenError("Join this channel first");
-  const membership: Membership = { orgId, orgName: row.orgName, role: row.role, standing: row.standing };
+  const membership: Membership = {
+    orgId,
+    orgName: row.orgName,
+    role: row.role,
+    permissions: resolvePermissions(row.role === "owner", row.keys),
+    rank: row.rank,
+    standing: row.standing,
+  };
   return { channel, membership };
 }
 
@@ -260,7 +285,7 @@ export async function addChannelMember(
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId), isNull(channels.archivedAt)));
   if (!channel) throw new NotFoundError("Channel not found");
   if (channel.kind === "dm") throw new ValidationError("A direct conversation keeps its participants");
-  if (channel.createdByUserId !== actorId && !can(membership.role, "manage_members")) {
+  if (channel.createdByUserId !== actorId && !can(membership, "manage_channels")) {
     throw new ForbiddenError("Only the channel's creator or an admin can add members");
   }
   if ("userId" in member) {
@@ -283,7 +308,7 @@ export async function addChannelMember(
     .from(agents)
     .where(and(eq(agents.id, member.agentId), eq(agents.orgId, orgId), isNull(agents.archivedAt)));
   if (!agent) throw new ValidationError("That agent does not exist in this organization");
-  if (agent.ownerUserId !== actorId && !can(membership.role, "manage_agents")) {
+  if (agent.ownerUserId !== actorId && !can(membership, "manage_agents")) {
     throw new ForbiddenError("Only an admin or the agent's owner can add this agent to a channel");
   }
   const autoReply = member.autoReply ?? true;
@@ -327,7 +352,7 @@ export async function setChannelAgentAutoReply(
       ),
     );
   if (!row) throw new NotFoundError("That agent is not in this channel");
-  if (row.createdBy !== actorId && row.ownerUserId !== actorId && !can(membership.role, "manage_members")) {
+  if (row.createdBy !== actorId && row.ownerUserId !== actorId && !can(membership, "manage_channels")) {
     throw new ForbiddenError("Only the channel's creator, an admin or the agent's owner can change this");
   }
   await db
@@ -373,7 +398,7 @@ export async function removeChannelMember(
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId)));
   if (!channel) throw new NotFoundError("Channel not found");
   const self = "userId" in member && member.userId === actorId;
-  if (!self && channel.createdByUserId !== actorId && !can(membership.role, "manage_members")) {
+  if (!self && channel.createdByUserId !== actorId && !can(membership, "manage_channels")) {
     throw new ForbiddenError("Only the channel's creator or an admin can remove members");
   }
   await db
@@ -411,7 +436,7 @@ async function archivableChannel(db: Database, actorId: string, orgId: string, c
     .from(channels)
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId)));
   if (!channel) throw new NotFoundError("Channel not found");
-  if (channel.createdByUserId !== actorId && !can(membership.role, "manage_members")) {
+  if (channel.createdByUserId !== actorId && !can(membership, "manage_channels")) {
     throw new ForbiddenError("Only the channel's creator or an admin can archive it");
   }
   return channel;

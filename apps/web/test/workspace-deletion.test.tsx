@@ -6,7 +6,7 @@ setupDom();
 import { ApiError, keys, type OrgDeletion, type OrgSummary, type Role } from "@agenteschat/client";
 import type { QueryClient } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { createFakeApi, meAsAdmin, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -57,10 +57,12 @@ describe("deleting a workspace (Configurações › Geral)", () => {
     const card = screen().getByRole("region", { name: "Apagar workspace" });
     expect(card.textContent).toContain("Fecha Acme para todos agora. Ele é apagado de vez depois de 7 dias.");
     expect(within(card).getByRole("button", { name: "Apagar workspace…" })).toBeTruthy();
-    for (const role of ["admin", "member"] as const) {
+    for (const admin of [true, false]) {
       cleanup();
+      const state = seedState();
+      if (admin) meAsAdmin(state);
       // Not even from the address the phone opens.
-      await open(`/org/${ORG_ID}/settings/general?delete=1`, { role });
+      await open(`/org/${ORG_ID}/settings/general?delete=1`, { role: "member", state });
       expect(screen().queryByRole("region", { name: "Apagar workspace" })).toBeNull();
       expect(screen().queryByRole("dialog")).toBeNull();
     }

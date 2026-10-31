@@ -25,7 +25,8 @@ import {
   publishMachineAgentsChanged,
   sha256Hex,
 } from "./machines";
-import { can, type MemberRole, pinnedOwner, requirePermission } from "./organizations";
+import { can, pinnedOwner, requirePermission } from "./organizations";
+import { maySql } from "./permissions";
 
 const { agents, channels, machines, organizationMembers, organizations } = schema;
 
@@ -85,7 +86,11 @@ const OSES = new Set(["linux", "darwin", "windows"]);
  */
 async function servedOrgs(db: Database, ownerId: string, orgId?: string) {
   const rows = await db
-    .select({ id: organizations.id, name: organizations.name, role: organizationMembers.role })
+    .select({
+      id: organizations.id,
+      name: organizations.name,
+      may: maySql(organizationMembers.orgId, ownerId, "configure"),
+    })
     .from(organizationMembers)
     .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
     .innerJoin(
@@ -94,7 +99,7 @@ async function servedOrgs(db: Database, ownerId: string, orgId?: string) {
     )
     .where(and(eq(organizationMembers.userId, ownerId), ...(orgId ? [eq(organizationMembers.orgId, orgId)] : [])))
     .orderBy(asc(organizations.createdAt));
-  return rows.filter((o) => can(o.role as MemberRole, "configure"));
+  return rows.filter((o) => o.may);
 }
 
 const revoke = (pubsub: PubSub | undefined, machineId: string) =>
@@ -302,7 +307,7 @@ export async function restoreHostComputer(deps: Pick<HostDeps, "db" | "pubsub">,
   const membership = await requirePermission(deps.db, actorId, orgId, "read");
   const row = await servedRow(deps.db, orgId);
   if (!row) throw new NotFoundError("This server's computer doesn't work for this organization", "machine.host_none");
-  if (!can(membership.role, "configure") && row.pairedByUserId !== actorId) {
+  if (!can(membership, "configure") && row.pairedByUserId !== actorId) {
     throw new ForbiddenError("Only an admin can turn this server's computer back on", "machine.forbidden");
   }
   if (row.deletedAt) {

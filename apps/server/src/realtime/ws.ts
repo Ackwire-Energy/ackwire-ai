@@ -11,11 +11,13 @@ import {
 import type { Config } from "@agenteschat/config";
 import { and, type Database, eq, inArray, isNotNull, isNull, or, schema } from "@agenteschat/db";
 import {
+  announcePresence,
   type BrowserLive,
   closedRefusal,
   closesWorkspace,
   ForbiddenError,
   getMembership,
+  isConnected,
   NotFoundError,
   type OrgEvent,
   requireBrowserAccess,
@@ -459,8 +461,10 @@ export function createRealtime(deps: RealtimeDeps) {
             if (ws.readyState === 1) send(ws, { type: "event", scope: "user", event });
           }),
         );
+        const wasConnected = await isConnected(deps.presence, orgId, user.id);
         await deps.presence.connect(ws.data.orgId, ws.data.user.id, ws.data.connectionId);
         await touchLastSeen(deps.db, orgId, user.id).catch(() => {});
+        if (!wasConnected) await announcePresence(deps, orgId, user.id).catch(() => {});
         send(ws, { type: "ready", orgId: ws.data.orgId, userId: ws.data.user.id });
       },
       async message(socket: Bun.ServerWebSocket<SocketData>, raw: string | Buffer): Promise<void> {
@@ -549,6 +553,9 @@ export function createRealtime(deps: RealtimeDeps) {
         ws.data.system = [];
         await deps.presence.disconnect(ws.data.orgId, ws.data.user.id, ws.data.connectionId);
         await touchLastSeen(deps.db, ws.data.orgId, ws.data.user.id).catch(() => {});
+        if (!(await isConnected(deps.presence, ws.data.orgId, ws.data.user.id))) {
+          await announcePresence(deps, ws.data.orgId, ws.data.user.id).catch(() => {});
+        }
       },
     },
   };

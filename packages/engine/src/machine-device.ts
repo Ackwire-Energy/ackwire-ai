@@ -350,8 +350,8 @@ async function reconnectTarget(
   // server's own (`host`, its sync) never come back as someone's computer.
   if (machine?.kind !== "connected") return null;
   const member = await getMembership(db, actorId, machine.orgId);
-  if (!member || closedRefusal(member.standing) || !can(member.role, "post")) return null;
-  if (!can(member.role, "configure") && machine.pairedByUserId !== actorId) return null;
+  if (!member || closedRefusal(member.standing) || !can(member, "pair_computers")) return null;
+  if (!can(member, "configure") && machine.pairedByUserId !== actorId) return null;
   return { machine, orgName: member.orgName };
 }
 
@@ -399,7 +399,7 @@ export async function confirmDeviceCode(
   input: { name?: string | null },
 ): Promise<MachineView> {
   const membership = await requireActiveMembership(deps.db, actorId, orgId);
-  if (!can(membership.role, "post")) {
+  if (!can(membership, "pair_computers")) {
     throw new ForbiddenError(
       "Only members who can post in the organization can connect a computer",
       "machine.forbidden",

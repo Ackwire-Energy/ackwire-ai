@@ -14,7 +14,7 @@ export const DEFAULT_AGENT_BUDGET_NANO_USD = 50_000_000_000;
  */
 export async function canViewCost(db: Database, actorId: string, orgId: string) {
   const membership = await getMembership(db, actorId, orgId);
-  return membership !== null && !closedRefusal(membership.standing) && can(membership.role, "view_usage");
+  return membership !== null && !closedRefusal(membership.standing) && can(membership, "view_usage");
 }
 
 /** The organization's default monthly budget per agent, in nano-USD (cached). */

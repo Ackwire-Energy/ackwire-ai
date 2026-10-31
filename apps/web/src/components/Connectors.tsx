@@ -69,7 +69,7 @@ export function ConnectorsSection({
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const admin = can(org.role, "configure");
+  const admin = can(org, "manage_connectors");
   const catalog = useCatalog();
   const connections = useConnections(org.id);
   const servers = useCustomServers(org.id);

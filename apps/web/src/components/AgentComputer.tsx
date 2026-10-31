@@ -224,7 +224,7 @@ function AgentMachineFolders({ agent, machineId }: { agent: Agent; machineId: st
 export function AgentComputersCard() {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const admin = can(org.role, "configure");
+  const admin = can(org, "configure");
   const agents = useAgents(org.id);
   const machines = useMachines(org.id);
   const noComputer = useNoComputer();

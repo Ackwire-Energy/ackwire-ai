@@ -2,7 +2,8 @@
 
 import type { OnboardingStepId } from "../lib/onboarding";
 
-export type Role = "owner" | "admin" | "member";
+/** Whether a person owns the workspace (ADR 0085); what anyone may do comes from their roles (`OrgRole`). */
+export type Role = "owner" | "member";
 export type Edition = "selfhost" | "cloud";
 
 export interface Health {
@@ -153,6 +154,13 @@ export interface OrgSummary {
   id: string;
   name: string;
   role: Role;
+  /**
+   * Everything the person may do here, resolved by the server from their roles (ADR 0085): read it with `can`
+   * (lib/permissions). Absent: nothing past reading.
+   */
+  permissions?: string[];
+  /** Their highest role's position (0 the top), null with none: they manage the roles and people below it. */
+  rank?: number | null;
   /** The workspace logo (`/api/app/org-logos/…`); null or absent = the agent mark. */
   logo?: string | null;
   /** From `GET /me`; absent from older servers (active). Changes come as `org.standing` events. */
@@ -223,6 +231,8 @@ export interface Member {
   /** The photo uploaded here (`PUT …/me/avatar`); wins over `image`. */
   avatarUrl?: string | null;
   role: Role;
+  /** Their roles (`OrgRole` ids), not `everyone`. */
+  roleIds?: string[];
   joinedAt: string;
   /** `@ana`: unique in the organization; mentions resolve by it. */
   handle: string;
@@ -234,7 +244,55 @@ export interface Invitation {
   id: string;
   email: string;
   role: Role;
+  /** Roles they get on accepting. */
+  roleIds?: string[];
   expiresAt: string;
+}
+
+/** One of a workspace's roles (ADR 0085, `GET …/roles`). */
+export interface OrgRole {
+  id: string;
+  /** `everyone`: the base every member holds ("Todos"), always last. */
+  kind: "custom" | "everyone";
+  name: string;
+  /** A `ROLE_ICONS` icon name. */
+  icon: string;
+  /** One of the agents' colors (not sky): the role's mark is drawn in it. */
+  color: string;
+  /** 0 the highest. */
+  position: number;
+  /** Its keys; `administrator` grants every other one. */
+  permissions: string[];
+  mentionable: boolean;
+  hoist: boolean;
+  people: number;
+  /** Whether you may change it (you manage roles and it is below your own). */
+  editable: boolean;
+  /** Whether you may give it to people: it is below your own. */
+  givable: boolean;
+}
+
+/** A permission area: its "use" keys and every key (its "manage" level). */
+export interface PermissionArea {
+  id: string;
+  use: string[];
+  keys: string[];
+}
+
+export interface OrgRoles {
+  roles: OrgRole[];
+  areas: PermissionArea[];
+  colors: string[];
+  icons: string[];
+}
+
+export interface RoleInput {
+  name: string;
+  icon?: string;
+  color?: string;
+  permissions?: string[];
+  mentionable?: boolean;
+  hoist?: boolean;
 }
 
 export interface InvitationPreview {
@@ -364,6 +422,28 @@ export interface Agent {
   appearance?: AgentLookInput;
   /** Who thinks for it (ADR 0032): the brain, a computer brain's model label, its computer (owner and admins). */
   brain?: AgentBrainLine;
+  /** No longer in the team (ADR 0082): only its name, role and look, from `FormerAgent`. */
+  former?: "archived" | "deleted";
+}
+
+/** An agent no longer in the team (archived or deleted): what its messages and reports still show. */
+export interface FormerAgent {
+  id: string;
+  name: string;
+  role: string;
+  appearance: AgentLookInput | null;
+  /** Deleted for good; false: archived (an admin may still delete it). */
+  deleted: boolean;
+}
+
+/**
+ * A named group of the workspace's agents (ADR 0083), shared by everyone in it: the sidebar's sections. The list
+ * comes in the workspace's order; `agentIds` in the group's. An agent is in one group at most.
+ */
+export interface AgentGroup {
+  id: string;
+  name: string;
+  agentIds: string[];
 }
 
 /** An agent on the team screen: what it can do. What it does comes from its instructions (`Agent`). */
@@ -405,6 +485,10 @@ export interface AgentBrainLine {
   computer?: string;
   /** A plan account's provider (`zai`, `kimi`…), whose mark replaces the brain's; absent for the CLI's own sign-in. */
   provider?: string | null;
+  /** On a plan: the account it thinks with ("Claude Team 2"; a computer's own sign-in by its plan, "Claude Max"). */
+  account?: string;
+  /** On a plan: that account's limits as last reported; absent: not known yet. */
+  usage?: PlanUsage;
 }
 
 /** `appearance` as stored: the UI only draws known values. */
@@ -425,6 +509,59 @@ export interface AgentInput {
   monthlyBudgetUsd?: number | null;
   audience?: AgentAudience;
   appearance?: AgentLookInput;
+  /** Created from an agent's proposal (its card's message id, ADR 0081): the card is marked created. */
+  proposal?: string;
+}
+
+/**
+ * The AI a proposed agent starts with (ADR 0081): an account of the person it was proposed for that thinks for
+ * no agent, else the workspace's model (it has a key), else none (connected after it is created).
+ */
+export type SuggestedAi =
+  | { kind: "account"; brain: "claude_code" | "codex"; machineId: string; accountId: string; label: string }
+  | { kind: "model" }
+  | { kind: "none" };
+
+/** What an agent proposes, as "Criar agente" takes it. */
+export interface AgentDraft {
+  name: string;
+  handle: string;
+  role: string;
+  instructions: string;
+  appearance: Required<AgentLookInput> | null;
+  /** Public channels it joins. */
+  channelIds: string[];
+  /** Its level on the workspace's connections (the connected apps' ids). */
+  access: { connectionId: string; level: "read" | "write" }[];
+  ai: SuggestedAi;
+}
+
+/** An agent's proposal of a new agent (`meta.actionCard` of its card, ADR 0081). A person creates it or says no. */
+export interface AgentProposalCard {
+  kind: "agent_proposal";
+  /** The person behind the run that proposed it. */
+  forUserId: string | null;
+  params: { draft: AgentDraft; why: string };
+  /** `creating`: a person is creating it right now. */
+  state: "pending" | "creating" | "created" | "denied";
+  agentId: string | null;
+  decidedByUserId: string | null;
+  decidedAt: string | null;
+  /** Past it, a pending one is expired. */
+  expiresAt: string;
+}
+
+/** What a person decided on a proposal: all that `agent.proposal.updated` carries of its card. */
+export type AgentProposalDecision = Pick<AgentProposalCard, "state" | "agentId" | "decidedByUserId" | "decidedAt">;
+
+/** `GET …/agent-proposals/{messageId}`: the card, where it is and what the viewer may do. */
+export interface AgentProposal extends AgentProposalCard {
+  messageId: string;
+  channelId: string;
+  threadId: string | null;
+  proposedByAgentId: string;
+  expired: boolean;
+  canDecide: boolean;
 }
 
 export interface Model {
@@ -453,6 +590,12 @@ export interface Channel {
   visibility: "public" | "private";
   isMember: boolean;
   createdAt: string;
+  /** Who created it: may change it and its members, like admins. */
+  createdByUserId?: string | null;
+  /** Its sidebar category (ADR 0080); null or absent: on top, with none. */
+  categoryId?: string | null;
+  /** Order inside its category, from 0. */
+  position?: number;
   /**
    * Channel list only (`chat.channels`): messages since you last read it
    * (since you joined, if never), not yours; a thread reply counts only in a
@@ -461,6 +604,14 @@ export interface Channel {
   unreadCount?: number;
   /** Channel list only: the latest top-level message; null when empty or not a member. */
   lastMessage?: ChannelLastMessage | null;
+}
+
+/** A named group of channels in the sidebar, the same for everyone in the organization (ADR 0080). */
+export interface ChannelCategory {
+  id: string;
+  name: string;
+  /** Order in the sidebar, from 0. */
+  position: number;
 }
 
 /** A channel's latest top-level message, for the conversation list. */
@@ -702,6 +853,13 @@ export type ChannelEvent =
       messageId: string;
       suggestion: ForumSuggestion;
     }
+  /** An agent's proposal of a new agent was decided (ADR 0081): the decision on its card (`meta.actionCard`). */
+  | ({
+      type: "agent.proposal.updated";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+    } & AgentProposalDecision)
   // ── Chat latency batch (packages/engine/src/events.ts) ──────────────────────
   /** An agent will answer: show "thinking" at once. `runId` is null when announced at post time. */
   | {
@@ -1155,18 +1313,91 @@ export interface Person {
   name: string;
   email: string;
   image: string | null;
+  /** The photo uploaded here (`PUT …/me/avatar`); wins over `image`. */
+  avatarUrl?: string | null;
   role: Role;
+  /** Their roles (`OrgRole` ids), not `everyone`. */
+  roleIds?: string[];
   joinedAt: string;
   lastSeenAt: string | null;
+  /** Seen as connected: `presence` is online, away or busy. */
   online: boolean;
+  /** `hidden` only for yourself; everyone else sees a hidden person as `offline` (ADR 0084). */
+  presence: MemberPresence;
+  /** What the person wrote they are doing; null = nothing (or its time is up). */
+  status: MemberStatus | null;
+  /** Only on your own row: what you picked (your `presence` reads offline while you aren't connected). */
+  availability?: Availability;
   handle: string;
   timezone: string;
+}
+
+/** A person as others see them (ADR 0084). */
+export type MemberPresence = "online" | "away" | "busy" | "hidden" | "offline";
+/** What a person picks: `auto` = online while connected, `away`, `busy`, or `hidden` (offline to everyone else). */
+export type Availability = "auto" | "away" | "busy" | "hidden";
+
+export interface MemberStatus {
+  text: string;
+  emoji: string | null;
+  /** ISO; null = until changed. */
+  until: string | null;
+}
+
+/** `PUT …/me/status`: either part may be left out; `status: null` clears the line. */
+export interface StatusInput {
+  availability?: Availability;
+  status?: { text: string; emoji?: string | null; until?: string | null } | null;
+}
+
+/** An agent's presence, from its work (ADR 0084); an agent with no AI is drawn `offline` by the apps. */
+export type AgentPresence = "online" | "busy" | "away" | "offline";
+
+/** What an agent's line says when the server picked it (ADR 0084 §8); worded by the app (`presence.agent.*`). */
+export type AgentStatusKind =
+  | "task"
+  | "routine"
+  | "mission"
+  | "channel"
+  | "browsing"
+  | "coding"
+  | "files"
+  | "wiki"
+  | "planning"
+  | "data"
+  | "mail"
+  | "connector"
+  | "computer"
+  | "waiting_approval"
+  | "waiting_answer"
+  | "waiting_computer";
+
+/** An agent's line: its own words (`by: "self"`, `text`), or one the server picked for the run (`kind` + `subject`). */
+export interface AgentStatusLine {
+  by: "self" | "auto" | "wait";
+  text: string | null;
+  kind: AgentStatusKind | null;
+  /** The task's title, the routine's name, the public channel, the connector… */
+  subject: string | null;
+  emoji: string | null;
+  /** ISO; null = until the run ends. */
+  until: string | null;
+}
+
+/** `GET …/agent-status`: one agent's presence and its line. */
+export interface AgentStatus {
+  agentId: string;
+  presence: AgentPresence;
+  status: AgentStatusLine | null;
+  /** Its last run's end (now while one is going); null = it never worked. */
+  activeAt: string | null;
 }
 
 export interface InvitationWithStatus {
   id: string;
   email: string;
   role: Role;
+  roleIds?: string[];
   status: "pending" | "expired";
   expiresAt: string;
   createdAt: string;
@@ -1415,6 +1646,7 @@ export type AgentActionKind =
   | "memory.forgotten"
   | "routine.created"
   | "routine.updated"
+  | "routine.deleted"
   | "channel.agent_added"
   | "channel.created"
   | "wiki.page_created"
@@ -3084,7 +3316,7 @@ export interface ImportItemResult {
   reason?: ImportSkipReason;
   /** Fields cut to fit our limits. */
   trimmed?: string[];
-  /** An agent whose handle was taken gets the next free one. */
+  /** The @handle an agent gets (or got) when it isn't the bundle's: that one was taken, or is an id. */
   renamedTo?: string;
   /** The row created or updated (after an apply). */
   targetId?: string;
@@ -3105,6 +3337,13 @@ export interface ImportInput {
 
 export interface ImportPlan {
   items: ImportItemResult[];
+}
+
+/** A source package this workspace brought things from, with how many of each kind came. */
+export interface ImportedSource {
+  app: string;
+  ref: string;
+  counts: Record<ImportItemKind, number>;
 }
 
 /** Where a page is mentioned: other pages, messages, forum topics, issues. */
@@ -3570,7 +3809,7 @@ export interface AgentBrain {
   canManageAccounts: boolean;
   /** False while the app on the computer is too old for accounts (nothing about them shows). */
   accountsSupported: boolean;
-  /** Nobody but the agent's owner talks to it ("Responde a todos" off). */
+  /** Nobody but the agent's owner talks to it ("Atende outras pessoas" off). */
   onlyOwner: boolean;
   /** The viewer owns the agent: only they choose its plan and let other people talk to it on one. */
   canUsePlans: boolean;
@@ -3659,7 +3898,9 @@ export interface AgentBrainInput {
   brain?: BrainKind;
   model?: string | null;
   fallback?: boolean;
-  /** "Responde a todos" turned off: false lets in whoever its "who can talk" list allows (everyone with no list). */
+  /**
+   * "Atende outras pessoas" turned off: false lets in whoever its "who can talk" list allows (everyone with no list).
+   */
   onlyOwner?: boolean;
   /** One of the viewer's own accounts; null = "Conta deste computador". */
   account?: string | null;

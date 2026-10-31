@@ -9,7 +9,20 @@ export const PreviewMeta = z.record(z.string(), z.unknown()).nullable().openapi(
     "For a body the server wrote (`bodyCode` + `bodyParams`, a cut-off run's notes, memory lines): show it in the reader's language, like the message itself. Null for a plain message.",
 });
 
-export const Role = z.enum(["owner", "admin", "member"]).openapi("Role");
+export const Role = z.enum(["owner", "member"]).openapi("Role", {
+  description:
+    "Whether the person owns the workspace (ADR 0085). What a member may do comes from their roles (`roleIds`, `GET …/roles`) and is sent resolved as `permissions`.",
+});
+
+/** One person's resolved permissions in a workspace (ADR 0085): the apps hide what's not there. */
+const Permissions = z.array(z.string()).openapi({
+  description:
+    "Everything this person may do here: their roles' keys and `everyone`'s, every key with `administrator`, all of them for an owner, plus `read` (any member) and `manage_owners` (owners).",
+});
+const Rank = z.number().int().nullable().openapi({
+  description: "Their highest role's position (0 the top), null with none. They manage roles and people below it.",
+});
+const RoleIds = z.array(z.string()).openapi({ description: "Their roles (`org_roles` ids), not `everyone`." });
 
 export const ProviderId = z.enum(PROVIDER_IDS).openapi("ProviderId");
 
@@ -18,6 +31,8 @@ export const Organization = z
     id: z.uuid(),
     name: z.string(),
     role: Role,
+    permissions: Permissions,
+    rank: Rank,
     context: z.string().optional(),
     logo: z
       .string()
@@ -74,6 +89,7 @@ export const Member = z
     image: z.string().nullable(),
     avatarUrl: z.string().nullable().openapi({ description: "The photo uploaded here; wins over `image`." }),
     role: Role,
+    roleIds: RoleIds,
     joinedAt: z.string(),
     handle: z.string(),
     timezone: z.string(),
@@ -81,7 +97,7 @@ export const Member = z
   .openapi("Member");
 
 export const Invitation = z
-  .object({ id: z.uuid(), email: z.string(), role: Role, expiresAt: z.string() })
+  .object({ id: z.uuid(), email: z.string(), role: Role, roleIds: RoleIds, expiresAt: z.string() })
   .openapi("Invitation");
 
 export const Credential = z
@@ -130,6 +146,35 @@ export const AgentAppearance = z
   })
   .openapi("AgentAppearance");
 
+export const PlanWindow = z.object({
+  kind: z.enum(["five_hour", "seven_day", "seven_day_opus", "seven_day_sonnet", "monthly", "other"]),
+  label: z.string().optional().openapi({ description: "`other`: the provider's name for it." }),
+  usedPercent: z.number().openapi({ description: "0–100." }),
+  resetsAt: z.string().optional(),
+});
+
+export const PlanUsage = z
+  .object({
+    windows: z.array(PlanWindow),
+    limited: z.boolean().optional().openapi({ description: "The plan refused a request for its limit." }),
+    source: z.enum(["turn", "probe"]),
+    at: z.string().openapi({ description: "When the computer learned it." }),
+  })
+  .openapi("PlanUsage", {
+    description: "A plan's usage limits, as the CLI on the computer said them (no token is ever read).",
+  });
+
+/** An agent no longer in the team (archived or deleted, ADR 0082): what its messages and reports still show. */
+export const FormerAgent = z
+  .object({
+    id: z.uuid(),
+    name: z.string(),
+    role: z.string(),
+    appearance: AgentAppearance.nullable(),
+    deleted: z.boolean().openapi({ description: "Deleted for good; false: archived (an admin may still delete it)." }),
+  })
+  .openapi("FormerAgent");
+
 export const Agent = z
   .object({
     id: z.uuid(),
@@ -165,11 +210,27 @@ export const Agent = z
         provider: z.string().optional().openapi({
           description: "A coding plan it thinks with through Claude Code (`zai`, `kimi`…): its maker's model.",
         }),
+        account: z.string().optional().openapi({
+          description:
+            "On a plan: the account it thinks with (`Claude Team 2`; a computer's own sign-in by its plan, `Claude Max`).",
+        }),
+        usage: PlanUsage.optional().openapi({
+          description: "On a plan: that account's limits as last reported (ADR 0063 §5); absent: not known yet.",
+        }),
       })
       .optional()
       .openapi({ description: "Who thinks for it (ADR 0032), to show next to its name." }),
   })
   .openapi("Agent");
+
+/** A named group of channels in the sidebar, the same for everyone in the organization. */
+export const ChannelCategory = z
+  .object({
+    id: z.uuid(),
+    name: z.string(),
+    position: z.number().int().openapi({ description: "Order in the sidebar, from 0." }),
+  })
+  .openapi("ChannelCategory");
 
 export const Channel = z
   .object({
@@ -184,6 +245,12 @@ export const Channel = z
       .optional()
       .openapi({ description: "The channel's creator: may manage its members, like admins." }),
     createdAt: z.string(),
+    categoryId: z
+      .uuid()
+      .nullable()
+      .optional()
+      .openapi({ description: "Its sidebar category; null: on top, with none." }),
+    position: z.number().int().optional().openapi({ description: "Order inside its category, from 0." }),
     unreadCount: z.number().int().optional().openapi({
       description:
         "Channel list only: messages since you last read it (since you joined, if never), not yours; a thread reply counts only in a thread you follow. At most 100; 0 when you're not a member.",
@@ -453,24 +520,6 @@ export const BrainEffortSetting = z.enum([...BRAIN_EFFORTS, "auto"]).openapi("Br
 
 export const AccountKind = z.enum(ACCOUNT_KINDS).openapi("AccountKind");
 
-export const PlanWindow = z.object({
-  kind: z.enum(["five_hour", "seven_day", "seven_day_opus", "seven_day_sonnet", "monthly", "other"]),
-  label: z.string().optional().openapi({ description: "`other`: the provider's name for it." }),
-  usedPercent: z.number().openapi({ description: "0–100." }),
-  resetsAt: z.string().optional(),
-});
-
-export const PlanUsage = z
-  .object({
-    windows: z.array(PlanWindow),
-    limited: z.boolean().optional().openapi({ description: "The plan refused a request for its limit." }),
-    source: z.enum(["turn", "probe"]),
-    at: z.string().openapi({ description: "When the computer learned it." }),
-  })
-  .openapi("PlanUsage", {
-    description: "A plan's usage limits, as the CLI on the computer said them (no token is ever read).",
-  });
-
 export const MachineAccount = z
   .object({
     id: z.uuid(),
@@ -528,7 +577,7 @@ export const AgentBrain = z
         "The caller may add an account there for this agent: its owner, on a computer where they add accounts.",
     }),
     accountsSupported: z.boolean().openapi({ description: "The computer's runner knows accounts (protocol 13)." }),
-    onlyOwner: z.boolean().openapi({ description: '"Responde a todos" off: nobody but its owner talks to it.' }),
+    onlyOwner: z.boolean().openapi({ description: '"Atende outras pessoas" off: nobody but its owner talks to it.' }),
     canUsePlans: z.boolean().openapi({
       description: "The caller owns the agent: only they choose its plan and let other people talk to it on a plan.",
     }),

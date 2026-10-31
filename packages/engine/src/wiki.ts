@@ -187,8 +187,8 @@ async function requireReader(db: Database, actor: WikiActor, orgId: string): Pro
 /** Members create and edit; a locked page only admins (never agents). */
 async function requireWriter(db: Database, actor: WikiActor, orgId: string, page?: PageRow) {
   const membership = await requireReader(db, actor, orgId);
-  if (membership && !can(membership.role, "post")) throw new ForbiddenError();
-  if (page?.locked && !(membership && can(membership.role, "configure"))) {
+  if (membership && !can(membership, "edit_wiki")) throw new ForbiddenError();
+  if (page?.locked && !(membership && can(membership, "configure"))) {
     throw new ForbiddenError("This page is locked: only admins edit it", "wiki.locked");
   }
   return membership;
@@ -1241,7 +1241,7 @@ export async function restoreWikiPage(deps: WikiDeps, actor: WikiActor, orgId: s
 export async function setWikiPageLock(deps: WikiDeps, userId: string, orgId: string, ref: string, locked: boolean) {
   const { db } = deps;
   const membership = await requireActiveMembership(db, userId, orgId);
-  if (!can(membership.role, "configure")) throw new ForbiddenError("Only admins lock pages", "wiki.lock_admins_only");
+  if (!can(membership, "configure")) throw new ForbiddenError("Only admins lock pages", "wiki.lock_admins_only");
   const page = await findPage(db, orgId, ref);
   const [row] = await db.update(wikiPages).set({ locked }).where(eq(wikiPages.id, page.id)).returning();
   if (!row) throw new NotFoundError("Page not found", "wiki.page_not_found");

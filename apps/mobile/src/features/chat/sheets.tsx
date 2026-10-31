@@ -6,6 +6,8 @@ import {
   type MissionEligibleAgent,
   type ThreadInfo,
   useApi,
+  useChannelCategories,
+  useChannels,
   useCloseMission,
   useCreateMission,
   useEligibleAgents,
@@ -27,6 +29,8 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { Button, CHROME_MAX_SCALE, Count, Icon, Text, useToast } from "@/ui";
+import { useMovesChannel } from "../categories/CategoryScreens";
+import { categoryHrefs } from "../categories/logic";
 import { chatHref } from "../links/logic";
 import { missionComputerKey } from "../missions/logic";
 import { AgentFace, Face } from "../shared/Face";
@@ -493,6 +497,7 @@ export function ChannelOptions({
   subtitle,
   leading,
   agentId,
+  about,
   onPins,
   onMembers,
 }: {
@@ -502,6 +507,8 @@ export function ChannelOptions({
   leading: ReactNode;
   /** An agent's DM: "Perfil". */
   agentId?: string | null;
+  /** Under the title: a person's status in a DM with them (ADR 0084). */
+  about?: ReactNode;
   onPins: () => void;
   /** A channel: who is in it (and, for admins, adding and removing). */
   onMembers?: (() => void) | undefined;
@@ -511,9 +518,17 @@ export function ChannelOptions({
   const sheet = useSheet();
   const pins = usePins(orgId, channelId);
   const count = pins.data?.length ?? 0;
+  // A channel's sidebar category (ADR 0080), for whoever may move it.
+  const moves = useMovesChannel(channelId);
+  const channel = useChannels(orgId).data?.find((c) => c.id === channelId);
+  const categories = useChannelCategories(orgId);
+  const categoryName = channel?.categoryId
+    ? categories.data?.find((c) => c.id === channel.categoryId)?.name
+    : undefined;
   return (
     <>
       <SheetTitle leading={leading} title={title} {...(subtitle ? { subtitle } : {})} />
+      {about}
       <ActionList
         items={[
           ...(onMembers
@@ -527,6 +542,20 @@ export function ChannelOptions({
             ...(count > 0 ? { trailing: <Count value={count} max={99} /> } : {}),
             onPress: onPins,
           },
+          ...(onMembers && moves
+            ? [
+                {
+                  key: "category",
+                  icon: "list" as const,
+                  label: t("channelCategories.category"),
+                  hint: categoryName ?? t("channelCategories.noCategory"),
+                  onPress: () => {
+                    sheet.close();
+                    router.push(categoryHrefs.pick(channelId));
+                  },
+                },
+              ]
+            : []),
           ...(agentId
             ? [
                 {

@@ -18,7 +18,7 @@ import {
   UnauthorizedError,
   USER_FILES_PURGE_JOB,
 } from "../src";
-import { addMember, addUser, type Fixture, SECRET, setup } from "./fixtures";
+import { addMember, addUser, type Fixture, makeAdmin, SECRET, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
 let f: Fixture;
@@ -109,7 +109,8 @@ describe("deleting an account", () => {
     const bia = await addMember(f.db, f.org.id, "member", "bia");
     await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
     const { organization: two } = await createOrganization(f.db, f.owner.id, { name: "Two" });
-    await f.db.insert(schema.organizationMembers).values({ orgId: two.id, userId: bia.id, role: "admin" });
+    await f.db.insert(schema.organizationMembers).values({ orgId: two.id, userId: bia.id, role: "member" });
+    await makeAdmin(f.db, two.id, bia.id);
     await registerPushDevice(f.db, bia.id, {
       token: "ExponentPushToken[bia-phone-0001]",
       platform: "ios",
@@ -128,7 +129,7 @@ describe("deleting an account", () => {
     const person = { name: "bia", email: bia.email, accountDeleted: true };
     expect(left).toEqual([
       [f.org.id, bia.id, { ...person, role: "member" }],
-      [two.id, bia.id, { ...person, role: "admin" }],
+      [two.id, bia.id, { ...person, role: "member" }],
     ]);
     // Workspaces with others in them stay open.
     expect((await orgRow())?.deletionDueAt).toBeNull();

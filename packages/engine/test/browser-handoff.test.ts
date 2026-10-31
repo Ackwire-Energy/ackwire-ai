@@ -743,6 +743,17 @@ describe("live view", () => {
     live.close();
   });
 
+  test("someone opening the agent's browser gets it ready for the agent's next command, where it runs", async () => {
+    const machine = await start();
+    const { hub } = fakeHub();
+    const warmed: unknown[] = [];
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub, warm: (at) => warmed.push(at) });
+    const stop = await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
+    expect(warmed).toEqual([{ orgId: f.org.id, agentId: f.agent.id, machineId: machine.machineId }]);
+    stop();
+    live.close();
+  });
+
   test("the stream outlives its last viewer for a moment: a quick re-watch doesn't stop and start it", async () => {
     await start();
     const { hub, calls } = fakeHub();

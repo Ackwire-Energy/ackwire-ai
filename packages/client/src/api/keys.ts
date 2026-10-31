@@ -16,16 +16,25 @@ export const keys = {
   invitation: (token: string) => ["invitation", token] as const,
   org: (orgId: string) => ["org", orgId] as const,
   members: (orgId: string) => ["org", orgId, "members"] as const,
+  /** The workspace's roles (ADR 0085). */
+  roles: (orgId: string) => ["org", orgId, "roles"] as const,
   /** Under `members`: someone joining or leaving refreshes it too. */
   limits: (orgId: string) => ["org", orgId, "members", "limits"] as const,
   invitations: (orgId: string) => ["org", orgId, "invitations"] as const,
   agents: (orgId: string) => ["org", orgId, "agents"] as const,
+  /** Set whole by every change; read again on the `agent.groups` org event. */
+  agentGroups: (orgId: string) => ["org", orgId, "agent-groups"] as const,
+  /** Under `agents`: archiving or deleting one refreshes both. */
+  formerAgents: (orgId: string) => ["org", orgId, "agents", "former"] as const,
+  /** An agent's proposal of a new agent, by its card's message (ADR 0081). */
+  agentProposal: (orgId: string, messageId: string) => ["org", orgId, "agent-proposal", messageId] as const,
   team: (orgId: string) => ["org", orgId, "team"] as const,
   credentials: (orgId: string) => ["org", orgId, "credentials"] as const,
   /** Under `credentials`: a key added, rotated or removed refreshes it too. */
   aiStatus: (orgId: string) => ["org", orgId, "credentials", "ai-status"] as const,
   usage: (orgId: string) => ["org", orgId, "usage"] as const,
   channels: (orgId: string) => ["org", orgId, "channels"] as const,
+  channelCategories: (orgId: string) => ["org", orgId, "channel-categories"] as const,
   channelMembers: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "members"] as const,
   messages: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "messages"] as const,
   /** A channel's older pages loaded on scroll-up: outside the channel's key, which holds only message lists. */
@@ -54,6 +63,7 @@ export const keys = {
   settings: (orgId: string) => ["org", orgId, "settings"] as const,
   overview: (orgId: string) => ["org", orgId, "overview"] as const,
   people: (orgId: string) => ["org", orgId, "people"] as const,
+  agentStatus: (orgId: string) => ["org", orgId, "agent-status"] as const,
   allInvitations: (orgId: string) => ["org", orgId, "invitations", "all"] as const,
   /** Under `invitations`: an approval (which may invite) refreshes the pending list too. */
   joinRequests: (orgId: string) => ["org", orgId, "invitations", "join-requests"] as const,

@@ -8,7 +8,9 @@ import {
   changeMemberRole,
   createInvitation,
   createOrganization,
+  createRole,
   ForbiddenError,
+  getMembership,
   isSignupAllowed,
   listMachineRequests,
   listMemberships,
@@ -17,12 +19,13 @@ import {
   removeMember,
   requirePermission,
   setBillingHold,
+  setMemberRoles,
   setOrgStanding,
   sha256,
   unfinishedWorkspaces,
   updateOrganization,
 } from "../src";
-import { addMember, addUser, type Fixture, setup } from "./fixtures";
+import { addMember, addUser, adminRoleId, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
 beforeEach(async () => {
@@ -31,7 +34,7 @@ beforeEach(async () => {
 afterEach(() => f.close());
 
 describe("permissions", () => {
-  test("role matrix", () => {
+  test("what an owner, an admin (the Admin role) and a member may do", async () => {
     const all: Permission[] = [
       "read",
       "post",
@@ -44,10 +47,15 @@ describe("permissions", () => {
       "manage_billing",
       "manage_owners",
     ];
-    const allowed = (role: "owner" | "admin" | "member") => all.filter((p) => can(role, p));
-    expect(allowed("owner")).toEqual(all);
-    expect(allowed("admin")).toEqual(all.filter((p) => p !== "manage_owners"));
-    expect(allowed("member")).toEqual(["read", "post", "create_channels"]);
+    const admin = await addMember(f.db, f.org.id, "admin");
+    const member = await addMember(f.db, f.org.id, "member");
+    const allowed = async (userId: string) => {
+      const membership = await getMembership(f.db, userId, f.org.id);
+      return all.filter((p) => can(membership, p));
+    };
+    expect(await allowed(f.owner.id)).toEqual(all);
+    expect(await allowed(admin.id)).toEqual(all.filter((p) => p !== "manage_owners"));
+    expect(await allowed(member.id)).toEqual(["read", "post", "create_channels"]);
   });
 
   test("requirePermission rejects non-members and missing permissions", async () => {
@@ -66,6 +74,8 @@ describe("permissions", () => {
         orgId: f.org.id,
         orgName: "Acme",
         role: "owner",
+        permissions: expect.any(Set),
+        rank: null,
         orgLogo: null,
         standing: { state: "active", reason: null, notice: "shown", deletionDueAt: null },
       },
@@ -93,18 +103,32 @@ describe("onboarding", () => {
 
 describe("ownership", () => {
   test("the last owner can't be demoted or leave", async () => {
-    await expect(changeMemberRole(f.db, f.owner.id, f.org.id, f.owner.id, "admin")).rejects.toBeInstanceOf(
+    await expect(changeMemberRole(f.db, f.owner.id, f.org.id, f.owner.id, "member")).rejects.toBeInstanceOf(
       ConflictError,
     );
     await expect(removeMember(f.db, f.owner.id, f.org.id, f.owner.id)).rejects.toBeInstanceOf(ConflictError);
   });
 
-  test("admins can't grant ownership or remove owners", async () => {
+  test("admins can't grant ownership or remove owners; they give roles below their own", async () => {
     const admin = await addMember(f.db, f.org.id, "admin");
     const member = await addMember(f.db, f.org.id, "member");
     await expect(changeMemberRole(f.db, admin.id, f.org.id, member.id, "owner")).rejects.toBeInstanceOf(ForbiddenError);
     await expect(removeMember(f.db, admin.id, f.org.id, f.owner.id)).rejects.toBeInstanceOf(ForbiddenError);
-    await changeMemberRole(f.db, admin.id, f.org.id, member.id, "admin");
+    // Their own Admin role is not below them; a role under it is.
+    const adminRole = await adminRoleId(f.db, f.org.id);
+    await expect(setMemberRoles(f.db, admin.id, f.org.id, member.id, [adminRole])).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+    const devs = await createRole(f.db, f.owner.id, f.org.id, { name: "Devs" });
+    expect(await setMemberRoles(f.db, admin.id, f.org.id, member.id, [devs.id])).toEqual([devs.id]);
+  });
+
+  test("an owner makes an owner and takes it back", async () => {
+    const member = await addMember(f.db, f.org.id, "member");
+    await changeMemberRole(f.db, f.owner.id, f.org.id, member.id, "owner");
+    expect(can(await getMembership(f.db, member.id, f.org.id), "manage_owners")).toBe(true);
+    await changeMemberRole(f.db, f.owner.id, f.org.id, member.id, "member");
+    expect(can(await getMembership(f.db, member.id, f.org.id), "manage_owners")).toBe(false);
   });
 });
 

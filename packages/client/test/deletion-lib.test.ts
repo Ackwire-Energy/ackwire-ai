@@ -47,7 +47,7 @@ describe("what deleting an account does, line by line", () => {
       t,
       "en",
       plan({
-        leaves: [{ id: "w", name: "Team", role: "admin" }],
+        leaves: [{ id: "w", name: "Team", role: "member" }],
         staysBehind: [
           { orgId: "w", kind: "key", name: "Bia's key" },
           { orgId: "w", kind: "connection", name: "GitHub" },

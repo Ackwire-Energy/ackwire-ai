@@ -2,12 +2,14 @@ import type { Actor, Agent } from "@agenteschat/client";
 import { useAgentDetail, useModels, usePeople, useSettings } from "@agenteschat/client";
 import { audienceNotice, audienceSummary, canTalk, modeOf } from "@agenteschat/client/lib/audience";
 import { brainLine } from "@agenteschat/client/lib/brain";
-import { formatPercent, relativeTime, shortModel } from "@agenteschat/client/lib/format";
+import { formatPercent, formatTime, relativeTime, shortModel, whenAt } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
+import { clearsText } from "@agenteschat/client/lib/presence";
 import { isAuto } from "@agenteschat/client/lib/providers";
 import { timezoneName } from "@agenteschat/client/lib/routines";
-import { Avatar, Button, hoverPointer, Meter, Popover, ProviderLogo } from "@agenteschat/ui";
+import { Avatar, Button, hoverPointer, Meter, PlanMeter, Popover, ProviderLogo } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
+import type { TFunction } from "i18next";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -15,6 +17,8 @@ import { useOpenAgentPanel } from "@/components/agent-panel-context";
 import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { type AgentShown, agentLine, personLine, useAgentPresence, usePersonPresence } from "@/hooks/usePresence";
+import { planMeterText, usageShown } from "@/lib/plan-usage";
 
 /** Hover delay before the card opens (mouse and pen only; touch opens on tap). */
 export const HOVER_OPEN_MS = 400;
@@ -110,6 +114,12 @@ function PersonCard({ userId }: { userId: string }) {
   const settings = useSettings(org.id);
   const dir = useDirectory(org.id);
   const person = people.data?.find((p) => p.userId === userId);
+  // Presence and line as the others see them (ADR 0084): a hidden person reads offline, to themselves hidden.
+  const shown = usePersonPresence(userId);
+  const line = shown?.status ? personLine(shown.status) : null;
+  const seen = person?.lastSeenAt
+    ? t("presence.seen", { when: relativeTime(t, i18n.language, person.lastSeenAt) })
+    : null;
   const member = dir.memberById.get(userId);
   const name = person?.name ?? member?.name ?? t("channel.unknownPerson");
   const role = person?.role ?? member?.role;
@@ -133,22 +143,34 @@ function PersonCard({ userId }: { userId: string }) {
           size="lg"
           name={name}
           imageUrl={person?.image ?? member?.image}
-          presence={person?.online}
+          presence={shown?.presence ?? null}
+          presenceLabel={shown ? t(`presence.${shown.presence}`) : undefined}
         />
         <div className="list-col">
           <span className="profile-card__name">{name}</span>
           {role && <span className="small muted">{t(`roles.${role}`)}</span>}
         </div>
       </div>
+      {line && shown?.status && (
+        <div className="profile-card__status">
+          <span className="profile-card__status-emoji" aria-hidden="true">
+            {line.emoji}
+          </span>
+          <span>
+            {line.text}
+            <small>{clearsText(t, i18n.language, shown.status.until)}</small>
+          </span>
+        </div>
+      )}
       <dl className="profile-card__facts">
-        {person && (
+        {person && shown && (
           <>
             <dt>{t("profile.presence")}</dt>
             <dd>
-              {person.online
-                ? t("members.activeNow")
-                : person.lastSeenAt
-                  ? t("members.seen", { when: relativeTime(t, i18n.language, person.lastSeenAt) })
+              {shown.presence !== "offline"
+                ? t(`presence.${shown.presence}`)
+                : seen
+                  ? `${t("presence.offline")} · ${seen}`
                   : t("profile.offline")}
             </dd>
           </>
@@ -181,8 +203,22 @@ function AgentCard({ agentId, onDone }: { agentId: string; onDone: () => void })
   const { t } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
-  const agent = dir.agentById.get(agentId);
+  const agent = dir.anyAgent(agentId);
   if (!agent) return <p className="small muted">{t("channel.unknownAgent")}</p>;
+  // No longer in the team (archived or deleted): who it was, nothing to do with it.
+  if (agent.former) {
+    return (
+      <div className="profile-card__body">
+        <div className="profile-card__head">
+          <AgentAvatar agentId={agent.id} size="lg" name={agent.name} />
+          <div className="list-col">
+            <span className="profile-card__name">{agent.name}</span>
+            <span className="small muted">{t("profile.former")}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
   return <AgentCardBody agent={agent} onDone={onDone} />;
 }
 
@@ -192,17 +228,26 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
   const dir = useDirectory(org.id);
   const models = useModels();
   const openPanel = useOpenAgentPanel();
-  const seesSpend = can(org.role, "view_usage") || agent.ownerUserId === me.user.id;
+  const seesSpend = can(org, "view_usage") || agent.ownerUserId === me.user.id;
   const owner = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId)?.name : null;
   const model = isAuto(agent.model)
     ? t("brain.auto.label")
     : (models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model);
   const thinks =
     agent.brain && agent.brain.kind !== "model" ? brainLine(t, agent.brain, model, owner?.split(" ")[0]) : null;
+  // Its presence from its work and its line (ADR 0084): its own words or what it is doing now.
+  const shown = useAgentPresence(agent.id);
+  const line = agentLine(t, shown?.line ?? null);
   return (
     <div className="profile-card__body">
       <div className="profile-card__head">
-        <AgentAvatar agentId={agent.id} size="lg" name={agent.name} />
+        <AgentAvatar
+          agentId={agent.id}
+          size="lg"
+          name={agent.name}
+          presence={shown?.presence ?? null}
+          presenceLabel={shown ? t(`presence.${shown.presence}`) : undefined}
+        />
         <div className="list-col">
           <span className="profile-card__name">{agent.name}</span>
           <span className="small muted">
@@ -211,7 +256,26 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
           <NoAiChip agentId={agent.id} />
         </div>
       </div>
+      {line && shown?.line && (
+        <div className="profile-card__status">
+          <span className="profile-card__status-emoji" aria-hidden="true">
+            {line.emoji}
+          </span>
+          <span>
+            {line.text}
+            <small>
+              {shown.line.by === "self" ? t("presence.bySelf", { name: agent.name }) : t("presence.byAuto")}
+            </small>
+          </span>
+        </div>
+      )}
       <dl className="profile-card__facts">
+        {shown && (
+          <>
+            <dt>{t("profile.presence")}</dt>
+            <dd>{`${t(`presence.${shown.presence}`)} · ${agentWhy(t, i18n.language, shown)}`}</dd>
+          </>
+        )}
         <dt>{t("profile.owner")}</dt>
         <dd>{owner ?? t("profile.noOwner")}</dd>
         {modeOf(agent) !== "everyone" && (
@@ -266,17 +330,36 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
   );
 }
 
+/** Why an agent reads as it does: "Ativo agora", "Num trabalho pesado", "Parado desde 14:20", "Sem IA conectada". */
+function agentWhy(t: TFunction, locale: string, shown: AgentShown) {
+  if (shown.noAi) return t("presence.agentWhy.noAi");
+  if (shown.presence !== "away") return t(`presence.agentWhy.${shown.presence}`);
+  if (!shown.activeAt) return t("presence.agentWhy.awayNever");
+  const today = new Date(shown.activeAt).toDateString() === new Date().toDateString();
+  return t("presence.agentWhy.away", {
+    when: today ? formatTime(locale, shown.activeAt) : whenAt(t, locale, shown.activeAt),
+  });
+}
+
 function Spend({ agent, locale }: { agent: Agent; locale: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const detail = useAgentDetail(org.id, agent.id);
   if (!detail.data) return null;
-  // A percentage of its budget, never money (owners who aren't admins see this too).
+  // A percentage of its budget, never money (owners who aren't admins see this too); on a plan, its limits first
+  // and the budget only once it spent through the API (ADR 0063 §5).
   const used = detail.data.budgetUsedPercent;
+  const shown = usageShown(agent.brain, used);
+  if (!shown.plan && !shown.budget) return null;
   return (
     <div className="stack-4" style={{ gap: 4 }}>
-      <span className="small">{t("profile.budgetUsed", { percent: formatPercent(locale, used) })}</span>
-      <Meter value={Math.min(100, used)} max={100} label={t("profile.spendLabel")} />
+      {shown.plan && (
+        <PlanMeter compact usage={shown.plan.usage} text={planMeterText(t, locale)} label={shown.plan.account} />
+      )}
+      {shown.budget && (
+        <span className="small">{t("profile.budgetUsed", { percent: formatPercent(locale, used) })}</span>
+      )}
+      {shown.budget && !shown.plan && <Meter value={Math.min(100, used)} max={100} label={t("profile.spendLabel")} />}
     </div>
   );
 }

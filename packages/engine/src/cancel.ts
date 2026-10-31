@@ -1,5 +1,6 @@
 import { DESKTOP_PROTOCOL, type PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, gte, inArray, schema, sql } from "@agenteschat/db";
+import { announceAgentStatus } from "./agent-status";
 import { recordAudit } from "./audit";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent } from "./events";
@@ -201,7 +202,7 @@ export async function cancelRun(
     .leftJoin(channels, eq(channels.id, agentRuns.channelId))
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.orgId, orgId)));
   if (!row) throw new NotFoundError("Run not found");
-  const allowed = row.requester === userId || row.ownerUserId === userId || can(membership.role, "manage_agents");
+  const allowed = row.requester === userId || row.ownerUserId === userId || can(membership, "manage_agents");
   if (!allowed)
     throw new ForbiddenError("Only who asked, the agent's owner or an admin can stop it", "run.cancel_forbidden");
 
@@ -305,6 +306,8 @@ export async function stopRun(
   if (actor.type === "person" && !run.background)
     await publishChannelEvent(deps.pubsub, { type: "run.canceled", ...where, byUserId: actor.id });
   await publishChannelEvent(deps.pubsub, { type: "agent.run", ...where, ...bg, status: "canceled" });
+  // Its line ends with the run (ADR 0084 §11).
+  await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
   if (previous !== "running" && run.background) {
     await publishChannelEvent(deps.pubsub, { type: "agent.idle", ...where, ...bg });
     await publishChannelEvent(deps.pubsub, { type: "run.finished", ...where, ...bg, status: "canceled" });
@@ -337,21 +340,29 @@ export async function stopRun(
 }
 
 /**
- * Ends what a closed workspace's agents still have going: every run not finished stops with `reason` (the
- * refusal's text) and hands nothing on, a routine's run closes under `code`, its computers stop its tasks, and its
- * agents' desktops end with whatever runs on them (nothing else stops a desktop: they stay on).
+ * Ends what a closed workspace's agents (or, with `agentId`, an agent being deleted) still have going: every run
+ * not finished stops with `reason` (the refusal's text, or `agent_archived`) and hands nothing on, a routine's run
+ * closes under `code`, its computers stop its tasks, and its agents' desktops end with whatever runs on them
+ * (nothing else stops a desktop: they stay on).
  */
 export async function stopOrgWork(
   deps: { db: Database; pubsub?: PubSub; hub?: Pick<MachineHub, "call"> },
   orgId: string,
   reason: string,
-  code: "org_suspended" | "org_deleting" = "org_suspended",
+  code: "org_suspended" | "org_deleting" | "deleted" = "org_suspended",
+  agentId?: string,
 ) {
   const live = await deps.db
     .select({ run: agentRuns, channelKind: channels.kind })
     .from(agentRuns)
     .leftJoin(channels, eq(channels.id, agentRuns.channelId))
-    .where(and(eq(agentRuns.orgId, orgId), inArray(agentRuns.status, [...ACTIVE_RUN_STATUSES])));
+    .where(
+      and(
+        eq(agentRuns.orgId, orgId),
+        inArray(agentRuns.status, [...ACTIVE_RUN_STATUSES]),
+        agentId ? eq(agentRuns.agentId, agentId) : undefined,
+      ),
+    );
   for (const { run, channelKind } of live) {
     await stopRun(deps, orgId, run, channelKind, { type: "system", reason }).catch(() => null);
     // A routine's run: its ledger says why (`stopRun` closes it only for a person).
@@ -364,13 +375,19 @@ export async function stopOrgWork(
   const call: TaskCall | undefined = hub
     ? (machineId, request) => hub.call(machineId, request, { timeoutMs: 15_000 })
     : undefined;
-  await cancelOrgTasks({ db: deps.db, pubsub: deps.pubsub, call }, orgId, "system");
+  await cancelOrgTasks({ db: deps.db, pubsub: deps.pubsub, call }, orgId, "system", agentId);
   if (!hub) return;
   const desktops = await deps.db
     .select({ id: agents.id, handle: agents.handle, name: agents.name, machineId: machines.id })
     .from(agents)
     .innerJoin(machines, eq(machines.id, agents.machineId))
-    .where(and(eq(agents.orgId, orgId), gte(machines.protocol, DESKTOP_PROTOCOL)));
+    .where(
+      and(
+        eq(agents.orgId, orgId),
+        gte(machines.protocol, DESKTOP_PROTOCOL),
+        agentId ? eq(agents.id, agentId) : undefined,
+      ),
+    );
   await Promise.all(
     desktops.map(({ machineId, ...agent }) =>
       hub.call(machineId, { op: "desktop.session.stop", agent }, { timeoutMs: 15_000 }).catch(() => null),

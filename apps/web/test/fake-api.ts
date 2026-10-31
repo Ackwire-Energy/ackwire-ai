@@ -4,25 +4,33 @@ import type {
   Agent,
   AgentAudience,
   AgentBrain,
+  AgentGroup,
+  AgentProposal,
+  AgentProposalCard,
   AgentQuestion,
   AgentSecret,
+  AgentStatus,
   AiStatus,
   ApiClient,
   AppNotification,
   Approval,
   AuditRow,
   AuthConfig,
+  Availability,
   BrainMachine,
   Channel,
+  ChannelCategory,
   ChannelMember,
   Connection,
   ConnectorCatalog,
   ConnectorDef,
   Credential,
   Edition,
+  FormerAgent,
   GitHubAppInstallation,
   GitHubRepositories,
   HttpApi,
+  ImportedSource,
   ImportItemKind,
   ImportItemResult,
   Instance,
@@ -34,8 +42,12 @@ import type {
   JoinRequest,
   Me,
   Member,
+  MemberPresence,
+  MemberStatus,
   Memory,
   Message,
+  OrgRole,
+  Person,
   PlanAccountUsage,
   Proposal,
   ReactionCount,
@@ -51,8 +63,10 @@ import type {
   WorkspaceLimits,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
+import { moveInGroups } from "@agenteschat/client/lib/agent-groups";
 import { answersOthers, audienceOf } from "@agenteschat/client/lib/audience";
 import { stepIndex } from "@agenteschat/client/lib/onboarding";
+import { grants, SUMMARY_ORDER } from "@agenteschat/client/lib/roles";
 import { createFakeAccess } from "./fakes/access";
 import { createMockArtifacts } from "./fakes/artifacts";
 import { createFakeBrowser, type FakeBrowser } from "./fakes/browser";
@@ -143,7 +157,13 @@ export interface FakeState {
   agentSecrets?: Record<string, AgentSecret[]>;
   members: Member[];
   agents: Agent[];
+  /** The workspace's groups of agents (`agentGroups.*`); unset = none. */
+  agentGroups?: AgentGroup[];
+  /** Agents no longer in the team (`agents.former`); a purge moves one here. */
+  former?: FormerAgent[];
   channels: Channel[];
+  /** Sidebar categories (ADR 0080); absent: none. */
+  channelCategories?: ChannelCategory[];
   channelMembers: Record<string, ChannelMember[]>;
   messages: Message[];
   invitations: InvitationWithStatus[];
@@ -163,7 +183,13 @@ export interface FakeState {
   platformKey: boolean;
   /** What `agents.importFromGithub` returns per link (else a 400 like the backend's). */
   githubFiles?: Record<string, { path: string; text: string }[]>;
+  /** Each item an applied import brought, as the server keeps them (`imports.sources`). */
+  imported?: { app: string; ref: string; kind: ImportItemKind }[];
   online: Set<string>;
+  /** People's chosen availability and line (`orgs.setStatus`); unset = auto, nothing written. */
+  statuses?: Map<string, { availability: Availability; status: MemberStatus | null }>;
+  /** `agents.statuses`; unset = every agent online with no line. */
+  agentStatuses?: AgentStatus[];
   memories: Memory[];
   proposals: Proposal[];
   reactions: Record<string, ReactionCount[]>;
@@ -174,6 +200,8 @@ export interface FakeState {
   defaultCredentialId?: string | null;
   /** The workspace default agent budget (US$); 50 when unset. */
   defaultAgentBudgetUsd?: number;
+  /** What an agent spent through the API this month (US$), over the fake's own (Ada 12.30, Atlas 3.10). */
+  spentUsd?: Record<string, number>;
   /** Configurações › Auditoria: newest first. */
   audit?: AuditRow[];
   /** The workspace switch "Agentes conferem o que o time já fez" (on when unset). */
@@ -241,7 +269,88 @@ export interface FakeState {
   deletionPlan?: AccountDeletionPlan;
   /** Make `orgs.deleteWorkspace` and `account.delete` fail with this error (`reauth.sign_in`…). */
   deletionError?: ApiError;
+  /** The workspace's roles (ADR 0085, `roles.*`); unset: a new workspace's (`seedRoles`). */
+  roles?: OrgRole[];
 }
+
+/** A new workspace's "Admin" role (ADR 0085); João holds it. */
+export const ADMIN_ROLE_ID = "role-admin";
+
+/** A new workspace's roles, as the server makes them: "Admin" (`administrator`) and `everyone`. */
+export function seedRoles(): OrgRole[] {
+  const role = { mentionable: false, hoist: false, people: 0, editable: true, givable: true };
+  return [
+    {
+      ...role,
+      id: ADMIN_ROLE_ID,
+      kind: "custom",
+      name: "Admin",
+      icon: "shield",
+      color: "indigo",
+      position: 0,
+      permissions: ["administrator"],
+    },
+    {
+      ...role,
+      id: "role-everyone",
+      kind: "everyone",
+      name: "everyone",
+      icon: "audienceEveryone",
+      color: "graphite",
+      position: 1,
+      permissions: [
+        "post",
+        "create_channels",
+        "talk_to_agents",
+        "assign_work",
+        "pair_computers",
+        "edit_wiki",
+        "upload_files",
+      ],
+    },
+  ];
+}
+
+/** Me as a member who holds the "Admin" role (ADR 0085): what an admin was before roles. */
+export function meAsAdmin(state: FakeState) {
+  const org = state.me?.organizations[0];
+  if (org) org.role = "member";
+  const me = state.members.find((m) => m.userId === state.me?.user.id);
+  if (me) me.roleIds = [ADMIN_ROLE_ID];
+}
+
+/** The permission areas `roles.list` sends (the server's `PERMISSION_AREAS`). */
+const PERMISSION_AREAS = [
+  { id: "chat", use: ["post", "create_channels"], keys: ["post", "create_channels", "manage_channels"] },
+  {
+    id: "agents",
+    use: ["talk_to_agents", "assign_work", "manage_routines"],
+    keys: ["talk_to_agents", "assign_work", "manage_routines", "approve_actions", "create_agents", "manage_agents"],
+  },
+  {
+    id: "tools",
+    use: ["pair_computers", "control_computers"],
+    keys: ["pair_computers", "control_computers", "manage_connectors", "manage_credentials"],
+  },
+  {
+    id: "knowledge",
+    use: ["edit_wiki", "upload_files"],
+    keys: ["edit_wiki", "upload_files", "review_memory"],
+  },
+  {
+    id: "org",
+    use: ["invite_people"],
+    keys: [
+      "invite_people",
+      "view_usage",
+      "view_audit",
+      "configure",
+      "manage_members",
+      "manage_roles",
+      "manage_billing",
+    ],
+  },
+];
 
 /** A small in-memory backend with the design's demo data ("Acme"). */
 export function seedState(overrides: Partial<FakeState> = {}): FakeState {
@@ -260,7 +369,8 @@ export function seedState(overrides: Partial<FakeState> = {}): FakeState {
     name: "João",
     email: "joao@acme.com.br",
     image: null,
-    role: "admin",
+    role: "member",
+    roleIds: [ADMIN_ROLE_ID],
     joinedAt: minutesAgo(60 * 24 * 20),
     handle: "joao",
     timezone: "Europe/Lisbon",
@@ -750,6 +860,23 @@ type FakedParts =
   | "desktop";
 
 /** The core of the fake backend, over `FakeState`. Records every call in `state.calls`. */
+/** A member as the signed-in person sees them: hidden reads as offline to everyone else (ADR 0084). */
+function presenceOf(state: FakeState, userId: string): Pick<Person, "online" | "presence" | "status"> {
+  const chosen = state.statuses?.get(userId) ?? { availability: "auto" as const, status: null };
+  const self = userId === state.me?.user.id;
+  const presence: MemberPresence =
+    chosen.availability === "hidden"
+      ? self
+        ? "hidden"
+        : "offline"
+      : !state.online.has(userId)
+        ? "offline"
+        : chosen.availability === "auto"
+          ? "online"
+          : chosen.availability;
+  return { online: presence !== "offline" && presence !== "hidden", presence, status: chosen.status };
+}
+
 export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
   const log = (method: string, ...args: unknown[]): void => {
     state.calls.push({ method, args });
@@ -758,6 +885,24 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
     if (!state.me) throw new ApiError(401, "unauthorized", "Sign in to continue");
     return state.me;
   };
+  const roles = () => {
+    state.roles ??= seedRoles();
+    return state.roles;
+  };
+  // What each membership may do, as the server resolves it (ADR 0085): an owner everything, a member what their
+  // roles and `everyone` give. A test may set `permissions` itself.
+  const withPermissions = (me: Me): Me => ({
+    ...me,
+    organizations: me.organizations.map((o) => {
+      if (o.permissions) return o;
+      if (o.role === "owner") return { ...o, permissions: ["read", "manage_owners", ...SUMMARY_ORDER] };
+      const mine = state.members.find((m) => m.userId === me.user.id)?.roleIds ?? [];
+      const keys = roles()
+        .filter((r) => r.kind === "everyone" || mine.includes(r.id))
+        .flatMap((r) => r.permissions);
+      return { ...o, permissions: ["read", ...grants(keys)] };
+    }),
+  });
   // "Quem pensa": every agent starts on the API, with a MacBook that has Claude Code and Codex.
   const brains = new Map<string, AgentBrain>();
   const brainOf = (agentId: string): AgentBrain => {
@@ -775,7 +920,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
     if (!state.me) return;
     state.me = { ...state.me, organizations: state.me.organizations.map((o) => (o.id === orgId ? { ...o, logo } : o)) };
   };
-  const spentOf = (agentId: string) => (agentId === ADA_ID ? 12.3 : agentId === ATLAS_ID ? 3.1 : 0);
+  const spentOf = (agentId: string) =>
+    state.spentUsd?.[agentId] ?? (agentId === ADA_ID ? 12.3 : agentId === ATLAS_ID ? 3.1 : 0);
   const budgetOf = (a: Agent) => a.monthlyBudgetUsd ?? state.defaultAgentBudgetUsd ?? 50;
   const percentOf = (a: Agent) => Math.round((spentOf(a.id) / budgetOf(a)) * 1000) / 10;
   const workspacePercent = () => {
@@ -840,7 +986,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (humanCheck !== undefined) state.calls.push({ method: "account.signInOptions", args: [input, humanCheck] });
         return state.signInOptions ?? { account: false, password: false, providers: [], canSignUp: true };
       },
-      me: async () => state.me,
+      me: async () => state.me && withPermissions(state.me),
       updateMe: async (input) => {
         log("account.updateMe", input);
       },
@@ -884,6 +1030,61 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       stale: async (ids) => {
         log("push.stale", ids);
         return ids.filter((id) => state.stalePushIds?.includes(id));
+      },
+    },
+    roles: {
+      list: async (orgId) => {
+        log("roles.list", orgId);
+        return {
+          roles: roles().map((r) => ({
+            ...r,
+            people:
+              r.kind === "everyone"
+                ? state.members.length
+                : state.members.filter((m) => m.roleIds?.includes(r.id)).length,
+          })),
+          areas: structuredClone(PERMISSION_AREAS),
+          colors: ["indigo", "violet", "rose", "amber", "green", "teal", "graphite"],
+          icons: ["shield", "code", "wallet", "mail", "bolt", "flag", "book", "chart", "bulb", "globe", "person"],
+        };
+      },
+      create: async (orgId, input) => {
+        log("roles.create", orgId, input);
+        const role: OrgRole = {
+          id: id("role"),
+          kind: "custom",
+          name: input.name,
+          icon: input.icon ?? "shield",
+          color: input.color ?? "indigo",
+          position: roles().filter((r) => r.kind !== "everyone").length,
+          permissions: input.permissions ?? [],
+          mentionable: input.mentionable ?? false,
+          hoist: input.hoist ?? false,
+          people: 0,
+          editable: true,
+          givable: true,
+        };
+        state.roles = [...roles(), role];
+        return { id: role.id };
+      },
+      update: async (orgId, roleId, patch) => {
+        log("roles.update", orgId, roleId, patch);
+        state.roles = roles().map((r) => (r.id === roleId ? { ...r, ...patch } : r));
+      },
+      remove: async (orgId, roleId) => {
+        log("roles.remove", orgId, roleId);
+        state.roles = roles().filter((r) => r.id !== roleId);
+        for (const m of state.members) m.roleIds = m.roleIds?.filter((x) => x !== roleId);
+      },
+      reorder: async (orgId, ids) => {
+        log("roles.reorder", orgId, ids);
+        state.roles = roles().map((r) => (ids.includes(r.id) ? { ...r, position: ids.indexOf(r.id) } : r));
+      },
+      setFor: async (orgId, userId, roleIds) => {
+        log("roles.setFor", orgId, userId, roleIds);
+        const m = state.members.find((x) => x.userId === userId);
+        if (m) m.roleIds = [...roleIds];
+        return { roleIds: [...roleIds] };
       },
     },
     orgs: {
@@ -962,7 +1163,28 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (!m) throw new ApiError(404, "not_found", "Member not found");
         if (input.handle !== undefined) m.handle = input.handle;
         if (input.timezone !== undefined) m.timezone = input.timezone ?? "America/Sao_Paulo";
-        return { ...m, online: true, lastSeenAt: new Date().toISOString() };
+        return { ...m, ...presenceOf(state, m.userId), lastSeenAt: new Date().toISOString() };
+      },
+      setStatus: async (orgId, input) => {
+        log("orgs.setStatus", orgId, input);
+        const m = state.members.find((x) => x.userId === state.me?.user.id);
+        if (!m) throw new ApiError(404, "not_found", "Member not found");
+        state.statuses ??= new Map();
+        const was = state.statuses.get(m.userId) ?? { availability: "auto" as const, status: null };
+        state.statuses.set(m.userId, {
+          availability: input.availability ?? was.availability,
+          status:
+            input.status === undefined
+              ? was.status
+              : input.status?.text.trim()
+                ? {
+                    text: input.status.text.trim(),
+                    emoji: input.status.emoji ?? null,
+                    until: input.status.until ?? null,
+                  }
+                : null,
+        });
+        return { ...m, ...presenceOf(state, m.userId), lastSeenAt: new Date().toISOString() };
       },
       setAvatar: async (orgId, input) => {
         log("orgs.setAvatar", orgId, { contentType: input.contentType, bytes: input.imageBase64.length });
@@ -1012,7 +1234,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("orgs.invite", orgId, input);
         if (state.members.some((m) => m.email === input.email))
           throw new ApiError(409, "conflict", `${input.email} is already a member`);
-        const invitation = newInvitation(input.email, input.role);
+        const invitation = newInvitation(input.email, input.role ?? "member", input.roleIds);
         state.invitations.push(invitation);
         return { invitation, url: `http://localhost:3000/invite/tok-${invitation.id}` };
       },
@@ -1065,7 +1287,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       people: async () =>
         state.members.map((m) => ({
           ...m,
-          online: state.online.has(m.userId),
+          ...presenceOf(state, m.userId),
           lastSeenAt: state.online.has(m.userId) ? new Date().toISOString() : minutesAgo(60),
         })),
       allInvitations: async () => structuredClone(state.invitations),
@@ -1074,7 +1296,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return input.emails.map((email) => {
           if (state.members.some((m) => m.email === email)) return { email, status: "already_member" as const };
           if (state.invitations.some((i) => i.email === email)) return { email, status: "already_invited" as const };
-          const inv = newInvitation(email, input.role);
+          const inv = newInvitation(email, "member", input.roleIds);
           state.invitations.push(inv);
           return {
             email,
@@ -1143,6 +1365,42 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           budgetUsedPercent: percentOf(a),
         })),
       }),
+    },
+    // Groups of agents (ADR 0083), with the server's order rules; every change answers with all of them.
+    agentGroups: {
+      list: async () => structuredClone(state.agentGroups ?? []),
+      create: async (orgId, input) => {
+        state.calls.push({ method: "agentGroups.create", args: [orgId, input] });
+        const ids = input.agentIds ?? [];
+        state.agentGroups = [
+          ...(state.agentGroups ?? []).map((g) => ({ ...g, agentIds: g.agentIds.filter((id) => !ids.includes(id)) })),
+          { id: crypto.randomUUID(), name: input.name, agentIds: ids },
+        ];
+        return structuredClone(state.agentGroups);
+      },
+      update: async (orgId, groupId, patch) => {
+        state.calls.push({ method: "agentGroups.update", args: [orgId, groupId, patch] });
+        const groups = (state.agentGroups ?? []).map((g) =>
+          g.id === groupId && patch.name ? { ...g, name: patch.name } : g,
+        );
+        const group = groups.find((g) => g.id === groupId);
+        const others = groups.filter((g) => g.id !== groupId);
+        state.agentGroups =
+          group && patch.index !== undefined
+            ? [...others.slice(0, patch.index), group, ...others.slice(patch.index)]
+            : groups;
+        return structuredClone(state.agentGroups);
+      },
+      remove: async (orgId, groupId) => {
+        state.calls.push({ method: "agentGroups.remove", args: [orgId, groupId] });
+        state.agentGroups = (state.agentGroups ?? []).filter((g) => g.id !== groupId);
+        return structuredClone(state.agentGroups);
+      },
+      move: async (orgId, agentId, input) => {
+        state.calls.push({ method: "agentGroups.move", args: [orgId, agentId, input] });
+        state.agentGroups = moveInGroups(state.agentGroups ?? [], agentId, input.groupId, input.index);
+        return structuredClone(state.agentGroups);
+      },
     },
     agents: {
       planUsage: async (_orgId, agentId) => {
@@ -1227,6 +1485,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         }),
       create: async (orgId, input) => {
         log("agents.create", orgId, input);
+        if (input.proposal) {
+          const found = proposalCard(input.proposal);
+          if (found.card.state !== "pending") throw new ApiError(409, "agent_proposal.decided", "Already decided");
+        }
         const agent: Agent = {
           id: id("agent"),
           name: input.name,
@@ -1242,7 +1504,14 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           ...(input.appearance ? { appearance: input.appearance } : {}),
         };
         state.agents.push(agent);
+        if (input.proposal) Object.assign(proposalCard(input.proposal).card, { state: "created", agentId: agent.id });
         return agent;
+      },
+      proposal: async (_orgId, messageId) => proposalView(messageId),
+      denyProposal: async (orgId, messageId) => {
+        log("agents.denyProposal", orgId, messageId);
+        Object.assign(proposalCard(messageId).card, { state: "denied", decidedByUserId: state.me?.user.id ?? null });
+        return proposalView(messageId);
       },
       update: async (orgId, agentId, input) => {
         log("agents.update", orgId, agentId, input);
@@ -1252,6 +1521,18 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return { ...agent };
       },
       archive: async (orgId, agentId) => log("agents.archive", orgId, agentId),
+      purge: async (orgId, agentId) => {
+        log("agents.purge", orgId, agentId);
+        const was =
+          state.agents.find((a) => a.id === agentId) ?? state.former?.find((a) => a.id === agentId && !a.deleted);
+        if (!was) throw new ApiError(404, "not_found", "Agent not found");
+        state.agents = state.agents.filter((a) => a.id !== agentId);
+        state.former = [
+          ...(state.former ?? []).filter((a) => a.id !== agentId),
+          { id: was.id, name: was.name, role: was.role, appearance: was.appearance ?? null, deleted: true },
+        ];
+      },
+      former: async () => state.former ?? [],
       models: async () => ({
         defaultModel: "claude-sonnet-5-5",
         models: [
@@ -1311,6 +1592,16 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
             any: true,
             agents: state.agents.map((a) => ({ agentId: a.id, state: "ready" as const })),
           },
+        ),
+      statuses: async () =>
+        structuredClone(
+          state.agentStatuses ??
+            state.agents.map((a) => ({
+              agentId: a.id,
+              presence: "online" as const,
+              status: null,
+              activeAt: new Date().toISOString(),
+            })),
         ),
       importFromGithub: async (orgId, url) => {
         log("agents.importFromGithub", orgId, url);
@@ -1505,7 +1796,26 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         for (const c of bundle.channels) add("channel", c.key, c.name);
         for (const r of bundle.routines) add("routine", r.key, r.name);
         for (const n of bundle.notes) add("note", n.key, n.title || n.content.split("\n")[0]?.slice(0, 80) || n.key);
+        if (!input.dryRun) {
+          state.imported = [
+            ...(state.imported ?? []),
+            ...items.map((i) => ({ app: bundle.source.app, ref: bundle.source.ref, kind: i.kind })),
+          ];
+        }
         return { items };
+      },
+      sources: async (orgId) => {
+        log("imports.sources", orgId);
+        const sources: ImportedSource[] = [];
+        for (const { app, ref, kind } of state.imported ?? []) {
+          let source = sources.find((x) => x.app === app && x.ref === ref);
+          if (!source) {
+            source = { app, ref, counts: { agent: 0, skill: 0, channel: 0, routine: 0, note: 0 } };
+            sources.push(source);
+          }
+          source.counts[kind] += 1;
+        }
+        return sources;
       },
       exportUrl: (orgId) => `/api/app/organizations/${orgId}/export`,
     },
@@ -1522,10 +1832,52 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           visibility: input.visibility ?? "public",
           isMember: true,
           createdAt: new Date().toISOString(),
+          categoryId: input.categoryId ?? null,
         };
         state.channels.push(channel);
         state.channelMembers[channel.id] = [{ type: "person", id: state.me?.user.id ?? "" }];
         return channel;
+      },
+      categories: async () => structuredClone(state.channelCategories ?? []),
+      createCategory: async (orgId, input) => {
+        log("chat.createCategory", orgId, input);
+        state.channelCategories ??= [];
+        const list = state.channelCategories;
+        if (list.some((c) => c.name.toLowerCase() === input.name.trim().toLowerCase()))
+          throw new ApiError(409, "conflict", `The category ${input.name} already exists`);
+        const category: ChannelCategory = { id: id("cat"), name: input.name.trim(), position: list.length };
+        list.push(category);
+        for (const channelId of input.channelIds ?? []) {
+          const c = state.channels.find((x) => x.id === channelId);
+          if (c) c.categoryId = category.id;
+        }
+        return { ...category };
+      },
+      renameCategory: async (orgId, categoryId, name) => {
+        log("chat.renameCategory", orgId, categoryId, name);
+        const c = state.channelCategories?.find((x) => x.id === categoryId);
+        if (!c) throw new ApiError(404, "not_found", "Category not found");
+        c.name = name.trim();
+        return { ...c };
+      },
+      deleteCategory: async (orgId, categoryId) => {
+        log("chat.deleteCategory", orgId, categoryId);
+        state.channelCategories = (state.channelCategories ?? []).filter((c) => c.id !== categoryId);
+        for (const c of state.channels) if (c.categoryId === categoryId) c.categoryId = null;
+      },
+      placeCategory: async (orgId, categoryId, beforeCategoryId) => {
+        log("chat.placeCategory", orgId, categoryId, beforeCategoryId);
+      },
+      place: async (orgId, channelId, input) => {
+        log("chat.place", orgId, channelId, input);
+        const c = state.channels.find((x) => x.id === channelId);
+        if (!c) throw new ApiError(404, "not_found", "Channel not found");
+        c.categoryId = input.categoryId;
+        // Like the server: before `beforeChannelId`, else at the end; the list comes back in that order.
+        const rest = state.channels.filter((x) => x !== c);
+        const at = rest.findIndex((x) => x.id === input.beforeChannelId);
+        rest.splice(at >= 0 ? at : rest.length, 0, c);
+        state.channels = rest;
       },
       join: async (orgId, channelId) => {
         log("chat.join", orgId, channelId);
@@ -1533,6 +1885,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (c) c.isMember = true;
       },
       members: async (_orgId, channelId) => state.channelMembers[channelId] ?? [],
+      archive: async (orgId, channelId) => {
+        log("chat.archive", orgId, channelId);
+        state.channels = state.channels.filter((c) => c.id !== channelId);
+      },
+      unarchive: async (orgId, channelId) => {
+        log("chat.unarchive", orgId, channelId);
+      },
       update: async (orgId, channelId, input) => {
         log("chat.update", orgId, channelId, input);
         const c = state.channels.find((x) => x.id === channelId);
@@ -1972,6 +2331,37 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
     return p;
   }
 
+  /**
+   * An agent's proposal of a new agent: its card message (`meta.actionCard`), changed in place like the server's,
+   * for whoever is in its conversation.
+   */
+  function proposalCard(messageId: string) {
+    const message = state.messages.find((m) => m.id === messageId);
+    const card = message?.meta?.actionCard as AgentProposalCard | undefined;
+    if (!message || card?.kind !== "agent_proposal") throw new ApiError(404, "not_found", "Proposal not found");
+    if (!state.channels.find((c) => c.id === message.channelId)?.isMember) {
+      throw new ApiError(403, "forbidden", "Join this channel first");
+    }
+    return { message, card };
+  }
+
+  function proposalView(messageId: string): AgentProposal {
+    const { message, card } = proposalCard(messageId);
+    const expired = card.state === "pending" && Date.parse(card.expiresAt) <= Date.now();
+    // Who may create agents decides (ADR 0085).
+    const mine = state.me ? withPermissions(state.me).organizations[0]?.permissions : undefined;
+    const decides = mine?.includes("create_agents") === true;
+    return {
+      ...structuredClone(card),
+      messageId,
+      channelId: message.channelId,
+      threadId: message.threadId,
+      proposedByAgentId: message.author.id ?? "",
+      expired,
+      canDecide: card.state === "pending" && !expired && decides,
+    };
+  }
+
   function decide(orgId: string, approvalId: string, status: "approved" | "refused", reason?: string) {
     log(`approvals.${status === "approved" ? "approve" : "refuse"}`, orgId, approvalId, reason);
     const a = state.approvals.find((x) => x.id === approvalId);
@@ -1988,11 +2378,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
   }
 }
 
-function newInvitation(email: string, role: Role): InvitationWithStatus {
+function newInvitation(email: string, role: Role, roleIds: string[] = []): InvitationWithStatus {
   return {
     id: id("inv"),
     email,
     role,
+    roleIds,
     status: "pending",
     expiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
     createdAt: new Date().toISOString(),
@@ -2028,7 +2419,17 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
   const threads = createFakeThreads(ctx, (method, ...args) => state.calls.push({ method, args }));
   state.openThread = threads.openByReply;
   const machines = createFakeMachines(ctx, (method, ...args) => state.calls.push({ method, args }));
-  const customConnectors = createMockCustomConnectors(ctx, (method, ...args) => state.calls.push({ method, args }));
+  const agentIds = async (orgId: string) => (await http.agents.list(orgId)).map((a) => a.id);
+  const customConnectors = createMockCustomConnectors(
+    ctx,
+    (method, ...args) => state.calls.push({ method, args }),
+    async (orgId, serverId) => access.connected(serverId, await agentIds(orgId)),
+  );
+  const access = createFakeAccess(
+    (orgId) => http.connectors.list(orgId),
+    (method, ...args) => state.calls.push({ method, args }),
+    (orgId) => customConnectors.list(orgId),
+  );
   const mail = createFakeMail((method, ...args) => state.calls.push({ method, args }), ctx.now);
   const databases = createFakeDatabases((method, ...args) => state.calls.push({ method, args }), ctx.now);
   const browser = createFakeBrowser((method, ...args) => state.calls.push({ method, args }), ctx.now);
@@ -2050,11 +2451,17 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
     threads,
     missions: createFakeMissions(ctx, (method, ...args) => state.calls.push({ method, args })),
     skills: createFakeSkills(ctx, (method, ...args) => state.calls.push({ method, args })),
-    access: createFakeAccess(
-      (orgId) => http.connectors.list(orgId),
-      (method, ...args) => state.calls.push({ method, args }),
-      (orgId) => customConnectors.list(orgId),
-    ),
+    access,
+    connectors: {
+      ...http.connectors,
+      // A first connection of a connector is every agent's (a new key for it keeps their grants).
+      connectWithKey: async (orgId, input) => {
+        const first = !(await http.connectors.list(orgId)).some((c) => c.connector === input.connector);
+        const connection = await http.connectors.connectWithKey(orgId, input);
+        if (first) access.connected(connection.id, await agentIds(orgId));
+        return connection;
+      },
+    },
     invites: {
       // The same link every time, like the server: a new one only when none can be shown.
       createLink: async (orgId) => {
@@ -2111,8 +2518,8 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
         state.calls.push({ method: "joinRequests.list", args: [orgId] });
         return structuredClone(state.joinRequests ?? []);
       },
-      approve: async (orgId, requestId, role) => {
-        state.calls.push({ method: "joinRequests.approve", args: [orgId, requestId, role] });
+      approve: async (orgId, requestId, roleIds) => {
+        state.calls.push({ method: "joinRequests.approve", args: [orgId, requestId, roleIds] });
         if (state.answerError) throw state.answerError;
         const request = state.joinRequests?.find((r) => r.id === requestId);
         state.joinRequests = state.joinRequests?.filter((r) => r.id !== requestId);
@@ -2122,7 +2529,8 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
             name: request.name,
             email: request.email,
             image: null,
-            role,
+            role: "member",
+            roleIds: roleIds ?? [],
             joinedAt: new Date().toISOString(),
             handle: requestId,
             timezone: "America/Sao_Paulo",

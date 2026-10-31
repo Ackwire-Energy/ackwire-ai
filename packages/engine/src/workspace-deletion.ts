@@ -28,6 +28,7 @@ import { MACHINE_CONTROL_TOPIC, machineOnline, personalMachines } from "./machin
 import { composioGrantShared, forgetAtComposio } from "./mail/accounts";
 import { recordOperatorEvent } from "./operator-events";
 import {
+  can,
   getMembership,
   getOrganization,
   lockOrgMembers,
@@ -155,7 +156,7 @@ export async function requireOwnerToDelete(db: Database, userId: string, orgId: 
   }
   const refusal = closedRefusal(membership.standing);
   if (refusal instanceof OrgPausedError) throw refusal;
-  if (membership.role !== "owner") throw new ForbiddenError("Only an owner can delete or restore the workspace");
+  if (!can(membership, "manage_owners")) throw new ForbiddenError("Only an owner can delete or restore the workspace");
   return membership;
 }
 

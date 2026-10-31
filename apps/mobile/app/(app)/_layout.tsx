@@ -70,6 +70,10 @@ function AppStack() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="chat/[channelId]" options={pushed} />
       <Stack.Screen name="conversations/[kind]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="channel-category" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="channel-category-new" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="channel-categories" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="channel-category-edit" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="mission/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent/[id]" options={{ ...pushed, ...coverBarOptions }} />
       <Stack.Screen name="account-delete" options={{ ...pushed, ...scrollUnder }} />
@@ -77,7 +81,9 @@ function AppStack() {
       <Stack.Screen name="usage" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-usage/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-ai/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="agent-model/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-edit" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="agent-delete" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="new-agent" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/[id]" options={{ ...pushed, ...scrollUnder }} />
@@ -107,6 +113,7 @@ function AppStack() {
       {/* Você: a pushed page with a clear bar over its sky; its screens pushed over it on the grouped gray. */}
       <Stack.Screen name="me/index" options={{ ...pushed, ...coverBarOptions }} />
       <Stack.Screen name="me/account" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/status" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/zone" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/workspaces" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/members" options={{ ...pushed, ...scrollUnder }} />

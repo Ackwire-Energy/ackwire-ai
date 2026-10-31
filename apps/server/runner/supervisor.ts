@@ -22,6 +22,7 @@ import {
   type AgentScope,
   HEARTBEAT_MS,
   inRange,
+  isObject,
   MAX_FRAME_BYTES,
   type MachineErrorCode,
   type MachineReplies,
@@ -141,10 +142,13 @@ export type WorkerDesktop = MachineReplies["desktop.session.start"] & { xauthori
 /** What a worker asks for its agent's desktop for: desktop use, or its Chrome there (ADR 0058 §7). */
 export type WorkerDesktopUse = "desktop" | "browser";
 
+/** Browser requests that may start the agent's Chrome, whose answers say what they waited on (protocol 27). */
+const BROWSER_SETUP_OPS: ReadonlySet<string> = new Set(["browser.act", "browser.batch", "browser.warm"]);
+
 /** What a request the server sent may use its agent's desktop for; null when it may not. */
 function desktopUseOf(req: MachineRequest): WorkerDesktopUse | null {
   if (DESKTOP_USE_OPS.has(req.op)) return "desktop";
-  return (req.op === "browser.act" || req.op === "browser.batch") && req.desktop === true ? "browser" : null;
+  return BROWSER_SETUP_OPS.has(req.op) && "desktop" in req && req.desktop === true ? "browser" : null;
 }
 
 /** The link's own frames, besides the machine protocol's. */
@@ -342,10 +346,16 @@ export class Supervisor {
     this.pinger.unref?.();
   }
 
-  /** An `agent` op (`OP_ROUTES`), run in the worker of the request's agent. */
+  /**
+   * An `agent` op (`OP_ROUTES`), run in the worker of the request's agent. A browser request that waited for that
+   * worker to start (its user made first, for a new agent) says how long in its answer's `setup.worker`.
+   */
   async run(req: MachineRequest, scope: RequestScope): Promise<unknown> {
     if (!req.agent) throw new RunnerError("bad_request", "This request belongs to an agent");
     if (this.closed) throw new RunnerError("dropped", STOPPING);
+    const now = this.opts.now ?? Date.now;
+    const since = now();
+    const cold = BROWSER_SETUP_OPS.has(req.op) && this.workers.get(String(req.agent.id))?.ready !== true;
     const w = this.entry(this.opts.user(req.agent));
     // Its turn reads the account's folder as the agent's user; a folder it can't have is `account_missing` there.
     if (
@@ -365,6 +375,7 @@ export class Supervisor {
     await this.ready(w, scope.signal);
     if (!w.ready) throw new RunnerError("internal", "The agent's worker isn't connected right now. Try again.");
     if (req.op === "task.start") this.own(req.taskId, w);
+    const worker = cold ? Math.round(now() - since) : 0;
     const id = String(++this.seq);
     return new Promise((resolve, reject) => {
       const onAbort = () => this.send(w, { type: "cancel", id });
@@ -375,8 +386,12 @@ export class Supervisor {
           if (w.inflight.get(id) !== entry) return;
           w.inflight.delete(id);
           scope.signal.removeEventListener("abort", onAbort);
-          if (outcome.ok) resolve(outcome.data);
-          else reject(outcome.error);
+          if (!outcome.ok) reject(outcome.error);
+          else if (worker < 10 || !isObject(outcome.data)) resolve(outcome.data);
+          else {
+            const setup = isObject(outcome.data.setup) ? outcome.data.setup : {};
+            resolve({ ...outcome.data, setup: { ...setup, worker } });
+          }
         },
       };
       w.inflight.set(id, entry);

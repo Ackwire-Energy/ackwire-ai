@@ -1,7 +1,8 @@
-import { and, asc, type Database, desc, eq, gt, inArray, or, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, desc, eq, gt, or, schema, sql } from "@agenteschat/db";
 import { z } from "zod";
 import { decodeCursor, encodeCursor } from "./cursor";
 import { getOrgLimits, orgMeters } from "./limits";
+import { maySql } from "./permissions";
 import { OPERATOR_STANDING_COLUMNS, type StandingState } from "./standing";
 
 /**
@@ -84,6 +85,11 @@ export async function operatorListOrgs(db: Database, query: OperatorOrgQuery) {
  * One workspace: its owners and admins, how much is in it, its limits (ADR 0079) with what it uses of them, and its
  * deletion and the operator's deletion hold, each null when there is none. Null when there is none with that id.
  */
+/** The operator API's role names (its contract): an owner, someone holding `administrator` (ADR 0085), a member. */
+const operatorRole = (orgId: unknown, userId: unknown) =>
+  sql<"owner" | "admin" | "member">`case when ${organizationMembers.role} = 'owner' then 'owner'
+    when ${maySql(orgId, userId, "administrator")} then 'admin' else 'member' end`;
+
 export async function operatorOrg(db: Database, orgId: string) {
   const [row] = await db
     .select({
@@ -121,13 +127,13 @@ export async function operatorOrg(db: Database, orgId: string) {
         userId: users.id,
         email: users.email,
         name: users.name,
-        role: organizationMembers.role,
+        role: operatorRole(orgId, organizationMembers.userId),
         createdAt: users.createdAt,
         lastSeenAt: organizationMembers.lastSeenAt,
       })
       .from(organizationMembers)
       .innerJoin(users, eq(users.id, organizationMembers.userId))
-      .where(and(eq(organizationMembers.orgId, orgId), inArray(organizationMembers.role, ["owner", "admin"])))
+      .where(and(eq(organizationMembers.orgId, orgId), maySql(orgId, organizationMembers.userId, "administrator")))
       .orderBy(asc(organizationMembers.role), asc(organizationMembers.createdAt)),
     getOrgLimits(db, orgId),
     orgMeters(db, orgId),
@@ -162,7 +168,7 @@ export async function operatorUser(db: Database, userId: string) {
       .select({
         orgId: organizations.id,
         name: organizations.name,
-        role: organizationMembers.role,
+        role: operatorRole(organizationMembers.orgId, organizationMembers.userId),
         joinedAt: organizationMembers.createdAt,
         lastSeenAt: organizationMembers.lastSeenAt,
       })

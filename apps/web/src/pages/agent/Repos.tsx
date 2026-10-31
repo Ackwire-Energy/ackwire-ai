@@ -250,7 +250,7 @@ export function RepoDialog({
   const query = q.trim().toLowerCase();
   const accounts = listing.data?.accounts ?? [];
   const matches = accounts.some((a) => a.repositories.some((r) => !query || r.fullName.toLowerCase().includes(query)));
-  const canInstall = orgCan(org.role, "configure") && app.data?.installable === true;
+  const canInstall = orgCan(org, "manage_connectors") && app.data?.installable === true;
   const exists = (e: string) => repoExists(listing.data, e);
   const all = pick.mode === "all";
   const total = accounts.reduce((n, a) => n + a.repositories.length, 0);

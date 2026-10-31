@@ -16,11 +16,13 @@ import {
 } from "@agenteschat/db";
 import type { ModelMessage, SystemBlock } from "@agenteschat/providers";
 import type { Agent } from "./agents";
+import { talksToAgents } from "./audience";
 import { personOfMessage, runAuthority } from "./authority";
 import { caches } from "./cache";
 import { summarizeScopes } from "./capabilities";
 import { isAgentOnlyDm } from "./dms";
 import { issueWorkBrief, issueWorkOf } from "./issue-work";
+import { openTasksBrief } from "./issues";
 import type { MachineCaller } from "./machine-hub";
 import type { Message } from "./messages";
 import { missionBrief } from "./mission-brief";
@@ -206,6 +208,8 @@ export interface RunContext {
   system: ContextBlock[];
   messages: ModelMessage[];
   stats: { historyMessages: number; systemChars: number; truncated: boolean };
+  /** The issue this run works on: its thread is this agent's work on it, or its trigger starts that work. */
+  issueId: string | null;
 }
 
 /**
@@ -232,6 +236,8 @@ export async function buildRunContext(
     skills?: { name: string; description: string }[];
     /** `find_agent` is available: name the other agents in "# Your team". */
     team?: boolean;
+    /** `update_issue` is available: "# Your open tasks" says how to keep them updated. */
+    issueTools?: boolean;
     trigger?: Message;
     /** A routine started the run: its own task, so no "Your recent work" from other conversations. */
     routine?: boolean;
@@ -272,6 +278,11 @@ export async function buildRunContext(
   const machineAccess = agent.machineId
     ? machineAccessOf(db, run.orgId, agent.id, agent.machineId).catch(() => null)
     : null;
+  // A routine's run keeps to its own task, as with "Your recent work" below.
+  const openTasks =
+    options.routine || run.background
+      ? null
+      : openTasksBrief(db, run.orgId, agent.id, run.channelId, options.issueTools === true).catch(() => null);
   const trigger = triggerRows[0];
   if (!org || !channel || !trigger) throw new Error("run context is incomplete (org, channel or trigger missing)");
 
@@ -507,7 +518,13 @@ export async function buildRunContext(
   // The rest of the org's agents: channel members are described in "Where you are".
   const team =
     options.team && channel.kind !== "forum"
-      ? teamPrompt(await loadTeam(db, run.orgId), agent.id, requester, new Set(others.map((m) => m.agentId as string)))
+      ? teamPrompt(
+          await loadTeam(db, run.orgId),
+          agent.id,
+          requester,
+          new Set(others.map((m) => m.agentId as string)),
+          await talksToAgents(db, run.orgId, requester),
+        )
       : "";
   const memberList = members
     .map((m) => (m.agentHandle ? `${m.agentName} (@${m.agentHandle}, agent)` : `${m.userName ?? "unknown"} (person)`))
@@ -515,10 +532,8 @@ export async function buildRunContext(
 
   // An issue's work thread (asked to implement it): the task, read from the issue now, never shown in the chat.
   const issueWork = root ? issueWorkOf(root.meta) : null;
-  const issueBrief =
-    issueWork && issueWork.agentId === agent.id
-      ? await issueWorkBrief(db, run.orgId, issueWork.issueId).catch(() => null)
-      : null;
+  const workIssueId = issueWork && issueWork.agentId === agent.id ? issueWork.issueId : null;
+  const issueBrief = workIssueId ? await issueWorkBrief(db, run.orgId, workIssueId).catch(() => null) : null;
 
   // A routine's background run: its routine block, time line and where it reports (ADR 0053 §4).
   const routine = background ? await routineContext(db, run, agent, trigger, zone) : null;
@@ -678,6 +693,9 @@ export async function buildRunContext(
                     : ""
                 }`,
     },
+    // Per turn and read whole, like memory: it changes between runs, and a live computer session keeps the
+    // system prompt it started with.
+    ...(openTasks ? await openTasks.then((text) => (text ? [{ turn: true, found: true, text }] : [])) : []),
   ];
   const systemChars = system.reduce((n, b) => n + b.text.length, 0);
 
@@ -685,6 +703,7 @@ export async function buildRunContext(
     system,
     messages: toTurns(history, agent.id, names, trigger.id),
     stats: { historyMessages: history.length, systemChars, truncated: thread.length >= options.maxMessages },
+    issueId: workIssueId ?? (typeof trigger.meta?.issueId === "string" ? trigger.meta.issueId : null),
   };
 }
 

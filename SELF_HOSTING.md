@@ -835,8 +835,9 @@ your organization. Then it installs a background service
 `--dir <folder>` (where agents work, default `~/agentes`), `--name <name>`, `--no-exec` (files only,
 no commands) and `--no-service`.
 
-That computer runs the commands agents execute, the browser they drive (Chrome for Testing, installed
-on first use), and Claude Code or Codex when an agent thinks with a subscription signed in there.
+That computer runs the commands agents execute, the browser they drive (Chrome for Testing, which the
+runner installs as it starts once the browser is turned on there), and Claude Code or Codex when an
+agent thinks with a subscription signed in there.
 Commands run as the user that runs the runner, so give it a dedicated user or a VM.
 `agentes-runner tools disable commands` (or `claude`, or `codex`) turns a capability off on that
 computer, and `agentes-runner folders allow <path>` shares a folder besides the agents' own.
@@ -883,12 +884,13 @@ computer (archived, or moved to another one).
 Each agent's desktop has the agentes.chat look: its wallpaper and a dock at the bottom center (the mark,
 which opens the apps menu, then Browser, Files and Terminal), one workspace and no desktop icons; its
 terminal's prompt shows the agent's name. Browser opens the agent's own browser on its desktop, the one
-it browses with, so a person who signs in to a site there signs the agent in (the first time, the
-browser is installed first, which takes about a minute). The runner writes the look into that desktop's
-own settings (`<agent folder>/.agentes/home`, or the agent's own home with `--system`), never your
-user's or the computer's, so your own desktop stays as it is. For its rounded windows, also install
-Orchis and the SVG loader it draws its buttons with (Debian 12 and 13, Ubuntu 24.04; `--system
---desktop` installs them where apt has them); without them the desktops use GTK's and XFCE's own theme.
+it browses with, so a person who signs in to a site there signs the agent in (the first time, unless
+the runner installed it as it started, it is installed first, which takes about a minute). The runner
+writes the look into that desktop's own settings (`<agent folder>/.agentes/home`, or the agent's own
+home with `--system`), never your user's or the computer's, so your own desktop stays as it is. For
+its rounded windows, also install Orchis and the SVG loader it draws its buttons with (Debian 12 and
+13, Ubuntu 24.04; `--system --desktop` installs them where apt has them); without them the desktops
+use GTK's and XFCE's own theme.
 Orchis takes about 42 MB on Debian 13 with what it brings along (GTK 2's theme engines among them), and
 its package alone about 84 MB on Ubuntu 24.04, where it carries every color variant (the desktops use
 only Orchis-Light):
@@ -918,9 +920,13 @@ terminal are for the person who connected the computer, since they act as its us
 agent runs as that one user, its desktop and terminal included, so whoever uses either can read the
 other agents' folders, the sign-ins on that computer and the runner's token, as the agents' commands
 can. Give the runner a user of its own, or a VM. On a Linux server, the installer's `--system` option
-(as root) makes each agent its own user instead. For the same reason a computer leaves the
-organization with the person who connected it, when they leave, are removed or delete their account;
-one installed with `--system` is the team's and stays.
+(as root) makes each agent its own user instead. On x64 it also installs `agent-browser` and Chrome for
+Testing once for all of them, in `/opt/agentes-runner/browser` (root's, each checked against the
+SHA-256 in the installer; running the installer again updates them), so an agent's first use of its
+browser downloads nothing. If the installer can't download them, it goes on, and each agent downloads
+what's missing at its browser's first use, which takes about a minute. Since its agents run as the
+person who connected it, a computer leaves the organization with them when they leave, are removed or
+delete their account; one installed with `--system` is the team's and stays.
 
 Mac and Windows computers get no agents' desktops: the agent's browser runs headless, and its card
 shows it live. A Mac connected with the command above opens terminals

@@ -22,6 +22,27 @@ export const channelVisibilityEnum = pgEnum("channel_visibility", ["public", "pr
 /** `channel`: a named channel. `dm`: a direct conversation (person↔person or person↔agent), participants only. */
 export const channelKindEnum = pgEnum("channel_kind", ["channel", "dm", "forum"]);
 
+/**
+ * A named group of channels in the sidebar, the same for everyone in the organization. Deleting one leaves its
+ * channels without a category.
+ */
+export const channelCategories = pgTable(
+  "channel_categories",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    /** As people typed it ("Marketing"); unique per organization, ignoring case (checked by the engine). */
+    name: text().notNull(),
+    /** Order in the sidebar, from 0. */
+    position: integer().notNull().default(0),
+    createdByUserId: text().references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique().on(t.orgId, t.id), unique().on(t.orgId, t.name)],
+);
+
 /** A conversation space. `public`: any member of the organization may join; `private`: invite only. */
 export const channels = pgTable(
   "channels",
@@ -40,6 +61,10 @@ export const channels = pgTable(
     createdByUserId: text().references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     archivedAt: timestamp({ withTimezone: true }),
+    /** Its sidebar category (channels only); null: on top, with no category. */
+    categoryId: uuid().references(() => channelCategories.id, { onDelete: "set null" }),
+    /** Order inside its category (or among the channels with none), from 0. */
+    position: integer().notNull().default(0),
   },
   (t) => [unique().on(t.orgId, t.name), unique().on(t.orgId, t.id), unique().on(t.orgId, t.dmKey)],
 );

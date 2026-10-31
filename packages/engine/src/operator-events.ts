@@ -28,6 +28,7 @@ export type OperatorEventType =
   | "organization.deleted"
   | "invitation.created"
   | "agent.created"
+  | "agent.deleted"
   | "mail.sent"
   | "run.finished"
   | "task.finished"
