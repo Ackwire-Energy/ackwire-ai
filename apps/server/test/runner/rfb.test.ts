@@ -171,6 +171,69 @@ test("the person in control logs in with the full password; bytes go both ways a
   expect([...data.bytes().subarray(before)]).toEqual([0, 0, 0, 1, 9, 9]);
 });
 
+/** What the runner sent from frame `from` on: text frames as they are, binary ones as their bytes. */
+const framesFrom = (data: ReturnType<typeof memoryDataSocket>, from: number) =>
+  data.sent.slice(from).map((f) => (typeof f === "string" ? f : [...f]));
+
+test("the server's switch, in place: the old login goes with nothing more of it sent, the frame back marks where its session ends, and a new session in that mode follows on the same socket", async () => {
+  const x = await fakeXvnc();
+  const { desktops, holds } = desktopOn(x.socketPath);
+  const data = memoryDataSocket();
+  await openDesktopStream(desktops, dev, "watch", async () => data.socket);
+  await viewerHandshake(data);
+  const pointer = Uint8Array.of(5, 0, 0, 100, 0, 120);
+  data.send(pointer);
+  await waitFor(() => (x.logins[0]?.got.length ?? 0) >= 6);
+  expect(x.desktop.pointer).toEqual([640, 400]);
+
+  let from = data.sent.length;
+  data.control({ type: "mode", mode: "control" });
+  await waitFor(() => data.bytes().length >= 2 * SERVER_SIDE);
+  await waitFor(() => x.logins[0]?.socket.destroyed === true);
+  expect(x.logins[1]).toMatchObject({ password: "full", shared: 1 });
+  expect(framesFrom(data, from).slice(0, 4)).toEqual([
+    '{"type":"mode","mode":"control"}',
+    [...Buffer.from(VERSION, "latin1")],
+    [1, 1],
+    [0, 0, 0, 0],
+  ]);
+  // The new session's answers, then the person's pointer: the desktop takes it now.
+  data.send(VERSION);
+  data.send(Uint8Array.of(1));
+  data.send(Uint8Array.of(1));
+  data.send(pointer);
+  await waitFor(() => x.desktop.pointer[0] === 100);
+
+  // Handed back: a view-only login again, the person's pointer ignored, the same stream all along.
+  from = data.sent.length;
+  data.control({ type: "mode", mode: "watch" });
+  await waitFor(() => data.bytes().length >= 3 * SERVER_SIDE);
+  expect(framesFrom(data, from)[0]).toBe('{"type":"mode","mode":"watch"}');
+  expect(x.logins[2]).toMatchObject({ password: "view", shared: 1 });
+  await waitFor(() => x.logins[1]?.socket.destroyed === true);
+  data.send(Buffer.concat([Buffer.from(VERSION, "latin1"), Buffer.from([1, 1, 5, 0, 0, 7, 0, 9])]));
+  await waitFor(() => (x.logins[2]?.got.length ?? 0) >= 6);
+  expect(x.desktop.pointer).toEqual([100, 120]);
+  expect(data.closed).toBeNull();
+  expect(holds).toEqual({ taken: 1, released: 0 });
+});
+
+test("a switch the computer can't take now (control on a paused computer) closes the stream with 1011: the viewer opens it again", async () => {
+  const x = await fakeXvnc();
+  const { desktops, holds } = desktopOn(x.socketPath);
+  const data = memoryDataSocket();
+  const paused = (mode: string) => {
+    if (mode === "control") throw new Error("paused");
+  };
+  await openDesktopStream(desktops, dev, "watch", async () => data.socket, paused);
+  await viewerHandshake(data);
+  data.control({ type: "mode", mode: "control" });
+  await waitFor(() => data.closed !== null);
+  expect(data.closed?.code).toBe(STREAM_CLOSE.internal);
+  expect(x.logins).toHaveLength(1);
+  await waitFor(() => holds.released === 1);
+});
+
 test("either side closing ends the stream: the desktop's end closes the data socket with 1011, the viewer's the desktop's connection", async () => {
   const x = await fakeXvnc();
   const { desktops, holds } = desktopOn(x.socketPath);
@@ -216,7 +279,7 @@ test("reading from the desktop pauses while the data socket holds more than its 
   const x = await fakeXvnc();
   const vnc = await connectVnc(x.socketPath, PASSWORDS.view);
   const data = memoryDataSocket();
-  void serveNone(data.socket, vnc, 100);
+  void serveNone(data.socket, vnc, { bufferedMax: 100 });
   await viewerHandshake(data);
   const desktopSide = x.logins[0]?.socket as net.Socket;
   const sent = () => data.bytes().length;
