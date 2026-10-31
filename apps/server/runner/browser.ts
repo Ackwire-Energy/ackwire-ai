@@ -816,8 +816,14 @@ export function dragDelay(e: BrowserInputEvent, state: InputState, now: number):
 export function relayCommands(e: BrowserInputEvent, state: InputState): Record<string, unknown>[] {
   switch (e.kind) {
     case "mouse": {
-      state.pointer = { x: e.x, y: e.y };
       const button = e.button ?? (e.type === "mouseMoved" || e.type === "mouseWheel" ? "none" : "left");
+      // A release that never came (dropped on the way, or control that ended mid-press) is sent first, where the
+      // pointer was: before a new press of that button, or a move that says no button is down.
+      const lost =
+        (state.buttons ?? 0) &
+        (e.type === "mousePressed" ? BUTTON_BITS[button] : e.type === "mouseMoved" && e.button === "none" ? ~0 : 0);
+      if (lost) return [...releaseHeld(state, lost), ...relayCommands(e, state)];
+      state.pointer = { x: e.x, y: e.y };
       if (e.type === "mousePressed") state.buttons = (state.buttons ?? 0) | BUTTON_BITS[button];
       else if (e.type === "mouseReleased") state.buttons = (state.buttons ?? 0) & ~BUTTON_BITS[button];
       return [
@@ -877,6 +883,15 @@ export function relayCommands(e: BrowserInputEvent, state: InputState): Record<s
     case "text":
       return [{ action: "keyboard", subaction: "insertText", text: e.text }];
   }
+}
+
+/** The mouse buttons in `mask` that `state` still holds, let go where the pointer is. */
+function releaseHeld(state: InputState, mask = ~0): Record<string, unknown>[] {
+  const at = state.pointer;
+  if (!at) return [];
+  return (["left", "right", "middle"] as const)
+    .filter((b) => (state.buttons ?? 0) & mask & BUTTON_BITS[b])
+    .flatMap((button) => relayCommands({ kind: "mouse", type: "mouseReleased", x: at.x, y: at.y, button }, state));
 }
 
 /** The subset of a WebSocket the stream relay uses (a fake in tests). */
@@ -2416,6 +2431,7 @@ export class BrowserManager {
     while (session.streamOpening) await session.streamOpening.catch(() => undefined);
     if (session.stream) {
       if (session.stream.mode !== mode) {
+        if (mode === "watch") this.letGo(session.stream);
         session.stream.mode = mode;
         session.stream.socket.send(JSON.stringify({ type: "config", maxFps: STREAM_FPS[mode] }));
         this.changed();
@@ -2613,6 +2629,7 @@ export class BrowserManager {
     const session = this.sessions.get(String(agent.id ?? ""));
     while (session?.streamOpening) await session.streamOpening.catch(() => undefined);
     if (!session?.stream) return { stopped: false };
+    this.letGo(session.stream);
     this.endStream(session, "stopped");
     return { stopped: true };
   }
@@ -2679,6 +2696,16 @@ export class BrowserManager {
     });
     stream.inputQueue = run.catch(() => undefined);
     return run;
+  }
+
+  /**
+   * The person's control ended (back to watching, or nobody watches): a button they still hold lets go where their
+   * pointer was, after the input queued before, so the agent doesn't go on with it held.
+   */
+  private letGo(stream: Stream) {
+    stream.inputQueue = stream.inputQueue.then(async () => {
+      for (const command of releaseHeld(stream.input)) await this.relay(stream.port, command);
+    });
   }
 
   /** One command on the daemon's relay (`POST /api/command` on the stream port); true when it ran. */
