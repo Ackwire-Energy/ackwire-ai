@@ -9676,6 +9676,8 @@ export const en: Translations = {
     },
     retry: "Try again",
     takeover: "Take control",
+    /** Over the last picture while control opens. */
+    taking: "Taking control…",
     clipboard: {
       got: "Copied on {{name}}'s computer:",
       copy: "Copy",
@@ -9695,7 +9697,6 @@ export const en: Translations = {
       doneByYou: "Done by you at {{time}}. {{agent}} looked at the screen again and went on.",
     },
     control: {
-      keys: "Copy and paste as usual: {{copy}}, {{paste}}.",
       notice: "Programs on {{name}}'s computer can see the screen and what you type or paste.",
     },
     /** The ⓘ beside the control line, on agentes.chat Cloud only (ADR 0076). */

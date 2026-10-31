@@ -100,6 +100,7 @@ const CLOUD_EXTRA = [
   "desktop.sub.controlAsked",
   "desktop.sub.hidden",
   "desktop.takeover",
+  "desktop.taking",
   ...["handBack", "done", "couldnt", "full", "fullExit", "closed", "closedHelp", "offlineCloud", "noComputerCloud"].map(
     (k) => `browser.inCard.${k}`,
   ),
@@ -108,7 +109,6 @@ const CLOUD_EXTRA = [
   "desktop.state.retrying",
   "desktop.retry",
   "browser.now.handedBack",
-  "desktop.control.keys",
   "desktop.control.notice",
   "desktop.watch.notice",
   "desktop.session.check",
