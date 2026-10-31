@@ -145,3 +145,6 @@ const typedForm = (value: string) =>
  * so a name that is only those needs nothing typed.
  */
 export const matchesName = (typed: string, name: string) => typedForm(typed) === typedForm(name);
+
+/** Text made safe inside HTML, as text or as an attribute value (quoted either way). */
+export const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);

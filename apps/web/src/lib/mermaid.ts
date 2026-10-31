@@ -1,49 +1,116 @@
+import { escapeHtml } from "@agenteschat/client/lib/text";
+import mermaidBundle from "mermaid/dist/mermaid.min.js?url&no-inline";
+import frameScript from "./mermaid-frame.js?url&no-inline";
+
 /**
- * Mermaid draws in the page itself (the SVG becomes an inert <img> only afterwards), so anything in a diagram that
- * makes the page load a URL while it draws reaches the network from every viewer's browser, no click needed: who
- * read it, when, and whatever text an agent put in the URL. Checked against mermaid 11.17.2, these are the ways a
- * source can do that, and a source that uses any of them stays code:
+ * Mermaid draws in the document it runs in, and a diagram has many ways to make that document load a URL while it
+ * draws (an image node, CSS url() through classDef, style or its own settings, label HTML, a sequence actor's icon…).
+ * In the page, each would reach the network from every viewer's browser with no click: who read it, when, and whatever
+ * an agent put in the URL. So mermaid runs in a frame where nothing loads, whatever the diagram says:
  *
- * - Settings: `%%{init}%%` / `%%{initialize}%%` directives and front matter `config` reach the page's CSS
- *   (themeCSS, themeVariables, fontFamily). Front matter may only hold a `title`.
- * - A flowchart image node (`A@{ img: "…" }`): mermaid loads it with `new Image()` before any SVG exists. The YAML key
- *   can be spelled with escapes (`"\x69mg"`), so in a source with shape data any backslash counts too.
- * - A sequence actor's `properties` (an icon drawn as an <image>) and `details` (JSON read from an element of the page),
- *   anywhere in the source: the statement may also follow `end` or `sequenceDiagram` on the same line. A message
- *   saying "details x:" stays code too.
- * - CSS that loads (`url(`, `image-set("…")`, `@import`…) in classDef, style, linkStyle, a gantt todayMarker: CSS
- *   escapes are read first (`\75 rl(` is `url(`).
- *
- * Label HTML is the one way left to mermaid: math labels, class labels with math, architecture icon text and event
- * modeling boxes put it in the page even with HTML labels off, and no source check reads HTML the way the browser does
- * (`<img alt src=…>`, `<\img src=…>`). It all goes through mermaid's sanitizer, which `drawWithMermaid` sets to drop
- * every tag and attribute that loads.
+ * - An iframe sandboxed with `allow-scripts` only (an opaque origin: no cookies, storage or DOM of ours) holds a second
+ *   one, sandboxed the same way, where mermaid draws. Both carry the CSP of `mermaidFrameDocument`: nothing loads but
+ *   mermaid's bundle and mermaid-frame.js, plus inline styles and data: images. The outer one's `default-src 'none'`
+ *   is also the inner one's frame-src, which refuses the inner frame navigating itself away (a `<meta
+ *   http-equiv="refresh">`): CSP has no other say over a document's own navigations, and the sandbox allows them.
+ *   Chromium 156 still opens a connection to a refused address, so the tags that navigate are left to the second layer
+ *   too.
+ * - The page sends `{id, source, dark}` and takes `{id, svg}` or `{id, error}` back only from the inner frame's
+ *   window, so another frame on the page (an agent's HTML page) can't post a drawing. The SVG still goes into an
+ *   `<img>`, where nothing in it runs or loads.
+ * - Mermaid's own settings in mermaid-frame.js (strict, no HTML labels, its sanitizer) are a second layer.
  */
 
 /** Mermaid's own `maxTextSize`: past it mermaid draws a red "Maximum text size" box instead of the diagram. */
-const MAX_TEXT = 50_000;
-/** Front matter where mermaid finds it: YAML between `---` lines at the very top (mermaid's own pattern). */
-const FRONT_MATTER = /^([^\S\n\r]*)-{3}\s*[\n\r](.*?)[\n\r]\1-{3}\s*[\n\r]+/s;
-const TITLE_LINE = /^\s*title\s*:/;
-const CSS_LOAD = /(?:url|image(?:-set)?|src)\s*\(|@import/i;
-const CSS_ESCAPE = /\\(?:([\da-f]{1,6})\s?|([^\n]))/gi;
-const ACTOR_MENU = /\b(?:properties|details)\b[^\n;]*:/i;
+export const MERMAID_MAX_TEXT = 50_000;
+/** Both frames' sandbox. Not the agent pages' (HtmlFrame): what those may be allowed must never reach this one. */
+const SANDBOX = "allow-scripts";
 
-const cssUnescaped = (text: string) =>
-  text.replace(CSS_ESCAPE, (_, hex: string | undefined, char: string | undefined) =>
-    hex ? String.fromCodePoint(Math.min(Number.parseInt(hex, 16), 0x10ffff)) : (char ?? ""),
-  );
+/** The frame mermaid draws in: the window that answers, its load (done or failed) and its removal. */
+export type MermaidFrame = { window: () => Window | null | undefined; loaded: Promise<unknown>; remove: () => void };
 
-/** Whether a ```mermaid source may be handed to mermaid (see above); if not, it shows as code. */
-export function mermaidDrawable(source: string): boolean {
-  if (source.length > MAX_TEXT) return false;
-  const text = source.replace(/\r\n?/g, "\n");
-  const front = text.match(FRONT_MATTER)?.[2];
-  if (front?.split("\n").some((line) => line.trim() && !TITLE_LINE.test(line))) return false;
-  if (text.includes("%%{")) return false;
-  if (text.includes("@{") && /img|\\/i.test(text)) return false;
-  if (text.includes("sequenceDiagram") && ACTOR_MENU.test(text)) return false;
-  return !CSS_LOAD.test(cssUnescaped(text));
+/**
+ * The outer frame's document, with the inner one where mermaid draws. `scripts`: the absolute addresses of mermaid's
+ * bundle and mermaid-frame.js, the only scripts it may run (an opaque origin has no 'self' to name them by).
+ */
+export function mermaidFrameDocument(scripts: string[]): string {
+  const head = `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${scripts.join(" ")}; style-src 'unsafe-inline'; img-src data:">`;
+  const drawing = head + scripts.map((src) => `<script src="${src}"></script>`).join("");
+  // The same size on every device, so every viewer gets the same drawing.
+  return `${head}<iframe sandbox="${SANDBOX}" width="1280" height="900" srcdoc="${escapeHtml(drawing)}"></iframe>`;
+}
+
+function sandboxFrame(): MermaidFrame {
+  const el = document.createElement("iframe");
+  el.setAttribute("sandbox", SANDBOX);
+  el.setAttribute("aria-hidden", "true");
+  el.tabIndex = -1;
+  // Off screen but laid out (not display: none): mermaid measures its text.
+  el.style.cssText = "position:fixed;left:-10000px;top:0;width:1280px;height:900px;border:0";
+  el.srcdoc = mermaidFrameDocument([mermaidBundle, frameScript].map((url) => new URL(url, document.baseURI).href));
+  const loaded = new Promise((resolve) => el.addEventListener("load", resolve, { once: true }));
+  document.body.append(el);
+  return { window: () => el.contentWindow?.[0], loaded, remove: () => el.remove() };
+}
+
+let makeFrame = sandboxFrame;
+let frame: { host: MermaidFrame; ready: Promise<void>; markReady: () => void } | null = null;
+const waiting = new Map<string, { resolve: (svg: string) => void; reject: (error: Error) => void }>();
+
+/** The frame's answers: only from its window, only in the protocol's shape. */
+function onAnswer({ source, data }: MessageEvent) {
+  if (!frame || source !== frame.host.window()) return;
+  if (data?.ready === true) frame.markReady();
+  const asked = typeof data?.id === "string" ? waiting.get(data.id) : undefined;
+  if (typeof data?.svg === "string") asked?.resolve(data.svg);
+  else if (typeof data?.error === "string") asked?.reject(new Error(data.error));
+}
+
+function currentFrame() {
+  if (!frame) {
+    window.addEventListener("message", onAnswer);
+    let markReady = () => {};
+    const ready = new Promise<void>((resolve) => {
+      markReady = resolve;
+    });
+    frame = { host: makeFrame(), ready, markReady };
+  }
+  return frame;
+}
+
+/**
+ * Mermaid's SVG for a source, drawn in the frame (made on first use and kept). It fails when mermaid can't draw the
+ * source, or hasn't answered `timeout` ms after the frame loaded: that frame is thrown away with whatever holds it up,
+ * and the next drawing gets a fresh one.
+ */
+export async function drawWithMermaid(id: string, source: string, dark: boolean, timeout = 10_000) {
+  const used = currentFrame();
+  // Counted from here, however long mermaid's bundle took to arrive.
+  await used.host.loaded;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await new Promise<string>((resolve, reject) => {
+      waiting.set(id, { resolve, reject });
+      timer = setTimeout(() => {
+        if (frame === used) {
+          used.host.remove();
+          frame = null;
+        }
+        reject(new Error("Mermaid didn't finish drawing"));
+      }, timeout);
+      used.ready.then(() => used.host.window()?.postMessage({ id, source, dark }, "*"));
+    });
+  } finally {
+    clearTimeout(timer);
+    waiting.delete(id);
+  }
+}
+
+/** Tests: the frame to draw in (a fake that answers like mermaid-frame.js), or null for the real one. */
+export function setMermaidFrame(next: (() => MermaidFrame) | null) {
+  frame?.host.remove();
+  frame = null;
+  makeFrame = next ?? sandboxFrame;
 }
 
 /**
@@ -54,19 +121,25 @@ export type Drawing = { src: string; width: number | null; title?: string; descr
 
 /** Mermaid's SVG as an image at its own size, its accessible name and description taken out for the <img>. */
 export function svgDrawing(svg: string): Drawing {
-  // Its own size, not its box's width (mermaid's "100%"): a small diagram isn't blown up to fill the box.
-  const size = svg.match(/viewBox="[^"]*?([\d.]+) ([\d.]+)"/);
-  const own = size ? svg.replace('width="100%"', `width="${size[1]}" height="${size[2]}"`) : svg;
-  // Mermaid writes accTitle and accDescr as the SVG's first <title> and <desc>, which an <img> hides from assistive
-  // technology. DOMParser's document never loads anything.
+  // DOMParser's document never loads anything.
   const root = new DOMParser().parseFromString(svg, "text/html").querySelector("svg");
+  // Its own size, not its box's width (mermaid's "100%"): a small diagram isn't blown up to fill the box.
+  const [, , width, height] =
+    root
+      ?.getAttribute("viewBox")
+      ?.trim()
+      .split(/[\s,]+/)
+      .map(Number) ?? [];
+  const own = width && height ? svg.replace('width="100%"', `width="${width}" height="${height}"`) : svg;
+  // Mermaid writes accTitle and accDescr as the SVG's first <title> and <desc>, which an <img> hides from assistive
+  // technology.
   const childText = (tag: string) =>
     Array.from(root?.children ?? [])
       .find((el) => el.localName === tag)
       ?.textContent?.trim() || undefined;
   return {
     src: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(own)}`,
-    width: size ? Number(size[1]) : null,
+    width: width || null,
     title: childText("title"),
     description: childText("desc"),
   };

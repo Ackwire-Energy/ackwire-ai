@@ -3,17 +3,200 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import { act, cleanup, render } from "@testing-library/react";
-import { drawWithMermaid, MermaidDiagram, setMermaidRenderer } from "@/components/artifacts/Mermaid";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { cleanup, render } from "@testing-library/react";
+import { MermaidDiagram, setMermaidRenderer } from "@/components/artifacts/Mermaid";
 import { createI18n } from "@/i18n";
 import { Markdown } from "@/lib/markdown";
-import { mermaidDrawable } from "@/lib/mermaid";
+import { drawWithMermaid, type MermaidFrame, mermaidFrameDocument, setMermaidFrame, svgDrawing } from "@/lib/mermaid";
 import { settle } from "./render";
 
+const fence = (source: string) => `\`\`\`mermaid\n${source}\n\`\`\``;
+const FLOW = "flowchart LR\n  A[Pedido] --> B[Deploy]";
+const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 200 80"><title>Fluxo</title></svg>';
+const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+type Request = { id: string; source: string; dark: boolean };
+/** A stand-in for the frame mermaid draws in: what the page posted to it, its load, whether it was thrown away. */
+type FakeFrame = { win: Window; posted: Request[]; load: () => void; removed: boolean };
+/** The frames the page made, oldest first. */
+const frames: FakeFrame[] = [];
+function fakeFrame(): MermaidFrame {
+  const posted: Request[] = [];
+  let load = () => {};
+  const loaded = new Promise<void>((resolve) => {
+    load = resolve;
+  });
+  const made: FakeFrame = {
+    win: { postMessage: (m: Request) => posted.push(m) } as unknown as Window,
+    posted,
+    load,
+    removed: false,
+  };
+  frames.push(made);
+  return {
+    window: () => (made.removed ? null : made.win),
+    loaded,
+    remove: () => {
+      made.removed = true;
+    },
+  };
+}
+/** A message to the page, as posted by `from`: the frame's window, or any other. */
+const post = (from: unknown, data: unknown) =>
+  window.dispatchEvent(new MessageEvent("message", { source: from as MessageEventSource, data }));
+/** The page's frame, loaded and ready, the way mermaid-frame.js says it is. */
+async function readyFrame(index = 0) {
+  const made = frames[index] as FakeFrame;
+  made.load();
+  await tick();
+  post(made.win, { ready: true });
+  await tick();
+  return made;
+}
+
+beforeAll(() => createI18n("pt-BR"));
+afterAll(() => {
+  setMermaidFrame(null);
+  setMermaidRenderer(null);
+});
+beforeEach(() => {
+  frames.length = 0;
+  setMermaidFrame(fakeFrame);
+  // The real renderer, with nothing drawn yet.
+  setMermaidRenderer(null);
+});
+afterEach(() => cleanup());
+
+describe("the frame mermaid draws in", () => {
+  test("a drawing is sent once the frame has loaded and said it's ready, and comes back as its SVG", async () => {
+    const drawing = drawWithMermaid("d1", FLOW, true);
+    const made = frames[0] as FakeFrame;
+    made.load();
+    await tick();
+    expect(made.posted).toEqual([]);
+    post(made.win, { ready: true });
+    await tick();
+    expect(made.posted).toEqual([{ id: "d1", source: FLOW, dark: true }]);
+    post(made.win, { id: "d1", svg: SVG });
+    expect(await drawing).toBe(SVG);
+  });
+
+  test("one mermaid can't draw fails with mermaid's error, and the frame is kept for the next", async () => {
+    const drawing = drawWithMermaid("bad", "sequenceDiagram\n  Ana-->>", false);
+    const made = await readyFrame();
+    post(made.win, { id: "bad", error: "Error: Parse error on line 2" });
+    await expect(drawing).rejects.toThrow("Parse error on line 2");
+    const next = drawWithMermaid("good", FLOW, false);
+    await tick();
+    expect(frames).toHaveLength(1);
+    expect(made.posted.at(-1)).toEqual({ id: "good", source: FLOW, dark: false });
+    post(made.win, { id: "good", svg: SVG });
+    expect(await next).toBe(SVG);
+  });
+
+  test("only the frame's own window is heard, and only in the protocol's shape", async () => {
+    // Another frame on the page, like an agent's HTML page.
+    const other = { postMessage() {} };
+    const drawing = drawWithMermaid("d2", FLOW, false);
+    const made = frames[0] as FakeFrame;
+    post(other, { ready: true });
+    made.load();
+    await tick();
+    expect(made.posted).toEqual([]);
+    post(made.win, { ready: true });
+    await tick();
+    expect(made.posted).toHaveLength(1);
+    const fake = '<svg xmlns="http://www.w3.org/2000/svg"><text>fake</text></svg>';
+    for (const [from, data] of [
+      [other, { id: "d2", svg: fake }],
+      [window, { id: "d2", svg: fake }],
+      [null, { id: "d2", svg: fake }],
+      [made.win, { id: "d2", svg: 1 }],
+      [made.win, { id: 2, svg: fake }],
+      [made.win, { id: "d3", svg: fake }],
+      [made.win, [{ id: "d2", svg: fake }]],
+      [made.win, fake],
+      [made.win, null],
+    ])
+      post(from, data);
+    post(made.win, { id: "d2", svg: SVG });
+    expect(await drawing).toBe(SVG);
+  });
+
+  test("a frame that doesn't answer in time is thrown away, and the next drawing gets a fresh one", async () => {
+    const stuck = drawWithMermaid("stuck", FLOW, false, 30);
+    const first = await readyFrame();
+    await expect(stuck).rejects.toThrow("didn't finish");
+    expect(first.removed).toBe(true);
+    const next = drawWithMermaid("next", FLOW, false, 1000);
+    expect(frames).toHaveLength(2);
+    const second = await readyFrame(1);
+    expect(second.posted).toEqual([{ id: "next", source: FLOW, dark: false }]);
+    // The block that timed out may try again: it goes to the fresh frame too.
+    const again = drawWithMermaid("stuck-again", FLOW, false, 1000);
+    await tick();
+    post(second.win, { id: "next", svg: SVG });
+    post(second.win, { id: "stuck-again", svg: SVG });
+    expect([await next, await again]).toEqual([SVG, SVG]);
+  });
+
+  test("the time allowed counts from the frame's load, however slow mermaid's bundle is to arrive", async () => {
+    const drawing = drawWithMermaid("slow", FLOW, false, 30);
+    await new Promise((resolve) => setTimeout(resolve, 90));
+    const made = await readyFrame();
+    expect(made.removed).toBe(false);
+    post(made.win, { id: "slow", svg: SVG });
+    expect(await drawing).toBe(SVG);
+  });
+
+  test("a fence on the page is drawn in the frame; a page without one makes no frame", async () => {
+    render(<Markdown source={"# Notas\n\n```ts\nconst a = 1;\n```"} />);
+    await settle();
+    expect(frames).toEqual([]);
+    const el = render(<Markdown source={fence(FLOW)} />).container;
+    await settle();
+    const made = await readyFrame();
+    const [asked] = made.posted;
+    expect(asked).toEqual({ id: expect.any(String), source: FLOW, dark: false });
+    post(made.win, { id: asked?.id, svg: SVG });
+    await settle();
+    expect(el.querySelector(".code-card__preview img")?.getAttribute("alt")).toBe("Fluxo");
+  });
+
+  test("a diagram longer than mermaid draws stays code, in Drive too, and never reaches the frame", async () => {
+    const long = `flowchart LR\n  A[${"x".repeat(50_000)}] --> B`;
+    const el = render(<MermaidDiagram source={long} label="Diagrama: Fluxo" />).container;
+    await settle();
+    expect(el.querySelector(".artifact-diagram--failed code")?.textContent).toBe(long);
+    expect(frames).toEqual([]);
+  });
+
+  test("both frames are sandboxed with scripts only, and load nothing but mermaid's bundle and mermaid-frame.js", () => {
+    const scripts = [
+      "https://agentes.example/assets/mermaid.min-a1.js",
+      "https://agentes.example/assets/mermaid-frame-b2.js",
+    ];
+    const csp = `default-src 'none'; script-src ${scripts.join(" ")}; style-src 'unsafe-inline'; img-src data:`;
+    const parse = (html: string) => new DOMParser().parseFromString(html, "text/html");
+    const policy = (doc: Document) =>
+      doc.querySelector('meta[http-equiv="Content-Security-Policy"]')?.getAttribute("content");
+    const outer = parse(mermaidFrameDocument(scripts));
+    expect(policy(outer)).toBe(csp);
+    expect(outer.querySelectorAll("script")).toHaveLength(0);
+    const inner = outer.querySelector("iframe");
+    expect(inner?.getAttribute("sandbox")).toBe("allow-scripts");
+    const drawing = parse(inner?.getAttribute("srcdoc") ?? "");
+    expect(policy(drawing)).toBe(csp);
+    expect(Array.from(drawing.querySelectorAll("script"), (s) => s.getAttribute("src"))).toEqual(scripts);
+  });
+});
+
 /*
- * The real mermaid 11.17.2, drawing in this test's page. Nothing reaches the network here: every place where markup
- * turns into a load is recorded instead (`new Image().src`, URL and style attributes, HTML handed to the parser,
- * <style> text, style properties), and the outside host is reserved (.invalid).
+ * mermaid-frame.js with the real mermaid 11.17.2, drawing in this test's page instead of the frame. Nothing reaches
+ * the network here: every place where markup turns into a load is recorded instead (`new Image().src`, URL and style
+ * attributes, HTML handed to the parser, <style> text, style properties), and the outside host is reserved (.invalid).
  */
 
 const HOST = "attacker.invalid";
@@ -24,9 +207,8 @@ const note = (where: string, value: unknown) => {
   if (String(value).includes(HOST)) requested.push(`${where}: ${value}`);
 };
 
-/** `new Image()` the way mermaid's image nodes use it; `decode` can be swapped for a load that never ends. */
+/** `new Image()` the way mermaid's image nodes use it. */
 class RecordingImage {
-  static decode = () => Promise.resolve();
   naturalWidth = 10;
   naturalHeight = 10;
   #src = "";
@@ -38,10 +220,12 @@ class RecordingImage {
     this.#src = value;
   }
   decode() {
-    return RecordingImage.decode();
+    return Promise.resolve();
   }
 }
 
+/** The real mermaid, loaded once the DOM is attached: its sanitizer takes the window it finds when it loads. */
+let mermaid: typeof import("mermaid")["default"];
 const restore: (() => void)[] = [];
 function patch(target: object, key: string, descriptor: PropertyDescriptor) {
   const before = Object.getOwnPropertyDescriptor(target, key);
@@ -49,121 +233,31 @@ function patch(target: object, key: string, descriptor: PropertyDescriptor) {
   restore.push(() => (before ? Object.defineProperty(target, key, before) : Reflect.deleteProperty(target, key)));
 }
 
-beforeAll(() => {
-  createI18n("pt-BR");
-  // What a browser has and happy-dom lacks, so mermaid takes the paths it takes there: MathML (without it each
-  // `$$…$$` becomes the text "MathML is unsupported") and text with a box (without one every label fails its
-  // measuring). Blank text has none, as in Chromium.
-  patch(window, "MathMLElement", { value: class {}, writable: true });
-  patch(SVGGraphicsElement.prototype, "getBBox", {
-    value(this: SVGGraphicsElement) {
-      const text = this.textContent?.trim() ?? "";
-      return new DOMRect(0, 0, text.length * 8, text ? 16 : 0);
+/** mermaid-frame.js run here: what it answered, and a way to post to it as `from` (by default, the page it answers). */
+function frameScript() {
+  const answers: unknown[] = [];
+  const page = { postMessage: (message: unknown) => answers.push(message) };
+  let listener = async (_event: { source: unknown; data: unknown }) => {};
+  const code = readFileSync(join(import.meta.dir, "../src/lib/mermaid-frame.js"), "utf8");
+  // Its globals in the frame: the window above the outer frame is the page, and mermaid's bundle defines `mermaid`.
+  new Function("parent", "addEventListener", "mermaid", code)(
+    { parent: page },
+    (_type: string, added: typeof listener) => {
+      listener = added;
     },
-  });
-  const inPage = (node: Node) => node.ownerDocument === document;
-  const loads = (name: string) => /^(?:src|srcset|href|background|poster|data|style)$/i.test(name.replace(/^.*:/, ""));
-  patch(globalThis, "Image", { value: RecordingImage, writable: true });
-  const { setAttribute, setAttributeNS, insertAdjacentHTML } = Element.prototype;
-  patch(Element.prototype, "setAttribute", {
-    value(this: Element, name: string, value: string) {
-      if (inPage(this) && loads(name)) note(`<${this.localName} ${name}>`, value);
-      setAttribute.call(this, name, value);
-    },
-  });
-  patch(Element.prototype, "setAttributeNS", {
-    value(this: Element, ns: string | null, name: string, value: string) {
-      if (inPage(this) && loads(name)) note(`<${this.localName} ${name}>`, value);
-      setAttributeNS.call(this, ns, name, value);
-    },
-  });
-  patch(Element.prototype, "insertAdjacentHTML", {
-    value(this: Element, where: InsertPosition, html: string) {
-      if (inPage(this)) note(`<${this.localName}> HTML`, html);
-      insertAdjacentHTML.call(this, where, html);
-    },
-  });
-  for (const proto of [Node.prototype, Element.prototype, HTMLElement.prototype, SVGElement.prototype])
-    for (const key of ["innerHTML", "outerHTML", "textContent"]) {
-      const own = Object.getOwnPropertyDescriptor(proto, key);
-      if (!own?.set) continue;
-      patch(proto, key, {
-        get: own.get,
-        set(this: Node, value: string) {
-          if (inPage(this) && (key !== "textContent" || this.nodeName === "STYLE"))
-            note(`<${this.nodeName.toLowerCase()}> ${key === "textContent" ? "text" : "HTML"}`, value);
-          own.set?.call(this, value);
-        },
-      });
-    }
-  const { setProperty } = CSSStyleDeclaration.prototype;
-  patch(CSSStyleDeclaration.prototype, "setProperty", {
-    value(this: CSSStyleDeclaration, name: string, value: string, priority?: string) {
-      note(`style ${name}`, value);
-      setProperty.call(this, name, value, priority);
-    },
-  });
-});
-afterAll(() => {
-  for (const undo of restore.reverse()) undo();
-  setMermaidRenderer(null);
-});
-beforeEach(() => {
-  requested.length = 0;
-  // The real mermaid, with nothing drawn yet.
-  setMermaidRenderer(null);
-});
-afterEach(() => cleanup());
+    mermaid,
+  );
+  const ask = async (data: unknown, from: unknown = page) => {
+    const before = answers.length;
+    await listener({ source: from, data });
+    return answers.length > before ? answers.at(-1) : undefined;
+  };
+  return { answers, ask };
+}
 
-const fence = (source: string) => `\`\`\`mermaid\n${source}\n\`\`\``;
-const IMAGE_NODE = `flowchart TD\n  A@{ img: "${LEAK}" }`;
-const CLASS_URL = `stateDiagram-v2\n  [*] --> s1\n  classDef c fill:url(${LEAK})\n  class s1 c`;
-const ICON_AFTER_END = `sequenceDiagram\n  participant A\n  loop L\n    A->>A: x\n  end properties A: {"icon": "${LEAK}"}`;
-/** Ways a source can make the page load a URL while mermaid 11.17.2 draws, in some diagram type or another. */
-const PATHS: [string, string][] = [
-  ["an image node", IMAGE_NODE],
-  ["an image node with an escaped YAML key", `flowchart TD\n  A@{ "\\x69mg": "${LEAK}" }`],
-  ["an image node with a relative URL", 'flowchart TD\n  A@{ img: "/api/app/me" }'],
-  [
-    "%%{init}%% themeCSS",
-    `%%{init: {"themeCSS": ".node rect { mask-image: url(${LEAK}) }"}}%%\nflowchart LR\n  A --> B`,
-  ],
-  [
-    "%%{initialize}%% fontFamily",
-    `%%{initialize: {"fontFamily": "x; mask-image: url(${LEAK})"}}%%\nflowchart LR\n  A --> B`,
-  ],
-  [
-    "front matter themeCSS",
-    `---\nconfig:\n  themeCSS: ".node rect { mask-image: url(${LEAK}) }"\n---\nflowchart LR\n  A --> B`,
-  ],
-  [
-    "front matter with an escaped key",
-    `---\n"\\x63onfig": {fontFamily: "x; mask-image: url(${LEAK})"}\n---\nflowchart LR\n  A --> B`,
-  ],
-  ["a classDef url()", CLASS_URL],
-  ["a CSS-escaped url()", `stateDiagram-v2\n  [*] --> s1\n  classDef c mask-image:\\75 rl(${LEAK})\n  class s1 c`],
-  ["a style image-set()", `flowchart LR\n  A --> B\n  style A mask-image:image-set("${LEAK}" 1x)`],
-  ["a linkStyle url()", `flowchart LR\n  A --> B\n  linkStyle 0 stroke:url(${LEAK})`],
-  ["a gantt todayMarker", `gantt\n  todayMarker mask-image:url(${LEAK})\n  section S\n  T :a1, 2024-01-01, 3d`],
-  ["a sequence actor's icon", `sequenceDiagram\n  participant A\n  properties A: {"icon": "${LEAK}"}`],
-  ["a sequence actor's icon after an end", ICON_AFTER_END],
-  [
-    "a sequence actor's icon after a box's end",
-    `sequenceDiagram\n  box G\n  participant A\n  end properties A: {"icon": "${LEAK}"}`,
-  ],
-  [
-    "a sequence actor's icon on the diagram's first line",
-    `sequenceDiagram properties A: {"icon": "${LEAK}"}\n  participant A`,
-  ],
-  ["a sequence actor's details, read from the page", "sequenceDiagram\n  participant A\n  details A: root"],
-  [
-    "a sequence actor's details after an end",
-    "sequenceDiagram\n  participant A\n  loop L\n    A->>A: x\n  end details A: root",
-  ],
-];
 /**
- * Label HTML that mermaid puts in the page, spelled the ways a tag check misses. These do reach mermaid: its sanitizer,
- * set by drawWithMermaid, is what drops what would load.
+ * Label HTML that mermaid puts in the document, spelled the ways a tag check misses. Its sanitizer, as
+ * mermaid-frame.js sets it, drops what would load.
  */
 const LABEL_HTML: [string, string][] = [
   [
@@ -186,34 +280,17 @@ const LABEL_HTML: [string, string][] = [
   ["an architecture service's text", `architecture-beta\n  service s1 "<img alt src=${LEAK}>"[S1]`],
   ["an architecture service's text, a backslash after <", `architecture-beta\n  service s1 "<\\img src=${LEAK}>"[S1]`],
 ];
-/** Diagrams as people and agents write them, which must still draw. */
-const EVERYDAY = [
-  "---\ntitle: Fluxo de deploy\n---\nflowchart LR\n  A[Linha 1<br/>Linha 2] --> B[<b>forte</b><br>e <i>itálico</i>]",
-  "flowchart LR\n  A{x < y} --> B{a<b}\n  B --> C[n <= 1]\n  classDef hot fill:#f96,stroke:rgb(10,20,30)\n  class A hot\n  style B fill:#bbf\n  linkStyle 0 stroke:#ff3",
-  'flowchart LR\n  A@{ shape: rounded, label: "Início" } --> B',
-  "classDiagram\n  class Animal {\n    <<interface>>\n    +List~int~ ids\n    +Map~String, Integer~ m\n  }\n  Animal <|-- Duck",
-  "sequenceDiagram\n  Ana->>Bia: Olá<br/>tudo bem?\n  Note over Ana: detalhes do pedido\n  Bia-->>Ana: Sim",
-  "%% um comentário\nflowchart LR\n  accTitle: Fluxo\n  accDescr: Do pedido ao deploy\n  A --> B",
-  'sequenceDiagram\n  Ana->>Bia: os details do pedido\n  Bia-->>Ana: <b class="ok">feito</b> em $$t_1$$',
-  "classDiagram\n  class Repo {\n    +Map<String, Integer> counts\n  }",
+/** A diagram's own settings that would reach the document's CSS. */
+const SETTINGS = [
+  `%%{init: {"themeCSS": ".node rect { mask-image: url(${LEAK}) }"}}%%\nflowchart LR\n  A --> B`,
+  `%%{initialize: {"fontFamily": "x; mask-image: url(${LEAK})"}}%%\nflowchart LR\n  A --> B`,
+  `---\nconfig:\n  themeCSS: ".node rect { mask-image: url(${LEAK}) }"\n---\nflowchart LR\n  A --> B`,
+  `---\n"\\x63onfig": {fontFamily: "x; mask-image: url(${LEAK})"}\n---\nflowchart LR\n  A --> B`,
 ];
-/** A diagram most pages would have: a title, a line break in a label, a color. */
-const PLAIN =
-  "---\ntitle: Fluxo\n---\nflowchart LR\n  A[Pedido<br/>novo] --> B[Deploy]\n  classDef hot fill:#f96\n  class A hot";
 
-/** Waits until `count` diagrams in `el` are drawn by the real mermaid. */
-async function untilDrawn(el: Element, count: number) {
-  for (let i = 0; i < 300 && el.querySelectorAll(".code-card__preview img").length < count; i++)
-    await act(() => new Promise<void>((resolve) => setTimeout(resolve, 10)));
-}
-
-/**
- * Mermaid with its own sanitizer settings instead of drawWithMermaid's; what it leaves in <body> is then removed. It
- * draws a participant's label without waiting for it, hence the settle.
- */
+/** Mermaid with its own sanitizer settings instead of mermaid-frame.js's; what it leaves in <body> is then removed. */
 async function drawRaw(id: string, source: string) {
   const before = new Set(document.body.children);
-  const { default: mermaid } = await import("mermaid");
   mermaid.initialize({
     startOnLoad: false,
     htmlLabels: false,
@@ -221,109 +298,135 @@ async function drawRaw(id: string, source: string) {
     suppressErrorRendering: true,
   });
   await mermaid.mermaidAPI.render(id, source).catch(() => {});
+  // It draws a participant's label without waiting for it.
   await settle();
   for (const el of Array.from(document.body.children)) if (!before.has(el)) el.remove();
 }
 
-describe("a ```mermaid fence can't make the page load anything", () => {
-  test("sources that would are refused; everyday diagrams aren't", () => {
-    for (const [name, source] of PATHS) expect([name, mermaidDrawable(source)]).toEqual([name, false]);
-    for (const source of EVERYDAY) expect([source, mermaidDrawable(source)]).toEqual([source, true]);
-    // Past mermaid's maxTextSize it would draw a red error box.
-    expect(mermaidDrawable(`flowchart LR\n  A[${"x".repeat(50_000)}] --> B`)).toBe(false);
+describe("inside the frame, mermaid-frame.js", () => {
+  beforeAll(async () => {
+    mermaid = (await import("mermaid")).default;
+    // What a browser has and happy-dom lacks, so mermaid takes the paths it takes there: MathML (without it each
+    // `$$…$$` becomes the text "MathML is unsupported") and text with a box (without one every label fails its
+    // measuring). Blank text has none, as in Chromium.
+    patch(window, "MathMLElement", { value: class {}, writable: true });
+    patch(SVGGraphicsElement.prototype, "getBBox", {
+      value(this: SVGGraphicsElement) {
+        const text = this.textContent?.trim() ?? "";
+        return new DOMRect(0, 0, text.length * 8, text ? 16 : 0);
+      },
+    });
+    const inPage = (node: Node) => node.ownerDocument === document;
+    const loads = (name: string) =>
+      /^(?:src|srcset|href|background|poster|data|style)$/i.test(name.replace(/^.*:/, ""));
+    patch(globalThis, "Image", { value: RecordingImage, writable: true });
+    const { setAttribute, setAttributeNS, insertAdjacentHTML } = Element.prototype;
+    patch(Element.prototype, "setAttribute", {
+      value(this: Element, name: string, value: string) {
+        if (inPage(this) && loads(name)) note(`<${this.localName} ${name}>`, value);
+        setAttribute.call(this, name, value);
+      },
+    });
+    patch(Element.prototype, "setAttributeNS", {
+      value(this: Element, ns: string | null, name: string, value: string) {
+        if (inPage(this) && loads(name)) note(`<${this.localName} ${name}>`, value);
+        setAttributeNS.call(this, ns, name, value);
+      },
+    });
+    patch(Element.prototype, "insertAdjacentHTML", {
+      value(this: Element, where: InsertPosition, html: string) {
+        if (inPage(this)) note(`<${this.localName}> HTML`, html);
+        insertAdjacentHTML.call(this, where, html);
+      },
+    });
+    for (const proto of [Node.prototype, Element.prototype, HTMLElement.prototype, SVGElement.prototype])
+      for (const key of ["innerHTML", "outerHTML", "textContent"]) {
+        const own = Object.getOwnPropertyDescriptor(proto, key);
+        if (!own?.set) continue;
+        patch(proto, key, {
+          get: own.get,
+          set(this: Node, value: string) {
+            if (inPage(this) && (key !== "textContent" || this.nodeName === "STYLE"))
+              note(`<${this.nodeName.toLowerCase()}> ${key === "textContent" ? "text" : "HTML"}`, value);
+            own.set?.call(this, value);
+          },
+        });
+      }
+    const { setProperty } = CSSStyleDeclaration.prototype;
+    patch(CSSStyleDeclaration.prototype, "setProperty", {
+      value(this: CSSStyleDeclaration, name: string, value: string, priority?: string) {
+        note(`style ${name}`, value);
+        setProperty.call(this, name, value, priority);
+      },
+    });
+  });
+  afterAll(() => {
+    for (const undo of restore.reverse()) undo();
+  });
+  beforeEach(() => {
+    requested.length = 0;
   });
 
-  test.each(PATHS)("%s: stays code and the page asks for nothing", async (_, source) => {
-    const el = render(<Markdown source={`${fence(source)}\n\n${fence(PLAIN)}`} />).container;
-    // The diagram after it is drawn by the real mermaid, so the drawings went past this one.
-    await untilDrawn(el, 1);
-    const [first, second] = el.querySelectorAll(".code-card");
-    expect(first?.querySelector(".code-card__code")?.textContent).toBe(source);
-    expect(second?.querySelector(".code-card__preview img")).not.toBeNull();
-    expect(requested).toEqual([]);
-  });
-
-  test("Drive's diagrams take the same check", async () => {
-    const el = render(<MermaidDiagram source={IMAGE_NODE} label="Diagrama: Fluxo" />).container;
-    await settle();
-    expect(el.querySelector(".artifact-diagram--failed code")?.textContent).toBe(IMAGE_NODE);
-    expect(requested).toEqual([]);
+  test("it answers the page that made it and no one else, each drawing as its SVG or mermaid's error", async () => {
+    const frame = frameScript();
+    expect(frame.answers).toEqual([{ ready: true }]);
+    expect(await frame.ask({ id: "a", source: FLOW, dark: false }, { postMessage() {} })).toBeUndefined();
+    for (const data of [{ id: 1, source: FLOW }, { id: "a", source: 1 }, FLOW, null])
+      expect(await frame.ask(data)).toBeUndefined();
+    const drawn = (await frame.ask({ id: "a", source: FLOW, dark: false })) as { id: string; svg: string };
+    expect(drawn.id).toBe("a");
+    expect(svgDrawing(drawn.svg).width).toBeGreaterThan(0);
+    expect(await frame.ask({ id: "b", source: "sequenceDiagram\n  Ana-->>", dark: true })).toEqual({
+      id: "b",
+      error: expect.stringContaining("Parse error"),
+    });
   });
 
   let labels = 0;
-  test.each(LABEL_HTML)("%s: its HTML reaches the page without anything that loads", async (_, source) => {
-    const id = `label-${++labels}`;
-    expect(mermaidDrawable(source)).toBe(true);
+  test.each(LABEL_HTML)("%s: its HTML goes into the document without anything that loads", async (_, source) => {
+    const frame = frameScript();
     // Under happy-dom an architecture diagram fails at its layout (no canvas), after its services are drawn. What a
-    // participant's label puts in the page after the drawing is done counts too.
-    await drawWithMermaid(id, source, false).catch(() => {});
+    // participant's label puts in the document after the drawing is done counts too.
+    await frame.ask({ id: "label", source, dark: false });
     await settle();
     expect(requested).toEqual([]);
-    // With mermaid's own sanitizer settings the page asks for the URL: this label's HTML does reach the page.
-    await drawRaw(`raw-${id}`, source);
+    // With mermaid's own sanitizer settings the document asks for the URL: this label's HTML does reach it.
+    await drawRaw(`raw-${++labels}`, source);
     expect(requested).not.toEqual([]);
   });
-});
 
-describe("the real mermaid", () => {
-  test("left to itself, it asks for an image node's URL, puts a classDef's url() in the page's CSS and an actor's icon in an <image>", async () => {
-    await drawWithMermaid("probe-image", IMAGE_NODE, false);
+  test("a diagram's own settings that would reach CSS are dropped", async () => {
+    const frame = frameScript();
+    for (const source of SETTINGS) expect(await frame.ask({ id: "s", source, dark: false })).toHaveProperty("svg");
+    expect(requested).toEqual([]);
+  });
+
+  test("what its settings let through, an image node, a classDef's url() and an actor's icon, is the frame's CSP to stop", async () => {
+    const frame = frameScript();
+    await frame.ask({ id: "image", source: `flowchart TD\n  A@{ img: "${LEAK}" }`, dark: false });
     expect(requested).toContain(`new Image().src: ${LEAK}`);
     requested.length = 0;
-    await drawWithMermaid("probe-css", CLASS_URL, false);
+    const classUrl = `stateDiagram-v2\n  [*] --> s1\n  classDef c fill:url(${LEAK})\n  class s1 c`;
+    await frame.ask({ id: "css", source: classUrl, dark: false });
     expect(requested.some((r) => r.startsWith("<style> HTML") && r.includes(LEAK))).toBe(true);
     requested.length = 0;
-    await drawWithMermaid("probe-icon", ICON_AFTER_END, false);
+    const icon = `sequenceDiagram\n  participant A\n  properties A: {"icon": "${LEAK}"}`;
+    await frame.ask({ id: "icon", source: icon, dark: false });
     expect(requested).toContain(`<image href>: ${LEAK}`);
   });
 
-  test("drops a diagram's own settings that reach the page's CSS, should one get past the check", async () => {
-    const settings = PATHS.filter(([name]) => /%%|front matter/.test(name)).map(([, source]) => source);
-    for (const [i, source] of settings.entries()) await drawWithMermaid(`settings-${i}`, source, false);
-    expect(requested).toEqual([]);
-  });
-
-  test("a drawing that never finishes gives up, leaves nothing in <body> and holds no other back", async () => {
-    RecordingImage.decode = () => new Promise(() => {});
-    try {
-      const hanging = 'flowchart TD\n  A@{ img: "https://slow.invalid/x.png" }';
-      await expect(drawWithMermaid("hang", hanging, false, 50)).rejects.toThrow("didn't finish");
-    } finally {
-      RecordingImage.decode = () => Promise.resolve();
-    }
-    expect(document.getElementById("dhang")).toBeNull();
-    // In mermaid's own queue this one would wait behind the drawing still hanging.
-    expect(await drawWithMermaid("after-hang", "flowchart LR\n  A --> B", false, 2000)).toBeString();
-  });
-
-  test("a drawing that fails takes what mermaid put in <body> with it, and only that", async () => {
-    const inBody = () => Array.from(document.body.children, (el) => el.outerHTML.slice(0, 80));
-    const before = inBody();
+  test("a drawing that fails takes everything mermaid left in its body with it", async () => {
+    const frame = frameScript();
     // A blank line in a label has no box to measure: mermaid stops with its measuring <svg> still in <body>.
-    const drawing = drawWithMermaid("blank-line", "sequenceDiagram\n  A->>B: a<br> <br>b", false);
-    // Added meanwhile by someone else, like a toast.
-    const toast = document.body.appendChild(document.createElement("output"));
-    await expect(drawing).rejects.toThrow("not in render tree");
-    expect(inBody()).toEqual([...before, "<output></output>"]);
-    toast.remove();
+    const failed = await frame.ask({ id: "blank", source: "sequenceDiagram\n  A->>B: a<br> <br>b", dark: false });
+    expect(failed).toEqual({ id: "blank", error: expect.stringContaining("not in render tree") });
+    expect(document.body.children).toHaveLength(0);
   });
 
-  test("a gantt is drawn 720px wide, which a card fits, not as wide as the box it's drawn in", async () => {
-    const boxes: string[] = [];
-    const { setAttribute } = Element.prototype;
-    Element.prototype.setAttribute = function (this: Element, name: string, value: string) {
-      if (name === "viewBox") boxes.push(value);
-      setAttribute.call(this, name, value);
-    };
-    try {
-      await drawWithMermaid(
-        "gantt",
-        "gantt\n  dateFormat YYYY-MM-DD\n  section Entrega\n  Build :a1, 2024-01-01, 3d",
-        false,
-      );
-    } finally {
-      Element.prototype.setAttribute = setAttribute;
-    }
-    expect(boxes).toEqual([expect.stringMatching(/^0 0 720 /)]);
+  test("a gantt is drawn 720px wide, which a card fits, not as wide as the frame", async () => {
+    const frame = frameScript();
+    const gantt = "gantt\n  dateFormat YYYY-MM-DD\n  section Entrega\n  Build :a1, 2024-01-01, 3d";
+    const drawn = (await frame.ask({ id: "g", source: gantt, dark: false })) as { svg: string };
+    expect(svgDrawing(drawn.svg).width).toBe(720);
   });
 });
