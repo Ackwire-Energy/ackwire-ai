@@ -115,7 +115,8 @@ export function createAuth(deps: {
     // Apple posts the sign-in result back from its own origin (`response_mode=form_post`).
     trustedOrigins: [config.PUBLIC_URL, ...devOrigins, ...appOrigins, ...(apple ? [APPLE_ORIGIN] : [])],
     // A provider's refusal lands on the sign-in page, which says why, when the sign-in named no page for it: the web's
-    // and the Mac app's name it, the phone's browser sign-in doesn't (its sheet would show Better Auth's bare page).
+    // and the Mac app's name it, the phone's browser sign-in doesn't. Without this, Better Auth's error page sends a
+    // production server to `/?error=`, which drops the code on its way to the sign-in page (its HTML page is dev-only).
     onAPIError: { errorURL: "/login" },
     plugins: [
       expo(),
