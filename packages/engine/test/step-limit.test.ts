@@ -3,6 +3,7 @@ import { eq, schema } from "@agenteschat/db";
 import type { ContentBlock, ModelRequest } from "@agenteschat/providers";
 import {
   ConflictError,
+  cancelRun,
   continuedTranscript,
   continueRun,
   createAgentRuns,
@@ -19,7 +20,7 @@ import {
   type Transcript,
   WRAP_UP_REPLY_NOTE,
 } from "../src";
-import { type Fixture, setup } from "./fixtures";
+import { addMember, type Fixture, setup } from "./fixtures";
 
 /**
  * A conversation run at its cap of model calls: told once to wrap up near it, it ends done with where it
@@ -226,6 +227,29 @@ describe("a conversation run that reaches its step limit mid-work", () => {
     expect(JSON.stringify(sent.messages)).toContain('"signature":"sig-1"');
     // A person asked it to go on: its `pass` is refused, and it answers.
     expect((await agentMessages(runId)).map((m) => m.body)).toEqual(["Revisei o #42 também."]);
+  });
+
+  test("a member who pressed Continuar asked for the run it started: they may continue it again, and stop it", async () => {
+    f = await setup({
+      toolSources: [workTools()],
+      reply: () => ({ chunks: [], toolUses: [{ name: "look", input: {} }] }),
+    });
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const asked = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "person", userId: bia.id },
+      body: "@dev olha os PRs",
+    });
+    await f.db.transaction((tx) => createAgentRuns(tx, asked, [f.agent.id], "mention"));
+    await drainOutbox(f.db, handlers(2));
+    const [first] = await runs();
+
+    const { runId: second } = await continueRun(deps(), bia.id, f.org.id, first?.id ?? "");
+    await drainOutbox(f.db, handlers(2));
+    expect((await agentMessages(second))[0]?.meta.bodyCode).toBe("step_limit");
+    const { runId: third } = await continueRun(deps(), bia.id, f.org.id, second);
+    await expect(cancelRun(deps(), bia.id, f.org.id, third)).resolves.toMatchObject({ status: "canceled" });
   });
 
   test("a run that ended done any other way can't be continued", async () => {
