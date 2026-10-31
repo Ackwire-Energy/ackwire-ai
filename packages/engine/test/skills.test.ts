@@ -338,8 +338,8 @@ describe("import", () => {
     f = await setup();
     const md = (name: string, description: string) => `---\nname: ${name}\ndescription: ${description}\n---\n# ${name}`;
     const archive = zip({
-      "skills-main/fonts/SKILL.md": md("fonts", "Desenha com as fontes da marca."),
-      "skills-main/fonts/brand.svg": "x".repeat(SKILL_LIMITS.maxBytes),
+      "skills-main/logo/SKILL.md": md("logo", "Desenha com o logo da marca."),
+      "skills-main/logo/brand.svg": "x".repeat(SKILL_LIMITS.maxBytes),
       "skills-main/good/SKILL.md": md("good", "Funciona."),
       "skills-main/long/SKILL.md": md("long", "x".repeat(1100)),
     });
@@ -348,7 +348,7 @@ describe("import", () => {
     expect(await importSkillFromUrl(deps, f.owner.id, f.org.id, url)).toEqual({
       choices: [{ path: "good", name: "good", description: "Funciona." }],
       skipped: [
-        { path: "fonts", code: "skill.too_large", message: "The skill is too large (max 2 MB)", params: { max: 2 } },
+        { path: "logo", code: "skill.too_large", message: "The skill is too large (max 2 MB)", params: { max: 2 } },
         {
           path: "long",
           code: "skill.invalid_description",

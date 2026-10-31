@@ -55,6 +55,8 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
   schedulingReminder: "bell",
   cancelingReminder: "bell",
   listingReminders: "bell",
+  followingUp: "clock",
+  cancelingFollowUp: "clock",
   creatingRoutine: "routines",
   updatingRoutine: "routines",
   listingRoutines: "routines",
