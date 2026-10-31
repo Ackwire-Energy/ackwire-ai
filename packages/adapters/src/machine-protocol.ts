@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 27;
+export const MACHINE_PROTOCOL_VERSION = 29;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -328,6 +328,51 @@ export const DESKTOP_TEXT_PROTOCOL = 25;
 export const DESKTOP_TEXT_MAX = 16_000;
 
 /**
+ * From this protocol on (ADR 0040 §11): `browser.warm` starts the agent's
+ * Chrome ahead of its first command, where that command would start it, on a
+ * blank page with no stream; it does nothing while a person has the agent's
+ * browser, while its Chrome runs or starts, or when it would take the
+ * computer's last free browser. The answers of `browser.act`, `browser.batch`
+ * and `browser.warm` say what they waited on before running (`setup`). The
+ * server never sends `browser.warm` to an older runner, whose answers carry
+ * no `setup`.
+ */
+export const BROWSER_WARM_PROTOCOL = 27;
+
+/**
+ * From this protocol on: `brain.turn` carries `contextTokens`, the most context the agent's model reads
+ * (Claude Code compacts there, `CLAUDE_CODE_AUTO_COMPACT_WINDOW`; Codex too, `model_auto_compact_token_limit`).
+ * An older runner never sees it.
+ */
+export const CONTEXT_LIMIT_PROTOCOL = 28;
+
+/**
+ * Protocol 27: what an agent's browser request waited on before it ran, in
+ * milliseconds, each only when it happened: its worker starting (system mode),
+ * `agent-browser` and Chrome for Testing being found or installed, the
+ * requests ahead of it in the agent's queue, the agent's desktop starting, and
+ * Chrome starting.
+ */
+export interface BrowserSetup {
+  worker?: number;
+  install?: number;
+  queued?: number;
+  desktop?: number;
+  launch?: number;
+}
+
+/** A runner's `setup` as the server keeps it: the known steps, whole milliseconds up to an hour; null when none. */
+export function browserSetupOf(v: unknown): BrowserSetup | null {
+  if (typeof v !== "object" || v === null) return null;
+  const out: BrowserSetup = {};
+  for (const key of ["worker", "install", "queued", "desktop", "launch"] as const) {
+    const ms = (v as Record<string, unknown>)[key];
+    if (typeof ms === "number" && Number.isInteger(ms) && ms >= 0 && ms <= 3_600_000) out[key] = ms;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+/**
  * From this protocol on (ADR 0059 §2, amended 2026-10-30): one sign-in thinks
  * for every agent its owner gives it on the computer. Accounts say so
  * (`RunnerAccountInfo.shared`): where every agent is the runner's own user,
@@ -337,7 +382,7 @@ export const DESKTOP_TEXT_MAX = 16_000;
  * turn what its CLI needs over the agent's worker link. The server never
  * sends `shared` to an older runner.
  */
-export const SHARED_ACCOUNTS_PROTOCOL = 27;
+export const SHARED_ACCOUNTS_PROTOCOL = 29;
 
 /** Which CLI an account signs in. */
 export type AccountKind = "claude_code" | "codex";
@@ -353,6 +398,10 @@ export const BRAIN_EFFORTS: readonly BrainEffort[] = ["low", "medium", "high", "
 export const isBrainEffort = (v: unknown): v is BrainEffort =>
   typeof v === "string" && (BRAIN_EFFORTS as readonly string[]).includes(v);
 
+/** A `brain.turn`'s `contextTokens` the runner applies (protocol 28): a whole number of tokens in a sane range. */
+export const isContextTokens = (v: unknown): v is number =>
+  typeof v === "number" && Number.isInteger(v) && v >= 50_000 && v <= 10_000_000;
+
 /** An account on the machine, as the runner sees it (`hello.accounts`, `account` replies). No secrets. */
 export interface RunnerAccountInfo {
   id: string;
@@ -360,7 +409,7 @@ export interface RunnerAccountInfo {
   /** The CLI's status command says it is signed in. */
   loggedIn: boolean;
   email?: string;
-  /** `pro`, `max`, `team`, `plus`… as the CLI says. */
+  /** `pro`, `max`, `ultra`, `team`, `enterprise`… from what the CLI says. */
   plan?: string;
   /** Protocol 19: the plan's usage limits, as last seen. */
   usage?: PlanUsage;
@@ -368,7 +417,7 @@ export interface RunnerAccountInfo {
   provider?: string;
   /** Protocol 20: the last 4 characters of a key account's key. */
   keyHint?: string;
-  /** Protocol 27: it thinks for several of its owner's agents at once. */
+  /** Protocol 29: it thinks for several of its owner's agents at once. */
   shared?: boolean;
 }
 
@@ -423,7 +472,7 @@ export type AccountRequest =
    * `again`: sign in once more to the existing account `loginId` (it was signed out); its folder stays on failure.
    * `email` (Claude Code): which account to sign in to (`claude auth login --email`), only if `isLoginEmail`;
    * an older runner leaves it out. Protocol 20, `provider`: a coding plan's key account (Claude Code), no CLI.
-   * Protocol 27, `shared`: one sign-in for every agent of its owner there (`SHARED_ACCOUNTS_PROTOCOL`).
+   * Protocol 29, `shared`: one sign-in for every agent of its owner there (`SHARED_ACCOUNTS_PROTOCOL`).
    */
   | {
       action: "begin";
@@ -478,6 +527,9 @@ export const AGENT_BROWSER_SHA256: Record<AgentBrowserTarget, string> = {
 /** `darwin-arm64` → `agent-browser-darwin-arm64`; `win32-x64` → `agent-browser-win32-x64.exe`. */
 export const agentBrowserAsset = (target: AgentBrowserTarget) =>
   `agent-browser-${target}${target.startsWith("win32") ? ".exe" : ""}`;
+/** Where the pinned release asset for `target` is downloaded from. */
+export const agentBrowserUrl = (target: AgentBrowserTarget) =>
+  `https://github.com/vercel-labs/agent-browser/releases/download/v${AGENT_BROWSER_VERSION}/${agentBrowserAsset(target)}`;
 
 /** Largest pieces of browser frames. */
 export const BROWSER_LIMITS = {
@@ -909,7 +961,7 @@ export interface RunnerExecutorInfo {
   version: string;
   /** Protocol 8, `claude` only: `claude auth status` says it is logged in (absent: unknown). */
   loggedIn?: boolean;
-  /** Protocol 8, `claude` only: how it is logged in (`claude.ai`, `api_key`…) and the plan (`pro`, `max`, `team`…). */
+  /** Protocol 8, `claude` only: how it is logged in (`claude.ai`, `api_key`…) and the plan (`pro`, `max`, `ultra`…). */
   authMethod?: string;
   plan?: string;
 }
@@ -1007,6 +1059,8 @@ export interface BrainTurnRequest {
   account?: string;
   /** Protocol 13: how hard it thinks; absent: the CLI's default. */
   effort?: BrainEffort;
+  /** Protocol 28: the most context it reads, in tokens; absent: the model's own window. */
+  contextTokens?: number;
 }
 
 /** Largest strings of a `brain.event` (tool inputs and results are cut, text deltas are small). */
@@ -1337,6 +1391,8 @@ export type MachineRequest = (
     }
   /** Protocol 17: a JPEG of the page with its elements numbered and boxed (for a judge that sees images). */
   | { op: "browser.capture"; allowedDomains?: string[] }
+  /** Protocol 27: start the agent's Chrome before its first command (`desktop`: as on `browser.act`). */
+  | { op: "browser.warm"; desktop?: boolean }
   /** Protocol 18: starts the agent's desktop; when it runs already, only marks it used (idempotent). */
   | { op: "desktop.session.start" }
   /** Protocol 18: ends the agent's desktop, and its browser on it. */
@@ -1393,6 +1449,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "browser.input",
   "browser.batch",
   "browser.capture",
+  "browser.warm",
   "desktop.session.start",
   "desktop.session.stop",
   "desktop.session.status",
@@ -1455,7 +1512,7 @@ export interface MachineReplies {
   "access.request": { requestId: string; status: "pending" | "granted" };
   "access.reduce": { access: RunnerAccess };
   /** `agent-browser`'s own JSON answer: `success: false` with its `error` is a page-level failure (stale ref, covered click). */
-  "browser.act": { success: boolean; data: unknown; error?: string };
+  "browser.act": { success: boolean; data: unknown; error?: string; setup?: BrowserSetup };
   /** `false`: there was no session. */
   "browser.stop": { stopped: boolean };
   "browser.stream.start": { mode: BrowserStreamMode };
@@ -1464,7 +1521,9 @@ export interface MachineReplies {
   /** `failed`: events the browser didn't confirm (absent when all went through). */
   "browser.input": { accepted: number; failed?: number };
   /** One answer per command run, in order: fewer than asked when one failed without `tolerate`. */
-  "browser.batch": { answers: { success: boolean; data: unknown; error?: string }[] };
+  "browser.batch": { answers: { success: boolean; data: unknown; error?: string }[]; setup?: BrowserSetup };
+  /** `false`: nothing was started (it runs or starts already, a person has the browser, or no room). */
+  "browser.warm": { started: boolean; setup?: BrowserSetup };
   /**
    * The page as a JPEG (base64), its size in pixels, the page's size in CSS
    * pixels, and its numbered elements with their boxes (CSS pixels).

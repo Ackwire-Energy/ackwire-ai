@@ -8,9 +8,11 @@ import {
   useIssueColumns,
   useWikiTree,
 } from "@agenteschat/client";
+import { canTalk } from "@agenteschat/client/lib/audience";
 import { relativeTime, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { webUrl } from "@agenteschat/client/lib/guards";
+import { foldSteps } from "@agenteschat/client/lib/work";
 import {
   Alert,
   Button,
@@ -337,6 +339,7 @@ function WorkBox({ issue: i }: { issue: Issue }) {
   const waiting = w.state === "waiting_approval" || w.state === "waiting_input";
   const when = relativeTime(t, i18n.language, w.since);
   const last = w.steps.at(-1);
+  const lines = foldSteps(w.steps, stepText);
   return (
     <section className={cx("issue-work", stalled && "is-stalled")} aria-label={t("issues.work.label", g)}>
       <div className="issue-work__head">
@@ -392,16 +395,16 @@ function WorkBox({ issue: i }: { issue: Issue }) {
           </div>
         </>
       ) : (
-        w.steps.length > 0 && (
+        lines.length > 0 && (
           <ol className="issue-work__steps">
-            {w.steps.map((s, k) => {
-              const current = k === w.steps.length - 1;
+            {lines.map(({ step: s, text, count }, k) => {
+              const current = k === lines.length - 1;
               return (
                 <li key={`${s.at}-${s.tool}`} className={cx(current && "is-current")}>
                   <span className="issue-work__dot" aria-hidden="true">
-                    <Icon name={current ? "play" : "check"} size={14} />
+                    <Icon name={s.outcome === "refused" ? "close" : current ? "play" : "check"} size={14} />
                   </span>
-                  <span>{stepText(s)}</span>
+                  <span>{count > 1 ? `${text} ${t("chat.work.times", { count })}` : text}</span>
                   <time dateTime={s.at}>{whenAt(t, i18n.language, s.at)}</time>
                 </li>
               );
@@ -414,11 +417,12 @@ function WorkBox({ issue: i }: { issue: Issue }) {
   );
 }
 
-/** The agents offered by "Pedir a um agente": a developer first, then the others. */
+/** The agents offered by "Pedir a um agente", the ones that answer me (as the server asks): a developer first. */
 function useAgentChoices() {
   const { dir } = useActors();
-  const dev = dir.agents.find((a) => /dev|engenh|program|cód/i.test(`${a.role} ${a.name}`)) ?? dir.agents[0];
-  return dev ? [dev, ...dir.agents.filter((a) => a.id !== dev.id)] : [];
+  const agents = dir.agents.filter(canTalk);
+  const dev = agents.find((a) => /dev|engenh|program|cód/i.test(`${a.role} ${a.name}`)) ?? agents[0];
+  return dev ? [dev, ...agents.filter((a) => a.id !== dev.id)] : [];
 }
 
 function AskAgent({ issue }: { issue: Issue }) {
@@ -645,7 +649,7 @@ function Details({ issue: i, bare = false }: { issue: Issue; bare?: boolean }) {
           size="sm"
           value={actorKey(i.assignee)}
           onValueChange={(v) => action.mutate({ type: "update", id: i.id, patch: { assignee: actorFromKey(v) } })}
-          options={actors.options(true)}
+          options={actors.options(true, actorKey(i.assignee))}
         />
       </Field>
       <Field label={t("issues.form.priority")} id={`is-pri-${i.id}`}>

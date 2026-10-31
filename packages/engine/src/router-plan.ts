@@ -89,7 +89,7 @@ export async function planSignInsOf(
   ]);
   const found: (PlanSignIn & { usedAt: number })[] = [];
   for (const r of lent) {
-    // One per account: one made for all agents thinks for several of them (protocol 27).
+    // One per account: one made for all agents thinks for several of them (protocol 29).
     if (!r.ownerId || !isAccountKind(r.kind) || found.some((s) => s.accountId === r.accountId)) continue;
     found.push({
       machineId: r.machineId,

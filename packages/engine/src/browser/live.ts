@@ -1,17 +1,23 @@
 import {
+  type AgentScope,
   BROWSER_LIMITS,
   type BrowserInputEvent,
   type BrowserStreamMode,
   type RunnerFrame,
 } from "@agenteschat/adapters";
 import { and, eq, inArray, schema } from "@agenteschat/db";
+import { getAgentCached } from "../agents";
+import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { type MachineHub, MachineRequestError } from "../machine-hub";
 import { getMachineById, machineOnline } from "../machines";
 import {
+  agentBrowserLink,
+  agentUsesScreen,
   BROWSER_HANDOFF_TOPIC,
   type BrowserHandoffRow,
   type BrowserHandoffView,
   browserMachineOf,
+  browserOnDesktop,
   CONTROL_GRACE_MS,
   expireControl,
   type HandoffDeps,
@@ -25,6 +31,7 @@ import {
   requireBrowserControl,
   setControlDeadline,
   touchControl,
+  webAddress,
 } from "./handoff";
 import type { BrowserFrame, BrowserPage, BrowserViewer, StreamRelay } from "./types";
 
@@ -204,6 +211,8 @@ export interface BrowserLiveDeps extends Omit<HandoffDeps, "live"> {
   /** Tests: how long input is gathered before it goes (`INPUT_BATCH_MS`). */
   inputBatchMs?: number;
   log?: { warn(message: string, data?: Record<string, unknown>): void };
+  /** Starts the agent's Chrome on that computer before its next command (ADR 0040 §11). Never waited on. */
+  warm?(at: { orgId: string; agentId: string; machineId: string }): void;
 }
 
 /**
@@ -227,6 +236,8 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
   const checked = new Map<string, number>();
   /** Last keep-alive per open handoff. */
   const touched = new Map<string, number>();
+  /** Agents whose browser `restart` closes and opens now: the runner's "stopped" for them isn't a Parar. */
+  const restarting = new Set<string>();
 
   const broadcast = (state: AgentLive, message: BrowserLiveMessage) => {
     for (const v of state.viewers) {
@@ -313,6 +324,8 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       state.mode = null;
       // An older runner says `bad_request` for a closed browser: still `unavailable`, with its message.
       const closed = error instanceof MachineRequestError && error.code === "browser_closed";
+      // Closed by a restart that is opening it again: its end starts the stream, the views keep waiting.
+      if (closed && restarting.has(agentId)) return;
       broadcast(state, {
         type: "browser.unavailable",
         agentId,
@@ -321,6 +334,42 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       });
     }
   }
+
+  /**
+   * The stream the computer ran for this agent is gone or unknown (its runner came back, maybe a new one; the
+   * browser restarted; a page opened): forgotten with its frame, and started again for the viewers here, so
+   * their page comes back even when nothing repaints.
+   */
+  function restartStream(agentId: string, state: AgentLive): Promise<void> {
+    state.syncing = state.syncing
+      .then(() => {
+        // With nobody watching, a stream still running stops as usual (forgetting it would leave it running).
+        if (state.viewers.size > 0) {
+          state.mode = null;
+          state.page = null;
+          state.frame = null;
+        }
+        return syncNow(agentId, state, false);
+      })
+      .catch(() => {})
+      .finally(() => forget(agentId, state));
+    return state.syncing;
+  }
+
+  /** The address the agent's browser shows, as its computer says (short: a person waits on it); null when it can't. */
+  const askUrl = async (machineId: string, agent: AgentScope) => {
+    try {
+      const reply = await deps.hub.call<"browser.act">(
+        machineId,
+        { op: "browser.act", agent, command: "get", args: ["url"], timeoutSeconds: 3 },
+        { timeoutMs: 4000 },
+      );
+      const data = reply.success ? (reply.data as { url?: unknown } | null) : null;
+      return typeof data?.url === "string" && data.url ? data.url.slice(0, BROWSER_LIMITS.url) : null;
+    } catch {
+      return null;
+    }
+  };
 
   const applyHandoff = (state: AgentLive, row: BrowserHandoffRow | null) => {
     const open = row && (row.status === "pending" || row.status === "active") ? row : null;
@@ -384,24 +433,9 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
         .from(agents)
         .where(and(eq(agents.id, row.agentId), eq(agents.orgId, row.orgId)));
       if (!agent) return null;
-      try {
-        // Short: a hand back waits on this answer before the agent is told.
-        const reply = await deps.hub.call<"browser.act">(
-          row.machineId,
-          {
-            op: "browser.act",
-            agent: { id: row.agentId, handle: agent.handle },
-            command: "get",
-            args: ["url"],
-            timeoutSeconds: 3,
-          },
-          { timeoutMs: 4000 },
-        );
-        const data = reply.success ? (reply.data as { url?: unknown } | null) : null;
-        return typeof data?.url === "string" && data.url ? { url: data.url.slice(0, BROWSER_LIMITS.url) } : null;
-      } catch {
-        return null;
-      }
+      // Short: a hand back waits on this answer before the agent is told.
+      const url = await askUrl(row.machineId, { id: row.agentId, handle: agent.handle });
+      return url ? { url } : null;
     },
   };
 
@@ -446,10 +480,13 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       });
       return;
     }
-    // Also `browser.opened` (a person opened a page): a stream that failed on a closed browser starts now.
+    // `browser.opened` (a person opened a page, a restart): the stream starts again, from a closed browser too.
     void openHandoffOf(deps.db, state.orgId, agentId)
       .then((row) => {
-        if (live.get(agentId) === state) handoffChanged(agentId, state, row);
+        if (live.get(agentId) !== state) return;
+        if (event.type !== "browser.opened") return handoffChanged(agentId, state, row);
+        announce(agentId, state, () => applyHandoff(state, row));
+        void restartStream(agentId, state);
       })
       .catch((error) => deps.log?.warn("browser handoff reload failed", { agentId, error: String(error) }));
   });
@@ -481,8 +518,10 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     const handoffId = state.handoff?.id;
     if (!handoffId) return;
     // Their deadline in the database: another server, or this one after a restart, ends it at the
-    // same time, and coming back anywhere pushes it again.
-    const written = setControlDeadline(deps.db, handoffId, userId, new Date(Date.now() + graceMs)).catch(() => {});
+    // same time, and coming back anywhere pushes it again. Only once their page showed: a view retrying on a
+    // page that never came (leaving and watching again) never pushes it.
+    const until = new Date(Date.now() + graceMs);
+    const written = setControlDeadline(deps.db, handoffId, userId, until, Boolean(state.frame)).catch(() => {});
     state.grace = setTimeout(() => {
       state.grace = null;
       if ([...state.viewers].some((v) => v.userId === userId)) return;
@@ -541,6 +580,8 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
         viewer.send({ type: "browser.unavailable", agentId, reason: "no_computer" });
         return () => {};
       }
+      // Someone opened the agent's computer: its browser gets ready for the agent's next command meanwhile.
+      deps.warm?.({ orgId, agentId, machineId });
       if (!deps.hub.isLocal(machineId)) {
         // Held by another replica (or not connected): frames only flow where the socket is.
         const machine = await getMachineById(deps.db, machineId);
@@ -591,7 +632,9 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
         clearTimeout(current.grace);
         current.grace = null;
       }
-      if (current.handoff && current.controllerUserId === viewer.userId) {
+      // Watching keeps control only while the page shows: a view whose page never came lets it end, and the agent
+      // goes on (its first frame keeps it then, `hubHooks.frame`).
+      if (current.handoff && current.controllerUserId === viewer.userId && current.frame) {
         await touchControl(deps.db, current.handoff.id, viewer.userId, new Date(), true).catch(() => {});
       }
       viewer.send(status(agentId, current, viewer.userId));
@@ -602,9 +645,9 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
         void requireBrowserAccess(deps.db, viewer.userId, orgId, agentId).then(
           () => {
             checked.set(`${viewer.userId}:${agentId}`, Date.now());
-            // Watching keeps their control alive across servers and restarts (the grace in the database).
+            // Watching the page keeps their control alive across servers and restarts (the grace in the database).
             const handoffId = current.handoff?.id;
-            if (handoffId && current.controllerUserId === viewer.userId) {
+            if (handoffId && current.controllerUserId === viewer.userId && current.frame) {
               void touchControl(deps.db, handoffId, viewer.userId).catch(() => {});
             }
           },
@@ -701,22 +744,105 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       return { accepted: reply.accepted, refused: false };
     },
 
+    /**
+     * Try again on a view whose page never came, by whoever may drive the agent's browser: it closes and opens
+     * again on the page it showed, else it just starts (ADR 0040 §11, not while a person's turn is open: it
+     * stays closed, and the views say so); its logins stay. Answers once it closed: opening again can take a
+     * minute on a cold computer, longer than a request may wait behind a proxy. Every view of it then gets its
+     * stream again, also when the close or the open failed. The person in control pressing it is there: their
+     * control holds meanwhile.
+     */
+    async restart(userId: string, orgId: string, agentId: string) {
+      await requireBrowserControl(deps.db, userId, orgId, agentId);
+      if (!(await agentUsesScreen(deps.db, orgId, agentId)))
+        throw new ForbiddenError("This agent can't use its browser");
+      const machineId = await browserMachineOf(deps.db, orgId, agentId);
+      if (!machineId) throw new ValidationError("This agent has no computer");
+      const agent = await getAgentCached(deps.db, orgId, agentId);
+      if (!agent) throw new NotFoundError("Agent not found");
+      // Already restarting here: its end brings every view the page.
+      if (restarting.has(agentId)) return;
+      // ponytail: only this server's views miss the stop's "stopped"; with several replicas, an event of its own.
+      restarting.add(agentId);
+      const scope: AgentScope = { id: agentId, handle: agent.handle, ...(agent.name ? { name: agent.name } : {}) };
+      const hold = () =>
+        openHandoffOf(deps.db, orgId, agentId)
+          .then((open) => open && touchControl(deps.db, open.id, userId, new Date(), true))
+          .catch(() => {});
+      // Every replica's views of it (the one holding the computer's socket among them) start their streams again.
+      const streamsAgain = async () => {
+        const told = await deps.pubsub
+          ?.publish(BROWSER_HANDOFF_TOPIC, { type: "browser.opened", orgId, agentId })
+          .then(() => true)
+          .catch(() => false);
+        const now = live.get(agentId);
+        if (!told && now) await restartStream(agentId, now);
+      };
+      await hold();
+      const state = live.get(agentId);
+      const shown = state?.machineId === machineId ? state.page?.url : undefined;
+      const page = webAddress(shown ?? (await askUrl(machineId, scope)) ?? "");
+      try {
+        await deps.hub.call<"browser.stop">(machineId, { op: "browser.stop", agent: scope }, { timeoutMs: 30_000 });
+      } catch (error) {
+        restarting.delete(agentId);
+        await streamsAgain();
+        throw error;
+      }
+      void (async () => {
+        try {
+          const desktop = (await browserOnDesktop(deps.db, orgId, agentId, machineId)) ? { desktop: true } : {};
+          if (page) {
+            await deps.hub.call<"browser.act">(
+              machineId,
+              {
+                op: "browser.act",
+                agent: scope,
+                command: "open",
+                args: [page],
+                timeoutSeconds: 60,
+                ...(agent.browserAllowedDomains ? { allowedDomains: agent.browserAllowedDomains } : {}),
+                link: agentBrowserLink(orgId, agentId),
+                ...desktop,
+              },
+              { timeoutMs: 90_000 },
+            );
+          } else await deps.hub.call<"browser.warm">(machineId, { op: "browser.warm", agent: scope, ...desktop });
+        } catch (error) {
+          // Not opened again (a site no longer allowed, an older computer): it stays closed, and the views say so.
+          deps.log?.warn("browser restart didn't open it again", { agentId, error: String(error) });
+        } finally {
+          restarting.delete(agentId);
+          await hold();
+          await streamsAgain();
+        }
+      })();
+    },
+
     /** What the machine hub hands over: frames and the end of a stream, from the machine holding them. */
     hubHooks: {
       frame(machineId: string, frame: Extract<RunnerFrame, { type: "browser.frame" }>) {
         const state = live.get(frame.agentId);
         // Only from the agent's own computer.
         if (!state || state.machineId !== machineId) return;
+        const first = !state.frame;
         const { url, title } = frame.metadata;
         if (url) state.page = { url, ...(title ? { title } : {}) };
         state.frame = { agentId: frame.agentId, seq: frame.seq, data: frame.data, metadata: frame.metadata };
         if (state.viewers.size > 0) relay.publish(frame.agentId, state.frame);
+        // The page shows at last for the person in control watching it: their control holds from now.
+        const controller = state.controllerUserId;
+        if (first && state.handoff && controller && [...state.viewers].some((v) => v.userId === controller)) {
+          void touchControl(deps.db, state.handoff.id, controller, new Date(), true).catch(() => {});
+        }
       },
       streamEnded(machineId: string, frame: Extract<RunnerFrame, { type: "browser.stream.ended" }>) {
         const state = live.get(frame.agentId);
         if (!state || state.machineId !== machineId) return;
         cancelStop(state);
         state.mode = null;
+        // A restart's own stop: its views keep waiting for the page, it isn't a Parar.
+        if (frame.reason === "stopped" && restarting.has(frame.agentId)) return;
         broadcast(state, {
           type: "browser.ended",
           agentId: frame.agentId,
@@ -724,8 +850,13 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
           ...(frame.message ? { message: frame.message } : {}),
         });
       },
-      /** A computer came back here: it hears its open handoffs again (it forgot them while offline). */
+      /**
+       * A computer came back here: the views of its agents' browsers get their streams again (its runner may be
+       * a new one, whose hello came before the old socket's close), and it hears its open handoffs again (it
+       * forgot them while offline).
+       */
       connected(machineId: string) {
+        for (const [agentId, state] of live) if (state.machineId === machineId) void restartStream(agentId, state);
         void openHandoffsOfMachine(deps.db, machineId)
           .then(async (rows) => {
             for (const row of rows) {

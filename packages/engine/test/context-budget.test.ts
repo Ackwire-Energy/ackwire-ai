@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { asc, eq, schema } from "@agenteschat/db";
-import type { ContentBlock, ModelMessage, ModelRequest } from "@agenteschat/providers";
+import {
+  type ContentBlock,
+  contextLimitsFor,
+  contextWindowWithin,
+  isContextLimit,
+  type ModelMessage,
+  type ModelRequest,
+} from "@agenteschat/providers";
 import {
   createFakeJudge,
   createJobHandlers,
@@ -85,6 +92,19 @@ describe("estimate", () => {
     expect(contextBudgetTokens(200_000, 16_000)).toBe(174_000);
     expect(contextBudgetTokens(1_000_000, 16_000)).toBe(MAX_CONTEXT_TOKENS);
     expect(contextBudgetTokens(1000, 5000)).toBe(0);
+    // An agent that chose 1M chose to pay for it: no cap.
+    expect(contextBudgetTokens(1_000_000, 16_000, Number.POSITIVE_INFINITY)).toBe(934_000);
+  });
+
+  test("the limits an agent may choose: those under the model's window; the smaller one wins", () => {
+    expect(contextLimitsFor(1_048_576)).toEqual([200_000, 400_000, 1_000_000]);
+    expect(contextLimitsFor(400_000)).toEqual([200_000, 400_000]);
+    expect(contextLimitsFor(128_000)).toEqual([]);
+    expect([isContextLimit(400_000), isContextLimit(300_000), isContextLimit("400000")]).toEqual([true, false, false]);
+    expect([contextWindowWithin(1_000_000, 400_000), contextWindowWithin(200_000, 400_000)]).toEqual([
+      400_000, 200_000,
+    ]);
+    expect(contextWindowWithin(200_000, null)).toBe(200_000);
   });
 });
 
@@ -93,6 +113,14 @@ describe("fitContextWindow", () => {
     const judge = createFakeJudge(() => 0.5);
     expect(await fitContextWindow(judge, input(three(), 200_000))).toBeNull();
     expect(judge.calls).toHaveLength(0);
+  });
+
+  test("the agent's limit is the window when smaller", async () => {
+    expect(await fitContextWindow(null, input(three(), 200_000))).toBeNull();
+    const limited = await fitContextWindow(null, { ...input(three(), 200_000), limitTokens: 28_000 });
+    expect(limited?.report).toMatchObject({ windowTokens: 28_000, removed: 1, fits: true });
+    // A limit past the window changes nothing.
+    expect(await fitContextWindow(null, { ...input(three(), 200_000), limitTokens: 1_000_000 })).toBeNull();
   });
 
   test("over budget without a judge: the oldest results go first, the latest turn's never", async () => {

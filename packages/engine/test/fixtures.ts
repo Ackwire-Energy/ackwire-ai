@@ -9,7 +9,7 @@ import {
   type PlatformCredentials,
   type RealtimeEvent,
 } from "@agenteschat/adapters";
-import { type Database, schema, sql } from "@agenteschat/db";
+import { and, arrayContains, type Database, eq, schema, sql } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
 import { PROVIDER_IDS } from "@agenteschat/providers";
 import { createFakeEmbeddings, createFakeProvider, type FakeProvider } from "@agenteschat/providers/testing";
@@ -27,9 +27,11 @@ import {
   createChatToolSource,
   createContextToolSource,
   createCredential,
+  createDefaultRoles,
   createFakeJudge,
   createFakeScheduleReader,
   createFindAgentToolSource,
+  createFollowUpToolSource,
   createForumToolSource,
   createHandOffToolSource,
   createIssueToolSource,
@@ -50,8 +52,9 @@ import {
   type FakeScheduleAnswer,
   type FakeScheduleAnswers,
   localDateTimeOf,
-  type MemberRole,
+  type RunExecutorDeps,
   type SandboxDeps,
+  type ServerCatalog,
   type StorageDeps,
   type ToolSource,
   zonedParts,
@@ -66,9 +69,49 @@ export async function addUser(db: Database, name: string) {
   return { id, name, email: `${name}-${id.slice(-8)}@example.com` };
 }
 
-export async function addMember(db: Database, orgId: string, role: MemberRole, name: string = role) {
+/** How tests name people: `admin` is a member holding the workspace's "Admin" role (ADR 0085). */
+export type TestRole = "owner" | "admin" | "member";
+
+/** The workspace's base and "Admin" roles, made when a test inserted the workspace itself. */
+export async function ensureRoles(db: Database, orgId: string) {
+  const [base] = await db
+    .select({ id: schema.orgRoles.id })
+    .from(schema.orgRoles)
+    .where(and(eq(schema.orgRoles.orgId, orgId), eq(schema.orgRoles.kind, "everyone")));
+  if (!base) await createDefaultRoles(db, orgId);
+}
+
+/** The workspace's role holding `administrator` (its "Admin"). */
+export async function adminRoleId(db: Database, orgId: string) {
+  await ensureRoles(db, orgId);
+  const [role] = await db
+    .select({ id: schema.orgRoles.id })
+    .from(schema.orgRoles)
+    .where(
+      and(
+        eq(schema.orgRoles.orgId, orgId),
+        eq(schema.orgRoles.kind, "custom"),
+        arrayContains(schema.orgRoles.permissions, ["administrator"]),
+      ),
+    )
+    .limit(1);
+  if (!role) throw new Error("no administrator role");
+  return role.id;
+}
+
+/** Gives a member the workspace's "Admin" role. */
+export async function makeAdmin(db: Database, orgId: string, userId: string) {
+  const roleId = await adminRoleId(db, orgId);
+  await db.insert(schema.organizationMemberRoles).values({ orgId, userId, roleId }).onConflictDoNothing();
+}
+
+export async function addMember(db: Database, orgId: string, role: TestRole, name: string = role) {
   const user = await addUser(db, name);
-  await db.insert(schema.organizationMembers).values({ orgId, userId: user.id, role });
+  await ensureRoles(db, orgId);
+  await db
+    .insert(schema.organizationMembers)
+    .values({ orgId, userId: user.id, role: role === "owner" ? "owner" : "member" });
+  if (role === "admin") await makeAdmin(db, orgId, user.id);
   return user;
 }
 
@@ -129,6 +172,8 @@ export async function setup(
     askAgent?: boolean;
     /** Add the built-in `react` tool. */
     react?: boolean;
+    /** Add the built-in `follow_up` and `cancel_follow_up` tools. */
+    followUps?: boolean;
     /** Add the built-in `hand_off` tool (background runs: routines). */
     handOff?: boolean;
     /** Add the Drive tools (create_artifact…). Storage is always wired (memory platform store, fake S3). */
@@ -158,6 +203,10 @@ export async function setup(
     schedules?: FakeScheduleAnswers;
     /** Tools on demand (ADR 0043): the judge picks the tool groups each run lists. */
     toolsOnDemand?: boolean;
+    /** The agent's browser started ahead when a run's judge chose it (ADR 0040 §11). */
+    warmBrowser?: RunExecutorDeps["warmBrowser"];
+    /** What the server can connect: `find_tools` names the connectors an agent lacks. None: it names none. */
+    catalog?: ServerCatalog;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -257,6 +306,7 @@ export async function setup(
         ]
       : []),
     ...(options.react ? [createReactToolSource({ pubsub })] : []),
+    ...(options.followUps ? [createFollowUpToolSource({ pubsub })] : []),
     ...(options.handOff ? [createHandOffToolSource({ pubsub })] : []),
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),
     ...(options.chatTools ? [createChatToolSource({ pubsub, artifacts: artifactDeps })] : []),
@@ -279,7 +329,7 @@ export async function setup(
       : []),
     ...(options.toolSources ?? []),
   ];
-  const tools = sources.length > 0 ? createToolGateway({ sources }) : undefined;
+  const tools = sources.length > 0 ? createToolGateway({ sources, catalog: options.catalog }) : undefined;
   machineHub?.setMissionHooks(createMissionHooks({ db, ...missionDeps, tools }));
   const jobDeps = {
     db,
@@ -296,6 +346,7 @@ export async function setup(
     artifacts: artifactDeps,
     sandbox: sandboxDeps,
     toolsOnDemand: options.toolsOnDemand ?? false,
+    ...(options.warmBrowser ? { warmBrowser: options.warmBrowser } : {}),
   };
   const handlers = createJobHandlers(jobDeps);
 

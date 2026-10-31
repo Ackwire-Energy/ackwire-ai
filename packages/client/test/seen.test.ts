@@ -18,6 +18,13 @@ describe('"Visto" in a DM between people', () => {
     expect(seenMessageId(list, "me", [])).toBeNull();
   });
 
+  test("my own read never counts: sending marks the DM read for me, not for them", () => {
+    const mine = { userId: "me", lastReadAt: "2026-10-20T08:48:00.000Z" };
+    expect(seenMessageId(list, "me", [mine])).toBeNull();
+    expect(seenMessageId(list, "me", [mine, ...read("08:40")])).toBeNull();
+    expect(seenMessageId(list, "me", [mine, ...read("08:50")])).toBe("m2");
+  });
+
   test("not when their answer came after, nor on a message still sending", () => {
     expect(seenMessageId([...list, msg("m3", "08:51", "bia")], "me", read("08:52"))).toBeNull();
     expect(seenMessageId([...list, msg("local-1", "08:53", "me", "pending")], "me", read("08:52"))).toBeNull();

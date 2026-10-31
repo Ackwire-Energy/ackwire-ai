@@ -63,7 +63,7 @@ export function HoldBanner() {
       </section>
     );
   }
-  const admin = can(org.role, "manage_billing");
+  const admin = can(org, "manage_billing");
   const fix = admin && billingUrl ? billing : null;
   return (
     <section className="outages" aria-label={t("standing.label")}>

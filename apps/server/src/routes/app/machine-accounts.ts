@@ -252,7 +252,7 @@ export function machineAccountRoutes(deps: AppDeps) {
                   keys: z.boolean().openapi({ description: "Its runner takes coding plans' keys (protocol 20)." }),
                   shares: z.object({ claude_code: z.boolean(), codex: z.boolean(), key: z.boolean() }).openapi({
                     description:
-                      "A new sign-in there thinks for all of the caller's agents on it (protocol 27): Claude's, ChatGPT's, a coding plan's key.",
+                      "A new sign-in there thinks for all of the caller's agents on it (protocol 29): Claude's, ChatGPT's, a coding plan's key.",
                   }),
                   brains: z.object({ claude_code: z.boolean(), codex: z.boolean() }).openapi({
                     description:

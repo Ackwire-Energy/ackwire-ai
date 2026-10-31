@@ -1,5 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
-import { DESKTOP_PROTOCOL, type MachineRequest, SECRET_ACTIVATE_PROTOCOL } from "@agenteschat/adapters";
+import {
+  BROWSER_FAST_PROTOCOL,
+  BROWSER_WARM_PROTOCOL,
+  DESKTOP_PROTOCOL,
+  type MachineRequest,
+  SECRET_ACTIVATE_PROTOCOL,
+} from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
   ARTIFACT_LIMITS,
@@ -21,9 +27,11 @@ import {
   type MachineStatus,
   normalizeRef,
   setAgentBrowserDomains,
+  startTakeover,
   type ToolSideEffects,
   toolDenyScope,
   updateSandboxSettings,
+  warmAgentBrowser,
   wrapPage,
 } from "../src";
 import { actionCommands } from "../src/browser/surface";
@@ -527,6 +535,103 @@ test("an agent whose Chrome belongs on its desktop says so on every command that
   ).toBe(false);
 });
 
+test("warmAgentBrowser: the agent's Chrome starts ahead only where its next command would start it", async () => {
+  const b = await browserSetup();
+  b.s.respond = (r) => (r.op === "browser.warm" ? { started: true } : page('- button "Save" [ref=e1]'));
+  const warm = (at: { machineId?: string } = {}) =>
+    warmAgentBrowser(f.db, b.hub, { orgId: f.org.id, agentId: f.agent.id, ...at });
+  const warms = () => b.calls.filter((c) => c.op === "browser.warm");
+  const tools = { folders: [], tools: { claude: true, codex: true, commands: true, browser: true } };
+  b.s.status = { protocol: BROWSER_WARM_PROTOCOL };
+  // An agent that may not use its browser: nothing.
+  expect(await warm()).toBe(false);
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: BROWSER_SCOPE }]);
+  // A runner that doesn't know the op, the computer's browser switch off, the computer offline: nothing.
+  b.s.status = { protocol: BROWSER_WARM_PROTOCOL - 1 };
+  expect(await warm()).toBe(false);
+  b.s.status = { protocol: BROWSER_WARM_PROTOCOL, access: { ...tools, tools: { ...tools.tools, browser: false } } };
+  expect(await warm()).toBe(false);
+  b.s.status = { protocol: BROWSER_WARM_PROTOCOL, online: false };
+  expect(await warm()).toBe(false);
+  expect(warms()).toEqual([]);
+  b.s.status = { protocol: BROWSER_WARM_PROTOCOL };
+  expect(await warm()).toBe(true);
+  expect(warms()).toEqual([{ op: "browser.warm", agent: { id: f.agent.id, handle: "dev", name: "Dev" } }]);
+  // A person asked to take the browser, or in control of it: nothing.
+  const [asked] = await f.db
+    .insert(schema.browserHandoffs)
+    .values({
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      machineId: b.machineId,
+      kind: "ask",
+      status: "pending",
+      requestedForUserId: f.owner.id,
+      expiresAt: new Date(Date.now() + 600_000),
+    })
+    .returning();
+  expect(await warm()).toBe(false);
+  await f.db
+    .update(schema.browserHandoffs)
+    .set({ status: "active", controllerUserId: f.owner.id })
+    .where(eq(schema.browserHandoffs.id, asked?.id as string));
+  expect(await warm()).toBe(false);
+  await f.db
+    .update(schema.browserHandoffs)
+    .set({ status: "done", resolvedAt: new Date() })
+    .where(eq(schema.browserHandoffs.id, asked?.id as string));
+  expect(warms()).toHaveLength(1);
+  // Where its Chrome belongs on its desktop, there.
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: DESKTOP_SCOPE }]);
+  await f.db
+    .update(schema.machines)
+    .set({
+      protocol: BROWSER_WARM_PROTOCOL,
+      executors: { browser: { available: true }, desktop: { available: true } },
+      access: { ...tools, tools: { ...tools.tools, desktop: true } },
+    })
+    .where(eq(schema.machines.id, b.machineId));
+  expect(await warm()).toBe(true);
+  expect(warms().at(-1)).toMatchObject({ op: "browser.warm", desktop: true });
+  // A computer that isn't the agent's to use (gone, another organization's): nothing.
+  expect(await warm({ machineId: "00000000-0000-4000-8000-000000000000" })).toBe(false);
+  expect(warms()).toHaveLength(2);
+});
+
+test("a browser_do's timing says what its commands waited on before they ran, summed from the runner's answers", async () => {
+  const b = await browserSetup();
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: BROWSER_SCOPE }]);
+  b.s.status = { protocol: BROWSER_FAST_PROTOCOL };
+  const setups: unknown[] = [];
+  b.s.respond = (r) => {
+    if (r.op !== "browser.batch") return page('- button "Save" [ref=e1]');
+    const answers = r.commands.map((c) => (c.command === "snapshot" ? page('- button "Save" [ref=e1]') : ok()));
+    const setup = setups.shift();
+    return setup === undefined ? { answers } : { answers, setup };
+  };
+  const plan = (steps: unknown[]) => b.call("browser_do", { steps });
+  // A browser that was ready: nothing to say.
+  const ready = await plan([{ do: "open", url: "https://shop.example/" }]);
+  expect(ready.isError).toBeUndefined();
+  expect(ready.data?.timing).not.toHaveProperty("setup");
+  // Its first command started it: what that took, from each answer, summed; what isn't a known step is dropped.
+  setups.push(
+    { worker: 1200, install: 28_100, launch: 1400 },
+    { launch: 600, queued: 12, desktop: -3, chrome: 5, install: 1.5 },
+  );
+  const first = await plan([
+    { do: "open", url: "https://shop.example/" },
+    { do: "click", target: "e1" },
+  ]);
+  expect(first.isError).toBeUndefined();
+  expect((first.data?.timing as { setup?: unknown } | undefined)?.setup).toEqual({
+    worker: 1200,
+    install: 28_100,
+    queued: 12,
+    launch: 2000,
+  });
+});
+
 test("the computer the browser runs on is remembered for the live view, take over and Stop", async () => {
   const b = await browserSetup();
   await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
@@ -801,4 +906,27 @@ test("browser_screenshot names its file a .png, so the browser writes the image 
   const shots = b.calls.filter((c): c is Act => c.op === "browser.act" && c.command === "screenshot");
   expect(shots.map((c) => c.args[0])).toEqual(["notes.png", "code.png"]);
   expect(b.calls.filter((c) => c.op === "push").map((c) => c.path)).toEqual(["notes.png"]);
+});
+
+test("browser_close restarts the browser even while a person has it: their turn ends, with a line, and the close goes", async () => {
+  const b = await browserSetup();
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  // Taken over from this run's card (a person asked the agent to restart its browser meanwhile).
+  await startTakeover({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.agent.id, b.ctx.runId);
+  const sent = b.since();
+  const out = await b.call("browser_close", {});
+  expect(out).toMatchObject({ content: "Closed. Logins stay saved." });
+  expect(sent().map((c) => c.command)).toEqual(["close"]);
+  const [h] = await f.db.select().from(schema.browserHandoffs);
+  expect(h?.status).toBe("cancelled");
+  // The line goes where the take over's card was: where this run answers.
+  const lines = (await f.db.select().from(schema.messages).where(eq(schema.messages.orgId, f.org.id))).filter(
+    (m) => (m.meta as { bodyCode?: string } | null)?.bodyCode === "browser_restarted",
+  );
+  expect(lines.map((m) => [m.channelId, m.body])).toEqual([
+    [b.ctx.channelId, `${f.agent.name} restarted its browser. ${f.owner.name}'s control ended.`],
+  ]);
+  // Opening it again works at once: nobody holds it, nothing to read first.
+  b.s.reply = page('- button "Entrar" [ref=e1]', "https://www.facebook.com/");
+  expect((await b.call("browser_open", { url: "https://www.facebook.com/" })).isError).toBeUndefined();
 });

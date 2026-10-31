@@ -186,7 +186,7 @@ export interface RouteDeps {
     accountDir(kind: AccountKind, id: string): string | null;
     agentHome?(kind: AccountKind, id: string): string | null;
   };
-  /** System mode, in a worker (protocol 27): what root handed this route for its account. */
+  /** System mode, in a worker (protocol 29): what root handed this route for its account. */
   grant?: AccountGrant;
   /** The processes kept for turns: a sign-in with one open is busy. */
   brains?: { holds(account: string | null): boolean };

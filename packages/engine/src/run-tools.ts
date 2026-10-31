@@ -1,11 +1,13 @@
-import type { PubSub } from "@agenteschat/adapters";
+import { PERMISSION_TOOL, type PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, inArray, type SQL, schema, sql } from "@agenteschat/db";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
+import { followWork } from "./agent-status";
 import { publishApproval } from "./approvals";
 import type { BrainTool, ToolResult } from "./brains/types";
-import { consultationCardThread } from "./consultations";
+import { consultationCardThread, consultationOrigin } from "./consultations";
 import { NotFoundError } from "./errors";
 import { type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
+import type { Judge } from "./judge";
 import { insertMessage, type Message, messageView } from "./messages";
 import { notifyMissionApproval } from "./mission-tools";
 import { notifyQuestion } from "./notification-producers";
@@ -22,11 +24,11 @@ import { routineBriefOf } from "./routine-brief";
 import type { BridgeIdentity } from "./run-tool-tokens";
 import { type AgentRun, replyThreadOf } from "./runs";
 import { publishSecret, type SecretRequestRow, secretRequestView, syncSecretMessage } from "./secrets";
-import { artifactToolDetail, toolCode, toolDetail } from "./tool-detail";
+import { artifactToolDetail, promptAnswer, promptPoll, toolCode, toolCommand, toolDetail } from "./tool-detail";
 import { directoryRole, ON_DEMAND_USE, resolveDirectoryTool } from "./tools/directory";
 import { type Approval, type InvokeResult, isSensitive, type ToolGateway } from "./tools/gateway";
 import { withWhy } from "./tools/run-policy";
-import type { ToolContext, ToolDefinition } from "./tools/types";
+import type { ToolContext, ToolDefinition, ToolOutput } from "./tools/types";
 import { withWikiLinks } from "./wiki-links";
 
 const { agentRuns, approvals, agentQuestions, secretRequests, machineTasks, messages } = schema;
@@ -327,7 +329,8 @@ export async function takeBridgeEffects(db: Database, runId: string): Promise<To
 
 /** What `invokeWithChip` needs: the run's tool context, where its events go and the tools of this turn. */
 export interface RunToolScope {
-  deps: { db: Database; pubsub?: PubSub };
+  /** `judge`: checks an agent's own status line against its step (ADR 0084 §10); none, no check. */
+  deps: { db: Database; pubsub?: PubSub; judge?: Judge | null };
   tools: ToolGateway;
   ctx: ToolContext;
   where: RunWhere;
@@ -336,6 +339,33 @@ export interface RunToolScope {
    * Null when unknown (a bridge call): the chip shows only the tool's name.
    */
   turnTools: ToolDefinition[] | null;
+}
+
+/** How a call ended, as its `agent.tool` end says it. */
+type ChipEnd = { failed?: boolean; held?: boolean; why?: string; refusal?: string; requestId?: string };
+
+/** The end's fields that say something. */
+const endFields = (end: ChipEnd) => ({
+  ...(end.failed ? { failed: true } : {}),
+  ...(end.held ? { held: true } : {}),
+  ...(end.why ? { why: end.why } : {}),
+  ...(end.refusal ? { refusal: end.refusal } : {}),
+  ...(end.requestId ? { requestId: end.requestId } : {}),
+});
+
+/**
+ * A permission check's end as the chat shows it: refused (the policy's own reason, and its code for the apps'
+ * words), waiting on a person (its request, which the person's answer names), or allowed. Only a `deny` carries
+ * its words: an error's text could hold anything.
+ */
+function promptEnd(output: ToolOutput): ChipEnd {
+  if (output.isError) return { failed: true };
+  const answer = promptAnswer(output.content);
+  const why = typeof answer.message === "string" ? answer.message.slice(0, 500) : "";
+  const refusal = typeof answer.code === "string" ? answer.code.slice(0, 40) : "";
+  if (answer.behavior === "deny") return { failed: true, why, refusal };
+  if (answer.status !== "pending") return {};
+  return { held: true, ...(typeof answer.request_id === "string" ? { requestId: answer.request_id } : {}) };
 }
 
 /**
@@ -349,6 +379,25 @@ export async function invokeWithChip(
   use: { id: string; name: string; input: unknown },
 ): Promise<InvokeResult> {
   const { deps, ctx, where } = scope;
+  const input = use.input as Record<string, unknown> | undefined;
+  const call = { toolUseId: use.id, name: use.name, input: input ?? {} };
+  // The runner asking again about a command that waits on a person: no line of its own, the first ask has one,
+  // and the person's answer, once there, ends that line (by its request).
+  if (promptPoll(use.name, input)) {
+    const outcome = await scope.tools.invoke(ctx, call);
+    const end = outcome.type === "result" ? promptEnd(outcome.output) : { held: true };
+    if (!end.held) {
+      const requestId = String(input?.request_id);
+      await publishChannelEvent(deps.pubsub, {
+        type: "agent.tool",
+        ...where,
+        tool: null,
+        ...endFields(end),
+        requestId,
+      });
+    }
+    return outcome;
+  }
   const listed = scope.turnTools?.find((t) => t.name === use.name);
   // Through a big connector's directory: the chip shows the real tool (`use_tool` only points at it).
   const role = directoryRole(listed);
@@ -366,17 +415,23 @@ export async function invokeWithChip(
       : use.name);
   const connector = def?.connectorLabel;
   // A short label for the UI (skill, issue, file); built-in tools only, never connector inputs.
-  const input = use.input as Record<string, unknown> | undefined;
   const builtIn = scope.turnTools !== null && !(connector || def?.connectionId);
-  // The agent's browser and desktop are ours on every brain: a computer brain's open names its site too.
+  // The agent's browser and desktop are ours on every brain (a computer brain's open names its site too), and so
+  // is the computer's permission check, which only exists on the bridge: its line says the command it checked.
   const screen = screenTool(use.name)?.tool;
+  const prompt = use.name === PERMISSION_TOOL;
   const detail = screen
     ? toolDetail(screen, input)
-    : builtIn
-      ? (toolDetail(use.name, input) ??
-        (await artifactToolDetail(deps.db, ctx.orgId, ctx.channelId, use.name, input).catch(() => undefined)))
-      : undefined;
+    : prompt
+      ? toolDetail(use.name, input)
+      : builtIn
+        ? (toolDetail(use.name, input) ??
+          (await artifactToolDetail(deps.db, ctx.orgId, ctx.channelId, use.name, input).catch(() => undefined)))
+        : undefined;
   const code = builtIn ? toolCode(use.name, input) : undefined;
+  const command = toolCommand(use.name, input);
+  // The agent's line follows what it does now (ADR 0084 §10), beside the call, never in its way.
+  if (def) void followWork(deps, ctx, def).catch(() => {});
   await publishChannelEvent(deps.pubsub, {
     type: "agent.tool",
     ...where,
@@ -385,30 +440,34 @@ export async function invokeWithChip(
     ...(detail ? { detail } : {}),
     toolUseId: use.id,
     ...(code ? { code } : {}),
+    ...(command ? { command } : {}),
   });
   // The end names its call and whether the tool answered with an error, or didn't run because it waits on a
   // person (an approval, a question, a secret): the chat marks that line.
-  const ended = (end: { failed?: boolean; held?: boolean }) =>
+  const ended = (end: ChipEnd) =>
     publishChannelEvent(deps.pubsub, {
       type: "agent.tool",
       ...where,
       tool: null,
       toolUseId: use.id,
-      ...(end.failed ? { failed: true } : {}),
-      ...(end.held ? { held: true } : {}),
+      ...endFields(end),
     });
-  return scope.tools
-    .invoke(ctx, { toolUseId: use.id, name: use.name, input: (use.input ?? {}) as Record<string, unknown> })
-    .then(
-      async (outcome) => {
-        await ended(outcome.type === "result" ? { failed: outcome.output.isError === true } : { held: true });
-        return outcome;
-      },
-      async (error: unknown) => {
-        await ended({ failed: true });
-        throw error;
-      },
-    );
+  return scope.tools.invoke(ctx, call).then(
+    async (outcome) => {
+      await ended(
+        outcome.type !== "result"
+          ? { held: true }
+          : prompt
+            ? promptEnd(outcome.output)
+            : { failed: outcome.output.isError === true },
+      );
+      return outcome;
+    },
+    async (error: unknown) => {
+      await ended({ failed: true });
+      throw error;
+    },
+  );
 }
 
 type Located = { ctx: ToolContext; run: AgentRun | null };
@@ -615,7 +674,8 @@ export function runMessageMeta(
  * The one way a run's pause cards are posted (ADR 0053 §10), for the model loop and for a computer brain's
  * bridged call alike: same meta, same receipts. Cards go where the run replies; a routine's background run
  * posts them where it reports (`brief.deliverTo`), never in its room. Each approval card carries the agent's
- * `why` and where it came from (`origin`); a consulted agent's approval goes to whoever asked (ADR 0034).
+ * `why` and where it came from (`origin`); a consulted agent's approvals, questions and secret requests go to
+ * whoever asked (ADR 0034), and its question and secret rows with them: answered from there, they resume it.
  * Runs inside the caller's transaction; nothing is published here (`publishPauseCards`).
  */
 export async function postPauseCards(tx: Executor, run: AgentRun, requests: PauseRequests): Promise<PostedPause> {
@@ -625,6 +685,13 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
   const extra = runMessageMeta(run, trigger);
   const brief = run.background ? routineBriefOf(trigger?.meta) : null;
   const home = brief?.deliverTo ?? { channelId: run.channelId, threadId: replyThreadOf(run) };
+  // A consulted run asks from the agents' DM, which no person reads: its questions and secret requests go where
+  // the person behind it asked, like its approvals (the gateway already placed those). Only a DM run answers one.
+  const origin =
+    !brief && run.trigger === "dm" && requests.questions.length + requests.secretRequestIds.length > 0
+      ? await consultationOrigin(tx, run.orgId, run.id)
+      : null;
+  const asked = origin ? { channelId: origin.channelId, threadId: origin.threadId } : home;
   const card = async (
     to: { channelId: string; threadId: string | null },
     body: string,
@@ -647,11 +714,11 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
   for (const requestId of requests.secretRequestIds) {
     const [request] = await tx
       .update(secretRequests)
-      .set({ threadId: home.threadId, ...(brief ? { channelId: home.channelId } : {}) })
+      .set({ threadId: asked.threadId, ...(brief || origin ? { channelId: asked.channelId } : {}) })
       .where(eq(secretRequests.id, requestId))
       .returning();
     if (!request) continue;
-    const message = await card(home, `Secret request: ${request.name}`, {
+    const message = await card(asked, `Secret request: ${request.name}`, {
       ...bodyCode("secret_request", { name: request.name }),
       secretRequestId: request.id,
       secretRequest: secretRequestView(request),
@@ -676,8 +743,9 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
         orgId: run.orgId,
         runId: run.id,
         agentId: run.agentId,
-        channelId: home.channelId,
-        threadId: home.threadId,
+        // Whoever can read that conversation may answer it (`answerQuestion`).
+        channelId: asked.channelId,
+        threadId: asked.threadId,
         toolUseId: ask.toolUseId,
         text: ask.text,
         choices: ask.choices,
@@ -686,7 +754,7 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
       .onConflictDoNothing()
       .returning();
     if (!inserted) continue;
-    const message = await card(home, ask.text, questionCardMeta(inserted, ask.why ?? ""));
+    const message = await card(asked, ask.text, questionCardMeta(inserted, ask.why ?? ""));
     const [linked] = await tx
       .update(agentQuestions)
       .set({ messageId: message.id })
@@ -826,6 +894,8 @@ export async function suspendRunForTool(
       name: call.name,
       // Its tool_use lives in the computer brain's session, not in the transcript: resumed as text.
       bridged: true,
+      // Asked in a turn still running: a decision before it ends resumes the run only once it ends.
+      inTurn: true,
       ...(gated.type === "approval" ? { approvalId: gated.approval.id } : {}),
       ...(questionId ? { questionId, askedAt: Date.now() } : {}),
       ...(gated.type === "secret" ? { secretRequestId: gated.requestId } : {}),

@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import type { Channel, DirectMessage } from "@agenteschat/client";
+import type { Channel, DirectMessage, OrgSummary } from "@agenteschat/client";
 import { previewBody } from "@agenteschat/client/lib/message-body";
 import { resources } from "@agenteschat/i18n";
 import i18next from "i18next";
 import {
   buildConversations,
+  hiddenAgentIds,
   homeSections,
   isListedThread,
   isListKind,
@@ -297,6 +298,35 @@ describe("the home by kind", () => {
     expect(homeSections([])).toEqual([]);
   });
 
+  test("Agentes leaves out the agents that don't answer me, and who manages agents sees all", () => {
+    const agents = [
+      { id: "a-A", canTalk: false },
+      { id: "a-B", canTalk: true },
+    ];
+    const dms = [dm("d0", "A", 1, 5), dm("d1", "B", 0, 9), person("p1", "Ana", 1)];
+    const member: OrgSummary = { id: "o1", name: "Acme", role: "member", permissions: ["read", "talk_to_agents"] };
+    const manager: OrgSummary = { ...member, permissions: ["read", "talk_to_agents", "manage_agents"] };
+    expect([...hiddenAgentIds(member, agents)]).toEqual(["a-A"]);
+    expect([...hiddenAgentIds(manager, agents)]).toEqual([]);
+    const hiddenAgents = (org: OrgSummary) => hiddenAgentIds(org, agents);
+    const agentRows = (org: OrgSummary) =>
+      homeSections(buildConversations({ channels: [], dms, threads: [], hiddenAgents: hiddenAgents(org) })).map((x) => [
+        x.key,
+        x.rows.map((r) => r.key),
+      ]);
+    expect(agentRows(member)).toEqual([
+      ["agents", ["d:d1"]],
+      ["people", ["d:p1"]],
+    ]);
+    expect(agentRows(manager)).toEqual([
+      ["agents", ["d:d0", "d:d1"]],
+      ["people", ["d:p1"]],
+    ]);
+    // The tab's badge counts what the home lists: A's unread stays out for the member.
+    expect(unreadConversationCount({ channels: [], dms, hiddenAgents: hiddenAgents(member) })).toBe(0);
+    expect(unreadConversationCount({ channels: [], dms, hiddenAgents: hiddenAgents(manager) })).toBe(1);
+  });
+
   test("the Threads tab: threads and missions by latest activity", () => {
     expect(threadRows(rows).map((r) => [r.key, r.kind])).toEqual([
       ["t:t1", "thread"],
@@ -327,6 +357,15 @@ describe("the home by kind", () => {
     expect(toggleCollapsed([], "people")).toEqual(["people"]);
     expect(toggleCollapsed(["people"], "agents")).toEqual(["agents", "people"]);
     expect(toggleCollapsed(["agents", "people"], "agents")).toEqual(["people"]);
+  });
+
+  test("collapsed groups of agents take any ids: one workspace's stay when another's change", () => {
+    // Workspace A collapses its group a1, then workspace B its b1, on the one remembered list.
+    let raw = JSON.stringify(toggleCollapsed(parseCollapsed(null, null), "a1", null));
+    raw = JSON.stringify(toggleCollapsed(parseCollapsed(raw, null), "b1", null));
+    expect(parseCollapsed(raw, null)).toEqual(["a1", "b1"]);
+    expect(toggleCollapsed(parseCollapsed(raw, null), "b1", null)).toEqual(["a1"]);
+    expect(parseCollapsed('["a1",2,null]', null)).toEqual(["a1"]);
   });
 });
 

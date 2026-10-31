@@ -1,9 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import type { AgentAccess, AgentForYouItem, Memory } from "@agenteschat/client";
+import type { AgentAccess, AgentForYouItem, Memory, PlanUsage } from "@agenteschat/client";
+import { planMeterText } from "@agenteschat/client/lib/plan-usage";
+import { planLine } from "@agenteschat/ui/plan-state";
 import {
   canEditMemories,
   dayWord,
   didLines,
+  freeSections,
   knownAboutMe,
   memoryOrigin,
   plainRole,
@@ -11,7 +14,7 @@ import {
   usesOf,
   type WorkItem,
 } from "../../src/features/agents/logic";
-import { agent } from "./fixtures";
+import { agent, translator } from "./fixtures";
 
 const NOW = new Date(2026, 9, 17, 15, 0);
 const ago = (hours: number) => new Date(NOW.getTime() - hours * 3_600_000).toISOString();
@@ -61,6 +64,26 @@ describe("Agentes: esperando você, trabalhando, livres", () => {
     expect(working.map((l) => l.agent.id)).toEqual(["nina"]);
     expect(free.map((l) => l.agent.id).sort()).toEqual(["iris", "theo"]);
   });
+
+  test("Livres by the workspace's groups: the ones in none first, then each group in its order; empty ones left out", () => {
+    const team = [...agents, agent({ id: "zoe", name: "Zoe" }), agent({ id: "ana", name: "Ana" })];
+    const { working, free } = teamLines(team, [work("nina", ago(1))], []);
+    const groups = [
+      { id: "g1", name: "Integrations", agentIds: ["zoe", "nina", "theo"] },
+      { id: "g2", name: "Produto", agentIds: ["nina"] },
+      { id: "g3", name: "Florim | Gestão e Financeiro", agentIds: ["ana"] },
+    ];
+    const sections = freeSections(free, groups);
+    expect(sections.map((s) => [s.group?.name ?? null, s.lines.map((l) => l.agent.id)])).toEqual([
+      [null, ["iris"]],
+      ["Integrations", ["zoe", "theo"]],
+      ["Florim | Gestão e Financeiro", ["ana"]],
+    ]);
+    // A working agent stays under "Trabalhando agora", out of its group's section.
+    expect(working.map((l) => l.agent.id)).toEqual(["nina"]);
+    // No groups: Livres alone, as before.
+    expect(freeSections(free, []).map((s) => [s.group, s.lines.length])).toEqual([[null, free.length]]);
+  });
 });
 
 describe("Perfil: o papel numa frase", () => {
@@ -104,14 +127,16 @@ describe("Perfil: memórias", () => {
     ...over,
   });
 
-  test("only the owner or an admin may change them", () => {
+  test("only the agent's owner or who reviews memory may change them", () => {
     const theo = { ownerUserId: "u1" };
-    expect(canEditMemories(theo, { id: "u1", role: "member" })).toBe(true);
-    expect(canEditMemories(theo, { id: "u2", role: "admin" })).toBe(true);
-    expect(canEditMemories(theo, { id: "u2", role: "owner" })).toBe(true);
-    expect(canEditMemories(theo, { id: "u2", role: "member" })).toBe(false);
-    expect(canEditMemories({ ownerUserId: null }, { id: "u2", role: "member" })).toBe(false);
-    expect(canEditMemories(theo, { id: null, role: "admin" })).toBe(false);
+    const member = { permissions: ["read", "post"] };
+    const reviewer = { permissions: ["read", "review_memory"] };
+    expect(canEditMemories(theo, { id: "u1", org: member })).toBe(true);
+    expect(canEditMemories(theo, { id: "u2", org: reviewer })).toBe(true);
+    expect(canEditMemories(theo, { id: "u2", org: member })).toBe(false);
+    expect(canEditMemories(theo, { id: "u2", org: undefined })).toBe(false);
+    expect(canEditMemories({ ownerUserId: null }, { id: "u2", org: member })).toBe(false);
+    expect(canEditMemories(theo, { id: null, org: reviewer })).toBe(false);
   });
 
   test("where it came from: said in your DM, in a channel, written by you, or learned", () => {
@@ -290,5 +315,50 @@ describe("Perfil: o que pode usar", () => {
     ]);
     expect(asks).toBe(true);
     expect(usesOf(null)).toEqual({ lines: [], asks: false });
+  });
+});
+
+describe("Perfil: o mês, com os limites do plano (ADR 0063 §5)", () => {
+  const usage = (windows: PlanUsage["windows"]): PlanUsage => ({ windows, source: "probe", at: NOW.toISOString() });
+
+  test("the compact line in the plan's words, tightest first; near the limit, when it renews; nothing unknown", async () => {
+    const pt = planMeterText(await translator("pt-BR"), "pt-BR", NOW);
+    const en = planMeterText(await translator("en"), "en", NOW);
+    const both = usage([
+      { kind: "five_hour", usedPercent: 12 },
+      { kind: "seven_day", usedPercent: 40 },
+    ]);
+    expect(planLine(both, pt, NOW.getTime())?.line).toBe("semana 40% · 5h 12%");
+    expect(planLine(both, en, NOW.getTime())?.line).toBe("week 40% · 5h 12%");
+    expect(planLine(both, pt, NOW.getTime())?.alert).toBeNull();
+    const soon = new Date(NOW.getTime() + 90 * 60_000).toISOString();
+    expect(planLine(usage([{ kind: "five_hour", usedPercent: 92, resetsAt: soon }]), pt, NOW.getTime())?.alert).toBe(
+      "Quase no limite · renova às 16:30",
+    );
+    expect(planLine(usage([]), pt, NOW.getTime())).toBeNull();
+    // Refused before any window was known: no bar, only that it is at the limit.
+    expect(planLine({ ...usage([]), limited: true }, pt, NOW.getTime())).toMatchObject({
+      line: "",
+      alert: "No limite",
+    });
+  });
+
+  test("the screen: the plan's card with its account's name first, the budget only once it spent through the API", async () => {
+    // The screens are components the tests can't render: what they wire in, as text.
+    const read = (file: string) => Bun.file(new URL(`../../src/features/${file}`, import.meta.url).pathname).text();
+    const [screen, parts] = await Promise.all([read("agents/AgentProfileScreen.tsx"), read("usage/parts.tsx")]);
+    expect(screen).toContain("const shown = usageShown(agent?.brain, detail.data?.budgetUsedPercent ?? 0);");
+    const plan = screen.indexOf("<PlanMeter compact usage={shown.plan.usage} label={shown.plan.account} />");
+    const budget = screen.indexOf(") : spend && shown.budget ? (");
+    expect(plan).toBeGreaterThan(0);
+    expect(budget).toBeGreaterThan(plan);
+    // The budget's share as the web says it ("<1%" for a little spent), in the plan's card and the budget's.
+    expect(screen.match(/formatPercent\(i18n\.language, spend\.percent\)/g)).toHaveLength(2);
+    // The phone's meter draws the same line as the web's (`planLine`).
+    expect(parts).toContain("const shown = planLine(usage, text, now);");
+    // The budget is never called a limit next to a plan's limits.
+    const t = await translator("pt-BR");
+    expect(t("mobile.agent.ofMonthBudget")).toBe("do orçamento do mês");
+    expect(t("mobile.agent.exhaustedF", { name: "Ada" })).toBe("A Ada usou todo o orçamento do mês.");
   });
 });

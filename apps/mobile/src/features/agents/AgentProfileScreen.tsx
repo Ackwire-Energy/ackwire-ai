@@ -11,9 +11,11 @@ import {
   useUsage,
 } from "@agenteschat/client";
 import { brainLine } from "@agenteschat/client/lib/brain";
+import { formatPercent } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { aiStateOf } from "@agenteschat/client/lib/no-ai";
+import { agentPlan, aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
+import { usageShown } from "@agenteschat/client/lib/plan-usage";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { type ReactNode, useState } from "react";
@@ -26,6 +28,7 @@ import {
   AgentAvatar,
   Button,
   Card,
+  EmptyState,
   Icon,
   type IconName,
   PixelOrbit,
@@ -36,6 +39,7 @@ import {
   SpendBar,
   Text,
   useToast,
+  WithPresence,
 } from "@/ui";
 import { CoverParallax, useCoverScroll, useScrollFade } from "@/ui/cover";
 import { openAgentAi } from "../ai/AgentAiScreen";
@@ -44,6 +48,7 @@ import { AgentComputerRow } from "../computer/AgentComputerRow";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { chatHref } from "../links/logic";
 import { useConnectedById } from "../settings/hooks";
+import { agentBadgeInset } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook, genderOf } from "../shared/logic";
 import { SheetTitle } from "../shared/PromptForm";
@@ -51,6 +56,9 @@ import { PushedHeader, Tile } from "../shared/parts";
 import { useWaitingApprovals, useWorkingNow } from "../shared/queries";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { TextArea } from "../shared/TextArea";
+import { useAgentProfileStatus } from "../status/hooks";
+import { StatusCard } from "../status/StatusCard";
+import { PlanMeter } from "../usage/parts";
 import { openAgentUsage } from "../usage/UsageScreen";
 import { openAgentEdit } from "./AgentEditScreen";
 import {
@@ -87,12 +95,25 @@ const AREA_ICON: Record<string, IconName> = {
 };
 
 /**
- * An agent's profile as a teammate: its sky and living body, its
- * role in one plain sentence, who answers for it, what it is on now (or what waits on you), one button
+ * An agent's profile as a teammate: its sky and living body (with its presence badge), its
+ * role in one plain sentence, who answers for it, its presence and status line (ADR 0084), what it is on now (or
+ * what waits on you), one button
  * (Conversar), then what it did for you, what it knows about you (tap to correct or forget, for its owner and
  * admins), what it can use in plain levels and the approval rule, and its month last.
  */
 export function AgentProfileScreen({ id }: { id: string }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const agent = useDirectory().anyAgent(id);
+  // No longer in the team (archived or deleted): its messages name it, it has no profile.
+  if (agent?.former) {
+    return (
+      <View style={[styles.screen, { backgroundColor: c.bg }]}>
+        <PushedHeader title={agent.name} solid={false} />
+        <EmptyState icon="agent" title={t("profile.former")} />
+      </View>
+    );
+  }
   return (
     <SheetHostProvider>
       <Profile id={id} />
@@ -111,7 +132,7 @@ function Profile({ id }: { id: string }) {
   const sheet = useSheet();
   const when = useWhen();
   const meId = useMeId();
-  const role = useOrg().org?.role;
+  const org = useOrg().org;
   const insets = useSafeAreaInsets();
   // The cover's sky lags behind the scroll and stretches on pull; the agent fades as it nears the bar.
   const { y, onScroll } = useCoverScroll();
@@ -137,8 +158,10 @@ function Profile({ id }: { id: string }) {
   const roleName = (agent?.role || detail.data?.role || "").trim();
   const plain = plainRole(agent?.instructions || detail.data?.instructions);
   const busy = work.length > 0;
-  const editable = canEditMemories(agent, { id: meId, role });
-  const decides = mine || can(role, "manage_agents");
+  const editable = canEditMemories(agent, { id: meId, org });
+  // Its presence and line (ADR 0084): the badge, "Ocupado · Num trabalho pesado", the card with what it does.
+  const status = useAgentProfileStatus(id, name);
+  const decides = mine || can(org, "manage_agents");
   const did = didLines(forYou.data?.items);
   const memories = knownAboutMe(knows.data);
   const uses = usesOf(access.data);
@@ -153,6 +176,8 @@ function Profile({ id }: { id: string }) {
         usage: usage.data?.find((u) => u.agentId === id) ?? null,
       })
     : null;
+  // On a plan, its limits first and the budget only once it spent through the API (ADR 0063 §5).
+  const shown = usageShown(agent?.brain, detail.data?.budgetUsedPercent ?? 0);
   const money = (v: number) =>
     new Intl.NumberFormat(i18n.language || "pt-BR", { style: "currency", currency: "USD" }).format(v);
   const date = (iso: string) =>
@@ -245,7 +270,9 @@ function Profile({ id }: { id: string }) {
             <Sky color={look.color} depth={1} style={StyleSheet.absoluteFill} />
           </CoverParallax>
           <Animated.View style={avatarFade}>
-            <AgentAvatar agent={look} size={104} mode={busy ? "run" : "idle"} />
+            <WithPresence size={104} presence={status?.presence} inset={agentBadgeInset(look, 104)}>
+              <AgentAvatar agent={look} size={104} mode={busy ? "run" : "idle"} />
+            </WithPresence>
           </Animated.View>
         </View>
         <View style={styles.prof}>
@@ -262,6 +289,16 @@ function Profile({ id }: { id: string }) {
               {ownerLine}
             </Text>
           ) : null}
+          {status ? (
+            <Text variant="small" tone="muted" style={styles.center}>
+              {status.line}
+            </Text>
+          ) : null}
+          {status?.card ? (
+            <View style={styles.status}>
+              <StatusCard emoji={status.card.emoji} text={status.card.text} note={status.card.note} />
+            </View>
+          ) : null}
           {waitingNow ? (
             <NowPill
               leading={<Icon name="wait" size={15} color={c.amber} />}
@@ -273,7 +310,7 @@ function Profile({ id }: { id: string }) {
             <NowPill
               leading={<Icon name="bolt" size={15} color={c.amber} />}
               label={t("noAi.agent", agentGrammar(t, agent?.name ?? ""))}
-              onPress={() => openConnectAi({ agentId: id })}
+              onPress={() => openConnectAi({ agentId: id, plan: agentPlan(agent) ?? undefined })}
             />
           ) : null}
           {work.map((w) => (
@@ -474,7 +511,20 @@ function Profile({ id }: { id: string }) {
 
         <Section title={t("mobile.agent.month")}>
           <View style={styles.monthCards}>
-            {spend ? (
+            {shown.plan ? (
+              <Card>
+                <View style={styles.spend}>
+                  <PlanMeter compact usage={shown.plan.usage} label={shown.plan.account} />
+                  {spend && shown.budget ? (
+                    <Text variant="caption" tone="muted">
+                      {spend.kind === "money"
+                        ? `${money(spend.spentUsd)} ${t("mobile.agent.ofBudget", { budget: money(spend.budgetUsd) })}`
+                        : `${formatPercent(i18n.language, spend.percent)} ${t("mobile.agent.ofMonthBudget")}`}
+                    </Text>
+                  ) : null}
+                </View>
+              </Card>
+            ) : spend && shown.budget ? (
               <Card>
                 <View style={styles.spend}>
                   <View style={styles.spendHead}>
@@ -490,10 +540,10 @@ function Profile({ id }: { id: string }) {
                     ) : (
                       <>
                         <Text variant="body" tone="ink2">
-                          {t("mobile.agent.percent", { percent: spend.percent })}
+                          {formatPercent(i18n.language, spend.percent)}
                         </Text>
                         <Text variant="small" tone="muted">
-                          {t("mobile.agent.ofLimit")}
+                          {t("mobile.agent.ofMonthBudget")}
                         </Text>
                       </>
                     )}
@@ -649,6 +699,7 @@ const styles = StyleSheet.create({
   // Not clipped: on a pull the sky grows up into the gap above the content.
   cover: { height: COVER_HEIGHT, alignItems: "center", justifyContent: "flex-end", paddingBottom: 22 },
   prof: { paddingHorizontal: 24, gap: 4 },
+  status: { marginTop: 10 },
   center: { textAlign: "center" },
   acts: { marginTop: 14 },
   grow: { flex: 1 },

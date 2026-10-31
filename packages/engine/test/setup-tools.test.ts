@@ -98,18 +98,20 @@ describe("the setup group", () => {
     expect(DEFAULT_AGENT_SCOPES).toContain(SETUP_SCOPE);
     const ctx = await runFor(f, f.owner.id, "cria um canal pro lançamento");
     const granted = await gatewayOf(f).granted(ctx);
-    expect(granted.map((t) => t.name)).toEqual(["create_channel", "offer_connect_ai"]);
+    expect(granted.map((t) => t.name)).toEqual(["create_channel", "offer_connect_ai", "propose_agent"]);
     expect(deferrableGroups(granted).map((g) => [g.key, g.label])).toEqual([
-      ["setup", "Workspace setup (connect an AI, create channels)"],
+      ["setup", "Workspace setup (connect an AI, create channels, propose agents)"],
     ]);
     // Not loaded: behind find_tools; loaded: as they are.
     expect(presentTools(granted, undefined, []).map((t) => t.name)).toEqual(["find_tools", "use_tool"]);
     expect(presentTools(granted, undefined, ["setup"]).map((t) => t.name)).toEqual([
       "create_channel",
       "offer_connect_ai",
+      "propose_agent",
     ]);
     const kind = (name: string) => toolKind({ name, scope: SETUP_SCOPE, connectionId: null }).kind;
     expect(kind("offer_connect_ai")).toBe("here");
+    expect(kind("propose_agent")).toBe("here");
     expect(kind("create_channel")).toBe("elsewhere");
   });
 });
@@ -171,7 +173,7 @@ describe("offer_connect_ai", () => {
       expect(out.content).toContain("Invalid input");
     }
     const unknown = await call(f, ctx, "offer_connect_ai", { agents: ["@dev", "@nobody"], why: "Conectar." });
-    expect(unknown).toMatchObject({ isError: true, content: "No agent @nobody in this organization." });
+    expect(unknown).toMatchObject({ isError: true, content: "No agent @nobody here." });
     expect(await cards(f)).toEqual([]);
     // Google's plans can't be used in other products: Gemini comes as an API key.
     await call(f, ctx, "offer_connect_ai", { what: "api_key", provider: "gemini", why: "Sua chave do Gemini." });
@@ -288,7 +290,7 @@ describe("create_channel", () => {
     });
     expect(await call(f, ctx, "create_channel", { name: "x", agents: ["@nobody"] })).toMatchObject({
       isError: true,
-      content: "No agent @nobody in this organization.",
+      content: "No agent @nobody here.",
     });
     expect((await call(f, ctx, "create_channel", { topic: "sem nome" })).content).toContain("Invalid input");
     expect(await channelNamed(f, "x")).toBeUndefined();

@@ -134,6 +134,8 @@ export function customConnectorRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Connect an https MCP server: connected, OAuth to finish, or an API key is needed",
+      description:
+        "A new server is every agent's, whole (`connector:*`): its tools reach them once classified, and sensitive ones still ask for approval. The same address again updates the credentials in place and keeps the grants.",
       request: {
         params: OrgParams,
         body: body(

@@ -267,7 +267,7 @@ test("hello.accounts: new accounts are added as the pairer's, known ones refresh
   let rows = await accountRows(machineId);
   // Signed in on the computer itself (the desktop app): the pairer's from the start.
   expect(rows.map((r) => [r.id, r.kind, r.label, r.email, r.plan, r.status, r.createdBy])).toEqual([
-    [CLAUDE_ID, "claude_code", "Claude Max", "ana@example.com", "max", "active", f.owner.id],
+    [CLAUDE_ID, "claude_code", "Claude", "ana@example.com", "max", "active", f.owner.id],
     [CODEX_ID, "codex", "ChatGPT", null, null, "signed_out", f.owner.id],
   ]);
 
@@ -363,7 +363,7 @@ test("signing in: the person who connected the computer; the code is sealed to i
     account: {
       id: login.loginId,
       kind: "claude_code",
-      label: "Claude Max",
+      label: "Claude",
       email: "ana@example.com",
       plan: "max",
       status: "active",
@@ -511,7 +511,7 @@ test("a coding plan's key: no sign-in page but the plan's key page, the key seal
       mine: true,
       canAdd: true,
       keys: true,
-      // A runner before protocol 27: a sign-in thinks for one agent.
+      // A runner before protocol 29: a sign-in thinks for one agent.
       shares: { claude_code: false, codex: false, key: false },
       brains: { claude_code: expect.any(Boolean), codex: expect.any(Boolean) },
       // Its Claude Code is signed in on its own, with no plan or usage known yet.
@@ -543,6 +543,18 @@ test("a coding plan's key: no sign-in page but the plan's key page, the key seal
   });
   // Someone else in the workspace: not theirs.
   expect((await listAiAccounts({ db: f.db }, bia.id, f.org.id)).computers[0]?.own).toEqual({});
+  // Claude Code saying it's signed out there wins over a usage read with that sign-in before.
+  await f.db
+    .update(schema.machines)
+    .set({
+      executors: {
+        claude: { version: "2.1.0", loggedIn: false },
+        ownUsage: { claude_code: usage },
+        detectedAt: new Date().toISOString(),
+      },
+    })
+    .where(eq(schema.machines.id, machineId));
+  expect((await listAiAccounts({ db: f.db }, f.owner.id, f.org.id)).computers[0]?.own).toEqual({});
   await f.db
     .update(schema.machines)
     .set({ execAllowed: before?.execAllowed ?? false, executors: before?.executors ?? {} })
@@ -672,7 +684,7 @@ test("ownership is bound when the sign-in starts: a member's account on a comput
   expect(await accountRow(login.loginId)).toMatchObject({
     status: "active",
     createdBy: caio.id,
-    label: "Claude Team",
+    label: "Claude",
     email: "caio@example.com",
   });
   const audit = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "account.added"));
@@ -689,11 +701,11 @@ test("ownership is bound when the sign-in starts: a member's account on a comput
   const asAdmin = await getMachineAccounts({ db: f.db }, f.owner.id, f.org.id, machineId);
   expect(asAdmin.accounts[0]?.email).toBeNull();
 
-  // His second seat is "Claude Team 2"; Bia's first is "Claude Team".
+  // His second seat is "Claude 2"; Bia's first is "Claude": the plan is never in the name.
   const second = signingRunner(machineId, () => ({ loggedIn: true, email: "caio2@example.com", plan: "team" }));
-  expect((await signIn(second, caio.id, machineId)).status.account?.label).toBe("Claude Team 2");
+  expect((await signIn(second, caio.id, machineId)).status.account?.label).toBe("Claude 2");
   const hers = signingRunner(machineId, () => ({ loggedIn: true, email: "bia@example.com", plan: "team" }));
-  expect((await signIn(hers, bia.id, machineId)).status.account?.label).toBe("Claude Team");
+  expect((await signIn(hers, bia.id, machineId)).status.account?.label).toBe("Claude");
 
   // Only the owner renames; the others can't.
   expect(
@@ -730,7 +742,7 @@ test("ChatGPT: the same email twice for one owner on one computer is refused, an
   // Another email is another account.
   expect((await signInChatGpt("ana.pessoal@example.com")).status).toMatchObject({
     state: "done",
-    account: { label: "ChatGPT Plus" },
+    account: { label: "ChatGPT" },
   });
 });
 
@@ -949,8 +961,8 @@ test("one login per agent where the account allows it: a key's logins share its 
     const login = await beginAccountLogin(chatgpt.deps, f.owner.id, f.org.id, machineId, "codex");
     return accountLoginStatus(chatgpt.deps, f.owner.id, f.org.id, machineId, login.loginId);
   };
-  expect(await signInChatGpt()).toMatchObject({ state: "done", account: { label: "ChatGPT Plus" } });
-  expect(await signInChatGpt()).toMatchObject({ state: "failed", duplicate: { label: "ChatGPT Plus" } });
+  expect(await signInChatGpt()).toMatchObject({ state: "done", account: { label: "ChatGPT" } });
+  expect(await signInChatGpt()).toMatchObject({ state: "failed", duplicate: { label: "ChatGPT" } });
 });
 
 test("rename and remove: the owner renames; the owner or the pairer removes; offline, a tombstone until the next hello", async () => {
@@ -1030,6 +1042,55 @@ test('the label migration: a ChatGPT account that kept its default name "Codex" 
     [id(4)]: "Codex",
     [id(5)]: "Codex Pro",
     [id(6)]: "ChatGPT Pro",
+  });
+});
+
+test('the Claude names migration: an account named after its plan ("Claude Max") is "Claude", numbered per owner; chosen names stay', async () => {
+  f = await setup();
+  const { machineId } = await ownedMachine();
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  const id = (n: number) => `0193dddd-0000-4000-8000-00000000020${n}`;
+  const at = (n: number) => ({ createdAt: new Date(Date.UTC(2026, 9, 30, 12, n)) });
+  await addAccount(machineId, id(1), "claude_code", { label: "Claude Max", plan: "max", ...at(1) });
+  // Another login of that account (one per agent): one name for both.
+  await addAccount(machineId, id(2), "claude_code", {
+    label: "Claude Max",
+    plan: "max",
+    email: "Ana@Example.com",
+    ...at(2),
+  });
+  await addAccount(machineId, id(3), "claude_code", {
+    label: "Claude Team",
+    plan: "team",
+    email: "ana@acme.com",
+    ...at(3),
+  });
+  await addAccount(machineId, id(4), "claude_code", {
+    label: "Claude Max 2",
+    plan: "ultra",
+    email: "ana2@x.com",
+    ...at(4),
+  });
+  await addAccount(machineId, id(5), "claude_code", {
+    label: "Claude Max pessoal",
+    plan: "max",
+    email: "a3@x.com",
+    ...at(5),
+  });
+  await addAccount(machineId, id(6), "claude_code", { label: "Claude Max", plan: "max", createdBy: bia.id, ...at(6) });
+  await addAccount(machineId, id(7), "claude_code", { label: "GLM Coding", provider: "zai", email: null, ...at(7) });
+  await addAccount(machineId, id(8), "codex", { label: "ChatGPT", ...at(8) });
+  await runMigration(f.db, "claude_account_names");
+  await runMigration(f.db, "claude_account_names");
+  expect(Object.fromEntries((await accountRows(machineId)).map((r) => [r.id, r.label]))).toEqual({
+    [id(1)]: "Claude",
+    [id(2)]: "Claude",
+    [id(3)]: "Claude 2",
+    [id(4)]: "Claude 3",
+    [id(5)]: "Claude Max pessoal",
+    [id(6)]: "Claude",
+    [id(7)]: "GLM Coding",
+    [id(8)]: "ChatGPT",
   });
 });
 
@@ -1307,7 +1368,7 @@ test("refreshing usage: the caller's own accounts, and their computers' own sign
   expect(await refreshAiAccounts(live.deps, stranger.id, f.org.id).catch((e) => e)).toBeInstanceOf(ForbiddenError);
 });
 
-test("one sign-in for all agents (protocol 27): asked for, it thinks for two agents, once; out and gone for both", async () => {
+test("one sign-in for all agents (protocol 29): asked for, it thinks for two agents, once; out and gone for both", async () => {
   f = await setup();
   const { machineId } = await ownedMachine(SHARED_ACCOUNTS_PROTOCOL);
   const runner = signingRunner(
@@ -1323,7 +1384,7 @@ test("one sign-in for all agents (protocol 27): asked for, it thinks for two age
     loginId: login.loginId,
     shared: true,
   });
-  expect(status).toMatchObject({ state: "done", account: { id: login.loginId, label: "Claude Max", shared: true } });
+  expect(status).toMatchObject({ state: "done", account: { id: login.loginId, label: "Claude", shared: true } });
   // The computer shares every new sign-in: each of the person's agents there is one click away.
   expect((await listAiAccounts({ db: f.db }, f.owner.id, f.org.id)).computers[0]?.shares).toEqual({
     claude_code: true,
@@ -1442,7 +1503,7 @@ test("where each agent is its own OS user, the switch decides: Claude's sign-ins
   });
 });
 
-/** A runner on protocol 27 where every login thinks for all of its owner's agents: a plan's key, or Claude's sign-in. */
+/** A runner on protocol 29 where every login thinks for all of its owner's agents: a plan's key, or Claude's sign-in. */
 function sharingRunner(machineId: string) {
   const runner = signingRunner(
     machineId,
@@ -1504,7 +1565,7 @@ test("logins made one per agent keep their agents when signed in again on a runn
   const KEY_2 = "0193dddd-0000-4000-8000-000000000012";
   const CLAUDE_1 = "0193dddd-0000-4000-8000-000000000013";
   const CLAUDE_2 = "0193dddd-0000-4000-8000-000000000014";
-  // One GLM Coding key signed in once per agent, and one Claude account the same way, as before protocol 27.
+  // One GLM Coding key signed in once per agent, and one Claude account the same way, as before protocol 29.
   const key = { provider: "zai", email: null, keyHint: "MnOp", label: "GLM Coding" };
   await addAccount(machineId, KEY_1, "claude_code", key);
   await addAccount(machineId, KEY_2, "claude_code", key);

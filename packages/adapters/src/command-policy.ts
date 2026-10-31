@@ -1006,8 +1006,8 @@ export function normalizedCommand(words: string[]): string {
   return out.join(" ");
 }
 
-/** The words of each part of a command (quotes dropped), for matching only: never to run anything. */
-function commandWords(command: string): string[][] {
+/** The words of each part of a command (quotes dropped), for matching and showing only: never to run anything. */
+export function commandWords(command: string): string[][] {
   const cmds = simpleCommands(command);
   if (cmds) return cmds.map((s) => s.argv);
   return commandParts(command).map((part) => part.split(" ").map(bareWord));
@@ -1209,3 +1209,19 @@ const FORBIDDEN_HINTS: Record<string, string> = {
 };
 
 export const forbiddenHint = (reason: string) => FORBIDDEN_HINTS[reason] ?? null;
+
+/** `forbiddenReason`'s reasons as the code a refusal carries, so the apps say why in the person's words. */
+const FORBIDDEN_CODES: Record<string, string> = {
+  "it touches secrets": "secret",
+  "it can't be read plainly": "unclear",
+  "it writes outside the mission folder": "outside",
+  "it changes files outside the mission folder": "outside",
+  "it sends data or saves outside the mission folder": "upload",
+  "it changes the system": "system",
+  "it connects to another host": "remote",
+  "it runs other commands": "shell",
+  "it runs code given inline": "inline",
+  "it installs globally": "global",
+};
+
+export const forbiddenCode = (reason: string) => FORBIDDEN_CODES[reason] ?? "rules";

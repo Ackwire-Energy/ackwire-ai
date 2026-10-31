@@ -61,11 +61,11 @@ const MINIMAX: AiAccounts["accounts"][number] = {
   keyHint: "MnOp",
 };
 
-async function page(accounts: AiAccounts["accounts"], role: "owner" | "member" = "owner") {
+async function page(accounts: AiAccounts["accounts"], role: "owner" | "member" = "owner", computers = [MAC]) {
   const state = seedState();
   if (state.me?.organizations[0]) state.me.organizations[0].role = role;
   const api = createFakeApi(state);
-  fakeMachinesOf.get(api)?.setAiAccounts({ accounts, computers: [MAC] });
+  fakeMachinesOf.get(api)?.setAiAccounts({ accounts, computers });
   await renderApp(`/org/${ORG_ID}/settings/keys`, { api });
   await settle(6);
   const rows = () => [...document.querySelectorAll(".ai-accounts__row")] as HTMLElement[];
@@ -187,6 +187,45 @@ describe("Contas de IA: a plan with a login per agent", () => {
     source: "probe" as const,
     at,
   });
+  test("every plan's windows in the agents' own compact line: the two tightest, one bar, all of them on hover", async () => {
+    const at = new Date().toISOString();
+    const team: AiAccounts["accounts"][number] = {
+      ...WORK,
+      usage: {
+        windows: [
+          { kind: "five_hour", usedPercent: 12 },
+          { kind: "seven_day", usedPercent: 40 },
+          { kind: "seven_day_sonnet", usedPercent: 3 },
+        ],
+        source: "probe",
+        at,
+      },
+    };
+    const own: AiComputer = {
+      ...MAC,
+      own: {
+        claude_code: { plan: "max", usage: { windows: [{ kind: "five_hour", usedPercent: 5 }], source: "turn", at } },
+      },
+    };
+    const { rows } = await page([team], "owner", [own]);
+    const [mine, account] = rows();
+    // The computer's own sign-in reads like an account: its maker's name, then its plan once.
+    expect([mine, account].map((r) => r?.querySelector(".ai-accounts__name")?.textContent)).toEqual([
+      "Claude · Max",
+      "Trabalho · Team",
+    ]);
+    expect(mine?.querySelector(".ac-planmeter__line")?.textContent).toBe("5h 5%");
+    const meter = account?.querySelector(".ac-planmeter--compact") as HTMLElement;
+    expect(meter.querySelector(".ac-planmeter__line")?.textContent).toBe("semana 40% · 5h 12%");
+    expect(
+      within(meter)
+        .getAllByRole("meter")
+        .map((m) => m.getAttribute("aria-label")),
+    ).toEqual(["Semana"]);
+    expect(meter.title.split("\n")).toEqual(["Semana 40%", "5 horas 12%", "Semana · Sonnet 3%"]);
+    expect(meter.querySelector(".ac-planmeter__state")).toBeNull();
+  });
+
   /** One GLM key signed in for Ada, Theo and Lia: three logins, one account. */
   type Row = AiAccounts["accounts"][number];
   const glm = (id: string, agent: string, over: Partial<Row> = {}): Row => ({

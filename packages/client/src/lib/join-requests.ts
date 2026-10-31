@@ -20,10 +20,6 @@ export const joinCode = (typed: string) => typed.replace(/\D/g, "").slice(0, JOI
 /** A signed-in person's open link page asks for the answer this often (ADR 0068). */
 export const ANSWER_POLL_MS = 15_000;
 
-/** The roles an approval can give; owner never goes to someone who asked through a link. */
-export const APPROVE_ROLES = ["member", "admin"] as const;
-export type ApproveRole = (typeof APPROVE_ROLES)[number];
-
 /**
  * What approving a request tells the admin (ADR 0068): they're in, or the invitation went to their address; on a
  * server that sends no email, the invitation's link to hand them, which the server returns only this once.

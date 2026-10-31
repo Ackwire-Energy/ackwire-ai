@@ -97,6 +97,8 @@ interface Entry {
   how: HowKind;
   /** What agents could do there; `asks` = it always asks a person first. */
   can: { text: string; asks: boolean }[];
+  /** What connecting does to who can use it. */
+  after: string;
   /** Starts this service's connect flow (the same flows as before). */
   pick: () => void;
 }
@@ -179,6 +181,7 @@ export function ConnectorCatalogDialog({
         brandColor: c === "gmail" ? "#EA4335" : c === "icloud" ? "#3693F3" : null,
         how: mailAuthKind(c),
         can: capabilities(t, exists, `mail-${c}`),
+        after: t("connectors.detail.afterText"),
         pick: () => mail?.onPick(c),
       }),
     ),
@@ -195,6 +198,7 @@ export function ConnectorCatalogDialog({
             brandColor: null,
             how: "addressPassword",
             can: capabilities(t, exists, "database"),
+            after: t("connectors.detail.afterText"),
             pick: database.onPick,
           } satisfies Entry,
         ]
@@ -211,6 +215,8 @@ export function ConnectorCatalogDialog({
         brandColor: d.brandColor,
         how: authKind(d),
         can: capabilities(t, exists, d.id, d),
+        // As the server does: a first connection is every agent's, connecting again keeps who uses it.
+        after: t(connected.has(d.id) ? "connectors.detail.keepText" : "connectors.detail.allText"),
         pick: () => onPick(d),
       }),
     ),
@@ -494,7 +500,7 @@ function Detail({ entry, onConnect }: { entry: Entry; onConnect: () => void }) {
             </ul>
           </div>
         )}
-        <p className="catalog-svc__text">{t("connectors.detail.afterText")}</p>
+        <p className="catalog-svc__text">{entry.after}</p>
       </div>
       <div className="catalog-svc__act">
         <span className="catalog-svc__how ac-iconline" data-ok={entry.connected || undefined}>

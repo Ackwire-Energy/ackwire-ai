@@ -1,4 +1,5 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { useApi } from "../api/context";
 import { keys } from "../api/keys";
 import type { AgentBrowserSettings, BrowserHandoff, DesktopStatus, ScreenKind } from "../api/types";
@@ -289,8 +290,9 @@ export interface OpenPageInput {
 
 /**
  * "Abrir" (take control), "Pronto"/"Devolver", "Não consegui", cancel, "Assumir" while
- * watching, opening a site while in control, and "Parar" (close the agent's browser), as
- * React Query mutations (`.mutate`, `.isPending`). Each answer updates the cached request.
+ * watching, opening a site while in control, "Parar" (close the agent's browser) and "Tentar de
+ * novo" (restart it), as React Query mutations (`.mutate`, `.isPending`). Each answer updates the
+ * cached request.
  */
 export function useBrowserHandoffMutations(orgId: string) {
   const api = useApi();
@@ -336,6 +338,11 @@ export function useBrowserHandoffMutations(orgId: string) {
       mutationFn: (agentId: string) => api.browser.stop(orgId, agentId),
       meta: { silent: true },
     }),
+    /** "Tentar de novo" on a page that never came (who may drive it). */
+    restart: useMutation({
+      mutationFn: (agentId: string) => api.browser.restart(orgId, agentId),
+      meta: { silent: true },
+    }),
   };
 }
 
@@ -353,6 +360,8 @@ export function useBrowserHandoffActions(orgId: string) {
     cancel: (handoffId: string) => m.cancel.mutateAsync(handoffId),
     takeover: (agentId: string, runId?: string) => m.takeover.mutateAsync(runId ? { agentId, runId } : agentId),
     stop: (agentId: string) => m.stop.mutateAsync(agentId),
+    /** Not in `pending`, as `open`: the browser may take a while to come back. */
+    restart: (agentId: string) => m.restart.mutateAsync(agentId),
     /** Not in `pending`: a page may take a while to open, and the rest stays usable meanwhile. */
     open: (agentId: string, url: string) => m.open.mutateAsync({ agentId, url }),
     opening: m.open.isPending,
@@ -364,4 +373,28 @@ export function useBrowserHandoffActions(orgId: string) {
       m.takeover.isPending ||
       m.stop.isPending,
   };
+}
+
+/** A view that waited this long for the agent's page (opening, reconnecting) says it couldn't open it, with Try again. */
+export const BROWSER_STUCK_MS = 75_000;
+
+/**
+ * Whether a view has waited `BROWSER_STUCK_MS` for the agent's page (`waiting`: it shows opening or reconnecting)
+ * without it coming. Waiting again starts over, and so does a new `attempt` (Try again).
+ */
+export function useBrowserStuck(waiting: boolean, attempt = 0): boolean {
+  const [since, setSince] = useState<number | null>(null);
+  const [, rerender] = useState(0);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new attempt starts the wait over
+  useEffect(() => {
+    if (!waiting) {
+      setSince(null);
+      return;
+    }
+    setSince(Date.now());
+    // Read again just after the time is up: the answer is the clock's.
+    const timer = setTimeout(() => rerender((n) => n + 1), BROWSER_STUCK_MS + 100);
+    return () => clearTimeout(timer);
+  }, [waiting, attempt]);
+  return waiting && since !== null && Date.now() - since >= BROWSER_STUCK_MS;
 }

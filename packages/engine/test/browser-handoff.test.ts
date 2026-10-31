@@ -3,6 +3,7 @@ import { type BrowserInputEvent, channelTopic, type MachineRequest, type Realtim
 import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import {
+  BROWSER_HANDOFF_TOPIC,
   BROWSER_SCOPE,
   type BrowserLiveDeps,
   type BrowserLiveMessage,
@@ -15,6 +16,7 @@ import {
   createBrowserHandoffToolSource,
   createBrowserLive,
   drainOutbox,
+  endHandoffForRestart,
   expireBrowserHandoffs,
   expireControl,
   ForbiddenError,
@@ -35,6 +37,7 @@ import {
   requirePageRead,
   startTakeover,
   stopAgentBrowser,
+  stopChecksSettled,
   type ToolSource,
   touchControl,
   ValidationError,
@@ -123,6 +126,23 @@ const post = (body: string) =>
 const runs = () => f.db.select().from(schema.agentRuns);
 const handoffs = () => f.db.select().from(schema.browserHandoffs);
 const deps = () => ({ db: f.db, pubsub: f.pubsub });
+/** A run of the agent in another conversation, for this person's message there. */
+async function runFor(userId: string) {
+  const msg = await postPersonMessage(deps(), userId, f.org.id, f.general.id, { body: "elsewhere" });
+  const [run] = await f.db
+    .insert(schema.agentRuns)
+    .values({
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      channelId: f.general.id,
+      threadRootId: msg.id,
+      triggerMessageId: msg.id,
+      trigger: "mention",
+      hop: 1,
+    })
+    .returning();
+  return { orgId: f.org.id, agentId: f.agent.id, runId: run?.id ?? "" };
+}
 
 describe("browser_ask_person", () => {
   test("asks with a card and a waiting notification; Done resumes the run, which checks the page", async () => {
@@ -178,6 +198,96 @@ describe("browser_ask_person", () => {
     await drainOutbox(f.db, f.handlers);
     expect((await handoffs())[0]).toMatchObject({ status: "failed", note: "it asked for Ana's code" });
     expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("it asked for Ana's code");
+  });
+
+  test("Couldn't from someone who never took control releases the browser: the agent acts at once, told who answered", async () => {
+    await start();
+    await post("@dev sign in please");
+    await drainOutbox(f.db, f.handlers);
+    const [h] = await handoffs();
+    await finishHandoff(deps(), f.owner.id, f.org.id, h?.id ?? "", { result: "failed", note: "cant take control" });
+    await drainOutbox(f.db, f.handlers);
+    expect((await handoffs())[0]).toMatchObject({ status: "failed", controllerUserId: null });
+    expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain(`${f.owner.name} answered.`);
+    // Nothing on its page changed: no "read the page again first", and no person holds the browser.
+    const ctx = { orgId: f.org.id, agentId: f.agent.id, runId: h?.runId ?? "" };
+    expect(await requirePageRead(f.db, ctx)).toBeNull();
+    expect(await waitIfPersonInControl(f.db, ctx)).toBeNull();
+  });
+
+  test("the agent restarting its browser, asked by the person in control, ends their turn: the waiting run is told, the conversation hears whose control ended", async () => {
+    await start();
+    await post("@dev sign in please");
+    await drainOutbox(f.db, f.handlers);
+    const [h] = await handoffs();
+    await claimHandoff(deps(), f.owner.id, f.org.id, h?.id ?? "");
+    // A run of someone else (or of no one: a routine's) can't end it: its `browser_close` waits or is refused.
+    const caio = await addMember(f.db, f.org.id, "member", "caio");
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: caio.id });
+    expect(await endHandoffForRestart(deps(), await runFor(caio.id))).toBeNull();
+    const nobody = { orgId: f.org.id, agentId: f.agent.id, runId: crypto.randomUUID() };
+    expect(await endHandoffForRestart(deps(), nobody)).toBeNull();
+    expect((await handoffs())[0]?.status).toBe("active");
+    // The person in control asks for it in another conversation (`browser_close` in that run).
+    const other = await runFor(f.owner.id);
+    expect((await endHandoffForRestart(deps(), other))?.status).toBe("cancelled");
+    expect(await endHandoffForRestart(deps(), other)).toBeNull();
+    // Nothing of the page survives a restart: nothing to read first, and no one holds the browser.
+    expect(await requirePageRead(f.db, other)).toBeNull();
+    expect(await waitIfPersonInControl(f.db, other)).toBeNull();
+    await drainOutbox(f.db, f.handlers);
+    expect((await runs()).find((r) => r.id === h?.runId)?.status).toBe("done");
+    expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("Your browser was restarted");
+    // Where the request's card is (the channel): one line, in the reader's language.
+    const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    const lines = timeline.filter((m) => m.meta.bodyCode === "browser_restarted");
+    expect(lines.map((m) => [m.body, m.meta.bodyParams])).toEqual([
+      [
+        `${f.agent.name} restarted its browser. ${f.owner.name}'s control ended.`,
+        { agent: f.agent.name, person: f.owner.name },
+      ],
+    ]);
+    expect(timeline.find((m) => m.id === h?.id)?.meta.browserHandoff).toMatchObject({ status: "cancelled" });
+  });
+
+  test("the agent restarting its browser while a person is only asked cancels the request without a line", async () => {
+    await start();
+    await post("@dev sign in please");
+    await drainOutbox(f.db, f.handlers);
+    const [h] = await handoffs();
+    await endHandoffForRestart(deps(), { orgId: f.org.id, agentId: f.agent.id, runId: h?.runId ?? "" });
+    expect((await handoffs())[0]?.status).toBe("cancelled");
+    const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(timeline.some((m) => m.meta.bodyCode === "browser_restarted")).toBe(false);
+  });
+
+  test("the run that asked restarting its browser after a person wrote meanwhile never hears of that request later", async () => {
+    await start();
+    const ask = await post("@dev sign in please");
+    await drainOutbox(f.db, f.handlers);
+    const [h] = await handoffs();
+    // "reinicia o navegador" in its thread: the run stops waiting on the request and reads it.
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "reinicia o navegador",
+      threadId: ask.id,
+    });
+    await stopChecksSettled();
+    await drainOutbox(f.db, f.handlers);
+    const run = (await runs()).find((r) => r.id === h?.runId);
+    const transcript = run?.transcript as { detachedWaits?: { waitId: string }[] } | null;
+    expect(transcript?.detachedWaits?.map((d) => d.waitId)).toEqual([String(h?.id)]);
+    // It restarts its browser (`browser_close`), then waits again (it asks for the sign-in once more).
+    const ctx = { orgId: f.org.id, agentId: f.agent.id, runId: run?.id ?? "" };
+    expect((await endHandoffForRestart(deps(), ctx))?.status).toBe("cancelled");
+    const again = { calls: [{ toolUseId: "tu_again", name: "browser_ask_person", waitId: crypto.randomUUID() }] };
+    await f.db
+      .update(schema.agentRuns)
+      .set({ status: "waiting_input", transcript: { ...transcript, pending: again } })
+      .where(eq(schema.agentRuns.id, ctx.runId));
+    // The sweep tells no one the old request was canceled.
+    await expireBrowserHandoffs(deps());
+    const notices = (await f.db.select().from(schema.messages)).filter((m) => (m.meta as { notice?: unknown }).notice);
+    expect(notices).toEqual([]);
   });
 
   test("a note on Pronto reaches the agent only: the card and the conversation's events carry Couldn't's alone", async () => {
@@ -743,6 +853,17 @@ describe("live view", () => {
     live.close();
   });
 
+  test("someone opening the agent's browser gets it ready for the agent's next command, where it runs", async () => {
+    const machine = await start();
+    const { hub } = fakeHub();
+    const warmed: unknown[] = [];
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub, warm: (at) => warmed.push(at) });
+    const stop = await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
+    expect(warmed).toEqual([{ orgId: f.org.id, agentId: f.agent.id, machineId: machine.machineId }]);
+    stop();
+    live.close();
+  });
+
   test("the stream outlives its last viewer for a moment: a quick re-watch doesn't stop and start it", async () => {
     await start();
     const { hub, calls } = fakeHub();
@@ -754,10 +875,11 @@ describe("live view", () => {
     const stopAgain = await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
     await Bun.sleep(50);
     expect(calls.map((c) => c.op)).toEqual(["browser.stream.start"]);
-    // Gone for good: stopped once, after the delay.
+    // Gone for good: stopped once, after the delay, even when a page opens meanwhile.
     stopAgain();
     await Bun.sleep(5);
     expect(calls.some((c) => c.op === "browser.stream.stop")).toBe(false);
+    await f.pubsub.publish(BROWSER_HANDOFF_TOPIC, { type: "browser.opened", orgId: f.org.id, agentId: f.agent.id });
     await Bun.sleep(50);
     expect(calls.filter((c) => c.op === "browser.stream.stop")).toHaveLength(1);
     expect(live.watching(f.agent.id)).toBe(false);
@@ -833,6 +955,157 @@ describe("live view", () => {
     await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
     await Bun.sleep(50);
     expect((await handoffs())[0]).toMatchObject({ status: "active", controllerUserId: f.owner.id });
+  });
+
+  test("watching keeps control only once the page shows: a view whose page never came lets it end, and the run goes on", async () => {
+    const machine = await start();
+    await post("@dev sign in please");
+    await drainOutbox(f.db, f.handlers);
+    const [h] = await handoffs();
+    const { hub } = fakeHub();
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub });
+    await claimHandoff(live.handoffDeps, f.owner.id, f.org.id, h?.id ?? "");
+    const soon = new Date(Date.now() + 5_000);
+    const deadline = () => f.db.update(schema.browserHandoffs).set({ expiresAt: soon });
+    const expiresAt = async () => (await handoffs())[0]?.expiresAt.getTime();
+    await deadline();
+    const stop = await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
+    await Bun.sleep(5);
+    // "Opening…" with no page: their watching doesn't hold control.
+    expect(await expiresAt()).toBe(soon.getTime());
+    // Nor does their view retrying (it leaves and watches again).
+    stop();
+    await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
+    await Bun.sleep(5);
+    expect(await expiresAt()).toBe(soon.getTime());
+    // The page shows: from its first frame, it does.
+    live.hubHooks.frame(machine.machineId, frame(f.agent.id, 1));
+    await Bun.sleep(5);
+    expect(await expiresAt()).toBeGreaterThan(Date.now() + CONTROL_GRACE_MS - 5_000);
+
+    // A fresh stream whose page never comes (a restart): past the deadline it expires, and the agent goes on.
+    await deadline();
+    live.hubHooks.connected(machine.machineId);
+    await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
+    await Bun.sleep(5);
+    expect(await expiresAt()).toBe(soon.getTime());
+    expect(await expireBrowserHandoffs(deps(), new Date(soon.getTime() + 1000))).toBe(1);
+    await drainOutbox(f.db, f.handlers);
+    expect((await runs())[0]?.status).toBe("done");
+    expect(
+      await waitIfPersonInControl(f.db, { orgId: f.org.id, agentId: f.agent.id, runId: h?.runId ?? "" }),
+    ).toBeNull();
+    live.close();
+  });
+
+  test("Try again restarts the agent's browser on the page it showed; its views get the stream again, never a Parar", async () => {
+    const machine = await start();
+    const box: { live?: ReturnType<typeof createBrowserLive> } = {};
+    const runner = { stopFails: false, closed: false, opened: null as Promise<void> | null };
+    const { hub, calls } = fakeHub((r) => {
+      // The runner: its stop ends the stream ("stopped") before it answers.
+      if (r.op === "browser.stop") {
+        if (runner.stopFails) throw new MachineRequestError("timeout", "no answer");
+        box.live?.hubHooks.streamEnded(machine.machineId, {
+          type: "browser.stream.ended",
+          agentId: f.agent.id,
+          reason: "stopped",
+        });
+        return { stopped: true };
+      }
+      if (r.op === "browser.stream.start" && runner.closed) {
+        throw new MachineRequestError("browser_closed", "The agent's browser isn't open");
+      }
+      if (r.op === "browser.act" && r.command === "open" && runner.opened) {
+        return runner.opened.then(() => ({ success: true, data: {} }));
+      }
+      if (r.op === "browser.act") return { success: true, data: { url: "https://m.facebook.com/login" } };
+    });
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub });
+    box.live = live;
+    const a = viewer(f.owner.id);
+    await live.watch(a.viewer, f.org.id, f.agent.id);
+    const ops = () => calls.map((c) => (c.op === "browser.act" ? `act:${c.command}` : c.op));
+    /** Restarts it and waits until its views asked for the stream again. */
+    const restart = async () => {
+      calls.length = 0;
+      await live.restart(f.owner.id, f.org.id, f.agent.id);
+      for (let i = 0; i < 50 && !ops().includes("browser.stream.start"); i++) await Bun.sleep(2);
+      return ops();
+    };
+
+    // No frame came: the computer says where the browser is, and it opens there again.
+    a.got.length = 0;
+    expect(await restart()).toEqual(["act:get", "browser.stop", "act:open", "browser.stream.start"]);
+    expect(calls.find((c) => c.op === "browser.act" && c.command === "open")).toMatchObject({
+      args: ["https://m.facebook.com/login"],
+    });
+    expect(a.got.some((m) => m.type === "browser.ended")).toBe(false);
+    expect(a.got.some((m) => m.type === "browser.status")).toBe(true);
+
+    // The page of the latest frame is used as it is; a browser showing no web page just starts again.
+    const page = (seq: number, url: string) => ({
+      ...frame(f.agent.id, seq),
+      metadata: { deviceWidth: 1280, deviceHeight: 720, url },
+    });
+    live.hubHooks.frame(machine.machineId, page(2, "https://www.facebook.com/"));
+    expect(await restart()).toEqual(["browser.stop", "act:open", "browser.stream.start"]);
+    expect(calls.find((c) => c.op === "browser.act")).toMatchObject({ args: ["https://www.facebook.com/"] });
+    live.hubHooks.frame(machine.machineId, page(3, "about:blank"));
+    expect(await restart()).toEqual(["browser.stop", "browser.warm", "browser.stream.start"]);
+
+    // It answers once closed; while it opens again, a view watching anew (the card's own retry) waits: never "closed".
+    let opened = () => {};
+    runner.opened = new Promise<void>((resolve) => {
+      opened = resolve;
+    });
+    runner.closed = true;
+    calls.length = 0;
+    a.got.length = 0;
+    await live.restart(f.owner.id, f.org.id, f.agent.id);
+    await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
+    for (let i = 0; i < 50 && ops().length < 4; i++) await Bun.sleep(2);
+    expect(ops().sort()).toEqual(["act:get", "act:open", "browser.stop", "browser.stream.start"]);
+    runner.closed = false;
+    opened();
+    for (let i = 0; i < 50 && ops().filter((o) => o === "browser.stream.start").length < 2; i++) await Bun.sleep(2);
+    expect(ops().filter((o) => o === "browser.stream.start")).toHaveLength(2);
+    expect(a.got.some((m) => m.type === "browser.unavailable" || m.type === "browser.ended")).toBe(false);
+    runner.opened = null;
+
+    // A stop that fails: the request says so, and its views get the stream again all the same.
+    runner.stopFails = true;
+    calls.length = 0;
+    await expect(live.restart(f.owner.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(MachineRequestError);
+    for (let i = 0; i < 50 && !ops().includes("browser.stream.start"); i++) await Bun.sleep(2);
+    expect(ops()).toEqual(["act:get", "browser.stop", "browser.stream.start"]);
+    runner.stopFails = false;
+
+    // Only who may drive it: someone else watching tries again by watching.
+    const member = await addMember(f.db, f.org.id, "member", "caio");
+    calls.length = 0;
+    await expect(live.restart(member.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
+    expect(calls).toHaveLength(0);
+    live.close();
+  });
+
+  test("the person in control pressing Try again keeps their control while the browser comes back", async () => {
+    await start();
+    await post("@dev sign in please");
+    await drainOutbox(f.db, f.handlers);
+    const [h] = await handoffs();
+    const { hub, calls } = fakeHub((r) => (r.op === "browser.act" ? { success: true, data: {} } : undefined));
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub });
+    await claimHandoff(live.handoffDeps, f.owner.id, f.org.id, h?.id ?? "");
+    await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
+    // Their page never came, so their watching didn't hold it: little time is left.
+    await f.db.update(schema.browserHandoffs).set({ expiresAt: new Date(Date.now() + 5_000) });
+    calls.length = 0;
+    await live.restart(f.owner.id, f.org.id, f.agent.id);
+    expect((await handoffs())[0]?.expiresAt.getTime()).toBeGreaterThan(Date.now() + CONTROL_GRACE_MS - 5_000);
+    for (let i = 0; i < 50 && !calls.some((c) => c.op === "browser.stream.start"); i++) await Bun.sleep(2);
+    expect(calls.map((c) => c.op)).toEqual(["browser.act", "browser.stop", "browser.warm", "browser.stream.start"]);
+    live.close();
   });
 
   test("stream changes go one at a time: a controller joining during a start asks after it", async () => {

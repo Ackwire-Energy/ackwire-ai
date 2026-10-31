@@ -186,7 +186,7 @@ export async function orgOverview(db: Database, actorId: string, orgId: string, 
     .select({ n: sql<number>`count(*)::int` })
     .from(agents)
     .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)));
-  const admin = can(membership.role, "manage_agents");
+  const admin = can(membership, "approve_actions");
   const [pending] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(approvals)
@@ -283,7 +283,7 @@ export async function listAgentChannels(db: Database, actorId: string, orgId: st
       .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.userId, actorId))),
   ]);
   const visible = new Set(ownChannels.map((row) => row.channelId));
-  const admin = can(membership.role, "manage_agents");
+  const admin = can(membership, "manage_agents");
   return rows
     .filter((row) => visible.has(row.id) || (row.kind === "channel" && (row.visibility === "public" || admin)))
     .map(({ id, name, autoReply }) => ({ id, name, autoReply }));
@@ -357,7 +357,7 @@ export async function updateChannel(
     .from(channels)
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId), isNull(channels.archivedAt)));
   if (!channel) throw new NotFoundError("Channel not found");
-  if (channel.createdByUserId !== actorId && !can(membership.role, "manage_members")) {
+  if (channel.createdByUserId !== actorId && !can(membership, "manage_channels")) {
     throw new ForbiddenError("Only the channel's creator or an admin can change it");
   }
   const name = input.name?.trim().toLowerCase();
@@ -410,7 +410,7 @@ export async function channelMembersDetail(db: Database, orgId: string, channelI
 /** Who may see runs and usage: admins (`view_usage`), or the agent's owner for that agent. */
 async function requireUsageAccess(db: Database, actorId: string, orgId: string, agentId?: string) {
   const membership = await requirePermission(db, actorId, orgId, "read");
-  if (can(membership.role, "view_usage")) return;
+  if (can(membership, "view_usage")) return;
   if (agentId) {
     const agent = await getAgent(db, orgId, agentId);
     if (agent?.ownerUserId === actorId) return;

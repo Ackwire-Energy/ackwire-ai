@@ -1,6 +1,6 @@
 import type { AppNotification, NotificationActor, Routine } from "@agenteschat/client";
 import { approvalOriginWords } from "@agenteschat/client/lib/approval-origin";
-import { joinNames } from "@agenteschat/client/lib/format";
+import { namesText } from "@agenteschat/client/lib/format";
 import { askersOf } from "@agenteschat/client/lib/notifications";
 import { routineNotificationWords, type Words } from "@agenteschat/client/lib/routine-view";
 import type { TFunction } from "i18next";
@@ -132,13 +132,6 @@ export function waitingCardOf(n: Pick<AppNotification, "kind" | "count" | "lates
   if (n.kind === "join_request")
     return { kind: "join", title: askersOf(n).names[0] ?? "", expiresAt: null, action: "review" };
   return { kind: "question", title: l.text ?? l.title ?? "", expiresAt: null, action: "answer" };
-}
-
-/** "Ana", "Ana e Bruno", "Ana, Bruno e mais 2": the first `max` names of `total` people (the web's inbox). */
-export function namesText(t: TFunction, names: string[], max = 2, total = names.length) {
-  const shown = names.slice(0, max);
-  if (total <= shown.length) return joinNames(shown, t("notifications.and"));
-  return t("notifications.namesMore", { names: shown.join(", "), count: total - shown.length });
 }
 
 /**

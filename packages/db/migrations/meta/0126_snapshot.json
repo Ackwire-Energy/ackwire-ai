@@ -1,5 +1,5 @@
 {
-  "id": "ed4877bb-d90b-459f-b76a-b450e047a8f5",
+  "id": "03059b75-ee2c-4dc7-85a9-90ef3c7c5f65",
   "prevId": "9c26299d-2854-47aa-a098-14825dbbf347",
   "version": "7",
   "dialect": "postgresql",
@@ -178,9 +178,38 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "agents_brain_account_unique": {
+          "name": "agents_brain_account_unique",
+          "columns": [
+            {
+              "expression": "org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "brain_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"agents\".\"brain_account_id\" is not null and \"agents\".\"archived_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "agents_org_id_organizations_id_fk": {
           "name": "agents_org_id_organizations_id_fk",
@@ -5951,13 +5980,6 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
-        },
-        "shared": {
-          "name": "shared",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         },
         "created_at": {
           "name": "created_at",

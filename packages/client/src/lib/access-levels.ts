@@ -186,6 +186,12 @@ export function levelIn(access: AgentAccess | undefined, resourceId: string): Le
   return levelsOf(access)[resourceId] ?? "none";
 }
 
+/** The level everyone has ("Todos os agentes"), or null when they differ (or there is nobody). */
+export function sharedLevel(levels: LevelState[]): LevelState | null {
+  const [first] = levels;
+  return first !== undefined && levels.every((l) => l === first) ? first : null;
+}
+
 /** The next level of a matrix cell: Sem acesso → Ler → Ler e escrever → Sem acesso (custom → the first after none). */
 export function nextLevel(r: Pick<AccessResource, "levels">, current: LevelState): Level {
   const i = current === "custom" ? 0 : r.levels.indexOf(current);

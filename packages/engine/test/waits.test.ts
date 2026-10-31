@@ -75,22 +75,33 @@ const readyHub: MachineCaller = {
   },
 };
 
-/** "sign in" asks a person for help in the browser; after a tool result it says "Ok.". */
-const browserReply = (req: ModelRequest) => {
-  const last = lastText(req);
-  if (last.includes("tool_result")) return { chunks: ["Ok."] };
-  if (last.includes("sign in"))
-    return { chunks: [], toolUses: [{ name: "browser_ask_person", input: { instructions: "Sign in to Stripe" } }] };
-  return { chunks: ["Noted."] };
-};
+/** "sign in" asks a person for help in the browser; after a tool result it says `after` ("Ok."). */
+const browserReply =
+  (after = "Ok.") =>
+  (req: ModelRequest) => {
+    const last = lastText(req);
+    if (last.includes("tool_result")) return { chunks: [after] };
+    if (last.includes("sign in"))
+      return { chunks: [], toolUses: [{ name: "browser_ask_person", input: { instructions: "Sign in to Stripe" } }] };
+    return { chunks: ["Noted."] };
+  };
 
-async function startBrowser(intent: "done" | "failed" | "other") {
+/** `followThrough`: what the judge says of a promise at the end of a reply. */
+async function startBrowser(
+  intent: "done" | "failed" | "other",
+  options: { after?: string; followThrough?: string } = {},
+) {
   ready.clear();
   f = await setup({
-    reply: browserReply,
+    reply: browserReply(options.after),
     machines: true,
     toolSources: [createBrowserHandoffToolSource({ machines: { hub: readyHub } })],
-    judge: (kind, id) => (kind === "handoff_reply" && id === "intent" ? intent : undefined),
+    judge: (kind, id) =>
+      kind === "handoff_reply" && id === "intent"
+        ? intent
+        : kind === "follow_through"
+          ? options.followThrough
+          : undefined,
   });
   const machine = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "MacBook" });
   await f.db
@@ -162,6 +173,19 @@ describe("a person's message while a run waits for help in the browser", () => {
       await resumeRunWithResult(f.db, { runId: run?.id ?? "", waitId: h?.id ?? "", result: { content: "again" } }),
     ).toBeNull();
     expect(await notices()).toHaveLength(1);
+  });
+
+  test("a promise to go on once the help is done asks no judge: the help's result will wake the agent", async () => {
+    const ask = await startBrowser("other", {
+      after: "It's the Stripe account. I'll continue as soon as you finish signing in.",
+      followThrough: "unkept",
+    });
+    await say("while you wait: which account is it?", ask.id);
+    await stopChecksSettled();
+    await drainOutbox(f.db, f.handlers);
+    expect((await runs())[0]?.status).toBe("done");
+    const judged = (f.context.judge as unknown as { calls: { kind: string }[] }).calls;
+    expect(judged.filter((j) => j.kind === "follow_through")).toEqual([]);
   });
 
   test('no judge: even "pronto" only wakes the run (the help stays open)', async () => {

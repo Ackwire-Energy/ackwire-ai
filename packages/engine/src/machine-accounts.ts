@@ -82,7 +82,7 @@ const { machineAccounts, agents, machines, users } = schema;
  * of `@agenteschat/providers/plans`). The key goes sealed from the browser to
  * the computer and stays there; we keep its last 4 as the runner says them.
  *
- * One sign-in for all agents (protocol 27, ADR 0059 §2): a login the runner
+ * One sign-in for all agents (protocol 29, ADR 0059 §2): a login the runner
  * says is `shared` thinks for every agent its owner gives it there. Any other
  * login thinks for one agent, and an account whose plan allows it
  * (`LOGIN_PER_AGENT`) may have one login per agent, the same account signed
@@ -119,7 +119,7 @@ export interface MachineAccountView {
   provider: string | null;
   /** The last 4 of a key account's key, for its owner's eyes only. */
   keyHint: string | null;
-  /** It thinks for every agent its owner gives it on that computer (protocol 27); else for one. */
+  /** It thinks for every agent its owner gives it on that computer (protocol 29); else for one. */
   shared: boolean;
 }
 
@@ -146,18 +146,14 @@ const kindOf = (row: Pick<MachineAccountRow, "kind">): AccountKind =>
   isAccountKind(row.kind) ? row.kind : "claude_code";
 
 /**
- * What a new account is called until its owner names it: the maker and the
- * plan ("Claude Max", "ChatGPT Plus", "GLM Coding"), numbered among the names
- * its owner already has ("Claude Team 2"); never the email (others see the name).
+ * What a new account is called until its owner names it: the maker ("Claude",
+ * "ChatGPT") or a coding plan's name ("GLM Coding"), numbered among the names
+ * its owner already has ("Claude 2"). Never the plan, which the apps show beside
+ * the name and which changes (an upgrade, a plan renamed), and never the email
+ * (others see the name).
  */
-export function defaultAccountLabel(
-  kind: AccountKind,
-  plan?: string | null,
-  taken: readonly string[] = [],
-  provider?: string | null,
-) {
-  const word = plan && /^[\w.-]{1,20}$/.test(plan) ? ` ${plan[0]?.toUpperCase()}${plan.slice(1)}` : "";
-  const base = planOf(provider)?.label ?? `${kind === "codex" ? "ChatGPT" : "Claude"}${word}`;
+export function defaultAccountLabel(kind: AccountKind, taken: readonly string[] = [], provider?: string | null) {
+  const base = planOf(provider)?.label ?? (kind === "codex" ? "ChatGPT" : "Claude");
   if (!taken.includes(base)) return base;
   for (let n = 2; ; n++) if (!taken.includes(`${base} ${n}`)) return `${base} ${n}`;
 }
@@ -429,7 +425,7 @@ interface Settled {
 
 /**
  * What the runner says about an account whose row exists: a sign-in started
- * from the app finishes (named after its plan, audited for its owner, who
+ * from the app finishes (named by `defaultAccountLabel`, audited for its owner, who
  * never changes), a known one is refreshed. `dedupe` (the person who signed
  * in is asking, so they hear why): one their own account on this computer
  * already is becomes a tombstone. A known account that signed in as another
@@ -505,7 +501,7 @@ async function settleAccount(
     // A login of an account its owner already has here (one per agent) takes that account's name.
     const label =
       (await sameAccount(db, row, { email, keyHint }))?.label ??
-      defaultAccountLabel(kindOf(row), plan, await takenLabels(db, orgId, row.createdBy, row.id), row.provider);
+      defaultAccountLabel(kindOf(row), await takenLabels(db, orgId, row.createdBy, row.id), row.provider);
     const [done] = await db
       .update(machineAccounts)
       .set({ email, plan, keyHint, status, label, shared, ...usage, updatedAt: now })
@@ -626,8 +622,7 @@ export async function syncMachineAccounts(
           .insert(machineAccounts)
           .values({
             ...candidate,
-            label:
-              same?.label ?? defaultAccountLabel(a.kind, a.plan, await takenLabels(tx, orgId, owner, a.id), provider),
+            label: same?.label ?? defaultAccountLabel(a.kind, await takenLabels(tx, orgId, owner, a.id), provider),
             email: a.email ?? null,
             plan: a.plan ?? null,
             keyHint: a.keyHint ?? null,
@@ -737,7 +732,7 @@ export async function refreshAiAccounts(deps: MachineAccountHubDeps, userId: str
 }
 
 /**
- * Whether a new sign-in of that kind on the computer thinks for all of its owner's agents there (protocol 27):
+ * Whether a new sign-in of that kind on the computer thinks for all of its owner's agents there (protocol 29):
  * every one where the agents are the runner's own user; where each is its own OS user (system mode), as
  * `SHARED_SIGN_INS` says (never ChatGPT's yet).
  */
@@ -855,7 +850,7 @@ export async function getMachineAccounts(
 ) {
   const { membership, machine } = await memberMachine(deps.db, userId, orgId, machineId);
   const adds = mayAddAccounts(machine, userId);
-  if (!adds && !can(membership.role, "configure")) {
+  if (!adds && !can(membership, "configure")) {
     throw new ForbiddenError(
       "Only an admin or the person who connected this computer can see its accounts",
       "machine.forbidden",
@@ -935,7 +930,7 @@ export async function beginAccountLogin(
     throw new ForbiddenError("Only the person who connected this computer can add accounts to it", "account.not_owner");
   }
   const protocol = await requireLive(deps, machine, plan ? PLAN_KEYS_PROTOCOL : ACCOUNTS_PROTOCOL);
-  // Once for every agent of its owner there, where the runner can (protocol 27).
+  // Once for every agent of its owner there, where the runner can (protocol 29).
   const shared = protocol >= SHARED_ACCOUNTS_PROTOCOL && sharedSignIn(kind, provider);
   const again = accountId !== undefined;
   const loginId = again ? accountId : crypto.randomUUID();
@@ -946,7 +941,7 @@ export async function beginAccountLogin(
       orgId,
       machineId: machine.id,
       kind,
-      label: defaultAccountLabel(kind, null, [], provider),
+      label: defaultAccountLabel(kind, [], provider),
       status: "signing_in",
       createdBy: userId,
       provider: plan ? provider : null,
@@ -1045,7 +1040,7 @@ export interface AccountLoginStatus {
 
 const LOGIN_STATES: readonly AccountLoginState[] = ["waiting", "done", "failed", "expired"];
 
-/** Where a sign-in is; once done, the account is stored (named after its plan) and returned. */
+/** Where a sign-in is; once done, the account is stored (named by `defaultAccountLabel`) and returned. */
 export async function accountLoginStatus(
   deps: MachineAccountHubDeps,
   userId: string,
@@ -1208,7 +1203,7 @@ export async function removeMachineAccount(
   const allowed =
     account.createdBy === userId ||
     machine.pairedByUserId === userId ||
-    (can(membership.role, "configure") && (machine.pairedByUserId === null || account.createdBy === null));
+    (can(membership, "configure") && (machine.pairedByUserId === null || account.createdBy === null));
   if (!allowed) {
     throw new ForbiddenError(
       "Only the account's owner or the person who connected this computer can remove it",
@@ -1277,7 +1272,41 @@ export async function releaseMemberAccounts(
   return out;
 }
 
-/** After `releaseMemberAccounts`: pages refetch, and the replica holding each machine's runner removes them. */
+/**
+ * An agent is being deleted (ADR 0082): its login (the account it thinks with, which serves only it) becomes a
+ * tombstone like one a person removes; the account's other logins stay with their agents, and so does a login made
+ * for all of its owner's agents (`shared`), which serves no agent alone. Runs in the caller's transaction;
+ * `announceReleasedAccounts` afterwards.
+ */
+export async function releaseAgentLogin(db: Executor, orgId: string, agentId: string): Promise<ReleasedAccounts> {
+  const [login] = await db
+    .select({ id: machineAccounts.id, machineId: machineAccounts.machineId, shared: machineAccounts.shared })
+    .from(agents)
+    .innerJoin(
+      machineAccounts,
+      and(eq(machineAccounts.orgId, agents.orgId), eq(machineAccounts.id, agents.brainAccountId)),
+    )
+    .where(and(eq(agents.orgId, orgId), eq(agents.id, agentId), ne(machineAccounts.status, "removing")));
+  if (!login || login.shared) return { machines: [], agents: [] };
+  // An archived agent's login may have been given to a live agent since (one agent per login counts only those
+  // not archived): it stays that agent's.
+  const [live] = await db
+    .select({ id: agents.id })
+    .from(agents)
+    .where(
+      and(
+        eq(agents.orgId, orgId),
+        eq(agents.brainAccountId, login.id),
+        ne(agents.id, agentId),
+        isNull(agents.archivedAt),
+      ),
+    );
+  if (live) return { machines: [], agents: [] };
+  const agentIds = await tombstone(db, orgId, [login.id]);
+  return { machines: [{ orgId, machineId: login.machineId }], agents: [{ orgId, agentIds }] };
+}
+
+/** After `releaseMemberAccounts` or `releaseAgentLogin`: pages refetch, and the replica holding each machine's runner removes them. */
 export async function announceReleasedAccounts(pubsub: PubSub | undefined, released: ReleasedAccounts) {
   for (const a of released.agents) forgetAgents(a.orgId, a.agentIds);
   for (const m of released.machines) {

@@ -624,6 +624,10 @@ export class RunnerDaemon implements RequestObserver {
       if (prevAccess.tools.browser === true && nextAccess.tools.browser !== true) {
         void this.session?.browser.closeAll();
       }
+      // On: what the first command would install is installed now (system mode's comes with its installer).
+      if (prevAccess.tools.browser !== true && nextAccess.tools.browser === true && !this.session?.supervisor) {
+        void this.session?.browser.prepareInBackground();
+      }
       if (prevAccess.tools.desktop === true && nextAccess.tools.desktop !== true) void this.desktops.stopAll();
       if (prevAccess.tools.terminal === true && nextAccess.tools.terminal !== true) this.terminals.closeAll();
       // Desktop use needs both: its helpers stop with either.
@@ -892,6 +896,9 @@ export class RunnerDaemon implements RequestObserver {
         log,
       });
     }
+    // Agents working as this runner's user: what their browsers' first command would install is installed now (in
+    // system mode, the installer shares it with every agent).
+    if (!supervisor && this.access().tools.browser === true) void browser.prepareInBackground();
     const context: HandlerContext = {
       workspaceReal,
       get exec() {

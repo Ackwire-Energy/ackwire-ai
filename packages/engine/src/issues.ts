@@ -1,7 +1,21 @@
-import type { PubSub } from "@agenteschat/adapters";
-import { and, asc, type Database, desc, type Executor, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
+import { PERMISSION_TOOL, type PubSub } from "@agenteschat/adapters";
+import {
+  and,
+  asc,
+  type Database,
+  desc,
+  type Executor,
+  eq,
+  inArray,
+  isNull,
+  or,
+  rowsOf,
+  type SQL,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { getAgent } from "./agents";
-import { audienceError, canTalkTo } from "./audience";
+import { audienceError, canTalkTo, talksToAgents } from "./audience";
 import { recordAudit } from "./audit";
 import { runAuthorityById } from "./authority";
 import { openDm } from "./dms";
@@ -15,7 +29,7 @@ import { notifyIssueChanged, notifyIssueComment } from "./notification-producers
 import { can, getMembership, requireActiveMembership } from "./organizations";
 import { fireRoutineEvent } from "./routines";
 import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./search";
-import { toolDetail } from "./tool-detail";
+import { promptAnswer, promptPoll, toolDetail } from "./tool-detail";
 import { syncWikiLinks } from "./wiki-links";
 
 const { issues, issueActivity, issueCounters, channels, channelMembers, artifacts, agentRuns, agentRunSteps } = schema;
@@ -75,8 +89,11 @@ export interface IssueWork {
   state: "running" | "waiting_approval" | "waiting_input" | "stalled";
   /** When the live run started, or when the work stopped (stalled). */
   since: string;
-  /** The run's last tool calls, oldest first (safe labels only: built-in details, no connector inputs). */
-  steps: { tool: string; detail?: string; at: string }[];
+  /**
+   * The run's last tool calls, oldest first (safe labels only: built-in details, no connector inputs). A permission
+   * check also says when its command was refused or still waits on a person (`outcome`).
+   */
+  steps: { tool: string; detail?: string; at: string; outcome?: "refused" | "waiting" }[];
   /** Stalled: how the last run ended, when it did not finish on its own. */
   reason?: "failed" | "canceled" | "budget";
 }
@@ -170,6 +187,15 @@ async function checkAssignee(db: Database, orgId: string, a: WorkActor | null | 
   }
 }
 
+/**
+ * Asked to implement an issue, an agent works on it in the requester's DM (`dmId`): from there it sees the
+ * issue when that person can see its channel (`channelId`, an SQL expression).
+ */
+const seenFromDmSql = (orgId: string, dmId: string, channelId: SQL) => sql`exists (select 1
+    from ${channelMembers} dm_m join ${channels} dm on dm.id = dm_m.channel_id and dm.kind = 'dm'
+    where dm_m.channel_id = ${dmId}::uuid and dm_m.org_id = ${orgId}::uuid and dm_m.user_id is not null
+      and exists (select 1 from ${channelMembers} cm2 where cm2.channel_id = ${channelId} and cm2.user_id = dm_m.user_id))`;
+
 async function canSee(
   db: Database,
   actor: IssueActor,
@@ -182,22 +208,10 @@ async function canSee(
   if (actor.type === "agent") {
     if ((await agentSearchChannels(db, orgId, actor.agentId, actor.channelId)).includes(channelId)) return true;
     if (assignee?.type !== "agent" || assignee.id !== actor.agentId) return false;
-    // Asked to implement it (its work lives in the requester's DM): visible when that person can see its channel.
-    const [row] = await db
-      .select({ id: channelMembers.id })
-      .from(channelMembers)
-      .innerJoin(channels, and(eq(channels.id, channelMembers.channelId), eq(channels.kind, "dm")))
-      .where(
-        and(
-          eq(channelMembers.channelId, actor.channelId),
-          eq(channelMembers.orgId, orgId),
-          sql`${channelMembers.userId} is not null`,
-          sql`exists (select 1 from ${channelMembers} cm2 where cm2.channel_id = ${channelId}::uuid
-            and cm2.user_id = ${channelMembers.userId})`,
-        ),
-      )
-      .limit(1);
-    return Boolean(row);
+    const [row] = rowsOf<{ yes: boolean | string }>(
+      await db.execute(sql`select ${seenFromDmSql(orgId, actor.channelId, sql`${channelId}::uuid`)} as yes`),
+    );
+    return row?.yes === true || row?.yes === "t";
   }
   const [row] = await db
     .select({ visibility: channels.visibility, kind: channels.kind, memberId: channelMembers.id })
@@ -246,18 +260,57 @@ async function workOf(db: Database, rows: IssueRow[]): Promise<Map<string, Issue
   const runIds = latest.map((r) => r.id);
   const steps = runIds.length
     ? await db
-        .select({ runId: agentRunSteps.runId, data: agentRunSteps.data, createdAt: agentRunSteps.createdAt })
+        .select({
+          runId: agentRunSteps.runId,
+          kind: agentRunSteps.kind,
+          data: agentRunSteps.data,
+          createdAt: agentRunSteps.createdAt,
+        })
         .from(agentRunSteps)
-        .where(and(inArray(agentRunSteps.runId, runIds), eq(agentRunSteps.kind, "tool_call")))
+        .where(
+          and(
+            inArray(agentRunSteps.runId, runIds),
+            or(
+              eq(agentRunSteps.kind, "tool_call"),
+              and(eq(agentRunSteps.kind, "tool_result"), sql`${agentRunSteps.data}->>'name' = ${PERMISSION_TOOL}`),
+            ),
+          ),
+        )
         .orderBy(asc(agentRunSteps.seq))
     : [];
+  // A permission check's answer, by its call: refused, or waiting on a person until the runner's asking again brings
+  // the person's answer (by its request: Claude Code may ask twice while the card is open).
+  const answers = new Map(
+    steps.flatMap((st) =>
+      st.kind === "tool_result" ? [[st.data.toolUseId, promptAnswer(String(st.data.content ?? ""))] as const] : [],
+    ),
+  );
+  const waiting = new Map<string, IssueWork["steps"]>();
   const stepsOf = new Map<string, IssueWork["steps"]>();
   for (const st of steps) {
-    const name = typeof st.data.name === "string" ? st.data.name : "";
+    const name = st.kind === "tool_call" && typeof st.data.name === "string" ? st.data.name : "";
+    const input = st.data.input as Record<string, unknown> | undefined;
     if (!name) continue;
-    const detail = toolDetail(name, st.data.input as Record<string, unknown> | undefined);
+    const answer = name === PERMISSION_TOOL ? answers.get(st.data.toolUseId) : undefined;
+    if (promptPoll(name, input)) {
+      for (const asked of answer?.behavior ? (waiting.get(String(input?.request_id)) ?? []) : []) {
+        if (answer?.behavior === "deny") asked.outcome = "refused";
+        else delete asked.outcome;
+      }
+      continue;
+    }
+    const detail = toolDetail(name, input);
+    const outcome = answer?.behavior === "deny" ? "refused" : answer?.status === "pending" ? "waiting" : null;
+    const step: IssueWork["steps"][number] = {
+      tool: name,
+      ...(detail ? { detail } : {}),
+      at: st.createdAt.toISOString(),
+      ...(outcome ? { outcome } : {}),
+    };
+    if (outcome === "waiting" && answer?.request_id)
+      waiting.set(answer.request_id, [...(waiting.get(answer.request_id) ?? []), step]);
     const list = stepsOf.get(st.runId) ?? [];
-    list.push({ tool: name, ...(detail ? { detail } : {}), at: st.createdAt.toISOString() });
+    list.push(step);
     stepsOf.set(st.runId, list);
   }
   for (const r of withAgent) {
@@ -445,7 +498,7 @@ export async function createIssue(
 ): Promise<IssueView> {
   const { db } = deps;
   const membership = await requireOrgMember(db, actor, orgId);
-  if (membership && !can(membership.role, "post")) throw new ForbiddenError();
+  if (membership && !can(membership, "post")) throw new ForbiddenError();
   const title = input.title.trim().slice(0, 300);
   if (!title) throw new ValidationError("title is required");
   if (input.priority && !PRIORITIES.includes(input.priority)) throw new ValidationError("invalid priority");
@@ -986,7 +1039,7 @@ export async function askAgentToImplement(
   const agent = await getAgent(db, orgId, agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
   // The person must be able to talk to the agent; the DM needs nothing else.
-  if (!canTalkTo(agent, userId)) throw await audienceError(db, agent);
+  if (!canTalkTo(agent, userId, await talksToAgents(db, orgId, userId))) throw await audienceError(db, agent);
   const dm = await openDm(db, userId, orgId, { agentId });
   const updated = await updateIssue(deps, actor, orgId, issue.id, { assignee: { type: "agent", id: agentId } });
   const card: IssueWorkMeta = { issueId: issue.id, number: issue.number, title: issue.title, agentId };
@@ -1073,6 +1126,76 @@ export async function mirrorReplyToIssue(
   text: string,
 ) {
   await commentIssue(deps, { type: "agent", agentId: run.agentId, channelId: run.channelId }, run.orgId, issueId, text);
+}
+
+/**
+ * A run started in an issue's work thread (or on its start message) works on that issue, as if it had
+ * touched it with a tool: the issue shows it working instead of stalled. Only while the issue is open and
+ * still this agent's.
+ */
+export async function linkRunToIssue(
+  deps: IssueDeps,
+  run: { id: string; orgId: string; agentId: string },
+  issueId: string,
+) {
+  const [issue] = await deps.db
+    .select()
+    .from(issues)
+    .where(and(eq(issues.id, issueId), eq(issues.orgId, run.orgId)));
+  // The issue's work is its latest linked run: a run in the thread of an agent it was taken from would hide
+  // the assignee's.
+  if (issue?.assigneeType !== "agent" || issue.assigneeId !== run.agentId || !OPEN_FOR_WORK.has(issue.status)) return;
+  await startedWork(deps, issue, run.agentId, [run.id]);
+}
+
+const OPEN_TASKS_SHOWN = 5;
+
+/**
+ * A run's reminder of the agent's open tasks: issues assigned to it, not done or canceled, that it can see
+ * from the run's channel, newest activity first. `updates`: it has the tools to keep them updated. Null when
+ * there are none.
+ */
+export async function openTasksBrief(
+  db: Database,
+  orgId: string,
+  agentId: string,
+  channelId: string,
+  updates: boolean,
+) {
+  const visible = await agentSearchChannels(db, orgId, agentId, channelId);
+  const rows = await db
+    .select({ number: issues.number, title: issues.title, status: issues.status, criteria: issues.criteria })
+    .from(issues)
+    .where(
+      and(
+        eq(issues.orgId, orgId),
+        eq(issues.assigneeType, "agent"),
+        eq(issues.assigneeId, agentId),
+        inArray(issues.status, [...OPEN_FOR_WORK]),
+        // What `canSee` lets it read from here: an issue of a private channel or DM would leak its title.
+        or(
+          isNull(issues.channelId),
+          inArray(issues.channelId, visible),
+          seenFromDmSql(orgId, channelId, sql`${issues.channelId}`),
+        ),
+      ),
+    )
+    .orderBy(desc(issues.updatedAt))
+    .limit(OPEN_TASKS_SHOWN);
+  if (rows.length === 0) return null;
+  return [
+    "# Your open tasks",
+    "Issues assigned to you, latest activity first:",
+    ...rows.map((r) => {
+      const done = r.criteria.filter((c) => c.done).length;
+      return `- #${r.number} ${r.title} (${r.status}${r.criteria.length ? `, criteria ${done}/${r.criteria.length}` : ""})`;
+    }),
+    ...(updates
+      ? [
+          "When what you're doing belongs to one of them, keep that task updated as you go: a short progress comment (`comment_issue`) and each criterion as you meet it (`update_issue`); its status moves on its own. That also ties your run to it, so the team sees you working on it.",
+        ]
+      : []),
+  ].join("\n");
 }
 
 registerDocumentBuilder("issue", async (db, orgId, id) => {

@@ -20,7 +20,11 @@ import {
   installCommand,
   isHandheld,
   isPaused,
+  LOGIN_RECONNECT_MS,
+  LoginReadError,
   locationText,
+  loginRead,
+  loginReadPasses,
   normalizeUserCode,
   otherThanHint,
   platformOf,
@@ -182,6 +186,17 @@ describe("connected computers helpers (ADR 0036)", () => {
     expect(stale()).toEqual([true, true]);
   });
 
+  test("a plan's usage moving on a computer refetches the agent list, which carries each plan's limits", () => {
+    const qc = new QueryClient();
+    const agents = keys.agents("o1");
+    const stale = () => qc.getQueryState(agents)?.isInvalidated ?? false;
+    qc.setQueryData(agents, []);
+    applyMachineEvent(qc, "o1", { type: "machine.updated", machineId: "m1", name: "Mac" } as { type: string });
+    expect(stale()).toBe(false);
+    applyMachineEvent(qc, "o1", { type: "machine.updated", machineId: "m1", accounts: true } as { type: string });
+    expect(stale()).toBe(true);
+  });
+
   test("a sign-in starts with no address asked: Claude's hint is the account's own, dropped if the server refuses it", async () => {
     const sent: AccountLoginInput[] = [];
     const begin = async (input: AccountLoginInput) => {
@@ -253,5 +268,40 @@ describe("connected computers helpers (ADR 0036)", () => {
     expect(otherThanHint(null, { email: "walt@acme.com" })).toBe(false);
     expect(otherThanHint(undefined, { email: "walt@acme.com" })).toBe(false);
     expect(otherThanHint("walt@pessoal.com", { email: null })).toBe(false);
+  });
+
+  test("a sign-in's status that can't be read: reconnecting for 90 s from the first failed read, if it passes", () => {
+    // A restart that misses the runner's fifth dial (`backoffDelay`: 1, 2, 4, 8, 16, then 32 s after a drop, each up
+    // to 20 % late) has it back at the sixth: still waiting then, and for the next read 2 s on.
+    const sixthDial = [1, 2, 4, 8, 16, 32].reduce((at, s) => at + s * 1.2, 0) * 1000;
+    expect(LOGIN_RECONNECT_MS).toBeGreaterThan(sixthDial + 2_000);
+    // The server restarting (no answer, or only the proxy's) or the computer reconnecting (offline, late).
+    for (const error of [
+      new TypeError("Failed to fetch"),
+      new ApiError(502, "http_502", "Bad Gateway"),
+      new ApiError(521, "http_521", "Web server is down"),
+      new ApiError(409, "machine.offline", "The computer agentes.chat isn't answering right now."),
+      new ApiError(502, "machine.timeout", "the computer agentes.chat did not answer in time"),
+    ])
+      expect(loginReadPasses(error)).toBe(true);
+    // The sign-in gone from the server or the computer, the session over, or the server's own error.
+    const gone = [
+      new ApiError(404, "account.login_not_found", "Sign-in not found"),
+      new ApiError(502, "machine.not_found", "This sign-in is gone (it expired or was canceled)"),
+      new ApiError(401, "unauthorized", "Sign in again"),
+      new ApiError(500, "internal", "Internal error"),
+    ];
+    for (const error of gone) expect(loginReadPasses(error)).toBe(false);
+    const first = Date.parse("2026-10-30T12:00:00Z");
+    const failing = (afterMs: number) => ({
+      isError: true,
+      error: new LoginReadError(new TypeError("Failed to fetch"), first),
+      errorUpdatedAt: first + afterMs,
+    });
+    expect(loginRead(failing(0))).toBe("reconnecting");
+    expect(loginRead(failing(LOGIN_RECONNECT_MS - 1))).toBe("reconnecting");
+    expect(loginRead(failing(LOGIN_RECONNECT_MS))).toBe("noAnswer");
+    for (const error of gone) expect(loginRead({ isError: true, error, errorUpdatedAt: first })).toBe("failed");
+    expect(loginRead({ isError: false, error: null, errorUpdatedAt: first })).toBeNull();
   });
 });

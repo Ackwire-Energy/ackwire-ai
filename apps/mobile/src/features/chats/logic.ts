@@ -1,13 +1,16 @@
 import type {
+  Agent,
   AppNotification,
   Channel,
   DirectMessage,
   Mission,
   MissionStatus,
+  OrgSummary,
   PreviewMeta,
   ThreadActor,
   ThreadInfo,
 } from "@agenteschat/client";
+import { listsAgent } from "@agenteschat/client/lib/audience";
 import { previewOf } from "../shared/logic";
 
 /**
@@ -92,6 +95,17 @@ export function isListedThread(t: Pick<ThreadInfo, "mission" | "title" | "contex
 export const threadTitle = (t: Pick<ThreadInfo, "title" | "rootText">) => t.title?.trim() || previewOf(t.rootText);
 
 /**
+ * The agents my lists leave out (`listsAgent`, from the server's `canTalk`): unless I manage agents, the ones not
+ * answering me.
+ */
+export const hiddenAgentIds = (org: OrgSummary | null | undefined, agents: readonly Pick<Agent, "id" | "canTalk">[]) =>
+  new Set(agents.filter((a) => !listsAgent(org, a)).map((a) => a.id));
+
+/** A DM with one of `hiddenAgents` (`hiddenAgentIds`): off the home and its badge. */
+const hiddenDm = (d: Pick<DirectMessage, "with">, hiddenAgents: ReadonlySet<string> | undefined) =>
+  d.with.type === "agent" && hiddenAgents?.has(d.with.id) === true;
+
+/**
  * One list: threads and missions, DMs and channels, by the latest activity (channels without any last, by
  * name). `workingChannels`: conversations where an agent has a run in progress (who is working now).
  */
@@ -100,6 +114,7 @@ export function buildConversations(input: {
   dms: DirectMessage[];
   threads: ThreadInfo[];
   workingChannels?: ReadonlySet<string>;
+  hiddenAgents?: ReadonlySet<string>;
 }): ConversationRow[] {
   const rows: ConversationRow[] = [];
   const dmWith = new Map(input.dms.map((d) => [d.channelId, d.with]));
@@ -141,6 +156,7 @@ export function buildConversations(input: {
     });
   }
   for (const d of input.dms) {
+    if (hiddenDm(d, input.hiddenAgents)) continue;
     rows.push({
       kind: "dm",
       key: `d:${d.channelId}`,
@@ -227,10 +243,11 @@ export const unreadConversations = (rows: ConversationRow[]) => rows.filter((r) 
  */
 export function unreadConversationCount(input: {
   channels: Pick<Channel, "isMember" | "unreadCount">[];
-  dms: Pick<DirectMessage, "unread">[];
+  dms: Pick<DirectMessage, "unread" | "with">[];
+  hiddenAgents?: ReadonlySet<string>;
 }): number {
   const channels = input.channels.filter((c) => c.isMember && (c.unreadCount ?? 0) > 0).length;
-  const dms = input.dms.filter((d) => d.unread > 0).length;
+  const dms = input.dms.filter((d) => d.unread > 0 && !hiddenDm(d, input.hiddenAgents)).length;
   return channels + dms;
 }
 
@@ -354,27 +371,32 @@ export const threadRows = (rows: ConversationRow[]) => rowsOfKind(rows, "threads
  */
 export const unreadThreadCount = (rows: ConversationRow[]) => threadRows(rows).filter((r) => r.unread > 0).length;
 
-/** The sections the person collapsed, as remembered (anything unreadable: none), out of `keys`. */
+/**
+ * The sections the person collapsed, as remembered (anything unreadable: none), out of `keys`. Null `keys` takes any
+ * ids: the groups of agents of every workspace share one list, so one workspace's toggles keep the others'.
+ */
 export function parseCollapsed<K extends string>(
   raw: string | null,
-  keys: readonly K[] = HOME_SECTIONS as unknown as readonly K[],
+  keys: readonly K[] | null = HOME_SECTIONS as unknown as readonly K[],
 ): K[] {
   if (!raw) return [];
   try {
     const v: unknown = JSON.parse(raw);
-    return Array.isArray(v) ? keys.filter((k) => v.includes(k)) : [];
+    if (!Array.isArray(v)) return [];
+    return keys ? keys.filter((k) => v.includes(k)) : v.filter((k): k is K => typeof k === "string");
   } catch {
     return [];
   }
 }
 
-/** Collapses or opens a section (in the sections' order). */
+/** Collapses or opens a section (in the sections' order; with null `keys`, the others stay as they were). */
 export function toggleCollapsed<K extends string>(
   list: readonly K[],
   key: K,
-  keys: readonly K[] = HOME_SECTIONS as unknown as readonly K[],
+  keys: readonly K[] | null = HOME_SECTIONS as unknown as readonly K[],
 ): K[] {
   const on = list.includes(key);
+  if (!keys) return on ? list.filter((k) => k !== key) : [...list, key];
   return keys.filter((k) => (k === key ? !on : list.includes(k)));
 }
 

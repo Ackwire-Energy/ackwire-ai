@@ -1,7 +1,7 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import type { EventEmitter } from "node:events";
 import { accessSync, constants, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
-import { chmod, lchown, lstat, mkdir, open, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { chmod, lchown, lstat, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { AGENT_WORKER_HOMES } from "@agenteschat/adapters/command-policy";
@@ -26,7 +26,8 @@ import { generateSecretKeyPair, openSecret } from "@agenteschat/adapters/secret-
 import { isPlanId, type PlanId, planKeyFits, planOf } from "@agenteschat/providers/plans";
 import { errnoCode, RunnerError } from "./errors";
 import { killTree } from "./exec";
-import { resolveCommand } from "./executors";
+import { claudeKeptPlan, claudePlan, claudeTier, resolveCommand } from "./executors";
+import { readSmallJson, writeJson } from "./json-file";
 import {
   codexUsage,
   fetchPlanKeyUsage,
@@ -49,8 +50,10 @@ import {
  * - `code` opens the sealed Claude code and writes it to the waiting CLI.
  * - When the CLI exits, its status command (`claude auth status --json`,
  *   `codex login status`) in that folder decides: `done` with the email and
- *   plan, or `failed` (folder removed). After `ACCOUNT_LOGIN_TTL_MS` the sign-in
- *   is killed and its folder removed (`expired`).
+ *   plan (a Claude Max's tier from the CLI's `.claude.json` there tells Ultra
+ *   apart, `claudePlan`), or `failed` (folder removed). After
+ *   `ACCOUNT_LOGIN_TTL_MS` the sign-in is killed and its folder removed
+ *   (`expired`).
  * - `list` asks each account's CLI (cached for `ACCOUNTS_TTL_MS`), but one a
  *   turn's endpoint refused reads as signed out until it signs in again
  *   (`refused`); `remove` signs out (best effort) and deletes the folder,
@@ -65,9 +68,10 @@ import {
  * - System mode (`lending`): a folder belongs to the OS user of the agent
  *   that thinks with it, only while it does (`lendTo`, `keepLent`), else to
  *   root. Root never runs a CLI against what an agent's user could write: such
- *   a folder's status is what its turns said, signing in again starts it over,
- *   and removing it signs nothing out.
- * - Protocol 27, one sign-in for all of its owner's agents: every folder
+ *   a folder's status is what its turns said and its plan what Claude Code
+ *   keeps there (`claudeKeptPlan`), signing in again starts it over, and
+ *   removing it signs nothing out.
+ * - Protocol 29, one sign-in for all of its owner's agents: every folder
  *   where the agents are the runner's own user (the CLIs keep one sign-in for
  *   several processes of one user). In system mode, a sign-in made `shared`
  *   (`<id>.shared` beside its folder) is root's alone and never lent: a
@@ -96,7 +100,6 @@ const STATUS_TIMEOUT_MS = 10_000;
 const MAX_CODE_CHARS = 2000;
 const OUTPUT_KEEP = 16_000;
 const EMAIL = /^[^\s@]+@[^\s@]+$/;
-const WORD = /^[\w.-]{1,40}$/;
 
 const LABEL: Record<AccountKind, string> = { claude_code: "Claude Code", codex: "Codex" };
 const ENV_VAR: Record<AccountKind, string> = { claude_code: "CLAUDE_CONFIG_DIR", codex: "CODEX_HOME" };
@@ -180,7 +183,7 @@ const PASTE_ENTER_MS = 300;
 const LAST_OUTPUT_MS = 500;
 
 /**
- * What a turn of an agent thinking with an account root keeps (system mode, protocol 27) gets over its worker
+ * What a turn of an agent thinking with an account root keeps (system mode, protocol 29) gets over its worker
  * link: the token or the key its CLI needs, or `none` while the account has neither (signed out). Root's alone
  * to give: never what the server sent.
  */
@@ -205,42 +208,15 @@ export function grantOf(v: unknown): AccountGrant | null {
 /** System mode: the account folders, outside root's home (its parents 711) so an agent's user reaches the one lent to it. */
 export const SYSTEM_ACCOUNTS_ROOT = path.join(AGENT_WORKER_HOMES, "accounts");
 
-/**
- * A small JSON object kept in an account folder; null when it isn't there or isn't one. Never follows a link,
- * and never waits on a pipe an agent's user put there (root reads lent folders: a blocked open would hang it).
- */
-async function readKept(file: string, max: number): Promise<Record<string, unknown> | null> {
-  const flags = constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0);
-  const handle = await open(file, flags).catch(() => null);
-  if (!handle) return null;
-  try {
-    const st = await handle.stat();
-    if (!st.isFile() || st.size > max) return null;
-    const o = JSON.parse(await handle.readFile("utf8")) as unknown;
-    return o && typeof o === "object" ? (o as Record<string, unknown>) : null;
-  } catch {
-    return null;
-  } finally {
-    await handle.close().catch(() => undefined);
-  }
-}
-
-/** Written whole (600): a reader never sees half of it. */
-async function keep(file: string, value: Record<string, string>) {
-  const tmp = `${file}.${process.pid}.tmp`;
-  await writeFile(tmp, JSON.stringify(value), { mode: 0o600 });
-  await rename(tmp, file);
-}
-
-/** A key account's plan and key (`provider.json`); null when the folder isn't one. */
+/** A key account's plan and key (`provider.json`); null when the folder isn't one. Never through a link or a pipe. */
 export async function planKeyOf(dir: string): Promise<{ provider: PlanId; key: string } | null> {
-  const o = await readKept(path.join(dir, PROVIDER_FILE), MAX_KEY_CHARS + 200);
+  const o = readSmallJson(path.join(dir, PROVIDER_FILE), MAX_KEY_CHARS + 200) as Record<string, unknown> | null;
   return isPlanId(o?.provider) && typeof o.key === "string" && o.key ? { provider: o.provider, key: o.key } : null;
 }
 
 /** A Claude account's token (`token.json`, system mode); null when the folder keeps none. */
 export async function tokenOf(dir: string): Promise<string | null> {
-  const o = await readKept(path.join(dir, TOKEN_FILE), 1000);
+  const o = readSmallJson(path.join(dir, TOKEN_FILE), 1000) as Record<string, unknown> | null;
   return typeof o?.token === "string" && WHOLE_OAUTH_TOKEN.test(o.token) ? o.token : null;
 }
 
@@ -545,10 +521,15 @@ export function parseCodexLogin(output: string, final = false): { url: string; u
 }
 
 /**
- * `claude auth status --json` → signed in, email and plan (short words only). Signed in means through
- * claude.ai: a folder that reports an API key isn't the account's own sign-in.
+ * `claude auth status --json` → signed in, email and plan (short words only, named by `claudePlan` with the
+ * folder's `tier`). Signed in means through claude.ai: a folder that reports an API key isn't the account's own
+ * sign-in.
  */
-export function parseClaudeStatus(status: number | null, stdout: string): Omit<RunnerAccountInfo, "id" | "kind"> {
+export function parseClaudeStatus(
+  status: number | null,
+  stdout: string,
+  tier: () => unknown = () => undefined,
+): Omit<RunnerAccountInfo, "id" | "kind"> {
   let json: unknown;
   try {
     json = JSON.parse(stdout.trim() || "null");
@@ -558,7 +539,7 @@ export function parseClaudeStatus(status: number | null, stdout: string): Omit<R
   if (!json || typeof json !== "object") return { loggedIn: false };
   const o = json as Record<string, unknown>;
   const email = typeof o.email === "string" && o.email.length <= 254 && EMAIL.test(o.email) ? o.email : undefined;
-  const plan = typeof o.subscriptionType === "string" && WORD.test(o.subscriptionType) ? o.subscriptionType : undefined;
+  const plan = claudePlan(o.subscriptionType, tier);
   return {
     loggedIn: o.loggedIn === true && status === 0 && o.authMethod === "claude.ai",
     ...(email ? { email } : {}),
@@ -779,7 +760,7 @@ export class AccountManager {
    * Starts the CLI's sign-in in a new folder named `loginId`, or (`again`) in
    * the existing account `loginId` that was signed out: same account, same
    * agents, and its folder stays if this sign-in fails. `email` (Claude Code):
-   * the account to sign in to, as the CLI's login hint. `shared` (protocol 27,
+   * the account to sign in to, as the CLI's login hint. `shared` (protocol 29,
    * system mode): a sign-in for every agent of its owner here, which root
    * keeps: Claude's through `claude setup-token` (no login hint there), a
    * plan's key as it is. ChatGPT's still thinks for one agent there.
@@ -1119,7 +1100,7 @@ export class AccountManager {
         `That doesn't look like a ${plan?.label ?? "plan"} key. Copy the whole key.`,
       );
     }
-    await keep(path.join(login.dir, PROVIDER_FILE), { provider, key });
+    writeJson(path.join(login.dir, PROVIDER_FILE), { provider, key });
     if (login.shared) await writeFile(this.marker(login.kind, login.id, "shared"), "", { mode: 0o600 });
     await rm(path.join(login.dir, SIGNING_IN), { force: true });
     await rm(this.marker(login.kind, login.id, "invalid"), { force: true });
@@ -1237,7 +1218,7 @@ export class AccountManager {
    */
   private async keepToken(login: Login, token: string): Promise<boolean> {
     try {
-      await keep(path.join(login.dir, TOKEN_FILE), { token });
+      writeJson(path.join(login.dir, TOKEN_FILE), { token });
       await writeFile(this.marker(login.kind, login.id, "shared"), "", { mode: 0o600 });
     } catch (err) {
       if (login.state === "waiting") {
@@ -1293,7 +1274,8 @@ export class AccountManager {
   /**
    * One account's status (never throws: unknown is signed out). Refused in a turn since it last signed in
    * (`refused`), it is signed out whatever its CLI says. Otherwise a key account is signed in; a token root keeps,
-   * while it has one; a folder an agent's user had, as its turns last said; any other, as its CLI says.
+   * while it has one; a folder an agent's user had, as its turns last said, with the plan Claude Code keeps there
+   * (that user could write it, so it is only ever one of the plans' words); any other, as its CLI says.
    */
   private async lookUp(kind: AccountKind, id: string): Promise<RunnerAccountInfo> {
     const dir = this.dirOf(kind, id);
@@ -1302,13 +1284,16 @@ export class AccountManager {
     const plan = kind === "claude_code" ? await planKeyOf(dir) : null;
     if (plan) return { id, kind, loggedIn: !refused, provider: plan.provider, keyHint: plan.key.slice(-4), ...shared };
     if (this.isShared(kind, id)) return { id, kind, loggedIn: !refused && (await tokenOf(dir)) !== null, ...shared };
-    if (refused || this.lentTo(kind, id) !== null) return { id, kind, loggedIn: !refused, ...shared };
+    if (refused || this.lentTo(kind, id) !== null) {
+      const kept = refused || kind !== "claude_code" ? undefined : claudeKeptPlan(dir);
+      return { id, kind, loggedIn: !refused, ...(kept ? { plan: kept } : {}), ...shared };
+    }
     const env = this.env(kind, dir);
     const r = await runCli(this.command(kind), STATUS_ARGS[kind], env, STATUS_TIMEOUT_MS);
     // Codex says it on stderr.
     const status =
       kind === "claude_code"
-        ? parseClaudeStatus(r.status, r.stdout)
+        ? parseClaudeStatus(r.status, r.stdout, () => claudeTier(dir))
         : parseCodexStatus(r.status, `${r.stdout}\n${r.stderr}`);
     return { id, kind, ...status, ...shared };
   }
@@ -1461,7 +1446,7 @@ export class AccountManager {
   }
 
   /**
-   * System mode (protocol 27): what a turn of any agent thinking with this account gets from root, over its
+   * System mode (protocol 29): what a turn of any agent thinking with this account gets from root, over its
    * worker link: its token or its key, or `none` while it has neither or a turn's endpoint refused it. Null for an
    * account made for one agent, whose folder is lent instead (`lendTo`).
    */

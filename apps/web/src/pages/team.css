@@ -260,6 +260,13 @@
   font-size: 14px;
   font-weight: 650;
 }
+.team-archived {
+  gap: 0;
+  padding: 8px;
+}
+.team-archived .member-row {
+  margin: 0;
+}
 .team-feed__window {
   font-size: 12px;
   color: var(--muted);
@@ -317,8 +324,11 @@
     padding: 16px 16px 40px;
     gap: 16px;
   }
-  .team-head > .ac-btn {
+  .team-head__actions {
     width: 100%;
+  }
+  .team-head__actions > .ac-btn {
+    flex: 1 1 auto;
   }
   .team-sky {
     height: 600px;

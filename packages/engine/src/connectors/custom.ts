@@ -24,6 +24,7 @@ import {
   type ConnectionSecret,
   type ConnectorConnection,
   connectionHeaders,
+  grantToEveryAgent,
   OAUTH_STATE_TTL_MS,
   oauthRedirectUri,
 } from "./connections";
@@ -215,7 +216,7 @@ export async function listCustomServers(db: Database, actorId: string, orgId: st
  * Stores a custom server's connection (its own row; several servers per org).
  * Connecting the same address again is a reconnect: the active row gets the
  * new credentials in place, so agents keep their grants and the tools keep
- * their classification.
+ * their classification. A new server is every agent's (`grantToEveryAgent`).
  */
 export async function storeCustomConnection(
   deps: CustomDeps,
@@ -273,32 +274,37 @@ export async function storeCustomConnection(
     });
     return row;
   }
-  const [row] = await deps.db
-    .insert(connectorConnections)
-    .values({
-      id,
+  const row = await deps.db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(connectorConnections)
+      .values({
+        id,
+        orgId: input.orgId,
+        connector: `${CUSTOM_PREFIX}${id}`,
+        label: input.label.slice(0, 80),
+        serverUrl: input.serverUrl,
+        authType: input.authType,
+        secretCiphertext: sealed?.ciphertext ?? null,
+        wrappedDataKey: sealed?.wrappedDataKey ?? null,
+        kekId: sealed?.kekId ?? null,
+        tokenExpiresAt: input.tokenExpiresAt ?? null,
+        oauthClientId: input.oauthClientId ?? null,
+        createdByUserId: input.actorId,
+      })
+      .returning();
+    if (!row) throw new Error("connection insert returned nothing");
+    await recordAudit(tx, {
       orgId: input.orgId,
-      connector: `${CUSTOM_PREFIX}${id}`,
-      label: input.label.slice(0, 80),
-      serverUrl: input.serverUrl,
-      authType: input.authType,
-      secretCiphertext: sealed?.ciphertext ?? null,
-      wrappedDataKey: sealed?.wrappedDataKey ?? null,
-      kekId: sealed?.kekId ?? null,
-      tokenExpiresAt: input.tokenExpiresAt ?? null,
-      oauthClientId: input.oauthClientId ?? null,
-      createdByUserId: input.actorId,
-    })
-    .returning();
-  if (!row) throw new Error("connection insert returned nothing");
-  caches.connections.delete(`${input.orgId}:active`);
-  await recordAudit(deps.db, {
-    orgId: input.orgId,
-    actor: { type: "person", id: input.actorId },
-    action: "connector.custom_connected",
-    target: { type: "connector_connection", id: row.id },
-    details: { serverUrl: input.serverUrl, authType: input.authType },
+      actor: { type: "person", id: input.actorId },
+      action: "connector.custom_connected",
+      target: { type: "connector_connection", id: row.id },
+      details: { serverUrl: input.serverUrl, authType: input.authType },
+    });
+    await grantToEveryAgent(tx, input.orgId, input.actorId, row);
+    return row;
   });
+  caches.connections.delete(`${input.orgId}:active`);
+  caches.scopes.deletePrefix(`${input.orgId}:`);
   return row;
 }
 

@@ -9,7 +9,7 @@ import {
   useSettings,
   useUpdateSettings,
 } from "@agenteschat/client";
-import { agentsToGive, endsOnClaude, ownSignIns, planWordOf } from "@agenteschat/client/lib/ai-accounts";
+import { accountTitle, agentsToGive, endsOnClaude, ownSignIns } from "@agenteschat/client/lib/ai-accounts";
 import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { agentAi, aiStateOf } from "@agenteschat/client/lib/no-ai";
@@ -219,7 +219,7 @@ export function AiAccountsScreen() {
               <Row
                 key={o.key}
                 leading={<ProviderLogo id={o.kind} size="sm" />}
-                title={[t(`aiAccounts.connect.${o.kind}`), planWordOf(o.plan)].filter(Boolean).join(" ")}
+                title={accountTitle({ label: t(`aiAccounts.connect.${o.kind}`), plan: o.plan })}
                 subtitle={t("aiAccounts.page.ownOn", { computer: o.computer })}
                 below={
                   o.usage ? (
@@ -248,7 +248,7 @@ export function AiAccountsScreen() {
                 <Row
                   key={a.id}
                   leading={<ProviderLogo id={a.provider ?? a.kind} size="sm" off={out} />}
-                  title={a.label}
+                  title={accountTitle(a)}
                   subtitle={facts.join(" · ")}
                   chevron
                   onPress={() => actions(a)}
@@ -309,7 +309,7 @@ export function AiAccountsScreen() {
             onPress={() => openConnectAi()}
           />
         </View>
-        {can(org?.role, "manage_credentials") ? <KeysSection locale={i18n.language} /> : null}
+        {can(org, "manage_credentials") ? <KeysSection locale={i18n.language} /> : null}
       </ScrollView>
     </View>
   );

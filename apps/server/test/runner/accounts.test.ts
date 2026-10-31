@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { existsSync, linkSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, linkSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { accountCodeAad, type MachineRequest } from "@agenteschat/adapters/machine-protocol";
 import { sealSecret } from "@agenteschat/adapters/secret-box";
@@ -21,6 +21,7 @@ import {
   stripAnsi,
   tokenOf,
 } from "../../runner/accounts";
+import { claudePlan } from "../../runner/executors";
 import { describeRequest, type HandlerContext, handleRequest } from "../../runner/handlers";
 import { errorCode, removeDirs, tempDir, waitFor } from "./helpers";
 
@@ -87,6 +88,7 @@ test("status commands: signed in through claude.ai with email and plan (short wo
     subscriptionType: "max",
   });
   expect(parseClaudeStatus(0, good)).toEqual({ loggedIn: true, email: "dev@acme.test", plan: "max" });
+  expect(parseClaudeStatus(0, good, () => "default_claude_max_20x")).toMatchObject({ plan: "ultra" });
   const odd = JSON.stringify({
     loggedIn: true,
     authMethod: "claude.ai",
@@ -105,6 +107,25 @@ test("status commands: signed in through claude.ai with email and plan (short wo
   expect(parseCodexStatus(0, `${ESC}[32mLogged in using ChatGPT${ESC}[0m\n`)).toEqual({ loggedIn: true });
   expect(parseCodexStatus(1, "Not logged in\n")).toEqual({ loggedIn: false });
   expect(parseCodexStatus(0, "Not logged in\n")).toEqual({ loggedIn: false });
+});
+
+test("Claude's plans by Anthropic's names: a Max on the 20x tier is Ultra, every other word as the CLI says it", () => {
+  const tier = (value?: string) => () => value;
+  expect(claudePlan("pro", tier("default_claude_ai"))).toBe("pro");
+  expect(claudePlan("max", tier("default_claude_max_5x"))).toBe("max");
+  expect(claudePlan("max", tier("default_claude_max_20x"))).toBe("ultra");
+  // No tier known: a Max stays Max.
+  expect(claudePlan("max", tier())).toBe("max");
+  // A Team seat on the premium tier is still Team.
+  expect(claudePlan("team", tier("default_claude_max_20x"))).toBe("team");
+  expect(claudePlan("enterprise", tier())).toBe("enterprise");
+  expect(claudePlan("ultra", tier())).toBe("ultra");
+  expect(claudePlan(null, tier("default_claude_max_20x"))).toBeUndefined();
+  expect(claudePlan("a b", tier())).toBeUndefined();
+  // The tier is read only for a Max.
+  let reads = 0;
+  claudePlan("pro", () => reads++);
+  expect(reads).toBe(0);
 });
 
 // ── The manager with fake CLIs ───────────────────────────────────────────────
@@ -419,6 +440,33 @@ test.if(posix)("remove signs out in the account's folder and deletes it; ids tha
   expect(await m.remove("claude_code", id)).toBe(false);
 });
 
+test.if(posix)(
+  "a Max on the 20x tier lists as Ultra, by the tier Claude Code keeps in the folder, never through a link",
+  async () => {
+    const { m, root } = setup();
+    const dir = path.join(root, "claude_code", LOGIN(61));
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, "signed-in"), "");
+    const config = path.join(dir, ".claude.json");
+    const ultra = JSON.stringify({ oauthAccount: { organizationRateLimitTier: "default_claude_max_20x" } });
+    const plan = async () => {
+      m.invalidate();
+      return (await m.list())[0]?.plan;
+    };
+    // No tier kept there (the CLI's sign-in couldn't fetch it): Max.
+    expect(await plan()).toBe("max");
+    writeFileSync(config, ultra);
+    expect(await plan()).toBe("ultra");
+    writeFileSync(config, JSON.stringify({ oauthAccount: { organizationRateLimitTier: "default_claude_max_5x" } }));
+    expect(await plan()).toBe("max");
+    const elsewhere = path.join(path.dirname(root), "elsewhere.json");
+    writeFileSync(elsewhere, ultra);
+    rmSync(config);
+    symlinkSync(elsewhere, config);
+    expect(await plan()).toBe("max");
+  },
+);
+
 test.if(posix)("list is cached: a second look doesn't run the CLIs again", async () => {
   const { m, root, runs } = setup();
   const id = LOGIN(10);
@@ -603,11 +651,49 @@ test.if(posix)("system mode: a pipe an agent's user leaves where a key would be 
   mkdirSync(dir, { recursive: true });
   expect(await m.lendTo("claude_code", id, 21001)).toBe(true);
   expect(spawnSync("mkfifo", [path.join(dir, "provider.json")]).status).toBe(0);
+  expect(spawnSync("mkfifo", [path.join(dir, ".claude.json")]).status).toBe(0);
   expect(await planKeyOf(dir)).toBeNull();
   m.invalidate();
   const listed = await Promise.race([m.list(), new Promise<null>((r) => setTimeout(() => r(null), 3000))]);
   expect(listed).toEqual([{ id, kind: "claude_code", loggedIn: true }]);
 });
+
+test.if(posix)(
+  "system mode: a folder an agent's user had lists the plan Claude Code keeps there, never through a link, with no CLI",
+  async () => {
+    const { m, root, runs } = setup({ lending: { chown: async () => {} } });
+    const id = LOGIN(56);
+    const dir = path.join(root, "claude_code", id);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, "signed-in"), "");
+    const config = path.join(dir, ".claude.json");
+    const kept = (organizationType: string, organizationRateLimitTier?: string) =>
+      JSON.stringify({ oauthAccount: { organizationType, organizationRateLimitTier } });
+    const listed = async () => {
+      m.invalidate();
+      return (await m.list())[0];
+    };
+    expect(await m.lendTo("claude_code", id, 21001)).toBe(true);
+    // Nothing kept there: no plan, so the server keeps the one it knew.
+    expect(await listed()).toEqual({ id, kind: "claude_code", loggedIn: true });
+    writeFileSync(config, kept("claude_max", "default_claude_max_20x"));
+    expect(await listed()).toEqual({ id, kind: "claude_code", loggedIn: true, plan: "ultra" });
+    writeFileSync(config, kept("claude_max", "default_claude_max_5x"));
+    expect((await listed())?.plan).toBe("max");
+    writeFileSync(config, kept("claude_team", "default_claude_max_20x"));
+    expect((await listed())?.plan).toBe("team");
+    // Root's again (no agent thinks with it now): still read, never run.
+    await m.keepLent(new Map());
+    writeFileSync(config, kept("claude_max", "default_claude_max_20x"));
+    expect((await listed())?.plan).toBe("ultra");
+    const elsewhere = path.join(path.dirname(root), "elsewhere.json");
+    writeFileSync(elsewhere, kept("claude_pro"));
+    rmSync(config);
+    symlinkSync(elsewhere, config);
+    expect(await listed()).toEqual({ id, kind: "claude_code", loggedIn: true });
+    expect(runs()).toHaveLength(0);
+  },
+);
 
 test.if(posix)("system mode: a sign-in in progress is lent to nobody; without lending nothing is", async () => {
   const chown = async () => {};
@@ -662,7 +748,7 @@ test.if(posix)("op account: machine-wide, a new sign-in is refused while paused,
   ).toBe(`account code ${LOGIN(11).slice(0, 8)}`);
 });
 
-// ── One sign-in for all of an owner's agents (protocol 27) ───────────────────
+// ── One sign-in for all of an owner's agents (protocol 29) ───────────────────
 
 const TOKEN = "sk-ant-oat01-fake-token-for-tests-only";
 
@@ -810,7 +896,7 @@ test.if(posix)(
     expect(await m.lendTo("claude_code", all, 21001)).toBe(false);
     expect(chowned).toEqual([]);
 
-    // Made for one agent (before protocol 27, or with the switch off): lent, never handed over.
+    // Made for one agent (before protocol 29, or with the switch off): lent, never handed over.
     const one = LOGIN(76);
     const b1 = await m.begin("claude_code", one, false, undefined, "zai");
     const k1 = await sealed(b1.publicKey as string, one, GLM_KEY);
