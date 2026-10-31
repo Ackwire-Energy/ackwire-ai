@@ -275,7 +275,7 @@ function ComputerStage({
   const dir = useDirectory(org.id);
   const actions = useBrowserHandoffMutations(org.id);
   const navigate = useNavigate();
-  const outages = useMachineOutages(org.id, can(org.role, "manage_agents"));
+  const outages = useMachineOutages(org.id, can(org, "manage_agents"));
   const [switching, setSwitching] = useState(false);
   // The screen's own held cover says it all: no pause line over it.
   const [screenHeld, setScreenHeld] = useState(false);
@@ -288,7 +288,7 @@ function ComputerStage({
   const reader = useWaitReader();
   const machine = view.machine;
   const computer = computerName(t, org.name, machine);
-  const manages = can(org.role, "manage_agents") || agent.ownerUserId === me.user.id;
+  const manages = can(org, "manage_agents") || agent.ownerUserId === me.user.id;
   const person = (id: string | null) => (id ? dir.memberById.get(id)?.name : undefined) ?? t("channel.unknownPerson");
   const paused = f?.edition === "selfhost" && machine && isPaused(machine, now) ? machine.paused : null;
   const waiting = waitingFor && isWaitingHandoff(waitingFor, now) ? waitingFor : null;

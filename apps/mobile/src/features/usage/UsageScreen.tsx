@@ -31,7 +31,7 @@ export function UsageScreen() {
   const c = useColors();
   const insets = useSafeAreaInsets();
   const usage = usePlanUsage(orgId);
-  const allowed = can(org?.role, "view_usage");
+  const allowed = can(org, "view_usage");
   const report = useUsageReport(orgId, allowed);
   // Looking at the plans: their usage is looked up again (it comes back as `machine.updated`).
   useEffect(() => {
@@ -225,7 +225,7 @@ function DefaultBudgetCard() {
   const update = useUpdateSettings(orgId);
   const toast = useToast();
   const { colors: c, shadows } = useTheme();
-  const editable = can(org?.role, "configure");
+  const editable = can(org, "configure");
   const saved = settings.data?.defaultAgentBudgetUsd;
   const [value, setValue] = useState("");
   useEffect(() => {

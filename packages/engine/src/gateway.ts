@@ -25,6 +25,7 @@ import { caches } from "./cache";
 import { decryptCredential, usableCredentialRow } from "./credentials";
 import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
+import { maySql, type RolePermission } from "./permissions";
 import { assertCanWork } from "./standing";
 import { budgetPercent, monthStartUtc, withEffectiveBudget } from "./usage";
 
@@ -735,13 +736,16 @@ export function notifyOwnerOnBudget(pubsub: PubSub, db?: Database): NonNullable<
   };
 }
 
-/** Owners and admins of an organization (who decides when an agent has no owner). */
-export async function adminIds(db: Database, orgId: string) {
+/**
+ * Who in an organization may `permission` (ADR 0085), owners included: by default who manages agents, who
+ * decides when an agent has no owner.
+ */
+export async function adminIds(db: Database, orgId: string, permission: RolePermission = "manage_agents") {
   const rows = await db
     .select({ userId: schema.organizationMembers.userId })
     .from(schema.organizationMembers)
     .where(
-      and(eq(schema.organizationMembers.orgId, orgId), sql`${schema.organizationMembers.role} in ('owner', 'admin')`),
+      and(eq(schema.organizationMembers.orgId, orgId), maySql(orgId, schema.organizationMembers.userId, permission)),
     );
   return rows.map((r) => r.userId);
 }

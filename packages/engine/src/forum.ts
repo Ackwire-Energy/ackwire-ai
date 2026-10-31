@@ -13,7 +13,7 @@ import {
   sql,
 } from "@agenteschat/db";
 import { type ArtifactDeps, createArtifact, updateArtifact } from "./artifacts";
-import { audienceError, canTalkTo } from "./audience";
+import { audienceError, canTalkTo, talksToAgents } from "./audience";
 import { recordAudit } from "./audit";
 import { runBrainOf } from "./brains/select";
 import { caches } from "./cache";
@@ -729,8 +729,9 @@ export async function createForumTopic(
     .where(and(eq(agents.orgId, orgId), inArray(agents.id, agentIds), isNull(agents.archivedAt)));
   if (rows.length !== agentIds.length)
     throw new ValidationError("An agent isn't in this organization", "forum.unknown_agent");
+  const talks = await talksToAgents(db, orgId, requester);
   for (const a of rows) {
-    if (!canTalkTo(a, requester)) throw await audienceError(db, a);
+    if (!canTalkTo(a, requester, talks)) throw await audienceError(db, a);
   }
   const userIds = [...new Set([requester, ...(input.userIds ?? []), ...seatedPeople])];
   const members = await db
@@ -892,7 +893,7 @@ async function enqueueDeadline(db: Executor, topic: Pick<TopicRow, "id" | "orgId
 
 async function requireTopicManager(db: Database, actorId: string, orgId: string, topic: TopicRow) {
   const membership = await requirePermission(db, actorId, orgId, "read");
-  if (can(membership.role, "manage_agents") || topic.requesterUserId === actorId) return;
+  if (can(membership, "manage_agents") || topic.requesterUserId === actorId) return;
   const [p] = await db
     .select({ id: forumParticipants.id })
     .from(forumParticipants)
@@ -1325,7 +1326,8 @@ export async function setForumParticipants(
       .where(and(eq(agents.orgId, orgId), inArray(agents.id, add), isNull(agents.archivedAt)));
     if (rows.length !== add.length)
       throw new ValidationError("An agent isn't in this organization", "forum.unknown_agent");
-    for (const a of rows) if (!canTalkTo(a, requester)) throw await audienceError(db, a);
+    const talks = await talksToAgents(db, orgId, requester);
+    for (const a of rows) if (!canTalkTo(a, requester, talks)) throw await audienceError(db, a);
     const current = (await participantsOf(db, [topicId])).filter((p) => p.agentId);
     if (current.length + add.length > FORUM_LIMITS.maxAgents)
       throw new ValidationError("At most 8 agents", "forum.too_many_agents", { max: 8 });

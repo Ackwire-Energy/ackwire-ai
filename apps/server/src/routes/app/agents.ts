@@ -3,6 +3,7 @@ import {
   type Agent as AgentRow,
   agentBrainSummaries,
   agentBudgetsThisMonth,
+  agentStatuses,
   agentView,
   archiveAgent,
   audienceOf,
@@ -37,6 +38,7 @@ import {
   setAgentAppearance,
   setAgentAudience,
   setAgentBrain,
+  talksToAgents,
   updateAgent,
   updateAgentGroup,
   usageSummary,
@@ -80,6 +82,8 @@ const toAgent = (
   seesCost: boolean,
   budgetUsedPercent?: number,
   brain?: AgentBrainSummary,
+  /** Whether the viewer's roles let them talk to agents (`talksToAgents`, ADR 0085). */
+  talks = true,
 ) => {
   const v = agentView(a);
   const { monthlyBudgetNanoUsd, ...rest } = v;
@@ -93,7 +97,7 @@ const toAgent = (
     createdAt: v.createdAt.toISOString(),
     audience: audienceOf(a),
     audienceMode: a.audienceMode,
-    canTalk: canTalkTo(a, viewerId),
+    canTalk: canTalkTo(a, viewerId, talks),
   };
 };
 
@@ -309,16 +313,20 @@ export function agentRoutes(deps: AppDeps) {
       const { orgId } = c.req.valid("param");
       const actor = c.get("user").id;
       const list = await listAgents(db, actor, orgId);
-      const [seesCost, budgets, brains] = await Promise.all([
+      const [seesCost, budgets, brains, talks] = await Promise.all([
         canViewCost(db, actor, orgId),
         agentBudgetsThisMonth(db, orgId),
         agentBrainSummaries(db, actor, orgId, list),
+        talksToAgents(db, orgId, actor),
       ]);
       const percent = (id: string) => {
         const b = budgets.get(id);
         return b ? budgetPercent(b.spentNanoUsd, b.budgetNanoUsd) : 0;
       };
-      return c.json({ agents: list.map((a) => toAgent(a, actor, seesCost, percent(a.id), brains.get(a.id))) }, 200);
+      return c.json(
+        { agents: list.map((a) => toAgent(a, actor, seesCost, percent(a.id), brains.get(a.id), talks)) },
+        200,
+      );
     },
   );
 
@@ -382,6 +390,69 @@ export function agentRoutes(deps: AppDeps) {
         orgRouting(status, deps.extras?.router?.routing ?? null, orgId, userId),
       ]);
       return c.json({ ...ai, ...routing }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/agent-status",
+      tags,
+      security,
+      summary: "Each agent's presence (online, busy, away, offline) and what it says it is doing",
+      description:
+        "From its work (ADR 0084): `busy` on a routine, a task, a run going for over 2 minutes or one rated heavy, or when it said so; `online` while answering, waiting on an answer or active in the last 30 minutes; `away` after that; `offline` when held. An agent with no AI is drawn offline by the apps (`ai-status`). `status`: its own words (`set_status`), a line picked for its run (`kind` + `subject`), or what its run waits on; gone when the run ends unless it set `until`. Refreshed on `agent.status` events and every 30 seconds while open.",
+      request: { params: OrgParams },
+      responses: {
+        200: json(
+          z.object({
+            agents: z.array(
+              z.object({
+                agentId: z.uuid(),
+                presence: z.enum(["online", "busy", "away", "offline"]),
+                status: z
+                  .object({
+                    by: z.enum(["self", "auto", "wait"]).openapi({
+                      description: "Its own words (`text`), a line picked for its run, or what its run waits on.",
+                    }),
+                    text: z.string().nullable(),
+                    kind: z
+                      .enum([
+                        "task",
+                        "routine",
+                        "mission",
+                        "channel",
+                        "browsing",
+                        "coding",
+                        "files",
+                        "wiki",
+                        "planning",
+                        "data",
+                        "mail",
+                        "connector",
+                        "computer",
+                        "waiting_approval",
+                        "waiting_answer",
+                        "waiting_computer",
+                      ])
+                      .nullable()
+                      .openapi({ description: "With `auto`/`wait`: what it does, worded by the app." }),
+                    subject: z.string().nullable(),
+                    emoji: z.string().nullable(),
+                    until: z.string().nullable(),
+                  })
+                  .nullable(),
+                activeAt: z.string().nullable(),
+              }),
+            ),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ agents: await agentStatuses(db, c.get("user").id, orgId) }, 200);
     },
   );
 
@@ -560,11 +631,12 @@ export function agentRoutes(deps: AppDeps) {
       ) {
         await publishMachineAgentsChanged(adapters.pubsub, orgId);
       }
-      const [seesCost, brains] = await Promise.all([
+      const [seesCost, brains, talks] = await Promise.all([
         canViewCost(db, actor, orgId),
         agentBrainSummaries(db, actor, orgId, [agent]),
+        talksToAgents(db, orgId, actor),
       ]);
-      return c.json(toAgent(agent, actor, seesCost, undefined, brains.get(agent.id)), 200);
+      return c.json(toAgent(agent, actor, seesCost, undefined, brains.get(agent.id), talks), 200);
     },
   );
 

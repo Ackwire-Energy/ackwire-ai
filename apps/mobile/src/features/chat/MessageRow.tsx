@@ -443,7 +443,7 @@ function StoppedLine({
   const toast = useToast();
   const meId = useMeId();
   const dir = useDirectory();
-  const role = useOrg().org?.role;
+  const org = useOrg().org;
   const { colors: c, shadows } = useTheme();
   const [busy, setBusy] = useState(false);
   // Continued here or on another device (`run.continued`), or already in the message's meta.
@@ -456,7 +456,7 @@ function StoppedLine({
       : t("mobile.chat.stopped.plain");
   const owner = m.author.id ? dir.agentById.get(m.author.id)?.ownerUserId : null;
   // Same people who may stop it (the server checks again).
-  const may = byMe || can(role, "manage_agents") || (Boolean(meId) && owner === meId);
+  const may = byMe || can(org, "manage_agents") || (Boolean(meId) && owner === meId);
   const open = may && !continued && !busy;
   const onContinue = () => {
     setBusy(true);

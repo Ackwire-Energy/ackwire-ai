@@ -74,7 +74,7 @@ export function AuditScreen() {
   const when = useWhen();
   const dir = useDirectory();
   const { orgId, org } = useOrg();
-  const admin = can(org?.role, "configure");
+  const admin = can(org, "view_audit");
   const [show, setShow] = useState<AuditShow>("all");
   const [agentId, setAgentId] = useState<string | null>(null);
   const audit = useAudit(orgId, auditQueryOf(show, agentId), admin);

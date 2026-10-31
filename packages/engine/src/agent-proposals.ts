@@ -11,6 +11,7 @@ import { publishChannelEvent } from "./events";
 import { getMessage, type Message } from "./messages";
 import type { Notice } from "./notices";
 import { can, getMembership, requirePermission } from "./organizations";
+import { maySql } from "./permissions";
 import { deliverNoticeToRun } from "./run-resume";
 
 const {
@@ -264,10 +265,10 @@ export async function suggestAgentAi(
   return { kind: "none" };
 }
 
-/** Whether this person may create agents (`manage_agents`), and so own the new one and give it their plan. */
+/** Whether this person may create agents (`create_agents`), and so own the new one and give it their plan. */
 export async function mayCreateAgents(db: Database, orgId: string, userId: string | null) {
   const membership = userId ? await getMembership(db, userId, orgId) : null;
-  return membership !== null && can(membership.role, "manage_agents");
+  return can(membership, "create_agents");
 }
 
 /**
@@ -285,14 +286,14 @@ export async function deciderCanOpen(db: Database, orgId: string, channelId: str
     return true;
   }
   const members = await db
-    .select({ role: organizationMembers.role })
+    .select({ may: maySql(orgId, channelMembers.userId, "create_agents") })
     .from(channelMembers)
     .innerJoin(
       organizationMembers,
       and(eq(organizationMembers.orgId, channelMembers.orgId), eq(organizationMembers.userId, channelMembers.userId)),
     )
     .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.channelId, channelId)));
-  return members.some((m) => can(m.role, "manage_agents"));
+  return members.some((m) => m.may);
 }
 
 /** The proposal behind a card message the viewer can read, or 404. */
@@ -335,7 +336,7 @@ export async function getAgentProposal(
   messageId: string,
 ) {
   const { message, card, proposedBy, membership } = await proposalMessage(deps.db, userId, orgId, messageId);
-  const shown = view(message, card, proposedBy, can(membership.role, "manage_agents"));
+  const shown = view(message, card, proposedBy, can(membership, "create_agents"));
   if (!shown.canDecide) return shown;
   const draft = { ...card.params.draft, ai: await suggestAgentAi(deps, orgId, userId) };
   return { ...shown, params: { ...card.params, draft } };
@@ -366,7 +367,7 @@ async function claim(
   to: "creating" | "denied",
 ) {
   const found = await proposalMessage(deps.db, userId, orgId, messageId);
-  await requirePermission(deps.db, userId, orgId, "manage_agents");
+  await requirePermission(deps.db, userId, orgId, "create_agents");
   // A crash between this claim and the agent leaves it `creating`, decided for good (as the forum's suggestions).
   const decided = () => new ConflictError("This proposal was already decided", "agent_proposal.decided");
   if (found.card.state !== "pending") throw decided();

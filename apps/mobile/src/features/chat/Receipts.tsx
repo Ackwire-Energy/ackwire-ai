@@ -1,5 +1,6 @@
 import { type AgentAction, ApiError, cacheMessageActions, type Message, useAgentActions } from "@agenteschat/client";
 import { actionErrorKey, actionTextKey, actionTextValues } from "@agenteschat/client/lib/actions";
+import { can } from "@agenteschat/client/lib/permissions";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
@@ -66,7 +67,7 @@ function ReceiptList({
 }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
-  const role = useOrg().org?.role;
+  const managesAgents = can(useOrg().org, "manage_agents");
   const meId = useMeId();
   const dir = useDirectory();
   const c = useColors();
@@ -74,7 +75,7 @@ function ReceiptList({
   const toast = useToast();
   const ops = useAgentActions(orgId, m.channelId);
   const ownsAgent = Boolean(meId && m.author.id && dir.agentById.get(m.author.id)?.ownerUserId === meId);
-  const viewer = { userId: meId, role, ownsAgent };
+  const viewer = { userId: meId, managesAgents, ownsAgent };
 
   const fail = (err: unknown) => {
     const code = err instanceof ApiError ? err.code : "";

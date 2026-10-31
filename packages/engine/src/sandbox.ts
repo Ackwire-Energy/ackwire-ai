@@ -269,7 +269,7 @@ export async function requireComputerManager(db: Database, actorId: string, orgI
   const membership = await requirePermission(db, actorId, orgId, "read");
   const agent = await getAgent(db, orgId, agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  if (!can(membership.role, "manage_agents") && agent.ownerUserId !== actorId) {
+  if (!can(membership, "manage_agents") && agent.ownerUserId !== actorId) {
     throw new ForbiddenError("Only an admin or the agent's owner can manage its computer");
   }
 }
