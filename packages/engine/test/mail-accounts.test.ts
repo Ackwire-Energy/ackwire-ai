@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { MailError } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
   ConflictError,
@@ -194,25 +195,66 @@ test("Gmail through Composio: a pending row, Composio's link, then active with i
     reads++;
     return read(id);
   };
-  expect(await completeComposioConnect(deps, f.owner.id, started.accountId)).toEqual({ orgId: f.org.id, ok: false });
+  expect(await completeComposioConnect(deps, started.accountId)).toEqual({ orgId: f.org.id, ok: false });
   expect(reads).toBeGreaterThan(1);
   expect((await listMailAccounts(f.db, f.owner.id, f.org.id))[0]).toMatchObject({ status: "pending", address: "" });
   composio.activate("ca_1", "Team@Example.com");
-  expect(await completeComposioConnect(deps, f.owner.id, started.accountId)).toEqual({ orgId: f.org.id, ok: true });
+  expect(await completeComposioConnect(deps, started.accountId)).toEqual({ orgId: f.org.id, ok: true });
   expect((await listMailAccounts(f.db, f.owner.id, f.org.id))[0]).toMatchObject({
     provider: "gmail",
     via: "composio",
     status: "active",
     address: "team@example.com",
   });
+  // The callback has no session: the person who started it connected it.
+  const [connected] = await f.db
+    .select()
+    .from(schema.auditLog)
+    .where(eq(schema.auditLog.action, "mail_account.connected"));
+  expect(connected).toMatchObject({ actorType: "person", actorId: f.owner.id });
 
   // A connection that failed at Composio goes away.
   const second = await startComposioConnect(deps, f.owner.id, f.org.id, { provider: "outlook" });
   const ca = composio.state.links[1]?.connectedAccountId ?? "";
   const remote = composio.state.accounts.get(ca);
   if (remote) remote.status = "failed";
-  expect(await completeComposioConnect(deps, f.owner.id, second.accountId)).toEqual({ orgId: f.org.id, ok: false });
+  expect(await completeComposioConnect(deps, second.accountId)).toEqual({ orgId: f.org.id, ok: false });
   expect(await listMailAccounts(f.db, f.owner.id, f.org.id)).toHaveLength(1);
+});
+
+test("the Composio callback reads again past an error that passes; a lasting one or a refusal is thrown", async () => {
+  m = await mailSetup();
+  const { f, deps, composio } = m;
+  const started = await startComposioConnect(deps, f.owner.id, f.org.id, { provider: "gmail", desktop: true });
+  expect(composio.state.links[0]?.callbackUrl).toBe(
+    `${PUBLIC_URL}/api/app/mail/composio/callback?account=${started.accountId}&from=desktop`,
+  );
+  const read = composio.client.getConnectedAccount;
+  let reads = 0;
+  composio.client.getConnectedAccount = async (id) => {
+    if (++reads === 1) throw new MailError("Composio GET /connected_accounts failed (503)", true);
+    composio.activate(id, "team@example.com");
+    return read(id);
+  };
+  expect(await completeComposioConnect(deps, started.accountId)).toEqual({ orgId: f.org.id, ok: true });
+  expect(reads).toBe(2);
+
+  const down = await startComposioConnect(deps, f.owner.id, f.org.id, { provider: "outlook" });
+  const failing = (retryable: boolean) => async () => {
+    reads++;
+    throw new MailError("Composio GET /connected_accounts failed", retryable);
+  };
+  reads = 0;
+  composio.client.getConnectedAccount = failing(true);
+  await expect(completeComposioConnect(deps, down.accountId)).rejects.toBeInstanceOf(MailError);
+  expect(reads).toBe(10);
+  reads = 0;
+  composio.client.getConnectedAccount = failing(false);
+  await expect(completeComposioConnect(deps, down.accountId)).rejects.toBeInstanceOf(MailError);
+  expect(reads).toBe(1);
+  expect((await listMailAccounts(f.db, f.owner.id, f.org.id)).find((a) => a.id === down.accountId)).toMatchObject({
+    status: "pending",
+  });
 });
 
 test("without Composio configured, connecting Gmail is a conflict", async () => {

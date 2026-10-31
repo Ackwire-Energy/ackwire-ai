@@ -174,9 +174,9 @@ function emailCardSave(saved: { canDelete: boolean; policy: object } | undefined
   return { level, canDelete: saved?.canDelete ?? false, policy };
 }
 
-test("Gmail that Composio finishes just after sending the person back: the agent's Email row has its address and saves", async () => {
+test("Gmail still pending at Composio on the callback's first read: the agent's Email row has its address and saves", async () => {
   const fake = fakeMail();
-  // Composio's redirect doesn't mean the account is active yet: it is on the next read.
+  // Composio still says pending when it sends the person back, then active on the next read.
   const read = fake.composio.client.getConnectedAccount;
   let reads = 0;
   fake.composio.client.getConnectedAccount = async (id) => {
@@ -212,6 +212,62 @@ test("Gmail that Composio finishes just after sending the person back: the agent
   expect(accounts.map((a) => [a.id, a.address, a.status])).toEqual([[accountId, "owner@gmail.com", "active"]]);
   expect(back.headers.get("location")).toBe(
     `${t.config.PUBLIC_URL}/org/${orgId}/settings/connectors?mail=connected&account=${accountId}`,
+  );
+});
+
+test("Gmail started in the desktop app: the browser without our session hands the return to the app, and it saves", async () => {
+  const fake = fakeMail();
+  t = await createTestServer({ mail: fake.mail });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, agentId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  const start = async (desktop: boolean) => {
+    const r = await api("/mail/accounts/composio", { json: { provider: "gmail", desktop } });
+    const { accountId } = (await r.json()) as { accountId: string };
+    const link = fake.composio.state.links.at(-1);
+    if (!link) throw new Error("no connect link");
+    return { accountId, ca: link.connectedAccountId };
+  };
+  // The window opens Composio in the person's browser, which isn't signed in.
+  const signedOut = browser(t);
+  const callback = (accountId: string, from = "&from=desktop") =>
+    signedOut(`/api/app/mail/composio/callback?account=${accountId}${from}`, { origin: null });
+
+  const gmail = await start(true);
+  fake.composio.activate(gmail.ca, "owner@gmail.com");
+  const back = await callback(gmail.accountId);
+  expect(back.status).toBe(302);
+  expect(back.headers.get("location")).toBe(
+    `agenteschat://desktop/connectors/oauth?org=${orgId}&state=mail&code=connected`,
+  );
+  const { accounts } = (await (await api("/mail/accounts")).json()) as {
+    accounts: { id: string; address: string; status: string }[];
+  };
+  expect(accounts.map((a) => [a.id, a.address, a.status])).toEqual([[gmail.accountId, "owner@gmail.com", "active"]]);
+  const put = await api(`/agents/${agentId}/mail/${gmail.accountId}`, {
+    method: "PUT",
+    json: emailCardSave(undefined, "read_write"),
+  });
+  expect(put.status).toBe(200);
+
+  // Refused at Composio, or a mailbox that isn't there: the app hears it failed.
+  const refused = await start(true);
+  const remote = fake.composio.state.accounts.get(refused.ca);
+  if (remote) remote.status = "failed";
+  expect((await callback(refused.accountId)).headers.get("location")).toBe(
+    `agenteschat://desktop/connectors/oauth?org=${orgId}&state=mail&code=failed`,
+  );
+  expect((await callback(crypto.randomUUID())).headers.get("location")).toBe(
+    "agenteschat://desktop/connectors/oauth?state=mail&code=failed",
+  );
+
+  // Started on the web, back in a browser that isn't signed in: it connects all the same.
+  const web = await start(false);
+  fake.composio.activate(web.ca, "team@gmail.com");
+  expect((await callback(web.accountId, "")).headers.get("location")).toBe(
+    `${t.config.PUBLIC_URL}/org/${orgId}/settings/connectors?mail=connected&account=${web.accountId}`,
   );
 });
 

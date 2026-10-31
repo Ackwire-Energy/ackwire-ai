@@ -99,8 +99,39 @@ describe("Conectores → Email", () => {
     expect(flow().textContent).toContain("Conectar Gmail");
     await click(within(flow()).getByRole("button", { name: "Conectar com Google" }));
     await settle(4);
-    expect(state.calls.find((c) => c.method === "mail.connectComposio")?.args[1]).toEqual({ provider: "gmail" });
+    expect(state.calls.find((c) => c.method === "mail.connectComposio")?.args[1]).toEqual({
+      provider: "gmail",
+      desktop: false,
+    });
     expect(left).toEqual(["https://composio.example/connect/gmail"]);
+  });
+
+  test("in the desktop app, Gmail's return comes back to the window: 'O que faz', or why it failed", async () => {
+    const win = window as { __agentesDesktop?: unknown };
+    win.__agentesDesktop = { version: "0.6.0", connectorReturn: true };
+    try {
+      setNavigateAway(() => {});
+      const { api, state } = mailApi();
+      await pick(await openCatalog(api), "Gmail");
+      await click(within(flow()).getByRole("button", { name: "Conectar com Google" }));
+      await settle(4);
+      expect(state.calls.find((c) => c.method === "mail.connectComposio")?.args[1]).toEqual({
+        provider: "gmail",
+        desktop: true,
+      });
+      cleanup();
+
+      const back = mailApi([{ provider: "gmail", via: "composio", preset: null, address: "new@example.com" }]);
+      await renderApp(`/desktop/connector?org=${ORG_ID}&state=mail&code=connected`, { api: back.api });
+      await settle(8);
+      expect(screen().getByRole("dialog", { name: "O que new@example.com faz" })).toBeTruthy();
+      cleanup();
+      await renderApp(`/desktop/connector?org=${ORG_ID}&state=mail&code=failed`, { api: mailApi().api });
+      await settle(8);
+      expect(screen().getByText("Não deu para conectar o email. Tente de novo.")).toBeTruthy();
+    } finally {
+      delete win.__agentesDesktop;
+    }
   });
 
   test("iCloud: address and app password; a 422 says why in plain words; then o que faz → quem pode usar", async () => {

@@ -86,7 +86,7 @@ export async function gmailAccount(m: MailFixture, address = "team@example.com")
   const link = m.composio.state.links.at(-1);
   if (!link) throw new Error("no connect link");
   m.composio.activate(link.connectedAccountId, address);
-  await completeComposioConnect(m.deps, m.f.owner.id, started.accountId);
+  await completeComposioConnect(m.deps, started.accountId);
   return { accountId: started.accountId, connectedAccountId: link.connectedAccountId };
 }
 

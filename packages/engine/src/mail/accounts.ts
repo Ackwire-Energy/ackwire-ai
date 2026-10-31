@@ -33,7 +33,7 @@ export interface MailDeps {
   /** DNS for the SSRF guard on custom IMAP/SMTP hosts (tests: fake). */
   resolveHost?: ResolveHost;
   now?: () => Date;
-  /** Between reads of a sign-in Composio is still finishing (default 1 s; tests: 0). */
+  /** Between the callback's reads of a sign-in that is still pending (default 1 s; tests: 0). */
   composioPollMs?: number;
 }
 
@@ -77,8 +77,9 @@ export const ASKABLE_MAIL_ACTIONS: readonly MailAction[] = ["draft", "organize"]
 const aadFor = (orgId: string, id: string) => `mail-account|${orgId}|${id}`;
 /** Our Composio user id for an organization. */
 export const composioUserId = (orgId: string) => `org_${orgId}`;
-export const composioCallbackUrl = (publicUrl: string, accountId: string) =>
-  `${publicUrl.replace(/\/$/, "")}/api/app/mail/composio/callback?account=${encodeURIComponent(accountId)}`;
+/** `from=desktop`: started in the desktop app's window, so the callback hands the return back to the app. */
+export const composioCallbackUrl = (publicUrl: string, accountId: string, desktop = false) =>
+  `${publicUrl.replace(/\/$/, "")}/api/app/mail/composio/callback?account=${encodeURIComponent(accountId)}${desktop ? "&from=desktop" : ""}`;
 
 /** The mail scopes an agent can hold on one mailbox (`agent_scopes.connection_id` = the account). */
 export const MAIL_SCOPES = {
@@ -405,13 +406,14 @@ const composioOf = (deps: MailDeps) => deps.mail?.composio ?? null;
 /**
  * Starts connecting Gmail or Outlook through Composio (admins): a pending
  * row and Composio's link; the person signs in there and comes back to
- * `/api/app/mail/composio/callback?account=<id>`.
+ * `/api/app/mail/composio/callback?account=<id>`. `desktop`: started in the
+ * desktop app's window, whose links open in the person's browser.
  */
 export async function startComposioConnect(
   deps: MailDeps,
   actorId: string,
   orgId: string,
-  input: { provider: "gmail" | "outlook"; label?: string },
+  input: { provider: "gmail" | "outlook"; label?: string; desktop?: boolean },
 ): Promise<{ accountId: string; redirectUrl: string }> {
   await requirePermission(deps.db, actorId, orgId, "manage_connectors");
   const composio = composioOf(deps);
@@ -431,7 +433,7 @@ export async function startComposioConnect(
     const link = await composio.client.createConnectLink({
       toolkit: input.provider,
       userId: composioUserId(orgId),
-      callbackUrl: composioCallbackUrl(deps.publicUrl, id),
+      callbackUrl: composioCallbackUrl(deps.publicUrl, id, input.desktop === true),
     });
     await deps.db
       .update(mailAccounts)
@@ -504,26 +506,31 @@ export async function applyComposioStateFor(
   return "off";
 }
 
-/** Reads of the connected account before the callback gives up on a sign-in Composio is still finishing. */
+/** Reads of the connected account before the callback leaves a sign-in that is still pending to the reconcile. */
 const CALLBACK_READS = 10;
 
 /**
  * Composio sent the person back (`GET /api/app/mail/composio/callback`):
- * reads the connected account; an admin of the account's organization only.
- * The redirect can come before Composio marks the account active (its own
- * flow polls until then), so a pending one is read again for a few seconds.
+ * reads the connected account. Needs no session: the browser Composio returns
+ * to may not be signed in (the desktop app opens it in the person's browser),
+ * the row's id is random, and only Composio's own state is copied onto the
+ * row, as the reconcile does. A pending account, or a read that failed for a
+ * moment, is read again for a few seconds in case Composio is still finishing.
  */
 export async function completeComposioConnect(
   deps: MailDeps,
-  actorId: string,
   accountId: string,
 ): Promise<{ orgId: string; ok: boolean }> {
   const [row] = await deps.db.select().from(mailAccounts).where(eq(mailAccounts.id, accountId));
   if (row?.via !== "composio" || row.revokedAt) throw new NotFoundError("Mailbox not found");
-  await requirePermission(deps.db, actorId, row.orgId, "manage_connectors");
   for (let read = 1; ; read++) {
-    const state = await applyComposioStateFor(deps, row, actorId);
-    if (state !== "pending" || read === CALLBACK_READS) return { orgId: row.orgId, ok: state === "active" };
+    const last = read === CALLBACK_READS;
+    // Composio's errors come from the read, before anything is written: the same row is read again.
+    const state = await applyComposioStateFor(deps, row, row.createdByUserId).catch((error: unknown) => {
+      if (!last && error instanceof MailError && error.retryable) return "pending" as const;
+      throw error;
+    });
+    if (state !== "pending" || last) return { orgId: row.orgId, ok: state === "active" };
     await Bun.sleep(deps.composioPollMs ?? 1000);
   }
 }
