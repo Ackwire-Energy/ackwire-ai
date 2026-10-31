@@ -5924,6 +5924,14 @@ button.ac-tools__row:focus-visible {
   font-size: 13px;
   color: var(--muted);
 }
+.ac-tz__option[aria-disabled="true"] {
+  color: var(--ink-muted);
+  cursor: not-allowed;
+}
+/* SearchSelect's own rows: a mark, then the name over its description, as a menu draws them. */
+.ac-search__option {
+  align-items: center;
+}
 .ac-recur__period {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

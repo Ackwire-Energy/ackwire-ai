@@ -44,7 +44,6 @@ import {
 import { setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { type ContextLimit, contextChoices, contextSize, isContextLimit } from "@agenteschat/client/lib/context-limits";
 import { lowerFirst } from "@agenteschat/client/lib/format";
-import { providerGrammar } from "@agenteschat/client/lib/grammar";
 import {
   allowsInApp,
   commandInReason,
@@ -95,7 +94,13 @@ import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { NO_COMPUTER, useNoComputer } from "@/components/AgentComputer";
-import { DEFAULT_KEY, keyOptions, modelDescription, pickerValue } from "@/components/AgentFields";
+import {
+  modelOptions as apiModelOptions,
+  DEFAULT_KEY,
+  keyOptions,
+  ModelSelect,
+  pickerValue,
+} from "@/components/AgentFields";
 import { AddAccount } from "@/components/ai/AddAccountFlow";
 import { accountOption } from "@/components/ai/ConnectAiSteps";
 import { PlanReplies, PlanRepliesOf } from "@/components/ai/PlanReplies";
@@ -781,7 +786,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       : planModel === view.effectiveModel);
   // A plan brain chosen now thinks with something there: the computer's own sign-in or an account.
   const needsAccount = kind !== view.brain && accountsOn && view.canUsePlans && account === null && !ownListed;
-  const choices = modelChoices(all, credentials.data ?? [], platform.data ?? false);
+  const modelList = apiModelOptions(
+    t,
+    i18n.language,
+    modelChoices(all, credentials.data ?? [], platform.data ?? false),
+  );
   const modelName = (value: string | null) =>
     isAuto(value)
       ? t("brain.auto.label")
@@ -1063,12 +1072,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const orgRows = can("model") ? (
     <>
       <BrainField label={t("agentPage.work.brain.planModel")}>
-        <Select
+        <ModelSelect
           className="agp-brainsel"
           aria-label={t("agentPage.work.brain.planModel")}
           value={model}
-          onValueChange={setModel}
-          renderValue={pickerValue}
+          onChange={setModel}
           options={[
             // "Automático" first: each task gets its model and effort, from the line of the agent's key.
             {
@@ -1077,18 +1085,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
               description: t("brain.auto.hint"),
               leading: autoMark,
             },
-            ...choices.flatMap(([provider, list]) =>
-              list.map(({ model: m, available }) => ({
-                value: m.id,
-                label: m.label,
-                group: providerLabel(provider),
-                disabled: !available,
-                leading: <ProviderLogo id={provider} size="sm" />,
-                description: available
-                  ? modelDescription(t, i18n.language, m)
-                  : t("newAgent.modelNeedsKey", providerGrammar(t, provider)),
-              })),
-            ),
+            // The model it has stays a choice when its list is out of reach (OpenRouter's) or no longer has it.
+            ...(isAuto(model) || modelList.some((o) => o.value === model) ? [] : [{ value: model, label: model }]),
+            ...modelList,
           ]}
         />
       </BrainField>

@@ -1,9 +1,10 @@
 import { and, asc, type Database, type Executor, eq, inArray, isNotNull, isNull, schema, sql } from "@agenteschat/db";
-import { AUTO_MODEL, isAutoModel, isKnownModel, MODEL_CATALOG } from "@agenteschat/providers";
+import { AUTO_MODEL, isAutoModel, MODEL_CATALOG } from "@agenteschat/providers";
 import type { AgentAppearance } from "./appearance";
 import { recordAudit } from "./audit";
 import { isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
+import { modelInfoFor } from "./credentials";
 import { ConflictError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { recordOperatorEvent } from "./operator-events";
 import { getMembership, requirePermission } from "./organizations";
@@ -32,8 +33,11 @@ async function validate(db: Database, orgId: string, input: Partial<AgentInput>)
     throw new ValidationError("handle must be 2–32 characters: lower-case letters, digits, - or _");
   }
   // "auto": each run picks the model from the line of the agent's key (any provider).
-  if (input.model !== undefined && !isAutoModel(input.model) && !isKnownModel(input.model)) {
-    throw new ValidationError(`model must be ${AUTO_MODEL} or one of: ${Object.keys(MODEL_CATALOG).join(", ")}`);
+  const model = input.model && !isAutoModel(input.model) ? await modelInfoFor(db, input.model) : undefined;
+  if (input.model !== undefined && !isAutoModel(input.model) && !model) {
+    throw new ValidationError(
+      `model must be ${AUTO_MODEL}, one of: ${Object.keys(MODEL_CATALOG).join(", ")}, or one OpenRouter lists`,
+    );
   }
   if (input.monthlyBudgetNanoUsd != null && input.monthlyBudgetNanoUsd < 0) {
     throw new ValidationError("budget can't be negative");
@@ -50,7 +54,6 @@ async function validate(db: Database, orgId: string, input: Partial<AgentInput>)
         ),
       );
     if (!cred) throw new ValidationError("credentialId does not belong to this organization");
-    const model = input.model ? MODEL_CATALOG[input.model] : undefined;
     if (model && model.provider !== cred.provider) {
       throw new ValidationError(
         `The model ${input.model} is from ${model.provider}, but this key is from ${cred.provider}`,

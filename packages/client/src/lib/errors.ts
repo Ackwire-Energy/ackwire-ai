@@ -118,6 +118,9 @@ const KNOWN = {
   human_check_blocked: "errors.humanCheckBlocked",
   // TypeSafe refused the key pasted for Jev: said under its field, nothing kept.
   jev_key_invalid: "jev.steps.invalid",
+  // A provider's own check refused a key on save (OpenRouter's): nothing kept.
+  provider_key_invalid: "settings.keyRefused",
+  provider_key_management: "settings.keyManagement",
   "github.repo_missing": "errors.github.repoMissing",
   "github.ref_missing": "errors.github.refMissing",
   // `count`: minutes until GitHub stops limiting the server.

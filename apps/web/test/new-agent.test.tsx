@@ -17,7 +17,17 @@ import {
   readBudget,
   stepErrors,
 } from "@/lib/new-agent";
-import { createFakeApi, ENG_ID, fakeMachinesOf, fakeMailOf, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
+import {
+  createFakeApi,
+  ENG_ID,
+  fakeMachinesOf,
+  fakeMailOf,
+  GENERAL_ID,
+  OPENROUTER_KEY,
+  OPENROUTER_MODELS,
+  ORG_ID,
+  seedState,
+} from "./fake-api";
 import {
   click,
   continueButton,
@@ -359,6 +369,28 @@ describe("Criar agente: what gets created", () => {
     await click(screen().getByRole("button", { name: "Criar Eva" }));
     await settle(8);
     expect(createdWith(state)?.model).toBe("claude-sonnet-5-5");
+  });
+
+  test("model: OpenRouter's good picks as cards, never the rest of its list; a pick is what gets created", async () => {
+    const seeded = seedState({ extraModels: OPENROUTER_MODELS });
+    seeded.credentials.push(OPENROUTER_KEY);
+    const state = await open(seeded);
+    await startAs("Assistente");
+    await proceed(4);
+    expect(title()).toBe("Modelo e orçamento");
+    const cards = within(screen().getByRole("group", { name: "Modelo" }))
+      .getAllByRole("button")
+      .filter((c) => c.querySelector(".newag__model-prov")?.textContent === "OpenRouter");
+    expect(cards.map((c) => c.querySelector("b")?.textContent)).toEqual([
+      "Z.ai: GLM Latest",
+      "DeepSeek: DeepSeek Flash Latest",
+      "Claude Sonnet Latest",
+    ]);
+    await click(screen().getByRole("button", { name: /^Z\.ai: GLM Latest/ }));
+    await proceed();
+    await click(screen().getByRole("button", { name: "Criar Eva" }));
+    await settle(8);
+    expect(createdWith(state)?.model).toBe("~z-ai/glm-latest");
   });
 
   const plan = (kind: "claude_code" | "codex", available: boolean) => ({

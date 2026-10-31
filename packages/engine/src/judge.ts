@@ -1,4 +1,4 @@
-import { MODEL_CATALOG } from "@agenteschat/providers";
+import { modelInfo } from "@agenteschat/providers";
 import type { ModelGateway } from "./gateway";
 import { callJev, type JevKeySource } from "./jev-key";
 import { jevCostNanoUsd } from "./router-jev";
@@ -228,7 +228,7 @@ export function createLlmJudge(deps: {
           },
         ],
         // Thinking counts toward the cap: a model that can't turn it off needs room for it.
-        maxTokens: MODEL_CATALOG[model]?.leastThinking === "off" ? 512 : 2048,
+        maxTokens: modelInfo(model)?.leastThinking === "off" ? 512 : 2048,
         effort: "none",
         outputSchema,
       });

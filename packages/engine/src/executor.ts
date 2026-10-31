@@ -17,6 +17,7 @@ import {
 } from "@agenteschat/db";
 import {
   type ContentBlock,
+  ensureOpenRouterModels,
   isAutoModel,
   type ModelMessage,
   ProviderError,
@@ -34,6 +35,7 @@ import { runAuthority } from "./authority";
 import {
   type AutoChoice,
   type AutoModelRecord,
+  type AutoModels,
   autoApplied,
   autoProvider,
   autoWanted,
@@ -41,6 +43,7 @@ import {
   fallbackChoice,
   inMission,
   needsAutoChoice,
+  orgAutoModels,
   withAuto,
 } from "./auto-model";
 import { brainOf } from "./brain-settings";
@@ -84,6 +87,7 @@ import { recordContextUse } from "./context/feedback";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
 import { itemLabel, retrieveForRun } from "./context/tools";
 import { fitContextWindow } from "./context-budget";
+import { modelInfoFor } from "./credentials";
 import { isAgentOnlyDm } from "./dms";
 import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationError } from "./errors";
 import { type ChannelEvent, type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
@@ -1318,7 +1322,20 @@ async function executeRunInner(
       isAutoModel(agent.model) && !choice.apiModel
         ? await autoProvider(db, agent).catch(() => "anthropic")
         : "anthropic";
-    const applied = autoApplied(agent, brainPlan, choice, provider);
+    // OpenRouter's line is its list: in place before a tier maps onto it.
+    if (provider === "openrouter") await ensureOpenRouterModels();
+    const tiers = (await orgAutoModels(db, run.orgId).catch((): AutoModels => ({})))[provider];
+    const applied = autoApplied(agent, brainPlan, choice, provider, tiers);
+    // No model for the tier: OpenRouter's list couldn't be read. Waited out like a provider outage, with the
+    // choice kept for the next attempt.
+    if (brainPlan.kind === "model" && isAutoModel(agent.model) && !applied.apiModel) {
+      const outage = new ProviderError("could not reach provider", true);
+      if (options.finalAttempt) return fail(`gave_up: ${outage.message}`);
+      t.autoModel = choice;
+      await saveTranscript(db, t);
+      await addRunStep(db, run, "error", { reason: "transient", message: String(outage), willRetry: true });
+      throw outage;
+    }
     ({ agent: thinker, plan: brainPlan } = withAuto(agent, brainPlan, applied));
     if (!kept) {
       t.autoModel = { ...choice, ...(applied.apiModel ? { apiModel: applied.apiModel } : {}) };
@@ -1334,6 +1351,8 @@ async function executeRunInner(
       later(() => saveTranscript(db, t));
     }
   }
+  // The context budget reads the model's window: an OpenRouter model's comes with its list.
+  await modelInfoFor(db, thinker.model);
   let plan: BrainPlan = brainPlan;
   let brain = createBrain(deps, thinker, run, plan.kind, turnToken, () => transcript as Transcript);
   let triggerText = trigger?.body ?? topTrigger?.body ?? "";

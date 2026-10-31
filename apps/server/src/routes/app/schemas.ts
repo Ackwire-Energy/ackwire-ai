@@ -1,6 +1,6 @@
 import { ACCOUNT_KINDS, BRAIN_EFFORTS } from "@agenteschat/adapters";
 import { ONBOARDING_STEPS, STANDING_STATES } from "@agenteschat/engine";
-import { CONTEXT_LIMITS, PROVIDER_IDS } from "@agenteschat/providers";
+import { CONTEXT_LIMITS, MODEL_TIERS, PROVIDER_IDS } from "@agenteschat/providers";
 import { z } from "@hono/zod-openapi";
 
 /** A last-message preview's `meta`: what the app needs to show a server-written body in the reader's language. */
@@ -25,6 +25,8 @@ const Rank = z.number().int().nullable().openapi({
 const RoleIds = z.array(z.string()).openapi({ description: "Their roles (`org_roles` ids), not `everyone`." });
 
 export const ProviderId = z.enum(PROVIDER_IDS).openapi("ProviderId");
+
+export const ModelTier = z.enum(MODEL_TIERS as ["small", "medium", "large"]);
 
 export const Organization = z
   .object({
@@ -467,6 +469,12 @@ export const Model = z
     contextWindow: z.number().int().openapi({ description: "Its context window in tokens." }),
     inputUsdPerMTok: z.number(),
     outputUsdPerMTok: z.number(),
+    pick: z.boolean().optional().openapi({
+      description: "In OpenRouter's long list (ADR 0087): a good pick, shown first. Absent: a catalog model.",
+    }),
+    tier: ModelTier.optional().openapi({
+      description: "The size Automático uses it for on its provider's key, by default.",
+    }),
   })
   .openapi("Model");
 

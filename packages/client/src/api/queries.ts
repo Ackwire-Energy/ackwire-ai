@@ -88,7 +88,6 @@ import type {
   NotificationEvent,
   NotificationFilter,
   OrgRoles,
-  OrgSettings,
   Person,
   ReactionCount,
   ReminderInput,
@@ -471,7 +470,11 @@ export function useAddCredential(orgId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: Parameters<ApiClient["agents"]["addCredential"]>[1]) => api.agents.addCredential(orgId, input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.credentials(orgId) }),
+    onSuccess: () => {
+      // An OpenRouter key brings its models into the pickers.
+      void qc.invalidateQueries({ queryKey: keys.models });
+      return qc.invalidateQueries({ queryKey: keys.credentials(orgId) });
+    },
   });
 }
 
@@ -1385,7 +1388,7 @@ export function useUpdateSettings(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: Partial<OrgSettings>) => api.orgs.updateSettings(orgId, input),
+    mutationFn: (input: Parameters<ApiClient["orgs"]["updateSettings"]>[1]) => api.orgs.updateSettings(orgId, input),
     onSuccess: (settings) => {
       qc.setQueryData(keys.settings(orgId), settings);
       void qc.invalidateQueries({ queryKey: keys.me });

@@ -221,7 +221,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
       "Kimi Code",
       "MiniMax",
       "OpenCode Go",
-      "Chave de APIClaude, OpenAI, Gemini e outros",
+      "Chave de APIClaude, OpenAI, Gemini, OpenRouter e outros",
     ]);
     // Each by its maker's mark; the key row by four of them, overlapped.
     expect(
@@ -232,7 +232,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
       "claude",
       "openai",
       "gemini",
-      "deepseek",
+      "openrouter",
     ]);
     expect(dialog.textContent).toContain("Ou pague pelo uso");
     expect(tile("Claude").getAttribute("aria-pressed")).toBe("true");
@@ -829,7 +829,18 @@ describe("Conectar uma IA: one picker, plans first", () => {
       "Kimi",
       "Z.ai",
       "MiniMax",
+      "OpenRouter",
     ]);
+    // OpenRouter passes what is sent on to other providers: its privacy settings say who may keep it, in the ⓘ.
+    await click(within(panel).getByRole("button", { name: "OpenRouter" }));
+    expect(hintOf("Crie a sua chave de API da OpenRouter", panel)).toMatchObject({
+      text: "As configurações de privacidade da OpenRouter decidem quais provedores podem guardar o que seus agentes enviam.",
+      hidden: true,
+    });
+    expect(within(panel).getByRole("link", { name: "Abrir openrouter.ai" }).getAttribute("href")).toBe(
+      "https://openrouter.ai/keys",
+    );
+    expect(within(panel).getByLabelText("Cole aqui").getAttribute("placeholder")).toBe("sk-or-v1-…");
     // A maker with coding plans: where a plan's key goes is the first step's ⓘ, with no line under it.
     await click(within(panel).getByRole("button", { name: "Kimi" }));
     expect(hintOf("Crie a sua chave de API da Kimi", panel).text).toBe(
