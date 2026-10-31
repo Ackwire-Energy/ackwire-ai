@@ -97,7 +97,7 @@ import { inDesktopApp, onPhoneAsk, takePhoneAsk } from "@/lib/desktop";
 import { useOpenParam } from "@/lib/open-param";
 import { markOpen } from "@/lib/perf";
 import { onSoundChoiceChange, type SoundChoice, setSoundChoice, soundChoice } from "@/lib/sounds";
-import { STORAGE_KEYS, storage } from "@/lib/storage";
+import { STORAGE_KEYS, storage, storedStrings } from "@/lib/storage";
 import { type ThemePreference, useTheme } from "@/lib/theme";
 import { useToast } from "@/lib/toast";
 import type { SettingsSection } from "@/pages/settings-sections";
@@ -239,7 +239,7 @@ export function Sidebar() {
   // A closed conversation category still says how many unread messages it holds.
   const unreadOf = (agents: Agent[]) => agents.reduce((n, a) => n + (unreadWith.get(a.id) ?? 0), 0);
   const peopleUnread = people.reduce((n, m) => n + (unreadWith.get(m.userId) ?? 0), 0);
-  const sections = useSidebarSections();
+  const sections = useSidebarSections(me.user.id, orgId);
   // The workspace's groups of agents (ADR 0083): the agents in none stay under "Agentes", each group is a category.
   // Who manages agents sees them all, to arrange them; everyone else, the agents that answer them and the groups
   // holding one.
@@ -445,7 +445,9 @@ export function Sidebar() {
                 <span className="sidebar__label">{t("shell.agents")}</span>
               </span>
             </div>
-            <SidebarSkeleton count={2} avatar label={t("common.loadingList")} />
+            <div className="sidebar__section-body">
+              <SidebarSkeleton count={2} avatar label={t("common.loadingList")} />
+            </div>
           </div>
         )}
         {dir.agents.length > 0 && (
@@ -573,36 +575,32 @@ export function Sidebar() {
  */
 type SectionId = "channels" | "agents" | "people" | `category:${string}` | `group:${string}`;
 
-/** Which sidebar categories are closed, remembered per browser. */
-function useSidebarSections() {
-  const [closed, setClosed] = useState<Set<string>>(() => {
-    try {
-      const saved = storage.get(STORAGE_KEYS.sidebarSections);
-      if (saved) return new Set(JSON.parse(saved) as string[]);
-    } catch {
-      // A bad value falls back to the defaults.
-    }
-    return new Set();
-  });
+/** Which sidebar categories are closed, remembered in this browser for each person in each workspace. */
+function useSidebarSections(userId: string, orgId: string) {
+  const key = `${STORAGE_KEYS.sidebarSections}.${userId}.${orgId}`;
+  const [saved, setSaved] = useState(() => ({ key, closed: new Set(storedStrings(key)) }));
+  // The sidebar stays mounted when the workspace changes: that one's own state.
+  if (saved.key !== key) setSaved({ key, closed: new Set(storedStrings(key)) });
+  const change = (edit: (closed: Set<string>) => void) =>
+    setSaved((prev) => {
+      const closed = new Set(prev.closed);
+      edit(closed);
+      storage.set(prev.key, JSON.stringify([...closed]));
+      return { key: prev.key, closed };
+    });
   const toggle = (id: SectionId) =>
-    setClosed((prev) => {
-      const next = new Set(prev);
-      if (!next.delete(id)) next.add(id);
-      storage.set(STORAGE_KEYS.sidebarSections, JSON.stringify([...next]));
-      return next;
+    change((closed) => {
+      if (!closed.delete(id)) closed.add(id);
     });
   /** "Fechar todas" / "Abrir todas" for the channel categories. */
   const setAll = (ids: SectionId[], open: boolean) =>
-    setClosed((prev) => {
-      const next = new Set(prev);
+    change((closed) => {
       for (const id of ids) {
-        if (open) next.delete(id);
-        else next.add(id);
+        if (open) closed.delete(id);
+        else closed.add(id);
       }
-      storage.set(STORAGE_KEYS.sidebarSections, JSON.stringify([...next]));
-      return next;
     });
-  return { isOpen: (id: SectionId) => !closed.has(id), toggle, setAll };
+  return { isOpen: (id: SectionId) => !saved.closed.has(id), toggle, setAll };
 }
 
 /**
@@ -1036,7 +1034,7 @@ function SidebarChannels({
                 {addButton(category.id, t("channelCategories.newChannelIn", { name: category.name }))}
                 <Menu
                   align="start"
-                  label={category.name}
+                  label={t("channelCategories.options", { name: category.name })}
                   trigger={
                     <Button
                       variant="ghost"
@@ -1044,7 +1042,7 @@ function SidebarChannels({
                       iconOnly
                       icon="more"
                       className="sidebar__section-add"
-                      aria-label={category.name}
+                      aria-label={t("channelCategories.options", { name: category.name })}
                     />
                   }
                 >

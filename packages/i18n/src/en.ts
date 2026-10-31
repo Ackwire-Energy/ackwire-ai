@@ -1690,6 +1690,7 @@ export const en: Translations = {
     expandAll: "Open all",
     newChannelHere: "New channel here",
     newChannelIn: "New channel in {{name}}",
+    options: "{{name}} options",
     category: "Category",
     categoryHelp: "Where the channel shows in everyone's sidebar.",
     newCategoryOption: "New category…",
