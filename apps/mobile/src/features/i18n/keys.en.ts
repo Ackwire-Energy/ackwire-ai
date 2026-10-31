@@ -22,6 +22,7 @@ export const featureKeysEn: FeatureTranslations = {
     up: "Move up",
     down: "Move down",
     position: "{{at}} of {{count}}.",
+    channelPosition: "{{at}} of {{count}}.",
     itsChannels: "Channels",
     seeAll: "See all",
   },

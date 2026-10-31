@@ -704,7 +704,8 @@ function SidebarChannels({
 
   const list = categories.data ?? [];
   const known = new Set(list.map((c) => c.id));
-  // A channel whose category isn't loaded yet (or is gone) shows with the ones with none.
+  // A channel whose category isn't loaded yet (or is gone) shows with the ones with none. So nothing drags until
+  // the categories load: a drop would take the channel out of its category.
   const categoryOf = (c: Channel) => (c.categoryId && known.has(c.categoryId) ? c.categoryId : null);
   const loose = channels.filter((c) => categoryOf(c) === null);
   const inCategory = (id: string) => channels.filter((c) => categoryOf(c) === id);
@@ -718,7 +719,8 @@ function SidebarChannels({
   const startDrag = (e: DragEvent, what: Dragging) => {
     drag.current = what;
     e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", what.id);
+    // Firefox starts a drag only with some data set. Not text, or a text field it's dropped on types the id.
+    e.dataTransfer.setData(`application/x-agentes-${what.kind}`, what.id);
   };
   const half = (e: DragEvent) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -769,7 +771,11 @@ function SidebarChannels({
     const siblings = categoryId ? inCategory(categoryId) : loose;
     const i = siblings.findIndex((c) => c.id === target.id);
     const before = m.where === "before" ? target.id : (siblings[i + 1]?.id ?? null);
-    if (before !== d.id) place.mutate({ channelId: d.id, categoryId, beforeChannelId: before }, { onError: failed });
+    const from = siblings.findIndex((c) => c.id === d.id);
+    // Already there. The server would still renumber the group, and a group arranged by hand takes new
+    // channels at its end instead of by name (endOfCategory).
+    if (before === d.id || (from >= 0 && (siblings[from + 1]?.id ?? null) === before)) return;
+    place.mutate({ channelId: d.id, categoryId, beforeChannelId: before }, { onError: failed });
   };
   const dropMark = (key: string) => (mark?.key === key ? mark.where : undefined);
 
@@ -901,7 +907,7 @@ function SidebarChannels({
         title={`#${c.name}`}
         data-unread={unread > 0}
         data-drop={dropMark(`channel:${c.id}`)}
-        draggable={list.length > 0 && mayChange(c)}
+        draggable={categories.data !== undefined && mayChange(c)}
         onDragStart={(e) => startDrag(e, { kind: "channel", id: c.id })}
         onDragEnd={endDrag}
         onDragOver={(e) => overChannel(e, c)}
