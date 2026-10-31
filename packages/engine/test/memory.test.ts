@@ -1389,6 +1389,34 @@ describe("proposals for teammates (one card, a row per agent and kind of change)
     ]);
   });
 
+  test("a built-in app turned off takes its tools turned on one by one too, as the Access tab's 'none'", async () => {
+    f = await setup();
+    const ada = await teammate("ada");
+    const lia = await teammate("lia");
+    for (const id of [ada.id, lia.id]) await f.db.delete(schema.agentScopes).where(eq(schema.agentScopes.agentId, id));
+    // Ada has only one of the Issues tools; Lia has Issues, one of its tools again and a denial.
+    await grantScopes(f.db, f.org.id, ada.id, [{ connectionId: null, scope: "tool:create_issue" }]);
+    await grantScopes(f.db, f.org.id, lia.id, [
+      { connectionId: null, scope: "issues:write" },
+      { connectionId: null, scope: "tool:comment_issue" },
+      { connectionId: null, scope: "deny:update_issue" },
+    ]);
+    const off = [{ id: "issues:write", label: "Issues", on: false }];
+    const { proposals, skipped } = await proposeFor({
+      target: "agent_instructions",
+      agentIds: [],
+      change: "",
+      access: [
+        { agentId: ada.id, lines: off },
+        { agentId: lia.id, lines: off },
+      ],
+    });
+    expect(skipped).toEqual([]);
+    for (const p of proposals) await decideProposal(f.db, f.owner.id, f.org.id, p.id, "accept");
+    expect(await scopesOf(ada.id)).toEqual([]);
+    expect(await scopesOf(lia.id)).toEqual(["deny:update_issue"]);
+  });
+
   test("the list's cap leaves out decided rows before a pending one, and a card's rows are read by id past it", async () => {
     f = await setup();
     const ada = await teammate("ada");

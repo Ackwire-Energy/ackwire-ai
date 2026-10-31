@@ -524,9 +524,13 @@ export type AccessLine = schema.ProposedAccessLine;
 const CONNECTOR_LINE = "connector:";
 const lineConnection = (id: string) => (id.startsWith(CONNECTOR_LINE) ? id.slice(CONNECTOR_LINE.length) : null);
 
+/** One of a built-in scope's tools turned on by itself (the Access tab's "custom" level): part of that app too. */
+const builtinToolOf = (g: ScopeGrant, scope: string) =>
+  g.connectionId === null && (BUILTIN_TOOLS[scope] ?? []).some((name) => g.scope === toolAllowScope(name));
+
 /**
  * Whether the agent has an app: a whole connection (`any`: any of its tools), or a built-in scope, also through
- * its write scope. "Every tool" covers both, but never code, the browser or the desktop.
+ * its write scope (`any`: or any of its tools). "Every tool" covers both, but never code, the browser or the desktop.
  */
 export function hasApp(grants: ScopeGrant[], id: string, any = false): boolean {
   const keys = new Set(grants.map((g) => grantKey(g.connectionId, g.scope)));
@@ -540,14 +544,18 @@ export function hasApp(grants: ScopeGrant[], id: string, any = false): boolean {
   }
   const write = impliedByWrite(id);
   return (
-    keys.has(grantKey(null, id)) || (write !== null && keys.has(grantKey(null, write))) || (all && !NOT_IN_ALL.has(id))
+    keys.has(grantKey(null, id)) ||
+    (write !== null && keys.has(grantKey(null, write))) ||
+    (all && !NOT_IN_ALL.has(id)) ||
+    (any && grants.some((g) => builtinToolOf(g, id)))
   );
 }
 
 /**
  * The grants with each line applied: on is `request_permission`'s grant (the scope, or the whole connection),
- * off drops the scope, or every grant on the connection. A connection's denials stay either way: with nothing else
- * on it they deny nothing, and dropping one would count as giving access, which its owner may not do.
+ * off drops the scope with its tools turned on one by one (as the Access tab's "none"), or every grant on the
+ * connection. Denials stay either way: with nothing else on they deny nothing, and dropping one would count as
+ * giving access, which the agent's owner may not do.
  */
 export function withAccessLines(grants: ScopeGrant[], lines: AccessLine[]): ScopeGrant[] {
   let out = grants;
@@ -556,7 +564,7 @@ export function withAccessLines(grants: ScopeGrant[], lines: AccessLine[]): Scop
     out = out.filter((g) =>
       connectionId
         ? g.connectionId !== connectionId || g.scope.startsWith(toolDenyScope(""))
-        : g.connectionId !== null || g.scope !== line.id,
+        : g.connectionId !== null || (g.scope !== line.id && !builtinToolOf(g, line.id)),
     );
     if (line.on) out = [...out, { connectionId, scope: connectionId ? CONNECTOR_ALL : line.id }];
   }
