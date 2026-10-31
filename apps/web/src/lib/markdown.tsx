@@ -132,6 +132,8 @@ export interface MarkdownProps {
   title?: string;
   /** Plain words in `.ac-word` spans: a streaming answer's newest block, whose words fade in. */
   words?: boolean;
+  /** The first lines of a page (a link's hover card): its ```mermaid blocks stay code, the cut may have split one. */
+  excerpt?: boolean;
   /** Added to the wrapper (`md--tail` on a streaming answer's last block). */
   className?: string;
 }
@@ -154,6 +156,7 @@ export function Markdown({
   embed,
   title,
   words,
+  excerpt,
   className,
 }: MarkdownProps) {
   const message = variant === "message";
@@ -187,9 +190,11 @@ export function Markdown({
       case "code": {
         const lang = b.lang.toLowerCase();
         if (lang === "chart") return <ChartOrCode key={k} text={b.text} writing={Boolean(words)} />;
-        // Drawn once its block is done: the tail of an answer still being written (its fence maybe still open)
-        // keeps the code, so the diagram isn't drawn again on every word.
-        if (lang === "mermaid" && !words) return <MermaidOrCode key={k} text={b.text} />;
+        // Drawn once its block is done. Only the last block of an answer still being written can grow (an open
+        // fence always runs to the end): it keeps the code, so the diagram isn't drawn again on every word. A
+        // diagram before it stays drawn even when the whole answer is the tail for a frame (it ends on a blank line).
+        if (lang === "mermaid" && !excerpt && !(words && i === parsed.length - 1))
+          return <MermaidOrCode key={k} text={b.text} />;
         return <CodeBlock key={k} lang={b.lang} text={b.text} />;
       }
       case "list": {

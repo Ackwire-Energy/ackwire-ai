@@ -1,43 +1,72 @@
-import { type CSSProperties, useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CodeBlock } from "@/components/CodeBlock";
 import { useDarkTheme } from "@/lib/grow";
+import { type Drawing, mermaidDrawable, svgDrawing } from "@/lib/mermaid";
 
 /** Source → SVG markup in the page's theme. Swappable for tests (the real one needs a browser layout engine). */
 export type MermaidRenderer = (id: string, source: string, dark: boolean) => Promise<string>;
 
-let counter = 0;
-let queue: Promise<unknown> = Promise.resolve();
-const realRenderer: MermaidRenderer = (id, source, dark) => {
-  // One at a time: mermaid reads its settings when its own queue reaches a drawing, not when render() is called,
-  // so the theme set for this one must not reach another still waiting.
-  const run = queue.then(async () => {
+/**
+ * The real mermaid. It draws in the page, so it's only handed sources `mermaidDrawable` accepts (useMermaid checks
+ * first). A drawing still unfinished after `timeout` ms fails, and the block shows its code.
+ */
+export async function drawWithMermaid(id: string, source: string, dark: boolean, timeout = 10_000) {
+  const draw = async () => {
     // Loaded on first use: Mermaid is large and most screens never need it.
     const { default: mermaid } = await import("mermaid");
     mermaid.initialize({
       startOnLoad: false,
-      // The text comes from people and agents: labels stay text, nothing is clickable, and a `%%{init}%%` in the
-      // diagram can't turn HTML labels back on (mermaid drops `secure` keys from a diagram's own settings).
+      // The text comes from people and agents: labels stay text and nothing is clickable. A diagram's own settings
+      // (`%%{init}%%`, front matter) never get this far, and if one did, mermaid drops its `secure` keys: HTML
+      // labels, the sanitizer's settings and everything that reaches the page's CSS.
       securityLevel: "strict",
       htmlLabels: false,
       flowchart: { htmlLabels: false },
-      secure: [...(mermaid.mermaidAPI.defaultConfig.secure ?? []), "htmlLabels"],
+      secure: [
+        ...(mermaid.mermaidAPI.defaultConfig.secure ?? []),
+        "htmlLabels",
+        "dompurifyConfig",
+        "themeCSS",
+        "themeVariables",
+        "fontFamily",
+        "altFontFamily",
+        "fontSize",
+      ],
       // A diagram that doesn't parse rejects, instead of drawing mermaid's error graphic and leaving it in <body>.
       suppressErrorRendering: true,
       theme: dark ? "dark" : "neutral",
       // The <img> can't use the page's web fonts, and mermaid sizes each box for the font it measured with.
       fontFamily: "system-ui, sans-serif",
+      // A gantt takes the width of the box it's drawn in, here <body>: a fixed one fits a card instead of the window.
+      gantt: { useWidth: 720 },
     });
-    const { svg } = await mermaid.render(id, source);
+    // Not mermaid.render: that waits its turn in mermaid's own queue, where one drawing that never finishes holds
+    // back every later one. useMermaid already draws one at a time.
+    const { svg } = await mermaid.mermaidAPI.render(id, source);
     return svg;
-  });
-  queue = run.catch(() => {});
-  return run;
-};
-let renderer: MermaidRenderer = realRenderer;
+  };
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      draw(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("Mermaid didn't finish drawing")), timeout);
+      }),
+    ]);
+  } catch (error) {
+    // Mermaid draws in a <div id="d{id}"> at the end of <body> and removes it only once done or on a parse error.
+    document.getElementById(`d${id}`)?.remove();
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
-/** A diagram drawn: its image URL and its own width in CSS pixels (null when its SVG doesn't say). */
-type Drawing = { src: string; width: number | null };
+let renderer: MermaidRenderer = drawWithMermaid;
+let counter = 0;
+/** One drawing at a time: mermaid keeps its settings (the theme) in one global, read while it draws. */
+let queue: Promise<void> = Promise.resolve();
 
 /**
  * Diagrams already drawn, by theme and source: drawn again (the streamed answer giving way to the message, a page
@@ -46,52 +75,61 @@ type Drawing = { src: string; width: number | null };
 const drawn = new Map<string, Drawing>();
 
 export function setMermaidRenderer(next: MermaidRenderer | null) {
-  renderer = next ?? realRenderer;
+  renderer = next ?? drawWithMermaid;
   drawn.clear();
 }
 
-/** The diagram in the page's theme: undefined while it's drawn, null when it doesn't parse. */
+/**
+ * The diagram in the page's theme: undefined until it's drawn, null when it can't be (it doesn't parse, or it would
+ * load something). While another source or theme is being drawn, the block keeps what it showed last.
+ */
 function useMermaid(source: string): Drawing | null | undefined {
   const dark = useDarkTheme();
   const key = `${dark ? "dark" : "light"}\n${source}`;
-  const [state, setState] = useState<{ key: string; drawing?: Drawing | null }>(() => ({
-    key,
-    drawing: drawn.get(key),
-  }));
+  const drawable = mermaidDrawable(source);
+  const [last, setLast] = useState<Drawing | null | undefined>(() => drawn.get(key));
+  const asked = useRef<string | undefined>(undefined);
   useEffect(() => {
+    if (!drawable) return;
     const hit = drawn.get(key);
     if (hit) {
-      setState((s) => (s.key === key && s.drawing === hit ? s : { key, drawing: hit }));
+      setLast(hit);
       return;
     }
     let live = true;
-    renderer(`mmd-${++counter}`, source, dark).then(
-      (svg) => {
-        // Its own size, not its box's width (mermaid's "100%"): a small diagram isn't blown up to fill the box.
-        const size = svg.match(/viewBox="[^"]*?([\d.]+) ([\d.]+)"/);
-        const own = size ? svg.replace('width="100%"', `width="${size[1]}" height="${size[2]}"`) : svg;
-        const drawing = {
-          src: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(own)}`,
-          width: size ? Number(size[1]) : null,
-        };
-        drawn.set(key, drawing);
-        // ponytail: the last 100 drawn, oldest out first; move a hit to the end (least recently used) if pages
-        // ever show more diagrams than that.
-        for (const old of drawn.keys()) {
-          if (drawn.size <= 100) break;
-          drawn.delete(old);
+    // A source being edited (the wiki's side-by-side preview) is drawn once the typing stops.
+    const wait = asked.current === undefined || asked.current === key ? 0 : 300;
+    asked.current = key;
+    const timer = setTimeout(() => {
+      queue = queue.then(async () => {
+        // Checked when its turn comes: the block may be gone, or another one may have drawn the same diagram.
+        if (!live) return;
+        const ready = drawn.get(key);
+        if (ready) {
+          setLast(ready);
+          return;
         }
-        if (live) setState({ key, drawing });
-      },
-      () => {
-        if (live) setState({ key, drawing: null });
-      },
-    );
+        try {
+          const drawing = svgDrawing(await renderer(`mmd-${++counter}`, source, dark));
+          drawn.set(key, drawing);
+          // ponytail: the last 100 drawn, oldest out first; move a hit to the end (least recently used) if pages
+          // ever show more diagrams than that.
+          for (const old of drawn.keys()) {
+            if (drawn.size <= 100) break;
+            drawn.delete(old);
+          }
+          if (live) setLast(drawing);
+        } catch {
+          if (live) setLast(null);
+        }
+      });
+    }, wait);
     return () => {
       live = false;
+      clearTimeout(timer);
     };
-  }, [key, source, dark]);
-  return state.key === key ? state.drawing : undefined;
+  }, [key, source, dark, drawable]);
+  return drawable ? (drawn.get(key) ?? last) : null;
 }
 
 /**
@@ -115,7 +153,7 @@ export function MermaidDiagram({ source, label, compact }: { source: string; lab
   return (
     <div className={compact ? "artifact-diagram artifact-diagram--compact" : "artifact-diagram"}>
       {drawing ? (
-        <img src={drawing.src} alt={label} />
+        <img src={drawing.src} alt={drawing.title ?? label} aria-description={drawing.description} />
       ) : (
         <span className="small muted" role="status">
           {t("artifacts.rendering")}
@@ -127,7 +165,7 @@ export function MermaidDiagram({ source, label, compact }: { source: string; lab
 
 /**
  * A ```mermaid block in a message or page: its code card shows the diagram ("Código" flips to the source, copy is
- * always there). Until it's drawn, or when it doesn't parse, the card shows the code like any other block.
+ * always there). Until it's drawn, or when it can't be, the card shows the code like any other block.
  */
 export function MermaidOrCode({ text }: { text: string }) {
   const { t } = useTranslation();
@@ -140,7 +178,8 @@ export function MermaidOrCode({ text }: { text: string }) {
         drawing ? (
           <img
             src={drawing.src}
-            alt={t("artifacts.kind.diagram")}
+            alt={drawing.title ?? t("artifacts.kind.diagram")}
+            aria-description={drawing.description}
             style={drawing.width ? ({ "--w": `${drawing.width}px` } as CSSProperties) : undefined}
           />
         ) : undefined
