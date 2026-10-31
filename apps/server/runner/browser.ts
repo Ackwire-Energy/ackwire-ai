@@ -99,8 +99,8 @@ import type { Spawn } from "./scope-gate";
  *   tab) is opened again at once, and the agent's next action is answered
  *   with what happened instead of running on a page that changed under it
  *   (looks and waits run, on the page as it is now). One that dies again
- *   before the agent heard of it shows our own notice there, never a reload
- *   loop (`pageCrashed`).
+ *   before the agent heard of it shows our own notice there, once, never a
+ *   reload loop (`pageCrashed`).
  */
 
 /** A session with no command for this long is closed (its Chrome stops; the profile stays). */
@@ -293,7 +293,7 @@ export function agentBrowserTarget(
 /** The counters in the agent's `memory.events` that rise when it runs out of memory (`max`: it reached its limit). */
 const OUT_OF_MEMORY = ["max", "oom", "oom_kill"];
 
-/** How a tab's page died (`pageCrashed`): `again` before the agent heard of the first time, so it was left on our notice. */
+/** How a tab's page died (`pageCrashed`): `again` before the agent heard of the first time, so it wasn't reloaded. */
 export interface PageCrash {
   memory: boolean;
   again: boolean;
@@ -999,8 +999,8 @@ interface Session {
   desktopFailedAt?: number;
   /** How its page died since the agent last heard (`pageCrashed`), for its next action's answer. */
   crash?: PageCrash;
-  /** Tabs opened again after their page died, since the agent last heard of it. */
-  reopened: Set<string>;
+  /** How many times each tab's page died since the agent last heard of it. */
+  crashes: Map<string, number>;
   /** Its `memory.events` when Chrome started or a page last died. */
   memory?: Record<string, number> | null;
 }
@@ -1766,7 +1766,7 @@ export class BrowserManager {
       queue: Promise.resolve(),
       lastUsed: this.now(),
       aliveAt: null,
-      reopened: new Set(),
+      crashes: new Map(),
     };
     this.sessions.set(agentId, session);
     this.sweepTimer ??= setInterval(() => void this.sweep(), SWEEP_MS);
@@ -1899,9 +1899,11 @@ export class BrowserManager {
   }
 
   /**
-   * A tab's page died: opened again once, and the agent's next answer says so. One that dies again before the
-   * agent heard of it shows our notice instead, so nothing reloads in a loop while the agent isn't there. It ran
-   * out of memory when the agent's slice reached its limit since its Chrome started or a page last died.
+   * A tab's page died: opened again once, and the agent's next action is told. One that dies again before the
+   * agent heard of it shows our notice instead, once: a page that can't even start there (the slice's last task
+   * taken, or its memory held by another process) would die again at once, and from then on it stays on Chrome's
+   * own page, so nothing starts again and again while the agent isn't there. It ran out of memory when the agent's
+   * slice reached its limit since its Chrome started or a page last died.
    */
   private pageCrashed(session: Session, chrome: OwnChrome, page: CrashedPage) {
     if (session.chrome !== chrome) return;
@@ -1909,16 +1911,13 @@ export class BrowserManager {
     const now = this.memoryCounters();
     session.memory = now;
     const memory = !!before && !!now && OUT_OF_MEMORY.some((k) => (now[k] ?? 0) > (before[k] ?? 0));
-    const again = session.reopened.has(page.targetId);
-    if (again) page.show(crashPage(memory));
-    else {
-      session.reopened.add(page.targetId);
-      page.reopen();
-    }
-    session.crash = { memory, again };
-    this.opts.log(
-      `the browser of ${session.name}: a page ${memory ? "ran out of memory" : "crashed"}, ${again ? "left on our notice" : "reloaded"}`,
-    );
+    const times = (session.crashes.get(page.targetId) ?? 0) + 1;
+    session.crashes.set(page.targetId, times);
+    if (times === 1) page.reopen();
+    else if (times === 2) page.show(crashPage(memory));
+    session.crash = { memory, again: times > 1 };
+    const left = times === 1 ? "reloaded" : times === 2 ? "left on our notice" : "left on Chrome's page";
+    this.opts.log(`the browser of ${session.name}: a page ${memory ? "ran out of memory" : "crashed"}, ${left}`);
   }
 
   private memoryCounters() {
@@ -1934,7 +1933,7 @@ export class BrowserManager {
     const crash = session.crash;
     if (!crash || this.handoffs.has(session.agentId)) return null;
     session.crash = undefined;
-    session.reopened.clear();
+    session.crashes.clear();
     return { success: false, data: null, error: crashNotice(crash, ran) };
   }
 

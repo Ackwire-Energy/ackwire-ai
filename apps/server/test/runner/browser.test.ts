@@ -689,7 +689,8 @@ test.if(posix)(
   async () => {
     const devtools = fakeDevtools([]);
     try {
-      const t = setup({ startChrome: chromesAt(devtools).start });
+      const logs: string[] = [];
+      const t = setup({ startChrome: chromesAt(devtools).start, log: (l) => logs.push(l) });
       await t.act("open", ["https://heavy.example/"]);
       await waitFor(() => devtools.asked.includes("Network.enable page-0"));
       devtools.crash(0);
@@ -716,11 +717,18 @@ test.if(posix)(
       await waitFor(() => devtools.navigated.length === 3);
       expect(devtools.navigated[2]).toBe(crashPage(false));
       expect(devtools.asked.filter((a) => a === "Page.getNavigationHistory page-0")).toHaveLength(2);
+      // Our notice died too (a page that can't start there at all): Chrome's own page stays, nothing opens again.
+      devtools.crash(0);
+      await waitFor(() => logs.filter((l) => l.includes(": a page crashed, ")).length === 4);
+      expect(logs.at(-1)).toEndWith("a page crashed, left on Chrome's page");
       expect(await t.act("click", ["@e1"])).toMatchObject({
         success: false,
         error: "The page crashed again, so it wasn't reloaded a second time. Open it again only if you need it.",
       });
+      // That click ran nothing; this one runs, long enough for a navigation sent at the crash to have arrived.
       expect(await t.act("click", ["@e1"])).toMatchObject({ success: true });
+      expect(devtools.navigated).toHaveLength(3);
+      expect(devtools.asked.filter((a) => a === "Page.getNavigationHistory page-0")).toHaveLength(2);
       // Our notice, in both languages, in the app's look.
       const notice = decodeURIComponent(crashPage(true).slice("data:text/html;charset=utf-8,".length));
       expect(notice).toContain("<title>A página ficou sem memória</title>");
