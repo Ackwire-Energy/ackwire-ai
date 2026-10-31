@@ -1441,3 +1441,158 @@ test("where each agent is its own OS user, the switch decides: Claude's sign-ins
     key: false,
   });
 });
+
+/** A runner on protocol 27 where every login thinks for all of its owner's agents: a plan's key, or Claude's sign-in. */
+function sharingRunner(machineId: string) {
+  const runner = signingRunner(
+    machineId,
+    (loginId) => {
+      const secret = runner.codes.get(loginId) ?? "";
+      return secret === KEY || secret.startsWith(KEY.slice(0, -4))
+        ? { loggedIn: true, provider: "zai", keyHint: secret.slice(-4), shared: true }
+        : { loggedIn: true, email: "ana@example.com", plan: "max", shared: true };
+    },
+    { protocol: SHARED_ACCOUNTS_PROTOCOL },
+  );
+  return runner;
+}
+
+/** A sign-in on the computer as the fixture's owner, new (`accountId` absent) or again, the whole way. */
+async function signInWith(
+  runner: ReturnType<typeof signingRunner>,
+  machineId: string,
+  secret: string,
+  options: { accountId?: string; provider?: string } = {},
+) {
+  const login = await beginAccountLogin(
+    runner.deps,
+    f.owner.id,
+    f.org.id,
+    machineId,
+    "claude_code",
+    options.accountId,
+    undefined,
+    options.provider,
+  );
+  const box = await sealSecret(login.publicKey ?? "", secret, accountCodeAad(login.loginId, f.org.id));
+  await sendAccountLoginCode(runner.deps, f.owner.id, f.org.id, machineId, login.loginId, box);
+  return accountLoginStatus(runner.deps, f.owner.id, f.org.id, machineId, login.loginId);
+}
+
+const newAgent = async (name: string, machineId: string, brainAccountId: string | null = null) => {
+  const [agent] = await f.db
+    .insert(schema.agents)
+    .values({
+      orgId: f.org.id,
+      name,
+      handle: name.toLowerCase(),
+      model: "claude-sonnet-5-5",
+      ownerUserId: f.owner.id,
+      machineId,
+      brain: "claude_code",
+      brainAccountId,
+    })
+    .returning();
+  if (!agent) throw new Error("no agent");
+  return agent;
+};
+
+test("logins made one per agent keep their agents when signed in again on a runner that says every login is for all agents", async () => {
+  f = await setup();
+  const { machineId } = await ownedMachine(SHARED_ACCOUNTS_PROTOCOL);
+  const KEY_1 = "0193dddd-0000-4000-8000-000000000011";
+  const KEY_2 = "0193dddd-0000-4000-8000-000000000012";
+  const CLAUDE_1 = "0193dddd-0000-4000-8000-000000000013";
+  const CLAUDE_2 = "0193dddd-0000-4000-8000-000000000014";
+  // One GLM Coding key signed in once per agent, and one Claude account the same way, as before protocol 27.
+  const key = { provider: "zai", email: null, keyHint: "MnOp", label: "GLM Coding" };
+  await addAccount(machineId, KEY_1, "claude_code", key);
+  await addAccount(machineId, KEY_2, "claude_code", key);
+  await addAccount(machineId, CLAUDE_1, "claude_code", { plan: "max", label: "Claude Max" });
+  await addAccount(machineId, CLAUDE_2, "claude_code", { plan: "max", label: "Claude Max", status: "signed_out" });
+  await f.db
+    .update(schema.agents)
+    .set({ machineId, brain: "claude_code", brainAccountId: KEY_1 })
+    .where(eq(schema.agents.id, f.agent.id));
+  const theo = await newAgent("Theo", machineId, KEY_2);
+  const ada = await newAgent("Ada", machineId, CLAUDE_1);
+  const mila = await newAgent("Mila", machineId, CLAUDE_2);
+  const report = (keyHint: string, claude2: boolean): RunnerAccountInfo[] => [
+    { id: KEY_1, kind: "claude_code", loggedIn: true, provider: "zai", keyHint, shared: true },
+    { id: KEY_2, kind: "claude_code", loggedIn: true, provider: "zai", keyHint, shared: true },
+    { id: CLAUDE_1, kind: "claude_code", loggedIn: true, email: "ana@example.com", plan: "max", shared: true },
+    { id: CLAUDE_2, kind: "claude_code", loggedIn: claude2, email: "ana@example.com", plan: "max", shared: true },
+  ];
+  // Every agent is the runner's own user here: the runner says each of them thinks for all agents.
+  await syncMachineAccounts({ db: f.db, pubsub: f.pubsub }, f.org.id, machineId, report("MnOp", false));
+  const runner = sharingRunner(machineId);
+  const NEW_KEY = `${KEY.slice(0, -4)}WxYz`;
+
+  // New key, given to each of its logins in turn: each takes it and keeps its agent.
+  for (const accountId of [KEY_1, KEY_2]) {
+    expect(await signInWith(runner, machineId, NEW_KEY, { accountId, provider: "zai" })).toMatchObject({
+      state: "done",
+      account: { id: accountId, keyHint: "WxYz" },
+    });
+  }
+  // The same key once more is still that login, never a duplicate of the other.
+  expect(await signInWith(runner, machineId, NEW_KEY, { accountId: KEY_1, provider: "zai" })).toMatchObject({
+    state: "done",
+    account: { id: KEY_1 },
+  });
+  // Signed in again where the other login of the account is: that login, its agent with it.
+  expect(await signInWith(runner, machineId, "abc#123", { accountId: CLAUDE_2 })).toMatchObject({
+    state: "done",
+    account: { id: CLAUDE_2, status: "active" },
+  });
+  // The next report changes none of it.
+  await syncMachineAccounts({ db: f.db, pubsub: f.pubsub }, f.org.id, machineId, report("WxYz", true));
+  expect((await accountRows(machineId)).map((r) => [r.id, r.status, r.keyHint])).toEqual([
+    [KEY_1, "active", "WxYz"],
+    [KEY_2, "active", "WxYz"],
+    [CLAUDE_1, "active", null],
+    [CLAUDE_2, "active", null],
+  ]);
+  const thinking = async () =>
+    Promise.all([f.agent.id, theo.id, ada.id, mila.id].map(async (id) => (await agentRow(id)).brainAccountId));
+  expect(await thinking()).toEqual([KEY_1, KEY_2, CLAUDE_1, CLAUDE_2]);
+});
+
+test("where each agent is its own OS user, a key's login made for one agent leaves room for a new one for all agents", async () => {
+  f = await setup();
+  const { machineId } = await ownedMachine(SHARED_ACCOUNTS_PROTOCOL);
+  const [m] = await f.db.select().from(schema.machines).where(eq(schema.machines.id, machineId));
+  await f.db
+    .update(schema.machines)
+    .set({ executors: { ...m?.executors, mode: "system" } })
+    .where(eq(schema.machines.id, machineId));
+  const OLD = "0193dddd-0000-4000-8000-000000000015";
+  // Made for Dev alone, lent to its user: it can't think for anyone else.
+  await addAccount(machineId, OLD, "claude_code", {
+    provider: "zai",
+    email: null,
+    keyHint: "MnOp",
+    label: "GLM Coding",
+  });
+  await f.db
+    .update(schema.agents)
+    .set({ machineId, brain: "claude_code", brainAccountId: OLD })
+    .where(eq(schema.agents.id, f.agent.id));
+  const theo = await newAgent("Theo", machineId);
+  const mila = await newAgent("Mila", machineId);
+  const status = await signInWith(sharingRunner(machineId), machineId, KEY, { provider: "zai" });
+  expect(status).toMatchObject({ state: "done", account: { keyHint: "MnOp", shared: true, label: "GLM Coding" } });
+  const id = status.account?.id ?? "";
+  expect(id).not.toBe(OLD);
+  // The new one thinks for the others with nothing more to sign in; the old one keeps Dev.
+  await setAgentBrain({ db: f.db }, f.owner.id, f.org.id, theo.id, { account: id });
+  await setAgentBrain({ db: f.db }, f.owner.id, f.org.id, mila.id, { account: id });
+  expect([(await agentRow()).brainAccountId, (await agentRow(theo.id)).brainAccountId]).toEqual([OLD, id]);
+  expect((await agentRow(mila.id)).brainAccountId).toBe(id);
+
+  // A second sign-in for all agents of that key is the one already there.
+  expect(await signInWith(sharingRunner(machineId), machineId, KEY, { provider: "zai" })).toMatchObject({
+    state: "failed",
+    duplicate: { account: { id } },
+  });
+});

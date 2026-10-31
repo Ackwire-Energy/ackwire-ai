@@ -866,3 +866,38 @@ test.if(posix)(
     expect(read).toBeNull();
   },
 );
+
+test.if(posix)(
+  "system mode: while an account for all agents signs in again, turns still get what it has, and closing the dialog changes nothing",
+  async () => {
+    const { m } = setup({ lending: { chown: async () => {} } });
+    const key = LOGIN(80);
+    const begun = await m.begin("claude_code", key, false, undefined, "zai", true);
+    const k = await sealed(begun.publicKey as string, key, GLM_KEY);
+    await m.code(key, k.aad, k.box);
+    const kept = { kind: "key", provider: "zai", key: GLM_KEY } as const;
+    expect(await m.grant("claude_code", key)).toEqual(kept);
+    // New key, its dialog open: the key it has still thinks.
+    await m.begin("claude_code", key, true, undefined, "zai", true);
+    expect(await m.grant("claude_code", key)).toEqual(kept);
+    // Closed with no key pasted: as it was.
+    expect(await m.cancel(key)).toBe(true);
+    expect(await m.grant("claude_code", key)).toEqual(kept);
+
+    const token = LOGIN(81);
+    const t = await m.begin("claude_code", token, false, undefined, undefined, true);
+    const c = await sealed(t.publicKey as string, token, "good-code");
+    await m.code(token, c.aad, c.box);
+    await waitFor(() => m.status(token).state !== "waiting", 8000);
+    // Sign in again started while the token still works: turns keep it meanwhile.
+    await m.begin("claude_code", token, true, undefined, undefined, true);
+    expect(await m.grant("claude_code", token)).toEqual({ kind: "token", token: TOKEN });
+    expect(await m.cancel(token)).toBe(true);
+    m.invalidate();
+    expect((await m.list()).map((a) => [a.id, a.loggedIn])).toEqual([
+      [key, true],
+      [token, true],
+    ]);
+  },
+  20_000,
+);

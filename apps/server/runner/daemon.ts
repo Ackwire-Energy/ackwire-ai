@@ -355,6 +355,8 @@ export class RunnerDaemon implements RequestObserver {
         // The server learns at once (a sign-in or removal from the desktop app, a status or usage that changed).
         const accounts = this.accounts.snapshot();
         if (accounts) this.send({ type: "accounts.changed", accounts, ...this.ownUsage() });
+        // One removed: its agents' workers close what still runs with it.
+        this.session?.supervisor?.stateChanged();
       },
     });
     const daemon = this;
@@ -879,6 +881,7 @@ export class RunnerDaemon implements RequestObserver {
             : this.accounts.noteRateLimit(accountId, info),
         desktop: (agent, use) => this.workerDesktop(agent, use),
         desktopViewers: (agentId) => this.desktops.status({ id: agentId }).streams,
+        account: (agentId) => this.agentAccount(agentId),
         ...this.opts.workers,
         ...(guard ? { guard } : {}),
         token: config.token,
@@ -1157,7 +1160,15 @@ export class RunnerDaemon implements RequestObserver {
     } catch {
       // kept in memory
     }
+    // System mode: each agent's worker closes what runs with an account it no longer thinks with.
+    this.session?.supervisor?.stateChanged();
     this.queueStatus();
+  }
+
+  /** The account an agent thinks with, as the agents frame says, while that account is still here. */
+  private agentAccount(agentId: string): string | null {
+    const id = this.agents.find((a) => a.id === agentId)?.account;
+    return id && this.accounts.has(id) ? id : null;
   }
 
   // ── State ──────────────────────────────────────────────────────────────────

@@ -450,6 +450,31 @@ test("an account root keeps goes with each turn as root's own grant, never the s
   expect(usage).toHaveLength(1);
 });
 
+test("each worker hears which account its own agent thinks with, and again when that changes", async () => {
+  const ACCOUNT = "0193ffff-0000-7000-8000-000000000001";
+  const accounts: Record<string, string> = {};
+  const t = setup({ account: (agentId) => accounts[agentId] ?? null });
+  t.sup.boot();
+  t.sup.attach();
+  const run = handleRequest(t.ctx, exec(ANA), scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const ana = t.last(ANA.id);
+  ana.hello();
+  await requestOn(ana);
+  expect(ana.of("worker.state")).toEqual([{ type: "worker.state", ...STATE, account: null }]);
+  accounts[ANA.id] = ACCOUNT;
+  t.sup.stateChanged();
+  await waitFor(() => ana.of("worker.state").length === 2);
+  expect(ana.of("worker.state")[1]).toEqual({ type: "worker.state", ...STATE, account: ACCOUNT });
+  // Another agent's account is none of its business.
+  accounts[BIA.id] = "0193ffff-0000-7000-8000-000000000002";
+  t.sup.stateChanged();
+  await new Promise((r) => setTimeout(r, 50));
+  expect(ana.of("worker.state")).toHaveLength(2);
+  ana.crash();
+  expect(await errorCode(() => run)).toBe("dropped");
+});
+
 test("a cancel reaches only the worker that runs that request", async () => {
   const t = setup();
   t.sup.boot();
@@ -1277,7 +1302,7 @@ test.if(posix)(
 );
 
 test.if(posix)(
-  "a real worker: a turn on an account root keeps thinks in the agent's own folder for it, with root's token in its env",
+  "a real worker: a turn on an account root keeps thinks in the agent's own folder for it, with root's token on a descriptor",
   async () => {
     const ACCOUNT = "0193ffff-0000-7000-8000-000000000001";
     const TOKEN = "sk-ant-oat01-fake-token-for-tests-only";
@@ -1288,6 +1313,7 @@ test.if(posix)(
     const agentHome = tempDir("agent-home-");
     const ownHome = tempDir("worker-home-");
     dirs.push(agentHome, ownHome);
+    let thinksWith: string | null = ACCOUNT;
     try {
       const t = setup({
         start: (user) => {
@@ -1311,6 +1337,7 @@ test.if(posix)(
           throw new Error("an account root keeps is never lent");
         },
         usage: (kind, id, info) => usage.push([kind, id, info]),
+        account: () => thinksWith,
       });
       t.sup.boot();
       t.sup.attach();
@@ -1328,12 +1355,29 @@ test.if(posix)(
       const [run] = readFileSync(log, "utf8")
         .trim()
         .split("\n")
-        .map((l) => JSON.parse(l) as { configDir: string; oauthToken: string | null });
+        .map(
+          (l) =>
+            JSON.parse(l) as { pid: number; configDir: string; oauthToken: string | null; oauthEnv: string | null },
+        );
       expect(run?.configDir).toBe(path.join(ownHome, "accounts", "claude_code", ACCOUNT));
       expect(run?.oauthToken).toBe(TOKEN);
+      expect(run?.oauthEnv).toBeNull();
       // What the turn said about the plan's usage reached root, for that account.
       await waitFor(() => usage.length > 0);
       expect(usage[0]?.slice(0, 2)).toEqual(["claude_code", ACCOUNT]);
+      // The agent thinks with something else now: root says so, and the process that holds the token goes.
+      const alive = (pid: number) => {
+        try {
+          process.kill(pid, 0);
+          return true;
+        } catch {
+          return false;
+        }
+      };
+      expect(alive(run?.pid ?? 0)).toBe(true);
+      thinksWith = null;
+      t.sup.stateChanged();
+      await waitFor(() => !alive(run?.pid ?? 0), 10_000);
     } finally {
       delete process.env.FAKE_CLAUDE_LOG;
     }

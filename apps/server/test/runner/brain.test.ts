@@ -903,9 +903,10 @@ test.if(posix)(
 );
 
 test.if(posix)(
-  "a token root hands over: only in the CLI's env, in the agent's own folder, Anthropic's endpoint pinned, refused at once",
+  "a token root hands over: only on a descriptor the CLI reads, in the agent's own folder, Anthropic's endpoint pinned, refused at once",
   async () => {
     process.env.CLAUDE_CODE_OAUTH_TOKEN = "sk-ant-oat01-stray-from-the-runner";
+    process.env.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR = "9";
     try {
       const TOKEN = "sk-ant-oat01-fake-token-for-tests-only";
       const NEXT = "sk-ant-oat01-fake-token-for-tests-next";
@@ -923,6 +924,8 @@ test.if(posix)(
         args: string[];
         configDir: string | null;
         oauthToken: string | null;
+        oauthEnv: string | null;
+        oauthFd: string | null;
         authToken: string | null;
         settingsEnv: Record<string, string> | null;
       };
@@ -932,7 +935,10 @@ test.if(posix)(
       expect(r.final).toMatchObject({ type: "done" });
       const first = runs()[0];
       expect(first?.configDir).toBe(own);
+      // Read off its descriptor at the start: never in its environment, nor in what its commands inherit.
       expect(first?.oauthToken).toBe(TOKEN);
+      expect(first?.oauthFd).toBe("3");
+      expect(first?.oauthEnv).toBeNull();
       expect(first?.authToken).toBeNull();
       // Never in a file the CLI or the agent reads.
       expect(JSON.stringify(first?.settingsEnv)).not.toContain("oat01");
@@ -966,11 +972,71 @@ test.if(posix)(
       const key = runs().at(-1);
       expect(key?.authToken).toBe(KEY);
       expect(key?.oauthToken).toBeNull();
+      expect(key?.oauthFd).toBeNull();
       expect(key?.configDir).toBe(own);
       expect(key?.settingsEnv?.ANTHROPIC_BASE_URL).toBe("https://api.z.ai/api/anthropic");
     } finally {
       delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+      delete process.env.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR;
     }
+  },
+);
+
+test.if(posix)(
+  "a secret streamed in pieces never leaves in pieces: each batch keeps back what could start one",
+  async () => {
+    const TOKEN = "sk-ant-oat01-fake-token-for-tests-only";
+    const own = tempDir("agent-account-");
+    dirs.push(own);
+    const { turn } = setup({
+      accounts: {
+        accountDir: () => null,
+        agentHome: (kind, id) => (kind === "claude_code" && id === ACCOUNT ? own : null),
+      },
+    });
+    const r = await turn(1, "ECHOSPLIT", { account: ACCOUNT }, undefined, { grant: { kind: "token", token: TOKEN } });
+    expect(r.final).toMatchObject({ type: "done", text: "token [secret:CLAUDE_CODE_OAUTH_TOKEN] printed" });
+    const deltas = r.events.flatMap((e) => (e.type === "text_delta" ? [e.text] : []));
+    expect(deltas.join("")).toBe("token [secret:CLAUDE_CODE_OAUTH_TOKEN] printed");
+    // Still streamed: what can't start a secret goes at once.
+    expect(deltas.length).toBeGreaterThan(1);
+  },
+);
+
+test.if(posix)(
+  "the agent thinks with another account now: its processes on any other close, a busy one once its turn ends",
+  async () => {
+    const OTHER = "0193ffff-0000-7000-8000-000000000002";
+    const homes: Record<string, string> = { [ACCOUNT]: tempDir("keep-a-"), [OTHER]: tempDir("keep-b-") };
+    dirs.push(...Object.values(homes));
+    const { m, turn } = setup({
+      accounts: {
+        accountDir: () => null,
+        agentHome: (kind, id) => (kind === "claude_code" ? (homes[id] ?? null) : null),
+      },
+    });
+    const grant = { grant: { kind: "token" as const, token: "sk-ant-oat01-fake-token-for-tests-only" } };
+    const on = (n: number, account?: string) => ({
+      session: { id: SESSION(n), resume: false },
+      ...(account ? { account } : {}),
+    });
+    await turn(1, "hi", on(1, ACCOUNT), undefined, grant);
+    await turn(2, "hi", on(2, OTHER), undefined, grant);
+    // The computer's own sign-in is no account: it stays whatever root says.
+    await turn(3, "hi", on(3));
+    expect(m.size).toBe(3);
+    const left = m.process(AGENT.id, SESSION(1));
+    m.keepAccount(OTHER);
+    await waitFor(() => left?.exited === true, 8000);
+    expect(m.size).toBe(2);
+    expect(m.process(AGENT.id, SESSION(2))).toBeDefined();
+    // A turn the server sent on the account it left still runs; its process isn't kept after it.
+    const r = await turn(4, "SLOW", on(4, ACCOUNT), undefined, grant);
+    expect(r.final).toMatchObject({ type: "done" });
+    expect(m.process(AGENT.id, SESSION(4))).toBeUndefined();
+    m.keepAccount(null);
+    await waitFor(() => m.size === 1, 8000);
+    expect(m.process(AGENT.id, SESSION(3))).toBeDefined();
   },
 );
 

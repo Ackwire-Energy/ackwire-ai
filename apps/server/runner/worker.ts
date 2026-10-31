@@ -5,6 +5,7 @@ import type { Readable, Writable } from "node:stream";
 import {
   type AccountKind,
   type AgentScope,
+  isAccountId,
   LOAD_SAMPLE_MS,
   MACHINE_PROTOCOL_VERSION,
   MAX_FRAME_BYTES,
@@ -95,7 +96,8 @@ function parseWorkerState(f: Record<string, unknown>): WorkerState | null {
   const paused = parsePause(f.paused);
   const limits = { ...DEFAULT_LIMITS, ...(f.limits as Partial<WorkerState["limits"]>) };
   const viewers = Number.isSafeInteger(f.desktopViewers) ? Math.max(0, f.desktopViewers as number) : 0;
-  return access && paused ? { access, paused, limits, desktopViewers: viewers } : null;
+  const account = f.account === null || isAccountId(f.account) ? { account: f.account } : {};
+  return access && paused ? { access, paused, limits, desktopViewers: viewers, ...account } : null;
 }
 
 /**
@@ -529,6 +531,7 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     tasks.setLimits({ maxConcurrent: next.limits.maxConcurrentTasks, defaultMaxSeconds: next.limits.taskMaxSeconds });
     brains.setLimits(brainLimits());
     codexApp.setLimits(brainLimits());
+    if (next.account !== undefined) brains.keepAccount(next.account);
     // The browser switch went off: the agent's browser closes now, not at its next command.
     if (browserOff) void browser.closeAll();
   };

@@ -134,6 +134,8 @@ export interface WorkerState {
   limits: { maxConcurrentTasks: number; taskMaxSeconds: number; brainIdleMinutes: number; brainMaxProcesses: number };
   /** People watching or controlling its agent's desktop (root's): its Chrome there isn't idle meanwhile. */
   desktopViewers?: number;
+  /** The account its agent thinks with now (null: none): its processes on any other close (`keepAccount`). */
+  account?: string | null;
 }
 
 /** The agent's desktop as its worker uses it (desktop use, its Chrome): where it runs, never its VNC passwords. */
@@ -241,6 +243,8 @@ export interface SupervisorOptions {
   desktop?: (agent: AgentScope, use: WorkerDesktopUse) => Promise<WorkerDesktop>;
   /** How many people watch or control the agent's desktop (`DesktopSessions.status`). */
   desktopViewers?: (agentId: string) => number;
+  /** The account an agent thinks with now, still on this computer (the agents frame); null: none. */
+  account?: (agentId: string) => string | null;
   /** Tests: the clock of the browser's lease. */
   now?: () => number;
   /** Tests: how long a click on Browser waits for its worker (`SHOW_MS`). */
@@ -749,7 +753,7 @@ export class Supervisor {
     if (handoff) this.send(w, handoff);
   }
 
-  /** The worker sees only its own agent's folders, and who watches its own agent's desktop. */
+  /** The worker sees only its own agent's folders, who watches its own agent's desktop and its account. */
   private sendState(w: Worker) {
     if (!w.ready) return;
     const s = this.opts.state();
@@ -760,6 +764,7 @@ export class Supervisor {
       ...s,
       access: { ...s.access, folders },
       ...(viewers > 0 ? { desktopViewers: viewers } : {}),
+      ...(this.opts.account ? { account: this.opts.account(w.user.id) } : {}),
     };
     const line = JSON.stringify(frame);
     if (line === w.state) return;

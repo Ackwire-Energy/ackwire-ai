@@ -376,30 +376,40 @@ function sameAccountWhere(row: AccountKey, same: AccountIdentity) {
   );
 }
 
-/** Another login of the same account (`sameAccountWhere`), the oldest. */
-async function sameAccount(db: Executor, row: AccountKey & Pick<MachineAccountRow, "id">, same: AccountIdentity) {
+/** Another login of the same account (`sameAccountWhere`), the oldest; `forAll`: only one made for all agents. */
+async function sameAccount(
+  db: Executor,
+  row: AccountKey & Pick<MachineAccountRow, "id">,
+  same: AccountIdentity,
+  forAll = false,
+) {
   const where = sameAccountWhere(row, same);
   if (!where) return null;
   const [other] = await db
     .select()
     .from(machineAccounts)
-    .where(and(where, ne(machineAccounts.id, row.id)))
+    .where(and(where, ne(machineAccounts.id, row.id), forAll ? eq(machineAccounts.shared, true) : undefined))
     .orderBy(machineAccounts.createdAt, machineAccounts.id)
     .limit(1);
   return other ?? null;
 }
 
 /**
- * The login of this account its owner already has here, which makes this one a duplicate: always for a login
- * that thinks for all agents (`shared`, the one already there can too), else unless the account may have one
- * login per agent (`LOGIN_PER_AGENT`).
+ * The login of this account its owner already has here, which makes this one a duplicate: any where the account
+ * has one login (`LOGIN_PER_AGENT` off). Where it may have one per agent, only for a new login for all agents
+ * (`forAll`), and only one made for all agents too: one made for one agent can't think for the others.
  */
 const duplicateOf = async (
   db: Executor,
   row: AccountKey & Pick<MachineAccountRow, "id">,
   same: AccountIdentity,
-  shared: boolean,
-) => (!shared && loginPerAgent(row.kind, row.provider) ? null : sameAccount(db, row, same));
+  forAll: boolean,
+) =>
+  !loginPerAgent(row.kind, row.provider)
+    ? sameAccount(db, row, same)
+    : forAll
+      ? sameAccount(db, row, same, true)
+      : null;
 
 interface Settled {
   /** The account as stored now; null: it isn't this computer's. */
@@ -460,7 +470,7 @@ async function settleAccount(
   if (!signingIn && info.loggedIn && (email !== row.email || keyHint !== row.keyHint)) {
     const otherEmail = Boolean(row.email && info.email && row.email.toLowerCase() !== info.email.toLowerCase());
     const duplicate = await sameAccount(db, row, { email, keyHint });
-    if (otherEmail || (duplicate && (shared || !loginPerAgent(row.kind, row.provider)))) {
+    if (otherEmail || (duplicate && !loginPerAgent(row.kind, row.provider))) {
       const [kept] =
         row.status === "signed_out" && row.shared === shared
           ? [row]
@@ -478,7 +488,8 @@ async function settleAccount(
       };
     }
   }
-  const duplicate = dedupe ? await duplicateOf(db, row, { email, keyHint }, shared) : null;
+  // Signed in again, a login is never the duplicate of one for all agents: it keeps its agents.
+  const duplicate = dedupe ? await duplicateOf(db, row, { email, keyHint }, shared && signingIn) : null;
   if (duplicate) {
     const [gone] = await db
       .update(machineAccounts)
@@ -607,7 +618,7 @@ export async function syncMachineAccounts(
         const provider = isPlanId(a.provider) ? a.provider : null;
         const candidate = { orgId, machineId, id: a.id, kind: a.kind, createdBy: owner, provider };
         const same = await sameAccount(tx, candidate, a);
-        if (same && (a.shared === true || !loginPerAgent(a.kind, provider))) {
+        if (same && (await duplicateOf(tx, candidate, a, a.shared === true))) {
           remove.push({ kind: a.kind, id: a.id });
           continue;
         }

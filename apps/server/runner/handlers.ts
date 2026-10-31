@@ -765,7 +765,7 @@ async function doBrainTurn(
   const final = await ctx.brains.turn(req, {
     agent: req.agent,
     folder: ctx.workspaceReal,
-    secrets: secrets ? { env: secrets.env, redact: secrets.redact } : null,
+    secrets: secrets ? { env: secrets.env, redact: secrets.redact, hold: secrets.hold } : null,
     signal: scope.signal,
     emit: (event) => scope.emit?.({ type: "brain.event", runId, event }),
     ...(ctx.grants ? { grants: ctx.grants } : {}),

@@ -12,7 +12,16 @@ import {
   ROUTE_LIMITS,
   ROUTE_TIMEOUT_MS,
 } from "@agenteschat/adapters/machine-protocol";
-import { type AccountGrant, accountEnv, planKeyOf, routesRunning, signInKey } from "./accounts";
+import {
+  type AccountGrant,
+  accountEnv,
+  handToken,
+  planKeyOf,
+  routesRunning,
+  signInKey,
+  TOKEN_FD_ENV,
+  TOKEN_STDIO,
+} from "./accounts";
 import { accountSettingsEnv } from "./brain";
 import { RunnerError } from "./errors";
 import { killTree } from "./exec";
@@ -258,9 +267,13 @@ async function claudeRoute(req: BrainRouteRequest, o: RouteDeps & { dir: string;
   const systemFile = path.join(o.dir, "system.txt");
   writeFileSync(systemFile, req.system, { mode: 0o600 });
   // An account's folder is the CLI's home, and requests go only to Claude's own endpoint.
-  const token = o.grant?.kind === "token" ? { CLAUDE_CODE_OAUTH_TOKEN: o.grant.token } : {};
+  const token = o.grant?.kind === "token" ? o.grant.token : undefined;
   const env = o.home
-    ? { ...accountEnv("claude_code", o.home), ...accountSettingsEnv(undefined, "haiku"), ...token }
+    ? {
+        ...accountEnv("claude_code", o.home),
+        ...accountSettingsEnv(undefined, "haiku"),
+        ...(token ? TOKEN_FD_ENV : {}),
+      }
     : process.env;
   const started = Date.now();
   const run = await runCli(o.claudeCommand ?? ["claude"], claudeRouteArgs({ systemFile, schema: req.schema }), {
@@ -269,6 +282,7 @@ async function claudeRoute(req: BrainRouteRequest, o: RouteDeps & { dir: string;
     input: req.prompt,
     timeoutMs: o.timeoutMs ?? ROUTE_TIMEOUT_MS,
     signal: o.signal,
+    ...(token ? { token } : {}),
   });
   const answer = claudeRouteAnswer(run.stdout);
   if (!answer) throw new RunnerError("internal", `Claude Code didn't answer${run.why(started)}`);
@@ -327,7 +341,15 @@ async function codexLuna(o: RouteDeps & { dir: string; key: string }, env: NodeJ
 function runCli(
   command: string[],
   args: string[],
-  o: { cwd: string; env: NodeJS.ProcessEnv; input: string; timeoutMs: number; signal?: AbortSignal },
+  o: {
+    cwd: string;
+    env: NodeJS.ProcessEnv;
+    input: string;
+    timeoutMs: number;
+    signal?: AbortSignal;
+    /** A token root handed over, on its own descriptor (`TOKEN_FD_ENV`). */
+    token?: string;
+  },
 ): Promise<{ stdout: string; why(started: number): string }> {
   const [file, ...pre] = command;
   return new Promise((resolve) => {
@@ -366,13 +388,14 @@ function runCli(
       child = spawn(resolveCommand(file ?? "", o.env.PATH), [...pre, ...args], {
         cwd: o.cwd,
         env: o.env,
-        stdio: ["pipe", "pipe", "pipe"],
+        stdio: o.token ? [...TOKEN_STDIO] : ["pipe", "pipe", "pipe"],
         detached: true,
         windowsHide: true,
       });
     } catch (error) {
       return done(null, error instanceof Error ? error : new Error(String(error)));
     }
+    if (o.token) handToken(child, o.token);
     timer = setTimeout(() => kill("timeout"), o.timeoutMs);
     if (o.signal?.aborted) onAbort();
     else o.signal?.addEventListener("abort", onAbort, { once: true });

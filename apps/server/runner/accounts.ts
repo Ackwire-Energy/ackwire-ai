@@ -120,7 +120,7 @@ export const ACCOUNT_MISSING_MESSAGE: Record<AccountKind, string> = {
 
 /** What would make a CLI think with anything but its folder's sign-in: a key, a token, another endpoint or cloud. */
 const STRAY_SIGN_IN =
-  /^(ANTHROPIC_(API_KEY|AUTH_TOKEN|BASE_URL)|CLAUDE_CODE_(OAUTH_TOKEN|USE_\w+)|OPENAI_API_KEY|CODEX_API_KEY)$/;
+  /^(ANTHROPIC_(API_KEY|AUTH_TOKEN|BASE_URL)|CLAUDE_CODE_(OAUTH_TOKEN|USE_\w+|\w+_FILE_DESCRIPTOR)|OPENAI_API_KEY|CODEX_API_KEY)$/;
 
 /** The env a CLI runs with for an account folder: `base` without any other sign-in, the folder as its home. */
 export function accountEnv(kind: AccountKind, dir: string, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
@@ -128,6 +128,22 @@ export function accountEnv(kind: AccountKind, dir: string, base: NodeJS.ProcessE
   for (const [k, v] of Object.entries(base)) if (!STRAY_SIGN_IN.test(k)) env[k] = v;
   env[ENV_VAR[kind]] = dir;
   return env;
+}
+
+/**
+ * How Claude Code gets a token root hands over: on descriptor 3, which it reads at its start, then closes, dropping
+ * this variable (Claude Code 2.1.296 to 2.1.314), so neither its environment nor any command it starts holds it.
+ */
+export const TOKEN_FD_ENV = { CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR: "3" } as const;
+
+/** The stdio of a CLI that gets a token (`TOKEN_FD_ENV`): a fourth pipe for it. */
+export const TOKEN_STDIO = ["pipe", "pipe", "pipe", "pipe"] as const;
+
+/** Writes the token to the CLI started with `TOKEN_STDIO`, and closes that pipe. */
+export function handToken(child: ChildProcess, token: string) {
+  const pipe = child.stdio[3] as NodeJS.WritableStream | null | undefined;
+  pipe?.on("error", () => {});
+  pipe?.end(`${token}\n`);
 }
 
 /**
@@ -738,6 +754,11 @@ export class AccountManager {
     } catch {
       return null;
     }
+  }
+
+  /** Whether an account's folder is here (signing in again included). */
+  has(id: string) {
+    return isAccountId(id) && ACCOUNT_KINDS.some((k) => existsSync(this.dirOf(k, id)));
   }
 
   /** An account's folder for a brain turn; null when it isn't here (or is still signing in). */
@@ -1446,8 +1467,9 @@ export class AccountManager {
    */
   async grant(kind: AccountKind, id: string): Promise<AccountGrant | null> {
     if (!isAccountKind(kind) || !isAccountId(id) || !this.isShared(kind, id)) return null;
-    const dir = this.accountDir(kind, id);
-    if (!dir || existsSync(this.marker(kind, id, "invalid"))) return { kind: "none" };
+    // Signing in again keeps what it has until the new one is kept: only a refusal, or nothing kept, is signed out.
+    if (existsSync(this.marker(kind, id, "invalid"))) return { kind: "none" };
+    const dir = this.dirOf(kind, id);
     const plan = await planKeyOf(dir);
     if (plan) return { kind: "key", provider: plan.provider, key: plan.key };
     const token = await tokenOf(dir);

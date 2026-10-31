@@ -1028,9 +1028,12 @@ you give it there, with no other sign-in (**Use for…** in **Settings → AI ac
 in an agent's **Who thinks**). With every agent running as the runner's own user, that is any account.
 With `install.sh --system`, a Claude sign-in made for all agents is `claude setup-token`'s token,
 kept in the account's folder (`token.json`, mode 600), which only root opens, and a coding plan's key
-stays in `provider.json` there the same way; each turn's CLI gets it in its environment only, in a
-folder of that agent's own. A ChatGPT sign-in there still thinks for one agent. Disconnecting a Claude
-account deletes its token from the computer: to end it on Claude too, revoke it in Claude's settings.
+stays in `provider.json` there the same way. Each turn's Claude Code runs in a folder of that agent's
+own and reads the token on a file descriptor as it starts, never from its environment, so the
+commands it runs don't get it; a key goes in its environment. When the agent moves to another account
+or brain, or the account is disconnected, the processes that had it close. A ChatGPT sign-in there
+still thinks for one agent. Disconnecting a Claude account deletes its token from the computer: to
+end it on Claude too, revoke it in Claude's settings.
 
 **Who can reach an account.** With every agent running as the runner's own user (the default
 install), any agent on that computer could reach every account folder there; the runner keeps them

@@ -30,7 +30,16 @@ import {
   planModel,
   planOf,
 } from "@agenteschat/providers/plans";
-import { ACCOUNT_MISSING_MESSAGE, type AccountGrant, accountEnv, planKeyOf, yieldRoute } from "./accounts";
+import {
+  ACCOUNT_MISSING_MESSAGE,
+  type AccountGrant,
+  accountEnv,
+  handToken,
+  planKeyOf,
+  TOKEN_FD_ENV,
+  TOKEN_STDIO,
+  yieldRoute,
+} from "./accounts";
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
 import { claudeMcpConfig, claudePermissionSettings, type McpTaskInfo, missionBranchPrefix, newMcpToken } from "./mcp";
@@ -659,17 +668,26 @@ export class ClaudeProcess {
   private lineHandler: ((line: string) => void) | null = null;
   private exitHandlers = new Set<() => void>();
 
-  constructor(command: string[], args: string[], cwd: string, env: NodeJS.ProcessEnv, start: Spawn = spawn) {
+  constructor(
+    command: string[],
+    args: string[],
+    cwd: string,
+    env: NodeJS.ProcessEnv,
+    start: Spawn = spawn,
+    /** A token root handed over, on its own descriptor (`TOKEN_FD_ENV`). */
+    token?: string,
+  ) {
     const [file, ...pre] = command;
     // A full path: the compiled runner would look the bare name up on the PATH it started with.
     this.child = start(resolveCommand(file ?? "claude", env.PATH), [...pre, ...args], {
       cwd,
-      env,
-      stdio: ["pipe", "pipe", "pipe"],
+      env: token ? { ...env, ...TOKEN_FD_ENV } : env,
+      stdio: token ? [...TOKEN_STDIO] : ["pipe", "pipe", "pipe"],
       windowsHide: true,
       // Windows finds `claude.cmd` only through the shell (argv stays plain: files, ids, flags).
       shell: process.platform === "win32" && command.length === 1,
     });
+    if (token) handToken(this.child, token);
     const events = this.child as unknown as EventEmitter;
     events.on("error", (err: Error) => {
       this.stderr = `${this.stderr}${err.message}\n`.slice(-STDERR_KEEP);
@@ -838,6 +856,8 @@ export function runTurnOnProcess(
     signal?: AbortSignal;
     deltaMs?: number;
     redact?: (text: string) => string;
+    /** Streamed text holds back this many characters (the longest secret − 1): a value split between batches never leaves in pieces. */
+    redactHold?: number;
     /** One-shot: stdin closes after the prompt. */
     endInput?: boolean;
     /** How long the CLI's next turn may take to start when it still has steered messages (`STEER_FOLLOW_UP_MS`). */
@@ -857,8 +877,11 @@ export function runTurnOnProcess(
   const deltaMs = opts.deltaMs ?? DELTA_FLUSH_MS;
   const followUpMs = opts.followUpMs ?? STEER_FOLLOW_UP_MS;
   proc.parser.beginTurn();
+  const hold = opts.redact ? Math.max(0, opts.redactHold ?? 0) : 0;
   return new Promise<TurnOutcome>((resolve) => {
     let buf = "";
+    /** Redacted text kept back from the last batch (`hold`). */
+    let tail = "";
     let timer: ReturnType<typeof setTimeout> | null = null;
     let settled = false;
     /** Steered messages written to this turn and not yet said read. */
@@ -919,13 +942,17 @@ export function runTurnOnProcess(
         return { status: "accepted", accepted: messages.map((m) => m.uuid) };
       },
     };
-    const flush = () => {
+    /** Sends the text so far; a batch (`whole` false) keeps back its last `hold` characters for the next one. */
+    const flush = (whole = true) => {
       if (timer) clearTimeout(timer);
       timer = null;
-      if (!buf) return;
-      const text = redact(buf);
+      if (!buf && !(whole && tail)) return;
+      // Redacted before cutting: the tail kept for next time can't split a value that was caught.
+      const out = redact(tail + buf);
       buf = "";
-      opts.emit({ type: "text_delta", text });
+      const cut = whole ? out.length : Math.max(0, out.length - hold);
+      tail = out.slice(cut);
+      if (cut > 0) opts.emit({ type: "text_delta", text: out.slice(0, cut) });
     };
     const clean = (e: WireBrainEvent): WireBrainEvent => {
       if (e.type === "tool_call") {
@@ -989,7 +1016,7 @@ export function runTurnOnProcess(
         }
         if (e.type === "text_delta") {
           buf += e.text;
-          if (!timer) timer = setTimeout(flush, deltaMs);
+          if (!timer) timer = setTimeout(() => flush(false), deltaMs);
           continue;
         }
         flush();
@@ -1157,6 +1184,7 @@ function withRedacted(secrets: TaskSecrets | null | undefined, secret: { name: s
   return {
     env: secrets?.env ?? {},
     redact: (text) => redactSecrets(before(text), [secret]),
+    hold: Math.max(secrets?.hold ?? 0, secret.value.length - 1),
   };
 }
 
@@ -1183,10 +1211,27 @@ export class BrainManager {
   /** Sessions that answered here (`ranKeyOf`): resumed next time even where Claude Code's folder can't be looked at. */
   private readonly ran = new Set<string>();
   private closed = false;
+  /** The account its agent thinks with, as root last said (`keepAccount`); undefined: not said. */
+  private keep: string | null | undefined;
   private readonly log: (line: string) => void;
 
   constructor(private readonly opts: BrainManagerOptions) {
     this.log = opts.log ?? (() => {});
+  }
+
+  /**
+   * System mode, in a worker: the account its agent thinks with now (null: none), as root says on each change.
+   * A process on any other account closes, a busy one once its turn ends, so no process of this agent's user
+   * keeps a sign-in the agent left or one that was removed.
+   */
+  keepAccount(account: string | null) {
+    this.keep = account;
+    for (const l of [...this.live.values()]) if (!l.busy && this.left(l)) this.drop(l);
+  }
+
+  /** On an account its agent no longer thinks with (the computer's own sign-in is none). */
+  private left(l: Live) {
+    return this.keep !== undefined && l.account !== null && l.account !== this.keep;
   }
 
   /** New limits from the config: idle time for processes started from now on, the process cap at once. */
@@ -1435,6 +1480,7 @@ export class BrainManager {
         signal: ctx.signal,
         deltaMs: this.opts.deltaMs,
         redact: ctx.secrets?.redact,
+        redactHold: ctx.secrets?.hold,
         endInput: !live.persistent,
         onRateLimit: (info) => this.opts.accounts?.noteRateLimit?.(usageKey, info),
         ...(ctx.planKey
@@ -1470,7 +1516,10 @@ export class BrainManager {
         bridge.runId = null;
         bridge.runToken = null;
       }
-      if (live.persistent && this.live.get(live.key) === live) this.armIdle(live);
+      if (live.persistent && this.live.get(live.key) === live) {
+        if (this.left(live)) this.drop(live);
+        else this.armIdle(live);
+      }
     }
   }
 
@@ -1526,7 +1575,6 @@ export class BrainManager {
     const env = ctx.accountHome ? accountEnv("claude_code", ctx.accountHome, base) : base;
     const plan = ctx.planKey ? planOf(ctx.planKey.provider) : undefined;
     if (plan && ctx.planKey) env[plan.claudeCode.tokenEnv] = ctx.planKey.key;
-    if (ctx.oauthToken) env.CLAUDE_CODE_OAUTH_TOKEN = ctx.oauthToken;
     const model = plan ? planAlias(req.model) : typeof req.model === "string" ? req.model : undefined;
     if (this.opts.mcp) {
       const token = newMcpToken();
@@ -1602,7 +1650,14 @@ export class BrainManager {
       ...(addDirs.length ? { addDirs } : {}),
       ...(isBrainEffort(req.effort) ? { effort: req.effort } : {}),
     });
-    const proc = new ClaudeProcess(this.opts.claudeCommand ?? ["claude"], args, cwd, env, this.opts.spawn);
+    const proc = new ClaudeProcess(
+      this.opts.claudeCommand ?? ["claude"],
+      args,
+      cwd,
+      env,
+      this.opts.spawn,
+      ctx.oauthToken,
+    );
     const live: Live = {
       key,
       id,

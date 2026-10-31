@@ -182,6 +182,7 @@ test.skipIf(!posix)(
     const [start] = claude();
     expect(start?.configDir).toBe(own);
     expect(start?.oauthToken).toBe(TOKEN);
+    expect([start?.oauthFd, start?.oauthEnv]).toEqual(["3", null]);
     expect(start?.baseUrl).toBe("https://api.anthropic.com");
     const key = { kind: "key" as const, provider: "zai" as const, key: "zai-key-1234567890abcdef" };
     expect(await errorCode(() => routeWithPlan(request(), { ...deps, accounts, grant: key }))).toBe("not_allowed");
