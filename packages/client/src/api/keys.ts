@@ -100,6 +100,10 @@ export const keys = {
   machines: (orgId: string) => ["org", orgId, "machines"] as const,
   /** Under `machines`: a computer that changes refreshes what a new agent could think with. */
   brainMachines: (orgId: string) => ["org", orgId, "machines", "brains"] as const,
+  /** What a new agent starts thinking with (ADR 0089). */
+  newAgentSetup: (orgId: string) => ["org", orgId, "agent-setup"] as const,
+  /** What a setup would do to each agent (`sig`: the setup and the agents, as JSON). */
+  setupPreview: (orgId: string, sig: string) => ["org", orgId, "agent-setup", "preview", sig] as const,
   /** The server's own computer here (under `machines`: a machines refetch refreshes it too). */
   hostComputer: (orgId: string) => ["org", orgId, "machines", "host"] as const,
   /** Offline computers agents wait for (under `machines`: a machines refetch refreshes it too). */

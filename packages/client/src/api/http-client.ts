@@ -26,6 +26,7 @@ import type {
   AgentProposal,
   AgentQuestion,
   AgentSecret,
+  AgentSetupResult,
   AgentSkill,
   AgentStatus,
   AgentUsage,
@@ -117,6 +118,7 @@ import type {
   MissionSummary,
   Model,
   MoveAgentsResult,
+  NewAgentSetup,
   NoticePrefs,
   NotificationCount,
   NotificationPage,
@@ -514,6 +516,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<AgentBrain>(`${org(orgId)}/agents/${enc(agentId)}/brain`, { method: "PUT", json: input }),
       brainMachines: async (orgId) =>
         (await request<{ machines: BrainMachine[] }>(`${org(orgId)}/brain-machines`)).machines,
+      applySetup: async (orgId, input) =>
+        (await request<{ results: AgentSetupResult[] }>(`${org(orgId)}/agent-setup`, { json: input })).results,
+      newAgentSetup: async (orgId) =>
+        (await request<{ setup: NewAgentSetup | null }>(`${org(orgId)}/agent-setup`)).setup,
       runs: async (orgId, filter = {}) =>
         (await request<{ runs: Run[] }>(`${org(orgId)}/runs`, { query: filter })).runs,
       run: (orgId, runId) => request<{ run: Run; steps: RunStep[] }>(`${org(orgId)}/runs/${enc(runId)}`),

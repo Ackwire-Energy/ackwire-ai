@@ -1,5 +1,7 @@
 import type {
+  Agent,
   AgentBrain,
+  AgentSetup,
   BrainEffortSetting,
   BrainKind,
   BrainOption,
@@ -13,6 +15,7 @@ import {
   useAgentBrain,
   useAgentBrowserSettings,
   useAgentScopes,
+  useAgents,
   useAiAccounts,
   useAiStatus,
   useApi,
@@ -23,10 +26,12 @@ import {
   usePlatformKey,
   useSetComputerTarget,
   useSettings,
+  useSetupPreview,
   useUpdateAgent,
   useUpdateAgentBrowserSettings,
 } from "@agenteschat/client";
 import { saveLevels } from "@agenteschat/client/lib/access-levels";
+import { setupResultLine, sortedResults, takers } from "@agenteschat/client/lib/agent-setup";
 import {
   accountChoices,
   ownSignInListed,
@@ -34,9 +39,11 @@ import {
   ownSignInReady,
   signInPlan,
 } from "@agenteschat/client/lib/ai-accounts";
+import { brainLine } from "@agenteschat/client/lib/brain";
 import {
   type Advanced,
   advancedDefaults,
+  advancedParts,
   advancedSummary,
   isAdvancedDefault,
   isClaudeAlias,
@@ -69,10 +76,12 @@ import {
   BrainLogo,
   BrainPortrait,
   Button,
+  Checkbox,
   ComputerPortrait,
   Dialog,
   DialogBody,
   DialogFooter,
+  DialogSearchList,
   EffortPixels,
   Icon,
   type IconName,
@@ -93,6 +102,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { NO_COMPUTER, useNoComputer } from "@/components/AgentComputer";
 import {
   modelOptions as apiModelOptions,
@@ -105,6 +115,7 @@ import { AddAccount } from "@/components/ai/AddAccountFlow";
 import { accountOption } from "@/components/ai/ConnectAiSteps";
 import { PlanReplies, PlanRepliesOf } from "@/components/ai/PlanReplies";
 import { useConnectAi } from "@/components/ConnectAi";
+import { LoadingLine } from "@/components/Loading";
 import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import {
@@ -116,6 +127,7 @@ import {
   useThisMac,
 } from "@/components/ThisMac";
 import { useComputerEdition } from "@/components/WorkspaceComputer";
+import { useDirectory } from "@/hooks/useDirectory";
 import { inDesktopApp } from "@/lib/desktop";
 import { limitOffers, planMeterText, planWord } from "@/lib/plan-usage";
 import { useToast } from "@/lib/toast";
@@ -505,6 +517,8 @@ function useRefresh() {
       keys.agentAccess(org.id, agent.id),
       keys.agents(org.id),
       keys.machines(org.id),
+      // What it thinks with now is what new agents start with.
+      keys.newAgentSetup(org.id),
     ])
       void qc.invalidateQueries({ queryKey: key });
   };
@@ -649,6 +663,10 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const [contextTokens, setContextTokens] = useState<ContextLimit | null>(savedContext);
   // "Configuração avançada" open: what it edits, put on the form by "Pronto" (nothing saves before "Usar").
   const [adv, setAdv] = useState<Advanced | null>(null);
+  // "Usar em outros agentes" open.
+  const [copying, setCopying] = useState(false);
+  const hasOthers = (useAgents(org.id).data ?? []).some((a) => a.id !== agent.id);
+  const qc = useQueryClient();
   // Adding an account: any, or (an account) one more login of it for this agent.
   const [adding, setAdding] = useState<boolean | MachineAccount>(false);
   // Accounts that arrived while the dialog was open (saved with the rest on "Usar").
@@ -801,35 +819,39 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         ? t("brain.auto.label")
         : (all.find((m) => m.id === model)?.label ?? model)
       : `${t(`brain.card.${k}`)} · ${modelName(planModel)}`;
-  const use = async () => {
-    setBusy(true);
-    try {
-      if (kind === "model") {
-        if (view.brain !== "model" || contextChanged) {
-          await api.agents.setBrain(org.id, agent.id, {
-            brain: "model",
-            fallback,
-            ...(contextChanged ? { contextTokens } : {}),
-          });
-        }
-        if (model !== saved.model || key !== (saved.key ?? DEFAULT_KEY)) {
-          await update.mutateAsync({
-            ...(model !== saved.model ? { model } : {}),
-            ...(key !== (saved.key ?? DEFAULT_KEY) ? { credentialId: key === DEFAULT_KEY ? null : key } : {}),
-          });
-        }
-      } else {
-        if (moves) await setTarget.mutateAsync({ agentId: agent.id, machineId: moves.machineId });
+  /** This agent's choice, in the right order: its computer, then who thinks. */
+  const saveThis = async () => {
+    if (kind === "model") {
+      if (view.brain !== "model" || contextChanged) {
         await api.agents.setBrain(org.id, agent.id, {
-          brain: kind,
-          model: planModel === option?.defaultModel ? null : planModel,
+          brain: "model",
           fallback,
-          ...(effortChanged ? { effort: effortToSave } : {}),
-          ...(accountChanged && view.canUsePlans ? { account, ...(moving ? { moveAccount: true } : {}) } : {}),
-          ...(shareChanged ? { onlyOwner } : {}),
           ...(contextChanged ? { contextTokens } : {}),
         });
       }
+      if (model !== saved.model || key !== (saved.key ?? DEFAULT_KEY)) {
+        await update.mutateAsync({
+          ...(model !== saved.model ? { model } : {}),
+          ...(key !== (saved.key ?? DEFAULT_KEY) ? { credentialId: key === DEFAULT_KEY ? null : key } : {}),
+        });
+      }
+      return;
+    }
+    if (moves) await setTarget.mutateAsync({ agentId: agent.id, machineId: moves.machineId });
+    await api.agents.setBrain(org.id, agent.id, {
+      brain: kind,
+      model: planModel === option?.defaultModel ? null : planModel,
+      fallback,
+      ...(effortChanged ? { effort: effortToSave } : {}),
+      ...(accountChanged && view.canUsePlans ? { account, ...(moving ? { moveAccount: true } : {}) } : {}),
+      ...(shareChanged ? { onlyOwner } : {}),
+      ...(contextChanged ? { contextTokens } : {}),
+    });
+  };
+  const use = async () => {
+    setBusy(true);
+    try {
+      await saveThis();
       refresh();
       const same =
         !effortChanged &&
@@ -866,6 +888,58 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                 ? t("agentPage.work.saved.brainMoved", { ...g, brain: brainName(kind), computer: moves.name })
                 : t("agentPage.work.saved.brain", { ...g, brain: brainName(kind) }),
         );
+      onClose();
+    } catch {
+      toast.show(t("agentPage.work.failed"), "error");
+      refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+  // "Usar em outros agentes" (ADR 0089): this choice as a value, each agent taking it by its own rules.
+  const setup: AgentSetup | null =
+    kind === "model"
+      ? {
+          brain: "model",
+          model,
+          // Only admins see and change the key: anyone else's leaves each agent's own.
+          ...(can("key") ? { key: key === DEFAULT_KEY ? null : key } : {}),
+          contextTokens: shownContext,
+        }
+      : home
+        ? {
+            brain: kind,
+            machineId: home.machineId,
+            account: accountsOn ? account : null,
+            model: planModel === option?.defaultModel ? null : planModel,
+            effort: effortToSave,
+            contextTokens: shownContext,
+            fallback,
+            onlyOwner,
+          }
+        : null;
+  const setupText = [
+    brainName(kind),
+    ...advancedParts(t, i18n.language, {
+      kind,
+      autoModel: isAuto(kind === "model" ? model : planModel),
+      apiKey,
+      now: { effort, contextTokens: shownContext, onlyOwner, fallback },
+    }),
+  ].join(" · ");
+  const copyTo = async (agentIds: string[]) => {
+    if (!setup) return;
+    setBusy(true);
+    try {
+      if (!unchanged) await saveThis();
+      const results = await api.agents.applySetup(org.id, { setup, agentIds });
+      refresh();
+      for (const id of agentIds) void qc.invalidateQueries({ queryKey: keys.agentBrain(org.id, id) });
+      const done = results.filter((r) => r.status === "applied").length;
+      if (done > 0) toast.show(t("agentPage.work.brain.copy.done", { count: done, setup: setupText }));
+      if (done < agentIds.length) {
+        toast.show(t("agentPage.work.brain.copy.missed", { count: agentIds.length - done }), "error");
+      }
       onClose();
     } catch {
       toast.show(t("agentPage.work.failed"), "error");
@@ -1055,6 +1129,15 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       label={t("agentPage.work.brain.advanced.title")}
     />
   );
+  // Once it can be saved: a plan just picked needs what it thinks with first.
+  const copyRow = setup && hasOthers && !needsAccount && adding === false && (
+    <AdvancedRow
+      icon="copy"
+      line={t("agentPage.work.brain.copy.rowLine")}
+      onOpen={() => setCopying(true)}
+      label={t("agentPage.work.brain.copy.row")}
+    />
+  );
   const planRows = (
     <div className="agp-brainpicks">
       <Select
@@ -1067,6 +1150,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       />
       {accountField}
       {advancedRow}
+      {copyRow}
     </div>
   );
   const orgRows = can("model") ? (
@@ -1103,6 +1187,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         />
       </BrainField>
       {advancedRow}
+      {copyRow}
     </>
   ) : (
     <SettingNote icon="lock">{t("agentPage.lock.admins")}</SettingNote>
@@ -1290,12 +1375,166 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           </DialogFooter>
         </Dialog>
       )}
+      {copying && setup && (
+        <SetupCopyDialog
+          setup={setup}
+          setupText={setupText}
+          busy={busy}
+          onClose={() => setCopying(false)}
+          onUse={(agentIds) => void copyTo(agentIds)}
+        />
+      )}
     </Dialog>
   );
 }
 
-/** "Configuração avançada": shaped like the pickers above it, a chevron that opens a step instead of a list. */
-function AdvancedRow({ label, line, onOpen }: { label: string; line: string; onOpen: () => void }) {
+/**
+ * "Usar em outros agentes" (ADR 0089): every other agent with what the setup would do to it (the server's preview),
+ * those that can take it first, "Todos" on top for all of them. "Usar" saves this agent's choice and theirs.
+ */
+function SetupCopyDialog({
+  setup,
+  setupText,
+  busy,
+  onClose,
+  onUse,
+}: {
+  setup: AgentSetup;
+  setupText: string;
+  busy: boolean;
+  onClose: () => void;
+  onUse: (agentIds: string[]) => void;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const { agent } = useAgentEdit();
+  const agents = useAgents(org.id);
+  const models = useModels();
+  const dir = useDirectory(org.id);
+  const others = (agents.data ?? []).filter((a) => a.id !== agent.id);
+  const preview = useSetupPreview(
+    org.id,
+    setup,
+    others.map((a) => a.id),
+  );
+  const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
+  const [q, setQ] = useState("");
+  const query = q.trim().toLowerCase();
+  const results = sortedResults(preview.data ?? []);
+  const can = takers(results);
+  const chosen = can.filter((id) => picked.has(id));
+  const byId = new Map(others.map((a) => [a.id, a]));
+  const shown = results.filter((r) => !query || byId.get(r.agentId)?.name.toLowerCase().includes(query));
+  const nowOf = (a: Agent) =>
+    a.brain && a.brain.kind !== "model"
+      ? brainLine(t, a.brain, "").text
+      : isAuto(a.model)
+        ? t("brain.auto.label")
+        : (models.data?.models.find((m) => m.id === a.model)?.label ?? a.model);
+  const ownerOf = (a: Agent) => (a.ownerUserId ? dir.memberById.get(a.ownerUserId)?.name.split(" ")[0] : undefined);
+  const toggle = (id: string, on: boolean) =>
+    setPicked((p) => {
+      const next = new Set(p);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  return (
+    <Dialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={t("agentPage.work.brain.copy.title")}
+      description={t("agentPage.work.brain.copy.sub", { setup: setupText })}
+      closeLabel={t("common.close")}
+      className="agp-copydialog"
+    >
+      <div className="ac-dialog__tools">
+        <label htmlFor="setup-all" className="agp-copydialog__all" data-off={can.length === 0 || undefined}>
+          <Checkbox
+            id="setup-all"
+            checked={can.length > 0 && chosen.length === can.length}
+            disabled={can.length === 0}
+            onCheckedChange={(on) => setPicked(new Set(on ? can : []))}
+          />
+          <span className="scope-row__text">
+            <b>{t("agentPage.work.brain.copy.all")}</b>
+            <span className="small muted">
+              {preview.data && can.length === 0
+                ? t("agentPage.work.brain.copy.none")
+                : t("agentPage.work.brain.copy.allLine", { count: can.length })}
+            </span>
+          </span>
+        </label>
+      </div>
+      {preview.isPending ? (
+        <div className="ac-dialog__body">
+          <LoadingLine width={220} />
+        </div>
+      ) : preview.isError ? (
+        <p className="ac-dialog__empty">{t("agentPage.work.failed")}</p>
+      ) : (
+        <DialogSearchList
+          query={q}
+          onQueryChange={setQ}
+          search={others.length > 8}
+          searchLabel={t("agentPage.work.brain.copy.search")}
+          searchPlaceholder={t("agentPage.work.brain.copy.search")}
+          listLabel={t("agentPage.work.brain.copy.title")}
+          isEmpty={shown.length === 0}
+          emptyText={t("agentPage.work.brain.copy.noMatch", { q })}
+        >
+          {shown.map((r) => {
+            const a = byId.get(r.agentId);
+            if (!a) return null;
+            const id = `setup-${a.id}`;
+            const off = r.status !== "applied";
+            return (
+              <label key={a.id} htmlFor={id} className="scope-row" data-off={off || undefined}>
+                <Checkbox
+                  id={id}
+                  checked={!off && picked.has(a.id)}
+                  disabled={off}
+                  onCheckedChange={(on) => toggle(a.id, on)}
+                />
+                <AgentAvatar agentId={a.id} name={a.name} size="sm" />
+                <span className="scope-row__text">
+                  <span>{a.name}</span>
+                  <span className="small muted">{setupResultLine(t, r, { now: nowOf(a), owner: ownerOf(a) })}</span>
+                </span>
+              </label>
+            );
+          })}
+        </DialogSearchList>
+      )}
+      <DialogFooter bar>
+        <Button variant="ghost" onClick={onClose}>
+          {t("common.cancel")}
+        </Button>
+        <Button variant="primary" disabled={chosen.length === 0} loading={busy} onClick={() => onUse(chosen)}>
+          {chosen.length === 0
+            ? t("agentPage.work.brain.copy.pick")
+            : t("agentPage.work.brain.copy.use", { count: chosen.length })}
+        </Button>
+      </DialogFooter>
+    </Dialog>
+  );
+}
+
+/**
+ * "Configuração avançada" and "Usar em outros agentes": shaped like the pickers above them, a chevron that opens a
+ * step instead of a list.
+ */
+function AdvancedRow({
+  label,
+  line,
+  icon = "settings",
+  onOpen,
+}: {
+  label: string;
+  line: string;
+  icon?: IconName;
+  onOpen: () => void;
+}) {
   return (
     <div className="ac-select agp-brainsel agp-advrow">
       <button type="button" className="ac-select__trigger" onClick={onOpen}>
@@ -1306,7 +1545,7 @@ function AdvancedRow({ label, line, onOpen }: { label: string; line: string; onO
             description: line,
             leading: (
               <span className="newag__ib">
-                <Icon name="settings" size={16} />
+                <Icon name={icon} size={16} />
               </span>
             ),
           })}

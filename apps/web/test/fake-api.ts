@@ -9,6 +9,7 @@ import type {
   AgentProposalCard,
   AgentQuestion,
   AgentSecret,
+  AgentSetupResult,
   AgentStatus,
   AiStatus,
   ApiClient,
@@ -50,6 +51,7 @@ import type {
   Message,
   Model,
   ModelTier,
+  NewAgentSetup,
   OrgRole,
   OrgSettings,
   Person,
@@ -250,6 +252,10 @@ export interface FakeState {
   instance?: Partial<Instance>;
   /** `agents.brainMachines`: the computers a new agent could think on ("Criar agente"); unset = none. */
   brainMachines?: BrainMachine[];
+  /** `agents.newAgentSetup`: what a new agent starts thinking with; unset = none ("Automático"). */
+  newAgentSetup?: NewAgentSetup | null;
+  /** `agents.applySetup`, per agent: what the setup does to it; unset = it takes it. */
+  setupResults?: Record<string, Omit<AgentSetupResult, "agentId">>;
   /** `system.telemetry`: the usage report's switch; unset = I'm not the installation's owner (null). */
   telemetry?: ServerTelemetry;
   /** `system.jev`: the installation's Jev key; unset = I'm not its owner on a self-hosted server (null). */
@@ -1773,6 +1779,31 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       brainMachines: async (orgId) => {
         log("agents.brainMachines", orgId);
         return structuredClone(state.brainMachines ?? []);
+      },
+      newAgentSetup: async (orgId) => {
+        log("agents.newAgentSetup", orgId);
+        return structuredClone(state.newAgentSetup ?? null);
+      },
+      // Each agent takes it unless `setupResults` says otherwise; applied, its brain view thinks so.
+      applySetup: async (orgId, input) => {
+        log("agents.applySetup", orgId, input);
+        return input.agentIds.map((agentId) => {
+          const result: AgentSetupResult = { agentId, status: "applied", ...state.setupResults?.[agentId] };
+          if (!input.preview && result.status === "applied") {
+            const b = brainOf(agentId);
+            const s = input.setup;
+            brains.set(agentId, {
+              ...b,
+              brain: s.brain,
+              model: s.brain === "model" ? null : s.model,
+              effectiveModel: s.brain === "model" ? null : s.model,
+              ...(s.brain !== "model" && !result.keeps ? { account: s.account ?? null } : {}),
+              ...(s.effort !== undefined ? { effort: s.effort } : {}),
+              ...(s.contextTokens !== undefined ? { contextTokens: s.contextTokens } : {}),
+            });
+          }
+          return result;
+        });
       },
       setBrain: async (orgId, agentId, input) => {
         log("agents.setBrain", orgId, agentId, input);

@@ -13,19 +13,24 @@ import {
   useMailAccounts,
   useMembers,
   useModels,
+  useNewAgentSetup,
   usePlatformKey,
   useSettings,
   useSkills,
 } from "@agenteschat/client";
 import { LEVELS, type Level, saveLevels } from "@agenteschat/client/lib/access-levels";
 import { draftLevels } from "@agenteschat/client/lib/action-cards";
+import { type NewAgentStart, newAgentStart } from "@agenteschat/client/lib/agent-setup";
 import { ownSignInReady } from "@agenteschat/client/lib/ai-accounts";
+import { advancedParts, effortLevel } from "@agenteschat/client/lib/brain-advanced";
 import { type ConnectedItem, itemName } from "@agenteschat/client/lib/connected";
+import { isContextLimit } from "@agenteschat/client/lib/context-limits";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { choiceOf, defaultPolicy, MAIL_ACTIONS, toMailLevel } from "@agenteschat/client/lib/mail";
 import { planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
+import { planModel, planOf } from "@agenteschat/client/lib/plans";
 import { AUTO, isAuto, modelChoices } from "@agenteschat/client/lib/providers";
 import { scopeText } from "@agenteschat/client/lib/scopes";
 import {
@@ -47,6 +52,7 @@ import {
   modKey,
   prefersReducedMotion,
   randomAppearance,
+  SettingNote,
   Spinner,
   Textarea,
 } from "@agenteschat/ui";
@@ -212,6 +218,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
   const dms = useDms(org.id);
   const platform = usePlatformKey(org.id);
   const brainMachines = useBrainMachines(org.id);
+  const lastSetup = useNewAgentSetup(org.id);
   const aiAccounts = useAiAccounts(org.id);
   const connect = useConnectAi();
   const toast = useToast();
@@ -295,6 +302,65 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
     [agents.data, members.data],
   );
 
+  // What it starts thinking with (ADR 0089): the last setup saved or used on other agents, where it can think for it.
+  const startOf = (ownerId: string | null): NewAgentStart | null =>
+    from ? null : newAgentStart(lastSetup.data, ownerId === me.user.id);
+  const startWith = (start: NewAgentStart | null) => {
+    const api = start?.brain === "model" ? start : null;
+    const fits = api && (isAuto(api.model) ? usable.size > 0 : usable.has(api.model));
+    setModel(fits ? api.model : AUTO);
+    setKey(fits && api.key && (credentials.data ?? []).some((c) => c.id === api.key) ? api.key : DEFAULT_KEY);
+    setPlan(
+      start && start.brain !== "model"
+        ? {
+            kind: start.brain,
+            machineId: start.machineId,
+            ...(start.account ? { accountId: start.account.id, label: start.account.label } : {}),
+          }
+        : null,
+    );
+  };
+  /** What it starts with in words: "Claude Code · Opus · Esforço alto", or the API's model. */
+  const startText = (st: NewAgentStart) => {
+    if (st.brain === "model") {
+      return isAuto(st.model)
+        ? t("brain.auto.label")
+        : ((models.data?.models ?? []).find((m) => m.id === st.model)?.label ?? st.model);
+    }
+    const option = brainMachines.data
+      ?.find((m) => m.machineId === st.machineId)
+      ?.options.find((o) => o.kind === st.brain);
+    const value = st.input.model ?? option?.defaultModel ?? null;
+    const coding = planOf(lastSetup.data?.account?.provider);
+    const name = isAuto(value)
+      ? t("brain.auto.label")
+      : coding
+        ? planModel(coding, value).label
+        : (option?.models.find((m) => m.value === value)?.label ?? value);
+    const parts = advancedParts(t, locale, {
+      kind: st.brain,
+      autoModel: isAuto(value),
+      apiKey: true,
+      now: {
+        effort: effortLevel(st.input.effort),
+        contextTokens: isContextLimit(st.input.contextTokens) ? st.input.contextTokens : null,
+        onlyOwner: true,
+        fallback: st.input.fallback ?? true,
+      },
+    });
+    return [t(`brain.card.${st.brain}`), name, ...parts].filter(Boolean).join(" · ");
+  };
+  // Until the person picks what it thinks with, it follows whose it is.
+  const [aiPicked, setAiPicked] = useState(Boolean(from));
+  const startsReady = lastSetup.isFetched && models.isFetched && credentials.isFetched && platform.isFetched;
+  const started = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, when what it starts with is known
+  useEffect(() => {
+    if (started.current || !startsReady || aiPicked) return;
+    started.current = true;
+    startWith(startOf(me.user.id));
+  }, [startsReady]);
+
   // Defaults once the data arrives: the skills on for new agents, the levels.
   useEffect(() => {
     if (library.data && skillIds === null)
@@ -349,6 +415,14 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
   const { amount, invalid: budgetInvalid } = readBudget(budget);
   const defaultBudget = settings.data?.defaultAgentBudgetUsd;
   const budgetShown = amount ?? defaultBudget;
+  const start = startOf(ownerId);
+  // Still on what it started with: said on the model step, saved with all of it.
+  const onStart = start
+    ? start.brain === "model"
+      ? !plan && model === start.model
+      : plan?.kind === start.brain && plan.machineId === start.machineId && plan.accountId === start.account?.id
+    : false;
+  const startLine = start && onStart ? startText(start) : null;
   const modelInfo = (models.data?.models ?? []).find((m) => m.id === model);
   const modelLabel = plan
     ? [t(`brain.card.${plan.kind}`), plan.label].filter(Boolean).join(" · ")
@@ -420,10 +494,13 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
     if (plan) {
       try {
         await api.sandbox.setTarget(org.id, agent.id, plan.machineId);
-        await api.agents.setBrain(org.id, agent.id, {
-          brain: plan.kind,
-          ...(plan.accountId ? { account: plan.accountId } : {}),
-        });
+        await api.agents.setBrain(
+          org.id,
+          agent.id,
+          start && start.brain !== "model" && onStart
+            ? start.input
+            : { brain: plan.kind, ...(plan.accountId ? { account: plan.accountId } : {}) },
+        );
         // Saved with no account, it thinks with that computer's own sign-in, which thinks only for agents of whoever
         // connected it, where that CLI is signed in (never on the workspace's computer). Else, for an agent of the
         // person's own, its plan's sign-in opens once it's created: only the owner signs a plan in for it.
@@ -511,8 +588,8 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
     setChannelIds(new Set());
     setOwner(me.user.id);
     setAudience({ mode: "everyone", userIds: [] });
-    setModel(AUTO);
-    setKey(DEFAULT_KEY);
+    startWith(startOf(me.user.id));
+    setAiPicked(false);
     setBudget("");
     scrollTop();
   };
@@ -571,7 +648,8 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
     setInstructions(t(`newAgent.roles.${id}.instructions`));
     setLevels(presetLevels(id, connectedList));
     setChannelIds(new Set(presetChannels(id, myChannels)));
-    setModel(AUTO);
+    startWith(startOf(ownerId));
+    setAiPicked(false);
   };
   const changeName = (value: string) => {
     const had = Boolean(name.trim());
@@ -1050,6 +1128,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
             meId={me.user.id}
             onChange={(v) => {
               setOwner(v);
+              if (!aiPicked) startWith(startOf(v === NO_OWNER ? null : v));
               if (v !== NO_OWNER) setAudience((a) => ({ ...a, userIds: a.userIds.filter((id) => id !== v) }));
             }}
           />
@@ -1078,6 +1157,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
       return (
         <>
           {head(t("newAgent.steps.model.title"), t("newAgent.steps.model.lead"))}
+          {startLine && <SettingNote icon="repeat">{t("newAgent.lastSetup", { setup: startLine })}</SettingNote>}
           <ModelCards
             choices={choices}
             value={plan ? undefined : model}
@@ -1085,6 +1165,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
             onChange={(id) => {
               setModel(id);
               setPlan(null);
+              setAiPicked(true);
               mood.react(id.toLowerCase().includes("opus") ? "star" : "happy", 800);
             }}
           />
@@ -1102,6 +1183,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
             value={plan}
             onChange={(choice) => {
               setPlan(choice);
+              setAiPicked(true);
               mood.react("happy", 800);
             }}
           />
@@ -1120,7 +1202,14 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
               {t("newAgent.key")}
             </h2>
           </div>
-          <KeySelect value={key} onChange={setKey} options={keys} />
+          <KeySelect
+            value={key}
+            onChange={(v) => {
+              setKey(v);
+              setAiPicked(true);
+            }}
+            options={keys}
+          />
           <div className="newag__sect">
             <div className="ac-hintline">
               <h2>

@@ -4031,6 +4031,62 @@ export interface AgentBrainInput {
   contextTokens?: number | null;
 }
 
+/** One agent's "Quem pensa" as a value, to use on other agents (ADR 0089, `POST …/agent-setup`). */
+export interface AgentSetup {
+  brain: BrainKind;
+  /** The API brain: the agent's model (`auto` included). A computer brain: its model as stored (null: the default). */
+  model: string | null;
+  /** The API brain's key; null = the workspace's default; omitted = each agent keeps its own. */
+  key?: string | null;
+  /** A computer brain: the computer it thinks on, and its account there (null: that computer's own sign-in). */
+  machineId?: string | null;
+  account?: string | null;
+  effort?: BrainEffortSetting | null;
+  contextTokens?: number | null;
+  fallback?: boolean;
+  /** "Atende outras pessoas" off, for the agents that move onto the plan. */
+  onlyOwner?: boolean;
+}
+
+/** Why an agent can't take a setup. */
+export type AgentSetupReason =
+  | "not_allowed"
+  | "admins_only"
+  | "account_owner"
+  | "account_single"
+  | "other_computer"
+  | "model_missing"
+  | "failed";
+
+/** What a setup does to one agent (in a preview, would do). */
+export interface AgentSetupResult {
+  agentId: string;
+  /** `same`: it already thinks this way; `skipped`: it can't take it (`reason`). */
+  status: "applied" | "same" | "skipped";
+  /** It keeps the account it has (another person's plan) and takes the rest: its name; null = its computer's own. */
+  keeps?: { account: string | null };
+  reason?: AgentSetupReason;
+  /** `owner` (account_owner, not the caller's), `agent` (account_single), `computer`, `plan` and `model`. */
+  params?: Record<string, string>;
+}
+
+/** `GET …/agent-setup`: what a new agent starts thinking with (the last setup saved or used on others). */
+export interface NewAgentSetup {
+  brain: BrainKind;
+  model: string | null;
+  /** The API brain's key, still the workspace's; null = the workspace's default. */
+  key: string | null;
+  contextTokens: number | null;
+  /** A computer brain: where it thinks. */
+  computer?: { machineId: string; name: string };
+  /** Its account there; null = that computer's own sign-in. */
+  account?: { id: string; label: string; provider: string | null; mine: boolean; free: boolean } | null;
+  /** The computer's own sign-in thinks for the caller's agents there (they connected it). */
+  ownSignIn?: boolean;
+  effort?: BrainEffortSetting | null;
+  fallback?: boolean;
+}
+
 /** `POST …/machines/{id}/account-logins` (201): what the person needs to sign in. */
 export interface AccountLoginStart {
   loginId: string;

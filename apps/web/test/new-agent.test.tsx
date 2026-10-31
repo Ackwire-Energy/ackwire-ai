@@ -508,6 +508,91 @@ describe("Criar agente: what gets created", () => {
     ).toBe("true");
   });
 
+  test("the last setup (ADR 0089): a plan of mine starts chosen, said on the model step, saved with all of it", async () => {
+    const state = seedState();
+    state.brainMachines = [
+      {
+        machineId: "machine_mini",
+        name: "Mac mini",
+        online: true,
+        options: [
+          { ...plan("claude_code", true), models: [{ value: "opus", label: "Opus" }], defaultModel: "sonnet" },
+          plan("codex", false),
+        ],
+      },
+    ];
+    state.newAgentSetup = {
+      brain: "claude_code",
+      model: "opus",
+      key: null,
+      contextTokens: null,
+      computer: { machineId: "machine_mini", name: "Mac mini" },
+      account: { id: "acc-1", label: "Claude", provider: null, mine: true, free: true },
+      ownSignIn: false,
+      effort: "high",
+      fallback: true,
+    };
+    await open(state);
+    await startAs("Assistente");
+    await proceed(4);
+    expect(title()).toBe("Modelo e orçamento");
+    expect(
+      screen()
+        .getByRole("button", { name: /^Claude Code.*Mac mini/ })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(screen().getByText("Começa com a última escolha: Claude Code · Opus · Esforço alto.")).toBeTruthy();
+    await proceed();
+    await click(screen().getByRole("button", { name: "Criar Eva" }));
+    await settle(8);
+    const agentId = state.agents.find((a) => a.handle === "eva")?.id;
+    expect(state.calls.find((c) => c.method === "agents.setBrain")?.args).toEqual([
+      ORG_ID,
+      agentId,
+      { brain: "claude_code", account: "acc-1", model: "opus", effort: "high", contextTokens: null, fallback: true },
+    ]);
+  });
+
+  test("the last setup: the API's model and key as they were; someone else's plan leaves Automático", async () => {
+    const state = seedState();
+    state.newAgentSetup = { brain: "model", model: "claude-opus-5-5", key: "cred-1", contextTokens: null };
+    await open(state);
+    await startAs("Assistente");
+    await proceed(4);
+    expect(
+      screen()
+        .getByRole("button", { name: /^Claude Opus 5\.5/ })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(screen().getByText("Começa com a última escolha: Claude Opus 5.5.")).toBeTruthy();
+    await proceed();
+    await click(screen().getByRole("button", { name: "Criar Eva" }));
+    await settle(8);
+    expect(createdWith(state)).toMatchObject({ model: "claude-opus-5-5", credentialId: "cred-1" });
+    cleanup();
+
+    // A plan on someone else's account can't think for my agent: it starts as before.
+    const theirs = seedState();
+    theirs.newAgentSetup = {
+      brain: "claude_code",
+      model: "opus",
+      key: null,
+      contextTokens: null,
+      computer: { machineId: "machine_mini", name: "Mac mini" },
+      account: { id: "acc-2", label: "Claude", provider: null, mine: false, free: true },
+      ownSignIn: false,
+    };
+    await open(theirs);
+    await startAs("Assistente");
+    await proceed(4);
+    expect(
+      screen()
+        .getByRole("button", { name: /^Automático/ })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(screen().queryByText(/^Começa com a última escolha/)).toBeNull();
+  });
+
   test("budget: empty is the workspace default; zero or text is invalid; a quick amount lights its button", async () => {
     const state = await open();
     await startAs("QA");

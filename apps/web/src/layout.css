@@ -9027,12 +9027,15 @@ a.machine-row__name:hover {
 .agp-repogroup .scope-row {
   align-items: center;
 }
-.agp-repogroup .scope-row[data-off] {
+.agp-repogroup .scope-row[data-off],
+.agp-copydialog .scope-row[data-off],
+.agp-copydialog__all[data-off] {
   cursor: default;
   opacity: 0.55;
 }
-/* "Todos os repositórios" on top of the list. */
-.agp-repodialog__all {
+/* "Todos os repositórios" on top of the list, and "Todos" over the agents a setup is used on. */
+.agp-repodialog__all,
+.agp-copydialog__all {
   flex: 1;
   display: flex;
   align-items: center;
