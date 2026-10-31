@@ -3359,8 +3359,9 @@ p {
   display: flex;
   min-width: 0;
 }
-.catalog-grid__empty {
-  grid-column: 1 / -1;
+/* The list is a flex column: auto margins put the empty state in the middle of its height. */
+.catalog__empty {
+  margin: auto 0;
 }
 .catalog-feat__card,
 .catalog-tile {

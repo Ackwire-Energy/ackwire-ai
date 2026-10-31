@@ -4039,6 +4039,11 @@ a.ac-list__row:focus-visible {
   width: 64px;
   height: 64px;
 }
+.ac-searchpx {
+  display: block;
+  flex: none;
+  image-rendering: pixelated;
+}
 
 /* Glass: menus, selects, popovers, suggestions, toasts (solid where backdrop-filter isn't supported) */
 .ac-menu,
@@ -6413,6 +6418,15 @@ button.ac-tools__row:focus-visible {
   width: min(320px, 100%);
   height: 140px;
   margin: 0 auto var(--space-2);
+}
+/* A pixel picture stands in for the icon: no dashed box either. */
+.ac-empty--art {
+  border: 0;
+}
+.ac-empty__art {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-4);
 }
 
 /*
