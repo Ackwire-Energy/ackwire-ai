@@ -39,6 +39,7 @@ import {
   SpendBar,
   Text,
   useToast,
+  WithPresence,
 } from "@/ui";
 import { CoverParallax, useCoverScroll, useScrollFade } from "@/ui/cover";
 import { openAgentAi } from "../ai/AgentAiScreen";
@@ -47,6 +48,7 @@ import { AgentComputerRow } from "../computer/AgentComputerRow";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { chatHref } from "../links/logic";
 import { useConnectedById } from "../settings/hooks";
+import { agentBadgeInset } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook, genderOf } from "../shared/logic";
 import { SheetTitle } from "../shared/PromptForm";
@@ -54,6 +56,8 @@ import { PushedHeader, Tile } from "../shared/parts";
 import { useWaitingApprovals, useWorkingNow } from "../shared/queries";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { TextArea } from "../shared/TextArea";
+import { useAgentProfileStatus } from "../status/hooks";
+import { StatusCard } from "../status/StatusCard";
 import { PlanMeter } from "../usage/parts";
 import { openAgentUsage } from "../usage/UsageScreen";
 import { openAgentEdit } from "./AgentEditScreen";
@@ -91,8 +95,9 @@ const AREA_ICON: Record<string, IconName> = {
 };
 
 /**
- * An agent's profile as a teammate: its sky and living body, its
- * role in one plain sentence, who answers for it, what it is on now (or what waits on you), one button
+ * An agent's profile as a teammate: its sky and living body (with its presence badge), its
+ * role in one plain sentence, who answers for it, its presence and status line (ADR 0084), what it is on now (or
+ * what waits on you), one button
  * (Conversar), then what it did for you, what it knows about you (tap to correct or forget, for its owner and
  * admins), what it can use in plain levels and the approval rule, and its month last.
  */
@@ -127,7 +132,7 @@ function Profile({ id }: { id: string }) {
   const sheet = useSheet();
   const when = useWhen();
   const meId = useMeId();
-  const role = useOrg().org?.role;
+  const org = useOrg().org;
   const insets = useSafeAreaInsets();
   // The cover's sky lags behind the scroll and stretches on pull; the agent fades as it nears the bar.
   const { y, onScroll } = useCoverScroll();
@@ -153,8 +158,10 @@ function Profile({ id }: { id: string }) {
   const roleName = (agent?.role || detail.data?.role || "").trim();
   const plain = plainRole(agent?.instructions || detail.data?.instructions);
   const busy = work.length > 0;
-  const editable = canEditMemories(agent, { id: meId, role });
-  const decides = mine || can(role, "manage_agents");
+  const editable = canEditMemories(agent, { id: meId, org });
+  // Its presence and line (ADR 0084): the badge, "Ocupado · Num trabalho pesado", the card with what it does.
+  const status = useAgentProfileStatus(id, name);
+  const decides = mine || can(org, "manage_agents");
   const did = didLines(forYou.data?.items);
   const memories = knownAboutMe(knows.data);
   const uses = usesOf(access.data);
@@ -263,7 +270,9 @@ function Profile({ id }: { id: string }) {
             <Sky color={look.color} depth={1} style={StyleSheet.absoluteFill} />
           </CoverParallax>
           <Animated.View style={avatarFade}>
-            <AgentAvatar agent={look} size={104} mode={busy ? "run" : "idle"} />
+            <WithPresence size={104} presence={status?.presence} inset={agentBadgeInset(look, 104)}>
+              <AgentAvatar agent={look} size={104} mode={busy ? "run" : "idle"} />
+            </WithPresence>
           </Animated.View>
         </View>
         <View style={styles.prof}>
@@ -279,6 +288,16 @@ function Profile({ id }: { id: string }) {
             <Text variant="small" tone="muted" style={styles.center}>
               {ownerLine}
             </Text>
+          ) : null}
+          {status ? (
+            <Text variant="small" tone="muted" style={styles.center}>
+              {status.line}
+            </Text>
+          ) : null}
+          {status?.card ? (
+            <View style={styles.status}>
+              <StatusCard emoji={status.card.emoji} text={status.card.text} note={status.card.note} />
+            </View>
           ) : null}
           {waitingNow ? (
             <NowPill
@@ -680,6 +699,7 @@ const styles = StyleSheet.create({
   // Not clipped: on a pull the sky grows up into the gap above the content.
   cover: { height: COVER_HEIGHT, alignItems: "center", justifyContent: "flex-end", paddingBottom: 22 },
   prof: { paddingHorizontal: 24, gap: 4 },
+  status: { marginTop: 10 },
   center: { textAlign: "center" },
   acts: { marginTop: 14 },
   grow: { flex: 1 },

@@ -469,11 +469,13 @@ export function WikiReader({
   const embed = useEmbedRenderer(page.data?.source?.attachments);
   const p = page.data;
   const folders = [...new Set(pages.map((x) => x.folder).filter(Boolean))].sort();
-  const admin = can(org.role, "configure");
+  // Who edits pages (and pins, moves and deletes them); a locked page, and locking it, only who configures.
+  const writes = can(org, "edit_wiki");
+  const admin = can(org, "configure");
   const editing = draft !== null;
 
   const startEdit = () => {
-    if (!p) return;
+    if (!p || !writes) return;
     if (p.locked && !admin) {
       toast.show(t("wiki.lockedHint"), "error");
       return;
@@ -600,10 +602,12 @@ export function WikiReader({
             {t("wiki.locked")}
           </Chip>
         )}
-        <Button icon="edit" onClick={startEdit}>
-          {t("wiki.edit")}
-          <Kbd>E</Kbd>
-        </Button>
+        {writes && (
+          <Button icon="edit" onClick={startEdit}>
+            {t("wiki.edit")}
+            <Kbd>E</Kbd>
+          </Button>
+        )}
         <Menu
           label={t("wiki.more")}
           trigger={<Button iconOnly icon="more" aria-label={t("wiki.more")} title={t("wiki.more")} />}
@@ -620,21 +624,25 @@ export function WikiReader({
           <MenuItem icon="clock" onSelect={() => setHistoryOpen(true)}>
             {t("wiki.history")}
           </MenuItem>
-          <MenuSeparator />
-          <MenuItem icon="edit" onSelect={startEdit}>
-            {t("wiki.renameOrMove")}
-          </MenuItem>
-          <MenuItem
-            icon="pin"
-            onSelect={() =>
-              action.mutate(
-                { type: "pin", slug: p.slug, pinned: !p.pinned },
-                { onSuccess: (x) => toast.show(x.pinned ? t("wiki.pinned") : t("wiki.unpinned")) },
-              )
-            }
-          >
-            {p.pinned ? t("wiki.unpin") : t("wiki.pin")}
-          </MenuItem>
+          {(writes || admin) && <MenuSeparator />}
+          {writes && (
+            <MenuItem icon="edit" onSelect={startEdit}>
+              {t("wiki.renameOrMove")}
+            </MenuItem>
+          )}
+          {writes && (
+            <MenuItem
+              icon="pin"
+              onSelect={() =>
+                action.mutate(
+                  { type: "pin", slug: p.slug, pinned: !p.pinned },
+                  { onSuccess: (x) => toast.show(x.pinned ? t("wiki.pinned") : t("wiki.unpinned")) },
+                )
+              }
+            >
+              {p.pinned ? t("wiki.unpin") : t("wiki.pin")}
+            </MenuItem>
+          )}
           {admin && (
             <MenuItem
               icon="lock"
@@ -648,10 +656,12 @@ export function WikiReader({
               {p.locked ? t("wiki.unlock") : t("wiki.lock")}
             </MenuItem>
           )}
-          <MenuSeparator />
-          <MenuItem icon="trash" danger onSelect={() => setConfirmDelete(true)}>
-            {t("wiki.delete")}
-          </MenuItem>
+          {writes && <MenuSeparator />}
+          {writes && (
+            <MenuItem icon="trash" danger onSelect={() => setConfirmDelete(true)}>
+              {t("wiki.delete")}
+            </MenuItem>
+          )}
         </Menu>
       </>
     );

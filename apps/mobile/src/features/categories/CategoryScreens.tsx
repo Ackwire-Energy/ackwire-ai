@@ -84,7 +84,7 @@ export function PickCategoryScreen({ channelId }: { channelId: string }) {
           />
         ))}
       </GroupedList>
-      {arrangesCategories(org?.role) ? (
+      {arrangesCategories(org) ? (
         <>
           <Gap />
           <GroupedList>
@@ -351,7 +351,7 @@ export function useMovesChannel(channelId: string) {
   const { org } = useOrg();
   const meId = useMeId();
   const channel = useChannels(orgId).data?.find((c) => c.id === channelId);
-  return channel ? movesChannel(channel, meId, org?.role) : false;
+  return channel ? movesChannel(channel, meId, org) : false;
 }
 
 const styles = StyleSheet.create({

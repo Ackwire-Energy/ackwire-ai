@@ -1,7 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, desc, type Executor, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
 import { getAgent } from "./agents";
-import { audienceError, canTalkTo } from "./audience";
+import { audienceError, canTalkTo, talksToAgents } from "./audience";
 import { recordAudit } from "./audit";
 import { runAuthorityById } from "./authority";
 import { openDm } from "./dms";
@@ -445,7 +445,7 @@ export async function createIssue(
 ): Promise<IssueView> {
   const { db } = deps;
   const membership = await requireOrgMember(db, actor, orgId);
-  if (membership && !can(membership.role, "post")) throw new ForbiddenError();
+  if (membership && !can(membership, "post")) throw new ForbiddenError();
   const title = input.title.trim().slice(0, 300);
   if (!title) throw new ValidationError("title is required");
   if (input.priority && !PRIORITIES.includes(input.priority)) throw new ValidationError("invalid priority");
@@ -986,7 +986,7 @@ export async function askAgentToImplement(
   const agent = await getAgent(db, orgId, agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
   // The person must be able to talk to the agent; the DM needs nothing else.
-  if (!canTalkTo(agent, userId)) throw await audienceError(db, agent);
+  if (!canTalkTo(agent, userId, await talksToAgents(db, orgId, userId))) throw await audienceError(db, agent);
   const dm = await openDm(db, userId, orgId, { agentId });
   const updated = await updateIssue(deps, actor, orgId, issue.id, { assignee: { type: "agent", id: agentId } });
   const card: IssueWorkMeta = { issueId: issue.id, number: issue.number, title: issue.title, agentId };

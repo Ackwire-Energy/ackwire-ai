@@ -664,7 +664,7 @@ export async function applyImport(
   defaults: { model: string },
 ): Promise<ImportPlan> {
   const { db, pubsub } = deps;
-  await requirePermission(db, actorId, orgId, "manage_agents");
+  await requirePermission(db, actorId, orgId, "create_agents");
   const { source } = input.bundle;
   const state = await loadImportState(db, actorId, orgId, source);
   const plan = planImport(input, state);

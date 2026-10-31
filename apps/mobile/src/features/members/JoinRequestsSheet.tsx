@@ -1,12 +1,20 @@
-import { type JoinRequest, useApproveJoinRequest, useDenyJoinRequest, useJoinRequests } from "@agenteschat/client";
+import {
+  type JoinRequest,
+  type OrgRole,
+  useApproveJoinRequest,
+  useDenyJoinRequest,
+  useJoinRequests,
+  useRoles,
+} from "@agenteschat/client";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
-import { APPROVE_ROLES, type ApproveRole, approvalNews, JOIN_REASON_MAX } from "@agenteschat/client/lib/join-requests";
+import { approvalNews, JOIN_REASON_MAX } from "@agenteschat/client/lib/join-requests";
 import { can } from "@agenteschat/client/lib/permissions";
+import { sortRoles } from "@agenteschat/client/lib/roles";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Share, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, Chip, InfoHint, PersonAvatar, Segmented, SheetScreen, Text, useToast } from "@/ui";
+import { Button, Chip, GroupedList, GroupedRow, InfoHint, PersonAvatar, SheetScreen, Text, useToast } from "@/ui";
 import { useColors } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { successHaptic, useSurface } from "../shared/parts";
@@ -15,16 +23,19 @@ import { requestChips } from "./logic";
 
 /**
  * Requests to join through the invitation link (ADR 0068), as a native form sheet: the web's Members › Requests on
- * the phone, opened by the push, Atividade's card and `agenteschat://join-requests`. Each is approved with a role or
- * denied with a reason the person reads in the email. On a server that sends no email, approving hands the admin
- * the invitation's link to share.
+ * the phone, opened by the push, Atividade's card and `agenteschat://join-requests`. Each is approved, with any of
+ * the roles the approver may give (ADR 0085; none: only what everyone may do), or denied with a reason the person
+ * reads in the email. On a server that sends no email, approving hands the approver the invitation's link to share.
  */
 export function JoinRequestsSheet({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const { orgId, org } = useOrg();
   const c = useColors();
-  const allowed = can(org?.role, "manage_members");
+  const allowed = can(org, "invite_people");
   const list = useJoinRequests(orgId, allowed);
+  const roles = useRoles(orgId);
+  // The roles the approver may give: the custom ones below their own (`givable`), top first.
+  const givable = sortRoles((roles.data?.roles ?? []).filter((r) => r.givable));
   // Every link handed over stays until the sheet closes: each is returned once, and the Share sheet can be dismissed.
   const [handOffs, setHandOffs] = useState<{ name: string; url: string }[]>([]);
   const orgName = org?.name ?? "";
@@ -47,6 +58,7 @@ export function JoinRequestsSheet({ onClose }: { onClose: () => void }) {
       <RequestCard
         key={r.id}
         request={r}
+        roles={givable}
         onSend={(url) => {
           setHandOffs((all) => [...all, { name: r.name, url }]);
           share(url);
@@ -66,7 +78,16 @@ export function JoinRequestsSheet({ onClose }: { onClose: () => void }) {
 }
 
 /** One request: who and their address, its chips (`requestChips`), their note, and the answer. */
-function RequestCard({ request: r, onSend }: { request: JoinRequest; onSend: (url: string) => void }) {
+function RequestCard({
+  request: r,
+  roles,
+  onSend,
+}: {
+  request: JoinRequest;
+  /** The roles the approver may give; none chosen at first. */
+  roles: readonly OrgRole[];
+  onSend: (url: string) => void;
+}) {
   const { t, i18n } = useTranslation();
   const { orgId } = useOrg();
   const surface = useSurface();
@@ -74,7 +95,8 @@ function RequestCard({ request: r, onSend }: { request: JoinRequest; onSend: (ur
   const toast = useToast();
   const approve = useApproveJoinRequest(orgId);
   const deny = useDenyJoinRequest(orgId);
-  const [role, setRole] = useState<ApproveRole>("member");
+  const [roleIds, setRoleIds] = useState<string[]>([]);
+  const flip = (id: string) => setRoleIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
   const [denying, setDenying] = useState(false);
   const [reason, setReason] = useState("");
   const busy = approve.isPending || deny.isPending;
@@ -82,10 +104,12 @@ function RequestCard({ request: r, onSend }: { request: JoinRequest; onSend: (ur
   const failed = (e: unknown) => toast({ title: knownErrorText(t, e) ?? t("mobile.app.failed"), icon: "x" });
 
   // Awaited, not `mutate`'s callbacks: the answered card leaves the list (unmounting) before those would run, and
-  // the link a server without email returns must still reach the admin.
+  // the link a server without email returns must still reach the approver.
   const approveIt = async () => {
     try {
-      const news = approvalNews(await approve.mutateAsync({ id: r.id, role }));
+      // Only roles still offered (one may have gone since it was picked).
+      const given = roleIds.filter((id) => roles.some((x) => x.id === id));
+      const news = approvalNews(await approve.mutateAsync({ id: r.id, roleIds: given }));
       successHaptic();
       if ("send" in news) onSend(news.send);
       else
@@ -167,13 +191,30 @@ function RequestCard({ request: r, onSend }: { request: JoinRequest; onSend: (ur
         </>
       ) : (
         <>
-          <InfoHint name={t("common.about", { label: t("members.role") })} text={t("mobile.joinRequests.rolesHint")}>
-            <Segmented
-              items={APPROVE_ROLES.map((key) => ({ key, label: t(`roles.${key}`) }))}
-              value={role}
-              onChange={(key) => setRole(key === "admin" ? "admin" : "member")}
-            />
-          </InfoHint>
+          {roles.length > 0 ? (
+            <View style={styles.field}>
+              <InfoHint
+                name={t("common.about", { label: t("mobile.joinRequests.roles") })}
+                text={t("mobile.joinRequests.rolesHint")}
+                variant="footnote"
+              >
+                <Text variant="footnote" tone="muted">
+                  {t("mobile.joinRequests.roles")}
+                </Text>
+              </InfoHint>
+              <GroupedList>
+                {roles.map((role) => (
+                  <GroupedRow
+                    key={role.id}
+                    label={role.name}
+                    toggle={roleIds.includes(role.id)}
+                    disabled={busy}
+                    onPress={() => flip(role.id)}
+                  />
+                ))}
+              </GroupedList>
+            </View>
+          ) : null}
           <View style={styles.acts}>
             <View style={styles.grow}>
               <Button

@@ -1,6 +1,7 @@
 import type { WikiPageSummary } from "@agenteschat/client";
 import { keys, useWikiReads, useWikiTree } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
+import { can } from "@agenteschat/client/lib/permissions";
 import { type WikiFolder, wikiSlug, wikiTree } from "@agenteschat/client/lib/wiki";
 import { Button, EmptyState, Icon, Kbd, SearchField } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -78,7 +79,10 @@ export function WikiPage({ slug, newTitle }: { slug?: string; newTitle?: string 
     }
   }, [slug]);
 
+  // Writing the wiki is a key (`edit_wiki`, ADR 0085): without it, new pages and imports don't start.
+  const writes = can(org, "edit_wiki");
   const startNew = (title = "", folder = current?.folder ?? "") => {
+    if (!writes) return;
     setWriting({ title, folder });
     setNavOpen(false);
   };
@@ -93,7 +97,7 @@ export function WikiPage({ slug, newTitle }: { slug?: string; newTitle?: string 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
-  const drop = useVaultDrop((files) => setImporting({ files }), importing === null && writing === null);
+  const drop = useVaultDrop((files) => setImporting({ files }), writes && importing === null && writing === null);
 
   let center: ReactNode;
   if (tree.isError && !tree.data) center = <ErrorState error={tree.error} onRetry={() => void tree.refetch()} />;
@@ -270,15 +274,17 @@ function WikiNav({
     <aside className="wiki-nav" data-open={open || undefined} aria-label={t("wiki.nav")}>
       <div className="wiki-nav__head">
         <b>{t("wiki.title")}</b>
-        <Button
-          size="sm"
-          variant="ghost"
-          iconOnly
-          icon="plus"
-          aria-label={t("wiki.new")}
-          title={`${t("wiki.new")} (N)`}
-          onClick={onNew}
-        />
+        {can(org, "edit_wiki") && (
+          <Button
+            size="sm"
+            variant="ghost"
+            iconOnly
+            icon="plus"
+            aria-label={t("wiki.new")}
+            title={`${t("wiki.new")} (N)`}
+            onClick={onNew}
+          />
+        )}
       </div>
       <SearchField
         size="sm"
@@ -354,13 +360,15 @@ function WikiNav({
           </div>
         </section>
       )}
-      <button type="button" className="wiki-import-card" onClick={onImport}>
-        <ObsidianMark size={20} />
-        <span>
-          <b>{t("wiki.import.cta")}</b>
-          <small>{t("wiki.import.ctaText")}</small>
-        </span>
-      </button>
+      {can(org, "edit_wiki") && (
+        <button type="button" className="wiki-import-card" onClick={onImport}>
+          <ObsidianMark size={20} />
+          <span>
+            <b>{t("wiki.import.cta")}</b>
+            <small>{t("wiki.import.ctaText")}</small>
+          </span>
+        </button>
+      )}
     </aside>
   );
 }
@@ -381,14 +389,18 @@ function HomeHead({ onNew, onImport, onNav }: { onNew: () => void; onImport: () 
         <Button size="sm" variant="ghost" icon="menu" className="wiki__navbtn" onClick={onNav}>
           {t("wiki.tree")}
         </Button>
-        <Button size="sm" onClick={onImport}>
-          <ObsidianMark size={16} />
-          {t("wiki.import.short")}
-        </Button>
-        <Button size="sm" variant="primary" icon="plus" onClick={onNew}>
-          {t("wiki.new")}
-          <Kbd>N</Kbd>
-        </Button>
+        {can(org, "edit_wiki") && (
+          <>
+            <Button size="sm" onClick={onImport}>
+              <ObsidianMark size={16} />
+              {t("wiki.import.short")}
+            </Button>
+            <Button size="sm" variant="primary" icon="plus" onClick={onNew}>
+              {t("wiki.new")}
+              <Kbd>N</Kbd>
+            </Button>
+          </>
+        )}
       </div>
     </header>
   );
@@ -560,38 +572,40 @@ function WikiEmpty({ onNew, onImport, onNav }: { onNew: () => void; onImport: ()
         icon="book"
         title={t("wiki.emptyTitle")}
         actions={
-          <div className="wiki-empty__acts">
-            <Button variant="primary" onClick={onImport}>
-              <ObsidianMark size={16} />
-              {t("wiki.import.cta")}
-            </Button>
-            <Button
-              loading={busy}
-              disabled={busy}
-              onClick={async () => {
-                setBusy(true);
-                try {
-                  // Straight to the API: the empty state goes away as soon as the first page exists.
-                  for (const p of starterPages(t)) {
-                    await api.wiki.create(org.id, { title: p.title, folder: p.folder, body: p.body });
+          can(org, "edit_wiki") && (
+            <div className="wiki-empty__acts">
+              <Button variant="primary" onClick={onImport}>
+                <ObsidianMark size={16} />
+                {t("wiki.import.cta")}
+              </Button>
+              <Button
+                loading={busy}
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    // Straight to the API: the empty state goes away as soon as the first page exists.
+                    for (const p of starterPages(t)) {
+                      await api.wiki.create(org.id, { title: p.title, folder: p.folder, body: p.body });
+                    }
+                    void qc.invalidateQueries({ queryKey: keys.wiki(org.id) });
+                    toast.show(t("wiki.starterCreated"));
+                    void navigate({
+                      to: "/org/$orgId/wiki/$slug",
+                      params: { orgId: org.id, slug: wikiSlug(t("wiki.starterPages.overview")) },
+                    });
+                  } finally {
+                    setBusy(false);
                   }
-                  void qc.invalidateQueries({ queryKey: keys.wiki(org.id) });
-                  toast.show(t("wiki.starterCreated"));
-                  void navigate({
-                    to: "/org/$orgId/wiki/$slug",
-                    params: { orgId: org.id, slug: wikiSlug(t("wiki.starterPages.overview")) },
-                  });
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              {t("wiki.useStarter")}
-            </Button>
-            <Button variant="ghost" icon="plus" onClick={onNew}>
-              {t("wiki.blankPage")}
-            </Button>
-          </div>
+                }}
+              >
+                {t("wiki.useStarter")}
+              </Button>
+              <Button variant="ghost" icon="plus" onClick={onNew}>
+                {t("wiki.blankPage")}
+              </Button>
+            </div>
+          )
         }
       >
         {t("wiki.emptyText")}

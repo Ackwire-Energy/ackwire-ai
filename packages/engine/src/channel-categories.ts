@@ -123,7 +123,7 @@ export async function createChannelCategory(
   input: { name: string; channelIds?: string[] },
   options: Options = {},
 ): Promise<ChannelCategory> {
-  await requirePermission(db, actorId, orgId, "configure");
+  await requirePermission(db, actorId, orgId, "manage_channels");
   const name = cleanName(input.name);
   await requireFreeName(db, orgId, name);
   try {
@@ -172,7 +172,7 @@ export async function renameChannelCategory(
   input: { name: string },
   options: Options = {},
 ): Promise<ChannelCategory> {
-  await requirePermission(db, actorId, orgId, "configure");
+  await requirePermission(db, actorId, orgId, "manage_channels");
   await requireCategory(db, orgId, categoryId);
   const name = cleanName(input.name);
   await requireFreeName(db, orgId, name, categoryId);
@@ -199,7 +199,7 @@ export async function deleteChannelCategory(
   categoryId: string,
   options: Options = {},
 ) {
-  await requirePermission(db, actorId, orgId, "configure");
+  await requirePermission(db, actorId, orgId, "manage_channels");
   await requireCategory(db, orgId, categoryId);
   await db.transaction(async (tx) => {
     const moving = await channelsIn(tx, orgId, categoryId);
@@ -221,7 +221,7 @@ export async function placeChannelCategory(
   input: { beforeCategoryId: string | null },
   options: Options = {},
 ) {
-  await requirePermission(db, actorId, orgId, "configure");
+  await requirePermission(db, actorId, orgId, "manage_channels");
   await requireCategory(db, orgId, categoryId);
   if (input.beforeCategoryId === categoryId) return;
   if (input.beforeCategoryId) await requireCategory(db, orgId, input.beforeCategoryId);
@@ -272,7 +272,7 @@ export async function placeChannel(
       ),
     );
   if (!channel) throw new NotFoundError("Channel not found");
-  if (channel.createdByUserId !== actorId && !can(membership.role, "manage_members")) {
+  if (channel.createdByUserId !== actorId && !can(membership, "manage_channels")) {
     throw new ForbiddenError("Only the channel's creator or an admin can move it");
   }
   if (input.categoryId) await requireCategory(db, orgId, input.categoryId);

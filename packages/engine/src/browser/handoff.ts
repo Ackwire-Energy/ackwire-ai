@@ -344,7 +344,7 @@ export async function requireBrowserAccess(
     .from(agents)
     .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
   if (!agent) throw new NotFoundError("Agent not found");
-  const admin = can(membership.role, "manage_agents");
+  const admin = can(membership, "control_computers");
   const access = { ...agent, admin };
   if (admin || agent.owner === userId) return access;
   const open = handoff === undefined ? await openHandoffOf(db, orgId, agentId, screen) : handoff;

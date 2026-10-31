@@ -157,7 +157,7 @@ export function NewAgentPage({ proposalId = null }: { proposalId?: string | null
   const opened = useRef<AgentProposal | null>(null);
   if (proposal.data?.canDecide && opened.current?.messageId !== proposal.data.messageId) opened.current = proposal.data;
   const from = opened.current?.messageId === proposalId ? opened.current : null;
-  const allowed = can(org.role, "manage_agents");
+  const allowed = can(org, "create_agents");
   const closed = proposalId !== null && !from;
   if (!allowed || closed) {
     return (

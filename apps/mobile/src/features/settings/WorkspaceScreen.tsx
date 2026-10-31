@@ -24,13 +24,13 @@ import { SETTINGS_GROUPS, type SettingsEntry, tileStates, visibleSections } from
 /**
  * The workspace's settings, as the web's sections in its groups, on a page like Você: the workspace's sky with its
  * mark, its name and who you are there; then "Editar workspace" (its logo, name, zone and what every agent knows)
- * above "Membros e convites", and each area this role opens, with how it is now under its name.
+ * above "Membros e convites", and each area this person opens, with how it is now under its name.
  */
 export function WorkspaceScreen() {
   const { t } = useTranslation();
   const { orgId, org } = useOrg();
   const role = org?.role;
-  const areas = visibleSections(role).filter((s) => s.id !== "general");
+  const areas = visibleSections(org).filter((s) => s.id !== "general");
   const states = useAreaStates(areas);
   const overview = useOverview(orgId).data;
   const headline = [
@@ -53,7 +53,7 @@ export function WorkspaceScreen() {
             {own ? (
               <PageRow
                 icon="pen"
-                label={can(role, "configure") ? t("mobile.settings.edit") : t("settings.section.general")}
+                label={can(org, "configure") ? t("mobile.settings.edit") : t("settings.section.general")}
                 below={<Line text={t("settings.sectionText.general")} />}
                 onPress={() => router.push("/settings/general")}
               />
@@ -88,14 +88,13 @@ function Line({ text }: { text: string }) {
 function useAreaStates(areas: readonly SettingsEntry[]) {
   const { t, i18n } = useTranslation();
   const { orgId, org } = useOrg();
-  const role = org?.role;
   const shown = (id: string) => areas.some((s) => s.id === id);
   const overview = useOverview(orgId);
-  const invitations = useInvitations(orgId, can(role, "manage_members"));
+  const invitations = useInvitations(orgId, can(org, "invite_people"));
   const connections = useConnections(orgId);
   const skills = useSkills(orgId, shown("skills"));
   const machines = useMachines(orgId, shown("computers"));
-  const managesKeys = can(role, "manage_credentials");
+  const managesKeys = can(org, "manage_credentials");
   const credentials = useCredentials(orgId, managesKeys);
   const plans = useAiAccounts(orgId, shown("keys") && !managesKeys);
   const platform = usePlatformKey(orgId);

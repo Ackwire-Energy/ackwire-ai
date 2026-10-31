@@ -206,6 +206,7 @@ export {
   planWindows,
 } from "./components/PlanMeter";
 export { Popover } from "./components/Popover";
+export { type BadgePresence, PresenceBadge, type PresenceBadgeProps } from "./components/PresenceBadge";
 export {
   ProviderLogo,
   type ProviderLogoProps,
@@ -220,6 +221,7 @@ export {
   RecurrencePicker,
   type RecurrencePickerProps,
 } from "./components/RecurrencePicker";
+export { RoleMark } from "./components/RoleMark";
 export {
   BrowserMark,
   type BrowserPixelKind,

@@ -406,7 +406,7 @@ export async function listAgentMemoryRows(db: Database, actorId: string, orgId: 
  */
 async function requireEdit(db: Database, actorId: string, item: ContextItem) {
   const membership = await requirePermission(db, actorId, item.orgId, "read");
-  if (can(membership.role, "configure")) return;
+  if (can(membership, "review_memory")) return;
   if (item.agentId) {
     const agent = await getAgent(db, item.orgId, item.agentId);
     if (agent?.ownerUserId === actorId) {
