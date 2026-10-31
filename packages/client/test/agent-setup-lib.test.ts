@@ -222,12 +222,15 @@ describe("a new agent starts with the last setup", () => {
       account: { id: "acc", label: "GLM Coding" },
       input: { brain: "claude_code" as const, model: "sonnet", effort: "medium" as const },
     };
-    expect(say(glm, "zai")).toBe("brain.card.claude_code · GLM-5.3");
+    // The model by the plan that pays for it, never the program it runs in.
+    const glmLine = 'brain.line.coding {"model":"GLM-5.3","plan":"GLM Coding"}';
+    expect(say(glm, "zai")).toBe(glmLine);
+    expect(say(glm)).toBe('brain.line.claude {"model":"sonnet","plan":"aiAccounts.connect.claude_code"}');
     // Then its Autonomia.
     const autonomy = (a: string) => `${A}.changed {"value":"${A}.${a}"}`;
     expect(say({ brain: "model", model: "claude-opus-5-5", key: null, contextTokens: null, autonomy: "never" })).toBe(
       `Claude Opus 5.5 · ${autonomy("never")}`,
     );
-    expect(say({ ...glm, autonomy: "always" }, "zai")).toBe(`brain.card.claude_code · GLM-5.3 · ${autonomy("always")}`);
+    expect(say({ ...glm, autonomy: "always" }, "zai")).toBe(`${glmLine} · ${autonomy("always")}`);
   });
 });

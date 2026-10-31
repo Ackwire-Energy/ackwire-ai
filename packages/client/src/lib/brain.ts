@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next";
 import type { AgentBrainLine, BrainKind, BrainOption } from "../api/types";
+import { type PlanChoice, planLabel, planOfAccount } from "./no-ai";
 import { isAuto } from "./providers";
 
 /*
@@ -36,10 +37,22 @@ export function engineStateOfOption(
 }
 
 /**
- * What thinks for an agent, wherever it is shown (DM header, profile card, the phone's "Pensa com"):
- * "Claude Code · Sonnet no mac", "GLM-5.3 pelo Claude Code", "Codex · GPT-6 Sol", or the API model's label.
- * Whoever doesn't see its computer (not its owner nor an admin) also reads whose plan it is (`owner`).
- * `mark` is the maker's (`ProviderLogo` id: a plan account's own provider when it has one), null for the API.
+ * What thinks on a plan, in one sentence wherever it's said: the model by the plan that pays for it ("Sonnet pelo
+ * plano do Claude", "DeepSeek V4.1 Flash pelo OpenCode Go"), never the program it runs in or the computer; with
+ * `owner`, whose plan it is.
+ */
+export function thinksWith(t: TFunction, plan: PlanChoice, model: string, owner?: string | null): string {
+  const line = plan === "claude" || plan === "chatgpt" ? plan : "coding";
+  return owner
+    ? t(`brain.line.${line}Of`, { model, plan: planLabel(t, plan), owner })
+    : t(`brain.line.${line}`, { model, plan: planLabel(t, plan) });
+}
+
+/**
+ * What thinks for an agent, wherever it is shown (DM header, profile card, the phone's "Pensa com"): on a plan its
+ * model by that plan (`thinksWith`), else the API model's label. Whoever doesn't see its computer (not its owner nor
+ * an admin) also reads whose plan it is (`owner`). `mark` is the maker's (`ProviderLogo` id: a plan account's own
+ * provider when it has one), null for the API.
  */
 export function brainLine(
   t: TFunction,
@@ -49,12 +62,9 @@ export function brainLine(
 ): { text: string; kind: EngineKind; mark: string | null } {
   if (!brain || brain.kind === "model") return { text: apiModelLabel, kind: "agent", mark: null };
   const model = isAuto(brain.model) ? t("brain.auto.label") : (brain.model ?? "");
-  const line = brain.provider && brain.kind === "claude_code" ? "plan" : brain.kind;
-  const text = brain.computer
-    ? t(`brain.line.${line}`, { model, computer: brain.computer })
-    : t(`brain.line.${line}NoComputer`, { model });
+  const plan = planOfAccount({ kind: brain.kind, provider: brain.provider ?? null });
   return {
-    text: !brain.computer && owner ? t("brain.line.ofOwner", { line: text, owner }) : text,
+    text: thinksWith(t, plan, model, brain.computer ? null : owner),
     kind: engineOfBrain(brain.kind),
     mark: brain.provider ?? brain.kind,
   };

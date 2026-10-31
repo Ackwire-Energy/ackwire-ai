@@ -541,7 +541,7 @@ describe("Criar agente: what gets created", () => {
         .getByRole("button", { name: /^Claude Code.*Mac mini/ })
         .getAttribute("aria-pressed"),
     ).toBe("true");
-    expect(screen().getByText("Começa com a última escolha: Claude Code · Opus · Esforço alto.")).toBeTruthy();
+    expect(screen().getByText("Começa com a última escolha: Opus pelo plano do Claude · Esforço alto.")).toBeTruthy();
     await proceed();
     await click(screen().getByRole("button", { name: "Criar Eva" }));
     await settle(8);

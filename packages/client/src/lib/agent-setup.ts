@@ -9,9 +9,11 @@ import type {
   Model,
   NewAgentSetup,
 } from "../api/types";
+import { thinksWith } from "./brain";
 import { advancedParts, effortLevel } from "./brain-advanced";
 import { isContextLimit } from "./context-limits";
 import { firstName } from "./format";
+import { planLabel, planOfAccount } from "./no-ai";
 import { planModel, planOf } from "./plans";
 import { isAuto } from "./providers";
 
@@ -174,8 +176,8 @@ export function newAgentStart(
 }
 
 /**
- * What a new agent starts with, in words: the API's model ("Claude Opus 5.5", "Automático"), or the plan with its
- * model and what differs in its advanced settings ("Claude Code · Opus · Esforço alto"), then its Autonomia.
+ * What a new agent starts with, in words: the API's model ("Claude Opus 5.5", "Automático"), or the model by its plan
+ * and what differs in its advanced settings ("Opus pelo plano do Claude · Esforço alto"), then its Autonomia.
  */
 export function newAgentStartText(
   t: TFunction,
@@ -209,5 +211,6 @@ export function newAgentStartText(
       fallback: start.input.fallback ?? true,
     },
   });
-  return [t(`brain.card.${start.brain}`), name, ...parts, ...autonomy].filter(Boolean).join(" · ");
+  const plan = planOfAccount({ kind: start.brain, provider: o.provider ?? null });
+  return [name ? thinksWith(t, plan, name) : planLabel(t, plan), ...parts, ...autonomy].filter(Boolean).join(" · ");
 }

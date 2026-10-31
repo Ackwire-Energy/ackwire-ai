@@ -1518,7 +1518,7 @@ export const en: Translations = {
       review: "Review",
       created: "Created",
       aiAccount: "Thinks with {{account}}",
-      aiModel: "Thinks with the workspace's model",
+      aiModel: "Thinks through the API",
       aiNone: "No AI yet. Connect one after creating it",
     },
   },
@@ -2343,7 +2343,6 @@ export const en: Translations = {
       sentenceMember: "Thinks with <brain/><end>.</end>",
       sentenceCloud: "Thinks with <brain/> in the <computer/> and <browser/><end>.</end>",
       sentenceMachine: "Thinks with <brain/> on <computer/> and <browser/><end>.</end>",
-      orgModel: "the workspace's model",
       cell: {
         label: "How {{she}} works",
         computer: "Works on",
@@ -2361,7 +2360,9 @@ export const en: Translations = {
       open: { brain: "Change who thinks", computer: "Change where {{she}} works", browser: "Change the browser" },
       saved: {
         brain: "{{name}} now thinks with {{brain}}.",
-        brainMoved: "{{name}} now thinks with {{brain}} on {{computer}}.",
+        brainMoved: "{{name}} now works on {{computer}} and thinks with {{brain}}.",
+        /** From the API onto a plan: it answers only its owner from now on (ADR 0059 §5). */
+        brainOwner: "{{name}} now thinks with {{brain}} and answers only you.",
         account: "{{name}} now uses the {{account}} account.",
         computer: "{{name}} now works on {{computer}}.",
         none: "{{name}} now has no computer.",
@@ -2372,18 +2373,17 @@ export const en: Translations = {
       },
       failed: "Couldn't save. Try again.",
       use: "Use",
-      usePlan: { claude_code: "Use my Claude plan", codex: "Use my ChatGPT plan" },
       brain: {
-        sub: "Applies to every conversation.",
-        model: "Workspace's model",
-        modelText: "Through the API. Usage counts in {{name}}'s budget.",
-        claude_codeText: "Uses your Claude plan",
-        codexText: "Uses your ChatGPT plan",
+        sub: "Applies only to {{name}}, in every conversation.",
+        model: "API key",
+        modelText: "Paid per use. It counts against {{name}}'s budget.",
+        /** A plan's card: `plan` is its name ("Claude", "ChatGPT", "OpenCode Go"). */
+        planText: "Uses your {{plan}} plan",
         moves: "Moves to {{computer}}",
         off: "{{computer}} is offline",
         none: "No computer has it",
         planModel: "Model",
-        account: { claude_code: "Claude account", codex: "ChatGPT account" },
+        account: "Account",
         accountLocked: "Only {{name}} changes it",
         accountSignedOut: "Signed out, sign in again",
         thisComputer: "{{computer}}'s account",
@@ -2392,10 +2392,11 @@ export const en: Translations = {
         accountOf: "{{name}}'s",
         addAccount: "Add account",
         signInAgain: "Sign in again",
+        connectPlan: "Connect another plan",
         keyLabel: "API key",
         fallbackTitle: "If {{computer}} stops answering, answer through the API",
         fallbackHint:
-          "It uses the workspace's model and counts in {{name}}'s budget. Otherwise {{name}} tells whoever asked and waits for the computer to come back.",
+          "It answers through the API and counts against {{name}}'s budget. Otherwise {{name}} tells whoever asked and waits for the computer to come back.",
         effort: "Effort",
         efforts: { auto: "Automatic", low: "Low", medium: "Medium", high: "High", max: "Maximum" },
         effortText: {
@@ -2512,8 +2513,8 @@ export const en: Translations = {
         offline: "Offline right now",
         browser: "Browser",
         browserPending: "Browser (needs turning on)",
-        onlyModel: "Only the workspace's model",
-        alsoBrain: "Goes back to the workspace's model ({{brain}} isn't there)",
+        onlyModel: "Only through the API",
+        alsoBrain: "Goes back to thinking through the API ({{brain}} isn't there)",
         alsoOffline: "It's offline: until it's back, {{name}} waits",
         connect: "Connect another computer",
         useMachine: "Use {{computer}}",
@@ -6273,14 +6274,14 @@ export const en: Translations = {
       hint: "Picks the model and the effort for each task",
     },
     sub: "Who writes {{name}}'s answers. It applies to every conversation.",
+    /** What thinks on a plan, everywhere (`thinksWith`): the model by the plan that pays; `plan` is a coding plan's name. */
     line: {
-      claude_code: "Claude Code · {{model}} on {{computer}}",
-      claude_codeNoComputer: "Claude Code · {{model}}",
-      codex: "Codex · {{model}} on {{computer}}",
-      codexNoComputer: "Codex · {{model}}",
-      plan: "{{model}} through Claude Code on {{computer}}",
-      planNoComputer: "{{model}} through Claude Code",
-      ofOwner: "{{line}} · {{owner}}'s plan",
+      claude: "{{model}} on the Claude plan",
+      chatgpt: "{{model}} on the ChatGPT plan",
+      coding: "{{model}} on {{plan}}",
+      claudeOf: "{{model}} on {{owner}}'s Claude plan",
+      chatgptOf: "{{model}} on {{owner}}'s ChatGPT plan",
+      codingOf: "{{model}} on {{owner}}'s {{plan}}",
     },
     model: "Model (API)",
     modelText: "An AI model through the API, with a workspace key.",
@@ -6299,9 +6300,12 @@ export const en: Translations = {
       no_computer: "Choose a connected computer under Computer to use it.",
       exec_off: "The computer was connected without permission to run programs.",
       runner_old: "Update the agentes.chat program on the computer to use it.",
-      tool_off: "Turned off on {{computer}}. Turn it on there, in the agentes.chat app: Preferences → Tools.",
-      tool_offLinux: "Turned off on {{computer}}. Turn it on there, in the agentes.chat app or with {{command}}.",
-      not_installed: "It isn't installed on {{computer}}.",
+      /** `program`: "Claude Code" or "Codex" (`brain.card`). */
+      tool_off:
+        "{{program}} is turned off on {{computer}}. Turn it on there, in the agentes.chat app: Preferences → Tools.",
+      tool_offLinux:
+        "{{program}} is turned off on {{computer}}. Turn it on there, in the agentes.chat app or with {{command}}.",
+      not_installed: "{{program}} isn't installed on {{computer}}.",
       outdated: "The version on {{computer}} is old. Update Codex to use it.",
       no_computerCloud: "Ready as soon as {{computer}} is.",
     },
@@ -6312,6 +6316,11 @@ export const en: Translations = {
     modelTag: { cheap: "Cheap", fast: "Fast", smart: "Flagship" },
     /** What a coding plan's model needs from its account before it answers. */
     modelNeeds: { globalRegion: "Needs the Global region in OpenCode" },
+    /** Under the model chosen that needs it: how to give it. */
+    modelHow: {
+      globalRegion:
+        "Turn on the Global region in OpenCode, under Settings › Privacy. Without it, this model doesn't answer.",
+    },
     recommended: "Recommended",
     modelHelp: "Bigger models think more and use up the plan faster.",
     hidden: "{{owner}} or an admin chooses who thinks.",

@@ -114,7 +114,7 @@ describe("agent page: tabs and the URL", () => {
     expect(within(cover).getByRole("button", { name: "Mais ações" })).toBeTruthy();
     expect(screen().getByRole("heading", { level: 1 }).textContent).toBe("Ada");
     expect(hero.querySelector(".agp-handle")?.textContent).toContain("@ada");
-    expect(work.textContent).toContain("o modelo do workspace");
+    expect(work.textContent).toContain("Pela API");
   });
 });
 
@@ -234,7 +234,8 @@ describe("agent page: the budget on the overview", () => {
     if (ada) ada.brain = { kind: "claude_code", model: "Sonnet" };
     await go("", state);
     const work = screen().getByRole("region", { name: "Como trabalha" });
-    expect(work.textContent).toContain("Pensa comClaude Code · Sonnet");
+    // The model, over the plan that pays for it.
+    expect(work.textContent).toContain("Pensa comSonnetClaude");
     // A member doesn't see where it works or its browser.
     expect(work.textContent).not.toContain("Trabalha");
   });

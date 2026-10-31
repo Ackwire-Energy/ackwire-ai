@@ -149,7 +149,7 @@ describe("profile card", () => {
     await click(screen().getAllByRole("button", { name: "Perfil de Ada" })[0] as HTMLElement);
     await settle(6);
     const c = card();
-    expect(c.textContent).toContain("Claude Code · Opus no MacBook");
+    expect(c.textContent).toContain("Opus pelo plano do Claude");
     expect(c.textContent).not.toContain("sonnet 5.5");
   });
 

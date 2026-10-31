@@ -48,7 +48,7 @@ import {
   ownSignInReady,
   signInPlan,
 } from "@agenteschat/client/lib/ai-accounts";
-import { brainLine } from "@agenteschat/client/lib/brain";
+import { brainLine, thinksWith } from "@agenteschat/client/lib/brain";
 import {
   type Advanced,
   advancedDefaults,
@@ -68,14 +68,22 @@ import {
   toolOffReason,
   toolOnCommand,
 } from "@agenteschat/client/lib/machines";
-import { aiStateOf } from "@agenteschat/client/lib/no-ai";
+import {
+  type AiChoice,
+  aiChoiceOf,
+  aiStateOf,
+  kindOf,
+  planLabel,
+  planMark,
+  planOfAccount,
+} from "@agenteschat/client/lib/no-ai";
 import { can as canDo } from "@agenteschat/client/lib/permissions";
 import {
-  accountPlan,
+  type BrainModelChoice,
   brainModelChoice,
   brainModelChoices,
-  brainPlan,
   isPlanId,
+  PLAN_IDS,
   planModel as planModelOf,
   planOf,
 } from "@agenteschat/client/lib/plans";
@@ -120,7 +128,7 @@ import {
   ModelSelect,
   pickerValue,
 } from "@/components/AgentFields";
-import { AddAccount } from "@/components/ai/AddAccountFlow";
+import { AddAccount, OpenPage } from "@/components/ai/AddAccountFlow";
 import { accountOption } from "@/components/ai/ConnectAiSteps";
 import { PlanReplies, PlanRepliesOf } from "@/components/ai/PlanReplies";
 import { useConnectAi } from "@/components/ConnectAi";
@@ -238,13 +246,17 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
   const noAi = aiStateOf(aiStatus.data, agent.id) === "no_ai";
   const view = work.brain.data;
   const kind: BrainKind = view?.brain ?? agent.brain?.kind ?? "model";
+  // What pays: the API key, or the plan of the account it thinks with (the agent list's until its view loads).
+  const ai: AiChoice = view
+    ? aiChoiceOf(view)
+    : kind === "model"
+      ? "key"
+      : planOfAccount({ kind, provider: agent.brain?.provider ?? null });
   const orgModel = isAuto(saved.model)
     ? t("brain.auto.label")
     : (models.data?.models.find((m) => m.id === saved.model)?.label ?? saved.model);
   const shownPlanModel = view ? view.effectiveModel : (agent.brain?.model ?? null);
-  // A coding plan's account: its maker's model thinks.
-  const thinkingAccount = view?.account ? view.accounts.find((a) => a.id === view.account) : undefined;
-  const plan = kind === "claude_code" ? (view ? brainPlan(view) : planOf(agent.brain?.provider)) : undefined;
+  const plan = isPlanId(ai) ? planOf(ai) : undefined;
   const effectiveChoice = view?.effectiveModel ? brainModelChoice(kind, plan, view.effectiveModel) : null;
   const planModel = isAuto(shownPlanModel)
     ? t("brain.auto.label")
@@ -253,13 +265,14 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
           (c) => c.value === effectiveChoice,
         )?.label ?? view.effectiveModel)
       : shownPlanModel;
-  // The account only when the computer has more than one of that kind.
-  const kindAccounts = view?.accountsSupported ? view.accounts.filter((a) => a.kind === kind) : [];
+  // The account by its name only where its plan has more than one there (Claude's and ChatGPT's count the computer's
+  // own sign-in), else the plan's name.
+  const planAccounts = view?.accountsSupported ? view.accounts.filter((a) => planOfAccount(a) === ai) : [];
   const accountWord =
-    kind === "model" || kindAccounts.length === 0
+    ai === "key" || planAccounts.length + (isPlanId(ai) ? 0 : 1) < 2
       ? null
       : view?.account
-        ? (kindAccounts.find((a) => a.id === view.account)?.label ?? null)
+        ? (planAccounts.find((a) => a.id === view.account)?.label ?? null)
         : ownSignInName(t, view?.ownSignIn === true && view.canUsePlans, view?.computer?.name ?? "");
   // Near or at its plan's limit: said where the account is.
   const usage =
@@ -268,7 +281,10 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
       : view.account
         ? view.accounts.find((a) => a.id === view.account)?.usage
         : view.ownUsage[kind];
-  const sub = [accountWord, planWord(t, i18n.language, usage)].filter(Boolean).join(" · ") || null;
+  const sub =
+    ai === "key"
+      ? t("brain.foot.api")
+      : [accountWord ?? planLabel(t, ai), planWord(t, i18n.language, usage)].filter(Boolean).join(" · ");
   const effort =
     kind !== "model" && view
       ? t("agentPage.work.cell.effort", {
@@ -318,19 +334,11 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
             />
           ) : (
             <Cell
-              icon={
-                kind === "model" ? (
-                  <Icon name="brainAgent" size={16} />
-                ) : plan ? (
-                  <ProviderLogo id={(view ? thinkingAccount?.provider : agent.brain?.provider) ?? kind} size="sm" />
-                ) : (
-                  <BrainLogo kind={kind} size="sm" />
-                )
-              }
+              icon={ai === "key" ? <Icon name="brainAgent" size={16} /> : <ProviderLogo id={planMark(ai)} size="sm" />}
               label={t("agentPage.work.cell.brain")}
-              value={kind === "model" ? orgModel : t(`brain.card.${kind}`)}
-              more={kind === "model" ? null : [planModel, effort].filter(Boolean).join(" · ") || null}
-              sub={kind === "model" ? t("agentPage.work.orgModel") : sub}
+              value={ai === "key" ? orgModel : planModel}
+              more={ai === "key" ? null : effort}
+              sub={sub}
               openLabel={t("agentPage.work.open.brain")}
               onOpen={can("brain") || can("model") ? () => onOpen("brain") : undefined}
             />
@@ -661,7 +669,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const apiKey = useAiStatus(org.id).data?.apiKey !== false;
   const update = useUpdateAgent(org.id, agent.id);
   const setTarget = useSetComputerTarget(org.id);
-  const [kind, setKind] = useState<BrainKind>(view.brain);
+  const connect = useConnectAi();
+  // The card is what pays (the API key, or a plan: Claude's, ChatGPT's, a coding plan's); its brain follows from it.
+  const savedCard = aiChoiceOf(view);
+  const [card, setCard] = useState<AiChoice>(savedCard);
+  const kind: BrainKind = card === "key" ? "model" : kindOf(card);
   const [planModel, setPlanModel] = useState<string | null>(view.effectiveModel);
   const [fallback, setFallback] = useState(view.fallback);
   const [model, setModel] = useState(saved.model);
@@ -696,14 +708,20 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const toolOffHere =
     useIsThisMac(org.id, view.computer?.machineId ?? "") && view.options.some((o) => o.reason === "tool_off");
   const machines = view.machines;
-  const homeOf = (k: BrainKind) => (k === "model" ? null : homeFor(k, work.machineId, machines));
+  // A coding plan thinks through Claude Code on the agent's computer, where its key is: it never moves.
+  const homeOf = (c: AiChoice) => {
+    if (c === "key") return null;
+    if (!isPlanId(c)) return homeFor(kindOf(c), work.machineId, machines);
+    const here = machines.find((m) => m.machineId === work.machineId);
+    return here?.options.some((o) => o.kind === "claude_code" && o.available) ? here : null;
+  };
   // While a sign-in is under way on the agent's computer, no brain there reads as offline: the sign-in's block says
   // how it stands (Reconnecting while that computer is away a moment).
-  const away = (k: BrainKind) => {
-    const where = homeOf(k);
+  const away = (c: AiChoice) => {
+    const where = homeOf(c);
     return !where?.online && !(signInBegun && where?.machineId === view.computer?.machineId);
   };
-  const home = homeOf(kind);
+  const home = homeOf(card);
   const moves = home && home.machineId !== work.machineId ? home : null;
   const option = (home?.options ?? view.options).find((o) => o.kind === kind);
   // Accounts live on the agent's computer: none when the brain moves elsewhere or the app there is old.
@@ -715,45 +733,59 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     ...view.accounts.map((v) => added.find((a) => a.id === v.id) ?? v),
     ...added.filter((a) => !view.accounts.some((v) => v.id === a.id)),
   ];
-  // Each person picks among their own accounts; someone else's shows only while it is this agent's.
-  const accounts = allAccounts.filter((a) => a.kind === accountKind && (a.mine || a.id === view.account));
+  // Each person picks among their own accounts of the card's plan; someone else's shows only while it is this agent's.
+  const accounts = allAccounts.filter((a) => planOfAccount(a) === card && (a.mine || a.id === view.account));
   const current = accounts.find((a) => a.id === account) ?? null;
   // The computers' rows: whether each one's own sign-ins are there, and their plan (a seat has its own words).
   const ai = useAiAccounts(org.id, view.canUsePlans);
   const rowOf = (machineId: string | undefined) => ai.data?.computers.find((c) => c.machineId === machineId);
   const row = rowOf(home?.machineId ?? view.computer?.machineId);
-  const ownListed = accountKind !== null && ownSignInListed(view, row, accountKind);
+  // The computer's own sign-in is Claude's or ChatGPT's: a coding plan signs in with its key.
+  const ownListed = accountKind !== null && !isPlanId(card) && ownSignInListed(view, row, accountKind);
+  // The API key, Claude's and ChatGPT's plans, then each coding plan with an account there that is the viewer's or
+  // that the agent thinks with.
+  const cards: AiChoice[] = [
+    "key",
+    "claude",
+    "chatgpt",
+    ...PLAN_IDS.filter(
+      (p) => p === savedCard || allAccounts.some((a) => a.provider === p && (a.mine || a.id === view.account)),
+    ),
+  ];
   /**
-   * Another plan brain starts on what can think for the agent on its computer: that computer's own sign-in where it's
-   * ready, else one of the viewer's accounts of that kind that thinks for nobody. With neither and no account of that
-   * kind there at all, its sign-in opens at once, once the computer's row says its own sign-in isn't there.
+   * Another card starts on what can think for the agent on its computer with that plan: that computer's own sign-in
+   * where it's ready (Claude's and ChatGPT's), else one of the viewer's accounts of that plan that thinks for nobody or
+   * for all of their agents there. With neither and no account of that plan there at all, its sign-in opens at once,
+   * once the computer's row says its own sign-in isn't there.
    */
-  const firstAccount = (k: BrainKind) => {
-    const where = homeOf(k);
+  const firstAccount = (c: AiChoice) => {
+    const where = homeOf(c);
     const none = { account: null, signIn: false };
-    if (k === "model" || !view.canUsePlans || !view.accountsSupported || !view.computer) return none;
+    if (c === "key" || !view.canUsePlans || !view.accountsSupported || !view.computer) return none;
     if (!where || where.machineId !== work.machineId) return none;
-    if (ownSignInReady(view, rowOf(view.computer.machineId), k)) return none;
-    const theirs = allAccounts.filter((a) => a.kind === k && a.mine);
-    const free = theirs.find((a) => a.status === "active" && a.usedBy.length === 0);
+    if (!isPlanId(c) && ownSignInReady(view, rowOf(view.computer.machineId), kindOf(c))) return none;
+    const theirs = allAccounts.filter((a) => a.mine && planOfAccount(a) === c);
+    const free = theirs.find((a) => a.status === "active" && (a.usedBy.length === 0 || a.shared === true));
     if (free) return { account: free.id, signIn: false };
     const known = !view.ownSignIn || ai.data !== undefined;
     return { account: null, signIn: known && theirs.length === 0 && view.canManageAccounts };
   };
-  const choose = (k: BrainKind) => {
-    setKind(k);
+  const choose = (c: AiChoice) => {
+    setCard(c);
     setArrived(null);
-    // The account belongs to a brain kind: another kind starts on what can think there.
-    const first = k === view.brain ? { account: view.account, signIn: false } : firstAccount(k);
+    // The account belongs to a plan: another card starts on what can think there.
+    const first = c === savedCard ? { account: view.account, signIn: false } : firstAccount(c);
     setAccount(first.account);
     setAdding(first.signIn);
-    if (k === "model") return;
-    const opt = homeOf(k)?.options.find((o) => o.kind === k);
-    // An agent on "Automático" (new agents start there) stays automatic on another brain.
-    setPlanModel(k === view.brain ? view.effectiveModel : isAuto(view.effort) ? AUTO : (opt?.defaultModel ?? null));
+    if (c === "key") return;
+    const opt = homeOf(c)?.options.find((o) => o.kind === kindOf(c));
+    // Another plan has other models: it starts on its own default, and an agent on "Automático" (new agents start
+    // there) stays automatic.
+    const auto = card === "key" ? isAuto(view.effort) : isAuto(planModel);
+    setPlanModel(c === savedCard ? view.effectiveModel : auto ? AUTO : (opt?.defaultModel ?? null));
   };
-  // On a coding plan Claude Code runs the plan's models: any of them, or the ones its aliases name.
-  const plan = accountKind === "claude_code" ? accountPlan(current) : undefined;
+  // The card's plan names its models, whichever of its accounts thinks: on a coding plan, any of them.
+  const plan = isPlanId(card) ? planOf(card) : undefined;
   const modelOptions = brainModelChoices(plan, option?.models ?? []);
   const autoMark = (
     <span className="newag__ib">
@@ -784,8 +816,6 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const savedOnlyOwner = kind === view.brain ? view.onlyOwner : true;
   const onlyOwner = share?.kind === kind ? share.onlyOwner : savedOnlyOwner;
   const shareChanged = kind !== "model" && onlyOwner !== savedOnlyOwner;
-  // A plan brain not saved yet: the button says whose plan it is.
-  const planKind = kind !== "model" && kind !== view.brain ? kind : null;
   const all = models.data?.models ?? [];
   // The context limits worth offering with the model chosen: under its window ("Automático": any of its line).
   const contextOptions = contextChoices(
@@ -803,7 +833,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const shownContext = contextTokens !== null && contextOptions.includes(contextTokens) ? contextTokens : null;
   const contextChanged = contextTokens !== savedContext;
   const unchanged =
-    kind === view.brain &&
+    card === savedCard &&
     fallback === view.fallback &&
     !accountChanged &&
     !effortChanged &&
@@ -812,8 +842,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     (kind === "model"
       ? model === saved.model && key === (saved.key ?? DEFAULT_KEY)
       : planModel === view.effectiveModel);
-  // A plan brain chosen now thinks with something there: the computer's own sign-in or an account.
-  const needsAccount = kind !== view.brain && accountsOn && view.canUsePlans && account === null && !ownListed;
+  // A plan chosen now thinks with something there: the computer's own sign-in or an account of that plan.
+  const needsAccount = card !== savedCard && accountsOn && view.canUsePlans && account === null && !ownListed;
   const modelList = apiModelOptions(
     t,
     i18n.language,
@@ -823,12 +853,13 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     isAuto(value)
       ? t("brain.auto.label")
       : (modelOptions.find((c) => c.value === brainModelChoice(kind, plan, value ?? ""))?.label ?? value ?? "");
-  const brainName = (k: BrainKind) =>
-    k === "model"
+  // What thinks, as every place says it: the API's model, or the model by the plan that pays for it.
+  const brainName =
+    card === "key"
       ? isAuto(model)
         ? t("brain.auto.label")
         : (all.find((m) => m.id === model)?.label ?? model)
-      : `${t(`brain.card.${k}`)} · ${modelName(planModel)}`;
+      : thinksWith(t, card, modelName(planModel));
   /** This agent's choice, in the right order: its computer, then who thinks. */
   const saveThis = async () => {
     if (kind === "model") {
@@ -866,7 +897,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       const same =
         !effortChanged &&
         !contextChanged &&
-        kind === view.brain &&
+        card === savedCard &&
         fallback === view.fallback &&
         planModel === view.effectiveModel;
       const onlyAccount = accountChanged && !shareChanged && same;
@@ -895,8 +926,12 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                   })
                 : t("agentPage.work.saved.account", { ...g, account: current?.label ?? "" })
               : moves
-                ? t("agentPage.work.saved.brainMoved", { ...g, brain: brainName(kind), computer: moves.name })
-                : t("agentPage.work.saved.brain", { ...g, brain: brainName(kind) }),
+                ? t("agentPage.work.saved.brainMoved", { ...g, brain: brainName, computer: moves.name })
+                : // Onto a plan it answers only its owner from now on (ADR 0059 §5): said, since it stops answering
+                  // whoever it answered before.
+                  kind !== "model" && kind !== view.brain && onlyOwner && !view.onlyOwner
+                  ? t("agentPage.work.saved.brainOwner", { ...g, brain: brainName })
+                  : t("agentPage.work.saved.brain", { ...g, brain: brainName }),
         );
       onClose();
     } catch {
@@ -934,7 +969,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           }
         : null;
   const setupText = [
-    brainName(kind),
+    brainName,
     ...advancedParts(t, i18n.language, {
       kind,
       autoModel: isAuto(kind === "model" ? model : planModel),
@@ -965,17 +1000,18 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       setBusy(false);
     }
   };
-  const side = (k: BrainKind) => {
-    if (k === "model") return null;
-    const where = homeOf(k);
+  const side = (c: AiChoice) => {
+    if (c === "key") return null;
+    const where = homeOf(c);
+    // A coding plan's card stays on the agent's computer, where its key is: no other computer could have it.
     if (!where)
-      return (
+      return isPlanId(c) ? null : (
         <>
           <Icon name="block" size={14} />
           {t("agentPage.work.brain.none")}
         </>
       );
-    if (away(k))
+    if (away(c))
       return (
         <>
           <Icon name="alert" size={14} />
@@ -993,20 +1029,24 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       </>
     );
   };
-  const reason = (k: BrainKind) => {
+  const reason = (c: AiChoice) => {
+    if (c === "key") return null;
+    const k = kindOf(c);
     const o = view.options.find((x) => x.kind === k);
     if (!o?.reason) return null;
     // The Cloud's agent without a computer yet gets the workspace's own: the plan signs in there once it's ready.
     if (o.reason === "no_computer" && edition === "cloud")
       return t("brain.reasons.no_computerCloud", { computer: t("computerSetup.title", { org: org.name }) });
-    if (o.reason === "tool_off" && k !== "model") {
+    // The card names the plan: the line names the program on the computer that can't run it.
+    const program = t(`brain.card.${k}`);
+    if (o.reason === "tool_off") {
       const off = toolOffReason(
         work.machines.data?.find((m) => m.id === view.computer?.machineId),
         k,
       );
-      return t(off.key, { computer: view.computer?.name ?? "", command: off.command });
+      return t(off.key, { computer: view.computer?.name ?? "", command: off.command, program });
     }
-    return t(`brain.reasons.${o.reason}`, { computer: view.computer?.name ?? "" });
+    return t(`brain.reasons.${o.reason}`, { computer: view.computer?.name ?? "", program });
   };
   const whereName = home?.name ?? "";
   const keyChoices = keyOptions(t, credentials.data ?? [], settings.data?.defaultCredentialId ?? null);
@@ -1031,7 +1071,10 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     })),
     {
       value: ADD,
-      label: signedOut ? t("agentPage.work.brain.signInAgain") : t("agentPage.work.brain.addAccount"),
+      // A coding plan's key that was refused gets a new key; a sign-in that ended signs in again.
+      label: signedOut
+        ? t(isPlanId(card) ? "aiAccounts.page.newKey" : "agentPage.work.brain.signInAgain")
+        : t("agentPage.work.brain.addAccount"),
       leading: (
         <span className="newag__ib">
           <Icon name="plus" size={16} />
@@ -1047,18 +1090,18 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   // The account says why only when it must: signed out, only the agent's owner changes it, or only whoever connected
   // the computer adds one there.
   const accountNote = signedOut
-    ? t("agentPage.work.brain.accountSignedOut")
+    ? t(isPlanId(card) ? "aiAccounts.page.keyRefused" : "agentPage.work.brain.accountSignedOut")
     : !view.canUsePlans && ownerFirst
       ? t("agentPage.work.brain.accountLocked", { name: ownerFirst })
       : lockedHere
         ? t("connectAi.accountsLocked", { name: pairer ?? "", computer: computerName })
         : null;
   const accountField = accountsOn && accountKind && (
-    <BrainField>
+    <BrainField label={t("agentPage.work.brain.account")}>
       {!lockedHere && (
         <Select
           className="agp-brainsel"
-          aria-label={t(`agentPage.work.brain.account.${accountKind}`)}
+          aria-label={t("agentPage.work.brain.account")}
           // Nothing chosen yet, where the computer's own sign-in can't think: it starts at "Adicionar conta".
           value={account ?? (ownListed ? HERE : "")}
           placeholder={view.canManageAccounts ? t("agentPage.work.brain.addAccount") : undefined}
@@ -1112,25 +1155,44 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const signingIn = also ?? again;
   // The model as a picker like the account's: Automático first, each model with its line. Claude's own models say what
   // each is for ("O mais capaz…"), a plan's what it's sold as and what it needs; several makers' models are grouped by
-  // maker, each beside its logo. An alias the plan leaves out runs its main model: shown as that one (`shownModel`).
-  const brainLogo = accountKind ? <BrainLogo kind={accountKind} size="sm" /> : null;
+  // maker, each beside its logo, the others beside their plan's. An alias the plan leaves out runs its main model: shown
+  // as that one (`shownModel`).
+  const planLogo = card === "key" ? null : <ProviderLogo id={planMark(card)} size="sm" />;
+  const modelLine = (m: BrainModelChoice, withNeed: boolean) =>
+    !plan && kind === "claude_code" && isClaudeAlias(m.value)
+      ? t(`agentPage.work.brain.modelLine.${m.value}`)
+      : [m.tag && t(`brain.modelTag.${m.tag}`), withNeed && m.needs && t(`brain.modelNeeds.${m.needs}`)]
+          .filter(Boolean)
+          .join(" · ");
   const planModelOptionsShown: SelectOption[] = [
     { value: AUTO, label: t("brain.auto.label"), description: t("brain.auto.hint"), leading: autoMark },
-    ...modelOptions.map(({ value, label, tag, needs, maker }) => {
-      const line =
-        !plan && kind === "claude_code" && isClaudeAlias(value)
-          ? t(`agentPage.work.brain.modelLine.${value}`)
-          : [tag && t(`brain.modelTag.${tag}`), needs && t(`brain.modelNeeds.${needs}`)].filter(Boolean).join(" · ");
+    ...modelOptions.map((m) => {
+      const line = modelLine(m, true);
       return {
-        value,
-        label,
+        value: m.value,
+        label: m.label,
         ...(line ? { description: line } : {}),
-        ...(maker
-          ? { group: providerLabel(maker), leading: <ProviderLogo id={maker} size="sm" /> }
-          : { leading: brainLogo }),
+        ...(m.maker
+          ? { group: providerLabel(m.maker), leading: <ProviderLogo id={m.maker} size="sm" /> }
+          : { leading: planLogo }),
       };
     }),
   ];
+  // Once chosen, what a model needs from its plan's account is the note under it, with where to give it: said once.
+  const chosenModel = modelOptions.find((m) => m.value === shownModel);
+  const modelValue = (o: SelectOption) => {
+    if (!chosenModel?.needs || o.value !== chosenModel.value) return pickerValue(o);
+    const line = modelLine(chosenModel, false);
+    return pickerValue({ ...o, description: line || undefined });
+  };
+  const modelHow = chosenModel?.needs && plan && (
+    <SettingNote icon="info" live>
+      {t(`brain.modelHow.${chosenModel.needs}`)}
+      <span style={{ display: "block", marginTop: 8 }}>
+        <OpenPage href={plan.site}>{t("aiAccounts.add.openKeys", { site: new URL(plan.site).host })}</OpenPage>
+      </span>
+    </SettingNote>
+  );
   // "Configuração avançada" says only what differs from the defaults (`ADVANCED_DEFAULTS`).
   const advancedNow: Advanced = { effort, contextTokens: shownContext, onlyOwner, fallback };
   const advancedLine = advancedSummary(t, i18n.language, {
@@ -1156,20 +1218,24 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       label={t("agentPage.work.brain.copy.row")}
     />
   );
+  // Under the plan's card, labeled like the API key's: the model, then the account of that plan that pays for it.
   const planRows = (
-    <div className="agp-brainpicks">
-      <Select
-        className="agp-brainsel"
-        aria-label={t("agentPage.work.brain.planModel")}
-        value={shownModel}
-        onValueChange={setPlanModel}
-        renderValue={pickerValue}
-        options={planModelOptionsShown}
-      />
+    <>
+      <BrainField label={t("agentPage.work.brain.planModel")}>
+        <Select
+          className="agp-brainsel"
+          aria-label={t("agentPage.work.brain.planModel")}
+          value={shownModel}
+          onValueChange={setPlanModel}
+          renderValue={modelValue}
+          options={planModelOptionsShown}
+        />
+        {modelHow}
+      </BrainField>
       {accountField}
       {advancedRow}
       {copyRow}
-    </div>
+    </>
   );
   const orgRows = can("model") ? (
     <>
@@ -1215,7 +1281,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       open
       onOpenChange={(o) => !o && onClose()}
       title={t("brain.title")}
-      description={t("agentPage.work.brain.sub")}
+      description={t("agentPage.work.brain.sub", g)}
       closeLabel={t("common.close")}
       width={560}
       className="agp-wdlg"
@@ -1224,28 +1290,33 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         <OptionList
           attached
           aria-label={t("brain.title")}
-          value={kind}
+          value={card}
           onValueChange={choose}
           disabled={!can("brain")}
-          options={(["model", "claude_code", "codex"] as const).map((k) => {
-            const where = homeOf(k);
-            const off = k !== "model" && away(k);
+          options={cards.map((c) => {
+            const where = homeOf(c);
+            const off = c !== "key" && away(c);
             return {
-              value: k,
-              // The computer brains by their makers' marks; thinking through the organization, the agent itself.
+              value: c,
+              // Each plan by its maker's mark; the API key by the agent itself, which it pays for per use.
               leading:
-                k === "model" ? (
-                  <BrainPortrait kind="agent" state={kind === k ? "working" : "idle"} agent={draft.look} />
+                c === "key" ? (
+                  <BrainPortrait kind="agent" state={card === c ? "working" : "idle"} agent={draft.look} />
                 ) : (
-                  <BrainLogo kind={k} off={off} />
+                  <ProviderLogo id={planMark(c)} off={off} />
                 ),
-              title: k === "model" ? t("agentPage.work.brain.model") : t(`brain.card.${k}`),
-              tag: k === "codex" ? t("brain.testing") : undefined,
-              description: k !== "model" && !where ? reason(k) : t(`agentPage.work.brain.${k}Text`, g),
-              side: side(k),
-              disabled: k !== "model" && !where,
+              title: c === "key" ? t("agentPage.work.brain.model") : planLabel(t, c),
+              tag: c === "chatgpt" ? t("brain.testing") : undefined,
+              description:
+                c === "key"
+                  ? t("agentPage.work.brain.modelText", g)
+                  : !where
+                    ? reason(c)
+                    : t("agentPage.work.brain.planText", { plan: planLabel(t, c) }),
+              side: side(c),
+              disabled: c !== "key" && !where,
               children:
-                k === "model" ? (
+                c === "key" ? (
                   orgRows
                 ) : adding && accountKind && view.computer ? (
                   <AddAccount
@@ -1253,7 +1324,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                     kind={accountKind}
                     computer={computerName}
                     again={again?.id}
-                    {...(isPlanId(signingIn?.provider) ? { provider: signingIn.provider } : {})}
+                    {...(isPlanId(card) ? { provider: card } : {})}
                     email={signingIn?.email}
                     local={view.ownSignIn}
                     onBack={() => setAdding(false)}
@@ -1284,11 +1355,27 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             </span>
           </SettingNote>
         )}
+        {/* Another plan, as the "Sem IA" cell offers it: Connect an AI, for this agent (its owner's choice). */}
+        {view.canUsePlans && connect && (
+          <span>
+            <Button
+              size="sm"
+              variant="ghost"
+              icon="plus"
+              onClick={() => {
+                onClose();
+                connect.open({ agentId: agent.id });
+              }}
+            >
+              {t("agentPage.work.brain.connectPlan")}
+            </Button>
+          </span>
+        )}
       </DialogBody>
       <Footer
         disabled={unchanged || needsAccount || adding !== false || (kind !== "model" && !home)}
         busy={busy}
-        primary={planKind ? t(`agentPage.work.usePlan.${planKind}`) : t("agentPage.work.use")}
+        primary={t("agentPage.work.use")}
         onClose={onClose}
         onUse={() => void use()}
       />
@@ -1297,7 +1384,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           open
           onOpenChange={(o) => !o && setAdv(null)}
           title={t("agentPage.work.brain.advanced.title")}
-          description={t("agentPage.work.brain.advanced.sub", { brain: brainName(kind) })}
+          description={t("agentPage.work.brain.advanced.sub", { brain: brainName })}
           closeLabel={t("common.close")}
           width={480}
           className="agp-wdlg"

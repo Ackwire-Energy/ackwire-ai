@@ -15,10 +15,17 @@ import {
   type ExistingAi,
   existingAi,
 } from "@agenteschat/client/lib/ai-accounts";
+import { thinksWith } from "@agenteschat/client/lib/brain";
 import { type Advanced, advancedParts, isClaudeAlias } from "@agenteschat/client/lib/brain-advanced";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import type { PlanGate } from "@agenteschat/client/lib/no-ai";
-import { brainModelChoice, brainModelChoices, brainPlan, type CodingPlan } from "@agenteschat/client/lib/plans";
+import { aiChoiceOf, type PlanGate, planOfAccount } from "@agenteschat/client/lib/no-ai";
+import {
+  brainModelChoice,
+  brainModelChoices,
+  brainPlan,
+  type CodingPlan,
+  type PlanModelNeed,
+} from "@agenteschat/client/lib/plans";
 import { AUTO, isAuto, providerLabel } from "@agenteschat/client/lib/providers";
 import type { TFunction } from "i18next";
 
@@ -84,6 +91,8 @@ export interface ModelRow {
   sub?: string;
   /** What the plan's account must allow before it answers. */
   note?: string;
+  /** That need's id: chosen, the agent's page says how to give it (`brain.modelHow`). */
+  needs?: PlanModelNeed;
   /** Who makes it, on a plan of several makers' models: a provider's id or the maker's name. */
   maker?: string;
   checked: boolean;
@@ -112,7 +121,7 @@ export function modelRows(
         : !plan && view.brain === "claude_code" && isClaudeAlias(value)
           ? { sub: t(`agentPage.work.brain.modelLine.${value}`) }
           : {}),
-      ...(needs ? { note: t(`brain.modelNeeds.${needs}`) } : {}),
+      ...(needs ? { note: t(`brain.modelNeeds.${needs}`), needs } : {}),
       ...(maker ? { maker } : {}),
     })),
   ];
@@ -128,6 +137,21 @@ export function modelSections(rows: ModelRow[]): { maker?: string; rows: ModelRo
     else sections.push({ ...(r.maker ? { maker: r.maker } : {}), rows: [r] });
   }
   return sections;
+}
+
+/**
+ * What picking an account saves on the agent's page (null: the computer's own sign-in), where the account list is the
+ * plan choice: the account, and on another plan that plan's default model (its models aren't this one's), Automático
+ * staying Automático, as the web's cards do.
+ */
+export function accountInput(
+  view: Pick<AgentBrain, "brain" | "account" | "accounts" | "effectiveModel">,
+  a: Pick<MachineAccount, "id" | "kind" | "provider"> | null,
+): Pick<AgentBrainInput, "account" | "model"> {
+  const kind = accountKindOf(view.brain);
+  const next = a ? planOfAccount(a) : kind ? planOfAccount({ kind, provider: null }) : null;
+  if (next === aiChoiceOf(view)) return { account: a?.id ?? null };
+  return { account: a?.id ?? null, model: isAuto(view.effectiveModel) ? AUTO : null };
 }
 
 /** What picking a model saves, as the web's dialog does: Automático picks the effort too; a fixed one after it, Médio. */
@@ -192,7 +216,9 @@ export function setupWords(
     now: o.now,
   });
   const autonomy = view.autonomy ? autonomyWords(t, view.autonomy) : null;
-  return [t(`brain.card.${view.brain}`), model, ...parts, autonomy].filter(Boolean).join(" · ");
+  const ai = aiChoiceOf(view);
+  const head = ai === "key" || !model ? model : thinksWith(t, ai, model);
+  return [head, ...parts, autonomy].filter(Boolean).join(" · ");
 }
 
 /**

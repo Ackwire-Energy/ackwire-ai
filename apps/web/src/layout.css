@@ -8290,13 +8290,7 @@ a.machine-row__name:hover {
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--ink2);
 }
-/* "Quem pensa": the opened brain's settings full width, a small label above each. */
-/* The brain's card: model, account and "Configuração avançada", one stack of pickers. */
-.agp-brainpicks {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
+/* "Quem pensa": the opened card's settings full width, a small label above each. */
 .agp-advrow .ac-select__trigger {
   cursor: pointer;
 }

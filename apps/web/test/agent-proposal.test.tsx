@@ -85,12 +85,7 @@ describe("an agent's proposal of a new agent, in the chat", () => {
     await settle(5);
     const [card] = cardOf("Atlas propõe um novo agente");
     if (!card) throw new Error("no card");
-    for (const shown of [
-      "Nina",
-      "@nina · Designer",
-      "Pensa com o modelo do workspace",
-      "Você pediu alguém para o design.",
-    ])
+    for (const shown of ["Nina", "@nina · Designer", "Pensa pela API", "Você pediu alguém para o design."])
       expect(card.textContent).toContain(shown);
     expect(card.textContent).not.toContain("server text");
     expect(within(card).getByRole("link", { name: "Revisar" }).getAttribute("href")).toBe(
