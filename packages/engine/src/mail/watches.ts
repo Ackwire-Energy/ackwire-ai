@@ -4,7 +4,7 @@ import { ValidationError } from "../errors";
 import { hasScope } from "../tools/scopes";
 import { normalizeAddressRule } from "./text";
 
-const { mailWatches, mailAccounts } = schema;
+const { mailWatches, mailAccounts, routines } = schema;
 
 /** A routine's mail filter: from addresses or `@domains`, words in the subject, words anywhere. */
 export interface MailFilter {
@@ -175,6 +175,27 @@ export async function syncMailWatch(
       .returning();
   }
   return row ?? null;
+}
+
+/**
+ * A Composio mailbox that works again (reconnected, or back at Composio):
+ * the routines watching it stop asking for a reconnect, and the active ones
+ * get a trigger again, on the account the mailbox has now.
+ */
+export async function restartMailWatches(deps: SyncDeps, accountId: string) {
+  const rows = await deps.db
+    .select({ watch: mailWatches, routine: routines })
+    .from(mailWatches)
+    .innerJoin(routines, eq(routines.id, mailWatches.routineId))
+    .where(eq(mailWatches.accountId, accountId));
+  for (const { watch, routine } of rows) {
+    await dropTrigger(deps, watch);
+    await deps.db
+      .update(mailWatches)
+      .set({ externalTriggerId: null, status: "active", lastError: null, updatedAt: new Date() })
+      .where(eq(mailWatches.id, watch.id));
+    await syncMailWatch(deps, routine, { accountId, folder: watch.folder, filter: watch.filter });
+  }
 }
 
 /** IMAP: a resumed routine starts again from "now" (no burst of everything that arrived while paused). */

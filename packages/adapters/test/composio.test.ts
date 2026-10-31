@@ -287,9 +287,11 @@ describe("Composio client", () => {
     expect(upserts[3]?.url).toBe(`${BASE}/trigger_instances/OUTLOOK_MESSAGE_TRIGGER/upsert`);
     await client.deleteTrigger("ti_1");
     await client.deleteConnectedAccount("ca_g");
+    await client.deleteConnectedAccount("ca_o", { revoke: false });
     expect(calls.filter((c) => c.method === "DELETE").map((c) => c.url)).toEqual([
       `${BASE}/trigger_instances/manage/ti_1`,
       `${BASE}/connected_accounts/ca_g?revoke_on_delete=true`,
+      `${BASE}/connected_accounts/ca_o`,
     ]);
   });
 

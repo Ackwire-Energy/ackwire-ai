@@ -96,7 +96,7 @@ export function ConnectorsSection({
     // Gmail/Outlook sign in again on the provider's page; the rest take a new app password.
     if (account.via === "composio" && (account.provider === "gmail" || account.provider === "outlook")) {
       connectComposio.mutate(
-        { provider: account.provider, label: account.label },
+        { provider: account.provider, accountId: account.id },
         { onSuccess: (started) => navigateAway(started.redirectUrl) },
       );
     } else setReconnecting(account);

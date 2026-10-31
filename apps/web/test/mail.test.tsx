@@ -345,6 +345,11 @@ describe("Conectores → Email", () => {
     ]);
     await click(screen().getByRole("button", { name: "Reconectar bia@example.com" }));
     await settle(4);
+    // The same mailbox signs in again (a new one would be refused: the address is taken).
+    expect(state.calls.find((c) => c.method === "mail.connectComposio")?.args[1]).toEqual({
+      provider: "gmail",
+      accountId: "mail-2",
+    });
     expect(left).toEqual(["https://composio.example/connect/gmail"]);
   });
 

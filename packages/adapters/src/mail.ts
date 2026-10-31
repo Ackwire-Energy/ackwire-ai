@@ -217,7 +217,8 @@ export interface ComposioClient {
   getConnectedAccount(
     id: string,
   ): Promise<{ status: "active" | "pending" | "failed" | "expired"; address: string | null }>;
-  deleteConnectedAccount(id: string): Promise<void>;
+  /** Also revokes the grant at Google/Microsoft, unless `revoke: false` (Composio only forgets the account). */
+  deleteConnectedAccount(id: string, options?: { revoke?: boolean }): Promise<void>;
   /** A "new message" trigger on the account; `query` is a Gmail search (Outlook: filtered on our side). */
   createMailTrigger(input: {
     toolkit: ComposioToolkit;

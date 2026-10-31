@@ -264,6 +264,8 @@ export function createFakeComposioClient() {
     >(),
     links: [] as { toolkit: ComposioToolkit; userId: string; callbackUrl: string; connectedAccountId: string }[],
     deletedAccounts: [] as string[],
+    /** The deleted accounts whose grant at Google/Microsoft was revoked too. */
+    revokedAccounts: [] as string[],
     triggers: new Map<string, { toolkit: ComposioToolkit; connectedAccountId: string; query: string | null }>(),
     deletedTriggers: [] as string[],
     failWith: null as Error | null,
@@ -288,8 +290,9 @@ export function createFakeComposioClient() {
       if (!a) return { status: "failed", address: null };
       return { status: a.status, address: a.status === "active" ? a.address : null };
     },
-    async deleteConnectedAccount(id) {
+    async deleteConnectedAccount(id, options) {
       state.deletedAccounts.push(id);
+      if (options?.revoke !== false) state.revokedAccounts.push(id);
       state.accounts.delete(id);
     },
     async createMailTrigger(input) {

@@ -159,6 +159,34 @@ test("mail API: IMAP account (tested), Gmail through Composio, agent access, fol
   expect(scopes).toEqual([]);
 });
 
+test("Reconectar on a Gmail that needs it: the same mailbox signs in again and comes back connected", async () => {
+  const fake = fakeMail();
+  t = await createTestServer({ mail: fake.mail });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  const signIn = async (json: object) => {
+    const { accountId } = (await (await api("/mail/accounts/composio", { json })).json()) as { accountId: string };
+    fake.composio.activate(fake.composio.state.links.at(-1)?.connectedAccountId ?? "", "team@example.com");
+    const back = await owner(`/api/app/mail/composio/callback?account=${accountId}`);
+    return { accountId, location: back.headers.get("location") };
+  };
+  const first = await signIn({ provider: "gmail" });
+  await t.db
+    .update(schema.mailAccounts)
+    .set({ status: "needs_reconnect" })
+    .where(eq(schema.mailAccounts.id, first.accountId));
+
+  expect(await signIn({ provider: "gmail", accountId: first.accountId })).toEqual({
+    accountId: first.accountId,
+    location: `${t.config.PUBLIC_URL}/org/${orgId}/settings/connectors?mail=connected&account=${first.accountId}`,
+  });
+  const { accounts } = (await (await api("/mail/accounts")).json()) as { accounts: { id: string; status: string }[] };
+  expect(accounts.map((a) => [a.id, a.status])).toEqual([[first.accountId, "active"]]);
+});
+
 test("email routines through the routines API, woken by a signed Composio webhook", async () => {
   const fake = fakeMail();
   t = await createTestServer({ mail: fake.mail });
