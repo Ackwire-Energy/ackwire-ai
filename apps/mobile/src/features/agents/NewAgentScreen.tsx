@@ -101,7 +101,7 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
   const api = useApi();
   const insets = useSafeAreaInsets();
   const orgId = useOrgId();
-  const mayImport = can(useOrg().org?.role, "manage_agents");
+  const mayImport = can(useOrg().org, "create_agents");
   const meId = useMeId();
   const dir = useDirectory();
   const create = useCreateAgent(orgId);

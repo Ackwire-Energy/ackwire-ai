@@ -78,6 +78,14 @@ const KNOWN = {
   "routine.take_over_no_access": "errors.routine.takeOverNoAccess",
   "routine.agent_not_in_channel": "errors.routine.agentNotInChannel",
   "audience.plan_owner_only": "aiAccounts.errors.planOwnerOnly",
+  "role.name_required": "errors.role.nameRequired",
+  "role.name_long": "errors.role.nameLong",
+  "role.too_many": "errors.role.tooMany",
+  "role.grant_forbidden": "errors.role.grantForbidden",
+  "role.above_you": "errors.role.aboveYou",
+  "role.base": "errors.role.base",
+  "role.unknown": "errors.role.unknown",
+  "role.order_incomplete": "errors.role.orderIncomplete",
   // Facts only (the phone shows this one): the web's onboarding says `standing.createUnpaid` beside the way to pay.
   "org.create_unpaid": "standing.createInactive",
   "machine.managed": "computerSetup.managedNotRemovable",
@@ -106,6 +114,16 @@ const KNOWN = {
   human_check_blocked: "errors.humanCheckBlocked",
   // TypeSafe refused the key pasted for Jev: said under its field, nothing kept.
   jev_key_invalid: "jev.steps.invalid",
+  "github.repo_missing": "errors.github.repoMissing",
+  "github.ref_missing": "errors.github.refMissing",
+  // `count`: minutes until GitHub stops limiting the server.
+  "github.limited": "errors.github.limited",
+  "skill.no_skill_md": "errors.skill.noSkillMd",
+  "skill.too_many_skills": "errors.skill.tooManySkills",
+  "skill.invalid_name": "errors.skill.invalidName",
+  "skill.invalid_description": "errors.skill.invalidDescription",
+  "skill.too_large": "errors.skill.tooLarge",
+  "skill.too_many_files": "errors.skill.tooManyFiles",
 } as const;
 
 /** Better Auth's code when a blocked account tries to sign in (the server's `session.create.before` hook). */

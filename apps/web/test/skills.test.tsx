@@ -148,6 +148,40 @@ describe("Configurações → Skills", () => {
     expect(state.calls.find((c) => c.method === "skills.create")?.args[1]).toMatchObject({ name: "Deploy seguro" });
   });
 
+  test("Instalar skill: a repository holding several skills lists them to pick; GitHub's refusals in words", async () => {
+    const { state, section } = await settings();
+    await click(within(section()).getByRole("button", { name: "Instalar skill" }));
+    const dialog = screen().getByRole("dialog", { name: "Instalar skill" });
+    const link = within(dialog).getByRole("textbox", { name: "Link do GitHub" });
+    await type(link, "https://github.com/acme/secret");
+    await click(within(dialog).getByRole("button", { name: "Instalar" }));
+    await settle(6);
+    expect(dialog.textContent).toContain("O repositório acme/secret é privado ou não existe no GitHub.");
+
+    await type(link, "https://github.com/acme/skills");
+    await click(within(dialog).getByRole("button", { name: "Instalar" }));
+    await settle(6);
+    // Nothing installed yet: each skill by name and what it is for, and the one that can't be installed with why.
+    expect(dialog.textContent).toContain("Este link tem 4 skills. Escolha quais instalar.");
+    expect(dialog.textContent).toContain("Revisa um pull request.");
+    const skipped = within(dialog).getByRole("checkbox", { name: /claude-api/ });
+    expect(skipped.hasAttribute("disabled")).toBe(true);
+    expect(dialog.textContent).toContain("Não dá para instalar. A descrição precisa ter de 1 a 1024 caracteres.");
+    await click(within(dialog).getByRole("button", { name: "Instalar" }));
+    expect(dialog.textContent).toContain("Escolha pelo menos uma skill.");
+    await click(within(dialog).getByRole("checkbox", { name: /deploy/ }));
+    await click(within(dialog).getByRole("checkbox", { name: /triage/ }));
+    expect(within(dialog).getByRole("checkbox", { name: "Todas" }).getAttribute("aria-checked")).toBe("mixed");
+    await click(within(dialog).getByRole("button", { name: "Instalar" }));
+    await settle(6);
+    expect(state.calls.find((c) => c.method === "skills.importPicked")?.args.slice(1)).toEqual([
+      "https://github.com/acme/skills",
+      ["skills/deploy", "skills/triage"],
+    ]);
+    expect(screen().getByText("2 skills instaladas.")).toBeTruthy();
+    expect(screen().queryByRole("dialog", { name: "Instalar skill" })).toBeNull();
+  });
+
   test("long libraries: 'Ver todas' opens a search dialog", async () => {
     const { state, api } = await withExtras(5);
     const { section } = await settings(state, api);

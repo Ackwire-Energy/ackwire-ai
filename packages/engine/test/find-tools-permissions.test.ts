@@ -1,7 +1,9 @@
 import { afterEach, expect, test } from "bun:test";
+import { createFakeMailConnector, createFakeMailPoller, createFakeMailTester } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import {
+  CONNECTOR_ALL,
   type ConnectorDeps,
   createApiKeyConnection,
   createBrowserToolSource,
@@ -13,14 +15,16 @@ import {
   grantScopes,
   listApprovals,
   postPersonMessage,
+  storeCustomConnection,
   type ToolContext,
+  type ToolDefinition,
   toolDenyScope,
 } from "../src";
 import { fakeHub } from "./desktop-fixtures";
 import { fakeGithubMcp } from "./fake-mcp";
 import { addUser, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
-import { PUBLIC_URL, runContext } from "./mail-fixtures";
+import { ICLOUD, PUBLIC_URL, runContext } from "./mail-fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -97,7 +101,8 @@ test("a tool an admin turned off by name is named as that, never as something to
   expect(turnedOff).toContain(OPEN);
   expect(turnedOff).not.toContain("request_permission");
   expect(turnedOff).not.toContain("permission");
-  expect(usable).not.toContain("browser_open");
+  // Not listed among its tools (browser_close's description may still name it).
+  expect(usable).not.toContain("- browser_open:");
 });
 
 test("a tool of a connection the agent lacks names that connection's permission; nothing of another workspace shows", async () => {
@@ -232,4 +237,171 @@ test("a run that can't call request_permission is never told to", async () => {
   );
   expect(text).toContain(`, for:\n  ${OPEN}\n`);
   expect(text).not.toContain("request_permission");
+});
+
+const connectorDeps = (): ConnectorDeps => ({
+  db: f.db,
+  keyWrappers: [f.keyWrapper],
+  publicUrl: "https://chat.example.com",
+});
+const TO_GET =
+  "Connectors you don't have yet. If the person wants one, say how to get it, never that it doesn't exist.";
+const DRIVE = "- Google Drive: Search, read and write documents (any Drive-like MCP server).";
+const CONNECT_DRIVE = `${DRIVE} Not connected in this workspace: an admin connects it in Settings › Connectors › Add connector › Google Drive (in Portuguese, Configurações › Conectores › Adicionar conector › Google Drive).`;
+
+test("a search for an app the workspace hasn't connected says it exists and how an admin connects it, after any other match", async () => {
+  f = await setup({ artifactTools: true, catalog: { oauthApps: {} } });
+  const ctx = await nothingLoaded();
+  const text = await findTools(ctx, "google drive");
+  // The workspace's own Drive matches the word: Google Drive still closes the answer.
+  expect(text).toContain("- list_artifacts");
+  expect(text).toEndWith(`\n\n${TO_GET}\n${CONNECT_DRIVE}`);
+  // Its id names it too.
+  expect(await findTools(ctx, "connect my drive")).toEndWith(`\n\n${TO_GET}\n${CONNECT_DRIVE}`);
+  expect(await findTools(ctx, "set up github")).toContain(
+    "- GitHub: Repositories, pull requests, issues and Actions. Not connected in this workspace: an admin connects it in Settings › Connectors › Add connector › GitHub",
+  );
+  expect(await findTools(ctx, "create an issue")).not.toContain(TO_GET);
+});
+
+test("an app connected in the workspace but not given to the agent says an admin gives it on the agent's page; once given, its tools", async () => {
+  let driveId = "";
+  const searchFiles = (): ToolDefinition => ({
+    name: "drive_search_files",
+    description: "[Google Drive] Search files",
+    inputSchema: { type: "object", properties: { query: { type: "string" } } },
+    scope: "drive:files.read",
+    connectionId: driveId,
+    connectorLabel: "Google Drive",
+    execute: async () => ({ content: "No files." }),
+  });
+  f = await setup({
+    issueTools: true,
+    catalog: { oauthApps: {} },
+    toolSources: [{ name: "drive", tools: async () => (driveId ? [searchFiles()] : []) }],
+  });
+  const drive = await createApiKeyConnection(connectorDeps(), f.owner.id, f.org.id, {
+    connector: "drive",
+    label: "Drive do Financeiro",
+    apiKey: "not-a-real-key",
+    serverUrl: "https://drive.example.com/mcp",
+  });
+  const ctx = await nothingLoaded();
+  // Connected but none of its tools listed (its server down): nothing says the agent lacks it.
+  expect(await findTools(ctx, "google drive")).not.toContain(TO_GET);
+
+  driveId = drive.id;
+  // A new connection is every agent's: take it away from this one, as an admin can.
+  await f.db.delete(schema.agentScopes).where(eq(schema.agentScopes.connectionId, drive.id));
+  const text = await findTools(ctx, "google drive");
+  expect(text).toEndWith(
+    `\n\n${TO_GET}\n${DRIVE} Connected in this workspace but not given to you: an admin gives you access on your page, in Tools and access (in Portuguese, Ferramentas e acesso).`,
+  );
+  // The catalog's name only, never the connection's own label, address or key.
+  const toGet = text.slice(text.indexOf(TO_GET));
+  for (const detail of ["Drive do Financeiro", "drive.example.com", "not-a-real-key"]) {
+    expect(toGet).not.toContain(detail);
+  }
+
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: drive.id, scope: CONNECTOR_ALL }]);
+  const given = await findTools(ctx, "google drive");
+  expect(given).toContain("- drive_search_files: [Google Drive] Search files");
+  expect(given).not.toContain(TO_GET);
+});
+
+/** IMAP only, no Composio: this server connects iCloud and other mailboxes, never Gmail or Outlook. */
+const imapOnly = () => ({
+  composio: null,
+  imap: {
+    connector: createFakeMailConnector().connector,
+    poller: createFakeMailPoller().poller,
+    tester: createFakeMailTester().tester,
+    presets: [ICLOUD],
+  },
+});
+
+test("an app this installation can't connect says whoever runs it turns it on; one it can, that an admin connects it", async () => {
+  f = await setup({ issueTools: true, catalog: { oauthApps: {}, mail: imapOnly() } });
+  const ctx = await nothingLoaded();
+  // Nothing matches: the groups to search again still come first.
+  expect(await findTools(ctx, "gmail")).toBe(
+    `No other tool matches "gmail". Try other words (Issues).\n\n${TO_GET}\n- Gmail: Read, organize and answer Gmail email. Not available on this installation: whoever runs the installation has to turn it on first.`,
+  );
+  expect(await findTools(ctx, "icloud")).toEndWith(
+    "\n- iCloud: iCloud email, custom domains included. Not connected in this workspace: an admin connects it in Settings › Connectors › Add connector › iCloud (in Portuguese, Configurações › Conectores › Adicionar conector › iCloud).",
+  );
+  expect(await findTools(ctx, "send an e-mail")).toContain(
+    "\n- Email: A mailbox: Gmail, Outlook, iCloud or another provider. Not connected in this workspace: an admin connects it in Settings › Connectors › Add connector › Email",
+  );
+});
+
+test("a mailbox that needs reconnecting says an admin reconnects it, never to connect it again", async () => {
+  f = await setup({ issueTools: true, catalog: { oauthApps: {}, mail: imapOnly() } });
+  // Its app password stopped working: connecting the same address again fails as already connected.
+  await f.db.insert(schema.mailAccounts).values({
+    orgId: f.org.id,
+    provider: "imap",
+    via: "imap",
+    preset: "icloud",
+    address: "ana@icloud.example.com",
+    label: "Caixa da Ana",
+    status: "needs_reconnect",
+  });
+  const ctx = await nothingLoaded();
+  const RECONNECT =
+    "Connected in this workspace but needs reconnecting: an admin clicks Reconnect on its row in Settings › Connectors (in Portuguese, Configurações › Conectores › Reconectar).";
+  const text = await findTools(ctx, "icloud");
+  expect(text).toEndWith(`\n- iCloud: iCloud email, custom domains included. ${RECONNECT}`);
+  for (const detail of ["ana@icloud.example.com", "Caixa da Ana"]) expect(text).not.toContain(detail);
+  expect(await findTools(ctx, "email")).toEndWith(
+    `\n- Email: A mailbox: Gmail, Outlook, iCloud or another provider. ${RECONNECT}`,
+  );
+});
+
+test("a server connected by address and named after a mailbox's service is that service: its tools, nothing to get", async () => {
+  let gmailId = "";
+  const searchMail = (): ToolDefinition => ({
+    name: "gmail_search_mail",
+    description: "[Gmail] Search mail",
+    inputSchema: { type: "object", properties: { query: { type: "string" } } },
+    scope: `custom:${gmailId}:read`,
+    connectionId: gmailId,
+    connectorLabel: "Gmail",
+    execute: async () => ({ content: "No mail." }),
+  });
+  f = await setup({
+    issueTools: true,
+    catalog: { oauthApps: {}, mail: imapOnly() },
+    toolSources: [{ name: "gmail", tools: async () => (gmailId ? [searchMail()] : []) }],
+  });
+  // A new server is every agent's.
+  const gmail = await storeCustomConnection(connectorDeps(), {
+    orgId: f.org.id,
+    actorId: f.owner.id,
+    serverUrl: "https://gmail-mcp.example.com/mcp",
+    label: "Gmail",
+    authType: "none",
+    secret: null,
+  });
+  gmailId = gmail.id;
+  const text = await findTools(await nothingLoaded(), "gmail");
+  expect(text).toContain("- gmail_search_mail: [Gmail] Search mail");
+  expect(text).not.toContain(TO_GET);
+});
+
+test("what another workspace connected never shows: the search answers for this workspace only", async () => {
+  f = await setup({ issueTools: true, catalog: { oauthApps: {} } });
+  const bia = await addUser(f.db, "bia");
+  const { organization: other } = await createOrganization(f.db, bia.id, { name: "Bia Labs" });
+  const theirs = await createApiKeyConnection(connectorDeps(), bia.id, other.id, {
+    connector: "drive",
+    label: "Drive da Bia",
+    apiKey: "not-a-real-key-bia",
+    serverUrl: "https://drive.bia.example.com/mcp",
+  });
+  const text = await findTools(await nothingLoaded(), "google drive");
+  expect(text).toEndWith(`\n\n${TO_GET}\n${CONNECT_DRIVE}`);
+  for (const detail of [theirs.id, "Drive da Bia", "drive.bia.example.com", "not-a-real-key-bia", "Bia Labs"]) {
+    expect(text).not.toContain(detail);
+  }
 });

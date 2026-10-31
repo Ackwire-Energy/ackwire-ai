@@ -36,7 +36,7 @@ export function ConnectPage({ code }: { code: string }) {
   const device = useMachineDevice(code);
   const confirm = useConfirmDevice();
   const deny = useDenyDevice();
-  const orgs = (me.data?.organizations ?? []).filter((o) => can(o.role, "post"));
+  const orgs = (me.data?.organizations ?? []).filter((o) => can(o, "pair_computers"));
   const [orgId, setOrgId] = useState<string | undefined>(undefined);
   const [name, setName] = useState("");
   const [outcome, setOutcome] = useState<Outcome>(null);

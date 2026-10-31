@@ -33,3 +33,7 @@ A message that @mentions nobody went to one strategy: Jev when the installation 
 - **The channel's only agent whatever the company.** With several people and one agent, every greeting would wake it.
 - **Kimi's large model as the small one.** About US$ 0.009 and several seconds a message: no routing beats that.
 - **Skipping the prompt cache on router calls.** It saves a quarter of the input of a call that costs a fiftieth of a cent.
+
+## Addendum (2026-10-30): the rules read a person's messages in a row
+
+A run of a person's messages, each within 2.5 s of the one before and each one the router decides on itself, is decided once, on its last message (ADR 0013, addendum of 2026-10-30, §2), so the rules see it as one message too. R3 reads whom the person speaks to: it stays out when the message, or the same person's messages right before it, name a person of the workspace ("boa tarde walter", then "como esta hoje"). R1 holds for a quote reply to an agent followed by more messages of the same person.

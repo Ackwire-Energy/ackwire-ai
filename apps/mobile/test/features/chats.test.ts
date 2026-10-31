@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { Channel, DirectMessage, Role } from "@agenteschat/client";
+import type { Channel, DirectMessage, OrgSummary } from "@agenteschat/client";
 import { previewBody } from "@agenteschat/client/lib/message-body";
 import { resources } from "@agenteschat/i18n";
 import i18next from "i18next";
@@ -298,30 +298,33 @@ describe("the home by kind", () => {
     expect(homeSections([])).toEqual([]);
   });
 
-  test("a member's Agentes leaves out the agents that don't answer them, owners and admins see all", () => {
+  test("Agentes leaves out the agents that don't answer me, and who manages agents sees all", () => {
     const agents = [
       { id: "a-A", canTalk: false },
       { id: "a-B", canTalk: true },
     ];
     const dms = [dm("d0", "A", 1, 5), dm("d1", "B", 0, 9), person("p1", "Ana", 1)];
-    expect([...hiddenAgentIds("member", agents)]).toEqual(["a-A"]);
-    expect([...hiddenAgentIds("owner", agents)]).toEqual([]);
-    const hiddenAgents = (role: Role) => hiddenAgentIds(role, agents);
-    const agentRows = (role: Role) =>
-      homeSections(buildConversations({ channels: [], dms, threads: [], hiddenAgents: hiddenAgents(role) })).map(
-        (x) => [x.key, x.rows.map((r) => r.key)],
-      );
-    expect(agentRows("member")).toEqual([
+    const member: OrgSummary = { id: "o1", name: "Acme", role: "member", permissions: ["read", "talk_to_agents"] };
+    const manager: OrgSummary = { ...member, permissions: ["read", "talk_to_agents", "manage_agents"] };
+    expect([...hiddenAgentIds(member, agents)]).toEqual(["a-A"]);
+    expect([...hiddenAgentIds(manager, agents)]).toEqual([]);
+    const hiddenAgents = (org: OrgSummary) => hiddenAgentIds(org, agents);
+    const agentRows = (org: OrgSummary) =>
+      homeSections(buildConversations({ channels: [], dms, threads: [], hiddenAgents: hiddenAgents(org) })).map((x) => [
+        x.key,
+        x.rows.map((r) => r.key),
+      ]);
+    expect(agentRows(member)).toEqual([
       ["agents", ["d:d1"]],
       ["people", ["d:p1"]],
     ]);
-    expect(agentRows("admin")).toEqual([
+    expect(agentRows(manager)).toEqual([
       ["agents", ["d:d0", "d:d1"]],
       ["people", ["d:p1"]],
     ]);
     // The tab's badge counts what the home lists: A's unread stays out for the member.
-    expect(unreadConversationCount({ channels: [], dms, hiddenAgents: hiddenAgents("member") })).toBe(0);
-    expect(unreadConversationCount({ channels: [], dms, hiddenAgents: hiddenAgents("admin") })).toBe(1);
+    expect(unreadConversationCount({ channels: [], dms, hiddenAgents: hiddenAgents(member) })).toBe(0);
+    expect(unreadConversationCount({ channels: [], dms, hiddenAgents: hiddenAgents(manager) })).toBe(1);
   });
 
   test("the Threads tab: threads and missions by latest activity", () => {

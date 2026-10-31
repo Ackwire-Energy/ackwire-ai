@@ -515,7 +515,7 @@ async function requireEventEditor(db: Database, userId: string, orgId: string, e
     .where(and(eq(calendarEvents.id, eventId), eq(calendarEvents.orgId, orgId), isNull(calendarEvents.deletedAt)));
   if (!row) throw new NotFoundError("Event not found");
   const own = row.createdByType === "person" && row.createdById === userId;
-  if (!own && !can(membership.role, "configure"))
+  if (!own && !can(membership, "configure"))
     throw new ForbiddenError("Only who created the event (or an admin) can change it");
   return row;
 }
@@ -1110,7 +1110,7 @@ async function decideProposalRow(db: Database, userId: string, orgId: string, id
     .where(and(eq(calendarProposals.id, id), eq(calendarProposals.orgId, orgId)));
   if (!p) throw new NotFoundError("Proposal not found");
   const membership = await requireActiveMembership(db, userId, orgId);
-  if (p.requesterUserId !== userId && !can(membership.role, "configure")) {
+  if (p.requesterUserId !== userId && !can(membership, "configure")) {
     throw new ForbiddenError("Only the person who asked can confirm this");
   }
   if (p.status !== "pending") throw new ValidationError("This proposal was already decided");

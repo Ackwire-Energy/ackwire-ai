@@ -296,7 +296,7 @@ export function OnboardingFlow() {
     if (!created) return;
     setPending(true);
     setError(null);
-    const failed = await inviteEach(emails, (email) => api.orgs.invite(created.orgId, { email, role: "member" }));
+    const failed = await inviteEach(emails, (email) => api.orgs.invite(created.orgId, { email }));
     setPending(false);
     setInvited((n) => n + emails.length - failed.length);
     setEmails(failed);

@@ -1,4 +1,4 @@
-import type { AiStatus, ApiClient, Machine, MachineAccount, Role } from "@agenteschat/client";
+import type { AiStatus, ApiClient, Machine, MachineAccount } from "@agenteschat/client";
 import {
   ApiError,
   keys,
@@ -12,6 +12,7 @@ import {
   useMachines,
   useSaveJevKey,
 } from "@agenteschat/client";
+import { accountTitle } from "@agenteschat/client/lib/ai-accounts";
 import { billingHoldOf, standingActive } from "@agenteschat/client/lib/billing";
 import {
   computerEdition,
@@ -808,7 +809,7 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
     });
   const aiAll = setOf(choice).map((a) => ({ ...a, done: (signedIn[a.id] ?? planned[a.id])?.choice === choice }));
   const thinksOf = (account: MachineAccount, plan: PlanChoice) => ({
-    label: account.label,
+    label: accountTitle(account),
     mark: account.provider ?? account.kind,
     choice: plan,
   });
@@ -853,9 +854,15 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
     mutationFn: async () => {
       if (!created) return;
       const next = new Set(sent);
+      // "Admin" invites get the workspace's administrator role (ADR 0085): the first one this person may give.
+      const roles = toSend.some((i) => i.admin) ? (await api.roles.list(created.orgId)).roles : [];
+      const adminRoleId = roles.find((r) => r.givable && r.permissions.includes("administrator"))?.id;
       for (const invite of toSend) {
         try {
-          await api.orgs.invite(created.orgId, { email: invite.email, role: invite.role });
+          await api.orgs.invite(created.orgId, {
+            email: invite.email,
+            roleIds: invite.admin && adminRoleId ? [adminRoleId] : [],
+          });
           next.add(invite.email);
         } catch (err) {
           toast.show(`${invite.email}: ${errorText(t, err)}`, "error");
@@ -2382,9 +2389,10 @@ function TeamStep({
     staleTime: Number.POSITIVE_INFINITY,
     retry: false,
   });
+  // Invited as a member, or with the workspace's administrator role (`InviteDraft.admin`).
   const roleOptions = [
-    { value: "member" as Role, label: t("roles.member"), description: t("roles.memberDesc") },
-    { value: "admin" as Role, label: t("roles.admin"), description: t("roles.adminDesc") },
+    { value: "member" as const, label: t("roles.member"), description: t("roles.memberDesc") },
+    { value: "admin" as const, label: t("roles.admin"), description: t("roles.adminDesc") },
   ];
   const commit = (text: string) => {
     if (!text.trim()) return;
@@ -2445,10 +2453,12 @@ function TeamStep({
                 ) : (
                   <Select
                     size="sm"
-                    value={i.role}
+                    value={i.admin ? "admin" : "member"}
                     aria-label={t("onboarding.team.roleOf", { email: i.email })}
                     options={roleOptions}
-                    onValueChange={(role) => onChange(invites.map((x) => (x.email === i.email ? { ...x, role } : x)))}
+                    onValueChange={(v) =>
+                      onChange(invites.map((x) => (x.email === i.email ? { ...x, admin: v === "admin" } : x)))
+                    }
                   />
                 )}
                 {!sent.has(i.email) && (

@@ -3,6 +3,7 @@ import {
   ApiError,
   useAgentProposal,
   useAgents,
+  useAiAccounts,
   useBrainMachines,
   useChannels,
   useCreateAgent,
@@ -18,10 +19,12 @@ import {
 } from "@agenteschat/client";
 import { LEVELS, type Level, saveLevels } from "@agenteschat/client/lib/access-levels";
 import { draftLevels } from "@agenteschat/client/lib/action-cards";
+import { ownSignInReady } from "@agenteschat/client/lib/ai-accounts";
 import { type ConnectedItem, itemName } from "@agenteschat/client/lib/connected";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { choiceOf, defaultPolicy, MAIL_ACTIONS, toMailLevel } from "@agenteschat/client/lib/mail";
+import { planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { AUTO, isAuto, modelChoices } from "@agenteschat/client/lib/providers";
 import { scopeText } from "@agenteschat/client/lib/scopes";
@@ -154,7 +157,7 @@ export function NewAgentPage({ proposalId = null }: { proposalId?: string | null
   const opened = useRef<AgentProposal | null>(null);
   if (proposal.data?.canDecide && opened.current?.messageId !== proposal.data.messageId) opened.current = proposal.data;
   const from = opened.current?.messageId === proposalId ? opened.current : null;
-  const allowed = can(org.role, "manage_agents");
+  const allowed = can(org, "create_agents");
   const closed = proposalId !== null && !from;
   if (!allowed || closed) {
     return (
@@ -209,6 +212,8 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
   const dms = useDms(org.id);
   const platform = usePlatformKey(org.id);
   const brainMachines = useBrainMachines(org.id);
+  const aiAccounts = useAiAccounts(org.id);
+  const connect = useConnectAi();
   const toast = useToast();
   const settings = useSettings(org.id);
   const library = useSkills(org.id);
@@ -219,7 +224,6 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
   const mail = useMailAccounts(org.id);
   // Mailboxes (ADR 0038) start without access: email is always granted on purpose.
   const mailboxes = useMemo(() => (mail.data ?? []).filter((a) => a.status === "active"), [mail.data]);
-  const connect = useConnectAi();
   const navigate = useNavigate();
   const mood = useDraftMood();
   const root = useRef<HTMLDivElement>(null);
@@ -412,6 +416,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
     });
     // A plan thinks on its computer: the agent goes there, then thinks with it (an automatic model stays automatic).
     // The agent exists either way: if the plan can't be saved now it stays on the API, and its page says so.
+    let signIn = false;
     if (plan) {
       try {
         await api.sandbox.setTarget(org.id, agent.id, plan.machineId);
@@ -419,6 +424,14 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
           brain: plan.kind,
           ...(plan.accountId ? { account: plan.accountId } : {}),
         });
+        // Saved with no account, it thinks with that computer's own sign-in, which thinks only for agents of whoever
+        // connected it, where that CLI is signed in (never on the workspace's computer). Else, for an agent of the
+        // person's own, its plan's sign-in opens once it's created: only the owner signs a plan in for it.
+        const row = aiAccounts.data?.computers.find((c) => c.machineId === plan.machineId);
+        signIn =
+          !plan.accountId &&
+          ownerId === me.user.id &&
+          !ownSignInReady({ ownSignIn: row?.mine === true }, row, plan.kind);
       } catch {
         toast.show(t("newAgent.planNotSaved", { ...g, brain: t(`brain.card.${plan.kind}`) }), "error");
       }
@@ -461,6 +474,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
     });
     mood.react("happy", 2200);
     scrollTop();
+    if (plan && signIn) connect?.open({ agentId: agent.id, plan: planOfKind(plan.kind) });
     if (connectAfter) connect?.open({ agentId: agent.id, agentIds: [agent.id] });
   };
   const next = () => {

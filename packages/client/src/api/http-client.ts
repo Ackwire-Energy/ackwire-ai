@@ -26,6 +26,7 @@ import type {
   AgentQuestion,
   AgentSecret,
   AgentSkill,
+  AgentStatus,
   AgentUsage,
   AiAccounts,
   AiStatus,
@@ -50,6 +51,7 @@ import type {
   ComputerTarget,
   Connection,
   ConnectorCatalog,
+  ConsultationConversation,
   Credential,
   CustomConnectStart,
   CustomServer,
@@ -120,6 +122,7 @@ import type {
   Organization,
   OrgOverview,
   OrgPlanUsage,
+  OrgRoles,
   OrgSettings,
   Person,
   PhoneSignIn,
@@ -131,6 +134,7 @@ import type {
   RoutineRun,
   RuleInfo,
   Run,
+  RunConsultation,
   RunStep,
   SandboxSettings,
   ScheduleParse,
@@ -141,6 +145,7 @@ import type {
   SignInOptions,
   Skill,
   SkillDetail,
+  SkillPick,
   StorageConfig,
   StorageMigration,
   StorageTestResult,
@@ -312,6 +317,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       open: (orgId, agentId, url) =>
         request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/open`, { json: { url } }),
       stop: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/stop`, { json: {} }),
+      restart: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/restart`, { json: {} }),
     },
     desktop: {
       status: (orgId, agentId) => request<DesktopStatus>(`${org(orgId)}/agents/${enc(agentId)}/desktop`),
@@ -376,6 +382,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<{ url: string; expiresAt: string }>(`${org(orgId)}/billing-link`, { json: { from } }),
       limits: (orgId) => request<WorkspaceLimits>(`${org(orgId)}/limits`),
       updateMe: (orgId, input) => request<Person>(`${org(orgId)}/me`, { method: "PATCH", json: input }),
+      setStatus: (orgId, input) => request<Person>(`${org(orgId)}/me/status`, { method: "PUT", json: input }),
       update: (orgId, input) => request<void>(org(orgId), { method: "PATCH", json: input }),
       members: async (orgId) => (await request<{ members: Member[] }>(`${org(orgId)}/members`)).members,
       changeRole: (orgId, userId, role) =>
@@ -413,6 +420,19 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
             before: query.before,
             limit: query.limit,
           },
+        }),
+    },
+    roles: {
+      list: (orgId) => request<OrgRoles>(`${org(orgId)}/roles`),
+      create: (orgId, input) => request<{ id: string }>(`${org(orgId)}/roles`, { json: input }),
+      update: (orgId, roleId, patch) =>
+        request<void>(`${org(orgId)}/roles/${enc(roleId)}`, { method: "PATCH", json: patch }),
+      remove: (orgId, roleId) => request<void>(`${org(orgId)}/roles/${enc(roleId)}`, { method: "DELETE" }),
+      reorder: (orgId, ids) => request<void>(`${org(orgId)}/roles/order`, { method: "PUT", json: { ids } }),
+      setFor: (orgId, userId, roleIds) =>
+        request<{ roleIds: string[] }>(`${org(orgId)}/members/${enc(userId)}/roles`, {
+          method: "PUT",
+          json: { roleIds },
         }),
     },
     agentGroups: {
@@ -465,6 +485,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       platformKeyAvailable: async (orgId) =>
         (await request<{ available: boolean }>(`${org(orgId)}/credentials/platform`)).available,
       aiStatus: (orgId) => request<AiStatus>(`${org(orgId)}/ai-status`),
+      statuses: async (orgId) => (await request<{ agents: AgentStatus[] }>(`${org(orgId)}/agent-status`)).agents,
       importFromGithub: (orgId, url) =>
         request<{ files: { path: string; text: string }[]; skipped?: string[] }>(`${org(orgId)}/agent-imports/github`, {
           json: { url },
@@ -503,6 +524,18 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         if (res?.consults) consultSeeds.publish(channelId, res.consults, askedAt);
         return res ? res.runs : null;
       },
+      consultations: async (orgId, channelId) =>
+        (
+          (await nullOn(404, () =>
+            request<{ consultations: RunConsultation[] }>(`${org(orgId)}/channels/${enc(channelId)}/consultations`),
+          )) ?? { consultations: [] }
+        ).consultations,
+      consultation: (orgId, channelId, consultationId) =>
+        nullOn(404, () =>
+          request<ConsultationConversation>(
+            `${org(orgId)}/channels/${enc(channelId)}/consultations/${enc(consultationId)}`,
+          ),
+        ),
       usage: async (orgId) => {
         const res = await nullOn(403, () => request<{ usage: AgentUsage[] }>(`${org(orgId)}/usage`));
         return res ? res.usage : null;
@@ -558,6 +591,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<{ runs: { agentId: string; runId: string }[] }>(`${org(orgId)}/messages/${enc(messageId)}/answer-now`, {
           json: {},
         }),
+      cancelFollowUp: (orgId, messageId) =>
+        request<void>(`${org(orgId)}/messages/${enc(messageId)}/cancel-follow-up`, { json: {} }),
       archive: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}`, { method: "DELETE" }),
       unarchive: (orgId, channelId) =>
         request<void>(`${org(orgId)}/channels/${enc(channelId)}/unarchive`, { json: {} }),
@@ -730,7 +765,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       list: async (orgId) => (await request<{ skills: Skill[] }>(`${org(orgId)}/skills`)).skills,
       get: (orgId, id) => request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}`),
       create: (orgId, input) => request<SkillDetail>(`${org(orgId)}/skills`, { json: input }),
-      import: (orgId, input) => request<SkillDetail>(`${org(orgId)}/skills/import`, { json: input }),
+      import: (orgId, input) => request<SkillDetail | SkillPick>(`${org(orgId)}/skills/import`, { json: input }),
+      importPicked: async (orgId, url, paths) =>
+        (await request<{ skills: SkillDetail[] }>(`${org(orgId)}/skills/import`, { json: { url, paths } })).skills,
       update: (orgId, id, patch) =>
         request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}`, { method: "PATCH", json: patch }),
       reimport: (orgId, id) => request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}/reimport`, { json: {} }),
@@ -767,8 +804,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     },
     joinRequests: {
       list: async (orgId) => (await request<{ requests: JoinRequest[] }>(`${org(orgId)}/join-requests`)).requests,
-      approve: (orgId, id, role) =>
-        request<JoinApproval>(`${org(orgId)}/join-requests/${enc(id)}/approve`, { json: { role } }),
+      approve: (orgId, id, roleIds) =>
+        request<JoinApproval>(`${org(orgId)}/join-requests/${enc(id)}/approve`, { json: { roleIds: roleIds ?? [] } }),
       deny: (orgId, id, reason) =>
         request<void>(`${org(orgId)}/join-requests/${enc(id)}/deny`, { json: reason ? { reason } : {} }),
     },

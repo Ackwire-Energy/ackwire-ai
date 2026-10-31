@@ -43,10 +43,10 @@ describe("receipts", () => {
   });
 
   test("who sees the buttons", () => {
-    expect(canUndoAction(action(), { userId: "u1", role: "member", ownsAgent: false })).toBe(true);
-    expect(canUndoAction(action(), { userId: "u2", role: "member", ownsAgent: false })).toBe(false);
-    expect(canUndoAction(action(), { userId: "u2", role: "admin", ownsAgent: false })).toBe(true);
-    expect(canUndoAction(action(), { userId: "u2", role: "member", ownsAgent: true })).toBe(true);
+    expect(canUndoAction(action(), { userId: "u1", managesAgents: false, ownsAgent: false })).toBe(true);
+    expect(canUndoAction(action(), { userId: "u2", managesAgents: false, ownsAgent: false })).toBe(false);
+    expect(canUndoAction(action(), { userId: "u2", managesAgents: true, ownsAgent: false })).toBe(true);
+    expect(canUndoAction(action(), { userId: "u2", managesAgents: false, ownsAgent: true })).toBe(true);
   });
 
   test("Desfazer tudo takes only the undoable ones; i18n keys", () => {
@@ -107,5 +107,16 @@ describe("receipt sentence values", () => {
       params: { from: "a", to: "b" },
     });
     expect(actionTextValues(renamed, t).to).toBe("b");
+  });
+
+  test("a deleted routine says its name; a kind this build doesn't know still gives values", () => {
+    const deleted = action({
+      kind: "routine.deleted",
+      target: { type: "routine", id: "r", title: "Daily" },
+      params: { name: "Daily" },
+    });
+    expect(actionTextValues(deleted, t)).toEqual({ name: "Daily" });
+    const unknown = action({ kind: "something.new" as AgentAction["kind"] });
+    expect(actionTextValues(unknown, t)).toEqual({});
   });
 });

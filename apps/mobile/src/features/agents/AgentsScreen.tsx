@@ -28,6 +28,7 @@ import { agentLook } from "../shared/logic";
 import { Tile } from "../shared/parts";
 import { useWaitingApprovals, useWorkingNow } from "../shared/queries";
 import { useTabHeader } from "../shared/tabHeader";
+import { usePresenceOf } from "../status/hooks";
 import { openAgentDelete } from "./DeleteAgentScreen";
 import { agoOf, freeSections, plainRole, type TeamLine, teamLines } from "./logic";
 import { agoText, workTitle } from "./work";
@@ -40,8 +41,8 @@ const LIVE_ROWS = 8;
  * "Esperando você" (the exact request and since when), "Trabalhando agora" (what each one is on, since when,
  * with the pixel orbit), then "Livres" (its role in plain words, and when you last talked; first, dozing, the
  * ones waiting for their offline computer: "Esperando o MacBook Air"), split by the workspace's groups of agents
- * when it has some. Tapping an agent opens its profile (Conversar is one tap there); "Novo agente" at the end.
- * Agents move between groups on the web.
+ * when it has some. Tapping an agent opens its profile (Conversar is one tap there); "Novo agente" at the end, for who
+ * may create one. Agents move between groups on the web.
  */
 export function AgentsScreen() {
   const { t } = useTranslation();
@@ -49,6 +50,8 @@ export function AgentsScreen() {
   const c = useColors();
   const header = useTabHeader();
   const orgId = useOrgId();
+  const org = useOrg().org;
+  const createsAgents = can(org, "create_agents");
   const runs = useWorkingRuns(orgId);
   const dms = useDms(orgId);
   const approvals = useApprovals(orgId);
@@ -57,8 +60,7 @@ export function AgentsScreen() {
   const outages = useMachineOutages();
   const groups = useAgentGroups(orgId);
   const offline = useMemo(() => waitingComputerByAgent(outages.outages), [outages.outages]);
-  const role = useOrg().org?.role;
-  const agents = dir.agents.filter((a) => listsAgent(role, a));
+  const agents = dir.agents.filter((a) => listsAgent(org, a));
   const { waiting, working, free } = teamLines(agents, work, dms.data ?? [], asking, offline);
   const busy = waiting.length + working.length;
   const pull = usePullRefresh(() =>
@@ -66,7 +68,7 @@ export function AgentsScreen() {
   );
   const total = agents.length;
   // Archived agents have no profile: admins delete them for good from here (ADR 0082).
-  const admin = can(role, "manage_agents");
+  const admin = can(org, "manage_agents");
   const archived = (useFormerAgents(orgId).data ?? []).filter((a) => admin && !a.deleted);
   return (
     <LargeTitleScreen
@@ -116,16 +118,18 @@ export function AgentsScreen() {
           ))}
         </>
       ) : null}
-      <Pressable
-        onPress={() => router.push("/new-agent")}
-        accessibilityRole="button"
-        style={({ pressed }) => [styles.newRow, pressed && { backgroundColor: c.sunken }]}
-      >
-        <Tile icon="plus" size={36} />
-        <Text variant="callout" tone="ink2" style={styles.bold}>
-          {t("mobile.agents.new")}
-        </Text>
-      </Pressable>
+      {createsAgents ? (
+        <Pressable
+          onPress={() => router.push("/new-agent")}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.newRow, pressed && { backgroundColor: c.sunken }]}
+        >
+          <Tile icon="plus" size={36} />
+          <Text variant="callout" tone="ink2" style={styles.bold}>
+            {t("mobile.agents.new")}
+          </Text>
+        </Pressable>
+      ) : null}
     </LargeTitleScreen>
   );
 }
@@ -172,8 +176,9 @@ function FreeSections({ free, groups, before }: { free: TeamLine[]; groups: Agen
 }
 
 /**
- * One agent (`.arow`): its body, the name and role, then what it needs from you (the exact request), what it is
- * on (since when), or its role in plain words (when you last talked).
+ * One agent (`.arow`): its body with its presence badge, the name and role, then what it needs from you (the exact
+ * request), what it is on (its line when it has one, ADR 0084; since when), or its role in plain words (when you
+ * last talked).
  */
 function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean; live: boolean }) {
   const { t } = useTranslation();
@@ -185,13 +190,16 @@ function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean
   // An agent with nothing to think with says so where its role would be (the web's "Sem IA").
   const noAi = !approval && !w && computer === undefined && aiStateOf(ai.data, a.id) === "no_ai";
   const busy = Boolean(approval || w);
+  const line = usePresenceOf().agent(a.id)?.line ?? null;
   const time = l.at ? (busy ? agoText(t, agoOf(l.at, now)) : when.short(l.at)) : null;
   const sub = approval
     ? l.waitingCount > 1
       ? t("mobile.intentAgents.waitingMore", { title: approval.title, count: l.waitingCount - 1 })
       : t("mobile.intentAgents.waitingLine", { title: approval.title })
     : w
-      ? workTitle(t, w)
+      ? line
+        ? line.text
+        : workTitle(t, w)
       : computer !== undefined
         ? t("mobile.outage.rowWaiting", { computer })
         : noAi
@@ -217,7 +225,13 @@ function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean
         .join(", ")}
       divider={divider}
       leading={
-        <AgentFace agentId={a.id} size={50} mode={w ? "run" : computer !== undefined ? "rest" : "idle"} live={live} />
+        <AgentFace
+          agentId={a.id}
+          size={50}
+          mode={w ? "run" : computer !== undefined ? "rest" : "idle"}
+          live={live}
+          presence
+        />
       }
       title={
         <View style={styles.l1}>

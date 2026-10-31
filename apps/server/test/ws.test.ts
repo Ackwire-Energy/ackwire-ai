@@ -205,7 +205,10 @@ test("end to end: a subscriber sees the message, the streamed deltas and the age
 
   const done = await c.next((f) => f.type === "event" && (f.event as { type: string }).type === "message.handled");
   expect(done).toMatchObject({ channelId, event: { type: "message.handled", agentId, status: "done" } });
-  const events = c.frames.filter((f) => f.type === "event").map((f) => f.event as Record<string, unknown>);
+  // The channel's own events (the workspace's, like `agent.status`, arrive on the same socket).
+  const events = c.frames
+    .filter((f) => f.type === "event" && f.channelId === channelId)
+    .map((f) => f.event as Record<string, unknown>);
   expect(events.map((e) => e.type)).toEqual([
     "message.created",
     "message.routed",
@@ -223,6 +226,9 @@ test("end to end: a subscriber sees the message, the streamed deltas and the age
     "run.finished",
     "message.handled",
   ]);
+  // The agent's presence moved with its run, for the whole workspace (ADR 0084 §11).
+  const org = c.frames.filter((f) => f.type === "event" && f.scope === "org").map((f) => f.event);
+  expect(org).toContainEqual(expect.objectContaining({ type: "agent.status", agentId }));
   expect(
     events
       .filter((e) => e.type === "agent.delta")

@@ -2,6 +2,7 @@ import type { Message } from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
 import {
   consultationOfNotice,
+  followUpLine,
   type MessageNotice,
   noticeAgentHandle,
   noticeOf,
@@ -13,6 +14,7 @@ import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useApi } from "@/api/context";
 import { MessageBody } from "@/chat/MessageBody";
 import { ConsultationCard } from "@/components/ConsultationCard";
 import { useOrg } from "@/components/org-context";
@@ -24,6 +26,7 @@ const NOTICE_ICON: Record<string, IconName> = {
   consult_reply: "agent",
   agent_note: "message",
   wait_result: "check",
+  follow_up: "clock",
 };
 
 /** The line's words: the app's own, never the agent-facing `from` ("Routine «…»") as is. */
@@ -61,12 +64,15 @@ function EventLine({
   label,
   text,
   labels,
+  action,
 }: {
   message: Message;
   icon: IconName;
   label: ReactNode;
   text: string;
   labels: { show: string; hide: string };
+  /** What a person can still do about it ("Cancelar" on a follow-up), at the end of the line. */
+  action?: ReactNode;
 }) {
   const { i18n } = useTranslation();
   const { org } = useOrg();
@@ -85,6 +91,12 @@ function EventLine({
             </button>
           </>
         )}
+        {action && (
+          <>
+            {" · "}
+            {action}
+          </>
+        )}
       </span>
       {open && text && (
         <div className="cn-line__body">
@@ -101,7 +113,7 @@ function EventLine({
  * The agent's own reply (if it has something to say) follows as a normal message.
  */
 export function NoticeLine({ message }: { message: Message }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const notice = noticeOf(message.meta);
@@ -116,14 +128,41 @@ export function NoticeLine({ message }: { message: Message }) {
       </div>
     );
   const nameOfHandle = (handle: string) => dir.agentByHandle.get(handle.toLowerCase())?.name ?? null;
+  const name = dir.authorName(message.author);
+  const followUp = followUpLine(notice, name, { time: (iso) => formatTime(i18n.language, iso), locale: i18n.language });
   return (
     <EventLine
       message={message}
       icon={NOTICE_ICON[notice.kind] ?? "info"}
-      label={noticeLabel(t, notice, dir.authorName(message.author), nameOfHandle)}
+      label={followUp ? t(followUp.key, followUp.values) : noticeLabel(t, notice, name, nameOfHandle)}
       text={message.body.trim() || notice.text}
       labels={{ show: t("chat.notice.show"), hide: t("chat.notice.hide") }}
+      action={followUp?.pending ? <CancelFollowUp messageId={message.id} /> : undefined}
     />
+  );
+}
+
+/** "Cancelar" on a follow-up still to come: the line changes in place once the server has it. */
+function CancelFollowUp({ messageId }: { messageId: string }) {
+  const { t } = useTranslation();
+  const api = useApi();
+  const { org } = useOrg();
+  const [busy, setBusy] = useState(false);
+  return (
+    <button
+      type="button"
+      className="cn-line__toggle"
+      disabled={busy}
+      onClick={() => {
+        setBusy(true);
+        void api.chat
+          .cancelFollowUp(org.id, messageId)
+          .catch(() => {})
+          .finally(() => setBusy(false));
+      }}
+    >
+      {t("chat.notice.followUpCancel")}
+    </button>
   );
 }
 

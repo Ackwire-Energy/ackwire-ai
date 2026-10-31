@@ -120,18 +120,14 @@ const kindOf = (row: Pick<MachineAccountRow, "kind">): AccountKind =>
   isAccountKind(row.kind) ? row.kind : "claude_code";
 
 /**
- * What a new account is called until its owner names it: the maker and the
- * plan ("Claude Max", "ChatGPT Plus", "GLM Coding"), numbered among the names
- * its owner already has ("Claude Team 2"); never the email (others see the name).
+ * What a new account is called until its owner names it: the maker ("Claude",
+ * "ChatGPT") or a coding plan's name ("GLM Coding"), numbered among the names
+ * its owner already has ("Claude 2"). Never the plan, which the apps show beside
+ * the name and which changes (an upgrade, a plan renamed), and never the email
+ * (others see the name).
  */
-export function defaultAccountLabel(
-  kind: AccountKind,
-  plan?: string | null,
-  taken: readonly string[] = [],
-  provider?: string | null,
-) {
-  const word = plan && /^[\w.-]{1,20}$/.test(plan) ? ` ${plan[0]?.toUpperCase()}${plan.slice(1)}` : "";
-  const base = planOf(provider)?.label ?? `${kind === "codex" ? "ChatGPT" : "Claude"}${word}`;
+export function defaultAccountLabel(kind: AccountKind, taken: readonly string[] = [], provider?: string | null) {
+  const base = planOf(provider)?.label ?? (kind === "codex" ? "ChatGPT" : "Claude");
   if (!taken.includes(base)) return base;
   for (let n = 2; ; n++) if (!taken.includes(`${base} ${n}`)) return `${base} ${n}`;
 }
@@ -386,7 +382,7 @@ interface Settled {
 
 /**
  * What the runner says about an account whose row exists: a sign-in started
- * from the app finishes (named after its plan, audited for its owner, who
+ * from the app finishes (named by `defaultAccountLabel`, audited for its owner, who
  * never changes), a known one is refreshed. `dedupe` (the person who signed
  * in is asking, so they hear why): one their own account on this computer
  * already is becomes a tombstone. A known account that signed in as another
@@ -459,7 +455,7 @@ async function settleAccount(
     // A login of an account its owner already has here (one per agent) takes that account's name.
     const label =
       (await sameAccount(db, row, { email, keyHint }))?.label ??
-      defaultAccountLabel(kindOf(row), plan, await takenLabels(db, orgId, row.createdBy, row.id), row.provider);
+      defaultAccountLabel(kindOf(row), await takenLabels(db, orgId, row.createdBy, row.id), row.provider);
     const [done] = await db
       .update(machineAccounts)
       .set({ email, plan, keyHint, status, label, ...usage, updatedAt: now })
@@ -572,8 +568,7 @@ export async function syncMachineAccounts(
           .insert(machineAccounts)
           .values({
             ...candidate,
-            label:
-              same?.label ?? defaultAccountLabel(a.kind, a.plan, await takenLabels(tx, orgId, owner, a.id), provider),
+            label: same?.label ?? defaultAccountLabel(a.kind, await takenLabels(tx, orgId, owner, a.id), provider),
             email: a.email ?? null,
             plan: a.plan ?? null,
             keyHint: a.keyHint ?? null,
@@ -771,7 +766,7 @@ export async function getMachineAccounts(
 ) {
   const { membership, machine } = await memberMachine(deps.db, userId, orgId, machineId);
   const adds = mayAddAccounts(machine, userId);
-  if (!adds && !can(membership.role, "configure")) {
+  if (!adds && !can(membership, "configure")) {
     throw new ForbiddenError(
       "Only an admin or the person who connected this computer can see its accounts",
       "machine.forbidden",
@@ -860,7 +855,7 @@ export async function beginAccountLogin(
       orgId,
       machineId: machine.id,
       kind,
-      label: defaultAccountLabel(kind, null, [], provider),
+      label: defaultAccountLabel(kind, [], provider),
       status: "signing_in",
       createdBy: userId,
       provider: plan ? provider : null,
@@ -958,7 +953,7 @@ export interface AccountLoginStatus {
 
 const LOGIN_STATES: readonly AccountLoginState[] = ["waiting", "done", "failed", "expired"];
 
-/** Where a sign-in is; once done, the account is stored (named after its plan) and returned. */
+/** Where a sign-in is; once done, the account is stored (named by `defaultAccountLabel`) and returned. */
 export async function accountLoginStatus(
   deps: MachineAccountHubDeps,
   userId: string,
@@ -1121,7 +1116,7 @@ export async function removeMachineAccount(
   const allowed =
     account.createdBy === userId ||
     machine.pairedByUserId === userId ||
-    (can(membership.role, "configure") && (machine.pairedByUserId === null || account.createdBy === null));
+    (can(membership, "configure") && (machine.pairedByUserId === null || account.createdBy === null));
   if (!allowed) {
     throw new ForbiddenError(
       "Only the account's owner or the person who connected this computer can remove it",

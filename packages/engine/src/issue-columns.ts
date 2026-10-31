@@ -58,7 +58,7 @@ export interface ColumnDeps {
 
 async function requirePoster(db: Database, userId: string, orgId: string) {
   const membership = await requireActiveMembership(db, userId, orgId);
-  if (!can(membership.role, "post")) throw new ForbiddenError();
+  if (!can(membership, "post")) throw new ForbiddenError();
 }
 
 async function announce(deps: ColumnDeps, orgId: string) {

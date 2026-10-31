@@ -38,7 +38,7 @@ test("management API: settings, overview, people, invitations, credentials, agen
   expect(people.people).toEqual([expect.objectContaining({ email: "owner@example.com", online: false })]);
 
   const batch = (await (
-    await api("/invitations/batch", { json: { emails: ["a@example.com", "bad", "b@example.com"], role: "member" } })
+    await api("/invitations/batch", { json: { emails: ["a@example.com", "bad", "b@example.com"] } })
   ).json()) as { results: { email: string; status: string; url?: string; invitationId?: string }[] };
   expect(batch.results.map((r) => r.status)).toEqual(["invited", "invalid_email", "invited"]);
   expect(batch.results[0]?.url).toContain("/invite/");

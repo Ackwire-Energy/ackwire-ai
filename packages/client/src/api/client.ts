@@ -25,6 +25,7 @@ import type {
   AgentQuestion,
   AgentSecret,
   AgentSkill,
+  AgentStatus,
   AgentUsage,
   AiAccounts,
   AiStatus,
@@ -57,6 +58,7 @@ import type {
   ComputerTarget,
   Connection,
   ConnectorCatalog,
+  ConsultationConversation,
   Credential,
   CustomConnectStart,
   CustomServer,
@@ -150,6 +152,7 @@ import type {
   Organization,
   OrgOverview,
   OrgPlanUsage,
+  OrgRoles,
   OrgSettings,
   Person,
   PhoneSignIn,
@@ -159,6 +162,7 @@ import type {
   Reminder,
   ReminderInput,
   Role,
+  RoleInput,
   RosterMember,
   Routine,
   RoutineInput,
@@ -166,6 +170,7 @@ import type {
   RoutineRun,
   RuleInfo,
   Run,
+  RunConsultation,
   RunStep,
   S3Input,
   SandboxSettings,
@@ -184,6 +189,8 @@ import type {
   SkillDetail,
   SkillInput,
   SkillPatch,
+  SkillPick,
+  StatusInput,
   StorageConfig,
   StorageMigration,
   StorageTestResult,
@@ -283,6 +290,8 @@ export interface ApiClient {
     update(orgId: string, input: { name?: string; context?: string }): Promise<void>;
     /** My handle and time zone in this organization (`timezone: null` = the organization's). */
     updateMe(orgId: string, input: { handle?: string; timezone?: string | null }): Promise<Person>;
+    /** Your availability (auto, busy, hidden) and what you are doing (ADR 0084). */
+    setStatus(orgId: string, input: StatusInput): Promise<Person>;
     /** My profile photo: a square image (JSON only: base64), already cropped. */
     setAvatar(orgId: string, input: { imageBase64: string; contentType: string }): Promise<{ avatarUrl: string }>;
     removeAvatar(orgId: string): Promise<void>;
@@ -298,10 +307,14 @@ export interface ApiClient {
     /** People, files and today's uploads against the workspace's limits (any member; ADR 0079). */
     limits(orgId: string): Promise<WorkspaceLimits>;
     members(orgId: string): Promise<Member[]>;
+    /** Makes a member an owner or not (owners only). What anyone may do is their roles (`roles.setFor`). */
     changeRole(orgId: string, userId: string, role: Role): Promise<void>;
     removeMember(orgId: string, userId: string): Promise<void>;
     invitations(orgId: string): Promise<Invitation[]>;
-    invite(orgId: string, input: { email: string; role: Role }): Promise<{ invitation: Invitation; url: string }>;
+    invite(
+      orgId: string,
+      input: { email: string; role?: Role; roleIds?: string[] },
+    ): Promise<{ invitation: Invitation; url: string }>;
     revokeInvitation(orgId: string, invitationId: string): Promise<void>;
     /** `null` when invalid or expired. */
     previewInvitation(token: string): Promise<InvitationPreview | null>;
@@ -313,7 +326,7 @@ export interface ApiClient {
     people(orgId: string): Promise<Person[]>;
     /** Invitations not accepted yet, pending or expired. */
     allInvitations(orgId: string): Promise<InvitationWithStatus[]>;
-    inviteMany(orgId: string, input: { emails: string[]; role: Role }): Promise<BatchInviteResult[]>;
+    inviteMany(orgId: string, input: { emails: string[]; roleIds?: string[] }): Promise<BatchInviteResult[]>;
     /** New link (the old one stops working), 7 more days. */
     resendInvitation(orgId: string, invitationId: string): Promise<{ url: string; expiresAt: string }>;
     usageReport(orgId: string, since?: string): Promise<UsageReport>;
@@ -321,6 +334,17 @@ export interface ApiClient {
     planUsage(orgId: string): Promise<OrgPlanUsage>;
     /** The audit log, newest first (admins): agents' tool calls and people's changes. `before`: `next`. */
     audit(orgId: string, query?: AuditQuery & { before?: string; limit?: number }): Promise<AuditPage>;
+  };
+  /** A workspace's roles (ADR 0085): every member reads them; who may manage roles changes those below theirs. */
+  roles: {
+    list(orgId: string): Promise<OrgRoles>;
+    create(orgId: string, input: RoleInput): Promise<{ id: string }>;
+    update(orgId: string, roleId: string, patch: Partial<RoleInput>): Promise<void>;
+    remove(orgId: string, roleId: string): Promise<void>;
+    /** Every role but `everyone`, top first. */
+    reorder(orgId: string, ids: string[]): Promise<void>;
+    /** A person's roles, exactly these. */
+    setFor(orgId: string, userId: string, roleIds: string[]): Promise<{ roleIds: string[] }>;
   };
   /** Groups of agents (ADR 0083): everyone reads them, owners and admins change them; each change answers with all. */
   agentGroups: {
@@ -378,6 +402,8 @@ export interface ApiClient {
     platformKeyAvailable(orgId: string): Promise<boolean>;
     /** Whether each agent has an AI to think with, and whether the organization has any (ADR 0061). */
     aiStatus(orgId: string): Promise<AiStatus>;
+    /** Each agent's presence and what it says it is doing (ADR 0084). */
+    statuses(orgId: string): Promise<AgentStatus[]>;
     /** The team file / agent definitions behind a GitHub link, read by the backend (onboarding import; nothing saved). */
     importFromGithub(
       orgId: string,
@@ -414,6 +440,10 @@ export interface ApiClient {
     continueRun(orgId: string, runId: string): Promise<{ runId: string }>;
     /** Runs still active in a channel (reconciles the live rows); `null` while the server lacks the endpoint. */
     activeRuns(orgId: string, channelId: string): Promise<ActiveRun[] | null>;
+    /** The questions agents asked other agents from a conversation, latest first; `[]` while the server lacks it. */
+    consultations(orgId: string, channelId: string): Promise<RunConsultation[]>;
+    /** One of those questions opened: what the two agents said for it (read only); `null` once it's gone. */
+    consultation(orgId: string, channelId: string, consultationId: string): Promise<ConsultationConversation | null>;
     /** This month's usage per agent; `null` without the `view_usage` permission. */
     usage(orgId: string): Promise<AgentUsage[] | null>;
   };
@@ -494,6 +524,8 @@ export interface ApiClient {
      * no-AI card or the person's message. 409 `ai.still_missing` while there's still no AI.
      */
     answerNow(orgId: string, messageId: string): Promise<{ runs: { agentId: string; runId: string }[] }>;
+    /** Cancels an agent's follow-up from its line (`messageId`); 409 `follow_up.not_pending` once it came. */
+    cancelFollowUp(orgId: string, messageId: string): Promise<void>;
   };
 
   approvals: {
@@ -604,8 +636,14 @@ export interface ApiClient {
     get(orgId: string, id: string): Promise<SkillDetail>;
     /** "Escrever". */
     create(orgId: string, input: SkillInput): Promise<SkillDetail>;
-    /** A GitHub link (folder or SKILL.md) or the folder as a zip in base64 (writes are JSON only). */
-    import(orgId: string, input: { url: string } | { zipBase64: string }): Promise<SkillDetail>;
+    /**
+     * A GitHub link (a skill's folder or a file in it) or the folder as a zip in base64 (writes are JSON only). A link
+     * holding several skills installs nothing and answers with them to pick from (`importPicked`), those that can't
+     * be installed apart.
+     */
+    import(orgId: string, input: { url: string } | { zipBase64: string }): Promise<SkillDetail | SkillPick>;
+    /** Installs the skills picked among a link's choices (their `path`). */
+    importPicked(orgId: string, url: string, paths: string[]): Promise<SkillDetail[]>;
     update(orgId: string, id: string, patch: SkillPatch): Promise<SkillDetail>;
     /** Fetch the link again (`url` skills). */
     reimport(orgId: string, id: string): Promise<SkillDetail>;
@@ -1071,7 +1109,7 @@ export interface ApiClient {
     /** Waiting ones, oldest first. */
     list(orgId: string): Promise<JoinRequest[]>;
     /** `join.answered` / `join.expired` (409) when someone answered first or it ran out. */
-    approve(orgId: string, requestId: string, role: "member" | "admin"): Promise<JoinApproval>;
+    approve(orgId: string, requestId: string, roleIds?: string[]): Promise<JoinApproval>;
     /** `reason` is told to the person by email. */
     deny(orgId: string, requestId: string, reason?: string): Promise<void>;
   };
@@ -1186,6 +1224,11 @@ export interface ApiClient {
     open(orgId: string, agentId: string, url: string): Promise<void>;
     /** "Parar": closes the agent's browser now (its logins stay). Its screen has no stop: it stays on. */
     stop(orgId: string, agentId: string): Promise<void>;
+    /**
+     * "Tentar de novo" on a page that never came: the browser closes and opens again where it was (its logins
+     * stay), and every live view gets it again. Resolves once it closed. Only who may drive it (403 otherwise).
+     */
+    restart(orgId: string, agentId: string): Promise<void>;
   };
   /**
    * The agent's screen (ADR 0058): its state. The screen itself is a WebSocket (`desktopSocketUrl`), which

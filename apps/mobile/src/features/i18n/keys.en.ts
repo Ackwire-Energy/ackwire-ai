@@ -276,8 +276,6 @@ export const featureKeysEn: FeatureTranslations = {
     sending: "Sending…",
     failed: "Not sent · Try again",
     notSent: "The message wasn't sent.",
-    /** Under my latest message in a DM with a person, once they read it. */
-    seen: "Seen",
     toLatest: "Go to the latest messages",
     stopAgent: "Stop {{name}}",
     offlineWait: "Goes out when the connection is back",
@@ -792,7 +790,6 @@ export const featureKeysEn: FeatureTranslations = {
     title: "You",
     role: {
       owner: "owner",
-      admin: "admin",
       member: "member",
     },
     appearance: "Appearance",
@@ -1302,6 +1299,8 @@ export const featureKeysEn: FeatureTranslations = {
       graceM: "If you leave, {{name}} waits 2 min.",
       closedHelpF: "Its sign-ins stay saved.",
       closedHelpM: "Its sign-ins stay saved.",
+      stuckHelpF: "Try again restarts the browser. Its sign-ins stay saved.",
+      stuckHelpM: "Try again restarts the browser. Its sign-ins stay saved.",
       hidden: "{{name}} is in control · screen hidden",
       key: {
         Tab: "Tab",
@@ -1326,6 +1325,10 @@ export const featureKeysEn: FeatureTranslations = {
         closedM: "{{name}}'s browser is closed.",
         offlineCloudF: "{{name}}'s computer isn't answering right now.",
         offlineCloudM: "{{name}}'s computer isn't answering right now.",
+        stuckF: "Couldn't open {{name}}'s browser.",
+        stuckM: "Couldn't open {{name}}'s browser.",
+        tooManyF: "Too many browsers open at once. This one shows when another one closes.",
+        tooManyM: "Too many browsers open at once. This one shows when another one closes.",
       },
     },
     done: {
@@ -1426,7 +1429,8 @@ export const featureKeysEn: FeatureTranslations = {
   },
   joinRequests: {
     share: "Share the link",
-    rolesHint: "Members chat, create tasks and approve their own agents. Admins also manage members, agents and keys.",
+    roles: "Roles",
+    rolesHint: "They join with the roles turned on. With none, they may do what Everyone may.",
   },
   humanCheck: {
     title: "Quick check",
@@ -1532,5 +1536,13 @@ export const featureKeysEn: FeatureTranslations = {
       preparing: "Preparing the file…",
       failed: "Couldn't download the file. Try again.",
     },
+  },
+  status: {
+    title: "Status",
+    doing: "What you're doing",
+    placeholder: "In a meeting, at lunch…",
+    noEmoji: "No emoji",
+    cleared: "Status cleared",
+    bySelfUntil: "Written by {{name}} · {{when}}",
   },
 };

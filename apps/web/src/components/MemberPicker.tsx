@@ -35,7 +35,7 @@ export function useMemberRows(query: string, exclude: Set<PickKey> = new Set(), 
         sub: m.email,
       })),
     ...dir.agents
-      .filter((a) => listsAgent(org.role, a) || keep?.has(`agent:${a.id}`))
+      .filter((a) => listsAgent(org, a) || keep?.has(`agent:${a.id}`))
       .map((a) => ({
         key: `agent:${a.id}` as PickKey,
         kind: "agent" as const,

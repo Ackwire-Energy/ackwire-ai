@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { Agent, AgentAudience, AudienceMode, Role } from "../api/types";
+import type { Agent, AgentAudience, AudienceMode, OrgSummary } from "../api/types";
 import { joinNames } from "./format";
 import { agentGrammar } from "./grammar";
 import { can } from "./permissions";
@@ -16,12 +16,12 @@ export const modeOf = (agent: Agent): AudienceMode => agent.audience?.mode ?? ag
 export const canTalk = (agent: Pick<Agent, "canTalk"> | undefined) => agent?.canTalk !== false;
 
 /**
- * Whether my lists and pickers show the agent: every agent for owners and admins, who arrange the team (the lock
- * says who it answers), only the ones that answer me for members. From the server's `canTalk`, so a later limit
- * per person reaches every list unchanged.
+ * Whether my lists and pickers show the agent: every agent for who manages agents, who arrange the team (the lock
+ * says who it answers), only the ones that answer me for everyone else. From the server's `canTalk` (the agent's
+ * audience and `talk_to_agents`), so a later limit per person reaches every list unchanged.
  */
-export const listsAgent = (role: Role | undefined, agent: Pick<Agent, "canTalk"> | undefined) =>
-  can(role, "manage_agents") || canTalk(agent);
+export const listsAgent = (org: OrgSummary | null | undefined, agent: Pick<Agent, "canTalk"> | undefined) =>
+  can(org, "manage_agents") || canTalk(agent);
 
 /** Whether `to` lets someone talk to the agent whom `from` didn't; its owner always can (same rule as the backend). */
 export function audienceWidens(from: AgentAudience, to: AgentAudience, ownerUserId: string | null): boolean {
@@ -35,9 +35,9 @@ export function audienceWidens(from: AgentAudience, to: AgentAudience, ownerUser
 export const answersOthers = (a: AgentAudience, ownerUserId: string | null) =>
   audienceWidens({ mode: "owner", userIds: [] }, a, ownerUserId);
 
-/** Only the agent's owner and admins change who talks to it (same rule as the backend). */
-export const canEditAudience = (role: Role | undefined, agent: Agent, myUserId: string) =>
-  can(role, "manage_agents") || (agent.ownerUserId != null && agent.ownerUserId === myUserId);
+/** Only the agent's owner and who manages agents change who talks to it (same rule as the backend). */
+export const canEditAudience = (org: OrgSummary | undefined, agent: Agent, myUserId: string) =>
+  can(org, "manage_agents") || (agent.ownerUserId != null && agent.ownerUserId === myUserId);
 
 /** "Pessoal" (only the owner) or "Restrito" (some people); nothing for everyone. */
 export function audienceChip(t: TFunction, agent: Agent): string | null {

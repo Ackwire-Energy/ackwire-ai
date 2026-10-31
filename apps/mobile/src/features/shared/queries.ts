@@ -41,9 +41,9 @@ const THREAD_LIST = { tab: "all", mine: true, limit: 50 } as const;
 
 /** The agents my lists leave out (`hiddenAgentIds`), and whether the directory that names them is still loading. */
 export function useHiddenAgents() {
-  const role = useOrg().org?.role;
+  const org = useOrg().org;
   const dir = useDirectory();
-  const hidden = useMemo(() => hiddenAgentIds(role, dir.agents), [dir.agents, role]);
+  const hidden = useMemo(() => hiddenAgentIds(org, dir.agents), [dir.agents, org]);
   return { hidden, loading: dir.loading };
 }
 

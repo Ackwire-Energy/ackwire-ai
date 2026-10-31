@@ -12,7 +12,9 @@ import { useCallback, useEffect, useRef } from "react";
 import { moveInGroups } from "../lib/agent-groups";
 import { artifactRefs } from "../lib/artifacts";
 import { newerSetup } from "../lib/computer";
+import { CONSULT_CONVERSATION_POLL_MS, CONSULT_GROUP_POLL_MS } from "../lib/consult-group";
 import { sendWaits } from "../lib/errors";
+import { LoginReadError, loginReadPasses } from "../lib/machines";
 import {
   allItems,
   matchesFilter,
@@ -85,10 +87,13 @@ import type {
   NotificationCount,
   NotificationEvent,
   NotificationFilter,
+  OrgRoles,
   OrgSettings,
+  Person,
   ReactionCount,
   ReminderInput,
   Role,
+  RoleInput,
   RoutineInput,
   RoutinePatch,
   S3Input,
@@ -97,6 +102,7 @@ import type {
   SeriesScope,
   SkillInput,
   SkillPatch,
+  StatusInput,
   StorageMigration,
   ThreadAction,
   ThreadCreateInput,
@@ -230,7 +236,116 @@ export function useChangeRole(orgId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ userId, role }: { userId: string; role: Role }) => api.orgs.changeRole(orgId, userId, role),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.members(orgId) }),
+    onSettled: () => refreshRoles(qc, orgId),
+  });
+}
+
+/** Roles changed: the roles, the people (their roles) and `me` (what you may do now) are read again. */
+export const refreshRoles = (qc: QueryClient, orgId: string) =>
+  Promise.all([
+    qc.invalidateQueries({ queryKey: keys.roles(orgId) }),
+    qc.invalidateQueries({ queryKey: keys.people(orgId) }),
+    qc.invalidateQueries({ queryKey: keys.members(orgId) }),
+    qc.invalidateQueries({ queryKey: keys.me }),
+  ]);
+
+/** The workspace's roles, top first, and the permission areas (ADR 0085). */
+export const useRoles = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.roles(orgId), queryFn: () => api.roles.list(orgId), staleTime: 30_000 });
+};
+
+export function useCreateRole(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: RoleInput) => api.roles.create(orgId, input),
+    onSettled: () => refreshRoles(qc, orgId),
+  });
+}
+
+/** Changes a role at once on screen (the toggles save by themselves), then reads the truth back. */
+export function useUpdateRole(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ roleId, patch }: { roleId: string; patch: Partial<RoleInput> }) =>
+      api.roles.update(orgId, roleId, patch),
+    onMutate: async ({ roleId, patch }) => {
+      await qc.cancelQueries({ queryKey: keys.roles(orgId) });
+      const before = qc.getQueryData<OrgRoles>(keys.roles(orgId));
+      if (before)
+        qc.setQueryData<OrgRoles>(keys.roles(orgId), {
+          ...before,
+          roles: before.roles.map((r) => (r.id === roleId ? { ...r, ...patch } : r)),
+        });
+      return { before };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.before) qc.setQueryData(keys.roles(orgId), ctx.before);
+    },
+    onSettled: () => refreshRoles(qc, orgId),
+  });
+}
+
+export function useDeleteRole(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (roleId: string) => api.roles.remove(orgId, roleId),
+    onSettled: () => refreshRoles(qc, orgId),
+  });
+}
+
+export function useReorderRoles(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => api.roles.reorder(orgId, ids),
+    onMutate: async (ids) => {
+      await qc.cancelQueries({ queryKey: keys.roles(orgId) });
+      const before = qc.getQueryData<OrgRoles>(keys.roles(orgId));
+      if (before) {
+        const at = new Map(ids.map((id, i) => [id, i]));
+        qc.setQueryData<OrgRoles>(keys.roles(orgId), {
+          ...before,
+          roles: [...before.roles]
+            .map((r) => (at.has(r.id) ? { ...r, position: at.get(r.id) ?? r.position } : r))
+            .sort(
+              (a, b) => (a.kind === "everyone" ? 1 : 0) - (b.kind === "everyone" ? 1 : 0) || a.position - b.position,
+            ),
+        });
+      }
+      return { before };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.before) qc.setQueryData(keys.roles(orgId), ctx.before);
+    },
+    onSettled: () => refreshRoles(qc, orgId),
+  });
+}
+
+/** Sets a person's roles (exactly these). */
+export function useSetMemberRoles(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, roleIds }: { userId: string; roleIds: string[] }) =>
+      api.roles.setFor(orgId, userId, roleIds),
+    onMutate: async ({ userId, roleIds }) => {
+      await qc.cancelQueries({ queryKey: keys.people(orgId) });
+      const before = qc.getQueryData<Person[]>(keys.people(orgId));
+      if (before)
+        qc.setQueryData<Person[]>(
+          keys.people(orgId),
+          before.map((p) => (p.userId === userId ? { ...p, roleIds } : p)),
+        );
+      return { before };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.before) qc.setQueryData(keys.people(orgId), ctx.before);
+    },
+    onSettled: () => refreshRoles(qc, orgId),
   });
 }
 
@@ -243,7 +358,7 @@ export function useInvite(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { email: string; role: Role }) => api.orgs.invite(orgId, input),
+    mutationFn: (input: { email: string; role?: Role; roleIds?: string[] }) => api.orgs.invite(orgId, input),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.invitations(orgId) }),
   });
 }
@@ -1256,6 +1371,69 @@ export const usePeople = (orgId: string) => {
   return useQuery({ queryKey: keys.people(orgId), queryFn: () => api.orgs.people(orgId), staleTime: 30_000 });
 };
 
+/**
+ * Your availability and line (ADR 0084), shown at once in the people (yours is the only row that changes);
+ * the server's answer replaces it, and everyone else's list follows on `member.status`.
+ */
+export function useSetMyStatus(orgId: string, userId: string | undefined) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: StatusInput) => api.orgs.setStatus(orgId, input),
+    onMutate: async (input) => {
+      await qc.cancelQueries({ queryKey: keys.people(orgId) });
+      const before = qc.getQueryData<Person[]>(keys.people(orgId));
+      qc.setQueryData<Person[]>(keys.people(orgId), (people) =>
+        people?.map((p) => (p.userId === userId ? withStatus(p, input) : p)),
+      );
+      return { before };
+    },
+    onError: (_e, _input, ctx) => {
+      if (ctx?.before) qc.setQueryData(keys.people(orgId), ctx.before);
+    },
+    onSuccess: (me) => {
+      qc.setQueryData<Person[]>(keys.people(orgId), (people) => people?.map((p) => (p.userId === me.userId ? me : p)));
+    },
+  });
+}
+
+/** Your own row with a status change applied, as the server will answer it. */
+function withStatus(p: Person, input: StatusInput): Person {
+  const presence = input.availability === undefined ? p.presence : AVAILABILITY_PRESENCE[input.availability];
+  const status =
+    input.status === undefined
+      ? p.status
+      : input.status?.text.trim()
+        ? { text: input.status.text.trim(), emoji: input.status.emoji ?? null, until: input.status.until ?? null }
+        : null;
+  const availability = input.availability ?? p.availability;
+  return {
+    ...p,
+    presence,
+    online: presence !== "offline" && presence !== "hidden",
+    status,
+    ...(availability ? { availability } : {}),
+  };
+}
+
+/** How you appear for what you picked (to yourself: hidden stays hidden). */
+const AVAILABILITY_PRESENCE = { auto: "online", away: "away", busy: "busy", hidden: "hidden" } as const;
+
+/**
+ * Each agent's presence and line (ADR 0084). Refetched on `agent.status`, and every 30 s: presence also follows
+ * time (busy after 2 minutes on one run, away after 30 idle) and runs elsewhere in the workspace.
+ */
+export const useAgentStatuses = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.agentStatus(orgId),
+    queryFn: () => api.agents.statuses(orgId),
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+    enabled: enabled && orgId.length > 0,
+  });
+};
+
 export const useAllInvitations = (orgId: string, enabled = true) => {
   const api = useApi();
   return useQuery({ queryKey: keys.allInvitations(orgId), queryFn: () => api.orgs.allInvitations(orgId), enabled });
@@ -1265,7 +1443,7 @@ export function useInviteMany(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { emails: string[]; role: Role }) => api.orgs.inviteMany(orgId, input),
+    mutationFn: (input: { emails: string[]; roleIds?: string[] }) => api.orgs.inviteMany(orgId, input),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.invitations(orgId) }),
   });
 }
@@ -1336,8 +1514,7 @@ export function useApproveJoinRequest(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { id: string; role: "member" | "admin" }) =>
-      api.joinRequests.approve(orgId, input.id, input.role),
+    mutationFn: (input: { id: string; roleIds?: string[] }) => api.joinRequests.approve(orgId, input.id, input.roleIds),
     onSettled: () => refreshAnswered(qc, orgId),
   });
 }
@@ -1470,6 +1647,37 @@ export const useRun = (orgId: string, runId: string | null) => {
     queryKey: keys.run(orgId, runId ?? ""),
     queryFn: () => api.agents.run(orgId, runId ?? ""),
     enabled: runId !== null,
+  });
+};
+
+/**
+ * The questions agents asked other agents from a conversation (`GET …/consultations`), for the block inside the
+ * reply that asked. The page reloads it on `agent.consulting`, `agent.consulted` and `agent.consultation`; while a
+ * question is out it also reloads every `CONSULT_GROUP_POLL_MS`.
+ */
+export const useConsultations = (orgId: string, channelId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.consultations(orgId, channelId),
+    queryFn: () => api.agents.consultations(orgId, channelId),
+    enabled,
+    staleTime: 10_000,
+    refetchInterval: (q) => (q.state.data?.some((c) => c.status === "open") ? CONSULT_GROUP_POLL_MS : false),
+  });
+};
+
+/**
+ * One of those questions opened beside the conversation (`GET …/consultations/{id}`). The agents' DM sends this
+ * page no events: while the question is out it reloads every `CONSULT_CONVERSATION_POLL_MS`, and with the list
+ * (its key sits under the list's) on every consult event.
+ */
+export const useConsultationConversation = (orgId: string, channelId: string, consultationId: string | null) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.consultation(orgId, channelId, consultationId ?? ""),
+    queryFn: () => api.agents.consultation(orgId, channelId, consultationId ?? ""),
+    enabled: consultationId !== null,
+    refetchInterval: (q) => (q.state.data?.consultation.status === "open" ? CONSULT_CONVERSATION_POLL_MS : false),
   });
 };
 
@@ -2231,6 +2439,7 @@ export function useSkillAction(orgId: string) {
     mutationFn: (
       action:
         | { type: "import"; input: { url: string } | { zipBase64: string } }
+        | { type: "importPicked"; url: string; paths: string[] }
         | { type: "create"; input: SkillInput }
         | { type: "update"; id: string; patch: SkillPatch }
         | { type: "reimport"; id: string }
@@ -2240,6 +2449,8 @@ export function useSkillAction(orgId: string) {
       switch (action.type) {
         case "import":
           return api.skills.import(orgId, action.input);
+        case "importPicked":
+          return api.skills.importPicked(orgId, action.url, action.paths);
         case "create":
           return api.skills.create(orgId, action.input);
         case "update":
@@ -2314,13 +2525,28 @@ export const useAiAccounts = (orgId: string, enabled = true, pollMs: number | fa
   });
 };
 
-/** ADR 0041 §2: a sign-in on the computer, asked every 2 s until it ends (done, failed or expired). */
+/**
+ * ADR 0041 §2: a sign-in on the computer, asked every 2 s until it ends (done, failed or expired), through failed
+ * reads too (`loginRead` says how long they may last).
+ */
 export const useAccountLogin = (orgId: string, machineId: string, loginId: string | null) => {
   const api = useApi();
   return useQuery({
     queryKey: keys.accountLogin(orgId, machineId, loginId ?? ""),
-    queryFn: () => api.machines.accountLogin(orgId, machineId, loginId ?? ""),
+    queryFn: async ({ client, queryKey }) => {
+      try {
+        return await api.machines.accountLogin(orgId, machineId, loginId ?? "");
+      } catch (error) {
+        if (!loginReadPasses(error)) throw error;
+        // The read before this one failed too: the run goes on from its first.
+        const before = client.getQueryState(queryKey)?.error;
+        throw new LoginReadError(error, before instanceof LoginReadError ? before.since : Date.now());
+      }
+    },
     enabled: loginId !== null,
+    // Waiting from its start. With data, a read keeps the last error until an answer clears it, so a run of failed
+    // reads adds up, and the block never drops back to loading meanwhile.
+    initialData: loginId === null ? undefined : { state: "waiting" },
     retry: false,
     refetchInterval: (q) => (q.state.data && q.state.data.state !== "waiting" ? false : 2000),
     // The person is on Claude's page in another tab meanwhile.

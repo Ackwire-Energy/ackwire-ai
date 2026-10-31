@@ -1,4 +1,6 @@
 import type { Message } from "@agenteschat/client";
+import type { ConsultNoticeFold } from "@agenteschat/client/lib/consult-group";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { consultationOfNotice } from "@agenteschat/client/lib/notices";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -14,20 +16,62 @@ import { MessageText } from "./MessageText";
  * conversation ("Rotina «Sentry» entregou um relatório" while the agent hasn't told it yet, "Infra
  * respondeu", "Nota de Dev", "Chegou o resultado que Ada esperava"). Quiet like `IssueTakenLine`; the
  * text opens under it on "Ver". The agent's own reply, if it has one, follows as a normal message.
+ * An answer the reply that asked shows (`ConsultGroup`, `fold`): nothing when that reply is close, one line
+ * when it is farther up ("Atlas respondeu à pergunta da Ada · Ver": `onSee` opens the two agents' conversation).
  */
-export function EventLine({ message }: { message: Message }) {
+export function EventLine({
+  message,
+  fold,
+  onSee,
+}: {
+  message: Message;
+  fold?: ConsultNoticeFold;
+  onSee?: (fold: Extract<ConsultNoticeFold, { fold: "line" }>) => void;
+}) {
   const { t } = useTranslation();
   const c = useColors();
   const dir = useDirectory();
   const when = useWhen();
   const [open, setOpen] = useState(false);
+  if (fold?.fold === "hide") return null;
+  const far = fold?.fold === "line" ? fold : null;
+  if (far) {
+    const asker = agentGrammar(t, dir.agentById.get(far.consultation.agentId)?.name ?? t("mobile.chat.someone"));
+    const to = dir.agentById.get(far.consultation.consultedAgentId)?.name ?? t("mobile.chat.someone");
+    return (
+      <View style={styles.line}>
+        <View style={styles.head}>
+          <LineIcon name="agent" size={13} color={c.faint} variant="caption" />
+          <Text variant="caption" tone="faint" style={styles.grow}>
+            {t("chat.consultGroup.answeredFar", { to, from: asker.name, of: asker.of })} ·{" "}
+            {when.time(message.createdAt)}
+            {" · "}
+            <Text
+              variant="caption"
+              tone="muted"
+              style={styles.toggle}
+              onPress={() => onSee?.(far)}
+              accessibilityRole="button"
+              suppressHighlighting
+            >
+              {t("chat.consultGroup.see")}
+            </Text>
+          </Text>
+        </View>
+      </View>
+    );
+  }
   // An answer from another agent that carries the consultation (who asked whom, the question and the
   // answer apart): the same card as a reply that waited for it, not the text written for the agent.
   const consulted = consultationOfNotice(message.meta);
-  const line = eventLineOf(message, {
-    author: dir.nameOf(message.author) || t("channel.unknownAgent"),
-    agentByHandle: (handle) => dir.agents.find((a) => a.handle.toLowerCase() === handle.toLowerCase())?.name ?? null,
-  });
+  const line = eventLineOf(
+    message,
+    {
+      author: dir.nameOf(message.author) || t("channel.unknownAgent"),
+      agentByHandle: (handle) => dir.agents.find((a) => a.handle.toLowerCase() === handle.toLowerCase())?.name ?? null,
+    },
+    when,
+  );
   if (consulted)
     return (
       <View style={styles.line}>

@@ -1,4 +1,12 @@
-import { type AiRouting, keys, type RosterMember, useAiStatus, useApi, useRoster } from "@agenteschat/client";
+import {
+  type AiRouting,
+  keys,
+  type RosterMember,
+  useAiStatus,
+  useApi,
+  useChannels,
+  useRoster,
+} from "@agenteschat/client";
 import { listsAgent } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -64,8 +72,9 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
   const c = useColors();
   const roster = useRoster(orgId, channelId);
   const routing = useAiStatus(orgId).data?.routing;
-  // The channel's creator may too, but the API doesn't say who created it yet: admins only (as on the web).
-  const editable = can(org?.role, "configure");
+  // Who manages channels, or the channel's creator (ADR 0085; the server checks it again).
+  const creator = useChannels(orgId).data?.find((x) => x.id === channelId)?.createdByUserId ?? null;
+  const editable = can(org, "manage_channels") || (meId !== null && creator === meId);
   const [q, setQ] = useState("");
   const all: Who[] = (roster.data ?? []).map((m: RosterMember) => ({
     kind: m.type === "agent" ? "agent" : "person",
@@ -102,7 +111,7 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
             return (
               <Row
                 key={`${w.kind}:${w.id}`}
-                leading={<Face who={{ type: w.kind, id: w.id }} size={30} live={false} />}
+                leading={<Face who={{ type: w.kind, id: w.id }} size={30} live={false} presence ring={c.raised} />}
                 title={mine ? `${w.name}${t("common.youSuffix")}` : w.name}
                 subtitle={lineOf(t, w, routing)}
                 subtitleLines={w.kind === "agent" ? 2 : 1}
@@ -276,7 +285,7 @@ function AddChannelMembers({ channelId, channelName }: { channelId: string; chan
   const sheet = useSheet();
   const toast = useToast();
   const dir = useDirectory();
-  const role = useOrg().org?.role;
+  const { org } = useOrg();
   const c = useColors();
   const roster = useRoster(orgId, channelId);
   const refresh = useRefresh(channelId);
@@ -285,7 +294,7 @@ function AddChannelMembers({ channelId, channelName }: { channelId: string; chan
   const inChannel = new Set((roster.data ?? []).map((m) => `${m.type === "agent" ? "agent" : "person"}:${m.id}`));
   const candidates = [
     ...dir.agents
-      .filter((a) => listsAgent(role, a))
+      .filter((a) => listsAgent(org, a))
       .map((a) => ({ kind: "agent" as const, id: a.id, name: a.name, line: `@${a.handle}` })),
     ...[...dir.memberById.values()].map((m) => ({
       kind: "person" as const,

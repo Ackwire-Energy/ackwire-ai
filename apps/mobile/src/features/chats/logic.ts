@@ -5,8 +5,8 @@ import type {
   DirectMessage,
   Mission,
   MissionStatus,
+  OrgSummary,
   PreviewMeta,
-  Role,
   ThreadActor,
   ThreadInfo,
 } from "@agenteschat/client";
@@ -94,9 +94,12 @@ export function isListedThread(t: Pick<ThreadInfo, "mission" | "title" | "contex
 
 export const threadTitle = (t: Pick<ThreadInfo, "title" | "rootText">) => t.title?.trim() || previewOf(t.rootText);
 
-/** The agents my lists leave out (`listsAgent`, from the server's `canTalk`): for a member, the ones not answering. */
-export const hiddenAgentIds = (role: Role | undefined, agents: readonly Pick<Agent, "id" | "canTalk">[]) =>
-  new Set(agents.filter((a) => !listsAgent(role, a)).map((a) => a.id));
+/**
+ * The agents my lists leave out (`listsAgent`, from the server's `canTalk`): unless I manage agents, the ones not
+ * answering me.
+ */
+export const hiddenAgentIds = (org: OrgSummary | null | undefined, agents: readonly Pick<Agent, "id" | "canTalk">[]) =>
+  new Set(agents.filter((a) => !listsAgent(org, a)).map((a) => a.id));
 
 /** A DM with one of `hiddenAgents` (`hiddenAgentIds`): off the home and its badge. */
 const hiddenDm = (d: Pick<DirectMessage, "with">, hiddenAgents: ReadonlySet<string> | undefined) =>

@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, lt, schema, sql } from "@agenteschat/db";
 import { requireChannelAccess } from "./channels";
+import { consultedFor } from "./consultations";
 import { isAgentOnlyDm } from "./dms";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
@@ -64,7 +65,8 @@ export const questionCardMeta = (q: AgentQuestionRow, why: string) => ({
  * The built-in `ask_user` tool: no scope needed (every agent may ask). It
  * doesn't run anything; the Tool Gateway hands the question (and its `why`)
  * to the executor, which posts it in the thread and suspends the run
- * (`waiting_input`).
+ * (`waiting_input`). A consulted agent asks from the agents' DM, which no
+ * person reads: its card goes where the person behind it asked (ADR 0034).
  */
 export function createAskUserToolSource(): ToolSource {
   const tool: ToolDefinition = {
@@ -86,7 +88,8 @@ export function createAskUserToolSource(): ToolSource {
         .select({ kind: schema.channels.kind, dmKey: schema.channels.dmKey })
         .from(schema.channels)
         .where(and(eq(schema.channels.id, ctx.channelId), eq(schema.channels.orgId, ctx.orgId)));
-      if (channel && isAgentOnlyDm(channel)) {
+      // In an agents' DM only a run answering another agent's question for a person may ask (`consultedFor`).
+      if (channel && isAgentOnlyDm(channel) && !(await consultedFor(ctx))) {
         return {
           content:
             "No person reads this conversation: you are answering another agent. Answer with what you know and say in your answer what is missing.",

@@ -86,7 +86,7 @@ export function GeneralScreen() {
   const { orgId, org } = useOrg();
   const settings = useSettings(orgId);
   const update = useUpdateSettings(orgId);
-  const editable = can(org?.role, "configure");
+  const editable = can(org, "configure");
   const [name, setName] = useState("");
   const [context, setContext] = useState("");
   const [timezone, setTimezone] = useState("");

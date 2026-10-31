@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { Agent } from "@agenteschat/client";
+import type { Agent, OrgSummary } from "@agenteschat/client";
 import {
   audienceNotice,
   audienceSummary,
@@ -146,19 +146,22 @@ describe("audience rules", () => {
   test("who can talk and who can edit", () => {
     expect(canTalk(theo({}))).toBe(true);
     expect(canTalk(theo({ canTalk: false }))).toBe(false);
-    expect(canEditAudience("member", theo({}), "u1")).toBe(true);
-    expect(canEditAudience("member", theo({}), "u2")).toBe(false);
-    expect(canEditAudience("admin", theo({}), "u2")).toBe(true);
+    const member: OrgSummary = { id: ORG_ID, name: "Acme", role: "member", permissions: ["read", "post"] };
+    const admin: OrgSummary = { ...member, permissions: ["read", "post", "manage_agents"] };
+    expect(canEditAudience(member, theo({}), "u1")).toBe(true);
+    expect(canEditAudience(member, theo({}), "u2")).toBe(false);
+    expect(canEditAudience(admin, theo({}), "u2")).toBe(true);
   });
 
-  test("whose lists show it: a member's while it answers them, always owners' and admins'", () => {
+  test("whose lists show it: anyone's while it answers them, always who manages agents'", () => {
+    const member: OrgSummary = { id: ORG_ID, name: "Acme", role: "member", permissions: ["read", "talk_to_agents"] };
+    const manager: OrgSummary = { ...member, permissions: ["read", "talk_to_agents", "manage_agents"] };
     const locked = theo({ canTalk: false });
-    expect(listsAgent("member", theo({}))).toBe(true);
-    expect(listsAgent("member", locked)).toBe(false);
-    expect(listsAgent("admin", locked)).toBe(true);
-    expect(listsAgent("owner", locked)).toBe(true);
+    expect(listsAgent(member, theo({}))).toBe(true);
+    expect(listsAgent(member, locked)).toBe(false);
+    expect(listsAgent(manager, locked)).toBe(true);
     // An older server says nothing: it answers everyone.
-    expect(listsAgent("member", theo({ canTalk: undefined }))).toBe(true);
+    expect(listsAgent(member, theo({ canTalk: undefined }))).toBe(true);
   });
 
   test("agent.unavailable: the notice shows for me and the 'pensando…' goes away", async () => {

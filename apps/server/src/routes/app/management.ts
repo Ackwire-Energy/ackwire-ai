@@ -15,18 +15,31 @@ import {
   listMembers,
   listRuns,
   makeDefaultCredential,
+  memberPresence,
+  memberStatus,
   orgOverview,
   queueInvitationEmail,
   requirePermission,
   resendInvitation,
   rotateCredential,
   runErrorDetail,
+  STATUS_EMOJI_MAX,
+  STATUS_TEXT_MAX,
   setAgentChannels,
+  setMyStatus,
+  talksToAgents,
   updateMyProfile,
   updateOrgSettings,
   usageReport,
 } from "@agenteschat/engine";
-import { MODEL_CATALOG, nanoUsdToUsd, PROVIDERS, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
+import {
+  contextWindowOf,
+  MODEL_CATALOG,
+  nanoUsdToUsd,
+  PROVIDERS,
+  pricesAt,
+  usdToNanoUsd,
+} from "@agenteschat/providers";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, iso, json, OrgParams, requireSession, security } from "./context";
 import { AgentAppearance, AgentAudience, Credential, ProviderId, Role } from "./schemas";
@@ -60,11 +73,37 @@ const Settings = z
   })
   .openapi("OrgSettings");
 
+/** A member as `viewerId` sees them: a hidden person is offline to everyone else (ADR 0084). */
+const personView = (
+  { availability, statusText, statusEmoji, statusUntil, ...m }: Awaited<ReturnType<typeof listMembers>>[number],
+  online: Set<string>,
+  viewerId: string,
+) => {
+  const presence = memberPresence({ availability }, online.has(m.userId), m.userId === viewerId);
+  return {
+    ...m,
+    joinedAt: m.joinedAt.toISOString(),
+    lastSeenAt: iso(m.lastSeenAt),
+    online: presence === "online" || presence === "away" || presence === "busy",
+    presence,
+    status: memberStatus({ statusText, statusEmoji, statusUntil }),
+    ...(m.userId === viewerId ? { availability } : {}),
+  };
+};
+
 /** Settings as this person may see them: the default budget is money, so admins only. */
 const settingsFor = (s: Awaited<ReturnType<typeof getOrgSettings>>, seesCost: boolean) => {
   const { defaultAgentBudgetNanoUsd, ...rest } = s;
   return seesCost ? { ...rest, defaultAgentBudgetUsd: nanoUsdToUsd(defaultAgentBudgetNanoUsd) } : rest;
 };
+
+const MemberStatus = z
+  .object({
+    text: z.string(),
+    emoji: z.string().nullable(),
+    until: z.string().nullable().openapi({ description: "When it clears itself; null = until changed." }),
+  })
+  .openapi("MemberStatus");
 
 const Person = z
   .object({
@@ -74,9 +113,17 @@ const Person = z
     image: z.string().nullable(),
     avatarUrl: z.string().nullable().openapi({ description: "The photo uploaded here; wins over `image`." }),
     role: Role,
+    roleIds: z.array(z.string()).openapi({ description: "Their roles (`org_roles` ids), not `everyone`." }),
     joinedAt: z.string(),
     lastSeenAt: z.string().nullable(),
-    online: z.boolean(),
+    online: z.boolean().openapi({ description: "Seen as connected: `presence` is online, away or busy." }),
+    presence: z.enum(["online", "away", "busy", "hidden", "offline"]).openapi({
+      description: "`hidden` only for yourself; everyone else sees a hidden person as `offline`.",
+    }),
+    status: MemberStatus.nullable().openapi({ description: "What the person wrote they are doing; null = nothing." }),
+    availability: z.enum(["auto", "away", "busy", "hidden"]).optional().openapi({
+      description: "Only on your own row: what you picked (your `presence` reads offline while you aren't connected).",
+    }),
     handle: z.string().openapi({ description: "`@ana`: unique in the organization; mentions resolve by it." }),
     timezone: z
       .string()
@@ -89,6 +136,7 @@ const InvitationWithStatus = z
     id: z.uuid(),
     email: z.string(),
     role: Role,
+    roleIds: z.array(z.string()),
     status: z.enum(["pending", "expired"]),
     expiresAt: z.string(),
     createdAt: z.string(),
@@ -284,17 +332,7 @@ export function managementRoutes(deps: AppDeps) {
       await requirePermission(db, c.get("user").id, orgId, "read");
       const online = new Set(await adapters.presence.online(orgId));
       const rows = await listMembers(db, orgId);
-      return c.json(
-        {
-          people: rows.map((m) => ({
-            ...m,
-            joinedAt: m.joinedAt.toISOString(),
-            lastSeenAt: iso(m.lastSeenAt),
-            online: online.has(m.userId),
-          })),
-        },
-        200,
-      );
+      return c.json({ people: rows.map((m) => personView(m, online, c.get("user").id)) }, 200);
     },
   );
 
@@ -320,10 +358,45 @@ export function managementRoutes(deps: AppDeps) {
       const { orgId } = c.req.valid("param");
       const me = await updateMyProfile(db, c.get("user").id, orgId, c.req.valid("json"));
       const online = new Set(await adapters.presence.online(orgId));
-      return c.json(
-        { ...me, joinedAt: me.joinedAt.toISOString(), lastSeenAt: iso(me.lastSeenAt), online: online.has(me.userId) },
-        200,
-      );
+      return c.json(personView(me, online, me.userId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/me/status",
+      tags: ["Members"],
+      security,
+      summary: "Set your availability (auto, away, busy, hidden) and what you are doing",
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            availability: z.enum(["auto", "away", "busy", "hidden"]).optional().openapi({
+              description: "`auto` = online while connected; `hidden` = everyone else sees you offline.",
+            }),
+            status: z
+              .object({
+                text: z.string().max(STATUS_TEXT_MAX * 2),
+                emoji: z.string().max(STATUS_EMOJI_MAX).nullable().optional(),
+                until: z.string().nullable().optional().openapi({ description: "ISO time it clears; null = never." }),
+              })
+              .nullable()
+              .optional()
+              .openapi({ description: "Null (or empty text) clears it." }),
+          }),
+        ),
+      },
+      responses: { 200: json(Person), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const userId = c.get("user").id;
+      await setMyStatus({ db, pubsub: adapters.pubsub }, userId, orgId, c.req.valid("json"));
+      const me = (await listMembers(db, orgId)).find((m) => m.userId === userId);
+      if (!me) return c.json({ error: { code: "not_found", message: "Not a member" } }, 404);
+      return c.json(personView(me, new Set(await adapters.presence.online(orgId)), userId), 200);
     },
   );
 
@@ -347,6 +420,7 @@ export function managementRoutes(deps: AppDeps) {
             id: i.id,
             email: i.email,
             role: i.role,
+            roleIds: i.roleIds,
             status: i.status,
             expiresAt: i.expiresAt.toISOString(),
             createdAt: i.createdAt.toISOString(),
@@ -368,7 +442,16 @@ export function managementRoutes(deps: AppDeps) {
         "One outcome per email. Links are returned once; only a hash of each token is stored (7-day expiry).",
       request: {
         params: OrgParams,
-        body: body(z.object({ emails: z.array(z.string().max(320)).min(1).max(100), role: Role })),
+        body: body(
+          z.object({
+            emails: z.array(z.string().max(320)).min(1).max(100),
+            roleIds: z
+              .array(z.string().uuid())
+              .max(50)
+              .optional()
+              .openapi({ description: "Roles they get on accepting, below your own (ADR 0085)." }),
+          }),
+        ),
       },
       responses: {
         200: json(
@@ -395,7 +478,7 @@ export function managementRoutes(deps: AppDeps) {
           orgId,
           invitationId: r.invitationId,
           email: r.email,
-          role: c.req.valid("json").role,
+          role: "member",
           url: inviteUrl(r.token),
           inviterId: c.get("user").id,
         });
@@ -531,6 +614,7 @@ export function managementRoutes(deps: AppDeps) {
                 id: z.string(),
                 label: z.string(),
                 provider: z.string(),
+                contextWindow: z.number().int().openapi({ description: "Its context window in tokens." }),
                 available: z.boolean(),
                 recommended: z.boolean().openapi({ description: "Suggested for new agents of an available provider." }),
                 cheap: z.boolean(),
@@ -558,6 +642,7 @@ export function managementRoutes(deps: AppDeps) {
             id,
             label: m.label,
             provider: m.provider,
+            contextWindow: contextWindowOf(id),
             available: usable(m.provider),
             recommended: usable(m.provider) && m.recommended === true,
             cheap: m.cheap === true,
@@ -616,7 +701,7 @@ export function managementRoutes(deps: AppDeps) {
           pendingApprovals: d.pendingApprovals,
           audience: audienceOf(d.agent),
           audienceMode: d.agent.audienceMode,
-          canTalk: canTalkTo(d.agent, c.get("user").id),
+          canTalk: canTalkTo(d.agent, c.get("user").id, await talksToAgents(db, orgId, c.get("user").id)),
           appearance: v.appearance,
           channels: d.channels,
           createdAt: v.createdAt.toISOString(),

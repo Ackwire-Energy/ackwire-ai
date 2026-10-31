@@ -37,7 +37,7 @@ export function NewChatPicker() {
           <ActionList
             items={agents.map((a) => ({
               key: a.id,
-              leading: <AgentFace agentId={a.id} size={38} live={false} />,
+              leading: <AgentFace agentId={a.id} size={38} live={false} presence ring={c.raised} />,
               label: a.name,
               ...(a.role ? { hint: a.role } : {}),
               trailing: chevron,
@@ -54,7 +54,7 @@ export function NewChatPicker() {
           <ActionList
             items={people.map((p) => ({
               key: p.userId,
-              leading: <Face who={{ type: "person", id: p.userId }} size={38} />,
+              leading: <Face who={{ type: "person", id: p.userId }} size={38} presence ring={c.raised} />,
               label: p.name,
               trailing: chevron,
               onPress: () => void openDm({ userId: p.userId }),

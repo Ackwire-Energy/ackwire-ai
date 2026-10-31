@@ -24,7 +24,7 @@ export function useActors() {
     ...(withNone ? [{ value: NO_ACTOR, label: t("issues.noAssignee") }] : []),
     ...dir.members.map((m) => ({ value: `person:${m.userId}`, label: m.name })),
     ...dir.agents
-      .filter((a) => listsAgent(org.role, a) || `agent:${a.id}` === current)
+      .filter((a) => listsAgent(org, a) || `agent:${a.id}` === current)
       .map((a) => ({
         value: `agent:${a.id}`,
         label: a.name,
