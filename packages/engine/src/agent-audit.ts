@@ -1,9 +1,8 @@
-import { redactCommon } from "@agenteschat/adapters/redact";
 import { and, type Database, desc, type Executor, eq, inArray, lt, ne, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import type { RunAuthority } from "./authority";
 import { requirePermission } from "./organizations";
-import { maskCredentials } from "./tool-detail";
+import { redactCredentials as masked } from "./tool-detail";
 
 const { auditLog, agents, approvals, channels, secretRequests, users } = schema;
 
@@ -21,8 +20,6 @@ const MAX_STRING = 500;
 const MAX_ITEMS = 20;
 const MAX_DEPTH = 4;
 const MAX_INPUT = 4000;
-
-const masked = (text: string) => redactCommon(maskCredentials(text));
 
 /**
  * A call's input as the audit keeps it: values under secret-looking keys
@@ -106,6 +103,8 @@ export async function recordToolCall(
     approvalId?: string | null;
     /** A call waiting for a person's secret (`request_secret`): the request. */
     secretRequestId?: string | null;
+    /** A call that ran without asking under "Aprovar sempre": its rules (`approval_rules`). */
+    approvalRules?: string[] | null;
   },
 ) {
   await recordAudit(db, {
@@ -125,6 +124,7 @@ export async function recordToolCall(
       ...(call.reason ? { reason: masked(call.reason).slice(0, MAX_STRING) } : {}),
       ...(call.approvalId ? { approvalId: call.approvalId } : {}),
       ...(call.secretRequestId ? { secretRequestId: call.secretRequestId } : {}),
+      ...(call.approvalRules?.length ? { approvalRules: call.approvalRules } : {}),
     },
     runId: call.runId,
     channelId: call.channelId,

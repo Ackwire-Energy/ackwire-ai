@@ -1,6 +1,8 @@
 import type { Issue, IssueColumn, IssueStatus, IssueWork } from "@agenteschat/client";
 import { toYmd } from "@agenteschat/client/lib/format";
 import { isOpen, STATUSES } from "@agenteschat/client/lib/issues";
+import { foldSteps, stepPhrase } from "@agenteschat/client/lib/work";
+import type { TFunction } from "i18next";
 
 /**
  * Tasks ("Tarefas", internally issues) on the phone: the list by stage
@@ -154,6 +156,22 @@ export const latestPr = (i: Pick<Issue, "pullRequests">) => i.pullRequests.at(-1
 /** The step the agent is on now (its last tool call), only while it works. */
 export const currentStep = (w: Pick<IssueWork, "steps" | "state"> | null | undefined) =>
   w && w.state !== "stalled" ? (w.steps.at(-1) ?? null) : null;
+
+/**
+ * The work card's steps as its lines: the same words in a row once, with how many ("Rodou: npm test ×3") and the
+ * last one's time. The last line is the step the agent is on while the run works (`going`), and reads as going on
+ * ("…") unless its command was refused or waits on a person.
+ */
+export function workLines(t: TFunction, steps: IssueWork["steps"], running: boolean) {
+  const lines = foldSteps(steps, (s) => stepPhrase(t, s));
+  return lines.map(({ step, text, count }, k) => {
+    const last = k === lines.length - 1;
+    const going = last && running;
+    const dots = going && !step.outcome ? "…" : "";
+    const times = count > 1 ? ` ${t("chat.work.times", { count })}` : "";
+    return { key: `${step.at}-${step.tool}-${k}`, step, text: `${text}${dots}${times}`, last, going };
+  });
+}
 
 /** Whole minutes since the run started ("trabalhando há 6 min"), at least 0. */
 export const minutesSince = (iso: string, now = Date.now()) =>

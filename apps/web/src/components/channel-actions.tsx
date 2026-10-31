@@ -20,6 +20,11 @@ export interface ChannelActions {
   reply?: (message: MessageType) => void;
   /** A thread's line or link: the panel beside the channel (absent in a thread view: links go to its page). */
   openThread?: (threadId: string) => void;
+  /**
+   * A question an agent asked another from here ("Theo ⇄ Iris" in the reply's block): what the two said for it, in
+   * the panel over the channel, read only (absent in a thread view: the block opens it in place).
+   */
+  openConsultation?: (consultationId: string) => void;
   /** "Pedir correção" after my 👎: my reply in the same conversation, quoting that message and mentioning its agent. */
   requestCorrection?: (message: MessageType, text: string) => void;
   /** A quote was clicked: scroll to the original and highlight it (paging back if needed). */

@@ -13,7 +13,7 @@ import { beginMcpOAuth, storeCustomConnection } from "./custom";
 import { clientCredentials, getOAuthClient, type McpOAuthDeps, probeMcpServer } from "./oauth-mcp";
 import { oauthReturnTo } from "./oauth-return";
 
-const { connectorConnections, oauthStates, agentScopes, agents } = schema;
+const { connectorConnections, oauthStates, agentScopes, agents, approvalRules } = schema;
 
 export type ConnectorConnection = typeof connectorConnections.$inferSelect;
 
@@ -227,7 +227,6 @@ export async function listConnections(db: Database, actorId: string, orgId: stri
     .orderBy(asc(connectorConnections.createdAt));
 }
 
-/** Disconnects: the secret stays sealed but unused; agents lose the connection's scopes. */
 /**
  * Best effort: tells the provider to drop this connection's token too (GitHub OAuth apps:
  * `DELETE /applications/{client_id}/token`). Never the whole grant: that would also revoke the tokens the same
@@ -257,6 +256,7 @@ export async function revokeAtProvider(deps: ConnectorDeps, orgId: string, conne
   return Boolean(res && (res.status === 204 || res.status === 404));
 }
 
+/** Disconnects: the secret stays sealed but unused; agents lose the connection's scopes and its "Aprovar sempre" rules. */
 export async function revokeConnection(db: Database, actorId: string, orgId: string, connectionId: string) {
   await requirePermission(db, actorId, orgId, "manage_connectors");
   await db.transaction(async (tx) => {
@@ -273,6 +273,7 @@ export async function revokeConnection(db: Database, actorId: string, orgId: str
       .returning();
     if (!row) throw new NotFoundError("Connection not found");
     await tx.delete(agentScopes).where(eq(agentScopes.connectionId, connectionId));
+    await tx.delete(approvalRules).where(eq(approvalRules.connectionId, connectionId));
     await recordAudit(tx, {
       orgId,
       actor: { type: "person", id: actorId },
@@ -611,7 +612,7 @@ async function nativeAuthorizeUrl(
 ) {
   const probe = await probeMcpServer(deps, serverUrl).catch(() => null);
   if (probe?.kind !== "oauth") return null;
-  return beginMcpOAuth(deps, actorId, orgId, {
+  const started = await beginMcpOAuth(deps, actorId, orgId, {
     connector,
     serverUrl,
     resource: probe.resource,
@@ -619,6 +620,7 @@ async function nativeAuthorizeUrl(
     scopes: probe.scopes,
     returnTo,
   });
+  return started.status === "oauth" ? started.authorizeUrl : null;
 }
 
 /** Callback of an MCP-native authorization: token with PKCE and `resource`, then the connection. */

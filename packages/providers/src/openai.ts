@@ -98,7 +98,7 @@ export function createOpenAIProvider(
         const response = await stream.finalResponse();
         return fromResponse(response as unknown as Response);
       } catch (error) {
-        const mapped = toProviderError(error);
+        const mapped = openAIError(error);
         if (partial.outputChars > 0) mapped.partial = partial;
         throw mapped;
       }
@@ -189,7 +189,8 @@ function fromResponse(response: Response): ModelResult {
   };
 }
 
-function toProviderError(error: unknown): ProviderError {
+/** An OpenAI SDK failure in the words every adapter uses (also OpenRouter's, which speaks through this SDK). */
+export function openAIError(error: unknown): ProviderError {
   if (error instanceof ProviderError) return error;
   if (error instanceof OpenAI.RateLimitError) return new ProviderError("rate limited by provider", true, 429);
   if (error instanceof OpenAI.AuthenticationError) return new ProviderError("invalid provider API key", false, 401);

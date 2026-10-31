@@ -1,9 +1,10 @@
 import { and, asc, type Database, desc, eq, gte, inArray, isNull, lt, schema, sql } from "@agenteschat/db";
-import { isKnownModel } from "@agenteschat/providers";
+import { MODEL_TIERS, type ModelTier } from "@agenteschat/providers";
 import { getAgent } from "./agents";
+import type { AutoModels } from "./auto-model";
 import { caches } from "./cache";
 import { CHANNEL_NAME_PATTERN } from "./channels";
-import { invalidateDefaults } from "./credentials";
+import { invalidateDefaults, modelInfoFor } from "./credentials";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { agentBudgetState } from "./gateway";
 import { can, requireActiveMembership, requirePermission } from "./organizations";
@@ -50,6 +51,8 @@ export interface OrgSettings {
   defaultAgentBudgetNanoUsd: number;
   /** Agents check what the team already did before an outside action (ADR 0064). On by default. */
   actionCheck: boolean;
+  /** Per provider, the models "Automático" picks per tier where the workspace chose its own (ADR 0087). */
+  autoModels: AutoModels;
 }
 
 export const TEAM_SIZES = ["solo", "small", "medium", "large"] as const;
@@ -71,6 +74,7 @@ export async function getOrgSettings(db: Database, actorId: string, orgId: strin
     teamSize: TEAM_SIZES.includes(s?.teamSize as TeamSize) ? (s?.teamSize as TeamSize) : null,
     defaultAgentBudgetNanoUsd: s?.defaultAgentBudgetNanoUsd ?? DEFAULT_AGENT_BUDGET_NANO_USD,
     actionCheck: s?.actionCheck ?? true,
+    autoModels: (s?.autoModels ?? {}) as AutoModels,
   };
 }
 
@@ -88,14 +92,28 @@ export async function updateOrgSettings(
   db: Database,
   actorId: string,
   orgId: string,
-  input: Partial<Omit<OrgSettings, "defaultCredentialIds">> & {
+  input: Partial<Omit<OrgSettings, "defaultCredentialIds" | "autoModels">> & {
     defaultCredentialIds?: Partial<Record<string, string | null>>;
+    /** Per provider and tier, a model of that provider; null puts the tier back on the default. */
+    autoModels?: Partial<Record<string, Partial<Record<ModelTier, string | null>>>>;
   },
 ): Promise<OrgSettings> {
   await requirePermission(db, actorId, orgId, "configure");
   if (input.name !== undefined && input.name.trim() === "") throw new ValidationError("name can't be empty");
   for (const model of [input.routerModel, input.summaryModel]) {
-    if (model && !isKnownModel(model)) throw new ValidationError(`Unknown model ${model}`);
+    if (!model) continue;
+    const info = await modelInfoFor(db, model);
+    if (!info) throw new ValidationError(`Unknown model ${model}`);
+    // Routing and summaries answer through a JSON schema.
+    if (info.structuredOutput === false) throw new ValidationError(`${model} can't follow a JSON schema`);
+  }
+  for (const [provider, tiers] of Object.entries(input.autoModels ?? {})) {
+    for (const [tier, model] of Object.entries(tiers ?? {})) {
+      if (!MODEL_TIERS.includes(tier as ModelTier)) throw new ValidationError(`autoModels has no tier ${tier}`);
+      if (model === null) continue;
+      if ((await modelInfoFor(db, model))?.provider !== provider)
+        throw new ValidationError(`autoModels.${provider}.${tier} must be one of ${provider}'s models`);
+    }
   }
   if (input.teamSize && !TEAM_SIZES.includes(input.teamSize)) throw new ValidationError("invalid teamSize");
   if (input.defaultAgentBudgetNanoUsd !== undefined && !(input.defaultAgentBudgetNanoUsd > 0)) {
@@ -133,6 +151,13 @@ export async function updateOrgSettings(
     if (!cred) throw new ValidationError("defaultCredentialId does not belong to this organization");
   }
   await db.transaction(async (tx) => {
+    const storedAutoModels = async () => {
+      const [row] = await tx
+        .select({ autoModels: organizationSettings.autoModels })
+        .from(organizationSettings)
+        .where(eq(organizationSettings.orgId, orgId));
+      return (row?.autoModels ?? {}) as AutoModels;
+    };
     if (input.name !== undefined || input.context !== undefined) {
       await tx
         .update(organizations)
@@ -159,6 +184,9 @@ export async function updateOrgSettings(
         ? { defaultAgentBudgetNanoUsd: Math.round(input.defaultAgentBudgetNanoUsd) }
         : {}),
       ...(input.actionCheck !== undefined ? { actionCheck: input.actionCheck } : {}),
+      ...(input.autoModels !== undefined
+        ? { autoModels: mergeAutoModels(await storedAutoModels(), input.autoModels) }
+        : {}),
     };
     if (Object.keys(settings).length > 0) {
       await tx
@@ -170,9 +198,28 @@ export async function updateOrgSettings(
   caches.orgs.delete(`${orgId}:`);
   caches.orgs.delete(`${orgId}:agent-budget`);
   caches.orgs.delete(`${orgId}:action-check`);
+  caches.orgs.delete(`${orgId}:auto-models`);
   caches.zones.deletePrefix(`${orgId}:`);
   invalidateDefaults(orgId);
   return getOrgSettings(db, actorId, orgId);
+}
+
+/** The stored tiers with a change applied: a model sets its tier, null clears it, a provider left with none goes. */
+function mergeAutoModels(
+  stored: AutoModels,
+  change: NonNullable<Parameters<typeof updateOrgSettings>[3]["autoModels"]>,
+): AutoModels {
+  const out: AutoModels = { ...stored };
+  for (const [provider, tiers] of Object.entries(change)) {
+    const next: Partial<Record<ModelTier, string>> = { ...out[provider] };
+    for (const [tier, model] of Object.entries(tiers ?? {}) as [ModelTier, string | null][]) {
+      if (model === null) delete next[tier];
+      else next[tier] = model;
+    }
+    if (Object.keys(next).length > 0) out[provider] = next;
+    else delete out[provider];
+  }
+  return out;
 }
 
 /** Counts for the sidebar: people, agents, the workspace's budget use, approvals waiting for me. */

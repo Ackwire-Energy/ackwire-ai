@@ -116,6 +116,8 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
   if (!message || message.deletedAt) return;
   const meta = message.meta;
   if (meta.questionId || meta.approvalId || meta.secretRequestId || meta.forum) return;
+  // An agent's follow-up line, and the notice that wakes it: the reply it brings notifies instead.
+  if ((meta.notice as { kind?: unknown } | undefined)?.kind === "follow_up") return;
   const [channel] = await db
     .select({ kind: channels.kind, name: channels.name })
     .from(channels)

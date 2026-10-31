@@ -581,9 +581,9 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
     expect(picker.firstElementChild?.textContent).toBe("Já conectadas");
     const rows = [...picker.querySelectorAll(":scope > .ac-option")].map((o) => shownText(o));
     expect(rows.slice(0, 5)).toEqual([
-      "Claude Team · Teamcontato@estudio.example",
+      "Claude Teamcontato@estudio.example",
       "Claude Pessoal · MaxTambém usada por Atlas",
-      "ChatGPT Plus · PlusEm uso por Atlas · Mover para cá",
+      "ChatGPT PlusEm uso por Atlas · Mover para cá",
       "Claude da AcmeClaude · termina em 7f2aPela API. O uso conta no orçamento da Ada.",
       "Claude",
     ]);
@@ -692,7 +692,7 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
     const state = withCard();
     const { box, picker } = await connectAda(state, { accounts: [joao], canUsePlans: false, canManageAccounts: false });
     const locked = within(picker).getByRole("button", { name: /^Claude Max/ }) as HTMLButtonElement;
-    expect(shownText(locked)).toBe("Claude Max · MaxDe João");
+    expect(shownText(locked)).toBe("Claude MaxDe João");
     expect(locked.disabled).toBe(true);
     await click(locked);
     expect(calls(state, "agents.setBrain")).toHaveLength(0);

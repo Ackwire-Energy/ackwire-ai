@@ -7,7 +7,9 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./catalog": "./src/catalog.ts",
     "./plans": "./src/plans.ts",
+    "./context-limits": "./src/context-limits.ts",
     "./testing": "./src/fake.ts"
   },
   "scripts": {

@@ -50,6 +50,7 @@ import {
   issueState,
   minutesSince,
   stageCustomized,
+  workLines,
 } from "./logic";
 import { StateChip, useColumnLabel, useStepText } from "./parts";
 
@@ -199,6 +200,7 @@ function WorkCard({ issue: i }: { issue: Issue }) {
           ? t("mobile.issues.justStarted")
           : t("mobile.issues.workingFor", { count: mins });
   const last = w.steps.length - 1;
+  const lines = workLines(t, w.steps, state === "running");
   return (
     <View style={[styles.work, surface]}>
       <View style={styles.workHead}>
@@ -256,19 +258,17 @@ function WorkCard({ issue: i }: { issue: Issue }) {
             )}
           </View>
         </>
-      ) : w.steps.length > 0 ? (
+      ) : lines.length > 0 ? (
         <View style={styles.steps}>
-          {w.steps.map((s, k) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: steps only append; two may share a time and tool
-            <View key={`${s.at}-${s.tool}-${k}`} style={styles.stepRow}>
-              {k === last && state === "running" ? (
+          {lines.map((l) => (
+            <View key={l.key} style={styles.stepRow}>
+              {l.going ? (
                 <PixelOrbit color={color} size={12} />
               ) : (
-                <Icon name="checkc" size={13} color={c.faint} />
+                <Icon name={l.step.outcome === "refused" ? "x" : "checkc"} size={13} color={c.faint} />
               )}
-              <Text variant="small" tone={k === last ? "ink2" : "muted"} style={styles.grow}>
-                {stepText(s)}
-                {k === last && state === "running" ? "…" : ""}
+              <Text variant="small" tone={l.last ? "ink2" : "muted"} style={styles.grow}>
+                {l.text}
               </Text>
             </View>
           ))}

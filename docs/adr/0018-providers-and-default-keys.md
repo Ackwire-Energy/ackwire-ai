@@ -2,7 +2,7 @@
 
 - Status: Accepted. Amended 2026-10-27: Gemini, and prices that change on a date
 - Date: 2026-10-14
-- Extends 0007 and 0012.
+- Extends 0007 and 0012. Extended by 0087 (OpenRouter).
 
 ## Decision
 

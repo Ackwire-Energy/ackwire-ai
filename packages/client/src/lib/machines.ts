@@ -211,11 +211,12 @@ export async function beginLogin<T>(
 
 /**
  * The account a sign-in came back as when its person already has it on that computer (the new sign-in is removed
- * there): theirs to think with instead, while it is signed in and no agent thinks with it.
+ * there): theirs to think with instead, while it is signed in and no agent thinks with it, or it thinks for all of
+ * their agents there (`shared`).
  */
 export function freeDuplicate(status: AccountLoginStatus | undefined): MachineAccount | null {
   const account = status?.duplicate?.account;
-  return account?.status === "active" && account.usedBy.length === 0 ? account : null;
+  return account?.status === "active" && (account.usedBy.length === 0 || account.shared === true) ? account : null;
 }
 
 /**

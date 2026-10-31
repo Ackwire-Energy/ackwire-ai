@@ -14,6 +14,7 @@ import {
   type ExistingAi,
   existingAi,
 } from "@agenteschat/client/lib/ai-accounts";
+import { isClaudeAlias } from "@agenteschat/client/lib/brain-advanced";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import type { PlanGate } from "@agenteschat/client/lib/no-ai";
 import { brainModelChoice, brainModelChoices, type CodingPlan } from "@agenteschat/client/lib/plans";
@@ -67,9 +68,12 @@ export function thinkingUsage(
   return view.accounts.find((a) => a.id === view.account)?.usage ?? undefined;
 }
 
-/** The other agents an account thinks for now: picking it takes it from them ("Mover para cá"). */
-export const takenFrom = (account: Pick<MachineAccount, "usedBy">, agentName: string) =>
-  account.usedBy.filter((n) => n !== agentName);
+/**
+ * The other agents an account thinks for now: picking it takes it from them ("Mover para cá"). One made for all of
+ * its owner's agents there (`shared`) takes it from nobody: they think with it too ("Também usada por").
+ */
+export const takenFrom = (account: Pick<MachineAccount, "usedBy" | "shared">, agentName: string) =>
+  account.shared === true ? [] : account.usedBy.filter((n) => n !== agentName);
 
 /** A row of the agent's model page. */
 export interface ModelRow {
@@ -86,7 +90,8 @@ export interface ModelRow {
 
 /**
  * The agent's model on the phone, as the web's "Quem pensa": Automático, then its brain's models (every model of
- * its account's coding plan, each with what its maker sells it as), the one it runs checked.
+ * its account's coding plan, each with what its maker sells it as; Claude's own with what each is for), the one it
+ * runs checked.
  */
 export function modelRows(
   t: TFunction,
@@ -100,7 +105,12 @@ export function modelRows(
     ...brainModelChoices(plan, option?.models ?? []).map(({ value, label, tag, needs, maker }) => ({
       value,
       label,
-      ...(tag ? { sub: t(`brain.modelTag.${tag}`) } : {}),
+      // Claude's own models say what each is for.
+      ...(tag
+        ? { sub: t(`brain.modelTag.${tag}`) }
+        : !plan && view.brain === "claude_code" && isClaudeAlias(value)
+          ? { sub: t(`agentPage.work.brain.modelLine.${value}`) }
+          : {}),
       ...(needs ? { note: t(`brain.modelNeeds.${needs}`) } : {}),
       ...(maker ? { maker } : {}),
     })),

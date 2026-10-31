@@ -12,7 +12,7 @@ anything, and every link the app sends come from it. Opened at any other address
 "Invalid origin" and saving fails with `bad_origin`.
 
 The server needs no model key of its own. Each organization adds its own keys (Claude, OpenAI,
-Gemini, DeepSeek, Kimi, Z.ai or MiniMax) in **Settings → AI accounts**. Keys are stored encrypted with a key derived from `AGENTES_SECRET` and are
+Gemini, DeepSeek, Kimi, Z.ai, MiniMax or OpenRouter) in **Settings → AI accounts**. Keys are stored encrypted with a key derived from `AGENTES_SECRET` and are
 never sent to browsers.
 
 **Requirements**
@@ -658,8 +658,8 @@ ones a self-hosted instance usually touches:
 | `TELEMETRY` | `on` | `off` stops the anonymous usage report (Optional services and what they receive). |
 | `TYPESAFE_API_KEY` | | Your TypeSafe key for Jev (AI: plans and keys). Wins over the key added in Settings → AI accounts. |
 
-**Model keys.** Each organization adds its own keys (Claude, OpenAI, Gemini, DeepSeek, Kimi, Z.ai or
-MiniMax) in **Settings → AI accounts**, and each agent uses one of them. Usage and cost are recorded per agent.
+**Model keys.** Each organization adds its own keys (Claude, OpenAI, Gemini, DeepSeek, Kimi, Z.ai,
+MiniMax or OpenRouter) in **Settings → AI accounts**, and each agent uses one of them. Usage and cost are recorded per agent.
 
 **Sign-up.** The first account is allowed unless an owner link or the desktop app's owner key holds
 it (below). After it, with `ALLOW_SIGNUP=false` (the default), only invited people get in: invited by
@@ -796,6 +796,7 @@ party only when you turn that service on:
 | Service | Turned on by | What it receives |
 | --- | --- | --- |
 | Claude (Anthropic), OpenAI, Gemini (Google), DeepSeek, Kimi, Z.ai, MiniMax | An organization's key | What an agent reads to answer: its instructions, the organization's context, recent messages, and the files and tool results it opens. Summaries and memory upkeep use the same key. |
+| OpenRouter | An organization's key | What the other model providers receive, passed on by OpenRouter to the model's own provider (the organization's OpenRouter privacy settings decide which may keep it). While a workspace has an OpenRouter key, the server also reads OpenRouter's public model list, with no key: about once an hour, and up to once a minute while agents' runs ask for a model the list lacks. |
 | TypeSafe Jev | `TYPESAFE_API_KEY`, or the key the owner adds in **Settings → AI accounts** (the variable wins). Either way it is your own TypeSafe key, so TypeSafe bills your account. | To pick which agent answers a message nobody @mentioned: the channel's name and topic, the message (up to 4,000 characters), recent messages (up to 800 each), and the name, role, description and tools of the channel's agents. To pick an agent's model or the tools it loads: its name, role and instructions (up to 1,500 characters), the message (up to 2,000) and recent messages (up to 400 each). Also the messages and memory items it is asked to judge (a request to stop, a hand-off, a permission change, whether to archive a memory), a long run's task and latest words with the tool calls and the start of the results it may set aside, a mission's commands it is asked to rate with the mission's goal and current step, the names and descriptions of a connector's tools, and, when a message meets no AI connected, that message (up to 4,000 characters), to tell whether it asks to connect one. On agents' computers, what is on the screen it is asked to look at: the page's address, its text and a screenshot. Without it, a small model on one of the organization's API keys picks and judges instead, each person's own plan picks for their own messages, and simple rules do the rest. Some memory and tool decisions go back to what they did before Jev, nothing guesses what to connect, and nothing is read from images. |
 | Voyage AI | `EMBEDDINGS_PROVIDER=voyage` and `VOYAGE_API_KEY` | The text of messages and memory items as they are indexed (up to 8,000 characters each), and search queries. Without it, search is full-text only. |
 | Composio | `COMPOSIO_API_KEY` | Gmail and Outlook for agents: Composio holds the mailbox connection, and the mail agents read or send passes through it. IMAP mailboxes connect directly. |
@@ -1045,13 +1046,26 @@ kept only in the folder (`provider.json`, mode 600); the server keeps its last 4
 turn's requests go comes from the runner's own list of plans, not from anything a project can set.
 Each person adds them in **Settings → AI accounts**.
 
+**One sign-in for all of your agents.** An account signed in once on a computer thinks for every agent
+you give it there, with no other sign-in (**Use for…** in **Settings → AI accounts**, or the account
+in an agent's **Who thinks**). With every agent running as the runner's own user, that is any account.
+With `install.sh --system`, a Claude sign-in made for all agents is `claude setup-token`'s token,
+kept in the account's folder (`token.json`, mode 600), which only root opens, and a coding plan's key
+stays in `provider.json` there the same way. Each turn's Claude Code runs in a folder of that agent's
+own and reads the token on a file descriptor as it starts, never from its environment, so the
+commands it runs don't get it; a key goes in its environment. When the agent moves to another account
+or brain, or the account is disconnected, the processes that had it close. A ChatGPT sign-in there
+still thinks for one agent. Disconnecting a Claude account deletes its token from the computer: to
+end it on Claude too, revoke it in Claude's settings.
+
 **Who can reach an account.** With every agent running as the runner's own user (the default
 install), any agent on that computer could reach every account folder there; the runner keeps them
-out of what agents read, but the OS doesn't. With `install.sh --system` each agent is its own user,
-and an account folder belongs to the user of the agent that thinks with it, only while it does.
-Taking control of an agent's desktop or opening its terminal is a shell as that user: in the default
-install only the person who paired the computer can, and with `--system` admins and the agent's
-owner can, but only its owner while the agent thinks with their plan.
+out of what agents read, but the OS doesn't. With `install.sh --system` each agent is its own user:
+a sign-in made for all agents stays root's, and its token or key reaches only the turns of the agents
+that think with it; any other account folder belongs to the user of the agent that thinks with it,
+only while it does. Taking control of an agent's desktop or opening its terminal is a shell as that
+user: in the default install only the person who paired the computer can, and with `--system` admins
+and the agent's owner can, but only its owner while the agent thinks with their plan.
 
 **Backups.** Leave `<runner home>/accounts`, and the CLIs' own `~/.claude` and `~/.codex`, out of the
 computer's backups: they hold sign-ins. The server's database never has them.

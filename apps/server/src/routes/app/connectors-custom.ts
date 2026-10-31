@@ -13,6 +13,7 @@ import {
   requirePermission,
   revokeConnection,
   saveCustomTools,
+  ValidationError,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { imageFile } from "../../http/image-file";
@@ -77,6 +78,17 @@ const CustomServer = z
   .openapi("CustomServer");
 
 const ServerParams = OrgParams.extend({ serverId: z.uuid() });
+
+const ConnectStart = z.union([
+  z.object({ status: z.literal("connected"), server: CustomServer }),
+  z.object({ status: z.literal("oauth"), authorizeUrl: z.string() }),
+  z.object({
+    status: z.literal("needs_key"),
+    reason: z.literal("not_approved").optional().openapi({
+      description: "It has OAuth but only lets in apps it approved, and agentes.chat isn't one yet.",
+    }),
+  }),
+]);
 
 /**
  * Custom MCP servers by URL (admins): MCP-native OAuth (discovery + dynamic
@@ -147,16 +159,7 @@ export function customConnectorRoutes(deps: AppDeps) {
           }),
         ),
       },
-      responses: {
-        200: json(
-          z.union([
-            z.object({ status: z.literal("connected"), server: CustomServer }),
-            z.object({ status: z.literal("oauth"), authorizeUrl: z.string() }),
-            z.object({ status: z.literal("needs_key") }),
-          ]),
-        ),
-        ...errors,
-      },
+      responses: { 200: json(ConnectStart), ...errors },
     }),
     async (c) => {
       const started = await connectCustomServer(
@@ -170,7 +173,14 @@ export function customConnectorRoutes(deps: AppDeps) {
   );
 
   const Preset = z
-    .object({ id: z.string(), label: z.string(), description: z.string(), icon: z.string(), serverUrl: z.string() })
+    .object({
+      id: z.string(),
+      label: z.string(),
+      description: z.string(),
+      icon: z.string(),
+      serverUrl: z.string(),
+      soon: z.boolean().openapi({ description: "The vendor hasn't approved agentes.chat yet: it can't be connected." }),
+    })
     .openapi("McpPreset");
   app.openapi(
     createRoute({
@@ -184,7 +194,7 @@ export function customConnectorRoutes(deps: AppDeps) {
     }),
     async (c) => {
       await requirePermission(db, c.get("user").id, c.req.valid("param").orgId, "read");
-      return c.json({ presets: [...MCP_PRESETS] }, 200);
+      return c.json({ presets: MCP_PRESETS.map((p) => ({ ...p, soon: p.soon === true })) }, 200);
     },
   );
 
@@ -196,26 +206,22 @@ export function customConnectorRoutes(deps: AppDeps) {
       security,
       summary: "Connect a one-click connector (admins): returns the OAuth URL to open",
       description:
-        "After the OAuth, our suggested classification is applied to its tools (admins can change it). No app registration needed.",
+        "After the OAuth, our suggested classification is applied to its tools (admins can change it). No app registration needed. A `soon` one is refused (400 `connector.not_approved`): its vendor hasn't approved agentes.chat yet.",
       request: {
         params: OrgParams.extend({ presetId: z.string().max(60) }),
         body: body(z.object({ returnTo: z.string().max(500).optional() })),
       },
-      responses: {
-        200: json(
-          z.union([
-            z.object({ status: z.literal("connected"), server: CustomServer }),
-            z.object({ status: z.literal("oauth"), authorizeUrl: z.string() }),
-            z.object({ status: z.literal("needs_key") }),
-          ]),
-        ),
-        ...errors,
-      },
+      responses: { 200: json(ConnectStart), ...errors },
     }),
     async (c) => {
       const { orgId, presetId } = c.req.valid("param");
       const preset = mcpPreset(presetId);
       if (!preset) throw new NotFoundError("Unknown connector");
+      if (preset.soon) {
+        throw new ValidationError(`${preset.label} hasn't approved agentes.chat yet`, "connector.not_approved", {
+          connector: preset.id,
+        });
+      }
       const started = await connectCustomServer(custom, c.get("user").id, orgId, {
         serverUrl: preset.serverUrl,
         label: preset.label,

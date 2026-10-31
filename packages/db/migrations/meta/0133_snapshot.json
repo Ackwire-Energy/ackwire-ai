@@ -1,6 +1,6 @@
 {
-  "id": "0da3e78b-55f6-4f5b-af43-1403bb124a11",
-  "prevId": "d6e4b533-3a96-4cd1-8fe3-1beb8b1b7eb0",
+  "id": "a87d4131-2ef6-4de0-89c3-93199ba6bf99",
+  "prevId": "42c9479d-b24e-4afc-9b1d-5d52a5878290",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -214,6 +214,12 @@
         "brain_effort": {
           "name": "brain_effort",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "context_tokens": {
+          "name": "context_tokens",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
@@ -2212,38 +2218,6 @@
           ],
           "isUnique": false,
           "where": "\"messages\".\"thread_id\" is not null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "messages_author_user_id_index": {
-          "name": "messages_author_user_id_index",
-          "columns": [
-            {
-              "expression": "author_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"messages\".\"author_user_id\" is not null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "messages_author_agent_id_index": {
-          "name": "messages_author_agent_id_index",
-          "columns": [
-            {
-              "expression": "author_agent_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"messages\".\"author_agent_id\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -15994,36 +15968,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "deletion_due_at": {
-          "name": "deletion_due_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "deletion_requested_at": {
-          "name": "deletion_requested_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "deletion_requested_by": {
-          "name": "deletion_requested_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "deletion_hold_at": {
-          "name": "deletion_hold_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "deletion_hold_reason": {
-          "name": "deletion_hold_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -16033,21 +15977,7 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {
-        "organizations_deletion_requested_by_users_id_fk": {
-          "name": "organizations_deletion_requested_by_users_id_fk",
-          "tableFrom": "organizations",
-          "tableTo": "users",
-          "columnsFrom": [
-            "deletion_requested_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},

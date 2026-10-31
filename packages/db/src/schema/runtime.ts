@@ -18,6 +18,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { agents, providerCredentials } from "./agents";
+import { connectorConnections } from "./connectors";
 import { machines } from "./machines";
 import { missions } from "./missions";
 import { organizations } from "./tenancy";
@@ -387,6 +388,11 @@ export const approvals = pgTable(
     /** Set once when the approved action runs: never twice. */
     executedAt: timestamp({ withTimezone: true }),
     result: jsonb().$type<Record<string, unknown>>(),
+    /**
+     * "Aprovar sempre", decided by the Tool Gateway when it asked: the kind a decider may approve for good (the
+     * server's own tool name and the actions it wraps, `approval_rules`). Null = not offered.
+     */
+    approveAlways: jsonb().$type<{ tool: string; actions: string[] }>(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -394,6 +400,35 @@ export const approvals = pgTable(
     unique().on(t.runId, t.toolUseId),
     index().on(t.orgId, t.status, t.createdAt),
     index().on(t.expiresAt).where(sql`${t.status} = 'pending'`),
+  ],
+);
+
+/**
+ * "Aprovar sempre" (docs/adr/0015): a kind of call one agent makes without asking again, approved for good by
+ * someone who decides its approvals. The kind is the connection, the server's own tool name and, for a tool that
+ * runs other actions (Composio's executor), one wrapped action (`''`: the tool itself). Params are never part of
+ * it. The Tool Gateway reads it fresh before every request it would make; it never grants access.
+ */
+export const approvalRules = pgTable(
+  "approval_rules",
+  {
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid().notNull(),
+    agentId: uuid().notNull(),
+    connectionId: uuid()
+      .notNull()
+      .references(() => connectorConnections.id, { onDelete: "cascade" }),
+    tool: text().notNull(),
+    action: text().notNull().default(""),
+    createdByUserId: text(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
+    unique().on(t.agentId, t.connectionId, t.tool, t.action),
+    index().on(t.connectionId),
   ],
 );
 

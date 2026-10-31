@@ -21,6 +21,8 @@ import {
   fakeBrowserOf,
   fakeMachinesOf,
   NOW,
+  OPENROUTER_KEY,
+  OPENROUTER_MODELS,
   ORG_ID,
   seedState,
 } from "./fake-api";
@@ -55,9 +57,24 @@ const dialog = async (word: string, title: string) => {
 const brainDialog = () => dialog("Mudar quem pensa", "Quem pensa");
 const card = (d: HTMLElement, name: RegExp) =>
   within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getByRole("radio", { name });
-/** The opened brain's model, one click away (a segmented control). */
-const model = (d: HTMLElement, name: RegExp) => click(within(d).getByRole("radio", { name }));
-/** The switch at the opened brain's foot: answer through the API while the computer doesn't answer. */
+/** The opened brain's model, from its dropdown. */
+const model = (d: HTMLElement, name: RegExp) => pick(d, "Modelo", name);
+/** What the opened brain's model dropdown offers (it stays open). */
+const modelNames = async (d: HTMLElement) => {
+  const trigger = within(d).getByRole("combobox", { name: "Modelo" });
+  trigger.focus();
+  await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+  return screen()
+    .getAllByRole("option")
+    .map((o) => o.textContent);
+};
+/** "Configuração avançada" over "Quem pensa": effort, context window, who it answers, the API (ADR 0086). */
+const advanced = async (d: HTMLElement) => {
+  await click(within(d).getByRole("button", { name: /^Configuração avançada/ }));
+  return screen().getByRole("dialog", { name: "Configuração avançada" });
+};
+const done = (a: HTMLElement) => click(within(a).getByRole("button", { name: "Pronto" }));
+/** In the advanced settings: answer through the API while the computer doesn't answer. */
 const offSwitch = (d: HTMLElement) =>
   within(d).getByRole("switch", { name: /^Se o MacBook parar de responder, responder pela API/ });
 /** Opens one of the opened brain's dropdowns and picks an option. */
@@ -167,18 +184,20 @@ describe("Quem pensa (its dialog)", () => {
     await click(card(d, /^Claude Code/));
     // The agent moves to the MacBook: its accounts there aren't offered yet.
     expect(within(d).queryByRole("combobox", { name: "Conta do Claude" })).toBeNull();
-    await model(d, /^Opus$/);
-    expect(offSwitch(d).getAttribute("aria-checked")).toBe("true");
+    await model(d, /^Opus/);
+    const a = await advanced(d);
+    expect(offSwitch(a).getAttribute("aria-checked")).toBe("true");
     // One line, its label and its ⓘ: what it does, the same on or off, describes the switch.
-    const fallback = hintOf("Se o MacBook parar de responder, responder pela API", d);
+    const fallback = hintOf("Se o MacBook parar de responder, responder pela API", a);
     expect(fallback.text).toBe(
       "Usa o modelo do workspace e conta no orçamento da Ada. Se não, a Ada avisa quem chamou e espera o computador voltar.",
     );
-    expect(offSwitch(d).getAttribute("aria-describedby")).toBe(fallback.button.getAttribute("aria-describedby"));
-    await click(offSwitch(d));
-    expect(offSwitch(d).getAttribute("aria-checked")).toBe("false");
-    expect(hintOf("Se o MacBook parar de responder, responder pela API", d).text).toBe(fallback.text);
-    expect(shownText(d)).not.toContain("avisa quem chamou");
+    expect(offSwitch(a).getAttribute("aria-describedby")).toBe(fallback.button.getAttribute("aria-describedby"));
+    await click(offSwitch(a));
+    expect(offSwitch(a).getAttribute("aria-checked")).toBe("false");
+    expect(hintOf("Se o MacBook parar de responder, responder pela API", a).text).toBe(fallback.text);
+    expect(shownText(a)).not.toContain("avisa quem chamou");
+    await done(a);
     await click(within(d).getByRole("button", { name: "Usar meu plano do Claude" }));
     await settle(6);
     expect(callOrder(state)).toEqual(["sandbox.setTarget", "agents.setBrain"]);
@@ -312,12 +331,14 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
       "Adicionar conta",
     ]);
     await click(screen().getByRole("option", { name: /^Trabalho · Team/ }));
-    // Effort: the pixel ramp, a slider (Médio → Alto with the arrow key).
-    const effort = within(d).getByRole("slider", { name: "Esforço" });
+    // Effort, in the advanced settings: the pixel ramp, a slider (Médio → Alto with the arrow key).
+    const a = await advanced(d);
+    const effort = within(a).getByRole("slider", { name: "Esforço" });
     expect(effort.getAttribute("aria-valuetext")).toBe("Médio");
     await act(async () => fireEvent.keyDown(effort, { key: "ArrowRight" }));
     expect(effort.getAttribute("aria-valuetext")).toBe("Alto");
-    expect(d.textContent).toContain("Pensa mais em tarefas difíceis.");
+    expect(a.textContent).toContain("Pensa mais em tarefas difíceis.");
+    await done(a);
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
     expect(brainCalls(state).at(-1)).toEqual({
@@ -327,6 +348,41 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
       effort: "high",
       account: "acct_work",
     });
+  });
+
+  test("an account made for all of the person's agents there: picked as it is, Also used by Theo, no sign-in, no move", async () => {
+    const shared: MachineAccount = {
+      ...work,
+      id: "acct_all",
+      label: "Pessoal",
+      email: "walt@pessoal.com",
+      plan: "Max",
+      usedBy: ["Theo"],
+      shared: true,
+    };
+    const { state } = await onMac({ accounts: [work, shared] });
+    const d = await brainDialog();
+    const account = within(d).getByRole("combobox", { name: "Conta do Claude" });
+    account.focus();
+    await act(async () => fireEvent.keyDown(account, { key: "Enter" }));
+    expect(
+      screen()
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual([
+      "A conta que os seus agentes dividem",
+      "Trabalho · Teamwalt@acme.com",
+      "Pessoal · MaxTambém usada por Theo",
+      "Adicionar conta",
+    ]);
+    await click(screen().getByRole("option", { name: /^Pessoal · Max/ }));
+    await settle(4);
+    expect(within(d).queryByRole("region", { name: "Adicionar conta do Claude" })).toBeNull();
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toMatchObject({ account: "acct_all" });
+    expect(brainCalls(state).at(-1)).not.toHaveProperty("moveAccount");
+    expect(state.calls.find((c) => c.method === "machines.beginAccountLogin")).toBeUndefined();
   });
 
   test("each person's own: a Claude account another agent thinks with signs in again for this one; someone else's only shows while it's this one's", async () => {
@@ -364,7 +420,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
       ["A conta que os seus agentes dividem", false],
       ["Trabalho · Teamwalt@acme.com", false],
       ["Pessoal · MaxTambém usada por Theo", false],
-      ["Claude Team 2 · TeamDe Ana", true],
+      ["Claude Team 2De Ana", true],
       ["Adicionar conta", false],
     ]);
     await click(screen().getByRole("option", { name: /^Pessoal · Max/ }));
@@ -518,7 +574,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     expect(sentence().textContent).not.toMatch(/Conta deste MacBook|A conta que os seus agentes dividem/);
     d = await brainDialog();
     expect(within(d).queryByRole("combobox", { name: "Conta do Claude" })).toBeNull();
-    expect(within(d).getByRole("slider", { name: "Esforço" })).toBeTruthy();
+    expect(within(await advanced(d)).getByRole("slider", { name: "Esforço" })).toBeTruthy();
   });
 
   test("a signed-out account says so and offers to sign in again, its own email going to Claude's sign-in unasked", async () => {
@@ -1036,12 +1092,14 @@ describe("Quem pensa: a plan with a login per agent, and plans on the Cloud", ()
       fakeAgentBrain(ADA_ID, { brain: "claude_code", effectiveModel: "sonnet", onlyOwner: true });
     await open(state, api);
     const d = await brainDialog();
-    const replies = within(d).getByRole("switch", { name: "Atende outras pessoas" });
+    const a = await advanced(d);
+    const replies = within(a).getByRole("switch", { name: "Atende outras pessoas" });
     expect(replies.getAttribute("aria-checked")).toBe("false");
-    expect(shownText(d)).toContain("A Ada só atende você, pelo seu plano do Claude.");
-    expect(hintOf("os termos do plano", d).text).toContain("Os planos do Claude são para uso pessoal.");
-    expect(shownText(d)).not.toContain("Um plano é pessoal");
+    expect(shownText(a)).toContain("A Ada só atende você, pelo seu plano do Claude.");
+    expect(hintOf("os termos do plano", a).text).toContain("Os planos do Claude são para uso pessoal.");
+    expect(shownText(a)).not.toContain("Um plano é pessoal");
     await click(replies);
+    await done(a);
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
     expect(brainCalls(state).at(-1)).toEqual({ brain: "claude_code", model: null, fallback: true, onlyOwner: false });
@@ -1138,7 +1196,7 @@ describe("Quem pensa: a coding plan's models", () => {
     expect(document.body.textContent).toContain("A Ada agora pensa com Claude Code · DeepSeek V4.1 Flash.");
   });
 
-  test("the cell names the plan's model it runs; models sold with words show them, the others keep the segments", async () => {
+  test("the cell names the plan's model it runs; models sold with words show them, a plan's only model too", async () => {
     await onPlan("kimi", { model: "k3-256k", effectiveModel: "k3-256k" });
     expect(sentence().textContent).toContain("K3 256K");
     cleanup();
@@ -1162,9 +1220,16 @@ describe("Quem pensa: a coding plan's models", () => {
     cleanup();
     await onPlan("minimax");
     d = await brainDialog();
-    const models = within(within(d).getByRole("radiogroup", { name: "Modelo" })).getAllByRole("radio");
-    expect(models.map((r) => r.textContent)).toEqual(["Automático", "MiniMax M3.1 Flash"]);
-    expect(models[1]?.getAttribute("aria-checked")).toBe("true");
+    // The model is a select on every brain, a plan of one model too.
+    const one = within(d).getByRole("combobox", { name: "Modelo" });
+    expect(one.textContent).toBe("MiniMax M3.1 Flash");
+    one.focus();
+    await act(async () => fireEvent.keyDown(one, { key: "Enter" }));
+    expect(
+      screen()
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["AutomáticoEscolhe o modelo e o esforço para cada tarefa", "MiniMax M3.1 Flash"]);
   });
 });
 
@@ -1347,16 +1412,27 @@ describe("Quem pensa: Automático", () => {
   test("Claude Code: Automático comes first for the model and picks the effort too; Usar saves both", async () => {
     const state = await onClaude();
     const d = await brainDialog();
-    const models = within(within(d).getByRole("radiogroup", { name: "Modelo" })).getAllByRole("radio");
-    expect(models.map((r) => r.textContent)).toEqual(["Automático", "Opus", "Sonnet", "Haiku"]);
-    // A fixed model: the effort's four levels, none of them Automático.
-    const ramp = within(d).getByRole("slider", { name: "Esforço" });
+    // Each with what it is for.
+    expect(await modelNames(d)).toEqual([
+      "AutomáticoEscolhe o modelo e o esforço para cada tarefa",
+      "OpusO mais capaz. Gasta o plano mais rápido.",
+      "SonnetEquilibrado. Bom para quase tudo.",
+      "HaikuRápido e leve. Para tarefas simples.",
+    ]);
+    await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
+    await settle(2);
+    // A fixed model: the effort's four levels, none of them Automático, in the advanced settings.
+    let a = await advanced(d);
+    const ramp = within(a).getByRole("slider", { name: "Esforço" });
     expect(ramp.getAttribute("aria-valuemax")).toBe("4");
     expect(ramp.getAttribute("aria-valuetext")).toBe("Médio");
-    await model(d, /^Automático$/);
+    await done(a);
+    await model(d, /^Automático/);
     expect(d.textContent).toContain("Escolhe o modelo e o esforço para cada tarefa");
     // The model picks the effort too: no ramp to set.
-    expect(within(d).queryByRole("slider", { name: "Esforço" })).toBeNull();
+    a = await advanced(d);
+    expect(within(a).queryByRole("slider", { name: "Esforço" })).toBeNull();
+    await done(a);
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
     expect(brainCalls(state).at(-1)).toEqual({ brain: "claude_code", model: "auto", fallback: true, effort: "auto" });
@@ -1365,9 +1441,13 @@ describe("Quem pensa: Automático", () => {
   test("back to a fixed model: the ramp returns at Médio and the effort is saved", async () => {
     const state = await onClaude({ model: "auto", effectiveModel: "auto", effort: "auto" });
     const d = await brainDialog();
-    expect(within(d).queryByRole("slider", { name: "Esforço" })).toBeNull();
-    await model(d, /^Opus$/);
-    expect(within(d).getByRole("slider", { name: "Esforço" }).getAttribute("aria-valuetext")).toBe("Médio");
+    let a = await advanced(d);
+    expect(within(a).queryByRole("slider", { name: "Esforço" })).toBeNull();
+    await done(a);
+    await model(d, /^Opus/);
+    a = await advanced(d);
+    expect(within(a).getByRole("slider", { name: "Esforço" }).getAttribute("aria-valuetext")).toBe("Médio");
+    await done(a);
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
     expect(brainCalls(state).at(-1)).toMatchObject({ brain: "claude_code", model: "opus", effort: "medium" });
@@ -1385,13 +1465,10 @@ describe("Quem pensa: Automático", () => {
     await open(state, api);
     const d = await brainDialog();
     await click(card(d, /^Claude Code/));
-    const models = within(d).getByRole("radiogroup", { name: "Modelo" });
-    expect(
-      within(models)
-        .getByRole("radio", { name: /^Automático$/ })
-        .getAttribute("aria-checked"),
-    ).toBe("true");
-    expect(within(d).queryByRole("slider", { name: "Esforço" })).toBeNull();
+    expect(within(d).getByRole("combobox", { name: "Modelo" }).textContent).toStartWith("Automático");
+    const a = await advanced(d);
+    expect(within(a).queryByRole("slider", { name: "Esforço" })).toBeNull();
+    await done(a);
     await click(within(d).getByRole("button", { name: "Usar meu plano do Claude" }));
     await settle(6);
     expect(brainCalls(state).at(-1)).toEqual({ brain: "claude_code", model: "auto", fallback: true });
@@ -1415,5 +1492,58 @@ describe("Quem pensa: Automático", () => {
     await settle(6);
     expect(state.calls.filter((c) => c.method === "agents.update").map((c) => c.args[2])).toEqual([{ model: "auto" }]);
     expect(document.body.textContent).toContain("A Ada agora pensa com Automático.");
+  });
+
+  test("OpenRouter's models: a search over them, its good picks before the rest, each with its price", async () => {
+    const seeded = seedState({ extraModels: OPENROUTER_MODELS });
+    seeded.credentials.push(OPENROUTER_KEY);
+    const { state } = await open(seeded);
+    const d = await brainDialog();
+    await click(within(d).getByRole("combobox", { name: "Modelo" }));
+    const list = screen().getByRole("listbox", { name: "Modelos" });
+    const groups = within(list)
+      .getAllByRole("group")
+      .map((g) => g.getAttribute("aria-label"));
+    expect(groups).toEqual(["Claude", "OpenAI", "OpenRouter · Boas escolhas", "OpenRouter"]);
+    const search = screen().getByRole("combobox", { name: "Buscar modelos" });
+    await act(async () => fireEvent.change(search, { target: { value: "glm" } }));
+    expect(
+      within(list)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual([
+      "Z.ai: GLM LatestUS$ 0,1 / US$ 2,77 por milhão de tokens",
+      "Z.ai: GLM 5.3US$ 0,1 / US$ 2,77 por milhão de tokens",
+    ]);
+    // The maker's name and the id find them too; a free one says so.
+    await act(async () => fireEvent.change(search, { target: { value: "nvidia free" } }));
+    expect(
+      within(list)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["NVIDIA: Nemotron 3 Ultra (free)Grátis, com limite diário"]);
+    await act(async () => fireEvent.change(search, { target: { value: "glm" } }));
+    await act(async () => fireEvent.keyDown(search, { key: "Enter" }));
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(state.calls.filter((c) => c.method === "agents.update").map((c) => c.args[2])).toEqual([
+      { model: "~z-ai/glm-latest" },
+    ]);
+  });
+
+  test("without an OpenRouter key its good picks show, each saying a key opens it, and not the rest of its list", async () => {
+    await open(seedState({ extraModels: OPENROUTER_MODELS }));
+    const d = await brainDialog();
+    await click(within(d).getByRole("combobox", { name: "Modelo" }));
+    const list = screen().getByRole("listbox", { name: "Modelos" });
+    const picks = within(within(list).getByRole("group", { name: "OpenRouter · Boas escolhas" })).getAllByRole(
+      "option",
+    );
+    expect(picks.map((o) => [o.textContent, o.getAttribute("aria-disabled")])).toEqual([
+      ["Z.ai: GLM LatestPrecisa de uma chave da OpenRouter", "true"],
+      ["DeepSeek: DeepSeek Flash LatestPrecisa de uma chave da OpenRouter", "true"],
+      ["Claude Sonnet LatestPrecisa de uma chave da OpenRouter", "true"],
+    ]);
+    expect(within(list).queryByRole("group", { name: "OpenRouter" })).toBeNull();
   });
 });

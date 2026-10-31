@@ -25,6 +25,7 @@ import {
   createDesktopControl,
   createDesktopToolSource,
   createFindAgentToolSource,
+  createFollowUpToolSource,
   createForumToolSource,
   createGitToolSource,
   createHandOffToolSource,
@@ -68,6 +69,7 @@ import {
   prepareAgentCode,
   queueBudgetEmail,
   type ResolveHost,
+  ROUTER_QUIET_MS,
   type RunExecutorDeps,
   recheckStream,
   resolveSummaryModel,
@@ -101,6 +103,8 @@ export interface EngineOptions {
   onTiming?(name: string, ms: number, attrs: Record<string, unknown>): void;
   /** Tests: fake TypeSafe transport. */
   jevFetch?: typeof fetch;
+  /** Tests: how long a person's message waits for their next one before the router decides (`ROUTER_QUIET_MS`). */
+  routerQuietMs?: number;
   /** Tests: a fake judge (no model calls for "is this a stop?" and the like). */
   judge?: Judge;
   /** Tests: a fake schedule reader (no model calls for "toda segunda às 9h" and the like). */
@@ -267,6 +271,8 @@ export function buildEngine(o: EngineOptions) {
       // What the agent says it is doing, next to its name (ADR 0084).
       createSetStatusToolSource({ pubsub: adapters.pubsub }),
       createReactToolSource({ pubsub: adapters.pubsub }),
+      // An agent comes back to a conversation by itself (a CI run, a deploy), instead of promising to.
+      createFollowUpToolSource({ pubsub: adapters.pubsub }),
       // Background runs (routines) speak only through it.
       createHandOffToolSource({ pubsub: adapters.pubsub }),
       // Runs nobody called by name may stay quiet (reply-policy.ts): listed only for them.
@@ -332,6 +338,7 @@ export function buildEngine(o: EngineOptions) {
       }),
       ...(o.toolSources ?? []),
     ],
+    catalog: { oauthApps: connectorDeps.oauthApps, mail: adapters.mail },
   });
   // Mission tasks' tools and computer-brain runs' tools come through the hub's MCP bridge (ADR 0032).
   machineHub.setMissionHooks(createMissionHooks({ db, ...missionDeps, tools }));
@@ -454,6 +461,7 @@ export function buildEngine(o: EngineOptions) {
       plans: { hub: machineHub, publicUrl: config.PUBLIC_URL },
       minScore: config.ROUTER_MIN_SCORE,
       mentionThreshold: config.ROUTER_MENTION_THRESHOLD,
+      quietMs: o.routerQuietMs ?? ROUTER_QUIET_MS,
       // Jev first whenever the installation has its key, unless ROUTER_STRATEGY=llm.
       ...((config.ROUTER_STRATEGY ?? "jev") === "jev"
         ? { jev: { key: jevKey, timeoutMs: config.JEV_TIMEOUT_MS, fetch: o.jevFetch } }

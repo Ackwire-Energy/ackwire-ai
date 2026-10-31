@@ -8,15 +8,17 @@ const LEGACY = "sk-9aB3cD5eF7gH1iJ3kL5mN7oP9qR1sT3uV5wX7yZ9aB1cD3eF";
 const DEEPSEEK = "sk-0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f";
 // Joined at run time: the secret scan reads a literal Google key shape as a real key.
 const GOOGLE = ["AIza", "SyA1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q"].join("");
+const OPENROUTER = ["sk", "or", "v1", "0123456789abcdef".repeat(4)].join("-");
 
 describe("looksLikeApiKey", () => {
-  test("finds the shapes people paste: Anthropic, OpenAI, other sk- keys, Google", () => {
+  test("finds the shapes people paste: Anthropic, OpenAI, OpenRouter, other sk- keys, Google", () => {
     expect(looksLikeApiKey(`minha chave é ${ANTHROPIC}`)).toBe(ANTHROPIC);
     expect(looksLikeApiKey(OPENAI)).toBe(OPENAI);
     expect(looksLikeApiKey(`usa essa: ${LEGACY}.`)).toBe(LEGACY);
     expect(looksLikeApiKey(`deepseek ${DEEPSEEK}\nvaleu`)).toBe(DEEPSEEK);
     expect(looksLikeApiKey(`https://x.dev/?key=${GOOGLE}`)).toBe(GOOGLE);
     expect(looksLikeApiKey(`\`${ANTHROPIC}\``)).toBe(ANTHROPIC);
+    expect(looksLikeApiKey(`tenho créditos na openrouter: ${OPENROUTER}`)).toBe(OPENROUTER);
   });
 
   test("normal text with sk- words, prefixes alone and hyphenated names is not a key", () => {

@@ -25,10 +25,38 @@ describe("one-click MCP connectors", () => {
     expect(new Set(ids).size).toBe(ids.length);
     for (const p of MCP_PRESETS) expect(p.serverUrl.startsWith("https://")).toBe(true);
     expect(ids).not.toContain("hubspot");
-    expect(ids).not.toContain("vercel");
     expect(mcpPreset("linear")?.serverUrl).toBe("https://mcp.linear.app/mcp");
     expect(presetForServer("https://mcp.linear.app/mcp/")?.id).toBe("linear");
     expect(presetForServer("https://example.com/mcp")).toBeNull();
+  });
+
+  test("vendors that refuse agentes.chat until they approve it stay listed as `soon`: greyed out, not connectable", () => {
+    expect(
+      MCP_PRESETS.filter((p) => p.soon)
+        .map((p) => p.id)
+        .sort(),
+    ).toEqual([
+      "asana",
+      "dropbox",
+      "figma",
+      "gamma",
+      "intercom",
+      "mercadopago",
+      "meta-ads",
+      "revenuecat",
+      "semrush",
+      "square",
+      "vercel",
+    ]);
+    expect(mcpPreset("vercel")).toMatchObject({ serverUrl: "https://mcp.vercel.com", category: "dev", soon: true });
+    expect(mcpPreset("figma")).toMatchObject({ serverUrl: "https://mcp.figma.com/mcp", soon: true });
+    const listed = connectorListing({});
+    const entry = (id: string) => listed.find((e) => e.id === id);
+    expect(entry("asana")).toMatchObject({ kind: "remote_mcp", available: false, soon: true });
+    expect(entry("figma")).toMatchObject({ available: false, soon: true, iconUrl: "/connectors/figma.svg" });
+    // Calendly refused only our name: it connects.
+    expect(entry("calendly")).toMatchObject({ available: true, soon: false });
+    expect(entry("github")).toMatchObject({ kind: "catalog", soon: false });
   });
 
   test("every connector in the catalog has a logo the web app serves", () => {

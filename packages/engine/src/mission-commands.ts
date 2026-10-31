@@ -2,10 +2,12 @@ import {
   allowedBy,
   type CommandScope,
   commandOf,
-  deniedInMissions,
+  deniedMessage,
+  forbiddenCode,
   forbiddenHint,
   forbiddenReason,
   inlineCodeCall,
+  NO_TERMINAL_COMMANDS,
   PERMISSION_TIMEOUT_MESSAGE,
   PERMISSION_WAIT_MS,
   readOnlyCall,
@@ -48,8 +50,10 @@ const { missionEvents, machineTasks } = schema;
  * at once; otherwise the command card goes to the thread and the runner asks
  * again every few seconds until the owner or someone who decides answers
  * (Aprovar / Recusar / Aprovar sempre), or `PERMISSION_WAIT_MS` passes.
- * Deny-list commands (merges, pushes to the default branch, deploys) never
- * get here: Claude Code and the runner refuse them first (and so do we).
+ * Deny-list commands (merges, deploys, publishing) never get here: Claude
+ * Code and the runner refuse them first (and so do we). Pushes the runner
+ * reads with git first: one to the default branch or a force push to someone
+ * else's branch is refused there, so a push that gets here is ordinary work.
  * Everything is in the mission's feed: `command_prompt`, `command_decided`,
  * `command_rule`, `command_auto`, `command_approval`.
  *
@@ -77,9 +81,6 @@ export const COMMAND_PROMPTS_PER_TASK = 30;
 export const LOW_RISK_THRESHOLD = 0.85;
 /** The judge answers within this, or it is the card. */
 export const COMMAND_JUDGE_TIMEOUT_MS = 8000;
-
-const NEVER_MESSAGE =
-  "This command is never allowed in a mission (merges, pushes to the default branch, deploys): ask with request_approval and wait.";
 
 /** Where the task runs, from the runner (absolute paths only); without it code allows no writes. */
 function scopeOf(value: unknown): CommandScope | null {
@@ -275,7 +276,8 @@ async function notifyCommand(deps: Pick<MissionDeps, "db" | "pubsub">, mission: 
 }
 
 const allow = () => JSON.stringify({ behavior: "allow" });
-const deny = (message: string) => JSON.stringify({ behavior: "deny", message });
+/** A refusal: its message is for the agent; its code, for the apps to say why in the person's words. */
+const deny = (message: string, code: string) => JSON.stringify({ behavior: "deny", message, code });
 
 /**
  * `permission_prompt` from the runner: a new prompt (`tool_name`, `input`),
@@ -298,11 +300,11 @@ export async function handlePermissionPrompt(
   const requestId = str(args.request_id);
   if (requestId) {
     const [p] = await readPrompts(deps.db, mission.id, requestId);
-    if (!p || p.taskId !== task.id) return deny("That request is unknown.");
+    if (!p || p.taskId !== task.id) return deny("That request is unknown.", "unknown");
     if (p.state === "allowed") return allow();
     if (p.state === "denied")
-      return deny("A person said no. Don't try this command again; continue another way or report.");
-    if (p.state === "expired") return deny(PERMISSION_TIMEOUT_MESSAGE);
+      return deny("A person said no. Don't try this command again; continue another way or report.", "person");
+    if (p.state === "expired") return deny(PERMISSION_TIMEOUT_MESSAGE, "expired");
     return JSON.stringify({ status: "pending", request_id: p.id });
   }
   const tool = str(args.tool_name).slice(0, 64);
@@ -311,16 +313,17 @@ export async function handlePermissionPrompt(
       ? (args.input as Record<string, unknown>)
       : {};
   const command = commandOf(tool, input);
-  if (!tool || !command) return deny("Unknown tool.");
-  // The deny list: refused, never shown, never judged.
-  if (deniedInMissions(tool, input)) return deny(NEVER_MESSAGE);
+  if (!tool || !command) return deny("Unknown tool.", "unknown");
+  // The deny list: refused, never shown, never judged; the refusal names the kind and how to ask a person.
+  const denied = deniedMessage(tool, input);
+  if (denied) return deny(denied, "never");
   const scope = scopeOf(args.scope);
   // Secrets, with any tool that reads: refused the same way (ADR 0053 §3).
-  if (secretRead(tool, input, scope ?? undefined)) return deny(SECRET_MESSAGE);
+  if (secretRead(tool, input, scope ?? undefined)) return deny(SECRET_MESSAGE, "secret");
   // Plain reads (`ls` of any folder, read-only git, a GET): allowed, nothing posted.
   if (scope && readOnlyCall(tool, input, scope)) return allow();
   if (mission.status !== "active" && mission.status !== "awaiting_close")
-    return deny("The plan isn't approved yet: only read for now.");
+    return deny("The plan isn't approved yet: only read for now.", "plan");
   // "Aprovar sempre nesta missão" covers it.
   if (allowedBy(await missionAllowRules(deps.db, mission.id), tool, input)) return allow();
   const recent = (await readPrompts(deps.db, mission.id)).filter((p) => p.taskId === task.id);
@@ -344,6 +347,7 @@ export async function handlePermissionPrompt(
   if (lately.length >= COMMAND_PROMPTS_PER_TASK) {
     return deny(
       `Too many commands to approve in a row (at most ${COMMAND_PROMPTS_PER_TASK} in 10 minutes). Continue with what is allowed, or report what you need and stop.`,
+      "tooMany",
     );
   }
   const promptId = crypto.randomUUID();
@@ -531,29 +535,30 @@ export async function setCommandApproval(
  * with what to do instead (nothing waits for a person here).
  */
 export function runPermissionPrompt(args: Record<string, unknown>, opts: { canRun: boolean }): string {
-  if (str(args.request_id)) return deny("That request is unknown.");
+  if (str(args.request_id)) return deny("That request is unknown.", "unknown");
   const tool = str(args.tool_name).slice(0, 64);
   const input =
     typeof args.input === "object" && args.input !== null && !Array.isArray(args.input)
       ? (args.input as Record<string, unknown>)
       : {};
   const command = commandOf(tool, input);
-  if (!tool || !command) return deny("Unknown tool.");
-  if (deniedInMissions(tool, input)) {
-    return deny("This command is never allowed for agents (merges, pushes to the default branch, deploys).");
-  }
+  if (!tool || !command) return deny("Unknown tool.", "unknown");
+  const denied = deniedMessage(tool, input);
+  if (denied) return deny(denied, "never");
   const scope = scopeOf(args.scope);
-  if (secretRead(tool, input, scope ?? undefined)) return deny(SECRET_MESSAGE);
+  if (secretRead(tool, input, scope ?? undefined)) return deny(SECRET_MESSAGE, "secret");
   if (scope && readOnlyCall(tool, input, scope)) return allow();
   if (!opts.canRun) {
     return deny(
-      "Running commands on this computer is turned off for you. If the request needs it, ask for it with request_permission (sandbox:run). Never give the person a terminal command to run.",
+      `Running commands on this computer is turned off for you. If the request needs it, ask for it with request_permission (sandbox:run). ${NO_TERMINAL_COMMANDS}`,
+      "off",
     );
   }
   const reason = forbiddenReason(tool, input, scope ?? NO_SCOPE);
   if (reason === null) return allow();
   const hint = forbiddenHint(reason);
   return deny(
-    `This command was refused because ${reason}.${hint ? ` ${hint}` : ""} Agents may not use sudo, delete or write outside their folder, upload, open remote shells or install globally. Do it another way; if there is none, tell the person in plain words what you couldn't do. Never give them a terminal command to run.`,
+    `This command was refused because ${reason}.${hint ? ` ${hint}` : ""} Agents may not use sudo, delete or write outside their folder, upload, open remote shells or install globally. Do it another way; if there is none, tell the person in plain words what you couldn't do. ${NO_TERMINAL_COMMANDS}`,
+    forbiddenCode(reason),
   );
 }

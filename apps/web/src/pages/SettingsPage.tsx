@@ -56,6 +56,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AccessMatrixSection } from "@/components/AccessLevels";
 import { AuditSection } from "@/components/Audit";
+import { AutoModelsRow } from "@/components/AutoModels";
 import { AiAccountsSection } from "@/components/ai/AiAccounts";
 import { WhoPicksSection } from "@/components/ai/Jev";
 import { BillingLinkButton } from "@/components/BillingLinkButton";
@@ -731,6 +732,7 @@ function KeysSection() {
           })}
         </List>
       )}
+      {live.some((c) => c.provider === "openrouter") && <AutoModelsRow />}
       <KeyDialog
         mode={dialog?.type === "add" ? "add" : dialog?.type === "rotate" ? "rotate" : null}
         cred={dialog && dialog.type !== "add" ? dialog.cred : undefined}

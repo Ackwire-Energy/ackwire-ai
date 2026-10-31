@@ -3,7 +3,7 @@
 - Status: Accepted (built: the server and the web, desktop and phone screens; the Cloud's own services follow). Amended 2026-10-31: §2 (the proof is one code emailed to the person; the password only where the server sends no email), §9 (no refunds at all, and the plans a deleted account paid for stop renewing)
 - Date: 2026-10-30
 - Amends: ADR 0009 (author indexes on `messages`), ADR 0019 (the purge job, a deleted account's photos), ADR 0035 §5 (account deletion needs proof, and has a web page), ADR 0056 §4, §5, §8, §9, §10 (the deletion's fields, events and hold; a workspace being deleted is no computer request), ADR 0059 §1 (a deleted workspace's AI accounts), ADR 0073 §7 (what follows the pin), ADR 0079 §2 (`org.create_unpaid` and a workspace being deleted)
-- Code: `packages/engine/src/workspace-deletion.ts`, `packages/engine/src/standing.ts` (`closedRefusal`, `workRefusal`, `openOrg`, `OrgDeletingError`), `packages/engine/src/organizations.ts` (`deleteAccount`, `removeMember`, `createOrganization`, `lockOrgMembers`), `packages/engine/src/machines.ts` (`personalMachines`), `packages/engine/src/email-codes.ts` (every emailed code's rules), `apps/server/src/auth.ts` (`deletionProof`, `signedInLately`), `apps/server/src/desktop-sign-in.ts`, `apps/server/src/routes/app/account.ts`, `apps/server/src/operator/standing.ts`, `apps/server/src/workers.ts`, `packages/db/migrations/0133_workspace_deletion.sql`; the screens: `packages/client/src/lib/deletion.ts`, `apps/web/src/components/DeleteWorkspace.tsx`, `DeleteAccount.tsx`, `Standing.tsx`, `apps/mobile/src/features/me/DeleteAccountScreen.tsx`, `apps/mobile/src/ui/auth/DeletingWorkspace.tsx`
+- Code: `packages/engine/src/workspace-deletion.ts`, `packages/engine/src/standing.ts` (`closedRefusal`, `workRefusal`, `openOrg`, `OrgDeletingError`), `packages/engine/src/organizations.ts` (`deleteAccount`, `removeMember`, `createOrganization`, `lockOrgMembers`), `packages/engine/src/machines.ts` (`personalMachines`), `packages/engine/src/email-codes.ts` (every emailed code's rules), `apps/server/src/auth.ts` (`deletionProof`, `signedInLately`), `apps/server/src/desktop-sign-in.ts`, `apps/server/src/routes/app/account.ts`, `apps/server/src/operator/standing.ts`, `apps/server/src/workers.ts`, `packages/db/migrations/0138_workspace_deletion.sql`; the screens: `packages/client/src/lib/deletion.ts`, `apps/web/src/components/DeleteWorkspace.tsx`, `DeleteAccount.tsx`, `Standing.tsx`, `apps/mobile/src/features/me/DeleteAccountScreen.tsx`, `apps/mobile/src/ui/auth/DeletingWorkspace.tsx`
 
 ## Context
 
@@ -113,7 +113,7 @@ When a person leaves a workspace, is removed from it or deletes their account, t
 
 ### 13. Data
 
-One migration, `0133_workspace_deletion`: `organizations.deletion_due_at`, `deletion_requested_at`, `deletion_requested_by` (a user, set null when that account goes), `deletion_hold_at` and `deletion_hold_reason` (the operator's own, never shown), with no backfill and no index, since the sweep reads a small table; and the two author indexes on `messages` (ADR 0009).
+One migration, `0138_workspace_deletion`: `organizations.deletion_due_at`, `deletion_requested_at`, `deletion_requested_by` (a user, set null when that account goes), `deletion_hold_at` and `deletion_hold_reason` (the operator's own, never shown), with no backfill and no index, since the sweep reads a small table; and the two author indexes on `messages` (ADR 0009).
 
 ## Consequences
 

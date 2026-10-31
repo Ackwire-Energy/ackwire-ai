@@ -32,6 +32,11 @@ export interface ToolContext {
    * do is the run policy's (`run-policy.ts`), read from who is behind the run, never from this flag.
    */
   background?: boolean;
+  /**
+   * The call runs because a person approved it (`executeApproved`): the computer runs its command even
+   * when its command policy would hold it. Never set from a call's input.
+   */
+  approved?: boolean;
 }
 
 export interface ToolOutput {
@@ -76,6 +81,11 @@ export interface ToolDefinition {
   /** Needs a person's approval for every call. Merge, deploy and rollback always do. */
   sensitive?: boolean;
   /**
+   * A call that carries `why` (in the tool's own schema) asks a person's approval first: how an agent asks for
+   * a command the computer held for a person (ADR 0053 §3, amended 2026-10-30).
+   */
+  whyAsks?: boolean;
+  /**
    * The output is third-party content (an MCP server's answer: issues, pages,
    * messages anyone can write). The gateway hands it to the model inside an
    * `<external_data>` block so instructions in it read as data. Tools that
@@ -84,6 +94,25 @@ export interface ToolDefinition {
   external?: boolean;
   /** A mission's tool (agent mode, ADR 0029): its approvals are bound to that mission too. */
   missionId?: string;
+  /**
+   * A tool that runs other actions by name (Composio's executor): the actions a call runs, or null when its
+   * input isn't a shape we know. A call whose actions all only read runs as the connection's read (`readScope`).
+   */
+  actions?(input: Record<string, unknown>): string[] | null;
+  /** With `actions`: the scope of the connection's reads. */
+  readScope?: string;
+  /**
+   * The server's own name for this tool, set only where "Aprovar sempre" may be offered on its approvals (custom
+   * servers: only Composio's executor, whose `actions` say what each call does). Rules are kept by it, so they
+   * outlive a renamed connection. The gateway still decides each call (`rememberable`).
+   */
+  rememberAs?: string;
+  /**
+   * A tool whose every call names one exact target (`request_branch_push`: `owner/repo:branch`): "Aprovar sempre"
+   * keeps the tool's name and that target, and only a call naming the same target runs without asking. Null: this
+   * call names none and can't be remembered.
+   */
+  rememberTarget?(input: Record<string, unknown>): string | null;
   /** Human summary of a call, for approval cards. */
   describe?(input: Record<string, unknown>): { title: string; detail?: string };
   /**

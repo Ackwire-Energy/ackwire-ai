@@ -22,7 +22,7 @@ import {
   useSkills,
 } from "@agenteschat/client";
 import { agentSections } from "@agenteschat/client/lib/agent-groups";
-import { audienceChip, audienceNotice } from "@agenteschat/client/lib/audience";
+import { audienceChip, audienceNotice, listsAgent } from "@agenteschat/client/lib/audience";
 import { formatPercent } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { waitingAgents } from "@agenteschat/client/lib/outages";
@@ -241,8 +241,16 @@ export function Sidebar() {
   const peopleUnread = people.reduce((n, m) => n + (unreadWith.get(m.userId) ?? 0), 0);
   const sections = useSidebarSections();
   // The workspace's groups of agents (ADR 0083): the agents in none stay under "Agentes", each group is a category.
+  // Who manages agents sees them all, to arrange them; everyone else, the agents that answer them and the groups
+  // holding one.
+  const arranges = can(org, "manage_agents");
   const groups = useAgentGroups(orgId).data ?? [];
-  const byGroup = agentSections(dir.agents, groups, (a) => a.id);
+  const byGroup = agentSections(
+    dir.agents.filter((a) => listsAgent(org, a)),
+    groups,
+    (a) => a.id,
+  );
+  const shownGroups = arranges ? byGroup.groups : byGroup.groups.filter((g) => g.items.length > 0);
   const drag = useAgentDrag(groups);
   const [groupDialog, setGroupDialog] = useState<GroupDialogFor | null>(null);
   const [deletingGroup, setDeletingGroup] = useState<AgentGroup | null>(null);
@@ -261,7 +269,7 @@ export function Sidebar() {
   const [collapsed, toggleCollapsed] = useSidebarCollapsed();
   const rail = !compact && (tablet || collapsed);
   // Owners and admins organize the groups, with the full sidebar (the rail shows faces only).
-  const organize = can(org, "manage_agents") && !rail;
+  const organize = arranges && !rail;
   const agentRow = (a: Agent) => (
     <AgentRow
       key={a.id}
@@ -470,7 +478,7 @@ export function Sidebar() {
           </SidebarSection>
         )}
         {dir.agents.length > 0 &&
-          byGroup.groups.map(({ group, items }, i) => {
+          shownGroups.map(({ group, items }, i) => {
             // Where a dragged row would land: a line before the row at that place among the others.
             const others = items.filter((a) => a.id !== drag.dragging);
             const lineAt = drag.over?.groupId === group.id ? drag.over.index : null;
@@ -487,7 +495,7 @@ export function Sidebar() {
                     <GroupMenu
                       group={group}
                       index={i}
-                      count={byGroup.groups.length}
+                      count={shownGroups.length}
                       onRename={() => setGroupDialog({ mode: "rename", group })}
                       onDelete={() => setDeletingGroup(group)}
                     />
@@ -711,7 +719,9 @@ function SidebarChannels({
   const categoryOf = (c: Channel) => (c.categoryId && known.has(c.categoryId) ? c.categoryId : null);
   const loose = channels.filter((c) => categoryOf(c) === null);
   const inCategory = (id: string) => channels.filter((c) => categoryOf(c) === id);
-  const categoryIds = list.map((c) => `${CATEGORY_KEY}${c.id}` as SectionId);
+  // A category shows while it holds a channel I can see; who manages channels keeps the empty ones to drop channels in.
+  const shown = manages ? list : list.filter((c) => inCategory(c.id).length > 0);
+  const categoryIds = shown.map((c) => `${CATEGORY_KEY}${c.id}` as SectionId);
 
   // ── Dragging: a channel onto a channel (before/after) or a header (into); a header onto a header ──
   const endDrag = () => {
@@ -959,7 +969,7 @@ function SidebarChannels({
     </button>
   );
 
-  if (list.length === 0) {
+  if (shown.length === 0) {
     return (
       <>
         <SidebarSection
@@ -989,7 +999,7 @@ function SidebarChannels({
       >
         {loose.map(row)}
       </div>
-      {list.map((category) => {
+      {shown.map((category) => {
         const actions = categoryActions(category);
         return (
           <SidebarSection

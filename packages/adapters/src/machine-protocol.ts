@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 27;
+export const MACHINE_PROTOCOL_VERSION = 29;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -340,6 +340,13 @@ export const DESKTOP_TEXT_MAX = 16_000;
 export const BROWSER_WARM_PROTOCOL = 27;
 
 /**
+ * From this protocol on: `brain.turn` carries `contextTokens`, the most context the agent's model reads
+ * (Claude Code compacts there, `CLAUDE_CODE_AUTO_COMPACT_WINDOW`; Codex too, `model_auto_compact_token_limit`).
+ * An older runner never sees it.
+ */
+export const CONTEXT_LIMIT_PROTOCOL = 28;
+
+/**
  * Protocol 27: what an agent's browser request waited on before it ran, in
  * milliseconds, each only when it happened: its worker starting (system mode),
  * `agent-browser` and Chrome for Testing being found or installed, the
@@ -365,6 +372,18 @@ export function browserSetupOf(v: unknown): BrowserSetup | null {
   return Object.keys(out).length > 0 ? out : null;
 }
 
+/**
+ * From this protocol on (ADR 0059 §2, amended 2026-10-30): one sign-in thinks
+ * for every agent its owner gives it on the computer. Accounts say so
+ * (`RunnerAccountInfo.shared`): where every agent is the runner's own user,
+ * all of them; where each agent is its own OS user (system mode), those made
+ * for all agents (`begin` with `shared`), which root keeps and never lends: a
+ * Claude sign-in there is `claude setup-token`'s token, and root hands each
+ * turn what its CLI needs over the agent's worker link. The server never
+ * sends `shared` to an older runner.
+ */
+export const SHARED_ACCOUNTS_PROTOCOL = 29;
+
 /** Which CLI an account signs in. */
 export type AccountKind = "claude_code" | "codex";
 export const ACCOUNT_KINDS: readonly AccountKind[] = ["claude_code", "codex"];
@@ -379,6 +398,10 @@ export const BRAIN_EFFORTS: readonly BrainEffort[] = ["low", "medium", "high", "
 export const isBrainEffort = (v: unknown): v is BrainEffort =>
   typeof v === "string" && (BRAIN_EFFORTS as readonly string[]).includes(v);
 
+/** A `brain.turn`'s `contextTokens` the runner applies (protocol 28): a whole number of tokens in a sane range. */
+export const isContextTokens = (v: unknown): v is number =>
+  typeof v === "number" && Number.isInteger(v) && v >= 50_000 && v <= 10_000_000;
+
 /** An account on the machine, as the runner sees it (`hello.accounts`, `account` replies). No secrets. */
 export interface RunnerAccountInfo {
   id: string;
@@ -386,7 +409,7 @@ export interface RunnerAccountInfo {
   /** The CLI's status command says it is signed in. */
   loggedIn: boolean;
   email?: string;
-  /** `pro`, `max`, `team`, `plus`… as the CLI says. */
+  /** `pro`, `max`, `ultra`, `team`, `enterprise`… from what the CLI says. */
   plan?: string;
   /** Protocol 19: the plan's usage limits, as last seen. */
   usage?: PlanUsage;
@@ -394,6 +417,8 @@ export interface RunnerAccountInfo {
   provider?: string;
   /** Protocol 20: the last 4 characters of a key account's key. */
   keyHint?: string;
+  /** Protocol 29: it thinks for several of its owner's agents at once. */
+  shared?: boolean;
 }
 
 /** A plan's usage window: how much of it is used (0–100) and when it resets. */
@@ -447,8 +472,17 @@ export type AccountRequest =
    * `again`: sign in once more to the existing account `loginId` (it was signed out); its folder stays on failure.
    * `email` (Claude Code): which account to sign in to (`claude auth login --email`), only if `isLoginEmail`;
    * an older runner leaves it out. Protocol 20, `provider`: a coding plan's key account (Claude Code), no CLI.
+   * Protocol 29, `shared`: one sign-in for every agent of its owner there (`SHARED_ACCOUNTS_PROTOCOL`).
    */
-  | { action: "begin"; kind: AccountKind; loginId: string; again?: boolean; email?: string; provider?: string }
+  | {
+      action: "begin";
+      kind: AccountKind;
+      loginId: string;
+      again?: boolean;
+      email?: string;
+      provider?: string;
+      shared?: boolean;
+    }
   | { action: "code"; loginId: string; aad: string; box: WireSecretBox }
   | { action: "status"; loginId: string }
   | { action: "cancel"; loginId: string }
@@ -919,6 +953,11 @@ export interface TaskStart {
   commit?: { message: string };
   /** Protocol 14: answer how many commits `branch` has beyond `sha` (`task.start` `baseBehind`). */
   baseCheck?: { branch: string; sha: string };
+  /**
+   * A person approved starting this very task (an approval card): a `shell` task's command runs even when the
+   * command policy would hold it (`approval_needed`).
+   */
+  approved?: boolean;
 }
 
 /** A coding CLI on the machine, as `hello` reports it (protocol 7). */
@@ -927,7 +966,7 @@ export interface RunnerExecutorInfo {
   version: string;
   /** Protocol 8, `claude` only: `claude auth status` says it is logged in (absent: unknown). */
   loggedIn?: boolean;
-  /** Protocol 8, `claude` only: how it is logged in (`claude.ai`, `api_key`…) and the plan (`pro`, `max`, `team`…). */
+  /** Protocol 8, `claude` only: how it is logged in (`claude.ai`, `api_key`…) and the plan (`pro`, `max`, `ultra`…). */
   authMethod?: string;
   plan?: string;
 }
@@ -1025,6 +1064,8 @@ export interface BrainTurnRequest {
   account?: string;
   /** Protocol 13: how hard it thinks; absent: the CLI's default. */
   effort?: BrainEffort;
+  /** Protocol 28: the most context it reads, in tokens; absent: the model's own window. */
+  contextTokens?: number;
 }
 
 /** Largest strings of a `brain.event` (tool inputs and results are cut, text deltas are small). */
@@ -1268,6 +1309,8 @@ export type MachineRequest = (
       timeoutSeconds: number;
       /** Send `output` frames while it runs. */
       stream: boolean;
+      /** A person approved this very command (an approval card): it runs even when the command policy would hold it. */
+      approved?: boolean;
     }
   | { op: "read"; path: string; maxBytes: number }
   | { op: "write"; path: string; base64: string }
@@ -1551,7 +1594,11 @@ export type MachineErrorCode =
   | "no_slot"
   /** Protocol 9: the owner paused this computer; nothing new starts until it resumes. */
   | "paused"
-  /** Protocol 10: the path is outside every folder this agent may use, or the tool is off on the machine. */
+  /**
+   * Protocol 10: the path is outside every folder this agent may use, or the tool is off on the machine. Also
+   * `exec` and a `shell` task's `task.start` that the command policy never runs here, approved or not (a push our
+   * git proxy refuses): the message says where to go instead (`policyRefusal`).
+   */
   | "not_allowed"
   /** Protocol 12: the agent browser can't run here (no binary, no Chrome, too many sessions); the message says why. */
   | "browser_unavailable"
@@ -1586,6 +1633,11 @@ export type MachineErrorCode =
    * stopping): it may have stopped partway. Older servers read it like `internal`.
    */
   | "dropped"
+  /**
+   * `exec` and a `shell` task's `task.start`: the command policy holds the command for a person's approval (a
+   * push to the default branch, a deploy); the message says why and what the agent can do. Nothing ran.
+   */
+  | "approval_needed"
   | "bad_request"
   | "internal";
 
@@ -1805,6 +1857,7 @@ export function parseAccounts(v: unknown[]): RunnerAccountInfo[] {
       ...(usage ? { usage } : {}),
       ...(provider ? { provider } : {}),
       ...(keyHint ? { keyHint } : {}),
+      ...(a.shared === true ? { shared: true } : {}),
     });
   }
   return out;

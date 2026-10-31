@@ -13,6 +13,7 @@ import {
   accountAbout,
   accountTitle,
   existingAi,
+  groupPlans,
   planWordOf,
   signInPlan,
 } from "@agenteschat/client/lib/ai-accounts";
@@ -44,6 +45,7 @@ import {
   planMark,
   planOfAccount,
   planTitle,
+  signsInOnce,
 } from "@agenteschat/client/lib/no-ai";
 import { isPlanId, planOf } from "@agenteschat/client/lib/plans";
 import {
@@ -659,6 +661,10 @@ function PlanSteps({
       setSaving((n) => n - 1);
     }
   };
+  // One account for every agent of "All agents" (one sign-in for all, or one already there), each in turn.
+  const assignAll = async (a: MachineAccount) => {
+    for (const x of todo) if (!assigned[x.id]) await assign(x.id, a);
+  };
   const saveOwn = async () => {
     try {
       for (const a of todo) await api.agents.setBrain(org.id, a.id, { brain: kind, account: null, ...toEveryone });
@@ -904,13 +910,34 @@ function PlanSteps({
   const ownable = ready && !login && ownSignInFor(choice, view, gates.row);
   // The shared sign-in's plan, where the computer says it ("Claude Max").
   const ownPlan = planWordOf(gates.row?.own?.[kind]?.plan ?? null);
-  const otherChosen = own ? !own.chosen : other;
+  // One sign-in there thinks for all of the person's agents (ADR 0059 §2): the accounts of this plan they already
+  // have there for all of their agents come first, one click each, before another account.
+  const once = signsInOnce(choice, gates.row);
+  const existing = ready
+    ? groupPlans(
+        (view?.accounts ?? []).filter(
+          (a) =>
+            a.shared === true &&
+            a.mine &&
+            a.status === "active" &&
+            a.kind === kind &&
+            (coding ? a.provider === choice : !a.provider) &&
+            (everyone || a.id !== view?.account),
+        ),
+      ).flatMap((g) => g.logins.slice(0, 1))
+    : [];
+  const choosing = ownable || existing.length > 0;
+  const otherChosen = ownable && own ? !own.chosen : other;
   const signedOut = !everyone && current?.status === "signed_out" ? current : undefined;
   // One sign-in per agent, in turn: the agent signing in now, and the account the first one signed in as.
-  const turn = everyone && !coding ? todo.find((a) => !assigned[a.id]) : undefined;
+  const turn = everyone && !coding && !once ? todo.find((a) => !assigned[a.id]) : undefined;
   const sameAs = Object.values(assigned).find((a) => a.email)?.email ?? undefined;
   const stateOf = (a: PlanSetAgent) =>
-    a.done || assigned[a.id] ? "done" : !missed.includes(a.id) && (coding ? sent : a.id === turn?.id) ? "now" : "next";
+    a.done || assigned[a.id]
+      ? "done"
+      : !missed.includes(a.id) && (coding || once ? sent : a.id === turn?.id)
+        ? "now"
+        : "next";
   return (
     <>
       {wait}
@@ -950,34 +977,54 @@ function PlanSteps({
       {everyone && !coding && steps && (
         <p className="ai-panel__each">
           <span className="ac-hintline">
-            <span>{t("connectAi.each")}</span>
-            <InfoHint name={t("common.about", { label: t("connectAi.each") })}>{t("connectAi.eachHint")}</InfoHint>
+            <span>{t(once ? "connectAi.once" : "connectAi.each")}</span>
+            <InfoHint name={t("common.about", { label: t(once ? "connectAi.once" : "connectAi.each") })}>
+              {t(once ? "connectAi.onceHint" : "connectAi.eachHint")}
+            </InfoHint>
           </span>
         </p>
       )}
       {retry}
-      {ownable && (
-        // Who shares the sign-in: the computer's own, which any of its pairer's agents there thinks with, or a sign-in
-        // for this agent alone, each agent's own for All agents (ADR 0059 §2). Small columns: indented to the panel's
-        // text column, the two still fit side by side in the setup's column.
+      {choosing && (
+        // Who shares the sign-in: the computer's own, which any of its pairer's agents there thinks with, an account
+        // of this plan the person already has there for all of their agents, or another sign-in (ADR 0059 §2). Small
+        // columns: indented to the panel's text column, two still fit side by side in the setup's column.
         // biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset
         <div className="grid-options grid-options--sm" role="group" aria-label={planTitle(t, choice)}>
-          <OptionCard pressed={own?.chosen ?? false} onClick={() => (own ? own.onChoose(true) : void saveOwn())}>
-            <span className="ac-option__text">
-              <span className="ac-option__title">{t("connectAi.own.shared")}</span>
-              {ownPlan && <span className="ac-option__desc">{`${brand} ${ownPlan}`}</span>}
-            </span>
-          </OptionCard>
-          <OptionCard pressed={otherChosen} onClick={() => (own ? own.onChoose(false) : setOther(true))}>
+          {ownable && (
+            <OptionCard pressed={own?.chosen ?? false} onClick={() => (own ? own.onChoose(true) : void saveOwn())}>
+              <span className="ac-option__text">
+                <span className="ac-option__title">{t("connectAi.own.shared")}</span>
+                {ownPlan && <span className="ac-option__desc">{`${brand} ${ownPlan}`}</span>}
+              </span>
+            </OptionCard>
+          )}
+          {existing.map((a) => (
+            <OptionCard key={a.id} pressed={false} onClick={() => void (everyone ? assignAll(a) : assign(agent.id, a))}>
+              <span className="ac-option__text">
+                <span className="ac-option__title">{t("connectAi.use", { label: accountTitle(a) })}</span>
+                {a.usedBy.length > 0 && (
+                  <span className="ac-option__desc">
+                    {t("agentPage.work.brain.accountAlso", { agents: namesText(t, a.usedBy, NAMES_SHOWN) })}
+                  </span>
+                )}
+              </span>
+            </OptionCard>
+          ))}
+          <OptionCard pressed={otherChosen} onClick={() => (ownable && own ? own.onChoose(false) : setOther(true))}>
             <span className="ac-option__text">
               <span className="ac-option__title">
-                {everyone ? t("connectAi.own.each") : t("connectAi.own.one", agentGrammar(t, agent.name))}
+                {!ownable
+                  ? t("connectAi.another")
+                  : everyone
+                    ? t("connectAi.own.each")
+                    : t("connectAi.own.one", agentGrammar(t, agent.name))}
               </span>
             </span>
           </OptionCard>
         </div>
       )}
-      {steps && (!ownable || otherChosen) && (
+      {steps && (!choosing || otherChosen) && (
         <AddAccount
           key={turn?.id ?? login?.from}
           machineId={view?.computer?.machineId ?? ""}
@@ -991,15 +1038,15 @@ function PlanSteps({
           ready={ready}
           loading={gates.catching}
           {...(turn ? { signInLabel: t("connectAi.signInFor", agentGrammar(t, turn.name)) } : {})}
-          {...(everyone && coding ? { fanOut: todo.map((a) => ({ id: a.id })) } : {})}
+          {...(everyone && coding && !once ? { fanOut: todo.map((a) => ({ id: a.id })) } : {})}
           onSent={() => {
             setSent(true);
             setMissed([]);
             onStart?.();
           }}
           onFailed={(id) => setMissed((m) => [...m, id])}
-          onAdded={(a, id) => void assign(id ?? turn?.id ?? agent.id, a)}
-          onUse={(a) => void assign(turn?.id ?? agent.id, a)}
+          onAdded={(a, id) => void (everyone && once ? assignAll(a) : assign(id ?? turn?.id ?? agent.id, a))}
+          onUse={(a) => void (everyone && once ? assignAll(a) : assign(turn?.id ?? agent.id, a))}
           onSigningIn={setSigningIn}
         />
       )}

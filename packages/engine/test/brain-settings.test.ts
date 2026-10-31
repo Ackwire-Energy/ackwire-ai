@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { ACCOUNTS_PROTOCOL, BRAIN_PROTOCOL, MISSION_PROTOCOL } from "@agenteschat/adapters";
+import { ACCOUNTS_PROTOCOL, BRAIN_PROTOCOL, CONTEXT_LIMIT_PROTOCOL, MISSION_PROTOCOL } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
+import { planOf } from "@agenteschat/providers/plans";
 import {
   ConflictError,
   canTalkTo,
@@ -11,6 +12,7 @@ import {
   setAgentAudience,
   setAgentBrain,
   updateAgent,
+  ValidationError,
 } from "../src";
 import {
   brainModelId,
@@ -22,6 +24,7 @@ import {
   executorBrain,
   normalizeBrainModel,
 } from "../src/brain-settings";
+import { contextFields } from "../src/brains/claude-code";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
@@ -174,6 +177,47 @@ describe("Criar agente: what a new agent could think with", () => {
   });
 });
 
+describe("context window (Configuração avançada)", () => {
+  test("any brain keeps a limit from CONTEXT_LIMITS through a switch; anything else is refused; audited", async () => {
+    const { fx, deps, row, audits } = await world();
+    const onApi = await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { contextTokens: 400_000 });
+    expect(onApi).toMatchObject({ brain: "model", contextTokens: 400_000 });
+    expect(await row()).toMatchObject({ contextTokens: 400_000 });
+    expect((await audits("agent.brain")).at(-1)?.details).toMatchObject({
+      from: { contextTokens: null },
+      to: { contextTokens: 400_000 },
+    });
+    // It is the agent's, not the brain's: a switch keeps it, and so does a change that leaves it out.
+    const onPlan = await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { brain: "claude_code" });
+    expect(onPlan).toMatchObject({ brain: "claude_code", contextTokens: 400_000 });
+    expect((await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { model: "opus" })).contextTokens).toBe(
+      400_000,
+    );
+    for (const bad of [300_000, "400000", -1, 2_000_000]) {
+      await expect(
+        setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { contextTokens: bad }),
+      ).rejects.toBeInstanceOf(ValidationError);
+    }
+    // Null: the model's own window again.
+    expect(
+      (await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { contextTokens: null })).contextTokens,
+    ).toBe(null);
+    expect(await row()).toMatchObject({ contextTokens: null });
+  });
+
+  test("a computer turn carries it only to a runner that knows it (protocol 28)", () => {
+    expect(contextFields(CONTEXT_LIMIT_PROTOCOL, { contextTokens: 400_000 })).toEqual({ contextTokens: 400_000 });
+    expect(contextFields(CONTEXT_LIMIT_PROTOCOL - 1, { contextTokens: 400_000 })).toEqual({});
+    expect(contextFields(CONTEXT_LIMIT_PROTOCOL, {})).toEqual({});
+  });
+
+  test("each model choice says its window: which limits are worth offering with it", () => {
+    expect(brainModelOptions("claude_code").find((o) => o.value === "opus")?.contextWindow).toBe(1_000_000);
+    // A coding plan's models are listed from its catalog by the apps, which read the window off the id (`[1m]`).
+    expect(planOf("minimax")?.claudeCode.models.every((m) => m.id.endsWith("[1m]"))).toBe(true);
+  });
+});
+
 describe("a plan answers its owner until it answers other people (Atende outras pessoas)", () => {
   test("onto a plan it answers only its owner; turning it on asks nothing and is audited as who may talk to it", async () => {
     const { fx, deps, bia, caio, row, audits } = await world();
@@ -261,7 +305,7 @@ describe("a plan answers its owner until it answers other people (Atende outras 
 });
 
 describe("a plan thinks only for its owner's agents, one account each", () => {
-  test("the owner's accounts only; both the account and the agent the caller's; another agent's with moveAccount", async () => {
+  test("the owner's accounts only; both the account and the agent the caller's; another agent's with moveAccount, unless for all", async () => {
     const { fx, deps, machineId, bia, caio, account, row, audits } = await world();
     await account(ANAS, fx.owner.id);
     await account(BIAS, bia.id);
@@ -312,13 +356,16 @@ describe("a plan thinks only for its owner's agents, one account each", () => {
     // Theo goes back to the computer's own sign-in, Ana's like Theo.
     expect(await row(theo.id)).toMatchObject({ brainAccountId: null, brain: "claude_code" });
     expect((await audits("account.moved"))[0]?.details).toEqual({ from: theo.id, to: fx.agent.id });
-    // The database holds the rule too: one agent per account.
-    const twice = await fx.db
-      .update(schema.agents)
-      .set({ brainAccountId: ANAS })
-      .where(eq(schema.agents.id, theo.id))
-      .catch((e) => e);
-    expect(twice).toBeInstanceOf(Error);
+    // Theo can't take it back without moving it: a login made for one agent thinks for one.
+    const back = await setAgentBrain(deps, fx.owner.id, fx.org.id, theo.id, { account: ANAS }).catch((e) => e);
+    expect(back).toMatchObject({ code: "account.in_use", params: { agentId: fx.agent.id } });
+
+    // One the runner made for all of Ana's agents there thinks for both, with no move.
+    await fx.db.update(schema.machineAccounts).set({ shared: true }).where(eq(schema.machineAccounts.id, ANAS));
+    const both = await setAgentBrain(deps, fx.owner.id, fx.org.id, theo.id, { account: ANAS });
+    expect(both.accounts.find((a) => a.id === ANAS)?.usedBy.sort()).toEqual(["Dev", "Theo"]);
+    expect(await row(fx.agent.id)).toMatchObject({ brainAccountId: ANAS });
+    expect(await audits("account.moved")).toHaveLength(1);
   });
 
   test("the computer's own sign-in: only for its pairer's agents; an account that goes sends the others to the API", async () => {

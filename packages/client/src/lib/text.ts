@@ -90,7 +90,7 @@ export function webmailOf(
 ): { name: "Gmail" | "Outlook" | "iCloud Mail" | "Yahoo Mail"; url: string } | null {
   const domain = email.trim().toLowerCase().split("@")[1] ?? "";
   if (domain === "gmail.com" || domain === "googlemail.com") return { name: "Gmail", url: "https://mail.google.com" };
-  if (["outlook.com", "hotmail.com", "live.com", "msn.com"].includes(domain))
+  if (["outlook.com", "hotmail.com", "live.com", "msn.com", "outlook.com.br", "hotmail.com.br"].includes(domain))
     return { name: "Outlook", url: "https://outlook.live.com/mail" };
   if (["icloud.com", "me.com", "mac.com"].includes(domain))
     return { name: "iCloud Mail", url: "https://www.icloud.com/mail" };

@@ -6,7 +6,7 @@ setupDom();
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { setNavigateAway } from "@/lib/navigate";
 import { pick } from "./catalog";
-import { createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { createFakeApi, OPENROUTER_KEY, OPENROUTER_MODELS, ORG_ID, seedState } from "./fake-api";
 import { shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
@@ -304,6 +304,65 @@ describe("Configurações do workspace", () => {
     });
   });
 
+  test("an OpenRouter key: found by its shape, its line says where and who may keep what is sent; refused, it says so", async () => {
+    const { state } = await go(seedState({ keyRefusal: "provider_key_invalid" }), "settings/keys");
+    const keys = screen().getByRole("region", { name: "Chaves de provedor" });
+    await click(within(keys).getByRole("button", { name: "Adicionar chave" }));
+    const add = screen().getByRole("dialog", { name: "Adicionar chave de API" });
+    const field = within(add).getByLabelText("Chave da API");
+    await type(field, ["sk", "or", "v1", "0123456789abcdef".repeat(4)].join("-"));
+    await click(within(add).getByRole("button", { name: "Salvar chave" }));
+    // Only OpenRouter's keys look like it.
+    for (const name of ["OpenAI", "DeepSeek", "Kimi", "MiniMax"])
+      expect(within(add).queryByRole("button", { name })).toBeNull();
+    await click(within(add).getByRole("button", { name: "OpenRouter" }));
+    expect(field.getAttribute("placeholder")).toBe("sk-or-v1-…");
+    expect(within(add).getByRole("link", { name: "Crie a chave em openrouter.ai/keys." })).toBeTruthy();
+    expect(add.textContent).toContain(
+      "As configurações de privacidade da OpenRouter decidem quais provedores podem guardar o que seus agentes enviam.",
+    );
+    await click(within(add).getByRole("button", { name: "Salvar chave" }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "agents.addCredential")?.args[1]).toMatchObject({
+      provider: "openrouter",
+      label: "OpenRouter",
+    });
+    expect(document.body.textContent).toContain("O provedor não aceitou esta chave.");
+  });
+
+  test("Modelos do Automático: with an OpenRouter key, each size of task gets a model of its own or the default", async () => {
+    // A model OpenRouter stopped listing: the tier runs on the default, so it reads as the default.
+    const seeded = seedState({
+      extraModels: OPENROUTER_MODELS,
+      autoModels: { openrouter: { medium: "acme/retired" } },
+    });
+    seeded.credentials.push(OPENROUTER_KEY);
+    const { state } = await go(seeded, "settings/keys");
+    const keys = screen().getByRole("region", { name: "Chaves de provedor" });
+    expect(keys.textContent).toContain("Cada tarefa usa um destes, conforme a dificuldade.");
+    await click(within(keys).getByRole("button", { name: "Escolher" }));
+    const dialog = screen().getByRole("dialog", { name: "Modelos do Automático" });
+    const field = (name: string) => within(dialog).getByRole("combobox", { name });
+    expect(["Tarefas rápidas", "Trabalho do dia a dia", "Trabalho difícil"].map((n) => field(n).textContent)).toEqual([
+      "Padrão · DeepSeek: DeepSeek Flash Latest",
+      "Padrão · Z.ai: GLM Latest",
+      "Padrão · Claude Sonnet Latest",
+    ]);
+    await click(field("Trabalho difícil"));
+    const search = screen().getByRole("combobox", { name: "Buscar modelos" });
+    await type(search, "glm 5.3");
+    await act(async () => fireEvent.keyDown(search, { key: "Enter" }));
+    expect(field("Trabalho difícil").textContent).toContain("Z.ai: GLM 5.3");
+    await click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await settle(4);
+    // Only what changed: the tier picked, and the dropped model cleared.
+    expect(state.calls.find((c) => c.method === "orgs.updateSettings")?.args[1]).toEqual({
+      autoModels: { openrouter: { medium: null, large: "z-ai/glm-5.3" } },
+    });
+    expect(state.autoModels).toEqual({ openrouter: { large: "z-ai/glm-5.3" } });
+    expect(document.body.textContent).toContain("Modelos salvos.");
+  });
+
   test("provider keys: default marked; rotate keeps the key; the default can't be deleted; usage by kind", async () => {
     const { state, router } = await go(seedState(), "settings/keys");
     const keys = () => screen().getByRole("region", { name: "Chaves de provedor" });
@@ -463,6 +522,8 @@ describe("Configurações do workspace", () => {
       "Notificações",
       "Geral",
       "Membros e convites",
+      // Every member reads what each role allows (ADR 0085).
+      "Papéis e permissões",
       "Conectores",
       "Computadores",
       "Orçamento e uso",

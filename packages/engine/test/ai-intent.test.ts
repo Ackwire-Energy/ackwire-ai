@@ -102,6 +102,21 @@ test("a key of a provider the catalog lists goes along with the step: Gemini", a
   });
 });
 
+test("OpenRouter is one of the providers a message may name: its key step opens with it chosen", async () => {
+  const judge = createFakeJudge(
+    (_kind, id): JudgeAnswer =>
+      id === "intent"
+        ? { choice: "api_key", probabilities: { api_key: 0.91 } }
+        : { choice: "openrouter", probabilities: { openrouter: 0.95 } },
+  );
+  expect(await aiConnectIntent(judge, { orgId: "o", text: "tenho creditos na openrouter" })).toEqual({
+    intent: "api_key",
+    provider: "openrouter",
+    autoOpen: true,
+  });
+  expect(PROVIDERS.openrouter.label).toBe("OpenRouter");
+});
+
 test("one calibrated request: the message, the five steps, the catalog's providers; usage as the router's", async () => {
   const bodies: { state: Record<string, unknown>; questions: Record<string, { criteria: Record<string, string> }> }[] =
     [];

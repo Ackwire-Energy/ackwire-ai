@@ -31,6 +31,7 @@ import {
   createFakeJudge,
   createFakeScheduleReader,
   createFindAgentToolSource,
+  createFollowUpToolSource,
   createForumToolSource,
   createHandOffToolSource,
   createIssueToolSource,
@@ -53,6 +54,7 @@ import {
   localDateTimeOf,
   type RunExecutorDeps,
   type SandboxDeps,
+  type ServerCatalog,
   type StorageDeps,
   type ToolSource,
   zonedParts,
@@ -170,6 +172,8 @@ export async function setup(
     askAgent?: boolean;
     /** Add the built-in `react` tool. */
     react?: boolean;
+    /** Add the built-in `follow_up` and `cancel_follow_up` tools. */
+    followUps?: boolean;
     /** Add the built-in `hand_off` tool (background runs: routines). */
     handOff?: boolean;
     /** Add the Drive tools (create_artifact…). Storage is always wired (memory platform store, fake S3). */
@@ -201,6 +205,8 @@ export async function setup(
     toolsOnDemand?: boolean;
     /** The agent's browser started ahead when a run's judge chose it (ADR 0040 §11). */
     warmBrowser?: RunExecutorDeps["warmBrowser"];
+    /** What the server can connect: `find_tools` names the connectors an agent lacks. None: it names none. */
+    catalog?: ServerCatalog;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -300,6 +306,7 @@ export async function setup(
         ]
       : []),
     ...(options.react ? [createReactToolSource({ pubsub })] : []),
+    ...(options.followUps ? [createFollowUpToolSource({ pubsub })] : []),
     ...(options.handOff ? [createHandOffToolSource({ pubsub })] : []),
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),
     ...(options.chatTools ? [createChatToolSource({ pubsub, artifacts: artifactDeps })] : []),
@@ -322,7 +329,7 @@ export async function setup(
       : []),
     ...(options.toolSources ?? []),
   ];
-  const tools = sources.length > 0 ? createToolGateway({ sources }) : undefined;
+  const tools = sources.length > 0 ? createToolGateway({ sources, catalog: options.catalog }) : undefined;
   machineHub?.setMissionHooks(createMissionHooks({ db, ...missionDeps, tools }));
   const jobDeps = {
     db,

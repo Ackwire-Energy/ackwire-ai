@@ -4,6 +4,7 @@ import type {
   AiAccounts,
   AiComputer,
   Credential,
+  Machine,
   MachineAccount,
   MachineAccountKind,
   PlanUsage,
@@ -58,23 +59,25 @@ export interface AccountChoice<A extends MachineAccount> {
   login: A;
   usedBy: string[];
   /**
-   * Every login of it thinks for another agent, and the account may have one per agent (`LOGIN_PER_AGENT`): choosing it
-   * signs this agent in to it again ("Also used by Ada") instead of taking a login from another agent.
+   * Every login of it thinks for another agent, none for all of them (`shared`), and the account may have one per
+   * agent (`LOGIN_PER_AGENT`): choosing it signs this agent in to it again ("Also used by Ada") instead of taking a
+   * login from another agent.
    */
   also: boolean;
 }
 
 /**
  * An agent's account choice, one entry per account (`groupPlans`): the first of `ids` it has a login of (the one
- * chosen, then the one the agent thinks with), else a login of the viewer's that thinks for nobody (a signed-in one
- * first: a new sign-in of Claude can sign the account's other logins out), else its first.
+ * chosen, then the one the agent thinks with), else a login of the viewer's that thinks for all of their agents
+ * there or for nobody (a signed-in one first: a new sign-in of Claude can sign the account's other logins out), else
+ * its first.
  */
 export function accountChoices<A extends MachineAccount & { machineId?: string }>(
   accounts: readonly A[],
   ids: readonly (string | null | undefined)[],
 ): AccountChoice<A>[] {
   return groupPlans(accounts).flatMap(({ logins, usedBy }) => {
-    const free = logins.filter((l) => l.mine && l.usedBy.length === 0);
+    const free = logins.filter((l) => l.mine && (l.shared === true || l.usedBy.length === 0));
     const own =
       ids.map((id) => logins.find((l) => l.id === id)).find(Boolean) ??
       free.find((l) => l.status === "active") ??
@@ -85,14 +88,56 @@ export function accountChoices<A extends MachineAccount & { machineId?: string }
   });
 }
 
-/** An account in an agent's account choice: its name, with its plan where the CLI said it ("Claude Team · Team"). */
+/**
+ * "Use for…" an account that thinks for all of its owner's agents there (`shared`): the viewer's agents on its
+ * computer that don't think with it yet. Never one on the workspace's API key: a plan makes an agent answer only
+ * its owner, so that one moves on its own page.
+ */
+export function agentsToGive<A extends { id: string; ownerUserId: string | null }>({
+  account,
+  agents,
+  machine,
+  viewerId,
+  onKey,
+}: {
+  account: Pick<MachineAccount, "shared" | "mine" | "usedByIds">;
+  agents: readonly A[];
+  /** The account's computer (`useMachines`): the agents on it. */
+  machine: Pick<Machine, "agents"> | undefined;
+  viewerId: string;
+  /** The agent thinks with the workspace's API key now. */
+  onKey: (agentId: string) => boolean;
+}): A[] {
+  if (account.shared !== true || !account.mine || !machine) return [];
+  const here = new Set(machine.agents.map((a) => a.id));
+  const using = new Set(account.usedByIds ?? []);
+  return agents.filter((a) => here.has(a.id) && a.ownerUserId === viewerId && !using.has(a.id) && !onKey(a.id));
+}
+
+/**
+ * Disconnecting ends the account's sign-in on the computer only: a Claude account made for all agents where each is
+ * its own OS user is a token, which only Claude's settings revoke.
+ */
+export const endsOnClaude = (
+  account: Pick<MachineAccount, "shared" | "kind" | "provider">,
+  machine: Pick<Machine, "mode"> | undefined,
+) => account.shared === true && account.kind === "claude_code" && !account.provider && machine?.mode === "system";
+
+/**
+ * An account by its name with its plan once ("Claude · Max", "Trabalho · Ultra"); a key account by its name. A name
+ * that already says the plan stays as it is: servers before ADR 0059's 2026-10-30 amendment name accounts after it
+ * ("Claude Max 2"), and the phone talks to those too.
+ */
 export const accountTitle = (a: Pick<MachineAccount, "label" | "plan">) =>
-  a.plan ? `${a.label} · ${planName(a.plan)}` : a.label;
+  a.plan && !a.label.toLowerCase().split(/\s+/).includes(a.plan.toLowerCase())
+    ? `${a.label} · ${planName(a.plan)}`
+    : a.label;
 
 /**
  * The line under an account in an agent's account choice (Quem pensa and Connect an AI, web and phone): whose it is
  * when it isn't the viewer's, the agents on it where choosing it signs this agent in to it too, signed out, the
- * agents it would be taken from, else its key's end or its email.
+ * agents it would be taken from (or those it thinks for too, made for all of its owner's agents), else its key's end
+ * or its email.
  */
 export function accountAbout(
   t: TFunction,
@@ -103,6 +148,10 @@ export function accountAbout(
   if (also) return t("agentPage.work.brain.accountAlso", { agents: joinNames(usedBy, t("newAgent.and")) });
   if (a.status === "signed_out") return t("agentPage.work.brain.accountSignedOut");
   const others = a.usedBy.filter((n) => n !== agentName);
+  // One made for all of its owner's agents there thinks for this one too: nothing moves.
+  if (others.length && a.shared === true) {
+    return t("agentPage.work.brain.accountAlso", { agents: joinNames(others, t("newAgent.and")) });
+  }
   if (others.length) return t("agentPage.work.brain.accountMove", { agents: others.join(", ") });
   return a.keyHint ? t("aiAccounts.page.keyEnds", { hint: a.keyHint }) : (a.email ?? undefined);
 }
@@ -124,7 +173,8 @@ const EXISTING_RANK: Record<ExistingAct | "key", number> = { use: 0, also: 1, ag
 function existingAct({ login: a, also }: AccountChoice<MachineAccount>): ExistingAct | null {
   if (!a.mine) return "locked";
   if (also) return "also";
-  const used = a.usedBy.length > 0;
+  // One made for all of its owner's agents there is never taken from the others.
+  const used = a.usedBy.length > 0 && a.shared !== true;
   if (a.status === "signed_out") return used ? null : "again";
   return used ? "move" : "use";
 }
@@ -182,7 +232,7 @@ export function ownSignIns(view: Pick<AiAccounts, "computers"> | null | undefine
   return out;
 }
 
-/** The plan's name as people know it ("Max", "Pro"): the CLI's word with a capital, or nothing. */
+/** The plan's name as people know it ("Max", "Ultra", "Pro"): the runner's word with a capital, or nothing. */
 export const planWordOf = (plan: string | null) =>
   plan ? plan.charAt(0).toUpperCase() + plan.slice(1).toLowerCase() : null;
 

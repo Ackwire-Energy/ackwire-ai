@@ -2817,6 +2817,25 @@ p {
 .skill-row .ac-chip {
   margin-left: 0;
 }
+.skill-picks {
+  margin: 12px 0 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.skill-picks > legend {
+  padding: 0;
+  margin-bottom: 4px;
+}
+.skill-pick__name {
+  font-weight: 600;
+}
+.skill-pick__about {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
 .skill-sheet {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 240px;
@@ -3465,6 +3484,17 @@ p {
 }
 .catalog-tile[data-soon] .catalog-tile__head,
 .catalog-tile[data-soon] .catalog-tile__desc {
+  opacity: 0.6;
+}
+/* "Em breve" with a lock: a tile that opens nothing, so it doesn't lift or press either. */
+.catalog-tile:disabled {
+  cursor: default;
+  transform: none;
+  box-shadow: var(--e1), var(--top);
+}
+/* In place of the description, so the name keeps the whole row. */
+.catalog-tile__soon {
+  align-self: flex-start;
   opacity: 0.6;
 }
 .catalog-tile--other {
@@ -7926,6 +7956,13 @@ a.machine-row__name:hover {
   }
 }
 
+/* "Aprovar sempre": what it covers, on a line of its own after the approval's buttons. */
+.ap-always {
+  order: 1;
+  flex-basis: 100%;
+  margin: 0;
+}
+
 /* Secrets (ADR 0027): the card's private field and the agent page's list. */
 .secret-card__form {
   display: grid;
@@ -8263,6 +8300,53 @@ a.machine-row__name:hover {
   color: var(--ink2);
 }
 /* "Quem pensa": the opened brain's settings full width, a small label above each. */
+/* The brain's card: model, account and "Configuração avançada", one stack of pickers. */
+.agp-brainpicks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.agp-advrow .ac-select__trigger {
+  cursor: pointer;
+}
+.agp-advrow__chev {
+  margin-left: auto;
+  flex: none;
+  color: var(--faint);
+}
+/* "Configuração avançada": its groups (how it thinks, who it answers) under a hairline each. */
+.agp-advgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.agp-advgroup + .agp-advgroup {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.agp-advgroup__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--ink);
+}
+/* In the dialog "Atende outras pessoas" lines up like the switch under it: its line beside the switch, centered. */
+.agp-advgroup .plan-replies__terms {
+  grid-column: 1;
+}
+.agp-advgroup .plan-replies > .ac-switch {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  translate: none;
+}
+.agp-advswitch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
 .agp-brainfield {
   display: flex;
   flex-direction: column;

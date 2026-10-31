@@ -1,6 +1,6 @@
 import { ACCOUNT_KINDS, BRAIN_EFFORTS } from "@agenteschat/adapters";
 import { ONBOARDING_STEPS, STANDING_STATES } from "@agenteschat/engine";
-import { PROVIDER_IDS } from "@agenteschat/providers";
+import { CONTEXT_LIMITS, MODEL_TIERS, PROVIDER_IDS } from "@agenteschat/providers";
 import { z } from "@hono/zod-openapi";
 
 /** A last-message preview's `meta`: what the app needs to show a server-written body in the reader's language. */
@@ -25,6 +25,8 @@ const Rank = z.number().int().nullable().openapi({
 const RoleIds = z.array(z.string()).openapi({ description: "Their roles (`org_roles` ids), not `everyone`." });
 
 export const ProviderId = z.enum(PROVIDER_IDS).openapi("ProviderId");
+
+export const ModelTier = z.enum(MODEL_TIERS as ["small", "medium", "large"]);
 
 export const Organization = z
   .object({
@@ -480,8 +482,15 @@ export const Model = z
     id: z.string(),
     label: z.string(),
     provider: z.string(),
+    contextWindow: z.number().int().openapi({ description: "Its context window in tokens." }),
     inputUsdPerMTok: z.number(),
     outputUsdPerMTok: z.number(),
+    pick: z.boolean().optional().openapi({
+      description: "In OpenRouter's long list (ADR 0087): a good pick, shown first. Absent: a catalog model.",
+    }),
+    tier: ModelTier.optional().openapi({
+      description: "The size Automático uses it for on its provider's key, by default.",
+    }),
   })
   .openapi("Model");
 
@@ -503,6 +512,11 @@ export const BrainOption = z
         label: z.string(),
         modelId: z.string().optional().openapi({ description: "The model id behind an alias." }),
         recommended: z.boolean().optional(),
+        contextWindow: z
+          .number()
+          .int()
+          .optional()
+          .openapi({ description: "Its context window in tokens: the context limits worth offering with it." }),
       }),
     ),
     defaultModel: z.string().nullable(),
@@ -518,6 +532,11 @@ export const BrainEffortSetting = z.enum([...BRAIN_EFFORTS, "auto"]).openapi("Br
   description: "A `BrainEffort`, or `auto`: the judge picks low, medium or high for each run.",
 });
 
+/** The context limits an agent may choose (`CONTEXT_LIMITS`), in tokens. */
+export const ContextLimit = z
+  .literal(CONTEXT_LIMITS)
+  .openapi("ContextLimit", { description: "The most context an agent reads, in tokens: 200000, 400000 or 1000000." });
+
 export const AccountKind = z.enum(ACCOUNT_KINDS).openapi("AccountKind");
 
 export const MachineAccount = z
@@ -526,17 +545,27 @@ export const MachineAccount = z
     kind: AccountKind,
     label: z.string(),
     email: z.string().nullable().openapi({ description: "Only for its owner." }),
-    plan: z.string().nullable().openapi({ description: "`pro`, `max`, `team`, `plus`… as the CLI says." }),
+    plan: z
+      .string()
+      .nullable()
+      .openapi({ description: "`pro`, `max`, `ultra`, `team`, `enterprise`… from what the CLI says." }),
     status: z.enum(["active", "signed_out"]),
     ownerId: z.string().nullable().openapi({ description: "Whose account it is; null: nobody's." }),
     ownerName: z.string().nullable(),
     mine: z.boolean().openapi({ description: "The caller owns it: only they rename it or choose it for an agent." }),
-    usedBy: z.array(z.string()).openapi({ description: "Names of the agents that think with it (one at most)." }),
+    usedBy: z.array(z.string()).openapi({
+      description: "Names of the agents that think with it (one at most, unless `shared`).",
+    }),
+    usedByIds: z.array(z.uuid()).openapi({ description: "Their ids, in the same order." }),
     usage: PlanUsage.nullable().openapi({ description: "Its plan's usage limits; null: not known yet." }),
     provider: z.string().nullable().openapi({
       description: "A key account's coding plan (`zai`, `kimi`, `minimax`, `opencode`); null: the CLI's own sign-in.",
     }),
     keyHint: z.string().nullable().openapi({ description: "The last 4 of a key account's key; only for its owner." }),
+    shared: z.boolean().openapi({
+      description:
+        "It thinks for every agent its owner gives it on that computer, with no new sign-in (runner protocol 29); else for one.",
+    }),
   })
   .openapi("MachineAccount", {
     description:
@@ -569,6 +598,9 @@ export const AgentBrain = z
       .nullable()
       .openapi({ description: "The account its computer brain runs with (ADR 0041); null = the computer's own." }),
     effort: BrainEffortSetting.nullable().openapi({ description: "`auto` = per run; null = the CLI's default." }),
+    contextTokens: ContextLimit.nullable().openapi({
+      description: "The most context it reads, any brain; null = its model's window (the smaller one wins).",
+    }),
     accounts: z.array(MachineAccount).openapi({
       description: "The agent's owner's accounts on its computer, both kinds, and the one it thinks with (ADR 0059).",
     }),

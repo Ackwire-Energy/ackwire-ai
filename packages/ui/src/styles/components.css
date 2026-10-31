@@ -5574,6 +5574,10 @@ button.ac-tools__row {
 button.ac-tools__row:hover {
   background: var(--plate-soft);
 }
+/* A line that opens beside the chat (another agent's conversation) while it shows there: like a thread's line. */
+button.ac-tools__row[aria-pressed="true"] {
+  background: var(--plate);
+}
 button.ac-tools__row:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
@@ -5923,6 +5927,14 @@ button.ac-tools__row:focus-visible {
   margin: 10px 12px;
   font-size: 13px;
   color: var(--muted);
+}
+.ac-tz__option[aria-disabled="true"] {
+  color: var(--ink-muted);
+  cursor: not-allowed;
+}
+/* SearchSelect's own rows: a mark, then the name over its description, as a menu draws them. */
+.ac-search__option {
+  align-items: center;
 }
 .ac-recur__period {
   display: grid;
@@ -7461,6 +7473,10 @@ label.ac-setrow__title {
   .ac-consult__body {
     padding-left: 12px;
   }
+}
+/* Inside a tool block's line (the questions a reply asked): the line's own padding holds it */
+.ac-consult__body.ac-consult__body--inline {
+  padding: 0;
 }
 
 /* An agent's reply nobody asked for: a faint word next to the time; a glass tip on hover/focus says why */
