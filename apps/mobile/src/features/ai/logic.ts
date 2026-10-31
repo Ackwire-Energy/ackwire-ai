@@ -7,7 +7,7 @@ import type {
   MachineAccountKind,
   PlanUsage,
 } from "@agenteschat/client";
-import type { NewAgentStart } from "@agenteschat/client/lib/agent-setup";
+import { autonomyWords, type NewAgentStart } from "@agenteschat/client/lib/agent-setup";
 import {
   type AccountChoice,
   accountAbout,
@@ -175,12 +175,13 @@ export function existingRows(
 
 /**
  * "Usar em outros agentes" on the phone (ADR 0089): the agent's saved setup in words, as the web's dialog says it
- * ("Claude Code · Opus · Esforço alto"): its brain, the model it runs and what differs in its advanced settings.
+ * ("Claude Code · Opus · Esforço alto · Autonomia: Não pergunta"): its brain, the model it runs, what differs in its
+ * advanced settings and its Autonomia.
  */
 export function setupWords(
   t: TFunction,
   language: string,
-  view: Pick<AgentBrain, "brain" | "effectiveModel" | "options" | "accounts" | "account">,
+  view: Pick<AgentBrain, "brain" | "effectiveModel" | "options" | "accounts" | "account" | "autonomy">,
   o: { apiKey: boolean; now: Advanced },
 ): string {
   const model = modelRows(t, view, brainPlan(view)).find((r) => r.checked)?.label;
@@ -190,22 +191,25 @@ export function setupWords(
     apiKey: o.apiKey,
     now: o.now,
   });
-  return [t(`brain.card.${view.brain}`), model, ...parts].filter(Boolean).join(" · ");
+  const autonomy = view.autonomy ? autonomyWords(t, view.autonomy) : null;
+  return [t(`brain.card.${view.brain}`), model, ...parts, autonomy].filter(Boolean).join(" · ");
 }
 
 /**
  * What the phone's Criar agente sends for who thinks (ADR 0089): the last setup's API model and key at creation, and
  * its context window right after; or Automático there and the last setup's plan saved on it right after; with no
- * setup, Automático on the API.
+ * setup, Automático on the API. The setup's Autonomia goes at creation either way.
  */
 export function newAgentAi(thinks: NewAgentStart | null) {
+  const autonomy = thinks?.autonomy;
   if (thinks?.brain === "model") {
-    return { model: thinks.model, credentialId: thinks.key, contextTokens: thinks.contextTokens, plan: null };
+    return { model: thinks.model, credentialId: thinks.key, contextTokens: thinks.contextTokens, plan: null, autonomy };
   }
   return {
     model: AUTO,
     credentialId: null,
     contextTokens: null,
     plan: thinks ? { machineId: thinks.machineId, input: thinks.input } : null,
+    autonomy,
   };
 }

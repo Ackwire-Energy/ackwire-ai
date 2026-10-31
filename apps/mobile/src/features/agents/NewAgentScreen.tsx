@@ -274,6 +274,7 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
         monthlyBudgetUsd: null,
         appearance: look,
         ...(from ? { proposal: from.messageId } : {}),
+        ...(thinks.autonomy ? { autonomy: thinks.autonomy } : {}),
       });
       created.current = true;
       // What the role brings, as the web's last step: its channels, its apps' levels, the default skills.

@@ -604,6 +604,15 @@ describe("the agent's AI", () => {
     expect(setupWords(t, "pt-BR", glm, { apiKey: true, now: { ...now, effort: "medium" } })).toBe(
       "Claude Code · GLM-5.3",
     );
+    // Its Autonomia last, as on the web; one that changes only it can take it, and the toast says so.
+    expect(setupWords(t, "pt-BR", { ...view, autonomy: "never" }, { apiKey: true, now })).toBe(
+      "Claude Code · Opus · Esforço alto · Autonomia: Não pergunta",
+    );
+    const setup = await Bun.file(
+      new URL("../../src/features/ai/AgentSetupScreen.tsx", import.meta.url).pathname,
+    ).text();
+    expect(setup).toContain("disabled={busy || !changes(r)}");
+    expect(setup).toContain('t("agentPage.work.brain.copy.autonomyOnly", { count: autonomyOnly })');
     const screen = await Bun.file(new URL("../../src/features/ai/AgentAiScreen.tsx", import.meta.url).pathname).text();
     expect(screen).toContain("onPress={() => openAgentSetup(agentId)}");
     const route = await Bun.file(new URL("../../app/(app)/agent-setup/[id].tsx", import.meta.url).pathname).text();
@@ -640,5 +649,11 @@ describe("the agent's AI", () => {
         input,
       }),
     ).toEqual({ model: "auto", credentialId: null, contextTokens: null, plan: { machineId: "m1", input } });
+    // The setup's Autonomia goes at creation, with the API's model or a plan.
+    expect(newAgentAi({ ...api, autonomy: "never" })).toMatchObject({ model: "claude-opus-5-5", autonomy: "never" });
+    const plan = { brain: "claude_code" as const, machineId: "m1", computer: "MacBook", account: null, input };
+    expect(newAgentAi({ ...plan, autonomy: "always" })).toMatchObject({ model: "auto", autonomy: "always" });
+    expect(newAgentAi(null).autonomy).toBeUndefined();
+    expect(screen).toContain("...(thinks.autonomy ? { autonomy: thinks.autonomy } : {})");
   });
 });

@@ -1,5 +1,12 @@
 import { keys, useAgentBrain, useAiStatus, useApi, useModels, useSetupPreview } from "@agenteschat/client";
-import { setupOfBrain, setupResultLine, sortedResults, takers } from "@agenteschat/client/lib/agent-setup";
+import {
+  changes,
+  setupOfBrain,
+  setupOutcome,
+  setupResultLine,
+  sortedResults,
+  takers,
+} from "@agenteschat/client/lib/agent-setup";
 import { brainLine } from "@agenteschat/client/lib/brain";
 import { firstName } from "@agenteschat/client/lib/format";
 import { isAuto } from "@agenteschat/client/lib/providers";
@@ -64,14 +71,13 @@ export function AgentSetupScreen({ agentId }: { agentId: string }) {
     if (!setup || chosen.length === 0) return;
     setBusy(true);
     try {
-      const done = (await api.agents.applySetup(orgId, { setup, agentIds: chosen })).filter(
-        (r) => r.status === "applied",
-      ).length;
+      const results = await api.agents.applySetup(orgId, { setup, agentIds: chosen });
+      const { done, autonomyOnly, missed } = setupOutcome(results, chosen.length);
       if (done > 0)
         toast({ title: t("agentPage.work.brain.copy.done", { count: done, setup: setupText }), icon: "check" });
-      if (done < chosen.length) {
-        toast({ title: t("agentPage.work.brain.copy.missed", { count: chosen.length - done }), icon: "x" });
-      }
+      if (autonomyOnly > 0)
+        toast({ title: t("agentPage.work.brain.copy.autonomyOnly", { count: autonomyOnly }), icon: "check" });
+      if (missed > 0) toast({ title: t("agentPage.work.brain.copy.missed", { count: missed }), icon: "x" });
       router.back();
     } catch {
       toast({ title: t("agentPage.work.failed"), icon: "x" });
@@ -81,6 +87,8 @@ export function AgentSetupScreen({ agentId }: { agentId: string }) {
         keys.agents(orgId),
         keys.aiStatus(orgId),
         keys.newAgentSetup(orgId),
+        // Nova missão starts from each agent's Autonomia.
+        [...keys.missions(orgId), "eligible"],
       ])
         void qc.invalidateQueries({ queryKey: key });
       setBusy(false);
@@ -131,8 +139,8 @@ export function AgentSetupScreen({ agentId }: { agentId: string }) {
                       leading={<AgentAvatar agent={{ ...agentLook(a), id: a.id }} size={32} live={false} />}
                       label={a.name}
                       sub={setupResultLine(t, r, { now, owner })}
-                      checked={r.status === "applied" && picked.has(a.id)}
-                      disabled={busy || r.status !== "applied"}
+                      checked={changes(r) && picked.has(a.id)}
+                      disabled={busy || !changes(r)}
                       onPress={() => toggle(a.id)}
                     />
                   );
