@@ -1,18 +1,18 @@
-import type { AgentBrainInput, BrainEffortSetting, MachineAccount } from "@agenteschat/client";
+import type { AgentBrainInput, MachineAccount } from "@agenteschat/client";
 import { keys, useAgentBrain, useAiAccounts, useAiStatus, useApi, useMachines } from "@agenteschat/client";
 import { accountChoices, ownSignInListed, ownSignInName } from "@agenteschat/client/lib/ai-accounts";
 import { brainLine } from "@agenteschat/client/lib/brain";
-import { advancedSummary, effortLevel, isClaudeAlias } from "@agenteschat/client/lib/brain-advanced";
+import { advancedSummary } from "@agenteschat/client/lib/brain-advanced";
 import { lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import { planAliases, planModelOptions, planOf } from "@agenteschat/client/lib/plans";
-import { AUTO, isAuto } from "@agenteschat/client/lib/providers";
+import { brainPlan, planOf } from "@agenteschat/client/lib/plans";
+import { isAuto, providerLabel } from "@agenteschat/client/lib/providers";
 import { limitOffers, planState } from "@agenteschat/ui/plan-state";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -22,7 +22,16 @@ import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { PushedHeader } from "../shared/parts";
 import { PlanMeter } from "../usage/parts";
 import { advancedOf, openAgentAdvanced } from "./AgentAdvancedScreen";
-import { accountKindOf, accountRow, agentAccounts, takenFrom, thinkingUsage } from "./logic";
+import {
+  accountKindOf,
+  accountRow,
+  agentAccounts,
+  modelInput,
+  modelRows,
+  modelSections,
+  takenFrom,
+  thinkingUsage,
+} from "./logic";
 import { openConnectAi } from "./NoAiCard";
 import { AiRow, Note } from "./parts";
 
@@ -39,12 +48,42 @@ import { AiRow, Note } from "./parts";
 /** Opens an agent's AI. */
 export const openAgentAi = (agentId: string) => router.push(`/agent-ai/${agentId}` as never);
 
+/** Opens an agent's model, from its AI. */
+const openAgentModel = (agentId: string) => router.push(`/agent-model/${agentId}` as never);
+
+/** Saves a change to the agent's AI at once and says so (or that it failed). */
+function useSaveBrain(agentId: string) {
+  const { t } = useTranslation();
+  const { orgId } = useOrg();
+  const api = useApi();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const save = async (input: AgentBrainInput, done: string) => {
+    setBusy(true);
+    try {
+      qc.setQueryData(keys.agentBrain(orgId, agentId), await api.agents.setBrain(orgId, agentId, input));
+      toast({ title: done, icon: "check" });
+    } catch {
+      toast({ title: t("agentPage.work.failed"), icon: "x" });
+    } finally {
+      for (const key of [
+        keys.agentBrain(orgId, agentId),
+        keys.agents(orgId),
+        keys.aiAccounts(orgId),
+        keys.aiStatus(orgId),
+      ])
+        void qc.invalidateQueries({ queryKey: key });
+      setBusy(false);
+    }
+  };
+  return { busy, save };
+}
+
 export function AgentAiScreen({ agentId }: { agentId: string }) {
   const { t, i18n } = useTranslation();
   const { orgId, org } = useOrg();
   const api = useApi();
-  const qc = useQueryClient();
-  const toast = useToast();
   const c = useColors();
   const insets = useSafeAreaInsets();
   const dir = useDirectory();
@@ -56,7 +95,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
   // As on the web: its owner and admins load it, members don't.
   const allowed = (meId !== null && agent?.ownerUserId === meId) || can(org, "manage_agents");
   const brain = useAgentBrain(orgId, agentId, allowed);
-  const [busy, setBusy] = useState(false);
+  const { busy, save } = useSaveBrain(agentId);
   // Looking at the plan: its usage is looked up again (it comes back as `machine.updated`).
   useEffect(() => {
     void api.machines.refreshAccountUsage(orgId).catch(() => undefined);
@@ -69,27 +108,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
     (c) => c.machineId === view?.computer?.machineId,
   );
   const thinks = brainLine(t, agent?.brain, t("brain.model"));
-  const refresh = () => {
-    for (const key of [
-      keys.agentBrain(orgId, agentId),
-      keys.agents(orgId),
-      keys.aiAccounts(orgId),
-      keys.aiStatus(orgId),
-    ])
-      void qc.invalidateQueries({ queryKey: key });
-  };
-  const save = async (input: AgentBrainInput, done: string) => {
-    setBusy(true);
-    try {
-      qc.setQueryData(keys.agentBrain(orgId, agentId), await api.agents.setBrain(orgId, agentId, input));
-      toast({ title: done, icon: "check" });
-    } catch {
-      toast({ title: t("agentPage.work.failed"), icon: "x" });
-    } finally {
-      refresh();
-      setBusy(false);
-    }
-  };
+  const model = view && kind ? modelRows(t, view, brainPlan(view)).find((r) => r.checked) : undefined;
   const accounts = view && kind ? agentAccounts(view, kind) : [];
   const current = view ? accounts.find((a) => a.id === view.account) : undefined;
   // Another account, or one more login of `a` other agents use (`also`, its email Claude's hint): Connect an AI on that
@@ -117,39 +136,6 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
     ]);
   };
 
-  // The model, as on the web's "Quem pensa": Automático first, Claude's own models with what each is for; on a
-  // coding plan, Claude Code's aliases named after the plan's models (an alias it leaves out runs its main one).
-  const plan = kind === "claude_code" ? planOf(current?.provider) : undefined;
-  const option = view?.options.find((o) => o.kind === view.brain);
-  const modelOptions =
-    !view || !kind
-      ? []
-      : [
-          { value: AUTO, label: t("brain.auto.label"), sub: t("brain.auto.hint") },
-          ...(plan ? planModelOptions(plan) : (option?.models ?? [])).map((m) => ({
-            value: m.value,
-            label: m.label,
-            sub:
-              !plan && kind === "claude_code" && isClaudeAlias(m.value)
-                ? t(`agentPage.work.brain.modelLine.${m.value}`)
-                : undefined,
-          })),
-        ];
-  const shownModel = view?.effectiveModel ?? option?.defaultModel ?? "";
-  const modelValue =
-    plan && !isAuto(shownModel) && !planAliases(plan).some((a) => a === shownModel) ? "sonnet" : shownModel;
-  const chooseModel = (value: string, label: string) => {
-    if (!view || !kind || busy || value === modelValue) return;
-    // An automatic model picks the effort too; back on a fixed one, the effort is the level it had.
-    const effort: { effort?: BrainEffortSetting } =
-      isAuto(value) !== isAuto(view.effectiveModel)
-        ? { effort: isAuto(value) ? "auto" : effortLevel(view.effort) }
-        : {};
-    void save(
-      { model: value === option?.defaultModel ? null : value, ...effort },
-      t("agentPage.work.saved.brain", { ...g, brain: `${t(`brain.card.${kind}`)} · ${label}` }),
-    );
-  };
   const apiKey = useAiStatus(orgId).data?.apiKey !== false;
   const usage = view && kind ? thinkingUsage(view, kind) : undefined;
   const limited = usage ? planState(usage).state === "limited" : false;
@@ -189,26 +175,17 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
           <Note icon="x">{t("common.loadFailed")}</Note>
         ) : (
           <>
-            {kind && modelOptions.length > 0 ? (
+            {kind ? (
               <>
                 <GroupedHeader>{t("agentPage.work.brain.planModel")}</GroupedHeader>
                 <GroupedList>
-                  {modelOptions.map((m) => (
-                    <GroupedRow
-                      key={m.value}
-                      leading={
-                        isAuto(m.value) ? undefined : (
-                          <ProviderLogo id={plan ? (current?.provider ?? kind) : kind} size="sm" />
-                        )
-                      }
-                      {...(isAuto(m.value) ? { icon: "sparkle" as const } : {})}
-                      label={m.label}
-                      {...(m.sub ? { sub: m.sub } : {})}
-                      checked={m.value === modelValue}
-                      disabled={busy || !view.canEdit}
-                      onPress={() => chooseModel(m.value, m.label)}
-                    />
-                  ))}
+                  <GroupedRow
+                    label={model?.label ?? view.effectiveModel ?? ""}
+                    {...(model?.sub ? { sub: model.sub } : {})}
+                    {...(model?.note ? { belowText: model.note } : {})}
+                    chevron
+                    onPress={() => openAgentModel(agentId)}
+                  />
                 </GroupedList>
               </>
             ) : null}
@@ -309,6 +286,70 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
               </>
             ) : null}
           </>
+        )}
+      </ScrollView>
+    </View>
+  );
+}
+
+/**
+ * The agent's model, pushed from its AI ("Modelo"): Automático, or one of its brain's models (every model of its
+ * coding plan, with what each is sold as). A tap saves at once.
+ */
+export function AgentModelScreen({ agentId }: { agentId: string }) {
+  const { t } = useTranslation();
+  const { orgId } = useOrg();
+  const c = useColors();
+  const insets = useSafeAreaInsets();
+  const dir = useDirectory();
+  const g = agentGrammar(t, dir.agentById.get(agentId)?.name ?? "");
+  const brain = useAgentBrain(orgId, agentId);
+  const { busy, save } = useSaveBrain(agentId);
+  const view = brain.data;
+  const plan = view ? brainPlan(view) : undefined;
+  const rows = view ? modelRows(t, view, plan) : [];
+  // A model without a maker of its own wears its plan's mark, else its brain's.
+  const mark = (plan && view?.accounts.find((a) => a.id === view.account)?.provider) || (view?.brain ?? "");
+  return (
+    <View style={[styles.screen, { backgroundColor: c.grouped }]}>
+      <PushedHeader title={t("agentPage.work.brain.planModel")} solid={false} grouped />
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 24 }]}
+      >
+        {brain.isPending ? (
+          <ActivityIndicator color={c.muted} style={styles.loading} />
+        ) : !view || view.brain === "model" ? (
+          <Note icon="x">{t("common.loadFailed")}</Note>
+        ) : (
+          modelSections(rows).map((s) => (
+            <Fragment key={s.maker ?? ""}>
+              {s.maker ? <GroupedHeader>{providerLabel(s.maker)}</GroupedHeader> : null}
+              <GroupedList>
+                {s.rows.map((r) => (
+                  <GroupedRow
+                    key={r.value}
+                    label={r.label}
+                    {...(r.sub ? { sub: r.sub } : {})}
+                    {...(r.note ? { belowText: r.note } : {})}
+                    {...(isAuto(r.value)
+                      ? { icon: "sparkle" as const }
+                      : { leading: <ProviderLogo id={r.maker ?? mark} size="sm" /> })}
+                    checked={r.checked}
+                    disabled={busy || !view.canEdit}
+                    onPress={() => {
+                      if (r.checked) return;
+                      const done = t("agentPage.work.saved.brain", {
+                        ...g,
+                        brain: `${t(`brain.card.${view.brain}`)} · ${r.label}`,
+                      });
+                      void save(modelInput(r.value, view), done);
+                    }}
+                  />
+                ))}
+              </GroupedList>
+            </Fragment>
+          ))
         )}
       </ScrollView>
     </View>

@@ -18,7 +18,7 @@ import {
   isContextLimit,
   MODEL_CATALOG,
 } from "@agenteschat/providers";
-import { planAliases, planModel, planOf } from "@agenteschat/providers/plans";
+import { claudeCodeModel, isPlanModelId, planModel, planOf } from "@agenteschat/providers/plans";
 import { type Agent, getAgent } from "./agents";
 import { type AgentAudience, answersOthers, audienceOf, OWNER_ONLY, planSharing } from "./audience";
 import { recordAudit } from "./audit";
@@ -92,23 +92,16 @@ export const codexModels = (): BrainModelOption[] =>
     .map(([id, m]) => ({ value: id, label: m.label, modelId: id, ...(m.recommended ? { recommended: true } : {}) }));
 
 /**
- * The model choices of a brain (none for the model brain: it uses the agent's model). Claude Code on a
- * coding plan keeps its aliases, named after what the plan runs for each.
+ * The model choices of a brain (none for the model brain: it uses the agent's model). A coding plan's are in its
+ * catalog (`@agenteschat/providers/plans`), which the apps read.
  */
-export function brainModelOptions(kind: BrainKind, provider?: string | null): BrainModelOption[] {
-  return modelChoices(kind, provider).map((o) =>
+export function brainModelOptions(kind: BrainKind): BrainModelOption[] {
+  return modelChoices(kind).map((o) =>
     o.modelId ? { ...o, contextWindow: contextWindowOf(catalogModelOf(o.modelId) ?? o.modelId) } : o,
   );
 }
 
-function modelChoices(kind: BrainKind, provider?: string | null): BrainModelOption[] {
-  const plan = kind === "claude_code" ? planOf(provider) : undefined;
-  if (plan) {
-    return planAliases(plan).map((value) => {
-      const m = planModel(plan, value);
-      return { value, label: m.label, modelId: m.id, ...(value === "sonnet" ? { recommended: true } : {}) };
-    });
-  }
+function modelChoices(kind: BrainKind): BrainModelOption[] {
   if (kind === "claude_code") return [...CLAUDE_CODE_MODELS];
   if (kind === "codex") return codexModels();
   return [];
@@ -132,8 +125,9 @@ const FREE_MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,79}$/;
 
 /**
  * A model for a brain, as stored: null = the brain's default. Claude Code
- * takes its aliases or a full Claude id; Codex any model name (a new one
- * may come out before our catalog knows it); the model brain none.
+ * takes its aliases, a full Claude id or a coding plan's model; Codex any
+ * model name (a new one may come out before our catalog knows it); the model
+ * brain none.
  */
 export function normalizeBrainModel(kind: BrainKind, value: unknown): string | null {
   if (value === null || value === undefined || value === "") return null;
@@ -147,8 +141,10 @@ export function normalizeBrainModel(kind: BrainKind, value: unknown): string | n
   if (kind === "claude_code") {
     const alias = CLAUDE_CODE_MODELS.find((o) => o.value === v.toLowerCase() || o.modelId === v);
     if (alias) return alias.value;
-    if (/^claude-[a-z0-9.-]{1,60}$/.test(v)) return v;
-    throw new ValidationError("Choose Opus, Sonnet or Haiku", "brain.invalid_model", { brain: kind });
+    if (/^claude-[a-z0-9.-]{1,60}$/.test(v) || isPlanModelId(v)) return v;
+    throw new ValidationError("Choose Opus, Sonnet, Haiku or one of the plan's models", "brain.invalid_model", {
+      brain: kind,
+    });
   }
   if (!FREE_MODEL.test(v)) throw new ValidationError("That isn't a model name", "brain.invalid_model", { brain: kind });
   return v;
@@ -813,7 +809,10 @@ export interface AgentBrainSummary {
   usage?: PlanUsage;
 }
 
-/** The label of a computer brain's model ("opus" → "Opus", "GLM-5.3" on a plan; a typed Codex model as is). */
+/**
+ * The label of a computer brain's model ("opus" → "Opus", "GLM-5.3" on a plan; a typed Codex model as is): what it
+ * runs, so a plan's model kept while Claude thinks reads as Sonnet.
+ */
 export function brainModelLabel(
   kind: BrainKind,
   model: string | null | undefined,
@@ -822,8 +821,9 @@ export function brainModelLabel(
   if (kind === "model") return null;
   const plan = kind === "claude_code" ? planOf(provider) : undefined;
   if (plan) return planModel(plan, isAutoModel(model) ? null : model).label;
-  const value = model ?? defaultBrainModel(kind);
-  if (!value) return null;
+  const stored = model ?? defaultBrainModel(kind);
+  if (!stored) return null;
+  const value = kind === "claude_code" && !isAutoModel(stored) ? claudeCodeModel(undefined, stored) : stored;
   return brainModelOptions(kind).find((o) => o.value === value)?.label ?? value;
 }
 

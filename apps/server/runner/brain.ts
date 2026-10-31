@@ -25,8 +25,8 @@ import {
 import { redactSecrets } from "@agenteschat/adapters/secret-box";
 import {
   type CodingPlan,
+  claudeCodeModel,
   PLAN_ALIASES,
-  type PlanAlias,
   type PlanId,
   planModel,
   planOf,
@@ -74,7 +74,8 @@ import { claudeSessionExists, claudeSessionFile, type TaskSecrets, WRONG_SESSION
  *   the project's settings the agent can write. A key account (protocol 20)
  *   thinks through its plan's endpoint: its key in the process env (never in
  *   a file the CLI reads, and redacted from everything sent), its model
- *   aliases mapped to the plan's models, no fallback model.
+ *   aliases mapped to the plan's models, no fallback model. `--model` is the
+ *   agent's alias, or one of the plan's models by id (`claudeCodeModel`).
  * - Protocol 15 (live steering): `steer` writes messages into the turn in
  *   progress as stream-json user lines (each with its `uuid`); Claude Code
  *   reads them at its next tool boundary (`priority: "next"`; "now" for an
@@ -568,13 +569,12 @@ export function accountSettingsEnv(
   for (const k of NETWORK_ENV) env[k] = runner[k] ?? "";
   if (!plan) return env;
   for (const alias of PLAN_ALIASES) env[`ANTHROPIC_DEFAULT_${alias.toUpperCase()}_MODEL`] = planModel(plan, alias).id;
+  // A subagent called with Claude Code's `fable` alias would otherwise ask the plan for a Claude model it doesn't serve.
+  env.ANTHROPIC_DEFAULT_FABLE_MODEL = planModel(plan, "opus").id;
   env.CLAUDE_CODE_SUBAGENT_MODEL = planModel(plan, model).id;
   env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1";
   return { ...env, ...plan.claudeCode.env };
 }
-
-/** A plan turn's `--model`: its alias (the plan names the model), `sonnet` for anything else. */
-export const planAlias = (model: unknown): PlanAlias => PLAN_ALIASES.find((a) => a === model) ?? "sonnet";
 
 /** The argv of a brain turn's Claude Code (spawned without a shell: nothing needs quoting). */
 export function claudeBrainArgs(l: ClaudeLaunch): string[] {
@@ -1512,7 +1512,7 @@ export class BrainManager {
     if (plan && ctx.planKey) env[plan.claudeCode.tokenEnv] = ctx.planKey.key;
     // Protocol 28: the agent's context limit; Claude Code compacts the conversation there instead of at its window.
     if (isContextTokens(req.contextTokens)) env.CLAUDE_CODE_AUTO_COMPACT_WINDOW = String(req.contextTokens);
-    const model = plan ? planAlias(req.model) : typeof req.model === "string" ? req.model : undefined;
+    const model = plan ? claudeCodeModel(plan, req.model) : typeof req.model === "string" ? req.model : undefined;
     if (this.opts.mcp) {
       const token = newMcpToken();
       mcpConfigFile = path.join(dir, "mcp.json");

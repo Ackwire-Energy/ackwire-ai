@@ -6255,6 +6255,10 @@ export const ptBR = {
     notAvailableNow: "Escolhido, mas indisponível agora.",
     offline: "O {{computer}} está offline agora.",
     modelLabel: "Modelo",
+    /** What a coding plan's model is sold as, beside its name. */
+    modelTag: { cheap: "Econômico", fast: "Rápido", smart: "Topo de linha" },
+    /** What a coding plan's model needs from its account before it answers. */
+    modelNeeds: { globalRegion: "Precisa da região Global no OpenCode" },
     recommended: "Recomendado",
     modelHelp: "Os modelos maiores pensam mais e gastam o plano mais rápido.",
     hidden: "{{owner}} ou um admin escolhe quem pensa.",

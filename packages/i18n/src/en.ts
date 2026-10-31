@@ -6219,6 +6219,10 @@ export const en: Translations = {
     notAvailableNow: "Chosen, but unavailable right now.",
     offline: "{{computer}} is offline right now.",
     modelLabel: "Model",
+    /** What a coding plan's model is sold as, beside its name. */
+    modelTag: { cheap: "Cheap", fast: "Fast", smart: "Flagship" },
+    /** What a coding plan's model needs from its account before it answers. */
+    modelNeeds: { globalRegion: "Needs the Global region in OpenCode" },
     recommended: "Recommended",
     modelHelp: "Bigger models think more and use up the plan faster.",
     hidden: "{{owner}} or an admin chooses who thinks.",

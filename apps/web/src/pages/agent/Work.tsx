@@ -57,10 +57,11 @@ import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can as canDo } from "@agenteschat/client/lib/permissions";
 import {
   accountPlan,
+  brainModelChoice,
+  brainModelChoices,
+  brainPlan,
   isPlanId,
-  planAliases,
   planModel as planModelOf,
-  planModelOptions,
   planOf,
 } from "@agenteschat/client/lib/plans";
 import { AUTO, isAuto, modelChoices, providerLabel } from "@agenteschat/client/lib/providers";
@@ -215,17 +216,16 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
     ? t("brain.auto.label")
     : (models.data?.models.find((m) => m.id === saved.model)?.label ?? saved.model);
   const shownPlanModel = view ? view.effectiveModel : (agent.brain?.model ?? null);
-  // A coding plan's account: its maker's model thinks (under Claude Code's alias).
+  // A coding plan's account: its maker's model thinks.
   const thinkingAccount = view?.account ? view.accounts.find((a) => a.id === view.account) : undefined;
-  const plan =
-    kind === "claude_code" ? (view ? accountPlan(thinkingAccount) : planOf(agent.brain?.provider)) : undefined;
+  const plan = kind === "claude_code" ? (view ? brainPlan(view) : planOf(agent.brain?.provider)) : undefined;
+  const effectiveChoice = view?.effectiveModel ? brainModelChoice(kind, plan, view.effectiveModel) : null;
   const planModel = isAuto(shownPlanModel)
     ? t("brain.auto.label")
     : view
-      ? plan
-        ? planModelOf(plan, view.effectiveModel).label
-        : (view.options.find((o) => o.kind === kind)?.models.find((m) => m.value === view.effectiveModel)?.label ??
-          view.effectiveModel)
+      ? (brainModelChoices(plan, view.options.find((o) => o.kind === kind)?.models ?? []).find(
+          (c) => c.value === effectiveChoice,
+        )?.label ?? view.effectiveModel)
       : shownPlanModel;
   // The account only when the computer has more than one of that kind.
   const kindAccounts = view?.accountsSupported ? view.accounts.filter((a) => a.kind === kind) : [];
@@ -719,8 +719,14 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     // An agent on "Automático" (new agents start there) stays automatic on another brain.
     setPlanModel(k === view.brain ? view.effectiveModel : isAuto(view.effort) ? AUTO : (opt?.defaultModel ?? null));
   };
-  // On a coding plan Claude Code keeps its aliases, each running the plan's model.
+  // On a coding plan Claude Code runs the plan's models: any of them, or the ones its aliases name.
   const plan = accountKind === "claude_code" ? accountPlan(current) : undefined;
+  const modelOptions = brainModelChoices(plan, option?.models ?? []);
+  const autoMark = (
+    <span className="newag__ib">
+      <Icon name="bulb" size={16} />
+    </span>
+  );
   // The chosen account's plan usage; the computer's own sign-in's only where it can think for this agent.
   const usage = accountKind
     ? account === null
@@ -778,9 +784,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const modelName = (value: string | null) =>
     isAuto(value)
       ? t("brain.auto.label")
-      : plan
-        ? planModelOf(plan, value).label
-        : (option?.models.find((m) => m.value === value)?.label ?? value ?? "");
+      : (modelOptions.find((c) => c.value === brainModelChoice(kind, plan, value ?? ""))?.label ?? value ?? "");
   const brainName = (k: BrainKind) =>
     k === "model"
       ? isAuto(model)
@@ -906,7 +910,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const whereName = home?.name ?? "";
   const keyChoices = keyOptions(t, credentials.data ?? [], settings.data?.defaultCredentialId ?? null);
   const accountIcon = accountKind ? <BrainLogo kind={accountKind} size="sm" /> : null;
-  const shownModel = planModel ?? option?.defaultModel ?? "";
+  const shownModel = brainModelChoice(kind, plan, planModel ?? option?.defaultModel ?? "");
   const accountOptions: SelectOption[] = [
     ...(ownListed
       ? [
@@ -1004,32 +1008,26 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   // A sign-in for one more login of the account picked (`also`), else for this agent's own signed-out one again.
   const again = !also && signedOut ? current : null;
   const signingIn = also ?? again;
-  // The model as a picker like the account's: Automático first, each model with its line ("O mais capaz…"). An alias
-  // the plan leaves out runs its main model: shown as that one.
-  const modelValue =
-    plan && !isAuto(shownModel) && !planAliases(plan).some((a) => a === shownModel) ? "sonnet" : shownModel;
+  // The model as a picker like the account's: Automático first, each model with its line. Claude's own models say what
+  // each is for ("O mais capaz…"), a plan's what it's sold as and what it needs; several makers' models are grouped by
+  // maker, each beside its logo. An alias the plan leaves out runs its main model: shown as that one (`shownModel`).
   const brainLogo = accountKind ? <BrainLogo kind={accountKind} size="sm" /> : null;
   const planModelOptionsShown: SelectOption[] = [
-    {
-      value: AUTO,
-      label: t("brain.auto.label"),
-      description: t("brain.auto.hint"),
-      leading: (
-        <span className="newag__ib">
-          <Icon name="bulb" size={16} />
-        </span>
-      ),
-    },
-    ...(plan ? planModelOptions(plan) : (option?.models ?? []).map((m) => ({ value: m.value, label: m.label }))).map(
-      (m) => ({
-        ...m,
-        // Claude's own models say what each is for; a plan's or Codex's go by their names.
-        ...(!plan && kind === "claude_code" && isClaudeAlias(m.value)
-          ? { description: t(`agentPage.work.brain.modelLine.${m.value}`) }
-          : {}),
-        leading: brainLogo,
-      }),
-    ),
+    { value: AUTO, label: t("brain.auto.label"), description: t("brain.auto.hint"), leading: autoMark },
+    ...modelOptions.map(({ value, label, tag, needs, maker }) => {
+      const line =
+        !plan && kind === "claude_code" && isClaudeAlias(value)
+          ? t(`agentPage.work.brain.modelLine.${value}`)
+          : [tag && t(`brain.modelTag.${tag}`), needs && t(`brain.modelNeeds.${needs}`)].filter(Boolean).join(" · ");
+      return {
+        value,
+        label,
+        ...(line ? { description: line } : {}),
+        ...(maker
+          ? { group: providerLabel(maker), leading: <ProviderLogo id={maker} size="sm" /> }
+          : { leading: brainLogo }),
+      };
+    }),
   ];
   // "Configuração avançada" says only what differs from the defaults (`ADVANCED_DEFAULTS`).
   const advancedNow: Advanced = { effort, contextTokens: shownContext, onlyOwner, fallback };
@@ -1051,7 +1049,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       <Select
         className="agp-brainsel"
         aria-label={t("agentPage.work.brain.planModel")}
-        value={modelValue}
+        value={shownModel}
         onValueChange={setPlanModel}
         renderValue={pickerValue}
         options={planModelOptionsShown}
@@ -1075,11 +1073,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
               value: AUTO,
               label: t("brain.auto.label"),
               description: t("brain.auto.hint"),
-              leading: (
-                <span className="newag__ib">
-                  <Icon name="bulb" size={16} />
-                </span>
-              ),
+              leading: autoMark,
             },
             ...choices.flatMap(([provider, list]) =>
               list.map(({ model: m, available }) => ({

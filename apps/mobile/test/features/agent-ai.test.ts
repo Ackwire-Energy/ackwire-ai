@@ -7,6 +7,9 @@ import {
   accountRow,
   agentAccounts,
   existingRows,
+  modelInput,
+  modelRows,
+  modelSections,
   takenFrom,
   thinkingUsage,
 } from "../../src/features/ai/logic";
@@ -420,6 +423,98 @@ describe("the agent's AI", () => {
         ["send", "starting", "sent", "startFailed"].map((k) => t(`agentPage.work.brain.add.${k}`, { computer })),
       ).toEqual(said[lang]);
     }
+  });
+
+  test("its model: Automático, then every model of its plan with what it's sold as, the one it runs checked", async () => {
+    const t = await translator("pt-BR");
+    const claude: AgentBrain["options"][number] = {
+      kind: "claude_code",
+      available: true,
+      experimental: false,
+      models: [
+        { value: "opus", label: "Opus" },
+        { value: "sonnet", label: "Sonnet", recommended: true },
+        { value: "haiku", label: "Haiku" },
+      ],
+      defaultModel: "sonnet",
+    };
+    const view = (effectiveModel: string) => ({ brain: "claude_code" as const, effectiveModel, options: [claude] });
+    const go = modelRows(t, view("deepseek-v4.1-flash"), planOf("opencode"));
+    expect(go).toHaveLength(25);
+    expect(go[0]).toEqual({
+      value: "auto",
+      label: "Automático",
+      sub: "Escolhe o modelo e o esforço para cada tarefa",
+      checked: false,
+    });
+    expect(go.slice(1, 4).map((r) => [r.value, r.label, r.maker])).toEqual([
+      ["sonnet", "MiniMax M3", "minimax"],
+      ["minimax-m3.1-flash", "MiniMax M3.1 Flash", "minimax"],
+      ["haiku", "Claude Haiku 5.5", "anthropic"],
+    ]);
+    // What it's sold as, and what the plan's account must allow first (read out with its name).
+    expect(go.filter((r) => r.checked)).toEqual([
+      {
+        value: "deepseek-v4.1-flash",
+        label: "DeepSeek V4.1 Flash",
+        sub: "Econômico",
+        note: "Precisa da região Global no OpenCode",
+        maker: "deepseek",
+        checked: true,
+      },
+    ]);
+    // A list per maker after Automático's, as the web groups them.
+    const sections = modelSections(go);
+    expect(sections.map((s) => s.maker ?? null)).toEqual([
+      null,
+      "minimax",
+      "anthropic",
+      "zai",
+      "moonshot",
+      "Alibaba",
+      "deepseek",
+      "Xiaomi",
+      "openai",
+      "gemini",
+      "xAI",
+      "Meituan",
+      "Tencent",
+      "StepFun",
+    ]);
+    expect(sections[0]?.rows.map((r) => r.label)).toEqual(["Automático"]);
+    expect(sections.flatMap((s) => s.rows)).toEqual(go);
+    expect(modelSections(modelRows(t, view("k3-256k"), planOf("kimi")))).toHaveLength(1);
+    // On Claude's sign-in: its aliases; a plan's model kept from before runs Sonnet there.
+    const own = modelRows(t, view("deepseek-v4.1-flash"), undefined);
+    expect(own.map((r) => r.label)).toEqual(["Automático", "Opus", "Sonnet", "Haiku"]);
+    expect(own.find((r) => r.checked)?.label).toBe("Sonnet");
+    // An alias the plan leaves out runs its main model.
+    expect(modelRows(t, view("opus"), planOf("zai")).find((r) => r.checked)?.label).toBe("GLM-5.3");
+  });
+
+  test("picking a model saves as the web does: Automático picks the effort too, a fixed one after it starts at Médio", () => {
+    const options: AgentBrain["options"] = [
+      { kind: "claude_code", available: true, experimental: false, models: [], defaultModel: "sonnet" },
+    ];
+    const view = (effort: AgentBrain["effort"]) => ({ brain: "claude_code" as const, options, effort });
+    expect(modelInput("auto", view(null))).toEqual({ model: "auto", effort: "auto" });
+    expect(modelInput("k3-256k", view("auto"))).toEqual({ model: "k3-256k", effort: "medium" });
+    expect(modelInput("k3-256k", view("high"))).toEqual({ model: "k3-256k" });
+    // The brain's default is stored as none.
+    expect(modelInput("sonnet", view("low"))).toEqual({ model: null });
+  });
+
+  test("the agent's AI opens its model on a page of its own, pushed over it", async () => {
+    // The screens are components the tests can't render: what they wire in, as text.
+    const screen = await Bun.file(new URL("../../src/features/ai/AgentAiScreen.tsx", import.meta.url).pathname).text();
+    expect(screen).toContain("router.push(`/agent-model/");
+    expect(screen).toContain("onPress={() => openAgentModel(agentId)}");
+    expect(screen).toContain("void save(modelInput(r.value, view), done);");
+    expect(screen).toContain("modelSections(rows).map(");
+    expect(screen).toContain("<GroupedHeader>{providerLabel(s.maker)}</GroupedHeader>");
+    expect(screen).toContain("belowText: r.note");
+    const route = await Bun.file(new URL("../../app/(app)/agent-model/[id].tsx", import.meta.url).pathname).text();
+    expect(route).toContain("<AgentModelScreen agentId={id");
   });
 
   test("a sign-in through a restart or a reconnect: Reconectando while reads fail, the same sign-in kept, then a failure", async () => {

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { ACCOUNTS_PROTOCOL, BRAIN_PROTOCOL, CONTEXT_LIMIT_PROTOCOL, MISSION_PROTOCOL } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
+import { planOf } from "@agenteschat/providers/plans";
 import {
   ConflictError,
   canTalkTo,
@@ -40,20 +41,21 @@ const mac = (patch: Record<string, unknown> = {}) => ({
 });
 
 describe("brain settings", () => {
-  test("a coding plan keeps Claude Code's aliases, named after the plan's models", () => {
-    expect(brainModelOptions("claude_code", "zai")).toEqual([
-      { value: "sonnet", label: "GLM-5.3", modelId: "glm-5.3[1m]", recommended: true, contextWindow: 1_000_000 },
-      { value: "haiku", label: "GLM-5.3 Flash", modelId: "glm-5.3-flash[1m]", contextWindow: 1_000_000 },
-    ]);
-    expect(brainModelOptions("claude_code", "kimi").map((o) => o.value)).toEqual(["opus", "sonnet"]);
-    // Anything else is Claude's own aliases; Codex has no plans.
-    expect(brainModelOptions("claude_code", "nope").map((o) => o.label)).toEqual(["Opus", "Sonnet", "Haiku"]);
-    expect(brainModelOptions("codex", "zai").every((o) => o.modelId?.startsWith("gpt"))).toBe(true);
+  test("a coding plan's models: any of them by id, its aliases named after what they run there", () => {
+    expect(brainModelOptions("claude_code").map((o) => o.label)).toEqual(["Opus", "Sonnet", "Haiku"]);
+    expect(brainModelOptions("codex").every((o) => o.modelId?.startsWith("gpt"))).toBe(true);
     // An alias the plan leaves out, or "Automático", is its main model; the value stays an alias.
     expect(brainModelLabel("claude_code", "opus", "zai")).toBe("GLM-5.3");
     expect(brainModelLabel("claude_code", "auto", "minimax")).toBe("MiniMax M3.1 Flash");
     expect(brainModelLabel("claude_code", "opus")).toBe("Opus");
     expect(normalizeBrainModel("claude_code", "haiku")).toBe("haiku");
+    // One of a plan's other models is stored by its id and named after it there; while Claude thinks it runs Sonnet.
+    expect(normalizeBrainModel("claude_code", "deepseek-v4.1-flash")).toBe("deepseek-v4.1-flash");
+    expect(normalizeBrainModel("claude_code", "k3-256k")).toBe("k3-256k");
+    expect(brainModelLabel("claude_code", "deepseek-v4.1-flash", "opencode")).toBe("DeepSeek V4.1 Flash");
+    expect(brainModelLabel("claude_code", "deepseek-v4.1-flash", "kimi")).toBe("Kimi for Coding");
+    expect(brainModelLabel("claude_code", "deepseek-v4.1-flash")).toBe("Sonnet");
+    expect(brainModelLabel("claude_code", "auto")).toBe("auto");
   });
 
   test("stored values read back; executors map to brains", () => {
@@ -211,7 +213,8 @@ describe("context window (Configuração avançada)", () => {
 
   test("each model choice says its window: which limits are worth offering with it", () => {
     expect(brainModelOptions("claude_code").find((o) => o.value === "opus")?.contextWindow).toBe(1_000_000);
-    expect(brainModelOptions("claude_code", "minimax").every((o) => o.contextWindow === 1_000_000)).toBe(true);
+    // A coding plan's models are listed from its catalog by the apps, which read the window off the id (`[1m]`).
+    expect(planOf("minimax")?.claudeCode.models.every((m) => m.id.endsWith("[1m]"))).toBe(true);
   });
 });
 
