@@ -32,9 +32,10 @@ import {
   type TargetCache,
 } from "../screen";
 import type { JsonSchema } from "../tools/json-schema";
-import { grantedScopeKeys, isAllowed, toolAccess } from "../tools/scopes";
+import { accessWithNeeds, grantedScopeKeys, isAllowed, toolAccess } from "../tools/scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
 import { untrustedBlock } from "../untrusted";
+import { SHARE_HINT, SHARE_INPUT, shareSavedFile } from "../uploads";
 import { agentDesktopUseStatus, desktopUseUnavailableText } from "./status";
 import { BROWSER_HINT, type DesktopLink, desktopSurface, observationOf } from "./surface";
 
@@ -60,6 +61,8 @@ export interface DesktopToolDeps {
   /** Tests: the memory of targets per app (default: one per source, in memory). */
   targets?: TargetCache;
   now?: () => number;
+  /** Our public base URL: a shared screenshot goes to its upload URL there, as `upload_file`'s files do. */
+  publicUrl?: string;
 }
 
 /** Driving a desktop runs commands (a terminal window, "Open Terminal Here"): only for agents that may run code. */
@@ -413,6 +416,7 @@ export function createDesktopToolSource(deps: DesktopToolDeps): ToolSource {
     description,
     inputSchema,
     scope: DESKTOP_SCOPE,
+    needs: RUN_CODE,
     execute: async (input, ctx) =>
       (await waitIfPersonInControl(ctx.db, ctx, deps.pubsub, "desktop")) ?? execute(input, ctx),
   });
@@ -500,7 +504,7 @@ export function createDesktopToolSource(deps: DesktopToolDeps): ToolSource {
     ),
     tool(
       "desktop_screenshot",
-      `${DESKTOP_TOOL_INFO.desktop_screenshot.description} A JPEG of the whole screen, for how something looks or to show it to people; to know what the screen says, desktop_read is faster and exact.`,
+      `${DESKTOP_TOOL_INFO.desktop_screenshot.description} A JPEG of the whole screen, for how something looks or to show it to people; to know what the screen says, desktop_read is faster and exact. When people want to see it (a screenshot here, in the chat), give \`share\`: in the same call it goes to the Drive and shows in this conversation with your reply.`,
       {
         type: "object",
         properties: {
@@ -509,6 +513,7 @@ export function createDesktopToolSource(deps: DesktopToolDeps): ToolSource {
             description: "Where in your folder (a .jpg; default `screenshots/<time>.jpg`).",
             maxLength: 1000,
           },
+          share: SHARE_INPUT,
         },
         additionalProperties: false,
       },
@@ -525,10 +530,12 @@ export function createDesktopToolSource(deps: DesktopToolDeps): ToolSource {
         try {
           const shot = await linked.link.capture();
           await linked.write(path, shot.data);
-          return {
-            content: `Saved ${path} in your folder: the whole screen as a JPEG (${shot.width}×${shot.height}). Open it with your own Read tool to look at it, or put it in the Drive with upload_file to show people.`,
+          const saved = {
+            content: `Saved ${path} in your folder: the whole screen as a JPEG (${shot.width}×${shot.height}). Open it with your own Read tool to look at it.`,
             data: { path },
           };
+          if (input.share !== true) return { ...saved, content: `${saved.content} ${SHARE_HINT}` };
+          return shareSavedFile(deps, ctx, linked.machineId, path, saved);
         } catch (error) {
           return { content: error instanceof Error ? error.message : String(error), isError: true };
         }
@@ -540,9 +547,10 @@ export function createDesktopToolSource(deps: DesktopToolDeps): ToolSource {
     name: "desktop",
     async tools(ctx) {
       if (!hub) return [];
-      // Most agents have no desktop: the cached grants decide before any lookup.
+      // Most agents have no desktop: the cached grants decide before any lookup. Without them (its own, or
+      // Run code's) the gateway keeps these from the agent, and `find_tools` names them as not allowed yet.
       const granted = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
-      if (!definitions.some((t) => isAllowed(toolAccess(granted, t)))) return [];
+      if (!definitions.some((t) => isAllowed(accessWithNeeds(granted, t).state))) return definitions;
       const gate = await gateOf(ctx, granted);
       if ("refused" in gate) return [];
       if (!(await agentDesktopUseStatus(ctx.db, hub, ctx.orgId, ctx.agentId)).available) return [];

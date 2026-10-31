@@ -1,4 +1,4 @@
-import { keys } from "@agenteschat/client";
+import { keys, useChannelCategories } from "@agenteschat/client";
 import { waitingComputerByAgent } from "@agenteschat/client/lib/machine-outages";
 import { useQueryClient } from "@tanstack/react-query";
 import { router, useIsFocused } from "expo-router";
@@ -8,6 +8,7 @@ import { AppState, RefreshControl, StyleSheet } from "react-native";
 import { usePush } from "@/providers/push";
 import { LargeTitleScreen, Text } from "@/ui";
 import { workByAgent } from "../agents/logic";
+import { useCategoryMenus } from "../categories/menus";
 import { SetupNotice } from "../computer/SetupWait";
 import { OutageNotices } from "../outages/OutageNotice";
 import { useMachineOutages } from "../outages/queries";
@@ -16,9 +17,9 @@ import { useActiveWork, useConversations, useWorkingNow } from "../shared/querie
 import { useTabHeader } from "../shared/tabHeader";
 import { ConversationRowView } from "./ConversationRowView";
 import { FirstAgentEmpty, Greeting, GreetingSky } from "./Greeting";
-import { CollapsibleSection, SeeAllRow, useCollapsedSections } from "./HomeSection";
+import { CollapsibleSection, SeeAllRow, useHomeCollapsed } from "./HomeSection";
 import { HomeServerError, HomeServerNotice } from "./HomeServerError";
-import { homeSections, type ListKind } from "./logic";
+import { type ConversationRow, categoryListKind, type HomeBlock, homeLayout, type ListKind } from "./logic";
 import { useAgentRowStates, useFinished } from "./useHomeNow";
 import { useWaitingItems, WaitingStrip } from "./WaitingStrip";
 
@@ -29,8 +30,8 @@ const WORKING_POLL_MS = 20_000;
 /** How long Conversas shows, loaded, before our notifications sheet opens over it (past the launch). */
 const PUSH_OFFER_MS = 2500;
 
-/** A section's "Ver todos", pushed. */
-export const openKindList = (kind: ListKind) => router.push(`/conversations/${kind}`);
+/** A section's "Ver todos", pushed: a kind, or one channel category (ADR 0080). */
+export const openKindList = (kind: ListKind | `category-${string}`) => router.push(`/conversations/${kind}`);
 
 /**
  * Conversas, the home: the
@@ -41,7 +42,7 @@ export const openKindList = (kind: ListKind) => router.push(`/conversations/${ki
  * is being prepared, and a notice per computer that went offline with agents waiting for it. An agent's row says it waits on your ok, waits
  * for its computer, or what it is doing. Search and Threads have their own tabs. Empty, it invites the first agent.
  * Our notifications sheet opens over it (never inside a conversation), once it has loaded and once more at the
- * first request to approve, while the phone wasn't asked yet (`lib/push-offer.ts`). When the server doesn't answer
+ * first request to approve, while the phone wasn't asked yet (`@agenteschat/client/lib/push-offer`). When the server doesn't answer
  * it says so (`HomeServerError`), over the kept rows as a card, and tries again on its own.
  */
 export function ChatsScreen() {
@@ -56,7 +57,9 @@ export function ChatsScreen() {
   // A run that stops on your ok hasn't finished: "terminou" is told from all the work, waiting included.
   const active = useActiveWork();
   const waiting = useWaitingItems();
-  const { collapsed, toggle } = useCollapsedSections();
+  const { collapsed, toggle } = useHomeCollapsed();
+  const categories = useChannelCategories(orgId);
+  const menus = useCategoryMenus();
   const [waitOpen, setWaitOpen] = useState(false);
 
   useEffect(() => {
@@ -74,7 +77,10 @@ export function ChatsScreen() {
   const finished = useFinished(active, list.rows);
   const agentStates = useAgentRowStates(list.rows, work, waiting.items, offline);
   const pull = usePullRefresh(() => Promise.allSettled([list.refetch(), waiting.refetch(), outages.refetch()]));
-  const sections = homeSections(list.rows);
+  const sections = homeLayout(list.rows, categories.data ?? []);
+  // A section's title: a fixed one by its key, a category by its name.
+  const sectionTitle = (b: HomeBlock) =>
+    b.name !== undefined ? b.name : t(`mobile.chats.section.${b.key as ListKind}`);
   // A list that failed to load isn't an empty workspace: it says the server didn't answer.
   const failed = list.failed && list.rows.length === 0;
   const empty = !list.loading && !failed && list.rows.length === 0;
@@ -122,25 +128,37 @@ export function ChatsScreen() {
       ) : (
         sections.map((s) => {
           const off = collapsed.includes(s.key);
+          const row = (r: ConversationRow, i: number, shown: boolean) => {
+            const hold = r.kind === "channel" && menus.movable(r.channelId);
+            return (
+              <ConversationRowView
+                key={r.key}
+                row={r}
+                divider={i > 0}
+                live={shown && live++ < LIVE_ROWS}
+                agent={agentStates.get(r.key)}
+                {...(hold ? { onHold: menus.openChannelMenu, holdLabel: t("channelCategories.move") } : {})}
+              />
+            );
+          };
+          const hold = s.categoryId ? menus.categoryMenu(s.categoryId, s.name ?? "") : undefined;
           return (
             <CollapsibleSection
               key={s.key}
-              title={t(`mobile.chats.section.${s.key}`)}
+              title={sectionTitle(s)}
               count={s.total}
               collapsed={off}
               onToggle={() => toggle(s.key)}
+              // A closed category keeps its unread channels in sight, as on the web.
+              {...(s.categoryId && s.unread.length > 0 ? { kept: s.unread.map((r, i) => row(r, i, true)) } : {})}
+              {...(hold ? { onLongPress: hold, holdLabel: t("mobile.categories.title") } : {})}
             >
-              {s.rows.map((r, i) => (
-                <ConversationRowView
-                  key={r.key}
-                  row={r}
-                  divider={i > 0}
-                  live={!off && live++ < LIVE_ROWS}
-                  agent={agentStates.get(r.key)}
-                />
-              ))}
+              {s.rows.map((r, i) => row(r, i, !off))}
               {s.more ? (
-                <SeeAllRow label={t(`mobile.chats.seeAll.${s.key}`)} onPress={() => openKindList(s.key)} />
+                <SeeAllRow
+                  label={s.categoryId ? t("mobile.categories.seeAll") : t(`mobile.chats.seeAll.${s.key}`)}
+                  onPress={() => openKindList(s.categoryId ? categoryListKind(s.categoryId) : (s.key as ListKind))}
+                />
               ) : null}
             </CollapsibleSection>
           );

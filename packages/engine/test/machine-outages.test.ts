@@ -184,6 +184,33 @@ test("outages: the workspace's own computer is marked managed, its system never 
   });
 });
 
+test("outages: a computer just gone isn't one yet (a restart, a blip), unless a run already said it waits", async () => {
+  const s = await scene();
+  const waitCode = async (code: string) => {
+    for (const r of await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.waitingMachineId, s.air))) {
+      const t = r.transcript as unknown as { waitingForBrain: Record<string, unknown> };
+      await f.db
+        .update(schema.agentRuns)
+        .set({ transcript: { ...t, waitingForBrain: { ...t.waitingForBrain, code } } as typeof r.transcript })
+        .where(eq(schema.agentRuns.id, r.id));
+    }
+  };
+  const goneFor = async (ms: number) => {
+    await f.db
+      .update(schema.machines)
+      .set({ lastSeenAt: new Date(Date.now() - ms) })
+      .where(eq(schema.machines.id, s.air));
+    return (await listMachineOutages(s.outageDeps, f.owner.id, f.org.id)).outages.map((o) => o.machineId);
+  };
+  // Its runs' turns were cut and wait quietly for a short while.
+  await waitCode("machine_dropped");
+  expect(await goneFor(20_000)).toEqual([]);
+  expect(await goneFor(3 * 60_000)).toEqual([s.air]);
+  // A run that already told the people it waits: the outage shows at once.
+  await waitCode("machine_offline");
+  expect(await goneFor(20_000)).toEqual([s.air]);
+});
+
 test("outages: a member sees only the agents they own; none when the computer is back", async () => {
   const s = await scene();
   const mine = await listMachineOutages(s.outageDeps, s.bia.id, f.org.id);

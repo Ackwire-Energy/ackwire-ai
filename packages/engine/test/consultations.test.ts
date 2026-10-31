@@ -622,6 +622,36 @@ describe("ask_agent", () => {
     expect(results.some((t) => t.includes("That is you"))).toBe(true);
   });
 
+  test("an agent with no AI connected is refused at once, saying why and who can fix it; with one it is asked", async () => {
+    f = await setup({ askAgent: true, reply: consultReply(() => answer("Staging deploys with deploy.sh")) });
+    const infra = await addInfra();
+    // Its model's provider has no key here: nothing to think with.
+    await f.db
+      .update(schema.agents)
+      .set({ model: "gpt-6-luna", credentialId: null })
+      .where(eq(schema.agents.id, infra.id));
+    await post("@dev how do we deploy to staging?");
+    await drainOutbox(f.db, f.handlers);
+    expect(await consultations()).toHaveLength(0);
+    expect((await runs()).some((r) => r.agentId === infra.id)).toBe(false);
+    const results = f.provider.calls.map((c) => lastText(c.request)).filter((t) => t.includes("tool_result"));
+    expect(
+      results.some((t) =>
+        t.includes("@infra has no AI connected yet, so it can't answer. An owner can connect one on its page."),
+      ),
+    ).toBe(true);
+
+    await f.db
+      .update(schema.agents)
+      .set({ model: "claude-sonnet-5-5", credentialId: f.credential.id })
+      .where(eq(schema.agents.id, infra.id));
+    await post("@dev how do we deploy to staging?");
+    await drainOutbox(f.db, f.handlers);
+    expect(await consultations()).toMatchObject([
+      { targetAgentId: infra.id, status: "answered", answer: "Staging deploys with deploy.sh" },
+    ]);
+  });
+
   test("no answer in time: the asker hears it, as a notice", async () => {
     f = await setup({ askAgent: true, reply: consultReply(() => answer("never sent")) });
     const infra = await addInfra();

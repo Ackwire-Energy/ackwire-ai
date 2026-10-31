@@ -553,14 +553,34 @@
   max-width: min(560px, 100%);
   padding-inline-end: 22px;
 }
+/*
+ * With no bar to set that column (in line, a problem), a line that wraps would start on the box's edge and leave its far
+ * side empty: each line centres under the portrait instead, its icon leading its first words, on their capitals' middle
+ * as the kit's inline marks are.
+ */
+.cmp-prep .setup-wait:not(:has(.ac-steps)) {
+  padding-inline-end: 0;
+  text-align: center;
+}
+.cmp-prep .setup-wait:not(:has(.ac-steps)) > .ac-iconline {
+  display: block;
+}
+.cmp-prep .setup-wait:not(:has(.ac-steps)) > .ac-iconline > :first-child {
+  margin-inline-end: 8px;
+  translate: none;
+  vertical-align: calc(var(--cap-top) - var(--cap-mid) - 7px);
+}
+.cmp-prep .setup-wait:not(:has(.ac-steps)) > .setup-eta {
+  margin-left: 0;
+}
 
 /*
  * Web on a phone: a full-screen sheet, as the kit's Details is there: clear of the notch and the home bar, what it
  * shows starting under its head. The wait and the agent's page fill it, what they show in their middle, the page at its
  * top. The screen and any cover in its place (the dialog's or the screen's) are one box, the screen's shape as wide as
- * the sheet, in the sheet's middle, so the screen opens where its cover was. What comes and goes with it goes under it
- * (the request being helped with first, then the line or the note, the steps, a banner), so none of them moves it but
- * where it wouldn't fit under it: there the box rises as much as that needs.
+ * the sheet. What goes with it goes under it (the request being helped with first, then the line or the note, the
+ * steps, a banner), and the box and its line sit in the sheet's middle as one block, so a cover with the screen's line
+ * under it holds the place the screen opens in.
  */
 @media (max-width: 720px) {
   .ac-dialog.cmp-dialog {
@@ -575,6 +595,11 @@
   .ac-dialog.cmp-dialog:not(.is-full) {
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  /* The controls stand on the name's line, taller than it: the head's top keeps them as far under the sheet's edge as
+     its sides are in (20 px, a phone's 16). */
+  .cmp-dialog:not(.is-screen-only) .ac-dialog__head {
+    padding-top: calc(20px + (var(--cmp-button) - 24px) / 2 + var(--title-cap-mid, var(--cap-mid)));
   }
   .cmp-body > .cmp-prep,
   .cmp-body > .brw-ac.is-surface,
@@ -623,9 +648,8 @@
     place-items: start center;
   }
   /*
-   * The sheet's body measures its room. Over the box, room that gives: at most half of what the box leaves, so the box
-   * sits in the middle, and less where what goes under it (a banner on a short phone) would then run past the foot, the
-   * box rising just enough, never past the top. Its gap after it is taken back: it adds none.
+   * The sheet's body measures its room. Over the block and under it, the same room that gives: the block rises where it
+   * wouldn't fit, never past the top. Neither adds a gap of its own.
    */
   .cmp-dialog:not(.is-screen-only) > .cmp-body {
     container-type: size;
@@ -633,10 +657,38 @@
   .cmp-dialog:not(.is-screen-only) > .cmp-body:has(> :is(.dsk, .cmp-stage))::before {
     content: "";
     flex: 1 1 0;
-    max-height: calc((100cqh - 100cqw * 900 / 1280) / 2);
     margin-bottom: -8px;
   }
-  /* No frame to keep on the sheet: the steps wrap whole, and with none the line takes no room. */
+  .cmp-dialog:not(.is-screen-only) > .cmp-body:has(> :is(.dsk, .cmp-stage))::after {
+    content: "";
+    order: 1;
+    flex: 1 1 0;
+    margin-top: -8px;
+  }
+  /*
+   * Watching, the block is the box and the room its line keeps (`--cmp-line`), whose words' ink ends about 4 px over
+   * its foot (13 px words on a 22 px line). The box holds that block's place: the run's steps take the line's place
+   * and a banner goes under it, so what the agent does never moves the screen, unless it wouldn't fit under it, the
+   * block then rising as much as that needs.
+   */
+  .cmp-dialog:not(.is-screen-only) > .cmp-body:has(.dsk-line):not(:has(> .dsk.is-control))::before {
+    max-height: calc((100cqh - 100cqw * 900 / 1280 - 8px - var(--cmp-line) + 4px) / 2);
+  }
+  .cmp-dialog:not(.is-screen-only) > .cmp-body:has(.dsk-line):not(:has(> .dsk.is-control))::after {
+    flex-grow: 0;
+  }
+  /*
+   * In control the block ends at its line's ink: the Keyboard button's edge, or, where the words reach under it, the
+   * 4 px under their descenders given back.
+   */
+  .cmp-dialog:not(.is-screen-only) > .cmp-body > .dsk.is-control > .dsk-line {
+    min-height: 0;
+  }
+  .cmp-dialog:not(.is-screen-only) > .cmp-body:not(:has(> .cmp-banner)) > .dsk.is-control > .dsk-line > :last-child {
+    margin-bottom: -4px;
+  }
+  /* No frame to keep on the sheet: the steps wrap whole, a line as close to the next as the notice's, and with none the
+     line takes no room. */
   .cmp-steps-row {
     height: auto;
     min-height: 22px;
@@ -646,21 +698,30 @@
   }
   .cmp-steps {
     flex-wrap: wrap;
-    gap: 4px 8px;
+    gap: 0 8px;
   }
   .cmp-steps li {
     white-space: normal;
   }
 }
-/* The phone's keyboard up (the screen's field or the note has the focus): the screen rises to the sheet's top, over it. */
+/* A phone held upright: what programs there can see takes two lines under the screen, and its line keeps their room. */
+@media (max-width: 480px) {
+  .ac-dialog.cmp-dialog {
+    --cmp-line: 44px;
+  }
+}
+/*
+ * The phone's keyboard up (the screen's field or the note has the focus): the screen rises to the sheet's top, over it.
+ * Its share of the room glides, not a bound: it rests at its share, under any bound, which a glide would reach early.
+ */
 @media (max-width: 720px) and (pointer: coarse) {
   .cmp-dialog:not(.is-screen-only) > .cmp-body:has(:is(.dsk-keys, .brw-ac__note):focus)::before {
-    max-height: 0;
+    flex-grow: 0;
   }
 }
 @media (max-width: 720px) and (prefers-reduced-motion: no-preference) {
   .cmp-body::before {
-    transition: max-height 0.2s var(--out);
+    transition: flex-grow 0.2s var(--out);
   }
 }
 /*
@@ -673,6 +734,9 @@
 @media (max-width: 640px) {
   .cmp-body {
     padding: 16px;
+  }
+  .cmp-dialog:not(.is-screen-only) .ac-dialog__head {
+    padding-top: calc(16px + (var(--cmp-button) - 24px) / 2 + var(--title-cap-mid, var(--cap-mid)));
   }
   .cmp-dialog .ac-dialog__lead {
     display: none;

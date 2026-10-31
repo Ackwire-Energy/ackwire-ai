@@ -184,7 +184,17 @@ test("org paging: newest first, every workspace exactly once, at any page size",
 test("org detail: owners and admins, and counts of what is in it", async () => {
   const { orgId } = acme;
   await t.db.insert(schema.users).values({ id: "admin-user", name: "Ada", email: "ada@acme.test" });
-  await t.db.insert(schema.organizationMembers).values({ orgId, userId: "admin-user", role: "admin" });
+  await t.db.insert(schema.organizationMembers).values({ orgId, userId: "admin-user", role: "member" });
+  // An admin holds the role with `administrator` (ADR 0085), given the way the members screen gives it.
+  const { roles } = (await (await owner(`/api/app/organizations/${orgId}/roles`)).json()) as {
+    roles: { id: string; permissions: string[] }[];
+  };
+  const adminRole = roles.find((r) => r.permissions.includes("administrator"))?.id;
+  const given = await owner(`/api/app/organizations/${orgId}/members/admin-user/roles`, {
+    method: "PUT",
+    json: { roleIds: [adminRole] },
+  });
+  expect(given.status).toBe(200);
   await t.db.insert(schema.agents).values({ orgId, name: "Old", handle: "old", model: "x", archivedAt: new Date() });
   await t.db.insert(schema.channels).values({ orgId, name: "dm-1", kind: "dm" });
   const day = 86_400_000;
@@ -222,6 +232,8 @@ test("org detail: owners and admins, and counts of what is in it", async () => {
       },
     ],
     counts: { members: 2, agents: 1, channels: 1, machines: 1, invitations: 1 },
+    limits: { members: null, storageBytes: null, uploadBytesPerDay: null, platformUsdPerMonth: null, updatedAt: null },
+    meters: { storageBytes: 0, uploadBytes24h: 0, ownStorage: false, platformUsdThisMonth: 0 },
   });
 
   expect((await op("/orgs/0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b")).status).toBe(404);
@@ -599,6 +611,253 @@ test("external provisioning: requests, progress, the workspace's computer and it
   expect((await put(`/orgs/${orgId}/provisioning`, { state: "waiting", reason: "capacity" })).status).toBe(204);
 });
 
+test("billing holds: put on, changed and lifted, never over a hold set through /standing", async () => {
+  const [org] = await t.db.insert(schema.organizations).values({ name: "Billing Co" }).returning();
+  if (!org) throw new Error("no org");
+  type Result = { applied: boolean; standing: { state: string; reason: string | null; notice: string } };
+  const hold = async (json: unknown) => body<Result>(await put(`/orgs/${org.id}/billing-hold`, json));
+
+  for (const bad of [{}, { hold: "late" }, { hold: "Payment" }]) {
+    expect({ bad, status: (await put(`/orgs/${org.id}/billing-hold`, bad)).status }).toEqual({ bad, status: 400 });
+  }
+  expect((await put("/orgs/0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b/billing-hold", { hold: null })).status).toBe(404);
+
+  expect(await hold({ hold: "payment" })).toMatchObject({
+    applied: true,
+    standing: { state: "hold", reason: "payment", notice: "shown" },
+  });
+  expect((await hold({ hold: "payment" })).applied).toBe(false);
+  expect(await hold({ hold: "unpaid" })).toMatchObject({ applied: true, standing: { reason: "unpaid" } });
+
+  // A hold set through /standing wins: the billing service neither replaces nor lifts it.
+  await body(await put(`/orgs/${org.id}/standing`, { state: "hold", reason: "Review", notice: "silent" }));
+  for (const code of [null, "ended"]) {
+    expect(await hold({ hold: code })).toMatchObject({ applied: false, standing: { state: "hold", reason: "Review" } });
+  }
+  await body(await put(`/orgs/${org.id}/standing`, { state: "active", reason: "Cleared", notice: "shown" }));
+  expect(await hold({ hold: "ended" })).toMatchObject({ applied: true, standing: { state: "hold", reason: "ended" } });
+  expect(await hold({ hold: null })).toMatchObject({ applied: true, standing: { state: "active", reason: null } });
+  expect((await hold({ hold: null })).applied).toBe(false);
+});
+
+test("limits: set all four, read back with what the workspace uses; any standing; idempotent", async () => {
+  const { orgId } = acme;
+  type State = { updatedAt: string | null; [key: string]: unknown };
+  const limits = {
+    members: 10,
+    storageBytes: 200 * 1024 ** 3,
+    uploadBytesPerDay: 10 * 1024 ** 3,
+    platformUsdPerMonth: 10,
+  };
+  for (const bad of [
+    {},
+    { ...limits, members: undefined },
+    { ...limits, members: 0 },
+    { ...limits, members: 1.5 },
+    { ...limits, storageBytes: -1 },
+    { ...limits, platformUsdPerMonth: 100_001 },
+    { ...limits, platformUsdPerMonth: "10" },
+  ]) {
+    expect({ bad, status: (await put(`/orgs/${orgId}/limits`, bad)).status }).toEqual({ bad, status: 400 });
+  }
+  expect((await put("/orgs/0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b/limits", limits)).status).toBe(404);
+  // Its apps hear of a change at once, and of nothing when the same limits are set again.
+  const heard: unknown[] = [];
+  t.adapters.pubsub.subscribe(orgTopic(orgId), (e) => {
+    if (e.type === "org.broadcast") heard.push(e.event);
+  });
+
+  const set = await body<State>(await put(`/orgs/${orgId}/limits`, limits));
+  expect(set).toEqual({ ...limits, updatedAt: expect.any(String) });
+  expect(heard).toEqual([{ type: "org.limits", orgId }]);
+  const again = await body<State>(await put(`/orgs/${orgId}/limits`, limits));
+  expect(again.updatedAt).toBe(set.updatedAt);
+  expect(heard).toHaveLength(1);
+  const org = await body<{ limits: unknown; meters: unknown }>(await op(`/orgs/${orgId}`));
+  expect(org.limits).toEqual(set);
+  expect(org.meters).toEqual({ storageBytes: 0, uploadBytes24h: 0, ownStorage: false, platformUsdThisMonth: 0 });
+
+  // Limits and standing are apart: a held workspace takes new limits too.
+  await body(await put(`/orgs/${orgId}/billing-hold`, { hold: "unpaid" }));
+  const none = { members: null, storageBytes: null, uploadBytesPerDay: null, platformUsdPerMonth: null };
+  heard.length = 0;
+  expect(await body(await put(`/orgs/${orgId}/limits`, none))).toEqual({ ...none, updatedAt: expect.any(String) });
+  expect(heard).toEqual([{ type: "org.limits", orgId }]);
+  await body(await put(`/orgs/${orgId}/billing-hold`, { hold: null }));
+});
+
+test("early access: every route needs the token, answers in its shape, and refuses with its codes", async () => {
+  const app = createOperatorApp({ ...deps, emails: true }, TOKEN);
+  const call = (method: string, path: string, json?: unknown, authorization: string | null = BEARER) =>
+    app.request(`/api/operator/v1${path}`, {
+      method,
+      headers: {
+        ...(authorization ? { authorization } : {}),
+        ...(json === undefined ? {} : { "content-type": "application/json" }),
+      },
+      body: json === undefined ? undefined : JSON.stringify(json),
+    });
+  const code = async (res: Response) => ((await res.json()) as { error: { code: string } }).error.code;
+  const unknown = crypto.randomUUID();
+  for (const [method, path] of [
+    ["GET", "/signup"],
+    ["PUT", "/signup"],
+    ["GET", "/waitlist"],
+    ["GET", "/waitlist/next"],
+    ["POST", "/waitlist/import"],
+    ["POST", "/early-access/invitations"],
+    ["GET", "/early-access/invitations"],
+    ["POST", `/early-access/invitations/${unknown}/resend`],
+    ["POST", `/early-access/invitations/${unknown}/revoke`],
+  ] as const) {
+    const res = await call(method, path, method === "GET" ? undefined : {}, null);
+    expect({ method, path, status: res.status }).toEqual({ method, path, status: 401 });
+  }
+
+  // This server has ALLOW_SIGNUP=true.
+  expect(await body(await call("GET", "/signup"))).toEqual({
+    mode: "invite",
+    forcedOpen: true,
+    changedAt: null,
+    emails: true,
+  });
+  expect(await code(await call("PUT", "/signup", { mode: "closed" }))).toBe("invalid_request");
+
+  expect(
+    await body(
+      await call("POST", "/waitlist/import", {
+        entries: [
+          { email: "wl-one@acme.test", locale: "en", joinedAt: "2026-01-01T00:00:00Z" },
+          { email: "not an address" },
+          { email: "wl-two@acme.test" },
+        ],
+      }),
+    ),
+  ).toEqual({ added: 2, confirmed: 0, unchanged: 0, invalid: [1] });
+  for (const entries of [[], Array.from({ length: 5001 }, (_, i) => ({ email: `p${i}@acme.test` }))]) {
+    expect(await code(await call("POST", "/waitlist/import", { entries }))).toBe("invalid_request");
+  }
+  expect(await body(await call("GET", "/waitlist"))).toEqual({
+    unconfirmed: 0,
+    confirmed: 2,
+    waiting: 2,
+    invited: 0,
+    signedUp: 0,
+    workspaceCreated: 0,
+  });
+  expect(await body(await call("GET", "/waitlist/next?limit=1"))).toEqual({
+    entries: [{ email: "wl-one@acme.test", locale: "en", joinedAt: "2026-01-01T00:00:00.000Z" }],
+  });
+  for (const limit of [0, 201]) {
+    expect((await call("GET", `/waitlist/next?limit=${limit}`)).status).toBe(400);
+  }
+
+  const invited = await body<{ results: { email: string; outcome: string; invitationId?: string }[] }>(
+    await call("POST", "/early-access/invitations", { emails: ["wl-one@acme.test", "x"] }),
+  );
+  expect(invited.results).toEqual([
+    { email: "wl-one@acme.test", outcome: "invited", invitationId: expect.any(String) },
+    { email: "x", outcome: "invalid_email" },
+  ]);
+  const id = invited.results[0]?.invitationId ?? "";
+  for (const emails of [[], Array(201).fill("a@acme.test")]) {
+    expect(await code(await call("POST", "/early-access/invitations", { emails }))).toBe("invalid_request");
+  }
+
+  const page = await body<{ invitations: Record<string, unknown>[]; counts: unknown; next: unknown }>(
+    await call("GET", "/early-access/invitations?limit=1"),
+  );
+  expect(page).toEqual({
+    invitations: [
+      {
+        id,
+        email: "wl-one@acme.test",
+        locale: "en",
+        state: "sent",
+        createdAt: expect.any(String),
+        sentAt: expect.any(String),
+        sends: 1,
+        expiresAt: expect.any(String),
+        revokedAt: null,
+        usedAt: null,
+        userId: null,
+        workspaceCreatedAt: null,
+        workspaceId: null,
+      },
+    ],
+    counts: { sent: 1, expired: 0, signedUp: 0, workspaceCreated: 0, revoked: 0 },
+    next: null,
+  });
+  for (const query of ["state=gone", "limit=0", "limit=201", "cursor=nope"]) {
+    expect({ query, status: (await call("GET", `/early-access/invitations?${query}`)).status }).toEqual({
+      query,
+      status: 400,
+    });
+  }
+
+  // Within 2 minutes nothing goes out again.
+  expect(await body(await call("POST", `/early-access/invitations/${id}/resend`))).toMatchObject({
+    sent: false,
+    invitation: { id, sends: 1 },
+  });
+  for (const action of ["resend", "revoke"]) {
+    expect(await code(await call("POST", `/early-access/invitations/${unknown}/${action}`))).toBe("not_found");
+    expect((await call("POST", `/early-access/invitations/nope/${action}`)).status).toBe(400);
+  }
+
+  // Its link makes an account, whose first workspace is recorded on it even here, where sign-up is open.
+  const [queued] = await t.db
+    .select({ payload: schema.outbox.payload })
+    .from(schema.outbox)
+    .where(sql`${schema.outbox.payload}->>'key' like ${`early-access:${id}:%`}`);
+  const link = (queued?.payload as { template?: { url?: string } } | undefined)?.template?.url ?? "";
+  const access = new URL(link).searchParams.get("access");
+  const ana = browser(t);
+  const signedUp = await ana("/api/auth/sign-up/email", {
+    json: { email: "wl-one@acme.test", password: "correct horse battery", name: "Ana" },
+    headers: { "x-early-access": access ?? "" },
+  });
+  expect(signedUp.status).toBe(200);
+  expect(await code(await call("POST", `/early-access/invitations/${id}/resend`))).toBe("early_access.used");
+  expect((await ana("/api/app/organizations", { json: { name: "Ana" } })).status).toBe(201);
+  expect(await body(await call("GET", "/waitlist"))).toMatchObject({ invited: 1, signedUp: 1, workspaceCreated: 1 });
+  // Revoking works once its account made a workspace too.
+  expect(await body(await call("POST", `/early-access/invitations/${id}/revoke`))).toMatchObject({
+    invitation: { id, state: "revoked" },
+  });
+
+  const other = await body<{ results: { invitationId?: string }[] }>(
+    await call("POST", "/early-access/invitations", { emails: ["wl-two@acme.test"], resend: false }),
+  );
+  const otherId = other.results[0]?.invitationId ?? "";
+  await signUp(browser(t), "wl-two@acme.test");
+  // The address has an account now: resending allows that account instead of sending a link.
+  expect(await body(await call("POST", `/early-access/invitations/${otherId}/resend`))).toMatchObject({
+    sent: false,
+    invitation: { id: otherId, state: "signed_up", userId: expect.any(String) },
+  });
+  // So does inviting an address with an account; allowing it again answers signed_up.
+  const allowed = await body<{ results: unknown[] }>(
+    await call("POST", "/early-access/invitations", { emails: ["owner@acme.test", "wl-two@acme.test"] }),
+  );
+  expect(allowed.results).toEqual([
+    { email: "owner@acme.test", outcome: "allowed", invitationId: expect.any(String) },
+    { email: "wl-two@acme.test", outcome: "signed_up", invitationId: otherId },
+  ]);
+  const revoked = await body<{ invitation: { state: string; revokedAt: string } }>(
+    await call("POST", `/early-access/invitations/${otherId}/revoke`),
+  );
+  expect(revoked.invitation.state).toBe("revoked");
+  expect(await body(await call("POST", `/early-access/invitations/${otherId}/revoke`))).toEqual(revoked);
+
+  const quiet = createOperatorApp({ ...deps, emails: false }, TOKEN);
+  const refused = await quiet.request(`/api/operator/v1/early-access/invitations/${otherId}/resend`, {
+    method: "POST",
+    headers: { authorization: BEARER },
+  });
+  expect({ status: refused.status, code: await code(refused) }).toEqual({ status: 409, code: "early_access.no_email" });
+});
+
 test("no answer carries a secret or a field named like one", async () => {
   const secrets = [
     "sk-ant-api-secret-9876",
@@ -610,8 +869,22 @@ test("no answer carries a secret or a field named like one", async () => {
       r.password ? [r.password] : [],
     ),
   ];
+  // Early-access links' tokens, in the emails queued above.
+  for (const { payload } of await t.db.select({ payload: schema.outbox.payload }).from(schema.outbox)) {
+    const email = (payload as { template?: { kind?: string; url?: string } }).template;
+    const access = email?.kind === "early_access" && email.url ? new URL(email.url).searchParams.get("access") : null;
+    if (access) secrets.push(access);
+  }
   expect(secrets.length).toBeGreaterThan(10);
-  for (const path of ["/health", "/orgs?limit=200", `/orgs/${acme.orgId}`, `/users/${acme.ownerId}`]) {
+  for (const path of [
+    "/health",
+    "/orgs?limit=200",
+    `/orgs/${acme.orgId}`,
+    `/users/${acme.ownerId}`,
+    "/signup",
+    "/waitlist",
+    "/early-access/invitations?limit=200",
+  ]) {
     const text = await (await op(path)).text();
     for (const secret of secrets) expect(text).not.toContain(secret);
     expect(text).not.toMatch(/"[^"]*(token|password|secret|hash|cipher|key)[^"]*":/i);

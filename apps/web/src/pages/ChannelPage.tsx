@@ -19,6 +19,7 @@ import type {
   ThreadInfo,
 } from "@agenteschat/client";
 import {
+  ApiError,
   agentStateOfRun,
   browserHandoffOf,
   browserTrailOf,
@@ -42,6 +43,8 @@ import {
   useAiStatus,
   useApproval,
   useApprovals,
+  useArchiveChannel,
+  useChannelCategories,
   useChannelMembers,
   useChannels,
   useChannelThreads,
@@ -53,6 +56,7 @@ import {
   useMessages,
   useMissionControl,
   useModels,
+  usePlaceChannel,
   usePostMessage,
   useRoster,
   useSteerState,
@@ -61,6 +65,7 @@ import {
   useThreadMessages,
   useThreadMission,
   useUpdateChannel,
+  useWaiting,
   useWikiTree,
 } from "@agenteschat/client";
 import { actionCardOf } from "@agenteschat/client/lib/action-cards";
@@ -108,6 +113,7 @@ import { contextMarks, hiddenByThreads, rangeCandidates, threadStartOf } from "@
 import { buildTimeline, groupsWith, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
 import { splitCanceled } from "@agenteschat/client/lib/work";
 import {
+  AffixInput,
   Avatar,
   Button,
   Composer,
@@ -117,13 +123,17 @@ import {
   cx,
   DayDivider,
   Dialog,
+  DialogBody,
   DialogFooter,
   DialogSearchList,
   EmptyState,
+  Field,
   FORMAT_KINDS,
   type FormatKind,
   Icon,
   type IconName,
+  Input,
+  isIdHandle,
   Kbd,
   Mention,
   Menu,
@@ -157,7 +167,7 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { tokenizeBody } from "@/chat/body";
 import { MessageBody } from "@/chat/MessageBody";
-import { browserOffline, failedOffline, outbox, useQueued } from "@/chat/outbox";
+import { browserOffline } from "@/chat/offline";
 import { readingLanding } from "@/chat/reading";
 import {
   blockRowByRun,
@@ -174,7 +184,7 @@ import {
 import { dividerIsFar, firstNewKey, pillParts, unseenOf } from "@/chat/unseen";
 import { ActionCard } from "@/components/ActionCard";
 import { AgentActionReceipts } from "@/components/AgentActions";
-import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
+import { ActorAvatar, AgentAvatar, AgentSpinner, PersonAvatar } from "@/components/AgentAvatar";
 import { AgentPanel } from "@/components/AgentPanel";
 import { ApprovalAsk } from "@/components/ApprovalAsk";
 import { InlineApproval } from "@/components/ApprovalItem";
@@ -185,7 +195,8 @@ import { HeldBrowserCard, RunBrowserCard, useHeldTakeover } from "@/components/b
 import { BrowserHandoffCard } from "@/components/browser/BrowserHandoffCard";
 import { BrowserTrailCard } from "@/components/browser/BrowserTrailCard";
 import { requestBrowserCard } from "@/components/browser/open";
-import { ChannelMembersStack } from "@/components/ChannelMembers";
+import { CategorySelect } from "@/components/ChannelCategoryDialogs";
+import { ChannelDetailsButton, ChannelMembersStack } from "@/components/ChannelMembers";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
 import { NoticeLine, RoutineReport, RoutineTag } from "@/components/ChatNotices";
 import { ConsultationCard } from "@/components/ConsultationCard";
@@ -203,6 +214,7 @@ import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@
 import { MenuEntries } from "@/components/DesktopMenus";
 import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfMessage } from "@/components/Forum";
 import { IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
+import { useUploadFailed } from "@/components/Limits";
 import { LiveCodeToggle, type SteerNote } from "@/components/LiveCode";
 import { ErrorState, LoadingConversation } from "@/components/Loading";
 import { WaitingCard } from "@/components/MachineOutages";
@@ -231,8 +243,10 @@ import {
 import { MissionCommandCard } from "@/components/missions/MissionCommandCard";
 import { NewMissionDialog } from "@/components/missions/MissionDialogs";
 import { NavToggle } from "@/components/NavDrawer";
+import { CHANNEL_NAME, toChannelName } from "@/components/NewChannelDialog";
 import { KeyGuardDialog, NoAiBanner, NoAiCard, useNoAiAutoOpen } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
+import { AuthorStatus } from "@/components/Presence";
 import { ProfileTrigger } from "@/components/ProfileCard";
 import { MessageReactions, useEmojiLabels } from "@/components/Reactions";
 import { ActivitySky, ChannelWelcome, colorOf } from "@/components/Sky";
@@ -255,6 +269,7 @@ import { BarPhrase, ConsultClock, WorkingStack } from "@/components/WorkingLine"
 import { useDirectory } from "@/hooks/useDirectory";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
+import { onChannelDetails, takeChannelDetails } from "@/lib/channel-details";
 import { useDocumentTitle } from "@/lib/desktop";
 import { reportPainted } from "@/lib/perf";
 import { useToast } from "@/lib/toast";
@@ -371,8 +386,9 @@ function highlightMessage(scroller: HTMLElement | null, messageId: string) {
   if (!el) return false;
   el.scrollIntoView?.({ block: "center" });
   // Rows off screen are laid out at an estimated height until drawn (`content-visibility`): once the
-  // ones around it are drawn, center it again.
-  requestAnimationFrame(() => el.scrollIntoView?.({ block: "center" }));
+  // ones around it are drawn, center it again. They are drawn by the next frame's rendering, which runs
+  // after its animation callbacks, so the second centering waits for a task after that frame.
+  requestAnimationFrame(() => setTimeout(() => el.scrollIntoView?.({ block: "center" }), 0));
   // A soft plate that fades (CSS; static with reduced motion).
   el.classList.add("ac-msg--focus");
   setTimeout(() => el.classList.remove("ac-msg--focus"), HIGHLIGHT_MS);
@@ -607,6 +623,15 @@ function ChannelView({
     if (draftKey) clearDraft(draftKey);
   }, [draftKey]);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  // "Editar canal" from the sidebar's right click: the details open once this channel shows.
+  useEffect(() => {
+    if (chrome?.header) return;
+    const open = () => {
+      if (takeChannelDetails(channel.id)) setDetailsOpen(true);
+    };
+    open();
+    return onChannelDetails(open);
+  }, [channel.id, chrome?.header]);
   // An agent mentioned from outside the channel: offer to add it.
   const [offer, setOffer] = useState<string | null>(null);
   const mentionSearch = useMentionSearch(members.data);
@@ -632,6 +657,8 @@ function ChannelView({
         .filter((a): a is Agent => Boolean(a)),
     [members.data, dir.agentById],
   );
+  // What the channel suggests goes to an agent people can read: one whose handle is an id only when every agent's is.
+  const suggestedAgent = channelAgents.find((a) => !isIdHandle(a.handle)) ?? channelAgents[0];
   const channelPeople = useMemo(
     () =>
       (members.data ?? [])
@@ -650,8 +677,6 @@ function ChannelView({
 
   const toast = useToast();
   const qc = useQueryClient();
-  // Failed copies already looked at (so a server refusal is never queued later as "offline").
-  const seenFailed = useRef(new Set<string>());
   const post = usePostMessage(org.id, channel.id, {
     me: { id: me.user.id },
     mentioned,
@@ -677,55 +702,29 @@ function ChannelView({
       const fresh = agents.filter((id) => !atWork(id));
       if (fresh.length > 0) live.expect(channel.id, local.id, fresh);
     },
-    onSent: (message, local) => {
-      if (local.clientId) outbox.remove(local.clientId);
-      live.retarget(local.id, message.id);
-    },
-    // A thread archived meanwhile (`thread.archived`): say so in the person's language.
+    onSent: (message, local) => live.retarget(local.id, message.id),
+    // A thread archived meanwhile (`thread.archived`): say so in the person's language. Without a connection
+    // (or with the server restarting) it waits instead, "sai quando a conexão voltar" (`useSendWaiting`).
     onFailed: (error) => {
       if (errorCode(error)?.startsWith("thread.")) toast.show(errorText(t, error), "error");
-      // No connection: the message waits ("sai quando a internet voltar") and goes out when it is back.
-      // The copy turns "failed" right after this callback; pick it up then.
-      const offline = failedOffline(error);
-      queueMicrotask(() => {
-        for (const m of qc.getQueryData<MessageType[]>(keys.messages(org.id, channel.id)) ?? []) {
-          if (m.local !== "failed" || !m.clientId || seenFailed.current.has(m.clientId)) continue;
-          seenFailed.current.add(m.clientId);
-          if (offline) outbox.add(m.clientId);
-        }
-      });
     },
   });
   const { send, retry } = sendHelpers(post);
-  // Back online (the socket reopened, or the browser says so): what waited goes out, in order.
   const status = useConnectionStatus();
-  const flushOutbox = useRef(() => {});
-  flushOutbox.current = () => {
-    if (browserOffline()) return;
-    for (const m of qc.getQueryData<MessageType[]>(keys.messages(org.id, channel.id)) ?? []) {
-      if (m.local !== "failed" || !outbox.has(m.clientId ?? undefined)) continue;
-      if (m.clientId) {
-        outbox.remove(m.clientId);
-        seenFailed.current.delete(m.clientId);
-      }
-      retry(m);
-    }
-  };
-  useEffect(() => {
-    if (status === "open") flushOutbox.current();
-  }, [status]);
-  useEffect(() => {
-    const online = () => flushOutbox.current();
-    window.addEventListener("online", online);
-    return () => window.removeEventListener("online", online);
-  }, []);
 
   const api = useApi();
-  // Reading the channel marks it read: the sidebar's badges (channel and DM) clear at once.
+  // Reading the channel marks it read: the sidebar's badges (channel and DM) clear at once. Only while the tab is
+  // in view: an answer arriving in a tab left in the background is unread, and its notification pushes (ADR 0071).
   const markChannelRead = useMarkChannelRead(org.id).mutate;
   const lastId = channelMessages.data?.at(-1)?.id;
   useEffect(() => {
-    if (isMember && lastId && !lastId.startsWith("local-")) markChannelRead(channel.id);
+    if (!isMember || !lastId || lastId.startsWith("local-")) return;
+    const mark = () => {
+      if (document.visibilityState === "visible") markChannelRead(channel.id);
+    };
+    mark();
+    document.addEventListener("visibilitychange", mark);
+    return () => document.removeEventListener("visibilitychange", mark);
   }, [markChannelRead, channel.id, isMember, lastId]);
 
   // The skeleton was on screen: the real messages fade in (once).
@@ -903,7 +902,7 @@ function ChannelView({
     stick.current = false;
     autoScrollUntil.current = 0;
   };
-  // Long answers open at their start: agent rows (`data-read-id`, the run's
+  // Long answers open at their start: rows by someone else (`data-read-id`; an agent's is the run's
   // id, shared by the live row and its final message) that already landed, and whether one is held
   // with its first line at the top ("Fim da resposta" shows until the person reaches the end).
   const landed = useRef(new Set<string>());
@@ -1164,8 +1163,8 @@ function ChannelView({
         ))}
       </>
     ) : undefined;
-  // "/" commands, for the DM agent or the channel's first agent.
-  const commandAgent = dmAgent ?? channelAgents[0];
+  // "/" commands, for the DM agent or the channel's suggested agent.
+  const commandAgent = dmAgent ?? suggestedAgent;
   const navigateTo = useNavigate();
   const commandPrefix = dmAgent || !commandAgent ? "" : `@${commandAgent.handle} `;
   const cg = agentGrammar(t, commandAgent?.name ?? "");
@@ -1331,6 +1330,7 @@ function ChannelView({
 
   // Files for the next message: uploaded to the Drive (this channel) right away; sending waits for them.
   const [files, setFiles] = useState<PendingFile[]>([]);
+  const uploadFailed = useUploadFailed();
   // Thumbnails are object URLs: freed when a file leaves the composer and when the page goes.
   const previews = useRef(new Set<string>());
   const dropFiles = (keep: (f: PendingFile) => boolean) => {
@@ -1370,7 +1370,7 @@ function ChannelView({
         .then((saved) => update({ status: "done", ref: { id: saved.id, version: saved.version, title: saved.title } }))
         .catch((error) => {
           update({ status: "failed" });
-          toast.show(errorText(t, error), "error");
+          uploadFailed(error);
         });
     }
     composer.current?.focus();
@@ -1484,10 +1484,13 @@ function ChannelView({
     openUnseen();
   }, [unseenFrom]);
   const emptySuggestions = useMemo(() => {
-    if (chrome?.suggestions) return chrome.suggestions;
-    const first = channelAgents[0];
-    return first ? greetingSuggestions(t, first.role).map((s) => `@${first.handle} ${s}`) : [];
-  }, [chrome?.suggestions, channelAgents, t]);
+    if (chrome?.suggestions) return chrome.suggestions.map((text) => ({ label: text, text }));
+    const a = suggestedAgent;
+    // The chip names the agent as a sent message shows its mention; the text keeps the handle.
+    return a
+      ? greetingSuggestions(t, a.role).map((s) => ({ label: `@${a.name} ${s}`, text: `@${a.handle} ${s}` }))
+      : [];
+  }, [chrome?.suggestions, suggestedAgent, t]);
 
   // "Ajustar trecho": the channel's messages that can be in the range (and the moved ones, back in
   // their place), with the selection band in place of the timeline and its bar in place of the composer.
@@ -1643,9 +1646,7 @@ function ChannelView({
                     onDetails={() => setDetailsOpen(true)}
                   />
                   {isMember && <ChannelThreadsButton channelId={channel.id} channelName={channel.name} />}
-                  <Button size="sm" onClick={() => setDetailsOpen(true)}>
-                    {t("channel.details")}
-                  </Button>
+                  <ChannelDetailsButton onClick={() => setDetailsOpen(true)} />
                 </div>
               </header>
             )}
@@ -1740,14 +1741,14 @@ function ChannelView({
                               <legend className="ac-visually-hidden">{t("chat.suggestions")}</legend>
                               {emptySuggestions.map((s) => (
                                 <Button
-                                  key={s}
+                                  key={s.text}
                                   size="sm"
                                   onClick={() => {
-                                    setDraft(s);
+                                    setDraft(s.text);
                                     composer.current?.focus();
                                   }}
                                 >
-                                  {s}
+                                  {s.label}
                                 </Button>
                               ))}
                             </fieldset>
@@ -1968,7 +1969,7 @@ function ChannelView({
                 onOpenChange={(o) => !o && setMissionDraft(null)}
                 initialGoal={missionDraft}
                 initialChannelId={chrome?.dmAgentId ? undefined : channel.id}
-                initialAgentId={channelAgents[0]?.id}
+                initialAgentId={suggestedAgent?.id}
               />
             )}
           </Tag>
@@ -2593,7 +2594,7 @@ function useAfter(ms: number, on: boolean) {
 }
 
 /**
- * Above the composer when the connection drops: "Sem internet. O que você mandar sai sozinho quando
+ * Above the composer when the connection drops: "Sem conexão. O que você mandar sai sozinho quando
  * voltar." (what is sent meanwhile waits and goes out on its own), then "Conectado de novo" for 1.6 s.
  * A socket that only reconnects for a moment says nothing.
  */
@@ -2879,8 +2880,11 @@ export const TimelineMessage = memo(function TimelineMessage({
   const liveWaiting = live?.status === "waiting_approval";
   const liveStopped = live?.status === "canceled";
   const opening = live ? openerOf(live) : { said: null, opener: null, work: [] };
+  // Nothing said and no steps yet: its words stream where the opener stands, so the line it opens with
+  // stays put when a tool call turns it into narration (and the answer, with no tools, starts there too).
+  const wordsOnTop = !opening.said && opening.work.length === 0;
   // A sent message that waits for the connection: not "Não enviada", it goes out on its own.
-  const queued = useQueued(m.local === "failed" ? (m.clientId ?? undefined) : undefined);
+  const queued = useWaiting(m.local === "failed" ? m.clientId : undefined);
   const local = m.local === "failed" && queued ? "pending" : m.local;
   const slowSend = useAfter(500, local === "pending");
   // The streamed row it replaces was already on screen: take its place without sliding in again.
@@ -3042,6 +3046,9 @@ export const TimelineMessage = memo(function TimelineMessage({
     keptAll && onCards.length > 0
       ? keptAll.filter((w) => !(w.kind === "call" && onCards.some((s) => isScreenTool(w.tool, s))))
       : keptAll;
+  // The line it opened with live stays where it was, above the steps: it never vanishes into the fold.
+  const keptSaid = keptWork?.find((w) => w.kind === "say");
+  const keptSteps = keptSaid && keptWork ? keptWork.filter((w) => w !== keptSaid) : keptWork;
   // People see name, time and text; the date, model and tokens wait behind the time.
   const usage = m.author.type === "agent" ? messageUsage(m) : null;
   const details = [
@@ -3056,8 +3063,17 @@ export const TimelineMessage = memo(function TimelineMessage({
       data-message-id={live ? undefined : m.id}
       data-run-id={live?.runId}
       data-live={live?.status}
-      // An agent's answer: lands at its start when long (same id as its live block, so only once).
-      data-read-id={m.author.type === "agent" && !m.local ? (m.agentRunId ?? m.id) : undefined}
+      // What someone else wrote (an agent's answer, a teammate's message): lands at its start when long, read
+      // from the top (an answer shares its live block's id, so only once). Never your own message.
+      data-read-id={
+        m.local
+          ? undefined
+          : m.author.type === "agent"
+            ? (m.agentRunId ?? m.id)
+            : m.author.type === "person" && m.author.id !== me.user.id
+              ? m.id
+              : undefined
+      }
       grouped={grouped}
       entering={entering && !replacesLive}
       streaming={Boolean(live) && !liveFailed && !liveWaiting && !liveStopped}
@@ -3068,17 +3084,21 @@ export const TimelineMessage = memo(function TimelineMessage({
       avatar={
         m.author.id ? (
           <ProfileTrigger actor={{ type: m.author.type, id: m.author.id }} label={t("profile.of", { name })} decorative>
-            {agent ? (
-              // At work: thinking, then writing; a saved message: the agent at rest.
+            {m.author.type === "agent" ? (
+              // At work: thinking, then writing; a saved message: the agent at rest (one no longer in the team too).
               // A person's 👍/👎 on this message plays a face on it (`applyReactions`).
+              // Both wear their presence badge (ADR 0084).
               <AgentAvatar
-                agentId={agent.id}
+                agentId={m.author.id}
                 name={name}
                 state={live ? agentStateOfRun(live) : "idle"}
                 reactionKey={live ? undefined : m.id}
+                presence
               />
+            ) : person ? (
+              <PersonAvatar id={person.userId} name={name} presence />
             ) : (
-              <Avatar kind="person" name={name} imageUrl={person?.image} />
+              <Avatar kind="person" name={name} />
             )}
           </ProfileTrigger>
         ) : m.author.type === "agent" ? (
@@ -3097,6 +3117,8 @@ export const TimelineMessage = memo(function TimelineMessage({
             >
               {name}
             </ProfileTrigger>
+            {/* The author's written status: its emoji, its words on hover (ADR 0084). */}
+            <AuthorStatus actor={{ type: m.author.type, id: m.author.id }} />
             {reminder && (
               <span className="msg-reminder">
                 <Icon name="bell" size={14} />
@@ -3154,13 +3176,24 @@ export const TimelineMessage = memo(function TimelineMessage({
       {live ? (
         <>
           {/* It opens as if it had answered: a generic phrase until the first thing it says takes its place. */}
-          {(opening.said || opening.opener !== null) && (
+          {wordsOnTop && !liveFailed && revealed ? (
             <MessageText>
               <MessageBody
-                body={opening.said ?? t(OPENER_KEYS[opening.opener ?? 0] ?? "run.opener0")}
+                body={revealed}
                 resolveMention={dir.mentionName}
+                live={!liveStopped}
+                accent={colorOf(agent)}
               />
             </MessageText>
+          ) : (
+            (opening.said || opening.opener !== null) && (
+              <MessageText>
+                <MessageBody
+                  body={opening.said ?? t(OPENER_KEYS[opening.opener ?? 0] ?? "run.opener0")}
+                  resolveMention={dir.mentionName}
+                />
+              </MessageText>
+            )
           )}
           {/* Its tools in one line (what it does now), opening into each call; the messages it read under it. */}
           <LiveTools
@@ -3179,9 +3212,11 @@ export const TimelineMessage = memo(function TimelineMessage({
               <span style={{ flex: 1 }}>
                 {refusal
                   ? t("channel.runRefused", { agent: name, reason: refusal })
-                  : live.error
-                    ? t("channel.runFailed", { agent: name, reason: live.error })
-                    : t("channel.runFailedNoReason", { agent: name })}
+                  : live.errorCode === "run.computer_busy"
+                    ? t("channel.runBusy", { agent: name })
+                    : live.error
+                      ? t("channel.runFailed", { agent: name, reason: live.error })
+                      : t("channel.runFailedNoReason", { agent: name })}
               </span>
               <Button
                 variant="ghost"
@@ -3195,7 +3230,7 @@ export const TimelineMessage = memo(function TimelineMessage({
           )}
           {/* Also on a failed or stopped run, for the person still in control (they hand back from it). */}
           <RunBrowserCard run={live} name={name} />
-          {!liveFailed && revealed && (
+          {!liveFailed && revealed && !wordsOnTop && (
             <MessageText>
               <MessageBody
                 body={revealed}
@@ -3216,9 +3251,14 @@ export const TimelineMessage = memo(function TimelineMessage({
         </>
       ) : (
         <>
-          {keptWork?.length && seenLive ? (
+          {keptSaid?.kind === "say" && (
+            <MessageText>
+              <MessageBody body={keptSaid.text} resolveMention={dir.mentionName} />
+            </MessageText>
+          )}
+          {keptSteps?.length && seenLive ? (
             <LiveTools
-              work={keptWork}
+              work={keptSteps}
               agentName={name}
               color={colorOf(agent)}
               steerNote={steerNote}
@@ -3465,8 +3505,18 @@ function ChannelDetails({
   // What "on its own" means for my messages: who reads the ones that mention nobody.
   const routing = useAiStatus(org.id, open).data?.routing;
   const update = useUpdateChannel(org.id, channel.id);
-  // The channel's creator may too, but the API doesn't say who created it yet: admins only.
-  const editable = can(org.role, "configure");
+  // Who manages channels, and the channel's creator (as the server allows).
+  const editable = can(org, "manage_channels") || channel.createdByUserId === me.user.id;
+  const navigate = useNavigate();
+  const toast = useToast();
+  const categories = useChannelCategories(org.id);
+  const place = usePlaceChannel(org.id);
+  const archive = useArchiveChannel(org.id);
+  // Name: saved on blur or Enter, like the description.
+  const [name, setName] = useState(channel.name);
+  const [nameError, setNameError] = useState<string | undefined>();
+  const categoryName =
+    categories.data?.find((c) => c.id === channel.categoryId)?.name ?? t("channelCategories.noCategory");
   const [q, setQ] = useState("");
   const [topic, setTopic] = useState(channel.topic);
   const [saved, setSaved] = useState(false);
@@ -3475,6 +3525,11 @@ function ChannelDetails({
   const [removing, setRemoving] = useState<{ kind: "person" | "agent"; id: string; name: string } | null>(null);
   // The last description sent: blur and close both save, and closing with the X does both.
   const sentTopic = useRef<string | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    setName(channel.name);
+    setNameError(undefined);
+  }, [open, channel.name]);
   useEffect(() => {
     if (!open) return;
     setTopic(channel.topic);
@@ -3499,6 +3554,54 @@ function ChannelDetails({
       },
     );
   };
+  const saveName = () => {
+    if (!editable || name === channel.name) return;
+    if (!name) {
+      setName(channel.name);
+      return;
+    }
+    if (!CHANNEL_NAME.test(name)) {
+      setNameError(t("newChannel.nameInvalid"));
+      return;
+    }
+    update.mutate(
+      { name },
+      {
+        onSuccess: () => {
+          setNameError(undefined);
+          setSaved(true);
+        },
+        onError: (e) =>
+          setNameError(
+            e instanceof ApiError && e.status === 409 ? t("channel.nameTaken", { name }) : (e as Error).message,
+          ),
+      },
+    );
+  };
+  const moveTo = (categoryId: string | null) =>
+    place.mutate(
+      { channelId: channel.id, categoryId },
+      {
+        onSuccess: () => setSaved(true),
+        onError: (e) => toast.show((e as Error).message, "error"),
+      },
+    );
+  const archiveIt = () =>
+    archive.mutate(channel.id, {
+      onSuccess: () => {
+        onOpenChange(false);
+        void navigate({ to: "/org/$orgId", params: { orgId: org.id } });
+        toast.show(t("channel.archived", { channel: channel.name }), "info", {
+          label: t("channelCategories.undo"),
+          run: () =>
+            void api.chat.unarchive(org.id, channel.id).then(async () => {
+              await qc.invalidateQueries({ queryKey: keys.channels(org.id) });
+              await navigate({ to: "/org/$orgId/c/$channelId", params: { orgId: org.id, channelId: channel.id } });
+            }),
+        });
+      },
+      onError: (e) => toast.show((e as Error).message, "error"),
+    });
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: keys.roster(org.id, channel.id) });
     void qc.invalidateQueries({ queryKey: keys.channelMembers(org.id, channel.id) });
@@ -3551,9 +3654,16 @@ function ChannelDetails({
       <Dialog
         open={open && !adding && !removing}
         onOpenChange={(o) => {
-          if (!o) saveTopic();
+          if (!o) {
+            saveTopic();
+            saveName();
+          }
           onOpenChange(o);
         }}
+        subtitle={t("channel.detailsSub", {
+          category: categoryName,
+          visibility: channel.visibility === "private" ? t("channel.visibilityPrivate") : t("channel.visibilityPublic"),
+        })}
         title={
           <>
             {t("channel.detailsTitle", { channel: channel.name })}
@@ -3573,20 +3683,45 @@ function ChannelDetails({
         closeLabel={t("common.close")}
       >
         {editable && (
-          <div className="channel-topic">
-            <input
-              className="channel-topic__input"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              onBlur={saveTopic}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") e.currentTarget.blur();
-              }}
-              placeholder={t("channel.topicPlaceholder")}
-              aria-label={t("channel.topicLabel")}
-              maxLength={250}
-            />
-          </div>
+          // Name, description and category on top of the members, each saved on its own (ADR 0080).
+          <DialogBody className="channel-category__fields">
+            <Field
+              label={t("channel.nameLabel")}
+              id="channel-edit-name"
+              help={channel.name === "general" ? t("channel.generalName") : t("channel.nameHelp")}
+              error={nameError}
+            >
+              <AffixInput
+                prefix="#"
+                value={name}
+                disabled={channel.name === "general"}
+                onChange={(e) => {
+                  setName(toChannelName(e.target.value));
+                  setNameError(undefined);
+                }}
+                onBlur={saveName}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                }}
+                autoComplete="off"
+              />
+            </Field>
+            <Field label={t("newChannel.topic")} id="channel-edit-topic">
+              <Input
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                onBlur={saveTopic}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                }}
+                placeholder={t("channel.topicPlaceholder")}
+                maxLength={250}
+              />
+            </Field>
+            <Field label={t("channelCategories.category")} id="channel-edit-category">
+              <CategorySelect value={channel.categoryId ?? null} onChange={moveTo} canCreate={editable} />
+            </Field>
+          </DialogBody>
         )}
         <DialogSearchList
           query={q}
@@ -3707,7 +3842,21 @@ function ChannelDetails({
             </button>
           )}
         </DialogSearchList>
-        <DialogFooter note={editable ? undefined : t("channelMembers.readOnly")} />
+        {editable && channel.name !== "general" ? (
+          <DialogFooter bar>
+            <Button
+              variant="ghost"
+              icon="archive"
+              className="channel-details__archive"
+              loading={archive.isPending}
+              onClick={archiveIt}
+            >
+              {t("channel.archive")}
+            </Button>
+          </DialogFooter>
+        ) : (
+          <DialogFooter note={editable ? undefined : t("channelMembers.readOnly")} />
+        )}
       </Dialog>
       <Dialog
         open={open && Boolean(removing)}
@@ -3836,7 +3985,7 @@ function AddToChannelOffer({ channelId, agentId, onDone }: { channelId: string; 
   const add = useAddChannelMember(org.id);
   const toast = useToast();
   const name = dir.agentById.get(agentId)?.name ?? t("channel.unknownAgent");
-  const admin = can(org.role, "configure");
+  const admin = can(org, "manage_channels");
   return (
     <div className="mention-offer" role="status">
       <span className="small">{t("mentions.offer", { name })}</span>

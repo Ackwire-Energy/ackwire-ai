@@ -1,21 +1,13 @@
 import { keys, useChannels } from "@agenteschat/client";
-import {
-  Button,
-  Dialog,
-  DialogBody,
-  DialogFooter,
-  DialogSearchList,
-  Field,
-  Input,
-  RadioCard,
-  RadioGroup,
-} from "@agenteschat/ui";
+import { can } from "@agenteschat/client/lib/permissions";
+import { Button, Dialog, DialogBody, DialogFooter, Field, Input, RadioCard, RadioGroup } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "./MemberPicker";
+import { CategorySelect } from "./ChannelCategoryDialogs";
+import { memberOf, PeoplePicker, type PickKey } from "./MemberPicker";
 import { useOrg } from "./org-context";
 
 /** Same rule as the backend (CHANNEL_NAME_PATTERN): lower case, digits, - or _. */
@@ -37,8 +29,20 @@ export function channelNameError(name: string, taken: Set<string>): "invalid" | 
   return null;
 }
 
-/** "Criar canal": name, topic, public/private and initial members (people and agents). */
-export function NewChannelDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+/**
+ * "Criar canal", in one column: name, topic, sidebar category, public/private, then the initial members (people and
+ * agents: search and a list that scrolls in its own box). The footer, with the count and Criar, stays in view.
+ */
+export function NewChannelDialog({
+  open,
+  onOpenChange,
+  category = null,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** Opened from a category's +: it starts chosen. */
+  category?: string | null;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
@@ -48,7 +52,7 @@ export function NewChannelDialog({ open, onOpenChange }: { open: boolean; onOpen
   const [name, setName] = useState("");
   const [topic, setTopic] = useState("");
   const [visibility, setVisibility] = useState<"public" | "private">("public");
-  const [q, setQ] = useState("");
+  const [categoryId, setCategoryId] = useState<string | null>(category);
   const [selected, setSelected] = useState<Set<PickKey>>(new Set());
   const [touched, setTouched] = useState(false);
   useEffect(() => {
@@ -56,21 +60,26 @@ export function NewChannelDialog({ open, onOpenChange }: { open: boolean; onOpen
     setName("");
     setTopic("");
     setVisibility("public");
-    setQ("");
+    setCategoryId(category);
     setSelected(new Set());
     setTouched(false);
-  }, [open]);
-  const rows = useMemberRows(q);
+  }, [open, category]);
   const taken = new Set((channels.data ?? []).map((c) => c.name));
   const error = channelNameError(name, taken);
   const create = useMutation({
     mutationFn: async () => {
-      const channel = await api.chat.createChannel(org.id, { name, topic: topic.trim() || undefined, visibility });
+      const channel = await api.chat.createChannel(org.id, {
+        name,
+        topic: topic.trim() || undefined,
+        visibility,
+        ...(categoryId ? { categoryId } : {}),
+      });
       for (const key of selected) await api.chat.addMember(org.id, channel.id, memberOf(key));
       return channel;
     },
     onSuccess: async (channel) => {
       await qc.invalidateQueries({ queryKey: keys.channels(org.id) });
+      void qc.invalidateQueries({ queryKey: keys.channelCategories(org.id) });
       onOpenChange(false);
       await navigate({ to: "/org/$orgId/c/$channelId", params: { orgId: org.id, channelId: channel.id } });
     },
@@ -115,6 +124,9 @@ export function NewChannelDialog({ open, onOpenChange }: { open: boolean; onOpen
               placeholder={t("newChannel.topicPlaceholder")}
             />
           </Field>
+          <Field label={t("channelCategories.category")} id="ch-category" help={t("channelCategories.categoryHelp")}>
+            <CategorySelect value={categoryId} onChange={setCategoryId} canCreate={can(org, "manage_channels")} />
+          </Field>
           <fieldset style={{ margin: 0, padding: 0, border: 0, display: "flex", flexDirection: "column", gap: 8 }}>
             <legend className="ac-field__label" style={{ padding: 0, marginBottom: 8 }} id="ch-vis">
               {t("newChannel.visibility")}
@@ -141,29 +153,14 @@ export function NewChannelDialog({ open, onOpenChange }: { open: boolean; onOpen
               />
             </RadioGroup>
           </fieldset>
-          <span className="ac-field__label">{t("newChannel.members")}</span>
-        </DialogBody>
-        <DialogSearchList
-          query={q}
-          onQueryChange={setQ}
-          searchLabel={t("newChannel.membersSearch")}
-          searchPlaceholder={t("newChannel.membersSearch")}
-          isEmpty={rows.length === 0}
-          emptyText={t("newChannel.membersEmpty", { q })}
-        >
-          <MemberPickerRows
-            rows={rows}
+          <PeoplePicker
+            label={t("newChannel.members")}
+            searchLabel={t("newChannel.membersSearch")}
+            emptyText={(q) => t("newChannel.membersEmpty", { q })}
             selected={selected}
-            onToggle={(key, on) =>
-              setSelected((prev) => {
-                const next = new Set(prev);
-                if (on) next.add(key);
-                else next.delete(key);
-                return next;
-              })
-            }
+            onChange={setSelected}
           />
-        </DialogSearchList>
+        </DialogBody>
         <DialogFooter bar note={t("newChannel.selected", { count: selected.size })}>
           <Button onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
           <Button type="submit" variant="primary" disabled={create.isPending} loading={create.isPending}>

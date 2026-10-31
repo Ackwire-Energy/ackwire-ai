@@ -15,6 +15,7 @@ import { lentAccounts } from "./accounts";
 import { BrainManager } from "./brain";
 import { CodexAppServers } from "./brain-codex-app";
 import { BrowserManager, type BrowserManagerOptions, launchChrome } from "./browser";
+import type { BrowserPorts } from "./browser-ports";
 import { type Dial, RunnerConnection, type SocketHandlers } from "./connection";
 import { DEFAULT_LIMITS, machineOs, prepareWorkspace } from "./daemon";
 import { DesktopManager, type DesktopManagerOptions } from "./desktop";
@@ -26,7 +27,7 @@ import { McpBridge, type McpTaskInfo, mcpSocketPath } from "./mcp";
 import { agentWorkspace } from "./paths";
 import type { FetchLike } from "./push";
 import { ENTER_MS, type ScopeKind, type Spawn, spawnGated } from "./scope-gate";
-import { agentSecrets, secretValue } from "./secrets";
+import { type ActivatedSecret, agentSecrets, handleSecret, secretValue } from "./secrets";
 import { systemdBooted } from "./service";
 import {
   BROWSER_LEASE_MS,
@@ -59,6 +60,8 @@ export interface WorkerOptions {
   /** To the supervisor. */
   output: Writable;
   log: (line: string) => void;
+  /** System mode: preguarded ports assigned from this worker's UID. */
+  browserPorts?: BrowserPorts;
   /** How this runner starts itself (default: this process). */
   self?: { command: string[]; compiled: boolean };
   /** Tests: the computer desktop use sees, and how its helper starts. */
@@ -105,6 +108,7 @@ export class WorkerLink {
   private readonly enters = new Map<string, () => void>();
   private nextEnter = 0;
   onState: (state: WorkerState) => void = () => {};
+  onSecretInstall: (id: string, agent: AgentScope, secret: ActivatedSecret) => void = () => {};
   /** Browser clicked on the agent's desktop, as root relays it: answered with `showing` and `shown`. */
   onShow: (showId: string, agent: AgentScope) => void = () => {};
   /** The supervisor is gone (stdin closed). */
@@ -182,6 +186,16 @@ export class WorkerLink {
       case "scope.entered":
         if (typeof f.enterId === "string") this.enters.get(f.enterId)?.();
         return;
+      case "secret.install":
+        if (
+          typeof f.installId === "string" &&
+          f.agent &&
+          typeof f.agent === "object" &&
+          f.secret &&
+          typeof f.secret === "object"
+        )
+          this.onSecretInstall(f.installId, f.agent as AgentScope, f.secret as ActivatedSecret);
+        return;
       case "browser.show": {
         const agent = f.agent as Partial<AgentScope> | undefined;
         if (typeof f.showId === "string" && typeof agent?.id === "string" && typeof agent.handle === "string") {
@@ -204,6 +218,13 @@ export class WorkerLink {
     this.write(
       JSON.stringify({ type: "browser.shown", showId, ...(error ? { error } : {}) } satisfies WorkerLinkFrame),
     );
+  }
+
+  secretInstalled(
+    installId: string,
+    result: { size?: number; superseded?: boolean } | { error: { code: MachineErrorCode; message: string } },
+  ) {
+    this.write(JSON.stringify({ type: "secret.installed", installId, ...result } satisfies WorkerLinkFrame));
   }
 
   /**
@@ -309,6 +330,18 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
   const mcpCommand = { socketPath, command: self.command };
   let state = NOTHING_ALLOWED;
   const link = new WorkerLink(o.input, o.output);
+  link.onSecretInstall = (installId, agent, secret) => {
+    if (agent.id !== o.agentId) {
+      link.secretInstalled(installId, { error: { code: "not_allowed", message: "This worker serves another agent" } });
+      return;
+    }
+    void agentWorkspace(workspaceReal, agent)
+      .then((folder) => handleSecret(secretsDir, agent, folder, secret))
+      .then(
+        (result) => link.secretInstalled(installId, result),
+        (error: unknown) => link.secretInstalled(installId, { error: toMachineError(error) }),
+      );
+  };
   // Under systemd the agent's Chrome and AI CLIs start in slices of their own, root moving them there first.
   const gated = (kind: ScopeKind): Spawn | undefined =>
     systemdBooted() ? (file, args, options) => spawnGated(kind, file, args, options, link.enterScope) : undefined;
@@ -365,6 +398,7 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
   };
   const browser = new BrowserManager({
     home,
+    ...(o.browserPorts ? { fixedPorts: o.browserPorts } : {}),
     log,
     send: (frame) => live?.send(frame) ?? false,
     secret: (agent, name) => secretValue(secretsDir, agent, name),

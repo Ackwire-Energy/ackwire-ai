@@ -27,6 +27,22 @@ test("health reports database state", async () => {
   expect((await down.request("/api/health")).status).toBe(503);
 });
 
+test("health answers 503 once the server is shutting down, so a proxy stops sending requests first", async () => {
+  let draining = false;
+  const app = createApp({
+    edition: "selfhost",
+    version: "1",
+    modules: [],
+    pingDatabase: async () => {},
+    draining: () => draining,
+  });
+  expect((await app.request("/api/health")).status).toBe(200);
+  draining = true;
+  const res = await app.request("/api/health");
+  expect(res.status).toBe(503);
+  expect(await res.json()).toMatchObject({ status: "draining", database: "ok" });
+});
+
 test("unknown API routes return the JSON error shape", async () => {
   const app = createApp({ edition: "selfhost", version: "1", modules: [], pingDatabase: async () => {} });
   const res = await app.request("/api/nope");
@@ -60,4 +76,14 @@ test("the OpenAPI document lists the app API", async () => {
     expect(Object.keys(doc.paths)).toContain(path);
   }
   await t.close();
+});
+
+test("the API explorer is served off production only; the OpenAPI document stays", async () => {
+  const dev = await createTestServer();
+  expect((await dev.app.request("/api/reference")).status).toBe(200);
+  await dev.close();
+  const prod = await createTestServer({ env: { NODE_ENV: "production" } });
+  expect((await prod.app.request("/api/reference")).status).toBe(404);
+  expect((await prod.app.request("/api/openapi.json")).status).toBe(200);
+  await prod.close();
 });

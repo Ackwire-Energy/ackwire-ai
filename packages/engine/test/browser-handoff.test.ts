@@ -31,6 +31,7 @@ import {
   postPersonMessage,
   renderPush,
   requireBrowserAccess,
+  requireBrowserControl,
   requirePageRead,
   startTakeover,
   stopAgentBrowser,
@@ -604,6 +605,44 @@ describe("take over", () => {
     expect(claimed.id).toBe(h?.id ?? "");
     expect(await handoffs()).toHaveLength(1);
   });
+
+  test("the person behind a live run only watches: taking over or opening a site is the owner's, an admin's or the asked person's", async () => {
+    await start();
+    const ana = await addMember(f.db, f.org.id, "member", "ana");
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: ana.id });
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, ana.id, f.org.id, f.general.id, { body: "@dev hello" });
+    await drainOutbox(f.db, f.handlers);
+    // Her run still going on: she may watch the agent's browser (everyone's logins in it), not drive it.
+    await f.db.update(schema.agentRuns).set({ status: "running" }).where(eq(schema.agentRuns.agentId, f.agent.id));
+    await requireBrowserAccess(f.db, ana.id, f.org.id, f.agent.id);
+    await expect(requireBrowserControl(f.db, ana.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(startTakeover(deps(), ana.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(
+      openPageInControl(deps(), readyHub, ana.id, f.org.id, f.agent.id, "https://bank.example.com"),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+    expect(await handoffs()).toHaveLength(0);
+    // The agent's owner and an admin may.
+    const admin = await addMember(f.db, f.org.id, "admin", "bia");
+    await requireBrowserControl(f.db, admin.id, f.org.id, f.agent.id);
+    await startTakeover(deps(), f.owner.id, f.org.id, f.agent.id);
+  });
+
+  test("the person a request was asked of takes control only while it is open", async () => {
+    await start();
+    const ana = await addMember(f.db, f.org.id, "member", "ana");
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: ana.id });
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, ana.id, f.org.id, f.general.id, {
+      body: "@dev sign in please",
+    });
+    await drainOutbox(f.db, f.handlers);
+    const [h] = await handoffs();
+    expect(h?.requestedForUserId).toBe(ana.id);
+    await claimHandoff(deps(), ana.id, f.org.id, h?.id ?? "");
+    await finishHandoff(deps(), ana.id, f.org.id, h?.id ?? "", { result: "done" });
+    await drainOutbox(f.db, f.handlers);
+    await expect(claimHandoff(deps(), ana.id, f.org.id, h?.id ?? "")).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(startTakeover(deps(), ana.id, f.org.id, f.agent.id)).rejects.toBeInstanceOf(ForbiddenError);
+  });
 });
 
 describe("live view", () => {
@@ -701,6 +740,17 @@ describe("live view", () => {
       expect(ended).toMatchObject({ type: "browser.ended", reason: "stopped", byUserId: f.owner.id });
       expect(typeof (ended as { at?: string }).at).toBe("string");
     }
+    live.close();
+  });
+
+  test("someone opening the agent's browser gets it ready for the agent's next command, where it runs", async () => {
+    const machine = await start();
+    const { hub } = fakeHub();
+    const warmed: unknown[] = [];
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub, warm: (at) => warmed.push(at) });
+    const stop = await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
+    expect(warmed).toEqual([{ orgId: f.org.id, agentId: f.agent.id, machineId: machine.machineId }]);
+    stop();
     live.close();
   });
 

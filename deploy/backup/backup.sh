@@ -1,7 +1,7 @@
 #!/bin/sh
-# The `backup` service of docker-compose.yml: every day at 03:00 UTC, a pg_dump of the database to an
-# S3-compatible bucket, deleting dumps older than BACKUP_RETENTION_DAYS (14 by default). Settings and
-# the restore: SELF_HOSTING.md, Backups.
+# The `backup` service of docker-compose.yml: every day at 03:00 UTC (or every BACKUP_INTERVAL_HOURS
+# hours from then), a pg_dump of the database to an S3-compatible bucket, deleting dumps older than
+# BACKUP_RETENTION_DAYS (14 by default). Settings and the restore: SELF_HOSTING.md, Backups.
 #   backup.sh             the schedule (what the service runs)
 #   backup.sh now         one dump, right away
 #   backup.sh list        the dumps in the bucket
@@ -47,17 +47,27 @@ case "${1:-}" in
     exec rclone cat "${bucket}/${2:?usage: backup.sh fetch NAME}"
     ;;
   "")
-    # A dump at start, unless one is less than 26 hours old: each restart or upgrade would take
-    # another, and a migration waits for a dump to finish. A listing that fails counts as none.
-    if [ -z "$(dumps lsf --files-only --max-age 26h || true)" ]; then
-      "$0" now || echo "backup: failed, next try at 03:00 UTC" >&2
+    hours=${BACKUP_INTERVAL_HOURS:-24}
+    case $hours in
+      *[!0-9]* | 0*)
+        echo "backup: BACKUP_INTERVAL_HOURS=${hours} is not a whole number of hours, so one dump a day" >&2
+        hours=24
+        ;;
+    esac
+    # A dump at start, unless the last one is younger than the interval plus 2 hours: each restart or
+    # upgrade would take another, and a migration waits for a dump to finish. A listing that fails
+    # counts as none.
+    if [ -z "$(dumps lsf --files-only --max-age "$((hours + 2))h" || true)" ]; then
+      "$0" now || echo "backup: failed, next try at the next scheduled dump" >&2
     fi
+    period=$((hours * 3600))
     while :; do
       now=$(date -u +%s)
-      # In the background, so a stop signal ends the wait at once instead of after the sleep.
-      sleep $((86400 - (now - 10800) % 86400)) &
+      # At 03:00 UTC and every period from then. In the background, so a stop signal ends the wait at
+      # once instead of after the sleep.
+      sleep $((period - (now - 10800) % period)) &
       wait $!
-      "$0" now || echo "backup: failed, next try tomorrow at 03:00 UTC" >&2
+      "$0" now || echo "backup: failed, next try at the next scheduled dump" >&2
     done
     ;;
   *)

@@ -36,7 +36,7 @@ export interface PinView {
 async function requirePinChannel(db: Database, actorId: string, orgId: string, channelId: string, write: boolean) {
   const { channel, membership } = await requireChannelAccess(db, actorId, orgId, channelId);
   if (channel.kind === "forum") throw new NotFoundError("Channel not found");
-  if (write && !can(membership.role, "post")) throw new ForbiddenError();
+  if (write && !can(membership, "post")) throw new ForbiddenError();
   return channel;
 }
 

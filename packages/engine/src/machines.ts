@@ -7,13 +7,14 @@ import {
   MIN_RUNNER_PROTOCOL,
   type PubSub,
 } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, inArray, isNull, or, schema } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, inArray, isNull, schema } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import { type AuditEntry, recordAudit } from "./audit";
 import { caches } from "./cache";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
-import { can, getMembership, requirePermission } from "./organizations";
+import { can, requireActiveMembership, requirePermission } from "./organizations";
+import { maySql } from "./permissions";
 
 const { machines, agents, users, organizationMembers } = schema;
 
@@ -48,11 +49,39 @@ export interface MachineDeps {
 export const REMOVED_COMPUTER_MESSAGE =
   "Your connected computer was removed. Ask an admin or your owner to choose another one.";
 
-/** The machine can't be reached now (runner not connected). */
+/**
+ * The machine can't be reached now (runner not connected): nothing was sent. The workspace's own computer
+ * (`managed`) has no runner for anyone to start: it comes back by itself. `kind` has no default, so no
+ * caller tells a workspace to start a runner it doesn't have.
+ */
 export class MachineOfflineError extends Error {
-  constructor(readonly machineName: string) {
-    super(`The computer ${machineName} is offline. Ask its owner to start the runner.`);
+  constructor(
+    readonly machineName: string,
+    kind: string | null | undefined,
+  ) {
+    super(
+      kind === "managed"
+        ? `The computer ${machineName} isn't answering right now. It usually comes back within minutes.`
+        : `The computer ${machineName} is offline. Ask its owner to start the runner.`,
+    );
     this.name = "MachineOfflineError";
+  }
+}
+
+/**
+ * The request was sent and the link to the machine (or the agent's process there) went away before its
+ * answer: it may have stopped partway or finished, with effects. `serverStop`: our own server stopped (a
+ * restart), not the computer or its network.
+ */
+export class MachineDroppedError extends MachineOfflineError {
+  readonly serverStop: boolean;
+  constructor(machineName: string, options: { serverStop?: boolean; message?: string } = {}) {
+    super(machineName, null);
+    this.name = "MachineDroppedError";
+    this.serverStop = options.serverStop === true;
+    this.message =
+      options.message ??
+      `The connection to the computer ${machineName} dropped while this ran: it may have stopped partway or finished, and may have had effects. Check before running it again.`;
   }
 }
 
@@ -206,8 +235,7 @@ export async function requireComputerDriver(
   orgId: string,
   agentId: string,
 ): Promise<MachineRow> {
-  const membership = await getMembership(db, userId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const membership = await requireActiveMembership(db, userId, orgId);
   const [agent] = await db
     .select({
       machineId: agents.machineId,
@@ -220,7 +248,7 @@ export async function requireComputerDriver(
   if (!agent) throw new NotFoundError("Agent not found");
   const machine = agent.machineId ? await getMachine(db, orgId, agent.machineId) : null;
   if (!machine) throw new NotFoundError("This agent has no computer");
-  const person = { userId, admin: can(membership.role, "manage_agents"), owner: agent.owner === userId };
+  const person = { userId, admin: can(membership, "control_computers"), owner: agent.owner === userId };
   const signIn = lentAccount(agent) !== null;
   if (!drivesComputer(machine, person, signIn)) {
     throw new ForbiddenError(
@@ -252,24 +280,19 @@ export async function computerDrivers(db: Database, orgId: string, agentId: stri
   if (!agent || !machine) return [];
   const signIn = lentAccount(agent) !== null;
   const named = [agent.owner, machine.pairedByUserId].filter((id): id is string => !!id);
-  const admins = inArray(organizationMembers.role, ["owner", "admin"]);
-  const members = await db
-    .select({ userId: organizationMembers.userId, role: organizationMembers.role })
+  // Who may drive it (`control_computers`, ADR 0085), read once per member, and the people named above.
+  const everyone = await db
+    .select({
+      userId: organizationMembers.userId,
+      admin: maySql(orgId, organizationMembers.userId, "control_computers"),
+    })
     .from(organizationMembers)
-    .where(
-      and(
-        eq(organizationMembers.orgId, orgId),
-        named.length > 0 ? or(admins, inArray(organizationMembers.userId, named)) : admins,
-      ),
-    )
+    .where(eq(organizationMembers.orgId, orgId))
     .orderBy(organizationMembers.createdAt);
+  const members = everyone.filter((m) => m.admin || named.includes(m.userId));
   const drivers = members
     .filter((m) =>
-      drivesComputer(
-        machine,
-        { userId: m.userId, admin: can(m.role, "manage_agents"), owner: m.userId === agent.owner },
-        signIn,
-      ),
+      drivesComputer(machine, { userId: m.userId, admin: m.admin, owner: m.userId === agent.owner }, signIn),
     )
     .map((m) => m.userId);
   return agent.owner && drivers.includes(agent.owner) ? [agent.owner] : drivers;
@@ -281,7 +304,7 @@ export async function computerDrivers(db: Database, orgId: string, agentId: stri
  */
 async function machineViews(db: Database, actorId: string, orgId: string, only?: string, now = new Date()) {
   const membership = await requirePermission(db, actorId, orgId, "read");
-  const admin = can(membership.role, "configure");
+  const admin = can(membership, "configure");
   const rows = await db
     .select({ machine: machines, pairedByName: users.name })
     .from(machines)
@@ -417,7 +440,7 @@ export async function requireMachineManager(db: Database, actorId: string, orgId
   const membership = await requirePermission(db, actorId, orgId, "read");
   const machine = await getMachine(db, orgId, machineId);
   if (!machine) throw new NotFoundError("Computer not found", "machine.not_found");
-  if (!can(membership.role, "configure") && machine.pairedByUserId !== actorId) {
+  if (!can(membership, "configure") && machine.pairedByUserId !== actorId) {
     throw new ForbiddenError(
       "Only an admin or the person who connected this computer can change it",
       "machine.forbidden",
@@ -485,12 +508,15 @@ export async function removeMachine(
       .where(and(eq(agents.orgId, orgId), eq(agents.machineId, machine.id)))
       .returning({ id: agents.id });
     const ids = rows.map((r) => r.id);
-    // Remembered so reconnecting this computer gives them back (`confirmDeviceCode`).
+    // Remembered so reconnecting this computer gives them back (`confirmDeviceCode`). A connected
+    // computer's token hash stays too: a removed row never authenticates (`authenticateMachine`), and
+    // the token is how that computer proves it is this machine when it asks to come back
+    // (`startDeviceCode`, ADR 0036 §5). The workspace's own computers lose it.
     await tx
       .update(machines)
       .set({
         deletedAt: now,
-        tokenHash: null,
+        ...(machine.kind === "connected" ? {} : { tokenHash: null }),
         online: false,
         connectedReplica: null,
         previousAgentIds: ids,
@@ -551,7 +577,7 @@ export async function setAgentComputerTarget(
   const membership = await requirePermission(deps.db, actorId, orgId, "read");
   const agent = await getAgent(deps.db, orgId, agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  const admin = can(membership.role, "manage_agents");
+  const admin = can(membership, "manage_agents");
   const machine = machineId ? await getMachine(deps.db, orgId, machineId) : null;
   if (machineId && !machine) throw new NotFoundError("Computer not found", "machine.not_found");
   if (!admin) {

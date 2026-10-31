@@ -1,12 +1,13 @@
 import { DESKTOP_PROTOCOL, type PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, gte, inArray, schema, sql } from "@agenteschat/db";
+import { announceAgentStatus } from "./agent-status";
 import { recordAudit } from "./audit";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { onForumRunFinished } from "./forum";
 import type { MachineHub } from "./machine-hub";
 import { cancelOrgTasks, type TaskCall } from "./machine-tasks";
-import { can, getMembership } from "./organizations";
+import { can, requireActiveMembership } from "./organizations";
 import { closeRoutineRun } from "./routine-ledger";
 import { ACTIVE_RUN_STATUSES, releaseInbox } from "./run-inbox";
 import { isTerminal, type RunStatus, replyThreadOf, transitionRun } from "./runs";
@@ -49,8 +50,12 @@ export function abortLocalRun(runId: string) {
 export const SHUTDOWN_REASON = "server_shutdown";
 export const isShutdown = (reason: unknown) => reason === SHUTDOWN_REASON;
 
-/** Thrown inside a run interrupted by shutdown: the job is retried (by the next instance) from the saved transcript. */
+/**
+ * Thrown inside a run interrupted by shutdown: the outbox hands its job back (`handback`), due at once and without
+ * spending an attempt, and the next instance continues from the saved transcript.
+ */
 export class RunInterruptedError extends Error {
+  readonly handback = true;
   constructor() {
     super("run interrupted by a server shutdown; it resumes from its last checkpoint");
     this.name = "RunInterruptedError";
@@ -59,6 +64,9 @@ export class RunInterruptedError extends Error {
 
 /** How many runs this process is executing. */
 export const activeRunCount = () => active.size;
+
+/** Whether this process is executing the run. */
+export const executesHere = (runId: string) => active.has(runId);
 
 /** Graceful shutdown: waits up to `ms` for runs to finish, then interrupts the rest (they resume elsewhere). */
 export async function drainLocalRuns(ms: number, options: { graceMs?: number } = {}) {
@@ -180,8 +188,7 @@ export async function cancelRun(
   options: { stopMessageId?: string } = {},
 ): Promise<{ id: string; status: RunStatus; previousStatus: RunStatus }> {
   const { db } = deps;
-  const membership = await getMembership(db, userId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const membership = await requireActiveMembership(db, userId, orgId);
   const [row] = await db
     .select({
       run: agentRuns,
@@ -195,7 +202,7 @@ export async function cancelRun(
     .leftJoin(channels, eq(channels.id, agentRuns.channelId))
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.orgId, orgId)));
   if (!row) throw new NotFoundError("Run not found");
-  const allowed = row.requester === userId || row.ownerUserId === userId || can(membership.role, "manage_agents");
+  const allowed = row.requester === userId || row.ownerUserId === userId || can(membership, "manage_agents");
   if (!allowed)
     throw new ForbiddenError("Only who asked, the agent's owner or an admin can stop it", "run.cancel_forbidden");
 
@@ -247,7 +254,7 @@ export async function stopRun(
         .update(agentQuestions)
         .set({ status: "canceled" })
         .where(and(eq(agentQuestions.runId, run.id), eq(agentQuestions.status, "open")));
-      // Its secret requests close too (the keys left on the computer are pruned there).
+      // Its secret requests close too; each terminal row queues runner key cleanup.
       closedSecrets = await cancelSecretRequests(tx, run.id);
       for (const r of closedSecrets) await syncSecretMessage(tx, r);
       // Jobs of this run that haven't started never will.
@@ -300,6 +307,8 @@ export async function stopRun(
   if (actor.type === "person" && !run.background)
     await publishChannelEvent(deps.pubsub, { type: "run.canceled", ...where, byUserId: actor.id });
   await publishChannelEvent(deps.pubsub, { type: "agent.run", ...where, ...bg, status: "canceled" });
+  // Its line ends with the run (ADR 0084 §11).
+  await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
   if (previous !== "running" && run.background) {
     await publishChannelEvent(deps.pubsub, { type: "agent.idle", ...where, ...bg });
     await publishChannelEvent(deps.pubsub, { type: "run.finished", ...where, ...bg, status: "canceled" });
@@ -341,25 +350,34 @@ export async function stopRun(
 }
 
 /**
- * Ends what a suspended workspace's agents still have going: every run not finished stops with `reason`
- * (its `standingText`) and hands nothing on, its computers stop its tasks, and its agents' desktops end with
- * whatever runs on them (nothing else stops a desktop: they stay on).
+ * Ends what a suspended workspace's agents (or, with `agentId`, an agent being deleted) still have going: every
+ * run not finished stops with `reason` (the standing's text, or `agent_archived`) and hands nothing on, its
+ * computers stop its tasks, and its agents' desktops end with whatever runs on them (nothing else stops a
+ * desktop: they stay on).
  */
 export async function stopOrgWork(
   deps: { db: Database; pubsub?: PubSub; hub?: Pick<MachineHub, "call"> },
   orgId: string,
   reason: string,
+  agentId?: string,
 ) {
   const live = await deps.db
     .select({ run: agentRuns, channelKind: channels.kind })
     .from(agentRuns)
     .leftJoin(channels, eq(channels.id, agentRuns.channelId))
-    .where(and(eq(agentRuns.orgId, orgId), inArray(agentRuns.status, [...ACTIVE_RUN_STATUSES])));
+    .where(
+      and(
+        eq(agentRuns.orgId, orgId),
+        inArray(agentRuns.status, [...ACTIVE_RUN_STATUSES]),
+        agentId ? eq(agentRuns.agentId, agentId) : undefined,
+      ),
+    );
   for (const { run, channelKind } of live) {
     await stopRun(deps, orgId, run, channelKind, { type: "system", reason }).catch(() => null);
     // A routine's run: its ledger says why (`stopRun` closes it only for a person).
     if (run.background) {
-      await closeRoutineRun(deps, run, { status: "canceled", code: "org_suspended" }).catch(() => null);
+      const code = agentId ? "deleted" : "org_suspended";
+      await closeRoutineRun(deps, run, { status: "canceled", code }).catch(() => null);
     }
   }
   const { hub } = deps;
@@ -367,13 +385,19 @@ export async function stopOrgWork(
   const call: TaskCall | undefined = hub
     ? (machineId, request) => hub.call(machineId, request, { timeoutMs: 15_000 })
     : undefined;
-  await cancelOrgTasks({ db: deps.db, pubsub: deps.pubsub, call }, orgId, "system");
+  await cancelOrgTasks({ db: deps.db, pubsub: deps.pubsub, call }, orgId, "system", agentId);
   if (!hub) return;
   const desktops = await deps.db
     .select({ id: agents.id, handle: agents.handle, name: agents.name, machineId: machines.id })
     .from(agents)
     .innerJoin(machines, eq(machines.id, agents.machineId))
-    .where(and(eq(agents.orgId, orgId), gte(machines.protocol, DESKTOP_PROTOCOL)));
+    .where(
+      and(
+        eq(agents.orgId, orgId),
+        gte(machines.protocol, DESKTOP_PROTOCOL),
+        agentId ? eq(agents.id, agentId) : undefined,
+      ),
+    );
   await Promise.all(
     desktops.map(({ machineId, ...agent }) =>
       hub.call(machineId, { op: "desktop.session.stop", agent }, { timeoutMs: 15_000 }).catch(() => null),

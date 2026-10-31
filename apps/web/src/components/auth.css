@@ -232,30 +232,22 @@
   flex-direction: column;
   gap: 10px;
 }
-.auth-social__btn.ac-btn {
-  justify-content: flex-start;
-  gap: 12px;
-  padding-left: 16px;
-}
 .auth-social__mark {
   width: 20px;
   height: 20px;
   flex: none;
 }
-.auth-social__label {
-  flex: 1;
-  text-align: left;
+.auth-social__item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 .auth-social__last {
-  display: inline-flex;
-  align-items: center;
+  justify-content: center;
   gap: 4px;
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 999px;
-  font-size: 11.5px;
-  font-weight: 600;
-  background: var(--surface-sunken);
+  font-size: 12.5px;
+  line-height: 18px;
+  font-weight: 500;
   color: var(--muted);
 }
 .auth__fine {
@@ -265,6 +257,19 @@
   color: var(--faint);
   text-align: center;
   text-wrap: balance;
+}
+/* The sign-in code the person matches between the app window and the browser. */
+.auth__code {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 2px;
+}
+.auth__codeValue {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--text);
 }
 .auth__fine a {
   color: var(--muted);

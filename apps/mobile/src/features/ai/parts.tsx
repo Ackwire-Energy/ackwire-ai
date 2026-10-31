@@ -1,5 +1,5 @@
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { planTerms } from "@agenteschat/client/lib/plans";
+import { type CodingPlan, planReplies } from "@agenteschat/client/lib/plans";
 import * as Clipboard from "expo-clipboard";
 import { openBrowserAsync } from "expo-web-browser";
 import type { ReactElement, ReactNode } from "react";
@@ -14,6 +14,7 @@ import {
   Icon,
   type IconName,
   InfoHint,
+  ProviderLogo,
   Text,
   useTheme,
 } from "@/ui";
@@ -22,6 +23,34 @@ import { useColors } from "../shared/hooks";
 /**
  * The pieces the web's AI panels are made of (`SettingNote`, the numbered `Step`, `OpenPage`), on the phone.
  */
+
+/**
+ * A row of an agent's AI (its page, Connect an AI's first group): its maker's mark, its name, the lines under it
+ * (`accountRow`, `existingRows`).
+ */
+export function AiRow({
+  row,
+  checked,
+  disabled,
+  onPress,
+}: {
+  row: { label: string; sub?: string; below?: string; mark: string; off: boolean };
+  checked?: boolean;
+  disabled?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <GroupedRow
+      leading={<ProviderLogo id={row.mark} size="sm" off={row.off} />}
+      label={row.label}
+      {...(row.sub ? { sub: row.sub } : {})}
+      {...(row.below ? { belowText: row.below } : {})}
+      {...(checked !== undefined ? { checked } : {})}
+      disabled={disabled}
+      onPress={onPress}
+    />
+  );
+}
 
 /**
  * A line with its icon (the web's `SettingNote`): why something waits, what is safe, what went wrong. `icon` may be
@@ -48,29 +77,32 @@ export function Note({
 }
 
 /**
- * "Responde a todos" (ADR 0059 §5), the web's `PlanReplies`: off, an agent on its owner's plan replies only to them;
- * on, to everyone who may talk to it. Under it, a line saying the plan's terms are a gray area there, what they say
- * behind its ⓘ. A plan's page and the agent's AI draw the same.
+ * "Atende outras pessoas" (ADR 0059 §5), the web's `PlanReplies`: off, an agent on its owner's plan answers only them;
+ * on, everyone who may talk to it. Under it, a line saying which, on which plan, and the plan's terms behind its ⓘ.
+ * A plan's page and the agent's AI draw the same.
  */
 export function PlanReplies({
   on,
   onChange,
+  agent,
   brain,
   plan,
-  maker,
+  coding,
   disabled,
 }: {
   on: boolean;
   onChange: (on: boolean) => void;
+  /** The agent's name, for the line under the switch. */
+  agent: string;
   brain: "claude_code" | "codex";
   /** The account's plan as the CLI says it (`max`, `team`…): a seat has its own words. */
   plan?: string | null;
-  /** A coding plan's maker, whose own words they are. */
-  maker?: string;
+  /** A coding plan, named by the line, its maker's words behind the ⓘ. */
+  coding?: CodingPlan;
   disabled?: boolean;
 }) {
   const { t } = useTranslation();
-  const terms = planTerms(t, brain, plan, maker);
+  const says = planReplies(t, { on, agent, brain, plan, coding });
   return (
     <View>
       <GroupedList>
@@ -83,9 +115,13 @@ export function PlanReplies({
         />
       </GroupedList>
       <View style={styles.foot}>
-        <InfoHint name={t("common.about", { label: terms.line })} text={terms.text} variant="footnote">
+        <InfoHint
+          name={t("common.about", { label: t("aiAccounts.share.terms.about") })}
+          text={says.text}
+          variant="footnote"
+        >
           <Text variant="footnote" tone="faint">
-            {terms.line}
+            {says.line}
           </Text>
         </InfoHint>
       </View>
@@ -93,14 +129,14 @@ export function PlanReplies({
   );
 }
 
-/** The same place for someone who isn't the plan's owner: whom the agent replies to, and who decides. */
+/** The same place for someone who isn't the plan's owner: whom the agent answers, and who decides. */
 export function PlanRepliesOf({ on, owner, agentName }: { on: boolean; owner: string; agentName: string }) {
   const { t } = useTranslation();
   return (
     <View>
       <GroupedList>
         <GroupedRow
-          label={on ? t("aiAccounts.share.switch") : t("aiAccounts.share.switchOther", { name: owner })}
+          label={on ? t("aiAccounts.share.switch") : t("aiAccounts.share.switchOther", { owner })}
           labelLines={2}
         />
       </GroupedList>
@@ -216,8 +252,8 @@ export function OpenPage({
 }
 
 /**
- * A step's field with "Colar" in it (a code, a plan's key, an API key), sunken inside the steps' white card.
- * `onPasted`: what the clipboard had, trimmed (nothing when it was empty).
+ * A step's field with "Colar" in it while it is empty (a code, a plan's key, an API key), sunken inside the steps'
+ * white card. `onPasted`: what the clipboard had, trimmed (nothing when it was empty).
  */
 export function PasteField({
   value,
@@ -244,8 +280,9 @@ export function PasteField({
 }) {
   const { t } = useTranslation();
   const c = useColors();
+  const empty = !value.trim();
   return (
-    <View style={[styles.inset, { backgroundColor: c.sunken, borderColor: c.line }]}>
+    <View style={[styles.inset, !empty && styles.insetFull, { backgroundColor: c.sunken, borderColor: c.line }]}>
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -265,22 +302,24 @@ export function PasteField({
         style={[styles.insetInput, { color: c.ink }]}
       />
       {/* A button sits at its row's top (`alignSelf: flex-start`); this box keeps it on the field's middle. */}
-      <View style={styles.insetAction}>
-        <Button
-          size="sm"
-          variant="secondary"
-          icon="copy"
-          label={t("aiAccounts.add.paste")}
-          disabled={disabled}
-          onPress={() =>
-            void Clipboard.getStringAsync()
-              .catch(() => "")
-              .then((v) => {
-                if (v.trim()) onPasted(v.trim());
-              })
-          }
-        />
-      </View>
+      {empty ? (
+        <View style={styles.insetAction}>
+          <Button
+            size="sm"
+            variant="secondary"
+            icon="copy"
+            label={t("aiAccounts.add.paste")}
+            disabled={disabled}
+            onPress={() =>
+              void Clipboard.getStringAsync()
+                .catch(() => "")
+                .then((v) => {
+                  if (v.trim()) onPasted(v.trim());
+                })
+            }
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -323,6 +362,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
   },
+  // Without "Colar" beside it, the text keeps the same edge on both sides.
+  insetFull: { paddingRight: 12 },
   insetInput: { flex: 1, minWidth: 0, paddingVertical: 8, ...fieldText("callout") },
   insetAction: { alignSelf: "center" },
 });

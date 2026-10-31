@@ -4,9 +4,12 @@ import {
   markAllNotificationsRead,
   markNotificationDone,
   markNotificationRead,
+  NOTICE_CATEGORIES,
   NOTIFICATION_FILTERS,
   NOTIFICATION_KINDS,
+  noticePrefsView,
   notificationCounts,
+  setNoticePref,
   snoozeNotification,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
@@ -52,6 +55,10 @@ const Notification = z
       quote: z.string().optional(),
       statusFrom: z.string().optional(),
       statusTo: z.string().optional(),
+      billingHold: z.string().optional().openapi({
+        description:
+          "`org_standing`: the billing hold put on (`payment`, `unpaid`, `ended`), said in the person's words.",
+      }),
       steps: z
         .object({ done: z.number().int(), total: z.number().int(), failedAt: z.number().int().optional() })
         .optional(),
@@ -96,6 +103,15 @@ const Counts = z.object({
   reactions: z.number().int(),
 });
 const NotificationParams = OrgParams.extend({ notificationId: z.uuid() });
+
+const NoticeCategory = z.enum(NOTICE_CATEGORIES).openapi({
+  description:
+    "`waiting` (approvals, questions, forum turns, help in the browser, anything waiting on you), `replies` (an agent's answer to you), `mentions` (mentions and DMs), `threads`, `tasks`, `routines` (missions and routines that stopped or failed), `computers`, `reactions`.",
+});
+const NoticePrefs = z.object({
+  categories: z.array(z.object({ id: NoticeCategory, on: z.boolean() })),
+  phones: z.number().int().openapi({ description: "Your phones that get pushes (the phone app)." }),
+});
 
 /**
  * The person's inbox: mentions, thread replies, DMs, agents' questions,
@@ -223,6 +239,41 @@ export function notificationRoutes(deps: AppDeps) {
         await snoozeNotification(nd, c.get("user").id, orgId, notificationId, until === null ? null : new Date(until)),
         200,
       );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/notification-prefs",
+      tags,
+      security,
+      summary: "What reaches my devices as a notification in this workspace",
+      description:
+        "Per category, on or off (ADR 0071 §8): pushes to the phone app and browsers, and the desktop app's banners. The inbox keeps everything either way.",
+      request: { params: OrgParams },
+      responses: { 200: json(NoticePrefs), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json(await noticePrefsView(db, orgId, c.get("user").id), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/notification-prefs",
+      tags,
+      security,
+      summary: "Turn one category of notifications on or off for me in this workspace",
+      request: { params: OrgParams, body: body(z.object({ category: NoticeCategory, on: z.boolean() })) },
+      responses: { 200: json(NoticePrefs), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const { category, on } = c.req.valid("json");
+      return c.json(await setNoticePref(db, orgId, c.get("user").id, category, on), 200);
     },
   );
 

@@ -9,18 +9,20 @@ import {
   userTopic,
 } from "@agenteschat/adapters";
 import type { Config } from "@agenteschat/config";
-import type { Database } from "@agenteschat/db";
+import { and, type Database, eq, inArray, isNotNull, isNull, or, schema } from "@agenteschat/db";
 import {
+  announcePresence,
   type BrowserLive,
   ForbiddenError,
   getMembership,
+  isConnected,
   NotFoundError,
   type OrgEvent,
   requireBrowserAccess,
   requireChannelAccess,
   touchLastSeen,
 } from "@agenteschat/engine";
-import { type Auth, type SessionUser, sessionUser } from "../auth";
+import type { Auth, SessionUser } from "../auth";
 import type { Logger } from "../logger";
 import { allowedOrigins, requestOriginAllowed } from "../routes/app/context";
 import {
@@ -50,9 +52,10 @@ import type { StreamSocketData, StreamSockets } from "./streams";
  *   `approval.*`) wrapped as `{"type":"event","channelId":…,"event":{…}}`.
  *   Events for this person only (approvals waiting for them, DMs) arrive as
  *   `{"type":"event","scope":"user","event":{…}}`.
- * - Membership changes take effect at once: leaving (or being removed from) a
- *   channel drops that subscription; leaving the organization closes the
- *   socket with code 4403.
+ * - Membership changes normally take effect through pub/sub at once. A
+ *   periodic database check also drops subscriptions or closes the socket if
+ *   that notification was lost.
+ * - A revoked session closes its socket on the next frame or periodic check.
  */
 export interface RealtimeDeps {
   db: Database;
@@ -75,6 +78,10 @@ export interface BrowserSocketData {
   kind: "browser";
   connectionId: string;
   user: SessionUser;
+  sessionToken: string;
+  sessionValidatedAt: number;
+  sessionCheckInFlight: Promise<boolean> | null;
+  sessionTimer: ReturnType<typeof setInterval> | null;
   orgId: string;
   subscriptions: Map<string, Unsubscribe>;
   /** Org and user topic listeners. */
@@ -105,6 +112,11 @@ export const TYPING_TTL_MS = 5000;
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const MAX_SUBSCRIPTIONS = 200;
+/** Bound the lifetime of an idle socket after its session is revoked. */
+export const SESSION_RECHECK_MS = 15_000;
+/** Incoming frames recheck at most once this often, to avoid a database query per mouse event. */
+const SESSION_FRAME_RECHECK_MS = 2_000;
+const MEMBERSHIP_CHECK_TIMEOUT_MS = 5_000;
 
 /**
  * The checks before a person's socket opens (`/api/ws`, and the desktop and
@@ -117,17 +129,21 @@ export async function personUpgrade(
   origins: Set<string>,
   req: Request,
   orgId: string,
-): Promise<SessionUser | Response> {
+): Promise<(SessionUser & { sessionToken: string }) | Response> {
   if (!requestOriginAllowed(origins, req.headers)) {
     return new Response("Cross-origin WebSocket refused", { status: 403 });
   }
   if (!UUID.test(orgId)) return new Response("orgId is required", { status: 400 });
-  const user = await sessionUser(deps.auth, req.headers);
-  if (!user) return new Response("Sign in to continue", { status: 401 });
-  if (!(await getMembership(deps.db, user.id, orgId))) {
+  // An upgrade is a new long-lived capability: resolve the session against the
+  // database instead of accepting a signed cookie that outlived its DB row.
+  const session = await deps.auth.api.getSession({ headers: req.headers, query: { disableCookieCache: true } });
+  if (!session) return new Response("Sign in to continue", { status: 401 });
+  const user = session.user as SessionUser;
+  const membership = await getMembership(deps.db, user.id, orgId);
+  if (!membership || membership.standing?.state === "suspended") {
     return new Response("Not a member of this organization", { status: 403 });
   }
-  return user;
+  return { ...user, sessionToken: session.session.token };
 }
 
 export function parseClientFrame(raw: string | Buffer): ClientFrame | null {
@@ -170,11 +186,71 @@ export async function authorizeSubscription(
   }
 }
 
+/** Reconcile an existing socket against durable membership when a revocation event was lost. */
+export async function currentSubscriptions(
+  db: Database,
+  userId: string,
+  orgId: string,
+  channelIds: string[],
+): Promise<Set<string> | null> {
+  const member = await getMembership(db, userId, orgId);
+  if (!member || member.standing?.state === "suspended") return null;
+  if (channelIds.length === 0) return new Set();
+  const rows = await db
+    .select({ id: schema.channels.id })
+    .from(schema.channels)
+    .leftJoin(
+      schema.channelMembers,
+      and(
+        eq(schema.channelMembers.orgId, orgId),
+        eq(schema.channelMembers.channelId, schema.channels.id),
+        eq(schema.channelMembers.userId, userId),
+      ),
+    )
+    .where(
+      and(
+        eq(schema.channels.orgId, orgId),
+        inArray(schema.channels.id, channelIds),
+        isNull(schema.channels.archivedAt),
+        or(eq(schema.channels.kind, "forum"), isNotNull(schema.channelMembers.id)),
+      ),
+    );
+  return new Set(rows.map((row) => row.id));
+}
+
 export function createRealtime(deps: RealtimeDeps) {
   const origins = allowedOrigins(deps.config);
   const send = (ws: BrowserSocket, frame: unknown): void => {
     ws.send(JSON.stringify(frame));
   };
+
+  async function liveSession(ws: BrowserSocket, force = false): Promise<boolean> {
+    if (ws.readyState !== 1) return false;
+    if (!force && Date.now() - ws.data.sessionValidatedAt < SESSION_FRAME_RECHECK_MS) return true;
+    if (ws.data.sessionCheckInFlight) return ws.data.sessionCheckInFlight;
+    const check = (async () => {
+      try {
+        const { internalAdapter } = await deps.auth.$context;
+        const found = await internalAdapter.findSession(ws.data.sessionToken);
+        if (!found || found.session.userId !== ws.data.user.id || found.session.expiresAt <= new Date()) {
+          if (ws.readyState === 1) ws.close(4401, "session revoked");
+          return false;
+        }
+        ws.data.sessionValidatedAt = Date.now();
+        return true;
+      } catch {
+        // If the session store cannot be checked, stop forwarding private events.
+        if (ws.readyState === 1) ws.close(1011, "session unavailable");
+        return false;
+      }
+    })();
+    ws.data.sessionCheckInFlight = check;
+    try {
+      return await check;
+    } finally {
+      ws.data.sessionCheckInFlight = null;
+    }
+  }
 
   /** Placeholders of browser views still starting (`browser.watch` in flight). */
   const startingBrowsers = new WeakSet<() => void>();
@@ -280,10 +356,15 @@ export function createRealtime(deps: RealtimeDeps) {
       const orgId = new URL(req.url).searchParams.get("orgId") ?? "";
       const user = await personUpgrade(deps, origins, req, orgId);
       if (user instanceof Response) return user;
+      const { sessionToken, ...person } = user;
       const data: BrowserSocketData = {
         kind: "browser",
         connectionId: crypto.randomUUID(),
-        user,
+        user: person,
+        sessionToken,
+        sessionValidatedAt: 0,
+        sessionCheckInFlight: null,
+        sessionTimer: null,
         orgId,
         subscriptions: new Map(),
         system: [],
@@ -301,6 +382,7 @@ export function createRealtime(deps: RealtimeDeps) {
         if (isMachine(socket)) return deps.machines?.open(socket);
         if (isStream(socket)) return deps.streams?.open(socket);
         const ws = socket as BrowserSocket;
+        if (!(await liveSession(ws, true))) return;
         const { orgId, user } = ws.data;
         const drop = (channelId: string, reason: string) => {
           const pending = ws.data.pending.get(channelId);
@@ -311,12 +393,58 @@ export function createRealtime(deps: RealtimeDeps) {
           ws.data.subscriptions.delete(channelId);
           if (ws.readyState === 1) send(ws, { type: "unsubscribed", channelId, reason });
         };
+        let rechecking = false;
+        ws.data.sessionTimer = setInterval(() => {
+          if (rechecking || ws.readyState !== 1) return;
+          rechecking = true;
+          void (async () => {
+            try {
+              if (!(await liveSession(ws, true))) return;
+              let timeout: ReturnType<typeof setTimeout> | undefined;
+              const deadline = new Promise<never>((_, reject) => {
+                timeout = setTimeout(
+                  () => reject(new Error("membership check timed out")),
+                  MEMBERSHIP_CHECK_TIMEOUT_MS,
+                );
+                timeout.unref?.();
+              });
+              let allowed: Set<string> | null;
+              try {
+                allowed = await Promise.race([
+                  currentSubscriptions(deps.db, user.id, orgId, [
+                    ...ws.data.subscriptions.keys(),
+                    ...ws.data.pending.keys(),
+                  ]),
+                  deadline,
+                ]);
+              } finally {
+                if (timeout) clearTimeout(timeout);
+              }
+              if (ws.readyState !== 1) return;
+              if (!allowed) {
+                ws.close(4403, "membership revoked");
+                return;
+              }
+              for (const channelId of ws.data.subscriptions.keys())
+                if (!allowed.has(channelId)) drop(channelId, "revoked");
+              for (const [channelId, pending] of ws.data.pending) if (!allowed.has(channelId)) pending.revoked = true;
+            } catch {
+              // A failed durable check must not leave a private subscription open.
+              if (ws.readyState === 1) ws.close(1011, "membership unavailable");
+            } finally {
+              rechecking = false;
+            }
+          })();
+        }, SESSION_RECHECK_MS);
         ws.data.system.push(
           deps.pubsub.subscribe(orgTopic(orgId), (raw) => {
             const event = raw as unknown as OrgEvent;
             if (event.type === "channel.archived") return drop(event.channelId, "archived");
             if (event.type === "org.broadcast") {
               if (ws.readyState === 1) send(ws, { type: "event", scope: "org", event: event.event });
+              if (event.event.type === "org.standing" && event.event.state === "suspended" && ws.readyState === 1) {
+                ws.close(4403, "organization suspended");
+              }
               return;
             }
             if (event.type !== "membership.revoked" || event.userId !== user.id) return;
@@ -333,14 +461,17 @@ export function createRealtime(deps: RealtimeDeps) {
             if (ws.readyState === 1) send(ws, { type: "event", scope: "user", event });
           }),
         );
+        const wasConnected = await isConnected(deps.presence, orgId, user.id);
         await deps.presence.connect(ws.data.orgId, ws.data.user.id, ws.data.connectionId);
         await touchLastSeen(deps.db, orgId, user.id).catch(() => {});
+        if (!wasConnected) await announcePresence(deps, orgId, user.id).catch(() => {});
         send(ws, { type: "ready", orgId: ws.data.orgId, userId: ws.data.user.id });
       },
       async message(socket: Bun.ServerWebSocket<SocketData>, raw: string | Buffer): Promise<void> {
         if (isMachine(socket)) return deps.machines?.message(socket, raw);
         if (isStream(socket)) return deps.streams?.message(socket, raw);
         const ws = socket as BrowserSocket;
+        if (!(await liveSession(ws))) return;
         const browserFrame = deps.browserLive ? parseBrowserClientFrame(raw) : null;
         if (browserFrame) {
           return browserMessage(ws, browserFrame).catch(() => {
@@ -388,6 +519,13 @@ export function createRealtime(deps: RealtimeDeps) {
         let denied: string | null;
         try {
           denied = await authorizeSubscription(deps.db, ws.data.user.id, ws.data.orgId, channelId);
+        } catch (error) {
+          // The check couldn't run (the database is away): the tab reconnects, which subscribes again and
+          // catches up on what it missed.
+          deps.log.warn("channel subscription check failed", { error: String(error) });
+          send(ws, { type: "error", code: "unavailable", channelId });
+          ws.close(1011, "try again");
+          return;
         } finally {
           ws.data.pending.delete(channelId);
         }
@@ -405,6 +543,8 @@ export function createRealtime(deps: RealtimeDeps) {
         if (isMachine(socket)) return deps.machines?.close(socket);
         if (isStream(socket)) return deps.streams?.close(socket, code);
         const ws = socket as BrowserSocket;
+        if (ws.data.sessionTimer) clearInterval(ws.data.sessionTimer);
+        ws.data.sessionTimer = null;
         for (const off of ws.data.subscriptions.values()) off();
         ws.data.subscriptions.clear();
         for (const stop of ws.data.browsers.values()) stop();
@@ -413,6 +553,9 @@ export function createRealtime(deps: RealtimeDeps) {
         ws.data.system = [];
         await deps.presence.disconnect(ws.data.orgId, ws.data.user.id, ws.data.connectionId);
         await touchLastSeen(deps.db, ws.data.orgId, ws.data.user.id).catch(() => {});
+        if (!(await isConnected(deps.presence, ws.data.orgId, ws.data.user.id))) {
+          await announcePresence(deps, ws.data.orgId, ws.data.user.id).catch(() => {});
+        }
       },
     },
   };

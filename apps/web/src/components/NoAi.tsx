@@ -2,7 +2,7 @@ import type { Message } from "@agenteschat/client";
 import { useAiStatus } from "@agenteschat/client";
 import { withoutApiKeys } from "@agenteschat/client/lib/api-key-text";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { aiStateOf, NO_AI, noAiCardOf, opensByItself } from "@agenteschat/client/lib/no-ai";
+import { aiStateOf, NO_AI, noAiCardOf, opensByItself, signInAgainPlan } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Button, Chip, Dialog, DialogFooter, Icon, InfoHint } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -83,20 +83,20 @@ export function NoAiCard({ message }: { message: Message }) {
   if (!card) return null;
   const agent = dir.agentById.get(card.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
+  const again = signInAgainPlan(card, agent);
   const answer = connect?.answered[message.id];
   const answering = answer === "answering";
   const state = aiStateOf(status.data, card.agentId);
   const ready = state !== undefined && state !== "no_ai" && answer !== "still_missing";
   // The same people as "Continuar": who asked, the agent's owner or an admin.
-  const mayAnswer =
-    card.forUserId === me.user.id || agent?.ownerUserId === me.user.id || can(org.role, "manage_agents");
+  const mayAnswer = card.forUserId === me.user.id || agent?.ownerUserId === me.user.id || can(org, "manage_agents");
   const title = answering
     ? t("noAi.card.answering", { name })
     : ready
       ? t("noAi.card.connected", { name })
       : answer === "still_missing"
         ? t("noAi.card.stillMissing", { name })
-        : t("noAi.agent", agentGrammar(t, name));
+        : t(card.signedOut ? "noAi.signedOut" : "noAi.agent", agentGrammar(t, name));
   const action =
     !connect || answering ? null : ready || answer === "pending" ? (
       mayAnswer && (
@@ -108,10 +108,16 @@ export function NoAiCard({ message }: { message: Message }) {
       <Button
         size="sm"
         onClick={() =>
-          connect.open({ intent: card.intent, provider: card.provider, agentId: card.agentId, from: message.id })
+          connect.open({
+            intent: card.intent,
+            provider: card.provider,
+            agentId: card.agentId,
+            from: message.id,
+            ...(again ? { plan: again } : {}),
+          })
         }
       >
-        {t("noAi.action")}
+        {t(again ? "agentPage.work.brain.signInAgain" : "noAi.action")}
       </Button>
     );
   return (
@@ -164,7 +170,7 @@ export function KeyGuardDialog({
   const { t } = useTranslation();
   const { org } = useOrg();
   const connect = useConnectAi();
-  const admin = connect !== null && can(org.role, "manage_credentials");
+  const admin = connect !== null && can(org, "manage_credentials");
   return (
     <Dialog
       open={ask !== null}

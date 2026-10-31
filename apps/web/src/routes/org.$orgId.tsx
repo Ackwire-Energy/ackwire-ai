@@ -1,8 +1,8 @@
 import { useMe } from "@agenteschat/client";
-import { membershipIn } from "@agenteschat/client/lib/guards";
+import { membershipIn, settingUp } from "@agenteschat/client/lib/guards";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Button, EmptyState } from "@agenteschat/ui";
-import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, redirect, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { requireUserIn } from "@/app/guards";
@@ -20,7 +20,7 @@ import { OrgProvider } from "@/components/org-context";
 import { Sidebar } from "@/components/Sidebar";
 import { BootSplash } from "@/components/Sky";
 import { HoldBanner, SuspendedScreen } from "@/components/Standing";
-import { useWebPushClear, useWebPushRefresh } from "@/components/WebPush";
+import { useWebPushClear, useWebPushRefresh, WebPushAsk } from "@/components/WebPush";
 import { ComputerSetupNotice } from "@/components/WorkspaceComputer";
 import { inDesktopApp } from "@/lib/desktop";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
@@ -30,7 +30,11 @@ import { RealtimeProvider } from "@/realtime/context";
 export const Route = createFileRoute("/org/$orgId")({
   beforeLoad: async ({ context, location, params }) => {
     const me = await requireUserIn(context, location.href, params.orgId);
-    return { me, membership: membershipIn(me, params.orgId) };
+    const membership = membershipIn(me, params.orgId);
+    // Back from its plan (`org.$orgId.onboarding.tsx`, ADR 0079) goes on to the onboarding with what it brings back.
+    if (membership && settingUp(membership) && location.pathname !== `/org/${params.orgId}/onboarding`)
+      throw redirect({ to: "/onboarding" });
+    return { me, membership };
   },
   component: OrgLayout,
   // Opening the workspace takes a moment (the session check): the sky rises meanwhile.
@@ -46,7 +50,7 @@ function OrgLayout() {
   const { t } = useTranslation();
   const path = useRouterState({ select: (s) => s.location.pathname });
   // "Criar agente" is a focused flow with its own rail: no sidebar while it's open (admins only; others see why not).
-  const focused = /\/agents\/new\/?$/.test(path) && can(membership?.role, "manage_agents");
+  const focused = /\/agents\/new\/?$/.test(path) && can(membership, "create_agents");
   // Notifications in this browser (ADR 0071), when already on: the server hears of them again, quietly.
   useWebPushRefresh(me.user.id);
   // …and the ones it still shows for what was already read elsewhere close.
@@ -113,6 +117,7 @@ function OrgLayout() {
                   <ConnectAiProvider>
                     <ComputerDialogProvider>
                       <PushOpens />
+                      <WebPushAsk />
                       <Outlet />
                     </ComputerDialogProvider>
                   </ConnectAiProvider>

@@ -39,6 +39,11 @@ export const RUN_TRANSITIONS: Record<RunStatus, readonly RunStatus[]> = {
 
 /** A run's error (and a routing decision's) when nobody could think: no AI connected. */
 export const NO_AI = "no_ai" as const;
+/** A run's error when its computer had no room for its turn for the whole wait (`COMPUTER_BUSY_WAIT_MS`). */
+export const COMPUTER_BUSY = "computer_busy" as const;
+
+/** A run's error when its server stopped in the middle of a tool call (a deploy, a crash, a reboot). */
+export const INTERRUPTED_BY_RESTART = "Interrupted by a server restart";
 
 /** Older stored errors name Claude's provider by the company, "Anthropic": they read with today's label. */
 const providerNow = (label: string) => (label === "Anthropic" ? PROVIDERS.anthropic.label : label);
@@ -52,7 +57,15 @@ export function runErrorDetail(error: string | null | undefined): {
   errorParams?: Record<string, string>;
 } | null {
   if (!error) return null;
-  const simple = ["budget_exceeded", "too_many_tool_calls", "empty_reply", "model_refused", "agent_archived", NO_AI];
+  const simple = [
+    "budget_exceeded",
+    "too_many_tool_calls",
+    "empty_reply",
+    "model_refused",
+    "agent_archived",
+    NO_AI,
+    COMPUTER_BUSY,
+  ];
   if (simple.includes(error)) return { errorCode: `run.${error}` };
   if (error.startsWith("provider_error:")) {
     return { errorCode: "run.provider_error", errorParams: { detail: error.slice(15).trim() } };
@@ -63,8 +76,12 @@ export function runErrorDetail(error: string | null | undefined): {
     return { errorCode: "run.canceled", errorParams: { byUserId: error.slice(12) } };
   const standing = standingErrorDetail(error);
   if (standing) return standing;
-  // Older rows hold the Portuguese texts these errors used to have: still recognized.
-  if (error === "Interrupted by a server update" || error === "Interrompida por uma atualização do servidor") {
+  // Older rows hold the Portuguese texts these errors used to have, or an earlier wording: still recognized.
+  if (
+    error === INTERRUPTED_BY_RESTART ||
+    error === "Interrupted by a server update" ||
+    error === "Interrompida por uma atualização do servidor"
+  ) {
     return { errorCode: "run.interrupted", errorParams: { reason: "deploy" } };
   }
   const none =

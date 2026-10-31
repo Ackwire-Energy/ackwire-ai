@@ -23,7 +23,7 @@ import {
 } from "../../runner/desktop";
 import type { HelperSnapshot, HelperWindow } from "../../runner/desktop-helper";
 import { RunnerError } from "../../runner/errors";
-import { handleRequest, NEW_WORK_OPS, OP_ROUTES, RequestRunner } from "../../runner/handlers";
+import { handleRequest, MAX_IN_FLIGHT, NEW_WORK_OPS, OP_ROUTES, RequestRunner } from "../../runner/handlers";
 import { errorCode, removeDirs, tempDir } from "./helpers";
 
 const FAKE = path.join(import.meta.dir, "fake-desktop-helper.mjs");
@@ -607,12 +607,18 @@ describe("protocol 25: the screen's text", () => {
     expect(NEW_WORK_OPS.has("desktop.text")).toBe(false);
     // A computer full of the agents' work still reads the screen of a person in control.
     const sent: RunnerFrame[] = [];
+    const held: (() => void)[] = [];
     const full = new RequestRunner(
       { workspaceReal: "/", exec: true, token: "" },
       (frame) => sent.push(frame),
       () => {},
-      async (_ctx, req) => ({ op: req.op }),
-      0,
+      async (_ctx, req) => {
+        if (req.op === "list") await new Promise<void>((resolve) => held.push(resolve));
+        return { op: req.op };
+      },
+    );
+    const work = Array.from({ length: MAX_IN_FLIGHT }, (_, i) =>
+      full.start(`w${i}`, { op: "list", path: "", depth: 1 }),
     );
     await full.start("look", { op: "desktop.look", agent: AGENT });
     await full.start("text", { op: "desktop.text", agent: AGENT });
@@ -620,6 +626,8 @@ describe("protocol 25: the screen's text", () => {
       { type: "result", id: "look", ok: false, error: { code: "internal", message: "busy" } },
       { type: "result", id: "text", ok: true, data: { op: "desktop.text" } },
     ]);
+    for (const release of held) release();
+    await Promise.all(work);
   });
 
   test("tesseract reads the capture as the agent's user, at the lowest priority; only the text comes back", async () => {

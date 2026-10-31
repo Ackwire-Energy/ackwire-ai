@@ -181,6 +181,20 @@ describe("import", () => {
     expect(again.version).toBe(2);
   });
 
+  test("two files that collapse to one path are refused (no shared blob key, no undercounted size)", async () => {
+    f = await setup();
+    // `a.md` and `./a.md` both normalize to `a.md`: without the guard the big one overwrites the small one
+    // on disk while its row is dropped, so the metered size (1 byte) no longer matches 100 KB on disk.
+    await expect(
+      importSkillZip(
+        skillDeps(),
+        f.owner.id,
+        f.org.id,
+        zip({ "SKILL.md": SKILL_MD, "a.md": "x", "./a.md": "y".repeat(100_000) }),
+      ),
+    ).rejects.toThrow(/share the path/);
+  });
+
   test("a GitHub folder URL, fetched within limits; non-GitHub and private addresses are refused", async () => {
     f = await setup();
     const fetched: string[] = [];
@@ -217,6 +231,74 @@ describe("import", () => {
     );
     const privateDns = { ...deps, resolveHost: async () => ["10.0.0.7"] };
     await expect(importSkillFromUrl(privateDns, f.owner.id, f.org.id, url)).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  test("images and videos are only listed, so they don't count toward 2 MB; text past 2 MB is still refused", async () => {
+    f = await setup();
+    // A repository shaped like a real one: a 31 MB video and screenshots next to 0.2 MB of Markdown.
+    const fetched: string[] = [];
+    const fake = async (url: string) => {
+      fetched.push(url);
+      if (url.startsWith("https://api.github.com/repos/acme/rcd/contents/assets")) {
+        return Response.json([
+          { type: "file", path: "assets/demo.mp4", size: 31_440_000 },
+          { type: "file", path: "assets/shot.jpg", size: 670_000 },
+        ]);
+      }
+      if (url.startsWith("https://api.github.com/repos/acme/rcd/contents/references")) {
+        return Response.json([{ type: "file", path: "references/pricing.md", size: 9 }]);
+      }
+      if (url.startsWith("https://api.github.com/repos/acme/rcd/contents/")) {
+        return Response.json([
+          { type: "file", path: "SKILL.md", size: SKILL_MD.length },
+          { type: "dir", path: "assets", size: 0 },
+          { type: "dir", path: "references", size: 0 },
+        ]);
+      }
+      if (url.endsWith("/SKILL.md")) return new Response(SKILL_MD);
+      if (url.endsWith("/references/pricing.md")) return new Response("# Pricing");
+      return new Response("not found", { status: 404 });
+    };
+    const skill = await importSkillFromUrl(
+      { ...skillDeps(), fetch: fake },
+      f.owner.id,
+      f.org.id,
+      "https://github.com/acme/rcd",
+    );
+    expect(skill.files.map((x) => [x.path, x.status])).toEqual([
+      ["assets/demo.mp4", "ignored"],
+      ["assets/shot.jpg", "ignored"],
+      ["references/pricing.md", "stored"],
+    ]);
+    expect(fetched.filter((u) => /\.(mp4|jpg)$/.test(u))).toEqual([]);
+
+    const bigText = async (url: string) =>
+      url.includes("/contents/")
+        ? Response.json([
+            { type: "file", path: "SKILL.md", size: SKILL_MD.length },
+            { type: "file", path: "book.md", size: 2_200_000 },
+          ])
+        : new Response(SKILL_MD);
+    await expect(
+      importSkillFromUrl({ ...skillDeps(), fetch: bigText }, f.owner.id, f.org.id, "https://github.com/acme/book"),
+    ).rejects.toThrow("too large");
+
+    // The same in a zip: a big image is listed and never inflated, a big text file is refused.
+    const zipped = await importSkillZip(
+      skillDeps(),
+      f.owner.id,
+      f.org.id,
+      zip({ "SKILL.md": SKILL_MD, "assets/shot.png": "x".repeat(2_200_000) }),
+    );
+    expect(zipped.files.map((x) => [x.path, x.status])).toEqual([["assets/shot.png", "ignored"]]);
+    await expect(
+      importSkillZip(
+        skillDeps(),
+        f.owner.id,
+        f.org.id,
+        zip({ "SKILL.md": SKILL_MD, "book.md": "x".repeat(2_200_000) }),
+      ),
+    ).rejects.toThrow("too large");
   });
 });
 

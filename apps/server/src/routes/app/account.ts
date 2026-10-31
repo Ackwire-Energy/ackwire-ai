@@ -4,6 +4,7 @@ import {
   announceMembers,
   appleSignInTokens,
   avatarFile,
+  canCreateWorkspace,
   changeMemberRole,
   cloudNotice,
   countUsers,
@@ -12,12 +13,15 @@ import {
   deleteAccount,
   getOrganization,
   hasPassword,
+  invitationLogoFile,
   isEmailVerified,
   isValidTimeZone,
   joinStatus,
   listInvitations,
   listMembers,
   listMemberships,
+  needsWorkspaceAllowance,
+  ONBOARDING_STEPS,
   orgLogoFile,
   previewInvitation,
   queueInvitationEmail,
@@ -25,7 +29,9 @@ import {
   removeMember,
   removeOrgLogo,
   requirePermission,
+  resolvePermissions,
   revokeInvitation,
+  saveOnboarding,
   setAvatar,
   setMyLocale,
   setOrgLogo,
@@ -33,14 +39,16 @@ import {
   signInOptions,
   toldReason,
   USER_LOCALES,
+  unfinishedWorkspaces,
   updateOrganization,
   updateOrgSettings,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
-import { authUiConfig, mintPhoneSignIn, sessionUser, signupPolicy } from "../../auth";
+import { authUiConfig, mintPhoneSignIn, sessionUser, signupOpen, signupPolicy, workspacePolicy } from "../../auth";
 import { requestLimitIp } from "../../http/client-ip";
 import { apiError, errorResponse } from "../../http/errors";
 import { humanCheckRefusal } from "../../http/human-check";
+import { imageFile } from "../../http/image-file";
 import {
   type AppDeps,
   body,
@@ -58,6 +66,8 @@ import { Invitation, Member, Organization, Role } from "./schemas";
 const tags = ["Account"];
 /** E-mail lookups on the sign-in screen: enough for typos and a few accounts, not for listing who has one. */
 const SIGN_IN_OPTIONS_PER_IP = { limit: 30, windowMs: 10 * 60_000 };
+/** A join page loads its logo once (cached for good): room for an office opening a link at once, not for hosting it. */
+const INVITE_LOGO_PER_IP = { limit: 60, windowMs: 60_000 };
 const Name = z.string().trim().min(1).max(100);
 const Context = z.string().max(20_000).openapi({ description: "Shared with every agent of the organization." });
 
@@ -113,6 +123,10 @@ export function accountRoutes(deps: AppDeps) {
               description:
                 "Every workspace gets a computer of its own (MACHINE_PROVISIONING=external): a new person's setup has none to connect.",
             }),
+            billingUrl: z.string().nullable().openapi({
+              description:
+                "The billing service (BILLING_URL, ADR 0079): owners and admins open a workspace's plan and billing there through `POST …/billing-link`. Null: no billing.",
+            }),
             turnstileSiteKey: z.string().nullable().openapi({
               description:
                 "The bot check's site key (`TURNSTILE_SITE_KEY`, ADR 0075): pages run Cloudflare Turnstile and send its token in `x-captcha-response`. Null: no check, and nothing loads from Cloudflare.",
@@ -128,11 +142,12 @@ export function accountRoutes(deps: AppDeps) {
       return c.json(
         {
           ...authUiConfig(config),
-          signupOpen: !ownerWaits && (config.ALLOW_SIGNUP || users === 0),
+          signupOpen: await signupOpen(db, config, users),
           firstRun: users === 0 && !ownerWaits,
           ownerClaim: users === 0 && Boolean(config.OWNER_CLAIM_SHA256),
           passwordReset: deps.adapters.email.delivers === true,
           workspaceComputer: config.MACHINE_PROVISIONING === "external",
+          billingUrl: config.BILLING_URL ?? null,
           turnstileSiteKey: deps.adapters.humanCheck?.siteKey ?? null,
         },
         200,
@@ -149,7 +164,17 @@ export function accountRoutes(deps: AppDeps) {
       description:
         "Tells whether the e-mail has an account, so it is rate limited per IP, and guarded by the bot check when this server has one (`human_check`, `human_check_blocked`).",
       request: {
-        body: body(z.object({ email: z.email().max(254) })),
+        body: body(
+          z.object({
+            email: z.email().max(254),
+            access: z.string().max(64).optional().catch(undefined).openapi({
+              type: "string",
+              maxLength: 64,
+              description:
+                "The token of an early-access link (`/signup?access=`, ADR 0078), when the page has one. Any other value counts as absent.",
+            }),
+          }),
+        ),
       },
       responses: {
         200: json(
@@ -160,6 +185,9 @@ export function accountRoutes(deps: AppDeps) {
               .array(z.enum(["google", "github", "apple"]))
               .openapi({ description: "Social sign-ins linked." }),
             canSignUp: z.boolean().openapi({ description: "No account, and this e-mail may create one." }),
+            accessExpired: z.literal(true).optional().openapi({
+              description: "`access` is the link of an invitation to this same address, and it expired.",
+            }),
           }),
         ),
         429: errorResponse("Too many attempts (`rate_limited`)"),
@@ -177,7 +205,8 @@ export function accountRoutes(deps: AppDeps) {
         config.TRUSTED_PROXIES,
       );
       if (refused) return apiError(c, 403, refused.code, refused.message);
-      return c.json(await signInOptions(db, c.req.valid("json").email, signupPolicy(config)), 200);
+      const { email, access } = c.req.valid("json");
+      return c.json(await signInOptions(db, email, signupPolicy(config), access), 200);
     },
   );
 
@@ -198,6 +227,14 @@ export function accountRoutes(deps: AppDeps) {
             role: Role,
             kind: z.enum(["email", "link"]),
             invitedBy: z.string().nullable().openapi({ description: "Who invited (their name), when known." }),
+            logo: z
+              .string()
+              .optional()
+              .openapi({
+                description:
+                  "The workspace's logo, at an address that serves it for this invitation or link only, while " +
+                  "it works. Absent without one, and while the workspace is paused.",
+              }),
             agents: z
               .array(
                 z.object({
@@ -253,6 +290,20 @@ export function accountRoutes(deps: AppDeps) {
     },
   );
 
+  // The preview's `logo`: the workspace's current logo for whoever holds a working invitation or link, 404 otherwise.
+  // No session guards it, so it is limited per address and only this server's own pages may show it.
+  app.get("/invitations/:token/logo/:file", async (c) => {
+    const ip = requestLimitIp(c.req.raw.headers, config.TRUSTED_PROXIES);
+    const limit = await deps.adapters.rateLimiter.consume(`invite-logo:${ip}`, INVITE_LOGO_PER_IP);
+    if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests. Try again in a minute.");
+    const file = await invitationLogoFile(
+      { db, blobs: deps.adapters.platformBlobs },
+      c.req.param("token"),
+      c.req.param("file"),
+    );
+    return imageFile(file, { "cross-origin-resource-policy": "same-origin" });
+  });
+
   // ── Signed in ─────────────────────────────────────────────────────────────
   app.openapi(
     createRoute({
@@ -276,6 +327,10 @@ export function accountRoutes(deps: AppDeps) {
               emailVerified: z.boolean().openapi({
                 description: "The person opened the link that confirms their email address.",
               }),
+              canCreateWorkspace: z.boolean().openapi({
+                description:
+                  "`POST /organizations` would make a workspace for them. False on agentes.chat Cloud while sign-up is by invitation, unless early access allowed their account and its address is confirmed (ADR 0078). `org.create_refused` and `org.create_unpaid` (ADR 0079) can still refuse it.",
+              }),
             }),
             organizations: z.array(Organization),
           }),
@@ -285,11 +340,14 @@ export function accountRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const user = c.get("user");
-      const [memberships, password, verified] = await Promise.all([
+      const [memberships, password, verified, creates, unfinished] = await Promise.all([
         listMemberships(db, user.id),
         hasPassword(db, user.id),
         isEmailVerified(db, user.id),
+        canCreateWorkspace(db, user.id, workspacePolicy(config)),
+        unfinishedWorkspaces(db, user.id),
       ]);
+      const onboardingOf = (orgId: string) => unfinished.find((u) => u.organization.id === orgId);
       return c.json(
         {
           user: {
@@ -299,16 +357,25 @@ export function accountRoutes(deps: AppDeps) {
             image: user.image ?? null,
             hasPassword: password,
             emailVerified: verified,
+            canCreateWorkspace: creates,
           },
-          organizations: memberships.map((m) => ({
-            id: m.orgId,
-            name: m.orgName,
-            role: m.role,
-            logo: m.orgLogo ?? null,
-            ...(m.standing
-              ? { standing: { state: m.standing.state, reason: toldReason(m.standing), ...cloudNotice() } }
-              : {}),
-          })),
+          organizations: memberships.map((m) => {
+            const setup = onboardingOf(m.orgId);
+            return {
+              id: m.orgId,
+              name: m.orgName,
+              role: m.role,
+              permissions: [...m.permissions],
+              rank: m.rank,
+              logo: m.orgLogo ?? null,
+              ...(m.standing
+                ? { standing: { state: m.standing.state, reason: toldReason(m.standing), ...cloudNotice() } }
+                : {}),
+              ...(setup
+                ? { onboarding: { step: setup.organization.onboardingStep, generalChannelId: setup.general.id } }
+                : {}),
+            };
+          }),
         },
         200,
       );
@@ -534,44 +601,30 @@ export function accountRoutes(deps: AppDeps) {
     },
   );
 
-  // The logo file, for the org's members (content-hash names: cached for good).
-  app.get("/org-logos/:orgId/:file", async (c) => {
-    const file = await orgLogoFile(
-      { db, blobs: deps.adapters.platformBlobs },
-      c.get("user").id,
-      c.req.param("orgId"),
-      c.req.param("file"),
-    );
-    return new Response(file.body, {
-      status: 200,
-      headers: {
-        "content-type": file.contentType,
-        "x-content-type-options": "nosniff",
-        "content-security-policy": "sandbox",
-        "cache-control": "private, max-age=31536000, immutable",
-      },
-    });
-  });
+  // The logo file, for the org's members.
+  app.get("/org-logos/:orgId/:file", async (c) =>
+    imageFile(
+      await orgLogoFile(
+        { db, blobs: deps.adapters.platformBlobs },
+        c.get("user").id,
+        c.req.param("orgId"),
+        c.req.param("file"),
+      ),
+    ),
+  );
 
   // A person's photo, for people who share an organization with them. The file
   // name is a content hash, so a new photo gets a new URL and the old one can be cached.
-  app.get("/avatars/:userId/:file", async (c) => {
-    const file = await avatarFile(
-      { db, blobs: deps.adapters.platformBlobs },
-      c.get("user").id,
-      c.req.param("userId"),
-      c.req.param("file"),
-    );
-    return new Response(file.body, {
-      status: 200,
-      headers: {
-        "content-type": file.contentType,
-        "x-content-type-options": "nosniff",
-        "content-security-policy": "sandbox",
-        "cache-control": "private, max-age=31536000, immutable",
-      },
-    });
-  });
+  app.get("/avatars/:userId/:file", async (c) =>
+    imageFile(
+      await avatarFile(
+        { db, blobs: deps.adapters.platformBlobs },
+        c.get("user").id,
+        c.req.param("userId"),
+        c.req.param("file"),
+      ),
+    ),
+  );
 
   app.openapi(
     createRoute({
@@ -580,6 +633,8 @@ export function accountRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Create an organization (you become its owner)",
+      description:
+        "Its owner sets it up in the onboarding, already past its first step (`onboarding` in `GET /me` until `PATCH …/onboarding` says it's finished). While they have one they haven't finished, that one comes back (200) instead of a new one, so a stale tab or a second press makes no other, even one waiting for its first plan. 403 `org.create_refused` while your account is blocked or you are in a workspace suspended or on a hold the billing service didn't set; 403 `org.create_unpaid` (`params.orgId`) while you own a workspace waiting for its first plan; 403 `org.create_invite_only` on agentes.chat Cloud while sign-up is by invitation, unless early access allowed the person's account and its address is confirmed (ADR 0078). With BILLING_HOLD_NEW_WORKSPACES it starts on the `payment` hold (ADR 0079).",
       request: {
         body: body(
           z.object({
@@ -592,12 +647,33 @@ export function accountRoutes(deps: AppDeps) {
       },
       responses: {
         201: json(z.object({ organization: Organization, generalChannelId: z.uuid() }), "Created"),
+        200: json(
+          z.object({ organization: Organization, generalChannelId: z.uuid() }),
+          "The workspace they are still setting up, as it is",
+        ),
         ...errors,
       },
     }),
     async (c) => {
       const { teamSize, timezone, ...input } = c.req.valid("json");
-      const { organization, general } = await createOrganization(db, c.get("user").id, input);
+      const userId = c.get("user").id;
+      const { organization, general, existing } = await createOrganization(db, userId, input, {
+        holdForPayment: config.BILLING_HOLD_NEW_WORKSPACES,
+        needsAllowance: await needsWorkspaceAllowance(db, userId, workspacePolicy(config)),
+        onboarding: true,
+      });
+      const created = {
+        organization: {
+          id: organization.id,
+          name: organization.name,
+          role: "owner" as const,
+          permissions: [...resolvePermissions(true, [])],
+          rank: null,
+          context: organization.context,
+        },
+        generalChannelId: general.id,
+      };
+      if (existing) return c.json(created, 200);
       if (config.HOST_COMPUTER_TOKEN) await addHostComputer(db, organization.id);
       if (teamSize || (timezone && isValidTimeZone(timezone))) {
         await updateOrgSettings(db, c.get("user").id, organization.id, {
@@ -605,19 +681,35 @@ export function accountRoutes(deps: AppDeps) {
           ...(timezone && isValidTimeZone(timezone) ? { timezone } : {}),
         });
       }
-      return c.json(
-        {
-          organization: {
-            id: organization.id,
-            name: organization.name,
-            role: "owner" as const,
-            context: organization.context,
-          },
-          generalChannelId: general.id,
-        },
-        201,
-      );
+      return c.json(created, 201);
     },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "patch",
+      path: "/organizations/{orgId}/onboarding",
+      tags,
+      security,
+      summary: "Save how far you got in setting up your workspace",
+      description:
+        "Its owner only (403 for anyone else). `step`: the furthest step reached, saved as each one is passed (a skipped one counts); it only moves forward, so an earlier one changes nothing. `finished`: the onboarding is over, for good. Until then the apps open the onboarding instead of the workspace (`onboarding` in `GET /me`).",
+      request: {
+        params: OrgParams,
+        body: body(z.object({ step: z.enum(ONBOARDING_STEPS).optional(), finished: z.literal(true).optional() })),
+      },
+      responses: {
+        200: json(
+          z.object({
+            step: z.enum(ONBOARDING_STEPS).openapi({ description: "The furthest step reached." }),
+            finished: z.boolean(),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) =>
+      c.json(await saveOnboarding(db, c.get("user").id, c.req.valid("param").orgId, c.req.valid("json")), 200),
   );
 
   app.openapi(
@@ -639,6 +731,8 @@ export function accountRoutes(deps: AppDeps) {
           id: orgId,
           name: membership.orgName,
           role: membership.role,
+          permissions: [...membership.permissions],
+          rank: membership.rank,
           context: org?.context ?? "",
           logo: org?.logo ?? null,
         },
@@ -677,7 +771,16 @@ export function accountRoutes(deps: AppDeps) {
       const { orgId } = c.req.valid("param");
       await requirePermission(db, c.get("user").id, orgId, "read");
       const members = await listMembers(db, orgId);
-      return c.json({ members: members.map((m) => ({ ...m, joinedAt: m.joinedAt.toISOString() })) }, 200);
+      return c.json(
+        {
+          // Status and availability only go out through `/people`, where a hidden person reads as offline.
+          members: members.map(({ availability, statusText, statusEmoji, statusUntil, ...m }) => ({
+            ...m,
+            joinedAt: m.joinedAt.toISOString(),
+          })),
+        },
+        200,
+      );
     },
   );
 
@@ -688,7 +791,9 @@ export function accountRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/members/{userId}",
       tags,
       security,
-      summary: "Change a member's role",
+      summary: "Make a member an owner, or not (owners)",
+      description:
+        "Only an owner does it; the last owner stays one. What anyone may do is their roles (`PUT …/roles`).",
       request: { params: MemberParams, body: body(z.object({ role: Role })) },
       responses: { 204: noContent[204], ...errors },
     }),
@@ -730,7 +835,7 @@ export function accountRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId } = c.req.valid("param");
-      await requirePermission(db, c.get("user").id, orgId, "manage_members");
+      await requirePermission(db, c.get("user").id, orgId, "invite_people");
       const rows = await listInvitations(db, orgId);
       return c.json(
         {
@@ -738,6 +843,7 @@ export function accountRoutes(deps: AppDeps) {
             id: i.id,
             email: i.email,
             role: i.role,
+            roleIds: i.roleIds,
             expiresAt: i.expiresAt.toISOString(),
           })),
         },
@@ -754,7 +860,20 @@ export function accountRoutes(deps: AppDeps) {
       security,
       summary: "Invite someone by email",
       description: "Returns the invitation link to share. Only a hash of its token is stored.",
-      request: { params: OrgParams, body: body(z.object({ email: z.email(), role: Role })) },
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            email: z.email(),
+            role: Role.optional().openapi({ description: "`owner` invites an owner (owners only); else a member." }),
+            roleIds: z
+              .array(z.string().uuid())
+              .max(50)
+              .optional()
+              .openapi({ description: "Roles they get on accepting, below your own (ADR 0085)." }),
+          }),
+        ),
+      },
       responses: { 201: json(z.object({ invitation: Invitation, url: z.string() }), "Created"), ...errors },
     }),
     async (c) => {
@@ -780,6 +899,7 @@ export function accountRoutes(deps: AppDeps) {
             id: invitation.id,
             email: invitation.email,
             role: invitation.role,
+            roleIds: invitation.roleIds,
             expiresAt: iso(invitation.expiresAt) ?? "",
           },
           url,

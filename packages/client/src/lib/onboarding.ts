@@ -1,22 +1,88 @@
-import type { Role } from "../api/types";
+import type { AgentLookInput } from "../api/types";
 import { isEmail } from "./text";
 
 /**
- * The onboarding's steps, in order.
+ * The onboarding's steps, in order (the server's `ONBOARDING_STEPS`, `packages/db/src/schema/tenancy.ts`, keeps the
+ * furthest one reached).
  * "import" reads another product's export (apps/web/src/lib/import); its
- * agents arrive chosen in "agents". "computer" comes before "agents": with a
- * computer connected, the model step can also pick its Claude Code.
+ * agents arrive chosen in "agents", which only picks and creates the team.
+ * "computer" comes before "ai": a computer the agents can use helps that step,
+ * whose plan sign-in runs on it.
  */
 export const ONBOARDING_STEPS = [
   { id: "workspace", optional: false },
   { id: "context", optional: false },
   { id: "import", optional: true },
-  { id: "computer", optional: true },
   { id: "agents", optional: false },
+  { id: "computer", optional: true },
+  { id: "ai", optional: false },
   { id: "team", optional: true },
   { id: "done", optional: false },
 ] as const;
 export type OnboardingStepId = (typeof ONBOARDING_STEPS)[number]["id"];
+
+export const stepIndex = (id: OnboardingStepId) => ONBOARDING_STEPS.findIndex((s) => s.id === id);
+
+/**
+ * Where a resumed onboarding opens: the furthest step the server keeps, or further where the workspace shows the
+ * person got there (an older app could have saved a step behind them). The team is kept once its guide is made
+ * (`guide`) and, saved at the import, once that import came in (`imported`): a creation cut short opens where it was,
+ * where keeping the team again makes it whole. Past the team, a computer step with nothing to ask (`computerDone`: the
+ * workspace's own computer, nothing held over it) is behind them too.
+ */
+export function resumeAt(
+  saved: OnboardingStepId,
+  shows: { guide: boolean; imported: boolean; computerDone?: boolean },
+) {
+  if (!shows.guide || (saved === "import" && !shows.imported)) return stepIndex(saved);
+  return Math.max(stepIndex(saved), stepIndex(shows.computerDone ? "ai" : "computer"));
+}
+
+/**
+ * Whether the server's answer to a step just saved (`saveOnboarding`) says the onboarding went further in another
+ * window or on another device, or was finished there: the app asks for `me` again and follows it.
+ */
+export const aheadOf = (answer: { step: OnboardingStepId; finished: boolean }, saved: OnboardingStepId) =>
+  answer.finished || stepIndex(answer.step) > stepIndex(saved);
+
+/** A ready-made agent as the onboarding makes it: its name, handle and look. */
+export interface PresetMark {
+  name: string;
+  handle: string;
+  color: string;
+  eyes: string;
+  accessory: string;
+}
+
+/**
+ * The agents an onboarding already made in its workspace, from its agents (oldest first): the ready-made ones by
+ * preset, told by name and look (by name and handle when it has no look, a create cut short before saving it), and
+ * the rest (imported). A resumed onboarding picks its team up from here.
+ */
+export function crewOf<
+  P extends string,
+  A extends { name: string; handle: string; appearance?: AgentLookInput | null },
+>(
+  agents: readonly A[],
+  presets: readonly P[],
+  markOf: (preset: P) => PresetMark,
+): { presets: Partial<Record<P, A>>; others: A[] } {
+  const made: Partial<Record<P, A>> = {};
+  const others: A[] = [];
+  for (const agent of agents) {
+    const look = agent.appearance;
+    const preset = presets.find((p) => {
+      const mark = markOf(p);
+      const same = look
+        ? look.color === mark.color && look.eyes === mark.eyes && look.accessory === mark.accessory
+        : agent.handle === mark.handle;
+      return !made[p] && agent.name === mark.name && same;
+    });
+    if (preset) made[preset] = agent;
+    else others.push(agent);
+  }
+  return { presets: made, others };
+}
 
 /**
  * Who offers the first message when the onboarding ends: the first of these on the team. Lia's research needs a
@@ -29,7 +95,8 @@ export const firstAskOrder = (browser: boolean) =>
 /** A person to invite, as a chip: invalid addresses stay (marked) so they can be fixed or removed. */
 export interface InviteDraft {
   email: string;
-  role: Role;
+  /** Invited with the workspace's administrator role (`adminRoleId`). */
+  admin: boolean;
   valid: boolean;
 }
 
@@ -46,11 +113,11 @@ export function splitEmails(text: string): string[] {
 }
 
 /** Typed or pasted text turned into chips after the ones already there (new addresses only). */
-export function addInvites(list: InviteDraft[], text: string, role: Role = "member"): InviteDraft[] {
+export function addInvites(list: InviteDraft[], text: string, admin = false): InviteDraft[] {
   const known = new Set(list.map((i) => i.email));
   const added = splitEmails(text)
     .filter((email) => !known.has(email))
-    .map((email) => ({ email, role, valid: isEmail(email) }));
+    .map((email) => ({ email, admin, valid: isEmail(email) }));
   return added.length ? [...list, ...added] : list;
 }
 

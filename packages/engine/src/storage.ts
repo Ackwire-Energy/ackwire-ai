@@ -27,6 +27,7 @@ import {
 import { recordAudit } from "./audit";
 import { openSecret, randomToken, sealSecret, sha256 } from "./crypto";
 import { NotFoundError, ValidationError } from "./errors";
+import { assertStorageRoom } from "./limits";
 import { assertPublicHttpsUrl, type ResolveHost } from "./net-guard";
 import { requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
@@ -140,6 +141,9 @@ async function activeConfig(db: Database, orgId: string) {
     .where(and(eq(storageConfigs.orgId, orgId), eq(storageConfigs.status, "active")));
   return row ?? null;
 }
+
+/** New files go to the workspace's own bucket. */
+export const usesOwnBucket = async (db: Database, orgId: string) => (await activeConfig(db, orgId)) !== null;
 
 /**
  * Every blob read and write goes through this (like `SearchIndexResolver`):
@@ -479,6 +483,9 @@ export async function getMigration(db: Database, actorId: string, orgId: string)
 const notAt = (orgId: string, target: string | null) =>
   and(
     eq(artifactVersions.orgId, orgId),
+    // Only a live artifact's versions: a trashed one's copies aren't counted or moved (matching storedBytes),
+    // so cycling storages doesn't drag dead files along.
+    sql`exists (select 1 from ${artifacts} where ${artifacts.id} = ${artifactVersions.artifactId} and ${artifacts.deletedAt} is null)`,
     target ? or(isNull(artifactVersions.storageConfigId), ne(artifactVersions.storageConfigId, target)) : undefined,
     target ? undefined : sql`${artifactVersions.storageConfigId} is not null`,
   );
@@ -497,6 +504,15 @@ export async function startMigration(deps: StorageDeps, actorId: string, orgId: 
     .from(artifactVersions)
     .where(notAt(orgId, target));
   const remaining = counted?.n ?? 0;
+  // Back onto this server's storage, the files it copies count against its limit.
+  if (target === null) {
+    const [moving] = await deps.db
+      .select({ bytes: sql<string>`coalesce(sum(${artifactVersions.size}), 0)` })
+      .from(artifactVersions)
+      .where(notAt(orgId, null));
+    const bytes = Number(moving?.bytes ?? 0);
+    if (bytes > 0) await assertStorageRoom(deps.db, orgId, bytes, { daily: false });
+  }
   const resume = last && last.status !== "done" && last.toStorageConfigId === target ? last : null;
   const migration = await deps.db.transaction(async (tx) => {
     let row: MigrationRow | undefined;
@@ -596,6 +612,10 @@ export async function runMigration(deps: StorageDeps, migrationId: string, optio
           .update(artifactVersions)
           .set({ storageConfigId: target.storageConfigId, blobKey: key })
           .where(eq(artifactVersions.id, v.id));
+        // The row now points at the target copy. Drop the old object only when it was on our platform store,
+        // so cycling off the platform frees our disk; a workspace's own bucket is theirs (and may be a backup),
+        // so its copies stay. Never delete the key the row now holds (a store that overwrote in place).
+        if (v.storageConfigId === null && v.blobKey !== key) await source.delete(v.blobKey).catch(() => undefined);
       } catch (error) {
         await db
           .update(storageMigrations)

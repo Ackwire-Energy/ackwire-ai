@@ -251,7 +251,7 @@ export function memAvailableBytes(meminfo: string): number | null {
 }
 
 /** The memory Linux says is available now; null elsewhere. */
-function hostMemAvailable(): number | null {
+export function hostMemAvailable(): number | null {
   try {
     return memAvailableBytes(readFileSync("/proc/meminfo", "utf8"));
   } catch {

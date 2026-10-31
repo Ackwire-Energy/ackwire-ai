@@ -1,4 +1,4 @@
-import type { Role } from "@agenteschat/client";
+import type { AuthConfig, OrgSummary } from "@agenteschat/client";
 import { can } from "@agenteschat/client/lib/permissions";
 import type { IconName } from "@agenteschat/ui";
 
@@ -6,8 +6,10 @@ import type { IconName } from "@agenteschat/ui";
 // the sections without loading the page itself.
 
 export type SettingsSection =
+  | "notifications"
   | "general"
   | "members"
+  | "roles"
   | "audit"
   | "access"
   | "connectors"
@@ -16,35 +18,47 @@ export type SettingsSection =
   | "storage"
   | "computers"
   | "usage"
+  | "billing"
   | "import";
 
-export type SettingsGroup = "org" | "agents" | "costs";
+export type SettingsGroup = "you" | "org" | "agents" | "costs";
 
-/** The settings sub-nav, in order and in groups, with who can open each. */
+/** The settings sub-nav, in order and in groups, with who can open each on this server. */
 export const SETTINGS_SECTIONS: {
   id: SettingsSection;
   icon: IconName;
   group: SettingsGroup;
-  allowed: (role: Role) => boolean;
+  allowed: (org: OrgSummary, server: AuthConfig | undefined) => boolean;
 }[] = [
+  // Mine, not the workspace's: what reaches my devices as a notification here (ADR 0071 §8).
+  { id: "notifications", icon: "bell", group: "you", allowed: () => true },
   { id: "general", icon: "settings", group: "org", allowed: () => true },
   { id: "members", icon: "members", group: "org", allowed: () => true },
-  // What agents did and people changed: admins only (it shows everyone's work).
-  { id: "audit", icon: "shield", group: "org", allowed: (r) => can(r, "configure") },
-  { id: "access", icon: "agent", group: "agents", allowed: (r) => can(r, "configure") },
+  // Every member reads what each role allows (ADR 0085); who manages roles changes the ones below theirs.
+  { id: "roles", icon: "audiencePeople", group: "org", allowed: () => true },
+  // What agents did and people changed: only for who may see it (it shows everyone's work).
+  { id: "audit", icon: "shield", group: "org", allowed: (o) => can(o, "view_audit") },
+  { id: "access", icon: "agent", group: "agents", allowed: (o) => can(o, "manage_agents") },
   { id: "connectors", icon: "plug", group: "agents", allowed: () => true },
-  { id: "skills", icon: "bulb", group: "agents", allowed: (r) => can(r, "configure") },
+  { id: "skills", icon: "bulb", group: "agents", allowed: (o) => can(o, "manage_agents") },
   // Every member sees the computers and can pair one (ADR 0025).
-  { id: "computers", icon: "computer", group: "agents", allowed: (r) => can(r, "read") },
+  { id: "computers", icon: "computer", group: "agents", allowed: (o) => can(o, "read") },
   // Everyone (ADR 0063): tokens and percentages; money only for who has `view_usage`.
   { id: "usage", icon: "wallet", group: "costs", allowed: () => true },
   // "Contas de IA": everyone's own plans; the workspace's API keys only for who manages them.
-  { id: "keys", icon: "key", group: "costs", allowed: (r) => can(r, "read") },
-  { id: "storage", icon: "drive", group: "costs", allowed: (r) => can(r, "configure") },
-  { id: "import", icon: "archiveBox", group: "costs", allowed: (r) => can(r, "manage_agents") },
+  { id: "keys", icon: "key", group: "costs", allowed: (o) => can(o, "read") },
+  { id: "storage", icon: "drive", group: "costs", allowed: (o) => can(o, "configure") },
+  // Only where a billing service runs (ADR 0079), for who may open it.
+  {
+    id: "billing",
+    icon: "coin",
+    group: "costs",
+    allowed: (o, server) => !!server?.billingUrl && can(o, "manage_billing"),
+  },
+  { id: "import", icon: "archiveBox", group: "costs", allowed: (o) => can(o, "create_agents") },
 ];
 
-export const SETTINGS_GROUPS: SettingsGroup[] = ["org", "agents", "costs"];
+export const SETTINGS_GROUPS: SettingsGroup[] = ["you", "org", "agents", "costs"];
 
 export const isSettingsSection = (v: unknown): v is SettingsSection => SETTINGS_SECTIONS.some((s) => s.id === v);
 

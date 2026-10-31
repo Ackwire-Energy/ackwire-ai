@@ -1,9 +1,16 @@
-import type { AiStatus, Edition } from "@agenteschat/client";
+import type { AgentLookInput, AiStatus, Edition, OrgOnboarding, OrgSummary } from "@agenteschat/client";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
-import { firstAskOrder } from "@agenteschat/client/lib/onboarding";
+import {
+  crewOf,
+  firstAskOrder,
+  ONBOARDING_STEPS,
+  type OnboardingStepId,
+  resumeAt,
+  stepIndex,
+} from "@agenteschat/client/lib/onboarding";
 import { platformZoneName } from "@agenteschat/client/lib/routines";
-import { isEmail } from "@agenteschat/client/lib/text";
+import { handleFrom, isEmail } from "@agenteschat/client/lib/text";
 import type { AgentColorName, EyeStyle } from "@agenteschat/ui/agent/engine";
 import type { TFunction } from "i18next";
 import { joinNames } from "../shared/logic";
@@ -18,6 +25,27 @@ export type StepId = (typeof STEPS)[number];
 
 /** Steps that can be skipped. */
 export const OPTIONAL: ReadonlySet<StepId> = new Set(["import", "ai", "team"]);
+
+/** The step the server keeps (the web's, `ONBOARDING_STEPS`) for a phone step: its "ai" is part of "agents". */
+export const serverStepOf = (step: StepId): OnboardingStepId => (step === "ai" ? "agents" : step);
+
+/** Where the phone resumes a step the server keeps: with no computer step, at the agents. */
+export const phoneStepOf = (step: OnboardingStepId): StepId => (step === "computer" ? "agents" : step);
+
+/** The step to save moving on to `next`, past the furthest one the server has from here (`reached`); else none. */
+export function stepToSave(next: StepId, reached: number): OnboardingStepId | null {
+  const step = serverStepOf(next);
+  return stepIndex(step) > reached ? step : null;
+}
+
+/**
+ * Whether the workspace a create gave back was taken past its first steps elsewhere (one being set up on the web
+ * comes back instead of a new one): the resume opens it as it is, nothing typed here written over it.
+ */
+export function setUpElsewhere(orgs: readonly OrgSummary[] | undefined, orgId: string): boolean {
+  const step = orgs?.find((o) => o.id === orgId)?.onboarding?.step;
+  return step !== undefined && stepIndex(step) > stepIndex("context");
+}
 
 /** The presets of the web's onboarding, in its order (the order they are created in), with the same looks and roles. */
 export const PRESETS = ["theo", "ada", "lia", "atlas"] as const;
@@ -50,6 +78,53 @@ export const DEFAULT_TEAM: readonly Preset[] = PRESETS;
 /** "Criar N agentes": the chosen ones still to create, besides the guide (as on the web). */
 export const joiningLeft = (chosen: ReadonlySet<Preset>, created: Partial<Record<Preset, string>>) =>
   PRESETS.filter((p) => p !== GUIDE && chosen.has(p) && !created[p]).length;
+
+/** An agent of the workspace, as much as telling a ready-made one needs. */
+type ListedAgent = { id: string; name: string; handle: string; appearance?: AgentLookInput | null };
+
+/**
+ * The ready-made agents a workspace has already (made here, on the web, or by a create cut short), told as the
+ * web tells them (`crewOf`): their ids and handles by preset.
+ */
+export function presetsMade(t: TFunction, agents: readonly ListedAgent[]) {
+  const made = crewOf(agents, PRESETS, (p) => {
+    const name = t(`onboarding.presets.${p}.name`);
+    return { name, handle: handleFrom(name), ...PRESET_LOOK[p] };
+  }).presets;
+  const ids: Partial<Record<Preset, string>> = {};
+  const handles: Partial<Record<Preset, string>> = {};
+  for (const p of PRESETS) {
+    const agent = made[p];
+    if (!agent) continue;
+    ids[p] = agent.id;
+    handles[p] = agent.handle;
+  }
+  return { ids, handles };
+}
+
+/**
+ * What a resume restores of the workspace being set up (`onboarding` in `me`, its agents, and whether an import came
+ * in): where it got, on the phone's steps, never behind what the workspace shows was passed (`resumeAt`); the team it
+ * has, which stays picked (the guide always, no other); the furthest step reached.
+ */
+export function resumeOf(
+  t: TFunction,
+  saved: OrgOnboarding & { orgId: string },
+  agents: readonly ListedAgent[],
+  imported = false,
+) {
+  const { ids, handles } = presetsMade(t, agents);
+  const kept = PRESETS.filter((p) => ids[p]);
+  const reached = resumeAt(saved.step, { guide: ids[GUIDE] !== undefined, imported });
+  return {
+    created: { orgId: saved.orgId, generalChannelId: saved.generalChannelId },
+    ids,
+    handles,
+    chosen: kept.length > 0 ? new Set<Preset>([GUIDE, ...kept]) : null,
+    reached,
+    step: phoneStepOf(ONBOARDING_STEPS[reached]?.id ?? saved.step),
+  };
+}
 
 /**
  * The import step's rows: the three most used apps the web brings agents from, in its order (its `IMPORT_CARDS`). The
@@ -187,7 +262,8 @@ export function askLineOf(
 }
 
 /** A step that failed: what the server's code says (a refused workspace, a restriction), else that it didn't save. */
-export const stepFailedText = (t: TFunction, error: unknown) => knownErrorText(t, error) ?? t("mobile.onb.failed");
+export const stepFailedText = (t: TFunction, error: unknown, locale?: string) =>
+  knownErrorText(t, error, locale) ?? t("mobile.onb.failed");
 
 /** Sends each invitation in turn; the addresses whose invitation failed, in order. */
 export async function inviteEach(emails: string[], invite: (email: string) => Promise<unknown>): Promise<string[]> {

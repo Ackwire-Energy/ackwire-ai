@@ -1,6 +1,7 @@
 import type { TFunction } from "i18next";
 import type { AuditQuery, AuditRow } from "../api/types";
 import { toolActivity } from "./activity";
+import { billingHoldOf } from "./billing";
 import { stepLabel } from "./work";
 
 /*
@@ -24,6 +25,16 @@ export function auditQueryOf(show: AuditShow, agentId: string | null): AuditQuer
 }
 
 export const auditStr = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+
+/** A row's reason as its panel says it: a billing hold's code in words (ADR 0079), never as it comes. */
+export function auditReason(t: TFunction, row: AuditRow): string | null {
+  const reason = auditStr(row.details.reason);
+  const billing =
+    row.action === "organization.standing_changed" && row.details.to === "hold"
+      ? billingHoldOf({ state: "hold", reason })
+      : null;
+  return billing ? t(`standing.notification.billing.${billing}`) : reason;
+}
 const lowerFirst = (s: string) => s.charAt(0).toLocaleLowerCase() + s.slice(1);
 
 /** Who did it, by name; null for the system (its sentence stands alone). */

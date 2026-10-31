@@ -67,6 +67,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
     view.picking === true ||
     status?.kind === "nobody" ||
     status?.kind === "no_ai" ||
+    status?.kind === "platform_cap" ||
     (status?.kind === "failed" && actions !== null);
   if (worded !== (part === "line")) return null;
   if (view.picking) {
@@ -82,7 +83,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
       </div>
     );
   }
-  if (view.seen.length === 0 && status?.kind !== "no_ai") return null;
+  if (view.seen.length === 0 && status?.kind !== "no_ai" && status?.kind !== "platform_cap") return null;
 
   const name = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
   const names = (ids: string[]) => joinNames(ids.map(name), t("newAgent.and"));
@@ -94,7 +95,9 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
         ? t(mentionNeeded ? "receipts.mentionNeeded" : "receipts.nobody")
         : status.kind === "no_ai"
           ? t("noAi.receipt")
-          : t(`receipts.${status.kind}`, { count: status.agents.length, names: names(status.agents) });
+          : status.kind === "platform_cap"
+            ? t("receipts.platformCap")
+            : t(`receipts.${status.kind}`, { count: status.agents.length, names: names(status.agents) });
   const label = [view.seen.length > 0 && t("receipts.seenBy", { names: names(view.seen) }), statusText]
     .filter(Boolean)
     .join(". ");
@@ -177,6 +180,11 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
             <span>{t("receipts.nobody")}</span>
           )}
           {callAgent}
+        </span>
+      )}
+      {status?.kind === "platform_cap" && (
+        <span className="ac-receipt__words">
+          <span>{t("receipts.platformCap")}</span>
         </span>
       )}
       {status?.kind === "no_ai" && (

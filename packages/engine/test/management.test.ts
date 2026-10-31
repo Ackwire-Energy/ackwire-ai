@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { noPlatformCredentials } from "@agenteschat/adapters";
-import { schema } from "@agenteschat/db";
+import { and, eq, schema } from "@agenteschat/db";
 import {
   acceptInvitation,
   agentDetail,
@@ -13,8 +13,10 @@ import {
   drainOutbox,
   ForbiddenError,
   inviteMany,
+  listAgentChannels,
   listInvitationsWithStatus,
   listRuns,
+  openDm,
   orgOverview,
   postPersonMessage,
   resendInvitation,
@@ -25,7 +27,7 @@ import {
   usageReport,
   ValidationError,
 } from "../src";
-import { addMember, addUser, type Fixture, setup } from "./fixtures";
+import { addMember, addUser, adminRoleId, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
 afterEach(() => f?.close());
@@ -64,7 +66,6 @@ describe("invitations", () => {
     const existing = await addMember(f.db, f.org.id, "member", "bia");
     const results = await inviteMany(f.db, f.owner.id, f.org.id, {
       emails: ["joao@example.com", "JOAO@example.com", "not-an-email", existing.email, "rita@example.com"],
-      role: "member",
     });
     expect(results.map((r) => [r.email, r.status])).toEqual([
       ["joao@example.com", "invited"],
@@ -72,7 +73,7 @@ describe("invitations", () => {
       [existing.email, "already_member"],
       ["rita@example.com", "invited"],
     ]);
-    const again = await inviteMany(f.db, f.owner.id, f.org.id, { emails: ["joao@example.com"], role: "member" });
+    const again = await inviteMany(f.db, f.owner.id, f.org.id, { emails: ["joao@example.com"] });
     expect(again[0]?.status).toBe("already_invited");
     const joaoInvite = results[0];
     if (joaoInvite?.status !== "invited") throw new Error("expected invite");
@@ -90,24 +91,25 @@ describe("invitations", () => {
     const later = new Date(Date.now() + 8 * 86_400_000);
     const statuses = await listInvitationsWithStatus(f.db, f.owner.id, f.org.id, later);
     expect(statuses.map((s) => [s.email, s.status])).toEqual([["rita@example.com", "expired"]]);
-    // Inviting an address that has an invitation sends that one again (a new link, the role asked), never a second.
+    // Inviting an address that has an invitation sends that one again (a new link, the roles asked), never a second.
     const rita = results[3];
     if (rita?.status !== "invited") throw new Error("expected invite");
+    const admin = await adminRoleId(f.db, f.org.id);
     const renewed = await createInvitation(
       f.db,
       f.owner.id,
       f.org.id,
-      { email: "Rita@Example.com", role: "admin" },
+      { email: "Rita@Example.com", roleIds: [admin] },
       later,
     );
-    expect(renewed.invitation).toMatchObject({ id: rita.invitationId, role: "admin" });
+    expect(renewed.invitation).toMatchObject({ id: rita.invitationId, role: "member", roleIds: [admin] });
     expect(renewed.token).not.toBe(rita.token);
     const after = await listInvitationsWithStatus(f.db, f.owner.id, f.org.id, later);
     expect(after.map((s) => [s.email, s.status])).toEqual([["rita@example.com", "pending"]]);
     const member = await addMember(f.db, f.org.id, "member");
-    await expect(
-      inviteMany(f.db, member.id, f.org.id, { emails: ["x@example.com"], role: "member" }),
-    ).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(inviteMany(f.db, member.id, f.org.id, { emails: ["x@example.com"] })).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
   });
 });
 
@@ -198,6 +200,41 @@ describe("agents, runs and usage", () => {
     await expect(
       setAgentChannels(f.db, f.owner.id, f.org.id, f.agent.id, [{ channelId: crypto.randomUUID() }]),
     ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  test("agent channel listings hide private and DM metadata from unrelated members", async () => {
+    f = await setup();
+    const outsider = await addMember(f.db, f.org.id, "member", "outsider");
+    const [secret] = await f.db
+      .insert(schema.channels)
+      .values({ orgId: f.org.id, name: "secret-project", visibility: "private", createdByUserId: f.owner.id })
+      .returning();
+    if (!secret) throw new Error("no private channel");
+    await setAgentChannels(f.db, f.owner.id, f.org.id, f.agent.id, [{ channelId: secret.id }]);
+    expect(await listAgentChannels(f.db, outsider.id, f.org.id, f.agent.id)).toEqual([]);
+    expect((await agentDetail(f.db, outsider.id, f.org.id, f.agent.id)).channels).toEqual([]);
+    expect(await listAgentChannels(f.db, f.owner.id, f.org.id, f.agent.id)).toEqual([
+      { id: secret.id, name: secret.name, autoReply: true },
+    ]);
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    expect(await listAgentChannels(f.db, outsider.id, f.org.id, f.agent.id)).toEqual([]);
+    expect((await listAgentChannels(f.db, f.owner.id, f.org.id, f.agent.id)).map((c) => c.id)).toContain(dm.id);
+  });
+
+  test("bulk agent channel settings cannot change a DM's fixed participants", async () => {
+    f = await setup();
+    const other = await addMember(f.db, f.org.id, "member", "dm-peer");
+    const peopleDm = await openDm(f.db, f.owner.id, f.org.id, { userId: other.id });
+    await expect(
+      setAgentChannels(f.db, f.owner.id, f.org.id, f.agent.id, [{ channelId: peopleDm.id }]),
+    ).rejects.toBeInstanceOf(ValidationError);
+    const agentDm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    await setAgentChannels(f.db, f.owner.id, f.org.id, f.agent.id, []);
+    const [participant] = await f.db
+      .select({ id: schema.channelMembers.id })
+      .from(schema.channelMembers)
+      .where(and(eq(schema.channelMembers.channelId, agentDm.id), eq(schema.channelMembers.agentId, f.agent.id)));
+    expect(participant).toBeDefined();
   });
 
   test("channel updates: creator or admin, unique names, #general keeps its name", async () => {

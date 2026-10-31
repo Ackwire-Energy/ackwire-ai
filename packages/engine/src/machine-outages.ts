@@ -6,6 +6,7 @@ import { brainOf, brainOptions } from "./brain-settings";
 import { isComputerBrain } from "./brains/types";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
+import { TASK_OFFLINE_GRACE_MS } from "./machine-tasks";
 import { getMachine, type MachineRow, machineOnline, machinePause, setAgentComputerTarget } from "./machines";
 import { missionTurnFor } from "./missions-engine";
 import { can, requirePermission } from "./organizations";
@@ -89,6 +90,8 @@ async function waitingRunsFor(db: Database, orgId: string, machineIds: string[],
       triggerMessageId: agentRuns.triggerMessageId,
       machineId: agentRuns.waitingMachineId,
       kind: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'kind'`,
+      /** `machine_dropped`: its turn was cut and it waits quietly for a short while. */
+      code: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'code'`,
       executed: sql<number>`coalesce(jsonb_array_length(${agentRuns.transcript}->'interruptedTurn'->'executed'), 0)`,
       routineRunId: routineRuns.id,
     })
@@ -118,7 +121,7 @@ export async function listMachineOutages(
   const { db } = deps;
   const now = deps.now?.() ?? new Date();
   const membership = await requirePermission(db, actorId, orgId, "read");
-  const admin = can(membership.role, "manage_agents");
+  const admin = can(membership, "manage_agents");
   const rows = await db
     .select()
     .from(machines)
@@ -192,6 +195,10 @@ export async function listMachineOutages(
       else entry.waiting.conversations++;
     }
     if (list.size === 0) continue;
+    // Just gone (our own restart, a blip, its runner dialing again): not an outage yet, unless a run already
+    // said it waits for it. The grace's end tells open apps to look again (`interruptOfflineMachineTasks`).
+    const fresh = now.getTime() - (m.lastSeenAt ?? m.updatedAt).getTime() < TASK_OFFLINE_GRACE_MS;
+    if (fresh && !waiting.some((r) => r.machineId === m.id && r.code !== "machine_dropped")) continue;
     const order = (id: string) => byId.get(id)?.createdAt.getTime() ?? 0;
     outages.push({
       machineId: m.id,
@@ -251,7 +258,7 @@ export async function moveAgentsFromMachine(
   const { db } = deps;
   const now = deps.now?.() ?? new Date();
   const membership = await requirePermission(db, actorId, orgId, "read");
-  const admin = can(membership.role, "manage_agents");
+  const admin = can(membership, "manage_agents");
   const from = await getMachine(db, orgId, machineId);
   if (!from) throw new NotFoundError("Computer not found", "machine.not_found");
   const agentIds = [...new Set(input.agentIds)];

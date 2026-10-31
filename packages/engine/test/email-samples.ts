@@ -26,7 +26,7 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     inviterName: "Ana Souza",
     inviterEmail: "ana@padariasouza.com.br",
     url: `${APP}/invite/T7xQ2mVb9KpL`,
-    role: "admin",
+    role: "owner",
   },
   "invite_request.en": {
     kind: "invite_request",
@@ -72,6 +72,32 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     locale: "pt-BR",
     email: "rafa@estudio.design",
     url: `${APP}/?confirm=wl_8Hq2`,
+  },
+  "early_access.en": {
+    kind: "early_access",
+    locale: "en",
+    email: "rafa@studio.design",
+    url: `${APP}/signup?email=rafa%40studio.design&access=Hk3vQ9xLm2Tz8Rb5Wc1Yd7Fg4Jn6Ps0Ua2Ve9Xi3Ko`,
+    days: 14,
+  },
+  "early_access.pt-BR": {
+    kind: "early_access",
+    locale: "pt-BR",
+    email: "rafa@estudio.design",
+    url: `${APP}/signup?email=rafa%40estudio.design&access=Hk3vQ9xLm2Tz8Rb5Wc1Yd7Fg4Jn6Ps0Ua2Ve9Xi3Ko`,
+    days: 14,
+  },
+  "early_access_allowed.en": {
+    kind: "early_access_allowed",
+    locale: "en",
+    email: "rafa@studio.design",
+    url: `${APP}/onboarding`,
+  },
+  "early_access_allowed.pt-BR": {
+    kind: "early_access_allowed",
+    locale: "pt-BR",
+    email: "rafa@estudio.design",
+    url: `${APP}/onboarding`,
   },
   "budget-warning.en": {
     kind: "budget",

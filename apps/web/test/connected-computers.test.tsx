@@ -532,15 +532,15 @@ describe("Configurações → Computadores", () => {
     expect(row.textContent).toContain("Computador deste servidor");
 
     const menu = await openMenu(within(row).getByRole("button", { name: "Ações de srv-1" }));
-    await click(within(menu).getByRole("menuitem", { name: "Parar de usar nesta organização" }));
+    await click(within(menu).getByRole("menuitem", { name: "Parar de usar neste workspace" }));
     const confirm = screen().getByRole("dialog", { name: "Parar de usar o computador deste servidor?" });
     expect(confirm.textContent).toContain("Dá para voltar a usar quando quiser");
-    await click(within(confirm).getByRole("button", { name: "Parar de usar nesta organização" }));
+    await click(within(confirm).getByRole("button", { name: "Parar de usar neste workspace" }));
     await settle(6);
     expect(state.calls.find((c) => c.method === "machines.remove")?.args).toEqual([ORG_ID, m.id]);
 
     const off = document.querySelector(".machine-row") as HTMLElement;
-    expect(off.textContent).toContain("Esta organização não usa o computador deste servidor.");
+    expect(off.textContent).toContain("Este workspace não usa o computador deste servidor.");
     await click(within(off).getByRole("button", { name: "Usar o computador deste servidor" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "machines.hostOn")?.args).toEqual([ORG_ID]);
@@ -834,7 +834,7 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
     expect(within(pc).getByRole("button", { name: "Mudar onde trabalha" })).toBeTruthy();
   });
 
-  test("browser: an agent at work in its browser stays in use between its calls (ADR 0040)", async () => {
+  test("browser: an agent at work in its browser stays in use between its calls; Ver shows its card (ADR 0040)", async () => {
     const state = seedState();
     const api = createFakeApi(state);
     const machines = fakeMachinesOf.get(api) as NonNullable<ReturnType<typeof fakeMachinesOf.get>>;
@@ -874,7 +874,16 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
     expect(card.textContent).toContain("Em uso agora");
     expect(card.textContent).not.toContain("Ninguém usa o navegador agora.");
     expect(card.querySelector(".brw-use")?.textContent).toContain("No navegador");
-    expect(within(card).getByRole("button", { name: "Ver" })).toBeTruthy();
+    // Ver shows its card in the page's own layout, not the conversation's frame. Recolher puts it away.
+    const see = within(card).getByRole("button", { name: "Ver" });
+    await act(async () => fireEvent.click(see));
+    await settle(4);
+    const browser = card.querySelector(".brw-ac") as HTMLElement;
+    expect(browser.classList.contains("brw-mf")).toBe(false);
+    await act(async () => fireEvent.click(within(browser).getByRole("button", { name: "Recolher" })));
+    await settle(2);
+    expect(card.querySelector(".brw-ac")).toBeNull();
+    expect(see.getAttribute("aria-expanded")).toBe("false");
   });
 });
 

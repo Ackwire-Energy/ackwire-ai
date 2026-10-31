@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { LiveConsult, LiveRun, Message, RunConsultation } from "@agenteschat/client";
 import { consultBlocksNearEnd, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
-import { toolCalls } from "@agenteschat/client/lib/work";
+import { toolCalls, toolNow } from "@agenteschat/client/lib/work";
 import {
   artifactsOf,
   buildRows,
@@ -347,7 +347,7 @@ describe("composer", () => {
 });
 
 describe("markdown", () => {
-  test("inline marks, links as text, mentions", () => {
+  test("inline marks, links, mentions", () => {
     expect(parseInline("Oi @theo, veja **isto** e `npm i` em [docs](https://x)")).toEqual([
       { kind: "text", text: "Oi " },
       { kind: "mention", text: "@theo" },
@@ -355,10 +355,27 @@ describe("markdown", () => {
       { kind: "bold", text: "isto" },
       { kind: "text", text: " e " },
       { kind: "code", text: "npm i" },
-      { kind: "text", text: " em docs" },
+      { kind: "text", text: " em " },
+      { kind: "link", text: "docs", href: "https://x" },
     ]);
     expect(parseInline("e-mail ana@x.com não é menção")).toEqual([
       { kind: "text", text: "e-mail ana@x.com não é menção" },
+    ]);
+  });
+  test("bare addresses are links, without trailing punctuation; only web and e-mail open", () => {
+    expect(parseInline("Aqui: https://github.com/acme/app/pull/76.")).toEqual([
+      { kind: "text", text: "Aqui: " },
+      { kind: "link", text: "https://github.com/acme/app/pull/76", href: "https://github.com/acme/app/pull/76" },
+      { kind: "text", text: "." },
+    ]);
+    expect(parseInline("(veja https://x.com/a_b_c)")).toEqual([
+      { kind: "text", text: "(veja " },
+      { kind: "link", text: "https://x.com/a_b_c", href: "https://x.com/a_b_c" },
+      { kind: "text", text: ")" },
+    ]);
+    expect(parseInline("[x](ftp://h) e ![logo](https://x/l.png) e `https://y`")).toEqual([
+      { kind: "text", text: "x e logo e " },
+      { kind: "code", text: "https://y" },
     ]);
   });
   test("blocks: paragraphs, lists, headings, quotes, code", () => {
@@ -437,6 +454,22 @@ describe("an agent's question (ask_user)", () => {
     });
     expect(hidesBody(asked)).toBe(true);
     expect(hidesBody({ ...asked, body: "Antes, uma pergunta." })).toBe(false);
+    // An agent's proposal of a new agent is its card (ADR 0081); a Connect card, with no card here, keeps its text.
+    const draft = { name: "Nina", handle: "nina", role: "", instructions: "x", appearance: null, channelIds: [] };
+    const proposal = {
+      kind: "agent_proposal",
+      forUserId: null,
+      params: { draft: { ...draft, access: [], ai: { kind: "none" } }, why: "x" },
+      state: "pending",
+      expiresAt: at(30),
+    };
+    expect(hidesBody(message({ id: "a1", author: { type: "agent", id: "dev" }, meta: { actionCard: proposal } }))).toBe(
+      true,
+    );
+    const connect = { kind: "connect_ai", forUserId: null, params: { agentIds: [], why: "x" } };
+    expect(hidesBody(message({ id: "a2", author: { type: "agent", id: "dev" }, meta: { actionCard: connect } }))).toBe(
+      false,
+    );
     const rows = buildRows([message({ id: "p", author: { type: "agent", id: "dev" }, createdAt: at(11) }), asked]);
     expect(rows.filter((r) => r.kind === "message").map((r) => r.kind === "message" && r.grouped)).toEqual([
       false,
@@ -514,6 +547,15 @@ describe("an agent's turn as one block", () => {
     expect(items[2]).toMatchObject({ kind: "steer", messageId: "m2", now: true });
     expect(items[3]).toMatchObject({ kind: "call", line: { state: "run" } });
     expect(toolCalls(items)).toBe(2);
+  });
+
+  test("a reaction already shows on the message: a turn that only reacted has no block, other tools count alone", () => {
+    expect(toolNow(turnItems(run({ runId: "r", status: "done", work: [call("1", "react", false)] })))).toBeNull();
+    const items = turnItems(
+      run({ runId: "r", work: [call("1", "mcp__agentes__react", false), call("2", "sentry_list_issues", false)] }),
+    );
+    expect(items.map((x) => (x.kind === "call" ? x.line.kind : x.kind))).toEqual(["consulting"]);
+    expect(toolCalls(items)).toBe(1);
   });
 
   test("the same call again, nothing said between: one line counting both", () => {

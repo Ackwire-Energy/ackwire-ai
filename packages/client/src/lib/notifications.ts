@@ -13,6 +13,7 @@ import type {
   NotificationKind,
   NotificationPage,
 } from "../api/types";
+import { billingHoldOf } from "./billing";
 
 export const NOTIFICATION_FILTERS: NotificationFilter[] = ["all", "mentions", "waiting", "unread", "reactions"];
 
@@ -179,6 +180,8 @@ export function workspaceHeadline(n: Pick<AppNotification, "kind" | "latest">) {
   if (n.kind === "computer_ready") return "computerSetup.notification.ready" as const;
   if (n.kind !== "org_standing") return null;
   const to = n.latest.statusTo;
+  const billing = billingHoldOf({ state: "hold", reason: n.latest.billingHold ?? null });
+  if (to === "hold" && billing) return `standing.notification.billing.${billing}` as const;
   return to === "suspended"
     ? ("standing.notification.suspended" as const)
     : to === "active"
@@ -226,7 +229,8 @@ export function replyTarget(n: AppNotification): ReplyTarget | null {
       return s.issueId ? { kind: "issue", issueId: s.issueId } : null;
     case "mention":
     case "thread_reply":
-    case "dm": {
+    case "dm":
+    case "agent_reply": {
       // A mention in an issue comment (its source may also carry the issue's channel).
       if (s.issueId) return { kind: "issue", issueId: s.issueId };
       const channelId = channelOf(n);
@@ -278,6 +282,9 @@ export function openTarget(n: AppNotification): OpenTarget | null {
   // What a routine found opens the agent's message in its conversation (below); without one, the routine.
   if (ROUTINE_TROUBLE.has(n.kind) || (n.kind === "routine_finished" && !s.messageId && !s.threadId))
     return s.routineId ? { to: "/org/$orgId/routines", search: { open: s.routineId } } : { to: "/org/$orgId/routines" };
+  // An agent's answer in its DM opens that DM, like a message there.
+  if (n.kind === "agent_reply" && s.dmId && n.actors[0]?.type === "agent")
+    return { to: "/org/$orgId/dm/agent/$agentId", params: { agentId: n.actors[0].id } };
   if (n.kind === "dm") {
     const who = n.actors[0];
     if (who?.type === "agent") return { to: "/org/$orgId/dm/agent/$agentId", params: { agentId: who.id } };

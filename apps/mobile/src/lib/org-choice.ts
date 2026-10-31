@@ -1,4 +1,19 @@
+import type { OrgSummary } from "@agenteschat/client";
+import { settingUp } from "@agenteschat/client/lib/guards";
 import type { ServerProblem } from "@agenteschat/client/lib/server";
+
+/**
+ * The workspaces the app opens (pure): not one this person is still setting up, which only the first run opens (it
+ * resumes it), so with none left the first run shows.
+ */
+export const openOrgs = <O extends OrgSummary>(orgs: readonly O[]) => orgs.filter((o) => !settingUp(o));
+
+/**
+ * Whether a tapped push about `orgId` opens its screen (pure): not for a workspace its owner is still setting up,
+ * which the app doesn't open (switching to it would land on the current one's screen instead).
+ */
+export const pushOpens = (orgs: readonly OrgSummary[], orgId: string) =>
+  !orgs.some((o) => o.id === orgId && settingUp(o));
 
 /** Picks the remembered organization if the person still belongs to it, else the first one (pure). */
 export function chooseOrg(orgs: readonly { id: string }[], remembered: string | null): string | null {

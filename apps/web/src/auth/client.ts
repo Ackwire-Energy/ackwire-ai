@@ -18,19 +18,32 @@ export type AuthResult =
 /** `humanCheck` on the email forms: the bot check's token, when the server has one (ADR 0075). */
 export interface AuthClient {
   signIn(input: { email: string; password: string }, humanCheck?: string): Promise<AuthResult>;
-  /** Creates the account, signed in; a server that sends e-mail sends the address a link that confirms it. */
-  signUp(input: { name: string; email: string; password: string }, humanCheck?: string): Promise<AuthResult>;
+  /**
+   * Creates the account, signed in; a server that sends e-mail sends the address a link that confirms it. `access`:
+   * the early-access link's token, which opens sign-up for the address it was sent to (ADR 0078).
+   */
+  signUp(
+    input: { name: string; email: string; password: string; access?: string },
+    humanCheck?: string,
+  ): Promise<AuthResult>;
   /** A new link confirming the signed-in person's own address (`email`). */
   sendVerificationEmail(email: string): Promise<AuthResult>;
-  /** Redirects the browser to the provider; comes back to `callbackURL`. */
-  signInSocial(provider: "google" | "github" | "apple", callbackURL: string): Promise<AuthResult>;
+  /**
+   * Redirects the browser to the provider; comes back to `callbackURL`, or to `/login?error=` when the server refuses.
+   * `earlyAccess`: the early-access link's token, carried through the provider's redirect.
+   */
+  signInSocial(provider: "google" | "github" | "apple", callbackURL: string, earlyAccess?: string): Promise<AuthResult>;
   /** E-mails a link to `redirectTo?token=…` (only when the server can send e-mail: `passwordReset`). */
   requestPasswordReset(input: { email: string; redirectTo: string }, humanCheck?: string): Promise<AuthResult>;
   /** The new password for the link's token; signs out every other session. */
   resetPassword(input: { token: string; newPassword: string }): Promise<AuthResult>;
   signOut(): Promise<void>;
-  /** In the browser, after a fresh sign-in: hands it to the Mac app's window waiting on `challenge` (ADR 0036). */
-  desktopHandoff(challenge: string): Promise<AuthResult>;
+  /** In the Mac app's window: opens a hand-over request for the window's challenge, returning its id and the code to show (ADR 0036). */
+  desktopOpen(challenge: string): Promise<{ requestId: string; code: string } | null>;
+  /** In the browser: the code of a pending request, to show for the person to match against the app's window. */
+  desktopRequestCode(requestId: string): Promise<string | null>;
+  /** In the browser, after a fresh sign-in and the person's confirmation: hands it to the window that opened `requestId`. */
+  desktopHandoff(requestId: string): Promise<AuthResult>;
   /** In the Mac app's window: true once the browser handed a sign-in over for this verifier (sets the cookie). */
   desktopRedeem(verifier: string): Promise<boolean>;
   /** In the app's window: a one-time sign-in from another device's link, traded once for a session of its own. */

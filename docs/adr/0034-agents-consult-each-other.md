@@ -17,7 +17,7 @@ Agents should be able to ask each other privately, and a message to the room may
 ## Decision
 
 **1. `ask_agent`: a private consultation that the asking run waits on.**
-- A built-in tool (no scope) with `agent` (handle) and `question`. Code allows only an active agent of the org other than the asker, one the person behind the run can talk to, and one not already in the chain.
+- A built-in tool (no scope) with `agent` (handle) and `question`. Code allows only an active agent of the org other than the asker, one the person behind the run can talk to, one with an AI to think with (ADR 0061: its run would only fail with `no_ai`, so the tool says so and who can connect one, and `tell_agent` too), and one not already in the chain.
 - The question is posted in the **private DM between the two agents**: a `dm` channel with key `a:<id>|a:<id>` and the two agents as its only members. No person reads it or sees it in their DMs. The consulted agent runs there (`trigger = dm`) with its own scopes; nothing is granted. Sensitive actions still need a person's approval.
 - The asking run pauses on the call's `waitId` (the generic wait of `run-resume.ts`, as for missions). When the consulted run ends, `onConsultedRunFinished` takes its reply and resumes the asker with `@infra answered: …`. A failed run resumes it with the failure. After `CONSULTATION_TTL_MS` (15 min) a worker resumes it without an answer.
 - `agent_consultations` (migration 0064) holds the asking run, both agents, the DM, the question message, the consulted run, the wait, `chain` (the agents already in the chain), status and answer.

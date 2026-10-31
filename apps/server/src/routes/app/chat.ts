@@ -83,6 +83,8 @@ export function chatRoutes(deps: AppDeps) {
             isMember: r.isMember,
             createdByUserId: r.createdByUserId,
             createdAt: r.createdAt.toISOString(),
+            categoryId: r.categoryId,
+            position: r.position,
             unreadCount: r.unreadCount,
             lastMessage: r.lastMessage ? { ...r.lastMessage, createdAt: r.lastMessage.createdAt.toISOString() } : null,
           })),
@@ -155,6 +157,7 @@ export function chatRoutes(deps: AppDeps) {
             name: z.string().min(1).max(80),
             topic: z.string().max(500).optional(),
             visibility: z.enum(["public", "private"]).optional(),
+            categoryId: z.uuid().nullable().optional().openapi({ description: "Put it in this sidebar category." }),
           }),
         ),
       },
@@ -171,6 +174,8 @@ export function chatRoutes(deps: AppDeps) {
           isMember: true,
           createdByUserId: r.createdByUserId,
           createdAt: r.createdAt.toISOString(),
+          categoryId: r.categoryId,
+          position: r.position,
         },
         201,
       );
@@ -495,7 +500,7 @@ export function chatRoutes(deps: AppDeps) {
       security,
       summary: "Once an AI is connected, the agent answers what it couldn't (Responder agora)",
       description:
-        "The id is a no-AI card (`meta.noAi`: its agent's failed run in that conversation starts again on the person's message) or the person's message (its failed `no_ai` runs start again, else it is routed again). Who asked, the agent's owner or an admin. 409 `ai.still_missing` while there's still no AI; 409 `run.not_restartable` when that run had already done something (a tool, a reply, an approval), so starting over would repeat it; 403 `audience.only` or `audience.nobody` when the agent no longer answers who asked (an agent moved onto a plan answers only its owner until they turn on \"Responde a todos\"). Pressed again, it returns the runs that answer it.",
+        "The id is a no-AI card (`meta.noAi`: its agent's failed run in that conversation starts again on the person's message) or the person's message (its failed `no_ai` runs start again, else it is routed again). Who asked, the agent's owner or an admin. 409 `ai.still_missing` while there's still no AI; 409 `run.not_restartable` when that run had already done something (a tool, a reply, an approval), so starting over would repeat it; 403 `audience.only` or `audience.nobody` when the agent no longer answers who asked (an agent moved onto a plan answers only its owner until they turn on \"Atende outras pessoas\"). Pressed again, it returns the runs that answer it.",
       request: { params: OrgParams.extend({ messageId: z.uuid() }) },
       responses: {
         200: json(z.object({ runs: z.array(z.object({ agentId: z.uuid(), runId: z.uuid() })) })),

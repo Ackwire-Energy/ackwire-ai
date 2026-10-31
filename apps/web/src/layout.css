@@ -153,6 +153,10 @@ p {
   line-height: 18px;
   color: var(--ink-muted);
 }
+/* What the person already has leads the picker: its line starts it, with no room over it. */
+.ai-picker__or:first-child {
+  margin-top: 0;
+}
 /* Its makers' marks lead its first line (an `.ac-iconline`), over the tiles' centring. */
 .grid-options--plans > .ai-picker__key {
   grid-column: 1 / -1;
@@ -641,10 +645,6 @@ p {
   gap: var(--space-2);
   line-height: 16px;
 }
-.sidebar__usage-label {
-  font-size: 11px;
-  color: var(--ink-muted);
-}
 /* A track that shows even at 0% (the sunken fill vanished on the sidebar's sky). */
 .sidebar__usage-track {
   flex: 1;
@@ -969,16 +969,26 @@ p {
   color: var(--ink-muted);
   vertical-align: 1px;
 }
-/* "Adicionar pessoa ou agente": the last row of the channel's member list. */
+/*
+ * "Adicionar pessoa ou agente": the last row of the channel's member list. Light: a dashed key the avatars' size
+ * and the rows' weight; it darkens on hover. The list keeps some air under it.
+ */
 .member-row--add {
   width: calc(100% + 16px);
+  margin-top: 4px;
   border: 0;
   background: transparent;
   font: inherit;
-  font-weight: 600;
-  color: var(--ink2);
+  font-weight: 500;
+  color: var(--ink-muted);
   text-align: left;
   cursor: pointer;
+}
+.member-row--add:hover {
+  color: var(--ink);
+}
+.ac-dialog__list:has(> .member-row--add:last-child) {
+  padding-bottom: 16px;
 }
 .member-row--add:focus-visible {
   outline: none;
@@ -989,10 +999,23 @@ p {
   place-items: center;
   width: 32px;
   height: 32px;
+  box-sizing: border-box;
   flex: none;
-  border-radius: 30%;
-  background: var(--surface-sunken);
-  box-shadow: inset 0 0 0 1px var(--line);
+  border: 1.5px dashed var(--line-strong);
+  border-radius: 30% 30% 30% 9%;
+  color: var(--ink-muted);
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+.member-row__plus .ac-icon {
+  width: 16px;
+  height: 16px;
+}
+.member-row--add:hover .member-row__plus {
+  border-style: solid;
+  border-color: var(--ink-muted);
+  color: var(--ink);
 }
 .member-group {
   display: flex;
@@ -2444,6 +2467,10 @@ p {
   overflow-y: auto;
   border-bottom: 1px solid var(--line);
 }
+/* Last in a dialog's body, the footer's line closes the list: one line there, not two. */
+.ac-dialog__body > .people-picker:last-child .people-picker__results {
+  border-bottom: 0;
+}
 
 /*
  * Markdown inside chat messages, styled for reading: line breaks
@@ -2861,6 +2888,11 @@ p {
 .skill-viewer > .row code {
   font-family: var(--font-mono);
   font-size: 12.5px;
+}
+.skill-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 /* Workspace header as a menu button; the account row stays at the bottom with the settings gear. */
 .sidebar__org-button {
@@ -3488,15 +3520,21 @@ p {
   margin-top: -36px;
   padding: 0 24px 4px;
 }
+/*
+ * The × in the corner, its ink as far from the top as from the side: the button reaches past its row by its plate and
+ * air up and down as it does sideways, so the row is its ink. 24px is the sheet's own inset, where its icon and words
+ * start, and keeps the × under the sky's densest top rows, whose lightest pixels in dark come close to its own ink. On
+ * the sky it takes the full ink: the muted one fades into a dark sky.
+ */
 .catalog-svc .ac-dialog__acts {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 24px;
+  right: 24px;
   /* In the corner, not beside the title: the kit's lift to the title's capitals doesn't apply. */
   translate: none;
 }
-/* On the sky the × takes the full ink: the muted one fades into a dark sky. */
 .catalog-svc .ac-dialog__acts > .ac-btn--glyph {
+  margin-block: calc(-1 * (var(--ghost-plate) + var(--glyph-air, 0px)));
   color: var(--ink);
 }
 .catalog-svc .ac-dialog__lead .connector-icon {
@@ -3899,6 +3937,28 @@ p {
   display: flex;
   flex-direction: column;
   font-weight: 600;
+}
+/* "Todos os agentes": the main choice, raised over the agents' own rows, which line up with its content. */
+.cflow-agent--all {
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+}
+.cflow-agent--all + .cflow-agents > .cflow-agent {
+  padding-right: 14px;
+  padding-left: 14px;
+}
+.cflow-agent__all-icon {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-agent);
+  background: var(--sunken);
+  color: var(--ink2);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 .cflow__asks {
   display: flex;
@@ -4550,7 +4610,15 @@ p {
  * paint containment, which would clip the floating action bar (it sits above the row), so a row
  * being hovered, focused, tapped open or with a menu open renders normally; so does a reply still
  * streaming. Room at the top so the first row's bar isn't cut by the scroll container.
+ * Nothing in the list shrinks. It is a column flexbox taller than its box, and a skipped row has no
+ * content to stop it shrinking (nor has a box that clips its overflow, like a range thread's context):
+ * it would be laid out at its padding, not at the size it remembers. A row that hover or focus just
+ * left stays skipped until the next frame finds it on screen, so the rows below it would move between
+ * a finger going down and lifting, and the tap would miss.
  */
+.channel__messages > * {
+  flex-shrink: 0;
+}
 .channel__messages .ac-msg {
   content-visibility: auto;
   contain-intrinsic-size: auto 56px;
@@ -4658,6 +4726,15 @@ p {
 }
 [data-theme="dark"] .sidebar__item[data-status="active"] {
   background-image: var(--sel-sky-dark, none);
+}
+/* The role, lock or state at the row's end lands on the sky's deepest cells: it gets a plate in the item's
+   own color so it stays readable. */
+.sidebar__item[data-status="active"] > .sidebar__item-meta {
+  padding: 2px 6px;
+  margin-right: -4px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--side-active) 90%, transparent);
+  color: var(--ink);
 }
 /* The icon rail is too narrow for a horizon. */
 .sidebar[data-rail="true"] .sidebar__item[data-status="active"] {
@@ -6451,6 +6528,41 @@ a.machine-row__name:hover {
 .setup-progress {
   margin: 0;
 }
+.setup-progress--steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* A plate, so it shows on a sunken well too (the AI step's wait, the setup's Computer step). */
+.setup-progress--steps .ac-chip {
+  background: var(--plate);
+}
+/* The team's lines share one cell, so the next one fades in where the last fades out. */
+.setup-says {
+  display: grid;
+  justify-items: start;
+  min-width: 0;
+}
+.setup-say {
+  grid-area: 1 / 1;
+  max-width: 100%;
+  padding-left: 2px;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.6s var(--out),
+    visibility 0s linear 0.6s;
+}
+.setup-say[data-on] {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0.15s, 0s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .setup-say {
+    transition: none;
+  }
+}
 .setup-progress--line {
   font-size: 13px;
   color: var(--ink-muted);
@@ -6904,6 +7016,8 @@ a.machine-row__name:hover {
   margin: 0;
   max-width: 62ch;
   color: var(--muted);
+  /* Criar agente's column doesn't wrap pretty, as the onboarding's does. */
+  text-wrap: pretty;
 }
 .onb__eyebrow--sky {
   color: var(--sky-ink2);
@@ -7175,12 +7289,14 @@ a.machine-row__name:hover {
 .newag__role-groups > .newag__role--blank {
   margin-top: 22px;
 }
-/* Pressable cards: the role presets, the models, the look options. */
+/* Two across while a card holds its longest name ("Atendimento", 150px) beside the face and clear of the check, one per
+   row below that. */
 .newag__roles {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 276px), 1fr));
   gap: 12px;
 }
+/* Pressable cards: the role presets, the models, the look options. */
 .newag__role,
 .newag__model,
 .newag__tip {
@@ -7188,7 +7304,7 @@ a.machine-row__name:hover {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 16px 16px 14px;
+  padding: 16px;
   border: 0;
   border-radius: 20px;
   background: var(--raised);
@@ -7222,11 +7338,6 @@ a.machine-row__name:hover {
 .newag__addrow:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
-}
-/* An `.ac-faceline` with room above it for the face's hat: the name's capitals at the face's top. */
-.newag__role-top {
-  min-height: 58px;
-  padding-top: 18px;
 }
 .newag__role-name {
   display: flex;
@@ -7537,6 +7648,11 @@ a.machine-row__name:hover {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+/* The line under the plan cards ("No plano, … só a você"): the steps have no gap, so it sits as far below them as
+   an error line or a note does. */
+.newag__models + .small {
+  margin-top: 12px;
 }
 .newag__model {
   gap: 6px;
@@ -7995,21 +8111,28 @@ a.machine-row__name:hover {
   background: var(--line);
 }
 /*
- * The key on its label's 16px line, in the label's type so the capitals are the label's: an icon's middle on their
- * middle (an `.ac-iconline` lead's place), a logo tile's top at their top (an `.ac-faceline` picture's).
+ * The key is a tile, the same as an engine's logo (`.ac-brand--sm`), so every cell's icon lines up with the next:
+ * its top at the label's capitals (an `.ac-faceline` picture's place), in the label's type so they are the label's.
  */
 .agp-cell__key {
   display: grid;
   place-items: center;
+  flex: none;
   width: 30px;
   height: 30px;
-  border-radius: 10px 10px 10px 3px;
+  border-radius: 10px 10px 10px 4px;
   color: var(--muted);
+  background: var(--raised);
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    var(--top);
   font-size: 12px;
-  translate: 0 calc(8px - var(--cap-mid) - 50%);
-}
-.agp-cell__key:has(> .ac-brand) {
   translate: 0 calc(8px - var(--cap-top));
+}
+/* A logo brings its own tile. */
+.agp-cell__key:has(> .ac-brand) {
+  background: none;
+  box-shadow: none;
 }
 .agp-cell__key .ac-brand--sm {
   border-radius: inherit;
@@ -8095,6 +8218,17 @@ a.machine-row__name:hover {
   width: 40px;
   height: 4px;
 }
+/* A plan's limits read like the facts beside them: the line, its small bar, then the state near the limit. */
+.agp-number .ac-planmeter--compact {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  font-size: inherit;
+}
+.agp-number .ac-planmeter__line {
+  color: inherit;
+}
 /* The sentence's dialogs: the note by the buttons (the plan, or what the choice does). */
 .agp-wdlg__note {
   color: var(--muted);
@@ -8168,10 +8302,11 @@ a.machine-row__name:hover {
   font-weight: 600;
 }
 /*
- * "Responde a todos" (`PlanReplies`), under a plan's account and at the end of a plan's panel: its label with the
- * switch at the end of its line, the switch's middle on the label's capitals' middle as an `.ac-iconline` lead's is;
- * under them the plan's terms with their ⓘ, under the switch too, so the few words keep one line on a phone. The
- * label is in the type of the switches beside it (a plan's panel gives its own).
+ * "Atende outras pessoas" (`PlanReplies`), under a plan's account and at the end of a plan's panel: its label with
+ * the switch at the end of its line, the switch's middle on the label's capitals' middle as an `.ac-iconline` lead's
+ * is; under them the line saying whom the agent answers, the plan's terms behind its ⓘ, under the switch too, so the
+ * sentence has the whole width on a phone. The label is in the type of the switches beside it (a plan's panel gives
+ * its own).
  */
 .plan-replies {
   display: grid;
@@ -9215,6 +9350,20 @@ a.machine-row__name:hover {
   color: var(--muted);
   font-size: 12.5px;
 }
+.agp-dz + .agp-dz {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+/* Deleting an agent: what goes and what stays, over the name to type. */
+.agp-delete {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+  color: var(--ink2);
+}
 /* The save bar and its list of changes */
 .agp-savebar {
   position: sticky;
@@ -9708,22 +9857,127 @@ html[data-menu-overlay] .shell {
   flex-direction: column;
   gap: 2px;
 }
-.sidebar__section[data-open="false"] .sidebar__section-body > :not([data-status="active"]) {
+.sidebar__section[data-open="false"]
+  .sidebar__section-body
+  > :not([data-status="active"], :has(> [data-status="active"])) {
   display: none;
 }
-/* The + on a category header shows on hover or focus (always on touch screens). */
+/* The + (or …) on a category header shows on hover or focus (always on touch screens). */
 .sidebar__section-add {
   opacity: 0;
   transition: opacity 0.15s;
 }
 .sidebar__section-head:hover .sidebar__section-add,
-.sidebar__section-add:focus-visible {
+.sidebar__section-add:focus-visible,
+.sidebar__section-add[data-state="open"] {
   opacity: 1;
+}
+/*
+ * Channel categories (ADR 0080). Closed, a category also keeps its unread channels in sight, not only the open
+ * one (the rule above hides the rest).
+ */
+.sidebar__section--category[data-open="false"] .sidebar__section-body > [data-unread="true"] {
+  display: flex;
+}
+.sidebar__new-category {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: var(--ink-muted);
+  text-align: left;
+  cursor: pointer;
+}
+.sidebar__new-category:hover {
+  color: var(--ink);
+}
+/* Dragging a channel or a category: a 2px line where it lands, or the header that takes it. */
+.sidebar [data-drop="before"] {
+  box-shadow: inset 0 2px 0 var(--ink);
+}
+.sidebar [data-drop="after"] {
+  box-shadow: inset 0 -2px 0 var(--ink);
+}
+.sidebar [data-drop="into"] {
+  background: var(--plate);
+}
+.channel-category__channel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.channel-category__channel .ac-icon {
+  color: var(--faint);
+}
+/* The fields above a list keep their height; the list is what scrolls. */
+.channel-category__fields {
+  flex: none;
+  overflow: visible;
+}
+.channel-category__add {
+  margin-top: 4px;
+}
+.channel-details__archive {
+  color: var(--danger);
 }
 @media (hover: none) {
   .sidebar__section-add {
     opacity: 1;
   }
+}
+/* An agent's row with its "…" (owners and admins: its group), over the row's end on hover or focus, where it
+   takes the place of the role or the count. Touch screens move agents from the agent's page. */
+.sidebar__row {
+  position: relative;
+  display: flex;
+}
+.sidebar__row > .sidebar__item {
+  flex: 1;
+  min-width: 0;
+}
+.sidebar__row-menu.ac-btn {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  /* `translate`, not `transform`: the button's press (`transform: scale(…)`) would drop the centering and jump it. */
+  translate: 0 -50%;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.sidebar__row:hover > .sidebar__row-menu,
+.sidebar__row-menu:focus-visible,
+.sidebar__row-menu[data-state="open"] {
+  opacity: 1;
+}
+.sidebar__row:hover:has(> .sidebar__row-menu) > .sidebar__item > :is(.sidebar__item-meta, .sidebar__unread),
+.sidebar__row:has(> .sidebar__row-menu:is(:focus-visible, [data-state="open"]))
+  > .sidebar__item
+  > :is(.sidebar__item-meta, .sidebar__unread) {
+  visibility: hidden;
+}
+@media (hover: none) {
+  .sidebar__row-menu.ac-btn {
+    display: none;
+  }
+}
+/* Dragging an agent: the category it would land in, and inside a group the line where it would go. */
+.sidebar__section[data-drop="true"] {
+  border-radius: var(--control-r-sm);
+  background: var(--plate-soft);
+}
+.sidebar__drop-line {
+  height: 3px;
+  margin: -2px 8px;
+  border-radius: 2px;
+  background: var(--ink);
+  opacity: 0.55;
+}
+/* An empty group, for whoever organizes: where its agents go, in the column of the agents' names. */
+.sidebar__drop-hint {
+  padding: 6px 8px 6px 36px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--faint);
 }
 /* More: the other tools in a panel beside the sidebar, each with a line on what it is for. */
 .sidebar__more {
@@ -10097,8 +10351,18 @@ html[data-menu-overlay] .shell {
 /* As far in from the panel's right edge as from its left, so its words keep the text's column on both sides. */
 .ai-panel__wait {
   padding: 12px var(--text-edge);
-  /* Short lines: wrapped, they break into two of a length. */
+}
+/* Short lines break into two of a length: under the steps' bar all of them, without it only the status or hold line.
+   The e-mail line then runs the bar's column, so the well isn't empty on its right. */
+.ai-panel__wait:has(> .setup-progress),
+.ai-panel__wait > [role="status"] {
   text-wrap: balance;
+}
+/* Without pretty (Safari before 26) the e-mail line would end on a word alone. */
+@supports not (text-wrap: pretty) {
+  .ai-panel__wait {
+    text-wrap: balance;
+  }
 }
 /* Its words, and the steps' bar on them, as far from its right edge as from its left: 14 px, then the 22 px the icons
    hang in before them. */
@@ -10145,7 +10409,7 @@ html[data-menu-overlay] .shell {
     padding-bottom: calc(16px + var(--cap-top) - 2 * var(--cap-mid) - 0.5lh);
   }
 }
-/* Who the agents reply to ends a plan's panel, as its foot: the icon on the switch's line in the mark's column, the
+/* Who the agents answer ends a plan's panel, as its foot: the icon on the switch's line in the mark's column, the
    words in the panel's type on the text's. */
 .ai-panel__replies {
   font-size: 14px;
@@ -10159,6 +10423,15 @@ html[data-menu-overlay] .shell {
 /* The Computer step's lines are the well's own, at its gap. */
 .onb__wait > .setup-wait {
   display: contents;
+}
+/* So are the team's line and the steps under it, in both wells. */
+.onb__wait .setup-progress--steps,
+.ai-panel__wait > .setup-progress--steps {
+  display: contents;
+}
+/* Boxless there, the steps take the wait's words edge themselves, as the time left under them does. */
+.onb__wait .setup-progress--steps > * {
+  margin-left: 22px;
 }
 /* "All agents": each agent's face and name, then done, signing in, or nothing while it waits. One line each, so its
    face and mark centre on it. */
@@ -10437,4 +10710,89 @@ html[data-menu-overlay] .shell {
   font-size: 12px;
   line-height: 16px;
   color: var(--ink-muted);
+}
+
+/* The notifications dialog (WebPush.tsx `WebPushAsk`, ADR 0071): three notifications as the computer shows them,
+   stacked like the phone's sheet, then "Ativar avisos" and "Agora não" full width. */
+.web-push-ask {
+  gap: 16px;
+}
+.web-push-ask__examples {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.web-push-ask__example {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--raised);
+  box-shadow: var(--e2);
+}
+.web-push-ask__example img {
+  flex: none;
+  border-radius: 8px;
+}
+.web-push-ask__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.web-push-ask__top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.web-push-ask__top strong {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.web-push-ask__top span {
+  font-size: 12px;
+  color: var(--faint);
+}
+.web-push-ask__body {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.web-push-ask__acts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Configurações › Notificações (NoticePrefs.tsx, ADR 0071 §8): settings rows with the kind's icon before its name
+   and a switch or a chip at the end. The icon sits in the agent page cells' tile (`.agp-cell__key`). */
+.notice-prefs__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px 10px 10px 4px;
+  color: var(--muted);
+  background: var(--raised);
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    var(--top);
+}
+.notice-prefs__control {
+  flex: none;
+  display: flex;
+  align-items: center;
 }

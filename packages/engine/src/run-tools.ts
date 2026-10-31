@@ -1,11 +1,13 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, inArray, type SQL, schema, sql } from "@agenteschat/db";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
+import { followWork } from "./agent-status";
 import { publishApproval } from "./approvals";
 import type { BrainTool, ToolResult } from "./brains/types";
 import { consultationCardThread, consultationOrigin } from "./consultations";
 import { NotFoundError } from "./errors";
 import { type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
+import type { Judge } from "./judge";
 import { insertMessage, type Message, messageView } from "./messages";
 import { notifyMissionApproval } from "./mission-tools";
 import { notifyQuestion } from "./notification-producers";
@@ -327,7 +329,8 @@ export async function takeBridgeEffects(db: Database, runId: string): Promise<To
 
 /** What `invokeWithChip` needs: the run's tool context, where its events go and the tools of this turn. */
 export interface RunToolScope {
-  deps: { db: Database; pubsub?: PubSub };
+  /** `judge`: checks an agent's own status line against its step (ADR 0084 §10); none, no check. */
+  deps: { db: Database; pubsub?: PubSub; judge?: Judge | null };
   tools: ToolGateway;
   ctx: ToolContext;
   where: RunWhere;
@@ -377,6 +380,8 @@ export async function invokeWithChip(
         (await artifactToolDetail(deps.db, ctx.orgId, ctx.channelId, use.name, input).catch(() => undefined)))
       : undefined;
   const code = builtIn ? toolCode(use.name, input) : undefined;
+  // The agent's line follows what it does now (ADR 0084 §10), beside the call, never in its way.
+  if (def) void followWork(deps, ctx, def).catch(() => {});
   await publishChannelEvent(deps.pubsub, {
     type: "agent.tool",
     ...where,

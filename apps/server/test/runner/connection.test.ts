@@ -5,6 +5,7 @@ import {
   type BrowserTraffic,
   MACHINE_PROTOCOL_VERSION,
   type MachineLoad,
+  type MachineRequest,
   type RunnerInfo,
   type ServerFrame,
 } from "@agenteschat/adapters/machine-protocol";
@@ -17,8 +18,9 @@ import {
   type Socket,
   type SocketHandlers,
 } from "../../runner/connection";
+import { MIN_FREE_BYTES } from "../../runner/desktop-session";
 import { RunnerError } from "../../runner/errors";
-import { RequestRunner } from "../../runner/handlers";
+import { MAX_IN_FLIGHT, RequestRunner, TURN_BYTES, TURN_SETTLE_MS, TURNS_WITHOUT_MEMORY } from "../../runner/handlers";
 import { removeDirs, tempDir, waitFor } from "./helpers";
 
 const dirs: string[] = [];
@@ -190,6 +192,30 @@ test("protocol 23: the browsers' traffic rides on the next pong once per new sum
   await done;
 });
 
+test("the welcome says whether the server runs a task's call once: the MCP side hears it before the tasks", async () => {
+  const heard: string[] = [];
+  const { sockets, connection } = setup({
+    mcp: { attach: (_send, server) => heard.push(`mcp ${server?.mcpOnce}`), detach() {}, result() {} },
+    tasks: { list: () => [], attach: () => heard.push("tasks"), detach() {}, ack() {} },
+  });
+  const done = connection.run();
+  const open = async (i: number, welcome: Partial<Extract<ServerFrame, { type: "welcome" }>>) => {
+    await waitFor(() => sockets.length === i + 1);
+    const s = sock(sockets, i);
+    s.handlers.onOpen();
+    await waitFor(() => s.sent.length === 1);
+    s.frame({ type: "welcome", machineId: "m1", name: "Box", heartbeatMs: 25_000, ...welcome });
+  };
+  await open(0, { mcpOnce: true });
+  expect(heard).toEqual(["mcp true", "tasks"]);
+  // An older server says nothing: a call cut by a drop isn't sent to it again.
+  connection.reconnect();
+  await open(1, {});
+  expect(heard.slice(2)).toEqual(["mcp false", "tasks"]);
+  connection.stop();
+  await done;
+});
+
 test("tasks: hello carries the journal, each welcome re-sends unacknowledged task.done, task.ack marks it", async () => {
   const done = { taskId: "t1", exitCode: 0, seconds: 3 };
   let delivered = false;
@@ -285,26 +311,38 @@ test("reconnect(): drops the welcomed socket and dials again without backoff; wh
   expect((await done).reason).toBe("stopped");
 });
 
-test("a browser command is logged when it ends, with how long it took", async () => {
+test("a browser command is logged when it ends, with how long it took and what it waited on first", async () => {
   const lines: string[] = [];
   const ws = tempDir();
   dirs.push(ws);
+  const setup = { launch: 1400, worker: 1200, install: 28_140, bogus: 7 };
   const runner = new RequestRunner(
     { workspaceReal: ws, exec: true, token: "agm_x" },
     () => {},
     (l) => lines.push(l),
-    async (_ctx, req) => (req.op === "browser.act" && req.command === "click" ? { success: false } : { success: true }),
+    async (_ctx, req) => {
+      if (req.op === "browser.warm") return { started: true, setup: { desktop: 2300, launch: 1400 } };
+      if (req.op === "browser.batch") return { answers: [], setup };
+      return req.op === "browser.act" && req.command === "click" ? { success: false, setup } : { success: true };
+    },
   );
   const agent = { id: "01a142cb-489d-7000-87a3-efb5adb382ca", handle: "dev" };
   await runner.start("a", { op: "browser.act", agent, command: "snapshot", args: [], timeoutSeconds: 30 });
   await runner.start("b", { op: "browser.act", agent, command: "click", args: ["@e1"], timeoutSeconds: 30 });
   await runner.start("c", { op: "list", path: "", depth: 1 });
+  const open = { command: "open", args: ["https://a.example/"], timeoutSeconds: 60 };
+  await runner.start("d", { op: "browser.batch", agent, commands: [open] });
+  await runner.start("e", { op: "browser.warm", agent, desktop: true });
   expect(lines[0]).toMatch(/^\[dev\] browser\.act snapshot \d+ms$/);
-  expect(lines[1]).toMatch(/^\[dev\] browser\.act click \d+ms \(failed\)$/);
+  expect(lines[1]).toMatch(
+    /^\[dev\] browser\.act click \d+ms \(failed, worker 1\.2 s, install 28\.1 s, launch 1\.4 s\)$/,
+  );
   expect(lines[2]).toBe("list .");
+  expect(lines[3]).toMatch(/^\[dev\] browser\.batch open \d+ms \(worker 1\.2 s, install 28\.1 s, launch 1\.4 s\)$/);
+  expect(lines[4]).toMatch(/^\[dev\] browser\.warm \(desktop\) \d+ms \(desktop 2\.3 s, launch 1\.4 s\)$/);
 });
 
-test("requests run concurrently up to 8; beyond that the runner answers busy (never to a person's view); cancel aborts", async () => {
+test("requests run concurrently up to the ceiling; beyond it the runner answers busy (never to a person's view); cancel aborts", async () => {
   const ws = tempDir();
   dirs.push(ws);
   const sent: Record<string, unknown>[] = [];
@@ -319,10 +357,12 @@ test("requests run concurrently up to 8; beyond that the runner answers busy (ne
         scope.signal.addEventListener("abort", () => reject(new RunnerError("internal", "Canceled")));
       }),
   );
-  const started = Array.from({ length: 8 }, (_, i) => runner.start(`r${i}`, { op: "list", path: "", depth: 1 }));
-  expect(runner.size).toBe(8);
-  await runner.start("r8", { op: "list", path: "", depth: 1 });
-  expect(sent).toEqual([{ type: "result", id: "r8", ok: false, error: { code: "internal", message: "busy" } }]);
+  const started = Array.from({ length: MAX_IN_FLIGHT }, (_, i) =>
+    runner.start(`r${i}`, { op: "list", path: "", depth: 1 }),
+  );
+  expect(runner.size).toBe(MAX_IN_FLIGHT);
+  await runner.start("over", { op: "list", path: "", depth: 1 });
+  expect(sent).toEqual([{ type: "result", id: "over", ok: false, error: { code: "internal", message: "busy" } }]);
   // A person's view of an agent still opens on a computer full of agents' work.
   const agent = { id: "01a142cb-489d-7000-87a3-efb5adb382ca", handle: "dev" };
   const view = runner.start("v", {
@@ -332,7 +372,7 @@ test("requests run concurrently up to 8; beyond that the runner answers busy (ne
     mode: "watch",
     agent,
   });
-  expect(runner.size).toBe(9);
+  expect(runner.size).toBe(MAX_IN_FLIGHT + 1);
   expect(sent).toHaveLength(1);
 
   runner.cancel("r0");
@@ -347,4 +387,68 @@ test("requests run concurrently up to 8; beyond that the runner answers busy (ne
   await Promise.all([...started, view]);
   expect(sent.length).toBe(3);
   expect(runner.size).toBe(0);
+});
+
+test("a brain turn starts only while the computer has room; recent ones count until they grow; elsewhere a count", async () => {
+  const ws = tempDir();
+  dirs.push(ws);
+  const sent: { id: string; ok: boolean; error?: { code: string } }[] = [];
+  const release = new Map<string, () => void>();
+  let free: number | null = MIN_FREE_BYTES + 2 * TURN_BYTES + 1;
+  let now = 1_000_000;
+  let paused = false;
+  const runner = new RequestRunner(
+    { workspaceReal: ws, exec: true, token: "agm_x", paused: () => paused },
+    (f) => sent.push(f as unknown as (typeof sent)[number]),
+    () => {},
+    (_ctx, req, scope) =>
+      new Promise((resolve, reject) => {
+        if (paused) return reject(new RunnerError("paused", "Paused by its owner"));
+        release.set((req as { runId?: string }).runId ?? req.op, () => resolve({}));
+        scope.signal.addEventListener("abort", () => reject(new RunnerError("internal", "Canceled")));
+      }),
+    { memAvailable: () => free, now: () => now },
+  );
+  const running: Promise<void>[] = [];
+  const start = (id: string, op = "brain.turn") => {
+    const started = runner.start(id, { op, runId: id } as unknown as MachineRequest);
+    running.push(started);
+    return started;
+  };
+  const refused = () => sent.filter((f) => !f.ok).map((f) => `${f.id}:${f.error?.code}`);
+
+  // Room for three: each one admitted counts for what it will take until the reading shows it.
+  for (const id of ["t1", "t2", "t3", "t4"]) start(id);
+  expect(refused()).toEqual(["t4:no_slot"]);
+  // Other requests (a turn's own tool calls, a background task with its own count) never wait for room.
+  start("task", "task.start");
+  running.push(runner.start("list", { op: "list", path: "", depth: 1 }));
+  expect(runner.size).toBe(5);
+
+  // Grown since: the reading shows them, so they no longer count on top of it.
+  now += TURN_SETTLE_MS;
+  free = MIN_FREE_BYTES + TURN_BYTES / 2;
+  start("t5");
+  start("t6");
+  expect(refused()).toEqual(["t4:no_slot", "t6:no_slot"]);
+
+  // A paused computer says so, never that it is full.
+  paused = true;
+  await start("t7");
+  expect(refused().at(-1)).toBe("t7:paused");
+  paused = false;
+
+  // Where the memory isn't known (not Linux), a count of the ones running.
+  free = null;
+  for (let i = 0; i < TURNS_WITHOUT_MEMORY - 4; i++) start(`c${i}`);
+  start("c-over");
+  expect(refused().at(-1)).toBe("c-over:no_slot");
+  release.get("t1")?.();
+  await running[0];
+  start("c-next");
+  expect(refused().at(-1)).toBe("c-over:no_slot");
+  expect(runner.size).toBe(TURNS_WITHOUT_MEMORY + 2);
+
+  runner.close();
+  await Promise.all(running);
 });

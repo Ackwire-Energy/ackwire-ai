@@ -131,8 +131,11 @@ describe("org storage", () => {
 
     const after = await createArtifact(f.artifactDeps, person(f.owner.id), f.org.id, doc("Depois"));
     const objects = [...(f.s3.buckets.get("acme-files")?.keys() ?? [])];
-    expect(objects).toEqual([`agentes/artifacts/${after.id}/v1`]);
-    expect(f.platformBlobs.objects.has(`orgs/${f.org.id}/artifacts/${before.id}/v1`)).toBe(true);
+    expect(objects).toHaveLength(1);
+    expect(objects[0]?.startsWith(`agentes/artifacts/${after.id}/v1-`)).toBe(true);
+    expect(
+      [...f.platformBlobs.objects.keys()].some((k) => k.startsWith(`orgs/${f.org.id}/artifacts/${before.id}/v1-`)),
+    ).toBe(true);
     expect((await getArtifact(f.artifactDeps, person(f.owner.id), f.org.id, before.id)).content).toEqual(
       doc("Antes").content,
     );
@@ -141,13 +144,15 @@ describe("org storage", () => {
     );
     // Downloads of bucket files are signed by the bucket (and the signature holds).
     const link = await artifactDownload(f.artifactDeps, f.owner.id, f.org.id, after.id);
-    expect(link.url.startsWith(`https://s3.example.com/acme-files/agentes/artifacts/${after.id}/v1?`)).toBe(true);
+    expect(link.url.startsWith(`https://s3.example.com/acme-files/agentes/artifacts/${after.id}/v1-`)).toBe(true);
     expect(await (await f.s3.fetch(link.url, { method: "GET" })).text()).toBe("# Depois");
 
     // Back to platform storage: new files go there; bucket files still read.
     await saveStorage(f.storage, f.owner.id, f.org.id, { kind: "agentes" });
     const back = await createArtifact(f.artifactDeps, person(f.owner.id), f.org.id, doc("De volta"));
-    expect(f.platformBlobs.objects.has(`orgs/${f.org.id}/artifacts/${back.id}/v1`)).toBe(true);
+    expect(
+      [...f.platformBlobs.objects.keys()].some((k) => k.startsWith(`orgs/${f.org.id}/artifacts/${back.id}/v1-`)),
+    ).toBe(true);
     expect((await getArtifact(f.artifactDeps, person(f.owner.id), f.org.id, after.id)).title).toBe("Depois");
   });
 
@@ -189,6 +194,64 @@ describe("org storage", () => {
     expect(await getMigration(f.db, f.owner.id, f.org.id)).toMatchObject({ status: "done", copied: 0, total: 0 });
   });
 
+  test("the migration deletes the source copy and skips trashed artifacts", async () => {
+    f = await setup();
+    const keep = await createArtifact(f.artifactDeps, person(f.owner.id), f.org.id, doc("Fica"));
+    const trash = await createArtifact(f.artifactDeps, person(f.owner.id), f.org.id, doc("Lixo"));
+    await deleteArtifact(f.artifactDeps, f.owner.id, f.org.id, trash.id);
+    await testStorage(f.storage, f.owner.id, f.org.id, bucket());
+    await saveStorage(f.storage, f.owner.id, f.org.id, { kind: "s3", s3: bucket() });
+
+    const [before] = await f.db
+      .select()
+      .from(schema.artifactVersions)
+      .where(eq(schema.artifactVersions.artifactId, keep.id));
+    if (!before) throw new Error("no version row");
+    const sourceKey = before.blobKey;
+    expect(f.platformBlobs.objects.has(sourceKey)).toBe(true);
+
+    // Only the live artifact counts; without the live-only filter this would be 2.
+    expect(await startMigration(f.storage, f.owner.id, f.org.id)).toMatchObject({ status: "running", total: 1 });
+    await drainOutbox(f.db, f.handlers);
+    expect(await getMigration(f.db, f.owner.id, f.org.id)).toMatchObject({ status: "done", copied: 1 });
+
+    // The live file moved to the bucket and its source copy was deleted (no pile-up when cycling storages).
+    expect(f.s3.buckets.get("acme-files")?.size).toBe(1);
+    expect(f.platformBlobs.objects.has(sourceKey)).toBe(false);
+    expect((await getArtifact(f.artifactDeps, person(f.owner.id), f.org.id, keep.id)).content).toEqual(
+      doc("Fica").content,
+    );
+  });
+
+  test("the migration keeps a workspace's own bucket copy; only platform copies are freed", async () => {
+    f = await setup();
+    const art = await createArtifact(f.artifactDeps, person(f.owner.id), f.org.id, doc("Minha"));
+    await testStorage(f.storage, f.owner.id, f.org.id, bucket());
+    await saveStorage(f.storage, f.owner.id, f.org.id, { kind: "s3", s3: bucket() });
+    await startMigration(f.storage, f.owner.id, f.org.id);
+    await drainOutbox(f.db, f.handlers);
+
+    // The version now lives in the workspace's own bucket.
+    const [onBucket] = await f.db
+      .select()
+      .from(schema.artifactVersions)
+      .where(eq(schema.artifactVersions.artifactId, art.id));
+    if (!onBucket?.storageConfigId) throw new Error("expected the version on the bucket");
+    const bucketKey = onBucket.blobKey;
+    expect(f.s3.buckets.get("acme-files")?.has(bucketKey)).toBe(true);
+
+    // Switch back to the platform and migrate: the bucket copy is theirs and must be kept, not deleted.
+    await saveStorage(f.storage, f.owner.id, f.org.id, { kind: "agentes" });
+    await startMigration(f.storage, f.owner.id, f.org.id);
+    await drainOutbox(f.db, f.handlers);
+    const [backOnPlatform] = await f.db
+      .select()
+      .from(schema.artifactVersions)
+      .where(eq(schema.artifactVersions.artifactId, art.id));
+    expect(backOnPlatform?.storageConfigId).toBeNull();
+    expect(f.s3.buckets.get("acme-files")?.has(bucketKey)).toBe(true);
+  });
+
   test("credentials never leak: hints only, sealed at rest, not in the audit log", async () => {
     f = await setup();
     await testStorage(f.storage, f.owner.id, f.org.id, bucket());
@@ -199,7 +262,12 @@ describe("org storage", () => {
     const rows = await f.db.select().from(schema.storageConfigs);
     expect(JSON.stringify(rows)).not.toContain(SECRET);
     const audit = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.orgId, f.org.id));
-    expect(audit.map((a) => a.action).sort()).toEqual(["storage.activated", "storage.test_passed"]);
+    expect(
+      audit
+        .map((a) => a.action)
+        .filter((a) => a.startsWith("storage."))
+        .sort(),
+    ).toEqual(["storage.activated", "storage.test_passed"]);
     expect(JSON.stringify(audit)).not.toContain(SECRET);
     // Re-testing with empty keys reuses the stored ones.
     const again = await testStorage(f.storage, f.owner.id, f.org.id, {

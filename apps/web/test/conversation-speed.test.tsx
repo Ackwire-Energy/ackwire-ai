@@ -147,14 +147,40 @@ describe("conversations load fast", () => {
     expect(list.scrollTop).toBe(3000);
   });
 
-  test("?m= (a copied link): pages back to the message, scrolls to it and highlights it", async () => {
+  test("?m= (a copied link): pages back to the message, scrolls to it, centres it again once the rows around it are drawn, and highlights it", async () => {
     const state = seedState();
     state.messages = [...history(130), ...state.messages];
+    // A browser frame: its animation callbacks run, then it is drawn (only then do rows near the screen get their
+    // real height, `content-visibility`).
+    let drawn = 0;
+    let ids = 0;
+    const frame = new Map<number, FrameRequestCallback>();
+    const realFrames = {
+      requestAnimationFrame: globalThis.requestAnimationFrame,
+      cancelAnimationFrame: globalThis.cancelAnimationFrame,
+    };
+    Object.assign(globalThis, {
+      requestAnimationFrame: (cb: FrameRequestCallback) => {
+        if (frame.size === 0)
+          setTimeout(() => {
+            const run = [...frame.values()];
+            frame.clear();
+            for (const f of run) f(performance.now());
+            drawn += 1;
+          }, 0);
+        frame.set(++ids, cb);
+        return ids;
+      },
+      cancelAnimationFrame: (id: number) => frame.delete(id),
+    });
     const scrolled: string[] = [];
+    const drawnAt: number[] = [];
     const proto = HTMLElement.prototype as unknown as { scrollIntoView?: () => void };
     const before = proto.scrollIntoView;
     proto.scrollIntoView = function (this: HTMLElement) {
-      scrolled.push(this.getAttribute("data-message-id") ?? "");
+      const id = this.getAttribute("data-message-id") ?? "";
+      scrolled.push(id);
+      if (id === "h-10") drawnAt.push(drawn);
     };
     // The highlight lasts a couple of seconds: seen at any point, not only at the end (a slow CI).
     let highlighted = false;
@@ -168,10 +194,13 @@ describe("conversations load fast", () => {
       // h-10 isn't in the latest page (h-30…h-129): one older page brings it.
       expect(document.body.textContent).toContain("Mensagem antiga 10");
       expect(scrolled).toContain("h-10");
+      // Not in an animation callback, which runs before its frame draws them.
+      expect(drawnAt.at(-1) ?? 0).toBeGreaterThan(drawnAt[0] ?? 0);
       expect(highlighted).toBe(true);
     } finally {
       watch.disconnect();
       proto.scrollIntoView = before;
+      Object.assign(globalThis, realFrames);
     }
   });
 });

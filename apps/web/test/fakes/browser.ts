@@ -16,6 +16,8 @@ export interface FakeBrowser {
   desktops: Map<string, Partial<DesktopStatus>>;
   /** Agents whose computer this person may not watch (`GET …/desktop` answers 403). */
   forbidden: Set<string>;
+  /** Agents whose screen this person may watch but not drive (`GET …/control` answers false). */
+  watchOnly: Set<string>;
 }
 
 const NO_DESKTOP: DesktopStatus = {
@@ -49,6 +51,7 @@ export function createFakeBrowser(
   const handoffs = new Map<string, BrowserHandoff>();
   const desktops = new Map<string, Partial<DesktopStatus>>();
   const forbidden = new Set<string>();
+  const watchOnly = new Set<string>();
   const openOn = (agentId: string, screen: BrowserHandoff["screen"] = "browser") =>
     [...handoffs.values()].find(
       (h) => h.agentId === agentId && handoffScreen(h) === screen && (h.status === "pending" || h.status === "active"),
@@ -81,6 +84,7 @@ export function createFakeBrowser(
       log("browser.agentHandoff", orgId, agentId);
       return openOn(agentId, screen);
     },
+    agentControl: async (_orgId, agentId) => !watchOnly.has(agentId),
     handoff: async (_orgId, handoffId) => find(handoffId),
     takeControl: async (orgId, handoffId) => {
       log("browser.takeControl", orgId, handoffId);
@@ -159,5 +163,5 @@ export function createFakeBrowser(
       };
     },
   };
-  return { client, desktop, settings, handoffs, desktops, forbidden };
+  return { client, desktop, settings, handoffs, desktops, forbidden, watchOnly };
 }

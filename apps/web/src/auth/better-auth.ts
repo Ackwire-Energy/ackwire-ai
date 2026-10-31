@@ -1,3 +1,4 @@
+import { EARLY_ACCESS_HEADER } from "@agenteschat/client/lib/guards";
 import { humanCheckHeaders } from "@agenteschat/client/lib/human-check";
 import { createAuthClient } from "better-auth/client";
 import type { AuthClient, AuthResult } from "./client";
@@ -36,14 +37,31 @@ export function createBetterAuthClient(origin = window.location.origin, language
         (await client.signIn.email({ email, password, fetchOptions: { headers: humanCheckHeaders(humanCheck) } }))
           .error,
       ),
-    signUp: async ({ name, email, password }, humanCheck) =>
+    signUp: async ({ name, email, password, access }, humanCheck) =>
       toResult(
-        (await client.signUp.email({ name, email, password, fetchOptions: { headers: humanCheckHeaders(humanCheck) } }))
-          .error,
+        (
+          await client.signUp.email({
+            name,
+            email,
+            password,
+            fetchOptions: {
+              headers: { ...humanCheckHeaders(humanCheck), ...(access ? { [EARLY_ACCESS_HEADER]: access } : {}) },
+            },
+          })
+        ).error,
       ),
     sendVerificationEmail: async (email) => toResult((await client.sendVerificationEmail({ email })).error),
-    signInSocial: async (provider, callbackURL) =>
-      toResult((await client.signIn.social({ provider, callbackURL, errorCallbackURL: "/login" })).error),
+    signInSocial: async (provider, callbackURL, earlyAccess) =>
+      toResult(
+        (
+          await client.signIn.social({
+            provider,
+            callbackURL,
+            errorCallbackURL: "/login",
+            ...(earlyAccess ? { additionalData: { earlyAccess } } : {}),
+          })
+        ).error,
+      ),
     requestPasswordReset: async ({ email, redirectTo }, humanCheck) =>
       toResult(
         (
@@ -59,8 +77,22 @@ export function createBetterAuthClient(origin = window.location.origin, language
     signOut: async () => {
       await client.signOut();
     },
-    desktopHandoff: async (challenge) =>
-      toResult((await client.$fetch("/desktop/handoff", { method: "POST", body: { challenge } })).error),
+    desktopOpen: async (challenge) => {
+      const res = await client.$fetch<{ requestId: string; code: string }>("/desktop/open", {
+        method: "POST",
+        body: { challenge },
+      });
+      return res.data ?? null;
+    },
+    desktopRequestCode: async (requestId) => {
+      const res = await client.$fetch<{ code: string | null }>("/desktop/request", {
+        method: "POST",
+        body: { requestId },
+      });
+      return res.data?.code ?? null;
+    },
+    desktopHandoff: async (requestId) =>
+      toResult((await client.$fetch("/desktop/handoff", { method: "POST", body: { requestId } })).error),
     signInOneTime: async (token) =>
       toResult((await client.$fetch("/sign-in/one-time-token", { method: "POST", body: { token } })).error),
     desktopRedeem: async (verifier) => {

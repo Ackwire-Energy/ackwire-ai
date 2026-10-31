@@ -31,6 +31,7 @@ import {
   type BrowserLiveUnavailable,
   type ConnectionStatus,
   type ConsultsState,
+  cacheAgentProposal,
   cacheApproval,
   cacheDmRead,
   cacheForumSuggestion,
@@ -69,7 +70,9 @@ import {
   touchRun,
   typingThrottle,
   unmarkStopping,
+  useSendWaiting,
 } from "@agenteschat/client";
+import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { formatPercent } from "@agenteschat/client/lib/format";
 import { playSound, soundForNotification } from "@agenteschat/client/lib/sounds";
 import { playAgentReaction } from "@agenteschat/ui";
@@ -417,13 +420,26 @@ export function RealtimeProvider({
       qc.removeQueries({ queryKey: ["org", orgId, "reactions"] });
       // Notifications that arrived while offline: the inbox and the badge catch up.
       void qc.invalidateQueries({ queryKey: keys.notifications(orgId) });
-      // The workspace's computer on its way and its standing may have moved meanwhile, and so may the computers
-      // (one back online, a pause) and the agents' screens.
+      // The workspace's computer on its way, its standing and its limits (a new plan) may have moved meanwhile, and so
+      // may the computers (one back online, a pause) and the agents' screens.
       void qc.invalidateQueries({ queryKey: keys.computerSetup(orgId) });
       void qc.invalidateQueries({ queryKey: keys.machines(orgId) });
       void qc.invalidateQueries({ queryKey: keys.agentDesktops(orgId) });
       void qc.invalidateQueries({ queryKey: keys.me });
+      void qc.invalidateQueries({ queryKey: keys.limits(orgId) });
       void qc.invalidateQueries({ queryKey: ["org", orgId, "channel"] });
+      // The groups of agents someone changed meanwhile.
+      void qc.invalidateQueries({ queryKey: keys.agentGroups(orgId) });
+    });
+    // The first open too, for what a return from the billing service changes: a new plan's limits, standing and
+    // computer can land in core between this page's first reads and the socket's open, and that event reaches no one.
+    let opened = false;
+    const offOpen = conn.onStatus((status) => {
+      if (status !== "open" || opened) return;
+      opened = true;
+      void qc.invalidateQueries({ queryKey: keys.limits(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.me });
+      void qc.invalidateQueries({ queryKey: keys.computerSetup(orgId) });
     });
     // Approvals I can decide arrive here even when I'm not in that channel (sidebar badge, Aprovações).
     const offUser = conn.onUserEvent((event) => {
@@ -444,8 +460,14 @@ export function RealtimeProvider({
       // Notifications in this browser (ADR 0071): what was read, done or snoozed closes there too; a drop in
       // the badge ("Marcar tudo como lido") has one tab ask the server which shown ones went stale.
       if (isNotificationEvent(event)) settleShownPushes(orgId, event, notificationAudience().mine);
-      // In the desktop app: what a phone would get pushed, shown by the app while its window is in the background.
-      if (isNotificationEvent(event) && event.type === "notification.upserted" && inDesktopApp()) {
+      // In the desktop app: what a phone would get pushed, shown by the app while its window is in the background,
+      // unless the person turned that kind off (`alert`, ADR 0071 §8).
+      if (
+        isNotificationEvent(event) &&
+        event.type === "notification.upserted" &&
+        event.alert !== false &&
+        inDesktopApp()
+      ) {
         const notice = desktopNotice(tRef.current, orgId, event.notification);
         if (notice) void thisMac.notify(notice.title, notice.body, notice.path).catch(() => {});
       }
@@ -453,11 +475,19 @@ export function RealtimeProvider({
       if (event.type.startsWith("mission.") && "missionId" in event && typeof event.missionId === "string") {
         refreshMission(qc, orgId, event.missionId);
       }
-      // Someone joined or left, or a role changed (org broadcast): the people, Members and the sidebar's count.
+      // Someone joined or left, or a role changed (org broadcast): the people, Members and the sidebar's count, the
+      // roles' counts, and `me` (a role change changes what you may do, ADR 0085).
       if (event.type === "org.members") {
         void qc.invalidateQueries({ queryKey: keys.people(orgId) });
         void qc.invalidateQueries({ queryKey: keys.members(orgId) });
         void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
+        void qc.invalidateQueries({ queryKey: keys.roles(orgId) });
+        void qc.invalidateQueries({ queryKey: keys.me });
+      }
+      // Someone arranged the sidebar's channel categories (ADR 0080): channels and categories refetch.
+      if (event.type === "channels.layout") {
+        void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
+        void qc.invalidateQueries({ queryKey: keys.channelCategories(orgId) });
       }
       // Someone changed the calendar: the open ranges refetch.
       if (event.type === "calendar.event_updated" || event.type === "calendar.event_deleted") {
@@ -503,7 +533,8 @@ export function RealtimeProvider({
       applyComputerEvent(qc, orgId, event);
       // Connected computers: online/offline, paired, renamed, removed.
       applyMachineEvent(qc, orgId, event);
-      // The workspace's own computer on its way, and its standing (the hold banner, the suspended screen).
+      // The workspace's own computer on its way, its standing (the hold banner, the suspended screen), and the groups
+      // of agents (the sidebar's sections).
       applyWorkspaceEvent(qc, orgId, event);
       if ((event.type === "budget.warning" || event.type === "budget.exhausted") && "agentId" in event) {
         const budgetEvent = event as BudgetEvent;
@@ -517,6 +548,7 @@ export function RealtimeProvider({
     setConnection(conn);
     return () => {
       offReconnect();
+      offOpen();
       offUser();
       conn.stop();
       setConnection(null);
@@ -532,6 +564,12 @@ export function RealtimeProvider({
     }, 5000);
     return () => clearInterval(timer);
   }, [streams, qc, orgId]);
+
+  // What I sent while the connection was down (or the server restarting) goes out once it's back, whatever page
+  // is open. One the server then refuses is said here, since its conversation may not be on screen.
+  useSendWaiting(orgId, connection, (error) =>
+    toast.show(knownErrorText(tRef.current, error) ?? tRef.current("channel.sendFailed"), "error"),
+  );
 
   // Stable across the layout's re-renders (every navigation): only a new socket changes it.
   const value = useMemo(() => ({ connection, streams }), [connection, streams]);
@@ -713,6 +751,8 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       // Missions (ADR 0029): the pinned card, the cards in the thread, the lists; a task's row.
       if (event.type === "mission.updated") applyMissionEvent(qc, orgId, event);
       if (event.type === "machine.task") applyTaskEvent(qc, orgId, event.task);
+      // An agent's proposal of a new agent was created or denied (by anyone): its card.
+      if (event.type === "agent.proposal.updated") cacheAgentProposal(qc, orgId, event, event);
       // An agent's "Vale um fórum?" card was accepted or dismissed (by anyone).
       if (event.type === "forum.suggestion.updated") {
         cacheForumSuggestion(qc, orgId, channelId, event.messageId, event.suggestion);

@@ -10,7 +10,7 @@ import {
   addChannelMember,
   agentHoldKind,
   assertCanWork,
-  changeMemberRole,
+  type BillingHold,
   cloudNotice,
   createAgent,
   createFakeJudge,
@@ -28,18 +28,21 @@ import {
   postPersonMessage,
   type RouterStrategy,
   removeMember,
+  requireBrowserAccess,
   requireChannelAccess,
   requirePermission,
   resendInvitation,
   routeMessage,
   runErrorDetail,
   setAgentHold,
+  setBillingHold,
+  setMemberRoles,
   setOrgStanding,
   setRestrictionNotices,
   setUserBlocked,
   standingJudge,
 } from "../src";
-import { addMember, addUser, type Fixture, SECRET, setup } from "./fixtures";
+import { addMember, addUser, adminRoleId, type Fixture, SECRET, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 import { channelRoutine, fire, routineRow } from "./routine-fixtures";
 
@@ -186,6 +189,32 @@ describe("hold", () => {
 });
 
 describe("suspended", () => {
+  test("browser and desktop access stop on suspension, while hold remains readable", async () => {
+    f = await setup();
+    const access = (screen: "browser" | "desktop") =>
+      requireBrowserAccess(f.db, f.owner.id, f.org.id, f.agent.id, undefined, screen);
+
+    await access("browser");
+    await standing("hold");
+    await access("browser");
+    await access("desktop");
+
+    await standing("suspended");
+    for (const screen of ["browser", "desktop"] as const) {
+      await expect(access(screen)).rejects.toMatchObject({ code: "org.suspended", params: { reason: REASON } });
+    }
+
+    await standing("suspended", "silent");
+    await expect(access("browser")).rejects.toMatchObject({
+      code: "org.suspended",
+      message: "This workspace is unavailable for now.",
+      params: undefined,
+    });
+
+    await standing("active");
+    await access("browser");
+  }, 75_000);
+
   test("every permission check refuses with org.suspended; back to active it works", async () => {
     f = await setup();
     await standing("suspended");
@@ -447,16 +476,19 @@ describe("user block", () => {
     // Nor erase their workspaces with their account.
     await expect(deleteAccount(f.db, bia.id)).rejects.toBeInstanceOf(ForbiddenError);
     // The workspace still manages them; they can't act, not even to leave.
-    await changeMemberRole(f.db, f.owner.id, f.org.id, bia.id, "admin");
+    await setMemberRoles(f.db, f.owner.id, f.org.id, bia.id, [await adminRoleId(f.db, f.org.id)]);
     await removeMember(f.db, bia.id, f.org.id, bia.id);
-    expect(await getMembership(f.db, bia.id, f.org.id, { includeBlocked: true })).toMatchObject({ role: "admin" });
+    expect(await getMembership(f.db, bia.id, f.org.id, { includeBlocked: true })).toMatchObject({ rank: 0 });
 
     expect(await setUserBlocked({ db: f.db }, bia.id, { blocked: false, reason: null })).toEqual({
       blockedAt: null,
       reason: null,
       sessionsRevoked: 0,
     });
-    expect(await requirePermission(f.db, bia.id, f.org.id, "manage_members")).toMatchObject({ role: "admin" });
+    expect(await requirePermission(f.db, bia.id, f.org.id, "manage_members")).toMatchObject({
+      role: "member",
+      rank: 0,
+    });
     expect((await createOrganization(f.db, bia.id, { name: "Bia's" })).organization.name).toBe("Bia's");
 
     await setUserBlocked({ db: f.db }, bia.id, { blocked: true, reason: null });
@@ -525,6 +557,77 @@ describe("notice", () => {
     expect(
       await setOrgStanding({ db: f.db }, crypto.randomUUID(), { state: "hold", reason: REASON, notice: "silent" }),
     ).toBeNull();
+  });
+});
+
+describe("billing hold", () => {
+  const billing = (hold: BillingHold | null) => setBillingHold({ db: f.db, pubsub: f.pubsub }, f.org.id, hold);
+
+  test("set, moved to another code and lifted through the standing's own write: told, audited, notified on a move", async () => {
+    f = await setup();
+    const events: unknown[] = [];
+    f.pubsub.subscribe(orgTopic(f.org.id), (e) => events.push(e));
+    // Held, it waits for no computer (the same write as any hold).
+    await f.db.insert(schema.machineProvisioning).values({ orgId: f.org.id, state: "preparing" });
+
+    const set = await billing("payment");
+    expect(set).toMatchObject({
+      applied: true,
+      standing: { state: "hold", reason: "payment", note: null, notice: "shown" },
+    });
+    expect(set?.standing.changedAt).toBeInstanceOf(Date);
+    expect(await f.db.select().from(schema.machineProvisioning)).toEqual([]);
+    await expect(assertCanWork(f.db, f.org.id)).rejects.toMatchObject({
+      code: "org.paused",
+      params: { reason: "payment" },
+    });
+    // Its owners and admins hear the code, never as text to print.
+    const [notice] = await standingNotices();
+    expect(notice?.latest).toEqual({ statusTo: "hold", billingHold: "payment" });
+
+    expect(await billing("payment")).toMatchObject({ applied: false, standing: { state: "hold", reason: "payment" } });
+    expect(await billing("unpaid")).toMatchObject({ applied: true, standing: { state: "hold", reason: "unpaid" } });
+    // Another code is a new reason told, not a move: audited and heard live, with no second notification.
+    expect(await standingNotices()).toHaveLength(1);
+
+    expect(await billing(null)).toMatchObject({ applied: true, standing: { state: "active", reason: null } });
+    expect(await billing(null)).toMatchObject({ applied: false, standing: { state: "active" } });
+    await assertCanWork(f.db, f.org.id);
+
+    expect((await audits()).map((a) => a.details)).toEqual([
+      { from: "active", to: "hold", reason: "payment" },
+      { from: "hold", to: "hold", reason: "unpaid" },
+      { from: "hold", to: "active", reason: null },
+    ]);
+    expect((await standingNotices()).map((n) => n.latest)).toEqual([
+      { statusTo: "hold", billingHold: "payment" },
+      { statusTo: "active" },
+    ]);
+    expect(events.map((e) => (e as { event: { reason: string | null } }).event.reason)).toEqual([
+      "payment",
+      "unpaid",
+      null,
+    ]);
+  });
+
+  test("never replaces nor lifts a hold set through the standing, shown or silent, or a suspension", async () => {
+    f = await setup();
+    await standing("hold");
+    expect(await billing("unpaid")).toMatchObject({ applied: false, standing: { state: "hold", reason: REASON } });
+    expect(await billing(null)).toMatchObject({ applied: false, standing: { state: "hold", reason: REASON } });
+
+    // A silent hold with a billing code for its reason is the operator's too.
+    await setOrgStanding({ db: f.db }, f.org.id, { state: "hold", reason: "payment", notice: "silent" });
+    expect(await billing(null)).toMatchObject({ applied: false, standing: { notice: "silent" } });
+
+    await standing("suspended");
+    expect(await billing("ended")).toMatchObject({ applied: false, standing: { state: "suspended" } });
+
+    await standing("active");
+    expect(await billing("ended")).toMatchObject({ applied: true, standing: { state: "hold", reason: "ended" } });
+    // The operator's hold replaces a billing one, as before.
+    expect(await standing("hold")).toMatchObject({ state: "hold", reason: REASON });
+    expect(await setBillingHold({ db: f.db }, crypto.randomUUID(), "payment")).toBeNull();
   });
 });
 

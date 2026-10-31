@@ -5,11 +5,14 @@ import {
   decideProposal,
   editContextItem,
   getAgent,
+  itemVisibleIn,
+  listAgentMemoryRows,
   listProposals,
   NotFoundError,
   type Proposal as ProposalRow,
   requirePermission,
   revertMemoryChange,
+  userVisibleChannels,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
@@ -109,7 +112,8 @@ const KIND: Record<ContextItem["kind"], z.infer<typeof Memory>["kind"]> = {
   period_summary: "fact",
 };
 
-async function memoryViews(db: Database, items: ContextItem[]) {
+/** `items` must be visible to the viewer; `visible` (the channels they read) also bounds the old versions shown. */
+async function memoryViews(db: Database, items: ContextItem[], visible: readonly string[]) {
   if (items.length === 0) return [];
   const channelIds = [...new Set(items.flatMap((i) => i.channelIds))];
   const channels = channelIds.length
@@ -120,7 +124,11 @@ async function memoryViews(db: Database, items: ContextItem[]) {
     : [];
   const channelName = new Map(channels.map((c) => [c.id, c.name]));
   const replaced = await db
-    .select({ supersededBy: schema.contextItems.supersededBy, content: schema.contextItems.content })
+    .select({
+      supersededBy: schema.contextItems.supersededBy,
+      content: schema.contextItems.content,
+      channelIds: schema.contextItems.channelIds,
+    })
     .from(schema.contextItems)
     .where(
       inArray(
@@ -128,7 +136,8 @@ async function memoryViews(db: Database, items: ContextItem[]) {
         items.map((i) => i.id),
       ),
     );
-  const previous = new Map(replaced.map((r) => [r.supersededBy, r.content]));
+  // A version merged in from a channel the viewer can't read isn't quoted.
+  const previous = new Map(replaced.filter((r) => itemVisibleIn(r, visible)).map((r) => [r.supersededBy, r.content]));
   const people = items.flatMap((i) => (i.createdByKind === "person" && i.createdById ? [i.createdById] : []));
   const names = new Map(
     (people.length
@@ -335,20 +344,19 @@ export function memoryRoutes(deps: AppDeps) {
       const viewerId = c.get("user").id;
       await requirePermission(db, viewerId, orgId, "read");
       if (!(await getAgent(db, orgId, agentId))) throw new NotFoundError("Agent not found");
-      const rows = await db
-        .select()
-        .from(schema.contextItems)
-        .where(and(eq(schema.contextItems.orgId, orgId), eq(schema.contextItems.agentId, agentId)));
+      // Only what the viewer may see: items learned in a DM or private channel they can't read stay out.
+      const { items: rows, visible } = await listAgentMemoryRows(db, viewerId, orgId, agentId);
       const current = rows
         .filter((r) => !r.supersededBy)
         .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.getTime() - a.updatedAt.getTime());
-      if (c.req.valid("query").about !== "me") return c.json({ memories: await memoryViews(db, current) }, 200);
+      if (c.req.valid("query").about !== "me")
+        return c.json({ memories: await memoryViews(db, current, visible) }, 200);
       const mine = await viewerSources(db, orgId, viewerId, current);
       const about = current.filter(
         (i) =>
           ABOUT_KINDS.has(i.kind) && (mine.has(i.id) || (i.createdByKind === "person" && i.createdById === viewerId)),
       );
-      const views = await memoryViews(db, about);
+      const views = await memoryViews(db, about, visible);
       return c.json({ memories: views.map((v) => ({ ...v, from: mine.get(v.id) ?? null })) }, 200);
     },
   );
@@ -382,7 +390,7 @@ export function memoryRoutes(deps: AppDeps) {
       });
       // The memory mark on the message it came from changes for everyone in the channel.
       await announceMessageMemories({ db, pubsub: deps.adapters.pubsub }, orgId, row).catch(() => {});
-      const [view] = await memoryViews(db, [row]);
+      const [view] = await memoryViews(db, [row], await userVisibleChannels(db, orgId, c.get("user").id));
       return c.json(view, 200);
     },
   );
@@ -401,7 +409,7 @@ export function memoryRoutes(deps: AppDeps) {
       const { orgId, memoryId } = c.req.valid("param");
       const row = await revertMemoryChange(db, c.get("user").id, orgId, memoryId);
       await announceMessageMemories({ db, pubsub: deps.adapters.pubsub }, orgId, row).catch(() => {});
-      const [view] = await memoryViews(db, [row]);
+      const [view] = await memoryViews(db, [row], await userVisibleChannels(db, orgId, c.get("user").id));
       return c.json(view, 200);
     },
   );

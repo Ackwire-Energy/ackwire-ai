@@ -1,6 +1,6 @@
-import { countUsers } from "@agenteschat/engine";
+import { countUsers, isAgentesCloud } from "@agenteschat/engine";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
-import { authUiConfig, signupPolicy } from "../auth";
+import { authUiConfig, signupOpen } from "../auth";
 import type { AppDeps } from "./app/context";
 
 /**
@@ -25,6 +25,10 @@ const InstanceResponse = z
     ownerClaim: z.boolean().openapi({
       description: "No account yet, and only the owner link (`/owner#claim=…`) creates the first one.",
     }),
+    cloud: z.boolean().openapi({
+      description:
+        "One of agentes.chat's own servers (`PUBLIC_URL` on agentes.chat): `/terms` and `/privacy` show agentes.chat Cloud's Terms and Privacy Policy.",
+    }),
   })
   .openapi("Instance");
 
@@ -48,8 +52,7 @@ export function registerInstance(api: OpenAPIHono, deps: AppDeps, version: strin
   api.openapi(route, async (c) => {
     const { config } = deps;
     const users = await countUsers(deps.db);
-    const ownerWaits = users === 0 && signupPolicy(config).ownerByLink;
-    const open = !ownerWaits && (config.ALLOW_SIGNUP || users === 0);
+    const open = await signupOpen(deps.db, config, users);
     return c.json(
       {
         name: "agentes.chat" as const,
@@ -60,6 +63,7 @@ export function registerInstance(api: OpenAPIHono, deps: AppDeps, version: strin
         signIn: { email: true, ...authUiConfig(config).socialProviders },
         signup: open ? ("open" as const) : ("invite" as const),
         ownerClaim: users === 0 && Boolean(config.OWNER_CLAIM_SHA256),
+        cloud: isAgentesCloud(config.PUBLIC_URL),
       },
       200,
     );

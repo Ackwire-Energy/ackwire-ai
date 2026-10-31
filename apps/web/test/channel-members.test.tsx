@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -28,16 +28,18 @@ describe("channel header: who's here", () => {
     expect(stack.querySelector('[data-accessory="hat"]')).not.toBeNull();
   });
 
-  test("the list: people (você, @handle) and agents (state, chip); arrows move; footer opens the details", async () => {
+  test("the list: people (você, presence), agents (presence or state, chip); arrows; foot opens details", async () => {
     const { sockets } = await open();
     await act(async () => sockets.last().open());
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Membros do canal (4)" })));
     await settle(4);
     const people = screen().getByRole("region", { name: "Pessoas" });
     expect(people.textContent).toContain("Walter · você");
-    expect(people.textContent).toContain("@");
+    // No line written: how each appears (ADR 0084), and when someone offline was last seen.
+    expect(people.textContent).toContain("Online");
+    expect(people.textContent).toContain("Offline · visto");
     const agents = screen().getByRole("region", { name: "Agentes" });
-    expect(agents.textContent).toContain("disponível");
+    expect(agents.textContent).toContain("Online · Dev");
     expect(agents.textContent).toContain("responde sem menção");
     // Live state: Ada starts thinking.
     await act(async () =>
@@ -64,6 +66,31 @@ describe("channel header: who's here", () => {
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Ver detalhes do canal" })));
     await settle(3);
     expect(screen().getByRole("dialog", { name: /eng/ })).toBeTruthy();
+  });
+
+  test("on a phone, Detalhes do canal folds to its icon and keeps its name", async () => {
+    const media = spyOn(window, "matchMedia").mockImplementation(
+      (query: string) =>
+        ({
+          matches: query === "(max-width: 480px)",
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    );
+    try {
+      await open();
+      const details = screen().getByRole("button", { name: "Detalhes do canal" });
+      expect({ icon: details.classList.contains("ac-btn--icon"), words: details.textContent }).toEqual({
+        icon: true,
+        words: "",
+      });
+      await act(async () => fireEvent.click(details));
+      await settle(3);
+      expect(screen().getByRole("dialog", { name: /eng/ })).toBeTruthy();
+    } finally {
+      media.mockRestore();
+    }
   });
 
   test("hover opens it after a short delay", async () => {

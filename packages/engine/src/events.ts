@@ -478,6 +478,20 @@ export type ChannelEvent =
       threadId: string | null;
       messageId: string;
       suggestion: Record<string, unknown>;
+    }
+  /**
+   * An agent's proposal of a new agent was decided (ADR 0081): what changed on its card (`meta.actionCard`). The
+   * draft stays on the message: its instructions alone can be past a NOTIFY payload's limit.
+   */
+  | {
+      type: "agent.proposal.updated";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+      state: "pending" | "creating" | "created" | "denied";
+      agentId: string | null;
+      decidedByUserId: string | null;
+      decidedAt: string | null;
     };
 
 const INLINE_LIMIT = 6000;

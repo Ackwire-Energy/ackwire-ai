@@ -3,6 +3,7 @@ import { and, asc, type Database, eq, inArray, isNull, schema, sql } from "@agen
 import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
+import { assertStorageRoom } from "./limits";
 import { assertPublicHttpsUrl, type ResolveHost } from "./net-guard";
 import { can, requirePermission } from "./organizations";
 import { readZip } from "./zip";
@@ -239,34 +240,53 @@ async function loadSkill(db: Database, orgId: string, id: string) {
   return s;
 }
 
-/** Stores a version's files: showable ones in the blob store, the rest only listed as ignored. */
-async function storeFiles(deps: SkillDeps, s: { id: string; orgId: string }, version: number, files: SkillFileInput[]) {
+/** Where a version's files go and how each is kept, refused before the skill or any file is written. */
+async function planFiles(deps: SkillDeps, orgId: string, files: SkillFileInput[]) {
   if (files.length > SKILL_LIMITS.maxFiles) throw new ValidationError(`Too many files (max ${SKILL_LIMITS.maxFiles})`);
-  const total = files.reduce((n, f) => n + f.data.byteLength, 0);
+  // Ignored files (binaries such as images and videos) are only listed, never stored: they don't count.
+  const total = files.reduce((n, f) => n + (classifyFile(f.path).status === "ignored" ? 0 : f.data.byteLength), 0);
   if (total > SKILL_LIMITS.maxBytes) throw new ValidationError("The skill is too large (max 2 MB)");
-  const location = await deps.blobs.forOrg(s.orgId);
-  for (const f of files) {
-    const path = safePath(f.path);
-    const { mime, status } = classifyFile(path);
+  // Two entries that normalize to the same path would share one blob key: the second's bytes overwrite
+  // the first on disk while its row insert is dropped on the unique key, so the stored size stops matching disk.
+  const normalized = files.map((f) => ({ path: safePath(f.path), data: f.data }));
+  const seen = new Set<string>();
+  for (const { path } of normalized) {
+    if (seen.has(path)) throw new ValidationError(`Two files share the path ${path}`, "skill.duplicate_path");
+    seen.add(path);
+  }
+  const location = await deps.blobs.forOrg(orgId);
+  const planned = normalized.map((n) => ({ ...n, ...classifyFile(n.path) }));
+  // The workspace's own bucket counts against no limit of ours. Storing no file (the skill's text is in the database)
+  // takes no room, even past a limit lowered below what the workspace already keeps.
+  const stored = planned.filter((p) => p.status !== "ignored").reduce((n, p) => n + p.data.byteLength, 0);
+  if (location.storageConfigId === null && stored > 0) await assertStorageRoom(deps.db, orgId, stored);
+  return { location, files: planned };
+}
+
+/** Stores a version's files: showable ones in the blob store, the rest only listed as ignored. */
+async function storeFiles(
+  deps: SkillDeps,
+  s: { id: string; orgId: string },
+  version: number,
+  { location, files }: Awaited<ReturnType<typeof planFiles>>,
+) {
+  for (const { path, data, mime, status } of files) {
     let blobKey: string | null = null;
     if (status !== "ignored") {
       blobKey = `${location.prefix}skills/${s.id}/v${version}/${path}`;
-      await location.store.put(blobKey, f.data, { contentType: mime });
+      await location.store.put(blobKey, data, { contentType: mime });
     }
-    await deps.db
-      .insert(skillFiles)
-      .values({
-        orgId: s.orgId,
-        skillId: s.id,
-        version,
-        path,
-        size: f.data.byteLength,
-        mime,
-        status,
-        storageConfigId: status !== "ignored" ? location.storageConfigId : null,
-        blobKey,
-      })
-      .onConflictDoNothing();
+    await deps.db.insert(skillFiles).values({
+      orgId: s.orgId,
+      skillId: s.id,
+      version,
+      path,
+      size: data.byteLength,
+      mime,
+      status,
+      storageConfigId: status !== "ignored" ? location.storageConfigId : null,
+      blobKey,
+    });
   }
 }
 
@@ -287,6 +307,7 @@ export async function saveSkill(
 ): Promise<SkillDetail> {
   await requirePermission(deps.db, actorId, orgId, "manage_agents");
   validateSkill(input);
+  const files = await planFiles(deps, orgId, input.files ?? []);
   const [existing] = await deps.db
     .select()
     .from(skills)
@@ -302,7 +323,8 @@ export async function saveSkill(
         metadata: input.metadata,
         source: input.source,
         sourceUrl: input.sourceUrl ?? existing.sourceUrl,
-        version: existing.version + 1,
+        // Incremented in SQL (not from the value read above) so two concurrent saves take distinct versions.
+        version: sql`${skills.version} + 1`,
         ...(input.defaultForNewAgents !== undefined ? { defaultForNewAgents: input.defaultForNewAgents } : {}),
         deletedAt: null,
         updatedAt: new Date(),
@@ -330,7 +352,7 @@ export async function saveSkill(
     if (!created) throw new Error("skill insert returned nothing");
     row = created;
   }
-  await storeFiles(deps, row, row.version, input.files ?? []);
+  await storeFiles(deps, row, row.version, files);
   await recordAudit(deps.db, {
     orgId,
     actor: { type: "person", id: actorId },
@@ -343,7 +365,11 @@ export async function saveSkill(
 
 /** Import from a zip of the skill folder (`SKILL.md` + files). */
 export async function importSkillZip(deps: SkillDeps, actorId: string, orgId: string, zip: Uint8Array) {
-  const entries = readZip(zip, { maxFiles: SKILL_LIMITS.maxFiles, maxBytes: SKILL_LIMITS.maxBytes });
+  const entries = readZip(
+    zip,
+    { maxFiles: SKILL_LIMITS.maxFiles, maxBytes: SKILL_LIMITS.maxBytes },
+    (path) => classifyFile(path).status === "ignored",
+  );
   const { skillMd, files } = splitSkillFolder(entries);
   return saveSkill(deps, actorId, orgId, { ...parseSkillMarkdown(skillMd), source: "upload", files });
 }
@@ -409,8 +435,9 @@ export function parseGithubUrl(url: string) {
 
 /**
  * Import from GitHub (a folder or a `SKILL.md`), fetched by the backend with
- * a 2 MB / 200 files limit; only GitHub hosts, and the SSRF guard on every
- * request. Importing the same skill again makes a new version.
+ * a 2 MB limit on the text and scripts it keeps (binaries are only listed) and
+ * 200 files; only GitHub hosts, and the SSRF guard on every request. Importing
+ * the same skill again makes a new version.
  */
 export async function importSkillFromUrl(deps: SkillDeps, actorId: string, orgId: string, url: string) {
   await requirePermission(deps.db, actorId, orgId, "manage_agents");
@@ -441,14 +468,11 @@ export async function importSkillFromUrl(deps: SkillDeps, actorId: string, orgId
       const relative = target.path ? item.path.slice(target.path.length + 1) : item.path;
       if (item.type === "dir") await walk(item.path, depth + 1);
       else if (item.type === "file") {
-        total += item.size;
+        // Binaries aren't downloaded (only listed), so only text and scripts count toward the size limit.
+        const kept = classifyFile(item.path).status !== "ignored";
+        if (kept) total += item.size;
         if (total > SKILL_LIMITS.maxBytes) throw new ValidationError("The skill is too large (max 2 MB)");
-        // Binaries aren't downloaded (only listed); text and scripts are.
-        const data =
-          classifyFile(item.path).status !== "ignored"
-            ? await fetchChecked(deps, raw(item.path), "*/*")
-            : new Uint8Array();
-        files.push({ path: relative, data });
+        files.push({ path: relative, data: kept ? await fetchChecked(deps, raw(item.path), "*/*") : new Uint8Array() });
       }
     }
   };
@@ -561,7 +585,7 @@ export async function setAgentSkills(
   const membership = await requirePermission(db, actorId, orgId, "read");
   const agent = await getAgent(db, orgId, agentId);
   if (!agent) throw new NotFoundError("Agent not found");
-  if (!can(membership.role, "manage_agents") && agent.ownerUserId !== actorId) {
+  if (!can(membership, "manage_agents") && agent.ownerUserId !== actorId) {
     throw new ForbiddenError("Only an admin or the agent's owner can change its skills");
   }
   const ids = [...new Set(input.map((i) => i.skillId))];

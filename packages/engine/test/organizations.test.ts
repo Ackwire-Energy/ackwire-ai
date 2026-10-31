@@ -1,22 +1,31 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { eq, schema } from "@agenteschat/db";
+import { eq, schema, sql } from "@agenteschat/db";
+import { runMigration } from "@agenteschat/db/testing";
 import {
   acceptInvitation,
   ConflictError,
   can,
   changeMemberRole,
   createInvitation,
+  createOrganization,
+  createRole,
   ForbiddenError,
+  getMembership,
   isSignupAllowed,
+  listMachineRequests,
   listMemberships,
   type Permission,
   previewInvitation,
   removeMember,
   requirePermission,
+  setBillingHold,
+  setMemberRoles,
+  setOrgStanding,
   sha256,
+  unfinishedWorkspaces,
   updateOrganization,
 } from "../src";
-import { addMember, addUser, type Fixture, setup } from "./fixtures";
+import { addMember, addUser, adminRoleId, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
 beforeEach(async () => {
@@ -25,7 +34,7 @@ beforeEach(async () => {
 afterEach(() => f.close());
 
 describe("permissions", () => {
-  test("role matrix", () => {
+  test("what an owner, an admin (the Admin role) and a member may do", async () => {
     const all: Permission[] = [
       "read",
       "post",
@@ -35,12 +44,18 @@ describe("permissions", () => {
       "manage_credentials",
       "view_usage",
       "manage_members",
+      "manage_billing",
       "manage_owners",
     ];
-    const allowed = (role: "owner" | "admin" | "member") => all.filter((p) => can(role, p));
-    expect(allowed("owner")).toEqual(all);
-    expect(allowed("admin")).toEqual(all.filter((p) => p !== "manage_owners"));
-    expect(allowed("member")).toEqual(["read", "post", "create_channels"]);
+    const admin = await addMember(f.db, f.org.id, "admin");
+    const member = await addMember(f.db, f.org.id, "member");
+    const allowed = async (userId: string) => {
+      const membership = await getMembership(f.db, userId, f.org.id);
+      return all.filter((p) => can(membership, p));
+    };
+    expect(await allowed(f.owner.id)).toEqual(all);
+    expect(await allowed(admin.id)).toEqual(all.filter((p) => p !== "manage_owners"));
+    expect(await allowed(member.id)).toEqual(["read", "post", "create_channels"]);
   });
 
   test("requirePermission rejects non-members and missing permissions", async () => {
@@ -59,6 +74,8 @@ describe("permissions", () => {
         orgId: f.org.id,
         orgName: "Acme",
         role: "owner",
+        permissions: expect.any(Set),
+        rank: null,
         orgLogo: null,
         standing: { state: "active", reason: null, notice: "shown" },
       },
@@ -71,20 +88,47 @@ describe("permissions", () => {
   });
 });
 
+describe("onboarding", () => {
+  test("workspaces from before it was kept count as set up, as do ones made outside the app", async () => {
+    // The table as it was before the migration, with a workspace in it.
+    await f.db.execute(sql`alter table organizations drop column onboarding_step, drop column onboarded_at`);
+    await f.db.execute(sql`insert into organizations (name) values ('Old')`);
+    await runMigration(f.db, "onboarding");
+    const [old] = await f.db.select().from(schema.organizations).where(eq(schema.organizations.name, "Old"));
+    expect(old?.onboardingStep).toBe("done");
+    expect(old?.onboardedAt).toBeInstanceOf(Date);
+    expect(await unfinishedWorkspaces(f.db, f.owner.id)).toEqual([]);
+  });
+});
+
 describe("ownership", () => {
   test("the last owner can't be demoted or leave", async () => {
-    await expect(changeMemberRole(f.db, f.owner.id, f.org.id, f.owner.id, "admin")).rejects.toBeInstanceOf(
+    await expect(changeMemberRole(f.db, f.owner.id, f.org.id, f.owner.id, "member")).rejects.toBeInstanceOf(
       ConflictError,
     );
     await expect(removeMember(f.db, f.owner.id, f.org.id, f.owner.id)).rejects.toBeInstanceOf(ConflictError);
   });
 
-  test("admins can't grant ownership or remove owners", async () => {
+  test("admins can't grant ownership or remove owners; they give roles below their own", async () => {
     const admin = await addMember(f.db, f.org.id, "admin");
     const member = await addMember(f.db, f.org.id, "member");
     await expect(changeMemberRole(f.db, admin.id, f.org.id, member.id, "owner")).rejects.toBeInstanceOf(ForbiddenError);
     await expect(removeMember(f.db, admin.id, f.org.id, f.owner.id)).rejects.toBeInstanceOf(ForbiddenError);
-    await changeMemberRole(f.db, admin.id, f.org.id, member.id, "admin");
+    // Their own Admin role is not below them; a role under it is.
+    const adminRole = await adminRoleId(f.db, f.org.id);
+    await expect(setMemberRoles(f.db, admin.id, f.org.id, member.id, [adminRole])).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+    const devs = await createRole(f.db, f.owner.id, f.org.id, { name: "Devs" });
+    expect(await setMemberRoles(f.db, admin.id, f.org.id, member.id, [devs.id])).toEqual([devs.id]);
+  });
+
+  test("an owner makes an owner and takes it back", async () => {
+    const member = await addMember(f.db, f.org.id, "member");
+    await changeMemberRole(f.db, f.owner.id, f.org.id, member.id, "owner");
+    expect(can(await getMembership(f.db, member.id, f.org.id), "manage_owners")).toBe(true);
+    await changeMemberRole(f.db, f.owner.id, f.org.id, member.id, "member");
+    expect(can(await getMembership(f.db, member.id, f.org.id), "manage_owners")).toBe(false);
   });
 });
 
@@ -178,5 +222,73 @@ describe("self-host sign-up policy", () => {
     expect(await isSignupAllowed(f.db, "first@example.com", closed)).toBe(true);
     expect(await isSignupAllowed(f.db, "first@example.com", { ...closed, ownerByLink: true })).toBe(false);
     expect(await isSignupAllowed(f.db, "first@example.com", { allowSignup: true, ownerByLink: true })).toBe(false);
+  });
+});
+
+describe("creating a workspace while one is held", () => {
+  const refusal = (userId: string) =>
+    createOrganization(f.db, userId, { name: "Next" }).then(
+      () => null,
+      (e: ForbiddenError) => ({ code: e.code, params: e.params }),
+    );
+
+  test("billing holds refuse nobody but the owner of a workspace waiting for its first plan; other holds still do", async () => {
+    const admin = await addMember(f.db, f.org.id, "admin");
+    const member = await addMember(f.db, f.org.id, "member");
+    const { organization: second } = await createOrganization(f.db, f.owner.id, { name: "Second" });
+    for (const hold of ["unpaid", "ended", "payment"] as const) {
+      await setBillingHold({ db: f.db }, f.org.id, hold);
+      expect(await refusal(admin.id)).toBeNull();
+      expect(await refusal(member.id)).toBeNull();
+    }
+    // Their own: the oldest one waiting.
+    await setBillingHold({ db: f.db }, second.id, "payment");
+    expect(await refusal(f.owner.id)).toEqual({ code: "org.create_unpaid", params: { orgId: f.org.id } });
+
+    // A hold set through the standing (shown or silent) or a suspension refuses everyone in it, as before.
+    await setOrgStanding({ db: f.db }, f.org.id, { state: "hold", reason: "review", notice: "shown" });
+    for (const who of [f.owner.id, admin.id, member.id])
+      expect(await refusal(who)).toEqual({ code: "org.create_refused", params: undefined });
+    await setOrgStanding({ db: f.db }, f.org.id, { state: "hold", reason: "payment", notice: "silent" });
+    expect(await refusal(member.id)).toEqual({ code: "org.create_refused", params: undefined });
+  });
+
+  test("holdForPayment: the workspace starts on that hold, with no audit row, notification or computer request", async () => {
+    const ana = await addUser(f.db, "ana");
+    const { organization } = await createOrganization(f.db, ana.id, { name: "Ana's" }, { holdForPayment: true });
+    expect(organization).toMatchObject({
+      standing: "hold",
+      standingReason: "payment",
+      standingNotice: "shown",
+      standingNote: null,
+    });
+    expect(organization.standingChangedAt).toBeInstanceOf(Date);
+    expect(await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.orgId, organization.id))).toEqual([]);
+    expect(
+      await f.db.select().from(schema.notifications).where(eq(schema.notifications.orgId, organization.id)),
+    ).toEqual([]);
+    const requests = await listMachineRequests(f.db, "external", { limit: 50 });
+    expect(requests.requests.map((r) => r.orgId)).toEqual([f.org.id]);
+
+    expect(await refusal(ana.id)).toEqual({ code: "org.create_unpaid", params: { orgId: organization.id } });
+    // Paid (the hold lifted), the next one may start.
+    await setBillingHold({ db: f.db }, organization.id, null);
+    expect((await createOrganization(f.db, ana.id, { name: "Ana 2" })).organization.standing).toBe("active");
+  });
+
+  test("two creates at once start one workspace waiting for its plan, and refuse the other", async () => {
+    const ana = await addUser(f.db, "ana");
+    const create = (name: string) =>
+      createOrganization(f.db, ana.id, { name }, { holdForPayment: true }).then(
+        ({ organization }) => organization.id,
+        (e: ForbiddenError) => e.code,
+      );
+    const results = await Promise.all([create("One"), create("Two")]);
+    expect(results.filter((r) => r === "org.create_unpaid")).toHaveLength(1);
+    const owned = await f.db
+      .select({ orgId: schema.organizationMembers.orgId })
+      .from(schema.organizationMembers)
+      .where(eq(schema.organizationMembers.userId, ana.id));
+    expect(owned).toHaveLength(1);
   });
 });

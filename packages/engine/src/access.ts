@@ -53,7 +53,7 @@ export const BUILTIN_TOOLS: Record<string, string[]> = {
   "forum:write": ["suggest_forum_topic", "open_forum_topic", "post_in_forum", "read_forum_topic"],
   "wiki:read": ["search_wiki", "read_wiki_page"],
   "wiki:write": ["create_wiki_page", "update_wiki_page", "link_to_wiki"],
-  "setup:write": ["offer_connect_ai", "create_channel"],
+  "setup:write": ["offer_connect_ai", "create_channel", "propose_agent"],
   "sandbox:run": [
     "run_code",
     "write_file",
@@ -170,6 +170,10 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
   create_channel: {
     label: "Create channel",
     description: "Creates a channel with people and agents for the person asking, with Undo.",
+  },
+  propose_agent: {
+    label: "Propose an agent",
+    description: "Posts a card with a new agent to review. A person creates it.",
   },
   run_code: { label: "Run code", description: "Runs Python, Node or bash on the agent's computer." },
   write_file: { label: "Write to environment", description: "Writes a file in the code environment." },
@@ -302,6 +306,18 @@ async function grantsOf(db: Database, orgId: string, agentId: string) {
   return new Set(rows.map((r) => grantKey(r.connectionId, r.scope)));
 }
 
+/** Whether `next` gives the agent anything `current` doesn't: a grant it lacks, or a denial lifted. */
+function widens(current: Set<string>, next: Map<string, ScopeGrant>) {
+  const deny = toolDenyScope("");
+  for (const [key, grant] of next) {
+    if (!grant.scope.startsWith(deny) && !current.has(key)) return true;
+  }
+  for (const key of current) {
+    if (key.slice(key.indexOf("|") + 1).startsWith(deny) && !next.has(key)) return true;
+  }
+  return false;
+}
+
 function scopeState(granted: Set<string>, connectionId: string | null, scope: string): AccessState {
   if (granted.has(grantKey(connectionId, scope))) return "granted";
   const writeScope = impliedByWrite(scope);
@@ -371,8 +387,11 @@ export async function getAgentAccess(db: Database, actorId: string, orgId: strin
 }
 
 /**
- * `PUT …/agents/{id}/access` (admins or the agent's owner): replaces the
- * agent's grants. Approvals never change: sensitive tools still ask a person.
+ * `PUT …/agents/{id}/access`: replaces the agent's grants. Admins give and take
+ * anything; the agent's owner may only narrow it (drop grants it has, add
+ * denials), like `PUT …/scopes`: giving an agent a connector, a tool or a
+ * built-in is an admin's call. Approvals never change: sensitive tools still
+ * ask a person.
  */
 export async function setAgentAccess(
   db: Database,
@@ -384,7 +403,8 @@ export async function setAgentAccess(
   const membership = await requirePermission(db, actorId, orgId, "read");
   const agent = await getAgent(db, orgId, agentId);
   if (!agent) throw new NotFoundError("Agent not found");
-  if (!can(membership.role, "manage_agents") && agent.ownerUserId !== actorId) {
+  const admin = can(membership, "manage_agents");
+  if (!admin && agent.ownerUserId !== actorId) {
     throw new ForbiddenError("Only an admin or the agent's owner can change its access");
   }
   const active = new Set(
@@ -422,6 +442,9 @@ export async function setAgentAccess(
   for (const ref of input.tools?.allow ?? []) rows.push(toolRow(ref, false));
   for (const ref of input.tools?.deny ?? []) rows.push(toolRow(ref, true));
   const unique = new Map(rows.map((r) => [grantKey(r.connectionId, r.scope), r]));
+  if (!admin && widens(await grantsOf(db, orgId, agentId), unique)) {
+    throw new ForbiddenError("Only an admin can give an agent new access. Its owner can only take access away.");
+  }
   await db.transaction(async (tx) => {
     // Mailbox grants are managed by the mail API (ADR 0038): kept as they are.
     await tx

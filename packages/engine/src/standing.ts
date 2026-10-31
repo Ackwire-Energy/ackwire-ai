@@ -81,6 +81,17 @@ export const OPERATOR_STANDING_COLUMNS = {
 /** What the workspace may know of its standing: never the operator's note. */
 export type WorkspaceStanding = Pick<OrgStanding, "state" | "reason" | "notice">;
 
+/**
+ * Holds a billing service sets (ADR 0079): a shown hold whose reason is one of these codes, which the apps say in
+ * the person's words. `payment`: no plan yet; `unpaid`: its payment failed; `ended`: its plan ended.
+ */
+export const BILLING_HOLDS = ["payment", "unpaid", "ended"] as const;
+export type BillingHold = (typeof BILLING_HOLDS)[number];
+
+/** A hold the billing service set: never one an operator or trust set (those win, and block creating workspaces). */
+export const isBillingHold = (s: Pick<OrgStanding, "state" | "reason" | "notice">) =>
+  s.state === "hold" && s.notice === "shown" && (BILLING_HOLDS as readonly string[]).includes(s.reason ?? "");
+
 const ACTIVE: WorkspaceStanding = { state: "active", reason: null, notice: "shown" };
 
 /** The reason the workspace is told: only with the notice `shown`. */
@@ -231,65 +242,108 @@ export async function setOrgStanding(
   orgId: string,
   change: StandingChange,
 ): Promise<OrgStanding | null> {
-  const { db } = deps;
-  const done = await db.transaction(async (tx) => {
-    const [before] = await tx
-      .select(OPERATOR_STANDING_COLUMNS)
-      .from(organizations)
-      .where(eq(organizations.id, orgId))
-      .for("update");
-    if (!before) return null;
-    const moved = before.state !== change.state;
-    const [after] = await tx
-      .update(organizations)
-      .set({
-        standing: change.state,
-        standingReason: change.reason,
-        standingNote: change.note ?? null,
-        standingNotice: change.notice,
-        ...(moved ? { standingChangedAt: new Date() } : {}),
-      })
-      .where(eq(organizations.id, orgId))
-      .returning(OPERATOR_STANDING_COLUMNS);
-    if (!after) return null;
-    // Held or suspended, it waits for no computer: what its provisioner last said goes (a ready computer stays), each
-    // time it is set. Under this row's lock, which a report and a removal share, so neither brings the wait back.
-    if (after.state !== "active") {
-      await tx
-        .delete(machineProvisioning)
-        .where(and(eq(machineProvisioning.orgId, orgId), ne(machineProvisioning.state, "ready")));
-    }
-    const seen = moved || (after.state !== "active" && toldReason(before) !== toldReason(after));
-    if (seen && after.notice === "shown") {
-      await recordAudit(tx, {
-        orgId,
-        actor: { type: "system", id: null },
-        action: "organization.standing_changed",
-        target: { type: "organization", id: orgId },
-        details: { from: before.state, to: after.state, reason: after.reason },
-      });
-    }
-    return { after, moved, seen };
+  const done = await deps.db.transaction(async (tx) => {
+    const [before] = await lockStanding(tx, orgId);
+    return before ? writeStanding(tx, orgId, before, change) : null;
   });
   if (!done) return null;
+  await standingWritten(deps, orgId, done);
+  return done.after;
+}
+
+/**
+ * Puts the billing service's hold on a workspace, moves it to another code, or lifts it (`null`), through the same
+ * write as `setOrgStanding`. A suspension or any other hold is never replaced nor lifted from here: `applied` false,
+ * as when it is already so. Null when there is no such workspace.
+ */
+export async function setBillingHold(
+  deps: StandingDeps,
+  orgId: string,
+  hold: BillingHold | null,
+): Promise<{ applied: boolean; standing: OrgStanding } | null> {
+  const done = await deps.db.transaction(async (tx) => {
+    const [before] = await lockStanding(tx, orgId);
+    if (!before) return null;
+    const change = billingChange(before, hold);
+    return { before, written: change ? await writeStanding(tx, orgId, before, change) : null };
+  });
+  if (!done) return null;
+  if (!done.written) return { applied: false, standing: done.before };
+  await standingWritten(deps, orgId, done.written);
+  return { applied: true, standing: done.written.after };
+}
+
+/** What a billing hold changes on the standing now; null when nothing (already so, or not the billing service's). */
+function billingChange(before: OrgStanding, hold: BillingHold | null): StandingChange | null {
+  const billing = isBillingHold(before);
+  if (before.state === "suspended" || (before.state === "hold" && !billing)) return null;
+  if (hold === null) return billing ? { state: "active", reason: null, note: null, notice: "shown" } : null;
+  return billing && before.reason === hold ? null : { state: "hold", reason: hold, note: null, notice: "shown" };
+}
+
+const lockStanding = (tx: Executor, orgId: string) =>
+  tx.select(OPERATOR_STANDING_COLUMNS).from(organizations).where(eq(organizations.id, orgId)).for("update");
+
+/** Writes a standing on the workspace's row, locked by `lockStanding` in the same transaction. */
+async function writeStanding(tx: Executor, orgId: string, before: OrgStanding, change: StandingChange) {
+  const moved = before.state !== change.state;
+  const [after] = await tx
+    .update(organizations)
+    .set({
+      standing: change.state,
+      standingReason: change.reason,
+      standingNote: change.note ?? null,
+      standingNotice: change.notice,
+      ...(moved ? { standingChangedAt: new Date() } : {}),
+    })
+    .where(eq(organizations.id, orgId))
+    .returning(OPERATOR_STANDING_COLUMNS);
+  if (!after) return null;
+  // Held or suspended, it waits for no computer: what its provisioner last said goes (a ready computer stays), each
+  // time it is set. Under this row's lock, which a report and a removal share, so neither brings the wait back.
+  if (after.state !== "active") {
+    await tx
+      .delete(machineProvisioning)
+      .where(and(eq(machineProvisioning.orgId, orgId), ne(machineProvisioning.state, "ready")));
+  }
+  const seen = moved || (after.state !== "active" && toldReason(before) !== toldReason(after));
+  if (seen && after.notice === "shown") {
+    await recordAudit(tx, {
+      orgId,
+      actor: { type: "system", id: null },
+      action: "organization.standing_changed",
+      target: { type: "organization", id: orgId },
+      details: { from: before.state, to: after.state, reason: after.reason },
+    });
+  }
+  return { after, moved, seen };
+}
+
+/** What follows a standing written, once its transaction committed: caches, the members, owners and admins, work. */
+async function standingWritten(
+  deps: StandingDeps,
+  orgId: string,
+  { after, moved, seen }: { after: OrgStanding; moved: boolean; seen: boolean },
+) {
   caches.standing.delete(`${orgId}:`);
-  const { after } = done;
-  if (done.seen) {
+  if (seen) {
     await publishOrgEvent(deps.pubsub, {
       type: "org.broadcast",
       orgId,
       event: { type: "org.standing", orgId, state: after.state, reason: toldReason(after), ...cloudNotice() },
     });
   }
-  if (done.moved && after.notice === "shown")
-    await notifyOrgStanding(deps, orgId, { ...after, cloud: cloudNotices }).catch(() => {});
+  if (moved && after.notice === "shown") {
+    await notifyOrgStanding(deps, orgId, { ...after, billing: isBillingHold(after), cloud: cloudNotices }).catch(
+      () => {},
+    );
+  }
   // Every time, not only on the move: setting it again (a retry after a failure) finishes the job.
   if (after.state === "suspended") {
     // Loaded here: the run engine builds on this module.
     const { stopOrgWork } = await import("./cancel");
     await stopOrgWork(deps, orgId, standingText(after));
   }
-  return after;
 }
 
 /**

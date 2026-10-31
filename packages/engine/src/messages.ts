@@ -28,6 +28,7 @@ import {
   publishUserEvent,
 } from "./events";
 import { type Judge, personMentionAddressees } from "./judge";
+import { PLATFORM_CAP } from "./limits";
 import { type MessageMemory, memoriesFor } from "./message-memories";
 import { can } from "./organizations";
 import { afterReplyAnswered } from "./questions";
@@ -169,6 +170,8 @@ export interface Receipts {
   referenced?: string[];
   /** Routed to nobody: the organization had no AI connected. */
   noAi?: true;
+  /** Routed to nobody: the workspace used up its platform AI for the month, so only @mentions start agents. */
+  platformCap?: true;
   /** The router's step that picked (ADR 0074); absent for a decision made before the chain. */
   decidedBy?: DecidedBy;
   /** No step could read it and no rule fit: only a mention reaches an agent. */
@@ -233,6 +236,7 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
   ]);
   const seen = new Map(decisions.map((d) => [d.messageId, d.candidates.map((c) => c.agentId)]));
   const noAi = new Set(decisions.filter((d) => d.error === NO_AI).map((d) => d.messageId));
+  const capped = new Set(decisions.filter((d) => d.error === PLATFORM_CAP).map((d) => d.messageId));
   const strategyOf = new Map(decisions.map((d) => [d.messageId, d.strategy]));
   const steeredById = new Map(steeredRuns.map((r) => [r.id, r]));
   const answeredByQuestion = new Map(answeredRuns.map((r) => [r.questionId, r]));
@@ -265,6 +269,7 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
           : [],
       ...(referenced.length > 0 ? { referenced } : {}),
       ...(noAi.has(m.id) ? { noAi: true as const } : {}),
+      ...(capped.has(m.id) ? { platformCap: true as const } : {}),
       ...decisionOf(strategyOf.get(m.id), m.authorUserId),
     });
   }
@@ -637,10 +642,11 @@ export async function insertMessageWithRuns(
           where m.author_type = 'person' or cardinality(m.mentioned_agent_ids) > 0
             or m.hop < ${AGENT_CHIME_IN_MAX_HOP}
         union all
-        -- In-app notifications: people mentioned, a reply in a thread, a person's DM.
+        -- In-app notifications: people mentioned, a reply in a thread, a person's DM, an agent's answer to whoever
+        -- is behind its run (ADR 0071).
         select gen_random_uuid(), ${input.orgId}::uuid, 'notifications.message', jsonb_build_object('messageId', m.id),
           'notifications.message:' || m.id, 4 from m
-          where cardinality(m.mentioned_user_ids) > 0 or m.thread_id is not null
+          where cardinality(m.mentioned_user_ids) > 0 or m.thread_id is not null or m.agent_run_id is not null
             or (m.author_type = 'person' and exists (
               select 1 from ${channels} dc where dc.id = ${input.channelId}::uuid and dc.kind = 'dm'))
         on conflict do nothing
@@ -808,7 +814,7 @@ export async function postPersonMessage(
 ): Promise<MessageView> {
   // One access check (membership + channel) instead of two round trips.
   const { channel, membership } = await requireChannelAccess(deps.db, userId, orgId, channelId);
-  if (!can(membership.role, "post")) throw new ForbiddenError();
+  if (!can(membership, "post")) throw new ForbiddenError();
   // A forum topic is written through the forum (its turns), never as a plain chat (ADR 0022).
   if (channel.kind === "forum")
     throw new ValidationError("Post in the forum from the topic's page", "forum.post_from_topic");

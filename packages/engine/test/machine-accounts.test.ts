@@ -156,7 +156,7 @@ function fakeHub(
     }),
     call: async (_id: string, req: MachineRequest) => {
       if (req.op !== "account") throw new Error(`unexpected ${req.op}`);
-      if (over.online === false) throw new MachineOfflineError("mac");
+      if (over.online === false) throw new MachineOfflineError("mac", null);
       calls.push(req);
       return (await answer(req)) as never;
     },
@@ -691,35 +691,82 @@ test("ownership is bound when the sign-in starts: a member's account on a comput
   ).toMatchObject({ label: "Startup", mine: true });
 });
 
-test("the same email twice for one owner on one computer is refused, and the new sign-in is removed there", async () => {
+test("ChatGPT: the same email twice for one owner on one computer is refused, and the new sign-in is removed there", async () => {
   f = await setup();
   const { machineId } = await ownedMachine();
-  await addAccount(machineId, CLAUDE_ID, "claude_code", { label: "Trabalho", email: "Ana@Example.com" });
-  const runner = signingRunner(machineId, () => ({ loggedIn: true, email: "ana@example.com", plan: "max" }));
-  const { login, status } = await signIn(runner, f.owner.id, machineId);
+  await addAccount(machineId, CODEX_ID, "codex", { label: "Trabalho", email: "Ana@Example.com", plan: "plus" });
+  const signInChatGpt = async (email: string) => {
+    const runner = codexRunner(machineId, email);
+    const login = await beginAccountLogin(runner.deps, f.owner.id, f.org.id, machineId, "codex");
+    const status = await accountLoginStatus(runner.deps, f.owner.id, f.org.id, machineId, login.loginId);
+    return { runner, login, status };
+  };
+  const { runner, login, status } = await signInChatGpt("ana@example.com");
   // Named, and the account itself: its owner may think with it instead.
   expect(status).toMatchObject({
     state: "failed",
     duplicate: {
       label: "Trabalho",
-      account: { id: CLAUDE_ID, label: "Trabalho", email: "Ana@Example.com", mine: true, status: "active", usedBy: [] },
+      account: { id: CODEX_ID, label: "Trabalho", email: "Ana@Example.com", mine: true, status: "active", usedBy: [] },
     },
   });
-  expect(runner.calls.at(-1)).toEqual({
-    op: "account",
-    action: "remove",
-    kind: "claude_code",
-    accountId: login.loginId,
-  });
-  expect((await accountRows(machineId)).map((r) => r.id)).toEqual([CLAUDE_ID]);
+  expect(runner.calls.at(-1)).toEqual({ op: "account", action: "remove", kind: "codex", accountId: login.loginId });
+  expect((await accountRows(machineId)).map((r) => r.id)).toEqual([CODEX_ID]);
   expect(await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "account.added"))).toEqual([]);
 
   // Another email is another account.
-  const other = signingRunner(machineId, () => ({ loggedIn: true, email: "ana.pessoal@example.com", plan: "pro" }));
-  expect((await signIn(other, f.owner.id, machineId)).status).toMatchObject({
+  expect((await signInChatGpt("ana.pessoal@example.com")).status).toMatchObject({
     state: "done",
-    account: { label: "Claude Pro" },
+    account: { label: "ChatGPT Plus" },
   });
+});
+
+test("Claude: an account another agent thinks with signs in again as a login of its own, under the account's name", async () => {
+  f = await setup();
+  const { machineId } = await ownedMachine();
+  await addAccount(machineId, CLAUDE_ID, "claude_code", { label: "Trabalho", email: "Ana@Example.com", plan: "max" });
+  await f.db
+    .update(schema.agents)
+    .set({ machineId, brain: "claude_code", brainAccountId: CLAUDE_ID })
+    .where(eq(schema.agents.id, f.agent.id));
+  const runner = signingRunner(machineId, () => ({ loggedIn: true, email: "ana@example.com", plan: "max" }));
+  const { login, status } = await signIn(runner, f.owner.id, machineId);
+  // Never refused as one already there: its own login, the account's name, nothing removed on the computer.
+  expect(status).toMatchObject({
+    state: "done",
+    account: { id: login.loginId, label: "Trabalho", email: "ana@example.com", status: "active", usedBy: [] },
+  });
+  expect(status.duplicate).toBeUndefined();
+  expect(runner.calls.filter((c) => c.action === "remove")).toEqual([]);
+
+  // A second agent thinks with it; the first keeps its own login.
+  const [theo] = await f.db
+    .insert(schema.agents)
+    .values({
+      orgId: f.org.id,
+      name: "Theo",
+      handle: "theo",
+      model: "claude-sonnet-5-5",
+      ownerUserId: f.owner.id,
+      machineId,
+      brain: "claude_code",
+    })
+    .returning();
+  if (!theo) throw new Error("no agent");
+  await setAgentBrain({ db: f.db }, f.owner.id, f.org.id, theo.id, { account: login.loginId });
+  const listed = await listMachineAccounts({ db: f.db }, f.org.id, machineId, f.owner.id);
+  expect(listed.map((a) => [a.id, a.label, a.usedBy])).toEqual([
+    [CLAUDE_ID, "Trabalho", ["Dev"]],
+    [login.loginId, "Trabalho", ["Theo"]],
+  ]);
+
+  // Renamed from either login, both take the name; removing one leaves the other thinking for its agent.
+  await renameMachineAccount(runner.deps, f.owner.id, f.org.id, machineId, login.loginId, "Empresa");
+  expect((await accountRows(machineId)).map((r) => r.label)).toEqual(["Empresa", "Empresa"]);
+  await removeMachineAccount(runner.deps, f.owner.id, f.org.id, machineId, login.loginId);
+  expect((await accountRows(machineId)).map((r) => r.id)).toEqual([CLAUDE_ID]);
+  expect((await agentRow(theo.id)).brainAccountId).toBeNull();
+  expect((await agentRow()).brainAccountId).toBe(CLAUDE_ID);
 });
 
 test("signing in again as another account: it stays signed out with its agents, and the answer says who came back", async () => {
@@ -883,7 +930,7 @@ test("one login per agent where the account allows it: a key's logins share its 
   expect(remove).toEqual([]);
   expect(await accountRow(DESKTOP_ID)).toMatchObject({ label: "Time", createdBy: f.owner.id, status: "active" });
 
-  // ChatGPT's and Claude's sign-ins stay one per account: the same ChatGPT account again is refused.
+  // ChatGPT's sign-ins stay one per account: the same ChatGPT account again is refused.
   const chatgpt = codexRunner(machineId, "ana@example.com");
   const signInChatGpt = async () => {
     const login = await beginAccountLogin(chatgpt.deps, f.owner.id, f.org.id, machineId, "codex");

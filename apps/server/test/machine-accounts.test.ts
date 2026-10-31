@@ -9,7 +9,7 @@ import {
   sealSecret,
 } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
-import { browser, createTestServer, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
+import { browser, createTestServer, joinByInvitation, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
 afterEach(() => t.close());
@@ -94,10 +94,7 @@ async function workspace() {
     owner(`/api/app/organizations/${seeded.orgId}${path}`, init);
   const admin = browser(t);
   await signUp(admin, "bia@example.com");
-  const { url } = (await (await api("/invitations", { json: { email: "bia@example.com", role: "admin" } })).json()) as {
-    url: string;
-  };
-  await admin(`/api/app/invitations/${url.split("/invite/")[1]}/accept`, { json: {} });
+  await joinByInvitation(t, owner, seeded.orgId, "bia@example.com", { role: "admin", as: admin });
   const asAdmin = (path: string, init?: Parameters<typeof admin>[1]) =>
     admin(`/api/app/organizations/${seeded.orgId}${path}`, init);
   return {
@@ -307,21 +304,20 @@ test("a computer nobody connected: anyone signs in, the account is theirs from t
   expect(asOwner.accounts).toMatchObject([{ id: login.loginId, email: null, mine: false, ownerName: "bia" }]);
   expect(JSON.stringify(asOwner)).not.toContain("bia@example.com");
 
-  // The same account again: refused, and the new folder removed there.
+  // The same account again: a login of its own for another agent, under the account's name, nothing removed there.
   const again = (await (await asAdmin(`${base}/account-logins`, { json: { kind: "claude_code" } })).json()) as {
     loginId: string;
     publicKey: string;
   };
   const sealedAgain = await sealSecret(again.publicKey, "abc#456", accountCodeAad(again.loginId, orgId));
   await asAdmin(`${base}/account-logins/${again.loginId}/code`, { json: { box: sealedAgain } });
-  const duplicate = await asAdmin(`${base}/account-logins/${again.loginId}`);
-  // Named, and the account itself, with its email for its owner: theirs to think with instead.
-  expect(await duplicate.json()).toMatchObject({
-    state: "failed",
-    duplicate: { label: "Claude Max", account: { id: login.loginId, email: "bia@example.com", mine: true } },
+  const second = await asAdmin(`${base}/account-logins/${again.loginId}`);
+  expect(await second.json()).toMatchObject({
+    state: "done",
+    account: { id: again.loginId, label: "Claude Max", email: "bia@example.com", mine: true },
   });
-  expect(runner.accountRequests("remove")).toMatchObject([{ accountId: again.loginId }]);
-  expect(await accountRow(again.loginId)).toBeNull();
+  expect(runner.accountRequests("remove")).toEqual([]);
+  expect(await accountRow(again.loginId)).toMatchObject({ status: "active", label: "Claude Max", createdBy: adminId });
 
   // Each start runs a CLI on the shared computer: ten per person per computer every 15 minutes.
   for (let n = 0; n < 5; n++) {

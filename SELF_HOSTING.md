@@ -645,11 +645,11 @@ ones a self-hosted instance usually touches:
 | `OWNER_CLAIM_SHA256` | | While no account exists, only the owner link made with it creates the first one (Sign-up, below). `OWNER_KEY_SHA256` is the desktop app's. |
 | `TRUSTED_PROXIES` | | Proxies in front of your proxy (see nginx above). |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | | "Sign in with Google", redirect URI `{PUBLIC_URL}/api/auth/callback/google`. `GITHUB_*` and `APPLE_*` work the same way. |
-| `TERMS_URL`, `PRIVACY_URL` | | Your terms and privacy policy, linked on the sign-in and sign-up screens when both are set. |
+| `TERMS_URL`, `PRIVACY_URL` | | Your terms and privacy policy, linked on the sign-in and sign-up screens and the help pages when both are set. `/terms` and `/privacy` on this server go to them, or say it has none. |
 | `LANDING_URL` | | The agentes.chat landing page's address, which turns on its waiting list. Leave it unset. |
 | `SMTP_URL` | | Email through your SMTP server: `smtps://user:password@smtp.example.com:465`, or `smtp://` for STARTTLS on 587, which is then required (`?requireTLS=false` at the end allows a relay without TLS on a trusted network). |
 | `MILLIONSEND_API_KEY`, `MILLIONSEND_API_URL` | `https://api.millionsend.com` for the URL | Email through a Resend-compatible API instead: MillionSend, your own MillionSend, or Resend (`https://api.resend.com`). |
-| `EMAIL_FROM`, `EMAIL_REPLY_TO` | `agentes.chat <ola@HOST>`, HOST being the host of `PUBLIC_URL` | Sender of the app's emails. Its domain must be verified with your email provider. |
+| `EMAIL_FROM`, `EMAIL_REPLY_TO` | `agentes.chat <ping@HOST>`, HOST being the host of `PUBLIC_URL` | Sender of the app's emails. Its domain must be verified with your email provider. |
 | `EMAIL_ART` | `auto` | Where emails get their pictures (the logo, agents' faces): from this server's `/email/` when its address is public, else attached to each message. `attach` always attaches them, for a public address people outside still can't open (an access proxy, a VPN, an IP allowlist). |
 | `FILES_DIR` | `/data/files`, set by the compose file | Folder for uploaded files, on the `files` volume. |
 | `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | | Files in an S3-compatible bucket instead, when all four are set. `S3_REGION` (default `auto`); `S3_PATH_STYLE=true` for MinIO and Garage. |
@@ -727,6 +727,7 @@ agents, machine sizes, AI tokens used and how much data the agents' browsers sen
 messages, files, names or sites. The first goes about an hour after the server first starts, then one a
 day at that time, restarts or not (one that came due while the server was off goes about 10 minutes
 after it starts again), as JSON in a POST to `TELEMETRY_URL` (`https://telemetry.agentes.chat/v1/report`).
+It passes through Cloudflare, which sits in front of agentes.chat and decrypts it on the way.
 A send that fails is tried again three times within about 2.5 hours, then dropped: the next day's
 report replaces it. These are all its fields:
 
@@ -823,8 +824,9 @@ your organization. Then it installs a background service
 `--dir <folder>` (where agents work, default `~/agentes`), `--name <name>`, `--no-exec` (files only,
 no commands) and `--no-service`.
 
-That computer runs the commands agents execute, the browser they drive (Chrome for Testing, installed
-on first use), and Claude Code or Codex when an agent thinks with a subscription signed in there.
+That computer runs the commands agents execute, the browser they drive (Chrome for Testing, which the
+runner installs as it starts once the browser is turned on there), and Claude Code or Codex when an
+agent thinks with a subscription signed in there.
 Commands run as the user that runs the runner, so give it a dedicated user or a VM.
 `agentes-runner tools disable commands` (or `claude`, or `codex`) turns a capability off on that
 computer, and `agentes-runner folders allow <path>` shares a folder besides the agents' own.
@@ -871,12 +873,13 @@ computer (archived, or moved to another one).
 Each agent's desktop has the agentes.chat look: its wallpaper and a dock at the bottom center (the mark,
 which opens the apps menu, then Browser, Files and Terminal), one workspace and no desktop icons; its
 terminal's prompt shows the agent's name. Browser opens the agent's own browser on its desktop, the one
-it browses with, so a person who signs in to a site there signs the agent in (the first time, the
-browser is installed first, which takes about a minute). The runner writes the look into that desktop's
-own settings (`<agent folder>/.agentes/home`, or the agent's own home with `--system`), never your
-user's or the computer's, so your own desktop stays as it is. For its rounded windows, also install
-Orchis and the SVG loader it draws its buttons with (Debian 12 and 13, Ubuntu 24.04; `--system
---desktop` installs them where apt has them); without them the desktops use GTK's and XFCE's own theme.
+it browses with, so a person who signs in to a site there signs the agent in (the first time, unless
+the runner installed it as it started, it is installed first, which takes about a minute). The runner
+writes the look into that desktop's own settings (`<agent folder>/.agentes/home`, or the agent's own
+home with `--system`), never your user's or the computer's, so your own desktop stays as it is. For
+its rounded windows, also install Orchis and the SVG loader it draws its buttons with (Debian 12 and
+13, Ubuntu 24.04; `--system --desktop` installs them where apt has them); without them the desktops
+use GTK's and XFCE's own theme.
 Orchis takes about 42 MB on Debian 13 with what it brings along (GTK 2's theme engines among them), and
 its package alone about 84 MB on Ubuntu 24.04, where it carries every color variant (the desktops use
 only Orchis-Light):
@@ -906,7 +909,11 @@ terminal are for the person who connected the computer, since they act as its us
 agent runs as that one user, its desktop and terminal included, so whoever uses either can read the
 other agents' folders, the sign-ins on that computer and the runner's token, as the agents' commands
 can. Give the runner a user of its own, or a VM. On a Linux server, the installer's `--system` option
-(as root) makes each agent its own user instead.
+(as root) makes each agent its own user instead. On x64 it also installs `agent-browser` and Chrome for
+Testing once for all of them, in `/opt/agentes-runner/browser` (root's, each checked against the
+SHA-256 in the installer; running the installer again updates them), so an agent's first use of its
+browser downloads nothing. If the installer can't download them, it goes on, and each agent downloads
+what's missing at its browser's first use, which takes about a minute.
 
 Mac and Windows computers get no agents' desktops: the agent's browser runs headless, and its card
 shows it live. A Mac connected with the command above opens terminals
@@ -1083,6 +1090,30 @@ can't open the old data directory, so moving to one takes a dump and a restore i
 </details>
 
 <details>
+<summary><b>Rebooting the server</b></summary>
+
+A reboot stops every container at once, so Postgres can go before the app saves the runs in
+progress. Stop the app first: runs get up to 20 s to finish, and the rest are saved and go on when it
+starts again.
+
+```sh
+docker compose stop agentes
+sudo reboot
+```
+
+A container stopped by hand stays stopped after the reboot. Start it again in the install directory:
+
+```sh
+docker compose up -d
+```
+
+An uptime check from outside the server on `https://<your address>/api/health` is worth having: it
+answers 200 only while the app and its database are up, so it tells you when the server doesn't come
+back. On Tailscale, run it from another device in your tailnet.
+
+</details>
+
+<details>
 <summary><b>From source</b></summary>
 
 To run your own changes, build the image and point the compose file at it:
@@ -1115,8 +1146,13 @@ anyone who holds both can read those keys.
 
 **Every day, to a bucket.** The `backup` service dumps the database at 03:00 UTC to a bucket on
 Cloudflare R2 or another S3-compatible store, and deletes dumps older than `BACKUP_RETENTION_DAYS`
-(14 by default). Create a private bucket for the dumps alone, since they hold every message, and a
-key that can read, write and delete in it. Then add to `.env`:
+(14 by default). To lose less than a day if the server is lost, dump more often:
+`BACKUP_INTERVAL_HOURS=6` dumps at 03:00, 09:00, 15:00 and 21:00 UTC, and `1` every hour. Each dump is
+the whole database, so with hourly dumps a shorter `BACKUP_RETENTION_DAYS` keeps the bucket small. While
+a dump runs, an upgrade's migration that changes a table waits for it to end, and the app's requests to
+that table wait behind the migration: once a dump takes minutes, upgrade between dumps.
+Create a private bucket for the dumps alone, since they hold every message, and a key that can read,
+write and delete in it. Then add to `.env`:
 
 ```sh
 S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
@@ -1128,11 +1164,11 @@ S3_BACKUP_BUCKET=agentes-backups
 Add `backup` to `COMPOSE_PROFILES` too, comma-separated: `COMPOSE_PROFILES=tailscale,backup` on
 Tailscale (the setup's default), `https,backup` with Caddy, or `backup` alone. Running the setup
 again keeps it. Run `docker compose up -d`: the first dump runs right away, unless the bucket has one
-from the last 26 hours, and `docker compose logs backup` shows each one. These `S3_*` values also
-serve file storage when `S3_BUCKET` is set, so the key then needs both buckets. Outside R2, set
-`S3_PROVIDER` to rclone's name for the store (`AWS`, `Minio`, `Other` and so on) and `S3_REGION` if it
-needs one. The service runs `ghcr.io/agentes-chat/backup`, published with each release under the
-app's tags; `AGENTES_BACKUP_IMAGE` holds a version the way `AGENTES_IMAGE` does.
+from the last 26 hours (the interval plus 2), and `docker compose logs backup` shows each one. These
+`S3_*` values also serve file storage when `S3_BUCKET` is set, so the key then needs both buckets.
+Outside R2, set `S3_PROVIDER` to rclone's name for the store (`AWS`, `Minio`, `Other` and so on) and
+`S3_REGION` if it needs one. The service runs `ghcr.io/agentes-chat/backup`, published with each
+release under the app's tags; `AGENTES_BACKUP_IMAGE` holds a version the way `AGENTES_IMAGE` does.
 
 ```sh
 docker compose run --rm backup now     # a dump right away, before a big upgrade for example

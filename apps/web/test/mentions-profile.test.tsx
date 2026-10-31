@@ -153,6 +153,54 @@ describe("profile card", () => {
     expect(c.textContent).not.toContain("sonnet 5.5");
   });
 
+  test("agent on a plan: its plan's limits and no budget until it spends through the API, then the budget after them", async () => {
+    /** Ada thinks with Claude Team; `spent`: what she spent through the API this month (of US$ 40). */
+    const onPlan = (spent: number) => {
+      const state = seedState();
+      const ada = state.agents.find((a) => a.id === ADA_ID);
+      if (ada) {
+        ada.brain = {
+          kind: "claude_code",
+          model: "Sonnet",
+          account: "Claude Team",
+          usage: {
+            windows: [
+              { kind: "five_hour", usedPercent: 12 },
+              { kind: "seven_day", usedPercent: 40 },
+            ],
+            source: "probe",
+            at: new Date().toISOString(),
+          },
+        };
+      }
+      state.spentUsd = { [ADA_ID]: spent };
+      return state;
+    };
+    const open = async (state: ReturnType<typeof seedState>) => {
+      await go(`c/${ENG_ID}`, state);
+      await click(screen().getAllByRole("button", { name: "Perfil de Ada" })[0] as HTMLElement);
+      await settle(6);
+      return card();
+    };
+    const meters = (c: HTMLElement) =>
+      within(c)
+        .queryAllByRole("meter")
+        .map((m) => m.getAttribute("aria-label"));
+    let c = await open(onPlan(0));
+    expect(c.querySelector(".ac-planmeter__line")?.textContent).toBe("Claude Team · semana 40% · 5h 12%");
+    expect(c.textContent).not.toContain("orçamento");
+    expect(meters(c)).toEqual(["Semana"]);
+    cleanup();
+    c = await open(onPlan(12.3));
+    const text = c.textContent ?? "";
+    expect(text.indexOf("Claude Team · semana 40% · 5h 12%")).toBeGreaterThanOrEqual(0);
+    expect(text.indexOf("Claude Team · semana 40% · 5h 12%")).toBeLessThan(
+      text.indexOf("31% do orçamento usado este mês"),
+    );
+    // One bar, the plan's: the budget is the short line under it.
+    expect(meters(c)).toEqual(["Semana"]);
+  });
+
   test("an agent without owner says so; members don't see spend", async () => {
     const state = seedState();
     const ada = state.agents.find((a) => a.id === ADA_ID);

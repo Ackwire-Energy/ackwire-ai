@@ -24,8 +24,8 @@ const { users, organizations, agents, approvals } = schema;
  */
 const SENDER_NAME = "agentes.chat";
 
-/** The sender when `EMAIL_FROM` is unset, at this server's host (`loadConfig` sets the Cloud's: ola@agentes.chat). */
-export const defaultEmailFrom = (publicUrl: string) => `${SENDER_NAME} <ola@${new URL(publicUrl).hostname}>`;
+/** The sender when `EMAIL_FROM` is unset, at this server's host (`loadConfig` sets the Cloud's: ping@agentes.chat). */
+export const defaultEmailFrom = (publicUrl: string) => `${SENDER_NAME} <ping@${new URL(publicUrl).hostname}>`;
 
 /** A stored or chosen language as an email locale: "en…" is English, anything else (or none) pt-BR. */
 export const emailLocale = (value: unknown): EmailLocale =>
@@ -108,6 +108,13 @@ export type EmailTemplate =
    * before it existed).
    */
   | { kind: "waitlist_confirm"; locale: EmailLocale; url: string; email?: string }
+  /**
+   * Early access (ADR 0078): `email` may now create an account and workspaces, through `url` (the sign-up page
+   * with the address filled in and the link's token), for `days` days.
+   */
+  | { kind: "early_access"; locale: EmailLocale; email: string; url: string; days: number }
+  /** Early access for the account `email` already has (ADR 0078): it may make workspaces now, from `url`. */
+  | { kind: "early_access_allowed"; locale: EmailLocale; email: string; url: string }
   | {
       kind: "budget";
       locale?: EmailLocale;
@@ -287,6 +294,32 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
           { small: c.small },
           fallback(t.url),
         ],
+        c.why,
+      );
+    }
+    case "early_access": {
+      const c = w.earlyAccess;
+      return doc(
+        c.subject,
+        c.preheader(t.days),
+        c.headline,
+        [
+          { p: c.body(inertText(t.email)) },
+          { p: c.what },
+          { button: c.button, url: t.url },
+          { small: c.small(t.days) },
+          fallback(t.url),
+        ],
+        c.why,
+      );
+    }
+    case "early_access_allowed": {
+      const c = w.earlyAccessAllowed;
+      return doc(
+        c.subject,
+        c.preheader,
+        c.headline,
+        [{ p: c.body(inertText(t.email)) }, { button: c.button, url: t.url }, fallback(t.url)],
         c.why,
       );
     }
@@ -477,7 +510,14 @@ export function emailsByLocale(recipients: { email: string; locale: EmailLocale 
  */
 export async function queueEmail(
   tx: Executor,
-  input: { orgId: string | null; key: string; to: string[]; template: EmailTemplate; maxAttempts?: number },
+  input: {
+    orgId: string | null;
+    key: string;
+    to: string[];
+    template: EmailTemplate;
+    maxAttempts?: number;
+    runAt?: Date;
+  },
 ) {
   await enqueue(tx, {
     orgId: input.orgId,
@@ -485,6 +525,7 @@ export async function queueEmail(
     payload: { key: input.key, to: input.to, template: input.template },
     dedupeKey: `email:${input.key}`,
     maxAttempts: input.maxAttempts ?? 6,
+    runAt: input.runAt,
   });
 }
 

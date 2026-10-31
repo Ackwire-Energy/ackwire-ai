@@ -13,6 +13,7 @@ import {
   useReactions,
   useSteerState,
   useToggleReaction,
+  useWaiting,
 } from "@agenteschat/client";
 import { CONTINUE_ERRORS, errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -43,6 +44,7 @@ import {
   useTheme,
   useToast,
 } from "@/ui";
+import { ProposalCard } from "../agents/ProposalCard";
 import { NoAiCard } from "../ai/NoAiCard";
 import { HandoffCard } from "../browser/HandoffCard";
 import { TrailCard } from "../browser/TrailCard";
@@ -75,7 +77,7 @@ import { MessageText } from "./MessageText";
 import { Receipts } from "./Receipts";
 import { TeamChecks } from "./TeamChecks";
 import { SavedTools, TurnTools } from "./ToolCalls";
-import { recentTurn, stoppedOf } from "./turn";
+import { recentTurn, stoppedOf, turnOpener } from "./turn";
 
 /** A run's message asks whether a take over still holds its browser only this recently (older: events only). */
 const TRAIL_RECENT_MS = 12 * 60 * 60_000;
@@ -94,7 +96,6 @@ export const MessageRow = memo(function MessageRow({
   thread,
   onLongPress,
   onRetry,
-  offline = false,
   readOnly = false,
 }: {
   message: Message;
@@ -105,12 +106,12 @@ export const MessageRow = memo(function MessageRow({
   /** Absent where it is read only. */
   onLongPress?: (m: Message) => void;
   onRetry?: (m: Message) => void;
-  /** Mine and not sent for lack of internet: it waits and goes by itself when the connection is back. */
-  offline?: boolean;
   /** Shown where the person can't act on it (two agents' conversation): no long press, reactions or block. */
   readOnly?: boolean;
 }) {
   const { t } = useTranslation();
+  // Mine and not sent for lack of a connection: it waits and goes by itself when the connection is back.
+  const offline = useWaiting(m.local === "failed" ? m.clientId : null);
   const dir = useDirectory();
   const c = useColors();
   const when = useWhen();
@@ -160,6 +161,9 @@ export const MessageRow = memo(function MessageRow({
   const stopped = isAgent && m.agentRunId ? stoppedOf(meta) : null;
   // This reply just took its live block's place here: the same tools (and the messages it read) stay.
   const [kept] = useState(() => (ownWork && m.agentRunId ? recentTurn(m.agentRunId, Date.now()) : null));
+  // The line its block opened with stays above the tools, where it was, instead of moving into them (`turnOpener`).
+  const opened =
+    kept && m.agentRunId ? turnOpener({ runId: m.agentRunId, status: "running", text: "" }, kept.items) : null;
   const approvalId = approvalIdOf(meta);
   const review = missionCardRef(meta, "missionReview");
   const decision = missionCardRef(meta, "missionDecision");
@@ -342,9 +346,10 @@ export const MessageRow = memo(function MessageRow({
         {isAgent && m.agentRunId && !m.local && !readOnly && consulted.length === 0 ? (
           <ConsultGroup message={m} color={color} />
         ) : null}
+        {opened?.said ? <MessageText body={opened.said} selectable={false} accent={accent} /> : null}
         {kept ? (
           <TurnTools
-            items={kept.items}
+            items={opened?.lines ?? kept.items}
             agentName={agent?.name ?? name}
             color={color}
             quoteOf={(id) => kept.quotes[id]}
@@ -374,6 +379,7 @@ export const MessageRow = memo(function MessageRow({
         {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
         {isAgent ? <TeamChecks message={m} /> : null}
         {isAgent ? <NoAiCard message={m} /> : null}
+        {isAgent ? <ProposalCard message={m} /> : null}
         {files.length > 0 ? <MessageFiles files={files} /> : null}
         {approvalId ? <ApprovalInline approvalId={approvalId} /> : null}
         {handoff ? <HandoffCard handoff={handoff} /> : null}
@@ -483,7 +489,7 @@ function StoppedLine({
   const toast = useToast();
   const meId = useMeId();
   const dir = useDirectory();
-  const role = useOrg().org?.role;
+  const org = useOrg().org;
   const { colors: c, shadows } = useTheme();
   const [busy, setBusy] = useState(false);
   // Continued here or on another device (`run.continued`), or already in the message's meta.
@@ -496,7 +502,7 @@ function StoppedLine({
       : t("mobile.chat.stopped.plain");
   const owner = m.author.id ? dir.agentById.get(m.author.id)?.ownerUserId : null;
   // Same people who may stop it (the server checks again).
-  const may = byMe || can(role, "manage_agents") || (Boolean(meId) && owner === meId);
+  const may = byMe || can(org, "manage_agents") || (Boolean(meId) && owner === meId);
   const open = may && !continued && !busy;
   const onContinue = () => {
     setBusy(true);
@@ -569,7 +575,13 @@ function Tag({
   );
   if (!onPress) return chip;
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityHint={hint} hitSlop={6}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityHint={hint}
+      hitSlop={6}
+      style={styles.tagPress}
+    >
       {chip}
     </Pressable>
   );
@@ -673,8 +685,9 @@ const styles = StyleSheet.create({
   cont: { paddingTop: 0, marginTop: 0 },
   avslot: { width: 34, alignItems: "center", paddingTop: 2 },
   body: { flex: 1, minWidth: 0 },
-  who: { flexDirection: "row", alignItems: "baseline", gap: 8, marginBottom: 3 },
-  name: { fontWeight: "600", fontSize: 14, lineHeight: 19 },
+  // Wraps on a narrow phone: a routine's tag and "Ver relatório" go to the next line instead of off the edge.
+  who: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", columnGap: 8, rowGap: 3, marginBottom: 3 },
+  name: { fontWeight: "600", fontSize: 14, lineHeight: 19, flexShrink: 1 },
   me: { paddingLeft: 64, paddingRight: 16, paddingVertical: 10, marginTop: 4, alignItems: "flex-end" },
   meCont: { paddingTop: 2, marginTop: 0 },
   mePressed: { opacity: 0.7 },
@@ -704,6 +717,8 @@ const styles = StyleSheet.create({
   continueIn: { flexGrow: 1, flexDirection: "row", alignItems: "center", gap: 5, paddingLeft: 8, paddingRight: 10 },
   medium: { fontWeight: "600" },
   shrink: { flexShrink: 1 },
+  // The chip's own shrink only works if what holds it can shrink too (a long routine name ends in "…").
+  tagPress: { flexShrink: 1, maxWidth: "100%", alignSelf: "center" },
   pin: { alignSelf: "center" },
   // The routine report a message answers, unfolded under its name (like the notice line's text).
   report: { marginTop: 2, marginBottom: 4, paddingLeft: 10, borderLeftWidth: 2 },

@@ -2,6 +2,8 @@ import { expect, test } from "bun:test";
 import { type BrainTurnRequest, CodexBrain, type ComputerBrainLink, codexVersionOk } from "../src/brains/codex";
 import { computerPrompt } from "../src/brains/prompt";
 import type { BrainEvent, BrainTurn } from "../src/brains/types";
+import { MachineRequestError } from "../src/machine-hub";
+import { MachineDroppedError } from "../src/machines";
 
 const SESSION = "0193aaaa-0000-7000-8000-00000000c0de";
 
@@ -141,6 +143,22 @@ test("the turn always ends once: a runner failure is an error, a silent end is d
   const brain = (l: ComputerBrainLink) => new CodexBrain({ link: l, mcp: async () => ({ token: "t" }) });
   const failed = await collect(brain(link({ fail: new Error("socket closed") })).run(turn(), io()));
   expect(failed).toMatchObject([{ type: "error", code: "runner_failed", message: "socket closed" }]);
+  // No room for the turn (or an older runner's ceiling): busy, so the engine waits for room.
+  for (const refusal of [
+    new MachineRequestError("no_slot", "short of memory"),
+    new MachineRequestError("internal", "busy"),
+  ]) {
+    const refused = await collect(brain(link({ fail: refusal })).run(turn(), io()));
+    expect(refused).toMatchObject([{ type: "error", code: "busy", retryable: true }]);
+  }
+  // Cut by the link dropping (or the agent's worker stopping) waits for the computer; our own stop says so.
+  const dropped = await collect(brain(link({ fail: new MachineDroppedError("mac") })).run(turn(), io()));
+  expect(dropped).toEqual([expect.objectContaining({ type: "error", code: "machine_offline", retryable: true })]);
+  expect("serverStop" in (dropped[0] ?? {})).toBe(false);
+  const ours = await collect(
+    brain(link({ fail: new MachineDroppedError("mac", { serverStop: true }) })).run(turn(), io()),
+  );
+  expect(ours).toMatchObject([{ type: "error", code: "machine_offline", serverStop: true }]);
   const silent = await collect(brain(link({ events: [{ type: "text_delta", text: "Hi" }] })).run(turn(), io()));
   expect(silent.at(-1)).toEqual({ type: "done", text: "Hi", session: { id: SESSION } });
   const errored = await collect(

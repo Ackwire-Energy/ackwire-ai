@@ -22,6 +22,7 @@ import {
   isPaused,
   locationText,
   normalizeUserCode,
+  otherThanHint,
   platformOf,
   shellQuote,
   toolOffReason,
@@ -181,6 +182,17 @@ describe("connected computers helpers (ADR 0036)", () => {
     expect(stale()).toEqual([true, true]);
   });
 
+  test("a plan's usage moving on a computer refetches the agent list, which carries each plan's limits", () => {
+    const qc = new QueryClient();
+    const agents = keys.agents("o1");
+    const stale = () => qc.getQueryState(agents)?.isInvalidated ?? false;
+    qc.setQueryData(agents, []);
+    applyMachineEvent(qc, "o1", { type: "machine.updated", machineId: "m1", name: "Mac" } as { type: string });
+    expect(stale()).toBe(false);
+    applyMachineEvent(qc, "o1", { type: "machine.updated", machineId: "m1", accounts: true } as { type: string });
+    expect(stale()).toBe(true);
+  });
+
   test("a sign-in starts with no address asked: Claude's hint is the account's own, dropped if the server refuses it", async () => {
     const sent: AccountLoginInput[] = [];
     const begin = async (input: AccountLoginInput) => {
@@ -240,5 +252,14 @@ describe("connected computers helpers (ADR 0036)", () => {
     expect(freeDuplicate(failed({ label: "Claude Max" }))).toBeNull();
     expect(freeDuplicate({ state: "failed" })).toBeNull();
     expect(freeDuplicate(undefined)).toBeNull();
+  });
+
+  test("a new sign-in is another account only when its hint named a different email", () => {
+    expect(otherThanHint("walt@pessoal.com", { email: "walt@acme.com" })).toBe(true);
+    expect(otherThanHint("Walt@Pessoal.com", { email: "walt@pessoal.com" })).toBe(false);
+    // No hint (Claude's page picked), or no email to compare: the account that came back is the one.
+    expect(otherThanHint(null, { email: "walt@acme.com" })).toBe(false);
+    expect(otherThanHint(undefined, { email: "walt@acme.com" })).toBe(false);
+    expect(otherThanHint("walt@pessoal.com", { email: null })).toBe(false);
   });
 });

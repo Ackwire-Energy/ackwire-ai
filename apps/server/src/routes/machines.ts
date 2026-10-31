@@ -4,6 +4,7 @@ import {
   authenticateMachine,
   computerSetup,
   confirmDeviceCode,
+  currentOrgLogo,
   DeviceCodeLimitError,
   deleteMachine,
   denyDeviceCode,
@@ -12,8 +13,8 @@ import {
   hostKey,
   listMachineOutages,
   listMachines,
-  machineOrgLogo,
   moveAgentsFromMachine,
+  NotFoundError,
   PROVISIONING_REASONS,
   PROVISIONING_STATES,
   PROVISIONING_STEPS,
@@ -311,6 +312,33 @@ export function machineAppRoutes(deps: AppDeps) {
     return machines;
   };
 
+  /**
+   * Connection codes are short (6 characters) and anyone signed in may name one, so looking one
+   * up, confirming and denying share one budget per person and per address, and a code that
+   * isn't pending costs `DEVICE_CODE_MISS_COST`: a few typos are fine, guessing stops fast
+   * (ADR 0036 §5). Runs `fn` when the budget allows; null after answering 429.
+   */
+  const codeKeys = (c: { req: { raw: Request } }, userId: string) =>
+    [
+      [`machine-device-code:user:${userId}`, DEVICE_CODE_USER],
+      [`machine-device-code:ip:${requestLimitIp(c.req.raw.headers, deps.config.TRUSTED_PROXIES)}`, DEVICE_CODE_IP],
+    ] as const;
+  const spend = (keys: ReturnType<typeof codeKeys>) =>
+    Promise.all(keys.map(([key, rule]) => deps.adapters.rateLimiter.consume(key, rule)));
+  const withCodeBudget = async <T>(keys: ReturnType<typeof codeKeys>, fn: () => Promise<T>): Promise<T | null> => {
+    if ((await spend(keys)).some((t) => !t.allowed)) return null;
+    try {
+      return await fn();
+    } catch (error) {
+      if (error instanceof NotFoundError && error.code === "machine.device_not_found") {
+        for (let n = 1; n < DEVICE_CODE_MISS_COST; n++) await spend(keys);
+      }
+      throw error;
+    }
+  };
+  const tooManyCodes = (c: Parameters<typeof apiError>[0]) =>
+    apiError(c, 429, "rate_limited", "Too many attempts. Try again in a few minutes.");
+
   app.openapi(
     createRoute({
       method: "get",
@@ -338,12 +366,12 @@ export function machineAppRoutes(deps: AppDeps) {
       responses: { 200: json(DeviceCode), 429: errorResponse("Too many lookups"), ...errors },
     }),
     async (c) => {
-      const limit = await deps.adapters.rateLimiter.consume(`machine-device-view:${c.get("user").id}`, {
-        limit: 30,
-        windowMs: 60_000,
-      });
-      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many attempts. Try again in a minute.");
-      return c.json(await getDeviceCode({ db }, c.req.valid("param").userCode, c.get("user").id), 200);
+      const userId = c.get("user").id;
+      const view = await withCodeBudget(codeKeys(c, userId), () =>
+        getDeviceCode({ db }, c.req.valid("param").userCode, userId),
+      );
+      if (!view) return tooManyCodes(c);
+      return c.json(view, 200);
     },
   );
 
@@ -359,14 +387,18 @@ export function machineAppRoutes(deps: AppDeps) {
         params: OrgParams.extend({ userCode: UserCode }),
         body: body(z.object({ name: z.string().max(80).optional() })),
       },
-      responses: { 201: json(Machine, "Connected"), ...errors },
+      responses: { 201: json(Machine, "Connected"), 429: errorResponse("Too many attempts"), ...errors },
     }),
     async (c) => {
       if (deps.config.MACHINE_PROVISIONING === "external") {
         return apiError(c, 403, "machine.pairing_off", PAIRING_OFF.workspace);
       }
       const { orgId, userCode } = c.req.valid("param");
-      const machine = await confirmDeviceCode({ db, pubsub }, c.get("user").id, orgId, userCode, c.req.valid("json"));
+      const userId = c.get("user").id;
+      const machine = await withCodeBudget(codeKeys(c, userId), () =>
+        confirmDeviceCode({ db, pubsub }, userId, orgId, userCode, c.req.valid("json")),
+      );
+      if (!machine) return tooManyCodes(c);
       return c.json(machine, 201);
     },
   );
@@ -379,10 +411,15 @@ export function machineAppRoutes(deps: AppDeps) {
       security,
       summary: '"It wasn\'t me": the computer that shows this code is refused (`access_denied`)',
       request: { params: UserCodeParams },
-      responses: { 204: noContent[204], ...errors },
+      responses: { 204: noContent[204], 429: errorResponse("Too many attempts"), ...errors },
     }),
     async (c) => {
-      await denyDeviceCode({ db }, c.get("user").id, c.req.valid("param").userCode);
+      const userId = c.get("user").id;
+      const denied = await withCodeBudget(codeKeys(c, userId), async () => {
+        await denyDeviceCode({ db }, userId, c.req.valid("param").userCode);
+        return true;
+      });
+      if (!denied) return tooManyCodes(c);
       return c.body(null, 204);
     },
   );
@@ -625,6 +662,8 @@ const DeviceBody = z.object({
   exec: z.boolean().optional(),
   /** A refused computer asking to come back as the machine it was (reconnect); ignored unless a uuid. */
   previousMachineId: z.string().max(64).optional(),
+  /** The token it had for `previousMachineId`, its proof of being that computer: no reconnect without it. */
+  previousToken: z.string().max(200).optional(),
 });
 
 const HostSyncBody = z.object({
@@ -643,6 +682,15 @@ const HostSyncBody = z.object({
 
 /** The server's computer syncs every minute; this leaves room for restarts. */
 const HOST_SYNC_LIMIT = { limit: 30, windowMs: 60_000 };
+
+/**
+ * Looking up, confirming and denying connection codes, per person and per address (an office
+ * may pair several computers at once), every 10 minutes; an unknown or expired code costs
+ * `DEVICE_CODE_MISS_COST` tries. 6 characters over 31 letters and digits is about 887M codes.
+ */
+const DEVICE_CODE_USER = { limit: 30, windowMs: 10 * 60_000 };
+const DEVICE_CODE_IP = { limit: 60, windowMs: 10 * 60_000 };
+const DEVICE_CODE_MISS_COST = 5;
 
 /** New codes per address per minute, and polls (every 3 s by contract: 20 a minute, with room for two computers). */
 const DEVICE_START_LIMIT = { limit: 10, windowMs: 60_000 };
@@ -844,7 +892,7 @@ export function registerMachinePublicRoutes(api: OpenAPIHono, deps: AppDeps) {
     const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
     const machine = token ? await authenticateMachine(db, token) : null;
     if (!machine) return apiError(c, 401, "machine.unauthorized", "This computer's token is not valid");
-    const logo = await machineOrgLogo({ db, blobs: adapters.platformBlobs }, machine.orgId);
+    const logo = await currentOrgLogo({ db, blobs: adapters.platformBlobs }, machine.orgId);
     if (!logo) return apiError(c, 404, "org.logo_not_found", "The organization has no logo");
     const etag = `"${logo.file}"`;
     const headers = { etag, "cache-control": "private, max-age=300", "x-content-type-options": "nosniff" };

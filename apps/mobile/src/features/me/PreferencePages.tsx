@@ -1,3 +1,4 @@
+import { type NoticeCategory, useNoticePrefs, useSetNoticePref } from "@agenteschat/client";
 import { SOUND_STYLES, type SoundStyle } from "@agenteschat/ui/sfx";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
@@ -8,7 +9,16 @@ import { setSoundChoice, useSoundChoice } from "@/lib/sounds";
 import { readValue, STORED } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
 import { usePush } from "@/providers/push";
-import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, type ThemePreference, useTheme, useToast } from "@/ui";
+import {
+  GroupedFooter,
+  GroupedHeader,
+  GroupedList,
+  GroupedRow,
+  type IconName,
+  type ThemePreference,
+  useTheme,
+  useToast,
+} from "@/ui";
 import { OrgAvatar } from "../shared/OrgAvatar";
 import { Page } from "./parts";
 
@@ -84,21 +94,63 @@ export function WorkspacesPage() {
   );
 }
 
-/** Notificações: this phone's switch. */
+const NOTICE_ICONS: Record<NoticeCategory, IconName> = {
+  waiting: "wait",
+  replies: "reply",
+  mentions: "chat",
+  threads: "replyTo",
+  tasks: "issue",
+  routines: "clock",
+  computers: "laptop",
+  reactions: "smile",
+};
+
+/**
+ * Notificações: this phone's switch, then what notifies me in this workspace (ADR 0071 §8), the same choices as
+ * the web's Configurações › Notificações (kept on the server, for every device). Off on this phone, the kinds stay,
+ * dimmed: they still decide the browser and the Mac app.
+ */
 export function NotificationsPage() {
   const { t } = useTranslation();
+  const toast = useToast();
+  const { orgId } = useOrg();
   const push = usePushSwitch();
+  const prefs = useNoticePrefs(orgId);
+  const set = useSetNoticePref(orgId);
+  const on = push.on ?? false;
   return (
     <Page title={t("mobile.me.notifications")}>
       <View style={styles.gap} />
       <GroupedList>
-        <GroupedRow
-          label={t("mobile.me.notificationsPhone")}
-          toggle={push.on ?? false}
-          onPress={() => void push.set(!(push.on ?? false))}
-        />
+        <GroupedRow label={t("mobile.me.notificationsPhone")} toggle={on} onPress={() => void push.set(!on)} />
       </GroupedList>
-      <GroupedFooter>{t("mobile.me.notificationsHint")}</GroupedFooter>
+      <GroupedFooter>{on ? t("mobile.me.notificationsOnHint") : t("mobile.me.notificationsOffHint")}</GroupedFooter>
+      {prefs.data ? (
+        <>
+          <GroupedHeader>{t("noticePrefs.whatTitle")}</GroupedHeader>
+          <View style={on ? null : styles.dimmed}>
+            <GroupedList>
+              {prefs.data.categories.map((c) => (
+                <GroupedRow
+                  key={c.id}
+                  icon={NOTICE_ICONS[c.id]}
+                  label={t(`noticePrefs.category.${c.id}.title`)}
+                  sub={t(`noticePrefs.category.${c.id}.help`)}
+                  subLines={2}
+                  toggle={c.on}
+                  onPress={() =>
+                    set.mutate(
+                      { category: c.id, on: !c.on },
+                      { onError: () => toast({ title: t("noticePrefs.failed"), icon: "x" }) },
+                    )
+                  }
+                />
+              ))}
+            </GroupedList>
+          </View>
+          <GroupedFooter>{t("mobile.me.notificationsKindsHint")}</GroupedFooter>
+        </>
+      ) : null}
     </Page>
   );
 }
@@ -176,4 +228,5 @@ export function LanguagePage() {
 
 const styles = StyleSheet.create({
   gap: { height: 14 },
+  dimmed: { opacity: 0.5 },
 });

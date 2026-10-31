@@ -42,7 +42,7 @@ export function machineGitUnavailable(status: MachineStatus | null, orgId: strin
   if (!status || status.orgId !== orgId) {
     return new Error(REMOVED_COMPUTER_MESSAGE);
   }
-  if (!status.online) return new MachineOfflineError(status.name);
+  if (!status.online) return new MachineOfflineError(status.name, status.kind);
   if (status.paused) return new MachinePausedError(status.name, status.paused.until, status.paused.timezone);
   if (status.protocol < GIT_PROTOCOL) {
     return new Error(

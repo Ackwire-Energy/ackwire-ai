@@ -27,9 +27,9 @@ import {
   useUpdateAgentBrowserSettings,
 } from "@agenteschat/client";
 import { saveLevels } from "@agenteschat/client/lib/access-levels";
-import { groupPlans, ownSignInName, signInPlan } from "@agenteschat/client/lib/ai-accounts";
+import { accountChoices, ownSignInName, signInPlan } from "@agenteschat/client/lib/ai-accounts";
 import { setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
-import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
+import { lowerFirst } from "@agenteschat/client/lib/format";
 import { providerGrammar } from "@agenteschat/client/lib/grammar";
 import {
   allowsInApp,
@@ -44,11 +44,9 @@ import { can as canDo } from "@agenteschat/client/lib/permissions";
 import {
   accountPlan,
   isPlanId,
-  loginPerAgent,
   planAliases,
   planModel as planModelOf,
   planModelOptions,
-  planName,
   planOf,
 } from "@agenteschat/client/lib/plans";
 import { AUTO, isAuto, modelChoices, providerLabel } from "@agenteschat/client/lib/providers";
@@ -84,6 +82,7 @@ import { Trans, useTranslation } from "react-i18next";
 import { NO_COMPUTER, useNoComputer } from "@/components/AgentComputer";
 import { DEFAULT_KEY, keyOptions, modelDescription, pickerValue } from "@/components/AgentFields";
 import { AddAccount } from "@/components/ai/AddAccountFlow";
+import { accountOption } from "@/components/ai/ConnectAiSteps";
 import { PlanReplies, PlanRepliesOf } from "@/components/ai/PlanReplies";
 import { useConnectAi } from "@/components/ConnectAi";
 import { CommandBlock } from "@/components/Machines";
@@ -613,7 +612,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const { agent, g, saved, can, draft, ownerFirst } = useAgentEdit();
   const work = useWork();
   const models = useModels();
-  const credentials = useCredentials(org.id, canDo(org.role, "manage_credentials"));
+  const credentials = useCredentials(org.id, canDo(org, "manage_credentials"));
   const platform = usePlatformKey(org.id);
   const settings = useSettings(org.id);
   // Answering through the API needs a key: the workspace's own, or the server's.
@@ -633,7 +632,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const [added, setAdded] = useState<MachineAccount[]>([]);
   const [arrived, setArrived] = useState<MachineAccount | null>(null);
   const [busy, setBusy] = useState(false);
-  // "Responde a todos" (ADR 0059 §5): switched onto a plan, the agent answers only its owner until they turn it on.
+  // "Atende outras pessoas" (ADR 0059 §5): moved onto a plan, the agent answers only its owner until they turn it on.
   const [share, setShare] = useState<{ kind: BrainKind; onlyOwner: boolean } | null>(null);
   const offId = useId();
   // Opening it is looking at the plans: their usage is looked up again (it comes back as `machine.updated`).
@@ -846,37 +845,10 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     },
     // One option per account: the login of it this agent has, or a free one. Else, where its plan allows a login
     // per agent, one more for this agent ("Also used by Ada"); else another agent's, moved here.
-    ...groupPlans(accounts).flatMap(({ logins, usedBy }) => {
-      const own =
-        logins.find((l) => l.id === account) ??
-        logins.find((l) => l.id === view.account) ??
-        logins.find((l) => l.mine && l.usedBy.length === 0);
-      const a = own ?? logins[0];
-      if (!a) return [];
-      const also = !own && a.mine && loginPerAgent(a.kind, a.provider);
-      // One login thinks for one agent.
-      const others = a.usedBy.filter((n) => n !== agent.name).join(", ");
-      const about = !a.mine
-        ? t("agentPage.work.brain.accountOf", { name: a.ownerName?.split(" ")[0] ?? "" })
-        : also
-          ? t("agentPage.work.brain.accountAlso", { agents: joinNames(usedBy, t("newAgent.and")) })
-          : a.status === "signed_out"
-            ? t("agentPage.work.brain.accountSignedOut")
-            : others
-              ? t("agentPage.work.brain.accountMove", { agents: others })
-              : a.keyHint
-                ? t("aiAccounts.page.keyEnds", { hint: a.keyHint })
-                : a.email;
-      return [
-        {
-          value: also ? `${ALSO}${a.id}` : a.id,
-          label: a.plan ? `${a.label} · ${planName(a.plan)}` : a.label,
-          disabled: !a.mine,
-          description: [about, planWord(t, i18n.language, a.usage)].filter(Boolean).join(" · ") || undefined,
-          leading: a.provider ? <ProviderLogo id={a.provider} size="sm" /> : accountIcon,
-        },
-      ];
-    }),
+    ...accountChoices(accounts, [account, view.account]).map((c) => ({
+      value: c.also ? `${ALSO}${c.login.id}` : c.login.id,
+      ...accountOption(t, i18n.language, c, agent.name),
+    })),
     {
       value: ADD,
       label: signedOut ? t("agentPage.work.brain.signInAgain") : t("agentPage.work.brain.addAccount"),
@@ -943,6 +915,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     </BrainField>
   );
   const also = typeof adding === "object" ? adding : undefined;
+  // A sign-in for one more login of the account picked (`also`), else for this agent's own signed-out one again.
+  const again = !also && signedOut ? current : null;
+  const signingIn = also ?? again;
   const planRows = (
     <>
       <BrainField label={t("agentPage.work.brain.planModel")}>
@@ -982,11 +957,12 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         accountKind &&
         (view.canUsePlans ? (
           <PlanReplies
+            agent={agent.name}
             on={!onlyOwner}
             onChange={(on) => setShare({ kind, onlyOwner: !on })}
             brain={accountKind}
             plan={signInPlan({ account, accounts }, row, accountKind)}
-            maker={plan?.maker}
+            coding={plan}
           />
         ) : (
           <PlanRepliesOf on={!onlyOwner} owner={ownerFirst ?? ""} agentName={agent.name} />
@@ -1096,13 +1072,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                     machineId={view.computer.machineId}
                     kind={accountKind}
                     computer={computerName}
-                    again={signedOut ? current?.id : undefined}
-                    {...(signedOut && isPlanId(current?.provider)
-                      ? { provider: current.provider }
-                      : isPlanId(also?.provider)
-                        ? { provider: also.provider }
-                        : {})}
-                    email={signedOut ? current?.email : also?.email}
+                    again={again?.id}
+                    {...(isPlanId(signingIn?.provider) ? { provider: signingIn.provider } : {})}
+                    email={signingIn?.email}
                     local={view.ownSignIn}
                     onBack={() => setAdding(false)}
                     onAdded={(a) => {
@@ -1181,7 +1153,7 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
   // from here and pick it (ADR 0036).
   const thisMac = useThisMac(org.id);
   const agentsHere = useAgentsHere();
-  const thisMacFree = agentsHere && canDo(org.role, "post") && thisMac.isSuccess && !thisMac.data;
+  const thisMacFree = agentsHere && canDo(org, "pair_computers") && thisMac.isSuccess && !thisMac.data;
   const [busy, setBusy] = useState(false);
   const view = work.brain.data;
   const brain = view?.brain ?? "model";
@@ -1504,7 +1476,7 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
             </SettingNote>
           )}
           {blocked && inDesktopApp() && (
-            <ThisMacButton orgId={org.id} canPair={canDo(org.role, "post")} folders={false} />
+            <ThisMacButton orgId={org.id} canPair={canDo(org, "pair_computers")} folders={false} />
           )}
           {on && (moveTo ? !ready(moveTo) : work.browser.data?.reason === "switched_off") && (
             <BrowserSteps

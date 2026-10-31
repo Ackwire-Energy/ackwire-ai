@@ -71,7 +71,11 @@ export interface PackCommit {
 }
 
 /** Object count and the commits (with their parents) in a pack; deltified commits are counted but not read. */
-export function readPack(data: Uint8Array, start = 0, options: { maxObjects?: number } = {}) {
+export function readPack(
+  data: Uint8Array,
+  start = 0,
+  options: { maxObjects?: number; maxInflatedBytes?: number; maxCommitBytes?: number } = {},
+) {
   if (data.length - start === 0) return { objects: 0, commits: [] as PackCommit[] };
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   if (new TextDecoder().decode(data.subarray(start, start + 4)) !== "PACK") throw new Error("not a pack");
@@ -80,17 +84,27 @@ export function readPack(data: Uint8Array, start = 0, options: { maxObjects?: nu
   const count = view.getUint32(start + 8);
   if (count > (options.maxObjects ?? 1_000_000)) throw new Error("too many objects");
   let pos = start + 12;
+  let inflatedTotal = 0;
   const commits: PackCommit[] = [];
   for (let i = 0; i < count; i++) {
+    if (pos >= data.length) throw new Error("truncated pack object");
     let c = data[pos++] as number;
     const type = (c >> 4) & 7;
     let size = c & 15;
     let shift = 4;
     while (c & 0x80) {
+      if (pos >= data.length || shift > 49) throw new Error("invalid pack object size");
       c = data[pos++] as number;
       size += (c & 0x7f) * 2 ** shift;
       shift += 7;
     }
+    if (
+      !Number.isSafeInteger(size) ||
+      size < 0 ||
+      size > (options.maxInflatedBytes ?? 128 * 1024 * 1024) - inflatedTotal
+    )
+      throw new Error("pack exceeds uncompressed size limit");
+    if (type === 1 && size > (options.maxCommitBytes ?? 2 * 1024 * 1024)) throw new Error("commit exceeds size limit");
     if (type === 6) {
       // OFS_DELTA: a variable-length offset to the base.
       do c = data[pos++] as number;
@@ -98,6 +112,8 @@ export function readPack(data: Uint8Array, start = 0, options: { maxObjects?: nu
     } else if (type === 7) pos += 20; // REF_DELTA: the base's id.
     const isCommit = type === 1;
     const inflated = inflateZlib(data, pos, { keep: isCommit, maxOut: Math.max(size, 1) });
+    if (inflated.size !== size) throw new Error("pack object size mismatch");
+    inflatedTotal += inflated.size;
     pos = inflated.end;
     if (isCommit && inflated.data) {
       const header = new TextEncoder().encode(`commit ${inflated.data.length}\0`);

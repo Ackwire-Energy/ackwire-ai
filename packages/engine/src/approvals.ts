@@ -9,7 +9,9 @@ import { type MailPreview, parseMailDetail, withoutReplyPrefix } from "./mail/pr
 import { notifyApproval, resolveApprovalNotifications } from "./notification-producers";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
+import { maySql } from "./permissions";
 import type { Approval } from "./tools/gateway";
+import { REQUEST_PERMISSION_TOOL } from "./tools/permission";
 import type { ApprovalOrigin } from "./tools/run-policy";
 
 const {
@@ -308,14 +310,28 @@ export const approvalView = (a: Approval, canDecide = false): ApprovalView => ({
   issue: null,
 });
 
-/** People who may decide: the agent's owner and the organization's admins and owners. */
-export async function approverIds(db: Database, approval: Pick<Approval, "orgId" | "ownerUserId">) {
+/**
+ * Whether only admins decide it: `request_permission` turns a connector or a built-in on for good, which
+ * is an admin's call like the agent's scopes (`setAgentScopes`); the agent's owner decides the others.
+ */
+export const adminsDecide = (approval: Pick<Approval, "tool">) => approval.tool === REQUEST_PERMISSION_TOOL;
+
+/** People who may decide: whoever may approve actions (ADR 0085), and the agent's owner (`adminsDecide` aside). */
+export async function approverIds(
+  db: Database,
+  approval: Pick<Approval, "orgId" | "ownerUserId"> & Partial<Pick<Approval, "tool">>,
+) {
   const admins = await db
     .select({ userId: organizationMembers.userId })
     .from(organizationMembers)
-    .where(and(eq(organizationMembers.orgId, approval.orgId), inArray(organizationMembers.role, ["owner", "admin"])));
+    .where(
+      and(
+        eq(organizationMembers.orgId, approval.orgId),
+        maySql(approval.orgId, organizationMembers.userId, "approve_actions"),
+      ),
+    );
   const ids = new Set(admins.map((a) => a.userId));
-  if (approval.ownerUserId) {
+  if (approval.ownerUserId && !adminsDecide({ tool: approval.tool ?? "" })) {
     const [owner] = await db
       .select({ userId: organizationMembers.userId })
       .from(organizationMembers)
@@ -360,12 +376,12 @@ async function enqueueResume(tx: Executor, row: Pick<Approval, "id" | "orgId" | 
 
 async function mayDecide(db: Database, actorId: string, approval: Approval) {
   const membership = await requirePermission(db, actorId, approval.orgId, "read");
-  return approval.ownerUserId === actorId || can(membership.role, "manage_agents");
+  return can(membership, "approve_actions") || (approval.ownerUserId === actorId && !adminsDecide(approval));
 }
 
 /**
  * Approves or refuses a pending approval. Only the agent's owner and org
- * admins may. The decision and the job that resumes the run commit together;
+ * admins may (a `request_permission` one: admins only, `adminsDecide`). The decision and the job that resumes the run commit together;
  * the run then executes exactly the hashed action, or tells the model it was
  * refused (with the reason).
  */
@@ -385,7 +401,11 @@ export async function decideApproval(
     .where(and(eq(approvals.id, approvalId), eq(approvals.orgId, orgId)));
   if (!current) throw new NotFoundError("Approval not found");
   if (!(await mayDecide(db, actorId, current))) {
-    throw new ForbiddenError("Only the agent's owner or an admin can decide this");
+    throw new ForbiddenError(
+      adminsDecide(current)
+        ? "Only an admin can give an agent new access"
+        : "Only the agent's owner or an admin can decide this",
+    );
   }
 
   const outcome = await db.transaction(async (tx) => {
@@ -468,7 +488,7 @@ export async function listApprovals(
   options: { status?: "pending" | "decided"; agentId?: string; limit?: number } = {},
 ): Promise<ApprovalView[]> {
   const membership = await requirePermission(db, actorId, orgId, "read");
-  const admin = can(membership.role, "manage_agents");
+  const admin = can(membership, "approve_actions");
   const myChannels = db
     .select({ id: channelMembers.channelId })
     .from(channelMembers)
@@ -490,7 +510,7 @@ export async function listApprovals(
     )
     .orderBy(desc(approvals.createdAt))
     .limit(Math.min(options.limit ?? 100, 500));
-  return viewsOf(db, rows, (r) => admin || r.ownerUserId === actorId);
+  return viewsOf(db, rows, (r) => admin || (r.ownerUserId === actorId && !adminsDecide(r)));
 }
 
 export async function getApproval(db: Database, actorId: string, orgId: string, approvalId: string) {

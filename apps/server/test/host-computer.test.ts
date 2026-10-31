@@ -102,16 +102,16 @@ test("one computer per organization of the first account, its own token each; no
   expect(lost?.token).not.toBe(rotated?.token);
   expect(await authenticateMachine(t.db, rotated?.token ?? "")).toBeNull();
 
-  // Bia can make the first account an admin, even an owner, of Beta on her own: Beta still isn't served.
-  await joinByInvitation(t, bia, betaId, "owner@example.com", { as: owner });
+  // Bia can make the first account an admin (the Admin role), even an owner, of Beta on her own: Beta still isn't
+  // served.
+  await joinByInvitation(t, bia, betaId, "owner@example.com", { role: "admin", as: owner });
   const ownerId = await userId("owner@example.com");
   const biaId = await userId("bia@example.com");
-  const setRole = async (by: Browser, org: string, who: string, role: string) =>
+  expect((await synced({ have: [orgId] })).map((o) => o.orgId)).toEqual([orgId]);
+  const setRole = async (by: Browser, org: string, who: string, role: "owner" | "member") =>
     (await by(`/api/app/organizations/${org}/members/${who}`, { method: "PATCH", json: { role } })).status;
-  for (const role of ["admin", "owner"]) {
-    expect(await setRole(bia, betaId, ownerId, role)).toBe(204);
-    expect((await synced({ have: [orgId] })).map((o) => o.orgId)).toEqual([orgId]);
-  }
+  expect(await setRole(bia, betaId, ownerId, "owner")).toBe(204);
+  expect((await synced({ have: [orgId] })).map((o) => o.orgId)).toEqual([orgId]);
   expect(await t.db.select().from(schema.machines).where(eq(schema.machines.orgId, betaId))).toEqual([]);
 
   // Acme, which the first account made: served while it runs it; made a member there, its token stops working.

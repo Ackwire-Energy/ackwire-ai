@@ -4,7 +4,7 @@ import { and, type Database, eq, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { NotFoundError, ValidationError } from "./errors";
-import { requirePermission } from "./organizations";
+import { invitedOrgId, requirePermission } from "./organizations";
 
 const { users, organizationMembers, organizations } = schema;
 
@@ -254,12 +254,11 @@ export async function orgLogoFile(
 }
 
 /**
- * The organization's logo for a connected computer (`GET /api/machines/org-logo`,
- * ADR 0036): the caller already authenticated the machine token, and the
- * machine belongs to `orgId`, so no person is checked. Null without a logo.
- * `file` (a content hash) doubles as the ETag.
+ * The organization's current logo, no person checked: for a connected computer (`GET /api/machines/org-logo`,
+ * ADR 0036: the caller authenticated the machine token, and the machine belongs to `orgId`) and an invitation's
+ * page (`invitationLogoFile`). Null without a logo. `file` (a content hash) doubles as the ETag.
  */
-export async function machineOrgLogo(deps: { db: Database; blobs: BlobStore }, orgId: string) {
+export async function currentOrgLogo(deps: { db: Database; blobs: BlobStore }, orgId: string) {
   const [org] = await deps.db
     .select({ logo: organizations.logo })
     .from(organizations)
@@ -269,4 +268,15 @@ export async function machineOrgLogo(deps: { db: Database; blobs: BlobStore }, o
   const object = await deps.blobs.get(`org-logos/${orgId}/${m[2]}`);
   if (!object) return null;
   return { file: m[2], ...object };
+}
+
+/**
+ * The logo on an invitation's page (`GET /api/app/invitations/{token}/logo/{file}`, the preview's `logo`): the
+ * current file of the workspace that token opens, only while the invitation or link works.
+ */
+export async function invitationLogoFile(deps: { db: Database; blobs: BlobStore }, token: string, file: string) {
+  const orgId = await invitedOrgId(deps.db, token);
+  const logo = orgId ? await currentOrgLogo(deps, orgId) : null;
+  if (!logo || logo.file !== file) throw new NotFoundError("Not found");
+  return logo;
 }

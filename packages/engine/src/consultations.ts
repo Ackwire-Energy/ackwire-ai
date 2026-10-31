@@ -14,7 +14,8 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
-import { canTalkTo } from "./audience";
+import { type AiStatusDeps, agentAiState } from "./ai-status";
+import { canTalkTo, talksToAgents } from "./audience";
 import { stopRun } from "./cancel";
 import { publishDelivery } from "./delivery";
 import { createAgentRuns, startOrJoinRun } from "./dispatch";
@@ -50,12 +51,16 @@ const refuse = (content: string): ToolOutput => ({ content, isError: true });
 /** No one pauses on this consultation: its answer comes as a notice. */
 export const isAsyncConsultation = (c: Pick<AgentConsultationRow, "waitId">) => c.waitId.startsWith(ASYNC_WAIT);
 
+/** What tells whether an agent has an AI to think with (`agentAiState`). */
+type AiCheck = Omit<AiStatusDeps, "db">;
+
 /**
  * Who an agent may ask or tell something: an active agent of the org, not
- * itself, one the person behind the run can talk to, and not after
- * agents went back and forth long enough (`NOTICE_WAKE_MAX_HOP`).
+ * itself, one the person behind the run can talk to, one with an AI to think
+ * with (its run would only fail with `no_ai`, so no answer would come), and
+ * not after agents went back and forth long enough (`NOTICE_WAKE_MAX_HOP`).
  */
-async function reachableAgent(ctx: ToolContext, input: unknown) {
+async function reachableAgent(ctx: ToolContext, input: unknown, ai?: AiCheck) {
   const handle = String(input).trim().replace(/^@/, "").toLowerCase();
   const { db } = ctx;
   const [target] = await db
@@ -65,9 +70,14 @@ async function reachableAgent(ctx: ToolContext, input: unknown) {
   if (!target) return { refused: refuse(`There is no agent @${handle} in this organization.`) };
   if (target.id === ctx.agentId) return { refused: refuse("That is you: answer it yourself.") };
   const person = await personBehindCall(ctx);
-  if (!canTalkTo(target, person)) {
+  if (!canTalkTo(target, person, await talksToAgents(db, ctx.orgId, person))) {
     return {
       refused: refuse(`@${handle} only works with some people, and the person you are helping isn't one of them.`),
+    };
+  }
+  if (ai && (await agentAiState({ ...ai, db }, target)).state === "no_ai") {
+    return {
+      refused: refuse(`@${handle} has no AI connected yet, so it can't answer. An owner can connect one on its page.`),
     };
   }
   const [run] = await db
@@ -95,12 +105,13 @@ const TOO_DEEP = refuse(
  * from before that still resume their paused runs (`onConsultedRunFinished`).
  *
  * Code decides who may be asked: an active agent of the org, not the asker,
- * one the person behind the run can talk to, and not already in this
- * chain (no cycles, at most `MAX_CONSULTATION_CHAIN` agents deep).
+ * one the person behind the run can talk to, one with an AI connected (with
+ * `deps.ai`), and not already in this chain (no cycles, at most
+ * `MAX_CONSULTATION_CHAIN` agents deep).
  *
  * `tell_agent`: a note to another agent, fire and forget (`createTellAgentTool`).
  */
-export function createAskAgentToolSource(deps: { pubsub?: PubSub } = {}): ToolSource {
+export function createAskAgentToolSource(deps: { pubsub?: PubSub; ai?: AiCheck } = {}): ToolSource {
   const tool: ToolDefinition = {
     name: ASK_AGENT_TOOL,
     description:
@@ -120,7 +131,7 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub } = {}): ToolSo
       const question = String(input.question).trim();
       if (!question) return refuse("Write the question.");
       const { db } = ctx;
-      const reached = await reachableAgent(ctx, input.agent);
+      const reached = await reachableAgent(ctx, input.agent, deps.ai);
       if (reached.refused) return reached.refused;
       const { target, handle } = reached;
       // The person already asked that agent here (the same message, or it is working in this thread):
@@ -188,7 +199,7 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub } = {}): ToolSo
       };
     },
   };
-  return { name: "consultations", tools: async () => [tool, createTellAgentTool()] };
+  return { name: "consultations", tools: async () => [tool, createTellAgentTool(deps.ai)] };
 }
 
 /** The agents already in the chain of consultations this run answers (empty when it answers none). */
@@ -209,7 +220,7 @@ async function chainOf(db: Executor, ctx: Pick<ToolContext, "orgId" | "runId">) 
  * conversation as an `agent_note` notice (`onConsultedRunFinished`). Same
  * checks as `ask_agent`; no note back into the conversation it is answering.
  */
-function createTellAgentTool(): ToolDefinition {
+function createTellAgentTool(ai?: AiCheck): ToolDefinition {
   return {
     name: TELL_AGENT_TOOL,
     description:
@@ -229,7 +240,7 @@ function createTellAgentTool(): ToolDefinition {
       const body = String(input.message).trim();
       if (!body) return refuse("Write the note.");
       const { db } = ctx;
-      const reached = await reachableAgent(ctx, input.agent);
+      const reached = await reachableAgent(ctx, input.agent, ai);
       if (reached.refused) return reached.refused;
       const { target, handle } = reached;
       // Answering that agent already (its question or note, in your private conversation): your reply goes back.

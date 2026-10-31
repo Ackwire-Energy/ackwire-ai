@@ -8,7 +8,7 @@ import { addChannelMember, archiveChannel, removeChannelMember, unarchiveChannel
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { getIssue, type IssueView, setCriterion, updateIssue, type WorkActor } from "./issues";
 import { announceMessageMemories } from "./message-memories";
-import { can, getMembership } from "./organizations";
+import { assertActiveMembership, can, getMembership } from "./organizations";
 import { nextRoutineTime } from "./routines";
 import { enqueueIndex } from "./search";
 import { closeThread, getThread, reopenThread, updateThread } from "./threads";
@@ -473,7 +473,8 @@ async function loadAction(db: Database, orgId: string, id: string) {
 async function requireMayUndo(db: Database, userId: string, a: Row) {
   const membership = await getMembership(db, userId, a.orgId);
   if (!membership) throw new NotFoundError("Action not found", "action.not_found");
-  if (a.requestedByUserId === userId || can(membership.role, "manage_agents")) return;
+  assertActiveMembership(membership);
+  if (a.requestedByUserId === userId || can(membership, "manage_agents")) return;
   const agent = await getAgentCached(db, a.orgId, a.agentId);
   if (agent?.ownerUserId === userId) return;
   throw new ForbiddenError(

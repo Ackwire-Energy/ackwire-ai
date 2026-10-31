@@ -1,10 +1,16 @@
 import { and, asc, type Database, desc, eq, gte, inArray, isNull, schema } from "@agenteschat/db";
+import { type AgentStatusView, lineInEnglish, loadAgentStatuses } from "./agent-status";
 import type { AgentAppearance } from "./appearance";
-import { canTalkTo } from "./audience";
+import { canTalkTo, talksToAgents } from "./audience";
+import { agentBrowserStatus } from "./browser/status";
+import { BROWSER_SCOPE, DESKTOP_SCOPE } from "./browser/types";
 import { caches } from "./cache";
 import { capabilityKeys, summarizeScopes } from "./capabilities";
-import { requirePermission } from "./organizations";
+import { agentDesktopUseStatus } from "./desktop/status";
+import type { MachineCaller, MachineStatus } from "./machine-hub";
+import { can, requirePermission } from "./organizations";
 import { personBehindCall } from "./requester";
+import { getSandboxSettings, SANDBOX_SCOPE } from "./sandbox";
 import type { ToolDefinition, ToolSource } from "./tools/types";
 
 const { agentConsultations, agentRuns, agentScopes, agents, connectorConnections, users } = schema;
@@ -24,6 +30,61 @@ export async function agentScopeNames(db: Database, orgId: string, agentIds: str
     agentId: r.agentId,
     scope: r.scope.startsWith("connector:") && r.connector ? `${r.connector}:${r.scope.slice(10)}` : r.scope,
   }));
+}
+
+/** Granted to every new agent, but each works only where the agent's computer serves it. */
+const COMPUTER_SCOPES: ReadonlySet<string> = new Set([SANDBOX_SCOPE, BROWSER_SCOPE, DESKTOP_SCOPE]);
+
+/**
+ * Each agent's scopes as the other agents read them (the roster in a run's
+ * context, `find_agent`): a computer's (Code, Browser, Desktop) only while the
+ * agent's computer serves it, by the checks its own tools pass.
+ */
+export async function rosterScopeNames(
+  db: Database,
+  machines: Pick<MachineCaller, "status"> | null | undefined,
+  orgId: string,
+  agentIds: string[],
+) {
+  if (agentIds.length === 0) return [];
+  // Every run's context reads this: one round trip, and one read per computer however many agents share it.
+  const reads = new Map<string, Promise<MachineStatus | null>>();
+  const hub = machines
+    ? {
+        status: (id: string) => {
+          const read = reads.get(id) ?? machines.status(id);
+          reads.set(id, read);
+          return read;
+        },
+      }
+    : undefined;
+  const [rows, sandbox, statuses] = await Promise.all([
+    agentScopeNames(db, orgId, agentIds),
+    getSandboxSettings(db, orgId),
+    Promise.all(
+      agentIds.map(async (agentId) => {
+        const [browser, desktop] = await Promise.all([
+          agentBrowserStatus(db, hub, orgId, agentId),
+          agentDesktopUseStatus(db, hub, orgId, agentId),
+        ]);
+        return { agentId, browser, desktop };
+      }),
+    ),
+  ]);
+  const served = new Map(
+    statuses.map(({ agentId, browser, desktop }) => {
+      // No computer, or a removed one, is what the browser's status checks first.
+      const computer = browser.available || !["no_machine", "machine_removed"].includes(browser.code);
+      const code = sandbox.enabled && computer && rows.some((r) => r.agentId === agentId && r.scope === SANDBOX_SCOPE);
+      const scopes = [
+        ...(code ? [SANDBOX_SCOPE] : []),
+        ...(browser.available ? [BROWSER_SCOPE] : []),
+        ...(code && desktop.available ? [DESKTOP_SCOPE] : []),
+      ];
+      return [agentId, new Set(scopes)] as const;
+    }),
+  );
+  return rows.filter((r) => !COMPUTER_SCOPES.has(r.scope) || served.get(r.agentId)?.has(r.scope));
 }
 
 export const FIND_AGENT_TOOL = "find_agent";
@@ -63,8 +124,15 @@ export const forgetTeam = (orgId: string) => caches.agents.delete(`${orgId}:team
  * exists even in a DM. Details stay behind `find_agent`. Agents already
  * described in "Where you are" (channel members) are left out.
  */
-export function teamPrompt(team: Teammate[], selfId: string, requester: string | null, skip: Set<string>) {
-  const others = team.filter((a) => a.id !== selfId && !skip.has(a.id) && canTalkTo(a, requester));
+export function teamPrompt(
+  team: Teammate[],
+  selfId: string,
+  requester: string | null,
+  skip: Set<string>,
+  /** Whether the requester's roles let them talk to agents (`talksToAgents`). */
+  talks = true,
+) {
+  const others = team.filter((a) => a.id !== selfId && !skip.has(a.id) && canTalkTo(a, requester, talks));
   if (others.length === 0) return "";
   const lines =
     others.length > TEAM_IN_PROMPT
@@ -84,10 +152,10 @@ const words = (s: string) =>
 /**
  * The built-in `find_agent` tool: who else works here, searchable by
  * name, role or what they do. Lists only agents the person behind the run can
- * talk to, with what they can do, who is responsible and whether they are
- * busy. Read-only; asking one is `ask_agent`.
+ * talk to, with what they can do (`rosterScopeNames`), who is responsible and
+ * whether they are busy. Read-only; asking one is `ask_agent`.
  */
-export function createFindAgentToolSource(): ToolSource {
+export function createFindAgentToolSource(deps: { machines?: Pick<MachineCaller, "status"> | null } = {}): ToolSource {
   const tool: ToolDefinition = {
     name: FIND_AGENT_TOOL,
     description:
@@ -104,7 +172,8 @@ export function createFindAgentToolSource(): ToolSource {
     async execute(input, ctx) {
       const { db } = ctx;
       const person = await personBehindCall(ctx);
-      const team = (await loadTeam(db, ctx.orgId)).filter((a) => a.id !== ctx.agentId && canTalkTo(a, person));
+      const talks = await talksToAgents(db, ctx.orgId, person);
+      const team = (await loadTeam(db, ctx.orgId)).filter((a) => a.id !== ctx.agentId && canTalkTo(a, person, talks));
       const query = words(String(input.query ?? ""));
       const scored = team
         .map((a) => {
@@ -126,29 +195,20 @@ export function createFindAgentToolSource(): ToolSource {
       }
       const ids = scored.map((x) => x.a.id);
       const ownerIds = [...new Set(scored.map((x) => x.a.ownerUserId).filter((id): id is string => !!id))];
-      const [scopes, owners, busy] = await Promise.all([
-        agentScopeNames(db, ctx.orgId, ids),
+      const [scopes, owners, statuses] = await Promise.all([
+        rosterScopeNames(db, deps.machines, ctx.orgId, ids),
         ownerIds.length
           ? db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, ownerIds))
           : Promise.resolve([]),
-        db
-          .select({ agentId: agentRuns.agentId })
-          .from(agentRuns)
-          .where(
-            and(
-              eq(agentRuns.orgId, ctx.orgId),
-              inArray(agentRuns.agentId, ids),
-              inArray(agentRuns.status, ["running", "waiting_approval", "waiting_input"]),
-            ),
-          ),
+        loadAgentStatuses(db, ctx.orgId, new Date(), ids),
       ]);
-      const busyIds = new Set(busy.map((r) => r.agentId));
+      const statusOf = new Map(statuses.map((s) => [s.agentId, s]));
       const content = scored
         .map(({ a }) => {
           const about = a.instructions.trim().replace(/\s+/g, " ");
           const owner = owners.find((o) => o.id === a.ownerUserId)?.name;
           return [
-            `@${a.handle}: ${a.name}${a.role ? `, ${a.role}` : ""}${busyIds.has(a.id) ? " (working now)" : ""}`,
+            `@${a.handle}: ${a.name}${a.role ? `, ${a.role}` : ""}${presenceNote(statusOf.get(a.id))}`,
             `  Can: ${summarizeScopes(scopes.filter((s) => s.agentId === a.id).map((s) => s.scope))}`,
             owner ? `  Responsible person: ${owner}` : "",
             about ? `  About: ${about.length > 240 ? `${about.slice(0, 237)}…` : about}` : "",
@@ -163,6 +223,14 @@ export function createFindAgentToolSource(): ToolSource {
   return { name: "team", tools: async () => [tool] };
 }
 
+/** " (busy: Revisando o PR #12)" after an agent's name in `find_agent`; its line is its own words. */
+function presenceNote(s: AgentStatusView | undefined) {
+  if (!s) return "";
+  const what = { online: "online", busy: "busy, on heavy work", away: "away", offline: "paused" }[s.presence];
+  const line = s.status ? lineInEnglish(s.status) : null;
+  return ` (${what}${line ? `: ${line.replace(/[()\n]/g, " ")}` : ""})`;
+}
+
 /** Consultations shown on the team screen: the last day. */
 export const TEAM_CONSULTATIONS_MS = 24 * 60 * 60_000;
 
@@ -173,7 +241,7 @@ export const TEAM_CONSULTATIONS_MS = 24 * 60 * 60_000;
  * a conversation between agents is private.
  */
 export async function getTeam(db: Database, actorId: string, orgId: string) {
-  await requirePermission(db, actorId, orgId, "read");
+  const talks = can(await requirePermission(db, actorId, orgId, "read"), "talk_to_agents");
   const list = await db
     .select({
       id: agents.id,
@@ -236,7 +304,7 @@ export async function getTeam(db: Database, actorId: string, orgId: string) {
       ownerUserId: a.ownerUserId,
       capabilities: capabilityKeys(scopes.filter((s) => s.agentId === a.id).map((s) => s.scope)),
       busy: busyIds.has(a.id),
-      canTalk: canTalkTo(a, actorId),
+      canTalk: canTalkTo(a, actorId, talks),
     })),
     people: owners.map((o) => ({ id: o.id, name: o.name, image: o.image ?? null })),
     // Only between agents still here (an archived one has no place in the sky).

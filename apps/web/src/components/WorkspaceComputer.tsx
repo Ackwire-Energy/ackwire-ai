@@ -9,6 +9,7 @@ import {
   SETUP_STEPS,
   type SetupView,
   setupEta,
+  setupLines,
   setupNoticeKey,
   setupNoticeTitleKey,
   setupPending,
@@ -19,6 +20,7 @@ import {
   WORKSPACE_COMPUTER_KIND,
 } from "@agenteschat/client/lib/computer";
 import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { around, endSentence } from "@agenteschat/client/lib/text";
 import {
   Button,
@@ -33,10 +35,11 @@ import {
   Steps,
 } from "@agenteschat/ui";
 import { Link, useMatchRoute } from "@tanstack/react-router";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
+import { usePrefersReducedMotion } from "@/hooks/useRevealedText";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 
 /**
@@ -91,9 +94,52 @@ const PHASE_ICON: Record<SetupView["phase"], IconName> = {
   paused: "pause",
 };
 
+/** How long each of the team's lines stays while it's prepared. */
+const LINE_MS = 3500;
+
 /**
- * While it's on its way: the four steps as bars ("Passo 2 de 4 · Iniciando"), or why it waits, in one line. `said`: a
- * chip or the window's head beside it says where it is, so a line that would only say it again stays out.
+ * While it's prepared, the team's lines about what it's doing (`setupLines`), one at a time, crossfading every 3.5 s;
+ * with reduced motion the one shown stays until the step changes. Followed by its key, so a line that comes meanwhile
+ * (its memory, once the size is known) waits for its turn instead of taking the shown one's place. Only for sighted
+ * readers: the step under it is what's announced. With no line for this team, nothing: the step's label already says
+ * where it is.
+ */
+function SetupSays({ view }: { view: SetupView }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const lines = setupLines(view, useAgents(org.id).data ?? []);
+  const still = usePrefersReducedMotion();
+  const [shown, setShown] = useState<string>();
+  const on = lines.find((l) => l.key === shown) ?? lines[0];
+  if (on && on.key !== shown) setShown(on.key);
+  const said = lines.map((l) => l.key).join(" ");
+  useEffect(() => {
+    const keys = said.split(" ");
+    if (still || keys.length < 2) return;
+    const timer = setInterval(() => setShown((key) => keys[(keys.indexOf(key ?? "") + 1) % keys.length]), LINE_MS);
+    return () => clearInterval(timer);
+  }, [still, said]);
+  if (!on) return null;
+  return (
+    <span className="setup-says" aria-hidden="true">
+      {lines.map(({ key, agent }) => (
+        <Chip
+          key={key}
+          className="setup-say"
+          data-on={key === on.key || undefined}
+          lead={<AgentAvatar agentId={agent.id} name={agent.name} size="xs" framed />}
+        >
+          {t(key, { ...agentGrammar(t, agent.name), gb: view.specs?.memoryGb })}
+        </Chip>
+      ))}
+    </span>
+  );
+}
+
+/**
+ * While it's on its way: the team's line, then the four steps as bars ("Passo 2 de 4 · Iniciando"); or why it waits,
+ * in one line. `said`: a chip or the window's head beside it says where it is, so a line that would only say it again
+ * stays out.
  */
 export function SetupProgress({ view, said = false }: { view: SetupView; said?: boolean }) {
   const { t } = useTranslation();
@@ -103,22 +149,25 @@ export function SetupProgress({ view, said = false }: { view: SetupView; said?: 
     // The step's own words stay on one line where they fit (layout.css).
     const cut = around(label, step);
     return (
-      <div className="setup-progress" role="status">
-        <Steps
-          current={view.stepNumber}
-          total={SETUP_STEPS.length}
-          label={
-            cut ? (
-              <>
-                {cut[0]}
-                <span>{step}</span>
-                {cut[1]}
-              </>
-            ) : (
-              label
-            )
-          }
-        />
+      <div className="setup-progress setup-progress--steps">
+        <SetupSays key={view.textKey} view={view} />
+        <div role="status">
+          <Steps
+            current={view.stepNumber}
+            total={SETUP_STEPS.length}
+            label={
+              cut ? (
+                <>
+                  {cut[0]}
+                  <span>{step}</span>
+                  {cut[1]}
+                </>
+              ) : (
+                label
+              )
+            }
+          />
+        </div>
       </div>
     );
   }

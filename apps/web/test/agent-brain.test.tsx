@@ -62,7 +62,7 @@ describe("Como trabalha under the name", () => {
     await open();
     expect(sentence().textContent).toContain("ComputadorNenhum computador");
     expect(sentence().textContent).toContain("Pensa com");
-    expect(sentence().textContent).toContain("o modelo da organização");
+    expect(sentence().textContent).toContain("o modelo do workspace");
     expect(sentence().textContent).toContain("Navegadornão navega em sites");
     expect(sentence().textContent?.indexOf("Computador")).toBeLessThan(
       sentence().textContent?.indexOf("Pensa com") ?? 0,
@@ -83,7 +83,7 @@ describe("Como trabalha under the name", () => {
     const member = seedState();
     if (member.me?.organizations[0]) member.me.organizations[0].role = "member";
     await open(member);
-    expect(sentence().textContent).toContain("o modelo da organização");
+    expect(sentence().textContent).toContain("o modelo do workspace");
     expect(screen().queryByRole("button", { name: "Mudar quem pensa" })).toBeNull();
     cleanup();
     const owner = seedState();
@@ -101,7 +101,7 @@ describe("Quem pensa (its dialog)", () => {
     const d = await brainDialog();
     const rows = within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getAllByRole("radio");
     expect(rows.map((r) => r.querySelector(".ac-optrow__title")?.textContent)).toEqual([
-      "Modelo da organização",
+      "Modelo do workspace",
       "Claude Code",
       "CodexEm teste",
     ]);
@@ -135,7 +135,7 @@ describe("Quem pensa (its dialog)", () => {
     // One line, its label and its ⓘ: what it does, the same on or off, describes the switch.
     const fallback = hintOf("Se o MacBook parar de responder, responder pela API", d);
     expect(fallback.text).toBe(
-      "Usa o modelo da organização e conta no orçamento da Ada. Se não, a Ada avisa quem chamou e espera o computador voltar.",
+      "Usa o modelo do workspace e conta no orçamento da Ada. Se não, a Ada avisa quem chamou e espera o computador voltar.",
     );
     expect(offSwitch(d).getAttribute("aria-describedby")).toBe(fallback.button.getAttribute("aria-describedby"));
     await click(offSwitch(d));
@@ -289,7 +289,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     });
   });
 
-  test("one agent per account, each person's own: another agent's moves here, someone else's only shows while it's this one's", async () => {
+  test("each person's own: a Claude account another agent thinks with signs in again for this one; someone else's only shows while it's this one's", async () => {
     const theo: MachineAccount = {
       ...work,
       id: "acct_theo",
@@ -309,7 +309,9 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
       usedBy: ["Ada"],
     };
     const other: MachineAccount = { ...hers, id: "acct_ana2", label: "Claude Team 3", usedBy: [] };
-    const { state } = await onMac({ account: "acct_ana", accounts: [work, theo, hers, other] });
+    const { state, api } = await onMac({ account: "acct_ana", accounts: [work, theo, hers, other] });
+    // Ada's own login of Pessoal, once Claude's page signs her in.
+    fakeMachinesOf.get(api)?.endLogin("login_1", { state: "done", account: { ...theo, id: "acct_ada", usedBy: [] } });
     const d = await brainDialog();
     const account = within(d).getByRole("combobox", { name: "Conta do Claude" });
     account.focus();
@@ -318,11 +320,87 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     expect(options.map((o) => [o.textContent, o.getAttribute("aria-disabled") === "true"])).toEqual([
       ["A conta que os seus agentes dividem", false],
       ["Trabalho · Teamwalt@acme.com", false],
-      ["Pessoal · MaxEm uso por Theo · Mover para cá", false],
+      ["Pessoal · MaxTambém usada por Theo", false],
       ["Claude Team 2 · TeamDe Ana", true],
       ["Adicionar conta", false],
     ]);
     await click(screen().getByRole("option", { name: /^Pessoal · Max/ }));
+    await settle(4);
+    const block = within(d).getByRole("region", { name: "Adicionar conta do Claude" });
+    const realOpen = window.open;
+    window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
+    try {
+      await click(within(block).getByRole("button", { name: "Entrar com Claude" }));
+      await settle(8);
+    } finally {
+      window.open = realOpen;
+    }
+    // A sign-in of Ada's own, Theo's account named to Claude's page unseen; nothing taken from Theo.
+    expect(state.calls.find((c) => c.method === "machines.beginAccountLogin")?.args).toEqual([
+      ORG_ID,
+      "machine_1",
+      "claude_code",
+      { email: "walt@pessoal.com" },
+    ]);
+    expect(d.textContent).toContain("A conta Pessoal entrou no MacBook. Clique em Usar para salvar.");
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toMatchObject({ account: "acct_ada" });
+    expect(brainCalls(state).at(-1)).not.toHaveProperty("moveAccount");
+  });
+
+  test("her own login signed out, an account another agent uses: a new login of that account, never hers again", async () => {
+    const theo: MachineAccount = {
+      ...work,
+      id: "acct_theo",
+      label: "Pessoal",
+      email: "walt@pessoal.com",
+      plan: "Max",
+      usedBy: ["Theo"],
+    };
+    const { state } = await onMac({
+      account: "acct_work",
+      accounts: [{ ...work, status: "signed_out", usedBy: ["Ada"] }, theo],
+    });
+    const d = await brainDialog();
+    await pick(d, "Conta do Claude", /^Pessoal · Max/);
+    await settle(4);
+    const block = within(d).getByRole("region", { name: "Adicionar conta do Claude" });
+    const realOpen = window.open;
+    window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
+    try {
+      await click(within(block).getByRole("button", { name: "Entrar com Claude" }));
+      await settle(8);
+    } finally {
+      window.open = realOpen;
+    }
+    expect(state.calls.find((c) => c.method === "machines.beginAccountLogin")?.args).toEqual([
+      ORG_ID,
+      "machine_1",
+      "claude_code",
+      { email: "walt@pessoal.com" },
+    ]);
+  });
+
+  test("ChatGPT stays one agent per account: another agent's moves here", async () => {
+    const theo: MachineAccount = {
+      ...work,
+      id: "acct_theo",
+      kind: "codex",
+      label: "Pessoal",
+      email: "walt@pessoal.com",
+      plan: "Plus",
+      usedBy: ["Theo"],
+    };
+    const { state } = await onMac({ brain: "codex", effectiveModel: "gpt-6-sol", accounts: [theo] });
+    const d = await brainDialog();
+    const account = within(d).getByRole("combobox", { name: "Conta do ChatGPT" });
+    account.focus();
+    await act(async () => fireEvent.keyDown(account, { key: "Enter" }));
+    expect(screen().getByRole("option", { name: /^Pessoal · Plus/ }).textContent).toBe(
+      "Pessoal · PlusEm uso por Theo · Mover para cá",
+    );
+    await click(screen().getByRole("option", { name: /^Pessoal · Plus/ }));
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
     expect(brainCalls(state).at(-1)).toMatchObject({ account: "acct_theo", moveAccount: true });
@@ -511,15 +589,17 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
       );
       const login = fakeMachinesOf.get(api)?.lastLogin();
       expect(login?.kind).toBe("claude_code");
-      // Something else on the clipboard (a password) waits for a tap.
+      // Something else on the clipboard (a password) waits for Send, with a line; Colar goes while the field holds it.
       clip = "hunter2-password";
       await click(within(block).getByRole("button", { name: "Colar" }));
       await settle(4);
       expect(fakeMachinesOf.get(api)?.lastLogin()?.box).toBeNull();
-      expect((within(block).getByRole("textbox", { name: "Código do Claude" }) as HTMLInputElement).value).toBe(
-        "hunter2-password",
-      );
-      // This sign-in's code (`…#<state>`) goes at once, sealed: the raw code is in no call.
+      const field = within(block).getByRole("textbox", { name: "Código do Claude" }) as HTMLInputElement;
+      expect(field.value).toBe("hunter2-password");
+      expect(shownText(block)).toContain("Isso não parece o código do Claude.");
+      expect(within(block).queryByRole("button", { name: "Colar" })).toBeNull();
+      // Emptied, Colar is back; this sign-in's code (`…#<state>`) goes at once, sealed: the raw code is in no call.
+      await act(async () => fireEvent.change(field, { target: { value: "" } }));
       clip = "c0de-from-claude#st4te";
       await click(within(block).getByRole("button", { name: "Colar" }));
       await settle(6);
@@ -537,6 +617,76 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     } finally {
       window.open = realOpen;
     }
+  });
+
+  /** Claude's sign-in started from Adicionar conta, its code field showing; the sign-in window is a stand-in. */
+  async function codeField() {
+    const { state, api } = await onMac();
+    const d = await brainDialog();
+    await pick(d, "Conta do Claude", /^Adicionar conta/);
+    await settle(6);
+    const block = within(d).getByRole("region", { name: "Adicionar conta do Claude" });
+    const realOpen = window.open;
+    window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
+    try {
+      await click(within(block).getByRole("button", { name: "Entrar com Claude" }));
+      await settle(6);
+    } finally {
+      window.open = realOpen;
+    }
+    const field = within(block).getByRole("textbox", { name: "Código do Claude" });
+    // ⌘V: the paste lands in the field as its new value.
+    const paste = async (text: string) => {
+      await act(async () => {
+        fireEvent.paste(field, { clipboardData: { getData: () => text } });
+        fireEvent.change(field, { target: { value: text } });
+      });
+      await settle(6);
+    };
+    return { state, block, paste, sealed: () => fakeMachinesOf.get(api)?.lastLogin()?.box ?? null };
+  }
+
+  test("Claude's code pasted into its field with ⌘V goes to the computer by itself, no click", async () => {
+    const { state, block, paste, sealed } = await codeField();
+    await paste("c0de-from-claude#st4te");
+    expect(sealed()).not.toBeNull();
+    expect(JSON.stringify(state.calls)).not.toContain("c0de-from-claude");
+    expect(shownText(block)).toContain("Código enviado. O MacBook está terminando de entrar.");
+    expect(shownText(block)).not.toContain("Isso não parece o código do Claude.");
+  });
+
+  test("Colar refused by the browser, then ⌘V: the code goes, and the refusal's line with it", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        readText: async () => {
+          throw new Error("denied");
+        },
+        writeText: async () => {},
+      },
+    });
+    const { block, paste, sealed } = await codeField();
+    await click(within(block).getByRole("button", { name: "Colar" }));
+    await settle(4);
+    expect(shownText(block)).toContain("O navegador não deixou colar.");
+    await paste("c0de-from-claude#st4te");
+    expect(sealed()).not.toBeNull();
+    expect(shownText(block)).toContain("Código enviado. O MacBook está terminando de entrar.");
+    expect(shownText(block)).not.toContain("O navegador não deixou colar.");
+  });
+
+  test("a code that isn't this sign-in's waits for Enviar, the one action, with a line under it", async () => {
+    const { block, paste, sealed } = await codeField();
+    await paste("c0de-from-claude#another-state");
+    expect(sealed()).toBeNull();
+    expect(shownText(block)).toContain("Isso não parece o código do Claude.");
+    expect(within(block).queryByRole("button", { name: "Colar" })).toBeNull();
+    const send = within(block).getByRole("button", { name: "Enviar ao MacBook" }) as HTMLButtonElement;
+    expect(send.disabled).toBe(false);
+    await click(send);
+    await settle(6);
+    expect(sealed()).not.toBeNull();
+    expect(shownText(block)).toContain("Código enviado. O MacBook está terminando de entrar.");
   });
 
   test("Adicionar conta (ChatGPT): its settings first, then the sign-in on its button; the account is chosen", async () => {
@@ -633,7 +783,7 @@ describe("Quem pensa: a plan with a login per agent, and plans on the Cloud", ()
     expect(brainCalls(state).at(-1)).toMatchObject({ account: "acct_ada" });
   });
 
-  test("on the Cloud too, the plan's owner lets it reply to everyone: the switch, its line and ⓘ", async () => {
+  test("on the Cloud too, the plan's owner lets it answer other people: the switch, its line and ⓘ", async () => {
     const state = seedState();
     const api = createFakeApi(state);
     pairMac(api, true);
@@ -643,9 +793,10 @@ describe("Quem pensa: a plan with a login per agent, and plans on the Cloud", ()
       fakeAgentBrain(ADA_ID, { brain: "claude_code", effectiveModel: "sonnet", onlyOwner: true });
     await open(state, api);
     const d = await brainDialog();
-    const replies = within(d).getByRole("switch", { name: "Responde a todos" });
+    const replies = within(d).getByRole("switch", { name: "Atende outras pessoas" });
     expect(replies.getAttribute("aria-checked")).toBe("false");
-    expect(hintOf("Zona cinzenta nos termos do Claude", d).text).toContain("Os termos do Claude dizem");
+    expect(shownText(d)).toContain("A Ada só atende você, pelo seu plano do Claude.");
+    expect(hintOf("os termos do plano", d).text).toContain("Os planos do Claude são para uso pessoal.");
     expect(shownText(d)).not.toContain("Um plano é pessoal");
     await click(replies);
     await click(within(d).getByRole("button", { name: "Usar" }));

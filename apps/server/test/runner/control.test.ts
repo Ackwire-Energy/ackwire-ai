@@ -562,7 +562,9 @@ test("reconnect after the server refused this Mac: pair.start sends the previous
 
   expect(await c.data({ type: "pair.start", server: "https://agentes.test" })).toEqual({ started: true });
   await waitFor(() => c.events("pair.done").length === 1);
-  expect(bodies[0]).toMatchObject({ previousMachineId: "m1" });
+  // The old token goes along as the proof that this is that computer.
+  expect(bodies[0]).toMatchObject({ previousMachineId: "m1", previousToken: TOKEN });
+  expect(readStoredConfig(home)?.previousToken).toBeUndefined();
   expect(readStoredConfig(home)).toMatchObject({
     machineId: "m1",
     token: NEW_TOKEN,
@@ -591,14 +593,18 @@ test("unpair keeps the machine id, so pairing again with the same server asks to
   await c.data({ type: "unpair" });
   expect(readStoredConfig(home)).toMatchObject({ machineId: "m1", server: "https://agentes.test" });
   expect(readStoredConfig(home)?.token).toBeUndefined();
+  // Kept only as the proof for coming back as that machine; nothing connects with it.
+  expect(readStoredConfig(home)?.previousToken).toBe(TOKEN);
+  expect(await c.data({ type: "status" })).toMatchObject({ paired: false, connection: "unpaired" });
   await c.data({ type: "pair.start", server: "https://agentes.test" });
   await waitFor(() => bodies.length === 1);
-  expect(bodies[0]).toMatchObject({ previousMachineId: "m1" });
+  expect(bodies[0]).toMatchObject({ previousMachineId: "m1", previousToken: TOKEN });
   await c.data({ type: "pair.cancel" });
   // Another server: a new computer there.
   await c.data({ type: "pair.start", server: "https://other.test" });
   await waitFor(() => bodies.length === 2);
   expect(bodies[1]?.previousMachineId).toBeUndefined();
+  expect(bodies[1]?.previousToken).toBeUndefined();
   await c.data({ type: "pair.cancel" });
 });
 

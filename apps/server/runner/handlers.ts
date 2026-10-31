@@ -3,6 +3,7 @@ import { lstat, mkdir, readdir, readFile, realpath, stat, writeFile } from "node
 import path from "node:path";
 import {
   type AgentScope,
+  browserSetupOf,
   type FileEntry,
   isStreamId,
   isTerminalSize,
@@ -22,12 +23,13 @@ import type { BrainManager } from "./brain";
 import { type CodexBrainEvent, type CodexBrainTurnRequest, handleCodexBrainTurn } from "./brain-codex";
 import type { CodexAppServers } from "./brain-codex-app";
 import { routeWithPlan } from "./brain-route";
-import type { BrowserManager } from "./browser";
+import { type BrowserManager, browserSetupText } from "./browser";
 import type { DesktopManager } from "./desktop";
-import type { DesktopSessions } from "./desktop-session";
+import { type DesktopSessions, hostMemAvailable, MIN_FREE_BYTES } from "./desktop-session";
 import { RunnerError, toMachineError } from "./errors";
 import { runCommand } from "./exec";
 import { gitSync } from "./git";
+import { isGitInternalPath, touchesGitInternals } from "./git-guard";
 import type { McpTaskInfo } from "./mcp";
 import { missionWorktree } from "./mission-worktree";
 import { agentWorkspace, isInside, resolveForAgent, resolveInWorkspace } from "./paths";
@@ -39,11 +41,25 @@ import type { DataSockets } from "./streams";
 import type { TaskManager } from "./tasks";
 import type { Terminals } from "./terminal";
 
-export const MAX_CONCURRENT_REQUESTS = 8;
 /**
- * Never refused as busy: a brain turn holds its slot for the whole turn, so a computer full of agents' work
- * would otherwise keep people from watching or taking control, or a person in control from being screened
- * (`desktop.text`). Short, and capped per agent on both sides.
+ * Requests one connection runs at once, whatever they are: a bound on a flood, far above what room allows
+ * (a 32 GB computer takes about 48 coding turns, each with a tool call in flight).
+ */
+export const MAX_IN_FLIGHT = 128;
+/**
+ * Where the memory isn't known (not Linux): brain turns at once, the count the runner always had. Background
+ * tasks keep their own count (`maxConcurrentTasks`): a mission item refused for room would sit in its queue,
+ * which moves when a task ends or the computer comes back, never when room frees.
+ */
+export const TURNS_WITHOUT_MEMORY = 8;
+/** What a coding CLI grows to once it runs (measured: about 0.6 GB). */
+export const TURN_BYTES = 0.6e9;
+/** A CLI takes seconds to grow: a turn admitted this recently isn't in the memory reading yet, so it is counted. */
+export const TURN_SETTLE_MS = 30_000;
+/**
+ * Never refused for room nor at the ceiling: a brain turn holds its request for the whole turn, so a computer
+ * full of agents' work would otherwise keep people from watching or taking control, or a person in control from
+ * being screened (`desktop.text`). Short, and capped per agent on both sides.
  */
 const PEOPLE_OPS: ReadonlySet<string> = new Set([
   "stream.open",
@@ -67,6 +83,7 @@ export const NEW_WORK_OPS: ReadonlySet<string> = new Set([
   "browser.act",
   "browser.batch",
   "browser.capture",
+  "browser.warm",
   "browser.stream.start",
   "desktop.session.start",
   "desktop.look",
@@ -88,7 +105,8 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   write: "agent",
   list: "agent",
   push: "agent",
-  secret: "agent",
+  // Keys and staged boxes stay in the root supervisor until DB-committed activation.
+  secret: "machine",
   account: "machine",
   "task.start": "agent",
   "task.status": "agent",
@@ -109,6 +127,7 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   "browser.input": "agent",
   "browser.batch": "agent",
   "browser.capture": "agent",
+  "browser.warm": "agent",
   // Root's: a stream's data socket needs the machine token, which no worker holds, and a desktop's password file
   // must be one its agent can't rewrite.
   "desktop.session.start": "machine",
@@ -172,7 +191,10 @@ export interface HandlerContext {
   /** System mode: this process is root and answers only the `machine` ops of `OP_ROUTES` itself. */
   systemMode?: () => boolean;
   /** System mode: runs an `agent` op in its agent's worker; without it those ops are refused. */
-  workers?: { run(req: MachineRequest, scope: RequestScope): Promise<unknown> };
+  workers?: {
+    run(req: MachineRequest, scope: RequestScope): Promise<unknown>;
+    secret?(req: Extract<MachineRequest, { op: "secret" }>, scope: RequestScope): Promise<unknown>;
+  };
   /**
    * Protocol 10: what the machine allows. With it, absolute paths inside the
    * agent's allowed folders are accepted and each tool needs to be on;
@@ -317,11 +339,19 @@ async function doWrite(
   if (data.byteLength > MAX_INLINE_FILE_BYTES) {
     throw new RunnerError("too_large", `Files sent inline are limited to ${MAX_INLINE_FILE_BYTES} bytes`);
   }
-  const first = await resolvePath(ctx, requireString(req.path, "path"));
+  const requested = requireString(req.path, "path");
+  // A repository's git dir is the runner's own git's settings (`git.sync`, `mission.worktree` run
+  // without the "commands" switch): never written by a file op (`git-guard.ts`).
+  const gitInternal = () =>
+    new RunnerError("bad_request", `${requested} is inside a .git folder. Files there can't be written this way.`);
+  if (isGitInternalPath(requested)) throw gitInternal();
+  const first = await resolvePath(ctx, requested);
   if (first.rel === "") throw new RunnerError("bad_request", "Can't write over the workspace folder");
+  if (touchesGitInternals(requested, first.abs)) throw gitInternal();
   if (!first.exists) await mkdir(path.dirname(first.abs), { recursive: true });
   // Check again now that the parents exist (nothing raced us outside).
   const target = await resolvePath(ctx, req.path);
+  if (touchesGitInternals(requested, target.abs)) throw gitInternal();
   if (target.exists && (await stat(target.abs)).isDirectory()) {
     throw new RunnerError("bad_request", `${req.path} is a folder`);
   }
@@ -410,6 +440,10 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
     return handleDesktop(ctx, req);
   }
   if (req.op === "stream.open") return handleStream(ctx, req, scope);
+  if (req.op === "secret" && ctx.systemMode?.()) {
+    if (!ctx.workers?.secret) throw new RunnerError("not_allowed", "The root secret broker is unavailable");
+    return ctx.workers.secret(req, scope);
+  }
   // Protocol 10: the folders this agent may use besides its own.
   if (ctx.access && req.agent) ctx = { ...ctx, grants: await realFoldersFor(ctx.access(), String(req.agent.id)) };
   if (req.op === "task.start" || req.op === "task.status" || req.op === "task.cancel" || req.op === "task.output") {
@@ -425,6 +459,7 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
     req.op === "browser.act" ||
     req.op === "browser.batch" ||
     req.op === "browser.capture" ||
+    req.op === "browser.warm" ||
     req.op === "browser.stop" ||
     req.op === "browser.stream.start" ||
     req.op === "browser.stream.stop" ||
@@ -457,7 +492,8 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
         signal: scope.signal,
       });
     case "git.sync":
-      // The runner's own git in the agent's folder (not the agent's shell): no "commands" switch needed.
+      // The runner's own git in the agent's folder (not the agent's shell): no "commands" switch needed,
+      // so it never runs with a program the repository's config names (`git-guard.ts`).
       if (!req.agent) throw new RunnerError("bad_request", "A git sync belongs to an agent");
       if (!ctx.gitDir) throw new RunnerError("bad_request", "This runner keeps no git credentials");
       return gitSync(
@@ -604,9 +640,9 @@ const onDesktop = (ctx: HandlerContext, req: { desktop?: unknown }) => req.deskt
 
 /**
  * Protocol 12: the agent's browser (ADR 0040); `browser.batch` and
- * `browser.capture` from protocol 17 (ADR 0054). Needs the machine's browser
- * switch on; stopping (the browser, its live view) always goes, so Stop works
- * even after the switch went off.
+ * `browser.capture` from protocol 17 (ADR 0054), `browser.warm` from 27.
+ * Needs the machine's browser switch on; stopping (the browser, its live view)
+ * always goes, so Stop works even after the switch went off.
  */
 async function handleBrowser(
   ctx: HandlerContext,
@@ -617,6 +653,7 @@ async function handleBrowser(
         | "browser.act"
         | "browser.batch"
         | "browser.capture"
+        | "browser.warm"
         | "browser.stop"
         | "browser.stream.start"
         | "browser.stream.stop"
@@ -642,6 +679,9 @@ async function handleBrowser(
     case "browser.capture":
       requireTool(ctx, "browser");
       return browser.capture(req.agent, ctx.workspaceReal, req.allowedDomains, scope.signal);
+    case "browser.warm":
+      requireTool(ctx, "browser");
+      return browser.warm(req.agent, ctx.workspaceReal, onDesktop(ctx, req));
     case "browser.stream.start":
       requireTool(ctx, "browser");
       return browser.streamStart(req.agent, req.mode);
@@ -767,10 +807,10 @@ function doBrainSteer(
 
 /**
  * A turn in an account that was refused (`not_logged_in`) or is gone
- * (`account_missing`): its CLI is asked again (a key, or a folder root can't
- * run, is marked refused) and the server hears the answer either way
- * (`accounts.changed`). The machine is the only one that says an account is
- * signed out or gone; a passing failure leaves it as it was.
+ * (`account_missing`): a refused one is marked so, and reads as signed out
+ * until it signs in again (`AccountManager.refused`), and the server hears the
+ * answer either way (`accounts.changed`). The machine is the only one that
+ * says an account is signed out or gone; a passing failure leaves it as it was.
  */
 function signedOut(
   ctx: HandlerContext,
@@ -939,6 +979,8 @@ function describeOp(req: MachineRequest): string {
       const commands = Array.isArray(req.commands) ? req.commands.map((c) => String(c?.command ?? "")) : [];
       return `browser.batch ${commands.join(", ").slice(0, 200)}`;
     }
+    case "browser.warm":
+      return `browser.warm${req.desktop === true ? " (desktop)" : ""}`;
     case "browser.stream.start":
       return `browser.stream.start (${String(req.mode ?? "")})`;
     case "browser.input":
@@ -977,22 +1019,51 @@ export interface RequestObserver {
   finished(id: string, req: MachineRequest, outcome: RequestOutcome): void;
 }
 
+/** Tests: what admission reads. */
+export interface Admission {
+  /** The memory available now (default: `/proc/meminfo`, as desktops read it; null: not known). */
+  memAvailable?: () => number | null;
+  now?: () => number;
+}
+
 /**
- * Runs the requests of one connection concurrently (at most 8), sends their
- * `result` frames, and aborts them on `cancel` or when the connection ends.
+ * Runs the requests of one connection concurrently, sends their `result`
+ * frames, and aborts them on `cancel` or when the connection ends. A brain turn
+ * that finds no room is refused `no_slot` (the server waits and asks again);
+ * past `MAX_IN_FLIGHT` anything but a person's view is refused `busy`.
  */
 export class RequestRunner {
   private readonly inflight = new Map<string, AbortController>();
   private closed = false;
+  /** Brain turns running now. */
+  private turns = 0;
+  /** When brain turns were admitted, over the last `TURN_SETTLE_MS`. */
+  private admitted: number[] = [];
 
   constructor(
     private readonly ctx: HandlerContext,
     private readonly send: (frame: RunnerFrame) => void,
     private readonly log: (line: string) => void = () => {},
     private readonly handler: typeof handleRequest = handleRequest,
-    private readonly maxConcurrent = MAX_CONCURRENT_REQUESTS,
+    private readonly admission: Admission = {},
     private readonly observer?: RequestObserver,
   ) {}
+
+  /**
+   * Room for one more brain turn: `MemAvailable`, less what the turns admitted in the last
+   * `TURN_SETTLE_MS` will still take, leaves `MIN_FREE_BYTES` (1.5 GiB, the floor desktops keep). The
+   * floor is more than the biggest thing a turn grows into (a computer-use agent, about 1.4 GB with its screen
+   * and browser), so the one admitted last still fits whole. Where the memory isn't known, a count instead.
+   */
+  private admit(): boolean {
+    const now = (this.admission.now ?? Date.now)();
+    this.admitted = this.admitted.filter((at) => now - at < TURN_SETTLE_MS);
+    const free = (this.admission.memAvailable ?? hostMemAvailable)();
+    const room =
+      free === null ? this.turns < TURNS_WITHOUT_MEMORY : free - this.admitted.length * TURN_BYTES >= MIN_FREE_BYTES;
+    if (room) this.admitted.push(now);
+    return room;
+  }
 
   get size() {
     return this.inflight.size;
@@ -1005,17 +1076,27 @@ export class RequestRunner {
       this.reply(id, { ok: false, error: { code: "bad_request", message: "Duplicate request id" } });
       return Promise.resolve();
     }
-    if (this.inflight.size >= this.maxConcurrent && !PEOPLE_OPS.has(req.op)) {
+    if (this.inflight.size >= MAX_IN_FLIGHT && !PEOPLE_OPS.has(req.op)) {
       this.reply(id, { ok: false, error: { code: "internal", message: "busy" } });
       return Promise.resolve();
     }
+    const turn = req.op === "brain.turn";
+    // A paused computer says so (the handler refuses new work), never that it is full.
+    if (turn && !this.ctx.paused?.() && !this.admit()) {
+      const message = "This computer is short of memory for more work right now";
+      this.reply(id, { ok: false, error: { code: "no_slot", message } });
+      return Promise.resolve();
+    }
+    if (turn) this.turns++;
     const controller = new AbortController();
     this.inflight.set(id, controller);
-    // A browser or desktop command is logged when it ends, with how long it took (`browser.act snapshot 812ms`).
+    // A browser or desktop command is logged when it ends, with how long it took (`browser.act snapshot 812ms`) and
+    // what it waited on first (`(install 28.1 s, launch 1.4 s)`).
     const timed =
       req.op === "browser.act" ||
       req.op === "browser.batch" ||
       req.op === "browser.capture" ||
+      req.op === "browser.warm" ||
       req.op === "browser.input" ||
       req.op === "desktop.look" ||
       req.op === "desktop.act" ||
@@ -1056,7 +1137,12 @@ export class RequestRunner {
           // An input batch says how many events the browser didn't confirm.
           const unconfirmed = typeof data?.failed === "number" && data.failed > 0 ? data.failed : 0;
           const failed = !outcome.ok || data?.success === false;
-          const note = failed ? " (failed)" : unconfirmed ? ` (failed: ${unconfirmed})` : "";
+          const setup = browserSetupOf(data?.setup);
+          const notes = [
+            failed ? "failed" : unconfirmed ? `failed: ${unconfirmed}` : "",
+            setup ? browserSetupText(setup) : "",
+          ].filter(Boolean);
+          const note = notes.length > 0 ? ` (${notes.join(", ")})` : "";
           this.log(`${describeRequest(req)} ${Date.now() - startedAt}ms${note}`);
         }
         this.observe(() => this.observer?.finished(id, req, outcome));
@@ -1064,6 +1150,7 @@ export class RequestRunner {
       })
       .finally(() => {
         this.inflight.delete(id);
+        if (turn) this.turns--;
       });
   }
 

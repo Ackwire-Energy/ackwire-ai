@@ -59,6 +59,23 @@ describe("finding the settings", () => {
     expect(document.documentElement.hasAttribute("data-menu-overlay")).toBe(false);
   });
 
+  test("New workspace only for whoever can make one (on agentes.chat Cloud, by invitation for now)", async () => {
+    for (const [can, offered] of [
+      [undefined, true],
+      [false, false],
+    ] as const) {
+      const state = seedState();
+      if (state.me && can === false) state.me.user.canCreateWorkspace = false;
+      await go("issues", state);
+      await openMenu(screen().getByRole("button", { name: "Menu do workspace Acme" }));
+      const mine = within(screen().getByRole("dialog", { name: "Acme" })).getByRole("menu", {
+        name: "Seus workspaces",
+      });
+      expect(within(mine).queryByRole("menuitem", { name: /Novo workspace/ }) !== null).toBe(offered);
+      cleanup();
+    }
+  });
+
   test("members see only what they can open", async () => {
     const state = seedState();
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";

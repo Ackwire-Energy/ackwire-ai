@@ -500,3 +500,12 @@ test("system mode is believed from a computer's first hello, and only from one t
   await say(laptop.token, "nonsense");
   expect(await modeOf(laptop.machineId)).toBeNull();
 });
+
+test("a stream whose session ended is refused on the recheck, before anything else is read", async () => {
+  f = await setup();
+  const stream = { sessionToken: "ended-session-token", userId: f.owner.id, orgId: f.org.id, agentId: f.agent.id };
+  expect(await recheckStream(f.db, stream as unknown as Parameters<typeof recheckStream>[1])).toEqual({
+    refused: STREAM_CLOSE.forbidden,
+    reason: "signed_out",
+  });
+});

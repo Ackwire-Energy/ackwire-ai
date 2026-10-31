@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, desc, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { and, count, type Database, desc, type Executor, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
 import {
   type ContentBlock,
   isAutoModel,
@@ -11,6 +11,7 @@ import {
 } from "@agenteschat/providers";
 import { pendingConnectors } from "./access";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
+import { announceAgentStatus, askRunStatus, startRunStatus, statusCandidates } from "./agent-status";
 import { type Agent, getAgentCached } from "./agents";
 import { agentAiState, type NoAiReason, noAiReasonOf } from "./ai-status";
 import { publishApproval } from "./approvals";
@@ -41,6 +42,7 @@ import {
   UNAVAILABLE_CODES,
 } from "./brains/select";
 import type { Brain, BrainIO, BrainKind, BrainTool, BrainTurn, ToolResult } from "./brains/types";
+import { BROWSER_SCOPE } from "./browser/types";
 import {
   canceledBy,
   isShutdown,
@@ -119,6 +121,7 @@ import {
 import {
   type AgentRun,
   addRunStep,
+  COMPUTER_BUSY,
   isTerminal,
   NO_AI,
   type RunStatus,
@@ -133,13 +136,24 @@ import { FIND_AGENT_TOOL } from "./team";
 import { linkRunChecks, runChecksForReply } from "./team-actions";
 import { carriesCredential, maskCredentials } from "./tool-detail";
 import { chooseToolGroups, keptToolGroups, recentForJudge, type ToolGroupChoice } from "./tool-loading";
-import { presentTools } from "./tools/directory";
+import { presentTools, toolGroupKey } from "./tools/directory";
 import { type Approval, type InvokeResult, isSensitive, type ToolGateway } from "./tools/gateway";
 import type { ToolContext, ToolDefinition } from "./tools/types";
 import { recordWikiReads, retrieveWikiForRun } from "./wiki";
 import { withWikiLinks } from "./wiki-links";
 
-const { agentActions, agentRuns, approvals, agentQuestions, messages, routineRuns, secretRequests, users } = schema;
+const {
+  agentActions,
+  agentRunSteps,
+  agentRuns,
+  approvals,
+  agentQuestions,
+  messages,
+  outbox,
+  routineRuns,
+  secretRequests,
+  users,
+} = schema;
 /** A bridged call can land a moment after the text the brain streamed before it: its text up to this much later counts as before. */
 const ASKED_GRACE_MS = 250;
 
@@ -181,12 +195,19 @@ export interface EngineDeps {
   machines?: { status(machineId: string): Promise<MachineStatus | null> };
   /** How long a run whose computer dropped mid-turn waits quietly for it (default `COMPUTER_DROP_GRACE_MS`). */
   computerDropGraceMs?: number;
+  /** How long a run waits for room on a busy computer before it fails (default `COMPUTER_BUSY_WAIT_MS`). */
+  computerBusyWaitMs?: number;
   /**
    * Tools on demand (ADR 0043): each run lists the core tools and the groups the
    * judge (`context.judge`) expects it to need; the rest go behind
    * `find_tools` / `use_tool`. Off: every granted tool is listed (tests).
    */
   toolsOnDemand?: boolean;
+  /**
+   * Starts the agent's browser while the run thinks, once the judge listed the browser's tools for it (ADR 0040
+   * §11): its first command then skips Chrome's start. Never waited on.
+   */
+  warmBrowser?(at: { orgId: string; agentId: string; threadRootId: string }): void;
 }
 
 /**
@@ -253,6 +274,8 @@ export interface Transcript {
   fallback?: { from: BrainKind; code: string; message: string };
   /** The computer brain is unavailable and nothing can stand in: the run waits for the computer. */
   waitingForBrain?: { kind: BrainKind; machineId: string; code: string; waitId?: string };
+  /** When the computer first had no room for this run's turn (ms), until a turn starts or it waits on something else. */
+  roomWaitSince?: number;
   /** The "unavailable" note already posted in this run (its code): not repeated while it waits. */
   brainNotice?: string;
   /**
@@ -263,9 +286,12 @@ export interface Transcript {
   /**
    * The computer dropped in the middle of a computer brain's turn: the turn is sent again to the same
    * computer once it is back (its session resumes), told which tools already ran so none is repeated.
-   * `prompt`: what the interrupted turn was asked; `drops`: how many times this run was cut off.
+   * `prompt`: what the interrupted turn was asked; `drops`: how many times this run was cut off;
+   * `cause`: `restart` when our server stopped in the middle of the turn, not the computer.
    */
-  interruptedTurn?: { prompt: string; executed: string[]; drops: number };
+  interruptedTurn?: { prompt: string; executed: string[]; drops: number; cause?: "restart" };
+  /** What the computer brain's turn under way was asked: a turn cut by a crash is sent again with it. */
+  turnPrompt?: string;
   /**
    * This run continues one a person stopped ("Continuar"): the line a computer brain reads first
    * (the model brain reads it at the end of `messages`). Taken by the first turn.
@@ -309,6 +335,8 @@ export class BrainFailure extends Error {
     readonly retryable: boolean,
     /** A plan limit's reset time, when the brain said it. */
     readonly resetsAt?: string,
+    /** The computer dropped because our own server stopped: not one of its drops (`MAX_COMPUTER_DROPS`). */
+    readonly serverStop = false,
   ) {
     super(message);
     this.name = "BrainFailure";
@@ -319,6 +347,13 @@ export class BrainFailure extends Error {
 export const COMPUTER_DROP_GRACE_MS = 2 * 60_000;
 /** A run resumes on its computer after this many drops at most; then it ends like any failed turn. */
 export const MAX_COMPUTER_DROPS = 3;
+/** How often a run whose computer had no room for its turn asks again (the runner admits turns by room). */
+export const COMPUTER_BUSY_RETRY_MS = 15_000;
+/**
+ * How long it keeps asking. A turn usually ends within minutes, so a computer with no room for this long is
+ * stuck or too small for its agents: the run fails with `computer_busy` and the person can ask again.
+ */
+export const COMPUTER_BUSY_WAIT_MS = 30 * 60_000;
 
 /** What a computer brain is asked again after its computer dropped mid-turn. */
 export function interruptedTurnPrompt(
@@ -326,8 +361,9 @@ export function interruptedTurnPrompt(
   extra: string | null = null,
 ): string {
   const done = t.executed.length > 0 ? ` Already done in it, do not repeat: ${t.executed.join(", ")}.` : "";
+  const why = t.cause === "restart" ? "the server restarted" : "the computer disconnected";
   return [
-    `Your previous turn was cut off because the computer disconnected.${done} Pick up where you left off and finish it. What you were asked:`,
+    `Your previous turn was cut off because ${why}.${done} Pick up where you left off and finish it. What you were asked:`,
     t.prompt,
     extra,
   ]
@@ -353,6 +389,13 @@ const userFacing = (error: unknown): string | null => {
   return null;
 };
 
+/** The result of a call in a step cut by a server restart that never started. */
+const NOT_RUN_BY_RESTART =
+  "Interrupted by a server restart before it ran: nothing was done. Call it again if it's still needed.";
+/** Put before the error of a call still running when a server restart began: the restart may be what ended it. */
+const CUT_BY_RESTART =
+  "A server restart began while this call ran: it may have stopped partway, after doing part of its work. Check before running it again. What it returned:";
+
 const toolResultFor = (approval: Approval | undefined): { content: string; isError: boolean } => {
   if (!approval) return { content: "The approval request is missing.", isError: true };
   if (approval.status === "refused") {
@@ -368,6 +411,12 @@ const toolResultFor = (approval: Approval | undefined): { content: string; isErr
 };
 
 /**
+ * `wait`: the job resumes one wait for the computer (`waitingForBrain.waitId`); anything else is stale.
+ * `jobId`: that job's row. `owned`: whether this claim still holds the job (`JobContext.owned`).
+ */
+type RunJobOptions = { finalAttempt: boolean; wait?: string; jobId?: string; owned?: () => Promise<boolean> };
+
+/**
  * Executes one agent run (job `agent_run.execute`), end to end
  * (docs/adr/0008, 0015): claim the run, build or load the transcript, then
  * loop: call the model through the Model Gateway (deltas go to the channel),
@@ -381,12 +430,7 @@ const toolResultFor = (approval: Approval | undefined): { content: string; isErr
  * On the final attempt, or for permanent problems (budget, credential), the
  * run fails.
  */
-export async function executeRun(
-  deps: EngineDeps,
-  runId: string,
-  /** `wait`: the job resumes one wait for the computer (`waitingForBrain.waitId`); anything else is stale. */
-  options: { finalAttempt: boolean; wait?: string },
-) {
+export async function executeRun(deps: EngineDeps, runId: string, options: RunJobOptions) {
   const prof = createProfiler();
   // A person can cancel it: the signal aborts the model stream, tools and running code.
   const abort = registerRunAbort(runId);
@@ -410,22 +454,27 @@ export async function executeRun(
 async function executeRunInner(
   deps: EngineDeps,
   runId: string,
-  options: { finalAttempt: boolean; wait?: string },
+  options: RunJobOptions,
   prof: ReturnType<typeof createProfiler>,
   signal: AbortSignal,
 ) {
   const { db } = deps;
-  // A job for one wait for the computer (back, grace, plan reset): only while the run still waits on it.
+  // A job for one wait for the computer (back, grace, plan reset, room): only while the run still waits on it.
   // Another job may have resumed it already; running it again would run the run twice.
+  let askingForRoom = false;
   if (options.wait) {
     const [row] = await db
       .select({
         status: agentRuns.status,
         waitId: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`,
+        code: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'code'`,
       })
       .from(agentRuns)
       .where(eq(agentRuns.id, runId));
     if (row?.status !== "waiting_input" || row.waitId !== options.wait) return;
+    // Asking a busy computer again: nothing says it works until a turn starts (its first words do), or the
+    // conversation would flash "thinking" every few seconds while it waits.
+    askingForRoom = row.code === "busy";
   }
   // Claim first (the common case is a queued run): one statement.
   let run: AgentRun;
@@ -441,6 +490,15 @@ async function executeRunInner(
     if (!loaded) throw new PermanentJobError(`agent run ${runId} not found`);
     run = loaded;
     if (isTerminal(run.status) || run.status === "queued") return;
+    if (run.status === "running") {
+      // Picked up again (handed back at a shutdown, or recovered) with its old beat: a fresh one first, so a
+      // recovery sweep can't take it from this worker. A sweep that took it first ended this job.
+      await db
+        .update(agentRuns)
+        .set({ heartbeatAt: new Date() })
+        .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, "running")));
+      if (options.owned && !(await options.owned())) return;
+    }
     if (run.status === "waiting_approval" || run.status === "waiting_input") {
       const [stillPending, stillOpen, stillSecret] = await Promise.all([
         db
@@ -454,7 +512,25 @@ async function executeRunInner(
         db
           .select({ id: secretRequests.id })
           .from(secretRequests)
-          .where(and(eq(secretRequests.runId, run.id), eq(secretRequests.status, "pending"))),
+          .leftJoin(
+            schema.outbox,
+            eq(
+              schema.outbox.dedupeKey,
+              sql<string>`concat('agent_run.execute:', ${secretRequests.runId}, ':secret:', ${secretRequests.id})`,
+            ),
+          )
+          .where(
+            and(
+              eq(secretRequests.runId, run.id),
+              or(
+                eq(secretRequests.status, "pending"),
+                // Delivery is committed before activation. Another wake-up
+                // must not tell the agent it has a secret until activation
+                // inserted the corresponding resume job.
+                and(eq(secretRequests.status, "delivered"), isNull(secretRequests.removedAt), isNull(schema.outbox.id)),
+              ),
+            ),
+          ),
       ]);
       // Resumes when the last decision or answer comes in.
       if (stillPending.length > 0 || stillOpen.length > 0 || stillSecret.length > 0) return;
@@ -465,6 +541,14 @@ async function executeRunInner(
       if (!resumed) return;
       run = resumed;
       backFromWait = true;
+      // This job runs the run from now on, not its wait: handed back at a shutdown or retried, it goes on with the
+      // run instead of finding it no longer waiting and doing nothing.
+      if (options.wait && options.jobId) {
+        await db
+          .update(outbox)
+          .set({ payload: sql`${outbox.payload} - 'wait'` })
+          .where(eq(outbox.id, options.jobId));
+      }
     }
   }
   // status is `running` here.
@@ -481,14 +565,16 @@ async function executeRunInner(
   const where = { channelId: run.channelId, threadId: replyThreadId, agentId: run.agentId, runId: run.id };
   // Background work (a routine's run) says so: the apps keep it out of the conversation's "working" row.
   const bg = run.background ? { background: true as const } : {};
-  await publishChannelEvent(deps.pubsub, { type: "agent.thinking", ...where, ...bg });
-  await publishChannelEvent(deps.pubsub, {
-    type: "message.claimed",
-    channelId: run.channelId,
-    messageId: run.triggerMessageId,
-    agentId: run.agentId,
-    runId: run.id,
-  });
+  if (!askingForRoom) {
+    await publishChannelEvent(deps.pubsub, { type: "agent.thinking", ...where, ...bg });
+    await publishChannelEvent(deps.pubsub, {
+      type: "message.claimed",
+      channelId: run.channelId,
+      messageId: run.triggerMessageId,
+      agentId: run.agentId,
+      runId: run.id,
+    });
+  }
   // Every way a held run comes back (an approval decided, a question answered, a secret given, its computer
   // back) passes here: the conversations that asked a consulted one (ADR 0034) stop showing it held.
   if (backFromWait && channelRow && isAgentOnlyDm(channelRow)) {
@@ -532,6 +618,8 @@ async function executeRunInner(
       status,
       ...(error ? { error, ...runErrorDetail(error) } : {}),
     });
+    // Its line ends with the run (checked on read); the apps refresh now (ADR 0084 §11).
+    await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
     await publishChannelEvent(deps.pubsub, {
       type: "message.handled",
       channelId: run.channelId,
@@ -659,7 +747,7 @@ async function executeRunInner(
     const ai = await agentAiState({ db, gateway: deps.gateway, machines: deps.machines }, agent, run);
     if (ai.state === "no_ai") return failNoAi(ai.reason ?? "no_key");
   }
-  await publishChannelEvent(deps.pubsub, event("running"));
+  if (!askingForRoom) await publishChannelEvent(deps.pubsub, event("running"));
   // Tools on demand (ADR 0043): a new run lists the core tools and the groups the judge expects it to need.
   let toolChoice: ToolGroupChoice | null = null;
   const judge = deps.context?.judge;
@@ -709,6 +797,28 @@ async function executeRunInner(
     });
     ctx.loadedGroups = toolChoice.groups;
     tools = presentTools(granted, isSensitive, ctx.loadedGroups);
+    if (toolChoice.groups.includes(toolGroupKey({ scope: BROWSER_SCOPE }))) {
+      deps.warmBrowser?.({ orgId: run.orgId, agentId: agent.id, threadRootId: run.threadRootId });
+    }
+  }
+  // What the agent shows it is doing (ADR 0084 §8–9): lines from facts everyone may see, picked by Jev in a request
+  // of its own, beside the run and never in its way.
+  if (needsContext) {
+    void (async () => {
+      const lines = await statusCandidates(db, run, granted);
+      const pick = judge
+        ? await askRunStatus(judge, {
+            orgId: run.orgId,
+            agentId: agent.id,
+            runId: run.id,
+            agent: { name: agent.name, role: agent.role, instructions: agent.instructions },
+            message: trigger?.body ?? topTrigger?.body ?? "",
+            recent: await recentMessages(),
+            candidates: lines,
+          }).catch(() => null)
+        : null;
+      await startRunStatus({ db, pubsub: deps.pubsub }, run, lines, pick);
+    })().catch(() => {});
   }
 
   // Started by a routine: its answer carries the routine (the app shows a small tag on the
@@ -744,12 +854,25 @@ async function executeRunInner(
         : body;
     // Team actions (ADR 0064): what the run didn't repeat because the team already did it rides on its reply.
     const teamChecks = note ? [] : await runChecksForReply(tx, run.orgId, run.id);
+    // "Ver o que ele fez" under the reply: how many tool calls so far, so the apps leave it out at 0. A reaction
+    // already shows on the message it reacts to: it isn't counted.
+    const [calls] = await tx
+      .select({ n: count() })
+      .from(agentRunSteps)
+      .where(
+        and(
+          eq(agentRunSteps.runId, run.id),
+          eq(agentRunSteps.kind, "tool_call"),
+          sql`${agentRunSteps.data}->>'name' is distinct from ${REACT_TOOL}`,
+        ),
+      );
+    const work = { steps: calls?.n ?? 0, durationMs: Math.max(0, Date.now() - run.createdAt.getTime()) };
     const m = await postAgentMessage(
       tx,
       run,
       threadId,
       said,
-      { ...meta, ...runMeta, ...tagged, ...(teamChecks.length > 0 ? { teamChecks } : {}) },
+      { ...meta, ...runMeta, ...tagged, work, ...(teamChecks.length > 0 ? { teamChecks } : {}) },
       createdAt,
     );
     await linkRunChecks(
@@ -805,6 +928,7 @@ async function executeRunInner(
         trigger,
         routine: Boolean(viaRoutine),
         mayPass: policy.mayPass,
+        machines: deps.machines,
       }),
       contextDeps
         ? retrieveForRun(contextDeps, {
@@ -961,6 +1085,8 @@ async function executeRunInner(
     if (isShutdown(signal.reason)) throw new RunInterruptedError();
     return true;
   };
+  /** The server is shutting down: the step in progress ends cleanly, then the run is handed back. */
+  const shuttingDown = () => signal.aborted && isShutdown(signal.reason);
   const isCanceled = async () => {
     if (aborted()) return true;
     const [row] = await db.select({ status: agentRuns.status }).from(agentRuns).where(eq(agentRuns.id, run.id));
@@ -1278,7 +1404,8 @@ async function executeRunInner(
 
   /**
    * The computer brain can't answer: the model brain stands in with a quiet note, or the run waits for the
-   * computer, or (nothing to think with) it fails with `no_ai`.
+   * computer, or (nothing to think with) it fails with `no_ai`. A computer with no room for the turn (`busy`)
+   * is asked again every `COMPUTER_BUSY_RETRY_MS`, until `COMPUTER_BUSY_WAIT_MS` after its first refusal.
    */
   const brainUnavailable = async (u: {
     code: string;
@@ -1320,6 +1447,16 @@ async function executeRunInner(
     }
     const machineId = plan.session?.machineId ?? agent.machineId ?? null;
     if (!machineId || !UNAVAILABLE_CODES.has(u.code)) return "no";
+    const busy = u.code === "busy";
+    // Still no room since an earlier refusal: the same wait goes on (no new step, the same deadline).
+    const stillBusy = busy && t.roomWaitSince !== undefined;
+    if (busy) {
+      t.roomWaitSince ??= Date.now();
+      if (Date.now() - t.roomWaitSince >= (deps.computerBusyWaitMs ?? COMPUTER_BUSY_WAIT_MS)) {
+        await fail(COMPUTER_BUSY);
+        return "failed";
+      }
+    } else delete t.roomWaitSince;
     // Nothing can stand in (no model credential, or background work): the run waits for the computer.
     await deferred;
     const name = from === "codex" ? "Codex" : "Claude Code";
@@ -1335,7 +1472,9 @@ async function executeRunInner(
           const m = await post(
             tx,
             replyThreadId,
-            `${u.message} I'll answer when it's back.`,
+            busy
+              ? "My computer is busy with other tasks right now. I'll answer as soon as it's free."
+              : `${u.message} I'll answer when it's back.`,
             {
               ...bodyCode("brain_unavailable", { brain: name }),
               // `machineId` and `agentId`: the app shows the note as a live "waiting" card tied to the computer's outage.
@@ -1360,14 +1499,29 @@ async function executeRunInner(
     if (!quiet) t.brainNoticeIn = { channelId: run.channelId, threadId: replyThreadId };
     // `waitId`: one wait (its "computer is back" job is queued once per wait, `resumeRunsWaitingForMachine`).
     t.waitingForBrain = { kind: from, machineId, code: u.code, waitId: Bun.randomUUIDv7() };
-    await addRunStep(db, run, "error", { reason: "brain_unavailable", code: u.code, message: u.message });
+    if (!stillBusy)
+      await addRunStep(db, run, "error", { reason: "brain_unavailable", code: u.code, message: u.message });
+    // Online and full, it sends no "back" signal: ask again soon. Queued before the wait is stored, so a crash
+    // in between leaves at worst a job that finds another wait and does nothing.
+    if (busy) {
+      await enqueue(db, {
+        orgId: run.orgId,
+        kind: "agent_run.execute",
+        payload: { runId: run.id, wait: t.waitingForBrain.waitId },
+        dedupeKey: `agent_run.execute:${run.id}:room:${t.waitingForBrain.waitId}`,
+        runAt: new Date(Date.now() + COMPUTER_BUSY_RETRY_MS),
+        maxAttempts: 4,
+      });
+    }
     const moved = await transitionRun(db, run.id, "running", "waiting_input", {
       transcript: storedTranscript(t),
       waitingMachineId: machineId,
     });
     if (!moved) throw new PermanentJobError("run changed state while executing");
     // A routine's run waits for its own computer, never the API (ADR 0053 §6.4): its people hear it once.
-    if (run.background) await routineRunWaitingForComputer({ db, pubsub: deps.pubsub }, run, machineId).catch(() => {});
+    // Waiting for room is no outage: it ends within `COMPUTER_BUSY_WAIT_MS`, and the routine's ledger tells.
+    if (run.background && !busy)
+      await routineRunWaitingForComputer({ db, pubsub: deps.pubsub }, run, machineId).catch(() => {});
     if (note) {
       const [view] = await withWikiLinks(db, run.orgId, [messageView(note)]);
       if (view) await publishMessageCreated(deps.pubsub, view);
@@ -1504,20 +1658,34 @@ async function executeRunInner(
    * The computer dropped in the middle of the turn (its runner restarted, the network went): the run
    * waits for that computer, saying nothing for a short while, and the turn is sent again when it is
    * back (`resumeRunsWaitingForMachine`, or right away when it already is). Still away after the grace:
-   * the next attempt finds it unavailable and says so ("I'll answer when it's back").
+   * the next attempt finds it unavailable and says so ("I'll answer when it's back"). A drop caused by
+   * our own server stopping (`serverStop`) isn't one of the computer's: it never counts toward the limit,
+   * and the turn sent again reads that the server restarted.
    */
-  const waitForDroppedComputer = async (from: BrainKind, machineId: string, prompt: string, executed: string[]) => {
+  const waitForDroppedComputer = async (
+    from: BrainKind,
+    machineId: string,
+    prompt: string,
+    executed: string[],
+    serverStop: boolean,
+  ) => {
     await deferred;
     const t = transcript as Transcript;
     const prev = t.interruptedTurn;
     t.interruptedTurn = {
       prompt: prev?.prompt ?? prompt,
       executed: [...new Set([...(prev?.executed ?? []), ...executed])],
-      drops: (prev?.drops ?? 0) + 1,
+      drops: (prev?.drops ?? 0) + (serverStop ? 0 : 1),
+      ...(serverStop ? { cause: "restart" as const } : {}),
     };
     const waitId = Bun.randomUUIDv7();
     t.waitingForBrain = { kind: from, machineId, code: "machine_dropped", waitId };
-    await addRunStep(db, run, "error", { reason: "brain_dropped", code: "machine_offline", executed });
+    await addRunStep(db, run, "error", {
+      reason: "brain_dropped",
+      code: "machine_offline",
+      executed,
+      ...(serverStop ? { serverStop: true } : {}),
+    });
     const moved = await transitionRun(db, run.id, "running", "waiting_input", {
       transcript: storedTranscript(t),
       waitingMachineId: machineId,
@@ -1603,7 +1771,9 @@ async function executeRunInner(
       }
       const turnTools = firstTurn ? tools : await listRunTools(deps, ctx);
       firstTurn = false;
-      const toolScope: RunToolScope | null = deps.tools ? { deps, tools: deps.tools, ctx, where, turnTools } : null;
+      const toolScope: RunToolScope | null = deps.tools
+        ? { deps: { db, pubsub: deps.pubsub, judge }, tools: deps.tools, ctx, where, turnTools }
+        : null;
 
       const turn = run.turns + 1;
       const deltas = createDeltaPublisher(
@@ -1637,6 +1807,7 @@ async function executeRunInner(
         // A computer brain's turn that can take messages mid-turn (live steering).
         steerable: (steer) => live.steerable(steer),
       };
+      const prompt = plan.kind === "model" ? triggerText : (nextPrompt ?? triggerText);
       // A computer brain's turn: the transcript is saved (the bridge's pauses join it), and the turn's
       // tool token goes in `brain.turn.mcp.token` so the runner bridge maps its calls to this run.
       if (plan.kind !== "model") {
@@ -1647,13 +1818,14 @@ async function executeRunInner(
           machineId: plan.session?.machineId ?? agent.machineId ?? "",
           runId: run.id,
         });
+        transcript.turnPrompt = prompt;
+        await saveTranscript(db, transcript);
       }
-      const prompt = plan.kind === "model" ? triggerText : (nextPrompt ?? triggerText);
       const turnPlan = plan;
       // Where this computer turn's steps start (the bridge records a step per tool it runs).
       const turnStepSeq = plan.kind !== "model" ? await lastStepSeq(db, run.id) : 0;
       /** Calls the computer brain said it ran in this turn (through the bridge or on its own). */
-      const executedNow: { id: string; name: string }[] = [];
+      const executedNow: { id: string; name: string; input: unknown }[] = [];
       // Context budget: a request that wouldn't fit the model's window sends old tool results as a
       // placeholder (the judge picks which). Saved on the transcript, so later turns and resumes agree.
       if (turnPlan.kind === "model") {
@@ -1724,8 +1896,9 @@ async function executeRunInner(
           // The account it ran with (ADR 0041): when it was last used, after the turn.
           const account = turnPlan.account;
           if (account && computerTurns === 1) later(() => touchMachineAccount(db, run.orgId, account.id));
-          // A turn cut off by its computer is finished now.
+          // A turn cut off by its computer is finished now, and one that found room ends that wait.
           delete transcript.interruptedTurn;
+          delete transcript.roomWaitSince;
           // Later turns of this run continue the same session.
           if (plan.session) plan = { ...plan, session: { ...plan.session, resume: true } };
         }
@@ -1736,6 +1909,8 @@ async function executeRunInner(
         if (await isCanceled()) return stopCanceled(deltas.text());
         // Keep the sequence moving: a retried turn must not reuse numbers the app already saw (it drops them).
         transcript.deltaSeq = deltas.seq();
+        // Anything but "no room" means the computer took the turn: that wait for room is over.
+        if (!(error instanceof BrainFailure && error.code === "busy")) delete transcript.roomWaitSince;
         if (turnAbort?.signal.aborted) {
           await interruptedTurn(turn, deltas.text());
           continue;
@@ -1767,16 +1942,18 @@ async function executeRunInner(
             machineId &&
             error instanceof BrainFailure &&
             error.code === "machine_offline" &&
-            (transcript.interruptedTurn?.drops ?? 0) < MAX_COMPUTER_DROPS
+            (error.serverStop || (transcript.interruptedTurn?.drops ?? 0) < MAX_COMPUTER_DROPS)
           ) {
-            return waitForDroppedComputer(turnPlan.kind, machineId, prompt, executed);
+            const labels = executed.map((c) => c.label);
+            return waitForDroppedComputer(turnPlan.kind, machineId, prompt, labels, error.serverStop);
           }
           if (executed.length > 0) {
             const failure =
               error instanceof BrainFailure
                 ? { code: error.code, message: error.message }
                 : { code: "brain_failed", message: error instanceof Error ? error.message : String(error) };
-            return interruptedAfterTools(turnPlan.kind, failure, executed, deltas.text());
+            const names = [...new Set(executed.map((c) => c.name))];
+            return interruptedAfterTools(turnPlan.kind, failure, names, deltas.text());
           }
         }
         // A computer brain that can't answer now (offline, not logged in, plan limit, a retryable failure):
@@ -1839,8 +2016,9 @@ async function executeRunInner(
         return suspendedByBridge(run.status, turnText, deltas.text() ? deltas.textBefore : undefined);
       }
 
-      // Canceled while the model answered: its tool calls never run.
-      if (aborted()) {
+      // Canceled while the model answered: its tool calls never run. A shutdown ends the step below instead: its
+      // calls don't start and are saved as not run, a final answer is posted.
+      if (!shuttingDown() && aborted()) {
         await saveTranscript(db, transcript);
         return stopCanceled("");
       }
@@ -1862,9 +2040,11 @@ async function executeRunInner(
         /** Mission tools' own waits (a blocking decision, a review): their ids. */
         const waits: string[] = [];
         for (const use of toolUses) {
-          // Canceled during a tool: the rest never run.
+          // Canceled during a tool, or the server is shutting down: the rest never run.
           if (signal.aborted) break;
           const outcome = await invokeWithChip(toolScope, use);
+          // The shutdown aborted it while it ran: its error may hide work it already did.
+          const cutShort = shuttingDown();
           await absorbToolOutcome(use, outcome);
           if (outcome.type === "approval") {
             calls.push({ toolUseId: use.id, name: use.name, approvalId: outcome.approval.id });
@@ -1887,14 +2067,25 @@ async function executeRunInner(
             calls.push({ toolUseId: use.id, name: use.name, waitId: wait.id });
             waits.push(wait.id);
           } else {
+            const { content, isError } = outcome.output;
             calls.push({
               toolUseId: use.id,
               name: use.name,
-              result: { content: outcome.output.content, isError: outcome.output.isError === true },
+              result: {
+                content: cutShort && isError ? `${CUT_BY_RESTART}\n${content}` : content,
+                isError: isError === true,
+              },
             });
           }
         }
-        if (aborted()) {
+        // The server is shutting down: the calls that never started say so, and the step ends as any other (its
+        // results saved, its approvals and questions asked); the next instance takes the run from there.
+        if (shuttingDown()) {
+          for (const use of toolUses) {
+            if (!calls.some((c) => c.toolUseId === use.id))
+              calls.push({ toolUseId: use.id, name: use.name, result: { content: NOT_RUN_BY_RESTART, isError: true } });
+          }
+        } else if (aborted()) {
           // The calls made are kept for the record; the run ends here.
           transcript.messages.push({
             role: "user",
@@ -2245,7 +2436,7 @@ async function thinkOnce(
     onUsage?(usage: { input: number; output: number; model?: string; cacheRead?: number; cacheWrite?: number }): void;
     onLimit?(resetsAt?: string): void;
     /** A call the brain already ran (through the bridge, or its own tools). */
-    onExecuted?(call: { id: string; name: string }): void;
+    onExecuted?(call: { id: string; name: string; input: unknown }): void;
     /** Messages handed to the turn mid-turn that it read (live steering). */
     onSteerRead?(uuids: string[]): void;
   } = {},
@@ -2260,7 +2451,7 @@ async function thinkOnce(
       // Executed elsewhere (a computer brain through the runner bridge, which recorded its steps): shown only.
       if (event.executed) {
         executedCount++;
-        hooks.onExecuted?.({ id: event.id, name: event.name });
+        hooks.onExecuted?.({ id: event.id, name: event.name, input: event.input });
       } else toolCalls.push({ id: event.id, name: event.name, input: (event.input ?? {}) as Record<string, unknown> });
     } else if (event.type === "usage") {
       usage = event;
@@ -2275,8 +2466,9 @@ async function thinkOnce(
         false,
         event.resetsAt,
       );
-    } else if (event.type === "error") throw new BrainFailure(event.code, event.message, event.retryable === true);
-    else if (event.type === "steer_read") hooks.onSteerRead?.(event.uuids);
+    } else if (event.type === "error") {
+      throw new BrainFailure(event.code, event.message, event.retryable === true, undefined, event.serverStop === true);
+    } else if (event.type === "steer_read") hooks.onSteerRead?.(event.uuids);
     // `event.session`: computer brains keep a stable session per conversation (`brainSessionId`); nothing to store.
     else if (event.type === "done") text = event.text;
   }
@@ -2326,32 +2518,59 @@ async function lastStepSeq(db: Executor, runId: string): Promise<number> {
 
 /**
  * The tools a computer-brain turn already ran: the bridge's successful calls
- * after `fromSeq` (the gateway records a `tool_result` step for each) and the
- * calls the brain reported as executed. Names, once per call.
+ * after `fromSeq` (the gateway records a `tool_call` and a `tool_result` step
+ * for each) and the calls the brain reported as executed. Once per call: its
+ * name, and `label` with what it ran on (`executedLabel`).
  */
 async function executedSince(
   db: Executor,
   runId: string,
   fromSeq: number,
-  reported: { id: string; name: string }[],
-): Promise<string[]> {
+  reported: { id: string; name: string; input?: unknown }[],
+): Promise<{ name: string; label: string }[]> {
   const steps = await db
-    .select({ data: schema.agentRunSteps.data })
+    .select({ kind: schema.agentRunSteps.kind, data: schema.agentRunSteps.data })
     .from(schema.agentRunSteps)
     .where(
       and(
         eq(schema.agentRunSteps.runId, runId),
-        eq(schema.agentRunSteps.kind, "tool_result"),
+        inArray(schema.agentRunSteps.kind, ["tool_call", "tool_result"]),
         sql`${schema.agentRunSteps.seq} > ${fromSeq}`,
       ),
-    );
-  const calls = new Map<string, string>();
-  for (const { data } of steps) {
+    )
+    .orderBy(schema.agentRunSteps.seq);
+  const inputs = new Map<string, unknown>();
+  const calls = new Map<string, { name: string; label: string }>();
+  for (const { kind, data } of steps) {
+    const id = typeof data.toolUseId === "string" ? data.toolUseId : null;
+    if (kind === "tool_call") {
+      if (id) inputs.set(id, data.input);
+      continue;
+    }
     if (data.isError === true || typeof data.name !== "string") continue;
-    calls.set(typeof data.toolUseId === "string" ? data.toolUseId : `step:${calls.size}`, data.name);
+    const input = id ? inputs.get(id) : undefined;
+    calls.set(id ?? `step:${calls.size}`, { name: data.name, label: executedLabel(data.name, input) });
   }
-  for (const c of reported) calls.set(c.id, c.name);
-  return [...new Set(calls.values())];
+  for (const c of reported) calls.set(c.id, { name: c.name, label: executedLabel(c.name, c.input) });
+  return [...new Map([...calls.values()].map((c) => [c.label, c])).values()];
+}
+
+/**
+ * A call a cut-off turn already ran, as its resumed turn reads it: the command's first line or the
+ * path it touched ("Bash (git push origin main)", "Edit (src/app.ts)"), so it can tell which ran.
+ */
+function executedLabel(name: string, input: unknown): string {
+  const i = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+  const text = (v: unknown) => (typeof v === "string" ? v : "");
+  const changes = Array.isArray(i.changes) ? i.changes.map((c) => text((c as { path?: unknown })?.path)) : [];
+  const what =
+    (text(i.command) || text(i.code)).trim().split("\n")[0] ||
+    text(i.file_path) ||
+    text(i.notebook_path) ||
+    text(i.path) ||
+    changes.filter(Boolean).join(", ");
+  const head = maskCredentials(what.trim().replace(/\s+/g, " "));
+  return head ? `${name} (${head.length > 120 ? `${head.slice(0, 119)}…` : head})` : name;
 }
 
 /** Identity of a run for tool access from outside the model loop (the runner MCP bridge). */

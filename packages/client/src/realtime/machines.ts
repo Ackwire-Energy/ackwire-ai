@@ -102,6 +102,8 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
     void qc.invalidateQueries({ queryKey: keys.aiAccounts(orgId) });
     void qc.invalidateQueries({ queryKey: keys.planUsage(orgId) });
   }
+  // The agent list carries each plan's limits (ADR 0063 §5), and the server says only when they would show otherwise.
+  if (accounts) void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
   switch (e.type) {
     case "machine.status": {
       const online = e.online === true;
@@ -190,13 +192,20 @@ const SETUP_FIELDS = [
 ] as const;
 
 /**
- * The workspace's own computer and standing (ADR 0056 §8, §10), live: `machine.provisioning` (the fields of
+ * The workspace's own computer, standing and limits (ADR 0056 §8, §10), live: `machine.provisioning` (the fields of
  * `GET …/computer-setup` but `mode`) replaces what the setup query holds, and the computer's first hello
  * (`ready`) refetches the computers; `org.standing` sets this workspace's standing in `GET /me`, so the banner
  * and the suspended screen follow without a reload, and asks for the setup again: a workspace on hold waits for no
- * computer, and one active again waits for one. Returns whether the event was one of these.
+ * computer, and one active again waits for one. `org.limits` (a new plan, ADR 0079) asks for the limits again, so a
+ * full workspace's invitations open by themselves. `agent.groups` (ADR 0083) says the groups of agents changed: they
+ * are read again. `member.status` and `agent.status` (ADR 0084) refetch the people and the agents' presence. Returns
+ * whether the event was one of these.
  */
 export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { type: string }): boolean {
+  if (event.type === "agent.groups") {
+    void qc.invalidateQueries({ queryKey: keys.agentGroups(orgId) });
+    return true;
+  }
   if (event.type === "machine.provisioning") {
     const e = event as Partial<Record<(typeof SETUP_FIELDS)[number] | "notifyByEmail", unknown>>;
     const next = Object.fromEntries(SETUP_FIELDS.map((k) => [k, e[k] ?? null])) as Omit<
@@ -230,6 +239,19 @@ export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { typ
       me ? { ...me, organizations: me.organizations.map((o) => (o.id === target ? { ...o, standing } : o)) } : me,
     );
     void qc.invalidateQueries({ queryKey: keys.computerSetup(target) });
+    return true;
+  }
+  if (event.type === "org.limits") {
+    void qc.invalidateQueries({ queryKey: keys.limits(orgId) });
+    return true;
+  }
+  // Someone changed their availability or line, or an agent its line (ADR 0084): the lists follow.
+  if (event.type === "member.status") {
+    void qc.invalidateQueries({ queryKey: keys.people(orgId) });
+    return true;
+  }
+  if (event.type === "agent.status") {
+    void qc.invalidateQueries({ queryKey: keys.agentStatus(orgId) });
     return true;
   }
   return false;

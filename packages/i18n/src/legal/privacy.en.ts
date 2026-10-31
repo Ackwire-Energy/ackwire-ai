@@ -3,7 +3,7 @@ import type { LegalDocument } from "./types";
 export const privacyEn: LegalDocument = {
   title: "Privacy Policy",
   summary: "What we collect, what agents send where, who can see your workspace, and the rights you have.",
-  updated: "2026-10-28",
+  updated: "2026-10-30",
   sections: [
     {
       id: "overview",
@@ -13,7 +13,7 @@ export const privacyEn: LegalDocument = {
         {
           list: [
             "For **account data**, the information people give us to create and use an account, we are the data controller.",
-            "For **Workspace Content**, everything an organization and its agents put into or produce in its workspace, we are a data processor acting on the organization's instructions. The organization is the controller.",
+            "For **Workspace Content**, everything a workspace's people and agents put into or produce in it, we are a data processor acting on the workspace's instructions. The workspace is the controller, meaning the person or entity that created it or on whose behalf it was created.",
           ],
         },
       ],
@@ -25,8 +25,9 @@ export const privacyEn: LegalDocument = {
         {
           list: [
             "**Account data:** name, email address, password hash, profile photo, language and time zone. If you sign in with Google, Apple or GitHub, we receive your name, email address and the account identifier from that provider, never its password.",
-            "**Organization data:** organization name, members, roles and invitations.",
-            "**Usage and log data:** IP addresses, browser and device, sign-in sessions, security events, API requests, and the record of each model call (model, tokens and cost, with the organization and agent it belongs to), which we keep to enforce budgets and show usage.",
+            "**Workspace data:** the workspace's name, members, roles and invitations.",
+            "**Billing data:** for a workspace with an agentes.chat plan, the name, email address, billing address and tax ID of the person who pays, the plan, and its invoices and payments. Payments are processed by Stripe, which handles the card details: they never reach us.",
+            "**Usage and log data:** IP addresses, browser and device, sign-in sessions, security events, API requests, and the record of each model call (model, tokens and cost, with the workspace and agent it belongs to), which we keep to enforce budgets and show usage.",
             "**Devices:** for the phone app, the push notification token of each device you sign in on; for connected computers and the Mac app, the computer's name, operating system and app version.",
             "**Waiting list:** the email address and language you give us on agentes.chat, and whether you confirmed it.",
             "**Site analytics:** on agentes.chat (the public site, not the workspace), the pages viewed, the referring site, the device type and an approximate location derived from the IP address, collected with Himetrica.",
@@ -38,33 +39,34 @@ export const privacyEn: LegalDocument = {
       id: "how-we-use",
       heading: "3. How we use account data",
       blocks: [
-        "To provide and secure the Service (including detecting and stopping abuse), apply budgets and limits, respond to support requests, meet legal obligations, and send service messages such as email confirmations, invitations, password resets, approval requests and notifications you turned on. We email the waiting list only to confirm the address and to invite you.",
+        "To provide and secure the Service (including detecting and stopping abuse), bill for plans, apply budgets and limits, respond to support requests, meet legal obligations, and send service messages such as email confirmations, invitations, password resets, approval requests and notifications you turned on. We email the waiting list only to confirm the address and to invite you.",
         "We do not sell personal data, do not use Workspace Content to train machine-learning models, and do not permit our subprocessors to do so.",
       ],
     },
     {
       id: "workspace-content",
-      heading: "4. Workspace Content, processed on behalf of organizations",
+      heading: "4. Workspace Content, processed on behalf of workspaces",
       blocks: [
-        "Workspace Content includes messages in channels, threads and direct messages; files in the Drive; wiki pages; tasks, forum topics, routines and calendar events; approvals; the instructions, settings and memory of agents; what agents write and do; and the data agents read through the connectors, databases and computers the organization connects. We process it only to run the workspace and its agents as the organization configures them, to show it to the organization's members, to send the notifications they ask for, and to provide support.",
-        "Workspace Content belongs to the organization's workspace: members see what the organization's channels and permissions allow, and the organization's owners and admins manage it. Messages you posted stay in the workspace after you leave it or delete your account, unless the organization deletes them.",
+        "Workspace Content includes messages in channels, threads and direct messages; files in the Drive; wiki pages; tasks, forum topics, routines and calendar events; approvals; the instructions, settings and memory of agents; what agents write and do; and the data agents read through the connectors, databases and computers the workspace connects. We process it only to run the workspace and its agents as the workspace configures them, to show it to the workspace's members, to send the notifications they ask for, and to provide support.",
+        "Workspace Content belongs to the workspace: members see what its channels and permissions allow, and its owners and admins manage it. Messages you posted stay in the workspace after you leave it or delete your account, unless the workspace deletes them.",
       ],
     },
     {
       id: "agents",
       heading: "5. How agents process Workspace Content",
       blocks: [
-        "Agents are AI models that read and act inside the workspace. To do that, Workspace Content leaves our servers in the following cases, and only in them:",
+        "Agents are AI models that read and act inside the workspace. Workspace Content leaves our servers in the following cases, and only in them:",
         {
           list: [
-            "**Answering.** When an agent works, it sends the context it needs (the organization's context, the agent's instructions, the conversation, relevant memory and the results of its tools) to the model provider chosen for that agent. With the platform's key, that provider processes it on our behalf. With a key the organization added, the call is made under the organization's own account and agreement with that provider. With a Claude or ChatGPT plan connected to an agent, the agent runs on the person's connected computer under that person's account and the provider's terms.",
-            "**Deciding who replies.** A routing model reads a new message, the names and roles of the organization's agents, and recent conversation to decide which agent, if any, should reply. It runs at TypeSafe or, as a fallback, at the organization's model provider. Routing never grants an agent any permission.",
-            "**Memory.** Agents keep memory from conversations (summaries, facts and lessons) so they improve over time. Some judgments about memory (whether something is worth keeping, or conflicts with what an agent already knows) are made by TypeSafe. Memory can be seen and removed in the agent's page, and it is deleted with the organization.",
+            "**Between devices and our servers.** Everything sent between our servers and the browsers, apps and computers that connect to them, Workspace Content included, passes through Cloudflare, which protects the Service from attacks. To do that, Cloudflare decrypts this traffic at its data center nearest to each device, and handles it on our behalf.",
+            "**Answering.** When an agent works, it sends the context it needs (the workspace's context, the agent's instructions, the conversation, relevant memory and the results of its tools) to the model provider chosen for that agent. With an API key the workspace added, the call is made under the workspace's own account and agreement with that provider. With an AI plan, such as Claude or ChatGPT, connected to an agent, the agent works under the account of the person who connected the plan and under the provider's terms.",
+            "**Deciding who replies.** A routing model reads a new message, the names and roles of the workspace's agents, and recent conversation to decide which agent, if any, should reply. It runs at TypeSafe or, as a fallback, at the workspace's model provider. Routing never grants an agent any permission.",
+            "**Memory.** Agents keep memory from conversations (summaries, facts and lessons) so they improve over time. Some judgments about memory (whether something is worth keeping, or conflicts with what an agent already knows) are made by TypeSafe. Memory can be seen and removed in the agent's page, and it is deleted with the workspace.",
             "**Search.** To find related messages and documents, text may be turned into vectors (embeddings) by Voyage AI.",
-            "**Connectors.** When the organization connects a service (such as GitHub, Google, Linear, Sentry, an email inbox or any MCP server), we store its access tokens encrypted and read or write that service only within the scopes the organization gave each agent. The connected service processes that data under its own terms. Connections to Gmail and Outlook inboxes go through Composio.",
+            "**Connectors.** When the workspace connects a service (such as GitHub, Google, Linear, Sentry, an email inbox or any MCP server), we store its access tokens encrypted and read or write that service only within the scopes the workspace gave each agent. The connected service processes that data under its own terms. Connections to Gmail and Outlook inboxes go through Composio.",
             "**Databases.** Database connections are read-only; credentials are stored encrypted and each query is checked before it runs.",
-            "**Connected computers.** When someone connects a computer, agents can run commands and use a browser there, within the folders and permissions set on that computer. The live view of an agent's browser passes through our servers in memory and is not recorded; a summary of the steps the agent took (such as addresses visited and actions) is kept with its work so the team can see what it did.",
-            "**Computers we run.** On the computers we run for your workspace, we count how much data each agent's browser, AI tools and other programs send and receive, per day.",
+            "**Connected computers.** When someone connects a computer, agents can run commands and use a browser there, within the folders and permissions set on that computer. The live view of an agent's browser passes through Cloudflare and through our servers' memory, and is not recorded; a summary of the steps the agent took (such as addresses visited and actions) is kept with its work so the team can see what it did.",
+            "**The workspace's computer.** On agentes.chat Cloud, a workspace's agents work on a computer we run for that workspace, hosted by Contabo in the European Union. We count how much data each agent's browser, AI tools and other programs send and receive there, per day. The computer is wiped after the workspace's agentes.chat plan ends, as the Terms of Use describe.",
           ],
         },
         "Actions that are hard to undo (such as merging code, deploying or sending on someone's behalf) become an approval request for a person before they happen. Text that comes from outside the workspace (web pages, emails, files) is marked as untrusted before an agent reads it.",
@@ -91,9 +93,10 @@ export const privacyEn: LegalDocument = {
       blocks: [
         {
           list: [
-            "**Account data:** for the life of the account. When you delete your account (Settings), it is removed at once, together with any organization in which you were the only member; it leaves our backups within 30 days, except records we must keep by law.",
-            "**Workspace Content:** for the life of the organization, and earlier when the organization deletes specific content. When an organization is deleted, its content is removed and leaves our backups within 30 days.",
-            "**Logs:** request and security logs for up to 90 days. Model usage records (tokens and cost) for the life of the organization, because budgets and usage reports depend on them.",
+            "**Account data:** for the life of the account. When you delete your account (Settings), it is removed at once, together with any workspace in which you were the only member; it leaves our backups within 30 days, except records we must keep by law.",
+            "**Workspace Content:** for the life of the workspace, and earlier when the workspace deletes specific content. When a workspace's agentes.chat plan ends, its content stays available for 90 days and is then deleted. When a workspace is deleted, its content is removed and leaves our backups within 30 days.",
+            "**Logs:** request and security logs for up to 90 days. Model usage records (tokens and cost) for the life of the workspace, because budgets and usage reports depend on them.",
+            "**Billing data:** while you pay for a workspace, and after that for as long as tax and accounting law requires.",
             "**Waiting list:** until you are invited and for 12 months after, or until you ask us to remove you.",
             "**Accounts we suspend or close for abuse:** we may keep the records of the account and of the abuse beyond these periods, including after deletion is requested, for as long as needed to establish, exercise or defend legal claims, to meet legal obligations, and to keep the same people from abusing the Service again, under Article 17(3)(b) and (e) and Article 6(1)(f) of the GDPR and Articles 7(VI), 7(IX) and 16(I) of the LGPD.",
           ],
@@ -104,14 +107,14 @@ export const privacyEn: LegalDocument = {
       id: "security",
       heading: "8. Security",
       blocks: [
-        "Data is encrypted in transit (TLS) and at rest. Model provider keys, connector tokens and database credentials are additionally encrypted with per-organization envelope encryption and are never sent back to the browser or the apps. Access to production systems is restricted and logged. If we learn of a personal-data breach, we will notify affected organizations without undue delay and within the timelines the GDPR and LGPD require.",
+        "Data is encrypted in transit (TLS) and at rest. Model provider keys, connector tokens and database credentials are additionally encrypted with per-workspace envelope encryption and are never sent back to the browser or the apps. Access to production systems is restricted and logged. If we learn of a personal-data breach, we will notify affected workspaces without undue delay and within the timelines the GDPR and LGPD require.",
       ],
     },
     {
       id: "transfers",
       heading: "9. International transfers",
       blocks: [
-        "Our application and its database run in the United States, and the providers named in this policy process data in the United States. Where personal data subject to the GDPR or UK GDPR is transferred to a third country, we rely on the European Commission's Standard Contractual Clauses and the UK Addendum. For data subject to the LGPD, we rely on the contractual safeguards of Article 33.",
+        "Our application and its database run in the United States, and the providers named in this policy process data in the United States, except the workspaces' computers, which Contabo hosts in the European Union, and Cloudflare, which handles traffic at its data center nearest to each device, in the United States or elsewhere. Where personal data subject to the GDPR or UK GDPR is transferred to a third country, we rely on the European Commission's Standard Contractual Clauses and the UK Addendum. For data subject to the LGPD, we rely on the contractual safeguards of Article 33.",
       ],
     },
     {
@@ -125,7 +128,7 @@ export const privacyEn: LegalDocument = {
       id: "gdpr",
       heading: "11. Your rights under the GDPR",
       blocks: [
-        "If you are in the EEA or the UK, you may request access, rectification, erasure, restriction and portability, and object to processing, and you may lodge a complaint with your supervisory authority. For account data, contact us directly; you can also correct your profile and delete your account yourself in Settings. For personal data in Workspace Content, contact the organization that controls it; we will refer requests we receive to that organization and assist it as processor.",
+        "If you are in the EEA or the UK, you may request access, rectification, erasure, restriction and portability, and object to processing, and you may lodge a complaint with your supervisory authority. For account data, contact us directly; you can also correct your profile and delete your account yourself in Settings. For personal data in Workspace Content, contact the owners or admins of the workspace, which controls it. We will refer requests we receive to that workspace and assist it as processor.",
       ],
     },
     {
@@ -139,7 +142,7 @@ export const privacyEn: LegalDocument = {
       id: "dpa",
       heading: "13. Data Processing Addendum",
       blocks: [
-        "A DPA covering our processing of Workspace Content, including the Standard Contractual Clauses and LGPD processing terms, is available to every organization. Request it at legal@agentes.chat.",
+        "A DPA covering our processing of Workspace Content, including the Standard Contractual Clauses and LGPD processing terms, is available to every workspace. Request it at legal@agentes.chat.",
       ],
     },
     {

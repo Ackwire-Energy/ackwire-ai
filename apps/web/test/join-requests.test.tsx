@@ -9,7 +9,7 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createI18n } from "@/i18n";
-import { ADA_ID, ATLAS_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ADMIN_ROLE_ID, ATLAS_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { notification } from "./fakes/notifications";
 import { hintOf } from "./hint";
 import { renderApp, screen, settle } from "./render";
@@ -388,6 +388,31 @@ describe("an invitation link asks to join", () => {
       cleanup();
     }
   });
+
+  test("the workspace's logo in place of its initial, on a link and an invitation alike; the initial without one", async () => {
+    const mark = () => document.querySelector<HTMLImageElement>(".invite-card img.org-mark");
+    const initial = () => document.querySelector(".invite-card .org-badge");
+    const logo = "/api/app/invitations/lnk/logo/0123456789abcdef.png";
+    await openLink({ ...LINK, logo });
+    expect(mark()?.getAttribute("src")).toBe(logo);
+    expect(initial()).toBeNull();
+    cleanup();
+
+    const invitation: InvitationPreview = { orgName: "Acme", email: "ana@acme.com.br", role: "member", kind: "email" };
+    const state = seedState({
+      me: null,
+      previews: { inv: { ...invitation, logo: "/api/app/invitations/inv/logo/a.png" } },
+    });
+    await renderApp("/invite/inv", { api: createFakeApi(state) });
+    await settle(4);
+    expect(mark()?.getAttribute("src")).toBe("/api/app/invitations/inv/logo/a.png");
+    expect(initial()).toBeNull();
+    cleanup();
+
+    await openLink(LINK);
+    expect(mark()).toBeNull();
+    expect(initial()?.textContent).toBe("A");
+  });
 });
 
 /** Mid-day: a request made 2 h ago is still today, so it reads "há 2 h" and never "ontem". */
@@ -445,24 +470,23 @@ describe("Members › Requests to join", () => {
 
     const sidebarCount = () => document.querySelector(".sidebar__org-meta")?.textContent;
     expect(sidebarCount()).toBe("2 membros · 2 agentes");
-    const role = within(ana).getByRole("combobox", { name: "Papel de Ana Souza" });
-    role.focus();
-    await act(async () => fireEvent.keyDown(role, { key: "Enter" }));
-    await click(screen().getByRole("option", { name: /^Admin/ }));
+    // Roles to give (ADR 0085): a menu that stays open, one switch per role below the approver's.
+    const roles = within(ana).getByRole("button", { name: "Papéis para Ana Souza" });
+    roles.focus();
+    await act(async () => fireEvent.keyDown(roles, { key: "Enter" }));
+    await click(screen().getByRole("menuitemcheckbox", { name: "Admin" }));
+    await act(async () => fireEvent.keyDown(screen().getByRole("menu"), { key: "Escape" }));
+    expect(roles.textContent).toContain("Admin");
     await click(within(ana).getByRole("button", { name: "Aprovar" }));
     await settle(4);
-    expect(state.calls.find((c) => c.method === "joinRequests.approve")?.args).toEqual([ORG_ID, "r1", "admin"]);
+    expect(state.calls.find((c) => c.method === "joinRequests.approve")?.args).toEqual([ORG_ID, "r1", [ADMIN_ROLE_ID]]);
     expect(text()).toContain("Ana Souza entrou.");
     // She counts in the workspace's line too, without a reload.
     expect(sidebarCount()).toBe("3 membros · 2 agentes");
 
     await click(within(card("Bruno Lima")).getByRole("button", { name: "Aprovar" }));
     await settle(4);
-    expect(state.calls.filter((c) => c.method === "joinRequests.approve").at(-1)?.args).toEqual([
-      ORG_ID,
-      "r2",
-      "member",
-    ]);
+    expect(state.calls.filter((c) => c.method === "joinRequests.approve").at(-1)?.args).toEqual([ORG_ID, "r2", []]);
     expect(text()).toContain("Convite enviado para bruno@lima.dev.");
     expect(screen().queryByRole("region", { name: /Pedidos para entrar/ })).toBeNull();
   });
@@ -571,12 +595,12 @@ describe("Members › Invite people", () => {
       await renderApp(`/org/${ORG_ID}/settings/members`, { api: createFakeApi(state) });
       await settle(6);
       const invite = screen().getByRole("region", { name: "Convidar pessoas" });
-      return { invite, line: within(invite).queryByText("Seus agentes só respondem a você.")?.closest(".setup-line") };
+      return { invite, line: within(invite).queryByText("Seus agentes só atendem você.")?.closest(".setup-line") };
     };
     const { invite, line } = await note("owner");
     expect(line).toBeTruthy();
-    expect(hintOf("Seus agentes só respondem a você.", invite).text).toBe(
-      "Num plano, você pode deixar cada um responder a todos na página dele.",
+    expect(hintOf("Seus agentes só atendem você.", invite).text).toBe(
+      "Num plano, você pode deixar cada um atender outras pessoas na página dele.",
     );
     // Under the card's title, before the invitations it's about.
     const emails = within(invite).getByLabelText("E-mails, separados por vírgula");
@@ -587,15 +611,27 @@ describe("Members › Invite people", () => {
   });
 });
 
-describe("Members › Invite people, self-hosted", () => {
-  test("no email to send invitations with: the link is the only way in, without the hairline over it", async () => {
-    const state = seedState({ joinRequests: [], edition: "selfhost" });
+describe("Members › Invite people, by email when the server sends it", () => {
+  const inviteCard = async (state: ReturnType<typeof seedState>) => {
     await renderApp(`/org/${ORG_ID}/settings/members`, { api: createFakeApi(state) });
     await settle(6);
-    const invite = screen().getByRole("region", { name: "Convidar pessoas" });
+    return screen().getByRole("region", { name: "Convidar pessoas" });
+  };
+
+  test("no email to send invitations with: the link is the only way in, without the hairline over it", async () => {
+    const invite = await inviteCard(seedState({ joinRequests: [], authConfig: { passwordReset: false } }));
     expect(within(invite).queryByLabelText("E-mails, separados por vírgula")).toBeNull();
     expect(within(invite).queryByRole("button", { name: "Convidar" })).toBeNull();
     expect(invite.querySelector(".jr-link--alone")).toBeTruthy();
+  });
+
+  test("a self-hosted server that sends email invites by email too, the link under it", async () => {
+    const invite = await inviteCard(
+      seedState({ joinRequests: [], edition: "selfhost", authConfig: { passwordReset: true } }),
+    );
+    expect(within(invite).getByLabelText("E-mails, separados por vírgula")).toBeTruthy();
+    expect(within(invite).getByRole("button", { name: "Convidar" })).toBeTruthy();
+    expect(invite.querySelector(".jr-link:not(.jr-link--alone)")).toBeTruthy();
   });
 });
 

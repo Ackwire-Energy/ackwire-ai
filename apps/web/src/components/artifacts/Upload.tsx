@@ -1,10 +1,10 @@
 import type { ArtifactDetail } from "@agenteschat/client";
 import { useUploadFile } from "@agenteschat/client";
-import { errorText } from "@agenteschat/client/lib/errors";
 import { fitsUpload, MAX_UPLOAD_MB } from "@agenteschat/client/lib/files";
 import { Button, type ButtonProps } from "@agenteschat/ui";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useUploadFailed } from "@/components/Limits";
 import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
 
@@ -24,6 +24,7 @@ export function useDriveUpload(onUploaded?: (saved: ArtifactDetail, file: File) 
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
+  const failed = useUploadFailed();
   const mutation = useUploadFile(org.id);
   const [current, setCurrent] = useState<string | null>(null);
   const [queue, setQueue] = useState<UploadItem[]>([]);
@@ -45,7 +46,7 @@ export function useDriveUpload(onUploaded?: (saved: ArtifactDetail, file: File) 
         onUploaded?.(saved, file);
       } catch (error) {
         mark(i, "failed");
-        toast.show(errorText(t, error), "error");
+        failed(error);
       }
     }
     setCurrent(null);

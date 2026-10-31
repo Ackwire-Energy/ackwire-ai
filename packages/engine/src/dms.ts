@@ -7,7 +7,8 @@ import { sha256 } from "./crypto";
 import { NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { type PreviewMeta, previewMeta } from "./message-preview";
-import { getMembership, requirePermission } from "./organizations";
+import { resolveNotifications } from "./notifications";
+import { can, getMembership, requirePermission } from "./organizations";
 
 const { channels, channelMembers, channelReads, messages, agents, users } = schema;
 
@@ -22,7 +23,7 @@ const keyOf = (participants: string[]) => [...new Set(participants)].sort().join
  * agent answers every message from the person (no router).
  */
 export async function openDm(db: Database, actorId: string, orgId: string, target: DmTarget) {
-  await requirePermission(db, actorId, orgId, "post");
+  const membership = await requirePermission(db, actorId, orgId, "post");
   let other: string;
   let blockedAgent: Agent | null = null;
   if ("userId" in target) {
@@ -36,7 +37,7 @@ export async function openDm(db: Database, actorId: string, orgId: string, targe
       .from(agents)
       .where(and(eq(agents.id, target.agentId), eq(agents.orgId, orgId), isNull(agents.archivedAt)));
     if (!agent) throw new NotFoundError("Agent not found");
-    if (!canTalkTo(agent, actorId)) blockedAgent = agent;
+    if (!canTalkTo(agent, actorId, can(membership, "talk_to_agents"))) blockedAgent = agent;
     other = `a:${target.agentId}`;
   }
   const dmKey = keyOf([`u:${actorId}`, other]);
@@ -296,7 +297,8 @@ export async function listDms(db: Database, actorId: string, orgId: string): Pro
 
 /**
  * Marks a channel (or DM) read up to now for me. In a DM between people the other one hears it
- * (`channel.read`): their app says "Visto" under the last message I read.
+ * (`channel.read`): their app says "Visto" under the last message I read. An agent's answers there
+ * (`agent_reply`) are seen, so they leave the inbox and never push (ADR 0071).
  */
 export async function markChannelRead(
   db: Database,
@@ -318,6 +320,11 @@ export async function markChannelRead(
     .insert(channelReads)
     .values({ orgId, channelId, userId: actorId, lastReadAt: at })
     .onConflictDoUpdate({ target: [channelReads.channelId, channelReads.userId], set: { lastReadAt: at } });
+  await resolveNotifications({ db, pubsub }, orgId, {
+    groupKeyPrefix: `agent_reply:${channelId}:`,
+    userIds: [actorId],
+    kind: "agent_reply",
+  });
   if (member.kind === "dm")
     await publishChannelEvent(pubsub, {
       type: "channel.read",

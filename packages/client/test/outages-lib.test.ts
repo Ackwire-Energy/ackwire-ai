@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import type { TFunction } from "i18next";
 import type { OutageTarget } from "../src/api/types";
+import { serverBody } from "../src/lib/message-body";
 import { brainUnavailableOf, isOfflineNotice, outageKey, targetBlock, targetsFor } from "../src/lib/outages";
 
 describe("offline computers", () => {
@@ -44,5 +46,17 @@ describe("offline computers", () => {
     expect(n && isOfflineNotice(n)).toBe(true);
     expect(isOfflineNotice({ ...(n as NonNullable<typeof n>), code: "machine_paused" })).toBe(false);
     expect(outageKey({ machineId: "m", offlineSince: "t" })).toBe("m@t");
+  });
+
+  test("a note waiting for room on a busy computer has its own words, never a card about it coming back", () => {
+    const t = ((key: string) => key) as unknown as TFunction;
+    const note = (code: string) => ({
+      bodyCode: "brain_unavailable",
+      brainUnavailable: { brain: "claude_code", code },
+    });
+    expect(serverBody(t, "…", note("busy"))).toBe("chat.body.brain_busy");
+    expect(serverBody(t, "…", note("machine_offline"))).toBe("chat.body.brain_unavailable");
+    const busy = brainUnavailableOf(note("busy"));
+    expect(busy && isOfflineNotice(busy)).toBe(false);
   });
 });

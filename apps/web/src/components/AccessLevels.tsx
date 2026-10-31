@@ -40,6 +40,8 @@ const AREA_ICON: Record<string, IconName> = {
   forum: "message",
   sandbox: "computer",
   browser: "globe",
+  setup: "edit",
+  desktop: "pointer",
 };
 
 /** The connected services by connection id (their names and brand icons). */
@@ -220,7 +222,7 @@ export function LevelRow({
 export function AccessMatrixSection() {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const admin = can(org.role, "configure");
+  const admin = can(org, "manage_agents");
   const agents = useAgents(org.id);
   const list = agents.data ?? [];
   const access = useAgentsAccess(list, admin);

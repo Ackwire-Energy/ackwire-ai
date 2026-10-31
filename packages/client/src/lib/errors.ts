@@ -1,7 +1,9 @@
 import type { TFunction } from "i18next";
 import { ApiError } from "../api/http";
 import type { AuthConfig, OrgStanding } from "../api/types";
+import { billingHoldOf } from "./billing";
 import { MAX_UPLOAD_MB } from "./files";
+import { limitRefusalText } from "./limits";
 import { endSentence } from "./text";
 
 /**
@@ -9,6 +11,8 @@ import { endSentence } from "./text";
  * own message is English). Anything else falls back to that message.
  */
 const KNOWN = {
+  "agent_proposal.decided": "errors.agentProposal.decided",
+  "agent_proposal.expired": "errors.agentProposal.expired",
   "artifact.file_too_large": "errors.artifact.fileTooLarge",
   "artifact.file_required": "errors.artifact.fileRequired",
   "artifact.file_name_required": "errors.artifact.fileNameRequired",
@@ -22,6 +26,8 @@ const KNOWN = {
   "machine.target_not_found": "errors.machine.targetNotFound",
   "machine.target_same": "errors.machine.targetSame",
   "machine.target_paused": "errors.machine.targetPaused",
+  "agent_group.not_found": "errors.agentGroup.notFound",
+  "agent_group.too_many": "errors.agentGroup.tooMany",
   "thread.context_not_visible": "errors.thread.contextNotVisible",
   "thread.archived": "errors.thread.archived",
   "thread.has_replies": "errors.thread.hasReplies",
@@ -72,6 +78,16 @@ const KNOWN = {
   "routine.take_over_no_access": "errors.routine.takeOverNoAccess",
   "routine.agent_not_in_channel": "errors.routine.agentNotInChannel",
   "audience.plan_owner_only": "aiAccounts.errors.planOwnerOnly",
+  "role.name_required": "errors.role.nameRequired",
+  "role.name_long": "errors.role.nameLong",
+  "role.too_many": "errors.role.tooMany",
+  "role.grant_forbidden": "errors.role.grantForbidden",
+  "role.above_you": "errors.role.aboveYou",
+  "role.base": "errors.role.base",
+  "role.unknown": "errors.role.unknown",
+  "role.order_incomplete": "errors.role.orderIncomplete",
+  // Facts only (the phone shows this one): the web's onboarding says `standing.createUnpaid` beside the way to pay.
+  "org.create_unpaid": "standing.createInactive",
   "machine.managed": "computerSetup.managedNotRemovable",
   "machine.managed_access": "computerSetup.managedAccess",
   "join.link_closed": "errors.join.linkClosed",
@@ -89,6 +105,11 @@ const KNOWN = {
   "join.code_wait": "errors.join.codeWait",
   "join.code_needed": "errors.join.codeNeeded",
   "invitation.ask_to_join": "errors.invitation.askToJoin",
+  "org.create_invite_only": "errors.org.createInviteOnly",
+  EARLY_ACCESS_OTHER_EMAIL: "auth.earlyAccess.otherEmail",
+  EARLY_ACCESS_EMAIL_UNVERIFIED: "auth.earlyAccess.unverified",
+  // A provider's sign-up on a closed server comes back to /login with this code.
+  SIGNUP_CLOSED: "auth.flow.closedLead",
   human_check: "errors.humanCheck",
   human_check_blocked: "errors.humanCheckBlocked",
   // TypeSafe refused the key pasted for Jev: said under its field, nothing kept.
@@ -97,6 +118,9 @@ const KNOWN = {
 
 /** Better Auth's code when a blocked account tries to sign in (the server's `session.create.before` hook). */
 export const ACCOUNT_BLOCKED = "ACCOUNT_BLOCKED";
+
+/** Better Auth's code when an early-access link signs up another address than the one it was sent to. */
+export const EARLY_ACCESS_OTHER_EMAIL = "EARLY_ACCESS_OTHER_EMAIL";
 
 /** Where a restriction on agentes.chat Cloud is contested. */
 export const LEGAL_EMAIL = "legal@agentes.chat";
@@ -138,9 +162,13 @@ export function restrictionLine(
   const contested = (line: string) =>
     cloud && !UNCONTESTED.has(reason) ? `${endSentence(line)} ${t("standing.cloud.contest", email)}` : line;
   switch (code?.startsWith("run.") ? code.slice(4).replace("_", ".") : code) {
-    case "org.paused":
+    case "org.paused": {
+      // A billing hold (ADR 0079) is said in words of its own, never as the reason.
+      const billing = billingHoldOf({ state: "hold", reason });
+      if (billing) return t(`standing.billing.${billing}`);
       if (cloud && reason === REVIEW_REASON) return t("standing.cloud.review", email);
       return reason ? contested(t("standing.onHold", { reason })) : t("standing.paused");
+    }
     case "org.suspended":
       return reason ? contested(t("standing.suspendedFor", { reason })) : t("standing.suspended");
     case "agent.paused":
@@ -193,17 +221,44 @@ export const CONTINUE_ERRORS: ReadonlySet<string> = new Set([
 export const errorCode = (error: unknown) => (error instanceof ApiError ? error.code : undefined);
 
 /**
- * A known server code in the person's language, and any other limit (a 429, or `rate_limited`) as "too many tries",
- * since the server says those in English. Null for anything else (the caller keeps its own words).
+ * What the proxy in front answers while the server restarts, is down or too slow: Caddy's 502, 503 and 504, and
+ * Cloudflare's 520 to 524. The server's own errors carry a code of theirs (its 502 for a computer's error does).
  */
-export function knownErrorText(t: TFunction, error: unknown): string | null {
+const UNREACHABLE = new Set([502, 503, 504, 520, 521, 522, 523, 524]);
+
+/** No answer from the server itself, only from the proxy in front of it: it may be back in a moment. */
+export const serverUnreachable = (error: unknown) =>
+  error instanceof ApiError && UNREACHABLE.has(error.status) && error.code === `http_${error.status}`;
+
+/**
+ * A message that failed to go out with no answer at all (`fetch` throws a `TypeError`: no network), or only the
+ * proxy's while the server restarts: it waits for the connection instead of failing. The server refusing it, or a
+ * bug, fails it.
+ */
+export const sendWaits = (error: unknown) => error instanceof TypeError || serverUnreachable(error);
+
+/**
+ * A known server code in the person's language, and any other limit (a 429, or `rate_limited`) as "too many tries",
+ * since the server says those in English. Null for anything else (the caller keeps its own words). `locale`
+ * writes the sizes a limit's refusal names.
+ */
+export function knownErrorText(t: TFunction, error: unknown, locale = "en"): string | null {
   if (!(error instanceof ApiError)) return null;
   const restriction = restrictionLine(t, error.code, error.params);
   if (restriction) return restriction;
+  const limit = limitRefusalText(t, locale, error.code, error.params);
+  if (limit) return limit;
   const key = KNOWN[error.code as keyof typeof KNOWN];
   if (key) return t(key, { max: MAX_UPLOAD_MB, ...error.params });
   return error.status === 429 || error.code === "rate_limited" ? t("common.tooMany") : null;
 }
+
+/**
+ * `knownErrorText` for the person an invitation is for: a full workspace says whom to tell, never its numbers,
+ * which are for its admins.
+ */
+export const invitedErrorText = (t: TFunction, error: unknown, locale?: string): string | null =>
+  errorCode(error) === "org.members_full" ? t("errors.org.membersFull") : knownErrorText(t, error, locale);
 
 /**
  * A sign-in, sign-up or reset Better Auth refused (`{ status, code, message }`, a block's kind on agentes.chat Cloud)
@@ -220,9 +275,9 @@ export function authErrorText(
 }
 
 /** Translated text for a failed request. */
-export function errorText(t: TFunction, error: unknown): string {
+export function errorText(t: TFunction, error: unknown, locale?: string): string {
   if (error instanceof ApiError) {
-    const known = knownErrorText(t, error);
+    const known = knownErrorText(t, error, locale);
     if (known) return known;
     if (error.status === 413) return t("errors.artifact.fileTooLarge", { max: MAX_UPLOAD_MB });
     if (error.status === 403) return t("common.notAllowed");

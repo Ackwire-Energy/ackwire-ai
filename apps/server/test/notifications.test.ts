@@ -190,3 +190,33 @@ test("notifications API: read, done and undo, snooze, read-all; session, CSRF an
     (await other(`/api/app/organizations/${orgId}/notifications/${id}/done`, { json: { done: true } })).status,
   ).toBe(403);
 });
+
+test("notification prefs: every category with its default, one switched per call, mine only", async () => {
+  t = await createTestServer({ reply: () => ({ chunks: ["ok"] }) });
+  const { owner, api, orgId } = await signedIn();
+  type Prefs = { categories: { id: string; on: boolean }[]; phones: number };
+  const first = (await (await api("/notification-prefs")).json()) as Prefs;
+  expect(first.phones).toBe(0);
+  expect(first.categories.map((c) => [c.id, c.on])).toEqual([
+    ["waiting", true],
+    ["replies", true],
+    ["mentions", true],
+    ["threads", false],
+    ["tasks", false],
+    ["routines", true],
+    ["computers", true],
+    ["reactions", false],
+  ]);
+  const res = await api("/notification-prefs", { method: "PUT", json: { category: "threads", on: true } });
+  expect(res.status).toBe(200);
+  expect(((await res.json()) as Prefs).categories.find((c) => c.id === "threads")?.on).toBe(true);
+  const again = (await (await api("/notification-prefs")).json()) as Prefs;
+  expect(again.categories.find((c) => c.id === "threads")?.on).toBe(true);
+  const bad = await api("/notification-prefs", { method: "PUT", json: { category: "everything", on: true } });
+  expect(bad.status).toBe(400);
+  // Not a member: refused, as for the inbox.
+  await owner(`/api/app/organizations/${orgId}/invitations`, { json: { email: "other@example.com", role: "member" } });
+  const other = browser(t);
+  await signUp(other, "other@example.com");
+  expect((await other(`/api/app/organizations/${orgId}/notification-prefs`)).status).toBe(403);
+});

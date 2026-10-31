@@ -22,9 +22,11 @@ import {
   listArtifacts,
   listDeletedArtifacts,
   postPersonMessage,
+  rankTools,
   receiveMachineUpload,
   restoreArtifact,
   type ToolContext,
+  toolGroupKey,
   UploadTimeoutError,
   updateArtifact,
   ValidationError,
@@ -431,6 +433,46 @@ describe("upload_file", () => {
     expect(missing).toMatchObject({ isError: true });
     const failed = (await f.db.select().from(schema.artifactUploads)).find((u) => u.path === "docs/nope.pdf");
     expect(failed).toMatchObject({ status: "failed" });
+  });
+
+  test("an upload that landed before the link dropped (its answer lost) returns the file, never failed", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    let machineId = "";
+    let drop = async () => {};
+    const computer = await connectedComputer(f, {
+      async push(req, bytes, name) {
+        await receiveMachineUpload(uploadDeps(), {
+          uploadId: req.uploadId,
+          machineId,
+          name,
+          contentType: "",
+          sha256: createHash("sha256").update(bytes).digest("hex"),
+          body: bytes,
+        });
+        // The bytes are in; the link drops before the runner's answer goes back.
+        await drop();
+      },
+    });
+    machineId = computer.paired.machineId;
+    drop = () => computer.runner.disconnect();
+    computer.runner.files.set("out/chart.png", PNG);
+    const ctx = await runCtx();
+    const out = await call(ctx, "upload_file", { path: "out/chart.png", title: "Gráfico" });
+    expect(out.isError).toBeFalsy();
+    expect(out.content).toContain('as "Gráfico" (file');
+    const [up] = await f.db.select().from(schema.artifactUploads);
+    expect(up).toMatchObject({ status: "done" });
+    expect(await f.db.select().from(schema.artifacts)).toHaveLength(1);
+  });
+
+  test("find_tools ranks it first among the computer's tools for sharing a file or a screenshot here", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    await connectedComputer(f);
+    const ctx = await runCtx();
+    const computer = ((await f.tools?.list(ctx)) ?? []).filter((t) => toolGroupKey(t) === "sandbox");
+    for (const query of ["share file in channel", "send screenshot", "attach image"]) {
+      expect(rankTools(computer, "", query)[0]?.name).toBe("upload_file");
+    }
   });
 
   test("import_file copies an uploaded file's bytes under its original name", async () => {

@@ -796,9 +796,6 @@
   gap: 8px;
   padding: 4px 24px 8px;
 }
-.cal-series__option.ac-btn {
-  justify-content: flex-start;
-}
 .cal-form__switch {
   display: inline-flex;
   align-items: center;

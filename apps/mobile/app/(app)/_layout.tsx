@@ -1,12 +1,20 @@
-import { usePrefetchRecent } from "@agenteschat/client";
+import { usePrefetchRecent, useSendWaiting } from "@agenteschat/client";
 import { type ErrorBoundaryProps, Stack } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { View } from "react-native";
-import { useRememberAgentLooks } from "@/features/shared/hooks";
+import { useConnection, useRememberAgentLooks } from "@/features/shared/hooks";
 import { ScreenError } from "@/features/shared/ScreenError";
 import { useUserEvents } from "@/features/shared/userEvents";
 import { useSounds } from "@/lib/sounds";
 import { useOrg, useOrgGate } from "@/providers/org";
-import { coverBarOptions, useFormSheetOptions, usePushedOptions, useScrollUnderPushedOptions, useTheme } from "@/ui";
+import {
+  coverBarOptions,
+  useFormSheetOptions,
+  usePushedOptions,
+  useScrollUnderPushedOptions,
+  useTheme,
+  useToast,
+} from "@/ui";
 
 /** A link straight to a pushed screen or a sheet still has the tabs under it (the back button works). */
 export const unstable_settings = { anchor: "(tabs)" };
@@ -39,8 +47,13 @@ function AppStack() {
   // The app's sounds (ADR 0070): the player and its audio session.
   useSounds();
   useRememberAgentLooks();
+  const { orgId } = useOrg();
   // The unread and latest conversations load while the app is idle: opening them is instant.
-  usePrefetchRecent(useOrg().orgId);
+  usePrefetchRecent(orgId);
+  // What I sent while the connection was down goes out once it's back, whatever screen is open.
+  const { t } = useTranslation();
+  const toast = useToast();
+  useSendWaiting(orgId, useConnection(), () => toast({ title: t("mobile.chat.notSent"), icon: "x" }));
   const pushed = usePushedOptions();
   const scrollUnder = useScrollUnderPushedOptions();
   const approvalSheet = useFormSheetOptions([0.62, 1], "raised");
@@ -58,6 +71,10 @@ function AppStack() {
       <Stack.Screen name="chat/[channelId]" options={pushed} />
       <Stack.Screen name="consultation/[id]" options={pushed} />
       <Stack.Screen name="conversations/[kind]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="channel-category" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="channel-category-new" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="channel-categories" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="channel-category-edit" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="mission/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent/[id]" options={{ ...pushed, ...coverBarOptions }} />
       <Stack.Screen name="account-delete" options={{ ...pushed, ...scrollUnder }} />
@@ -66,6 +83,7 @@ function AppStack() {
       <Stack.Screen name="agent-usage/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-ai/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-edit" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="agent-delete" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="new-agent" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/[id]" options={{ ...pushed, ...scrollUnder }} />
@@ -95,6 +113,7 @@ function AppStack() {
       {/* Você: a pushed page with a clear bar over its sky; its screens pushed over it on the grouped gray. */}
       <Stack.Screen name="me/index" options={{ ...pushed, ...coverBarOptions }} />
       <Stack.Screen name="me/account" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/status" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/zone" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/workspaces" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/members" options={{ ...pushed, ...scrollUnder }} />

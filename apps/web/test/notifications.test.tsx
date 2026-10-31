@@ -554,27 +554,27 @@ describe("its computer is ready: what comes next", () => {
     expect(other.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/computers/m-9`);
   });
 
-  test("its headline's line sits in the middle of the face beside it, and its text as far from the top as the bottom", async () => {
+  test("its face's top is its headline's line's, and a headline alone sits in the middle of the face", async () => {
     const css = (await Bun.file(new URL("../src/pages/notifications.css", import.meta.url).pathname).text()).replace(
       /\/\*[\s\S]*?\*\//g,
       "",
     );
     const phone = css.split("\n@media (max-width: 720px) {")[1]?.split("\n}")[0] ?? "";
+    const body = (selector: string, sheet = css) =>
+      new RegExp(`\\n *${selector.replace(/[.()>:]/g, "\\$&")} \\{([^}]*)\\}`).exec(sheet)?.[1] ?? "";
     const px = (selector: string, prop: string, sheet = css) =>
-      Number(
-        new RegExp(`\\n *${selector.replace(/[.()>:]/g, "\\$&")} \\{[^}]*\\b${prop}: (-?\\d+)(px)?;`).exec(sheet)?.[1],
-      );
+      Number(new RegExp(`\\b${prop}: (-?\\d+)(px)?;`).exec(body(selector, sheet))?.[1]);
     const face = px(".nt-sys", "height");
     expect(px(".nt-av28", "height")).toBe(face);
     const line = px(".nt-tags .ac-chip", "height");
-    const pad = px(".nt-who", "padding-top");
-    // A headline alone comes down to the face's middle.
-    expect(px(".nt-l1:only-child", "margin-top")).toBe(pad + (face - line) / 2);
-    // With lines under it the face goes up to the headline's, which keeps the row's padding; on a phone, where a
-    // headline wraps, in every row.
-    const up = (sheet: string, selector: string) => pad + px(selector, "margin-top", sheet) + face / 2;
-    expect(up(css, ".nt-item:has(> .nt-c > :nth-child(2)) > .nt-who")).toBe(line / 2);
-    expect(up(phone, ".nt-who")).toBe(line / 2);
+    // The face's box starts at the row's top, as the headline's line does: no line box around it, and nothing moves
+    // it, with lines under the headline or not, on a phone too.
+    expect(body(".nt-who")).toContain("display: flex");
+    expect(body(".nt-who")).not.toMatch(/\b(padding|margin)(-top)?:/);
+    expect(css).not.toContain("> .nt-who {");
+    expect(body(".nt-who", phone)).toBe("");
+    // A headline alone comes down to the face's middle. On a phone, where a headline wraps, it stays at the top.
+    expect(px(".nt-l1:only-child", "margin-top")).toBe((face - line) / 2);
     expect(px(".nt-l1:only-child", "margin-top", phone)).toBe(0);
   });
 });

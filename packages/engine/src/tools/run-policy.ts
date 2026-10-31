@@ -36,6 +36,8 @@ export type ToolKind =
   | { kind: "hand_off" }
   /** `pass`: ends the run without a message. */
   | { kind: "pass" }
+  /** `set_status`: the agent's own line next to its name (ADR 0084), nothing else. */
+  | { kind: "self" }
   /** Speaks in the run's own conversation (a reaction, a question, a card people act on). */
   | { kind: "here" }
   /** Speaks elsewhere or for someone: other channels, people, agents, routines, reminders, secrets. */
@@ -95,6 +97,7 @@ const HERE = new Set([
   "desktop_ask_person",
   "update_thread",
   "offer_connect_ai",
+  "propose_agent",
 ]);
 
 /** Reads under a scope that also writes, by name. */
@@ -146,11 +149,21 @@ const INTERNAL_BY_SCOPE: Readonly<Record<string, InternalArea>> = {
 
 const isReadScope = (scope: string) => /[:.]read$/.test(scope);
 
-/** What a tool does (see `ToolKind`): by name first, then its scope and whether it is a connector's. */
+/** What a tool does (see `ToolKind`): provenance first, then built-in name and scope. */
 export function toolKind(tool: PolicyTool): ToolKind {
   if (directoryRole(tool as ToolDefinition)) return { kind: "directory" };
+  // These Git tools carry a connection ID for credentials, but they are our own
+  // workspace-changing actions. Their exact scopes distinguish them from MCP tools.
+  if (tool.name === "git_clone" && tool.scope === "github:git.read") return { kind: "internal", area: "code" };
+  if (tool.name === "open_pull_request" && tool.scope === "github:pr.write") return { kind: "internal", area: "code" };
+  // A connected app's tool (a catalog connector, custom server, mailbox, or database) is a read
+  // only when its scope says so. Connector names can collide with built-ins (a custom MCP
+  // server named "permission" exposing "prompt"). Classify by provenance
+  // before consulting the built-in name table.
+  if (tool.connectionId) return isReadScope(tool.scope) && !tool.sensitive ? { kind: "read" } : { kind: "external" };
   if (tool.name === "hand_off") return { kind: "hand_off" };
   if (tool.name === "pass") return { kind: "pass" };
+  if (tool.name === "set_status") return { kind: "self" };
   if (tool.name === "permission_prompt") return { kind: "computer" };
   if (MISSION.has(tool.name)) return { kind: "mission" };
   if (ELSEWHERE.has(tool.name)) return { kind: "elsewhere" };
@@ -158,9 +171,6 @@ export function toolKind(tool: PolicyTool): ToolKind {
   if (READS.has(tool.name)) return { kind: "read" };
   const named = INTERNAL_BY_NAME[tool.name];
   if (named) return { kind: "internal", area: named };
-  // A connected app's tool (a catalog connector, a custom server, a mailbox, a database): a read when
-  // its scope says so (`github:pr.read`, `custom:<id>:read`, `mail:read`, `database:read`), else a write.
-  if (tool.connectionId) return isReadScope(tool.scope) && !tool.sensitive ? { kind: "read" } : { kind: "external" };
   if (isReadScope(tool.scope)) return { kind: "read" };
   const area = INTERNAL_BY_SCOPE[tool.scope];
   if (area) return { kind: "internal", area };
@@ -206,7 +216,9 @@ const READ_ONLY_REFUSAL: Partial<Record<InternalArea, string>> = {
 /** The table (see the file's comment): what `authority` may do with `tool`. */
 export function toolPolicy(authority: RunAuthority, tool: PolicyTool): PolicyDecision {
   const what = toolKind(tool);
-  if (what.kind === "directory" || what.kind === "pass" || what.kind === "computer") return ALLOW;
+  if (what.kind === "directory" || what.kind === "pass" || what.kind === "self" || what.kind === "computer") {
+    return ALLOW;
+  }
   // The mission's own work (a person's run, or the run its inbox woke: nobody but the mission behind it);
   // never a routine nor a run a report or a note woke in its thread.
   if (what.kind === "mission") {

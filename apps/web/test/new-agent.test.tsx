@@ -64,12 +64,27 @@ describe("Criar agente: steps", () => {
     expect(railStep("Identidade").disabled).toBe(true);
     expect(screen().getByRole("link", { name: "Sair sem criar" }).getAttribute("href")).toBe(`/org/${ORG_ID}`);
     expect(screen().getByRole("link", { name: "Cancelar" }).getAttribute("href")).toBe(`/org/${ORG_ID}`);
-    expect(screen().getByRole("complementary", { name: "Prévia do agente" }).textContent).toContain("Seu agente");
-    // One short lead under the title; the preview is headed by its name alone.
+    // One short lead under the title.
     expect(document.querySelector(".onb__lead")?.textContent).toBe(
       "Escolha um ponto de partida: o resto a gente preenche.",
     );
+  });
+
+  test("the preview waits for a role: none before a pick, then the picked role's agent, on to the next steps", async () => {
+    await open();
+    const preview = () => screen().queryByRole("complementary", { name: "Prévia do agente" });
+    expect(preview()).toBeNull();
+    // A pick shows it on the role step itself: Do zero has no name yet, QA starts as Iris.
+    await click(screen().getByRole("button", { name: /^Do zero/ }));
+    expect(title()).toBe("Qual vai ser o papel?");
+    expect(preview()?.textContent).toContain("Seu agente");
+    await click(screen().getByRole("button", { name: /^QA/ }));
+    expect(preview()?.textContent).toContain("Iris");
+    // Headed by its name alone. It says which step it's on: a narrow screen keeps it out of the role step.
     expect(document.querySelector(".newag__cap")?.textContent).toBe("Prévia");
+    expect(preview()?.getAttribute("data-step")).toBe("role");
+    await proceed();
+    expect(preview()?.getAttribute("data-step")).toBe("identity");
   });
 
   test("what a step needs explained: the instructions' and the budget's ⓘ; the tools keep the approval line", async () => {
@@ -187,6 +202,12 @@ describe("Criar agente: steps", () => {
     expect(names("Clientes")).toEqual(["Atendimento", "Vendas", "Marketing", "Conteúdo"]);
     expect(names("Operação")).toEqual(["Dados", "Financeiro", "Pessoas", "Pesquisa", "Assistente"]);
     expect(within(step).getAllByRole("button").at(-1)?.textContent).toContain("Do zero");
+    // A preset's first row under the card's padding is the shared face line alone: no class of its own to add room
+    // above the face.
+    const firstRows = [...step.querySelectorAll(".newag__role:not(.newag__role--blank)")].map(
+      (card) => [...card.children].find((c) => !c.classList.contains("newag__check"))?.className,
+    );
+    expect(firstRows).toEqual(ROLE_IDS.filter((id) => id !== "custom").map(() => "ac-faceline"));
 
     // A role outside engineering fills the rest the same way.
     await click(within(step).getByRole("button", { name: /^Atendimento/ }));
@@ -375,6 +396,12 @@ describe("Criar agente: what gets created", () => {
     const claude = screen().getByRole("button", { name: /^Claude Code.*Mac mini/ });
     await click(claude);
     expect(claude.getAttribute("aria-pressed")).toBe("true");
+    // In the words of the switch it points to, "Atende outras pessoas".
+    expect(
+      screen().getByText(
+        "No plano, a Eva começa atendendo só você. Na página da Eva, você pode escolher se ela atende outras pessoas.",
+      ),
+    ).toBeTruthy();
     expect(
       screen()
         .getByRole("button", { name: /^Automático/ })
@@ -485,6 +512,22 @@ describe("Criar agente: what gets created", () => {
     expect(document.body.textContent).toContain("João sempre pode, como responsável.");
     await click(screen().getAllByLabelText(/Walter/)[0] as HTMLElement);
     await proceed(2);
+    // The owner and who can talk each under a label of their own, in the review and the preview: under "Responde a",
+    // next to who can talk, the owner would read as whom the agent replies to.
+    const labelled = (rows: string, label: string, value: string) =>
+      [...document.querySelectorAll(rows)].map((r) => [
+        r.querySelector(label)?.textContent,
+        r.querySelector(value)?.textContent,
+      ]);
+    expect(labelled(".newag__review .newag__rv", ".newag__rv-k", ".newag__rv-v").slice(5, 7)).toEqual([
+      ["Responsável", "João"],
+      ["Quem pode falar", "Walter e João"],
+    ]);
+    expect(labelled(".newag__pv-sec", ".newag__pv-label", ".newag__chips").slice(2, 4)).toEqual([
+      ["Responsável", "João"],
+      ["Quem pode falar", "Walter e João"],
+    ]);
+    expect(screen().getByRole("complementary", { name: "Prévia do agente" }).textContent).not.toContain("Responde a");
     await click(screen().getByRole("button", { name: "Criar Iris" }));
     await settle(8);
     expect(createdWith(state)).toMatchObject({
@@ -531,6 +574,8 @@ describe("Criar agente: what gets created", () => {
     expect(railStep("Papel").disabled).toBe(true);
     await click(screen().getByRole("button", { name: "Criar outro agente" }));
     expect(title()).toBe("Qual vai ser o papel?");
+    // The draft starts over, so the preview waits for a role again.
+    expect(screen().queryByRole("complementary", { name: "Prévia do agente" })).toBeNull();
     await startAs("Do zero");
     expect((screen().getByLabelText("Nome") as HTMLInputElement).value).toBe("");
   });

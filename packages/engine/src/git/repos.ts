@@ -77,6 +77,17 @@ export async function agentRepositoryList(db: Executor, orgId: string, agentId: 
   return rows.map((r) => r.repo);
 }
 
+/** Whether every entry of `next` was already in reach with `current` (empty = every repository). */
+function withinRepos(current: readonly string[], next: readonly string[]) {
+  if (current.length === 0) return true;
+  if (next.length === 0) return false;
+  const have = new Set(current.map((e) => e.toLowerCase()));
+  return next.every((entry) => {
+    const lower = entry.toLowerCase();
+    return have.has(lower) || have.has(`${lower.split("/")[0]}/*`);
+  });
+}
+
 /** `GET …/agents/{id}/repositories` (any member). Empty = every repository. */
 export async function getAgentRepositories(db: Database, actorId: string, orgId: string, agentId: string) {
   await requirePermission(db, actorId, orgId, "read");
@@ -85,8 +96,9 @@ export async function getAgentRepositories(db: Database, actorId: string, orgId:
 }
 
 /**
- * `PUT …/agents/{id}/repositories` (admins or the agent's owner, like its
- * access): replaces the list. Empty = every repository. Audited.
+ * `PUT …/agents/{id}/repositories`: replaces the list. Empty = every
+ * repository. Admins set anything; the agent's owner may only narrow it (each
+ * repository already in reach), like its access. Audited.
  */
 export async function setAgentRepositories(
   db: Database,
@@ -98,11 +110,15 @@ export async function setAgentRepositories(
   const membership = await requirePermission(db, actorId, orgId, "read");
   const agent = await getAgent(db, orgId, agentId);
   if (!agent) throw new NotFoundError("Agent not found");
-  if (!can(membership.role, "manage_agents") && agent.ownerUserId !== actorId) {
+  const admin = can(membership, "manage_agents");
+  if (!admin && agent.ownerUserId !== actorId) {
     throw new ForbiddenError("Only an admin or the agent's owner can change its repositories");
   }
   const { list, invalid } = cleanRepoList(repositories);
   if (invalid.length > 0) throw new ValidationError(`Not a repository (owner/name or owner/*): ${invalid.join(", ")}`);
+  if (!admin && !withinRepos(await agentRepositoryList(db, orgId, agentId), list)) {
+    throw new ForbiddenError("Only an admin can give an agent more repositories. Its owner can only take some away.");
+  }
   if (list.length > MAX_AGENT_REPOSITORIES) {
     throw new ValidationError(`At most ${MAX_AGENT_REPOSITORIES} repositories per agent`);
   }

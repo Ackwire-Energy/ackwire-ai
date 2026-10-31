@@ -23,7 +23,7 @@ import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from ".
 import { publishOrgEvent } from "./events";
 import { getForumTopic } from "./forum";
 import { getMessage } from "./messages";
-import { can, getMembership, type Membership } from "./organizations";
+import { can, type Membership, requireActiveMembership } from "./organizations";
 import { enqueueIndex, registerDocumentBuilder, registerReindexSource, type SearchDeps, searchVisible } from "./search";
 import { pagesBySlug, parseWikiLinks, syncWikiLinks, wikiSlug } from "./wiki-links";
 
@@ -180,16 +180,15 @@ async function requireReader(db: Database, actor: WikiActor, orgId: string): Pro
     if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
     return null;
   }
-  const membership = await getMembership(db, actor.userId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const membership = await requireActiveMembership(db, actor.userId, orgId);
   return membership;
 }
 
 /** Members create and edit; a locked page only admins (never agents). */
 async function requireWriter(db: Database, actor: WikiActor, orgId: string, page?: PageRow) {
   const membership = await requireReader(db, actor, orgId);
-  if (membership && !can(membership.role, "post")) throw new ForbiddenError();
-  if (page?.locked && !(membership && can(membership.role, "configure"))) {
+  if (membership && !can(membership, "edit_wiki")) throw new ForbiddenError();
+  if (page?.locked && !(membership && can(membership, "configure"))) {
     throw new ForbiddenError("This page is locked: only admins edit it", "wiki.locked");
   }
   return membership;
@@ -1241,9 +1240,8 @@ export async function restoreWikiPage(deps: WikiDeps, actor: WikiActor, orgId: s
 /** Admins lock (only admins edit) or unlock a page. */
 export async function setWikiPageLock(deps: WikiDeps, userId: string, orgId: string, ref: string, locked: boolean) {
   const { db } = deps;
-  const membership = await getMembership(db, userId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
-  if (!can(membership.role, "configure")) throw new ForbiddenError("Only admins lock pages", "wiki.lock_admins_only");
+  const membership = await requireActiveMembership(db, userId, orgId);
+  if (!can(membership, "configure")) throw new ForbiddenError("Only admins lock pages", "wiki.lock_admins_only");
   const page = await findPage(db, orgId, ref);
   const [row] = await db.update(wikiPages).set({ locked }).where(eq(wikiPages.id, page.id)).returning();
   if (!row) throw new NotFoundError("Page not found", "wiki.page_not_found");

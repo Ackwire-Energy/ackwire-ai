@@ -1,6 +1,7 @@
-import { useChannels, useForumTopics, useWikiTree } from "@agenteschat/client";
+import { useAuthConfig, useChannels, useForumTopics, useWikiTree } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { setDraftFor } from "@agenteschat/client/lib/drafts";
+import { can } from "@agenteschat/client/lib/permissions";
 import { Avatar, CommandPalette, Icon, type PaletteItem } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -26,6 +27,7 @@ export function CommandMenu() {
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const channels = useChannels(org.id);
+  const server = useAuthConfig().data;
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   // Topics only when the palette is open (no request on every page).
@@ -128,17 +130,18 @@ export function CommandMenu() {
         onSelect: () => void navigate({ to: "/org/$orgId/wiki/$slug", params: { orgId, slug: p.slug } }),
       });
     }
-    list.push({
-      key: "w:new",
-      group: goTo,
-      label: t("palette.wikiNew"),
-      sub: t("shell.wiki"),
-      keywords: t("palette.newWikiKeywords"),
-      mark: <Icon name="plus" size={16} />,
-      onSelect: () => void navigate({ to: "/org/$orgId/wiki", params: { orgId }, search: { new: "" } }),
-    });
+    if (can(org, "edit_wiki"))
+      list.push({
+        key: "w:new",
+        group: goTo,
+        label: t("palette.wikiNew"),
+        sub: t("shell.wiki"),
+        keywords: t("palette.newWikiKeywords"),
+        mark: <Icon name="plus" size={16} />,
+        onSelect: () => void navigate({ to: "/org/$orgId/wiki", params: { orgId }, search: { new: "" } }),
+      });
     for (const s of SETTINGS_SECTIONS) {
-      if (!s.allowed(org.role)) continue;
+      if (!s.allowed(org, server)) continue;
       list.push({
         key: `s:${s.id}`,
         group: goTo,
@@ -150,7 +153,7 @@ export function CommandMenu() {
       });
     }
     return list;
-  }, [channels.data, topics.data, wiki.data, dir.agents, dir.members, me.user.id, org.id, org.role, navigate, t, goTo]);
+  }, [channels.data, topics.data, wiki.data, dir.agents, dir.members, me.user.id, org, server, navigate, t, goTo]);
 
   // "Pedir a um agente": the agents I can talk to, with what was typed.
   const askable = useMemo(() => dir.agents.filter((a) => canTalk(a)), [dir.agents]);

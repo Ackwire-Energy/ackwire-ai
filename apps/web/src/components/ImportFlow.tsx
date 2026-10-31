@@ -1,5 +1,6 @@
 import type {
   BundleTodo,
+  ImportedSource,
   ImportItemKind,
   ImportItemResult,
   ImportSkipReason,
@@ -22,6 +23,7 @@ import {
   type IconName,
   InfoHint,
   Input,
+  isIdHandle,
   normalizeAppearance,
   OptionCard,
   Spinner,
@@ -34,7 +36,7 @@ import type { TFunction } from "i18next";
 import { type ComponentProps, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
-import { failedOffline } from "@/chat/outbox";
+import { failedOffline } from "@/chat/offline";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { fileSaver } from "@/components/artifacts/fileSaver";
 import { HelpLink } from "@/components/HelpLink";
@@ -62,10 +64,12 @@ import {
   EXPORT_PROMPT_APPS,
   githubRoot,
   IMPORT_CARDS,
+  IMPORT_KINDS,
   type ImportCard,
   type ImportFailure,
   isGithubLink,
   itemId,
+  kindsLine,
   NOT_GITHUB,
   picksOf,
   type RequestCard,
@@ -75,7 +79,6 @@ import { hasFiles } from "@/lib/obsidian";
 import { useTheme } from "@/lib/theme";
 import "./import-flow.css";
 
-const KINDS: ImportItemKind[] = ["agent", "skill", "channel", "routine", "note"];
 const KIND_ICON: Record<ImportItemKind, IconName> = {
   agent: "agent",
   skill: "bulb",
@@ -138,6 +141,8 @@ export function useImportFlow(orgId: string | null) {
   const [skillsOn, setSkillsOn] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [report, setReport] = useState<ImportItemResult[] | null>(null);
+  // Something read, or the flow cleared, since it opened: what it shows is this page's doing.
+  const [touched, setTouched] = useState(false);
   const done = useRef(new Map<string, ImportItemResult>());
   const run = useRef(0);
   const last = useRef<ReadInput | null>(null);
@@ -145,6 +150,7 @@ export function useImportFlow(orgId: string | null) {
 
   const read = async (input: ReadInput) => {
     if (!orgId) return;
+    setTouched(true);
     const mine = ++run.current;
     const current = () => mine === run.current;
     const from: ImportFailure["from"] = "url" in input ? "link" : "text" in input ? "paste" : "files";
@@ -238,6 +244,7 @@ export function useImportFlow(orgId: string | null) {
     skillsOn,
     progress,
     report,
+    touched,
     focus,
     read,
     /** Reads the last input again (after a failure that wasn't about the input itself). */
@@ -252,6 +259,7 @@ export function useImportFlow(orgId: string | null) {
     toggle: (ids: string[], on: boolean) => toggle(ids, on),
     toggleSkill: (id: string, on: boolean) => toggle([id], on, setSkillsOn),
     reset: () => {
+      setTouched(true);
       run.current++;
       done.current = new Map();
       focus.current = "drop";
@@ -312,9 +320,10 @@ function whyText(t: TFunction, kind: ImportItemKind, reason: ImportSkipReason) {
 
 /**
  * The whole flow: the source cards and the drop zone, the plan to pick from,
- * then the report. `standalone` (Configurações) has its own Importar button;
- * onboarding applies when its agents step continues. `level` is the
- * flow's top heading level.
+ * then the report. `standalone` (Configurações) has its own Importar button and
+ * links to the workspace's pages; onboarding applies when its agents step
+ * continues, and links nowhere (until it's finished, every page of the workspace
+ * leads back to it). `level` is the flow's top heading level.
  */
 export function ImportFlow({
   flow,
@@ -328,7 +337,7 @@ export function ImportFlow({
   level?: 2 | 3;
 }) {
   if (flow.planned && flow.report)
-    return <ImportReport flow={flow} orgId={orgId} level={level} onAnother={flow.reset} />;
+    return <ImportReport flow={flow} orgId={orgId} level={level} onAnother={flow.reset} linked={standalone} />;
   if (flow.planned) return <Preview flow={flow} orgId={orgId} standalone={standalone} level={level} />;
   return <Picker flow={flow} />;
 }
@@ -641,12 +650,7 @@ function Preview({
   const origin = bundleOrigin(bundle);
   const applying = flow.progress !== null;
   const picks = picksOf(items, flow.pick, blocked);
-  const summary = KINDS.map(
-    (kind) => [kind, items.filter((i) => i.kind === kind && i.action !== "skip").length] as const,
-  )
-    .filter(([, n]) => n > 0)
-    .map(([kind, count]) => t(`onboarding.import.report.kinds.${kind}`, { count }))
-    .join(" · ");
+  const summary = kindsLine(t, (kind) => items.filter((i) => i.kind === kind && i.action !== "skip").length);
   const left = groupLeftOut(bundle.leftOut);
   const sub = (level + 1) as 3 | 4;
 
@@ -674,7 +678,7 @@ function Preview({
 
       <fieldset className="imp-groups" disabled={applying}>
         <legend className="ac-visually-hidden">{t("onboarding.import.pickLegend")}</legend>
-        {KINDS.map((kind) => {
+        {IMPORT_KINDS.map((kind) => {
           const rows = items.filter((i) => i.kind === kind).sort((a, b) => RANK[a.action] - RANK[b.action]);
           return rows.length > 0 ? (
             <Group key={kind} kind={kind} rows={rows} flow={flow} blocked={blocked} index={index} level={sub} />
@@ -682,7 +686,9 @@ function Preview({
         })}
       </fieldset>
 
-      {bundle.todo.length > 0 && <Todos todo={bundle.todo} nameOf={index.nameOf} level={sub} orgId={orgId} newTab />}
+      {bundle.todo.length > 0 && (
+        <Todos todo={bundle.todo} nameOf={index.nameOf} level={sub} orgId={orgId} newTab linked={standalone} />
+      )}
 
       {(left.length > 0 || skipped.length > 0) && (
         <section className="imp-block" aria-labelledby="imp-left-title">
@@ -875,7 +881,10 @@ function Row({
     if (a) {
       title = a.role ? `${item.label} · ${a.role}` : item.label;
       lead = <AgentAvatar name={a.name} appearance={normalizeAppearance(a.appearance)} size="sm" />;
-      if (!item.renamedTo) lines.push(`@${a.handle}`);
+      // An id another app gave the agent is no handle: only the one it gets shows, and that is no rename.
+      if (isIdHandle(a.handle)) {
+        if (item.renamedTo) lines.push(`@${item.renamedTo}`);
+      } else if (!item.renamedTo) lines.push(`@${a.handle}`);
     }
   } else if (item.kind === "skill") {
     const s = index.skills.get(item.key);
@@ -934,7 +943,7 @@ function Row({
   }
   if (item.renamedTo && !reason) {
     const wanted = index.agents.get(item.key)?.handle ?? item.key;
-    notes.push(t("onboarding.import.renamed", { handle: item.renamedTo, wanted }));
+    if (!isIdHandle(wanted)) notes.push(t("onboarding.import.renamed", { handle: item.renamedTo, wanted }));
   }
   if (item.trimmed?.length && !reason) {
     const fields = item.trimmed.map((f) =>
@@ -1036,12 +1045,15 @@ function Todos({
   level,
   orgId,
   newTab = false,
+  linked = true,
 }: {
   todo: BundleTodo[];
   nameOf: (key: string) => string;
   level: 3 | 4;
   orgId: string;
   newTab?: boolean;
+  /** Where each one is done, as a link. */
+  linked?: boolean;
 }) {
   const { t } = useTranslation();
   return (
@@ -1061,7 +1073,7 @@ function Todos({
                 </span>
               )}
             </span>
-            <TodoLink kind={x.kind} orgId={orgId} newTab={newTab} />
+            {linked && <TodoLink kind={x.kind} orgId={orgId} newTab={newTab} />}
           </li>
         ))}
       </ul>
@@ -1077,12 +1089,15 @@ export function ImportReport({
   flow,
   orgId,
   level = 2,
+  linked = true,
   onRetry,
   onAnother,
 }: {
   flow: ImportFlowState;
   orgId: string;
   level?: 2 | 3;
+  /** Links to what came, and to where each to-do is done. */
+  linked?: boolean;
   /** Default: apply again. */
   onRetry?: () => Promise<unknown>;
   onAnother?: () => void;
@@ -1105,6 +1120,7 @@ export function ImportReport({
   const sub = (level + 1) as 3 | 4;
 
   const links = (kind: ImportItemKind, list: ImportItemResult[]): ReactNode => {
+    if (!linked) return null;
     if (kind === "agent") {
       return list.map((i) => {
         const a = index.agents.get(i.key);
@@ -1184,7 +1200,7 @@ export function ImportReport({
       </header>
 
       <ul className="imp-made">
-        {KINDS.map((kind) => {
+        {IMPORT_KINDS.map((kind) => {
           const list = made.filter((i) => i.kind === kind);
           if (list.length === 0) return null;
           return (
@@ -1229,7 +1245,9 @@ export function ImportReport({
         </section>
       )}
 
-      {bundle.todo.length > 0 && <Todos todo={bundle.todo} nameOf={index.nameOf} level={sub} orgId={orgId} />}
+      {bundle.todo.length > 0 && (
+        <Todos todo={bundle.todo} nameOf={index.nameOf} level={sub} orgId={orgId} linked={linked} />
+      )}
 
       {onAnother && (
         <div>
@@ -1243,6 +1261,37 @@ export function ImportReport({
 }
 
 /**
+ * What the workspace brought from other apps, once it's in and no file is in hand here (the onboarding opened again):
+ * each source by its mark with how much of each kind came, and the way to bring another file.
+ */
+export function ImportedSummary({ sources, onAnother }: { sources: ImportedSource[]; onAnother: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <section className="imp-report">
+      {sources.map((source) => {
+        const origin = bundleOrigin({ source });
+        return (
+          <header key={`${source.app}:${source.ref}`} className="imp-head">
+            <SourceMark card={origin.card} />
+            <div className="imp-head__text">
+              <h2 className="imp-head__title">
+                {origin.app ? t("onboarding.import.from", { app: origin.app }) : t("onboarding.import.fromOther")}
+              </h2>
+              <p className="imp-head__sub">{kindsLine(t, (kind) => source.counts[kind])}</p>
+            </div>
+          </header>
+        );
+      })}
+      <div>
+        <Button variant="ghost" icon="upload" onClick={onAnother}>
+          {t("onboarding.import.report.another")}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+/**
  * Configurações → Importar e exportar (admins): the import flow, and this workspace as a file, with what it never
  * carries (whoever shares the file needs that); the full list is on the help page.
  */
@@ -1251,7 +1300,7 @@ export function ImportExportSection() {
   const { org } = useOrg();
   const api = useApi();
   const flow = useImportFlow(org.id);
-  if (!can(org.role, "manage_agents")) return null;
+  if (!can(org, "create_agents")) return null;
   const download = () =>
     fileSaver.save(api.imports.exportUrl(org.id), `agentes-chat-${new Date().toISOString().slice(0, 10)}.json`);
   return (

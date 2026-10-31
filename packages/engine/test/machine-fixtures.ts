@@ -2,8 +2,11 @@ import { createHash } from "node:crypto";
 import {
   generateSecretKeyPair,
   MACHINE_PROTOCOL_VERSION,
+  type MachineReplies,
+  type MachineRequest,
   openSecret,
   type PubSub,
+  type SecretRequest,
   type ServerFrame,
 } from "@agenteschat/adapters";
 import type { Database } from "@agenteschat/db";
@@ -11,11 +14,34 @@ import {
   confirmDeviceCode,
   grantScopes,
   type MachineHub,
+  MachineRequestError,
   pollDeviceToken,
+  receiveMachineUpload,
   setAgentComputerTarget,
   startDeviceCode,
 } from "../src";
 import type { Fixture } from "./fixtures";
+
+/**
+ * A runner's `push` for a fake hub: the file at the request's path in the agent's folder (`folder`) goes to its
+ * upload as that machine, the way a real runner sends it to the upload URL.
+ */
+export async function pushFromFolder(
+  f: Fixture,
+  machineId: string,
+  folder: Map<string, Uint8Array>,
+  req: Extract<MachineRequest, { op: "push" }>,
+): Promise<MachineReplies["push"]> {
+  const body = folder.get(req.path);
+  if (!body) throw new MachineRequestError("not_found", `no ${req.path}`);
+  const name = req.path.split("/").at(-1) ?? req.path;
+  const sha256 = createHash("sha256").update(body).digest("hex");
+  await receiveMachineUpload(
+    { db: f.db, artifacts: f.artifactDeps, pubsub: f.pubsub },
+    { uploadId: req.uploadId, machineId, name, contentType: "", sha256, body },
+  );
+  return { name, size: body.byteLength, sha256, contentType: "" };
+}
 
 export interface PairInput {
   name?: string;
@@ -80,6 +106,12 @@ export interface FakeRunnerOptions {
   execAllowed?: boolean;
   /** A socket whose close never reaches the hub (a runner killed behind a proxy: half-open). */
   dead?: boolean;
+  /** Pause a staged secret before answering, for delivery/decline races. */
+  onSecretStaged?: (requestId: string) => Promise<void>;
+  /** Pause activation before checking the current value, for replacement races. */
+  onSecretActivate?: (requestId: string) => Promise<void>;
+  /** Pause after the runner stores the value, before its reply reaches the server. */
+  onSecretActivated?: (requestId: string) => Promise<void>;
 }
 
 /**
@@ -89,9 +121,13 @@ export interface FakeRunnerOptions {
 export function fakeRunner(hub: MachineHub, options: FakeRunnerOptions = {}) {
   const sent: ServerFrame[] = [];
   const files = new Map<string, Uint8Array>();
-  /** Like the real runner: private keys per request, opened values per name. */
+  /** Like the real runner: private keys and ciphertext before activation. */
   const keys = new Map<string, string>();
+  const staged = new Map<string, Extract<SecretRequest, { action: "deliver" }>>();
   const secrets = new Map<string, string>();
+  const orders = new Map<string, string>();
+  const activated = new Map<string, { name: string; value: string; order: string }>();
+  const canceled = new Set<string>();
   let closed: { code?: number; reason?: string } | null = null;
   const reply = (frame: unknown) => hub.message(conn, JSON.stringify(frame));
   const handle = async (req: Request) => {
@@ -110,12 +146,64 @@ export function fakeRunner(hub: MachineHub, options: FakeRunnerOptions = {}) {
           if (!key) return fail("not_found", "This request's key is gone");
           const value = await openSecret(key, req.box, req.aad).catch(() => null);
           if (value === null) return fail("bad_request", "The secret couldn't be opened");
-          keys.delete(req.requestId);
-          secrets.set(req.name, value);
+          // The real runner receives MachineRequest after the wire's request id is stripped.
+          const delivery = {
+            action: req.action,
+            requestId: req.requestId,
+            name: req.name,
+            target: req.target,
+            aad: req.aad,
+            box: req.box,
+          };
+          const previous = staged.get(req.requestId);
+          if (previous && JSON.stringify(previous) !== JSON.stringify(delivery))
+            return fail("conflict", "This request is already staged with another box");
+          if (!previous) staged.set(req.requestId, delivery);
+          await options.onSecretStaged?.(req.requestId);
           return ok({ size: Buffer.byteLength(value) });
         }
-        if (req.action === "discard") keys.delete(req.requestId);
-        if (req.action === "remove") secrets.delete(req.name);
+        if (req.action === "activate") {
+          await options.onSecretActivate?.(req.requestId);
+          if (canceled.has(req.requestId)) return ok({ superseded: true });
+          const delivery = staged.get(req.requestId);
+          const key = keys.get(req.requestId);
+          if (!delivery || !key) {
+            const prior = activated.get(req.requestId);
+            if (prior && (orders.get(prior.name) ?? "") > req.order) return ok({ superseded: true });
+            if (prior && orders.get(prior.name) === prior.order) return ok({ size: Buffer.byteLength(prior.value) });
+            return fail("not_found", "This request has no staged secret");
+          }
+          if ((orders.get(delivery.name) ?? "") > req.order) return ok({ superseded: true });
+          const value = await openSecret(key, delivery.box, delivery.aad);
+          keys.delete(req.requestId);
+          staged.delete(req.requestId);
+          secrets.set(delivery.name, value);
+          orders.set(delivery.name, req.order);
+          activated.set(req.requestId, { name: delivery.name, value, order: req.order });
+          await options.onSecretActivated?.(req.requestId);
+          return ok({ size: Buffer.byteLength(value) });
+        }
+        if (req.action === "discard") {
+          keys.delete(req.requestId);
+          staged.delete(req.requestId);
+        }
+        if (req.action === "remove") {
+          const selected = (id: string, prior: { order: string }) =>
+            !req.requestIds ||
+            req.requestIds.includes(id) ||
+            (req.throughOrder !== undefined && prior.order <= req.throughOrder);
+          for (const [id, prior] of activated)
+            if (prior.name === req.name && selected(id, prior)) {
+              activated.delete(id);
+              if (orders.get(req.name) === prior.order) secrets.delete(req.name);
+            }
+          if (!req.requestIds) secrets.delete(req.name);
+          for (const id of req.requestIds ?? []) {
+            canceled.add(id);
+            keys.delete(id);
+            staged.delete(id);
+          }
+        }
         return ok({});
       }
       case "exec": {
@@ -180,6 +268,7 @@ export function fakeRunner(hub: MachineHub, options: FakeRunnerOptions = {}) {
     sent,
     files,
     keys,
+    staged,
     secrets,
     closed: () => closed,
     hello: (token: string, extra: Record<string, unknown> = {}) =>

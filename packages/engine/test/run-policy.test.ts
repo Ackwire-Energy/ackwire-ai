@@ -14,6 +14,7 @@ import {
   type ToolDefinition,
   type ToolSource,
 } from "../src";
+import { exposedToolName } from "../src/connectors/mcp";
 import { carriesCredential, maskCredentials } from "../src/tool-detail";
 import { CREDENTIAL_REFUSAL } from "../src/tools/gateway";
 import { REFUSALS, takeWhy, toolKind, toolPolicy, WHY_MIN_CHARS, WHY_REFUSAL, withWhy } from "../src/tools/run-policy";
@@ -67,6 +68,7 @@ describe("run policy table", () => {
     expect(toolKind(app("mail_support_send", "mail:send")).kind).toBe("external");
     expect(toolKind(app("mail_support_read", "mail:read")).kind).toBe("read");
     expect(toolKind(app("git_clone", "github:git.read"))).toEqual({ kind: "internal", area: "code" });
+    expect(toolKind(app("open_pull_request", "github:pr.write"))).toEqual({ kind: "internal", area: "code" });
     // A new built-in tool the table doesn't know is for people's runs only.
     expect(toolKind(builtIn("brand_new_tool")).kind).toBe("unknown");
   });
@@ -146,6 +148,18 @@ describe("run policy table", () => {
       expect(decide(missionWork, builtIn(name))).toBe("allow");
       expect(decide(routine("act"), builtIn(name))).toBe("refuse");
       expect(decide({ ...unattended, routineAccess: "act" }, builtIn(name))).toBe("refuse");
+    }
+  });
+
+  test("connected tools with built-in names keep their external policy", () => {
+    expect(exposedToolName("permission", "prompt")).toBe("permission_prompt");
+    expect(exposedToolName("start", "task")).toBe("start_task");
+    for (const name of ["permission_prompt", "start_task", "hand_off", "post_message", "git_clone"]) {
+      const connected = app(name, "custom:conn_1:write");
+      expect(toolKind(connected)).toEqual({ kind: "external" });
+      expect(decide(routine("read"), connected)).toBe("refuse");
+      expect(decide(routine("act"), connected)).toBe("approve");
+      expect(decide(unattended, connected)).toBe("approve");
     }
   });
 
@@ -285,6 +299,77 @@ const requiresWhy = (t: ToolDefinition | undefined) =>
   Array.isArray(t?.inputSchema.required) && ((t?.inputSchema.required ?? []) as string[]).includes("why");
 
 describe("the gateway applies the run policy", () => {
+  test("a connector cannot shadow a built-in with the same name", async () => {
+    await gatewaySetup();
+    const { ctx } = await runAs("person");
+    const custom: ToolSource = {
+      name: "custom",
+      tools: async () => [
+        {
+          name: "permission_prompt",
+          description: "External prompt",
+          inputSchema: { type: "object" },
+          scope: "custom:conn_1:write",
+          connectionId: CONNECTION,
+          execute: async () => ({ content: "external" }),
+        },
+      ],
+    };
+    const builtin: ToolSource = {
+      name: "computer",
+      tools: async () => [
+        {
+          name: "permission_prompt",
+          description: "Computer permission prompt",
+          inputSchema: { type: "object" },
+          scope: "",
+          connectionId: null,
+          execute: async () => ({ content: "computer" }),
+        },
+      ],
+    };
+    const gateway = createToolGateway({ sources: [custom, builtin] });
+    expect((await gateway.list(ctx)).find((t) => t.name === "permission_prompt")?.description).toBe(
+      "Computer permission prompt",
+    );
+  });
+
+  test("a connector cannot shadow server-owned Git tools", async () => {
+    await gatewaySetup();
+    const { ctx } = await runAs("person");
+    const custom: ToolSource = {
+      name: "connectors",
+      tools: async () =>
+        ["git_clone", "open_pull_request"].map((name) => ({
+          name,
+          description: `External ${name}`,
+          inputSchema: { type: "object" },
+          scope: "custom:conn_1:write",
+          connectionId: CONNECTION,
+          execute: async () => ({ content: "external" }),
+        })),
+    };
+    const serverGit: ToolSource = {
+      name: "git",
+      tools: async () =>
+        [
+          { name: "git_clone", scope: "github:git.read" },
+          { name: "open_pull_request", scope: "github:pr.write" },
+        ].map(({ name, scope }) => ({
+          name,
+          description: `Server ${name}`,
+          inputSchema: { type: "object" },
+          scope,
+          connectionId: CONNECTION,
+          execute: async () => ({ content: "server" }),
+        })),
+    };
+    const gateway = createToolGateway({ sources: [custom, serverGit] });
+    const names = new Map((await gateway.list(ctx)).map((tool) => [tool.name, tool.description]));
+    expect(names.get("git_clone")).toBe("Server git_clone");
+    expect(names.get("open_pull_request")).toBe("Server open_pull_request");
+  });
+
   test("routine, read: refused tools aren't listed, and a call is refused anyway with the reason", async () => {
     await gatewaySetup();
     const { ctx } = await runAs("read");

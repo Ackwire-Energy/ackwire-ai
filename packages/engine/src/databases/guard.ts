@@ -47,9 +47,15 @@ const BLOCKED_FUNCTIONS = new Set([
   "set_config",
   "pg_drop_replication_slot",
   "dblink",
+  // Run the SQL text they are given (full-text statistics and rewrites, the tablefunc and xml2 extensions).
+  "ts_stat",
+  "ts_rewrite",
+  "connectby",
+  "xpath_table",
 ]);
-/** Families refused by prefix: large objects, dblink, advisory locks, SQL-from-text XML, admin files, replication. */
+/** Refused by prefix: large objects, dblink, advisory locks, SQL-from-text (XML, crosstab), admin files, replication. */
 const BLOCKED_PREFIXES = [
+  "crosstab",
   "lo_",
   "dblink_",
   "pg_advisory_",
@@ -78,6 +84,41 @@ const BLOCKED_RELATIONS = new Set([
   "pg_catalog.pg_user_mappings",
 ]);
 const CATALOG_SCHEMAS = new Set(["pg_catalog", "information_schema"]);
+/**
+ * Relations of `pg_catalog` that an unqualified name resolves to (Postgres searches `pg_catalog` before
+ * `public`). Any other unqualified `pg_*` name is a table in `public` and goes through the agent's rules.
+ * Kept to those every Postgres from 14 on has, so a listed name is a catalog on any of them; newer catalogs
+ * are read schema-qualified (`pg_catalog.pg_stat_io`).
+ */
+const CATALOG_RELATIONS = new Set(
+  `
+  pg_aggregate pg_am pg_amop pg_amproc pg_attrdef pg_attribute pg_authid pg_auth_members pg_cast pg_class
+  pg_collation pg_constraint pg_conversion pg_database pg_db_role_setting pg_default_acl pg_depend
+  pg_description pg_enum pg_event_trigger pg_extension pg_foreign_data_wrapper pg_foreign_server
+  pg_foreign_table pg_index pg_inherits pg_init_privs pg_language pg_largeobject pg_largeobject_metadata
+  pg_namespace pg_opclass pg_operator pg_opfamily pg_partitioned_table pg_policy pg_proc pg_publication
+  pg_publication_rel pg_range pg_replication_origin pg_rewrite pg_seclabel pg_sequence pg_shdepend
+  pg_shdescription pg_shseclabel pg_statistic pg_statistic_ext pg_statistic_ext_data pg_subscription
+  pg_subscription_rel pg_tablespace pg_transform pg_trigger pg_ts_config pg_ts_config_map pg_ts_dict
+  pg_ts_parser pg_ts_template pg_type pg_user_mapping
+  pg_available_extensions pg_available_extension_versions pg_backend_memory_contexts pg_config pg_cursors
+  pg_file_settings pg_group pg_hba_file_rules pg_indexes pg_locks pg_matviews pg_policies pg_prepared_statements
+  pg_prepared_xacts pg_publication_tables pg_replication_origin_status pg_replication_slots pg_roles pg_rules
+  pg_seclabels pg_sequences pg_settings pg_shadow pg_shmem_allocations pg_stats pg_stats_ext pg_stats_ext_exprs
+  pg_tables pg_timezone_abbrevs pg_timezone_names pg_user pg_user_mappings pg_views pg_stat_activity
+  pg_stat_all_indexes pg_stat_all_tables pg_stat_archiver pg_stat_bgwriter pg_stat_database
+  pg_stat_database_conflicts pg_stat_gssapi pg_stat_progress_analyze pg_stat_progress_basebackup
+  pg_stat_progress_cluster pg_stat_progress_copy pg_stat_progress_create_index pg_stat_progress_vacuum
+  pg_stat_replication pg_stat_replication_slots pg_stat_slru pg_stat_ssl pg_stat_subscription
+  pg_stat_sys_indexes pg_stat_sys_tables pg_stat_user_functions pg_stat_user_indexes pg_stat_user_tables
+  pg_stat_wal pg_stat_wal_receiver pg_stat_xact_all_tables pg_stat_xact_sys_tables pg_stat_xact_user_functions
+  pg_stat_xact_user_tables pg_statio_all_indexes pg_statio_all_sequences pg_statio_all_tables
+  pg_statio_sys_indexes pg_statio_sys_sequences pg_statio_sys_tables pg_statio_user_indexes
+  pg_statio_user_sequences pg_statio_user_tables
+  `
+    .trim()
+    .split(/\s+/),
+);
 
 const lower = (s: string) => s.toLowerCase();
 /** `schema.table` → `schema.table` lowercase; `table` → `public.table`. */
@@ -146,6 +187,7 @@ export async function guardSql(text: string, rules: SqlRules): Promise<GuardResu
   const functions: string[] = [];
   const columnRefs: string[][] = [];
   let star = false;
+  let aliasColumns = false;
   walk(top, (key, node) => {
     if (key.endsWith("Stmt") && key !== "SelectStmt" && key !== "ExplainStmt")
       problems.push(`${key.replace(/Stmt$/, "").toUpperCase()} is not allowed: this database is read-only.`);
@@ -160,6 +202,8 @@ export async function guardSql(text: string, rules: SqlRules): Promise<GuardResu
         isObject(node.alias) && typeof node.alias.aliasname === "string" ? lower(node.alias.aliasname) : null;
       relations.push({ name: schema ? `${schema}.${lower(node.relname)}` : `?${lower(node.relname)}`, alias });
     }
+    // `t(a, b)` after a table, join, subquery or function renames its columns by position.
+    if (key === "alias" && Array.isArray(node.colnames) && node.colnames.length > 0) aliasColumns = true;
     if (key === "FuncCall") functions.push(lower(svalsOf(node.funcname).at(-1) ?? ""));
     if (key === "ColumnRef" && Array.isArray(node.fields)) {
       const fields = node.fields as unknown[];
@@ -174,13 +218,14 @@ export async function guardSql(text: string, rules: SqlRules): Promise<GuardResu
       return { ok: false, reason: `The function ${fn}() is not allowed here.` };
   }
 
-  // Unqualified names that aren't CTEs are tables in `public` (the search path we set), or catalogs (pg_*).
+  // Unqualified names that aren't CTEs are catalogs (pg_catalog is searched first) or tables in `public`
+  // (the search path we set).
   const resolved = relations
     .filter((r) => !(r.name.startsWith("?") && ctes.has(r.name.slice(1))))
     .map((r) => {
       if (!r.name.startsWith("?")) return r;
       const bare = r.name.slice(1);
-      return { ...r, name: bare.startsWith("pg_") ? `pg_catalog.${bare}` : `public.${bare}` };
+      return { ...r, name: CATALOG_RELATIONS.has(bare) ? `pg_catalog.${bare}` : `public.${bare}` };
     });
   const allowed = new Set(rules.tables.map(relationName));
   for (const r of resolved) {
@@ -210,6 +255,11 @@ export async function guardSql(text: string, rules: SqlRules): Promise<GuardResu
     const hidden = new Set(touched.flatMap((r) => [...(hiddenByTable.get(r.name) ?? [])]));
     const rowNames = new Set(touched.flatMap((r) => [r.alias, r.name.split(".")[1]]).filter((x): x is string => !!x));
     const list = touched.map((r) => `${r.name}: ${[...(hiddenByTable.get(r.name) ?? [])].join(", ")}`).join("; ");
+    if (aliasColumns)
+      return {
+        ok: false,
+        reason: `Some columns are hidden from this agent (${list}); don't rename columns with an alias list like t(a, b).`,
+      };
     if (star)
       return {
         ok: false,

@@ -3,8 +3,8 @@ import { eq, schema } from "@agenteschat/db";
 import {
   archiveAgent,
   auditInput,
-  changeMemberRole,
   auditsCall,
+  changeMemberRole,
   createToolGateway,
   decideApproval,
   ForbiddenError,
@@ -17,10 +17,10 @@ import {
   removeMember,
   revokeConnection,
   rotateCredential,
-  updateAgent,
   type ToolContext,
   type ToolDefinition,
   type ToolSource,
+  updateAgent,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
@@ -357,9 +357,9 @@ describe("people's changes in the audit log", () => {
     expect((await changes()).map((r) => r.action)).toEqual(["agent.created", "credential.added"]);
 
     const bia = await addMember(f.db, f.org.id, "member", "bia");
-    await changeMemberRole(f.db, f.owner.id, f.org.id, bia.id, "admin");
+    await changeMemberRole(f.db, f.owner.id, f.org.id, bia.id, "owner");
     await removeMember(f.db, f.owner.id, f.org.id, bia.id);
-    await inviteMany(f.db, f.owner.id, f.org.id, { emails: ["caio@acme.com"], role: "member" });
+    await inviteMany(f.db, f.owner.id, f.org.id, { emails: ["caio@acme.com"] });
     await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { instructions: "Be brief.", role: "Support" });
     await rotateCredential(f.db, f.keyWrapper, f.owner.id, f.org.id, f.credential.id, {
       apiKey: "sk-new-abcdefgh1234",
@@ -391,7 +391,7 @@ describe("people's changes in the audit log", () => {
     expect(byAction("member.role_changed")).toMatchObject({
       actor: { id: f.owner.id },
       target: { type: "person", id: bia.id },
-      details: { name: "bia", from: "member", to: "admin" },
+      details: { name: "bia", from: "member", to: "owner" },
     });
     expect(byAction("invitation.sent")?.details).toMatchObject({ email: "caio@acme.com", role: "member" });
     expect(byAction("agent.updated")?.details).toMatchObject({ changed: ["instructions", "role"], role: "Support" });

@@ -1,3 +1,4 @@
+import type { OnboardingStepId } from "../lib/onboarding";
 import type {
   AccessInput,
   AccountLoginStart,
@@ -15,13 +16,16 @@ import type {
   AgentDatabaseInput,
   AgentDetail,
   AgentForYou,
+  AgentGroup,
   AgentInput,
   AgentMailbox,
   AgentMailboxInput,
   AgentPlanUsage,
+  AgentProposal,
   AgentQuestion,
   AgentSecret,
   AgentSkill,
+  AgentStatus,
   AgentUsage,
   AiAccounts,
   AiStatus,
@@ -38,6 +42,7 @@ import type {
   AuditQuery,
   AuthConfig,
   BatchInviteResult,
+  BillingFrom,
   BrainKind,
   BrainMachine,
   BrowserHandoff,
@@ -46,6 +51,7 @@ import type {
   CalendarEventPatch,
   CalendarRange,
   Channel,
+  ChannelCategory,
   ChannelMember,
   CommandApproval,
   ComputerSetup,
@@ -66,6 +72,7 @@ import type {
   DirectMessage,
   DmRead,
   DmTarget,
+  FormerAgent,
   ForumParticipantsInput,
   ForumPost,
   ForumPostInput,
@@ -79,8 +86,10 @@ import type {
   GitHubRepositories,
   Health,
   HostComputer,
+  ImportedSource,
   ImportInput,
   ImportPlan,
+  Instance,
   Invitation,
   InvitationPreview,
   InvitationWithStatus,
@@ -135,12 +144,15 @@ import type {
   Model,
   MoveAgentsInput,
   MoveAgentsResult,
+  NoticeCategory,
+  NoticePrefs,
   NotificationCount,
   NotificationFilter,
   NotificationPage,
   Organization,
   OrgOverview,
   OrgPlanUsage,
+  OrgRoles,
   OrgSettings,
   Person,
   PhoneSignIn,
@@ -150,6 +162,7 @@ import type {
   Reminder,
   ReminderInput,
   Role,
+  RoleInput,
   RosterMember,
   Routine,
   RoutineInput,
@@ -176,6 +189,7 @@ import type {
   SkillDetail,
   SkillInput,
   SkillPatch,
+  StatusInput,
   StorageConfig,
   StorageMigration,
   StorageTestResult,
@@ -202,6 +216,7 @@ import type {
   WikiUpdateInput,
   WikiVersion,
   WorkingRun,
+  WorkspaceLimits,
 } from "./types";
 
 /**
@@ -212,6 +227,7 @@ import type {
 export interface ApiClient {
   system: {
     health(): Promise<Health>;
+    instance(): Promise<Instance>;
     /** `null` unless I am the installation's owner (and not on agentes.chat itself). */
     telemetry(): Promise<ServerTelemetry | null>;
     setTelemetry(enabled: boolean): Promise<ServerTelemetry>;
@@ -225,10 +241,11 @@ export interface ApiClient {
   account: {
     authConfig(): Promise<AuthConfig>;
     /**
-     * Whether the e-mail has an account and how it signs in (rate limited: `rate_limited` 429). `humanCheck`: the
-     * bot check's token, when the server has one (`human_check` 403 without it).
+     * Whether the e-mail has an account and how it signs in (rate limited: `rate_limited` 429). `access`: the
+     * early-access link's token, when the page has one. `humanCheck`: the bot check's token, when the server has one
+     * (`human_check` 403 without it).
      */
-    signInOptions(input: { email: string }, humanCheck?: string): Promise<SignInOptions>;
+    signInOptions(input: { email: string; access?: string }, humanCheck?: string): Promise<SignInOptions>;
     /** `null` when signed out. */
     me(): Promise<Me | null>;
     /** My app language (emails and pushes are written in it). */
@@ -260,21 +277,43 @@ export interface ApiClient {
       name: string;
       context?: string;
     }): Promise<{ organization: Organization; generalChannelId: string }>;
+    /**
+     * Its owner's progress in setting it up: the furthest step reached (it only moves forward), or `finished`. Null
+     * from a server that doesn't keep it.
+     */
+    saveOnboarding(
+      orgId: string,
+      input: { step: OnboardingStepId } | { finished: true },
+    ): Promise<{ step: OnboardingStepId; finished: boolean } | null>;
     get(orgId: string): Promise<Organization>;
     update(orgId: string, input: { name?: string; context?: string }): Promise<void>;
     /** My handle and time zone in this organization (`timezone: null` = the organization's). */
     updateMe(orgId: string, input: { handle?: string; timezone?: string | null }): Promise<Person>;
+    /** Your availability (auto, busy, hidden) and what you are doing (ADR 0084). */
+    setStatus(orgId: string, input: StatusInput): Promise<Person>;
     /** My profile photo: a square image (JSON only: base64), already cropped. */
     setAvatar(orgId: string, input: { imageBase64: string; contentType: string }): Promise<{ avatarUrl: string }>;
     removeAvatar(orgId: string): Promise<void>;
     /** The workspace logo (admins): a square image (JSON only: base64), already cropped. */
     setLogo(orgId: string, input: { imageBase64: string; contentType: string }): Promise<{ logo: string }>;
     removeLogo(orgId: string): Promise<void>;
+    /**
+     * A signed link that opens the workspace's plan and billing on the billing service (owners and admins; ADR
+     * 0079). Navigate to it at once and keep it nowhere else: it lasts 5 minutes and opens once. `billing.off` 404
+     * on a server without billing.
+     */
+    billingLink(orgId: string, from: BillingFrom): Promise<{ url: string; expiresAt: string }>;
+    /** People, files and today's uploads against the workspace's limits (any member; ADR 0079). */
+    limits(orgId: string): Promise<WorkspaceLimits>;
     members(orgId: string): Promise<Member[]>;
+    /** Makes a member an owner or not (owners only). What anyone may do is their roles (`roles.setFor`). */
     changeRole(orgId: string, userId: string, role: Role): Promise<void>;
     removeMember(orgId: string, userId: string): Promise<void>;
     invitations(orgId: string): Promise<Invitation[]>;
-    invite(orgId: string, input: { email: string; role: Role }): Promise<{ invitation: Invitation; url: string }>;
+    invite(
+      orgId: string,
+      input: { email: string; role?: Role; roleIds?: string[] },
+    ): Promise<{ invitation: Invitation; url: string }>;
     revokeInvitation(orgId: string, invitationId: string): Promise<void>;
     /** `null` when invalid or expired. */
     previewInvitation(token: string): Promise<InvitationPreview | null>;
@@ -286,7 +325,7 @@ export interface ApiClient {
     people(orgId: string): Promise<Person[]>;
     /** Invitations not accepted yet, pending or expired. */
     allInvitations(orgId: string): Promise<InvitationWithStatus[]>;
-    inviteMany(orgId: string, input: { emails: string[]; role: Role }): Promise<BatchInviteResult[]>;
+    inviteMany(orgId: string, input: { emails: string[]; roleIds?: string[] }): Promise<BatchInviteResult[]>;
     /** New link (the old one stops working), 7 more days. */
     resendInvitation(orgId: string, invitationId: string): Promise<{ url: string; expiresAt: string }>;
     usageReport(orgId: string, since?: string): Promise<UsageReport>;
@@ -295,6 +334,29 @@ export interface ApiClient {
     /** The audit log, newest first (admins): agents' tool calls and people's changes. `before`: `next`. */
     audit(orgId: string, query?: AuditQuery & { before?: string; limit?: number }): Promise<AuditPage>;
   };
+  /** A workspace's roles (ADR 0085): every member reads them; who may manage roles changes those below theirs. */
+  roles: {
+    list(orgId: string): Promise<OrgRoles>;
+    create(orgId: string, input: RoleInput): Promise<{ id: string }>;
+    update(orgId: string, roleId: string, patch: Partial<RoleInput>): Promise<void>;
+    remove(orgId: string, roleId: string): Promise<void>;
+    /** Every role but `everyone`, top first. */
+    reorder(orgId: string, ids: string[]): Promise<void>;
+    /** A person's roles, exactly these. */
+    setFor(orgId: string, userId: string, roleIds: string[]): Promise<{ roleIds: string[] }>;
+  };
+  /** Groups of agents (ADR 0083): everyone reads them, owners and admins change them; each change answers with all. */
+  agentGroups: {
+    list(orgId: string): Promise<AgentGroup[]>;
+    /** After the other groups, with `agentIds` in it in that order (out of any group they were in). */
+    create(orgId: string, input: { name: string; agentIds?: string[] }): Promise<AgentGroup[]>;
+    /** Renames it, or moves it among the groups (`index`). */
+    update(orgId: string, groupId: string, patch: { name?: string; index?: number }): Promise<AgentGroup[]>;
+    /** Its agents go back to no group. */
+    remove(orgId: string, groupId: string): Promise<AgentGroup[]>;
+    /** Into a group at `index` among its agents (the end without one), or out of any (`groupId` null). */
+    move(orgId: string, agentId: string, input: { groupId: string | null; index?: number }): Promise<AgentGroup[]>;
+  };
   agents: {
     list(orgId: string): Promise<Agent[]>;
     /** Its month by account and day, and the account it thinks with now (ADR 0063). */
@@ -302,8 +364,16 @@ export interface ApiClient {
     /** The agents as a team: grouped by person, with who consulted whom in the last day. */
     team(orgId: string): Promise<Team>;
     create(orgId: string, input: AgentInput): Promise<Agent>;
+    /** An agent's proposal of a new agent, by its card's message (ADR 0081). */
+    proposal(orgId: string, messageId: string): Promise<AgentProposal>;
+    /** Says no to it (who may create agents): the card stays, marked denied. */
+    denyProposal(orgId: string, messageId: string): Promise<AgentProposal>;
     update(orgId: string, agentId: string, input: Partial<Omit<AgentInput, "handle">>): Promise<Agent>;
     archive(orgId: string, agentId: string): Promise<void>;
+    /** Deletes it for good (ADR 0082): owners and admins, archived or not. */
+    purge(orgId: string, agentId: string): Promise<void>;
+    /** Agents no longer in the team (archived or deleted), for the names and faces of what they left. */
+    former(orgId: string): Promise<FormerAgent[]>;
     models(): Promise<{ models: Model[]; defaultModel: string }>;
     credentials(orgId: string): Promise<Credential[]>;
     addCredential(
@@ -331,6 +401,8 @@ export interface ApiClient {
     platformKeyAvailable(orgId: string): Promise<boolean>;
     /** Whether each agent has an AI to think with, and whether the organization has any (ADR 0061). */
     aiStatus(orgId: string): Promise<AiStatus>;
+    /** Each agent's presence and what it says it is doing (ADR 0084). */
+    statuses(orgId: string): Promise<AgentStatus[]>;
     /** The team file / agent definitions behind a GitHub link, read by the backend (onboarding import; nothing saved). */
     importFromGithub(
       orgId: string,
@@ -378,6 +450,8 @@ export interface ApiClient {
   imports: {
     /** The plan of a bundle (`dryRun`), or the picked items applied: either way every item with its action. */
     apply(orgId: string, input: ImportInput): Promise<ImportPlan>;
+    /** What this workspace brought from other apps, by source package (admins). */
+    sources(orgId: string): Promise<ImportedSource[]>;
     /** Same-origin URL that downloads this workspace as a bundle (`.json`). */
     exportUrl(orgId: string): string;
   };
@@ -385,14 +459,33 @@ export interface ApiClient {
     channels(orgId: string): Promise<Channel[]>;
     createChannel(
       orgId: string,
-      input: { name: string; topic?: string; visibility?: "public" | "private" },
+      input: { name: string; topic?: string; visibility?: "public" | "private"; categoryId?: string | null },
     ): Promise<Channel>;
+    /** The sidebar's categories, in order (ADR 0080). */
+    categories(orgId: string): Promise<ChannelCategory[]>;
+    /** Admins: a category at the end, optionally taking `channelIds` along. */
+    createCategory(orgId: string, input: { name: string; channelIds?: string[] }): Promise<ChannelCategory>;
+    renameCategory(orgId: string, categoryId: string, name: string): Promise<ChannelCategory>;
+    /** Its channels go on top, with no category. */
+    deleteCategory(orgId: string, categoryId: string): Promise<void>;
+    /** Before `beforeCategoryId`, or to the end (null). */
+    placeCategory(orgId: string, categoryId: string, beforeCategoryId: string | null): Promise<void>;
+    /** Into `categoryId` (null: none), before `beforeChannelId` or at the end. */
+    place(
+      orgId: string,
+      channelId: string,
+      input: { categoryId: string | null; beforeChannelId?: string | null },
+    ): Promise<void>;
     join(orgId: string, channelId: string): Promise<void>;
     update(
       orgId: string,
       channelId: string,
       input: { name?: string; topic?: string; visibility?: "public" | "private" },
     ): Promise<Channel>;
+    /** Creator or admin: the channel leaves everyone's list (its messages are kept). */
+    archive(orgId: string, channelId: string): Promise<void>;
+    /** "Desfazer" right after archiving. */
+    unarchive(orgId: string, channelId: string): Promise<void>;
     /** Members with names; agents carry `autoReply`. */
     roster(orgId: string, channelId: string): Promise<RosterMember[]>;
     members(orgId: string, channelId: string): Promise<ChannelMember[]>;
@@ -904,6 +997,9 @@ export interface ApiClient {
     snooze(orgId: string, id: string, until: string | null): Promise<AppNotification>;
     /** "Marcar tudo como lido": the ids it changed (undo marks them unread again). */
     readAll(orgId: string, filter?: NotificationFilter): Promise<{ ids: string[] }>;
+    /** What reaches my devices as a notification in this workspace (ADR 0071 §8). */
+    prefs(orgId: string): Promise<NoticePrefs>;
+    setPref(orgId: string, category: NoticeCategory, on: boolean): Promise<NoticePrefs>;
   };
   calendar: {
     /** Events, routine runs, issue deadlines and proposals between `from` and `to` (ISO). */
@@ -1004,7 +1100,7 @@ export interface ApiClient {
     /** Waiting ones, oldest first. */
     list(orgId: string): Promise<JoinRequest[]>;
     /** `join.answered` / `join.expired` (409) when someone answered first or it ran out. */
-    approve(orgId: string, requestId: string, role: "member" | "admin"): Promise<JoinApproval>;
+    approve(orgId: string, requestId: string, roleIds?: string[]): Promise<JoinApproval>;
     /** `reason` is told to the person by email. */
     deny(orgId: string, requestId: string, reason?: string): Promise<void>;
   };
@@ -1093,6 +1189,8 @@ export interface ApiClient {
     setDomains(orgId: string, agentId: string, allowedDomains: string[] | null): Promise<AgentBrowserSettings>;
     /** The agent's open request or take over on that screen (the browser by default), if any. */
     agentHandoff(orgId: string, agentId: string, screen?: ScreenKind): Promise<BrowserHandoff | null>;
+    /** Whether this person may drive that screen (take over, open a page, type); watching needs less (ADR 0040). */
+    agentControl(orgId: string, agentId: string, screen?: ScreenKind): Promise<boolean>;
     handoff(orgId: string, handoffId: string): Promise<BrowserHandoff>;
     /** Take control of a request (one person at a time; 409 when someone else has it). */
     takeControl(orgId: string, handoffId: string): Promise<BrowserHandoff>;

@@ -150,8 +150,12 @@ export function computerBrainUnavailable(
   return accountUnavailable(status, account, "codex");
 }
 
-/** Brain errors that mean "not now on this computer": they fall back, or the message waits. */
+/**
+ * Brain errors that mean "not now on this computer": they fall back, or the message waits. `busy`: the
+ * computer had no room for the turn, and the run looks again on a timer (`COMPUTER_BUSY_RETRY_MS`).
+ */
 export const UNAVAILABLE_CODES: ReadonlySet<string> = new Set([
+  "busy",
   "no_session",
   "no_computer",
   "machine_offline",

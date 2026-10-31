@@ -11,14 +11,15 @@ import {
 import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { formatDuration } from "@agenteschat/client/lib/work";
-import { BrowserMark, BrowserStrip, Button, Icon, PageSilhouette, SkyStrip } from "@agenteschat/ui";
+import { agentGradient, BrowserMark, BrowserStrip, Icon } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
-import { useState } from "react";
+import { type CSSProperties, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useOrg } from "../org-context";
 import { colorOf } from "../Sky";
 import { stepText, useHeldTakeover } from "./BrowserCard";
+import { SiteIcon } from "./SiteIcon";
 import { screenIcon, screenT } from "./screen";
 import "./browser.css";
 
@@ -89,58 +90,43 @@ export function BrowserTrailCard({
   const summary = tt("after.summaryNoSite", { steps: count, duration });
   const group = tt("inCard.group", g);
   const toggle = open ? tt("after.hideSteps") : tt("after.showSteps");
+  const [top, bottom] = agentGradient(color);
 
   return (
     // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
-    <div className={open ? "brw-ac brw-trail is-open" : "brw-ac brw-trail"} role="group" aria-label={group}>
-      <SkyStrip color={color} muted moving={false} />
-      <div className="brw-ac__compact">
-        <button
-          type="button"
-          className="brw-ac__thumb brw-trail__shot"
-          aria-hidden="true"
-          tabIndex={-1}
-          onClick={() => setOpen((o) => !o)}
-        >
-          <span className="brw-trail__bar">
-            <i />
-            <i />
-            <i />
-            <span />
-          </span>
-          <PageSilhouette color={color} />
-        </button>
-        <button type="button" className="brw-ac__tt" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-          <span className="brw-ac__tx">
-            <b>{title}</b>
-            <small className="brw-trail__sum">
-              <BrowserStrip kinds={steps.map(browserTrailKind)} color={color} rows={7} />
-              <span>{summary}</span>
-            </small>
-            {ended && (
-              <span className="brw-ac__hint">
-                <Icon name="stop" size={14} />
-                {ended}
-              </span>
-            )}
-          </span>
-        </button>
-        <span className="brw-ac__acts">
-          <Button
-            size="sm"
-            variant="ghost"
-            iconOnly
-            icon="chevronDown"
-            className="brw-ac__chev"
-            aria-label={toggle}
-            title={toggle}
-            aria-expanded={open}
-            onClick={() => setOpen((o) => !o)}
-          />
+    <div
+      className={open ? "brw-ac brw-trail brw-mf-end is-open" : "brw-ac brw-trail brw-mf-end"}
+      role="group"
+      aria-label={group}
+      style={{ "--mf-a": top, "--mf-b": bottom } as CSSProperties}
+    >
+      {/* The frame it worked in, closed into its top: where, its steps as pixel columns, how long. */}
+      <button
+        type="button"
+        className="brw-mf-end__row"
+        aria-expanded={open}
+        title={toggle}
+        onClick={() => setOpen((o) => !o)}
+      >
+        {hosts[0] ? (
+          <SiteIcon host={hosts[0]} letterOnly={screen !== "browser"} />
+        ) : (
+          <Icon name={screenIcon(screen)} size={14} />
+        )}
+        <b>{title}</b>
+        <span className="brw-grow" />
+        <BrowserStrip kinds={steps.map(browserTrailKind)} color={color} rows={7} />
+        <span className="brw-mf-end__sum">{summary}</span>
+        <Icon name="chevronDown" size={14} className="brw-mf-end__chev" />
+      </button>
+      {ended && (
+        <span className="brw-ac__hint brw-mf-end__hint">
+          <Icon name="stop" size={14} />
+          {ended}
         </span>
-      </div>
+      )}
       {open && (
-        <ol className="brw-log brw-trail__log">
+        <ol className="brw-log brw-trail__log brw-mf-end__log">
           {browserTrailPages(steps).map((p, i) => {
             const href = p.link ? browserTrailHref(p.site) : null;
             return (

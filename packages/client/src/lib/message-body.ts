@@ -14,7 +14,7 @@ export function serverBody(t: TFunction, body: string, meta: Meta): string {
   const m = meta ?? {};
   const interrupted = m.interrupted as { text?: unknown } | undefined;
   if (interrupted && typeof interrupted === "object" && typeof interrupted.text === "string") {
-    const note = `_${t("chat.body.interrupted", { defaultValue: "Interrupted by a server update. Ask again to continue." })}_`;
+    const note = `_${t("chat.body.interrupted", { defaultValue: "Interrupted by a server restart. Ask again to continue." })}_`;
     return interrupted.text ? `${interrupted.text}\n\n${note}` : note;
   }
   // A computer brain stopped mid-turn after its tools ran: what it wrote, then which tools it used.
@@ -42,7 +42,11 @@ export function serverBody(t: TFunction, body: string, meta: Meta): string {
   }
   const params =
     m.bodyParams && typeof m.bodyParams === "object" ? (m.bodyParams as Record<string, unknown>) : ({} as const);
-  return t(`chat.body.${code}`, { ...params, defaultValue: body });
+  // Waiting for room on a busy computer, not for one that went away; no AI because its sign-in ended, not none at all.
+  const busy = code === "brain_unavailable" && (m.brainUnavailable as { code?: unknown } | undefined)?.code === "busy";
+  const signedOut = code === "no_ai" && (m.noAi as { reason?: unknown } | undefined)?.reason === "not_signed_in";
+  const shown = busy ? "brain_busy" : signedOut ? "no_ai_signed_out" : code;
+  return t(`chat.body.${shown}`, { ...params, defaultValue: body });
 }
 
 /**

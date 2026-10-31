@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
 import { type AiStatus, ApiError } from "@agenteschat/client";
+import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { isInviteToken } from "../../src/features/auth/links";
 import {
   askLineOf,
@@ -17,14 +18,21 @@ import {
   nextStep,
   noComputerOf,
   OPTIONAL,
+  PRESET_LOOK,
   PRESET_ROWS,
   PRESETS,
   type Preset,
+  phoneStepOf,
+  presetsMade,
   prevStep,
   progressAt,
+  resumeOf,
   STEPS,
+  serverStepOf,
+  setUpElsewhere,
   stepFailedText,
   stepText,
+  stepToSave,
   zoneCity,
   zoneLabel,
 } from "../../src/features/onboarding/logic";
@@ -42,6 +50,70 @@ test("the phone's steps: no computer step; import, the AI and people are optiona
   expect(prevStep("workspace")).toBeNull();
   expect(prevStep("done")).toBeNull();
   expect(prevStep("context")).toBe("workspace");
+});
+
+test("the server keeps the web's steps: the phone's AI is part of its agents, and the web's computer resumes there", () => {
+  expect(STEPS.map(serverStepOf)).toEqual(["workspace", "context", "import", "agents", "agents", "team", "done"]);
+  expect(phoneStepOf("computer")).toBe("agents");
+  for (const step of ["workspace", "context", "import", "agents", "team", "done"] as const)
+    expect(phoneStepOf(step)).toBe(step);
+});
+
+test("each step reached is saved, as the server counts them; one no further than it has saves nothing", () => {
+  // Creating the workspace passed the first step: the context step is where it is.
+  expect(stepToSave("import", 1)).toBe("import");
+  // The phone's AI step is the server's agents: reached with the agents, nothing more to save.
+  expect(stepToSave("agents", 2)).toBe("agents");
+  expect(stepToSave("ai", 4)).toBeNull();
+  expect(stepToSave("team", 4)).toBe("team");
+  expect(stepToSave("done", 5)).toBe("done");
+  // Back and on again: already saved.
+  expect(stepToSave("context", 4)).toBeNull();
+});
+
+test("a resume opens the workspace where the server has it, with the team made there, never the first step", async () => {
+  const t = await translator("pt-BR");
+  const saved = { orgId: "o", generalChannelId: "g", step: "computer" as const };
+  const theo = { id: "t", name: "Theo", handle: "theo", appearance: PRESET_LOOK.theo };
+  const ada = { id: "a", name: "Ada", handle: "ada", appearance: PRESET_LOOK.ada };
+  // Made on the web, Theo and Ada; an imported agent isn't a preset.
+  const r = resumeOf(t, saved, [theo, ada, { id: "m", name: "Morgan", handle: "lead" }]);
+  expect(r).toEqual({
+    created: { orgId: "o", generalChannelId: "g" },
+    ids: { theo: "t", ada: "a" },
+    handles: { theo: "theo", ada: "ada" },
+    chosen: new Set(["ada", "theo"]),
+    // The web's computer step (after its agents): the phone has none, so its agents.
+    reached: 4,
+    step: "agents",
+  });
+  // No team yet: the picks stay as they are.
+  expect(resumeOf(t, { ...saved, step: "import" }, []).chosen).toBeNull();
+  // A create cut short before the look was saved: still Ada, not made again.
+  expect(presetsMade(t, [{ id: "x", name: "Ada", handle: "ada", appearance: null }]).ids).toEqual({ ada: "x" });
+});
+
+test("a resume never opens behind what the workspace shows was passed, whatever step an older app saved", async () => {
+  const t = await translator("pt-BR");
+  const saved = { orgId: "o", generalChannelId: "g", step: "import" as const };
+  const theo = { id: "t", name: "Theo", handle: "theo", appearance: PRESET_LOOK.theo };
+  const ada = { id: "a", name: "Ada", handle: "ada", appearance: PRESET_LOOK.ada };
+  // The team made and the import in, while the server still says the import: the web's computer step, its agents here.
+  expect(resumeOf(t, saved, [theo, ada], true)).toMatchObject({ reached: 4, step: "agents" });
+  // An import picked and never applied, or a create cut short before the guide: where it was, to be made whole.
+  expect(resumeOf(t, saved, [theo, ada], false)).toMatchObject({ reached: 2, step: "import" });
+  expect(resumeOf(t, { ...saved, step: "agents" }, [theo], false)).toMatchObject({ reached: 3, step: "agents" });
+});
+
+test("a create that gives back the workspace being set up on the web: past its first steps, nothing is written over it", () => {
+  const org = (step: "context" | "agents") => [
+    { id: "o", name: "Acme", role: "owner" as const, onboarding: { step, generalChannelId: "g" } },
+  ];
+  expect(setUpElsewhere(org("agents"), "o")).toBe(true);
+  // New (or still at its first step): the phone's time zone and logo go to it.
+  expect(setUpElsewhere(org("context"), "o")).toBe(false);
+  expect(setUpElsewhere([], "o")).toBe(false);
+  expect(setUpElsewhere(undefined, "o")).toBe(false);
 });
 
 test("each host says hi only the first time it appears", () => {
@@ -209,6 +281,18 @@ test("invitations: each is sent once, and the ones that failed are what is left 
   expect(await inviteEach(["ana@acme.com"], async () => undefined)).toEqual([]);
 });
 
+test("a second workspace refused while one isn't active: the facts, with no plan or way to pay (store rules)", async () => {
+  const refused = new ApiError(403, "org.create_unpaid", "You already have a workspace waiting for a plan", {
+    orgId: "o1",
+  });
+  for (const lng of ["pt-BR", "en"] as const) {
+    const t = await translator(lng);
+    const said = knownErrorText(t, refused, lng);
+    expect(said).toBe(t("standing.createInactive"));
+    expect(said).not.toMatch(/plan|pag|pay|escolh|choose/i);
+  }
+});
+
 test("a step that failed says why the server refused it, else that it didn't save", async () => {
   const pt = await translator("pt-BR");
   const refused = (params?: Record<string, unknown>) =>
@@ -217,6 +301,9 @@ test("a step that failed says why the server refused it, else that it didn't sav
     "Você não pode criar um workspace enquanto a sua conta ou um dos seus workspaces estiver com restrição. Para contestar, escreva para legal@agentes.chat.",
   );
   expect(stepFailedText(pt, refused())).toBe("Você não pode criar um workspace agora.");
+  const inviteOnly = new ApiError(403, "org.create_invite_only", "New workspaces need an invitation for now");
+  expect(stepFailedText(pt, inviteOnly)).toBe("Novos workspaces precisam de convite por enquanto.");
+  expect(stepFailedText(await translator("en"), inviteOnly)).toBe("New workspaces need an invitation for now.");
   expect(stepFailedText(pt, new ApiError(500, "internal", "x"))).toBe(pt("mobile.onb.failed"));
   expect(stepFailedText(pt, new TypeError("Network request failed"))).toBe(pt("mobile.onb.failed"));
 });

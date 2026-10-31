@@ -52,6 +52,33 @@ export async function settle(times = 3) {
 export const screen = () => within(document.body);
 
 /**
+ * Elements matching `selector` are on screen once observed, as a browser's IntersectionObserver says (happy-dom's
+ * never answers): what streams only while on screen, like the browser card in the conversation, streams. Returns
+ * the undo.
+ */
+export function onScreen(selector: string) {
+  const native = globalThis.IntersectionObserver;
+  globalThis.IntersectionObserver = class {
+    answer: IntersectionObserverCallback;
+    constructor(answer: IntersectionObserverCallback) {
+      this.answer = answer;
+    }
+    observe(target: Element) {
+      if (target.matches(selector))
+        this.answer([{ isIntersecting: true, target } as IntersectionObserverEntry], this as never);
+    }
+    unobserve() {}
+    disconnect() {}
+    takeRecords() {
+      return [];
+    }
+  } as unknown as typeof IntersectionObserver;
+  return () => {
+    globalThis.IntersectionObserver = native;
+  };
+}
+
+/**
  * Renders one page inside the app providers and a minimal router (for
  * `<Link>`), optionally inside an organization (sidebar context + realtime).
  */

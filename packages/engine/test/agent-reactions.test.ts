@@ -6,12 +6,17 @@ import {
   addAgentReaction,
   addReaction,
   drainOutbox,
+  ForbiddenError,
+  grantScopes,
+  listMessageReactions,
   listMessages,
   listReactions,
   normalizeReaction,
   postPersonMessage,
+  removeReaction,
 } from "../src";
-import { type Fixture, setup } from "./fixtures";
+import { addMember, type Fixture, setup } from "./fixtures";
+import { ALL_GITHUB_SCOPES, fakeGithub } from "./tool-fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -98,6 +103,27 @@ describe("react (reaction instead of reply)", () => {
     expect(normalizeReaction(" 🎉 ")).toBe("🎉");
   });
 
+  test("a reply that also reacted counts only its other tools: alone, the apps show no tools under it", async () => {
+    const gh = fakeGithub();
+    // Reacts, and on "PR" also reads it; then answers anyway.
+    const both = (req: ModelRequest) => {
+      const last = lastText(req);
+      if (last.includes("tool_result")) return { chunks: ["Os builds rodam no GitHub Actions."] };
+      const pr = last.includes("PR") ? [{ name: "github_get_pr", input: { repo: "acme/app", pr: 42 } }] : [];
+      return { chunks: [], toolUses: [{ name: "react", input: { emoji: "🙌" } }, ...pr] };
+    };
+    f = await setup({ react: true, reply: both, toolSources: [gh.source] });
+    await grantScopes(f.db, f.org.id, f.agent.id, ALL_GITHUB_SCOPES);
+    await post("@dev valeu, e onde rodam os builds?");
+    await drainOutbox(f.db, f.handlers);
+    await post("@dev valeu, e o PR 42?");
+    await drainOutbox(f.db, f.handlers);
+
+    const replies = (await agentMessages()).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    expect(replies.map((m) => (m.meta as { work?: { steps: number } } | null)?.work?.steps)).toEqual([0, 1]);
+    expect(gh.executed.map((e) => e.tool)).toEqual(["github_get_pr"]);
+  });
+
   test("the react tool turns 👎 into -1 without a feedback job", async () => {
     f = await setup({ react: true, reply });
     const msg = await post("@dev joinha");
@@ -129,6 +155,26 @@ describe("react (reaction instead of reply)", () => {
       .where(and(eq(r.orgId, f.org.id), eq(r.messageId, m.id)));
     expect(rows).toHaveLength(2);
   });
+});
+
+test("reaction reads and deletes require access to the message's channel", async () => {
+  f = await setup();
+  const outsider = await addMember(f.db, f.org.id, "member", "reaction-outsider");
+  const [privateChannel] = await f.db
+    .insert(schema.channels)
+    .values({ orgId: f.org.id, name: "reaction-private", visibility: "private", createdByUserId: f.owner.id })
+    .returning();
+  if (!privateChannel) throw new Error("no private channel");
+  await f.db
+    .insert(schema.channelMembers)
+    .values({ orgId: f.org.id, channelId: privateChannel.id, userId: f.owner.id });
+  const message = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, privateChannel.id, {
+    body: "private note",
+  });
+  await addReaction(f.db, f.owner.id, f.org.id, message.id, "🎉");
+  expect(await listMessageReactions(f.db, f.owner.id, f.org.id, message.id)).toHaveLength(1);
+  await expect(listMessageReactions(f.db, outsider.id, f.org.id, message.id)).rejects.toBeInstanceOf(ForbiddenError);
+  await expect(removeReaction(f.db, outsider.id, f.org.id, message.id, "🎉")).rejects.toBeInstanceOf(ForbiddenError);
 });
 
 describe('👎 then "Pedir correção"', () => {

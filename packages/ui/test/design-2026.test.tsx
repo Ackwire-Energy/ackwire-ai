@@ -15,12 +15,14 @@ import {
   filterPalette,
   Kbd,
   type PaletteItem,
+  PresenceBadge,
   Reaction,
   SearchField,
   Segmented,
   Toolbar,
   WorkSummary,
 } from "../src";
+import { contrastRatio } from "../src/sky/math";
 
 afterEach(() => cleanup());
 const body = () => within(document.body);
@@ -126,11 +128,15 @@ describe("buttons and kbd", () => {
     expect(light.get("chosen-press")).toBe(
       "inset 0 2px 5px rgba(0, 0, 0, 0.16), inset 0 1px 1.5px rgba(0, 0, 0, 0.12)",
     );
-    // Dark's face sits between the page and a card, never on its near-black --sunken, where a black shadow can't
-    // show. Its shadow is light's, deeper.
+    // A black press shows only on a face it can darken: dark's sits lighter than a card, as light as the faint words
+    // on a chosen option allow, as light's face does. Its shadow is light's, deeper.
     const level = (hex = "") => Number.parseInt(hex.slice(1, 3), 16);
-    expect(level(dark.get("chosen-bg"))).toBeGreaterThan(level(dark.get("bg")));
-    expect(level(dark.get("chosen-bg"))).toBeLessThan(level(dark.get("raised")));
+    expect(level(dark.get("chosen-bg"))).toBeGreaterThan(level(dark.get("raised")));
+    for (const [theme, face] of [
+      [light, light.get("sunken")],
+      [dark, dark.get("chosen-bg")],
+    ] as const)
+      expect(contrastRatio(theme.get("faint") ?? "", face ?? "")).toBeGreaterThanOrEqual(4.5);
     const shape = (press = "") => press.replace(/rgba\([^)]*\)/g, "");
     expect(shape(dark.get("chosen-press"))).toBe(shape(light.get("chosen-press")));
     const alphas = (press = "") => [...press.matchAll(/rgba\(0, 0, 0, ([\d.]+)\)/g)].map(([, a]) => Number(a));
@@ -168,6 +174,31 @@ describe("segmented control", () => {
     expect(within(group).getByRole("radio", { name: "Escrevendo" }).getAttribute("aria-checked")).toBe("true");
     await act(async () => fireEvent.keyDown(group, { key: "ArrowRight" }));
     expect(within(group).getByRole("radio", { name: "Disponível" }).getAttribute("aria-checked")).toBe("true");
+    expect(group.querySelector(".ac-seg__pill")).not.toBeNull();
+  });
+
+  test("a value no option has (agents at different levels): nothing chosen, no pill, Tab reaches the first", () => {
+    render(
+      <Segmented
+        label="Nível de todos os agentes"
+        value=""
+        onValueChange={() => {}}
+        options={[
+          { value: "read", label: "Ler" },
+          { value: "write", label: "Ler e escrever" },
+        ]}
+      />,
+    );
+    const group = body().getByRole("radiogroup", { name: "Nível de todos os agentes" });
+    expect(
+      within(group)
+        .getAllByRole("radio")
+        .map((r) => [r.getAttribute("aria-checked"), r.tabIndex]),
+    ).toEqual([
+      ["false", 0],
+      ["false", -1],
+    ]);
+    expect(group.querySelector(".ac-seg__pill")).toBeNull();
   });
 });
 
@@ -310,7 +341,7 @@ describe("the living agent symbol", () => {
         <Avatar kind="agent" name="Theo" />
         <Avatar kind="agent" name="Theo" state="thinking" />
         <Avatar kind="agent" name="Theo" state="writing" />
-        <Avatar name="Walter" presence />
+        <Avatar name="Walter" presence="online" />
       </>,
     );
     const [idle, thinking, writing, person] = Array.from(container.querySelectorAll(".ac-avatar"));
@@ -321,8 +352,52 @@ describe("the living agent symbol", () => {
     expect(writing?.className).toContain("ac-avatar--writing");
     expect(writing?.querySelector("canvas.ac-avatar__canvas")).not.toBeNull();
     expect(person?.textContent).toBe("W");
-    expect(person?.querySelector(".ac-avatar__presence")).not.toBeNull();
+    expect(person?.querySelector(".ac-avatar__badge .ac-presence")?.getAttribute("data-presence")).toBe("online");
     expect(person?.hasAttribute("data-state")).toBe(false);
+  });
+});
+
+describe("the presence badge (ADR 0084)", () => {
+  const badge = (el: Element | null | undefined) => el?.querySelector("svg.ac-presence");
+  const tones = (svg: Element | null | undefined) =>
+    Array.from(svg?.querySelectorAll("path") ?? []).map((p) => p.getAttribute("class"));
+
+  test("1 px pixels on small faces (11 px with the ring), 1.5 px from the profile cards' up; none when null", () => {
+    const { container } = render(
+      <>
+        <Avatar name="Walter" size="sm" presence="busy" presenceLabel="Ocupado" />
+        <Avatar name="Walter" size="lg" presence="away" />
+        <Avatar kind="agent" name="Theo" presence="online" />
+        <Avatar name="Walter" presence={null} />
+      </>,
+    );
+    const [sm, lg, agent, none] = Array.from(container.querySelectorAll(".ac-avatar"));
+    expect([badge(sm)?.getAttribute("width"), badge(lg)?.getAttribute("width")]).toEqual(["11", "16.5"]);
+    expect(sm?.querySelector(".ac-avatar__badge")?.getAttribute("title")).toBe("Ocupado");
+    expect(badge(agent)?.getAttribute("data-presence")).toBe("online");
+    expect(none?.querySelector(".ac-avatar__badge")).toBeNull();
+  });
+
+  test("busy and away carry a white mark; offline and hidden are outlines, no mark", () => {
+    const { container } = render(
+      <>
+        <PresenceBadge presence="busy" />
+        <PresenceBadge presence="away" />
+        <PresenceBadge presence="online" />
+        <PresenceBadge presence="offline" />
+        <PresenceBadge presence="hidden" ring={false} />
+      </>,
+    );
+    const [busy, away, online, offline, hidden] = Array.from(container.querySelectorAll("svg.ac-presence"));
+    expect(tones(busy)).toContain("ac-presence__mark");
+    expect(tones(away)).toContain("ac-presence__mark");
+    expect(tones(online)).not.toContain("ac-presence__mark");
+    expect(tones(online)).toContain("ac-presence__light");
+    expect(tones(offline)).not.toContain("ac-presence__mark");
+    expect(tones(offline)).toContain("ac-presence__ring");
+    // Without its ring, 9 pixels of 1 px; the dotted outline leaves its holes empty (no ring to fill them).
+    expect(hidden?.getAttribute("viewBox")).toBe("0 0 9 9");
+    expect(tones(hidden)).toEqual(["ac-presence__base", "ac-presence__light"]);
   });
 });
 

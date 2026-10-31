@@ -1,6 +1,17 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { authorizeSubscription, parseClientFrame } from "../src/realtime/ws";
-import { browser, createTestServer, listen, ORIGIN, seedOrg, signUp, type TestServer, upgradeStatus } from "./harness";
+import { orgTopic } from "@agenteschat/adapters";
+import { authorizeSubscription, currentSubscriptions, parseClientFrame } from "../src/realtime/ws";
+import {
+  browser,
+  createTestServer,
+  joinByInvitation,
+  listen,
+  ORIGIN,
+  seedOrg,
+  signUp,
+  type TestServer,
+  upgradeStatus,
+} from "./harness";
 
 describe("parseClientFrame", () => {
   test("accepts subscribe/unsubscribe with a uuid and ping; rejects the rest", () => {
@@ -75,6 +86,35 @@ test("upgrade requires a session, our Origin and org membership", async () => {
   expect(await upgradeStatus(wsUrl(orgId), { origin: ORIGIN, cookie: stranger.cookie() })).toBe(403);
 });
 
+test("revoked signed cookies cannot open a new realtime socket", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const oldCookies = owner.cookie();
+
+  expect((await owner("/api/auth/sign-out", { json: {} })).status).toBe(200);
+  expect(await upgradeStatus(wsUrl(orgId), { origin: ORIGIN, cookie: oldCookies })).toBe(401);
+});
+
+test("a revoked session closes its existing realtime socket", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId } = await seedOrg(owner);
+  const oldCookies = owner.cookie();
+  const c = connect(wsUrl(orgId), { origin: ORIGIN, cookie: oldCookies });
+  await c.opened;
+  c.send({ type: "subscribe", channelId });
+  await c.next((f) => f.type === "subscribed" && f.channelId === channelId);
+  const closed = new Promise<number>((resolve) => c.ws.addEventListener("close", (e) => resolve(e.code)));
+
+  expect((await owner("/api/auth/sign-out", { json: {} })).status).toBe(200);
+  // The ordinary client pings; a revoked socket must close instead of
+  // accepting another frame. The periodic check also bounds idle sockets.
+  await Bun.sleep(2_100);
+  c.send({ type: "ping" });
+  expect(await Promise.race([closed, Bun.sleep(5_000).then(() => -1)])).toBe(4401);
+});
+
 test("subscriptions are limited to channels the person belongs to, in the connection's org", async () => {
   const owner = browser(t);
   await signUp(owner, "owner@example.com");
@@ -123,6 +163,34 @@ async function meId(b: ReturnType<typeof browser>) {
   return ((await (await b("/api/app/me")).json()) as { user: { id: string } }).user.id;
 }
 
+test("a subscribe whose check can't run (the database is away) answers an error and closes, so the tab reconnects", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId } = await seedOrg(owner);
+  const c = connect(wsUrl(orgId), { origin: ORIGIN, cookie: owner.cookie() });
+  await c.opened;
+  await c.next((f) => f.type === "ready");
+  const closed = new Promise<number>((resolve) => c.ws.addEventListener("close", (e) => resolve(e.code)));
+  const select = t.db.select;
+  t.db.select = (() => {
+    throw new Error("connection refused");
+  }) as unknown as typeof t.db.select;
+  try {
+    c.send({ type: "subscribe", channelId });
+    expect(await c.next((f) => f.channelId === channelId)).toEqual({ type: "error", code: "unavailable", channelId });
+    expect(await closed).toBe(1011);
+  } finally {
+    t.db.select = select;
+  }
+
+  // The server lives on: the tab's next connection subscribes.
+  const again = connect(wsUrl(orgId), { origin: ORIGIN, cookie: owner.cookie() });
+  await again.opened;
+  again.send({ type: "subscribe", channelId });
+  expect(await again.next((f) => f.channelId === channelId)).toEqual({ type: "subscribed", channelId });
+  again.ws.close();
+});
+
 test("end to end: a subscriber sees the message, the streamed deltas and the agent's reply", async () => {
   const owner = browser(t);
   await signUp(owner, "owner@example.com");
@@ -137,7 +205,10 @@ test("end to end: a subscriber sees the message, the streamed deltas and the age
 
   const done = await c.next((f) => f.type === "event" && (f.event as { type: string }).type === "message.handled");
   expect(done).toMatchObject({ channelId, event: { type: "message.handled", agentId, status: "done" } });
-  const events = c.frames.filter((f) => f.type === "event").map((f) => f.event as Record<string, unknown>);
+  // The channel's own events (the workspace's, like `agent.status`, arrive on the same socket).
+  const events = c.frames
+    .filter((f) => f.type === "event" && f.channelId === channelId)
+    .map((f) => f.event as Record<string, unknown>);
   expect(events.map((e) => e.type)).toEqual([
     "message.created",
     "message.routed",
@@ -155,6 +226,9 @@ test("end to end: a subscriber sees the message, the streamed deltas and the age
     "run.finished",
     "message.handled",
   ]);
+  // The agent's presence moved with its run, for the whole workspace (ADR 0084 §11).
+  const org = c.frames.filter((f) => f.type === "event" && f.scope === "org").map((f) => f.event);
+  expect(org).toContainEqual(expect.objectContaining({ type: "agent.status", agentId }));
   expect(
     events
       .filter((e) => e.type === "agent.delta")
@@ -220,3 +294,37 @@ test("membership changes drop live subscriptions at once (channel, then organiza
   expect(a.frames).toContainEqual({ type: "unsubscribed", channelId: other.id, reason: "revoked" });
   expect(a.frames).toContainEqual({ type: "error", code: "membership_revoked" });
 });
+
+test("a missed revocation event is reconciled from durable membership", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId } = await seedOrg(owner);
+  const ana = await joinByInvitation(t, owner, orgId, "ana@example.com");
+  const anaId = (await meId(ana)) ?? "";
+  const publish = t.adapters.pubsub.publish.bind(t.adapters.pubsub);
+  t.adapters.pubsub.publish = (topic, event) =>
+    topic === orgTopic(orgId) && (event as { type?: string }).type === "membership.revoked"
+      ? Promise.resolve()
+      : publish(topic, event);
+
+  const a = connect(wsUrl(orgId), { origin: ORIGIN, cookie: ana.cookie() });
+  await a.opened;
+  a.send({ type: "subscribe", channelId });
+  await a.next((f) => f.type === "subscribed" && f.channelId === channelId);
+  expect((await currentSubscriptions(t.db, anaId, orgId, [channelId]))?.has(channelId)).toBe(true);
+
+  expect(
+    (
+      await owner(`/api/app/organizations/${orgId}/channels/${channelId}/members/people/${anaId}`, {
+        method: "DELETE",
+      })
+    ).status,
+  ).toBe(204);
+  expect((await currentSubscriptions(t.db, anaId, orgId, [channelId]))?.has(channelId)).toBe(false);
+  expect(await a.next((f) => f.type === "unsubscribed" && f.channelId === channelId, 20_000)).toMatchObject({
+    reason: "revoked",
+  });
+  const closed = new Promise<number>((resolve) => a.ws.addEventListener("close", (e) => resolve(e.code)));
+  expect((await owner(`/api/app/organizations/${orgId}/members/${anaId}`, { method: "DELETE" })).status).toBe(204);
+  expect(await Promise.race([closed, Bun.sleep(20_000).then(() => -1)])).toBe(4403);
+}, 60_000);

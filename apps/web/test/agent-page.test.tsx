@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { Run } from "@agenteschat/client";
+import type { PlanUsage, Run } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import {
   agentSearch,
@@ -114,7 +114,7 @@ describe("agent page: tabs and the URL", () => {
     expect(within(cover).getByRole("button", { name: "Mais ações" })).toBeTruthy();
     expect(screen().getByRole("heading", { level: 1 }).textContent).toBe("Ada");
     expect(hero.querySelector(".agp-handle")?.textContent).toContain("@ada");
-    expect(work.textContent).toContain("o modelo da organização");
+    expect(work.textContent).toContain("o modelo do workspace");
   });
 });
 
@@ -240,6 +240,103 @@ describe("agent page: the budget on the overview", () => {
   });
 });
 
+describe("agent page: a plan's limits where the budget was (ADR 0063 §5)", () => {
+  const hours = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString();
+  const LIMITS: PlanUsage = {
+    windows: [
+      { kind: "five_hour", usedPercent: 12, resetsAt: hours(2) },
+      { kind: "seven_day", usedPercent: 40, resetsAt: hours(72) },
+    ],
+    source: "probe",
+    at: new Date().toISOString(),
+  };
+  /** Ada thinks with Claude Team; `spent`: what she spent through the API this month. */
+  const onPlan = (spent: number, usage: PlanUsage | null = LIMITS) => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) {
+      ada.brain = {
+        kind: "claude_code",
+        model: "Sonnet",
+        account: "Claude Team",
+        ...(usage ? { usage } : {}),
+      };
+    }
+    state.spentUsd = { [ADA_ID]: spent };
+    return state;
+  };
+  const line = (el: Element) => el.querySelector(".ac-planmeter__line")?.textContent;
+
+  test("on a plan: its account's tightest windows and one bar, and no budget while it spent nothing through the API", async () => {
+    const { router } = await go("", onPlan(0));
+    const work = screen().getByRole("region", { name: "Como trabalha" });
+    expect(line(work)).toBe("Claude Team · semana 40% · 5h 12%");
+    expect(within(work).getByRole("meter", { name: "Semana" }).getAttribute("aria-valuenow")).toBe("40");
+    expect(work.textContent).not.toMatch(/orçamento|US\$/);
+    // The side card: the same line, nothing called a budget, and the rest in Uso.
+    expect(screen().queryByRole("region", { name: "Orçamento" })).toBeNull();
+    const card = screen().getByRole("region", { name: "Uso" });
+    expect(line(card)).toBe("Claude Team · semana 40% · 5h 12%");
+    expect(card.textContent).not.toMatch(/orçamento|US\$/);
+    await click(within(card).getByRole("button", { name: "Ver tudo" }));
+    expect(router.state.location.search).toMatchObject({ tab: "usage" });
+  });
+
+  test("on a plan that also spent through the API: the plan's limits first, the budget after them", async () => {
+    await go("", onPlan(12.3));
+    const work = screen().getByRole("region", { name: "Como trabalha" }).textContent ?? "";
+    expect(work.indexOf("Claude Team · semana 40%")).toBeGreaterThanOrEqual(0);
+    expect(work.indexOf("Claude Team · semana 40%")).toBeLessThan(work.indexOf("US$ 12,30 de US$ 40"));
+    const card = screen().getByRole("region", { name: "Uso" });
+    expect(card.textContent).toMatch(/^Uso.*Claude Team · semana 40% · 5h 12%.*US\$ 12,30 de US\$ 40 em /);
+  });
+
+  test("on the API: the budget as before, and no plan line", async () => {
+    await go();
+    const work = screen().getByRole("region", { name: "Como trabalha" });
+    expect(work.querySelector(".ac-planmeter")).toBeNull();
+    expect(work.textContent).toContain("US$ 12,30");
+    expect(screen().getByRole("region", { name: "Orçamento" })).toBeTruthy();
+    expect(screen().queryByRole("region", { name: "Uso" })).toBeNull();
+  });
+
+  test("a plan whose windows aren't known yet shows nothing rather than 0%", async () => {
+    await go("", onPlan(0, null));
+    const work = screen().getByRole("region", { name: "Como trabalha" });
+    expect(work.querySelector(".ac-planmeter")).toBeNull();
+    expect(work.textContent).not.toMatch(/orçamento|US\$/);
+    expect(screen().queryByRole("region", { name: "Uso" })).toBeNull();
+    expect(screen().queryByRole("region", { name: "Orçamento" })).toBeNull();
+  });
+
+  test("near the limit it says when the window renews", async () => {
+    const almost: PlanUsage = {
+      ...LIMITS,
+      windows: [{ kind: "five_hour", usedPercent: 92, resetsAt: new Date(Date.now() + 90 * 60_000).toISOString() }],
+    };
+    await go("", onPlan(0, almost));
+    const card = screen().getByRole("region", { name: "Uso" });
+    expect(line(card)).toBe("Claude Team · 5h 92%");
+    expect(card.querySelector(".ac-planmeter__state")?.textContent).toMatch(
+      /^Quase no limite · renova (\S+ )?às \d\d:\d\d$/,
+    );
+  });
+
+  test("Atividade: the month's numbers leave the money out until it spends through the API", async () => {
+    const legend = () =>
+      screen()
+        .getByRole("region", { name: /^O mês de / })
+        .querySelector(".agp-month__legend")?.textContent ?? "";
+    await go("?tab=activity", onPlan(0));
+    expect(legend()).toContain("142");
+    expect(legend()).not.toMatch(/Gasto|Orçamento|US\$/);
+    cleanup();
+    await go("?tab=activity", onPlan(12.3));
+    expect(legend()).toContain("Gasto");
+    expect(legend()).toContain("US$ 12,30");
+  });
+});
+
 describe("agent page: who edits what", () => {
   test("members read: values, not inputs; never money; no runs", async () => {
     await go("?tab=settings", asMember());
@@ -260,7 +357,7 @@ describe("agent page: who edits what", () => {
     expect(saveBar()).toBeNull();
   });
 
-  test("the owner changes the look, access, audience and computer; the save sends only what they may", async () => {
+  test("the owner changes the look, audience and computer, not access; the save sends only what they may", async () => {
     const { state } = await go("?tab=settings", asOwner());
     expect(screen().queryByLabelText("Nome")).toBeNull();
     expect(document.body.textContent).toContain("Você é responsável da Ada");
@@ -270,6 +367,10 @@ describe("agent page: who edits what", () => {
     await openTab(/^Instruções/);
     expect(screen().queryByRole("textbox", { name: "Instruções" })).toBeNull();
     expect(document.body.textContent).toContain("Só admins editam as instruções.");
+    // Access is an admin's call, like the agent's scopes: the owner reads it.
+    await openTab(/^Ferramentas/);
+    expect(screen().queryByRole("radiogroup", { name: "Nível em GitHub" })).toBeNull();
+    expect(document.body.textContent).toContain("Só admins dão ou tiram acessos e repositórios.");
     await click(within(saveBar() as HTMLElement).getByRole("button", { name: /^Salvar/ }));
     await settle(6);
     expect(updates(state)).toEqual([{ appearance: { color: "rose", eyes: "round", accessory: "none" } }]);
@@ -338,6 +439,50 @@ describe("agent page: inline editing and the save bar", () => {
     ]);
     expect(document.body.textContent).toContain("Alterações da Ada salvas.");
     expect(saveBar()).toBeNull();
+  });
+
+  test("Conectores: 'Ler e escrever' gives every connector full access in one click, saved in one write", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    // A server Ada only reads, beside GitHub, which she doesn't use.
+    const res = await api.customConnectors.connect(ORG_ID, {
+      serverUrl: "https://oauth.suporte.example.com",
+      label: "Suporte",
+      returnTo: "/",
+    });
+    if (res.status !== "connected") throw new Error("expected connected");
+    const server = res.server.id;
+    await api.customConnectors.saveTools(ORG_ID, server, {
+      label: "Suporte",
+      tools: res.server.tools.map((x) => ({ name: x.name, access: x.sensitive ? "approval" : "read", label: x.name })),
+    });
+    await api.access.set(ORG_ID, ADA_ID, {
+      all: false,
+      connectors: {},
+      scopes: [
+        { connectionId: null, scope: "memory:write" },
+        { connectionId: server, scope: `custom:${server}:read` },
+      ],
+      tools: { allow: [], deny: [] },
+    });
+    state.calls.length = 0;
+    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=access`, { api });
+    await settle(8);
+    const level = (name: string) =>
+      within(screen().getByRole("radiogroup", { name: `Nível em ${name}` }))
+        .getAllByRole("radio")
+        .find((r) => r.getAttribute("aria-checked") === "true")?.textContent;
+    expect([level("GitHub"), level("Suporte")]).toEqual(["Sem acesso", "Ler"]);
+    await click(screen().getByRole("button", { name: "Ler e escrever" }));
+    expect([level("GitHub"), level("Suporte")]).toEqual(["Ler e escrever", "Ler e escrever"]);
+    expect(saveBar()?.textContent).toContain("2 alterações");
+    await click(within(saveBar() as HTMLElement).getByRole("button", { name: /^Salvar/ }));
+    await settle(8);
+    const writes = state.calls.filter((c) => c.method === "access.set");
+    expect(writes).toHaveLength(1);
+    const input = writes[0]?.args[2] as { connectors: Record<string, boolean>; scopes: { scope: string }[] };
+    expect(input.connectors).toEqual({ "conn-gh": true, [server]: true });
+    expect(input.scopes.map((g) => g.scope)).toEqual(["memory:write"]);
   });
 
   test("⌘S saves; an invalid budget blocks it and says why", async () => {

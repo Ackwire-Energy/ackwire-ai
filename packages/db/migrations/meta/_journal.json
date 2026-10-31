@@ -841,6 +841,83 @@
       "when": 1793154118058,
       "tag": "0119_agent_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 120,
+      "version": "7",
+      "when": 1793296939159,
+      "tag": "0120_machine_mcp_calls",
+      "breakpoints": true
+    },
+    {
+      "idx": 121,
+      "version": "7",
+      "when": 1793344946668,
+      "tag": "0121_early_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 122,
+      "version": "7",
+      "when": 1793362432312,
+      "tag": "0122_onboarding",
+      "breakpoints": true
+    },
+    {
+      "idx": 123,
+      "version": "7",
+      "when": 1793370843712,
+      "tag": "0123_org_limits",
+      "breakpoints": true
+    },
+    {
+      "idx": 124,
+      "version": "7",
+      "when": 1793380843712,
+      "tag": "0124_notice_prefs",
+      "breakpoints": true
+    },
+    {
+      "idx": 125,
+      "version": "7",
+      "when": 1793390843712,
+      "tag": "0125_channel_categories",
+      "breakpoints": true
+    },
+    {
+      "idx": 126,
+      "version": "7",
+      "when": 1793393736459,
+      "tag": "0126_agent_deleted",
+      "breakpoints": true
+    },
+    {
+      "idx": 127,
+      "version": "7",
+      "when": 1793393974159,
+      "tag": "0127_agent_groups",
+      "breakpoints": true
+    },
+    {
+      "idx": 128,
+      "version": "7",
+      "when": 1793420843712,
+      "tag": "0128_presence_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 129,
+      "version": "7",
+      "when": 1793430843712,
+      "tag": "0129_agent_status_source",
+      "breakpoints": true
+    },
+    {
+      "idx": 130,
+      "version": "7",
+      "when": 1793440843712,
+      "tag": "0130_roles",
+      "breakpoints": true
     }
   ]
 }

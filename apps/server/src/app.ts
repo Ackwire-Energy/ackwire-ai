@@ -15,6 +15,7 @@ import { agentRoutes } from "./routes/app/agents";
 import { approvalRoutes } from "./routes/app/approvals";
 import { artifactRoutes } from "./routes/app/artifacts";
 import { auditRoutes } from "./routes/app/audit";
+import { billingRoutes } from "./routes/app/billing";
 import { browserRoutes } from "./routes/app/browser";
 import { calendarRoutes } from "./routes/app/calendar";
 import { channelRoutes } from "./routes/app/channels";
@@ -39,6 +40,7 @@ import { notificationRoutes } from "./routes/app/notifications";
 import { planUsageRoutes } from "./routes/app/plan-usage";
 import { pushRoutes } from "./routes/app/push";
 import { questionRoutes } from "./routes/app/questions";
+import { roleRoutes } from "./routes/app/roles";
 import { routineRoutes } from "./routes/app/routines";
 import { sandboxRoutes } from "./routes/app/sandboxes";
 import { secretRoutes } from "./routes/app/secrets";
@@ -66,6 +68,8 @@ export interface AppOptions {
   version: string;
   modules: AgentesModule[];
   pingDatabase: () => Promise<void>;
+  /** True once the server is shutting down: `/api/health` answers 503. */
+  draining?: () => boolean;
   /** Needed when modules register routes. */
   moduleContext?: ModuleContext;
   /** Database, auth and adapters. Without them only system routes are mounted (some tests). */
@@ -114,6 +118,7 @@ export function createApp(options: AppOptions) {
     edition: options.edition,
     modules: options.modules.map((m) => m.name),
     pingDatabase: options.pingDatabase,
+    draining: options.draining,
   });
 
   if (options.services) {
@@ -144,7 +149,9 @@ export function createApp(options: AppOptions) {
     api.route("/app", pushRoutes(deps));
     api.route("/app", secretRoutes(deps));
     api.route("/app", inviteRoutes(deps));
+    api.route("/app", roleRoutes(deps));
     api.route("/app", storageRoutes(deps));
+    api.route("/app", billingRoutes(deps));
     api.route("/app", artifactRoutes(deps));
     api.route("/app", issueRoutes(deps));
     api.route("/app", forumRoutes(deps));
@@ -202,7 +209,11 @@ export function createApp(options: AppOptions) {
       description: "Workspace where people and AI agents work together.",
     },
   });
-  api.get("/reference", Scalar({ url: "/api/openapi.json", pageTitle: "agentes.chat API" }));
+  // The interactive explorer loads its bundle from a CDN; keep it off the production origin, where a
+  // compromised CDN would run on the session's origin. The OpenAPI document itself stays available everywhere.
+  if (options.services?.config.NODE_ENV !== "production") {
+    api.get("/reference", Scalar({ url: "/api/openapi.json", pageTitle: "agentes.chat API" }));
+  }
 
   const app = new OpenAPIHono();
   app.onError((error, c) => {
@@ -210,6 +221,22 @@ export function createApp(options: AppOptions) {
     if (mapped) return mapped;
     log.error("unhandled error", { method: c.req.method, path: c.req.path, error: String(error), stack: error.stack });
     return apiError(c, 500, "internal_error", "Something went wrong on our side");
+  });
+  // Security headers on every response: the app may not be framed (clickjacking of approval, merge and deploy
+  // cards), <base> is pinned to our own origin, and HSTS is sent where the instance is served over TLS.
+  const httpsPublicUrl = options.services?.config.PUBLIC_URL?.startsWith("https:") ?? false;
+  app.use("*", async (c, next) => {
+    await next();
+    const h = c.res.headers;
+    if (!h.has("x-frame-options")) h.set("x-frame-options", "DENY");
+    if (!h.has("content-security-policy")) h.set("content-security-policy", "frame-ancestors 'none'; base-uri 'self'");
+    if (httpsPublicUrl && !h.has("strict-transport-security")) h.set("strict-transport-security", "max-age=63072000");
+  });
+  // A CDN in front may cache by the path's extension, whatever the type: without this, a private
+  // answer at a path that ends like a file (a skill's `data.csv`) would be served to anyone asking.
+  app.use("/api/*", async (c, next) => {
+    await next();
+    if (!c.res.headers.has("cache-control")) c.res.headers.set("cache-control", "no-store");
   });
   app.route("/api", api);
   if (options.services) registerAppLinks(app, options.services.config);

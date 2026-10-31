@@ -58,7 +58,10 @@ export function deciderOf(
 ): Decider | null {
   const by = view.decidedBy;
   const status = view.status;
-  const first = status && status.kind !== "nobody" && status.kind !== "no_ai" ? status.agents[0] : undefined;
+  const first =
+    status && status.kind !== "nobody" && status.kind !== "no_ai" && status.kind !== "platform_cap"
+      ? status.agents[0]
+      : undefined;
   if (!by || first === undefined) return null;
   if (by.step === "jev") return { mark: { logo: "typesafe" }, text: t("receipts.by.jev") };
   if (by.step === "model") {

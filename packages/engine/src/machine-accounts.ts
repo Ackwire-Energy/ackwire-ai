@@ -416,15 +416,17 @@ async function settleAccount(
   const keyHint = info.keyHint ?? row.keyHint;
   const status: MachineAccountStatus = info.loggedIn ? "active" : "signed_out";
   const signingIn = row.status === "signing_in";
-  // Signed in again as another account (an email other than its own, or one its owner already has here): it stays
-  // signed out with what it was, so its agents never think with an account nobody chose for them, and Try again signs
-  // in to it once more. Checked on every report, not only when its owner asks: the runner reports a new login at once.
+  // Signed in again as another account (an email other than its own, or one its owner already has here where an
+  // account has one login): it stays signed out with what it was, so its agents never think with an account nobody
+  // chose for them, and Try again signs in to it once more. The account that came back, where its owner has it here,
+  // goes with the answer (theirs to think with instead). Checked on every report, not only when its owner asks: the
+  // runner reports a new login at once.
   // ponytail: that login stays in the account's folder on the computer until it signs in again or is removed (nothing
   // thinks with a signed-out account); a runner sign-out that keeps the folder, if a stray login there ever matters.
   if (!signingIn && info.loggedIn && (email !== row.email || keyHint !== row.keyHint)) {
     const otherEmail = Boolean(row.email && info.email && row.email.toLowerCase() !== info.email.toLowerCase());
-    const duplicate = await duplicateOf(db, row, { email, keyHint });
-    if (otherEmail || duplicate) {
+    const duplicate = await sameAccount(db, row, { email, keyHint });
+    if (otherEmail || (duplicate && !loginPerAgent(row.kind, row.provider))) {
       const [kept] =
         row.status === "signed_out"
           ? [row]
@@ -735,7 +737,7 @@ const runnerOld = (machine: Pick<MachineRow, "name">) =>
 async function requireLive(deps: MachineAccountHubDeps, machine: MachineRow, protocol = ACCOUNTS_PROTOCOL) {
   if (machine.protocol < protocol) throw runnerOld(machine);
   const status = await deps.hub.status(machine.id);
-  if (!status?.online) throw new MachineOfflineError(machine.name);
+  if (!status?.online) throw new MachineOfflineError(machine.name, machine.kind);
   if (status.protocol < protocol) throw runnerOld(machine);
 }
 
@@ -769,7 +771,7 @@ export async function getMachineAccounts(
 ) {
   const { membership, machine } = await memberMachine(deps.db, userId, orgId, machineId);
   const adds = mayAddAccounts(machine, userId);
-  if (!adds && !can(membership.role, "configure")) {
+  if (!adds && !can(membership, "configure")) {
     throw new ForbiddenError(
       "Only an admin or the person who connected this computer can see its accounts",
       "machine.forbidden",
@@ -1119,7 +1121,7 @@ export async function removeMachineAccount(
   const allowed =
     account.createdBy === userId ||
     machine.pairedByUserId === userId ||
-    (can(membership.role, "configure") && (machine.pairedByUserId === null || account.createdBy === null));
+    (can(membership, "configure") && (machine.pairedByUserId === null || account.createdBy === null));
   if (!allowed) {
     throw new ForbiddenError(
       "Only the account's owner or the person who connected this computer can remove it",
@@ -1188,7 +1190,40 @@ export async function releaseMemberAccounts(
   return out;
 }
 
-/** After `releaseMemberAccounts`: pages refetch, and the replica holding each machine's runner removes them. */
+/**
+ * An agent is being deleted (ADR 0082): its login (the account it thinks with, which serves only it) becomes a
+ * tombstone like one a person removes; the account's other logins stay with their agents. Runs in the caller's
+ * transaction; `announceReleasedAccounts` afterwards.
+ */
+export async function releaseAgentLogin(db: Executor, orgId: string, agentId: string): Promise<ReleasedAccounts> {
+  const [login] = await db
+    .select({ id: machineAccounts.id, machineId: machineAccounts.machineId })
+    .from(agents)
+    .innerJoin(
+      machineAccounts,
+      and(eq(machineAccounts.orgId, agents.orgId), eq(machineAccounts.id, agents.brainAccountId)),
+    )
+    .where(and(eq(agents.orgId, orgId), eq(agents.id, agentId), ne(machineAccounts.status, "removing")));
+  if (!login) return { machines: [], agents: [] };
+  // An archived agent's login may have been given to a live agent since (one agent per login counts only those
+  // not archived): it stays that agent's.
+  const [live] = await db
+    .select({ id: agents.id })
+    .from(agents)
+    .where(
+      and(
+        eq(agents.orgId, orgId),
+        eq(agents.brainAccountId, login.id),
+        ne(agents.id, agentId),
+        isNull(agents.archivedAt),
+      ),
+    );
+  if (live) return { machines: [], agents: [] };
+  const agentIds = await tombstone(db, orgId, [login.id]);
+  return { machines: [{ orgId, machineId: login.machineId }], agents: [{ orgId, agentIds }] };
+}
+
+/** After `releaseMemberAccounts` or `releaseAgentLogin`: pages refetch, and the replica holding each machine's runner removes them. */
 export async function announceReleasedAccounts(pubsub: PubSub | undefined, released: ReleasedAccounts) {
   for (const a of released.agents) forgetAgents(a.orgId, a.agentIds);
   for (const m of released.machines) {

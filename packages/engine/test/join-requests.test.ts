@@ -18,6 +18,7 @@ import {
   listInviteLinks,
   listWaitingJoinRequests,
   MAX_PENDING_JOIN_REQUESTS,
+  memberRoleIds,
   pruneJoinRequests,
   randomToken,
   removeMember,
@@ -29,7 +30,7 @@ import {
   sha256,
   turnOffInviteLink,
 } from "../src";
-import { addMember, type Fixture, SECRET, setup } from "./fixtures";
+import { addMember, adminRoleId, type Fixture, SECRET, setup } from "./fixtures";
 
 let f: Fixture;
 let close: (() => Promise<void>) | undefined;
@@ -365,18 +366,20 @@ describe("asking to join through a link", () => {
 });
 
 describe("answering", () => {
-  test("approve: a confirmed account joins with the role; anyone else gets an invitation, refreshed not doubled", async () => {
+  test("approve: a confirmed account joins with the roles; anyone else gets an invitation, refreshed not doubled", async () => {
     const { token, link } = await start();
+    const admin = await adminRoleId(f.db, f.org.id);
     const erin = await person("erin@example.com", { verified: true, locale: "en" });
     await signedIn(token, erin);
     const [erinRow] = await rows();
     expect(await listWaitingJoinRequests(f.db, f.owner.id, f.org.id, NOW)).toEqual([
       expect.objectContaining({ id: erinRow?.id, email: "erin@example.com", confirmed: true }),
     ]);
-    expect(await approveJoinRequest(deps(), PUBLIC, f.owner.id, f.org.id, erinRow?.id ?? "", "admin", NOW)).toEqual({
+    expect(await approveJoinRequest(deps(), PUBLIC, f.owner.id, f.org.id, erinRow?.id ?? "", [admin], NOW)).toEqual({
       outcome: "joined",
     });
-    expect((await memberOf(erin.id))?.role).toBe("admin");
+    expect((await memberOf(erin.id))?.role).toBe("member");
+    expect(await memberRoleIds(f.db, f.org.id, erin.id)).toEqual([admin]);
     const general = await f.db
       .select()
       .from(schema.channelMembers)
@@ -397,14 +400,14 @@ describe("answering", () => {
         outcome: "joined",
         orgName: "Acme",
         approverName: "ana",
-        role: "admin",
+        role: "member",
         url: `https://agentes.test/org/${f.org.id}`,
       },
     });
     // Nothing left waiting: the admins' notice closed.
     expect((await notices()).every((n) => n.doneAt !== null)).toBe(true);
     await expect(
-      approveJoinRequest(deps(), PUBLIC, f.owner.id, f.org.id, erinRow?.id ?? "", "member", NOW),
+      approveJoinRequest(deps(), PUBLIC, f.owner.id, f.org.id, erinRow?.id ?? "", [], NOW),
     ).rejects.toMatchObject({ code: "join.answered" });
 
     // Typed (or an unconfirmed account): an invitation to the address, the one already waiting refreshed.
@@ -412,12 +415,12 @@ describe("answering", () => {
       f.db,
       f.owner.id,
       f.org.id,
-      { email: "fay@example.com", role: "admin" },
+      { email: "fay@example.com", roleIds: [admin] },
       NOW,
     );
     await typed(token, "Fay", "fay@example.com");
     const [fayRow] = (await rows()).filter((r) => r.email === "fay@example.com");
-    const approved = await approveJoinRequest(deps(), PUBLIC, f.owner.id, f.org.id, fayRow?.id ?? "", "member", NOW);
+    const approved = await approveJoinRequest(deps(), PUBLIC, f.owner.id, f.org.id, fayRow?.id ?? "", [], NOW);
     const url = approved.outcome === "invited" ? approved.url : "";
     expect(approved.outcome).toBe("invited");
     expect(url).toStartWith("https://agentes.test/invite/");
@@ -425,9 +428,9 @@ describe("answering", () => {
       .select()
       .from(schema.organizationInvitations)
       .where(eq(schema.organizationInvitations.email, "fay@example.com"));
-    // Still out as admin, it stays admin: approving never demotes it.
-    expect(invitations.map((i) => [i.id, i.role, i.expiresAt, i.tokenHash])).toEqual([
-      [waiting.invitation.id, "admin", later(7), sha256(url.split("/invite/")[1] ?? "")],
+    // Still out with the Admin role, it keeps it: approving never takes a role away.
+    expect(invitations.map((i) => [i.id, i.roleIds, i.expiresAt, i.tokenHash])).toEqual([
+      [waiting.invitation.id, [admin], later(7), sha256(url.split("/invite/")[1] ?? "")],
     ]);
     const [, invitedEmail] = await joinEmails("join_answer");
     expect(invitedEmail?.template).toMatchObject({ outcome: "invited", url, role: "member", locale: "pt-BR" });
@@ -440,13 +443,14 @@ describe("answering", () => {
     const [gusRow] = (await rows()).filter((r) => r.email === "gus@example.com");
     const member = await addMember(f.db, f.org.id, "member", "hal");
     await expect(
-      approveJoinRequest(deps(), PUBLIC, member.id, f.org.id, gusRow?.id ?? "", "member", NOW),
+      approveJoinRequest(deps(), PUBLIC, member.id, f.org.id, gusRow?.id ?? "", [], NOW),
     ).rejects.toMatchObject({ code: "forbidden" });
+    // Only roles of this workspace.
     await expect(
-      approveJoinRequest(deps(), PUBLIC, f.owner.id, f.org.id, gusRow?.id ?? "", "owner", NOW),
-    ).rejects.toMatchObject({ code: "invalid_request" });
+      approveJoinRequest(deps(), PUBLIC, f.owner.id, f.org.id, gusRow?.id ?? "", [crypto.randomUUID()], NOW),
+    ).rejects.toMatchObject({ code: "role.unknown" });
     await expect(
-      approveJoinRequest(deps(), PUBLIC, f.owner.id, f.org.id, gusRow?.id ?? "", "member", later(15)),
+      approveJoinRequest(deps(), PUBLIC, f.owner.id, f.org.id, gusRow?.id ?? "", [], later(15)),
     ).rejects.toMatchObject({ code: "join.expired" });
   });
 
@@ -456,9 +460,9 @@ describe("answering", () => {
     const first = await createInvitation(f.db, f.owner.id, f.org.id, { email: "co@example.com", role: "owner" }, NOW);
     await typed(token, "Co", "co@example.com");
     const [row] = await rows();
-    await expect(
-      approveJoinRequest(deps(), PUBLIC, admin.id, f.org.id, row?.id ?? "", "member", NOW),
-    ).rejects.toMatchObject({ code: "forbidden" });
+    await expect(approveJoinRequest(deps(), PUBLIC, admin.id, f.org.id, row?.id ?? "", [], NOW)).rejects.toMatchObject({
+      code: "forbidden",
+    });
     await expect(
       createInvitation(f.db, admin.id, f.org.id, { email: "co@example.com", role: "member" }, NOW),
     ).rejects.toMatchObject({ code: "forbidden" });
@@ -469,7 +473,7 @@ describe("answering", () => {
     expect(await invitation()).toMatchObject({ role: "owner", tokenHash: first.invitation.tokenHash });
     expect((await rows())[0]?.status).toBe("pending");
 
-    expect(await approveJoinRequest(deps(), PUBLIC, f.owner.id, f.org.id, row?.id ?? "", "member", NOW)).toMatchObject({
+    expect(await approveJoinRequest(deps(), PUBLIC, f.owner.id, f.org.id, row?.id ?? "", [], NOW)).toMatchObject({
       outcome: "invited",
     });
     expect(await invitation()).toMatchObject({ id: first.invitation.id, role: "owner" });
@@ -483,7 +487,7 @@ describe("answering", () => {
     const ana = await person("ana@example.com", { verified: true });
     await signedIn(token, ana);
     const [anaRow] = await rows();
-    await approveJoinRequest(deps(), PUBLIC, f.owner.id, f.org.id, anaRow?.id ?? "", "member", NOW);
+    await approveJoinRequest(deps(), PUBLIC, f.owner.id, f.org.id, anaRow?.id ?? "", [], NOW);
     expect(await joinStatus(f.db, ana, token, NOW)).toMatchObject({ member: true, request: { status: "approved" } });
     // Removed later: the page asks again, and asking files a new request.
     await removeMember(f.db, f.owner.id, f.org.id, ana.id);
@@ -493,7 +497,7 @@ describe("answering", () => {
     // Asked signed out, approved, then signed in with the address confirmed: the invitation finishes it.
     await typed(token, "Bo", "bo@example.com");
     const boRow = (await rows()).find((r) => r.email === "bo@example.com");
-    const invited = await approveJoinRequest(deps(), PUBLIC, f.owner.id, f.org.id, boRow?.id ?? "", "member", NOW);
+    const invited = await approveJoinRequest(deps(), PUBLIC, f.owner.id, f.org.id, boRow?.id ?? "", [], NOW);
     expect(invited.outcome).toBe("invited");
     const bo = await person("bo@example.com", { verified: true });
     expect(await joinStatus(f.db, bo, token, NOW)).toMatchObject({ request: { status: "approved" } });
@@ -544,7 +548,9 @@ describe("answering", () => {
     expect(answer?.template).toMatchObject({ outcome: "denied", reason: "Only <b>studio</b> people", locale: "en" });
     const rendered = renderEmail(answer?.template as EmailTemplate);
     expect(rendered.subject).toBe("Your request to join wasn't approved");
-    expect(rendered.html).toContain("“Only &lt;b&gt;studio&lt;/b&gt; people”");
+    expect(rendered.html).toContain(
+      '“Only <span style="display:inline-block">&lt;b&gt;studio&lt;/b&gt; people”</span>',
+    );
     expect(rendered.html).not.toContain("<b>studio</b>");
     expect((await notices()).every((n) => n.doneAt !== null)).toBe(true);
     const audit = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "join_request.denied"));
@@ -696,7 +702,7 @@ describe("words", () => {
         outcome,
         orgName: "Acme",
         approverName: "Marina",
-        role: "admin",
+        role: "member",
         url: outcome === "denied" ? undefined : "https://a.test/x",
         reason: outcome === "denied" ? "Full <b>team</b>" : undefined,
       });
@@ -711,7 +717,7 @@ describe("words", () => {
       "Seu pedido para entrar foi aprovado",
       "Seu pedido para entrar não foi aprovado",
     ]);
-    expect(answer("en", "joined").text).toContain("Marina approved your request. You joined Acme as an admin.");
+    expect(answer("en", "joined").text).toContain("Marina approved your request. You joined Acme as a member.");
     expect(answer("pt-BR", "invited").text).toContain("Aceitar convite: https://a.test/x");
     // The address proved itself before asking: nothing for someone who never asked.
     for (const outcome of outcomes) {
@@ -724,7 +730,9 @@ describe("words", () => {
     expect(answer("en", "denied").text).toContain("Their note: “Full <b>team</b>”");
     expect(answer("en", "denied").html).toContain("“Full &lt;b&gt;team&lt;/b&gt;”");
     expect(answer("en", "denied").html).not.toContain("https://a.test/x");
-    expect(answer("en", "denied").html).toContain("this address asked to join Acme on agentes.chat");
+    expect(answer("en", "denied").html).toContain(
+      'this address asked to join Acme <span style="display:inline-block">on agentes.chat.</span>',
+    );
     expect(answer("pt-BR", "joined").html).toContain("este endereço pediu para entrar na Acme");
   });
 

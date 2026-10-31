@@ -6,12 +6,14 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 25;
+export const MACHINE_PROTOCOL_VERSION = 27;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
 /** From this protocol on, the runner keeps secrets for each agent (`op: "secret"`, ADR 0027). */
 export const SECRETS_PROTOCOL = 3;
+/** Staged ciphertext and a separate activation after the server commits delivery. */
+export const SECRET_ACTIVATE_PROTOCOL = 26;
 /** From this protocol on, the runner runs background tasks that outlive a request (`task.*`, ADR 0029). */
 export const TASKS_PROTOCOL = 4;
 /**
@@ -325,6 +327,44 @@ export const DESKTOP_TEXT_PROTOCOL = 25;
 /** The most text one `desktop.text` answers (characters). */
 export const DESKTOP_TEXT_MAX = 16_000;
 
+/**
+ * From this protocol on (ADR 0040 §11): `browser.warm` starts the agent's
+ * Chrome ahead of its first command, where that command would start it, on a
+ * blank page with no stream; it does nothing while a person has the agent's
+ * browser, while its Chrome runs or starts, or when it would take the
+ * computer's last free browser. The answers of `browser.act`, `browser.batch`
+ * and `browser.warm` say what they waited on before running (`setup`). The
+ * server never sends `browser.warm` to an older runner, whose answers carry
+ * no `setup`.
+ */
+export const BROWSER_WARM_PROTOCOL = 27;
+
+/**
+ * Protocol 27: what an agent's browser request waited on before it ran, in
+ * milliseconds, each only when it happened: its worker starting (system mode),
+ * `agent-browser` and Chrome for Testing being found or installed, the
+ * requests ahead of it in the agent's queue, the agent's desktop starting, and
+ * Chrome starting.
+ */
+export interface BrowserSetup {
+  worker?: number;
+  install?: number;
+  queued?: number;
+  desktop?: number;
+  launch?: number;
+}
+
+/** A runner's `setup` as the server keeps it: the known steps, whole milliseconds up to an hour; null when none. */
+export function browserSetupOf(v: unknown): BrowserSetup | null {
+  if (typeof v !== "object" || v === null) return null;
+  const out: BrowserSetup = {};
+  for (const key of ["worker", "install", "queued", "desktop", "launch"] as const) {
+    const ms = (v as Record<string, unknown>)[key];
+    if (typeof ms === "number" && Number.isInteger(ms) && ms >= 0 && ms <= 3_600_000) out[key] = ms;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
 /** Which CLI an account signs in. */
 export type AccountKind = "claude_code" | "codex";
 export const ACCOUNT_KINDS: readonly AccountKind[] = ["claude_code", "codex"];
@@ -453,6 +493,9 @@ export const AGENT_BROWSER_SHA256: Record<AgentBrowserTarget, string> = {
 /** `darwin-arm64` → `agent-browser-darwin-arm64`; `win32-x64` → `agent-browser-win32-x64.exe`. */
 export const agentBrowserAsset = (target: AgentBrowserTarget) =>
   `agent-browser-${target}${target.startsWith("win32") ? ".exe" : ""}`;
+/** Where the pinned release asset for `target` is downloaded from. */
+export const agentBrowserUrl = (target: AgentBrowserTarget) =>
+  `https://github.com/vercel-labs/agent-browser/releases/download/v${AGENT_BROWSER_VERSION}/${agentBrowserAsset(target)}`;
 
 /** Largest pieces of browser frames. */
 export const BROWSER_LIMITS = {
@@ -792,14 +835,16 @@ export type WireSecretTarget = { kind: "env" } | { kind: "file"; path: string };
 
 /**
  * Secrets of the request's agent (ADR 0027): `keypair` makes the key for a
- * request (the private key stays on the machine), `deliver` opens the box and
- * stores the value, `discard` drops a request's key, `remove` forgets a secret.
+ * request (the private key stays on the machine), `deliver` validates and stages
+ * only the sealed box, `activate` opens it after the server commits delivery,
+ * `discard` drops a request's key and staged box, `remove` forgets a secret.
  */
 export type SecretRequest =
   | { action: "keypair"; requestId: string }
   | { action: "deliver"; requestId: string; name: string; target: WireSecretTarget; aad: string; box: WireSecretBox }
+  | { action: "activate"; requestId: string; order: string }
   | { action: "discard"; requestId: string }
-  | { action: "remove"; name: string };
+  | { action: "remove"; name: string; requestIds?: string[]; throughOrder?: string };
 
 export type MachineOs = "linux" | "darwin" | "windows" | "other";
 
@@ -1310,6 +1355,8 @@ export type MachineRequest = (
     }
   /** Protocol 17: a JPEG of the page with its elements numbered and boxed (for a judge that sees images). */
   | { op: "browser.capture"; allowedDomains?: string[] }
+  /** Protocol 27: start the agent's Chrome before its first command (`desktop`: as on `browser.act`). */
+  | { op: "browser.warm"; desktop?: boolean }
   /** Protocol 18: starts the agent's desktop; when it runs already, only marks it used (idempotent). */
   | { op: "desktop.session.start" }
   /** Protocol 18: ends the agent's desktop, and its browser on it. */
@@ -1366,6 +1413,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "browser.input",
   "browser.batch",
   "browser.capture",
+  "browser.warm",
   "desktop.session.start",
   "desktop.session.stop",
   "desktop.session.status",
@@ -1386,8 +1434,8 @@ export interface MachineReplies {
   list: { entries: FileEntry[] };
   /** What was sent: the uploaded name (`report.pdf`, or `folder.zip`), bytes and SHA-256 (hex). */
   push: { name: string; size: number; sha256: string; contentType: string };
-  /** `keypair`: the public key (raw P-256, base64); `deliver`: the value's size in bytes. */
-  secret: { publicKey?: string; size?: number };
+  /** `keypair`: public key; `deliver`/`activate`: size; an older activation may be superseded. */
+  secret: { publicKey?: string; size?: number; superseded?: boolean };
   /**
    * `begin`: what the person needs (`url`; Claude Code: `publicKey`; Codex: `userCode`);
    * `status`: `state` and, when done, `account`; `list`: `accounts`; `code`, `cancel`, `remove`: `{}`.
@@ -1428,7 +1476,7 @@ export interface MachineReplies {
   "access.request": { requestId: string; status: "pending" | "granted" };
   "access.reduce": { access: RunnerAccess };
   /** `agent-browser`'s own JSON answer: `success: false` with its `error` is a page-level failure (stale ref, covered click). */
-  "browser.act": { success: boolean; data: unknown; error?: string };
+  "browser.act": { success: boolean; data: unknown; error?: string; setup?: BrowserSetup };
   /** `false`: there was no session. */
   "browser.stop": { stopped: boolean };
   "browser.stream.start": { mode: BrowserStreamMode };
@@ -1437,7 +1485,9 @@ export interface MachineReplies {
   /** `failed`: events the browser didn't confirm (absent when all went through). */
   "browser.input": { accepted: number; failed?: number };
   /** One answer per command run, in order: fewer than asked when one failed without `tolerate`. */
-  "browser.batch": { answers: { success: boolean; data: unknown; error?: string }[] };
+  "browser.batch": { answers: { success: boolean; data: unknown; error?: string }[]; setup?: BrowserSetup };
+  /** `false`: nothing was started (it runs or starts already, a person has the browser, or no room). */
+  "browser.warm": { started: boolean; setup?: BrowserSetup };
   /**
    * The page as a JPEG (base64), its size in pixels, the page's size in CSS
    * pixels, and its numbered elements with their boxes (CSS pixels).
@@ -1494,7 +1544,10 @@ export type MachineErrorCode =
   | "exec_disabled"
   | "too_large"
   | "upload_failed"
-  /** `task.start` beyond the runner's concurrent tasks (`maxConcurrentTasks`). */
+  /**
+   * `task.start` beyond the runner's concurrent tasks (`maxConcurrentTasks`); `brain.turn` while the computer
+   * has no room for one more turn (ADR 0025 §5, admission). Try again later.
+   */
   | "no_slot"
   /** Protocol 9: the owner paused this computer; nothing new starts until it resumes. */
   | "paused"
@@ -1528,12 +1581,27 @@ export type MachineErrorCode =
   | "terminal_unavailable"
   /** Protocol 18: the agent's (or the computer's) streams of that kind are at their cap. */
   | "too_many_streams"
+  /**
+   * The agent's process on the computer went away while the request ran (its worker stopped, the runner is
+   * stopping): it may have stopped partway. Older servers read it like `internal`.
+   */
+  | "dropped"
   | "bad_request"
   | "internal";
 
 /** Server → runner. */
 export type ServerFrame =
-  | { type: "welcome"; machineId: string; name: string; heartbeatMs: number }
+  | {
+      type: "welcome";
+      machineId: string;
+      name: string;
+      heartbeatMs: number;
+      /**
+       * The server runs each `mcp.call` once per `callId` and answers a copy with the first answer: a call cut by
+       * a reconnect may be sent again. Absent (older servers): sent again it would run twice.
+       */
+      mcpOnce?: boolean;
+    }
   | ({ type: "request"; id: string } & MachineRequest)
   | { type: "cancel"; id: string }
   | { type: "ping"; at: number }

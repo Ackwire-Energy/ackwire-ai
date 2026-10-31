@@ -10,7 +10,7 @@ import {
   notify,
   resolveNotifications,
 } from "./notifications";
-import type { MemberRole } from "./organizations";
+import { maySql, type RolePermission } from "./permissions";
 
 /**
  * Where notifications come from: each flow calls one of these after
@@ -93,9 +93,17 @@ async function agentOwner(deps: Pick<NotificationDeps, "db">, agentId: string) {
 // ── Chat: mentions, thread replies, DMs ───────────────────────────────────────
 
 /**
+ * One open `agent_reply` per conversation (a channel's top level, a thread, a DM): an agent's later answers there
+ * merge into it until it's read. Reading the conversation resolves it (`markChannelRead`).
+ */
+export const agentReplyGroup = (channelId: string, threadId: string | null) =>
+  `agent_reply:${channelId}:${threadId ?? "top"}`;
+
+/**
  * Job `notifications.message` (enqueued in the message's own statement):
- * people mentioned (`mention`), the other person of a DM (`dm`), and the
- * people in a thread (`thread_reply`, merged per thread). Cards of the
+ * people mentioned (`mention`), the other person of a DM (`dm`), the person
+ * an agent answers (`agent_reply`, merged per conversation, ADR 0071), and
+ * the people in a thread (`thread_reply`, merged per thread). Cards of the
  * agent's own flows (questions, approvals, secret requests) notify through
  * those flows instead; the forum notifies through its turns.
  */
@@ -125,8 +133,33 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
   };
   const done = new Set<string>(authorUser ? [authorUser] : []);
 
+  // An agent's answer: the person behind its run hears it (ADR 0071), once per conversation until read, so they
+  // can close the tab while it works. Not a routine's (its creator hears `routine_finished`), not a run that
+  // person stopped, not when they're mentioned in it (the mention says it).
+  const asker =
+    message.authorType === "agent" && message.agentRunId && !meta.viaRoutine && !meta.canceled && !meta.agentDm
+      ? await humanBehindRun(deps, orgId, message.agentRunId)
+      : null;
+  if (
+    asker &&
+    !message.mentionedUserIds.includes(asker) &&
+    (await inChannel(deps, message.channelId, [asker])).length > 0
+  ) {
+    await notify(deps, {
+      orgId,
+      userIds: [asker],
+      kind: "agent_reply",
+      groupKey: agentReplyGroup(message.channelId, message.threadId),
+      actor,
+      source: { ...where, ...(label ? { label } : {}) },
+      latest: { text },
+    });
+    done.add(asker);
+  }
+
   // A DM from a person: the other person hears it (an agent's replies in a DM are the conversation itself,
-  // except a message the agent started there on someone's behalf, `send_dm`).
+  // answered above for the person behind them, except a message the agent started there on someone's behalf,
+  // `send_dm`).
   if (channel.kind === "dm") {
     if (message.authorType !== "person" && !meta.agentDm) return;
     const others = await db
@@ -678,13 +711,20 @@ export async function resolveRoutinePaused(deps: NotificationDeps, orgId: string
   await resolveNotifications(deps, orgId, { groupKeyPrefix: `routine_paused:${routineId}:` });
 }
 
-/** The organization's owners and admins (or only the roles given). */
-const adminsOf = async (deps: NotificationDeps, orgId: string, roles: MemberRole[] = ["owner", "admin"]) =>
+/** Who in the organization may `permission` (ADR 0085), or only its owners. */
+const adminsOf = async (deps: NotificationDeps, orgId: string, permission: RolePermission | "owners") =>
   (
     await deps.db
       .select({ userId: organizationMembers.userId })
       .from(organizationMembers)
-      .where(and(eq(organizationMembers.orgId, orgId), inArray(organizationMembers.role, roles)))
+      .where(
+        and(
+          eq(organizationMembers.orgId, orgId),
+          permission === "owners"
+            ? eq(organizationMembers.role, "owner")
+            : maySql(orgId, organizationMembers.userId, permission),
+        ),
+      )
   ).map((a) => a.userId);
 
 // ── Connected computers ───────────────────────────────────────────────────────
@@ -701,7 +741,7 @@ export async function notifyMachineConnected(
 ) {
   await notify(deps, {
     orgId: machine.orgId,
-    userIds: await adminsOf(deps, machine.orgId),
+    userIds: await adminsOf(deps, machine.orgId, "configure"),
     kind: "machine_connected",
     groupKey: `machine_connected:${machine.id}`,
     actor: person(actorId),
@@ -721,7 +761,7 @@ export async function notifyComputerReady(
 ) {
   await notify(deps, {
     orgId: machine.orgId,
-    userIds: await adminsOf(deps, machine.orgId, ["owner"]),
+    userIds: await adminsOf(deps, machine.orgId, "owners"),
     kind: "computer_ready",
     groupKey: `computer_ready:${machine.id}:${readyAt.getTime()}`,
     source: { machineId: machine.id, label: machine.name },
@@ -733,25 +773,27 @@ export async function notifyComputerReady(
 
 /**
  * The people who run this server held, suspended or restored the workspace, with the notice shown: its
- * owners and admins hear it, with the reason (`latest.text`), and on agentes.chat Cloud `latest.cloud`, so the apps
- * read it as the restriction itself reads. One row per change.
+ * owners and admins hear it, with the reason (`latest.text`), or a billing hold's code (`latest.billingHold`,
+ * ADR 0079), which the apps say in the person's words, and on agentes.chat Cloud `latest.cloud`, so the apps
+ * read a restriction as the restriction itself reads. One row per change.
  */
 export async function notifyOrgStanding(
   deps: NotificationDeps,
   orgId: string,
-  standing: { state: string; reason: string | null; changedAt: Date | null; cloud?: boolean },
+  standing: { state: string; reason: string | null; changedAt: Date | null; billing?: boolean; cloud?: boolean },
 ) {
+  const why = standing.billing
+    ? { billingHold: standing.reason ?? "" }
+    : standing.reason
+      ? { text: notificationSnippet(standing.reason) }
+      : {};
   await notify(deps, {
     orgId,
-    userIds: await adminsOf(deps, orgId),
+    userIds: await adminsOf(deps, orgId, "configure"),
     kind: "org_standing",
     groupKey: `org_standing:${orgId}:${standing.changedAt?.getTime() ?? 0}`,
     source: {},
-    latest: {
-      statusTo: standing.state,
-      ...(standing.reason ? { text: notificationSnippet(standing.reason) } : {}),
-      ...(standing.cloud ? { cloud: true } : {}),
-    },
+    latest: { statusTo: standing.state, ...why, ...(standing.cloud ? { cloud: true } : {}) },
   });
 }
 
@@ -768,7 +810,7 @@ export async function notifyAgentHold(
 ) {
   await notify(deps, {
     orgId: hold.orgId,
-    userIds: [await agentOwner(deps, hold.agentId), ...(await adminsOf(deps, hold.orgId))],
+    userIds: [await agentOwner(deps, hold.agentId), ...(await adminsOf(deps, hold.orgId, "manage_agents"))],
     kind: "org_standing",
     groupKey: `${agentHoldGroup(hold.agentId)}${hold.at.getTime()}:${hold.kind}`,
     source: { agentId: hold.agentId, label: hold.name },

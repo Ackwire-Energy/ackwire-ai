@@ -1,7 +1,15 @@
 import { afterEach, expect, test } from "bun:test";
-import { DESKTOP_PROTOCOL, type MachineRequest } from "@agenteschat/adapters";
+import {
+  BROWSER_FAST_PROTOCOL,
+  BROWSER_WARM_PROTOCOL,
+  DESKTOP_PROTOCOL,
+  type MachineRequest,
+  SECRET_ACTIVATE_PROTOCOL,
+} from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
+  ARTIFACT_LIMITS,
+  absorbToolData,
   agentBrowserStatus,
   agentFolderPath,
   BROWSER_SCOPE,
@@ -19,11 +27,15 @@ import {
   type MachineStatus,
   normalizeRef,
   setAgentBrowserDomains,
+  type ToolSideEffects,
+  toolDenyScope,
+  updateSandboxSettings,
+  warmAgentBrowser,
   wrapPage,
 } from "../src";
 import { actionCommands } from "../src/browser/surface";
 import { addMember, type Fixture, setup } from "./fixtures";
-import { pairMachine } from "./machine-fixtures";
+import { pairMachine, pushFromFolder } from "./machine-fixtures";
 import { runContext } from "./mail-fixtures";
 
 let f: Fixture;
@@ -85,6 +97,7 @@ async function browserSetup(options: { judge?: Judge; vision?: boolean; now?: ()
         ...(options.judge ? { judge: options.judge } : {}),
         ...(options.vision ? { vision: () => true } : {}),
         ...(options.now ? { now: options.now } : {}),
+        publicUrl: "http://localhost:3000",
       }),
     ],
   });
@@ -521,6 +534,103 @@ test("an agent whose Chrome belongs on its desktop says so on every command that
   ).toBe(false);
 });
 
+test("warmAgentBrowser: the agent's Chrome starts ahead only where its next command would start it", async () => {
+  const b = await browserSetup();
+  b.s.respond = (r) => (r.op === "browser.warm" ? { started: true } : page('- button "Save" [ref=e1]'));
+  const warm = (at: { machineId?: string } = {}) =>
+    warmAgentBrowser(f.db, b.hub, { orgId: f.org.id, agentId: f.agent.id, ...at });
+  const warms = () => b.calls.filter((c) => c.op === "browser.warm");
+  const tools = { folders: [], tools: { claude: true, codex: true, commands: true, browser: true } };
+  b.s.status = { protocol: BROWSER_WARM_PROTOCOL };
+  // An agent that may not use its browser: nothing.
+  expect(await warm()).toBe(false);
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: BROWSER_SCOPE }]);
+  // A runner that doesn't know the op, the computer's browser switch off, the computer offline: nothing.
+  b.s.status = { protocol: BROWSER_WARM_PROTOCOL - 1 };
+  expect(await warm()).toBe(false);
+  b.s.status = { protocol: BROWSER_WARM_PROTOCOL, access: { ...tools, tools: { ...tools.tools, browser: false } } };
+  expect(await warm()).toBe(false);
+  b.s.status = { protocol: BROWSER_WARM_PROTOCOL, online: false };
+  expect(await warm()).toBe(false);
+  expect(warms()).toEqual([]);
+  b.s.status = { protocol: BROWSER_WARM_PROTOCOL };
+  expect(await warm()).toBe(true);
+  expect(warms()).toEqual([{ op: "browser.warm", agent: { id: f.agent.id, handle: "dev", name: "Dev" } }]);
+  // A person asked to take the browser, or in control of it: nothing.
+  const [asked] = await f.db
+    .insert(schema.browserHandoffs)
+    .values({
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      machineId: b.machineId,
+      kind: "ask",
+      status: "pending",
+      requestedForUserId: f.owner.id,
+      expiresAt: new Date(Date.now() + 600_000),
+    })
+    .returning();
+  expect(await warm()).toBe(false);
+  await f.db
+    .update(schema.browserHandoffs)
+    .set({ status: "active", controllerUserId: f.owner.id })
+    .where(eq(schema.browserHandoffs.id, asked?.id as string));
+  expect(await warm()).toBe(false);
+  await f.db
+    .update(schema.browserHandoffs)
+    .set({ status: "done", resolvedAt: new Date() })
+    .where(eq(schema.browserHandoffs.id, asked?.id as string));
+  expect(warms()).toHaveLength(1);
+  // Where its Chrome belongs on its desktop, there.
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: DESKTOP_SCOPE }]);
+  await f.db
+    .update(schema.machines)
+    .set({
+      protocol: BROWSER_WARM_PROTOCOL,
+      executors: { browser: { available: true }, desktop: { available: true } },
+      access: { ...tools, tools: { ...tools.tools, desktop: true } },
+    })
+    .where(eq(schema.machines.id, b.machineId));
+  expect(await warm()).toBe(true);
+  expect(warms().at(-1)).toMatchObject({ op: "browser.warm", desktop: true });
+  // A computer that isn't the agent's to use (gone, another organization's): nothing.
+  expect(await warm({ machineId: "00000000-0000-4000-8000-000000000000" })).toBe(false);
+  expect(warms()).toHaveLength(2);
+});
+
+test("a browser_do's timing says what its commands waited on before they ran, summed from the runner's answers", async () => {
+  const b = await browserSetup();
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: BROWSER_SCOPE }]);
+  b.s.status = { protocol: BROWSER_FAST_PROTOCOL };
+  const setups: unknown[] = [];
+  b.s.respond = (r) => {
+    if (r.op !== "browser.batch") return page('- button "Save" [ref=e1]');
+    const answers = r.commands.map((c) => (c.command === "snapshot" ? page('- button "Save" [ref=e1]') : ok()));
+    const setup = setups.shift();
+    return setup === undefined ? { answers } : { answers, setup };
+  };
+  const plan = (steps: unknown[]) => b.call("browser_do", { steps });
+  // A browser that was ready: nothing to say.
+  const ready = await plan([{ do: "open", url: "https://shop.example/" }]);
+  expect(ready.isError).toBeUndefined();
+  expect(ready.data?.timing).not.toHaveProperty("setup");
+  // Its first command started it: what that took, from each answer, summed; what isn't a known step is dropped.
+  setups.push(
+    { worker: 1200, install: 28_100, launch: 1400 },
+    { launch: 600, queued: 12, desktop: -3, chrome: 5, install: 1.5 },
+  );
+  const first = await plan([
+    { do: "open", url: "https://shop.example/" },
+    { do: "click", target: "e1" },
+  ]);
+  expect(first.isError).toBeUndefined();
+  expect((first.data?.timing as { setup?: unknown } | undefined)?.setup).toEqual({
+    worker: 1200,
+    install: 28_100,
+    queued: 12,
+    launch: 2000,
+  });
+});
+
 test("the computer the browser runs on is remembered for the live view, take over and Stop", async () => {
   const b = await browserSetup();
   await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
@@ -642,6 +752,7 @@ test("an agent with only the browser asks for a password bound to one site, made
   expect(noSite.isError).toBe(true);
   expect(b.calls).toHaveLength(0);
 
+  b.s.status = { protocol: SECRET_ACTIVATE_PROTOCOL };
   b.s.reply = { publicKey: "pk-browser" } as never;
   const r = await tools.invoke(b.ctx, {
     toolUseId: "tu_secret_browser",
@@ -693,4 +804,105 @@ test("with the computer and the browser, there is exactly one request_secret (th
   const both = await secretTools();
   expect(both).toHaveLength(1);
   expect(both[0]?.scope).toBe("sandbox:run");
+});
+
+const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+test("browser_screenshot with share: sent to the Drive and attached to the reply as upload_file does, without Run code", async () => {
+  const b = await browserSetup();
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  await updateSandboxSettings(f.db, f.owner.id, f.org.id, { enabled: false });
+  // The agent's folder on the computer: the screenshot is written there and pushed from there.
+  const folder = new Map<string, Uint8Array>();
+  b.s.respond = (r) => {
+    if (r.op === "push") return pushFromFolder(f, b.machineId, folder, r);
+    if (r.op === "browser.act" && r.command === "screenshot") folder.set(String(r.args[0]), PNG);
+    return ok();
+  };
+
+  const kept = await b.call("browser_screenshot", { path: "shots/kept.png" });
+  expect(kept.content).toBe(
+    "Saved shots/kept.png in your folder. To show a screenshot in this conversation, take it with share: true.",
+  );
+  expect(b.calls.filter((c) => c.op === "push")).toEqual([]);
+
+  const sent = b.since();
+  const out = await b.call("browser_screenshot", { share: true });
+  expect(out.isError).toBeUndefined();
+  const shot = sent()[0];
+  const path = String(shot?.args[0]);
+  expect(path).toMatch(/^screenshots\/.+\.png$/);
+  const [a] = await f.db.select().from(schema.artifacts);
+  expect(a).toMatchObject({ kind: "file", title: path.slice("screenshots/".length), channelId: f.general.id });
+  expect(out.data).toEqual({ path, artifact: { id: a?.id, version: 1 } });
+  const reply: ToolSideEffects = {};
+  absorbToolData(reply, out.data);
+  expect(reply.artifacts).toEqual([{ id: a?.id as string, version: 1 }]);
+  expect(out.content).toBe(
+    `Saved ${path} in your folder. It is shown in this conversation: its card goes with your reply ("${a?.title}" in the Drive, 8 bytes, artifact ${a?.id}).`,
+  );
+  const [up] = await f.db.select().from(schema.artifactUploads);
+  expect(up).toMatchObject({ status: "done", path, runId: b.ctx.runId, computer: `machine:${b.machineId}` });
+  // Pushed by the computer itself, for the same agent (so from the same folder) the browser wrote it in.
+  expect(b.calls.filter((c) => c.op === "push")).toEqual([
+    {
+      op: "push",
+      agent: shot?.agent as Act["agent"],
+      path,
+      url: `http://localhost:3000/api/machines/uploads/${up?.id}`,
+      uploadId: up?.id as string,
+      maxBytes: ARTIFACT_LIMITS.fileBytes,
+    },
+  ]);
+});
+
+test("browser_screenshot with share but without Write files: saved, and the answer says how to ask for it", async () => {
+  const b = await browserSetup();
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  await f.db
+    .delete(schema.agentScopes)
+    .where(and(eq(schema.agentScopes.agentId, f.agent.id), eq(schema.agentScopes.scope, "drive:write")));
+  const out = await b.call("browser_screenshot", { path: "shots/x.png", share: true });
+  expect(out.isError).toBeUndefined();
+  expect(out.content).toBe(
+    `Saved shots/x.png in your folder. It isn't shown in this conversation: that needs "Write files" (drive:write), which you don't have. Ask for it with request_permission, then take it again with share: true.`,
+  );
+  expect(out.data).toEqual({ url: "https://shop.example/", path: "shots/x.png" });
+  // Turned off by name: nothing to ask for.
+  await grantScopes(f.db, f.org.id, f.agent.id, [
+    { connectionId: null, scope: "drive:write" },
+    { connectionId: null, scope: toolDenyScope("create_artifact") },
+  ]);
+  const off = await b.call("browser_screenshot", { path: "shots/y.png", share: true });
+  expect(off.content).toContain("It isn't shown in this conversation: making Drive files is turned off for you");
+  const shots = b.calls.filter((c): c is Act => c.op === "browser.act" && c.command === "screenshot");
+  expect(shots.map((c) => c.args[0])).toEqual(["shots/x.png", "shots/y.png"]);
+  expect(b.calls.filter((c) => c.op === "push")).toEqual([]);
+  expect(await f.db.select().from(schema.artifactUploads)).toEqual([]);
+});
+
+test("browser_screenshot names its file a .png, so the browser writes the image where share sends it from", async () => {
+  const b = await browserSetup();
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
+  const folder = new Map<string, Uint8Array>([["notes.txt", new TextEncoder().encode("a note")]]);
+  b.s.respond = (r) => {
+    if (r.op === "push") return pushFromFolder(f, b.machineId, folder, r);
+    if (r.op === "browser.act" && r.command === "screenshot") {
+      // agent-browser's `screenshot [selector] [path]`: a lone argument without a slash or an image extension is a selector.
+      const arg = String(r.args[0]);
+      folder.set(/[/\\]|\.(png|jpe?g|webp)$/i.test(arg) ? arg : "screenshots/generated.png", PNG);
+    }
+    return ok();
+  };
+
+  const out = await b.call("browser_screenshot", { path: "notes.txt", share: true });
+  const [a] = await f.db.select().from(schema.artifacts);
+  expect(out.content).toBe(
+    `Saved notes.png in your folder. It is shown in this conversation: its card goes with your reply ("notes.png" in the Drive, 8 bytes, artifact ${a?.id}).`,
+  );
+  const kept = await b.call("browser_screenshot", { path: "code" });
+  expect(kept.content).toStartWith("Saved code.png in your folder.");
+  const shots = b.calls.filter((c): c is Act => c.op === "browser.act" && c.command === "screenshot");
+  expect(shots.map((c) => c.args[0])).toEqual(["notes.png", "code.png"]);
+  expect(b.calls.filter((c) => c.op === "push").map((c) => c.path)).toEqual(["notes.png"]);
 });

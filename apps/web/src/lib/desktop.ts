@@ -40,6 +40,7 @@ export function applyDesktopDevice(i18n: I18n, platform: DesktopPlatform) {
 const NOTICE_KINDS = [
   "mention",
   "dm",
+  "agent_reply",
   "agent_question",
   "approval",
   "forum_turn",
@@ -113,29 +114,8 @@ export async function challengeOf(verifier: string) {
   return base64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
 }
 
-export const browserSignInUrl = (provider: SignInProvider, challenge: string) =>
-  `${BROWSER_SIGN_IN_PATH}?${new URLSearchParams({ provider, challenge })}`;
-
-/** The browser keeps the challenge it started with: a link that skips the provider finds none. */
-const CHALLENGE_KEY = "agentes.desktopChallenge";
-export const browserChallenge = {
-  set(challenge: string) {
-    try {
-      sessionStorage.setItem(CHALLENGE_KEY, challenge);
-    } catch {
-      // Without storage the handoff is refused; the person signs in again.
-    }
-  },
-  take(): string | null {
-    try {
-      const value = sessionStorage.getItem(CHALLENGE_KEY);
-      sessionStorage.removeItem(CHALLENGE_KEY);
-      return value;
-    } catch {
-      return null;
-    }
-  },
-};
+export const browserSignInUrl = (provider: SignInProvider, requestId: string) =>
+  `${BROWSER_SIGN_IN_PATH}?${new URLSearchParams({ provider, request: requestId })}`;
 
 /**
  * What the site may ask of this computer (ADR 0036, `this_mac` in main_window.rs): which of this server's

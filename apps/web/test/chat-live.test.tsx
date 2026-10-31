@@ -3,6 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import { ApiError } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -85,6 +86,61 @@ describe("optimistic send", () => {
     expect(state.calls.filter((c) => c.method === "chat.post")).toHaveLength(2);
     expect(rowsWith("vai falhar")).toHaveLength(1);
     expect(rowsWith("vai falhar")[0]?.className).not.toContain("ac-msg--failed");
+  });
+
+  test("the server restarting (the proxy's 502): it waits instead of failing, then goes out by itself with its clientId", async () => {
+    const state = seedState({ failPosts: new ApiError(502, "http_502", "Bad Gateway") });
+    const { sockets } = await open(state);
+    await sendText("durante o deploy");
+    await settle(4);
+    const row = () => rowsWith("durante o deploy")[0] as HTMLElement;
+    expect(row().className).not.toContain("ac-msg--failed");
+    expect(row().textContent).toContain("sai quando a conexão voltar");
+    // The new server is up: the socket drops with the old one and reconnects.
+    state.failPosts = false;
+    await act(async () => sockets.last().drop());
+    await act(() => new Promise((r) => setTimeout(r, 650)));
+    await act(async () => sockets.last().open());
+    await settle(4);
+    const clientIds = state.calls
+      .filter((c) => c.method === "chat.post")
+      .map((c) => (c.args[2] as { clientId: string }).clientId);
+    expect(clientIds).toHaveLength(2);
+    expect(clientIds[0]).toBeTruthy();
+    expect(clientIds[1]).toBe(clientIds[0]);
+    expect(rowsWith("durante o deploy")).toHaveLength(1);
+    expect(row().className).not.toContain("ac-msg--pending");
+    expect(row().className).not.toContain("ac-msg--failed");
+  });
+
+  test("a message waiting in one conversation goes out once the server is back, while the person is in another", async () => {
+    const state = seedState({ failPosts: new ApiError(502, "http_502", "Bad Gateway") });
+    const { sockets, router } = await open(state);
+    const go = (channelId: string) =>
+      act(() => router.navigate({ to: "/org/$orgId/c/$channelId", params: { orgId: ORG_ID, channelId } }));
+    await sendText("antes do deploy");
+    await settle(4);
+    expect(rowsWith("antes do deploy")[0]?.textContent).toContain("sai quando a conexão voltar");
+    await go(GENERAL_ID);
+    await settle(4);
+    state.failPosts = false;
+    await act(async () => sockets.last().drop());
+    await act(() => new Promise((r) => setTimeout(r, 650)));
+    await act(async () => sockets.last().open());
+    await settle(4);
+    const posts = () =>
+      state.calls
+        .filter((c) => c.method === "chat.post")
+        .map((c) => `${c.args[1]}:${(c.args[2] as { clientId: string }).clientId}`);
+    expect(posts()).toHaveLength(2);
+    expect(posts()[1]).toBe(posts()[0] as string);
+    // Back in that conversation: the message is there, sent, and nothing goes out again.
+    await go(ENG_ID);
+    await settle(4);
+    expect(rowsWith("antes do deploy")).toHaveLength(1);
+    expect(rowsWith("antes do deploy")[0]?.className).not.toContain("ac-msg--failed");
+    expect(rowsWith("antes do deploy")[0]?.className).not.toContain("ac-msg--pending");
+    expect(posts()).toHaveLength(2);
   });
 });
 
@@ -485,6 +541,44 @@ describe("empty conversations", () => {
     expect(dm.querySelector(".ac-empty__title")?.textContent).toBe("Diga oi para João");
     expect(dm.querySelector(".ac-empty__text")).toBeNull();
   });
+
+  test("a channel's suggestions go to the first agent with a handle someone chose, by name; with none, to the first agent", async () => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (!ada) throw new Error("no Ada");
+    const imported = "00000000-0000-4000-8000-0000000000a9";
+    const alsoImported = "00000000-0000-4000-8000-0000000000aa";
+    state.agents.push(
+      { ...ada, id: imported, name: "New agent", handle: "agent-e9665a97-c8d5-423f-ae59-25", role: "" },
+      { ...ada, id: alsoImported, name: "Rita Revisão", handle: "agent-925ca021-21e4-4053-9e0a-23", role: "" },
+    );
+    state.channelMembers[GENERAL_ID] = [
+      { type: "person", id: "u-walter" },
+      { type: "agent", id: imported },
+      { type: "agent", id: ADA_ID },
+    ];
+    await open(state, `c/${GENERAL_ID}`);
+    await settle(4);
+    const suggestion = screen().getByRole("button", { name: "@Ada O que quebrou desde o último deploy?" });
+    expect(document.querySelector(".channel__suggestions")?.textContent).not.toContain("agent-");
+    await act(async () => fireEvent.click(suggestion));
+    expect((composer() as HTMLTextAreaElement).value).toBe("@ada O que quebrou desde o último deploy?");
+    cleanup();
+
+    state.channelMembers[GENERAL_ID] = [
+      { type: "person", id: "u-walter" },
+      { type: "agent", id: imported },
+      { type: "agent", id: alsoImported },
+    ];
+    await open(state, `c/${GENERAL_ID}`);
+    await settle(4);
+    await act(async () =>
+      fireEvent.click(screen().getByRole("button", { name: "@New agent Oi, o que você sabe fazer?" })),
+    );
+    expect((composer() as HTMLTextAreaElement).value).toBe(
+      "@agent-e9665a97-c8d5-423f-ae59-25 Oi, o que você sabe fazer?",
+    );
+  });
 });
 
 test("a DM's head: the name with a line under it rises to the face's top, a person's as an agent's", async () => {
@@ -516,7 +610,7 @@ describe("direct messages with an agent", () => {
     if (ada) ada.brain = { kind: "claude_code", model: "Sonnet", computer: "MacBook" };
     await open(state, `dm/agent/${ADA_ID}`);
     await settle(4);
-    expect(document.body.textContent).toContain("Dev · responde a João · Claude Code · Sonnet no MacBook");
+    expect(document.body.textContent).toContain("Dev · de João · Claude Code · Sonnet no MacBook");
     expect(document.body.textContent).not.toContain("Claude Sonnet 5.5");
     const brain = document.querySelector(".channel__brain") as HTMLElement;
     expect(brain.querySelector(".ac-brand[data-mark='claude']")).not.toBeNull();
@@ -527,7 +621,7 @@ describe("direct messages with an agent", () => {
     if (codex) codex.brain = { kind: "codex", model: "GPT-6 Sol" };
     await open(member, `dm/agent/${ADA_ID}`);
     await settle(4);
-    expect(document.body.textContent).toContain("Dev · responde a João · Codex · GPT-6 Sol");
+    expect(document.body.textContent).toContain("Dev · de João · Codex · GPT-6 Sol");
   });
 
   test("sidebar agent → DM via POST /dms: header with role, owner and model; empty state; the agent answers without a mention", async () => {
@@ -536,7 +630,7 @@ describe("direct messages with an agent", () => {
     await settle(4);
     expect(state.calls.find((c) => c.method === "dms.open")?.args).toEqual([ORG_ID, { agentId: ADA_ID }]);
     expect(screen().getByRole("heading", { level: 1, name: "Ada" })).toBeTruthy();
-    expect(document.body.textContent).toContain("Dev · responde a João · Claude Sonnet 5.5");
+    expect(document.body.textContent).toContain("Dev · de João · Claude Sonnet 5.5");
     // "Ver perfil": the agent's page in the panel beside the conversation (like a thread's), closed by its ×.
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Ver perfil" })));
     await settle(4);

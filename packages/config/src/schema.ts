@@ -78,6 +78,12 @@ export const envVars = {
       "Directory containing the built web app (single-page app). Served by this server when it exists; otherwise only the API runs.",
     section: "Server",
   },
+  SHUTDOWN_DELAY_MS: {
+    schema: z.coerce.number().int().min(0).max(5_000).default(0),
+    description:
+      "On SIGTERM, how long the server keeps serving while `/api/health` answers 503, before it stops taking requests. Behind a reverse proxy with an active health check (and a retry window), set it above the check's interval so the proxy stops sending requests here first and holds them for the next instance instead of failing them (2000 for a check every second). 0 (default): stop taking requests at once.",
+    section: "Server",
+  },
   DATABASE_URL: {
     schema: z
       .string()
@@ -113,7 +119,7 @@ export const envVars = {
   ALLOW_SIGNUP: {
     schema: z.stringbool().default(false),
     description:
-      "Let anyone create an account. When off (default), only the **first** account can sign up (it becomes owner of the installation) and everyone else needs an invitation. Keep it off on a self-hosted instance reachable from the internet.",
+      "Forces sign-up open: anyone can create an account. When off (default), the **first** account can sign up (it becomes owner of the installation), and after it sign-up is by invitation only until the operator API's sign-up mode is set to open, live, with no restart (ADR 0078). Keep it off on a self-hosted instance reachable from the internet.",
     section: "Sign-in",
   },
   OWNER_CLAIM_SHA256: {
@@ -137,14 +143,14 @@ export const envVars = {
   TERMS_URL: {
     schema: z.url().optional(),
     description:
-      "Your terms of service, linked on the sign-in and sign-up screens. The line shows only when `PRIVACY_URL` is set too. Default on agentes.chat Cloud (https://app.agentes.chat): its /terms page.",
+      "Your terms of service, linked on the sign-in and sign-up screens and the help pages when `PRIVACY_URL` is set too, and where this server's /terms leads. Default on agentes.chat Cloud (https://app.agentes.chat): its /terms page.",
     section: "Sign-in",
     example: "https://example.com/terms",
   },
   PRIVACY_URL: {
     schema: z.url().optional(),
     description:
-      "Your privacy policy, linked on the sign-in and sign-up screens together with `TERMS_URL`. Default on agentes.chat Cloud (https://app.agentes.chat): its /privacy page.",
+      "Your privacy policy, linked on the sign-in and sign-up screens and the help pages together with `TERMS_URL`, and where this server's /privacy leads. Default on agentes.chat Cloud (https://app.agentes.chat): its /privacy page.",
     section: "Sign-in",
     example: "https://example.com/privacy",
   },
@@ -513,7 +519,7 @@ export const envVars = {
   EMAIL_FROM: {
     schema: z.string().optional(),
     description:
-      "Sender of transactional emails, e.g. `agentes.chat <ola@example.com>` (its domain must be verified with your email provider). Default: `agentes.chat <ola@HOST>`, HOST being the host of `PUBLIC_URL`. On agentes.chat Cloud (https://app.agentes.chat): `agentes.chat <ola@agentes.chat>`.",
+      "Sender of transactional emails, e.g. `agentes.chat <ping@example.com>` (its domain must be verified with your email provider). Default: `agentes.chat <ping@HOST>`, HOST being the host of `PUBLIC_URL`. On agentes.chat Cloud (https://app.agentes.chat): `agentes.chat <ping@agentes.chat>`.",
     section: "Email",
   },
   EMAIL_ART: {
@@ -697,6 +703,30 @@ export const envVars = {
       "Where people write to whoever runs this server, shown with a workspace's hold notice, its suspended screen and the workspace's own computer when something on it doesn't work. Unset (default): they are told to ask the people who run the server.",
     section: "Operator",
     example: "support@example.com",
+  },
+  BILLING_URL: {
+    schema: z.url({ protocol: /^https$/ }).optional(),
+    description:
+      "Your billing service's address. With `BILLING_LINK_SECRET`, owners and admins get a Plan and billing page and buttons on billing holds and full workspaces that open it signed in. Unset (default): no billing anywhere.",
+    section: "Operator",
+    example: "https://billing.example.com",
+  },
+  BILLING_LINK_SECRET: {
+    schema: z
+      .string()
+      .min(32, "must be at least 32 characters; generate one with `openssl rand -base64 48`")
+      .optional(),
+    description:
+      "Signs the link to the billing service (HMAC-SHA256, 5 minutes). The billing service holds the same value. Generate with `openssl rand -base64 48`.",
+    section: "Operator",
+    example: "<output of openssl rand -base64 48>",
+    secret: true,
+  },
+  BILLING_HOLD_NEW_WORKSPACES: {
+    schema: z.stringbool().default(false),
+    description:
+      "New workspaces start on a payment hold: their agents wait until the billing service lifts it. Needs `BILLING_URL`, `BILLING_LINK_SECRET` and `OPERATOR_API_TOKEN`.",
+    section: "Operator",
   },
   SESSION_SCREENING: {
     schema: z.stringbool().default(false),

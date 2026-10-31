@@ -6,7 +6,7 @@ import { CHANNEL_NAME_PATTERN } from "./channels";
 import { invalidateDefaults } from "./credentials";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { agentBudgetState } from "./gateway";
-import { can, getMembership, requirePermission } from "./organizations";
+import { can, requireActiveMembership, requirePermission } from "./organizations";
 import {
   agentBudgetsThisMonth,
   budgetPercent,
@@ -186,7 +186,7 @@ export async function orgOverview(db: Database, actorId: string, orgId: string, 
     .select({ n: sql<number>`count(*)::int` })
     .from(agents)
     .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)));
-  const admin = can(membership.role, "manage_agents");
+  const admin = can(membership, "approve_actions");
   const [pending] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(approvals)
@@ -238,7 +238,7 @@ export async function agentDetail(db: Database, actorId: string, orgId: string, 
     .select({ n: sql<number>`count(*)::int` })
     .from(approvals)
     .where(and(eq(approvals.agentId, agentId), eq(approvals.status, "pending")));
-  const channelsOf = await listAgentChannels(db, orgId, agentId);
+  const channelsOf = await listAgentChannels(db, actorId, orgId, agentId);
   const budget = await agentBudgetState(db, orgId, agentId, now);
   const budgetNanoUsd = await effectiveAgentBudget(db, agent);
   const spentNanoUsd = Number(usage?.cost ?? 0);
@@ -262,13 +262,31 @@ export async function agentDetail(db: Database, actorId: string, orgId: string, 
   };
 }
 
-export async function listAgentChannels(db: Database, orgId: string, agentId: string) {
-  return db
-    .select({ id: channels.id, name: channels.name, autoReply: channelMembers.autoReply })
-    .from(channelMembers)
-    .innerJoin(channels, eq(channels.id, channelMembers.channelId))
-    .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.agentId, agentId), isNull(channels.archivedAt)))
-    .orderBy(asc(channels.name));
+export async function listAgentChannels(db: Database, actorId: string, orgId: string, agentId: string) {
+  const membership = await requireActiveMembership(db, actorId, orgId);
+  const [rows, ownChannels] = await Promise.all([
+    db
+      .select({
+        id: channels.id,
+        name: channels.name,
+        autoReply: channelMembers.autoReply,
+        kind: channels.kind,
+        visibility: channels.visibility,
+      })
+      .from(channelMembers)
+      .innerJoin(channels, eq(channels.id, channelMembers.channelId))
+      .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.agentId, agentId), isNull(channels.archivedAt)))
+      .orderBy(asc(channels.name)),
+    db
+      .select({ channelId: channelMembers.channelId })
+      .from(channelMembers)
+      .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.userId, actorId))),
+  ]);
+  const visible = new Set(ownChannels.map((row) => row.channelId));
+  const admin = can(membership, "manage_agents");
+  return rows
+    .filter((row) => visible.has(row.id) || (row.kind === "channel" && (row.visibility === "public" || admin)))
+    .map(({ id, name, autoReply }) => ({ id, name, autoReply }));
 }
 
 /**
@@ -288,13 +306,29 @@ export async function setAgentChannels(
   const ids = [...new Set(input.map((c) => c.channelId))];
   if (ids.length > 0) {
     const found = await db
-      .select({ id: channels.id })
+      .select({ id: channels.id, kind: channels.kind })
       .from(channels)
       .where(and(eq(channels.orgId, orgId), inArray(channels.id, ids), isNull(channels.archivedAt)));
     if (found.length !== ids.length) throw new ValidationError("Every channel must belong to this organization");
+    if (found.some((channel) => channel.kind === "dm")) {
+      throw new ValidationError("A direct conversation keeps its participants");
+    }
   }
   await db.transaction(async (tx) => {
-    await tx.delete(channelMembers).where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.agentId, agentId)));
+    // Bulk management changes ordinary channels only; DM participants are fixed by the DM flow.
+    const ordinaryChannels = db
+      .select({ id: channels.id })
+      .from(channels)
+      .where(and(eq(channels.orgId, orgId), eq(channels.kind, "channel")));
+    await tx
+      .delete(channelMembers)
+      .where(
+        and(
+          eq(channelMembers.orgId, orgId),
+          eq(channelMembers.agentId, agentId),
+          inArray(channelMembers.channelId, ordinaryChannels),
+        ),
+      );
     for (const c of input) {
       await tx
         .insert(channelMembers)
@@ -304,7 +338,7 @@ export async function setAgentChannels(
   });
   caches.channelMembers.deletePrefix(`${orgId}:`);
   caches.scopes.deletePrefix(`${orgId}:${agentId}:visible`);
-  return listAgentChannels(db, orgId, agentId);
+  return listAgentChannels(db, actorId, orgId, agentId);
 }
 
 // ── Channels ─────────────────────────────────────────────────────────────────
@@ -317,14 +351,13 @@ export async function updateChannel(
   channelId: string,
   input: { name?: string; topic?: string; visibility?: "public" | "private" },
 ) {
-  const membership = await getMembership(db, actorId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const membership = await requireActiveMembership(db, actorId, orgId);
   const [channel] = await db
     .select()
     .from(channels)
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId), isNull(channels.archivedAt)));
   if (!channel) throw new NotFoundError("Channel not found");
-  if (channel.createdByUserId !== actorId && !can(membership.role, "manage_members")) {
+  if (channel.createdByUserId !== actorId && !can(membership, "manage_channels")) {
     throw new ForbiddenError("Only the channel's creator or an admin can change it");
   }
   const name = input.name?.trim().toLowerCase();
@@ -377,7 +410,7 @@ export async function channelMembersDetail(db: Database, orgId: string, channelI
 /** Who may see runs and usage: admins (`view_usage`), or the agent's owner for that agent. */
 async function requireUsageAccess(db: Database, actorId: string, orgId: string, agentId?: string) {
   const membership = await requirePermission(db, actorId, orgId, "read");
-  if (can(membership.role, "view_usage")) return;
+  if (can(membership, "view_usage")) return;
   if (agentId) {
     const agent = await getAgent(db, orgId, agentId);
     if (agent?.ownerUserId === actorId) return;

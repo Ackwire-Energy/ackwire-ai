@@ -1,4 +1,4 @@
-import { ApiProvider, createSnapshot } from "@agenteschat/client";
+import { ApiProvider, createSnapshot, outbox } from "@agenteschat/client";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useMemo } from "react";
 import { I18nextProvider } from "react-i18next";
@@ -9,6 +9,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { frameClock } from "@/agent/clock";
 import { createApi } from "@/lib/api";
 import { authClient } from "@/lib/auth";
+import { outboxStore } from "@/lib/outbox";
 import { useServer } from "@/lib/server";
 import { snapshotStore } from "@/lib/snapshot";
 import { hintTouches } from "@/ui/hints";
@@ -44,13 +45,16 @@ export function AppProviders({ children }: { children: ReactNode }) {
     const { queryClient } = scope;
     const snapshot = createSnapshot(queryClient, snapshotStore);
     const stop = snapshot.start();
-    void snapshot.restore();
+    // What waits for the connection outlives the app being closed, and shows again in its conversation.
+    const stopOutbox = outbox.keep(queryClient, outboxStore);
+    void snapshot.restore().then(() => outbox.show(queryClient));
     const sub = AppState.addEventListener("change", (s) => {
       if (s === "background") void snapshot.flush();
     });
     return () => {
       queryClient.clear();
       stop();
+      stopOutbox();
       sub.remove();
     };
   }, [scope]);

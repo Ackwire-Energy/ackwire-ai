@@ -53,6 +53,7 @@ interface Strings {
   forumTitle: string;
   forumBody: string;
   mentionTitle: (actor: string) => string;
+  replyTitle: (actor: string) => string;
   missionStoppedTitle: string;
   routineFailedTitle: string;
   routineFailedBody: string;
@@ -87,6 +88,7 @@ export const PUSH_STRINGS: Record<PushLocale, Strings> = {
     forumTitle: "Sua vez de opinar",
     forumBody: "Toque para entrar na conversa.",
     mentionTitle: (a) => `${a} mencionou você`,
+    replyTitle: (a) => `${a} respondeu`,
     missionStoppedTitle: "Uma missão parou",
     routineFailedTitle: "Uma rotina não terminou",
     routineFailedBody: "Toque para ver o que aconteceu.",
@@ -94,7 +96,7 @@ export const PUSH_STRINGS: Record<PushLocale, Strings> = {
     routinePausedBody: "Toque para ver o motivo.",
     routineStalledTitle: "Uma rotina está esperando o computador",
     routineStalledBody: (c) => `Ela roda quando ${c} voltar.`,
-    machineConnectedTitle: "Um computador novo entrou na organização",
+    machineConnectedTitle: "Um computador novo entrou no workspace",
     computerReadyTitle: "O computador do seu workspace está pronto",
     computerReadyBody: "Abra a página de um agente para ver ao vivo.",
     browserHandoffTitle: (a) => `${a} precisa de você no navegador`,
@@ -118,6 +120,7 @@ export const PUSH_STRINGS: Record<PushLocale, Strings> = {
     forumTitle: "Your turn to weigh in",
     forumBody: "Tap to join the conversation.",
     mentionTitle: (a) => `${a} mentioned you`,
+    replyTitle: (a) => `${a} replied`,
     missionStoppedTitle: "A mission stopped",
     routineFailedTitle: "A routine didn't finish",
     routineFailedBody: "Tap to see what happened.",
@@ -125,7 +128,7 @@ export const PUSH_STRINGS: Record<PushLocale, Strings> = {
     routinePausedBody: "Tap to see why.",
     routineStalledTitle: "A routine is waiting for its computer",
     routineStalledBody: (c) => `It runs when ${c} is back.`,
-    machineConnectedTitle: "A new computer joined the organization",
+    machineConnectedTitle: "A new computer joined the workspace",
     computerReadyTitle: "Your workspace's computer is ready",
     computerReadyBody: "Open an agent's page to see it live.",
     browserHandoffTitle: (a) => `${a} needs you in the browser`,
@@ -171,6 +174,9 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
       return out(s.mentionTitle(actor), text || s.openBody);
     case "dm":
       return out(actor, text || s.openBody);
+    case "agent_reply":
+      // What it answered, from its first words: the person asked and closed the tab.
+      return out(s.replyTitle(actor), text || s.openBody);
     case "mission_stopped":
       // Only its name: the reason it stopped may carry technical details.
       return out(s.missionStoppedTitle, what || s.openBody);

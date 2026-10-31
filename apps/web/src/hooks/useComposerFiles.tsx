@@ -1,11 +1,11 @@
 import type { ArtifactRef } from "@agenteschat/client";
-import { errorText } from "@agenteschat/client/lib/errors";
 import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@agenteschat/client/lib/files";
 import { ComposerFile, type IconName } from "@agenteschat/ui";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { objectUrls } from "@/components/artifacts/FileView";
+import { useUploadFailed } from "@/components/Limits";
 import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
 
@@ -33,6 +33,7 @@ export function useComposerFiles(channelId: string | null, focus?: () => void) {
   const { org } = useOrg();
   const api = useApi();
   const toast = useToast();
+  const failed = useUploadFailed();
   const [files, setFiles] = useState<PendingFile[]>([]);
   const previews = useRef(new Set<string>());
   const drop = (keep: (f: PendingFile) => boolean) => {
@@ -72,7 +73,7 @@ export function useComposerFiles(channelId: string | null, focus?: () => void) {
         .then((saved) => update({ status: "done", ref: { id: saved.id, version: saved.version, title: saved.title } }))
         .catch((error) => {
           update({ status: "failed" });
-          toast.show(errorText(t, error), "error");
+          failed(error);
         });
     }
     focus?.();

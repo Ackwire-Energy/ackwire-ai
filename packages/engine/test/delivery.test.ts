@@ -206,6 +206,22 @@ describe("ending a run hands its unread messages on", () => {
     expect(await sweepEndedInboxes(deps(), { now: new Date(Date.now() + 60_000) })).toBe(0);
   });
 
+  test("an archived agent's ended run: the sweeper only empties its inbox", async () => {
+    f = await setup();
+    const ask = await post("@dev prepara o relatório");
+    await post("inclui setembro", { threadId: ask.id });
+    const [first] = await runs();
+    await f.db
+      .update(schema.agentRuns)
+      .set({ status: "failed", finishedAt: new Date(Date.now() - 5_000) })
+      .where(eq(schema.agentRuns.id, first?.id ?? ""));
+    await f.db.update(schema.agents).set({ archivedAt: new Date() }).where(eq(schema.agents.id, f.agent.id));
+    expect(await sweepEndedInboxes(deps(), { now: new Date(Date.now() + 60_000) })).toBe(1);
+    const all = await runs();
+    expect(all).toHaveLength(1);
+    expect(all[0]?.pendingMessageIds).toEqual([]);
+  });
+
   test("the sweeper only empties the inbox of a run that ended long ago", async () => {
     f = await setup();
     const ask = await post("@dev prepare the report");

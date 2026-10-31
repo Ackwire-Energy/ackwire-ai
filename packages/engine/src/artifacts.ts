@@ -5,7 +5,8 @@ import { recordAudit } from "./audit";
 import { markdownToDocx } from "./docx";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
-import { can, getMembership } from "./organizations";
+import { assertStorageRoom } from "./limits";
+import { can, requireActiveMembership } from "./organizations";
 import { markdownToPdf } from "./pdf";
 import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./search";
 
@@ -380,8 +381,7 @@ async function canRead(db: Database, actor: ArtifactActor, orgId: string, a: Pic
 
 async function requireMember(db: Database, actor: ArtifactActor, orgId: string) {
   if (actor.type !== "person") return null;
-  const membership = await getMembership(db, actor.userId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  const membership = await requireActiveMembership(db, actor.userId, orgId);
   return membership;
 }
 
@@ -436,7 +436,11 @@ interface Stored {
 async function writeBlob(deps: ArtifactDeps, orgId: string, artifactId: string, version: number, stored: Stored) {
   const location = await deps.blobs.forOrg(orgId);
   const { body, contentType } = stored;
-  const key = `${location.prefix}artifacts/${artifactId}/v${version}`;
+  // The workspace's own bucket counts against no limit of ours.
+  if (location.storageConfigId === null) await assertStorageRoom(deps.db, orgId, body.byteLength);
+  // A per-write suffix so two saves racing on the same version number never share a key: without it the
+  // loser's put overwrites the winner's committed bytes, leaving the row's size and sha not matching disk.
+  const key = `${location.prefix}artifacts/${artifactId}/v${version}-${Bun.randomUUIDv7()}`;
   await location.store.put(key, body, { contentType });
   return { storageConfigId: location.storageConfigId, key, contentType, size: body.byteLength, sha: sha256Hex(body) };
 }
@@ -449,7 +453,7 @@ async function placeNew(
   input: { title: string; channelId?: string | null; threadId?: string | null },
 ) {
   const membership = await requireMember(db, actor, orgId);
-  if (membership && !can(membership.role, "post")) throw new ForbiddenError();
+  if (membership && !can(membership, "upload_files")) throw new ForbiddenError();
   const title = input.title.trim().slice(0, ARTIFACT_LIMITS.titleChars);
   if (!title) throw new ValidationError("title is required");
   const channelId = actor.type === "agent" ? actor.channelId : (input.channelId ?? null);
@@ -533,7 +537,7 @@ async function insertArtifact(
 }
 
 /** A new version of `current`: blob, rows (a newer version in between is a conflict), index, audit, event. */
-async function insertVersion(
+export async function insertVersion(
   deps: ArtifactDeps,
   actor: ArtifactActor,
   orgId: string,
@@ -1015,9 +1019,8 @@ export const ARTIFACT_TRASH_DAYS = 30;
  * agent made, the person who asked it and the agent's owner; admins always.
  */
 async function canDeleteArtifact(db: Database, userId: string, orgId: string, a: ArtifactRow) {
-  const membership = await getMembership(db, userId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
-  if (can(membership.role, "configure")) return true;
+  const membership = await requireActiveMembership(db, userId, orgId);
+  if (can(membership, "configure")) return true;
   if (a.createdByType === "person") return a.createdById === userId;
   const [agent] = await db
     .select({ ownerUserId: schema.agents.ownerUserId })
@@ -1095,8 +1098,7 @@ export async function listDeletedArtifacts(
   userId: string,
   orgId: string,
 ): Promise<TrashedArtifactView[]> {
-  const membership = await getMembership(db, userId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  await requireActiveMembership(db, userId, orgId);
   const since = new Date(Date.now() - ARTIFACT_TRASH_DAYS * 86_400_000);
   const rows = await db
     .select()
@@ -1132,6 +1134,13 @@ export async function restoreArtifact(deps: ArtifactDeps, userId: string, orgId:
   if (!(await canDeleteArtifact(deps.db, userId, orgId, a))) {
     throw new ForbiddenError("Only who could delete it can restore it", "artifact.restore_forbidden");
   }
+  // Out of the trash, what it keeps on this server's storage counts against the limit again.
+  const [kept] = await deps.db
+    .select({ bytes: sql<string>`coalesce(sum(${artifactVersions.size}), 0)` })
+    .from(artifactVersions)
+    .where(and(eq(artifactVersions.artifactId, a.id), isNull(artifactVersions.storageConfigId)));
+  const bytes = Number(kept?.bytes ?? 0);
+  if (bytes > 0) await assertStorageRoom(deps.db, orgId, bytes, { daily: false });
   const [row] = await deps.db.transaction(async (tx) => {
     const updated = await tx.update(artifacts).set({ deletedAt: null }).where(eq(artifacts.id, a.id)).returning();
     await enqueueIndex(tx, { orgId, kind: "file", sourceId: a.id });

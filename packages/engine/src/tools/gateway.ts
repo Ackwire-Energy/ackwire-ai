@@ -19,10 +19,26 @@ import {
 import { carriesCredential, toolDetail } from "../tool-detail";
 import { untrustedBlock } from "../untrusted";
 import { checkToolCall } from "./checks";
-import { compactSchema, directoryRole, ON_DEMAND_FIND, presentTools, resolveDirectoryTool } from "./directory";
+import {
+  type BlockedTool,
+  compactSchema,
+  directoryRole,
+  ON_DEMAND_FIND,
+  presentTools,
+  resolveDirectoryTool,
+} from "./directory";
 import { canonicalJson, validateJson } from "./json-schema";
+import { missingPermissions, REQUEST_PERMISSION_TOOL } from "./permission";
 import { approvalOrigin, type PolicyDecision, takeWhy, toolKind, toolPolicy, WHY_REFUSAL, withWhy } from "./run-policy";
-import { freshGrantedKeys, grantedScopeKeys, isAllowed, toolAccess } from "./scopes";
+import {
+  accessWithNeeds,
+  BUILTIN_SCOPES,
+  freshGrantedKeys,
+  grantedScopeKeys,
+  isAllowed,
+  NOT_IN_ALL,
+  toolAccess,
+} from "./scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./types";
 
 const { approvals, agents } = schema;
@@ -45,6 +61,10 @@ export const actionHash = (action: {
 export const APPROVAL_TTL_MS = 24 * 3600_000;
 const TOOL_NAME = /^[a-zA-Z0-9_-]{1,64}$/;
 const MAX_RESULT_CHARS = 50_000;
+/** Server-owned Git tools have a connection ID only to use that connection's credential. */
+const serverGitTool = (tool: ToolDefinition) =>
+  (tool.name === "git_clone" && tool.scope === "github:git.read") ||
+  (tool.name === "open_pull_request" && tool.scope === "github:pr.write");
 
 /**
  * An `external` tool's output (an MCP server's answer) reaches the model inside the one envelope for
@@ -55,6 +75,17 @@ export const wrapExternal = (source: string, text: string) => untrustedBlock(sou
 /** What run steps and approvals keep: the text people see, without the model's envelope. */
 const shown = (text: string) =>
   text.replace(/^<external_data source="[^"]*">\n([\s\S]*)\n<\/external_data>$/, "$1").slice(0, 4000);
+
+/**
+ * An approved action already claimed (it runs at most once): what it returned, or, with nothing recorded
+ * (it still runs elsewhere, or a restart or a dropped connection cut it), that it may not have finished.
+ */
+const ranBefore = (approval: { result: unknown }): ToolOutput =>
+  (approval.result as ToolOutput | null) ?? {
+    content:
+      "This approved action was already started and its result isn't recorded: it may still be running, or it was cut off before finishing. Check its state before doing it again.",
+    isError: true,
+  };
 
 /** The answer to a call of a run nobody is behind that carries a credential (`carriesCredential`). */
 export const CREDENTIAL_REFUSAL =
@@ -162,8 +193,12 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
     const byName = new Map<string, ToolDefinition>();
     for (const source of deps.sources) {
       for (const tool of await source.tools(ctx)) {
-        if (!TOOL_NAME.test(tool.name) || byName.has(tool.name)) continue;
-        byName.set(tool.name, tool);
+        if (!TOOL_NAME.test(tool.name)) continue;
+        const current = byName.get(tool.name);
+        // A connected MCP server must not shadow one of our own tools just
+        // because its source appears earlier in the list.
+        if (!current || (current.connectionId && (!tool.connectionId || serverGitTool(tool))))
+          byName.set(tool.name, tool);
       }
     }
     return byName;
@@ -177,15 +212,57 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
     return grantedFor(ctx, await authorityOf(ctx));
   }
 
-  async function grantedFor(ctx: ToolContext, authority: RunAuthority | null): Promise<ToolDefinition[]> {
-    const [keys, all] = await Promise.all([grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId), allTools(ctx)]);
+  /** `known`: this call's `allTools`, when already read. */
+  async function grantedFor(
+    ctx: ToolContext,
+    authority: RunAuthority | null,
+    known?: Map<string, ToolDefinition>,
+  ): Promise<ToolDefinition[]> {
+    const [keys, all] = await Promise.all([grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId), known ?? allTools(ctx)]);
     return [...all.values()]
-      .filter((t) => isAllowed(toolAccess(keys, t)))
+      .filter((t) => isAllowed(accessWithNeeds(keys, t).state))
       .flatMap((t) => {
         const decision = policyFor(authority, t);
         return decision.action === "refuse" ? [] : [asListed(t, decision)];
       })
       .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /**
+   * What `find_tools` names as not allowed yet: every tool of this server's sources the agent may not use
+   * (and the run could, once allowed), with each permission `request_permission` offers for it (its own,
+   * and the one of a tool it `needs`), so the card can grant what the agent asks for; or none when an admin
+   * turned that tool, or the one it needs, off by name. A tool with a permission `request_permission` doesn't
+   * offer (a mailbox's or a database's, one more scope of a connector the agent already has some of) isn't named.
+   */
+  async function notAllowed(
+    ctx: ToolContext,
+    authority: RunAuthority | null,
+    all: Map<string, ToolDefinition>,
+  ): Promise<BlockedTool[]> {
+    const [keys, missing] = await Promise.all([
+      grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId),
+      missingPermissions(ctx),
+    ]);
+    const offered = new Map(missing.map((m) => [m.id, m]));
+    return [...all.values()].flatMap((tool): BlockedTool[] => {
+      const own = toolAccess(keys, tool);
+      const needs = tool.needs && { scope: tool.needs.scope, state: toolAccess(keys, tool.needs) };
+      const lacks = [
+        ...(isAllowed(own) ? [] : [tool.connectionId ? `connector:${tool.connectionId}` : tool.scope]),
+        ...(needs && !isAllowed(needs.state) ? [needs.scope] : []),
+      ];
+      if (lacks.length === 0 || policyFor(authority, tool).action === "refuse") return [];
+      if (own === "denied" || needs?.state === "denied") return [{ tool, permissions: null }];
+      const asked = lacks.flatMap((id) => offered.get(id) ?? []);
+      if (asked.length < lacks.length) return [];
+      // The computer's scopes ("all tools" never covers them) say what they give, for the person approving.
+      const permissions = asked.map((m) => {
+        const plain = NOT_IN_ALL.has(m.scope) ? BUILTIN_SCOPES[m.scope]?.description : undefined;
+        return { id: m.id, label: plain ? `${m.label}: ${plain}` : m.label };
+      });
+      return [{ tool, permissions }];
+    });
   }
 
   /**
@@ -237,14 +314,19 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       let directoryTool: ToolDefinition | undefined;
       let unknownInDirectory: string | null = null;
       if (!all.has(call.name)) {
-        const listed = presentTools(await grantedFor(ctx, authority), isSensitive, ctx.loadedGroups).find(
-          (t) => t.name === call.name,
-        );
+        const usable = await grantedFor(ctx, authority, all);
+        const blocked = async () => ({
+          tools: await notAllowed(ctx, authority, all).catch(() => []),
+          ask: usable.some((t) => t.name === REQUEST_PERMISSION_TOOL) ? REQUEST_PERMISSION_TOOL : null,
+        });
+        const listed = presentTools(usable, isSensitive, ctx.loadedGroups, blocked).find((t) => t.name === call.name);
         const role = directoryRole(listed);
         if (role?.kind === "find") directoryTool = listed;
         else if (role?.kind === "use") {
           const name = typeof call.input.tool === "string" ? call.input.tool : "";
-          const real = resolveDirectoryTool(role, name);
+          // `find_tools` also names tools the agent may not use: through its `use_tool` they run as a direct call
+          // would, refused saying why. A big connector's search names only the tools the agent holds.
+          const real = resolveDirectoryTool(role, name) ?? (role.prefix ? undefined : all.get(name.trim()));
           const args = call.input.arguments;
           if (real) {
             call = {
@@ -321,12 +403,12 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       }
       // A directory's search lists only tools the agent already holds; each real tool is checked on its own.
       if (tool !== directoryTool) {
-        const access = toolAccess(await freshGrantedKeys(ctx.db, ctx.orgId, ctx.agentId), tool);
-        if (!isAllowed(access)) {
+        const access = accessWithNeeds(await freshGrantedKeys(ctx.db, ctx.orgId, ctx.agentId), tool);
+        if (!isAllowed(access.state)) {
           const reason =
-            access === "denied"
-              ? "this tool is turned off for this agent"
-              : `this agent lacks the scope ${tool.scope}. If the request needs it, ask for it with request_permission`;
+            access.state === "denied"
+              ? `${access.of === tool ? "this tool" : access.of.name} is turned off for this agent`
+              : `this agent lacks the scope ${access.of.scope}. If the request needs it, ask for it with request_permission`;
           return finish({ content: `Not allowed: ${reason}`, isError: true }, "refused");
         }
       }
@@ -493,9 +575,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
      */
     async executeApproved(ctx: ToolContext, approval: Approval): Promise<ToolOutput> {
       if (approval.status !== "approved") return { content: "This action was not approved", isError: true };
-      if (approval.executedAt) {
-        return (approval.result as ToolOutput | null) ?? { content: "Already executed", isError: false };
-      }
+      if (approval.executedAt) return ranBefore(approval);
       const expected = actionHash({
         tool: approval.tool,
         scope: approval.scope,
@@ -508,8 +588,8 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
         if (expected !== approval.actionHash) return "Approval does not match the action";
         if (!tool || tool.scope !== approval.scope || (tool.connectionId ?? null) !== approval.connectionId)
           return `The tool ${approval.tool} is no longer available`;
-        if (!isAllowed(toolAccess(await freshGrantedKeys(ctx.db, ctx.orgId, ctx.agentId), tool)))
-          return `Not allowed: this agent lost the scope ${tool.scope}`;
+        const access = accessWithNeeds(await freshGrantedKeys(ctx.db, ctx.orgId, ctx.agentId), tool);
+        if (!isAllowed(access.state)) return `Not allowed: this agent lost the scope ${access.of.scope}`;
         // Rules about the arguments again: a repository or recipient may have been removed while waiting.
         const check = await checkToolCall(tool, approval.params, ctx);
         return check.ok ? null : check.message;
@@ -524,7 +604,13 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
           .set({ executedAt: now() })
           .where(sql`${approvals.id} = ${approval.id} and ${approvals.executedAt} is null`)
           .returning({ id: approvals.id });
-        if (claimed.length === 0) return { content: "Already executed", isError: false };
+        if (claimed.length === 0) {
+          const [row] = await ctx.db
+            .select({ result: approvals.result })
+            .from(approvals)
+            .where(sql`${approvals.id} = ${approval.id}`);
+          return ranBefore(row ?? approval);
+        }
         output = await run(tool, approval.params, { ...ctx, toolUseId: approval.toolUseId });
         // Team actions (ADR 0064): what a person approved and went out is the team's too.
         if (isOutsideTool(tool) && !output.isError) {

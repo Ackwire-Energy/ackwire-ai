@@ -156,6 +156,32 @@ describe("Configurações → Armazenamento", () => {
         { cloud: true, en: true },
       ),
     ).toEqual(["Your files stay in our storage, kept apart per workspace.", "3.2 GB of files"]);
+    // The Cloud keeps them on its own disk too, which every workspace there shares: its server sends no disk, so the
+    // line is the workspace's files alone.
+    const cloudDisk = { storagePlatform: { kind: "disk", folder: null } as StoragePlatform, storageUsage: held(0) };
+    expect((await lines(cloudDisk, { cloud: true }))[1]).toBe("Nenhum arquivo");
+    expect((await lines(cloudDisk, { cloud: true, en: true }))[1]).toBe("No files");
+  });
+
+  test("under a storage limit the meter says what the files take, and the option in use doesn't say it again", async () => {
+    const api = createFakeApi(
+      seedState({
+        storagePlatform: { kind: "bucket", folder: null },
+        storageUsage: { platformBytes: 3.2 * GB, ownBucketBytes: 0, disk: null },
+        limits: {
+          members: { used: 2, limit: null },
+          storage: { usedBytes: 3.2 * GB, limitBytes: 50 * GB, ownStorage: false },
+          uploads: { usedBytes24h: 0, limitBytesPerDay: null },
+        },
+      }),
+    );
+    fakeMachinesOf.get(api)?.setSetup({ state: "ready", machineId: "machine_1" });
+    await renderApp(`/org/${ORG_ID}/settings/storage`, { api });
+    await settle(5);
+    expect(text(section())).toContain("Vocês usaram 3,2 GB de 50 GB.");
+    expect(linesOf(document.querySelector('label.ac-option[data-state="checked"]'))).toEqual([
+      "Seus arquivos ficam no nosso armazenamento, separados por workspace.",
+    ]);
   });
 
   test("on its own bucket, that option says what the bucket holds; picked and not saved, the line stays put", async () => {

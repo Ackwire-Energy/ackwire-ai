@@ -40,12 +40,14 @@ export const STORED = {
   pushAsked: "push-asked",
   /** The person turned notifications off in the app (no silent re-registration). */
   pushOff: "push-off",
-  /** How many times our notifications sheet opened by itself (lib/push-offer.ts). */
+  /** How many times our notifications sheet opened by itself (@agenteschat/client/lib/push-offer). */
   pushOffers: "push-offers",
   /** Conversas' sections the person collapsed (JSON list). */
   homeCollapsed: "home-collapsed",
   /** The Threads tab's sections the person collapsed (JSON list). */
   threadsCollapsed: "threads-collapsed",
+  /** Agentes' groups the person collapsed, in every workspace (JSON list of group ids). */
+  agentGroupsCollapsed: "agent-groups-collapsed",
   /** An invitation opened before signing in: dealt with once the person is in (features/auth/invite.ts). */
   invite: "invite",
   /** The app's sounds on this phone: "tactile" (default), "sky", "pixel" or "off" (lib/sounds.ts). */

@@ -18,16 +18,22 @@ import { appLocale } from "@agenteschat/i18n/locale";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { inviteLinkToken, randomToken, sha256 } from "./crypto";
+import { earlyAccessLink, hasWorkspaceAllowance, recordFirstWorkspace, signupMode } from "./early-access";
 import { ConflictError, ForbiddenError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
 import { deleteJevKey } from "./jev-key";
+import { assertMemberRoom } from "./limits";
 import { followWorkspaceName } from "./machine-provisioning";
 import { addressDomain } from "./mail/text";
 import { type OperatorEvent, recordOperatorEvent } from "./operator-events";
 import { enqueue } from "./outbox";
+import { memberKeysSql, memberRankSql, type Permission, resolvePermissions } from "./permissions";
+import { addMemberRolesInTx, createDefaultRoles, givableRoleIds, rolesStillThere } from "./roles";
 import {
   assertCanWork,
+  type BillingHold,
   cloudNotice,
+  isBillingHold,
   isUserBlocked,
   OrgPausedError,
   STANDING_COLUMNS,
@@ -48,68 +54,69 @@ const {
   instanceTelemetry,
 } = schema;
 
-export type MemberRole = "owner" | "admin" | "member";
+/** Whether a person owns the workspace (ADR 0085); what a member may do comes from their roles (`roles.ts`). */
+export type MemberRole = "owner" | "member";
 
-/**
- * What each role may do in an organization (docs/adr/0006-auth-and-tenancy.md).
- * Checked by the backend on every request; the UI only hides what's not
- * allowed. Agents never hold these permissions: what an agent may do is
- * decided by its own scopes (Tool Gateway, later), never by a prompt.
- */
-export type Permission =
-  | "read" // see the organization, its members, agents and public channels
-  | "post" // write messages in channels they belong to
-  | "create_channels"
-  | "configure" // organization name and context
-  | "manage_agents" // create, edit and archive agents; set budgets
-  | "manage_credentials" // add and revoke provider API keys
-  | "manage_connectors" // connect MCP servers (GitHub, Sentry…) for the organization
-  | "view_usage" // tokens and cost of every agent
-  | "manage_members" // invite, remove, change roles (except owners)
-  | "manage_owners"; // grant/revoke owner
-
-const MEMBER: Permission[] = ["read", "post", "create_channels"];
-const ADMIN: Permission[] = [
-  ...MEMBER,
-  "configure",
-  "manage_agents",
-  "manage_credentials",
-  "manage_connectors",
-  "view_usage",
-  "manage_members",
-];
-const PERMISSIONS: Record<MemberRole, ReadonlySet<Permission>> = {
-  owner: new Set([...ADMIN, "manage_owners"]),
-  admin: new Set(ADMIN),
-  member: new Set(MEMBER),
-};
-
-export const can = (role: MemberRole, permission: Permission) => PERMISSIONS[role].has(permission);
+/** The billing hold of a workspace with no plan yet: the one a new workspace may start on. */
+const PAYMENT: BillingHold = "payment";
 
 export interface Membership {
   orgId: string;
   orgName: string;
   role: MemberRole;
+  /**
+   * Everything this person may do here (ADR 0085): the keys of their roles and of `everyone`, every one of them
+   * with `administrator`, all of it for an owner. Checked by the backend on every request; the apps only hide.
+   */
+  permissions: ReadonlySet<Permission>;
+  /** Their highest role's position (0 the top); null when they hold none but `everyone`. An owner is above all. */
+  rank: number | null;
   /** The workspace logo URL, when one was uploaded (listMemberships). */
   orgLogo?: string | null;
   /** The workspace's standing (`standing.ts`). */
   standing?: WorkspaceStanding;
 }
 
+/** Whether a membership (or none) may `permission`. */
+export const can = (membership: Pick<Membership, "permissions"> | null | undefined, permission: Permission) =>
+  membership?.permissions.has(permission) === true;
+
+/**
+ * Whether `actor` stands above a role at `position` or a person whose highest role is `rank` (ADR 0085): an owner
+ * above everything, anyone else only strictly above (lower position). `everyone` (`Infinity`) is below everybody.
+ */
+export function outranks(actor: Pick<Membership, "role" | "rank">, rank: number | null) {
+  if (actor.role === "owner") return true;
+  return (actor.rank ?? Number.POSITIVE_INFINITY) < (rank ?? Number.POSITIVE_INFINITY);
+}
+
+type MembershipRow = Omit<Membership, "permissions"> & { keys: string[] };
+const withPermissions = ({ keys, ...row }: MembershipRow): Membership => ({
+  ...row,
+  permissions: resolvePermissions(row.role === "owner", keys),
+});
+
+const ROLE_COLUMNS = {
+  keys: memberKeysSql({ orgId: organizationMembers.orgId, userId: organizationMembers.userId }),
+  rank: memberRankSql({ orgId: organizationMembers.orgId, userId: organizationMembers.userId }),
+};
+
 export async function listMemberships(db: Database, userId: string): Promise<Membership[]> {
-  return db
+  const rows = await db
     .select({
       orgId: organizations.id,
       orgName: organizations.name,
       role: organizationMembers.role,
       orgLogo: organizations.logo,
       standing: STANDING_COLUMNS,
+      ...ROLE_COLUMNS,
     })
     .from(organizationMembers)
     .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
     .innerJoin(users, eq(users.id, organizationMembers.userId))
     .where(and(eq(organizationMembers.userId, userId), isNull(users.blockedAt)))
     .orderBy(asc(organizations.createdAt));
+  return rows.map(withPermissions);
 }
 
 /**
@@ -128,6 +135,7 @@ export async function getMembership(
       orgName: organizations.name,
       role: organizationMembers.role,
       standing: STANDING_COLUMNS,
+      ...ROLE_COLUMNS,
     })
     .from(organizationMembers)
     .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
@@ -139,7 +147,20 @@ export async function getMembership(
         options.includeBlocked ? undefined : isNull(users.blockedAt),
       ),
     );
-  return row ?? null;
+  return row ? withPermissions(row) : null;
+}
+
+/** Refuses a suspended workspace without changing membership/status lookups. */
+export function assertActiveMembership(membership: Membership): void {
+  if (membership.standing?.state === "suspended") throw new OrgPausedError(membership.standing);
+}
+
+/** Requires an active organization member before acting on its resources. */
+export async function requireActiveMembership(db: Database, userId: string, orgId: string): Promise<Membership> {
+  const membership = await getMembership(db, userId, orgId);
+  if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  assertActiveMembership(membership);
+  return membership;
 }
 
 /**
@@ -147,10 +168,8 @@ export async function getMembership(
  * suspended workspace. Returns the membership.
  */
 export async function requirePermission(db: Database, userId: string, orgId: string, permission: Permission) {
-  const membership = await getMembership(db, userId, orgId);
-  if (!membership) throw new ForbiddenError("You are not a member of this organization");
-  if (membership.standing?.state === "suspended") throw new OrgPausedError(membership.standing);
-  if (!can(membership.role, permission)) throw new ForbiddenError();
+  const membership = await requireActiveMembership(db, userId, orgId);
+  if (!can(membership, permission)) throw new ForbiddenError();
   return membership;
 }
 
@@ -161,25 +180,67 @@ export function assertInviting(membership: Membership) {
 
 /**
  * Creates an organization owned by `userId`, with a `general` channel. Refused while their account is
- * blocked or they are in a workspace on hold or suspended: they don't carry on in a new one
- * (`org.create_refused`, the same words whatever the cause, and how to contest it on agentes.chat Cloud).
+ * blocked or they are in a workspace suspended or on any hold but a billing one: they don't carry on in a new
+ * one (`org.create_refused`, the same words whatever the cause, and how to contest it on agentes.chat Cloud).
+ * Billing holds refuse nobody, but one person
+ * owns at most one workspace waiting for its first plan (`org.create_unpaid`, with that workspace's id).
+ * With `needsAllowance` (`needsWorkspaceAllowance`) early access must have allowed the account, else
+ * `org.create_invite_only` and nothing is made. An allowed account's first workspace is recorded on its invitation.
+ * `holdForPayment`: the workspace starts on the `payment` hold (ADR 0079), with no audit row or notification.
+ * With `onboarding` (the app's), its owner sets it up in the onboarding, already past its first step; while they
+ * have one they haven't finished, that one comes back (`existing`) instead of a new one, even one waiting for its
+ * first plan.
  */
-export async function createOrganization(db: Database, userId: string, input: { name: string; context?: string }) {
-  const [paused] = await db
-    .select({ id: organizations.id })
-    .from(organizationMembers)
-    .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
-    .where(and(eq(organizationMembers.userId, userId), ne(organizations.standing, "active")))
-    .limit(1);
-  if (paused || (await isUserBlocked(db, userId)))
-    throw new ForbiddenError("You can't create a workspace right now", "org.create_refused", cloudNotice());
+export async function createOrganization(
+  db: Database,
+  userId: string,
+  input: { name: string; context?: string },
+  options: { holdForPayment?: boolean; needsAllowance?: boolean; onboarding?: boolean } = {},
+) {
   return db.transaction(async (tx) => {
+    // One create at a time per person, checked after the lock: two at once would both start waiting for a plan.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-create:${userId}`}))`);
+    const held = await tx
+      .select({ id: organizations.id, role: organizationMembers.role, standing: STANDING_COLUMNS })
+      .from(organizationMembers)
+      .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
+      .where(and(eq(organizationMembers.userId, userId), ne(organizations.standing, "active")))
+      .orderBy(asc(organizations.createdAt));
+    if (held.some((o) => !isBillingHold(o.standing)) || (await isUserBlocked(tx, userId)))
+      throw new ForbiddenError("You can't create a workspace right now", "org.create_refused", cloudNotice());
+    if (options.needsAllowance && !(await hasWorkspaceAllowance(tx, userId)))
+      throw new ForbiddenError("New workspaces need an invitation for now", "org.create_invite_only");
+    if (options.onboarding) {
+      // Locked first, so a second create at the same time (a double submit, another tab) waits and finds this one.
+      await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for("update");
+      const [open] = await unfinishedWorkspaces(tx, userId);
+      if (open) return { ...open, existing: true };
+    }
+    const unpaid = held.find((o) => o.role === "owner" && o.standing.reason === PAYMENT);
+    if (unpaid)
+      throw new ForbiddenError("You already have a workspace waiting for a plan", "org.create_unpaid", {
+        orgId: unpaid.id,
+      });
     const [organization] = await tx
       .insert(organizations)
-      .values({ name: input.name, context: input.context ?? "" })
+      .values({
+        name: input.name,
+        context: input.context ?? "",
+        ...(options.onboarding ? { onboardingStep: "context" as const, onboardedAt: null } : {}),
+        ...(options.holdForPayment
+          ? ({
+              standing: "hold",
+              standingReason: PAYMENT,
+              standingNotice: "shown",
+              standingChangedAt: new Date(),
+            } as const)
+          : {}),
+      })
       .returning();
     if (!organization) throw new Error("organization insert returned nothing");
+    await recordFirstWorkspace(tx, userId, organization.id);
     await tx.insert(organizationMembers).values({ orgId: organization.id, userId, role: "owner" });
+    await createDefaultRoles(tx, organization.id);
     await assignHandle(tx, organization.id, userId);
     const [general] = await tx
       .insert(channels)
@@ -193,8 +254,63 @@ export async function createOrganization(db: Database, userId: string, input: { 
       userId,
       data: { name: organization.name },
     });
-    return { organization, general };
+    return { organization, general, existing: false };
   });
+}
+
+/** The onboarding's steps, in order: a workspace's only moves forward through them. */
+export const ONBOARDING_STEPS = schema.ONBOARDING_STEPS;
+
+/**
+ * The workspaces `userId` owns whose onboarding isn't finished, oldest first, each with its #general (where the
+ * onboarding puts the agents and posts the first message). A suspended one isn't among them: it shows as suspended.
+ */
+export async function unfinishedWorkspaces(db: Executor, userId: string) {
+  return db
+    .select({ organization: organizations, general: channels })
+    .from(organizationMembers)
+    .innerJoin(organizations, eq(organizations.id, organizationMembers.orgId))
+    .innerJoin(channels, and(eq(channels.orgId, organizations.id), eq(channels.name, "general")))
+    .where(
+      and(
+        eq(organizationMembers.userId, userId),
+        eq(organizationMembers.role, "owner"),
+        isNull(organizations.onboardedAt),
+        ne(organizations.standing, "suspended"),
+      ),
+    )
+    .orderBy(asc(organizations.createdAt));
+}
+
+/**
+ * Saves how far a workspace's owner got in its onboarding: `step`, the furthest one reached, only moves forward;
+ * `finished` ends it, for good. Anyone else is refused. Returns where it stands.
+ */
+export async function saveOnboarding(
+  db: Database,
+  userId: string,
+  orgId: string,
+  input: { step?: schema.OnboardingStep; finished?: boolean },
+) {
+  const membership = await requireActiveMembership(db, userId, orgId);
+  if (membership.role !== "owner") throw new ForbiddenError("Only the workspace's owner sets it up");
+  const open = and(eq(organizations.id, orgId), isNull(organizations.onboardedAt));
+  if (input.finished) {
+    await db.update(organizations).set({ onboardingStep: "done", onboardedAt: new Date() }).where(open);
+  } else if (input.step) {
+    // The steps before it, in the statement itself: two tabs saving at once never take it back.
+    const before = ONBOARDING_STEPS.slice(0, ONBOARDING_STEPS.indexOf(input.step));
+    if (before.length > 0)
+      await db
+        .update(organizations)
+        .set({ onboardingStep: input.step })
+        .where(and(open, inArray(organizations.onboardingStep, before)));
+  }
+  const [row] = await db
+    .select({ step: organizations.onboardingStep, onboardedAt: organizations.onboardedAt })
+    .from(organizations)
+    .where(eq(organizations.id, orgId));
+  return { step: row?.step ?? "done", finished: Boolean(row?.onboardedAt) };
 }
 
 export async function updateOrganization(
@@ -273,32 +389,77 @@ export interface SignupPolicy {
   allowSignup: boolean;
   /** An owner link (`OWNER_CLAIM_SHA256`) or the desktop app's owner key (`OWNER_KEY_SHA256`) makes the first account (ADR 0060 §6). */
   ownerByLink: boolean;
+  /** `HOST_COMPUTER_TOKEN`: agents run on this server's own machine, so the live mode never opens sign-up. */
+  hostComputer?: boolean;
 }
 
+/** Anyone may sign up once the first account exists: `ALLOW_SIGNUP`, or the live mode `open` (ADR 0078). */
+export async function signupOpenToAll(db: Database, policy: SignupPolicy) {
+  return policy.allowSignup || (!policy.hostComputer && (await signupMode(db)).mode === "open");
+}
+
+/** Why a sign-up may go ahead (`signupAdmission`). */
+export type SignupAdmission = "open" | "first" | "invitation" | "early_access";
+
 /**
- * Self-hosted sign-up policy: the first account may always register (there is
- * no other way in), unless the installation waits for its owner's link or key,
- * which make it on their own path; after that, only with ALLOW_SIGNUP or a pending
- * invitation for that email. An invitation link never opens it (ADR 0068): whoever holds one asks to join
- * without an account. Open sign-up on a reachable server would let anyone create organizations (and spend
- * model credits) on it.
+ * Who may create an account (ADR 0006, ADR 0078): the first account may always register (there is no other way
+ * in), unless the installation waits for its owner's link or key, which make it on their own path. After that,
+ * anyone with `ALLOW_SIGNUP` or while the sign-up mode is `open` (`signupOpenToAll`); else only a pending workspace
+ * invitation for that email, or an early-access link (`access`) sent to it. An invitation link never opens it
+ * (ADR 0068): whoever holds one asks to join without an account. Open sign-up on a reachable server would let
+ * anyone create organizations (and spend model credits) on it. Null: refused.
  */
-export async function isSignupAllowed(db: Database, email: string, policy: SignupPolicy, now = new Date()) {
-  if (policy.allowSignup && !policy.ownerByLink) return true;
-  if ((await countUsers(db)) === 0) return !policy.ownerByLink;
-  if (policy.allowSignup) return true;
+export async function signupAdmission(
+  db: Database,
+  email: string,
+  policy: SignupPolicy,
+  options: { access?: string | null; now?: Date } = {},
+): Promise<SignupAdmission | null> {
+  const now = options.now ?? new Date();
+  const stored = email.trim().toLowerCase();
+  if (policy.allowSignup && !policy.ownerByLink) return "open";
+  if ((await countUsers(db)) === 0) return policy.ownerByLink ? null : "first";
+  if (await signupOpenToAll(db, policy)) return "open";
   const [invite] = await db
     .select({ id: organizationInvitations.id })
     .from(organizationInvitations)
     .where(
       and(
-        eq(organizationInvitations.email, email.toLowerCase()),
+        eq(organizationInvitations.email, stored),
         isNull(organizationInvitations.acceptedAt),
         gt(organizationInvitations.expiresAt, now),
       ),
     )
     .limit(1);
-  return invite !== undefined;
+  if (invite) return "invitation";
+  const link = await earlyAccessLink(db, options.access);
+  return link && link.expiresAt > now && link.email === stored ? "early_access" : null;
+}
+
+export async function isSignupAllowed(db: Database, email: string, policy: SignupPolicy, now = new Date()) {
+  return (await signupAdmission(db, email, policy, { now })) !== null;
+}
+
+/** What decides whether making a workspace needs early access (`needsWorkspaceAllowance`). */
+export interface WorkspacePolicy {
+  /** agentes.chat Cloud, whose provisioner gives every workspace a computer that costs money (ADR 0056 §10). */
+  paidMachines: boolean;
+  /** `ALLOW_SIGNUP`. */
+  allowSignup: boolean;
+}
+
+/**
+ * Whether making a workspace needs the account allowed by early access (ADR 0078 §4): on agentes.chat Cloud, where
+ * every workspace gets a paid computer, while sign-up is by invitation only, for everyone but the installation's owner.
+ */
+export async function needsWorkspaceAllowance(db: Database, userId: string, policy: WorkspacePolicy) {
+  if (!policy.paidMachines || policy.allowSignup) return false;
+  if ((await signupMode(db)).mode === "open") return false;
+  return userId !== (await pinnedOwner(db));
+}
+
+export async function canCreateWorkspace(db: Database, userId: string, policy: WorkspacePolicy) {
+  return !(await needsWorkspaceAllowance(db, userId, policy)) || (await hasWorkspaceAllowance(db, userId));
 }
 
 export type SignInProvider = "google" | "github" | "apple";
@@ -307,21 +468,33 @@ const SIGN_IN_PROVIDERS = new Set<string>(["google", "github", "apple"]);
 /**
  * The sign-in screen asks for the e-mail first, then shows the one next step:
  * the password, the provider the account signs in with, or the sign-up (when
- * allowed for that e-mail). This tells whether the e-mail has an account, so
- * the route that serves it is rate limited.
+ * allowed for that e-mail, with the early-access link's `access` when the page
+ * has one). This tells whether the e-mail has an account, so the route that
+ * serves it is rate limited. `accessExpired` speaks only of a link sent to this
+ * same address.
  */
-export async function signInOptions(db: Database, email: string, policy: SignupPolicy) {
+export async function signInOptions(
+  db: Database,
+  email: string,
+  policy: SignupPolicy,
+  access?: string | null,
+  now = new Date(),
+) {
+  const stored = email.trim().toLowerCase();
   const rows = await db
     .select({ providerId: accounts.providerId })
     .from(users)
     .leftJoin(accounts, eq(accounts.userId, users.id))
-    .where(eq(users.email, email.trim().toLowerCase()));
+    .where(eq(users.email, stored));
   if (rows.length === 0) {
+    const canSignUp = (await signupAdmission(db, email, policy, { access, now })) !== null;
+    const link = canSignUp ? null : await earlyAccessLink(db, access);
     return {
       account: false,
       password: false,
       providers: [] as SignInProvider[],
-      canSignUp: await isSignupAllowed(db, email, policy),
+      canSignUp,
+      ...(link && link.email === stored && link.expiresAt <= now ? { accessExpired: true as const } : {}),
     };
   }
   const ids = rows.map((r) => r.providerId).filter((id): id is string => id !== null);
@@ -372,9 +545,16 @@ export async function listMembers(db: Database, orgId: string) {
         email: users.email,
         image: users.image,
         role: organizationMembers.role,
+        /** Their roles (`org_roles`), not `everyone`; ordered by the apps. */
+        roleIds: sql<string[]>`coalesce((select array_agg(mr.role_id::text) from organization_member_roles mr
+          where mr.org_id = ${organizationMembers.orgId} and mr.user_id = ${organizationMembers.userId}), '{}'::text[])`,
         joinedAt: organizationMembers.createdAt,
         lastSeenAt: organizationMembers.lastSeenAt,
         handle: organizationMembers.handle,
+        availability: organizationMembers.availability,
+        statusText: organizationMembers.statusText,
+        statusEmoji: organizationMembers.statusEmoji,
+        statusUntil: organizationMembers.statusUntil,
         ownTimezone: organizationMembers.timezone,
         orgTimezone: schema.organizationSettings.timezone,
       })
@@ -557,7 +737,10 @@ async function auditMember(
   });
 }
 
-/** Changes a member's role. Admins can't touch owners or make owners; nobody can demote the last owner. */
+/**
+ * Makes a member an owner or takes it back (ADR 0085): only an owner does it, and nobody can demote the last
+ * owner. What anyone else may do is their roles (`setMemberRoles`).
+ */
 export async function changeMemberRole(
   db: Database,
   actorId: string,
@@ -566,12 +749,9 @@ export async function changeMemberRole(
   role: MemberRole,
   options: { pubsub?: PubSub } = {},
 ) {
-  const actor = await requirePermission(db, actorId, orgId, "manage_members");
+  await requirePermission(db, actorId, orgId, "manage_owners");
   const target = await getMembership(db, targetUserId, orgId, { includeBlocked: true });
   if (!target) throw new ConflictError("That user is not a member");
-  if ((target.role === "owner" || role === "owner") && !can(actor.role, "manage_owners")) {
-    throw new ForbiddenError("Only owners can grant or revoke ownership");
-  }
   await db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-members:${orgId}`}))`);
     if (target.role === "owner" && role !== "owner" && (await ownerCount(tx, orgId)) <= 1) {
@@ -601,8 +781,10 @@ export async function removeMember(
   if (!target) return;
   if (actorId !== targetUserId) {
     const actor = await requirePermission(db, actorId, orgId, "manage_members");
-    if (target.role === "owner" && !can(actor.role, "manage_owners"))
+    if (target.role === "owner" && !can(actor, "manage_owners"))
       throw new ForbiddenError("Only owners can remove owners");
+    // Only someone above them (ADR 0085): their highest role below the actor's.
+    if (!outranks(actor, target.rank)) throw new ForbiddenError("Only someone above them can remove them");
   }
   // Loaded here: the accounts module builds on this one.
   const { announceReleasedAccounts, releaseMemberAccounts } = await import("./machine-accounts");
@@ -759,14 +941,15 @@ export const INVITATION_TTL_DAYS = 7;
 /** How long an invitation link works (ADR 0068): nobody gets in through it without an admin's approval. */
 export const INVITE_LINK_TTL_DAYS = 30;
 
-const ROLE_RANK: Record<MemberRole, number> = { member: 0, admin: 1, owner: 2 };
+const ROLE_RANK: Record<MemberRole, number> = { member: 0, owner: 1 };
 
 /**
- * Sends an invitation to an address with a role: the one named (`invitationId`), else the newest one for that
- * address not accepted yet, gets a new token and 7 more days (its old link stops working); with none, a new one
- * is made. One still working keeps the higher of its role and this one, so sending it again never demotes
- * whoever it was meant for, and an owner's invitation goes out again only from an owner (`ownersOk`). Records
- * `invitation.created`. The caller checks who may invite.
+ * Sends an invitation to an address with a role and the roles (`org_roles`) the person gets: the one named
+ * (`invitationId`), else the newest one for that address not accepted yet, gets a new token and 7 more days (its
+ * old link stops working); with none, a new one is made. One still working keeps the higher of its role and this
+ * one and adds these roles to its own, so sending it again never demotes whoever it was meant for, and an owner's
+ * invitation goes out again only from an owner (`ownersOk`). Records `invitation.created`. The caller checks who
+ * may invite and which roles they may give (`givableRoleIds`).
  */
 export async function sendInvitation(
   db: Executor,
@@ -774,6 +957,8 @@ export async function sendInvitation(
     orgId: string;
     email: string;
     role: MemberRole;
+    /** Roles the person gets on accepting (checked by the caller). */
+    roleIds?: string[];
     invitedBy: string;
     /** The sender may invite owners (`manage_owners`). */
     ownersOk: boolean;
@@ -791,6 +976,7 @@ export async function sendInvitation(
     .select({
       id: organizationInvitations.id,
       role: organizationInvitations.role,
+      roleIds: organizationInvitations.roleIds,
       expiresAt: organizationInvitations.expiresAt,
     })
     .from(organizationInvitations)
@@ -810,9 +996,11 @@ export async function sendInvitation(
       ? existing.role
       : input.role;
   if (role === "owner" && !input.ownersOk) throw new ForbiddenError("Only owners can invite owners");
+  const keep = existing && existing.expiresAt > now ? existing.roleIds : [];
   const token = randomToken(32);
   const fresh = {
     role,
+    roleIds: [...new Set([...keep, ...(input.roleIds ?? [])])],
     tokenHash: sha256(token),
     invitedByUserId: input.invitedBy,
     expiresAt: new Date(now.getTime() + INVITATION_TTL_DAYS * 86_400_000),
@@ -829,7 +1017,12 @@ export async function sendInvitation(
     actor: { type: "person", id: input.invitedBy },
     action: input.resent ? "invitation.resent" : "invitation.sent",
     target: { type: "invitation", id: invitation.id },
-    details: { email: invitation.email, role: invitation.role, ...(input.fromRequest ? { fromRequest: true } : {}) },
+    details: {
+      email: invitation.email,
+      role: invitation.role,
+      roleIds: invitation.roleIds,
+      ...(input.fromRequest ? { fromRequest: true } : {}),
+    },
   });
   await recordOperatorEvent(db, {
     type: "invitation.created",
@@ -850,11 +1043,12 @@ export async function createInvitation(
   db: Database,
   actorId: string,
   orgId: string,
-  input: { email: string; role: MemberRole },
+  input: { email: string; role?: MemberRole; roleIds?: string[] },
   now = new Date(),
 ) {
-  const actor = await requirePermission(db, actorId, orgId, "manage_members");
+  const actor = await requirePermission(db, actorId, orgId, "invite_people");
   assertInviting(actor);
+  const roleIds = await givableRoleIds(db, actor, orgId, input.roleIds ?? []);
   const email = input.email.trim().toLowerCase();
 
   const [alreadyMember] = await db
@@ -863,8 +1057,9 @@ export async function createInvitation(
     .innerJoin(organizationMembers, eq(organizationMembers.userId, users.id))
     .where(and(eq(users.email, email), eq(organizationMembers.orgId, orgId)));
   if (alreadyMember) throw new ConflictError(`${email} is already a member`);
-  const ownersOk = can(actor.role, "manage_owners");
-  return sendInvitation(db, { orgId, email, role: input.role, invitedBy: actorId, ownersOk, now });
+  await assertMemberRoom(db, orgId);
+  const ownersOk = can(actor, "manage_owners");
+  return sendInvitation(db, { orgId, email, role: input.role ?? "member", roleIds, invitedBy: actorId, ownersOk, now });
 }
 
 export async function listInvitations(db: Database, orgId: string, now = new Date()) {
@@ -873,6 +1068,7 @@ export async function listInvitations(db: Database, orgId: string, now = new Dat
       id: organizationInvitations.id,
       email: organizationInvitations.email,
       role: organizationInvitations.role,
+      roleIds: organizationInvitations.roleIds,
       expiresAt: organizationInvitations.expiresAt,
       createdAt: organizationInvitations.createdAt,
     })
@@ -888,7 +1084,7 @@ export async function listInvitations(db: Database, orgId: string, now = new Dat
 }
 
 export async function revokeInvitation(db: Database, actorId: string, orgId: string, invitationId: string) {
-  await requirePermission(db, actorId, orgId, "manage_members");
+  await requirePermission(db, actorId, orgId, "invite_people");
   const [gone] = await db
     .delete(organizationInvitations)
     .where(and(eq(organizationInvitations.id, invitationId), eq(organizationInvitations.orgId, orgId)))
@@ -911,7 +1107,7 @@ export async function revokeInvitation(db: Database, actorId: string, orgId: str
  * email invitations.
  */
 export async function inviteLink(db: Database, secret: string, actorId: string, orgId: string, now = new Date()) {
-  assertInviting(await requirePermission(db, actorId, orgId, "manage_members"));
+  assertInviting(await requirePermission(db, actorId, orgId, "invite_people"));
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`invite-links:${orgId}`}))`);
     const active = await tx
@@ -948,10 +1144,15 @@ export async function inviteLink(db: Database, secret: string, actorId: string, 
   });
 }
 
-/** An invitation link by its token (or its id), with its workspace's name and standing; null when there is none. */
+/** An invitation link by its token (or its id), with its workspace's name, logo and standing; null when there is none. */
 export async function findInviteLink(db: Executor, by: string | { id: string }) {
   const [row] = await db
-    .select({ link: organizationInviteLinks, orgName: organizations.name, standing: STANDING_COLUMNS })
+    .select({
+      link: organizationInviteLinks,
+      orgName: organizations.name,
+      orgLogo: organizations.logo,
+      standing: STANDING_COLUMNS,
+    })
     .from(organizationInviteLinks)
     .innerJoin(organizations, eq(organizations.id, organizationInviteLinks.orgId))
     .where(
@@ -987,8 +1188,17 @@ async function inviteAgents(db: Database, orgId: string) {
 }
 
 /**
- * What the invite page shows before signing in (`email` is empty for an org link): the organization, who
- * invited (their name), the role and its first agents. Only for a valid token, which reached the person.
+ * The workspace's logo on an invitation's page (`logo`, when it has one): its current file at an address of that
+ * token's own (`invitationLogoFile`), since the members' address serves members only.
+ */
+const inviteLogo = (token: string, logo: string | null) => {
+  const file = logo?.split("/").pop();
+  return file ? { logo: `/api/app/invitations/${encodeURIComponent(token)}/logo/${file}` } : {};
+};
+
+/**
+ * What the invite page shows before signing in (`email` is empty for an org link): the organization and its logo,
+ * who invited (their name), the role and its first agents. Only for a valid token, which reached the person.
  * A link that was turned off, expired, or whose workspace is paused says only that (`closed`), never why.
  */
 export async function previewInvitation(db: Database, token: string, now = new Date()) {
@@ -996,6 +1206,8 @@ export async function previewInvitation(db: Database, token: string, now = new D
     .select({
       orgId: organizationInvitations.orgId,
       orgName: organizations.name,
+      orgLogo: organizations.logo,
+      standing: organizations.standing,
       email: organizationInvitations.email,
       role: organizationInvitations.role,
       expiresAt: organizationInvitations.expiresAt,
@@ -1029,6 +1241,7 @@ export async function previewInvitation(db: Database, token: string, now = new D
       role: link.link.role,
       kind: "link" as const,
       invitedBy: creator?.name ?? null,
+      ...inviteLogo(token, link.orgLogo),
       ...(await inviteAgents(db, link.link.orgId)),
     };
   }
@@ -1039,8 +1252,33 @@ export async function previewInvitation(db: Database, token: string, now = new D
     role: row.role,
     kind: "email" as const,
     invitedBy: row.invitedBy ?? null,
+    // Only while it can be accepted, as `invitedOrgId` serves it.
+    ...(row.standing === "active" ? inviteLogo(token, row.orgLogo) : {}),
     ...(await inviteAgents(db, row.orgId)),
   };
+}
+
+/**
+ * The workspace a token opens while it works, else null: an invitation neither accepted nor expired into an active
+ * workspace (`acceptInvitation` refuses any other), or an open link.
+ */
+export async function invitedOrgId(db: Executor, token: string, now = new Date()): Promise<string | null> {
+  const [invitation] = await db
+    .select({
+      orgId: organizationInvitations.orgId,
+      acceptedAt: organizationInvitations.acceptedAt,
+      expiresAt: organizationInvitations.expiresAt,
+      standing: organizations.standing,
+    })
+    .from(organizationInvitations)
+    .innerJoin(organizations, eq(organizations.id, organizationInvitations.orgId))
+    .where(eq(organizationInvitations.tokenHash, sha256(token)));
+  if (invitation) {
+    const works = !invitation.acceptedAt && invitation.expiresAt > now && invitation.standing === "active";
+    return works ? invitation.orgId : null;
+  }
+  const link = await findInviteLink(db, token);
+  return link && inviteLinkOpen(link, now) ? link.link.orgId : null;
 }
 
 /**
@@ -1075,9 +1313,10 @@ export async function acceptInvitation(
       );
     }
     await assertCanWork(tx, invitation.orgId);
-    await joinOrganization(tx, invitation.orgId, user.id, invitation.role);
+    await joinOrganization(tx, invitation.orgId, user.id, invitation.role, invitation.roleIds);
     await auditMember(tx, invitation.orgId, user.id, "member.joined", user.id, {
       role: invitation.role,
+      roleIds: invitation.roleIds,
       invitedBy: invitation.invitedByUserId,
     });
     await tx
@@ -1089,11 +1328,27 @@ export async function acceptInvitation(
 }
 
 /**
- * Adds a person to an organization (keeping an existing role) and to `general`. A request to join that they or
- * their address had waiting closes: whoever answers it next finds it answered.
+ * Adds a person to an organization (keeping an existing role), with `roleIds` (those still there), and to
+ * `general`, in the caller's transaction. A
+ * request to join that they or their address had waiting closes: whoever answers it next finds it answered. A
+ * full workspace refuses a new member (`org.members_full`), under the lock role changes and removals take, so
+ * two people taking the last seat at once can't both get in.
  */
-export async function joinOrganization(tx: Executor, orgId: string, userId: string, role: MemberRole) {
+export async function joinOrganization(
+  tx: Executor,
+  orgId: string,
+  userId: string,
+  role: MemberRole,
+  roleIds: readonly string[] = [],
+) {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-members:${orgId}`}))`);
+  const [member] = await tx
+    .select({ userId: organizationMembers.userId })
+    .from(organizationMembers)
+    .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+  if (!member) await assertMemberRoom(tx, orgId);
   await tx.insert(organizationMembers).values({ orgId, userId, role }).onConflictDoNothing();
+  await addMemberRolesInTx(tx, orgId, userId, roleIds);
   await tx
     .update(organizationJoinRequests)
     .set({ status: "closed", decidedAt: new Date() })
@@ -1118,11 +1373,18 @@ export async function joinOrganization(tx: Executor, orgId: string, userId: stri
 }
 
 /** Marks a person as seen now in an organization (WebSocket connect/disconnect). */
+/** Not while the person is hidden: a "last seen" that keeps moving would give them away. */
 export async function touchLastSeen(db: Database, orgId: string, userId: string, at = new Date()) {
   await db
     .update(organizationMembers)
     .set({ lastSeenAt: at })
-    .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+    .where(
+      and(
+        eq(organizationMembers.orgId, orgId),
+        eq(organizationMembers.userId, userId),
+        ne(organizationMembers.availability, "hidden"),
+      ),
+    );
 }
 
 export type InviteOutcome =
@@ -1140,10 +1402,12 @@ export async function inviteMany(
   db: Database,
   actorId: string,
   orgId: string,
-  input: { emails: string[]; role: MemberRole },
+  input: { emails: string[]; roleIds?: string[] },
   now = new Date(),
 ): Promise<InviteOutcome[]> {
-  await requirePermission(db, actorId, orgId, "manage_members");
+  const actor = await requirePermission(db, actorId, orgId, "invite_people");
+  // Checked once for the batch: a role the sender may not give refuses it all.
+  await givableRoleIds(db, actor, orgId, input.roleIds ?? []);
   const emails = [...new Set(input.emails.map((e) => e.trim().toLowerCase()).filter(Boolean))].slice(0, 100);
   const out: InviteOutcome[] = [];
   for (const email of emails) {
@@ -1167,10 +1431,11 @@ export async function inviteMany(
       continue;
     }
     try {
-      const { invitation, token } = await createInvitation(db, actorId, orgId, { email, role: input.role }, now);
+      const { invitation, token } = await createInvitation(db, actorId, orgId, { email, roleIds: input.roleIds }, now);
       out.push({ email, status: "invited", invitationId: invitation.id, token });
     } catch (error) {
-      if (error instanceof ConflictError) out.push({ email, status: "already_member" });
+      // A full workspace (`org.members_full`) refuses the batch, not one address.
+      if (error instanceof ConflictError && error.code === "conflict") out.push({ email, status: "already_member" });
       else throw error;
     }
   }
@@ -1185,19 +1450,23 @@ export async function resendInvitation(
   invitationId: string,
   now = new Date(),
 ) {
-  const actor = await requirePermission(db, actorId, orgId, "manage_members");
+  const actor = await requirePermission(db, actorId, orgId, "invite_people");
   assertInviting(actor);
   const [existing] = await db
     .select()
     .from(organizationInvitations)
     .where(and(eq(organizationInvitations.id, invitationId), eq(organizationInvitations.orgId, orgId)));
   if (!existing || existing.acceptedAt) throw new ConflictError("This invitation can't be resent");
+  await assertMemberRoom(db, orgId);
+  // Its roles go again, expired or not: the ones still there, when the sender may give them (ADR 0085).
+  const roleIds = await givableRoleIds(db, actor, orgId, await rolesStillThere(db, orgId, existing.roleIds));
   return sendInvitation(db, {
     orgId,
     email: existing.email,
     role: existing.role,
+    roleIds,
     invitedBy: actorId,
-    ownersOk: can(actor.role, "manage_owners"),
+    ownersOk: can(actor, "manage_owners"),
     now,
     invitationId,
     resent: true,
@@ -1206,7 +1475,7 @@ export async function resendInvitation(
 
 /** Invitations not yet accepted, expired ones included, with their status. */
 export async function listInvitationsWithStatus(db: Database, actorId: string, orgId: string, now = new Date()) {
-  await requirePermission(db, actorId, orgId, "manage_members");
+  await requirePermission(db, actorId, orgId, "invite_people");
   const rows = await db
     .select()
     .from(organizationInvitations)
@@ -1216,6 +1485,7 @@ export async function listInvitationsWithStatus(db: Database, actorId: string, o
     id: i.id,
     email: i.email,
     role: i.role,
+    roleIds: i.roleIds,
     status: i.expiresAt > now ? ("pending" as const) : ("expired" as const),
     expiresAt: i.expiresAt,
     createdAt: i.createdAt,

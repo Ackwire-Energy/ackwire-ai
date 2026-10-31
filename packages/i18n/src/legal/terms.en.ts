@@ -3,13 +3,13 @@ import type { LegalDocument } from "./types";
 export const termsEn: LegalDocument = {
   title: "Terms of Use",
   summary: "The agreement for using agentes.chat: your workspace, your agents, and what each side is responsible for.",
-  updated: "2026-10-26",
+  updated: "2026-10-30",
   sections: [
     {
       id: "agreement",
       heading: "1. Agreement",
       blocks: [
-        'These Terms of Use (the "Terms") are a binding agreement between CODARI GLOBAL, LLC, a Wyoming limited liability company doing business as agentes.chat ("agentes.chat", "we", "us"), and the person or entity that creates an account or an organization ("you"). By creating an account, joining an organization, or otherwise using agentes.chat on the web, the Mac app or the phone app (the "Service"), you accept these Terms and our Privacy Policy. If you use the Service on behalf of an organization, you represent that you have authority to bind that organization.',
+        'These Terms of Use (the "Terms") are a binding agreement between CODARI GLOBAL, LLC, a Wyoming limited liability company doing business as agentes.chat ("agentes.chat", "we", "us"), and the person or entity that creates an account or a workspace ("you"). By creating an account, joining a workspace, or otherwise using agentes.chat on the web, the Mac app or the phone app (the "Service"), you accept these Terms and our Privacy Policy. If you use the Service on behalf of a company or other entity, you represent that you have authority to bind it.',
         "You must be at least 18 years old and able to enter into a contract to use the Service.",
       ],
     },
@@ -18,21 +18,21 @@ export const termsEn: LegalDocument = {
       heading: "2. The Service",
       blocks: [
         "The Service is a workspace where people and AI agents work together: channels, threads and direct messages; agents with their own roles, instructions, memory and budgets; tasks, wiki, Drive, forum, calendar and routines; approvals; connectors to other services; and the option to connect computers on which agents can work.",
-        "The Service is in early access: accounts are opened by invitation, and features may change, be limited or be removed as it evolves. We will tell you in advance before removing something you rely on, where practicable.",
+        "The Service is new and still evolving: features may change, be limited or be removed. We may open new accounts only by invitation for a time, or to anyone who signs up. We will tell you in advance before removing something you rely on, where practicable.",
       ],
     },
     {
       id: "accounts",
-      heading: "3. Accounts and organizations",
+      heading: "3. Accounts and workspaces",
       blocks: [
-        "You are responsible for the accuracy of your account information, for the security of your credentials, and for all activity under your account. An organization's owners and admins decide who joins it, what roles they have, which agents exist and what those agents may do. Notify us promptly at security@agentes.chat if you believe an account, a key or a connected computer has been compromised.",
+        "You are responsible for the accuracy of your account information, for the security of your credentials, and for all activity under your account. A workspace's owners and admins decide who joins it, what roles they have, which agents exist and what those agents may do. Where these Terms say a workspace owns, decides or answers for something, they mean the person or entity that created it, or on whose behalf it was created, acting through its owners and admins. Notify us promptly at security@agentes.chat if you believe an account, a key or a connected computer has been compromised.",
       ],
     },
     {
       id: "agents",
       heading: "4. Agents and what they do",
       blocks: [
-        "Agents act on the instructions, permissions, connectors, budgets and computers that you and your organization give them. What an agent does within those permissions, including messages it sends, code it changes, data it reads, writes or deletes, and commands it runs on a connected computer, is done on your organization's behalf, and your organization is responsible for it under these Terms. Each agent has a person responsible for it.",
+        "Agents act on the instructions, permissions, connectors, budgets and computers that you and your workspace give them. What an agent does within those permissions, including messages it sends, code it changes, data it reads, writes or deletes, and commands it runs on a computer, is done on your workspace's behalf, and your workspace is responsible for it under these Terms. Each agent has a person responsible for it.",
         "Actions that are hard to undo become an approval request for a person before they happen. Approving one is your decision; the Service shows what will be done, but you are responsible for reviewing it.",
         "AI output can be wrong, incomplete or out of date, even when it sounds confident. Review what agents produce before relying on it, and do not use it as a substitute for professional advice (legal, medical, financial or otherwise) or as the only basis for decisions with legal or similarly significant effects on people.",
       ],
@@ -60,16 +60,16 @@ export const termsEn: LegalDocument = {
       id: "content",
       heading: "6. Your content",
       blocks: [
-        '"Workspace Content" means what you and your organization put into the Service and what your agents produce in it. Your organization owns its Workspace Content, and as between you and us, the output agents produce for you is yours, subject to the terms of the model provider that produced it. Output may be similar to what the same models produce for others.',
+        '"Workspace Content" means what you and the other people in your workspace put into the Service and what your agents produce in it. Your workspace owns its Workspace Content, and as between you and us, the output agents produce for you is yours, subject to the terms of the model provider that produced it. Output may be similar to what the same models produce for others.',
         "You grant us the limited rights needed to operate the Service: to store, process, transmit and display Workspace Content in order to run your workspace and agents, send it to the providers your agents use as described in the Privacy Policy, and provide support. We do not sell Workspace Content and do not use it to train machine-learning models.",
-        "Your organization is the controller of the personal data in its Workspace Content; we process it on its instructions as a processor, as described in the Privacy Policy and the Data Processing Addendum.",
+        "Your workspace is the controller of the personal data in its Workspace Content, and we process that data on its instructions as a processor, as described in the Privacy Policy and the Data Processing Addendum.",
       ],
     },
     {
       id: "third-parties",
       heading: "7. Model providers, connectors and your own accounts",
       blocks: [
-        "Agents run on AI models from third parties (such as Anthropic, which makes Claude, and OpenAI), either through the platform's key, through a key your organization adds, or through a Claude or ChatGPT plan connected on someone's computer. When you use your own key or plan, your use is also governed by your agreement with that provider, and you are responsible for following its terms and for its charges.",
+        "Agents run on AI models from third parties (such as Anthropic, which makes Claude, and OpenAI), through an API key your workspace adds or an AI plan, such as Claude or ChatGPT, that someone in your workspace connects. Using that key or plan is also governed by your agreement with its provider, and you are responsible for following its terms and for its charges.",
         "Connectors give agents access to other services (such as GitHub, Google, Linear, Sentry or an email inbox). Those services are provided by third parties under their own terms; their availability and what they do with data are outside our control.",
       ],
     },
@@ -89,9 +89,22 @@ export const termsEn: LegalDocument = {
     },
     {
       id: "fees",
-      heading: "10. Fees, budgets and limits",
+      heading: "10. Plans, payments and fair use",
       blocks: [
-        "During early access the Service may be offered free of charge or with usage limits. Paid plans, when offered, will be described in the app with their prices before you choose one; we will give at least 30 days' notice before charging for something that is free today. Budgets set per organization and per agent stop agents' model usage when they are reached; they are part of the Service, not a defect of it. Charges a provider makes for your own key or plan are between you and that provider.",
+        "Each workspace pays for its own agentes.chat plan. These rules apply to every plan:",
+        {
+          list: [
+            "**Prices.** Plans and their prices are on our pricing page. Prices are in US dollars, and taxes are added where they apply. Your bank or payment provider may charge its own fees on purchases from abroad, such as the IOF in Brazil.",
+            "**Renewal.** A plan renews automatically each month or each year, depending on the period chosen, until it is canceled. We send a reminder before a yearly plan renews.",
+            "**Cancellation.** You can cancel at any time, and the cancellation takes effect at the end of the period already paid. Then the workspace's agents stop, its computer is wiped 7 days later, and its conversations and files stay available to read and download for 90 days, after which they are deleted.",
+            "**No refunds.** Payments are final and non-refundable, in whole or in part, including for the rest of a period after a cancellation, except where the law requires otherwise.",
+            "**Failed payments.** If a payment fails, we try again over the following days. If it still fails, the workspace is put on hold: its agents stop, and people can still read and write in it. Its computer is kept for 7 days, then released and wiped. Paying brings the workspace back, on a new computer if the old one was released.",
+            "**Price changes.** We may change prices for new customers at any time. The price of a plan you already have changes only because of new taxes, from its next renewal, with at least 30 days' notice.",
+            "**Fair use.** Some features run on AI services we provide at no extra charge, such as choosing which agent answers, judging memories and actions, and finding what to click on a screen. We may limit them for a workspace whose use is far above normal.",
+            "**Early access.** We will give at least 30 days' notice before charging for something that was free during early access.",
+            "**Budgets.** Budgets set per workspace and per agent stop agents' model usage when they are reached. They are part of the Service, not a defect of it. Charges a provider makes for your own key or AI plan are between you and that provider.",
+          ],
+        },
       ],
     },
     {
@@ -105,7 +118,7 @@ export const termsEn: LegalDocument = {
       id: "termination",
       heading: "12. Term and termination",
       blocks: [
-        "You may stop using the Service and delete your account at any time in Settings. We may suspend or end your access for material breach of these Terms, where required by law, or with 30 days' notice if we discontinue the Service. When we end the Service for reasons other than your breach, we will make your organization's Workspace Content available for export for 30 days, then delete it as described in the Privacy Policy. Sections that by their nature survive termination (including 6, 9, 11, 13, 14 and 15) do so.",
+        "You may stop using the Service and delete your account at any time in Settings. We may suspend or end your access for material breach of these Terms, where required by law, or with 30 days' notice if we discontinue the Service. When we end the Service for reasons other than your breach, we will make your Workspace Content available for export for 30 days, then delete it as described in the Privacy Policy. Sections that by their nature survive termination (including 6, 9, 11, 13, 14 and 15) do so.",
       ],
     },
     {

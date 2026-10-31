@@ -11,6 +11,7 @@ import {
 } from "@agenteschat/engine";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./app/context";
+import { readWebhookText } from "./webhook-body";
 
 /**
  * Incoming webhooks: `POST /api/webhooks/{provider}/{endpointId}` (public,
@@ -21,8 +22,8 @@ export function registerWebhookReceiver(api: OpenAPIHono, deps: AppDeps) {
   // Composio (ADR 0038): new mail for routines, expired accounts. One endpoint for the whole server,
   // signed with the subscription's secret (checked by the Composio client). Before the generic route.
   api.post("/webhooks/composio", async (c) => {
-    const raw = await c.req.text();
-    if (raw.length > 1_000_000) return c.json({ error: "too large" }, 413);
+    const raw = await readWebhookText(c.req.raw, 1_000_000);
+    if (raw === null) return c.json({ error: "too large" }, 413);
     try {
       const result = await handleComposioWebhook({ db: deps.db, mail: deps.adapters.mail }, c.req.raw.headers, raw);
       if (result.fired > 0) deps.wakeWorkers?.();
@@ -37,8 +38,8 @@ export function registerWebhookReceiver(api: OpenAPIHono, deps: AppDeps) {
   api.post("/webhooks/:provider/:endpointId", async (c) => {
     const provider = c.req.param("provider") as WebhookProvider;
     if (!WEBHOOK_PROVIDERS.includes(provider)) return c.json({ error: "unknown provider" }, 404);
-    const raw = await c.req.text();
-    if (raw.length > 1_000_000) return c.json({ error: "too large" }, 413);
+    const raw = await readWebhookText(c.req.raw, 1_000_000);
+    if (raw === null) return c.json({ error: "too large" }, 413);
     try {
       const result = await handleWebhook(webhookDeps, provider, c.req.param("endpointId"), c.req.raw.headers, raw);
       if (result.fired > 0) deps.wakeWorkers?.();

@@ -1,5 +1,6 @@
 import {
   keys,
+  type Me,
   newClientId,
   useAiStatus,
   useApi,
@@ -9,12 +10,14 @@ import {
   useMe,
 } from "@agenteschat/client";
 import { computerEdition, computerName } from "@agenteschat/client/lib/computer";
+import { settingUp } from "@agenteschat/client/lib/guards";
 import { sendsEmail } from "@agenteschat/client/lib/join-requests";
 import { firstMentioned } from "@agenteschat/client/lib/markdown";
 import { type AiChoice, aiStateOf } from "@agenteschat/client/lib/no-ai";
+import { aheadOf, stepIndex } from "@agenteschat/client/lib/onboarding";
 import { AUTO } from "@agenteschat/client/lib/providers";
 import { handleFrom } from "@agenteschat/client/lib/text";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
@@ -24,6 +27,7 @@ import { Pressable, ScrollView, Share, StyleSheet, TextInput, View } from "react
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { signOut } from "@/features/account";
 import { useConnectKey } from "@/features/ai/ConnectAi";
 import { authClient } from "@/lib/auth";
 import { useOrgGate } from "@/providers/org";
@@ -69,18 +73,23 @@ import {
   PRESETS,
   type Preset,
   phoneTimezone,
+  presetsMade,
   prevStep,
   progressAt,
+  resumeOf,
   STEPS,
   type StepId,
+  serverStepOf,
+  setUpElsewhere,
   stepFailedText,
   stepText,
+  stepToSave,
   zoneLabel,
 } from "./logic";
 
 /**
- * The first run on the phone: signed in with no workspace yet, one
- * question per full screen, hosted by an agent of the team, the progress a strip of sky with a small agent
+ * The first run on the phone: signed in with no workspace to open yet (none, or one still being set up, which it
+ * resumes), one question per full screen, hosted by an agent of the team, the progress a strip of sky with a small agent
  * walking at its front. Workspace (logo optional, time zone from the phone) → Contexto → Trazer agentes
  * (optional; brought from the web) → Agentes → IA (optional: an AI plan or an API key, skipped when the agents
  * already think with one) → Pessoas (optional: type e-mails or share a link) → Pronto: the team's welcome and the
@@ -94,6 +103,8 @@ export function OnboardingFlow() {
   const me = useMe();
   const { colors: c } = useTheme();
   const [step, setStep] = useState<StepId>("workspace");
+  // The furthest step reached here, as the server counts them (`stepIndex`).
+  const [reached, setReached] = useState(0);
   const [created, setCreated] = useState<{ orgId: string; generalChannelId: string } | null>(null);
   const [name, setName] = useState("");
   const [logo, setLogo] = useState<{ base64: string; type: "image/jpeg" | "image/png" | "image/webp" } | null>(null);
@@ -171,18 +182,31 @@ export function OnboardingFlow() {
     setFirstAsk(offer ? { team, ...offer, clientId: newClientId() } : null);
   }, [step, team]);
 
+  // Each step reached is saved, so the web, or the app opened again, resumes there (creating the workspace passed the
+  // first one).
+  const reach = async (next: StepId) => {
+    const saving = created ? stepToSave(next, reached) : null;
+    const at = created && saving ? await api.orgs.saveOnboarding(created.orgId, { step: saving }) : null;
+    // Further on, or finished, on the web or another device: `me` again, which the app follows (finished, it opens).
+    if (at && saving && aheadOf(at, saving)) await qc.invalidateQueries({ queryKey: keys.me });
+    if (at?.finished) return;
+    setReached((r) => Math.max(r, stepIndex(serverStepOf(next))));
+    setStep(next);
+  };
+
   const run = async (work: () => Promise<void>, then: StepId | (() => StepId)) => {
     setPending(true);
     setError(null);
     try {
       await work();
-      setStep(typeof then === "function" ? then() : then);
+      await reach(typeof then === "function" ? then() : then);
     } catch (e) {
-      setError({ at: step, text: stepFailedText(t, e) });
+      setError({ at: step, text: stepFailedText(t, e, i18n.language) });
     } finally {
       setPending(false);
     }
   };
+  const skipTo = (next: StepId) => void run(async () => {}, next);
 
   const saveWorkspace = () =>
     run(async () => {
@@ -191,6 +215,10 @@ export function OnboardingFlow() {
         const res = await api.orgs.create({ name: orgName });
         target = { orgId: res.organization.id, generalChannelId: res.generalChannelId };
         setCreated(target);
+        setName(res.organization.name);
+        // One being set up comes back instead of a new one: `me` says how far it got, and the resume opens it there.
+        await qc.invalidateQueries({ queryKey: keys.me });
+        if (setUpElsewhere(qc.getQueryData<Me | null>(keys.me)?.organizations, target.orgId)) return;
         await Promise.all([
           zone ? api.orgs.updateSettings(target.orgId, { timezone: zone }) : null,
           zone ? api.orgs.updateMe(target.orgId, { timezone: zone }) : null,
@@ -214,8 +242,17 @@ export function OnboardingFlow() {
     return run(
       async () => {
         if (!created) return;
-        const ids = { ...agentIds };
-        const named = { ...handles };
+        // One made already (on the web, or by a create cut short) is kept, never made twice, and put in #general,
+        // where mentions reach it (once more is harmless).
+        const made = presetsMade(t, await api.agents.list(created.orgId));
+        for (const p of PRESETS) {
+          const id = made.ids[p];
+          if (id) await api.chat.addMember(created.orgId, created.generalChannelId, { agentId: id });
+        }
+        const ids = { ...agentIds, ...made.ids };
+        const named = { ...handles, ...made.handles };
+        setAgentIds({ ...ids });
+        setHandles({ ...named });
         for (const p of PRESETS) {
           if (!chosen.has(p) || ids[p]) continue;
           const role = PRESET_ROLE[p];
@@ -250,7 +287,7 @@ export function OnboardingFlow() {
     setError(null);
     if (await ai.save()) {
       setAiSaved(true);
-      setStep("team");
+      skipTo("team");
     }
   };
 
@@ -259,12 +296,12 @@ export function OnboardingFlow() {
     if (!created) return;
     setPending(true);
     setError(null);
-    const failed = await inviteEach(emails, (email) => api.orgs.invite(created.orgId, { email, role: "member" }));
+    const failed = await inviteEach(emails, (email) => api.orgs.invite(created.orgId, { email }));
     setPending(false);
     setInvited((n) => n + emails.length - failed.length);
     setEmails(failed);
     if (failed.length) setError({ at: "team", text: t("mobile.onb.invitesFailed") });
-    else setStep("done");
+    else skipTo("done");
   };
 
   const shareLink = async () => {
@@ -306,7 +343,10 @@ export function OnboardingFlow() {
     setPending(true);
     setError(null);
     try {
-      if (message) await api.chat.post(created.orgId, created.generalChannelId, message);
+      // Finished on the web or another device, its first message went from there: none again here.
+      const at = await api.orgs.saveOnboarding(created.orgId, { step: "done" });
+      if (message && !at?.finished) await api.chat.post(created.orgId, created.generalChannelId, message);
+      await api.orgs.saveOnboarding(created.orgId, { finished: true });
     } catch {
       setPending(false);
       setError({ at: "done", text: t("mobile.app.failed") });
@@ -321,6 +361,41 @@ export function OnboardingFlow() {
     setPending(false);
     router.push(chatHref(created.generalChannelId));
   };
+
+  // The workspace being set up, as the server keeps it (made here or on the web): opened at the furthest step
+  // reached with what was saved, and followed when the web gets further.
+  const mine = created
+    ? me.data?.organizations.find((o) => o.id === created.orgId)
+    : me.data?.organizations.find(settingUp);
+  const saved = mine?.onboarding ? { orgId: mine.id, ...mine.onboarding } : null;
+  const behind = saved !== null && stepIndex(saved.step) > reached;
+  const resume = useQuery({
+    queryKey: ["onboarding", "resume", saved?.orgId, saved?.step],
+    enabled: behind,
+    gcTime: 0,
+    queryFn: async () => {
+      if (!saved) return null;
+      const [settings, agents, sources] = await Promise.all([
+        api.orgs.settings(saved.orgId),
+        api.agents.list(saved.orgId),
+        saved.step === "import" ? api.imports.sources(saved.orgId).catch(() => []) : [],
+      ]);
+      return { settings, ...resumeOf(t, saved, agents, sources.length > 0) };
+    },
+  });
+  useEffect(() => {
+    const r = resume.data;
+    if (!r || pending || r.reached <= reached) return;
+    setCreated(r.created);
+    setName(r.settings.name);
+    setContext(r.settings.context);
+    setSavedContext(r.settings.context);
+    setAgentIds(r.ids);
+    setHandles(r.handles);
+    if (r.chosen) setChosen(r.chosen);
+    setReached(r.reached);
+    setStep(r.step);
+  }, [resume.data, pending, reached]);
 
   const host = HOST[step];
   const count = joiningLeft(chosen, agentIds);
@@ -348,7 +423,7 @@ export function OnboardingFlow() {
           },
         }
       : planned.length > 0
-        ? { ai: { label: t("onboarding.actions.continue"), onPress: () => setStep("team"), ready: true } }
+        ? { ai: { label: t("onboarding.actions.continue"), onPress: () => skipTo("team"), ready: true } }
         : {}),
     // With no e-mails the step has no main action: "Agora não" is the quiet way on, below.
     ...(emails.length
@@ -373,6 +448,26 @@ export function OnboardingFlow() {
   const action = primary[step];
   const back = prevStep(step);
 
+  // Never the form that would make another workspace while one is being set up: its saved state loads first.
+  if (created === null && behind)
+    return (
+      <View style={[styles.screen, styles.wait, { backgroundColor: c.bg }]}>
+        {resume.isError ? (
+          <>
+            <Text tone="muted" style={styles.waitText}>
+              {t("common.loadFailed")}
+            </Text>
+            <Button
+              variant="secondary"
+              size="sm"
+              label={t("mobile.common.retry")}
+              onPress={() => void resume.refetch()}
+            />
+          </>
+        ) : null}
+      </View>
+    );
+
   return (
     <StepFrame
       step={step}
@@ -396,14 +491,24 @@ export function OnboardingFlow() {
               onPress={action.onPress}
             />
           ) : null}
+          {/* Until a workspace is set up this is the only screen: the way out of the account is on its first step. */}
+          {step === "workspace" ? (
+            <Button
+              variant="ghost"
+              wide
+              label={t("mobile.org.signOut")}
+              disabled={pending}
+              onPress={() => void signOut()}
+            />
+          ) : null}
           {step === "import" ? (
-            <Button variant="ghost" wide label={t("mobile.onb.importSkip")} onPress={() => setStep("agents")} />
+            <Button variant="ghost" wide label={t("mobile.onb.importSkip")} onPress={() => skipTo("agents")} />
           ) : null}
           {step === "ai" ? (
-            <Button variant="ghost" wide label={t("connectAi.later")} onPress={() => setStep("team")} />
+            <Button variant="ghost" wide label={t("connectAi.later")} onPress={() => skipTo("team")} />
           ) : null}
           {step === "team" ? (
-            <Button variant="ghost" wide label={t("mobile.onb.later")} onPress={() => setStep("done")} />
+            <Button variant="ghost" wide label={t("mobile.onb.later")} onPress={() => skipTo("done")} />
           ) : null}
           {/* On Done the quiet way opens #general without the first message, while there is one. */}
           {step === "done" && asking ? (
@@ -977,6 +1082,8 @@ function Note({
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  wait: { alignItems: "center", justifyContent: "center", gap: 12, padding: 24 },
+  waitText: { textAlign: "center" },
   doneSky: { position: "absolute", left: 0, right: 0, top: 0, height: 320 },
   top: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingBottom: 8 },
   backSpace: { width: 40, height: 40 },

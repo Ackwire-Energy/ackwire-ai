@@ -1,6 +1,6 @@
 import type { AccountLoginStart, AccountLoginStatus, MachineAccount, MachineAccountKind } from "@agenteschat/client";
 import { keys, useAccountLogin, useApi } from "@agenteschat/client";
-import { beginLogin, freeDuplicate, isSignInCode } from "@agenteschat/client/lib/machines";
+import { beginLogin, freeDuplicate, isSignInCode, otherThanHint } from "@agenteschat/client/lib/machines";
 import { type PlanId, planKeyFits, planOf } from "@agenteschat/client/lib/plans";
 import { accountCodeAad, sealSecret } from "@agenteschat/client/lib/secret-box";
 import { Button, cx, Icon, InfoHint, Input, ProviderLogo, SettingNote } from "@agenteschat/ui";
@@ -14,14 +14,16 @@ import { openPopup, sendPopup } from "@/lib/popup";
  * "Adicionar conta" (ADR 0041 §2, ADR 0059): the computer starts the
  * provider's own sign-in and its link opens here, in a window of its own: the
  * account chosen there is the one connected. Claude: the code Claude shows
- * comes back by "Colar" (sent by itself only when it is this sign-in's) or by
- * hand, sealed here to the computer's key. ChatGPT: device code sign-in
- * allowed in its settings first, then the device page and the one-time code
- * to type there. A coding plan: its own key page, then the key, sealed the
- * same way; it never reaches our server. Every start is a click, never the
- * block showing. The page asks every 2 s; Voltar or closing stops the sign-in
- * on the computer. One key can go to several logins at once (`fanOut`): each
- * is begun, sealed to and watched on its own.
+ * goes to the computer by itself as soon as it lands in the field ("Colar",
+ * a paste, typed or dropped) when it is this sign-in's; anything else waits
+ * for "Enviar", with a line under it. Either way it is sealed here to the
+ * computer's key. ChatGPT: device code sign-in allowed in its settings first,
+ * then the device page and the one-time code to type there. A coding plan:
+ * its own key page, then the key, sealed the same way; it never reaches our
+ * server. "Colar" shows only while the field is empty. Every start is a click,
+ * never the block showing. The page asks every 2 s; Voltar or closing stops
+ * the sign-in on the computer. One key can go to several logins at once
+ * (`fanOut`): each is begun, sealed to and watched on its own.
  */
 
 /** Where ChatGPT allows signing in with a code (Settings › Security): Codex's device sign-in needs it. */
@@ -263,8 +265,7 @@ function AddAccountFlow({
     running.current = running.current.filter((r) => r.loginId !== login.loginId);
     if (result.state === "done" && result.account && !reported.current) {
       reported.current = true;
-      const got = result.account.email;
-      if (hint && got && got.toLowerCase() !== hint.toLowerCase()) setOther(result.account);
+      if (otherThanHint(hint, result.account)) setOther(result.account);
       else onAdded(result.account);
     }
   }, [result, login, hint, onAdded]);
@@ -326,6 +327,14 @@ function AddAccountFlow({
     }
   };
 
+  /** What the field holds now, however it got there: a code of this sign-in goes to the computer by itself. */
+  const take = (text: string) => {
+    setCode(text);
+    setSendFailed(false);
+    setPasteFailed(false);
+    if (!plan && login && isSignInCode(text, login.url)) void send(text);
+  };
+
   const paste = async () => {
     setPasteFailed(false);
     let text = "";
@@ -335,10 +344,7 @@ function AddAccountFlow({
       setPasteFailed(true);
       return;
     }
-    if (!text) return;
-    setCode(text);
-    setSendFailed(false);
-    if (!plan && login && isSignInCode(text, login.url)) void send(text);
+    if (text) take(text);
   };
 
   const copy = async () => {
@@ -372,10 +378,7 @@ function AddAccountFlow({
           aria-label={label}
           aria-describedby={plan ? keyHintId : undefined}
           disabled={sent}
-          onChange={(e) => {
-            setCode(e.target.value);
-            setSendFailed(false);
-          }}
+          onChange={(e) => take(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
@@ -383,9 +386,11 @@ function AddAccountFlow({
             }
           }}
         />
-        <Button icon="copy" disabled={sent} onClick={() => void paste()}>
-          {t("aiAccounts.add.paste")}
-        </Button>
+        {!code.trim() && (
+          <Button icon="copy" disabled={sent} onClick={() => void paste()}>
+            {t("aiAccounts.add.paste")}
+          </Button>
+        )}
         <Button
           variant="primary"
           loading={sending || loading}
@@ -568,6 +573,9 @@ function AddAccountFlow({
               t("agentPage.work.brain.add.codeLabel"),
               false,
               key.length > 0,
+            )}
+            {key && !isSignInCode(key, login.url) && (
+              <SettingNote icon="alert">{t("agentPage.work.brain.add.notCode")}</SettingNote>
             )}
             {(sent || local) && (
               <span>

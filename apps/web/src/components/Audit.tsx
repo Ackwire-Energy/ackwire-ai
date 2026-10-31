@@ -11,6 +11,7 @@ import {
   auditOutcome,
   auditPhrase,
   auditQueryOf,
+  auditReason,
   auditReasonKey,
   auditRoutine,
   auditSecretText,
@@ -204,7 +205,7 @@ function AuditPanel({ row, onClose }: { row: AuditRow; onClose: () => void }) {
   const { org } = useOrg();
   const toast = useToast();
   const name = auditActorName(t, row) ?? t("audit.system");
-  const reason = auditStr(row.details.reason);
+  const reason = auditReason(t, row);
   const isCall = row.action === TOOL_CALL;
   const where = auditWhere(t, row);
   const connector = auditStr(row.details.connector);
@@ -305,7 +306,7 @@ function AuditPanel({ row, onClose }: { row: AuditRow; onClose: () => void }) {
             </div>
           )}
           {reason && (
-            <div className={`audit-panel__reason audit-panel__reason--${reasonKey}`}>
+            <div className={`audit-panel__reason ac-iconline audit-panel__reason--${reasonKey}`}>
               <Icon name={reasonKey === "refused" ? "block" : reasonKey === "failed" ? "alert" : "info"} size={16} />
               <span>
                 <strong>{t(`audit.panel.reason.${reasonKey}`)}:</strong> {reason}

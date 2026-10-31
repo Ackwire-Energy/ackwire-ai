@@ -13,12 +13,15 @@ import {
   whenAt,
 } from "@agenteschat/client/lib/format";
 import { agentGrammar, isFeminineName, providerGrammar, runErrorGrammar } from "@agenteschat/client/lib/grammar";
-import { landingFor, membershipIn, safeRedirect } from "@agenteschat/client/lib/guards";
+import { landingFor, membershipIn, safeRedirect, settingUp, webUrl } from "@agenteschat/client/lib/guards";
 import {
   addInvites,
+  aheadOf,
+  crewOf,
   firstAskOrder,
   ONBOARDING_STEPS,
   splitEmails,
+  stepIndex,
   validInvites,
 } from "@agenteschat/client/lib/onboarding";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -100,17 +103,17 @@ describe("text", () => {
     ]);
     const first = addInvites([], "Marina@acme.com.br, joao@acme.com.br\nnão-é-email");
     expect(first).toEqual([
-      { email: "marina@acme.com.br", role: "member", valid: true },
-      { email: "joao@acme.com.br", role: "member", valid: true },
-      { email: "não-é-email", role: "member", valid: false },
+      { email: "marina@acme.com.br", admin: false, valid: true },
+      { email: "joao@acme.com.br", admin: false, valid: true },
+      { email: "não-é-email", admin: false, valid: false },
     ]);
-    // Already there: kept as is (its role too); nothing new returns the same list.
-    const admin = first.map((i) => (i.email === "joao@acme.com.br" ? { ...i, role: "admin" as const } : i));
+    // Already there: kept as is ("Admin" too); nothing new returns the same list.
+    const admin = first.map((i) => (i.email === "joao@acme.com.br" ? { ...i, admin: true } : i));
     expect(addInvites(admin, "joao@acme.com.br")).toBe(admin);
     expect(addInvites(admin, "  ,\n ")).toBe(admin);
-    expect(addInvites(admin, "ana@acme.com.br", "admin").at(-1)).toEqual({
+    expect(addInvites(admin, "ana@acme.com.br", true).at(-1)).toEqual({
       email: "ana@acme.com.br",
-      role: "admin",
+      admin: true,
       valid: true,
     });
     expect(validInvites(first).map((i) => i.email)).toEqual(["marina@acme.com.br", "joao@acme.com.br"]);
@@ -120,8 +123,9 @@ describe("text", () => {
       "workspace",
       "context",
       "import",
-      "computer",
       "agents",
+      "computer",
+      "ai",
       "team",
       "done",
     ]);
@@ -163,7 +167,7 @@ describe("grammar", () => {
     const ada = agentGrammar(te, "Ada");
     const theo = agentGrammar(te, "Theo");
     // Her page says "her" in both lines it has for her.
-    expect(te("noAi.agent", ada)).toBe("Ada won't reply because she has no AI connected.");
+    expect(te("noAi.agent", ada)).toBe("Ada won't reply because she has no AI\u00a0connected.");
     expect(te("dm.emptyAgent", ada)).toBe("Ask her to remember, forget or work differently.");
     expect(te("agentPage.work.cell.label", ada)).toBe("How she works");
     expect(te("agentPage.overview.proposes", ada)).toBe("Ada proposes changing her instructions");
@@ -216,7 +220,7 @@ describe("grammar", () => {
       expect([name, agentGrammar(te, name).she, agentGrammar(t, name).article]).toEqual([name, "she", "a"]);
     for (const name of masculine)
       expect([name, agentGrammar(te, name).she, agentGrammar(t, name).article]).toEqual([name, "he", "o"]);
-    expect(te("noAi.agent", agentGrammar(te, "Iris"))).toBe("Iris won't reply because she has no AI connected.");
+    expect(te("noAi.agent", agentGrammar(te, "Iris"))).toBe("Iris won't reply because she has no AI\u00a0connected.");
     expect(t("chat.joined.tip", agentGrammar(t, "Iris"))).toBe("Ninguém chamou a Iris. Ela entrou para ajudar.");
   });
 
@@ -251,6 +255,30 @@ describe("guards and permissions", () => {
     expect(safeRedirect("//evil.com")).toBeUndefined();
     expect(safeRedirect("https://evil.com")).toBeUndefined();
     expect(safeRedirect("/\\evil.com")).toBeUndefined();
+    expect(safeRedirect("/org/a/issues?view=board#top")).toBe("/org/a/issues?view=board#top");
+    // Browsers drop tabs and newlines and read a backslash as a slash: each would leave the site.
+    for (const bypass of [
+      "/\t/evil.com",
+      "/\n/evil.com",
+      "/\r/evil.com",
+      "/%09/evil.com",
+      "/%0a/evil.com",
+      "/%2F/evil.com",
+      "/%2f%2fevil.com",
+      "/%5Cevil.com",
+      "\\\\evil.com",
+      "/.//evil.com",
+      "///evil.com",
+      "javascript:alert(1)",
+    ])
+      expect(safeRedirect(bypass)).toBeUndefined();
+  });
+  test("web links: only http(s)", () => {
+    expect(webUrl("https://github.com/acme/app/pull/3")).toBe("https://github.com/acme/app/pull/3");
+    expect(webUrl("http://example.com")).toBe("http://example.com");
+    expect(webUrl("javascript:alert(1)")).toBeUndefined();
+    expect(webUrl("data:text/html,x")).toBeUndefined();
+    expect(webUrl("/relative")).toBeUndefined();
   });
   test("landing: last org, first org, onboarding", () => {
     expect(landingFor(me, "b")).toEqual({ orgId: "b" });
@@ -259,12 +287,65 @@ describe("guards and permissions", () => {
     expect(membershipIn(me, "b")?.role).toBe("member");
     expect(membershipIn(me, "c")).toBeNull();
   });
-  test("role table mirrors the backend", () => {
-    expect(can("member", "post")).toBe(true);
-    expect(can("member", "manage_agents")).toBe(false);
-    expect(can("admin", "manage_members")).toBe(true);
-    expect(can("admin", "manage_owners")).toBe(false);
-    expect(can("owner", "manage_owners")).toBe(true);
+  test("landing: a workspace its owner hasn't finished setting up is the onboarding, never a place to land", () => {
+    const onboarding = { step: "agents" as const, generalChannelId: "g" };
+    const mine = { id: "n", name: "N", role: "owner" as const, onboarding };
+    expect(settingUp(mine)).toBe(true);
+    expect(landingFor({ ...me, organizations: [mine] }, "n")).toEqual({ to: "/onboarding" });
+    // Another of theirs is set up: that one opens, last visited or not.
+    expect(landingFor({ ...me, organizations: [mine, ...me.organizations] }, "n")).toEqual({ orgId: "a" });
+    // Invited into one being set up, or finished: no onboarding of theirs.
+    expect(settingUp({ ...mine, role: "member" })).toBe(false);
+    expect(landingFor({ ...me, organizations: [{ ...mine, role: "member" }] }, null)).toEqual({ orgId: "n" });
+    expect(settingUp({ id: "n", name: "N", role: "owner" })).toBe(false);
+  });
+  test("a resumed onboarding knows its ready-made agents by name and look; the rest are imported", () => {
+    const look = { color: "indigo", eyes: "round", accessory: "cap" };
+    const mark = (p: "theo" | "lia") =>
+      p === "theo"
+        ? { name: "Theo", handle: "theo", ...look }
+        : { name: "Lia", handle: "lia", color: "rose", eyes: "dots", accessory: "flower" };
+    const agents = [
+      { id: "1", name: "Theo", handle: "theo", appearance: look },
+      { id: "2", name: "Theo", handle: "theo-2", appearance: { ...look, color: "green" } },
+      { id: "3", name: "Lia", handle: "lia", appearance: { color: "rose", eyes: "dots", accessory: "flower" } },
+      { id: "4", name: "Theo", handle: "theo-3", appearance: look },
+      { id: "5", name: "Dev", handle: "dev" },
+    ];
+    const crew = crewOf(agents, ["theo", "lia"] as const, mark);
+    expect(Object.keys(crew.presets)).toEqual(["theo", "lia"]);
+    expect([crew.presets.theo?.id, crew.presets.lia?.id]).toEqual(["1", "3"]);
+    expect(crew.others.map((a) => a.id)).toEqual(["2", "4", "5"]);
+    // A create cut short after the agent but before its look: known by its handle, never made again (a 409).
+    const halfMade = crewOf(
+      [{ id: "6", name: "Lia", handle: "lia", appearance: null }],
+      ["theo", "lia"] as const,
+      mark,
+    );
+    expect(halfMade.presets.lia?.id).toBe("6");
+    // Its handle with another look, or another name: someone else's.
+    expect(
+      crewOf([{ id: "7", name: "Lia", handle: "lia", appearance: look }], ["lia"] as const, mark).others,
+    ).toHaveLength(1);
+    expect(crewOf([{ id: "8", name: "Lia B", handle: "lia" }], ["lia"] as const, mark).others).toHaveLength(1);
+    expect(stepIndex("context")).toBe(1);
+    expect(stepIndex("done")).toBe(ONBOARDING_STEPS.length - 1);
+  });
+  test("the server's answer to a step saved: further on or finished elsewhere is followed, the same step isn't", () => {
+    expect(aheadOf({ step: "computer", finished: false }, "computer")).toBe(false);
+    expect(aheadOf({ step: "computer", finished: false }, "agents")).toBe(true);
+    expect(aheadOf({ step: "ai", finished: false }, "computer")).toBe(true);
+    expect(aheadOf({ step: "done", finished: true }, "team")).toBe(true);
+  });
+  test("what a membership may do is what the server resolved from its roles", () => {
+    const member = { id: "b", name: "B", role: "member" as const, permissions: ["read", "post"] };
+    expect(can(member, "post")).toBe(true);
+    expect(can(member, "manage_agents")).toBe(false);
+    const owner = { id: "a", name: "A", role: "owner" as const, permissions: ["read", "manage_owners", "configure"] };
+    expect(can(owner, "manage_owners")).toBe(true);
+    // No list: nothing (the server checks every request anyway).
+    const unresolved: { role: "owner"; permissions?: string[] } = { role: "owner" };
+    expect(can(unresolved, "read")).toBe(false);
     expect(can(undefined, "read")).toBe(false);
   });
 });

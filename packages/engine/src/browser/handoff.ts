@@ -37,6 +37,7 @@ import {
 import { can, getMembership } from "../organizations";
 import { resumeRunWithResult } from "../run-resume";
 import { bodyCode, runWhere } from "../run-tools";
+import { OrgPausedError } from "../standing";
 import { grantedScopeKeys, isAllowed, toolAccess } from "../tools/scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
 import { agentBrowserStatus, browserUnavailableText } from "./status";
@@ -320,7 +321,7 @@ async function handoffFacts(db: Executor, row: BrowserHandoffRow): Promise<Hando
 // ── Access ────────────────────────────────────────────────────────────────────
 
 /**
- * Who may watch an agent's screen, and take part in its handoffs: org admins,
+ * Who may watch an agent's screen, and see its handoffs (driving it: `requireBrowserControl`): org admins,
  * the agent's responsible person, the person a handoff was asked of, and the
  * person behind the work (who asked for the run waiting on it, or for one of
  * the agent's runs going on now). Not everyone who can read a channel: the
@@ -337,12 +338,13 @@ export async function requireBrowserAccess(
 ) {
   const membership = await getMembership(db, userId, orgId);
   if (!membership) throw new ForbiddenError("You are not a member of this organization");
+  if (membership.standing?.state === "suspended") throw new OrgPausedError(membership.standing);
   const [agent] = await db
     .select({ owner: agents.ownerUserId, machineId: agents.machineId })
     .from(agents)
     .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
   if (!agent) throw new NotFoundError("Agent not found");
-  const admin = can(membership.role, "manage_agents");
+  const admin = can(membership, "control_computers");
   const access = { ...agent, admin };
   if (admin || agent.owner === userId) return access;
   const open = handoff === undefined ? await openHandoffOf(db, orgId, agentId, screen) : handoff;
@@ -371,6 +373,34 @@ export async function requireBrowserAccess(
     if (machine && drivesComputer(machine, { userId, admin, owner: false })) return access;
   }
   throw new ForbiddenError(`You can't use this agent's ${SCREENS[screen].what}`);
+}
+
+/**
+ * Who may drive an agent's screen (take over, take an asked handoff, type, click, open a page): org admins,
+ * the agent's responsible person, and the person an open handoff was asked of, only while it stays open. The
+ * person behind a live run only watches (`requireBrowserAccess`): the agent's browser keeps one profile with
+ * everyone's logins, so talking to the agent must not lend them (ADR 0040 §6). A desktop also to who may
+ * drive its computer (it needs that anyway: `mayControl`).
+ */
+export async function requireBrowserControl(
+  db: Database,
+  userId: string,
+  orgId: string,
+  agentId: string,
+  handoff?: BrowserHandoffRow | null,
+  screen: ScreenKind = "browser",
+) {
+  const open = handoff === undefined ? await openHandoffOf(db, orgId, agentId, screen) : handoff;
+  const access = await requireBrowserAccess(db, userId, orgId, agentId, open, screen);
+  if (access.admin || access.owner === userId) return access;
+  if (open && OPEN.includes(open.status) && open.requestedForUserId === userId) return access;
+  if (screen === "desktop" && access.machineId) {
+    const machine = await getMachine(db, orgId, access.machineId);
+    if (machine && drivesComputer(machine, { userId, admin: false, owner: false })) return access;
+  }
+  throw new ForbiddenError(
+    `Only an admin, the agent's owner or the person it asked can control its ${SCREENS[screen].what}`,
+  );
 }
 
 /**
@@ -840,7 +870,7 @@ async function settle(deps: HandoffDeps, row: BrowserHandoffRow) {
  */
 export async function claimHandoff(deps: HandoffDeps, actorId: string, orgId: string, handoffId: string) {
   const current = await loadHandoff(deps.db, orgId, handoffId);
-  await requireBrowserAccess(deps.db, actorId, orgId, current.agentId, current, current.screen);
+  await requireBrowserControl(deps.db, actorId, orgId, current.agentId, current, current.screen);
   await SCREENS[current.screen].mayControl?.(deps.db, actorId, orgId, current.agentId);
   if (!OPEN.includes(current.status)) throw new ConflictError("This is already over");
   if (current.status === "active" && current.controllerUserId === actorId) return handoffView(current);
@@ -961,7 +991,7 @@ export async function startTakeover(
   runId?: string | null,
   screen: ScreenKind = "browser",
 ) {
-  await requireBrowserAccess(deps.db, actorId, orgId, agentId, undefined, screen);
+  await requireBrowserControl(deps.db, actorId, orgId, agentId, undefined, screen);
   await requireAgentBrowserSwitch(deps.db, orgId, agentId, screen);
   await SCREENS[screen].mayControl?.(deps.db, actorId, orgId, agentId);
   let boundRun: string | null = null;
@@ -1330,7 +1360,7 @@ export async function openPageInControl(
   typed: string,
 ) {
   const open = await openHandoffOf(deps.db, orgId, agentId);
-  await requireBrowserAccess(deps.db, actorId, orgId, agentId, open);
+  await requireBrowserControl(deps.db, actorId, orgId, agentId, open);
   if (open?.status !== "active" || open.controllerUserId !== actorId) {
     throw new ConflictError("Take control of the browser first", "browser.not_in_control");
   }

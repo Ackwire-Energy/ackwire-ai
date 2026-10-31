@@ -129,7 +129,7 @@ describe("Apagar conta", () => {
     );
     // The server didn't say which: the same line, without names.
     expect(deleteBlockedText(en, [])).toBe(
-      "You're the only owner of an organization with other members. On the website, in People, make someone else an owner, then come back.",
+      "You're the only owner of a workspace with other members. On the website, in People, make someone else an owner, then come back.",
     );
   });
 });

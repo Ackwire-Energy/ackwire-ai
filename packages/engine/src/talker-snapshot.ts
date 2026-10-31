@@ -80,7 +80,14 @@ function stepLine(kind: string, data: Record<string, unknown>): string | null {
 /** What a waiting run waits on, from the rows it waits for. */
 async function waitsOf(db: Database, run: AgentRun): Promise<string[]> {
   const out: string[] = [];
-  if (run.waitingMachineId) out.push("its computer to come back online (it is offline)");
+  if (run.waitingMachineId) {
+    const code = (run.transcript as { waitingForBrain?: { code?: string } } | null)?.waitingForBrain?.code;
+    out.push(
+      code === "busy"
+        ? "room on its computer (busy with other tasks)"
+        : "its computer to come back online (it is offline)",
+    );
+  }
   // An approval or a secret never gets here: the talker says nothing for a run that holds messages.
   if (run.status !== "waiting_input") return out;
   const [questions, handoffs, consults] = await Promise.all([

@@ -7,6 +7,7 @@ import type {
   BrainUnavailable,
   ConnectIntent,
   Edition,
+  MachineAccount,
   MachineAccountKind,
 } from "../api/types";
 import { answersOthers, audienceOf } from "./audience";
@@ -30,6 +31,8 @@ export interface NoAiCard {
   /** With `api_key`: the provider the message named. */
   provider?: string;
   autoOpen?: boolean;
+  /** Its plan's sign-in ended (`reason: not_signed_in`): the agent says so, and signing in again is the way back. */
+  signedOut?: boolean;
 }
 
 const INTENTS: ReadonlySet<string> = new Set<ConnectIntent>(["claude", "chatgpt", "api_key", "any", "task"]);
@@ -46,6 +49,7 @@ export function noAiCardOf(meta: Record<string, unknown> | null | undefined): No
     intent: isIntent(o.intent) ? o.intent : "task",
     ...(typeof o.provider === "string" ? { provider: o.provider } : {}),
     ...(o.autoOpen === true ? { autoOpen: true } : {}),
+    ...(o.reason === "not_signed_in" ? { signedOut: true } : {}),
   };
 }
 
@@ -74,6 +78,20 @@ export const PLAN_CHOICES: readonly PlanChoice[] = ["claude", "chatgpt", ...PLAN
 /** The account a plan signs in as: ChatGPT's through Codex; Claude's and every coding plan's through Claude Code. */
 export const kindOf = (choice: PlanChoice): MachineAccountKind =>
   choice === "chatgpt" ? PLAN_BRAIN.chatgpt : PLAN_BRAIN.claude;
+/** The plan an account signs in with: a coding plan's key, ChatGPT's through Codex, else Claude's. */
+export const planOfAccount = (a: Pick<MachineAccount, "kind" | "provider">): PlanChoice =>
+  isPlanId(a.provider) ? a.provider : a.kind === "codex" ? "chatgpt" : "claude";
+/**
+ * The sign-in a row of what the person already has asks for (`existingAi`), in its plan's panel: one more login of
+ * that account for the agent (`email`, Claude's hint), or a free login of it signed back in (`again`). `from`: the
+ * row's login.
+ */
+export interface ExistingSignIn {
+  choice: PlanChoice;
+  from: string;
+  again?: string;
+  email?: string | null;
+}
 /** A plan's maker mark (a `ProviderLogo` id): ChatGPT's is OpenAI's. */
 export const planMark = (choice: PlanChoice) => (choice === "chatgpt" ? "openai" : choice);
 /** A plan's short name, as its tile and its accounts say it: "Claude", "ChatGPT", "GLM Coding"… */
@@ -184,6 +202,15 @@ export function agentAi(agent: Pick<Agent, "brain"> | undefined, state: AiState 
   if (brain?.kind === "codex") return "chatgpt";
   if (brain?.kind === "claude_code") return isPlanId(brain.provider) ? brain.provider : "claude";
   return state === undefined || state === "no_ai" ? null : "key";
+}
+
+/**
+ * The plan a card's Sign in again opens on: the agent's own, where the card says its sign-in ended and the agent
+ * still thinks with a plan; null otherwise (Connect an AI, at the card's step).
+ */
+export function signInAgainPlan(card: Pick<NoAiCard, "signedOut">, agent: Pick<Agent, "brain"> | undefined) {
+  const ai = card.signedOut ? agentAi(agent, undefined) : null;
+  return ai === "key" ? null : ai;
 }
 
 /** The "For" select's choice that signs a plan in for every agent of `allAgents`. */
