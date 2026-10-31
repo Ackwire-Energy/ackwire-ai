@@ -17,7 +17,7 @@ import {
   readBudget,
   stepErrors,
 } from "@/lib/new-agent";
-import { createFakeApi, ENG_ID, fakeMailOf, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
+import { createFakeApi, ENG_ID, fakeMachinesOf, fakeMailOf, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import {
   click,
   continueButton,
@@ -34,8 +34,8 @@ import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
 
-const open = async (state = seedState()) => {
-  await renderApp(`/org/${ORG_ID}/agents/new`, { api: createFakeApi(state) });
+const open = async (state = seedState(), api = createFakeApi(state)) => {
+  await renderApp(`/org/${ORG_ID}/agents/new`, { api });
   await settle(8);
   return state;
 };
@@ -361,15 +361,16 @@ describe("Criar agente: what gets created", () => {
     expect(createdWith(state)?.model).toBe("claude-sonnet-5-5");
   });
 
+  const plan = (kind: "claude_code" | "codex", available: boolean) => ({
+    kind,
+    available,
+    ...(available ? {} : { reason: "not_installed" as const }),
+    experimental: kind === "codex",
+    models: [],
+    defaultModel: null,
+  });
+
   test("plan: with no key, Claude Code on a computer can think; the agent moves there and thinks with it", async () => {
-    const plan = (kind: "claude_code" | "codex", available: boolean) => ({
-      kind,
-      available,
-      ...(available ? {} : { reason: "not_installed" as const }),
-      experimental: kind === "codex",
-      models: [],
-      defaultModel: null,
-    });
     const state = seedState();
     state.credentials = [];
     state.platformKey = false;
@@ -381,7 +382,24 @@ describe("Criar agente: what gets created", () => {
         options: [plan("claude_code", true), plan("codex", false)],
       },
     ];
-    await open(state);
+    const api = createFakeApi(state);
+    // The Mac mini is his, its Claude Code signed in there: its own sign-in thinks for his agents.
+    fakeMachinesOf.get(api)?.setAiAccounts({
+      accounts: [],
+      computers: [
+        {
+          machineId: "machine_mini",
+          name: "Mac mini",
+          online: true,
+          mine: true,
+          canAdd: true,
+          keys: true,
+          brains: { claude_code: true, codex: false },
+          own: { claude_code: {} },
+        },
+      ],
+    });
+    await open(state, api);
     await startAs("Assistente");
     await proceed(4);
     expect(title()).toBe("Modelo e orçamento");
@@ -396,6 +414,12 @@ describe("Criar agente: what gets created", () => {
     const claude = screen().getByRole("button", { name: /^Claude Code.*Mac mini/ });
     await click(claude);
     expect(claude.getAttribute("aria-pressed")).toBe("true");
+    // In the words of the switch it points to, "Atende outras pessoas".
+    expect(
+      screen().getByText(
+        "No plano, a Eva começa atendendo só você. Na página da Eva, você pode escolher se ela atende outras pessoas.",
+      ),
+    ).toBeTruthy();
     expect(
       screen()
         .getByRole("button", { name: /^Automático/ })
@@ -412,6 +436,44 @@ describe("Criar agente: what gets created", () => {
       agentId,
       { brain: "claude_code" },
     ]);
+    // It thinks with the Mac mini's own sign-in: nothing to connect.
+    expect(screen().queryByRole("dialog", { name: /^Conectar uma IA/ })).toBeNull();
+  });
+
+  test("plan: Codex on the workspace's computer, whose own sign-in thinks for nobody: ChatGPT's sign-in opens once it's created", async () => {
+    const state = seedState();
+    state.credentials = [];
+    state.platformKey = false;
+    state.brainMachines = [
+      {
+        machineId: "machine_1",
+        name: "Computador da Acme",
+        online: true,
+        options: [plan("claude_code", true), plan("codex", true)],
+      },
+    ];
+    await open(state);
+    await startAs("Assistente");
+    await proceed(4);
+    expect(title()).toBe("Modelo e orçamento");
+    await click(screen().getByRole("button", { name: /^Codex.*Computador da Acme/ }));
+    await proceed();
+    await click(screen().getByRole("button", { name: "Criar Eva" }));
+    await settle(8);
+    const agentId = state.agents.find((a) => a.handle === "eva")?.id;
+    expect(state.calls.find((c) => c.method === "agents.setBrain")?.args).toEqual([
+      ORG_ID,
+      agentId,
+      { brain: "codex" },
+    ]);
+    // Nobody signed in to ChatGPT there: Connect an AI for Eva, on ChatGPT, over the moment she's created.
+    const d = screen().getByRole("dialog", { name: /^Conectar uma IA para .*Eva$/ });
+    const picker = within(d).getByRole("group", { name: "Qual IA eles vão usar?" });
+    expect(
+      within(picker)
+        .getByRole("button", { name: /^ChatGPT$/ })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
   });
 
   test("budget: empty is the workspace default; zero or text is invalid; a quick amount lights its button", async () => {

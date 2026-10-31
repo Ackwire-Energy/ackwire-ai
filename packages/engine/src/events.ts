@@ -149,6 +149,18 @@ export type ChannelEvent =
       status: "answered" | "expired" | "failed";
     }
   /**
+   * A question still out changed without closing: the consulted agent stopped on a person (an approval, a
+   * question, a secret) or on its computer, or went back to work. The app reloads the conversation's questions
+   * (`GET …/consultations`).
+   */
+  | {
+      type: "agent.consultation";
+      channelId: string;
+      threadId: string | null;
+      runId: string;
+      consultationId: string;
+    }
+  /**
    * The agent started a tool call (`tool` = its name; `connector` = the app, for MCP tools) or finished (`tool: null`,
    * with its `toolUseId`, `failed` when the tool answered with an error, `held` when it waits on a person).
    */
@@ -480,6 +492,20 @@ export type ChannelEvent =
       threadId: string | null;
       messageId: string;
       suggestion: Record<string, unknown>;
+    }
+  /**
+   * An agent's proposal of a new agent was decided (ADR 0081): what changed on its card (`meta.actionCard`). The
+   * draft stays on the message: its instructions alone can be past a NOTIFY payload's limit.
+   */
+  | {
+      type: "agent.proposal.updated";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+      state: "pending" | "creating" | "created" | "denied";
+      agentId: string | null;
+      decidedByUserId: string | null;
+      decidedAt: string | null;
     };
 
 const INLINE_LIMIT = 6000;

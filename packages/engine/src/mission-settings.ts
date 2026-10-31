@@ -37,7 +37,7 @@ async function mayManageAgent(deps: Pick<MissionDeps, "db">, userId: string, org
   const membership = await requirePermission(deps.db, userId, orgId, "read");
   const agent = await getAgent(deps.db, orgId, agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  return { agent, allowed: can(membership.role, "manage_agents") || agent.ownerUserId === userId };
+  return { agent, allowed: can(membership, "manage_agents") || agent.ownerUserId === userId };
 }
 
 export interface MissionSettingsView {

@@ -159,7 +159,7 @@ export function DownloadMacButton({ primary = false }: { primary?: boolean }) {
   const target = desktopTargetOf(navigator.userAgent);
   const latest = useDesktopLatest(target?.target ?? "", target?.arch ?? "", target !== null);
   const origin = typeof window === "undefined" ? "" : window.location.origin;
-  if (inDesktopApp()) return <ThisMacButton orgId={org.id} canPair={can(org.role, "post")} primary={primary} />;
+  if (inDesktopApp()) return <ThisMacButton orgId={org.id} canPair={can(org, "pair_computers")} primary={primary} />;
   if (!target || !latest.data) return null;
   return (
     <Button asChild size="sm" variant={primary ? "primary" : "default"}>
@@ -406,7 +406,7 @@ function HostOffRow() {
         <span className="machine-row__name">{t("machines.host.label")}</span>
         <span className="small muted">{t("machines.host.offText")}</span>
       </span>
-      {can(org.role, "configure") && (
+      {can(org, "configure") && (
         <Button
           size="sm"
           loading={turnOn.isPending}
@@ -546,7 +546,7 @@ export function HostComputerCard() {
   const [removing, setRemoving] = useState<Machine | null>(null);
   const m = (machines.data ?? []).find((x) => x.kind === "host");
   const off = host.data?.on === false;
-  const missing = host.isSuccess && host.data === null && can(org.role, "configure") && auth.data?.signupOpen === false;
+  const missing = host.isSuccess && host.data === null && can(org, "configure") && auth.data?.signupOpen === false;
   if (!m && !off && !missing) return null;
   return (
     <Card aria-labelledby="sec-host-computer">
@@ -580,7 +580,7 @@ export function MachinesSection() {
   const { t } = useTranslation();
   const { org } = useOrg();
   const machines = useMachines(org.id);
-  const canPair = can(org.role, "post");
+  const canPair = can(org, "pair_computers");
   const [renaming, setRenaming] = useState<Machine | null>(null);
   const [removing, setRemoving] = useState<Machine | null>(null);
   // This server's computer and the workspace's own have cards of their own: this list is people's.

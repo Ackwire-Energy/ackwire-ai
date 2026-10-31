@@ -33,6 +33,7 @@ import { LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { groupByDay, isRoutineRun, type RunFilter, runMatches } from "@/lib/agent-edit";
+import { usageShown } from "@/lib/plan-usage";
 import { useAgentEdit } from "./context";
 import { RunChip, runWhere } from "./pieces";
 
@@ -56,7 +57,8 @@ function failure(t: TFunction, run: Run) {
 
 /**
  * The month on top of Atividade (NumerosAgente C): its runs per day in pixels, in the agent's tones, failures
- * capped in the danger tone, and the numbers beside it as the legend (runs, failures, tokens, money).
+ * capped in the danger tone, and the numbers beside it as the legend (runs, failures, tokens, money). No money
+ * for an agent on a plan that spent nothing through the API: its limits are in Uso (ADR 0063 §5).
  */
 function MonthStrip({
   color,
@@ -74,7 +76,7 @@ function MonthStrip({
   perDay: MonthDay[];
   tokens: string;
   /** Admins see dollars against the budget; the others its share used. */
-  money: { spent: number; limit: number } | { percent: number };
+  money: { spent: number; limit: number } | { percent: number } | null;
 }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
@@ -132,27 +134,31 @@ function MonthStrip({
           {t("agentPage.activity.tokens")}
         </dt>
         <dd>{tokens}</dd>
-        <dt>
-          <Icon name="wallet" size={14} />
-          {"spent" in money ? t("agentPage.activity.spent") : t("agentPage.stats.budget")}
-        </dt>
-        <dd>
-          {"spent" in money ? (
-            <>
-              {formatUsd(t, locale, money.spent)}{" "}
-              <small>{t("agentPage.stats.of", { amount: usd(t, locale, money.limit) })}</small>
-            </>
-          ) : (
-            formatPercent(locale, money.percent)
-          )}
-        </dd>
-        <div className="agp-month__meter">
-          {"spent" in money ? (
-            <Meter value={money.spent} max={money.limit} label={t("agentPage.activity.spent")} />
-          ) : (
-            <Meter value={money.percent} max={100} label={t("agentPage.stats.budget")} />
-          )}
-        </div>
+        {money && (
+          <>
+            <dt>
+              <Icon name="wallet" size={14} />
+              {"spent" in money ? t("agentPage.activity.spent") : t("agentPage.stats.budget")}
+            </dt>
+            <dd>
+              {"spent" in money ? (
+                <>
+                  {formatUsd(t, locale, money.spent)}{" "}
+                  <small>{t("agentPage.stats.of", { amount: usd(t, locale, money.limit) })}</small>
+                </>
+              ) : (
+                formatPercent(locale, money.percent)
+              )}
+            </dd>
+            <div className="agp-month__meter">
+              {"spent" in money ? (
+                <Meter value={money.spent} max={money.limit} label={t("agentPage.activity.spent")} />
+              ) : (
+                <Meter value={money.percent} max={100} label={t("agentPage.stats.budget")} />
+              )}
+            </div>
+          </>
+        )}
       </dl>
     </section>
   );
@@ -214,7 +220,13 @@ export function ActivityTab() {
         failures={detail.data?.failuresThisMonth ?? 0}
         perDay={detail.data?.runsByDay ?? []}
         tokens={formatTokensShort(t, locale, detail.data?.tokensThisMonth ?? 0)}
-        money={viewer === "admin" && spent !== undefined && limit !== undefined ? { spent, limit } : { percent: used }}
+        money={
+          !usageShown(agent.brain, used).budget
+            ? null
+            : viewer === "admin" && spent !== undefined && limit !== undefined
+              ? { spent, limit }
+              : { percent: used }
+        }
       />
       <Card as="section" className="agp-card" aria-label={t("agentPage.activity.title")}>
         <Toolbar

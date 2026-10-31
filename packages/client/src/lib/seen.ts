@@ -9,7 +9,8 @@ export function seenMessageId(
   meId: string,
   reads: readonly DmRead[],
 ): string | null {
-  const readAt = Math.max(0, ...reads.map((r) => Date.parse(r.lastReadAt)));
+  // The live `channel.read` events fold my own reads in too (the server's list leaves them out).
+  const readAt = Math.max(0, ...reads.filter((r) => r.userId !== meId).map((r) => Date.parse(r.lastReadAt)));
   if (!readAt) return null;
   const last = messages.at(-1);
   if (!last || last.local || last.author.type !== "person" || last.author.id !== meId) return null;

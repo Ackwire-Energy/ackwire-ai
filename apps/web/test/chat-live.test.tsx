@@ -395,16 +395,28 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
     expect(pop.querySelectorAll(".who-by")).toHaveLength(1);
   });
 
-  test("'Escolhendo quem responde' with the clock while the author's plan reads it, then who picked", async () => {
+  test("'Escolhendo quem responde': the clock where the check goes while the author's plan reads it, then who picked", async () => {
     const { socket, state } = await open();
     await sendText("revisa o PR?");
     await settle(4);
     const root = lastPerson(state);
     await push(socket, { type: "message.routing", messageId: root?.id, step: "plan" });
-    const picking = receiptOf("revisa o PR?");
-    expect(picking.textContent).toBe("Escolhendo quem responde·Chamar um agente");
-    expect(picking.querySelector(".ac-receipt__clock path")?.getAttribute("d")).toBe("M10 6v4l2.6 1.8");
-    expect(picking.querySelector(".ac-receipt__check")).toBeNull();
+    // A mark, not a line: its words are its name and its popover's line, with "Chamar um agente".
+    const clock = receiptOf("revisa o PR?").querySelector(".ac-receipt__check") as HTMLElement;
+    expect(clock.getAttribute("aria-label")).toBe("Escolhendo quem responde");
+    expect(clock.querySelector("path")?.getAttribute("d")).toBe("M10 6v4l2.6 1.8");
+    expect(rowsWith("revisa o PR?")[0]?.querySelector(".ac-msg__foot")?.textContent).toBe("");
+    const picking = await popoverOf("revisa o PR?");
+    expect(picking.querySelector(".who-by")?.textContent).toBe("Escolhendo quem responde·Chamar um agente");
+    await act(async () => {
+      const call = within(picking).getByRole("button", { name: "Chamar um agente" });
+      call.focus();
+      fireEvent.keyDown(call, { key: "Enter" });
+    });
+    await act(async () => fireEvent.click(screen().getByRole("menuitem", { name: /Atlas/ })));
+    await settle();
+    expect((composer() as HTMLTextAreaElement).value).toBe("@atlas ");
+    await closePopover(picking);
     await push(socket, {
       type: "message.routed",
       messageId: root?.id,
@@ -413,8 +425,12 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
       strategy: "router",
       decidedBy: { step: "plan", brand: "claude", ownerId: "u-walter" },
     });
-    expect(receiptOf("revisa o PR?").textContent).not.toContain("Escolhendo");
+    // The check takes the clock's place.
+    const check = receiptOf("revisa o PR?").querySelector(".ac-receipt__check") as HTMLElement;
+    expect(check.getAttribute("aria-label")).toBe("Vista por Ada e Atlas. Ada vai responder");
+    expect(check.querySelector("path")?.getAttribute("d")).toBe("m5.5 10.5 3 3 6-7");
     const pop = await popoverOf("revisa o PR?");
+    expect(pop.textContent).not.toContain("Escolhendo");
     const by = pop.querySelector(".who-by") as HTMLElement;
     expect(by.textContent).toBe("Escolhido pelo seu plano do Claude");
     expect(by.querySelector(".ac-brand")?.getAttribute("data-mark")).toBe("claude");
@@ -540,6 +556,44 @@ describe("empty conversations", () => {
     const dm = document.querySelector(".ac-empty") as HTMLElement;
     expect(dm.querySelector(".ac-empty__title")?.textContent).toBe("Diga oi para João");
     expect(dm.querySelector(".ac-empty__text")).toBeNull();
+  });
+
+  test("a channel's suggestions go to the first agent with a handle someone chose, by name; with none, to the first agent", async () => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (!ada) throw new Error("no Ada");
+    const imported = "00000000-0000-4000-8000-0000000000a9";
+    const alsoImported = "00000000-0000-4000-8000-0000000000aa";
+    state.agents.push(
+      { ...ada, id: imported, name: "New agent", handle: "agent-e9665a97-c8d5-423f-ae59-25", role: "" },
+      { ...ada, id: alsoImported, name: "Rita Revisão", handle: "agent-925ca021-21e4-4053-9e0a-23", role: "" },
+    );
+    state.channelMembers[GENERAL_ID] = [
+      { type: "person", id: "u-walter" },
+      { type: "agent", id: imported },
+      { type: "agent", id: ADA_ID },
+    ];
+    await open(state, `c/${GENERAL_ID}`);
+    await settle(4);
+    const suggestion = screen().getByRole("button", { name: "@Ada O que quebrou desde o último deploy?" });
+    expect(document.querySelector(".channel__suggestions")?.textContent).not.toContain("agent-");
+    await act(async () => fireEvent.click(suggestion));
+    expect((composer() as HTMLTextAreaElement).value).toBe("@ada O que quebrou desde o último deploy?");
+    cleanup();
+
+    state.channelMembers[GENERAL_ID] = [
+      { type: "person", id: "u-walter" },
+      { type: "agent", id: imported },
+      { type: "agent", id: alsoImported },
+    ];
+    await open(state, `c/${GENERAL_ID}`);
+    await settle(4);
+    await act(async () =>
+      fireEvent.click(screen().getByRole("button", { name: "@New agent Oi, o que você sabe fazer?" })),
+    );
+    expect((composer() as HTMLTextAreaElement).value).toBe(
+      "@agent-e9665a97-c8d5-423f-ae59-25 Oi, o que você sabe fazer?",
+    );
   });
 });
 

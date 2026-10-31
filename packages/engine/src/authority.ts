@@ -82,10 +82,11 @@ export async function messageRoot(db: Executor, orgId: string, messageId: string
       return { kind: "routine_report", backgroundRunId: typeof runId === "string" ? runId : null };
     }
     if (notice?.kind === "agent_note") return { kind: "agent_note" };
-    // The answer to a question this agent asked, or the result it waited for: it continues the work of
-    // the run that asked (its `refs.runId`), for whoever is behind that run.
+    // The answer to a question this agent asked, the result it waited for, or the follow-up it set: it
+    // continues the work of the run that asked (its `refs.runId`), for whoever is behind that run.
     const resumes =
-      (notice?.kind === "consult_reply" || notice?.kind === "wait_result") && typeof notice.refs?.runId === "string"
+      (notice?.kind === "consult_reply" || notice?.kind === "wait_result" || notice?.kind === "follow_up") &&
+      typeof notice.refs?.runId === "string"
         ? notice.refs.runId
         : null;
     const runId = resumes ?? m.agentRunId;

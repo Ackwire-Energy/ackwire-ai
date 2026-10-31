@@ -1,23 +1,13 @@
 import { keys, useChannels } from "@agenteschat/client";
 import { can } from "@agenteschat/client/lib/permissions";
-import {
-  Button,
-  Dialog,
-  DialogBody,
-  DialogFooter,
-  DialogSearchList,
-  Field,
-  Input,
-  RadioCard,
-  RadioGroup,
-} from "@agenteschat/ui";
+import { Button, Dialog, DialogBody, DialogFooter, Field, Input, RadioCard, RadioGroup } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { CategorySelect } from "./ChannelCategoryDialogs";
-import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "./MemberPicker";
+import { memberOf, PeoplePicker, type PickKey } from "./MemberPicker";
 import { useOrg } from "./org-context";
 
 /** Same rule as the backend (CHANNEL_NAME_PATTERN): lower case, digits, - or _. */
@@ -39,7 +29,10 @@ export function channelNameError(name: string, taken: Set<string>): "invalid" | 
   return null;
 }
 
-/** "Criar canal": name, topic, sidebar category, public/private and initial members (people and agents). */
+/**
+ * "Criar canal", in one column: name, topic, sidebar category, public/private, then the initial members (people and
+ * agents: search and a list that scrolls in its own box). The footer, with the count and Criar, stays in view.
+ */
 export function NewChannelDialog({
   open,
   onOpenChange,
@@ -60,7 +53,6 @@ export function NewChannelDialog({
   const [topic, setTopic] = useState("");
   const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [categoryId, setCategoryId] = useState<string | null>(category);
-  const [q, setQ] = useState("");
   const [selected, setSelected] = useState<Set<PickKey>>(new Set());
   const [touched, setTouched] = useState(false);
   useEffect(() => {
@@ -69,11 +61,9 @@ export function NewChannelDialog({
     setTopic("");
     setVisibility("public");
     setCategoryId(category);
-    setQ("");
     setSelected(new Set());
     setTouched(false);
   }, [open, category]);
-  const rows = useMemberRows(q);
   const taken = new Set((channels.data ?? []).map((c) => c.name));
   const error = channelNameError(name, taken);
   const create = useMutation({
@@ -135,7 +125,7 @@ export function NewChannelDialog({
             />
           </Field>
           <Field label={t("channelCategories.category")} id="ch-category" help={t("channelCategories.categoryHelp")}>
-            <CategorySelect value={categoryId} onChange={setCategoryId} canCreate={can(org.role, "configure")} />
+            <CategorySelect value={categoryId} onChange={setCategoryId} canCreate={can(org, "manage_channels")} />
           </Field>
           <fieldset style={{ margin: 0, padding: 0, border: 0, display: "flex", flexDirection: "column", gap: 8 }}>
             <legend className="ac-field__label" style={{ padding: 0, marginBottom: 8 }} id="ch-vis">
@@ -163,29 +153,14 @@ export function NewChannelDialog({
               />
             </RadioGroup>
           </fieldset>
-          <span className="ac-field__label">{t("newChannel.members")}</span>
-        </DialogBody>
-        <DialogSearchList
-          query={q}
-          onQueryChange={setQ}
-          searchLabel={t("newChannel.membersSearch")}
-          searchPlaceholder={t("newChannel.membersSearch")}
-          isEmpty={rows.length === 0}
-          emptyText={t("newChannel.membersEmpty", { q })}
-        >
-          <MemberPickerRows
-            rows={rows}
+          <PeoplePicker
+            label={t("newChannel.members")}
+            searchLabel={t("newChannel.membersSearch")}
+            emptyText={(q) => t("newChannel.membersEmpty", { q })}
             selected={selected}
-            onToggle={(key, on) =>
-              setSelected((prev) => {
-                const next = new Set(prev);
-                if (on) next.add(key);
-                else next.delete(key);
-                return next;
-              })
-            }
+            onChange={setSelected}
           />
-        </DialogSearchList>
+        </DialogBody>
         <DialogFooter bar note={t("newChannel.selected", { count: selected.size })}>
           <Button onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
           <Button type="submit" variant="primary" disabled={create.isPending} loading={create.isPending}>

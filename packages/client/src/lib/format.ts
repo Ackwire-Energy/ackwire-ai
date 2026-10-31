@@ -124,6 +124,16 @@ export function joinNames(names: string[], and: string) {
   return `${names.slice(0, -1).join(", ")}${and}${names[names.length - 1]}`;
 }
 
+/** How many names a list of a team says before "and N more" (`namesText`): a ready-made team's four, whole. */
+export const NAMES_SHOWN = 4;
+
+/** "Ana", "Ana e Bruno", "Ana, Bruno e mais 2": the first `max` names of `total`. */
+export function namesText(t: TFunction, names: string[], max = 2, total = names.length) {
+  const shown = names.slice(0, max);
+  if (total <= shown.length) return joinNames(shown, t("notifications.and"));
+  return t("notifications.namesMore", { names: shown.join(", "), count: total - shown.length });
+}
+
 /** Short model label for message meta: "Claude Sonnet 5.5" → "sonnet 5.5". */
 export const shortModel = (label: string) => label.replace(/^Claude\s+/i, "").toLowerCase();
 

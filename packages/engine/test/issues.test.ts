@@ -1,21 +1,27 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
-import type { ModelRequest } from "@agenteschat/providers";
+import { type ModelRequest, systemText } from "@agenteschat/providers";
 import {
   addChannelMember,
   addRunStep,
   askAgentToImplement,
+  buildRunContext,
   commentIssue,
+  createAgent,
+  createAgentRuns,
   createChannel,
   createIssue,
   createIssueToolSource,
   drainOutbox,
+  executeRun,
   ForbiddenError,
   getIssue,
   grantScopes,
+  insertMessage,
   issueFromMessage,
   listIssueActivity,
   listIssues,
+  NEW_AGENT_DEFAULTS,
   NotFoundError,
   openDm,
   postPersonMessage,
@@ -23,6 +29,7 @@ import {
   setCriterion,
   updateIssue,
   ValidationError,
+  type WorkActor,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
@@ -209,6 +216,8 @@ describe("issues", () => {
     const runs = await f.db.select().from(schema.agentRuns);
     expect(runs).toHaveLength(1);
     expect(system).toContain("# Your task: issue #1");
+    // From the DM the agent sees the private issue, so it's among its open tasks there.
+    expect(system).toContain("- #1 Checkout quebra (in_progress)");
     const comments = (await listIssueActivity(f.db, person(f.owner.id), f.org.id, issue.id))
       .filter((a) => a.kind === "comment")
       .map((a) => a.text);
@@ -336,6 +345,126 @@ describe("issues", () => {
       ["npm version patch", null],
       ["git push origin", "waiting"],
     ]);
+  });
+
+  test("every run in the issue's work thread works on it: a reply there, a computer task's end; a run elsewhere doesn't", async () => {
+    f = await setup();
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const issue = await createIssue(deps, person(f.owner.id), f.org.id, { title: "Frete lento" });
+    await askAgentToImplement(deps, f.owner.id, f.org.id, issue.id, f.agent.id);
+    await drainOutbox(f.db, f.handlers);
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    const root = (await f.db.select().from(schema.messages)).find((m) => m.channelId === dm.id && !m.threadId);
+    if (!root) throw new Error("no issue card");
+    const runOf = async (messageId: string) =>
+      (await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, messageId)))[0];
+    // Moved back to "to do": the next run in its thread starts the work again.
+    await updateIssue(deps, person(f.owner.id), f.org.id, issue.id, { status: "todo" });
+
+    const reply = await postPersonMessage(deps, f.owner.id, f.org.id, dm.id, { body: "e aí?", threadId: root.id });
+    await drainOutbox(f.db, f.handlers);
+    expect((await runOf(reply.id))?.issueId).toBe(issue.id);
+    expect((await getIssue(f.db, person(f.owner.id), f.org.id, { id: issue.id })).status).toBe("in_progress");
+
+    // A task on its computer ended: the notice lands in that thread and wakes the agent there.
+    const notice = await f.db.transaction(async (tx) => {
+      const message = await insertMessage(tx, {
+        orgId: f.org.id,
+        channelId: dm.id,
+        threadId: root.id,
+        author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1 },
+        body: 'Task "Rodar os testes" finished on mac after 2 min.',
+        meta: { machineTask: { id: crypto.randomUUID(), title: "Rodar os testes", status: "done" } },
+      });
+      await createAgentRuns(tx, message, [f.agent.id], "mention");
+      return message;
+    });
+    await drainOutbox(f.db, f.handlers);
+    expect((await runOf(notice.id))?.issueId).toBe(issue.id);
+
+    const elsewhere = await postPersonMessage(deps, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
+    await drainOutbox(f.db, f.handlers);
+    expect(await runOf(elsewhere.id)).toMatchObject({ status: "done", issueId: null });
+  });
+
+  test("an issue handed to another agent: a run in the first one's work thread doesn't hide the new one's work", async () => {
+    f = await setup();
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const issue = await createIssue(deps, person(f.owner.id), f.org.id, { title: "Frete lento" });
+    await askAgentToImplement(deps, f.owner.id, f.org.id, issue.id, f.agent.id);
+    await drainOutbox(f.db, f.handlers);
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    const root = (await f.db.select().from(schema.messages)).find((m) => m.channelId === dm.id && !m.threadId);
+    if (!root) throw new Error("no issue card");
+    const qa = await createAgent(f.db, f.owner.id, f.org.id, { name: "QA", handle: "qa" }, NEW_AGENT_DEFAULTS);
+    // QA's run stays queued, so it is live: only the reply below runs.
+    const handed = await askAgentToImplement(deps, f.owner.id, f.org.id, issue.id, qa.id);
+    expect(handed.work).toMatchObject({ agentId: qa.id, state: "running" });
+
+    const reply = await postPersonMessage(deps, f.owner.id, f.org.id, dm.id, { body: "e aí?", threadId: root.id });
+    const runOf = async () =>
+      (await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, reply.id)))[0];
+    await executeRun(f.jobDeps, (await runOf())?.id ?? "", { finalAttempt: true });
+    expect(await runOf()).toMatchObject({ agentId: f.agent.id, status: "done", issueId: null });
+    const work = (await getIssue(f.db, person(f.owner.id), f.org.id, { id: issue.id })).work;
+    expect(work).toMatchObject({ agentId: qa.id, state: "running", runId: handed.work?.runId });
+  });
+
+  test("a run's context lists the agent's open tasks, latest activity first; not closed, others' or hidden ones; none for a routine", async () => {
+    f = await setup({ issueTools: true });
+    const deps = { db: f.db, pubsub: f.pubsub };
+    let asked = "";
+    const ask = async (body: string) => {
+      asked = (await postPersonMessage(deps, f.owner.id, f.org.id, f.general.id, { body })).id;
+      await drainOutbox(f.db, f.handlers);
+      return systemText(f.provider.calls.at(-1)?.request.system ?? "");
+    };
+    expect(await ask("@dev bom dia")).not.toContain("# Your open tasks");
+
+    const mine: WorkActor = { type: "agent", id: f.agent.id };
+    const make = (title: string, assignee: WorkActor, criteria: string[] = []) =>
+      createIssue(deps, person(f.owner.id), f.org.id, { title, assignee, criteria });
+    const older = await make("Frete lento", mine, ["Responde em 2 s", "Tem teste"]);
+    const newer = await make("Login quebra", mine);
+    for (const [title, status] of [
+      ["Já feito", "done"],
+      ["Desistimos", "canceled"],
+    ] as const) {
+      await updateIssue(deps, person(f.owner.id), f.org.id, (await make(title, mine)).id, { status });
+    }
+    const qa = await createAgent(f.db, f.owner.id, f.org.id, { name: "QA", handle: "qa" }, NEW_AGENT_DEFAULTS);
+    await make("Do QA", { type: "agent", id: qa.id });
+    // From a private channel the agent isn't in: it keeps that channel's visibility.
+    const secret = await createChannel(f.db, f.owner.id, f.org.id, { name: "secreto", visibility: "private" });
+    const said = await postPersonMessage(deps, f.owner.id, f.org.id, secret.id, { body: "Cofre aberto" });
+    const hidden = await issueFromMessage(deps, f.owner.id, f.org.id, said.id);
+    await updateIssue(deps, person(f.owner.id), f.org.id, hidden.id, { assignee: mine });
+    await updateIssue(deps, person(f.owner.id), f.org.id, older.id, { status: "in_progress" });
+    await setCriterion(deps, person(f.owner.id), f.org.id, older.id, older.criteria[0]?.id ?? "", true);
+    const at = (id: string, minutesAgo: number) =>
+      f.db
+        .update(schema.issues)
+        .set({ updatedAt: new Date(Date.now() - minutesAgo * 60_000) })
+        .where(eq(schema.issues.id, id));
+    await at(older.id, 5);
+    await at(newer.id, 1);
+
+    const listed =
+      "# Your open tasks\nIssues assigned to you, latest activity first:\n- #2 Login quebra (todo)\n- #1 Frete lento (in_progress, criteria 1/2)";
+    // Reading issues only, like every new agent: the list, and nothing about tools it doesn't have.
+    const reading = await ask("@dev e agora?");
+    expect(reading).toContain(listed);
+    expect(reading).not.toContain("keep that task updated");
+    for (const title of ["Já feito", "Desistimos", "Do QA", "Cofre aberto"]) expect(reading).not.toContain(title);
+    await grantScopes(f.db, f.org.id, f.agent.id, ISSUES);
+    expect(await ask("@dev e agora?")).toContain(
+      `${listed}\nWhen what you're doing belongs to one of them, keep that task updated as you go: a short progress comment (\`comment_issue\`) and each criterion as you meet it (\`update_issue\`); its status moves on its own.`,
+    );
+    // A routine's run keeps to its own task.
+    const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, asked));
+    if (!run) throw new Error("no run");
+    const routine = await buildRunContext(f.db, run, f.agent, { maxMessages: 30, routine: true });
+    expect(systemText(routine.system)).not.toContain("# Your open tasks");
   });
 
   test("a comment can carry the author's Drive files; they link to the issue; someone else's can't be attached", async () => {

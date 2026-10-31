@@ -5,15 +5,25 @@ import { untrustedBlock } from "./untrusted";
  * looking: a routine's report (`routine_handoff`), another agent's answer
  * (`consult_reply`) or note (`agent_note`), the late result of a wait it
  * stopped waiting on (`wait_result`), a fast reply it gave while it worked
- * (`talker_reply`). Stored on the notice message as `meta.notice`; the
- * agent's context reads it as an event, never as a person's words.
+ * (`talker_reply`), what a person decided on its proposal of a new agent
+ * (`proposal_result`), its own follow-up (`follow_up`: the line it set, and at
+ * its time the notice that wakes it, `refs.wake`). Stored on the notice
+ * message as `meta.notice`; the agent's context reads it as an event, never
+ * as a person's words.
  *
  * A notice is written as the agent it is for (its message's author). It reads
  * as that agent's own ("Your routine reports…") only in that agent's context;
  * other agents in the conversation read a neutral line or nothing
  * (`noticeForOthers`), so nobody takes another agent's report or note as theirs.
  */
-export type NoticeKind = "routine_handoff" | "consult_reply" | "agent_note" | "wait_result" | "talker_reply";
+export type NoticeKind =
+  | "routine_handoff"
+  | "consult_reply"
+  | "agent_note"
+  | "wait_result"
+  | "talker_reply"
+  | "proposal_result"
+  | "follow_up";
 
 export interface Notice {
   kind: NoticeKind;
@@ -85,6 +95,17 @@ export function noticeText(meta: Record<string, unknown> | null | undefined, cur
       return `[${from ?? "Something you were waiting on"} finished]: ${n.text}`;
     case "talker_reply":
       return `[You already told them, while you worked]: ${n.text}`;
+    case "follow_up": {
+      const at = n.refs?.at ?? "";
+      if (n.refs?.wake)
+        return `[Your follow-up for ${at} is due: you set it earlier in this conversation to come back now]: ${n.text}${
+          current
+            ? "\nDo what you came back for now with your tools, then tell the people here what you found, briefly. If it still isn't ready, say so in a line and set another follow_up only if waiting still makes sense."
+            : ""
+        }`;
+      const state = n.refs?.state === "canceled" ? "canceled" : n.refs?.state === "done" ? "came" : "still to come";
+      return `[You set a follow-up for ${at} (${state})]: ${n.text}`;
+    }
     default:
       return `[${from ?? "Notice"}]: ${n.text}`;
   }

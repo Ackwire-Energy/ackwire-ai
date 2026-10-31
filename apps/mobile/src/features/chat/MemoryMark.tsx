@@ -8,6 +8,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { AgentReadingBook } from "@/agent/ReadingBook";
 import { useOrg } from "@/providers/org";
 import { Button, Card, Text, useToast } from "@/ui";
+import { canEditMemories } from "../agents/logic";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
@@ -66,7 +67,7 @@ export function MemoryMarks({ message, divided }: { message: Message; divided: b
 
 /**
  * What one agent saved from a message, as the web's card: the fact, where it came from, Corrigir (in place) and
- * Esquecer (with Desfazer) for the agent's owner or an admin, and Ver na memória.
+ * Esquecer (with Desfazer) for the agent's owner or who reviews memory, and Ver na memória.
  */
 function MemorySheet({ message, memory, onClose }: { message: Message; memory: MessageMemory; onClose: () => void }) {
   const { t, i18n } = useTranslation();
@@ -78,7 +79,7 @@ function MemorySheet({ message, memory, onClose }: { message: Message; memory: M
   const { orgId, org } = useOrg();
   const agent = dir.agentById.get(memory.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
-  const canEdit = org?.role === "owner" || org?.role === "admin" || (agent?.ownerUserId ?? null) === meId;
+  const canEdit = canEditMemories(agent, { id: meId, org });
   const [text, setText] = useState(memory.text);
   const [mode, setMode] = useState<"card" | "edit" | "forgot">("card");
   const [draft, setDraft] = useState(memory.text);

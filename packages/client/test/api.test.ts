@@ -248,12 +248,12 @@ describe("HTTP client: management (phase 4)", () => {
     expect((await api.orgs.overview("o1")).people).toBe(7);
     expect((await api.orgs.people("o1"))[0]?.online).toBe(true);
     expect((await api.orgs.allInvitations("o1"))[0]?.status).toBe("expired");
-    expect(await api.orgs.inviteMany("o1", { emails: ["a@x.com"], role: "member" })).toEqual([
+    expect(await api.orgs.inviteMany("o1", { emails: ["a@x.com"], roleIds: [] })).toEqual([
       { email: "a@x.com", status: "invited" },
     ]);
     expect((await api.orgs.resendInvitation("o1", "i")).url).toBe("u");
     expect((await api.orgs.usageReport("o1")).totalUsd).toBe(1);
-    expect(calls[5]?.init.body).toBe('{"emails":["a@x.com"],"role":"member"}');
+    expect(calls[5]?.init.body).toBe('{"emails":["a@x.com"],"roleIds":[]}');
   });
 
   test("credentials rotate/purge/platform, agent detail, channels, runs, roster, channel update", async () => {
@@ -578,10 +578,10 @@ describe("HTTP client: drive, storage, issues, routines, calendar, custom MCP, i
     expect((await api.invites.ask("tok", { name: "Ana", email: "a@x.com", code: "123456" })).status).toBe("pending");
     await api.invites.requestNew("tok");
     expect(await api.joinRequests.list("o1")).toEqual([expect.objectContaining({ id: "r1" })]);
-    expect(await api.joinRequests.approve("o1", "r1", "admin")).toEqual({ outcome: "joined" });
+    expect(await api.joinRequests.approve("o1", "r1", ["r-admin"])).toEqual({ outcome: "joined" });
     await api.joinRequests.deny("o1", "r1", "Not now");
     const sent = (path: string) => calls.find((c) => c.url === path && c.init.method === "POST")?.init.body;
-    expect(sent(`${org}/join-requests/r1/approve`)).toBe('{"role":"admin"}');
+    expect(sent(`${org}/join-requests/r1/approve`)).toBe('{"roleIds":["r-admin"]}');
     expect(sent(`${org}/join-requests/r1/deny`)).toBe('{"reason":"Not now"}');
     expect(sent("/api/app/invitations/tok/requests")).toBe('{"name":"Ana","email":"a@x.com","code":"123456"}');
     expect(sent("/api/app/invitations/tok/code/check")).toBe('{"email":"a@x.com","code":"123456"}');

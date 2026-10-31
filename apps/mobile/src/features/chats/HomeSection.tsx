@@ -16,11 +16,11 @@ import {
 
 /**
  * The sections the person collapsed, remembered across launches: Conversas' by default, or another list's
- * (`store`, `keys`: the Threads tab's Missões and Threads).
+ * (`store`, `keys`: the Threads tab's Missões and Threads; null `keys`: any ids, Agentes' groups).
  */
 export function useCollapsedSections<K extends string = HomeSection>(
   store: string = STORED.homeCollapsed,
-  keys: readonly K[] = HOME_SECTIONS as unknown as readonly K[],
+  keys: readonly K[] | null = HOME_SECTIONS as unknown as readonly K[],
 ) {
   const [collapsed, setCollapsed] = useState<K[]>(() => parseCollapsed(readValueSync(store), keys));
   const toggle = useCallback(

@@ -1,7 +1,9 @@
 import { spawnSync } from "node:child_process";
 import { accessSync, constants } from "node:fs";
+import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
 import type { RunnerInfo } from "@agenteschat/adapters/machine-protocol";
+import { readSmallJson } from "./json-file";
 
 /**
  * Which coding CLIs this machine has (protocol 7, ADR 0029): `claude` and
@@ -43,20 +45,75 @@ const defaultRun: Run = (command, args) => {
   return { status: r.status, stdout: `${r.stdout ?? ""}`, error: r.error };
 };
 
+const word = (v: unknown) => (typeof v === "string" && /^[\w.-]{1,40}$/.test(v) ? v : undefined);
+
+/**
+ * The rate-limit tier of the plan Anthropic sold as Max 20x, called Ultra since 2026-10-30 (claude.com/pricing);
+ * the old Max 5x, now Max, is `default_claude_max_5x`.
+ */
+const ULTRA_TIER = "default_claude_max_20x";
+/** `.claude.json` also holds the CLI's projects: one larger than this isn't read. */
+const CLAUDE_CONFIG_MAX_BYTES = 4 * 1024 * 1024;
+/** Claude Code's `subscriptionType` for each organization type, as the CLI maps them. */
+const CLAUDE_ORG_PLANS = new Map([
+  ["claude_pro", "pro"],
+  ["claude_max", "max"],
+  ["claude_team", "team"],
+  ["claude_enterprise", "enterprise"],
+]);
+
+/**
+ * Claude's plan as Anthropic names it (`pro`, `max`, `ultra`, `team`, `enterprise`): Claude Code's
+ * `subscriptionType`, which says `max` for both Max and Ultra, told apart by the organization's rate-limit tier
+ * (`tier`, read only for a `max`). A `max` whose tier is unknown stays `max`.
+ */
+export function claudePlan(subscriptionType: unknown, tier: () => unknown): string | undefined {
+  const plan = word(subscriptionType);
+  return plan === "max" && tier() === ULTRA_TIER ? "ultra" : plan;
+}
+
+/**
+ * The organization Claude Code is signed in to, as the CLI keeps it in its config folder's `.claude.json`
+ * (`oauthAccount`): its type and rate-limit tier, which `auth status` doesn't say. Its sign-in writes both, and they
+ * are missing only where its bootstrap call there failed or was skipped (offline, nonessential traffic off, another
+ * provider). `own`: the computer's own config, read through a link as Claude Code reads it; an account folder's never
+ * is.
+ */
+function claudeOrganization(configDir: string, own = false) {
+  const config = readSmallJson(join(configDir, ".claude.json"), CLAUDE_CONFIG_MAX_BYTES, own) as {
+    oauthAccount?: { organizationType?: unknown; organizationRateLimitTier?: unknown };
+  } | null;
+  return config?.oauthAccount;
+}
+
+/** The rate-limit tier of the organization Claude Code is signed in to (`claudeOrganization`). */
+export const claudeTier = (configDir: string, own = false): unknown =>
+  claudeOrganization(configDir, own)?.organizationRateLimitTier;
+
+/** The plan as `claudePlan` names it from `.claude.json` alone, for a folder where no CLI may run. */
+export function claudeKeptPlan(configDir: string): string | undefined {
+  const org = claudeOrganization(configDir);
+  const type = typeof org?.organizationType === "string" ? CLAUDE_ORG_PLANS.get(org.organizationType) : undefined;
+  return claudePlan(type, () => org?.organizationRateLimitTier);
+}
+
 /**
  * Protocol 8: whether Claude Code is logged in (`claude auth status --json`:
- * `loggedIn`, `authMethod`, `subscriptionType`). Only these three leave the
- * machine (never the email or the organization). Unknown on any failure.
+ * `loggedIn`, `authMethod`, `subscriptionType`, the plan as `claudePlan` names
+ * it). Only these three leave the machine (never the email or the
+ * organization). Unknown on any failure.
  */
-export function claudeAuth(run: Run = defaultRun): { loggedIn?: boolean; authMethod?: string; plan?: string } {
+export function claudeAuth(
+  run: Run = defaultRun,
+  tier: () => unknown = () => claudeTier(process.env.CLAUDE_CONFIG_DIR || homedir(), true),
+): { loggedIn?: boolean; authMethod?: string; plan?: string } {
   try {
     const r = run("claude", ["auth", "status", "--json"]);
     if (r.error) return {};
     const json = JSON.parse(r.stdout.trim() || "null") as Record<string, unknown> | null;
     if (!json || typeof json !== "object") return r.status !== 0 ? { loggedIn: false } : {};
-    const word = (v: unknown) => (typeof v === "string" && /^[\w.-]{1,40}$/.test(v) ? v : undefined);
     const authMethod = word(json.authMethod);
-    const plan = word(json.subscriptionType);
+    const plan = claudePlan(json.subscriptionType, tier);
     return {
       ...(typeof json.loggedIn === "boolean" ? { loggedIn: json.loggedIn } : {}),
       ...(authMethod ? { authMethod } : {}),

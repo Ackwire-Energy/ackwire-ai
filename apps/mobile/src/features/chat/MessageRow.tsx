@@ -4,16 +4,19 @@ import {
   desktopTrailOf,
   keys,
   type Message,
+  type MessageReceipt,
+  type RunConsultation,
   type ScreenKind,
   type ThreadInfo,
   useApi,
+  useConsultations,
   useContinuedRun,
   useReactions,
-  useSteerState,
   useToggleReaction,
   useWaiting,
 } from "@agenteschat/client";
 import { CONTINUE_ERRORS, errorCode, errorText } from "@agenteschat/client/lib/errors";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
 import { brainUnavailableOf } from "@agenteschat/client/lib/machine-outages";
 import { serverBody } from "@agenteschat/client/lib/message-body";
@@ -27,31 +30,22 @@ import { router } from "expo-router";
 import { memo, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import Animated, { FadeIn } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
-import {
-  CHROME_MAX_SCALE,
-  Count,
-  Icon,
-  InkOrbit,
-  PixelStopped,
-  PressScale,
-  Text,
-  useReducedMotion,
-  useTheme,
-  useToast,
-} from "@/ui";
+import { CHROME_MAX_SCALE, Count, Icon, InkOrbit, PixelStopped, PressScale, Text, useTheme, useToast } from "@/ui";
+import { ProposalCard } from "../agents/ProposalCard";
 import { NoAiCard } from "../ai/NoAiCard";
 import { HandoffCard } from "../browser/HandoffCard";
 import { TrailCard } from "../browser/TrailCard";
 import { MessageFiles } from "../files/MessageFiles";
-import { routineHref } from "../links/logic";
+import { consultationHref, routineHref } from "../links/logic";
 import { DecisionCard, MissionCard, PlanCard, ReviewCard, SetupFailedCard } from "../missions/cards";
 import { BrainWait } from "../outages/WaitCard";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
+import { ReceiptMark } from "./AgentReceipts";
+import { ConsultGroup } from "./ConsultGroup";
 import { ApprovalInline, ConsultationCard, QuestionCard, ThreadLink } from "./cards";
 import { IssueWorkCard } from "./issue-work";
 import { cacheContinued } from "./live";
@@ -76,13 +70,17 @@ import { recentTurn, stoppedOf, turnOpener } from "./turn";
 
 /** A run's message asks whether a take over still holds its browser only this recently (older: events only). */
 const TRAIL_RECENT_MS = 12 * 60 * 60_000;
+/** The room beside my bubble for its receipt's mark: my row's 64px left padding past the screen's 16px edge. */
+const MARK_ROOM = 48;
 
 /**
  * One message: the face and name (dropped when grouped), a pin mark when
  * pinned, what it consulted, its text, the cards it carries and the reactions. Long press opens its
  * actions (the screen's sheet). An agent's reply takes its live block's place: its tools stay one closed
- * line above the words ("Usou N ferramentas"), and a stopped one says so with "Continuar". Under my own
- * message sent while an agent works: whether it read it ("lê na próxima pausa", "leu", "parou para ler").
+ * line above the words ("Usou N ferramentas"), and a stopped one says so with "Continuar". A person's message's
+ * receipt is a mark in room the row already has (`ReceiptMark`), so it never changes the row's height: beside my
+ * bubble, whether an agent read it ("lê na próxima pausa", "leu") or who read it in a DM; at the end of someone
+ * else's name line, the agents' receipt of their latest message.
  */
 export const MessageRow = memo(function MessageRow({
   message: m,
@@ -91,14 +89,24 @@ export const MessageRow = memo(function MessageRow({
   thread,
   onLongPress,
   onRetry,
+  receipt,
+  seenBy,
+  readOnly = false,
 }: {
   message: Message;
   grouped: boolean;
   meId: string | null;
   /** Its thread, when it is the root of one the conversation shows as a link. */
   thread?: ThreadInfo;
-  onLongPress: (m: Message) => void;
+  /** Absent where it is read only. */
+  onLongPress?: (m: Message) => void;
   onRetry?: (m: Message) => void;
+  /** The agents' receipt its mark shows: the latest person's message's, on it or on its turn's first row. */
+  receipt?: MessageReceipt;
+  /** A DM between people: who read this message, my latest. */
+  seenBy?: string;
+  /** Shown where the person can't act on it (two agents' conversation): no long press, reactions or block. */
+  readOnly?: boolean;
 }) {
   const { t } = useTranslation();
   // Mine and not sent for lack of a connection: it waits and goes by itself when the connection is back.
@@ -134,10 +142,24 @@ export const MessageRow = memo(function MessageRow({
   // What the server wrote itself is said in the person's language; a stopped reply drops the server's note.
   const body = hidesBody(m) ? "" : reminderBody(splitCanceled(serverBody(t, m.body, meta), meta).body, meta);
   const consulted = isAgent && m.author.id ? consultationsOf(meta) : [];
-  const steps = isAgent && m.agentRunId ? workStepsOf(meta) : null;
+  // A question to another agent (in their DM) carries the asking run: its work shows on that run's reply.
+  const ownWork = isAgent && Boolean(m.agentRunId) && !meta?.consultation;
+  const steps = ownWork ? workStepsOf(meta) : null;
+  // Posted by a run answering another agent's question from here (its approval, question, secret): whom it helps.
+  const consultations = useConsultations(orgId, m.channelId, isAgent && Boolean(m.agentRunId) && !readOnly);
+  const helping =
+    isAgent && m.agentRunId && !readOnly
+      ? consultations.data?.find((x) => x.consultedRunId === m.agentRunId)
+      : undefined;
+  const press = readOnly
+    ? undefined
+    : () => {
+        tapHaptic();
+        onLongPress?.(m);
+      };
   const stopped = isAgent && m.agentRunId ? stoppedOf(meta) : null;
   // This reply just took its live block's place here: the same tools (and the messages it read) stay.
-  const [kept] = useState(() => (isAgent && m.agentRunId ? recentTurn(m.agentRunId, Date.now()) : null));
+  const [kept] = useState(() => (ownWork && m.agentRunId ? recentTurn(m.agentRunId, Date.now()) : null));
   // The line its block opened with stays above the tools, where it was, instead of moving into them (`turnOpener`).
   const opened =
     kept && m.agentRunId ? turnOpener({ runId: m.agentRunId, status: "running", text: "" }, kept.items) : null;
@@ -196,9 +218,11 @@ export const MessageRow = memo(function MessageRow({
           {...(setup.reason === "branch_missing" ? { lostBranch: setup.branch ?? null } : {})}
         />
       ) : null}
-      <View style={mine ? styles.meEnd : undefined}>
-        <Reactions message={m} meId={meId} />
-      </View>
+      {readOnly ? null : (
+        <View style={mine ? styles.meEnd : undefined}>
+          <Reactions message={m} meId={meId} />
+        </View>
+      )}
       {m.local === "pending" || (m.local === "failed" && offline) ? (
         <Sending offline={offline} end={mine} />
       ) : m.local === "failed" ? (
@@ -211,16 +235,23 @@ export const MessageRow = memo(function MessageRow({
     </>
   );
 
-  if (mine)
+  if (mine) {
+    // The bubble, or the files of a message with no words, leads; the receipt's mark stands beside it.
+    const lead = body ? (
+      <View style={[styles.bubble, styles.lead, { backgroundColor: c.bubble }]}>
+        <MessageText body={body} muted={m.local === "pending"} selectable={false} accent={accent} />
+      </View>
+    ) : files.length > 0 ? (
+      <View style={styles.grow}>
+        <MessageFiles files={files} align="end" />
+      </View>
+    ) : null;
     return (
       <Pressable
-        onLongPress={() => {
-          tapHaptic();
-          onLongPress(m);
-        }}
+        onLongPress={press}
         delayLongPress={380}
-        accessibilityHint={t("mobile.chat.longPressHint")}
-        style={({ pressed }) => [styles.me, grouped && styles.meCont, pressed && styles.mePressed]}
+        accessibilityHint={press ? t("mobile.chat.longPressHint") : undefined}
+        style={({ pressed }) => [styles.me, grouped && styles.meCont, pressed && press && styles.mePressed]}
       >
         {m.pinned ? (
           <View style={[styles.pinLine, styles.meEnd]}>
@@ -230,35 +261,35 @@ export const MessageRow = memo(function MessageRow({
             </Text>
           </View>
         ) : null}
-        {body ? (
-          <View style={[styles.bubble, { backgroundColor: c.bubble }]}>
-            <MessageText body={body} muted={m.local === "pending"} selectable={false} accent={accent} />
+        {lead ? (
+          <View style={styles.meLine}>
+            <View style={styles.meMark}>
+              {m.local ? null : <ReceiptMark message={m} mine receipt={receipt} seenBy={seenBy} />}
+            </View>
+            {lead}
           </View>
         ) : null}
-        {files.length > 0 ? (
+        {body && files.length > 0 ? (
           <View style={styles.meFiles}>
             <MessageFiles files={files} align="end" />
           </View>
         ) : null}
         <View style={styles.meCards}>{cards}</View>
-        {m.local ? null : <SteerLine message={m} />}
       </Pressable>
     );
+  }
 
   return (
     <Pressable
-      onLongPress={() => {
-        tapHaptic();
-        onLongPress(m);
-      }}
+      onLongPress={press}
       delayLongPress={380}
-      accessibilityHint={t("mobile.chat.longPressHint")}
-      style={({ pressed }) => [styles.msg, grouped && styles.cont, pressed && { backgroundColor: c.sunken }]}
+      accessibilityHint={press ? t("mobile.chat.longPressHint") : undefined}
+      style={({ pressed }) => [styles.msg, grouped && styles.cont, pressed && press && { backgroundColor: c.sunken }]}
     >
       <View style={styles.avslot}>{grouped ? null : <Face who={m.author} size={32} live={false} />}</View>
       <View style={styles.body}>
         {grouped ? null : (
-          <View style={styles.who}>
+          <View style={[styles.who, m.author.type === "person" && styles.whoRoom]}>
             <Text variant="footnote" tone="ink2" style={styles.name} numberOfLines={1}>
               {name}
             </Text>
@@ -296,7 +327,8 @@ export const MessageRow = memo(function MessageRow({
                 {t("chat.notice.talker")}
               </Text>
             ) : null}
-            {!reminder && !routine && !talker && agent?.role ? (
+            {helping ? <HelpingTag consultation={helping} channelId={m.channelId} /> : null}
+            {!reminder && !routine && !talker && !helping && agent?.role ? (
               <Text variant="caption" tone="faint" numberOfLines={1} style={styles.shrink}>
                 {agent.role}
               </Text>
@@ -305,6 +337,11 @@ export const MessageRow = memo(function MessageRow({
               {when.time(m.createdAt)}
             </Text>
             {m.pinned ? <PinMark /> : null}
+            {receipt && !m.local ? (
+              <View style={styles.whoMark}>
+                <ReceiptMark message={m} mine={false} receipt={receipt} />
+              </View>
+            ) : null}
           </View>
         )}
         {grouped && m.pinned ? (
@@ -323,6 +360,9 @@ export const MessageRow = memo(function MessageRow({
         {consulted.map((cs) => (
           <ConsultationCard key={cs.consultationId} askerId={m.author.id ?? ""} consultation={cs} />
         ))}
+        {isAgent && m.agentRunId && !m.local && !readOnly && consulted.length === 0 ? (
+          <ConsultGroup message={m} color={color} />
+        ) : null}
         {opened?.said ? <MessageText body={opened.said} selectable={false} accent={accent} /> : null}
         {kept ? (
           <TurnTools
@@ -356,6 +396,7 @@ export const MessageRow = memo(function MessageRow({
         {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
         {isAgent ? <TeamChecks message={m} /> : null}
         {isAgent ? <NoAiCard message={m} /> : null}
+        {isAgent ? <ProposalCard message={m} /> : null}
         {files.length > 0 ? <MessageFiles files={files} /> : null}
         {approvalId ? <ApprovalInline approvalId={approvalId} /> : null}
         {handoff ? <HandoffCard handoff={handoff} /> : null}
@@ -405,47 +446,6 @@ function Sending({ offline, end }: { offline: boolean; end: boolean }) {
 }
 
 /**
- * Under my message sent while an agent works: "{nome} lê na próxima pausa" (the ink
- * orbit) until it reads it, "{nome} parou para ler" when I asked it to stop and read (or it woke a wait),
- * "{nome} recebeu" (a check) once handed to its computer mid-turn, "{nome} lê depois da sua decisão no
- * card" (paused) while an approval holds it, then "{nome} leu" or "{nome} encerrou o pedido de ajuda"
- * with its small face (the shared store, `useSteerState`, as on the web).
- */
-function SteerLine({ message: m }: { message: Message }) {
-  const { t } = useTranslation();
-  const orgId = useOrgId();
-  const dir = useDirectory();
-  const c = useColors();
-  const reduced = useReducedMotion();
-  const steer = useSteerState(orgId, m.channelId, m.id);
-  if (!steer) return null;
-  const name = dir.agentById.get(steer.agentId)?.name ?? t("channel.unknownAgent");
-  return (
-    <Animated.View
-      key={steer.state}
-      entering={reduced ? undefined : FadeIn.duration(250)}
-      style={[styles.status, styles.statusEnd]}
-      accessibilityLiveRegion="polite"
-    >
-      {steer.state === "read" || steer.state === "resolved" ? (
-        <AgentFace agentId={steer.agentId} size={16} live={false} framed={false} />
-      ) : steer.state === "now" ? (
-        <Icon name="bolt" size={12} color={c.muted} />
-      ) : steer.state === "delivered" ? (
-        <Icon name="check" size={12} color={c.muted} />
-      ) : steer.state === "held" ? (
-        <Icon name="pause" size={12} color={c.muted} />
-      ) : (
-        <InkOrbit size={10} color={c.muted} />
-      )}
-      <Text variant="caption" tone="muted">
-        {t(`mobile.chat.steer.${steer.state}`, { name })}
-      </Text>
-    </Animated.View>
-  );
-}
-
-/**
  * A reply someone stopped: what it wrote stays, with "Parado por você · Continuar"; the
  * button picks up from where it stopped (a new run) and goes away once it did, for everyone.
  */
@@ -465,7 +465,7 @@ function StoppedLine({
   const toast = useToast();
   const meId = useMeId();
   const dir = useDirectory();
-  const role = useOrg().org?.role;
+  const org = useOrg().org;
   const { colors: c, shadows } = useTheme();
   const [busy, setBusy] = useState(false);
   // Continued here or on another device (`run.continued`), or already in the message's meta.
@@ -478,7 +478,7 @@ function StoppedLine({
       : t("mobile.chat.stopped.plain");
   const owner = m.author.id ? dir.agentById.get(m.author.id)?.ownerUserId : null;
   // Same people who may stop it (the server checks again).
-  const may = byMe || can(role, "manage_agents") || (Boolean(meId) && owner === meId);
+  const may = byMe || can(org, "manage_agents") || (Boolean(meId) && owner === meId);
   const open = may && !continued && !busy;
   const onContinue = () => {
     setBusy(true);
@@ -563,6 +563,30 @@ function Tag({
   );
 }
 
+/** On a card this agent posted while answering another agent's question: "ajudando o Theo · Ver conversa". */
+function HelpingTag({ consultation: c, channelId }: { consultation: RunConsultation; channelId: string }) {
+  const { t } = useTranslation();
+  const dir = useDirectory();
+  const from = agentGrammar(t, dir.agentById.get(c.agentId)?.name ?? t("mobile.chat.someone"));
+  return (
+    <>
+      <Text variant="caption" tone="faint" numberOfLines={1} style={styles.shrink}>
+        {t("chat.consultPanel.helping", { name: from.name, article: from.article })}
+      </Text>
+      <Pressable
+        onPress={() => router.push(consultationHref(c.id, channelId))}
+        accessibilityRole="button"
+        hitSlop={6}
+        style={styles.shrink}
+      >
+        <Text variant="caption" tone="muted" numberOfLines={1} style={styles.medium}>
+          {t("chat.consultPanel.see")}
+        </Text>
+      </Pressable>
+    </>
+  );
+}
+
 /** Pinned: a small neutral pin (no colored dot). */
 function PinMark() {
   const { t } = useTranslation();
@@ -639,6 +663,10 @@ const styles = StyleSheet.create({
   body: { flex: 1, minWidth: 0 },
   // Wraps on a narrow phone: a routine's tag and "Ver relatório" go to the next line instead of off the edge.
   who: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", columnGap: 8, rowGap: 3, marginBottom: 3 },
+  // A person's name line keeps room at its end for the receipt's mark, with or without one, so a mark that comes
+  // never wraps the line.
+  whoRoom: { paddingRight: 40 },
+  whoMark: { position: "absolute", top: 0, right: 0, height: 19, justifyContent: "center" },
   name: { fontWeight: "600", fontSize: 14, lineHeight: 19, flexShrink: 1 },
   me: { paddingLeft: 64, paddingRight: 16, paddingVertical: 10, marginTop: 4, alignItems: "flex-end" },
   meCont: { paddingTop: 2, marginTop: 0 },
@@ -653,6 +681,18 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 21,
     borderBottomRightRadius: 6,
   },
+  // My row keeps 64px free on the left, 48 of them past the screen's 16px edge: the receipt's mark stands there, on
+  // the bubble's last line (10px under the text, 24px lines), so it never adds a line.
+  meLine: {
+    alignSelf: "stretch",
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "flex-end",
+    marginLeft: -MARK_ROOM,
+  },
+  meMark: { width: MARK_ROOM, alignItems: "flex-end", paddingRight: 6, paddingBottom: 14 },
+  lead: { flexShrink: 1 },
+  grow: { flex: 1 },
   meFiles: { alignSelf: "stretch" },
   meCards: { alignSelf: "stretch" },
   meStatus: { marginTop: 4, textAlign: "right" },

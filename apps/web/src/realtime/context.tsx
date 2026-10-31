@@ -31,6 +31,7 @@ import {
   type BrowserLiveUnavailable,
   type ConnectionStatus,
   type ConsultsState,
+  cacheAgentProposal,
   cacheApproval,
   cacheDmRead,
   cacheForumSuggestion,
@@ -427,6 +428,8 @@ export function RealtimeProvider({
       void qc.invalidateQueries({ queryKey: keys.me });
       void qc.invalidateQueries({ queryKey: keys.limits(orgId) });
       void qc.invalidateQueries({ queryKey: ["org", orgId, "channel"] });
+      // The groups of agents someone changed meanwhile.
+      void qc.invalidateQueries({ queryKey: keys.agentGroups(orgId) });
     });
     // The first open too, for what a return from the billing service changes: a new plan's limits, standing and
     // computer can land in core between this page's first reads and the socket's open, and that event reaches no one.
@@ -472,11 +475,14 @@ export function RealtimeProvider({
       if (event.type.startsWith("mission.") && "missionId" in event && typeof event.missionId === "string") {
         refreshMission(qc, orgId, event.missionId);
       }
-      // Someone joined or left, or a role changed (org broadcast): the people, Members and the sidebar's count.
+      // Someone joined or left, or a role changed (org broadcast): the people, Members and the sidebar's count, the
+      // roles' counts, and `me` (a role change changes what you may do, ADR 0085).
       if (event.type === "org.members") {
         void qc.invalidateQueries({ queryKey: keys.people(orgId) });
         void qc.invalidateQueries({ queryKey: keys.members(orgId) });
         void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
+        void qc.invalidateQueries({ queryKey: keys.roles(orgId) });
+        void qc.invalidateQueries({ queryKey: keys.me });
       }
       // Someone arranged the sidebar's channel categories (ADR 0080): channels and categories refetch.
       if (event.type === "channels.layout") {
@@ -527,7 +533,8 @@ export function RealtimeProvider({
       applyComputerEvent(qc, orgId, event);
       // Connected computers: online/offline, paired, renamed, removed.
       applyMachineEvent(qc, orgId, event);
-      // The workspace's own computer on its way, and its standing (the hold banner, the suspended screen).
+      // The workspace's own computer on its way, its standing (the hold banner, the suspended screen), and the groups
+      // of agents (the sidebar's sections).
       applyWorkspaceEvent(qc, orgId, event);
       if ((event.type === "budget.warning" || event.type === "budget.exhausted") && "agentId" in event) {
         const budgetEvent = event as BudgetEvent;
@@ -744,6 +751,8 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       // Missions (ADR 0029): the pinned card, the cards in the thread, the lists; a task's row.
       if (event.type === "mission.updated") applyMissionEvent(qc, orgId, event);
       if (event.type === "machine.task") applyTaskEvent(qc, orgId, event.task);
+      // An agent's proposal of a new agent was created or denied (by anyone): its card.
+      if (event.type === "agent.proposal.updated") cacheAgentProposal(qc, orgId, event, event);
       // An agent's "Vale um fórum?" card was accepted or dismissed (by anyone).
       if (event.type === "forum.suggestion.updated") {
         cacheForumSuggestion(qc, orgId, channelId, event.messageId, event.suggestion);

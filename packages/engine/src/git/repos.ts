@@ -110,7 +110,7 @@ export async function setAgentRepositories(
   const membership = await requirePermission(db, actorId, orgId, "read");
   const agent = await getAgent(db, orgId, agentId);
   if (!agent) throw new NotFoundError("Agent not found");
-  const admin = can(membership.role, "manage_agents");
+  const admin = can(membership, "manage_agents");
   if (!admin && agent.ownerUserId !== actorId) {
     throw new ForbiddenError("Only an admin or the agent's owner can change its repositories");
   }

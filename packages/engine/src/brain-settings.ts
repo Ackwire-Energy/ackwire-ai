@@ -9,8 +9,16 @@ import {
   type PlanUsage,
 } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
-import { AUTO_MODEL, isAutoModel, MODEL_CATALOG } from "@agenteschat/providers";
-import { planAliases, planModel, planOf } from "@agenteschat/providers/plans";
+import {
+  AUTO_MODEL,
+  type ContextLimit,
+  catalogModelOf,
+  contextWindowOf,
+  isAutoModel,
+  isContextLimit,
+  MODEL_CATALOG,
+} from "@agenteschat/providers";
+import { claudeCodeModel, isPlanModelId, planModel, planOf } from "@agenteschat/providers/plans";
 import { type Agent, getAgent } from "./agents";
 import { type AgentAudience, answersOthers, audienceOf, OWNER_ONLY, planSharing } from "./audience";
 import { recordAudit } from "./audit";
@@ -18,6 +26,7 @@ import { type BrainKind, isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import {
+  defaultAccountLabel,
   forgetAgents,
   getListedAccount,
   listMachineAccounts,
@@ -65,6 +74,8 @@ export interface BrainModelOption {
   /** The model id behind an alias (Claude Code's `opus` → `claude-opus-5-5`). */
   modelId?: string;
   recommended?: boolean;
+  /** Its context window in tokens: which context limits are worth offering with it. */
+  contextWindow?: number;
 }
 
 /** Claude Code's aliases (`--model opus|sonnet|haiku`), mapped to today's ids in the catalog. */
@@ -81,17 +92,16 @@ export const codexModels = (): BrainModelOption[] =>
     .map(([id, m]) => ({ value: id, label: m.label, modelId: id, ...(m.recommended ? { recommended: true } : {}) }));
 
 /**
- * The model choices of a brain (none for the model brain: it uses the agent's model). Claude Code on a
- * coding plan keeps its aliases, named after what the plan runs for each.
+ * The model choices of a brain (none for the model brain: it uses the agent's model). A coding plan's are in its
+ * catalog (`@agenteschat/providers/plans`), which the apps read.
  */
-export function brainModelOptions(kind: BrainKind, provider?: string | null): BrainModelOption[] {
-  const plan = kind === "claude_code" ? planOf(provider) : undefined;
-  if (plan) {
-    return planAliases(plan).map((value) => {
-      const m = planModel(plan, value);
-      return { value, label: m.label, modelId: m.id, ...(value === "sonnet" ? { recommended: true } : {}) };
-    });
-  }
+export function brainModelOptions(kind: BrainKind): BrainModelOption[] {
+  return modelChoices(kind).map((o) =>
+    o.modelId ? { ...o, contextWindow: contextWindowOf(catalogModelOf(o.modelId) ?? o.modelId) } : o,
+  );
+}
+
+function modelChoices(kind: BrainKind): BrainModelOption[] {
   if (kind === "claude_code") return [...CLAUDE_CODE_MODELS];
   if (kind === "codex") return codexModels();
   return [];
@@ -115,8 +125,9 @@ const FREE_MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,79}$/;
 
 /**
  * A model for a brain, as stored: null = the brain's default. Claude Code
- * takes its aliases or a full Claude id; Codex any model name (a new one
- * may come out before our catalog knows it); the model brain none.
+ * takes its aliases, a full Claude id or a coding plan's model; Codex any
+ * model name (a new one may come out before our catalog knows it); the model
+ * brain none.
  */
 export function normalizeBrainModel(kind: BrainKind, value: unknown): string | null {
   if (value === null || value === undefined || value === "") return null;
@@ -130,8 +141,10 @@ export function normalizeBrainModel(kind: BrainKind, value: unknown): string | n
   if (kind === "claude_code") {
     const alias = CLAUDE_CODE_MODELS.find((o) => o.value === v.toLowerCase() || o.modelId === v);
     if (alias) return alias.value;
-    if (/^claude-[a-z0-9.-]{1,60}$/.test(v)) return v;
-    throw new ValidationError("Choose Opus, Sonnet or Haiku", "brain.invalid_model", { brain: kind });
+    if (/^claude-[a-z0-9.-]{1,60}$/.test(v) || isPlanModelId(v)) return v;
+    throw new ValidationError("Choose Opus, Sonnet, Haiku or one of the plan's models", "brain.invalid_model", {
+      brain: kind,
+    });
   }
   if (!FREE_MODEL.test(v)) throw new ValidationError("That isn't a model name", "brain.invalid_model", { brain: kind });
   return v;
@@ -219,6 +232,8 @@ export interface AgentBrainView {
   account: string | null;
   /** How hard its computer brain thinks; `auto` = picked per run; null = the CLI's default. */
   effort: BrainEffortSetting | null;
+  /** The most context it reads, in tokens (`CONTEXT_LIMITS`, any brain); null = its model's window. */
+  contextTokens: ContextLimit | null;
   /**
    * The agent's owner's accounts on its computer, both kinds ([] without a computer), and the one it thinks
    * with; emails only of the caller's own. A plan thinks only for its owner's agents (ADR 0059 §3).
@@ -228,7 +243,7 @@ export interface AgentBrainView {
   canManageAccounts: boolean;
   /** The computer's runner knows accounts (protocol 13). */
   accountsSupported: boolean;
-  /** Nobody but its owner talks to it ("Responde a todos" off, ADR 0059 §5). */
+  /** Nobody but its owner talks to it ("Atende outras pessoas" off, ADR 0059 §5). */
   onlyOwner: boolean;
   /** The caller owns the agent: only they choose its plan and let other people talk to it on a plan. */
   canUsePlans: boolean;
@@ -276,7 +291,7 @@ async function agentBrainAccess(db: Database, userId: string, orgId: string, age
   const membership = await requirePermission(db, userId, orgId, "read");
   const agent = await getAgent(db, orgId, agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  const admin = can(membership.role, "manage_agents");
+  const admin = can(membership, "manage_agents");
   if (!admin && agent.ownerUserId !== userId) {
     throw new ForbiddenError("Only an admin or the agent's owner can see who thinks for it", "agent.not_owner");
   }
@@ -326,6 +341,7 @@ function view(
     canEdit: true,
     account: agent.brainAccountId,
     effort: isBrainEffortSetting(agent.brainEffort) ? agent.brainEffort : null,
+    contextTokens: isContextLimit(agent.contextTokens) ? agent.contextTokens : null,
     ...accounts,
     onlyOwner: !answersOthers(audienceOf(agent), agent.ownerUserId),
     canUsePlans: agent.ownerUserId === userId,
@@ -369,7 +385,7 @@ export async function newAgentBrainMachines(
   userId: string,
   orgId: string,
 ): Promise<BrainMachineOptions[]> {
-  await requirePermission(deps.db, userId, orgId, "manage_agents");
+  await requirePermission(deps.db, userId, orgId, "create_agents");
   return candidateMachines(deps.db, userId, orgId, true, null);
 }
 
@@ -379,7 +395,7 @@ export interface AgentBrainInput {
   model?: unknown;
   fallback?: unknown;
   /**
-   * "Responde a todos" turned off (ADR 0059 §5): true, only its owner talks
+   * "Atende outras pessoas" turned off (ADR 0059 §5): true, only its owner talks
    * to it; false, whoever its "who can talk" list lets in (everyone with no
    * list). Omitted = keep it; a switch onto a plan makes it its owner's only,
    * and only the plan's owner lets more people in (`planSharing`).
@@ -396,6 +412,8 @@ export interface AgentBrainInput {
   moveAccount?: unknown;
   /** `low`…`max`, `auto` (picked per run), or null for the CLI's default. Omitted = keep it. */
   effort?: unknown;
+  /** One of `CONTEXT_LIMITS`, or null for the model's window; kept through brain switches. Omitted = keep it. */
+  contextTokens?: unknown;
 }
 
 const EVERYONE: AgentAudience = { mode: "everyone", userIds: [] };
@@ -468,6 +486,11 @@ export async function setAgentBrain(
     throw new ValidationError("Choose auto, low, medium, high, xhigh or max", "brain.invalid_effort");
   }
   const effort = input.effort === undefined ? agent.brainEffort : (input.effort as BrainEffortSetting | null);
+  if (input.contextTokens !== undefined && input.contextTokens !== null && !isContextLimit(input.contextTokens)) {
+    throw new ValidationError("Choose 200000, 400000 or 1000000 tokens", "brain.invalid_context");
+  }
+  const contextTokens =
+    input.contextTokens === undefined ? agent.contextTokens : (input.contextTokens as number | null);
   const { base, to } = nextAudience(agent, brain, changed, input.onlyOwner as boolean | undefined);
   planSharing({ ...agent, brain }, userId, base, to);
   const audience = to.mode === agent.audienceMode ? null : to;
@@ -481,7 +504,8 @@ export async function setAgentBrain(
     model !== agent.brainModel ||
     fallback !== agent.brainFallback ||
     account !== agent.brainAccountId ||
-    effort !== agent.brainEffort;
+    effort !== agent.brainEffort ||
+    contextTokens !== agent.contextTokens;
   if (!thinks && !audience) return view(agent, machine, machines, accounts, userId);
   const { row, released } = await deps.db.transaction(async (tx) => {
     const released = next.from ? await releaseAgents(tx, orgId, [next.from.accountId]) : [];
@@ -493,6 +517,7 @@ export async function setAgentBrain(
         brainFallback: fallback,
         brainAccountId: account,
         brainEffort: effort,
+        contextTokens,
         // The people list stays while it is its owner's only, for when it is let out again.
         ...(audience
           ? { audienceMode: audience.mode, ...(audience.mode === "everyone" ? { audienceUserIds: [] } : {}) }
@@ -530,8 +555,9 @@ export async function setAgentBrain(
           fallback: agent.brainFallback,
           account: agent.brainAccountId,
           effort: agent.brainEffort,
+          contextTokens: agent.contextTokens,
         },
-        to: { brain, model, fallback, account, effort },
+        to: { brain, model, fallback, account, effort, contextTokens },
       },
     });
   }
@@ -561,6 +587,7 @@ export async function setAgentBrain(
     brainFallback: fallback,
     brainAccountId: account,
     brainEffort: effort,
+    contextTokens,
     ...(audience ? { audienceMode: audience.mode } : {}),
   };
   // The account's `usedBy` changed with it.
@@ -767,6 +794,8 @@ export async function setMissionBrain(
  * profile, cards): the brain, its model's label ("Sonnet"; null for the
  * model brain, which shows the agent's model) and the computer's name, only
  * for those who may see it (admins and the agent's owner, like Quem pensa).
+ * On a plan, the account it thinks with and that plan's limits, for everyone
+ * (ADR 0063 §4, §5).
  */
 export interface AgentBrainSummary {
   kind: BrainKind;
@@ -774,9 +803,16 @@ export interface AgentBrainSummary {
   computer?: string;
   /** A key account's coding plan (`zai`…): its maker's model thinks, through Claude Code. */
   provider?: string;
+  /** The account's name ("Claude 2"); a computer's own sign-in by its maker and plan ("Claude Max"). */
+  account?: string;
+  /** That account's limits as the runner last reported them; absent: not known yet. */
+  usage?: PlanUsage;
 }
 
-/** The label of a computer brain's model ("opus" → "Opus", "GLM-5.3" on a plan; a typed Codex model as is). */
+/**
+ * The label of a computer brain's model ("opus" → "Opus", "GLM-5.3" on a plan; a typed Codex model as is): what it
+ * runs, so a plan's model kept while Claude thinks reads as Sonnet.
+ */
 export function brainModelLabel(
   kind: BrainKind,
   model: string | null | undefined,
@@ -785,12 +821,13 @@ export function brainModelLabel(
   if (kind === "model") return null;
   const plan = kind === "claude_code" ? planOf(provider) : undefined;
   if (plan) return planModel(plan, isAutoModel(model) ? null : model).label;
-  const value = model ?? defaultBrainModel(kind);
-  if (!value) return null;
+  const stored = model ?? defaultBrainModel(kind);
+  if (!stored) return null;
+  const value = kind === "claude_code" && !isAutoModel(stored) ? claudeCodeModel(undefined, stored) : stored;
   return brainModelOptions(kind).find((o) => o.value === value)?.label ?? value;
 }
 
-/** Each agent's brain summary for this viewer (one query for the computers' names). */
+/** Each agent's brain summary for this viewer (one query for the computers, one for the accounts). */
 export async function agentBrainSummaries(
   db: Database,
   viewerId: string,
@@ -810,42 +847,63 @@ export async function agentBrainSummaries(
   ];
   const accountIds = [
     ...new Set(
-      agents
-        .filter((a) => brainOf(a.brain) === "claude_code" && a.brainAccountId)
-        .map((a) => a.brainAccountId as string),
+      agents.filter((a) => brainOf(a.brain) !== "model" && a.brainAccountId).map((a) => a.brainAccountId as string),
     ),
   ];
-  const plans = new Map(
-    accountIds.length
-      ? (
-          await db
-            .select({ id: schema.machineAccounts.id, provider: schema.machineAccounts.provider })
-            .from(schema.machineAccounts)
-            .where(and(eq(schema.machineAccounts.orgId, orgId), inArray(schema.machineAccounts.id, accountIds)))
-        ).flatMap((r) => (r.provider ? [[r.id, r.provider] as const] : []))
-      : [],
-  );
-  const [membership, machines] = await Promise.all([
+  const [membership, machines, accounts] = await Promise.all([
     computerIds.length ? getMembership(db, viewerId, orgId) : Promise.resolve(null),
     computerIds.length
       ? db
-          .select({ id: schema.machines.id, name: schema.machines.name, deletedAt: schema.machines.deletedAt })
+          .select({
+            id: schema.machines.id,
+            name: schema.machines.name,
+            deletedAt: schema.machines.deletedAt,
+            pairer: schema.machines.pairedByUserId,
+            executors: schema.machines.executors,
+          })
           .from(schema.machines)
           .where(and(eq(schema.machines.orgId, orgId), inArray(schema.machines.id, computerIds)))
       : Promise.resolve([]),
+    accountIds.length
+      ? db
+          .select({
+            id: schema.machineAccounts.id,
+            label: schema.machineAccounts.label,
+            provider: schema.machineAccounts.provider,
+            usage: schema.machineAccounts.usage,
+          })
+          .from(schema.machineAccounts)
+          .where(and(eq(schema.machineAccounts.orgId, orgId), inArray(schema.machineAccounts.id, accountIds)))
+      : Promise.resolve([]),
   ]);
-  const names = new Map(machines.filter((m) => !m.deletedAt).map((m) => [m.id, m.name]));
-  const manages =
-    membership !== null && membership.standing?.state !== "suspended" && can(membership.role, "manage_agents");
+  const live = new Map(machines.filter((m) => !m.deletedAt).map((m) => [m.id, m]));
+  const accountById = new Map(accounts.map((r) => [r.id, r]));
+  const manages = membership !== null && membership.standing?.state !== "suspended" && can(membership, "manage_agents");
   for (const a of agents) {
     const kind = brainOf(a.brain);
-    const computer = a.machineId && (manages || a.ownerUserId === viewerId) ? names.get(a.machineId) : undefined;
-    const provider = kind === "claude_code" && a.brainAccountId ? plans.get(a.brainAccountId) : undefined;
+    const machine = a.machineId ? live.get(a.machineId) : undefined;
+    const computer = machine && (manages || a.ownerUserId === viewerId) ? machine.name : undefined;
+    const row = kind !== "model" && a.brainAccountId ? accountById.get(a.brainAccountId) : undefined;
+    const provider = kind === "claude_code" ? (row?.provider ?? undefined) : undefined;
+    const ownPlan = kind === "claude_code" ? machine?.executors?.claude?.plan : undefined;
+    // With no account, the computer's own sign-in thinks only for its pairer's agents (ADR 0059 §3).
+    const own =
+      kind !== "model" && !a.brainAccountId && machine?.pairer && machine.pairer === a.ownerUserId
+        ? {
+            account: ownPlan
+              ? `${defaultAccountLabel(kind)} ${ownPlan[0]?.toUpperCase()}${ownPlan.slice(1)}`
+              : defaultAccountLabel(kind),
+            usage: machine.executors?.ownUsage?.[kind],
+          }
+        : null;
+    const plan = row ? { account: row.label, usage: row.usage ?? undefined } : own;
     out.set(a.id, {
       kind,
       model: brainModelLabel(kind, a.brainModel, provider),
       ...(kind !== "model" && computer ? { computer } : {}),
       ...(provider ? { provider } : {}),
+      ...(plan ? { account: plan.account } : {}),
+      ...(plan?.usage ? { usage: plan.usage } : {}),
     });
   }
   return out;
@@ -929,7 +987,9 @@ function ownSignIns(
   const usage: OwnPlanUsage = executors?.ownUsage ?? {};
   const out: Partial<Record<AccountKind, OwnSignIn>> = {};
   const claude = executors?.claude;
-  if (can("claude_code") && (claude?.loggedIn === true || usage.claude_code))
+  // A usage read stays after a sign-out (`ownUsage` is never cleared): `claude auth status` saying signed out wins,
+  // as it does for the turns (`claudeCodeAvailability`).
+  if (can("claude_code") && (claude?.loggedIn === true || (claude?.loggedIn !== false && usage.claude_code)))
     out.claude_code = {
       ...(claude?.plan ? { plan: claude.plan } : {}),
       ...(usage.claude_code ? { usage: usage.claude_code } : {}),

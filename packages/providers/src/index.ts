@@ -6,6 +6,7 @@ import type { ModelProvider } from "./types";
 
 export * from "./anthropic";
 export * from "./catalog";
+export * from "./context-limits";
 export * from "./embeddings";
 export * from "./gemini";
 export * from "./openai";

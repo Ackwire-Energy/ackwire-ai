@@ -38,7 +38,7 @@ import { Face } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { ActionList, copyText, goBack, MONO, PushedHeader, successHaptic, Tile, useSurface } from "../shared/parts";
-import { useSheet } from "../shared/SheetHost";
+import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { foldersIn, searchWiki, wikiHome } from "./logic";
 import { WikiDoc } from "./WikiDoc";
 
@@ -64,6 +64,8 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
   const { t, i18n } = useTranslation();
   const c = useColors();
   const orgId = useOrgId();
+  // Writing in the wiki is `edit_wiki` (ADR 0085; the server checks it again).
+  const writes = can(useOrg().org, "edit_wiki");
   const dir = useDirectory();
   const insets = useSafeAreaInsets();
   const tree = useWikiTree(orgId);
@@ -213,22 +215,24 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
           <EmptyState icon="archive" title={t("mobile.wiki.folderGone")} />
         ) : null}
       </PushedLargeTitle>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t("wiki.newPage")}
-        onPress={() => newWikiPage(folder ? { folder } : {})}
-        style={({ pressed }) => [
-          styles.fab,
-          { backgroundColor: c.ink, bottom: insets.bottom + 18, opacity: pressed ? 0.85 : 1 },
-        ]}
-      >
-        <Text variant="title2" style={[styles.fabPlus, { color: c.bg }]}>
-          +
-        </Text>
-        <Text variant="callout" style={[styles.fabText, { color: c.bg }]}>
-          {t("wiki.newPage")}
-        </Text>
-      </Pressable>
+      {writes ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("wiki.newPage")}
+          onPress={() => newWikiPage(folder ? { folder } : {})}
+          style={({ pressed }) => [
+            styles.fab,
+            { backgroundColor: c.ink, bottom: insets.bottom + 18, opacity: pressed ? 0.85 : 1 },
+          ]}
+        >
+          <Text variant="title2" style={[styles.fabPlus, { color: c.bg }]}>
+            +
+          </Text>
+          <Text variant="callout" style={[styles.fabText, { color: c.bg }]}>
+            {t("wiki.newPage")}
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -291,6 +295,14 @@ interface MenuItem {
  * "Editar" (writing, the B layout) and ⋯ (Copiar link, Renomear ou mover, Fixar, Trancar, Histórico, Lixeira).
  */
 export function WikiPageScreen({ slug }: { slug: string }) {
+  return (
+    <SheetHostProvider>
+      <WikiPage slug={slug} />
+    </SheetHostProvider>
+  );
+}
+
+function WikiPage({ slug }: { slug: string }) {
   const { t, i18n } = useTranslation();
   const c = useColors();
   const dir = useDirectory();
@@ -300,13 +312,15 @@ export function WikiPageScreen({ slug }: { slug: string }) {
   const api = useApi();
   const qc = useQueryClient();
   const { orgId, org } = useOrg();
-  const admin = can(org?.role, "configure");
+  // Writing is `edit_wiki`; a locked page, and locking, only for who configures the workspace (ADR 0085).
+  const writes = can(org, "edit_wiki");
+  const admin = can(org, "configure");
   const page = useWikiPage(orgId, slug);
   const tree = useWikiTree(orgId);
   const action = useWikiAction(orgId);
   const insets = useSafeAreaInsets();
   const p = page.data;
-  const editable = p ? !p.locked || admin : false;
+  const editable = p ? writes && (!p.locked || admin) : false;
   const pages = useMemo(() => tree.data ?? [], [tree.data]);
 
   const toggle = (line: number) => {
@@ -368,16 +382,17 @@ export function WikiPageScreen({ slug }: { slug: string }) {
         label: t("wiki.renameOrMove"),
         run: () => router.push({ pathname: "/wiki-move", params: { slug: p.slug } }),
       });
-    items.push({
-      key: "pin",
-      icon: "pin",
-      label: p.pinned ? t("wiki.unpin") : t("wiki.pin"),
-      run: () =>
-        action.mutate(
-          { type: "pin", slug: p.slug, pinned: !p.pinned },
-          { onSuccess: (x) => toast({ title: x.pinned ? t("wiki.pinned") : t("wiki.unpinned") }), onError: failed },
-        ),
-    });
+    if (writes)
+      items.push({
+        key: "pin",
+        icon: "pin",
+        label: p.pinned ? t("wiki.unpin") : t("wiki.pin"),
+        run: () =>
+          action.mutate(
+            { type: "pin", slug: p.slug, pinned: !p.pinned },
+            { onSuccess: (x) => toast({ title: x.pinned ? t("wiki.pinned") : t("wiki.unpinned") }), onError: failed },
+          ),
+      });
     if (admin)
       items.push({
         key: "lock",

@@ -47,7 +47,7 @@ export function shuffleLook(current: FullLook, rand: () => number = Math.random)
 
 export type AgentEditField = "name" | "role" | "instructions" | "look";
 
-/** Admins change everything here; the agent's own person, its look (as on the web). */
+/** Who manages agents changes everything here; the agent's own person, its look (as on the web). */
 export function editableFields(viewer: { admin: boolean; owner: boolean }): Set<AgentEditField> {
   if (viewer.admin) return new Set(["name", "role", "instructions", "look"]);
   if (viewer.owner) return new Set(["look"]);

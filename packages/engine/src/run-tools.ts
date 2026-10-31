@@ -1,11 +1,13 @@
 import { PERMISSION_TOOL, type PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, inArray, type SQL, schema, sql } from "@agenteschat/db";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
+import { followWork } from "./agent-status";
 import { publishApproval } from "./approvals";
 import type { BrainTool, ToolResult } from "./brains/types";
-import { consultationCardThread } from "./consultations";
+import { consultationCardThread, consultationOrigin } from "./consultations";
 import { NotFoundError } from "./errors";
 import { type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
+import type { Judge } from "./judge";
 import { insertMessage, type Message, messageView } from "./messages";
 import { notifyMissionApproval } from "./mission-tools";
 import { notifyQuestion } from "./notification-producers";
@@ -327,7 +329,8 @@ export async function takeBridgeEffects(db: Database, runId: string): Promise<To
 
 /** What `invokeWithChip` needs: the run's tool context, where its events go and the tools of this turn. */
 export interface RunToolScope {
-  deps: { db: Database; pubsub?: PubSub };
+  /** `judge`: checks an agent's own status line against its step (ADR 0084 §10); none, no check. */
+  deps: { db: Database; pubsub?: PubSub; judge?: Judge | null };
   tools: ToolGateway;
   ctx: ToolContext;
   where: RunWhere;
@@ -427,6 +430,8 @@ export async function invokeWithChip(
         : undefined;
   const code = builtIn ? toolCode(use.name, input) : undefined;
   const command = toolCommand(use.name, input);
+  // The agent's line follows what it does now (ADR 0084 §10), beside the call, never in its way.
+  if (def) void followWork(deps, ctx, def).catch(() => {});
   await publishChannelEvent(deps.pubsub, {
     type: "agent.tool",
     ...where,
@@ -669,7 +674,8 @@ export function runMessageMeta(
  * The one way a run's pause cards are posted (ADR 0053 §10), for the model loop and for a computer brain's
  * bridged call alike: same meta, same receipts. Cards go where the run replies; a routine's background run
  * posts them where it reports (`brief.deliverTo`), never in its room. Each approval card carries the agent's
- * `why` and where it came from (`origin`); a consulted agent's approval goes to whoever asked (ADR 0034).
+ * `why` and where it came from (`origin`); a consulted agent's approvals, questions and secret requests go to
+ * whoever asked (ADR 0034), and its question and secret rows with them: answered from there, they resume it.
  * Runs inside the caller's transaction; nothing is published here (`publishPauseCards`).
  */
 export async function postPauseCards(tx: Executor, run: AgentRun, requests: PauseRequests): Promise<PostedPause> {
@@ -679,6 +685,13 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
   const extra = runMessageMeta(run, trigger);
   const brief = run.background ? routineBriefOf(trigger?.meta) : null;
   const home = brief?.deliverTo ?? { channelId: run.channelId, threadId: replyThreadOf(run) };
+  // A consulted run asks from the agents' DM, which no person reads: its questions and secret requests go where
+  // the person behind it asked, like its approvals (the gateway already placed those). Only a DM run answers one.
+  const origin =
+    !brief && run.trigger === "dm" && requests.questions.length + requests.secretRequestIds.length > 0
+      ? await consultationOrigin(tx, run.orgId, run.id)
+      : null;
+  const asked = origin ? { channelId: origin.channelId, threadId: origin.threadId } : home;
   const card = async (
     to: { channelId: string; threadId: string | null },
     body: string,
@@ -701,11 +714,11 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
   for (const requestId of requests.secretRequestIds) {
     const [request] = await tx
       .update(secretRequests)
-      .set({ threadId: home.threadId, ...(brief ? { channelId: home.channelId } : {}) })
+      .set({ threadId: asked.threadId, ...(brief || origin ? { channelId: asked.channelId } : {}) })
       .where(eq(secretRequests.id, requestId))
       .returning();
     if (!request) continue;
-    const message = await card(home, `Secret request: ${request.name}`, {
+    const message = await card(asked, `Secret request: ${request.name}`, {
       ...bodyCode("secret_request", { name: request.name }),
       secretRequestId: request.id,
       secretRequest: secretRequestView(request),
@@ -730,8 +743,9 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
         orgId: run.orgId,
         runId: run.id,
         agentId: run.agentId,
-        channelId: home.channelId,
-        threadId: home.threadId,
+        // Whoever can read that conversation may answer it (`answerQuestion`).
+        channelId: asked.channelId,
+        threadId: asked.threadId,
         toolUseId: ask.toolUseId,
         text: ask.text,
         choices: ask.choices,
@@ -740,7 +754,7 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
       .onConflictDoNothing()
       .returning();
     if (!inserted) continue;
-    const message = await card(home, ask.text, questionCardMeta(inserted, ask.why ?? ""));
+    const message = await card(asked, ask.text, questionCardMeta(inserted, ask.why ?? ""));
     const [linked] = await tx
       .update(agentQuestions)
       .set({ messageId: message.id })
@@ -880,6 +894,8 @@ export async function suspendRunForTool(
       name: call.name,
       // Its tool_use lives in the computer brain's session, not in the transcript: resumed as text.
       bridged: true,
+      // Asked in a turn still running: a decision before it ends resumes the run only once it ends.
+      inTurn: true,
       ...(gated.type === "approval" ? { approvalId: gated.approval.id } : {}),
       ...(questionId ? { questionId, askedAt: Date.now() } : {}),
       ...(gated.type === "secret" ? { secretRequestId: gated.requestId } : {}),
