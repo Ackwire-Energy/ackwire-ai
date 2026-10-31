@@ -16,6 +16,7 @@ import {
   COMPUTER_BUSY_WAIT_MS,
   COMPUTER_REACT_NOTE,
   COMPUTER_TOOLS_NOTE,
+  cancelRun,
   clearPlanLimits,
   computerBrainUnavailable,
   createChannel,
@@ -29,6 +30,7 @@ import {
   invokeToolForRun,
   listApprovals,
   listChannels,
+  listMachineOutages,
   listMessages,
   listThreads,
   listWorkingRuns,
@@ -113,6 +115,17 @@ const post = (fx: Fixture, body: string) =>
 
 /** The channel's main timeline: a run asked there answers there. */
 const timeline = (fx: Fixture) => listMessages(fx.db, fx.owner.id, fx.org.id, fx.general.id);
+
+/** The run knows its brain (`resolveBrain` looked at its computer once): a look now is it waiting there. */
+const waitingLook = async (fx: Fixture) =>
+  Boolean((await fx.db.select({ brain: schema.agentRuns.brain }).from(schema.agentRuns))[0]?.brain);
+
+/** Its computer went a few seconds ago (a runner dialing again), the row as the hub leaves it. */
+async function justGone(fx: Fixture, machineId: string) {
+  const lastSeenAt = new Date(Date.now() - 5_000);
+  await fx.db.update(schema.machines).set({ online: false, lastSeenAt }).where(eq(schema.machines.id, machineId));
+  return lastSeenAt.toISOString();
+}
 
 test("brainFor: the mission's brain first, then the agent's; unknown values are the model brain", () => {
   const run = { id: "r" };
@@ -617,6 +630,139 @@ test("with no model credential, an offline computer: the agent says so once and 
   expect(seen.length).toBe(1);
   main = await timeline(f);
   expect(main.at(-1)?.body).toBe("Voltei e respondo.");
+});
+
+test("a computer gone a few seconds ago: the run waits for it as one still working, and answers once it is back", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  const lastSeenAt = await justGone(f, machineId);
+  let looks = 0;
+  const { brain, seen } = scriptedComputerBrain(() => [{ type: "done", text: "Pronto." }]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    computerBlipWaitMs: 10_000,
+    brains: { claude_code: () => brain },
+    machines: {
+      status: async (id) => {
+        if (await waitingLook(f)) looks++;
+        // Back at its second look while the run waits.
+        return statusOf(id, { online: looks >= 2, lastSeenAt });
+      },
+    },
+  });
+  const events: { type: string; status?: string }[] = [];
+  f.pubsub.subscribe(channelTopic(f.general.id), (e) => events.push(e as { type: string; status?: string }));
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+
+  const [run] = await f.db.select().from(schema.agentRuns);
+  if (!run) throw new Error("no run");
+  expect(looks).toBeGreaterThanOrEqual(2);
+  expect(run.status).toBe("done");
+  expect(seen.length).toBe(1);
+  // No note, no wait stored, never parked: only its answer.
+  expect((await timeline(f)).map((m) => m.body)).toEqual(["@dev oi", "Pronto."]);
+  expect((run.transcript as { waitingForBrain?: unknown }).waitingForBrain).toBeUndefined();
+  expect(events.some((e) => e.type === "run.finished" && e.status === "waiting_input")).toBe(false);
+  const steps = await f.db
+    .select({ data: schema.agentRunSteps.data })
+    .from(schema.agentRunSteps)
+    .where(eq(schema.agentRunSteps.runId, run.id));
+  expect(steps.some((s) => s.data.reason === "brain_unavailable")).toBe(false);
+});
+
+test("a computer still gone after that moment: the note and the wait as before; the outage shows only then", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  const lastSeenAt = await justGone(f, machineId);
+  const outages = async () =>
+    (await listMachineOutages({ db: f.db }, f.owner.id, f.org.id)).outages.map((o) => o.machineId);
+  const whileWaiting: string[][] = [];
+  const { brain, seen } = scriptedComputerBrain(() => [{ type: "done", text: "Voltei." }]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    computerBlipWaitMs: 1_200,
+    brains: { claude_code: () => brain },
+    machines: {
+      status: async (id) => {
+        if (whileWaiting.length === 0 && (await waitingLook(f))) whileWaiting.push(await outages());
+        return statusOf(id, { online: false, lastSeenAt });
+      },
+    },
+  });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+
+  // While the run waited for it, nobody waited yet: "Computador desconectado" kept its grace.
+  expect(whileWaiting).toEqual([[]]);
+  const [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("waiting_input");
+  expect(run?.waitingMachineId).toBe(machineId);
+  expect(seen.length).toBe(0);
+  const main = await timeline(f);
+  expect(main.filter((m) => m.meta.bodyCode === "brain_unavailable")).toHaveLength(1);
+  expect(main.at(-1)?.meta).toMatchObject({ brainUnavailable: { code: "machine_offline", machineId } });
+  expect(await outages()).toEqual([machineId]);
+});
+
+test("a computer gone for minutes is an outage: the agent says so at once, without waiting", async () => {
+  f = await setup();
+  await computerAgent(f);
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  const lastSeenAt = new Date(Date.now() - 10 * 60_000).toISOString();
+  let looks = 0;
+  const { brain } = scriptedComputerBrain(() => [{ type: "done", text: "Voltei." }]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    computerBlipWaitMs: 10_000,
+    brains: { claude_code: () => brain },
+    machines: {
+      status: async (id) => {
+        if (await waitingLook(f)) looks++;
+        return statusOf(id, { online: false, lastSeenAt });
+      },
+    },
+  });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  expect(looks).toBe(1);
+  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("waiting_input");
+  expect((await timeline(f)).at(-1)?.meta).toMatchObject({ bodyCode: "brain_unavailable" });
+});
+
+test("a cancel while the run waits for its computer ends it at once", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  const lastSeenAt = await justGone(f, machineId);
+  let canceled = false;
+  const { brain, seen } = scriptedComputerBrain(() => [{ type: "done", text: "Pronto." }]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    computerBlipWaitMs: 20_000,
+    brains: { claude_code: () => brain },
+    machines: {
+      status: async (id) => {
+        if (!canceled && (await waitingLook(f))) {
+          canceled = true;
+          const [run] = await f.db.select().from(schema.agentRuns);
+          void cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, run?.id ?? "");
+        }
+        return statusOf(id, { online: false, lastSeenAt });
+      },
+    },
+  });
+  await post(f, "@dev oi");
+  const started = Date.now();
+  await drainOutbox(f.db, handlers);
+  expect(Date.now() - started).toBeLessThan(5_000);
+  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("canceled");
+  expect(seen.length).toBe(0);
+  const main = await timeline(f);
+  expect(main.at(-1)?.body).toBe("_Stopped by ana._");
+  expect(main.some((m) => m.meta.bodyCode === "brain_unavailable")).toBe(false);
 });
 
 test("the computer drops mid-turn after a tool ran: the run stops working, resumes there when it is back, nothing runs twice", async () => {

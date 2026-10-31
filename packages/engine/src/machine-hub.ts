@@ -132,6 +132,8 @@ export interface MachineStatus {
   /** `managed`: the workspace's own computer (ADR 0056 §10), always on. */
   kind?: string;
   online: boolean;
+  /** ISO: its last sign of life (null: never seen). */
+  lastSeenAt?: string | null;
   execAllowed: boolean;
   os: string;
   /** The runner's protocol (from its last hello). */
@@ -1224,6 +1226,7 @@ export function createMachineHub(deps: MachineHubDeps) {
         name: row.name,
         kind: row.kind,
         online,
+        lastSeenAt: row.lastSeenAt?.toISOString() ?? null,
         execAllowed: row.execAllowed,
         os: row.os,
         protocol: row.protocol,
