@@ -404,6 +404,31 @@ export function barAsking(entries: ActivityEntry[]): EntryConsult | undefined {
   return consult?.status === "asking" ? consult : undefined;
 }
 
+/** " · 4 s" shows from 2 s on: minutes and seconds past a minute. */
+export function elapsedParts(ms: number): { m: number; s: number } | null {
+  const secs = Math.floor(Math.max(0, ms) / 1000);
+  if (secs < 2) return null;
+  return { m: Math.floor(secs / 60), s: secs % 60 };
+}
+
+/**
+ * The turn the bar tells for one agent on its own, its phrase and its time alike: a turn it stopped, or one that
+ * failed, can still be listed beside the one at work.
+ */
+const turnAtWork = (runs: LiveRun[], agentId: string) =>
+  runs.find((r) => r.agentId === agentId && r.status !== "failed" && r.status !== "canceled");
+
+/** How long one agent on its own has been at it ("16 s", "1 min 5 s"): none for several, or while it asks another. */
+export function barElapsed(t: TFunction, entries: ActivityEntry[], runs: LiveRun[], now: number): string | null {
+  const agents = entries.filter((e) => e.type === "agent");
+  const only = agents.length === 1 ? agents[0] : undefined;
+  if (!only || only.consult?.status === "asking") return null;
+  const run = turnAtWork(runs, only.id);
+  const took = run ? elapsedParts(now - (run.startedAt ?? now)) : null;
+  if (!took) return null;
+  return took.m > 0 ? t("run.elapsedMinutes", { m: took.m, s: took.s }) : t("run.elapsedSeconds", { n: took.s });
+}
+
 /** "trabalhando", "consultando o GitHub". */
 export const activityVerb = (t: TFunction, a: Activity) => t(`chat.activity.${a.kind}`, { app: appLabel(a) });
 
@@ -505,7 +530,7 @@ export function barPhrase(
   const sentence = activitySentence(t, entries, mark);
   const only = entries.length === 1 ? entries[0] : undefined;
   if (only?.type !== "agent" || only.consult || only.activity.kind === "writing") return sentence;
-  const run = runs.find((r) => r.agentId === only.id);
+  const run = turnAtWork(runs, only.id);
   if (!run) return sentence;
   const calls = (run.work ?? []).filter((w) => w.kind === "call");
   if (only.activity.kind === "thinking" && calls.length === 0) {

@@ -152,10 +152,3 @@ export function openerOf(r: Pick<LiveRun, "runId" | "status" | "text" | "work">)
   const generic = r.text.length === 0 && r.status !== "canceled" && r.status !== "failed";
   return { said: null, opener: generic ? hashOf(r.runId) % OPENERS : null, work };
 }
-
-/** " · 4 s" shows from 2 s on: minutes and seconds past a minute. */
-export function elapsedParts(ms: number): { m: number; s: number } | null {
-  const secs = Math.floor(Math.max(0, ms) / 1000);
-  if (secs < 2) return null;
-  return { m: Math.floor(secs / 60), s: secs % 60 };
-}

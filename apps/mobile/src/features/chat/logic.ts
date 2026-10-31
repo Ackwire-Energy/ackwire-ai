@@ -8,7 +8,7 @@ import type {
   ReactionCount,
 } from "@agenteschat/client";
 import { agentProposalOf, stretchCardOf } from "@agenteschat/client/lib/action-cards";
-import { type ActivityEntry, barEntries } from "@agenteschat/client/lib/activity";
+import { type ActivityEntry, barEntries, type barWords } from "@agenteschat/client/lib/activity";
 import { type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
 import {
   answeredNotices,
@@ -350,6 +350,71 @@ export function markedParts(text: string): { text: string; bold: boolean }[] {
   }
   return out;
 }
+
+/** How wide the working line's pieces that can end in "…" drew their text (`onTextLayout`). */
+export interface LineDrawn {
+  agents?: number;
+  typers?: number;
+}
+
+/** A piece only narrows: kept to what it drew, it can't draw wider, and a narrower room cuts it again. */
+export const narrowDrawn = (drawn: LineDrawn, part: keyof LineDrawn, width: number): LineDrawn =>
+  (drawn[part] ?? Number.POSITIVE_INFINITY) <= width ? drawn : { ...drawn, [part]: width };
+
+/** Narrower than this, the agents' words cut short are a sliver ("A", "Th…"). */
+export const AGENT_WORDS_MIN = 40;
+
+/**
+ * The widths the working line's pieces keep (whole points) while someone types: iOS keeps a cut text's whole box,
+ * a gap before what follows, so each keeps to what it drew and the next piece comes right after its "…".
+ * `agents: null` drops the agents' words, their " · " with them, when they'd be a sliver: who types keeps the room,
+ * as on the web. Alone, the agents' words keep the line as it is (nothing follows them).
+ */
+export function lineFit(drawn: LineDrawn, someoneTypes: boolean): { agents?: number | null; typers?: number } {
+  if (!someoneTypes) return {};
+  const whole = (width?: number) => (width === undefined ? undefined : Math.ceil(width));
+  const sliver = drawn.agents !== undefined && drawn.agents < AGENT_WORDS_MIN;
+  return { agents: sliver ? null : whole(drawn.agents), typers: whole(drawn.typers) };
+}
+
+/** The working line's words in the pieces that give way in turn (`barWords`). */
+export type LineWords = ReturnType<typeof barWords>;
+
+/** How long the working line's phrase takes to turn (the web's `.ac-turn`). */
+export const PHRASE_FADE_MS = 420;
+
+/**
+ * The working line's phrase as it turns, as on the web (TurnText): the one shown and the one leaving, the only two
+ * drawn. `n` counts the turns: the phrase shown is the `n`th, the one leaving the one before it.
+ */
+export interface PhraseTurn {
+  now: LineWords;
+  was: LineWords | null;
+  n: number;
+  /** When the phrase shown came. */
+  since: number;
+}
+
+/**
+ * The phrase once the line's words are `words`, at `at`: new words turn it, the phrase shown leaving as they come in.
+ * A phrase stays a whole crossfade first, so it has come all the way in before it leaves (it never flashes back to
+ * full on its way out) and the one before it has gone; until then `wait` says how long, and the newest words come
+ * when it ends (any in between never show).
+ */
+export function turnPhrase(shown: PhraseTurn, words: LineWords, at: number): { shown: PhraseTurn; wait: number } {
+  if (words.join("") === shown.now.join("")) return { shown, wait: 0 };
+  const wait = shown.since + PHRASE_FADE_MS - at;
+  if (wait > 0) return { shown, wait };
+  return { shown: { now: words, was: shown.now, n: shown.n + 1, since: at }, wait: 0 };
+}
+
+/**
+ * The phrase still leaving at `at`: none under Reduce Motion, and none once its crossfade is over. A phrase that left
+ * while Reduce Motion was on, or long ago, must not mount again when Reduce Motion is turned off: it would start whole,
+ * over the phrase shown.
+ */
+export const leavingWords = (shown: PhraseTurn, reduced: boolean, at: number): LineWords | null =>
+  !reduced && shown.was && at - shown.since < PHRASE_FADE_MS ? shown.was : null;
 
 // ── Reactions ────────────────────────────────────────────────────────────────
 
