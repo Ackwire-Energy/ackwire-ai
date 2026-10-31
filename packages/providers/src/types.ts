@@ -14,7 +14,16 @@ export type ContentBlock =
    * It must be sent back to the same provider exactly as received when the
    * conversation continues (tool loops), so we keep the raw object.
    */
-  | { type: "opaque"; provider: string; data: Record<string, unknown> };
+  | {
+      type: "opaque";
+      provider: string;
+      data: Record<string, unknown>;
+      /**
+       * Thinking written while the thinking before it was left out (Anthropic dropped or refused it): that earlier
+       * thinking is never sent again, or the API would drop or refuse this block with it.
+       */
+      restart?: true;
+    };
 
 export interface ModelMessage {
   role: "user" | "assistant";

@@ -22,6 +22,12 @@ import {
 /** The tool a compatible endpoint gives structured output through: its input is the reply. */
 const STRUCTURED_OUTPUT = "structured_output";
 
+/** Lets a request say what happens to thinking the API can no longer read back (`block_binding`). */
+const THINKING_BINDING_BETA = "thinking-binding-controls-2026-08-01";
+
+/** What the API said about a refused request, at most (it ends up on the run's error). */
+const API_ERROR_CHARS = 300;
+
 /**
  * Anthropic Messages API, streaming. A client is created per call with the
  * org's decrypted key (never cached or logged).
@@ -34,10 +40,20 @@ const STRUCTURED_OUTPUT = "structured_output";
  *   by the Tool Gateway before anything runs. Thinking and other provider
  *   blocks come back as `opaque` and are replayed unchanged, only to the
  *   provider that wrote them.
+ * - Preserved thinking: Claude reads a thinking block back only while the
+ *   system prompt, the tools and every message before it are the ones it was
+ *   written with, and refuses the call otherwise (accounts created since
+ *   2026-08-31). A run's tools change between calls (a computer that stops
+ *   answering, a permission turned on), so the API is asked to drop such a
+ *   block instead. It drops every later thinking block with it, so thinking
+ *   written after a drop is a `restart` and what came before it is never sent
+ *   again. A call refused for its thinking all the same goes once more
+ *   without any.
  * - Structured output: `outputSchema` maps to `output_config.format`.
  * - Models flagged `serverSideFallback` opt into Anthropic's server-side
  *   refusal fallback; the answering model is reported back for pricing.
- * - Mid-stream failures carry the usage seen so far (`ProviderError.partial`).
+ * - Mid-stream failures carry the usage seen so far (`ProviderError.partial`);
+ *   a refused request keeps the API's error type and words.
  *
  * `compat` points it at another company's Anthropic-compatible endpoint
  * (`baseURL`, `id`). It keeps the beta client and the system blocks' cache
@@ -103,17 +119,32 @@ export function createAnthropicProvider(
         outputTokens: null,
         outputChars: 0,
       };
-      try {
+      const call = async (withThinking: boolean): Promise<ModelResult> => {
+        // `block_binding` is taken only with thinking on; the call made without thinking goes plain.
+        const bind = withThinking && !compat && !thinkingOff;
+        const betas = [
+          ...(fallback ? ["server-side-fallback-2026-07-01"] : []),
+          ...(bind ? [THINKING_BINDING_BETA] : []),
+        ];
         const stream = client(apiKey, workspaceId).beta.messages.stream(
           {
             model: request.model,
             max_tokens: request.maxTokens,
             system: toSystem(request),
-            messages: request.messages.map((m) => toMessageParam(m, id)),
+            messages: toMessageParams(request.messages, id, withThinking),
             ...(compat ? {} : { cache_control: { type: "ephemeral" as const } }),
             ...(tools.length > 0 ? { tools } : {}),
             ...(answerSchema && compat?.toolChoiceAny ? { tool_choice: { type: "any" as const } } : {}),
-            ...(thinkingOff ? { thinking: { type: "disabled" as const } } : {}),
+            ...(thinkingOff
+              ? { thinking: { type: "disabled" as const } }
+              : bind
+                ? {
+                    thinking: {
+                      type: "adaptive" as const,
+                      block_binding: { prefix_mismatch_behavior: "drop_block" as const },
+                    },
+                  }
+                : {}),
             ...(format || effort
               ? {
                   output_config: {
@@ -122,7 +153,8 @@ export function createAnthropicProvider(
                   },
                 }
               : {}),
-            ...(fallback ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
+            ...(betas.length > 0 ? { betas } : {}),
+            ...(fallback ? { fallbacks: "default" as const } : {}),
           },
           { signal: request.signal },
         );
@@ -142,7 +174,13 @@ export function createAnthropicProvider(
           onDelta(delta);
         });
         const message = await stream.finalMessage();
-        const blocks = message.content.map((b) => fromContentBlock(b, id));
+        // Only a prefix mismatch takes the later blocks with it; one another model wrote (a fallback) goes alone.
+        const restart =
+          !withThinking ||
+          (message.input_transformations ?? []).some(
+            (t) => t.type === "thinking_dropped" && t.reason === "prefix_binding_mismatch",
+          );
+        const blocks = message.content.map((b) => fromContentBlock(b, id, restart));
         const answer = answerSchema ? blocks.find(isAnswer) : undefined;
         // The answer as `output_config.format` gives it: the JSON as the only text, after any thinking.
         const content: ContentBlock[] = answer
@@ -160,10 +198,21 @@ export function createAnthropicProvider(
             cacheWriteTokens: message.usage.cache_creation_input_tokens ?? 0,
           },
         };
-      } catch (error) {
+      };
+      const failure = (error: unknown) => {
         const mapped = toProviderError(error);
         if (partial.inputTokens !== null || partial.outputChars > 0) mapped.partial = partial;
-        throw mapped;
+        return mapped;
+      };
+      try {
+        return await call(true);
+      } catch (error) {
+        if (!refusesThinking(error)) throw failure(error);
+      }
+      try {
+        return await call(false);
+      } catch (error) {
+        throw failure(error);
       }
     },
 
@@ -175,7 +224,7 @@ export function createAnthropicProvider(
               const result = await client(apiKey, workspaceId).beta.messages.countTokens({
                 model: request.model,
                 system: toSystem(request),
-                messages: request.messages.map((m) => toMessageParam(m, id)),
+                messages: toMessageParams(request.messages, id),
                 ...(request.tools && request.tools.length > 0 ? { tools: toTools(request.tools, true) } : {}),
               });
               return result.input_tokens;
@@ -214,12 +263,32 @@ function toTools(tools: ToolSpec[], eager: boolean): BetaTool[] {
     }));
 }
 
-function toMessageParam(message: ModelMessage, provider: string): BetaMessageParam {
-  if (typeof message.content === "string") return { role: message.role, content: message.content };
-  return { role: message.role, content: message.content.flatMap((b) => toBlockParam(b, provider)) };
+const isThinking = (data: Record<string, unknown>) => data.type === "thinking" || data.type === "redacted_thinking";
+
+/**
+ * The messages as sent: the thinking before the last `restart` is left out, and all of it without
+ * `withThinking`. A message left empty goes too (the API merges the turns around it).
+ */
+function toMessageParams(messages: ModelMessage[], provider: string, withThinking = true): BetaMessageParam[] {
+  let from = 0;
+  messages.forEach((m, i) => {
+    if (
+      typeof m.content !== "string" &&
+      m.content.some((b) => b.type === "opaque" && b.provider === provider && b.restart)
+    )
+      from = i;
+  });
+  return messages
+    .map((m, i) => toMessageParam(m, provider, withThinking && i >= from))
+    .filter((m) => typeof m.content === "string" || m.content.length > 0);
 }
 
-function toBlockParam(block: ContentBlock, provider: string): BetaContentBlockParam[] {
+function toMessageParam(message: ModelMessage, provider: string, thinking: boolean): BetaMessageParam {
+  if (typeof message.content === "string") return { role: message.role, content: message.content };
+  return { role: message.role, content: message.content.flatMap((b) => toBlockParam(b, provider, thinking)) };
+}
+
+function toBlockParam(block: ContentBlock, provider: string, thinking: boolean): BetaContentBlockParam[] {
   switch (block.type) {
     case "text":
       return [{ type: "text", text: block.text }];
@@ -236,16 +305,22 @@ function toBlockParam(block: ContentBlock, provider: string): BetaContentBlockPa
       ];
     case "opaque":
       // Replayed exactly as received (thinking keeps its signature); another provider's would be refused.
-      return block.provider === provider ? [block.data as unknown as BetaContentBlockParam] : [];
+      if (block.provider !== provider || (!thinking && isThinking(block.data))) return [];
+      return [block.data as unknown as BetaContentBlockParam];
   }
 }
 
-function fromContentBlock(block: BetaContentBlock, provider: string): ContentBlock {
+function fromContentBlock(block: BetaContentBlock, provider: string, restart: boolean): ContentBlock {
   if (block.type === "text") return { type: "text", text: block.text };
   if (block.type === "tool_use")
     return { type: "tool_use", id: block.id, name: block.name, input: (block.input ?? {}) as Record<string, unknown> };
-  return { type: "opaque", provider, data: block as unknown as Record<string, unknown> };
+  const data = block as unknown as Record<string, unknown>;
+  return { type: "opaque", provider, data, ...(restart && isThinking(data) ? { restart: true as const } : {}) };
 }
+
+/** A 400 about the thinking sent back (a signature it can't verify, a block out of place): worth a call without it. */
+const refusesThinking = (error: unknown) =>
+  error instanceof Anthropic.BadRequestError && /thinking|signature/i.test(error.message);
 
 function mapStopReason(reason: string | null): StopReason {
   if (reason === "end_turn" || reason === "max_tokens" || reason === "refusal" || reason === "tool_use") return reason;
@@ -263,7 +338,17 @@ function toProviderError(error: unknown): ProviderError {
   if (error instanceof Anthropic.APIUserAbortError) return new ProviderError("request aborted", false);
   if (error instanceof Anthropic.APIError) {
     const status = error.status;
-    return new ProviderError(`provider rejected the request (${status ?? "?"})`, status === 529, status);
+    const body = error.error as { error?: { message?: unknown } } | undefined;
+    const said =
+      typeof body?.error?.message === "string"
+        ? body.error.message.replace(/\s+/g, " ").trim().slice(0, API_ERROR_CHARS)
+        : "";
+    const what = [status ?? "?", error.type].filter(Boolean).join(" ");
+    return new ProviderError(
+      `provider rejected the request (${what})${said ? `: ${said}` : ""}`,
+      status === 529,
+      status,
+    );
   }
   // With eager input streaming a tool input can arrive as unparseable JSON: retrying the turn is the fix.
   if (error instanceof Anthropic.AnthropicError || error instanceof SyntaxError) {
