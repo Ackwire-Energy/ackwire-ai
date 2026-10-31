@@ -277,9 +277,14 @@ const SECRET_FILES = [
 ] as const;
 /**
  * Sign-ins by a name too common to refuse everywhere: Codex's own, and what an account folder
- * (`accounts/<kind>/<id>`) holds (Codex's sign-in, a coding plan's key).
+ * (`accounts/<kind>/<id>`) holds (Codex's sign-in, a coding plan's key, a Claude token root keeps).
  */
-const SECRET_SIGN_IN_FILES = [".codex/auth.json", "accounts/*/*/auth.json", "accounts/*/*/provider.json"] as const;
+const SECRET_SIGN_IN_FILES = [
+  ".codex/auth.json",
+  "accounts/*/*/auth.json",
+  "accounts/*/*/provider.json",
+  "accounts/*/*/token.json",
+] as const;
 /** Env files with values in them; `.env.example` and the like hold none (`SECRET_PATH` refuses every other `.env.*`). */
 const SECRET_ENV_FILES = [
   ".env",
@@ -327,8 +332,9 @@ function secretPath(scope: CommandScope, p: string) {
   );
 }
 
-/** A command that names the variables pointing at an account's sign-in, or holding a plan's key. */
-const SECRET_VARIABLE = /\$\{?(CLAUDE_CONFIG_DIR|CODEX_HOME|ANTHROPIC_AUTH_TOKEN|ANTHROPIC_API_KEY)\b/;
+/** A command that names the variables pointing at an account's sign-in, or holding a plan's key or a Claude token. */
+const SECRET_VARIABLE =
+  /\$\{?(CLAUDE_CONFIG_DIR|CODEX_HOME|ANTHROPIC_AUTH_TOKEN|ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN)\b/;
 
 /** A word of a line that can't be parsed plainly, without the quotes and substitution marks around it (`$(cat`, `x)`). */
 const bareWord = (w: string) => w.replace(/^[$('"`{]+|[)'"`};]+$/g, "");

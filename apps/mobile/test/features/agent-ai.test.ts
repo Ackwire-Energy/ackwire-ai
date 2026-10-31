@@ -76,9 +76,10 @@ describe("the agent's AI", () => {
     expect(thinkingUsage({ ...base, account: null }, "codex")).toBeUndefined();
   });
 
-  test("picking an account another agent thinks with takes it from that one", () => {
+  test("picking an account another agent thinks with takes it from that one, unless it is for all of them", () => {
     expect(takenFrom(account("a", { usedBy: ["Infra"] }), "Dev")).toEqual(["Infra"]);
     expect(takenFrom(account("a", { usedBy: ["Dev"] }), "Dev")).toEqual([]);
+    expect(takenFrom(account("a", { usedBy: ["Infra"], shared: true }), "Dev")).toEqual([]);
   });
 
   test("the line under Atende outras pessoas follows the switch: its key by state, for one agent or all of them", () => {
@@ -215,6 +216,8 @@ describe("the agent's AI", () => {
     // signed-out login again.
     expect(connect).toContain("= login ?? (email ? { email } : undefined);");
     expect(connect).toContain('const signedOut = !hint && current?.status === "signed_out" ? current : undefined;');
+    // Nor an account made for all of the person's agents: the sign-in asked for goes straight to its steps.
+    expect(connect).toMatch(/const existing =\s+ready && !hint\s+\? groupPlans\(/);
     // An account already connected thinks for an agent only where one is in view: Connect an AI, never Settings.
     expect(connect).toContain("onUse={(a) => void assign(a)}");
     expect(settings).not.toContain("onUse=");

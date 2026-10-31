@@ -946,6 +946,13 @@
       "when": 1793451023712,
       "tag": "0134_claude_account_names",
       "breakpoints": true
+    },
+    {
+      "idx": 135,
+      "version": "7",
+      "when": 1793451083712,
+      "tag": "0135_shared_accounts",
+      "breakpoints": true
     }
   ]
 }

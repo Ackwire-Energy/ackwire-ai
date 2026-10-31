@@ -91,7 +91,7 @@ export function shellCommand(command: string): { file: string; args: string[]; v
 }
 
 /** Kills the command and everything it started. */
-export function killTree(child: ChildProcess, signal: NodeJS.Signals) {
+export function killTree(child: { pid?: number; kill(signal: NodeJS.Signals): unknown }, signal: NodeJS.Signals) {
   const pid = child.pid;
   if (pid === undefined) return;
   if (process.platform === "win32") {

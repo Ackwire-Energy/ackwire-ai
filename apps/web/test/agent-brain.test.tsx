@@ -348,6 +348,41 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     });
   });
 
+  test("an account made for all of the person's agents there: picked as it is, Also used by Theo, no sign-in, no move", async () => {
+    const shared: MachineAccount = {
+      ...work,
+      id: "acct_all",
+      label: "Pessoal",
+      email: "walt@pessoal.com",
+      plan: "Max",
+      usedBy: ["Theo"],
+      shared: true,
+    };
+    const { state } = await onMac({ accounts: [work, shared] });
+    const d = await brainDialog();
+    const account = within(d).getByRole("combobox", { name: "Conta do Claude" });
+    account.focus();
+    await act(async () => fireEvent.keyDown(account, { key: "Enter" }));
+    expect(
+      screen()
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual([
+      "A conta que os seus agentes dividem",
+      "Trabalho · Teamwalt@acme.com",
+      "Pessoal · MaxTambém usada por Theo",
+      "Adicionar conta",
+    ]);
+    await click(screen().getByRole("option", { name: /^Pessoal · Max/ }));
+    await settle(4);
+    expect(within(d).queryByRole("region", { name: "Adicionar conta do Claude" })).toBeNull();
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toMatchObject({ account: "acct_all" });
+    expect(brainCalls(state).at(-1)).not.toHaveProperty("moveAccount");
+    expect(state.calls.find((c) => c.method === "machines.beginAccountLogin")).toBeUndefined();
+  });
+
   test("each person's own: a Claude account another agent thinks with signs in again for this one; someone else's only shows while it's this one's", async () => {
     const theo: MachineAccount = {
       ...work,

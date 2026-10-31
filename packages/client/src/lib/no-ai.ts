@@ -205,6 +205,14 @@ export const firstAgent = <A extends { id: string }>(
 /** A plan signs in once per agent with the same account (`LOGIN_PER_AGENT`), so it can think for all of them. */
 export const signsInPerAgent = (choice: PlanChoice) => loginPerAgent(kindOf(choice), choice);
 
+/** A plan's row in a computer's `shares` (`AiComputer`): Claude's and ChatGPT's sign-ins, or a coding plan's key. */
+export const shareOf = (choice: PlanChoice): keyof NonNullable<AiComputer["shares"]> =>
+  isPlanId(choice) ? "key" : kindOf(choice);
+
+/** One sign-in of this plan on that computer thinks for all of the viewer's agents there (protocol 29). */
+export const signsInOnce = (choice: PlanChoice, computer: Pick<AiComputer, "shares"> | undefined) =>
+  computer?.shares?.[shareOf(choice)] === true;
+
 /** What an agent thinks with now: a plan, the workspace's API key (`key`), or nothing yet (null). */
 export type AgentAi = AiChoice | null;
 
@@ -236,14 +244,15 @@ export const ALL_AGENTS = "all";
  * "All agents" for a plan: the viewer's agents that have no AI yet, and those already on this plan (they read as
  * done), on the computer of the first with no AI (else of the first on this plan). An agent on the API key stays
  * out, since a plan makes an agent answer only its owner and one on the key may be answering the team. One on
- * another plan keeps it. Empty where the plan signs in for one agent per account, and below two agents, where the
- * choice is that one agent.
+ * another plan keeps it. Empty where the plan's account thinks for one agent there (neither one sign-in for all,
+ * `sharedOn`, nor one login per agent), and below two agents, where the choice is that one agent.
  */
 export function allAgents<A extends { id: string }>({
   choice,
   agents,
   aiOf,
   machineOf,
+  sharedOn,
 }: {
   choice: PlanChoice;
   /** The viewer's agents, in team order. */
@@ -251,14 +260,16 @@ export function allAgents<A extends { id: string }>({
   aiOf: (agentId: string) => AgentAi;
   /** The computer an agent works on; null or undefined while it has none. */
   machineOf: (agentId: string) => string | null | undefined;
+  /** One sign-in of this plan thinks for all of the viewer's agents on that computer (`signsInOnce`). */
+  sharedOn?: (machineId: string | null) => boolean;
 }): A[] {
-  if (!signsInPerAgent(choice)) return [];
   const open = agents.filter((a) => {
     const ai = aiOf(a.id);
     return ai === null || ai === choice;
   });
   const first = open.find((a) => aiOf(a.id) === null) ?? open[0];
   const machine = first ? (machineOf(first.id) ?? null) : null;
+  if (!signsInPerAgent(choice) && !sharedOn?.(machine)) return [];
   const set = open.filter((a) => (machineOf(a.id) ?? null) === machine);
   return set.length >= 2 ? set : [];
 }

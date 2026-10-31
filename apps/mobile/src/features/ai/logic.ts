@@ -68,9 +68,12 @@ export function thinkingUsage(
   return view.accounts.find((a) => a.id === view.account)?.usage ?? undefined;
 }
 
-/** The other agents an account thinks for now: picking it takes it from them ("Mover para cá"). */
-export const takenFrom = (account: Pick<MachineAccount, "usedBy">, agentName: string) =>
-  account.usedBy.filter((n) => n !== agentName);
+/**
+ * The other agents an account thinks for now: picking it takes it from them ("Mover para cá"). One made for all of
+ * its owner's agents there (`shared`) takes it from nobody: they think with it too ("Também usada por").
+ */
+export const takenFrom = (account: Pick<MachineAccount, "usedBy" | "shared">, agentName: string) =>
+  account.shared === true ? [] : account.usedBy.filter((n) => n !== agentName);
 
 /** A row of the agent's model page. */
 export interface ModelRow {

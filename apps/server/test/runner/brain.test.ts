@@ -19,6 +19,7 @@ import {
   BRAIN_BUILTIN_TOOLS,
   BrainManager,
   type BrainManagerOptions,
+  type BrainTurnContext,
   brainProfileLaunch,
   ClaudeStreamParser,
   carryClaudeSession,
@@ -28,6 +29,7 @@ import {
   STEER_CAPABILITY,
   STEER_NOW_CAPABILITY,
   steerSupport,
+  TOKEN_REFUSED,
   userMessageLine,
 } from "../../runner/brain";
 import { claudeAuth } from "../../runner/executors";
@@ -338,7 +340,13 @@ function setup(over: Partial<BrainManagerOptions> = {}) {
   };
   // One lookup shared by every turn: turns started together reach the manager in the order they started.
   let folderOnce: Promise<string> | null = null;
-  const turn = async (n: number, prompt: string, extra: Partial<BrainTurnRequest> = {}, signal?: AbortSignal) => {
+  const turn = async (
+    n: number,
+    prompt: string,
+    extra: Partial<BrainTurnRequest> = {},
+    signal?: AbortSignal,
+    context: Partial<BrainTurnContext> = {},
+  ) => {
     folderOnce ??= agentWorkspace(ws, AGENT);
     const folder = await folderOnce;
     const events: WireBrainEvent[] = [];
@@ -353,7 +361,7 @@ function setup(over: Partial<BrainManagerOptions> = {}) {
         mcp: { token: `agr_${"t".repeat(24)}${n}` },
         ...extra,
       },
-      { agent: AGENT, folder, emit: (e) => events.push(e), ...(signal ? { signal } : {}) },
+      { agent: AGENT, folder, emit: (e) => events.push(e), ...(signal ? { signal } : {}), ...context },
     );
     return { final, events };
   };
@@ -947,6 +955,144 @@ test.if(posix)(
     } finally {
       for (const k of Object.keys(stray)) delete process.env[k];
     }
+  },
+);
+
+test.if(posix)(
+  "a token root hands over: only on a descriptor the CLI reads, in the agent's own folder, Anthropic's endpoint pinned, refused at once",
+  async () => {
+    process.env.CLAUDE_CODE_OAUTH_TOKEN = "sk-ant-oat01-stray-from-the-runner";
+    process.env.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR = "9";
+    try {
+      const TOKEN = "sk-ant-oat01-fake-token-for-tests-only";
+      const NEXT = "sk-ant-oat01-fake-token-for-tests-next";
+      const own = tempDir("agent-account-");
+      const lent = tempDir("lent-account-");
+      dirs.push(own, lent);
+      const { spawns, turn } = setup({
+        accounts: {
+          // A lent folder of that id exists too: a grant never uses it.
+          accountDir: (kind, id) => (kind === "claude_code" && id === ACCOUNT ? lent : null),
+          agentHome: (kind, id) => (kind === "claude_code" && id === ACCOUNT ? own : null),
+        },
+      });
+      type Run = {
+        args: string[];
+        configDir: string | null;
+        oauthToken: string | null;
+        oauthEnv: string | null;
+        oauthFd: string | null;
+        authToken: string | null;
+        settingsEnv: Record<string, string> | null;
+      };
+      const runs = () => spawns() as unknown as Run[];
+      const grant = { grant: { kind: "token" as const, token: TOKEN } };
+      const r = await turn(1, "ECHOTOKEN", { account: ACCOUNT }, undefined, grant);
+      expect(r.final).toMatchObject({ type: "done" });
+      const first = runs()[0];
+      expect(first?.configDir).toBe(own);
+      // Read off its descriptor at the start: never in its environment, nor in what its commands inherit.
+      expect(first?.oauthToken).toBe(TOKEN);
+      expect(first?.oauthFd).toBe("3");
+      expect(first?.oauthEnv).toBeNull();
+      expect(first?.authToken).toBeNull();
+      // Never in a file the CLI or the agent reads.
+      expect(JSON.stringify(first?.settingsEnv)).not.toContain("oat01");
+      expect(first?.settingsEnv?.ANTHROPIC_BASE_URL).toBe("https://api.anthropic.com");
+      expect(first?.settingsEnv?.CLAUDE_CODE_USE_BEDROCK).toBe("");
+      // What the CLI printed with it comes back redacted.
+      const sent = JSON.stringify([r.final, ...r.events]);
+      expect(sent).not.toContain(TOKEN);
+      expect(sent).toContain("[secret:CLAUDE_CODE_OAUTH_TOKEN]");
+      // The same token keeps its process; a new one starts another.
+      await turn(2, "hi", { account: ACCOUNT }, undefined, grant);
+      expect(runs()).toHaveLength(1);
+      await turn(3, "hi", { account: ACCOUNT }, undefined, { grant: { kind: "token", token: NEXT } });
+      expect(runs()).toHaveLength(2);
+      expect(runs()[1]?.oauthToken).toBe(NEXT);
+      // Its endpoint refuses it: the turn ends at once, as signed out (the CLI would retry for minutes).
+      const started = Date.now();
+      const refused = await turn(4, "KEY401", { account: ACCOUNT }, undefined, grant);
+      expect(refused.final).toEqual({ type: "error", code: "not_logged_in", message: TOKEN_REFUSED, retryable: true });
+      expect(Date.now() - started).toBeLessThan(10_000);
+      // Nothing to sign in with on the computer: signed out, no CLI started.
+      const before = runs().length;
+      const none = await turn(5, "hi", { account: ACCOUNT }, undefined, { grant: { kind: "none" } });
+      expect(none.final).toMatchObject({ type: "error", code: "not_logged_in" });
+      expect(runs()).toHaveLength(before);
+      // A key root hands over thinks through its plan's endpoint the same way.
+      const KEY = "0123456789abcdef0123456789abcdef.AbCdEfGhIjKlMnOp";
+      await turn(6, "hi", { account: ACCOUNT, session: { id: SESSION(6), resume: false } }, undefined, {
+        grant: { kind: "key", provider: "zai", key: KEY },
+      });
+      const key = runs().at(-1);
+      expect(key?.authToken).toBe(KEY);
+      expect(key?.oauthToken).toBeNull();
+      expect(key?.oauthFd).toBeNull();
+      expect(key?.configDir).toBe(own);
+      expect(key?.settingsEnv?.ANTHROPIC_BASE_URL).toBe("https://api.z.ai/api/anthropic");
+    } finally {
+      delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+      delete process.env.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR;
+    }
+  },
+);
+
+test.if(posix)(
+  "a secret streamed in pieces never leaves in pieces: each batch keeps back what could start one",
+  async () => {
+    const TOKEN = "sk-ant-oat01-fake-token-for-tests-only";
+    const own = tempDir("agent-account-");
+    dirs.push(own);
+    const { turn } = setup({
+      accounts: {
+        accountDir: () => null,
+        agentHome: (kind, id) => (kind === "claude_code" && id === ACCOUNT ? own : null),
+      },
+    });
+    const r = await turn(1, "ECHOSPLIT", { account: ACCOUNT }, undefined, { grant: { kind: "token", token: TOKEN } });
+    expect(r.final).toMatchObject({ type: "done", text: "token [secret:CLAUDE_CODE_OAUTH_TOKEN] printed" });
+    const deltas = r.events.flatMap((e) => (e.type === "text_delta" ? [e.text] : []));
+    expect(deltas.join("")).toBe("token [secret:CLAUDE_CODE_OAUTH_TOKEN] printed");
+    // Still streamed: what can't start a secret goes at once.
+    expect(deltas.length).toBeGreaterThan(1);
+  },
+);
+
+test.if(posix)(
+  "the agent thinks with another account now: its processes on any other close, a busy one once its turn ends",
+  async () => {
+    const OTHER = "0193ffff-0000-7000-8000-000000000002";
+    const homes: Record<string, string> = { [ACCOUNT]: tempDir("keep-a-"), [OTHER]: tempDir("keep-b-") };
+    dirs.push(...Object.values(homes));
+    const { m, turn } = setup({
+      accounts: {
+        accountDir: () => null,
+        agentHome: (kind, id) => (kind === "claude_code" ? (homes[id] ?? null) : null),
+      },
+    });
+    const grant = { grant: { kind: "token" as const, token: "sk-ant-oat01-fake-token-for-tests-only" } };
+    const on = (n: number, account?: string) => ({
+      session: { id: SESSION(n), resume: false },
+      ...(account ? { account } : {}),
+    });
+    await turn(1, "hi", on(1, ACCOUNT), undefined, grant);
+    await turn(2, "hi", on(2, OTHER), undefined, grant);
+    // The computer's own sign-in is no account: it stays whatever root says.
+    await turn(3, "hi", on(3));
+    expect(m.size).toBe(3);
+    const left = m.process(AGENT.id, SESSION(1));
+    m.keepAccount(OTHER);
+    await waitFor(() => left?.exited === true, 8000);
+    expect(m.size).toBe(2);
+    expect(m.process(AGENT.id, SESSION(2))).toBeDefined();
+    // A turn the server sent on the account it left still runs; its process isn't kept after it.
+    const r = await turn(4, "SLOW", on(4, ACCOUNT), undefined, grant);
+    expect(r.final).toMatchObject({ type: "done" });
+    expect(m.process(AGENT.id, SESSION(4))).toBeUndefined();
+    m.keepAccount(null);
+    await waitFor(() => m.size === 1, 8000);
+    expect(m.process(AGENT.id, SESSION(3))).toBeDefined();
   },
 );
 

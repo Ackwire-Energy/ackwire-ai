@@ -741,8 +741,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   // Signing in to it again is its owner's.
   const signedOut = current?.status === "signed_out" && current.mine;
   const accountChanged = accountsOn && account !== view.account;
-  // One account thinks for one agent: picking another agent's takes it from that one ("Mover para cá").
-  const moving = accountChanged && current?.usedBy.some((n) => n !== agent.name) === true;
+  // A login made for one agent thinks for one: picking another agent's takes it from that one ("Mover para cá"). One
+  // made for all of its owner's agents there thinks for this one too.
+  const moving = accountChanged && current?.shared !== true && current?.usedBy.some((n) => n !== agent.name) === true;
   // An automatic model picks the effort too; a fixed one takes the ramp's level.
   const effortToSave: BrainEffortSetting = isAuto(planModel) ? AUTO : effort;
   const savedEffort: BrainEffortSetting = isAuto(view.effort) ? AUTO : shownEffort(view.effort);
@@ -921,8 +922,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           },
         ]
       : []),
-    // One option per account: the login of it this agent has, or a free one. Else, where its plan allows a login
-    // per agent, one more for this agent ("Also used by Ada"); else another agent's, moved here.
+    // One option per account: the login of it this agent has, one for all of its owner's agents, or a free one.
+    // Else, where its plan allows a login per agent, one more for this agent ("Also used by Ada"); else another
+    // agent's, moved here.
     ...accountChoices(accounts, [account, view.account]).map((c) => ({
       value: c.also ? `${ALSO}${c.login.id}` : c.login.id,
       ...accountOption(t, i18n.language, c, agent.name),

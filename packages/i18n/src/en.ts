@@ -1472,6 +1472,11 @@ export const en: Translations = {
     agentAria: "Agents that use this plan",
     each: "One sign-in per agent, with the same account.",
     eachHint: "Each agent keeps its own sign-in. They all share your plan's limits.",
+    once: "One sign-in for all of them.",
+    onceHint: "They all share your plan's limits.",
+    /** An account of this plan the person already has on that computer, for all of their agents there. */
+    use: "Use {{label}}",
+    another: "Another account",
     signInFor: "Sign in for {{name}}",
     doneAll: "{{names}} now think with {{label}}.",
     otherAccount: {
@@ -5160,6 +5165,9 @@ export const en: Translations = {
       disconnectAgents_other: "{{agents}} stop thinking with it. {{computer}} signs out and deletes what it kept.",
       disconnectNone: "{{computer}} signs out and deletes what it kept of it.",
       disconnected: "{{label}} disconnected.",
+      useFor: "Use for {{name}} too",
+      useForMenu: "Use for…",
+      revokeOnClaude: "To end it on Claude too, revoke it in Claude's settings.",
     },
     usage: {
       window: {

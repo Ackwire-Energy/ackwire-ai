@@ -8,13 +8,18 @@ import {
   AccountManager,
   type AccountManagerOptions,
   accountEnv,
+  agentAccountHome,
+  grantOf,
   lentAccounts,
   parseClaudeLoginUrl,
   parseClaudeStatus,
   parseCodexLogin,
   parseCodexStatus,
+  parseSetupToken,
   planKeyOf,
+  Screen,
   stripAnsi,
+  tokenOf,
 } from "../../runner/accounts";
 import { claudePlan } from "../../runner/executors";
 import { describeRequest, type HandlerContext, handleRequest } from "../../runner/handlers";
@@ -147,7 +152,7 @@ function setup(over: Partial<AccountManagerOptions> = {}) {
         .trim()
         .split("\n")
         .filter(Boolean)
-        .map((l) => JSON.parse(l) as { args: string; home: string });
+        .map((l) => JSON.parse(l) as { args: string; home: string; terminal?: boolean });
     } catch {
       return [];
     }
@@ -192,12 +197,14 @@ test.if(posix)(
     await waitFor(() => m.status(id).state !== "waiting", 5000);
     expect(m.status(id)).toEqual({
       state: "done",
-      account: { id, kind: "claude_code", loggedIn: true, email: "dev@acme.test", plan: "max" },
+      account: { id, kind: "claude_code", loggedIn: true, email: "dev@acme.test", plan: "max", shared: true },
     });
     expect(changes()).toBeGreaterThan(0);
     expect(m.accountDir("claude_code", id)).toBe(dir);
     expect(m.accountDir("codex", id)).toBeNull();
-    expect(await m.list()).toEqual([{ id, kind: "claude_code", loggedIn: true, email: "dev@acme.test", plan: "max" }]);
+    expect(await m.list()).toEqual([
+      { id, kind: "claude_code", loggedIn: true, email: "dev@acme.test", plan: "max", shared: true },
+    ]);
     expect(m.snapshot()).toHaveLength(1);
     // The same id can't start again.
     expect(await errorCode(() => m.begin("claude_code", id))).toBe("bad_request");
@@ -218,12 +225,19 @@ test.if(posix)(
       await waitFor(() => m.status(id).state !== "waiting", 5000);
     };
     await signIn(false);
-    const account = { id, kind: "claude_code" as const, loggedIn: true, email: "dev@acme.test", plan: "max" };
+    const account = {
+      id,
+      kind: "claude_code" as const,
+      loggedIn: true,
+      email: "dev@acme.test",
+      plan: "max",
+      shared: true,
+    };
     expect(await m.list()).toEqual([account]);
     // Another login of the same account ended this one: its credentials stay, the turn's refusal decides.
     await m.refused("claude_code", id);
     m.invalidate();
-    expect(await m.list()).toEqual([{ id, kind: "claude_code", loggedIn: false }]);
+    expect(await m.list()).toEqual([{ id, kind: "claude_code", loggedIn: false, shared: true }]);
     await signIn(true);
     expect(m.status(id)).toEqual({ state: "done", account });
     m.invalidate();
@@ -247,7 +261,7 @@ test.if(posix)(
       const dir = path.join(root, "claude_code", id);
       mkdirSync(dir, { recursive: true });
       // Signed out there: the key in the runner's env would have made it "signed in" (and billed the key).
-      expect(await m.list()).toEqual([{ id, kind: "claude_code", loggedIn: false }]);
+      expect(await m.list()).toEqual([{ id, kind: "claude_code", loggedIn: false, shared: true }]);
       const env = accountEnv("claude_code", dir);
       expect(env.CLAUDE_CONFIG_DIR).toBe(dir);
       for (const k of Object.keys(stray)) expect(env[k]).toBeUndefined();
@@ -294,9 +308,9 @@ test.if(posix)(
       "bad_request",
     );
     await waitFor(() => m.status(id).state !== "waiting", 5000);
-    expect(m.status(id)).toEqual({ state: "done", account: { id, kind: "codex", loggedIn: true } });
+    expect(m.status(id)).toEqual({ state: "done", account: { id, kind: "codex", loggedIn: true, shared: true } });
     expect(runs().map((r) => r.args)).toContain("login status");
-    expect(await m.list()).toEqual([{ id, kind: "codex", loggedIn: true }]);
+    expect(await m.list()).toEqual([{ id, kind: "codex", loggedIn: true, shared: true }]);
   },
   15_000,
 );
@@ -414,7 +428,9 @@ test.if(posix)("remove signs out in the account's folder and deletes it; ids tha
   mkdirSync(dir, { recursive: true });
   writeFileSync(path.join(dir, "signed-in"), "");
   mkdirSync(path.join(root, "claude_code", "notes"), { recursive: true });
-  expect(await m.list()).toEqual([{ id, kind: "claude_code", loggedIn: true, email: "dev@acme.test", plan: "max" }]);
+  expect(await m.list()).toEqual([
+    { id, kind: "claude_code", loggedIn: true, email: "dev@acme.test", plan: "max", shared: true },
+  ]);
   const before = changes();
   expect(await m.remove("claude_code", id)).toBe(true);
   expect(runs().find((r) => r.args === "auth logout")?.home).toBe(dir);
@@ -494,7 +510,14 @@ test.if(posix)(
     const { aad, box } = await sealed(begun.publicKey as string, id, `  ${GLM_KEY}\n`);
     const before = changes();
     await m.code(id, aad, box);
-    const account = { id, kind: "claude_code" as const, loggedIn: true, provider: "zai", keyHint: "MnOp" };
+    const account = {
+      id,
+      kind: "claude_code" as const,
+      loggedIn: true,
+      provider: "zai",
+      keyHint: "MnOp",
+      shared: true,
+    };
     expect(m.status(id)).toEqual({ state: "done", account });
     expect(changes()).toBeGreaterThan(before);
     const file = path.join(dir, "provider.json");
@@ -724,3 +747,243 @@ test.if(posix)("op account: machine-wide, a new sign-in is refused while paused,
     describeRequest(req({ action: "code", loginId: LOGIN(11), aad: "x", box: { v: 1, epk: "e", iv: "i", ct: "c" } })),
   ).toBe(`account code ${LOGIN(11).slice(0, 8)}`);
 });
+
+// ── One sign-in for all of an owner's agents (protocol 29) ───────────────────
+
+const TOKEN = "sk-ant-oat01-fake-token-for-tests-only";
+
+test("a terminal's screen: words apart by cursor moves, a line drawn in pieces, cut escapes and erases", () => {
+  const s = new Screen();
+  s.write(`${ESC}[2GYour${ESC}[7GOAuth${ESC}[13Gtoken:\r\r\n${ESC}[33m${ESC}[2Gsk-ant-oat01-ab`);
+  // Half a token, nothing drawn under it yet: not it.
+  expect(parseSetupToken(s.text())).toBeNull();
+  s.write(`${ESC}[17Gcdefgh${ESC}[39m\r\r\n\r\r\n${ESC}[2GStore${ESC}[8Gthis${ESC}[13Gtoken`);
+  expect(s.text()).toBe(" Your OAuth token:\n sk-ant-oat01-abcdefgh\n\n Store this token");
+  expect(parseSetupToken(s.text())).toBe("sk-ant-oat01-abcdefgh");
+  // An escape cut between two pieces waits for the rest; a hyperlink keeps only its text.
+  const t = new Screen();
+  t.write(`ab${ESC}[3`);
+  t.write(`8;5;246mcd ${ESC}]8;id=x;https://x.test\x07link${ESC}]8;;\x07`);
+  expect(t.text()).toBe("abcd link");
+  // Moving up and erasing redraws a line in place.
+  const u = new Screen();
+  u.write("one\r\ntwo\r\n");
+  u.write(`${ESC}[2A${ESC}[2K${ESC}[1Gthree`);
+  expect(u.text()).toBe("three\ntwo");
+  // Only a token after "OAuth token"; once the CLI ended, without the line under it.
+  expect(parseSetupToken(`${TOKEN}\nYour OAuth token:\nStore this token`)).toBeNull();
+  expect(parseSetupToken(`Your OAuth token:\n${TOKEN}`, true)).toBe(TOKEN);
+  // A grant off root's frame: only whole tokens, known plans.
+  expect(grantOf({ kind: "token", token: TOKEN })).toEqual({ kind: "token", token: TOKEN });
+  expect(grantOf({ kind: "token", token: `${TOKEN} x` })).toBeNull();
+  expect(grantOf({ kind: "key", provider: "nope", key: "k" })).toBeNull();
+  expect(grantOf({ kind: "none" })).toEqual({ kind: "none" });
+  expect(grantOf(undefined)).toBeNull();
+});
+
+test("Claude Code 2.1.314's own setup-token screen, read in pieces: its link and the prompt, words where they show", () => {
+  const raw = JSON.parse(
+    readFileSync(path.join(import.meta.dir, "fixtures", "setup-token", "claude-2.1.314.json"), "utf8"),
+  ) as string;
+  const s = new Screen();
+  for (let i = 0; i < raw.length; i += 37) s.write(raw.slice(i, i + 37));
+  const text = s.text();
+  expect(text).toContain("This will guide you through long-lived (1-year) auth token setup for your Claude account.");
+  // The spinner's line was drawn over by the link's.
+  expect(text).not.toContain("Opening browser");
+  expect(text.trimEnd().endsWith("Paste code here if prompted >")).toBe(true);
+  const url = parseClaudeLoginUrl(text);
+  expect(url).toStartWith("https://claude.com/cai/oauth/authorize?code=true&client_id=");
+  expect(url).toEndWith("&state=fake-state-for-tests-00000000000000000000000");
+  expect(url).toContain("scope=user%3Ainference");
+});
+
+test.if(posix)(
+  "system mode, Claude for all agents: setup-token signs in in a terminal, root keeps only its token (600), never lent",
+  async () => {
+    const lines: string[] = [];
+    const { m, root, runs } = setup({ lending: { chown: async () => {} }, log: (l) => lines.push(l) });
+    const id = LOGIN(70);
+    const begun = await m.begin("claude_code", id, false, undefined, undefined, true);
+    expect(begun.url).toStartWith("https://claude.com/cai/oauth/authorize?");
+    expect(begun.url).toContain("scope=user%3Ainference");
+    expect(typeof begun.publicKey).toBe("string");
+    const dir = path.join(root, "claude_code", id);
+    expect(runs()[0]).toEqual({ args: "setup-token", home: dir, terminal: true });
+    const { aad, box } = await sealed(begun.publicKey as string, id, "good-code");
+    await m.code(id, aad, box);
+    await waitFor(() => m.status(id).state !== "waiting", 8000);
+    const account = { id, kind: "claude_code" as const, loggedIn: true, shared: true };
+    expect(m.status(id)).toEqual({ state: "done", account });
+    const file = path.join(dir, "token.json");
+    expect(statSync(file).mode & 0o777).toBe(0o600);
+    expect(JSON.parse(readFileSync(file, "utf8"))).toEqual({ token: TOKEN });
+    expect(await tokenOf(dir)).toBe(TOKEN);
+    expect(statSync(dir).mode & 0o777).toBe(0o700);
+    expect(existsSync(path.join(dir, ".signing-in"))).toBe(false);
+    m.invalidate();
+    expect(await m.list()).toEqual([account]);
+    // Each turn gets the token from root; the folder is never an agent's, and no CLI asks about it as root.
+    expect(await m.grant("claude_code", id)).toEqual({ kind: "token", token: TOKEN });
+    expect(await m.lendTo("claude_code", id, 21001)).toBe(false);
+    m.probeUsage([id]);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(runs().map((r) => r.args)).toEqual(["setup-token"]);
+    // A turn's endpoint refused it: signed out for every agent, nothing to hand over, until it signs in again.
+    await m.refused("claude_code", id);
+    m.invalidate();
+    expect(await m.list()).toEqual([{ ...account, loggedIn: false }]);
+    expect(await m.grant("claude_code", id)).toEqual({ kind: "none" });
+    const again = await m.begin("claude_code", id, true, undefined, undefined, true);
+    const next = await sealed(again.publicKey as string, id, "good-code");
+    await m.code(id, next.aad, next.box);
+    await waitFor(() => m.status(id).state !== "waiting", 8000);
+    expect(m.status(id)).toEqual({ state: "done", account });
+    expect(await m.grant("claude_code", id)).toEqual({ kind: "token", token: TOKEN });
+    // Never in a log line.
+    expect(lines.join("\n")).not.toContain("oat01");
+    // Removed: nothing runs as root (only Claude's settings end a token), the folder and its markers go.
+    expect(await m.remove("claude_code", id)).toBe(true);
+    expect(runs().map((r) => r.args)).toEqual(["setup-token", "setup-token"]);
+    expect(existsSync(dir)).toBe(false);
+    expect(existsSync(`${dir}.shared`)).toBe(false);
+    expect(existsSync(`${dir}.invalid`)).toBe(false);
+  },
+  20_000,
+);
+
+test.if(posix)(
+  "a token sign-in that fails or shows no token keeps nothing, and never says the code or a token back",
+  async () => {
+    const { m, root } = setup({ lending: { chown: async () => {} } });
+    const id = LOGIN(73);
+    const begun = await m.begin("claude_code", id, false, undefined, undefined, true);
+    const wrong = await sealed(begun.publicKey as string, id, "wrong-secret-code");
+    await m.code(id, wrong.aad, wrong.box);
+    await waitFor(() => m.status(id).state !== "waiting", 8000);
+    const failed = m.status(id);
+    expect(failed.state).toBe("failed");
+    expect(failed.error).toContain("couldn't sign in");
+    expect(failed.error).not.toContain("wrong-secret-code");
+    await waitFor(() => !existsSync(path.join(root, "claude_code", id)));
+    expect(existsSync(path.join(root, "claude_code", `${id}.shared`))).toBe(false);
+
+    process.env.FAKE_ACCOUNT_MODE = "notoken";
+    const other = LOGIN(74);
+    const b = await m.begin("claude_code", other, false, undefined, undefined, true);
+    const good = await sealed(b.publicKey as string, other, "good-code");
+    await m.code(other, good.aad, good.box);
+    await waitFor(() => m.status(other).state !== "waiting", 8000);
+    expect(m.status(other)).toMatchObject({ state: "failed", error: expect.stringContaining("didn't show its token") });
+    await waitFor(() => !existsSync(path.join(root, "claude_code", other)));
+    expect(await m.list()).toEqual([]);
+  },
+  20_000,
+);
+
+test.if(posix)(
+  "system mode: a plan's key for all agents is handed over, never lent; one agent's login starts over when signed in for all",
+  async () => {
+    const chowned: string[] = [];
+    const { m, root, runs } = setup({ lending: { chown: async (file) => void chowned.push(file) } });
+    const all = LOGIN(75);
+    const begun = await m.begin("claude_code", all, false, undefined, "zai", true);
+    const k = await sealed(begun.publicKey as string, all, GLM_KEY);
+    await m.code(all, k.aad, k.box);
+    const account = { id: all, kind: "claude_code" as const, loggedIn: true, provider: "zai", keyHint: "MnOp" };
+    expect(m.status(all)).toEqual({ state: "done", account: { ...account, shared: true } });
+    expect(await m.grant("claude_code", all)).toEqual({ kind: "key", provider: "zai", key: GLM_KEY });
+    expect(await m.lendTo("claude_code", all, 21001)).toBe(false);
+    expect(chowned).toEqual([]);
+
+    // Made for one agent (before protocol 29, or with the switch off): lent, never handed over.
+    const one = LOGIN(76);
+    const b1 = await m.begin("claude_code", one, false, undefined, "zai");
+    const k1 = await sealed(b1.publicKey as string, one, GLM_KEY);
+    await m.code(one, k1.aad, k1.box);
+    expect(m.status(one).account).toEqual({ ...account, id: one });
+    expect(await m.grant("claude_code", one)).toBeNull();
+    expect(await m.lendTo("claude_code", one, 21001)).toBe(true);
+    // Signed in again for all agents: root takes it back and empties it first, then it is for all.
+    const b2 = await m.begin("claude_code", one, true, undefined, "zai", true);
+    expect(existsSync(path.join(root, "claude_code", `${one}.lent`))).toBe(false);
+    expect(existsSync(path.join(root, "claude_code", one, "provider.json"))).toBe(false);
+    const k2 = await sealed(b2.publicKey as string, one, GLM_KEY);
+    await m.code(one, k2.aad, k2.box);
+    expect(await m.grant("claude_code", one)).toEqual({ kind: "key", provider: "zai", key: GLM_KEY });
+    m.invalidate();
+    expect((await m.list()).map((a) => a.shared)).toEqual([true, true]);
+
+    // ChatGPT's still thinks for one agent there.
+    const codex = LOGIN(77);
+    await m.begin("codex", codex, false, undefined, undefined, true);
+    await waitFor(() => m.status(codex).state !== "waiting", 5000);
+    expect(m.status(codex)).toEqual({ state: "done", account: { id: codex, kind: "codex", loggedIn: true } });
+    expect(await m.grant("codex", codex)).toBeNull();
+    expect(runs().map((r) => r.args)).toEqual(["login --device-auth", "login status"]);
+  },
+  20_000,
+);
+
+test.if(posix)("where every agent is the runner's own user, every account thinks for all of them", async () => {
+  const { m, root } = setup();
+  const id = LOGIN(78);
+  const dir = path.join(root, "claude_code", id);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(path.join(dir, "signed-in"), "");
+  expect(await m.list()).toEqual([
+    { id, kind: "claude_code", loggedIn: true, email: "dev@acme.test", plan: "max", shared: true },
+  ]);
+  // Nothing to hand over: every agent's CLI opens the folder itself.
+  expect(await m.grant("claude_code", id)).toBeNull();
+});
+
+test.if(posix)(
+  "a worker's own folder for an account root keeps; a pipe where a token would be never hangs root",
+  async () => {
+    const home = tempDir("worker-home-");
+    dirs.push(home);
+    const own = agentAccountHome(home, "claude_code", LOGIN(79));
+    expect(own).toBe(path.join(home, "accounts", "claude_code", LOGIN(79)));
+    expect(statSync(own as string).mode & 0o777).toBe(0o700);
+    expect(agentAccountHome(home, "claude_code", "../x")).toBeNull();
+    expect(spawnSync("mkfifo", [path.join(own as string, "token.json")]).status).toBe(0);
+    const read = await Promise.race([tokenOf(own as string), new Promise((r) => setTimeout(() => r("hung"), 3000))]);
+    expect(read).toBeNull();
+  },
+);
+
+test.if(posix)(
+  "system mode: while an account for all agents signs in again, turns still get what it has, and closing the dialog changes nothing",
+  async () => {
+    const { m } = setup({ lending: { chown: async () => {} } });
+    const key = LOGIN(80);
+    const begun = await m.begin("claude_code", key, false, undefined, "zai", true);
+    const k = await sealed(begun.publicKey as string, key, GLM_KEY);
+    await m.code(key, k.aad, k.box);
+    const kept = { kind: "key", provider: "zai", key: GLM_KEY } as const;
+    expect(await m.grant("claude_code", key)).toEqual(kept);
+    // New key, its dialog open: the key it has still thinks.
+    await m.begin("claude_code", key, true, undefined, "zai", true);
+    expect(await m.grant("claude_code", key)).toEqual(kept);
+    // Closed with no key pasted: as it was.
+    expect(await m.cancel(key)).toBe(true);
+    expect(await m.grant("claude_code", key)).toEqual(kept);
+
+    const token = LOGIN(81);
+    const t = await m.begin("claude_code", token, false, undefined, undefined, true);
+    const c = await sealed(t.publicKey as string, token, "good-code");
+    await m.code(token, c.aad, c.box);
+    await waitFor(() => m.status(token).state !== "waiting", 8000);
+    // Sign in again started while the token still works: turns keep it meanwhile.
+    await m.begin("claude_code", token, true, undefined, undefined, true);
+    expect(await m.grant("claude_code", token)).toEqual({ kind: "token", token: TOKEN });
+    expect(await m.cancel(token)).toBe(true);
+    m.invalidate();
+    expect((await m.list()).map((a) => [a.id, a.loggedIn])).toEqual([
+      [key, true],
+      [token, true],
+    ]);
+  },
+  20_000,
+);
