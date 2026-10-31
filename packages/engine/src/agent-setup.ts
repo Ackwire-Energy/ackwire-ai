@@ -188,6 +188,11 @@ export async function applyAgentSetup(
   const machine = setup.machineId ? await getMachine(deps.db, orgId, setup.machineId) : null;
   const theirs = machine ? await listMachineAccounts(deps, orgId, machine.id, userId) : [];
   const account = setup.account ? theirs.find((a) => a.id === setup.account) : undefined;
+  // The computer's own sign-in is its pairer's plan: who else may pick it says whose it is.
+  const pairer = machine?.pairedByUserId && machine.pairedByUserId !== userId ? machine.pairedByUserId : null;
+  const [paired] = pairer
+    ? await deps.db.select({ name: schema.users.name }).from(schema.users).where(eq(schema.users.id, pairer))
+    : [];
   // What the agents that keep their own accounts think with now, and the computers the others work on.
   const ownIds = targets.map((t) => t.brainAccountId).filter((id): id is string => id !== null);
   const [owns, computers] = await Promise.all([
@@ -218,6 +223,7 @@ export async function applyAgentSetup(
       ownById,
       computerName,
       sourcePlan: account?.provider ?? null,
+      pairerName: paired?.name ?? null,
     });
 
   const results = new Map<string, SetupResult>();
@@ -266,6 +272,8 @@ function planFor(
     ownById: Map<string, { label: string; provider: string | null }>;
     computerName: Map<string, string>;
     sourcePlan: string | null;
+    /** Whoever connected the setup's computer, when not the caller. */
+    pairerName: string | null;
   },
 ): Plan {
   const { setup, admin, userId } = c;
@@ -333,7 +341,7 @@ function planFor(
 /** Whether the setup's account (or its computer's own sign-in) can think for the agent, else why not. */
 function takesAccount(
   t: Agent,
-  c: Pick<Parameters<typeof planFor>[1], "setup" | "userId" | "machine" | "account" | "computerName">,
+  c: Pick<Parameters<typeof planFor>[1], "setup" | "userId" | "machine" | "account" | "computerName" | "pairerName">,
 ): true | Plan {
   const { setup, userId, machine } = c;
   if (!machine || !brainOptions(machine).some((o) => o.kind === setup.brain && o.available)) return skip("failed");
@@ -352,7 +360,9 @@ function takesAccount(
     return true;
   }
   // The computer's own sign-in thinks only for the agents of whoever connected it.
-  if (machine.pairedByUserId !== userId || t.ownerUserId !== userId) return skip("account_owner");
+  if (machine.pairedByUserId !== userId)
+    return skip("account_owner", c.pairerName ? { owner: c.pairerName } : undefined);
+  if (t.ownerUserId !== userId) return skip("account_owner");
   return true;
 }
 

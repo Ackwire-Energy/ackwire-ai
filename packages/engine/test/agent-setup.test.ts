@@ -198,6 +198,11 @@ describe("Usar em outros agentes", () => {
     expect(
       await applyAgentSetup(deps, caio.id, fx.org.id, { setup: ANA_CLAUDE(w.mac), agentIds: [w.theo] }),
     ).toMatchObject([{ agentId: w.theo, status: "skipped", reason: "account_owner", params: { owner: "ana" } }]);
+    // So is the MacBook's own sign-in: she connected it.
+    const own = { ...ANA_CLAUDE(w.mac), account: null };
+    expect(await applyAgentSetup(deps, caio.id, fx.org.id, { setup: own, agentIds: [w.theo] })).toEqual([
+      { agentId: w.theo, status: "skipped", reason: "account_owner", params: { owner: "ana" } },
+    ]);
     expect(
       await applyAgentSetup(deps, fx.owner.id, fx.org.id, { setup: ANA_CLAUDE(w.mac), agentIds: [w.zoe] }),
     ).toEqual([{ agentId: w.zoe, status: "skipped", reason: "account_owner" }]);
