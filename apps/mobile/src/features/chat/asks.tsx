@@ -121,7 +121,13 @@ export function useExpired(at: string | null | undefined): boolean {
  */
 export function AskProbes({ messages }: { messages: Message[] }) {
   const asking = useMemo(() => messages.flatMap((m, order) => (mayAsk(m) ? [{ m, order }] : [])), [messages]);
-  return <>{asking.map(({ m, order }) => <AskProbe key={m.id} message={m} order={order} />)}</>;
+  return (
+    <>
+      {asking.map(({ m, order }) => (
+        <AskProbe key={m.id} message={m} order={order} />
+      ))}
+    </>
+  );
 }
 
 const AskProbe = memo(function AskProbe({ message: m, order }: { message: Message; order: number }) {
@@ -151,7 +157,9 @@ const AskProbe = memo(function AskProbe({ message: m, order }: { message: Messag
       {proposal && m.author.id ? (
         <ProposalProbe card={proposal} agentId={m.author.id} messageId={m.id} order={order} />
       ) : null}
-      {changes.map((id) => <ChangeProposalProbe key={id} id={id} messageId={m.id} order={order} />)}
+      {changes.map((id) => (
+        <ChangeProposalProbe key={id} id={id} messageId={m.id} order={order} />
+      ))}
     </>
   );
 });
@@ -569,7 +577,11 @@ export function AskBar({
   }).replace(/<\/?b>/g, "");
   const parts = markedParts(sentence);
   const plain = parts.map((p) => p.text).join("");
-  const stops = lineStops(workingEntries(runs, consults, (id) => dir.agentById.get(id)?.name ?? ""), runs, canStop);
+  const stops = lineStops(
+    workingEntries(runs, consults, (id) => dir.agentById.get(id)?.name ?? ""),
+    runs,
+    canStop,
+  );
   const see = () => {
     tapHaptic();
     onSee();

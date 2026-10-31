@@ -124,7 +124,10 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
   // Waiting: a request card, the change behind "Ver a mudança" (edited there before accepting).
   if (pending) {
     const before = new Set(p.before.split("\n"));
-    const firstNew = p.after.split("\n").find((line) => line.trim() && !before.has(line))?.trim();
+    const firstNew = p.after
+      .split("\n")
+      .find((line) => line.trim() && !before.has(line))
+      ?.trim();
     return (
       <RequestCard
         id={p.id}

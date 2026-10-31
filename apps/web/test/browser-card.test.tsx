@@ -160,11 +160,7 @@ describe("the card in the message", () => {
     const socket = r.sockets.last();
     await act(async () => socket.open());
     // Taking over from the request: the card is the control.
-    await act(async () =>
-      fireEvent.click(
-        within(waitingRequest()).getByRole("button", { name: "Abrir aqui" }),
-      ),
-    );
+    await act(async () => fireEvent.click(within(waitingRequest()).getByRole("button", { name: "Abrir aqui" })));
     await settle(4);
     const card = document.querySelector(".brw-ac") as HTMLElement;
     await act(async () =>
@@ -198,11 +194,7 @@ describe("the card in the message", () => {
     await settle(6);
     const socket = r.sockets.last();
     await act(async () => socket.open());
-    await act(async () =>
-      fireEvent.click(
-        within(waitingRequest()).getByRole("button", { name: "Abrir aqui" }),
-      ),
-    );
+    await act(async () => fireEvent.click(within(waitingRequest()).getByRole("button", { name: "Abrir aqui" })));
     await settle(4);
     await act(async () =>
       socket.push({
@@ -312,11 +304,7 @@ describe("a card whose page doesn't come never stays on Opening", () => {
     const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(6);
     await act(async () => r.sockets.last().open());
-    await act(async () =>
-      fireEvent.click(
-        within(waitingRequest()).getByRole("button", { name: "Abrir aqui" }),
-      ),
-    );
+    await act(async () => fireEvent.click(within(waitingRequest()).getByRole("button", { name: "Abrir aqui" })));
     await settle(4);
     const card = document.querySelector(".brw-ac") as HTMLElement;
     const cover = () => card.querySelector(".brw-dim__box")?.textContent ?? "";
@@ -385,11 +373,7 @@ describe("a card whose page doesn't come never stays on Opening", () => {
     await serve({ mode: "watch", controllerUserId: null, handoff: null });
     expect(document.querySelector(".brw-ac .brw-ac__page img")).toBeTruthy();
     // It asked for help; Abrir aqui opens the request's own card, in control.
-    await act(async () =>
-      fireEvent.click(
-        within(waitingRequest()).getByRole("button", { name: "Abrir aqui" }),
-      ),
-    );
+    await act(async () => fireEvent.click(within(waitingRequest()).getByRole("button", { name: "Abrir aqui" })));
     await settle(4);
     const active = { ...handoff, status: "active", controllerUserId: "u-walter", expiresAt: null };
     await serve({ mode: "control", controllerUserId: "u-walter", handoff: active });

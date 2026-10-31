@@ -159,11 +159,7 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
   return (
     <>
       {/* biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset */}
-      <div
-        className={settled ? "brw-rq brw-rq--settled" : "brw-rq"}
-        role="group"
-        aria-label={groupLabel}
-      >
+      <div className={settled ? "brw-rq brw-rq--settled" : "brw-rq"} role="group" aria-label={groupLabel}>
         <span className="brw-rq__face">
           <AgentAvatar
             agentId={current.agentId}

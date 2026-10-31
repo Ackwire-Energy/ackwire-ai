@@ -414,7 +414,9 @@ export const MessageRow = memo(function MessageRow({
         {isAgent ? <TeamChecks message={m} /> : null}
         {isAgent ? <NoAiCard message={m} /> : null}
         {isAgent ? <ProposalCard message={m} /> : null}
-        {changes.map((id) => <ChangeProposalCard key={id} proposalId={id} />)}
+        {changes.map((id) => (
+          <ChangeProposalCard key={id} proposalId={id} />
+        ))}
         {files.length > 0 ? <MessageFiles files={files} /> : null}
         {approvalId ? <ApprovalInline approvalId={approvalId} /> : null}
         {handoff ? <HandoffCard handoff={handoff} /> : null}
