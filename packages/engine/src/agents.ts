@@ -7,7 +7,7 @@ import { caches } from "./cache";
 import { modelInfoFor } from "./credentials";
 import { ConflictError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { recordOperatorEvent } from "./operator-events";
-import { getMembership, requirePermission } from "./organizations";
+import { can, getMembership, type Membership, requirePermission } from "./organizations";
 import { DEFAULT_AGENT_SCOPES, grantScopes } from "./tools/scopes";
 import { resyncBudgetCounter } from "./usage";
 
@@ -88,11 +88,16 @@ export function setupOfAgent(a: Agent): schema.AgentSetup {
   };
 }
 
-/** What the workspace's new agents start with from now on: the "Quem pensa" someone just saved or used on others. */
-export async function rememberAgentSetup(db: Executor, orgId: string, setup: schema.AgentSetup) {
+/**
+ * What the workspace's new agents start with from now on: the "Quem pensa" someone just saved or used on others.
+ * Only whoever creates agents sets it (they start from it), and one on the API only an admin: only admins change an
+ * agent's API model and key.
+ */
+export async function rememberAgentSetup(db: Executor, membership: Membership, setup: schema.AgentSetup) {
+  if (!can(membership, "create_agents") || (setup.brain === "model" && !can(membership, "manage_agents"))) return;
   await db
     .insert(schema.organizationSettings)
-    .values({ orgId, agentSetup: setup })
+    .values({ orgId: membership.orgId, agentSetup: setup })
     .onConflictDoUpdate({
       target: schema.organizationSettings.orgId,
       set: { agentSetup: setup, updatedAt: new Date() },
@@ -105,8 +110,9 @@ export async function createAgent(
   orgId: string,
   input: AgentInput,
   defaults: { model: string },
+  options: { remember?: boolean } = {},
 ): Promise<Agent> {
-  await requirePermission(db, actorId, orgId, "create_agents");
+  const membership = await requirePermission(db, actorId, orgId, "create_agents");
   const values = { ...input, handle: input.handle.toLowerCase(), model: input.model ?? defaults.model };
   await validateAgentFields(db, orgId, values);
   // An agent born on "Automático" is automatic on every brain: switched to Claude Code or Codex later, it
@@ -175,6 +181,10 @@ export async function createAgent(
       target: { type: "agent", id: agent.id },
       details: { name: agent.name, handle: agent.handle, model: agent.model },
     });
+    // A model or key the creator picked is their latest choice; "Automático" with the default key is no choice.
+    if (options.remember && (!isAutoModel(agent.model) || agent.credentialId)) {
+      await rememberAgentSetup(db, membership, setupOfAgent(agent));
+    }
     return agent;
   } catch (error) {
     if (isUniqueViolation(error)) throw new ConflictError(`@${values.handle} is already taken`);
@@ -206,7 +216,7 @@ export async function updateAgent(
   input: Partial<Omit<AgentInput, "handle">>,
   options: { remember?: boolean } = {},
 ): Promise<Agent> {
-  await requirePermission(db, actorId, orgId, "manage_agents");
+  const membership = await requirePermission(db, actorId, orgId, "manage_agents");
   await validateAgentFields(db, orgId, input);
   const owner = input.ownerUserId;
   const before = owner !== undefined ? await getAgent(db, orgId, agentId) : null;
@@ -255,7 +265,7 @@ export async function updateAgent(
   // Its API model or key is "Quem pensa" only while it thinks through the API.
   const thinking = input.model !== undefined || input.credentialId !== undefined;
   if (thinking && options.remember !== false && !isComputerBrain(agent.brain)) {
-    await rememberAgentSetup(db, orgId, setupOfAgent(agent));
+    await rememberAgentSetup(db, membership, setupOfAgent(agent));
   }
   return agent;
 }

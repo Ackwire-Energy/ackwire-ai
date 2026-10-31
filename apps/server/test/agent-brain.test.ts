@@ -391,7 +391,7 @@ test("a new agent starts on Automático on every brain; one with a fixed model k
 });
 
 test("one agent's setup on others (ADR 0089): a preview keeps nothing, each agent by its rules, new agents start with it", async () => {
-  const { api, asBia, agentId } = await workspace();
+  const { api, asBia, agentId, credentialId } = await workspace();
   const eva = (await (await api("/agents", { json: { name: "Eva", handle: "eva" } })).json()) as { id: string };
   const mac = await pairMac(api);
   for (const id of [agentId, eva.id]) {
@@ -401,17 +401,21 @@ test("one agent's setup on others (ADR 0089): a preview keeps nothing, each agen
   const use = (json: Record<string, unknown>, as = api) => as("/agent-setup", { json });
   type Results = { results: { agentId: string; status: string; reason?: string }[] };
   const brainOf = async (id: string) => (await (await api(`/agents/${id}/brain`)).json()) as Brain;
+  const newAgentSetup = async () => ((await (await api("/agent-setup")).json()) as { setup: unknown }).setup;
+  // Dev was created on Sonnet with the workspace's key, Eva on Automático: Dev's is the last pick.
+  const created = { brain: "model", model: "claude-sonnet-5-5", key: credentialId, contextTokens: null };
+  expect(await newAgentSetup()).toEqual(created);
 
   const preview = await use({ setup, agentIds: [agentId, eva.id], preview: true });
   expect(preview.status).toBe(200);
   expect(((await preview.json()) as Results).results.map((r) => r.status)).toEqual(["applied", "applied"]);
   expect((await brainOf(eva.id)).brain).toBe("model");
-  expect(((await (await api("/agent-setup")).json()) as { setup: unknown }).setup).toBeNull();
+  expect(await newAgentSetup()).toEqual(created);
 
   const done = (await (await use({ setup, agentIds: [agentId, eva.id] })).json()) as Results;
   expect(done.results.map((r) => r.status)).toEqual(["applied", "applied"]);
   expect(await brainOf(eva.id)).toMatchObject({ brain: "claude_code", model: "opus", effort: "high" });
-  expect(((await (await api("/agent-setup")).json()) as { setup: unknown }).setup).toMatchObject({
+  expect(await newAgentSetup()).toMatchObject({
     brain: "claude_code",
     model: "opus",
     computer: { machineId: mac.machineId, name: "mac" },

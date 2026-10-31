@@ -38,6 +38,7 @@ import {
   publishMachineAgentsChanged,
   requirePermission,
   revokeCredential,
+  SETUP_AGENTS_MAX,
   setAgentAppearance,
   setAgentAudience,
   setAgentBrain,
@@ -555,6 +556,8 @@ export function agentRoutes(deps: AppDeps) {
           { ...input, monthlyBudgetNanoUsd: budget(monthlyBudgetUsd) },
           // New agents start on "Automático".
           NEW_AGENT_DEFAULTS,
+          // The person's Criar agente: what they pick is what the next one starts with (ADR 0089).
+          { remember: true },
         );
       let agent = proposal
         ? await createAgentFromProposal({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, proposal, make)
@@ -929,7 +932,7 @@ export function agentRoutes(deps: AppDeps) {
         body: body(
           z.object({
             setup: AgentSetup,
-            agentIds: z.array(z.uuid()).min(1).max(200),
+            agentIds: z.array(z.uuid()).min(1).max(SETUP_AGENTS_MAX),
             preview: z.boolean().optional(),
           }),
         ),

@@ -1,7 +1,14 @@
-import { and, type Database, eq, inArray, isNull, schema } from "@agenteschat/db";
+import { and, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { type ContextLimit, isAutoModel, isContextLimit } from "@agenteschat/providers";
 import { type CodingPlan, PLAN_ALIASES, planOf } from "@agenteschat/providers/plans";
-import { type Agent, type AgentInput, rememberAgentSetup, updateAgent, validateAgentFields } from "./agents";
+import {
+  type Agent,
+  type AgentInput,
+  rememberAgentSetup,
+  setupOfAgent,
+  updateAgent,
+  validateAgentFields,
+} from "./agents";
 import { answersOthers, audienceOf } from "./audience";
 import {
   type AgentBrainInput,
@@ -161,9 +168,9 @@ function refusal(error: unknown): Pick<SetupResult, "reason" | "params"> {
 class PreviewOnly extends Error {}
 
 /**
- * `POST …/agent-setup`: the setup on each agent picked, each by its own rules and in its own savepoint, audited
- * as its own change (`agent.brain` with `via: "setup"`). With `preview`, the same run rolled back: what each would
- * do, nothing kept. Applied, it is what new agents start with.
+ * `POST …/agent-setup`: the setup on each agent picked, in the order asked, each by its own rules and in its own
+ * savepoint, audited as its own change (`agent.brain` with `via: "setup"`). With `preview`, the same run rolled back:
+ * what each would do, nothing kept. Taken whole by one of them, it is what new agents start with.
  */
 export async function applyAgentSetup(
   deps: { db: Database },
@@ -179,12 +186,15 @@ export async function applyAgentSetup(
   if (setup.brain === "model") {
     await validateAgentFields(deps.db, orgId, { model: setup.model ?? undefined, credentialId: setup.key ?? null });
   }
-  const targets = ids.length
+  const rows = ids.length
     ? await deps.db
         .select()
         .from(schema.agents)
         .where(and(eq(schema.agents.orgId, orgId), inArray(schema.agents.id, ids), isNull(schema.agents.archivedAt)))
     : [];
+  const rowById = new Map(rows.map((r) => [r.id, r]));
+  // In the order asked: the first one asked takes a sign-in made for one agent.
+  const targets = ids.flatMap((id) => rowById.get(id) ?? []);
   const machine = setup.machineId ? await getMachine(deps.db, orgId, setup.machineId) : null;
   const theirs = machine ? await listMachineAccounts(deps, orgId, machine.id, userId) : [];
   const account = setup.account ? theirs.find((a) => a.id === setup.account) : undefined;
@@ -230,6 +240,9 @@ export async function applyAgentSetup(
   const applied: string[] = [];
   try {
     await deps.db.transaction(async (tx) => {
+      // A preview's changed rows stay locked until it rolls back: it gives up on a row someone else holds rather
+      // than keep the others locked while it waits.
+      if (input.preview) await tx.execute(sql`set local lock_timeout = '1s'`);
       for (const t of targets) {
         const p = plan(t);
         if (p.status !== "applied") {
@@ -248,8 +261,15 @@ export async function applyAgentSetup(
         }
       }
       if (input.preview) throw new PreviewOnly();
-      const { onlyOwner: _, ...stored } = setup;
-      await rememberAgentSetup(tx, orgId, stored);
+      // What one of them took whole, as saved (not one that kept its own account).
+      const whole = applied.find((id) => !results.get(id)?.keeps);
+      const [saved] = whole
+        ? await tx
+            .select()
+            .from(schema.agents)
+            .where(and(eq(schema.agents.orgId, orgId), eq(schema.agents.id, whole)))
+        : [];
+      if (saved) await rememberAgentSetup(tx, membership, setupOfAgent(saved));
     });
   } catch (error) {
     if (!(error instanceof PreviewOnly)) throw error;
@@ -322,8 +342,11 @@ function planFor(
       },
     };
   }
-  // Already on this brain with an account of its own (another person's plan): it keeps that and takes the rest.
-  if (brainOf(t.brain) === kind) {
+  // Already on this brain here with an account of its own (another person's plan, its own one-agent sign-in): it keeps
+  // that and takes the rest. On another computer, or with a setup that can't think there, it takes nothing.
+  const accountOnly =
+    takes.status === "skipped" && (takes.reason === "account_owner" || takes.reason === "account_single");
+  if (accountOnly && brainOf(t.brain) === kind) {
     const own = t.brainAccountId ? c.ownById.get(t.brainAccountId) : undefined;
     const ownPlan = kind === "claude_code" ? planOf(own?.provider) : undefined;
     if (!modelFits(kind, how.model, ownPlan)) {

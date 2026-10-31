@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { ACCOUNTS_PROTOCOL } from "@agenteschat/adapters";
-import { and, eq, schema } from "@agenteschat/db";
+import { and, eq, schema, sql } from "@agenteschat/db";
 import {
   applyAgentSetup,
+  createAgent,
   ForbiddenError,
   getNewAgentSetup,
+  NEW_AGENT_DEFAULTS,
   releaseAgents,
   type SetupResult,
   setAgentBrain,
@@ -182,6 +184,24 @@ describe("Usar em outros agentes", () => {
       brainEffort: "high",
       contextTokens: 400_000,
     });
+    // Nobody took it whole: new agents don't start with it.
+    expect(await w.stored()).toBeNull();
+  });
+
+  test("an agent on another computer, or a setup whose computer is gone, takes nothing", async () => {
+    const w = await world();
+    await w.fx.db.update(schema.agents).set({ brain: "claude_code" }).where(eq(schema.agents.id, w.lia));
+    const use = (setup: Record<string, unknown>) =>
+      applyAgentSetup(w.deps, w.fx.owner.id, w.fx.org.id, { setup, agentIds: [w.lia] });
+    expect(await use(ANA_CLAUDE(w.mac))).toEqual([
+      { agentId: w.lia, status: "skipped", reason: "other_computer", params: { computer: "PC" } },
+    ]);
+    expect(await use({ ...ANA_CLAUDE(w.mac), machineId: "0193dddd-0000-4000-8000-00000000dead" })).toEqual([
+      { agentId: w.lia, status: "skipped", reason: "failed" },
+    ]);
+    expect(await w.row(w.lia)).toMatchObject({ brain: "claude_code", brainModel: null, brainEffort: null });
+    // Nobody took it: new agents don't start with it.
+    expect(await w.stored()).toBeNull();
   });
 
   test("who may: a member only their own agents, an API model only admins, one agent's sign-in for one", async () => {
@@ -192,6 +212,8 @@ describe("Usar em outros agentes", () => {
       { agentId: w.dev, status: "skipped", reason: "not_allowed" },
       { agentId: w.zoe, status: "skipped", reason: "admins_only" },
     ]);
+    // Nothing taken, nothing kept for new agents.
+    expect(await w.stored()).toBeNull();
     // An admin changes the model and key of anyone's agent; Zoe leaves Bia's plan for the API.
     expect(await applyAgentSetup(deps, caio.id, fx.org.id, { setup: api, agentIds: [w.zoe] })).toEqual([
       { agentId: w.zoe, status: "applied" },
@@ -200,6 +222,12 @@ describe("Usar em outros agentes", () => {
       brain: "model",
       model: "claude-opus-5-5",
       credentialId: fx.credential.id,
+    });
+    expect(await w.stored()).toEqual({
+      brain: "model",
+      model: "claude-opus-5-5",
+      key: fx.credential.id,
+      contextTokens: null,
     });
 
     // Ana's plan is hers to give: an admin can't give it, and it thinks only for her agents.
@@ -217,6 +245,17 @@ describe("Usar em outros agentes", () => {
 
     // A sign-in made for one agent thinks for that one: Theo can't share Dev's.
     await fx.db.update(schema.machineAccounts).set({ shared: false }).where(eq(schema.machineAccounts.id, ANAS));
+    // In the order asked: the first one takes it, also in a preview.
+    const first = (agentIds: string[]) =>
+      applyAgentSetup(deps, fx.owner.id, fx.org.id, { setup: ANA_CLAUDE(w.mac), agentIds, preview: true });
+    expect(await first([w.theo, w.dev])).toEqual([
+      { agentId: w.theo, status: "applied" },
+      { agentId: w.dev, status: "skipped", reason: "account_single", params: { agent: "Theo" } },
+    ]);
+    expect(await first([w.dev, w.theo])).toEqual([
+      { agentId: w.dev, status: "applied" },
+      { agentId: w.theo, status: "skipped", reason: "account_single", params: { agent: "Dev" } },
+    ]);
     await setAgentBrain(deps, fx.owner.id, fx.org.id, w.dev, { brain: "claude_code", account: ANAS });
     expect(
       await applyAgentSetup(deps, fx.owner.id, fx.org.id, { setup: ANA_CLAUDE(w.mac), agentIds: [w.dev, w.theo] }),
@@ -269,5 +308,56 @@ describe("new agents start with the last setup", () => {
     await releaseAgents(fx.db, fx.org.id, [ANAS]);
     await fx.db.delete(schema.machineAccounts).where(eq(schema.machineAccounts.id, ANAS));
     expect(await getNewAgentSetup(deps, fx.owner.id, fx.org.id)).toBeNull();
+  });
+
+  test("Criar agente's own pick counts: a fixed model or a key, not Automático, not an import's model", async () => {
+    const w = await world();
+    const { fx } = w;
+    const make = (handle: string, model?: string, remember = true) =>
+      createAgent(
+        fx.db,
+        fx.owner.id,
+        fx.org.id,
+        { name: handle, handle, ...(model ? { model } : {}) },
+        NEW_AGENT_DEFAULTS,
+        {
+          remember,
+        },
+      );
+    await make("eva");
+    expect(await w.stored()).toBeNull();
+    await make("ivo", "claude-haiku-5-5");
+    expect(await w.stored()).toEqual({ brain: "model", model: "claude-haiku-5-5", key: null, contextTokens: null });
+    await make("rui", "claude-opus-5-5", false);
+    expect((await w.stored())?.model).toBe("claude-haiku-5-5");
+  });
+
+  test("set only by whoever creates agents, and on the API only by an admin", async () => {
+    const w = await world();
+    const { fx, deps, bia } = w;
+    const glm = { brain: "claude_code", machineId: w.mac, account: BIAS, model: null, effort: "high" };
+    // Bia can't create agents: her own agent takes her plan, new agents don't start with it.
+    expect(await applyAgentSetup(deps, bia.id, fx.org.id, { setup: glm, agentIds: [w.zoe] })).toEqual([
+      { agentId: w.zoe, status: "applied" },
+    ]);
+    expect(await w.stored()).toBeNull();
+    // Once she may (but isn't an admin), her plan counts, and an API model she picks doesn't.
+    await fx.db
+      .update(schema.orgRoles)
+      .set({ permissions: sql`array_append(${schema.orgRoles.permissions}, 'create_agents')` })
+      .where(and(eq(schema.orgRoles.orgId, fx.org.id), eq(schema.orgRoles.kind, "everyone")));
+    await setAgentBrain(deps, bia.id, fx.org.id, w.zoe, { effort: "max" });
+    expect(await w.stored()).toMatchObject({ brain: "claude_code", account: BIAS, effort: "max" });
+    await createAgent(
+      fx.db,
+      bia.id,
+      fx.org.id,
+      { name: "Ivo", handle: "ivo", model: "claude-haiku-5-5" },
+      NEW_AGENT_DEFAULTS,
+      {
+        remember: true,
+      },
+    );
+    expect(await w.stored()).toMatchObject({ brain: "claude_code", account: BIAS });
   });
 });

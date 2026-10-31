@@ -297,7 +297,7 @@ async function agentBrainAccess(db: Database, userId: string, orgId: string, age
   if (!admin && agent.ownerUserId !== userId) {
     throw new ForbiddenError("Only an admin or the agent's owner can see who thinks for it", "agent.not_owner");
   }
-  return { agent, admin };
+  return { agent, admin, membership };
 }
 
 /** The computers the caller may give the agent (the same rule as `setAgentComputerTarget`), with their options. */
@@ -448,7 +448,7 @@ export async function setAgentBrain(
   input: AgentBrainInput,
   options: { remember?: boolean; audit?: Record<string, unknown> } = {},
 ): Promise<AgentBrainView> {
-  const { agent, admin } = await agentBrainAccess(deps.db, userId, orgId, agentId);
+  const { agent, admin, membership } = await agentBrainAccess(deps.db, userId, orgId, agentId);
   const from = brainOf(agent.brain);
   if (input.brain !== undefined && !isBrainKind(input.brain)) {
     throw new ValidationError("Choose model, claude_code or codex", "brain.invalid");
@@ -618,7 +618,7 @@ export async function setAgentBrain(
     contextTokens,
     ...(audience ? { audienceMode: audience.mode } : {}),
   };
-  if (thinks && options.remember !== false) await rememberAgentSetup(deps.db, orgId, setupOfAgent(saved));
+  if (thinks && options.remember !== false) await rememberAgentSetup(deps.db, membership, setupOfAgent(saved));
   // The account's `usedBy` changed with it.
   const fresh =
     account !== agent.brainAccountId ? await brainAccounts(deps.db, userId, orgId, saved, machine) : accounts;
