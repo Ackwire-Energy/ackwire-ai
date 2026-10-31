@@ -23,7 +23,7 @@ describe("floating layers", () => {
     const layers = await css("layers.css");
     const z = (name: string) => Number(layers.match(new RegExp(`--z-${name}:\\s*(\\d+)`))?.[1]);
     expect(z("floating")).toBeGreaterThan(z("dialog"));
-    expect(z("dialog")).toBeGreaterThan(z("scrim"));
+    expect(z("scrim")).toBe(z("dialog"));
     expect(z("toast")).toBeGreaterThan(z("floating"));
     const components = await css("components.css");
     // No raw z-index numbers: everything uses the scale.
