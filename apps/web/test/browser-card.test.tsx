@@ -165,7 +165,11 @@ describe("the card in the message", () => {
     expect(card.classList.contains("brw-mf")).toBe(true);
   });
 
-  test("the wheel scrolls the conversation until the page is clicked; Esc gives it back", async () => {
+  /**
+   * The person in control of Ada's page (1280×800, shown at 640×400 from the window's corner: twice as small), and
+   * what the card sends the page from here on ("pressed@200,200", "moved+left@…", "wheel@…:dx,dy").
+   */
+  async function inControlOfPage() {
     const { state, handoff } = seedRequest();
     const api = createFakeApi(state);
     fakeBrowserOf.get(api)?.handoffs.set(handoff.id, handoff);
@@ -204,24 +208,95 @@ describe("the card in the message", () => {
         y: 0,
         toJSON: () => ({}),
       }) as DOMRect;
+    const before = socket.sent.length;
+    type Sent = { type: string; events?: Record<string, unknown>[] };
+    const sentToPage = () =>
+      (socket.sent.slice(before) as Sent[])
+        .filter((f) => f.type === "browser.input")
+        .flatMap((f) => f.events ?? [])
+        .map((e) =>
+          e.type === "mouseWheel"
+            ? `wheel@${e.x},${e.y}:${e.deltaX},${e.deltaY}`
+            : `${String(e.type).replace("mouse", "").toLowerCase()}${e.type === "mouseMoved" ? `+${e.button}` : ""}@${e.x},${e.y}`,
+        );
+    // The card sends a drag's moves every 25 ms: this waits for them.
+    const flushed = () => act(() => new Promise((r) => setTimeout(r, 40)));
+    return { card, page, img, sentToPage, flushed };
+  }
+  const pointer = (pointerId: number, x: number, y: number, pointerType = "mouse") => ({
+    pointerId,
+    pointerType,
+    button: 0,
+    clientX: x,
+    clientY: y,
+  });
+
+  test("the wheel scrolls the conversation until the page is pressed; Esc gives it back", async () => {
+    const { card, page } = await inControlOfPage();
     const wheelOn = async () => {
       const e = new WheelEvent("wheel", { deltaY: 120, clientX: 100, clientY: 100, bubbles: true, cancelable: true });
       await act(async () => page.dispatchEvent(e));
       return e;
     };
 
-    // Not clicked yet: the wheel is the conversation's (not taken by the page).
+    // Not pressed yet: the wheel is the conversation's (not taken by the page).
     expect((await wheelOn()).defaultPrevented).toBe(false);
     expect(card.querySelector(".brw-ac__capture")).toBeNull();
 
-    // A click into the page takes the wheel: the hint shows and the page keeps the wheel.
-    await act(async () => fireEvent.click(img, { clientX: 100, clientY: 100 }));
-    expect(card.querySelector(".brw-ac__capture")?.textContent).toBe("Rolando a página · Esc para sair");
+    // A click into the page takes the wheel: the hint says how to scroll it, and the page keeps the wheel.
+    await act(async () => fireEvent.pointerDown(page, pointer(1, 100, 100)));
+    await act(async () => fireEvent.pointerUp(page, pointer(1, 100, 100)));
+    expect(card.querySelector(".brw-ac__capture")?.textContent).toBe("A roda rola a página · Esc para sair");
     expect((await wheelOn()).defaultPrevented).toBe(true);
 
     // Esc gives the wheel back to the conversation.
     await act(async () => fireEvent.keyDown(page, { key: "Escape" }));
     expect(card.querySelector(".brw-ac__capture")).toBeNull();
+  });
+
+  test("a press and a move drag on the page with the button held, past its edge too; a click stays a click", async () => {
+    const { page, sentToPage, flushed } = await inControlOfPage();
+    // A slider's handle at (100, 100) on the screen, (200, 200) on the page: pressed at once, dragged right.
+    await act(async () => fireEvent.pointerDown(page, pointer(1, 100, 100)));
+    expect(sentToPage()).toEqual(["moved+none@200,200", "pressed@200,200"]);
+    await act(async () => fireEvent.pointerMove(page, pointer(1, 150, 100)));
+    await flushed();
+    await act(async () => fireEvent.pointerMove(page, pointer(1, 700, 100)));
+    await act(async () => fireEvent.pointerUp(page, pointer(1, 720, 100)));
+    // Out of the picture the drag stays at its right edge, and lets go there.
+    expect(sentToPage().slice(2)).toEqual(["moved+left@300,200", "moved+left@1280,200", "released@1280,200"]);
+
+    await act(async () => fireEvent.pointerDown(page, pointer(1, 10, 20)));
+    await act(async () => fireEvent.pointerUp(page, pointer(1, 10, 20)));
+    expect(sentToPage().slice(5)).toEqual(["moved+none@20,40", "pressed@20,40", "released@20,40"]);
+  });
+
+  test("on a touch screen a finger that moves drags, two fingers scroll the page, and the hint says so", async () => {
+    const { card, page, sentToPage, flushed } = await inControlOfPage();
+    const hint = () => card.querySelector(".brw-ac__capture")?.textContent ?? null;
+    // In control the page takes the fingers, not the conversation.
+    expect(page.classList.contains("is-control")).toBe(true);
+    const css = await Bun.file(new URL("../src/components/browser/browser.css", import.meta.url).pathname).text();
+    expect(css.split("\n.brw-ac__page.is-control {")[1]?.split("}")[0]).toContain("touch-action: none");
+    await act(async () => fireEvent.pointerDown(page, pointer(1, 100, 100, "touch")));
+    expect(sentToPage()).toEqual([]);
+    await act(async () => fireEvent.pointerMove(page, pointer(1, 130, 100, "touch")));
+    expect(sentToPage()).toEqual(["moved+none@200,200", "pressed@200,200", "moved+left@260,200"]);
+    expect(hint()).toBe("Arraste com um dedo · role com dois");
+    await act(async () => fireEvent.pointerUp(page, pointer(1, 130, 100, "touch")));
+    expect(sentToPage().slice(3)).toEqual(["released@260,200"]);
+    expect(hint()).toBeNull();
+
+    // Two fingers up by 30 px: the page scrolls down by 60 of its own, and nothing is pressed.
+    await act(async () => fireEvent.pointerDown(page, pointer(2, 100, 100, "touch")));
+    await act(async () => fireEvent.pointerDown(page, pointer(3, 200, 100, "touch")));
+    await act(async () => fireEvent.pointerMove(page, pointer(2, 100, 70, "touch")));
+    await act(async () => fireEvent.pointerMove(page, pointer(3, 200, 70, "touch")));
+    await flushed();
+    expect(sentToPage().slice(4)).toEqual(["wheel@300,140:0,60"]);
+    await act(async () => fireEvent.pointerUp(page, pointer(2, 100, 70, "touch")));
+    await act(async () => fireEvent.pointerUp(page, pointer(3, 200, 70, "touch")));
+    expect(sentToPage()).toHaveLength(5);
   });
 
   test("its Chrome on the agent's desktop: Ver a tela inteira over the page, and in the frame's top in control", async () => {

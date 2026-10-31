@@ -9237,7 +9237,8 @@ export const en: Translations = {
       noSite: "Before opening a page",
     },
     inCard: {
-      scrollHint: "Scrolling the page · Esc to leave",
+      scrollHint: "The wheel scrolls the page · Esc to leave",
+      touchHint: "Drag with one finger · scroll with two",
       targetMarked: "Marked field",
       targetNone: "Click a field",
       typePlaceholder: "Type into the marked field",

@@ -9,8 +9,9 @@ import type {
 import {
   browserSiteUrl,
   browserSteps,
-  clickEvents,
   controlledBy,
+  createTouchInput,
+  dragEvent,
   frameMetadata,
   HELD_STALE_MS,
   isHeldTakeover,
@@ -19,6 +20,8 @@ import {
   keyEvents,
   modifiersOf,
   pagePoint,
+  pressEvents,
+  releaseEvent,
   rememberHeldPlace,
   textEvent,
   useAgentBrowserHandoff,
@@ -48,9 +51,10 @@ import type { TFunction } from "i18next";
 import {
   type CSSProperties,
   type KeyboardEvent,
-  type MouseEvent,
+  type PointerEvent,
   type ReactNode,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -463,16 +467,86 @@ export function BrowserCard({
     live.sendInput(events);
   };
 
-  const onPageClick = (e: MouseEvent<HTMLImageElement>) => {
+  // Where a point of the window lands on the page as shown now: null off it, its nearest edge with `clamp`.
+  const meta = useMemo(() => (live.frame ? frameMetadata(live.frame) : undefined), [live.frame]);
+  const toPage = (p: { x: number; y: number }, clamp = false) => {
     const img = imgRef.current;
-    const meta = live.frame ? frameMetadata(live.frame) : undefined;
-    if (!inControl || !img || !meta) return;
-    const box = img.getBoundingClientRect();
-    const at = pagePoint({ x: e.clientX, y: e.clientY }, box, meta);
+    return img && meta ? pagePoint(p, img.getBoundingClientRect(), meta, "contain", clamp) : null;
+  };
+  const toPageNow = useRef(toPage);
+  toPageNow.current = toPage;
+  // A mouse or a pen presses at once and drags while held, as on a computer; fingers go through
+  // `createTouchInput` (a tap clicks, one moving finger drags, two scroll).
+  const press = useRef<{ id: number; at: { x: number; y: number } } | null>(null);
+  const [fingers] = useState(() => createTouchInput((p, clamp) => toPageNow.current(p, clamp)));
+  const landed = useRef({ x: 0, y: 0 });
+  // A finger drags or scrolls: the hint says how to scroll.
+  const [sliding, setSliding] = useState(false);
+  const markAt = (p: { x: number; y: number }) => {
+    const box = imgRef.current?.getBoundingClientRect();
+    if (box) setMark({ x: p.x - box.left, y: p.y - box.top, key: Date.now() });
+  };
+  const onFingers = (events: BrowserInputEvent[]) => {
+    send(events);
+    setSliding(fingers.mode === "drag" || fingers.mode === "scroll");
+  };
+
+  const onPagePointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    if (!inControl) return;
+    const p = { x: e.clientX, y: e.clientY };
+    if (e.pointerType === "touch") {
+      onFingers(fingers.down(e.pointerId, p));
+      if (fingers.mode === "pending") landed.current = p;
+      return;
+    }
+    if (e.button !== 0 || press.current) return;
+    const at = toPage(p);
     if (!at) return;
+    // The moves and the release outside the page still come here: a drag past its edge stays at the edge.
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {}
+    press.current = { id: e.pointerId, at };
     setCapturing(true);
-    setMark({ x: e.clientX - box.left, y: e.clientY - box.top, key: Date.now() });
-    send(clickEvents(at, modifiersOf(e, remoteIsMac)));
+    markAt(p);
+    send(pressEvents(at, modifiersOf(e, remoteIsMac)));
+  };
+  const onPagePointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    const p = { x: e.clientX, y: e.clientY };
+    if (e.pointerType === "touch") return onFingers(fingers.move(e.pointerId, p));
+    const held = press.current;
+    const at = held?.id === e.pointerId ? toPage(p, true) : null;
+    if (!held || !at || (at.x === held.at.x && at.y === held.at.y)) return;
+    held.at = at;
+    send([dragEvent(at, modifiersOf(e, remoteIsMac))]);
+  };
+  const onPagePointerUp = (e: PointerEvent<HTMLDivElement>) => {
+    const p = { x: e.clientX, y: e.clientY };
+    if (e.pointerType === "touch") {
+      const tap = fingers.mode === "pending";
+      const events = fingers.up(e.pointerId, p);
+      if (tap && events.length > 0) markAt(landed.current);
+      return onFingers(events);
+    }
+    const held = press.current;
+    if (!held || held.id !== e.pointerId) return;
+    press.current = null;
+    const at = toPage(p, true) ?? held.at;
+    const mods = modifiersOf(e, remoteIsMac);
+    const moved = at.x !== held.at.x || at.y !== held.at.y;
+    send(moved ? [dragEvent(at, mods), releaseEvent(at, mods)] : [releaseEvent(at, mods)]);
+  };
+  // The system took the pointer away (a gesture, a lost capture): what was held is let go where it was.
+  const onPagePointerCancel = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "touch") {
+      // Each finger's capture also ends as it lifts: only a cancel ends the fingers' gesture.
+      if (e.type === "pointercancel") onFingers(fingers.cancel());
+      return;
+    }
+    const held = press.current;
+    if (!held || held.id !== e.pointerId) return;
+    press.current = null;
+    send([releaseEvent(held.at)]);
   };
 
   // What is shown of the page: nothing while it is closed, opening or hidden (only a stale frame is held).
@@ -481,11 +555,9 @@ export function BrowserCard({
   // stopped only then); anywhere else the wheel scrolls the conversation.
   const wheelTo = useRef<(e: globalThis.WheelEvent) => void>(() => {});
   wheelTo.current = (e) => {
-    const img = imgRef.current;
-    const meta = live.frame ? frameMetadata(live.frame) : undefined;
-    if (!capturing || !inControl || !img || !meta) return;
+    if (!capturing || !inControl || !imgRef.current || !live.frame) return;
     e.preventDefault();
-    const at = pagePoint({ x: e.clientX, y: e.clientY }, img.getBoundingClientRect(), meta);
+    const at = toPage({ x: e.clientX, y: e.clientY });
     if (at) send([wheelEvent(at, e.deltaX, e.deltaY)]);
   };
   // biome-ignore lint/correctness/useExhaustiveDependencies: the page element mounts with the first frame
@@ -498,7 +570,7 @@ export function BrowserCard({
   }, [Boolean(frame)]);
   useEffect(() => {
     if (!capturing) return;
-    const out = (e: PointerEvent) => {
+    const out = (e: globalThis.PointerEvent) => {
       if (!pageRef.current?.contains(e.target as Node)) setCapturing(false);
     };
     document.addEventListener("pointerdown", out, true);
@@ -508,7 +580,10 @@ export function BrowserCard({
     if (inControl) return;
     setCapturing(false);
     setHandingBack(false);
-  }, [inControl]);
+    press.current = null;
+    fingers.cancel();
+    setSliding(false);
+  }, [inControl, fingers]);
   useEffect(() => {
     if (handingBack) backRef.current?.focus();
   }, [handingBack]);
@@ -1014,6 +1089,11 @@ export function BrowserCard({
                 .join(" ")}
               tabIndex={inControl ? 0 : -1}
               onKeyDown={onPageKey}
+              onPointerDown={onPagePointerDown}
+              onPointerMove={onPagePointerMove}
+              onPointerUp={onPagePointerUp}
+              onPointerCancel={onPagePointerCancel}
+              onLostPointerCapture={onPagePointerCancel}
               onPaste={(e) => {
                 const pasted = e.clipboardData.getData("text");
                 if (pasted) {
@@ -1022,12 +1102,11 @@ export function BrowserCard({
                 }
               }}
             >
-              {/* biome-ignore lint/a11y/useKeyWithClickEvents: keys go through the page's own handler above */}
-              <img ref={imgRef} src={src} alt={t("browser.live.page", g)} draggable={false} onClick={onPageClick} />
+              <img ref={imgRef} src={src} alt={t("browser.live.page", g)} draggable={false} />
               {mark && <span key={mark.key} className="brw-mark" style={{ left: mark.x, top: mark.y }} />}
-              {capturing && (
+              {(sliding || capturing) && (
                 <span className="brw-ac__capture" role="status">
-                  {t("browser.inCard.scrollHint")}
+                  {sliding ? t("browser.inCard.touchHint") : t("browser.inCard.scrollHint")}
                 </span>
               )}
             </div>

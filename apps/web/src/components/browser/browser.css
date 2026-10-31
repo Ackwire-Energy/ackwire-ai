@@ -710,6 +710,15 @@
   box-shadow: var(--e2);
   pointer-events: none;
   white-space: nowrap;
+  max-width: calc(100% - 16px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* In control the pointer on the page is the page's: a finger drags or scrolls it, never the conversation, and a
+   drag past its edge selects nothing around it. */
+.brw-ac__page.is-control {
+  touch-action: none;
+  user-select: none;
 }
 .brw-ac__page.is-control img {
   cursor: pointer;
