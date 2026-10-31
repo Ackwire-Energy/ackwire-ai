@@ -4727,6 +4727,15 @@ p {
 [data-theme="dark"] .sidebar__item[data-status="active"] {
   background-image: var(--sel-sky-dark, none);
 }
+/* The role, lock or state at the row's end lands on the sky's deepest cells: it gets a plate in the item's
+   own color so it stays readable. */
+.sidebar__item[data-status="active"] > .sidebar__item-meta {
+  padding: 2px 6px;
+  margin-right: -4px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--side-active) 90%, transparent);
+  color: var(--ink);
+}
 /* The icon rail is too narrow for a horizon. */
 .sidebar[data-rail="true"] .sidebar__item[data-status="active"] {
   background-image: none;
@@ -9930,7 +9939,8 @@ html[data-menu-overlay] .shell {
   position: absolute;
   top: 50%;
   right: 4px;
-  transform: translateY(-50%);
+  /* `translate`, not `transform`: the button's press (`transform: scale(…)`) would drop the centering and jump it. */
+  translate: 0 -50%;
   opacity: 0;
   transition: opacity 0.15s;
 }
