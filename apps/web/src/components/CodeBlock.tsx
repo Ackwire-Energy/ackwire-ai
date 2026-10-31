@@ -1,6 +1,6 @@
 import { type CodeToken, codeLabel, highlightCode } from "@agenteschat/client/lib/code";
 import { Button, Dialog, DialogBody } from "@agenteschat/ui";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useGrowFrom } from "@/lib/grow";
 
@@ -8,14 +8,17 @@ import { useGrowFrom } from "@/lib/grow";
  * Fenced code in a message or document: the language on top, copy
  * (the icon turns into "Copiado" for a moment) and full screen. Full screen grows out of the card itself
  * into a dialog with line numbers and an optional wrap; Esc closes. Colors from the shared highlighter
- * (`@agenteschat/client/lib/code`, the phone app uses the same one).
+ * (`@agenteschat/client/lib/code`, the phone app uses the same one). `preview`: the block drawn (a diagram), shown
+ * in place of the code until "Código" is pressed; full screen shows whichever is on.
  */
-export function CodeBlock({ lang, text }: { lang: string; text: string }) {
+export function CodeBlock({ lang, text, preview }: { lang: string; text: string; preview?: ReactNode }) {
   const { t } = useTranslation();
   const lines = useMemo(() => highlightCode(text, lang), [text, lang]);
   const label = codeLabel(lang) || t("common.code");
   const [open, setOpen] = useState(false);
   const [wrap, setWrap] = useState(false);
+  const [code, setCode] = useState(false);
+  const drawing = code ? null : preview;
   const card = useRef<HTMLDivElement>(null);
   const remember = useGrowFrom(open, card, ".code-viewer");
   const expand = () => {
@@ -27,6 +30,11 @@ export function CodeBlock({ lang, text }: { lang: string; text: string }) {
     <div className="code-card" ref={card}>
       <div className="code-card__top">
         <span className="code-card__lang">{label}</span>
+        {preview && (
+          <Button variant="ghost" size="sm" aria-pressed={code} onClick={() => setCode((c) => !c)}>
+            {t("common.code")}
+          </Button>
+        )}
         <CopyCode text={text} />
         <Button
           variant="ghost"
@@ -38,11 +46,15 @@ export function CodeBlock({ lang, text }: { lang: string; text: string }) {
           onClick={expand}
         />
       </div>
-      <pre className="code-card__code">
-        <code>
-          <CodeLines lines={lines} />
-        </code>
-      </pre>
+      {drawing ? (
+        <div className="code-card__preview">{drawing}</div>
+      ) : (
+        <pre className="code-card__code">
+          <code>
+            <CodeLines lines={lines} />
+          </code>
+        </pre>
+      )}
       <Dialog
         open={open}
         onOpenChange={setOpen}
@@ -52,19 +64,25 @@ export function CodeBlock({ lang, text }: { lang: string; text: string }) {
         className="code-viewer"
         actions={
           <>
-            <Button variant="ghost" size="sm" aria-pressed={wrap} onClick={() => setWrap((w) => !w)}>
-              {t("common.wrapLines")}
-            </Button>
+            {!drawing && (
+              <Button variant="ghost" size="sm" aria-pressed={wrap} onClick={() => setWrap((w) => !w)}>
+                {t("common.wrapLines")}
+              </Button>
+            )}
             <CopyCode text={text} />
           </>
         }
       >
         <DialogBody className="code-viewer__body">
-          <pre className="code-viewer__code" data-wrap={wrap}>
-            <code>
-              <CodeLines lines={lines} numbered />
-            </code>
-          </pre>
+          {drawing ? (
+            <div className="code-viewer__preview">{drawing}</div>
+          ) : (
+            <pre className="code-viewer__code" data-wrap={wrap}>
+              <code>
+                <CodeLines lines={lines} numbered />
+              </code>
+            </pre>
+          )}
         </DialogBody>
       </Dialog>
     </div>

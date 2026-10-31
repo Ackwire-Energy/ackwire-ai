@@ -1,10 +1,15 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import { cleanup, render } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
+import { Glob } from "bun";
 import { MessageBody } from "@/chat/MessageBody";
+import { setMermaidRenderer } from "@/components/artifacts/Mermaid";
+import { createI18n } from "@/i18n";
 import { Markdown, renderInline } from "@/lib/markdown";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -172,5 +177,105 @@ describe("streaming words", () => {
       "Agora",
       "escrevendo",
     ]);
+  });
+});
+
+describe("```mermaid fences", () => {
+  /** The sources the page asked to draw (the fake stands in for mermaid, which needs a browser's layout). */
+  const asked: string[] = [];
+  beforeAll(() => createI18n("pt-BR"));
+  afterAll(() => setMermaidRenderer(null));
+  beforeEach(() => {
+    asked.length = 0;
+    // Set again for each test: that also forgets what the last test drew.
+    setMermaidRenderer(async (_id, source) => {
+      asked.push(source);
+      if (source.includes("-->>")) throw new Error("Parse error on line 2");
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="100%" style="max-width: 640px;" viewBox="-8 -8 640 120"><text>${source.length}</text></svg>`;
+    });
+  });
+
+  const FLOW = "flowchart LR\n  A[Pedido] --> B{Aprovado?}\n  B -- sim --> C[Deploy]";
+  const fence = (source: string) => `\`\`\`mermaid\n${source}\n\`\`\``;
+  const svgOf = (img: Element | null) => {
+    const src = img?.getAttribute("src") ?? "";
+    return decodeURIComponent(src.slice(src.indexOf(",") + 1));
+  };
+
+  test("drawn in its code card at its own size; Código shows the source, copy stays", async () => {
+    const el = render(<Markdown source={`O fluxo:\n\n${fence(FLOW)}`} />).container;
+    await settle();
+    const img = el.querySelector(".code-card__preview img");
+    expect(img?.getAttribute("alt")).toBe("Diagrama");
+    expect(img?.getAttribute("src")?.startsWith("data:image/svg+xml")).toBe(true);
+    // Its own size, not its box's width ("100%"); the card fits it down to 60% of that (`--w`), then it scrolls.
+    expect(svgOf(img)).toContain('width="640" height="120"');
+    expect((img as HTMLElement).style.getPropertyValue("--w")).toBe("640px");
+    expect(el.querySelector(".code-card__code")).toBeNull();
+    const card = el.querySelector(".code-card") as HTMLElement;
+    expect(card.querySelector(".code-card__lang")?.textContent).toBe("Mermaid");
+    expect(within(card).getByRole("button", { name: "Copiar" })).toBeTruthy();
+    const code = within(card).getByRole("button", { name: "Código" });
+    await act(async () => fireEvent.click(code));
+    expect(code.getAttribute("aria-pressed")).toBe("true");
+    expect(card.querySelector(".code-card__preview")).toBeNull();
+    expect(card.querySelector(".code-card__code")?.textContent).toBe(FLOW);
+    expect(asked).toEqual([FLOW]);
+  });
+
+  test("one that doesn't parse stays a code block: no image, no error", async () => {
+    const bad = "sequenceDiagram\n  Ana-->>";
+    const el = render(<MessageBody body={`Tentei:\n\n${fence(bad)}`} />).container;
+    await settle();
+    expect(asked).toEqual([bad]);
+    expect(el.querySelector("img")).toBeNull();
+    expect(el.querySelector(".code-card__code")?.textContent).toBe(bad);
+    expect(within(el).queryByRole("button", { name: "Código" })).toBeNull();
+    expect(el.querySelector(".artifact-diagram")).toBeNull();
+    expect(el.textContent).not.toContain("Não foi possível");
+  });
+
+  test("while an answer streams its last block stays code, open or closed; the finished message draws it", async () => {
+    const view = render(<MessageBody body={`Olha o fluxo:\n\n\`\`\`mermaid\n${FLOW}`} live />);
+    await settle();
+    const el = view.container;
+    expect(el.querySelector(".md--tail .code-card__code")?.textContent).toBe(FLOW);
+    view.rerender(<MessageBody body={`Olha o fluxo:\n\n${fence(FLOW)}`} live />);
+    await settle();
+    expect(el.querySelector(".md--tail .code-card__code")?.textContent).toBe(FLOW);
+    expect(el.querySelector("img")).toBeNull();
+    expect(asked).toEqual([]);
+    view.rerender(<MessageBody body={`Olha o fluxo:\n\n${fence(FLOW)}`} />);
+    await settle();
+    expect(el.querySelector(".code-card__preview img")).not.toBeNull();
+    expect(asked).toEqual([FLOW]);
+  });
+
+  test("a closed fence the answer has moved past is drawn while it streams, once", async () => {
+    const answer = `Olha o fluxo:\n\n${fence(FLOW)}\n\nDepois do deploy`;
+    const view = render(<MessageBody body={answer} live />);
+    await settle();
+    expect(view.container.querySelector(".code-card__preview img")).not.toBeNull();
+    view.rerender(<MessageBody body={`${answer} eu aviso.`} live />);
+    await settle();
+    // The finished message takes the live row's place: the drawing is reused, not made again.
+    view.unmount();
+    const done = render(<MessageBody body={`${answer} eu aviso.`} />).container;
+    expect(done.querySelector(".code-card__preview img")).not.toBeNull();
+    expect(asked).toEqual([FLOW]);
+  });
+
+  test("a page with no mermaid fence never loads mermaid", async () => {
+    render(<Markdown source={"# Notas\n\nTexto.\n\n```ts\nconst a = 1;\n```\n\n- item"} />);
+    render(<MessageBody body={"Oi **time**\n\n```\nflowchart LR\n  A --> B\n```"} />);
+    await settle();
+    expect(asked).toEqual([]);
+    expect(document.querySelector("img")).toBeNull();
+    // Nothing imports mermaid up front: only the renderer loads it, with import(), when a diagram is drawn.
+    const src = join(import.meta.dir, "..", "src");
+    const upFront = [...new Glob("**/*.{ts,tsx}").scanSync(src)].filter((f) =>
+      /^\s*import\s+(?!type\b)[^;(]*["']mermaid["']/m.test(readFileSync(join(src, f), "utf8")),
+    );
+    expect(upFront).toEqual([]);
   });
 });

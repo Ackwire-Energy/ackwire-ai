@@ -1,5 +1,6 @@
 import { headingId, INLINE, MENTION, parseMarkdown, parseWikiToken, SAFE_URL } from "@agenteschat/client/lib/markdown";
 import { type ReactNode, useMemo } from "react";
+import { MermaidOrCode } from "@/components/artifacts/Mermaid";
 import { ChartOrCode } from "@/components/ChartBlock";
 import { CodeBlock } from "@/components/CodeBlock";
 
@@ -183,12 +184,14 @@ export function Markdown({
       }
       case "paragraph":
         return <p key={k}>{inline(b.text, k)}</p>;
-      case "code":
-        return b.lang.toLowerCase() === "chart" ? (
-          <ChartOrCode key={k} text={b.text} writing={Boolean(words)} />
-        ) : (
-          <CodeBlock key={k} lang={b.lang} text={b.text} />
-        );
+      case "code": {
+        const lang = b.lang.toLowerCase();
+        if (lang === "chart") return <ChartOrCode key={k} text={b.text} writing={Boolean(words)} />;
+        // Drawn once its block is done: the tail of an answer still being written (its fence maybe still open)
+        // keeps the code, so the diagram isn't drawn again on every word.
+        if (lang === "mermaid" && !words) return <MermaidOrCode key={k} text={b.text} />;
+        return <CodeBlock key={k} lang={b.lang} text={b.text} />;
+      }
       case "list": {
         const L = b.ordered ? "ol" : "ul";
         return (
