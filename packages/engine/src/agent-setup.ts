@@ -27,18 +27,28 @@ import { caches } from "./cache";
 import { ValidationError } from "./errors";
 import { defaultAccountLabel, listMachineAccounts, type MachineAccountView } from "./machine-accounts";
 import { getMachine } from "./machines";
+import { setAgentMissionApproval } from "./mission-settings";
+import {
+  agentMissionApproval,
+  type CommandApproval,
+  DEFAULT_MISSION_COMMAND_APPROVAL,
+  isCommandApproval,
+} from "./missions";
 import { can, requirePermission } from "./organizations";
 
 /*
- * One agent's "Quem pensa" on others (ADR 0089): "Usar em outros agentes" applies it to each agent picked, by that
- * agent's own rules (who may change it, whose plan thinks for it), and says why the others can't take it. The last one
- * saved or used on others is what new agents start with (`rememberAgentSetup`).
+ * One agent's "Quem pensa" and its Autonomia on others (ADR 0089): "Usar em outros agentes" applies them to each agent
+ * picked, by that agent's own rules (who may change it, whose plan thinks for it), and says why the others can't take
+ * them. The last one saved or used on others is what new agents start with (`rememberAgentSetup`).
  */
 
 /** At most this many agents in one call. */
 export const SETUP_AGENTS_MAX = 200;
 
-/** A setup as "Quem pensa" chose it; `onlyOwner` ("Atende outras pessoas" off) only where it moves onto the plan. */
+/**
+ * A setup as "Quem pensa" chose it; `onlyOwner` ("Atende outras pessoas" off) only where it moves onto the plan;
+ * `autonomy`, the agent's Autonomia, goes with it (left out, each agent keeps its own).
+ */
 export interface AgentSetupInput {
   brain?: unknown;
   model?: unknown;
@@ -49,9 +59,10 @@ export interface AgentSetupInput {
   contextTokens?: unknown;
   fallback?: unknown;
   onlyOwner?: unknown;
+  autonomy?: unknown;
 }
 
-type Setup = schema.AgentSetup & { onlyOwner?: boolean };
+type Setup = schema.AgentSetup & { onlyOwner?: boolean; autonomy?: CommandApproval };
 
 /** Why an agent can't take the setup. */
 export type SetupReason =
@@ -71,12 +82,14 @@ export type SetupReason =
 
 export interface SetupResult {
   agentId: string;
-  /** `applied` (in a preview, would be); `same`: it already thinks this way; `skipped`: it can't take it. */
+  /** Its AI: `applied` (in a preview, would be); `same`: it already thinks this way; `skipped`: it can't take it. */
   status: "applied" | "same" | "skipped";
   /** It takes the rest with the account it has (another person's plan): its name, null for its computer's own. */
   keeps?: { account: string | null };
   reason?: SetupReason;
   params?: Record<string, string>;
+  /** Its Autonomia changes (in a preview, would), whatever its AI does. */
+  autonomy?: { from: CommandApproval; to: CommandApproval };
 }
 
 const nullableId = (v: unknown, what: string): string | null => {
@@ -92,6 +105,10 @@ function readSetup(input: AgentSetupInput): Setup {
   if (contextTokens !== null && !isContextLimit(contextTokens)) {
     throw new ValidationError("Choose 200000, 400000 or 1000000 tokens", "brain.invalid_context");
   }
+  if (input.autonomy !== undefined && !isCommandApproval(input.autonomy)) {
+    throw new ValidationError("Choose always, low_risk_auto or never", "mission.invalid_command_approval");
+  }
+  const autonomy = isCommandApproval(input.autonomy) ? { autonomy: input.autonomy } : {};
   if (input.brain === "model") {
     if (typeof input.model !== "string" || !input.model) {
       throw new ValidationError("The API brain needs a model", "brain.invalid_model");
@@ -101,6 +118,7 @@ function readSetup(input: AgentSetupInput): Setup {
       model: input.model,
       ...(input.key !== undefined ? { key: nullableId(input.key, "key") } : {}),
       contextTokens,
+      ...autonomy,
     };
   }
   const machineId = nullableId(input.machineId, "machineId");
@@ -122,6 +140,7 @@ function readSetup(input: AgentSetupInput): Setup {
     contextTokens,
     fallback: (input.fallback as boolean | undefined) ?? true,
     ...(input.onlyOwner !== undefined ? { onlyOwner: input.onlyOwner as boolean } : {}),
+    ...autonomy,
   };
 }
 
@@ -169,8 +188,10 @@ class PreviewOnly extends Error {}
 
 /**
  * `POST …/agent-setup`: the setup on each agent picked, in the order asked, each by its own rules and in its own
- * savepoint, audited as its own change (`agent.brain` with `via: "setup"`). With `preview`, the same run rolled back:
- * what each would do, nothing kept. Taken whole by one of them, it is what new agents start with.
+ * savepoint, audited as its own change (`agent.brain`, `agent.mission_command_approval`, with `via: "setup"`). Its
+ * Autonomia goes to every agent the person may set it on by hand, through the editor that sets it on one agent ("Usar
+ * como padrão": an admin or the agent's owner), even one that can't take the AI. With `preview`, the same run rolled
+ * back: what each would do, nothing kept. Taken whole by one of them, it is what new agents start with.
  */
 export async function applyAgentSetup(
   deps: { db: Database },
@@ -245,24 +266,40 @@ export async function applyAgentSetup(
       if (input.preview) await tx.execute(sql`set local lock_timeout = '1s'`);
       for (const t of targets) {
         const p = plan(t);
-        if (p.status !== "applied") {
+        const from = agentMissionApproval(t);
+        // Its Autonomia wherever the person may set it by hand, whatever its AI can take.
+        const mayManage = admin || t.ownerUserId === userId;
+        const autonomy = mayManage && setup.autonomy && setup.autonomy !== from ? setup.autonomy : null;
+        if (p.status !== "applied" && !autonomy) {
           results.set(t.id, { agentId: t.id, ...p });
           continue;
         }
         try {
           await tx.transaction(async (sp) => {
-            if (p.patch) await updateAgent(sp, userId, orgId, t.id, p.patch, { remember: false });
-            await setAgentBrain({ db: sp }, userId, orgId, t.id, p.brain, { remember: false, audit: { via: "setup" } });
+            if (p.status === "applied") {
+              if (p.patch) await updateAgent(sp, userId, orgId, t.id, p.patch, { remember: false });
+              await setAgentBrain({ db: sp }, userId, orgId, t.id, p.brain, {
+                remember: false,
+                audit: { via: "setup" },
+              });
+            }
+            if (autonomy) {
+              await setAgentMissionApproval({ db: sp }, userId, orgId, t.id, autonomy, { audit: { via: "setup" } });
+            }
           });
           applied.push(t.id);
-          results.set(t.id, { agentId: t.id, status: "applied", ...(p.keeps ? { keeps: p.keeps } : {}) });
+          const ai = p.status === "applied" ? { status: p.status, ...(p.keeps ? { keeps: p.keeps } : {}) } : p;
+          results.set(t.id, { agentId: t.id, ...ai, ...(autonomy ? { autonomy: { from, to: autonomy } } : {}) });
         } catch (error) {
           results.set(t.id, { agentId: t.id, status: "skipped", ...refusal(error) });
         }
       }
       if (input.preview) throw new PreviewOnly();
-      // What one of them took whole, as saved (not one that kept its own account).
-      const whole = applied.find((id) => !results.get(id)?.keeps);
+      // What one of them took whole, as saved (not one that kept its own account or took only the Autonomia).
+      const whole = applied.find((id) => {
+        const r = results.get(id);
+        return r?.status !== "skipped" && !r?.keeps;
+      });
       const [saved] = whole
         ? await tx
             .select()
@@ -413,6 +450,8 @@ export interface NewAgentSetup {
   ownSignIn?: boolean;
   effort?: BrainEffortSetting | null;
   fallback?: boolean;
+  /** Its Autonomia; null: the default. Set at creation only by an admin or the new agent's owner (`createAgent`). */
+  autonomy: CommandApproval | null;
 }
 
 /** `GET …/agent-setup` (whoever creates agents): what a new agent starts thinking with. */
@@ -429,6 +468,7 @@ export async function getNewAgentSetup(
   const s = row?.setup;
   if (!s || !isBrainKind(s.brain)) return null;
   const contextTokens = isContextLimit(s.contextTokens) ? s.contextTokens : null;
+  const autonomy = isCommandApproval(s.autonomy) && s.autonomy !== DEFAULT_MISSION_COMMAND_APPROVAL ? s.autonomy : null;
   if (s.brain === "model") {
     const [key] = s.key
       ? await deps.db
@@ -442,7 +482,7 @@ export async function getNewAgentSetup(
             ),
           )
       : [];
-    return { brain: "model", model: s.model, key: key?.id ?? null, contextTokens };
+    return { brain: "model", model: s.model, key: key?.id ?? null, contextTokens, autonomy };
   }
   const machine = s.machineId ? await getMachine(deps.db, orgId, s.machineId) : null;
   if (!machine || !brainOptions(machine).some((o) => o.kind === s.brain && o.available)) return null;
@@ -468,5 +508,6 @@ export async function getNewAgentSetup(
     ownSignIn: machine.pairedByUserId === userId,
     effort: isBrainEffortSetting(s.effort) ? s.effort : null,
     fallback: s.fallback ?? true,
+    autonomy,
   };
 }

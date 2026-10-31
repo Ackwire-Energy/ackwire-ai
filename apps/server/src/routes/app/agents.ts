@@ -72,6 +72,7 @@ import {
   BrainEffortSetting,
   BrainKind,
   BrainMachine,
+  CommandApproval,
   ContextLimit,
   Credential,
   FormerAgent,
@@ -540,6 +541,10 @@ export function agentRoutes(deps: AppDeps) {
             proposal: z.uuid().optional().openapi({
               description: "The card of an agent's proposal it comes from (ADR 0081): it is marked created.",
             }),
+            autonomy: CommandApproval.optional().openapi({
+              description:
+                "The Autonomia it starts with (ADR 0089, the last setup's): only from an admin or its own owner, else 403. Default: low_risk_auto.",
+            }),
           }),
         ),
       },
@@ -909,7 +914,7 @@ export function agentRoutes(deps: AppDeps) {
       tags,
       security,
       summary:
-        'What a new agent starts thinking with (ADR 0089): the last "Quem pensa" someone saved or used on other agents, as it stands now. Whoever creates agents.',
+        'What a new agent starts thinking with (ADR 0089): the last "Quem pensa" someone saved or used on other agents, with its Autonomia, as it stands now. Whoever creates agents.',
       request: { params: OrgParams },
       responses: { 200: json(z.object({ setup: NewAgentSetup.nullable() })), ...errors },
     }),
@@ -926,7 +931,7 @@ export function agentRoutes(deps: AppDeps) {
       tags,
       security,
       summary:
-        'Use one agent\'s "Quem pensa" on these agents (ADR 0089), each by its own rules: who may change it, whose plan thinks for it. Each change is audited as its own (`agent.brain`, `via: setup`); `preview` says what each would do and keeps nothing. Applied, it is what new agents start with.',
+        'Use one agent\'s "Quem pensa" and its Autonomia on these agents (ADR 0089), each by its own rules: who may change it, whose plan thinks for it. Each change is audited as its own (`agent.brain`, `agent.mission_command_approval`, `via: setup`); `preview` says what each would do and keeps nothing. Applied, it is what new agents start with.',
       request: {
         params: OrgParams,
         body: body(

@@ -537,6 +537,11 @@ export const ContextLimit = z
   .literal(CONTEXT_LIMITS)
   .openapi("ContextLimit", { description: "The most context an agent reads, in tokens: 200000, 400000 or 1000000." });
 
+export const CommandApproval = z.enum(["always", "low_risk_auto", "never"]).openapi({
+  description:
+    '"Pedir aprovação de comandos": always (every command off the allow list asks), low_risk_auto (the judge allows low-risk ones within what code allows) or never (everything but the deny list).',
+});
+
 export const AccountKind = z.enum(ACCOUNT_KINDS).openapi("AccountKind");
 
 export const MachineAccount = z
@@ -619,6 +624,10 @@ export const AgentBrain = z
     ownUsage: z
       .object({ claude_code: PlanUsage.optional(), codex: PlanUsage.optional() })
       .openapi({ description: "The computer's own sign-ins' usage limits, by brain (absent: not known)." }),
+    autonomy: CommandApproval.openapi({
+      description:
+        'Its Autonomia: the autonomy its new missions start with ("Usar como padrão"), copied with its setup.',
+    }),
   })
   .openapi("AgentBrain");
 
@@ -646,6 +655,10 @@ export const AgentSetup = z
       description:
         '"Atende outras pessoas" off, for the agents that move onto the plan (only the plan\'s owner turns it on).',
     }),
+    autonomy: CommandApproval.optional().openapi({
+      description:
+        "Its Autonomia, set on the agents that take the rest or already think this way, where the caller may set it by hand (an admin or the agent's owner); omitted = each agent keeps its own.",
+    }),
   })
   .openapi("AgentSetup");
 
@@ -654,7 +667,10 @@ export const AgentSetupResult = z
     agentId: z.uuid(),
     status: z.enum(["applied", "same", "skipped"]).openapi({
       description:
-        "`applied` (in a preview: would be); `same`: it already thinks this way; `skipped`: it can't take it.",
+        "Its AI: `applied` (in a preview: would be); `same`: it already thinks this way; `skipped`: it takes nothing.",
+    }),
+    autonomy: z.object({ from: CommandApproval, to: CommandApproval }).optional().openapi({
+      description: "Its Autonomia changes too (in a preview: would): with the AI it takes, or alone when `same`.",
     }),
     keeps: z.object({ account: z.string().nullable() }).optional().openapi({
       description: "It keeps the account it has (another person's plan): its name; null = its computer's own.",
@@ -699,6 +715,10 @@ export const NewAgentSetup = z
       .openapi({ description: "The computer's own sign-in thinks for the caller's agents (they connected it)." }),
     effort: BrainEffortSetting.nullable().optional(),
     fallback: z.boolean().optional(),
+    autonomy: CommandApproval.nullable().openapi({
+      description:
+        "Its Autonomia; null = the default. `POST …/agents` takes it only from an admin or the new agent's owner.",
+    }),
   })
   .openapi("NewAgentSetup", {
     description: "What a new agent starts thinking with (ADR 0089): the last setup saved or used on other agents.",

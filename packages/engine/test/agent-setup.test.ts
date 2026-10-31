@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { ACCOUNTS_PROTOCOL } from "@agenteschat/adapters";
-import { and, eq, schema, sql } from "@agenteschat/db";
+import { and, eq, inArray, schema, sql } from "@agenteschat/db";
 import {
   applyAgentSetup,
   createAgent,
@@ -11,6 +11,7 @@ import {
   type SetupResult,
   setAgentBrain,
   updateAgent,
+  ValidationError,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
@@ -167,6 +168,7 @@ describe("Usar em outros agentes", () => {
       effort: "high",
       contextTokens: null,
       fallback: true,
+      autonomy: null,
     });
     // Again: they already think so.
     const again = await applyAgentSetup(deps, fx.owner.id, fx.org.id, { setup: ANA_CLAUDE(w.mac), agentIds: [w.dev] });
@@ -228,6 +230,7 @@ describe("Usar em outros agentes", () => {
       model: "claude-opus-5-5",
       key: fx.credential.id,
       contextTokens: null,
+      autonomy: null,
     });
 
     // Ana's plan is hers to give: an admin can't give it, and it thinks only for her agents.
@@ -288,6 +291,7 @@ describe("new agents start with the last setup", () => {
       ownSignIn: true,
       effort: "high",
       fallback: true,
+      autonomy: null,
     });
     // Anyone else sees whose it is: a plan thinks only for its owner's agents.
     expect((await getNewAgentSetup(deps, caio.id, fx.org.id))?.account).toMatchObject({ mine: false });
@@ -300,6 +304,7 @@ describe("new agents start with the last setup", () => {
       model: "claude-haiku-5-5",
       key: null,
       contextTokens: null,
+      autonomy: null,
     });
     // Used on others, the setup itself.
     await applyAgentSetup(deps, fx.owner.id, fx.org.id, { setup: ANA_CLAUDE(w.mac), agentIds: [w.theo] });
@@ -327,7 +332,13 @@ describe("new agents start with the last setup", () => {
     await make("eva");
     expect(await w.stored()).toBeNull();
     await make("ivo", "claude-haiku-5-5");
-    expect(await w.stored()).toEqual({ brain: "model", model: "claude-haiku-5-5", key: null, contextTokens: null });
+    expect(await w.stored()).toEqual({
+      brain: "model",
+      model: "claude-haiku-5-5",
+      key: null,
+      contextTokens: null,
+      autonomy: null,
+    });
     await make("rui", "claude-opus-5-5", false);
     expect((await w.stored())?.model).toBe("claude-haiku-5-5");
   });
@@ -359,5 +370,157 @@ describe("new agents start with the last setup", () => {
       },
     );
     expect(await w.stored()).toMatchObject({ brain: "claude_code", account: BIAS });
+  });
+});
+
+describe("the Autonomia goes with the setup", () => {
+  const autonomyAudits = (w: Awaited<ReturnType<typeof world>>, id: string) =>
+    w.fx.db
+      .select()
+      .from(schema.auditLog)
+      .where(and(eq(schema.auditLog.action, "agent.mission_command_approval"), eq(schema.auditLog.targetId, id)));
+
+  test("the preview says each agent's change; one that can't take the AI still takes the Autonomia", async () => {
+    const w = await world();
+    const { fx, deps } = w;
+    await fx.db
+      .update(schema.agents)
+      .set({ missionCommandApproval: "always" })
+      .where(inArray(schema.agents.id, [w.theo, w.lia]));
+    const setup = { ...ANA_CLAUDE(w.mac), autonomy: "never" };
+    const ids = [w.dev, w.theo, w.lia, w.zoe];
+    const onPc = { agentId: w.lia, status: "skipped", reason: "other_computer", params: { computer: "PC" } } as const;
+    const expected: SetupResult[] = [
+      { agentId: w.dev, status: "applied", autonomy: { from: "low_risk_auto", to: "never" } },
+      { agentId: w.theo, status: "applied", autonomy: { from: "always", to: "never" } },
+      { ...onPc, autonomy: { from: "always", to: "never" } },
+      {
+        agentId: w.zoe,
+        status: "skipped",
+        reason: "model_missing",
+        params: { plan: "GLM Coding", model: "Opus" },
+        autonomy: { from: "low_risk_auto", to: "never" },
+      },
+    ];
+    expect(await applyAgentSetup(deps, fx.owner.id, fx.org.id, { setup, agentIds: ids, preview: true })).toEqual(
+      expected,
+    );
+    expect(await w.row(w.dev)).toMatchObject({ missionCommandApproval: null });
+    expect(await autonomyAudits(w, w.dev)).toHaveLength(0);
+
+    expect(await applyAgentSetup(deps, fx.owner.id, fx.org.id, { setup, agentIds: ids })).toEqual(expected);
+    for (const id of ids) {
+      expect(await w.row(id)).toMatchObject({ missionCommandApproval: "never" });
+      // Set by the editor of one agent's Autonomia, audited as its own change.
+      const [audit] = await autonomyAudits(w, id);
+      expect(audit?.details).toMatchObject({ to: "never", via: "setup" });
+    }
+    // Lia and Zoe keep their AI.
+    expect(await w.row(w.lia)).toMatchObject({ brain: "model", machineId: w.pc });
+    expect(await w.row(w.zoe)).toMatchObject({ brainAccountId: BIAS, brainModel: null });
+    expect(await w.stored()).toMatchObject({ account: ANAS, autonomy: "never" });
+    expect(await getNewAgentSetup(deps, fx.owner.id, fx.org.id)).toMatchObject({ autonomy: "never" });
+    // Only the Autonomia taken is not a setup new agents start with.
+    const always = { ...setup, autonomy: "always" };
+    expect(await applyAgentSetup(deps, fx.owner.id, fx.org.id, { setup: always, agentIds: [w.lia] })).toEqual([
+      { ...onPc, autonomy: { from: "never", to: "always" } },
+    ]);
+    expect(await w.stored()).toMatchObject({ autonomy: "never" });
+
+    // Already thinking this way, it takes the Autonomia alone.
+    await fx.db.update(schema.agents).set({ missionCommandApproval: "always" }).where(eq(schema.agents.id, w.dev));
+    expect(await applyAgentSetup(deps, fx.owner.id, fx.org.id, { setup, agentIds: [w.dev] })).toEqual([
+      { agentId: w.dev, status: "same", autonomy: { from: "always", to: "never" } },
+    ]);
+    expect(await applyAgentSetup(deps, fx.owner.id, fx.org.id, { setup, agentIds: [w.dev] })).toEqual([
+      { agentId: w.dev, status: "same" },
+    ]);
+    // Left out of the setup, each keeps its own; the default is no Autonomia for new agents to start with.
+    expect(
+      await applyAgentSetup(deps, fx.owner.id, fx.org.id, { setup: ANA_CLAUDE(w.mac), agentIds: [w.dev] }),
+    ).toEqual([{ agentId: w.dev, status: "same" }]);
+    await applyAgentSetup(deps, fx.owner.id, fx.org.id, {
+      setup: { ...setup, autonomy: "low_risk_auto" },
+      agentIds: [w.dev],
+    });
+    expect(await w.stored()).toMatchObject({ autonomy: "low_risk_auto" });
+    expect(await getNewAgentSetup(deps, fx.owner.id, fx.org.id)).toMatchObject({ autonomy: null });
+  });
+
+  test("only where the person may set it by hand: a member on their own agents, an admin on anyone's", async () => {
+    const w = await world();
+    const { fx, deps, bia, caio } = w;
+    const glm = {
+      brain: "claude_code",
+      machineId: w.mac,
+      account: BIAS,
+      model: null,
+      effort: "high",
+      autonomy: "never",
+    };
+    expect(await applyAgentSetup(deps, bia.id, fx.org.id, { setup: glm, agentIds: [w.dev, w.zoe] })).toEqual([
+      { agentId: w.dev, status: "skipped", reason: "not_allowed" },
+      { agentId: w.zoe, status: "applied", autonomy: { from: "low_risk_auto", to: "never" } },
+    ]);
+    expect(await w.row(w.dev)).toMatchObject({ missionCommandApproval: null });
+    expect(await w.row(w.zoe)).toMatchObject({ missionCommandApproval: "never" });
+    const api = { brain: "model", model: "claude-opus-5-5", autonomy: "always" };
+    expect(await applyAgentSetup(deps, caio.id, fx.org.id, { setup: api, agentIds: [w.zoe] })).toEqual([
+      { agentId: w.zoe, status: "applied", autonomy: { from: "never", to: "always" } },
+    ]);
+    expect(await w.row(w.zoe)).toMatchObject({ missionCommandApproval: "always" });
+    // Bia's own agent takes it even where its AI can't; Ana's takes nothing from her.
+    const onPc = { brain: "claude_code", machineId: w.pc, account: null, autonomy: "never" };
+    expect(await applyAgentSetup(deps, bia.id, fx.org.id, { setup: onPc, agentIds: [w.dev, w.zoe] })).toEqual([
+      { agentId: w.dev, status: "skipped", reason: "not_allowed" },
+      {
+        agentId: w.zoe,
+        status: "skipped",
+        reason: "other_computer",
+        params: { computer: "MacBook" },
+        autonomy: { from: "always", to: "never" },
+      },
+    ]);
+    expect(await w.row(w.dev)).toMatchObject({ missionCommandApproval: null });
+    await expect(
+      applyAgentSetup(deps, caio.id, fx.org.id, { setup: { ...api, autonomy: "sometimes" }, agentIds: [w.zoe] }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  test("a new agent starts with an Autonomia only from an admin or its own owner", async () => {
+    const w = await world();
+    const { fx, bia } = w;
+    await fx.db
+      .update(schema.orgRoles)
+      .set({ permissions: sql`array_append(${schema.orgRoles.permissions}, 'create_agents')` })
+      .where(and(eq(schema.orgRoles.orgId, fx.org.id), eq(schema.orgRoles.kind, "everyone")));
+    const make = (by: string, handle: string, ownerUserId?: string | null) =>
+      createAgent(
+        fx.db,
+        by,
+        fx.org.id,
+        {
+          name: handle,
+          handle,
+          model: "claude-haiku-5-5",
+          ...(ownerUserId !== undefined ? { ownerUserId } : {}),
+          autonomy: "never",
+        },
+        NEW_AGENT_DEFAULTS,
+        { remember: true },
+      );
+    expect((await make(bia.id, "ivo")).missionCommandApproval).toBe("never");
+    // Someone else's agent, or nobody's: she couldn't set it there by hand.
+    await expect(make(bia.id, "rui", fx.owner.id)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(make(bia.id, "lua", null)).rejects.toBeInstanceOf(ForbiddenError);
+    const eva = await make(fx.owner.id, "eva", bia.id);
+    expect(eva.missionCommandApproval).toBe("never");
+    const [created] = await fx.db
+      .select()
+      .from(schema.auditLog)
+      .where(and(eq(schema.auditLog.action, "agent.created"), eq(schema.auditLog.targetId, eva.id)));
+    expect(created?.details).toMatchObject({ autonomy: "never" });
+    // Created on a model picked, it is the last setup, with its Autonomia.
+    expect(await w.stored()).toMatchObject({ model: "claude-haiku-5-5", autonomy: "never" });
   });
 });

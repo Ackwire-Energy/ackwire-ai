@@ -242,14 +242,14 @@ export const organizationSettings = pgTable("organization_settings", {
    * (`{ openrouter: { small, medium, large } }`); a tier left out is the provider's default (ADR 0087).
    */
   autoModels: jsonb().$type<Partial<Record<string, Partial<Record<string, string>>>>>().notNull().default({}),
-  /** What a new agent starts thinking with (ADR 0089); null = "Automático" on the API. */
+  /** What a new agent starts thinking with, and its Autonomia (ADR 0089); null = "Automático" on the API. */
   agentSetup: jsonb().$type<AgentSetup>(),
   updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });
 
 /**
- * An agent's "Quem pensa" as a value (ADR 0089): the last one someone saved, or used on other agents, is what new
- * agents start with. Validated in code (`agent-setup.ts`).
+ * An agent's "Quem pensa" and its Autonomia as a value (ADR 0089): the last one someone saved, or used on other
+ * agents, is what new agents start with. Validated in code (`agent-setup.ts`).
  */
 export interface AgentSetup {
   brain: "model" | "claude_code" | "codex";
@@ -263,4 +263,6 @@ export interface AgentSetup {
   effort?: string | null;
   contextTokens?: number | null;
   fallback?: boolean;
+  /** Its Autonomia (`agents.mission_command_approval`); null: the default. */
+  autonomy?: string | null;
 }

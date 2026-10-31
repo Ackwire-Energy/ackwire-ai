@@ -5,7 +5,8 @@ import { recordAudit } from "./audit";
 import { isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
 import { modelInfoFor } from "./credentials";
-import { ConflictError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
+import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
+import type { CommandApproval } from "./missions";
 import { recordOperatorEvent } from "./operator-events";
 import { can, getMembership, type Membership, requirePermission } from "./organizations";
 import { DEFAULT_AGENT_SCOPES, grantScopes } from "./tools/scopes";
@@ -70,12 +71,13 @@ export async function validateAgentFields(db: Database, orgId: string, input: Pa
 export const NEW_AGENT_DEFAULTS = { model: AUTO_MODEL } as const;
 
 /**
- * An agent's "Quem pensa" as new agents take it (ADR 0089). Who it answers stays out: a new agent on a plan answers
- * only its owner (ADR 0059 §5).
+ * An agent's "Quem pensa" and its Autonomia as new agents take them (ADR 0089). Who it answers stays out: a new agent
+ * on a plan answers only its owner (ADR 0059 §5).
  */
 export function setupOfAgent(a: Agent): schema.AgentSetup {
+  const autonomy = a.missionCommandApproval;
   if (!isComputerBrain(a.brain)) {
-    return { brain: "model", model: a.model, key: a.credentialId, contextTokens: a.contextTokens };
+    return { brain: "model", model: a.model, key: a.credentialId, contextTokens: a.contextTokens, autonomy };
   }
   return {
     brain: a.brain,
@@ -85,6 +87,7 @@ export function setupOfAgent(a: Agent): schema.AgentSetup {
     effort: a.brainEffort,
     contextTokens: a.contextTokens,
     fallback: a.brainFallback,
+    autonomy,
   };
 }
 
@@ -108,13 +111,19 @@ export async function createAgent(
   db: Database,
   actorId: string,
   orgId: string,
-  input: AgentInput,
+  input: AgentInput & { autonomy?: CommandApproval },
   defaults: { model: string },
   options: { remember?: boolean } = {},
 ): Promise<Agent> {
   const membership = await requirePermission(db, actorId, orgId, "create_agents");
-  const values = { ...input, handle: input.handle.toLowerCase(), model: input.model ?? defaults.model };
+  const { autonomy, ...fields } = input;
+  const values = { ...fields, handle: fields.handle.toLowerCase(), model: fields.model ?? defaults.model };
   await validateAgentFields(db, orgId, values);
+  const ownerUserId = input.ownerUserId === undefined ? actorId : input.ownerUserId;
+  // The Autonomia it starts with, only from someone who may set it on the agent: an admin or its owner.
+  if (autonomy && !can(membership, "manage_agents") && ownerUserId !== actorId) {
+    throw new ForbiddenError("Only an admin or the agent's owner can choose its autonomy", "agent.not_owner");
+  }
   // An agent born on "Automático" is automatic on every brain: switched to Claude Code or Codex later, it
   // starts with the model and effort picked per run (written here, so agents made before Automático keep theirs).
   const brainAuto = isAutoModel(values.model) ? { brainModel: AUTO_MODEL, brainEffort: AUTO_MODEL } : {};
@@ -141,7 +150,8 @@ export async function createAgent(
         ...brainAuto,
         machineId: home?.id ?? null,
         orgId,
-        ownerUserId: input.ownerUserId === undefined ? actorId : input.ownerUserId,
+        ownerUserId,
+        ...(autonomy ? { missionCommandApproval: autonomy } : {}),
       })
       .returning();
     if (!agent) throw new Error("agent insert returned nothing");
@@ -179,7 +189,7 @@ export async function createAgent(
       actor: { type: "person", id: actorId },
       action: "agent.created",
       target: { type: "agent", id: agent.id },
-      details: { name: agent.name, handle: agent.handle, model: agent.model },
+      details: { name: agent.name, handle: agent.handle, model: agent.model, ...(autonomy ? { autonomy } : {}) },
     });
     // A model or key the creator picked is their latest choice; "Automático" with the default key is no choice.
     if (options.remember && (!isAutoModel(agent.model) || agent.credentialId)) {

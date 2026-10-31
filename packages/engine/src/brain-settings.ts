@@ -37,6 +37,8 @@ import {
 } from "./machine-accounts";
 import { getMachine, type MachineRow, machineOnline } from "./machines";
 import {
+  agentMissionApproval,
+  type CommandApproval,
   type MissionDeps,
   type MissionRow,
   machineExecutors,
@@ -253,6 +255,8 @@ export interface AgentBrainView {
   ownSignIn: boolean;
   /** The computer's own sign-ins' plan usage, by brain (protocol 19; empty: not known). */
   ownUsage: OwnPlanUsage;
+  /** Its Autonomia (the autonomy its missions start with): "Usar em outros agentes" takes it along (ADR 0089). */
+  autonomy: CommandApproval;
 }
 
 /** The account part of the brain view. */
@@ -349,6 +353,7 @@ function view(
     canUsePlans: agent.ownerUserId === userId,
     ownSignIn: Boolean(machine?.pairedByUserId) && machine?.pairedByUserId === agent.ownerUserId,
     ownUsage: machine?.executors?.ownUsage ?? {},
+    autonomy: agentMissionApproval(agent),
   };
 }
 
