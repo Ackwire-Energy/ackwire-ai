@@ -143,6 +143,19 @@ describe("the block's lines", () => {
     ]);
   });
 
+  test("coming back later is ours, not apps called follow and cancel", () => {
+    const items = toolItemsLive([
+      call("1", "follow_up"),
+      call("2", "mcp__agentes__follow_up"),
+      call("3", "cancel_follow_up"),
+    ]);
+    expect(items.map((i) => (i.kind === "call" ? `${i.line.kind}×${i.line.count}` : i.kind))).toEqual([
+      "followingUp×2",
+      "cancelingFollowUp×1",
+    ]);
+    expect(toolApps(items)).toEqual([{ kind: "followingUp" }, { kind: "cancelingFollowUp" }]);
+  });
+
   test("grey words: a built-in's label, or a connector tool's own name without its app; never its input", () => {
     expect(toolHint("create_issue", { kind: "creatingIssue" }, "Corrigir login")).toBe("Corrigir login");
     expect(toolHint("create_issue", { kind: "creatingIssue" })).toBeNull();
