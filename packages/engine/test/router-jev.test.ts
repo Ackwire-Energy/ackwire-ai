@@ -497,14 +497,14 @@ describe("who a message speaks to", () => {
 describe("the agent a person last talked to", () => {
   /**
    * `by`: an agent (in `runId`, when given), else Ana; `routedTo`: the agents the router sent it to, `working` when
-   * their runs on it are still at work.
+   * their runs on it are still at work; `thread`: in the thread of that line of the talk.
    */
   type Said = [
     by: { id: string; runId?: string } | null,
     text: string,
     minutesAgo: number,
     routedTo?: { id: string }[],
-    more?: { working?: boolean },
+    more?: { working?: boolean; thread?: number },
   ];
 
   /** Ana alone with Theo (PM) and Ada (Dev), as in #private on 2026-10-31. */
@@ -536,10 +536,12 @@ describe("the agent a person last talked to", () => {
       const now = Date.now();
       const channel = await createChannel(f.db, f.owner.id, f.org.id, { name: `private-${n}` });
       for (const a of [theo, ada]) await addChannelMember(f.db, f.owner.id, f.org.id, channel.id, { agentId: a.id });
+      const said: string[] = [];
       const say = async ([author, text, minutesAgo, routedTo, more]: Said) => {
         const m = await insertMessage(f.db, {
           orgId: f.org.id,
           channelId: channel.id,
+          threadId: more?.thread === undefined ? null : said[more.thread],
           author: author
             ? { type: "agent", agentId: author.id, runId: author.runId ?? null, hop: 1, stretchId: null }
             : { type: "person", userId: f.owner.id },
@@ -558,6 +560,7 @@ describe("the agent a person last talked to", () => {
           });
           if (more?.working) await f.db.transaction((tx) => createAgentRuns(tx, m, selectedAgentIds, "router"));
         }
+        said.push(m.id);
         return m;
       };
       for (const line of before) await say(line);
@@ -765,6 +768,23 @@ describe("the agent a person last talked to", () => {
       500,
     );
     expect(thanked.selected).toEqual([t.ada.id]);
+  });
+
+  test("a talk in another thread is that thread's, not the channel's", async () => {
+    const t = await privateRoom();
+    // Ana talked to Ada in the channel, then to Theo in the thread of an older message. Jev leans to Ada.
+    const { selected } = await t.talk(
+      [
+        [null, "pessoal, revisão do contrato", 40],
+        [null, "ada quanto ta seu limite de uso?", 23.2, [t.ada]],
+        [t.ada, "Não consigo ver meu saldo por aqui.", 22.8],
+        [null, "theo, pode revisar isso?", 15, [t.theo], { thread: 0 }],
+        [t.theo, "Revisei.", 14, undefined, { thread: 0 }],
+      ],
+      BOM_DIA,
+      bomDia("ada", "theo"),
+    );
+    expect(selected).toEqual([t.ada.id]);
   });
 
   test("an agent's message is unchanged: only a clear pick, the best one, and it may pass", async () => {

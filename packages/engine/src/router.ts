@@ -971,8 +971,10 @@ export async function routeMessage(
   const repliedAgentId = quotedAgentId ?? rootAgentId;
   if (repliedAgentId) continuityAgentId = repliedAgentId;
   const continuityHandle = candidates.find((c) => c.agentId === continuityAgentId)?.handle ?? null;
-  // The agent this person last talked to here, among two or more agents, not in a reply to an agent and not when
-  // they speak to a person: the one agent their latest message to an agent went to, within what the router reads
+  // The agent this person last talked to in this conversation (this thread with the message it is under, or the
+  // channel's main timeline: another thread is another conversation), among two or more agents, not in a reply to
+  // an agent and not when they speak to a person: the one agent their latest message to an agent went to, within
+  // what the router reads
   // (`ROUTER_SLICE`: 30 minutes, 12 messages). It went to whom it @mentioned, else to the agent the router sent it
   // to once that agent answered or while it is still at work on it (one that passed or failed was never talked
   // to: the message went to no agent, like a "valeu"), else, never routed, to the first agent that answered it.
@@ -988,6 +990,7 @@ export async function routeMessage(
     let next: (typeof history)[number] | undefined;
     for (const m of [...before, ...(root ? [root] : [])]) {
       if (message.createdAt.getTime() - m.createdAt.getTime() > ROUTER_SLICE.maxAgeMs) break;
+      if (m !== root && m.threadId !== message.threadId) continue;
       const after = next;
       next = m;
       if (m.authorAgentId) {
