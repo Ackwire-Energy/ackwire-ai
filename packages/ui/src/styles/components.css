@@ -4580,12 +4580,11 @@ a.ac-list__row:focus-visible {
 .ac-msg:focus-within {
   z-index: var(--z-lifted);
 }
-/* Reading: 15.5px / 1.7 in the ink color, about 68 characters a line (72 in a team chat). */
+/* Reading: 15.5px / 1.7 in the ink color, across the whole column (a code block or a table scrolls in its own box). */
 .ac-msg__text {
   font-size: 15.5px;
   line-height: 1.7;
   color: var(--ink);
-  max-width: 68ch;
 }
 
 /* Work under an agent message: a quiet 32px button ("Ver o que ela fez · 7 passos · 38 s");

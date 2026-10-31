@@ -832,11 +832,6 @@ p {
 .channel__messages > .ac-msg--grouped {
   margin-top: -4px;
 }
-/* Every conversation (channels, threads, DMs with people or agents) is one layout: left-aligned and full
-   width, the line capped. */
-.shell__main--chat .ac-msg__text {
-  max-width: 72ch;
-}
 .channel__composer {
   position: relative;
   padding: 8px 24px 20px;
@@ -1570,8 +1565,10 @@ p {
 }
 /* Tables: a quiet box with a hairline, the header on a soft band, rows split by hairlines, numbers aligned
    (right, tabular figures; the parser decides the side). A wide table scrolls inside its box. */
+/* As wide as its columns, up to the message's: a wide one scrolls in its box, a small one doesn't stretch across. */
 .md__table {
   overflow: auto;
+  width: fit-content;
   max-width: 100%;
   border-radius: 12px;
   box-shadow: inset 0 0 0 1px var(--line);
