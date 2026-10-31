@@ -138,8 +138,8 @@ const NOTICE_ICON: Record<string, EventLineView["icon"]> = {
 export function eventLineOf(
   m: Pick<Message, "body" | "meta">,
   names: { author: string; agentByHandle: (handle: string) => string | null },
-  /** A follow-up's time for the reader ("18:30"). */
-  time: (iso: string) => string = (iso) => iso,
+  /** A follow-up's time for the reader ("18:30"), and the reader's locale for its day. */
+  when: { time: (iso: string) => string; locale: string } = { time: (iso) => iso, locale: "pt-BR" },
 ): EventLineView | null {
   const notice = noticeOf(m.meta);
   if (!notice) return null;
@@ -166,7 +166,7 @@ export function eventLineOf(
     case "wait_result":
       return line("chat.notice.waitResult", { name: names.author });
     case "follow_up": {
-      const followUp = followUpLine(notice, names.author, time);
+      const followUp = followUpLine(notice, names.author, when);
       return followUp ? line(followUp.key, followUp.values) : null;
     }
     default:

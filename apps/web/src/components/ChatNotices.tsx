@@ -129,7 +129,7 @@ export function NoticeLine({ message }: { message: Message }) {
     );
   const nameOfHandle = (handle: string) => dir.agentByHandle.get(handle.toLowerCase())?.name ?? null;
   const name = dir.authorName(message.author);
-  const followUp = followUpLine(notice, name, (iso) => formatTime(i18n.language, iso));
+  const followUp = followUpLine(notice, name, { time: (iso) => formatTime(i18n.language, iso), locale: i18n.language });
   return (
     <EventLine
       message={message}

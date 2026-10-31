@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { ACCOUNTS_PROTOCOL, channelTopic, MACHINE_PROTOCOL_VERSION } from "@agenteschat/adapters";
-import { eq, schema } from "@agenteschat/db";
+import { and, eq, schema } from "@agenteschat/db";
 import { systemText } from "@agenteschat/providers";
 import {
   addChannelMember,
@@ -359,8 +359,11 @@ test("a gated call through the bridge leaves the run waiting; the decision resum
   expect(seen[1]?.trigger).toContain("github_merge_pr ok: acme/app#42");
 });
 
-/** A connector call that asks a person every time, answering like a remote workbench that gave only a preview. */
-function workbench() {
+/**
+ * A connector call that asks a person every time, answering like a remote workbench that gave only a preview.
+ * `external`: an MCP server's answer, which reaches the model inside `<external_data>`.
+ */
+function workbench(options: { content?: string; external?: boolean } = {}) {
   const ran: Record<string, unknown>[] = [];
   const source: ToolSource = {
     name: "fake-workbench",
@@ -370,6 +373,7 @@ function workbench() {
         description: "Runs code against the CI provider (fake)",
         scope: "ci:run",
         sensitive: true,
+        ...(options.external ? { external: true } : {}),
         inputSchema: {
           type: "object",
           properties: { run: { type: "integer" } },
@@ -378,7 +382,7 @@ function workbench() {
         },
         async execute(input) {
           ran.push(input);
-          return { content: "Response schema: {jobs: [...]} Data Preview: (2 rows hidden)" };
+          return { content: options.content ?? "Response schema: {jobs: [...]} Data Preview: (2 rows hidden)" };
         },
       },
     ],
@@ -389,7 +393,9 @@ function workbench() {
 const WORKBENCH_WHY = "The CI run is slow and its per-job times answer the question: this call reads them.";
 
 test("approved, it ran, and the brain ended its turn without a word: one more turn with the result, then the answer", async () => {
-  const bench = workbench();
+  // A remote workbench's long preview, an MCP server's words: the run reads them as data, never as instructions.
+  const preview = `Response schema: {jobs: [...]} Data Preview: ${"x".repeat(2500)} (2 rows hidden)`;
+  const bench = workbench({ content: preview, external: true });
   f = await setup({ toolSources: [bench.source] });
   await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "ci:run" }]);
   const machineId = await computerAgent(f);
@@ -428,10 +434,16 @@ test("approved, it ran, and the brain ended its turn without a word: one more tu
 
   expect(bench.ran).toEqual([{ run: 42 }]);
   expect(seen.length).toBe(3);
-  expect(seen[1]?.trigger).toContain("ci_workbench: Response schema");
-  // Told what was decided and what came back, and to finish what it said it would do.
-  expect(seen[2]?.trigger).toContain("ended your turn without telling them anything");
-  expect(seen[2]?.trigger).toContain("Data Preview");
+  expect(seen[1]?.trigger).toContain("Response schema");
+  // Told what was decided and what came back, and to finish what it said it would do: what it is told comes
+  // first, and the result keeps its envelope (cut in the middle, its end and closing marker kept).
+  const nudge = seen[2]?.trigger ?? "";
+  expect(nudge).toContain("ended your turn without telling them anything");
+  expect(nudge).toContain("Data Preview");
+  expect(nudge).toContain("(2 rows hidden)\n</external_data>");
+  expect(nudge).toContain("characters cut");
+  expect(nudge.indexOf("Go on with the task")).toBeGreaterThan(-1);
+  expect(nudge.indexOf("Go on with the task")).toBeLessThan(nudge.indexOf("<external_data"));
   const [run] = await f.db.select().from(schema.agentRuns);
   expect(run?.status).toBe("done");
   const fromAgent = (await timeline(f)).filter((m) => m.author.type === "agent" && !m.meta.approvalId);
@@ -518,6 +530,57 @@ test("decided while the turn that asked still runs: the run goes on once that tu
   const [run] = await f.db.select().from(schema.agentRuns);
   expect(run?.status).toBe("done");
   expect((await timeline(f)).at(-1)?.body).toBe("Tests took 9 min, lint 2.");
+});
+
+test("two decisions of one pause: the resume that finds the run running under the other's job leaves it alone", async () => {
+  const bench = workbench();
+  let nested: Promise<number> | null = null;
+  f = await setup({
+    toolSources: [bench.source],
+    reply: (_request, call) => {
+      if (call === 1)
+        return {
+          chunks: ["Reading both CI runs."],
+          toolUses: [41, 42].map((n) => ({ name: "ci_workbench", input: { run: n, why: WORKBENCH_WHY } })),
+        };
+      if (call > 2) return { chunks: ["A second turn beside the first."] };
+      // The second decision's job runs while this resumed turn still thinks.
+      nested = (async () => {
+        await f.db
+          .update(schema.outbox)
+          .set({ nextAttemptAt: new Date() })
+          .where(eq(schema.outbox.kind, "agent_run.execute"));
+        return drainOutbox(f.db, f.handlers);
+      })();
+      return { chunks: ["Tests took 9 min, lint 2."], hold: nested };
+    },
+  });
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "ci:run" }]);
+  await post(f, "@dev compara os dois últimos CIs");
+  await drainOutbox(f.db, f.handlers);
+  const pending = await listApprovals(f.db, f.owner.id, f.org.id, { status: "pending" });
+  expect(pending.length).toBe(2);
+  for (const a of pending)
+    await decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, a.id, { decision: "approve" });
+  // Two resume jobs: the second one is held back until the first one's turn is under way.
+  const resumes = await f.db
+    .select()
+    .from(schema.outbox)
+    .where(and(eq(schema.outbox.kind, "agent_run.execute"), eq(schema.outbox.status, "pending")));
+  expect(resumes.length).toBe(2);
+  await f.db
+    .update(schema.outbox)
+    .set({ nextAttemptAt: new Date(Date.now() + 3600_000) })
+    .where(eq(schema.outbox.id, resumes[1]?.id ?? ""));
+  await drainOutbox(f.db, f.handlers);
+  await nested;
+
+  expect(bench.ran).toEqual([{ run: 41 }, { run: 42 }]);
+  expect(f.provider.calls.length).toBe(2);
+  const [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("done");
+  const fromAgent = (await timeline(f)).filter((m) => m.author.type === "agent" && !m.meta.approvalId);
+  expect(fromAgent.map((m) => m.body)).toEqual(["Reading both CI runs.", "Tests took 9 min, lint 2."]);
 });
 
 test("a question asked through the bridge: the text written before it comes first, what follows isn't posted", async () => {

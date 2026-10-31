@@ -1,15 +1,18 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, gt, isNull, schema, sql } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, gt, gte, isNotNull, isNull, schema, sql } from "@agenteschat/db";
+import { runAuthority } from "./authority";
 import { requireChannelAccess } from "./channels";
 import { getChannelCached } from "./context";
 import { publishDelivery } from "./delivery";
+import { eligibleChannelAgents } from "./dispatch";
 import { isAgentOnlyDm } from "./dms";
 import { ConflictError, NotFoundError } from "./errors";
 import { publishMessageCreated } from "./events";
 import type { Judge } from "./judge";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import { enqueue } from "./outbox";
-import { deliverNoticeToRun, NOTICE_WAKE_MAX_HOP } from "./run-resume";
+import { personCanPost } from "./routine-state";
+import { deliverNoticeToRun, lateNoticeSent, NOTICE_WAKE_MAX_HOP } from "./run-resume";
 import { type AgentRun, replyThreadOf } from "./runs";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
@@ -21,7 +24,7 @@ import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tool
  * line there now, and at its time a notice that wakes the agent in that conversation (`wakeFollowUp`).
  */
 
-const { agentRuns, messages } = schema;
+const { agentConsultations, agentRuns, messages, routines } = schema;
 
 export const FOLLOW_UP_TOOL = "follow_up";
 export const CANCEL_FOLLOW_UP_TOOL = "cancel_follow_up";
@@ -33,25 +36,48 @@ export const FOLLOW_UP_LIMITS = { maxMinutes: 24 * 60, perRun: 2, perConversatio
 export type FollowUpState = "pending" | "done" | "canceled";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
+/** An ISO 8601 time that says its offset ("Z", "-03:00"). */
+const WITH_OFFSET = /(?:z|[+-]\d{2}:?\d{2})$/i;
 
 // ── After a decision ─────────────────────────────────────────────────────────
 
-/** What a run reads when it ended its turn right after a decision without telling anyone what came of it. */
+/**
+ * What a run reads when it ended its turn right after a decision without telling anyone what came of it. The
+ * results come last: one may be an outside envelope (`<external_data>`), and nothing it is told may follow it.
+ */
 export const decisionNudge = (decided: string) =>
   [
-    "A person decided what you were waiting on, and you ended your turn without telling them anything. What they decided and what came back:",
+    "A person decided what you were waiting on, and you ended your turn without telling them anything. Go on with the task with the result below now (call the tools you need), then tell them the outcome. If the result isn't what you needed (empty, a placeholder, an error), say so and what you'll do instead.",
+    "What they decided and what came back:",
     decided,
-    "Go on with the task with this result now (call the tools you need), then tell them the outcome. If the result isn't what you needed (empty, a placeholder, an error), say so and what you'll do instead.",
   ].join("\n");
 
 // ── Promises at the end of a run ─────────────────────────────────────────────
 
+/** Verbs of later work after "I'll", "vou", "voy a" (and up to two words between): "I'll check", "vou te passar". */
+const LATER = {
+  en: "check|recheck|look|see|verify|confirm|run|rerun|re-run|retry|try|test|send|share|post|report|update|tell|give|let you know|get back|come back|be back|circle back|follow up|keep (?:an eye|you posted|you updated|watching|monitoring|track)|monitor|watch|ping|notify|dig|investigate|review|fix|open|create|write|draft|prepare|grab|pull|fetch|ask|wait|continue|finish|go on|handle|take care|work on|start|deploy|merge|push|do (?:it|that|this|so)",
+  pt: "checar|verificar|ver|olhar|conferir|rodar|testar|mandar|enviar|passar|avisar|acompanhar|investigar|revisar|corrigir|consertar|abrir|criar|tentar|esperar|continuar|seguir|terminar|voltar|retornar|monitorar|buscar|pegar|puxar|configurar|fazer|analisar|perguntar|dar uma olhada|ficar de olho",
+  es: "revisar|verificar|ver|mirar|comprobar|chequear|correr|probar|enviar|mandar|pasar|avisar|investigar|corregir|abrir|crear|intentar|esperar|seguir|continuar|volver|configurar|hacer|preguntar|contar",
+};
+
 /**
  * Words that promise more work by the agent itself (English, Portuguese, Spanish), looked for at the end of
- * its last message: only then is the judge asked. A miss costs a nudge, a false hit one cheap judge call.
+ * its last message: only then is the judge asked. A future counts only with a verb of later work ("I'll
+ * check", never "I'll be honest" or "vou ser direto"). A miss costs a nudge, a false hit one cheap judge call.
  */
-const PROMISE =
-  /\b(?:i['’]ll|i will|i['’]m going to|i am going to|will (?:update you|report back|let you know|get back to you)|vou\s|volto\b|te (?:aviso|falo|conto|mando|passo|retorno)|(?:eu )?aviso (?:quando|assim)|assim que (?:terminar|acabar|sair|ficar)|quando (?:terminar|acabar|ficar pronto|sair o)|fico de olho|voy a\s|te (?:cuento|paso)|cuando termine)/i;
+const PROMISE = new RegExp(
+  [
+    String.raw`\b(?:i['’]ll|i will|i['’]m going to|i am going to|i['’]m gonna)\s+(?:\w+\s+){0,2}?(?:${LATER.en})\b`,
+    String.raw`\blet me\s+(?:\w+\s+)?(?:check|look|see|verify|confirm|dig|find|grab|pull|fetch|run|try|test|investigate|review|take a look|think)\b`,
+    String.raw`\b(?:get back to you|keep you posted|report back|will (?:update you|let you know)|one (?:moment|sec(?:ond)?)|just a (?:moment|sec(?:ond)?|minute)|give me a (?:moment|minute|sec(?:ond)?)|hang on|bear with me|checking now|looking into it)\b`,
+    String.raw`\bvou\s+(?:\p{L}+\s+){0,2}?(?:${LATER.pt})(?!\p{L})`,
+    String.raw`\b(?:volto|te (?:aviso|falo|conto|mando|passo|retorno)|(?:eu )?aviso (?:quando|assim)|assim que (?:terminar|acabar|sair|ficar)|quando (?:terminar|acabar|ficar pronto|sair o)|fico de olho|deix[ae](?:-me| eu)|já (?:vejo|olho|checo|confiro|verifico|te falo|te digo|te passo)|só um (?:momento|minuto|segundo|instante)|um (?:momento|instante))(?!\p{L})`,
+    String.raw`\bvoy a\s+(?:\p{L}+\s+){0,2}?(?:${LATER.es})(?!\p{L})`,
+    String.raw`\b(?:d[ée]j[ae]me|te (?:cuento|paso|aviso|escribo)|cuando termine|vuelvo|un momento)(?!\p{L})`,
+  ].join("|"),
+  "iu",
+);
 
 /** How much of the end of the message is read for a promise (the start is the answer itself). */
 const PROMISE_TAIL = 600;
@@ -117,10 +143,15 @@ const refsOf = (m: Pick<Message, "meta">) =>
 const isFollowUpLine = (m: Pick<Message, "meta">) =>
   (m.meta.notice as { kind?: unknown } | undefined)?.kind === "follow_up" && !refsOf(m).wake;
 
-/** The follow-ups still waiting in a run's conversation (all set in the last day: none goes further ahead). */
+/**
+ * The follow-ups still waiting in a run's conversation (all set in the last day: none goes further ahead). In a
+ * thread that is the thread's; in the main timeline (a channel's, a DM's) it is the person's: `personId`, who is
+ * behind the run (null: nobody), keeps other people's follow-ups there out.
+ */
 async function pendingFollowUps(
   db: Executor,
   run: Pick<AgentRun, "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId">,
+  personId: string | null,
 ) {
   const threadId = replyThreadOf(run);
   return db
@@ -130,7 +161,12 @@ async function pendingFollowUps(
       and(
         eq(messages.orgId, run.orgId),
         eq(messages.channelId, run.channelId),
-        threadId ? eq(messages.threadId, threadId) : isNull(messages.threadId),
+        threadId
+          ? eq(messages.threadId, threadId)
+          : and(
+              isNull(messages.threadId),
+              sql`coalesce(${messages.meta}->'notice'->'refs'->>'personId', '') = ${personId ?? ""}`,
+            ),
         eq(messages.authorAgentId, run.agentId),
         isNull(messages.deletedAt),
         gt(messages.createdAt, new Date(Date.now() - (FOLLOW_UP_LIMITS.maxMinutes + 60) * 60_000)),
@@ -140,12 +176,65 @@ async function pendingFollowUps(
     );
 }
 
-/** Whether this run set a follow-up that hasn't come yet (it keeps the run's promise). */
-export async function runHasFollowUp(
+/**
+ * Whether something this run set up brings the agent back here by itself, keeping its promise: a follow-up still
+ * to come, an agent it asked that hasn't answered (`ask_agent`), a wait it stopped waiting on whose result hasn't
+ * come, or a reminder it set to do the work then (`schedule_reminder` with `ask_agent`).
+ */
+export async function wakesLater(
   db: Executor,
-  run: Pick<AgentRun, "id" | "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId">,
+  run: Pick<AgentRun, "id" | "orgId" | "agentId" | "channelId" | "createdAt">,
+  detachedWaits: { waitId: string }[] = [],
 ) {
-  return (await pendingFollowUps(db, run)).some((f) => f.runId === run.id);
+  const [followUp, consultation, reminder] = await Promise.all([
+    db
+      .select({ id: messages.id })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.orgId, run.orgId),
+          eq(messages.channelId, run.channelId),
+          eq(messages.authorAgentId, run.agentId),
+          gte(messages.createdAt, run.createdAt),
+          isNull(messages.deletedAt),
+          sql`${messages.meta}->'notice'->>'kind' = 'follow_up'`,
+          sql`${messages.meta}->'notice'->'refs'->>'runId' = ${run.id}`,
+          sql`${messages.meta}->'notice'->'refs'->>'state' = 'pending'`,
+        ),
+      )
+      .limit(1),
+    db
+      .select({ id: agentConsultations.id })
+      .from(agentConsultations)
+      .where(
+        and(
+          eq(agentConsultations.orgId, run.orgId),
+          eq(agentConsultations.askerRunId, run.id),
+          eq(agentConsultations.status, "open"),
+        ),
+      )
+      .limit(1),
+    db
+      .select({ id: routines.id })
+      .from(routines)
+      .where(
+        and(
+          eq(routines.orgId, run.orgId),
+          eq(routines.agentId, run.agentId),
+          eq(routines.triggerType, "once"),
+          eq(routines.active, true),
+          isNull(routines.deletedAt),
+          isNotNull(routines.nextRunAt),
+          gte(routines.createdAt, run.createdAt),
+          sql`${routines.target}->>'channelId' = ${run.channelId}`,
+          sql`${routines.target}->>'reminder' = 'false'`,
+        ),
+      )
+      .limit(1),
+  ]);
+  if (followUp.length > 0 || consultation.length > 0 || reminder.length > 0) return true;
+  for (const d of detachedWaits) if (!(await lateNoticeSent(db, run, d.waitId))) return true;
+  return false;
 }
 
 /** Moves a pending follow-up line to `state`; null when it isn't pending anymore. */
@@ -222,7 +311,12 @@ export function createFollowUpToolSource(deps: { pubsub?: PubSub }): ToolSource 
           );
         const now = Date.now();
         const given = str(input.at).trim();
-        const due = given ? Date.parse(given) : now + Number(input.minutes ?? 0) * 60_000;
+        // A time without its offset would be read in the server's zone, not the person's.
+        const due = given
+          ? WITH_OFFSET.test(given)
+            ? Date.parse(given)
+            : Number.NaN
+          : now + Number(input.minutes ?? 0) * 60_000;
         if (!Number.isFinite(due) || (!given && !input.minutes))
           return refused("Say when: `minutes` from now, or `at` as an ISO 8601 time with its offset.");
         if (due < now + 30_000) return refused("That time has passed: pick one at least a minute ahead.");
@@ -231,8 +325,9 @@ export function createFollowUpToolSource(deps: { pubsub?: PubSub }): ToolSource 
         const note = str(input.note).trim();
         const about = str(input.about).trim();
         const at = new Date(due).toISOString();
+        const personId = (await runAuthority(ctx.db, run)).personId;
         const line = await ctx.db.transaction(async (tx) => {
-          const pending = await pendingFollowUps(tx, run);
+          const pending = await pendingFollowUps(tx, run, personId);
           if (pending.filter((p) => p.runId === run.id).length >= FOLLOW_UP_LIMITS.perRun) return "run" as const;
           if (pending.length >= FOLLOW_UP_LIMITS.perConversation) return "conversation" as const;
           const message = await insertMessage(tx, {
@@ -242,7 +337,11 @@ export function createFollowUpToolSource(deps: { pubsub?: PubSub }): ToolSource 
             author: { type: "agent", agentId: run.agentId, runId: null, hop: run.hop },
             body: note,
             meta: {
-              notice: { kind: "follow_up", text: note, refs: { runId: run.id, at, about, state: "pending" } },
+              notice: {
+                kind: "follow_up",
+                text: note,
+                refs: { runId: run.id, at, about, state: "pending", ...(personId ? { personId } : {}) },
+              },
             },
           });
           await enqueue(tx, {
@@ -282,7 +381,8 @@ export function createFollowUpToolSource(deps: { pubsub?: PubSub }): ToolSource 
         const run = await conversationRun(ctx);
         if (!run) return refused("Only a conversation's run has follow-ups.");
         const id = str(input.id);
-        const pending = (await pendingFollowUps(ctx.db, run)).filter((p) => !id || p.id === id);
+        const personId = (await runAuthority(ctx.db, run)).personId;
+        const pending = (await pendingFollowUps(ctx.db, run, personId)).filter((p) => !id || p.id === id);
         if (pending.length === 0) return refused(id ? "No such follow-up waits here." : "No follow-up waits here.");
         const lines: Message[] = [];
         for (const p of pending) {
@@ -316,8 +416,9 @@ export async function wakeFollowUp(deps: { db: Database; pubsub?: PubSub }, orgI
       .select()
       .from(agentRuns)
       .where(and(eq(agentRuns.orgId, orgId), eq(agentRuns.id, refs.runId ?? "")));
-    const settled = await settle(tx, line, run ? "done" : "canceled");
-    if (!settled || !run) return settled ? { line: settled, delivered: null } : null;
+    const here = run ? await stillHere(tx, run) : false;
+    const settled = await settle(tx, line, here ? "done" : "canceled");
+    if (!settled || !run || !here) return settled ? { line: settled, delivered: null } : null;
     const delivered = await deliverNoticeToRun(tx, run, {
       kind: "follow_up",
       text: str((line.meta.notice as { text?: unknown }).text) || line.body,
@@ -329,6 +430,22 @@ export async function wakeFollowUp(deps: { db: Database; pubsub?: PubSub }, orgI
   await publishLine(deps.pubsub, woke.line);
   if (woke.delivered) await publishDelivery(deps.pubsub, woke.delivered).catch(() => {});
   return woke.delivered?.message ?? null;
+}
+
+/**
+ * At a follow-up's time the agent is still in its conversation and may answer the person behind the run that
+ * set it, who can still post there: neither changed since (a removal doesn't cancel the line, its time does).
+ */
+async function stillHere(tx: Executor, run: AgentRun) {
+  const personId = (await runAuthority(tx, run)).personId;
+  const agents = await eligibleChannelAgents(
+    tx,
+    run.orgId,
+    run.channelId,
+    [run.agentId],
+    personId ? { requesterUserId: personId } : {},
+  );
+  return agents.length > 0 && (!personId || (await personCanPost(tx, run.orgId, personId, run.channelId)));
 }
 
 /** A person cancels a follow-up from its line: anyone who can read the conversation. */

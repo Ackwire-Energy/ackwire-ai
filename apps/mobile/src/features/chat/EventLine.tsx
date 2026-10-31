@@ -30,7 +30,7 @@ export function EventLine({ message }: { message: Message }) {
       author: dir.nameOf(message.author) || t("channel.unknownAgent"),
       agentByHandle: (handle) => dir.agents.find((a) => a.handle.toLowerCase() === handle.toLowerCase())?.name ?? null,
     },
-    when.time,
+    when,
   );
   if (consulted)
     return (

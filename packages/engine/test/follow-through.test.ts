@@ -2,29 +2,40 @@ import { afterEach, expect, test } from "bun:test";
 import { and, eq, schema } from "@agenteschat/db";
 import { type ModelRequest, systemText, textOf } from "@agenteschat/providers";
 import {
+  askAgentToImplement,
   CANCEL_FOLLOW_UP_TOOL,
   cancelFollowUp,
+  createIssue,
   drainOutbox,
   FOLLOW_UP_JOB,
   FOLLOW_UP_TOOL,
   invokeToolForRun,
+  joinChannel,
+  listIssueActivity,
   NOTICE_WAKE_MAX_HOP,
   postPersonMessage,
   promiseIn,
+  removeChannelMember,
   runAuthority,
   toolPolicy,
+  wakeFollowUp,
 } from "../src";
-import { type Fixture, setup } from "./fixtures";
+import { addMember, type Fixture, setup } from "./fixtures";
 
 /**
  * Agents follow through (ADR 0037, round 3): a promise nothing keeps gets one judge call and one more turn,
- * never two; a person's go-ahead they wait for is no unkept promise; `follow_up` posts its line, wakes the
- * agent in the same conversation at its time for the same person, and keeps its bounds; a canceled one
- * wakes nobody.
+ * never two; a person's go-ahead they wait for is no unkept promise, nor is one that something the run set up
+ * keeps; `follow_up` posts its line, wakes the agent in the same conversation at its time for the same person,
+ * and keeps its bounds; a canceled one, or one whose agent or person left the conversation, wakes nobody.
  */
 
 let f: Fixture;
-afterEach(() => f?.close());
+afterEach(async () => {
+  // A test without a database leaves the last one's: close each one once.
+  const current = f;
+  f = undefined as unknown as Fixture;
+  await current?.close();
+});
 
 const lastUserText = (request: ModelRequest) => {
   const last = request.messages.at(-1);
@@ -95,12 +106,33 @@ test("a plain answer asks no judge; only a promise at the end of the message cou
   await drainOutbox(f.db, f.handlers);
   expect(followThroughCalls(f).length).toBe(0);
   expect(f.provider.calls.length).toBe(1);
+});
 
+test("promises of later work by the agent, in English, Portuguese and Spanish; other future words aren't", () => {
   expect(promiseIn("When you approve, I'll give you the numbers and say if any job is slower.")).toBe(
     "When you approve, I'll give you the numbers and say if any job is slower.",
   );
   expect(promiseIn("Pronto. Quando terminar eu aviso.")).toBe("Quando terminar eu aviso.");
-  expect(promiseIn(`I'll explain. ${"Tests took 9 min. ".repeat(60)}All green.`)).toBeNull();
+  for (const said of [
+    "Let me check the CI logs.",
+    "Let me look into that and get back to you.",
+    "One moment, checking now.",
+    "The build is still running. I'll keep an eye on it.",
+  ])
+    expect(promiseIn(said)).not.toBeNull();
+  for (const said of ["Deixa eu ver os logs do CI.", "Já volto com os números.", "Vou rodar os testes de novo."])
+    expect(promiseIn(said)).not.toBeNull();
+  for (const said of ["Déjame revisar el log.", "Voy a revisar el pipeline y te cuento."])
+    expect(promiseIn(said)).not.toBeNull();
+  // Future words that promise no later work: no judge call.
+  for (const said of [
+    "Okay. I'll be honest: the CI took 12 minutes, which is normal.",
+    "I'll keep it short: tests 9 min, lint 2.",
+    "Vou ser direto: o CI levou 12 minutos, normal.",
+    "Let me know if you want the per-job times.",
+    `I'll explain. ${"Tests took 9 min. ".repeat(60)}All green.`,
+  ])
+    expect(promiseIn(said)).toBeNull();
 });
 
 test("the prompt asks to finish what it starts, and names follow_up only when the run has it", async () => {
@@ -228,6 +260,10 @@ test("follow_up bounds: a day ahead at most, two per run, three per conversation
   );
   expect((await call(run.id, { at: new Date(Date.now() - 60_000).toISOString() })).result.isError).toBe(true);
   expect((await call(run.id, {})).result.isError).toBe(true);
+  // A time without its offset would be read in the server's zone, not the person's: refused, a bare date too.
+  const local = new Date(Date.now() + 3600_000).toISOString().slice(0, 19);
+  expect((await call(run.id, { at: local })).result.content).toContain("offset");
+  expect((await call(run.id, { at: local.slice(0, 10) })).result.content).toContain("offset");
   expect((await call(run.id, { minutes: 10 })).result.isError).toBeUndefined();
   expect((await call(run.id, { at: new Date(Date.now() + 3600_000).toISOString() })).result.isError).toBeUndefined();
   expect((await call(run.id, { minutes: 20 })).result.content).toContain("already set 2 follow-ups");
@@ -295,9 +331,17 @@ test("canceled by the agent or by a person, a follow-up wakes nobody; a second c
         at: expect.any(String),
         about: "ver o deploy",
         state: "canceled",
+        personId: f.owner.id,
         canceledBy: `agent:${f.agent.id}`,
       },
-      { runId: run.id, at: expect.any(String), about: "ver o deploy", state: "canceled", canceledBy: f.owner.id },
+      {
+        runId: run.id,
+        at: expect.any(String),
+        about: "ver o deploy",
+        state: "canceled",
+        personId: f.owner.id,
+        canceledBy: f.owner.id,
+      },
     ]),
   );
 
@@ -313,4 +357,116 @@ test("canceled by the agent or by a person, a follow-up wakes nobody; a second c
     .from(schema.agentRuns)
     .where(and(eq(schema.agentRuns.orgId, f.org.id), eq(schema.agentRuns.agentId, f.agent.id)));
   expect(runs.length).toBe(1);
+});
+
+/** Sets a follow-up from a run, as its tool call would. Returns the line's id. */
+async function setFollowUp(fx: Fixture, runId: string, minutes: number) {
+  const out = await invokeToolForRun(
+    { db: fx.db, pubsub: fx.pubsub, tools: fx.tools },
+    { orgId: fx.org.id, agentId: fx.agent.id, runId, machineId: "" },
+    {
+      id: `fu-${runId}-${minutes}`,
+      name: FOLLOW_UP_TOOL,
+      input: { minutes, note: "Check the deploy.", about: "ver o deploy" },
+    },
+  );
+  return out.result.content.match(/Follow-up (\S+) set/)?.[1] ?? "";
+}
+
+const lineState = async (fx: Fixture, id: string) => {
+  const [line] = await fx.db.select().from(schema.messages).where(eq(schema.messages.id, id));
+  return (line?.meta.notice as { refs?: { state?: string } } | undefined)?.refs?.state;
+};
+
+test("at its time, an agent no longer in the conversation, or for a person who left it, wakes nobody", async () => {
+  f = await setup({ followUps: true });
+  await ask(f, "@dev acompanha o deploy");
+  const [run] = await f.db.select().from(schema.agentRuns);
+  if (!run) throw new Error("no run");
+  const forPerson = await setFollowUp(f, run.id, 10);
+  const forAgent = await setFollowUp(f, run.id, 20);
+
+  // The person who asked left the channel.
+  await removeChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: f.owner.id });
+  expect(await wakeFollowUp({ db: f.db, pubsub: f.pubsub }, f.org.id, forPerson)).toBeNull();
+  expect(await lineState(f, forPerson)).toBe("canceled");
+
+  // Back in it, but the agent was removed.
+  await joinChannel(f.db, f.owner.id, f.org.id, f.general.id);
+  await removeChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId: f.agent.id });
+  expect(await wakeFollowUp({ db: f.db, pubsub: f.pubsub }, f.org.id, forAgent)).toBeNull();
+  expect(await lineState(f, forAgent)).toBe("canceled");
+  expect((await f.db.select().from(schema.agentRuns)).length).toBe(1);
+});
+
+test("in a channel's timeline the follow-ups are each person's: cancel_follow_up and the limit count only theirs", async () => {
+  f = await setup({ followUps: true });
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  await joinChannel(f.db, bia.id, f.org.id, f.general.id);
+  // One run each (a message while the agent works in the timeline joins its run there).
+  await ask(f, "@dev acompanha o deploy");
+  await drainOutbox(f.db, f.handlers);
+  await ask(f, "@dev e o de staging?");
+  await drainOutbox(f.db, f.handlers);
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, bia.id, f.org.id, f.general.id, {
+    body: "@dev me avisa do build",
+  });
+  await drainOutbox(f.db, f.handlers);
+  const [ana1, ana2, biaRun] = await f.db.select().from(schema.agentRuns).orderBy(schema.agentRuns.createdAt);
+  if (!ana1 || !ana2 || !biaRun) throw new Error("no runs");
+  await setFollowUp(f, ana1.id, 10);
+  await setFollowUp(f, ana1.id, 11);
+  const anaThird = await setFollowUp(f, ana2.id, 12);
+  expect(anaThird).not.toBe("");
+  // Ana's three fill her conversation with @dev here; Bia's is her own.
+  const biaLine = await setFollowUp(f, biaRun.id, 13);
+  expect(biaLine).not.toBe("");
+
+  const canceled = await invokeToolForRun(
+    { db: f.db, pubsub: f.pubsub, tools: f.tools },
+    { orgId: f.org.id, agentId: f.agent.id, runId: biaRun.id, machineId: "" },
+    { id: "c-bia", name: CANCEL_FOLLOW_UP_TOOL, input: {} },
+  );
+  expect(canceled.result.content).toBe("Canceled 1 follow-up.");
+  expect(await lineState(f, biaLine)).toBe("canceled");
+  expect(await lineState(f, anaThird)).toBe("pending");
+});
+
+test("a reminder it set to do the work itself keeps the promise: no judge, no nudge", async () => {
+  f = await setup({
+    scheduleTools: true,
+    judge: (kind) => (kind === "follow_through" ? "unkept" : undefined),
+    reply: (request) =>
+      JSON.stringify(request.messages.at(-1)?.content).includes("tool_result")
+        ? { chunks: ["Agendado: daqui a 2 horas eu confiro o deploy e te passo como ficou."] }
+        : {
+            chunks: [],
+            toolUses: [
+              {
+                name: "schedule_reminder",
+                input: { when: "em 2 horas", message: "verifique o deploy e conte aqui", ask_agent: true },
+              },
+            ],
+          },
+  });
+  await ask(f, "@dev daqui a 2 horas verifica o deploy");
+  await drainOutbox(f.db, f.handlers);
+  expect(followThroughCalls(f).length).toBe(0);
+  expect(f.provider.calls.length).toBe(2);
+});
+
+test("asked to implement an issue: an answer posted before a nudge is a comment there too", async () => {
+  const first = "Fixed in PR #7. CI is running: I'll check it once it finishes.";
+  const second = "CI passed: PR #7 is ready to merge.";
+  f = await setup({
+    judge: (kind) => (kind === "follow_through" ? "unkept" : undefined),
+    reply: (_request, call) => ({ chunks: [call === 1 ? first : second] }),
+  });
+  const deps = { db: f.db, pubsub: f.pubsub };
+  const person = { type: "person" as const, userId: f.owner.id };
+  const issue = await createIssue(deps, person, f.org.id, { title: "Login breaks on Safari" });
+  await askAgentToImplement(deps, f.owner.id, f.org.id, issue.id, f.agent.id);
+  await drainOutbox(f.db, f.handlers);
+  const comments = (await listIssueActivity(f.db, person, f.org.id, issue.id)).filter((a) => a.kind === "comment");
+  expect(comments.map((a) => a.text)).toEqual([first, second]);
 });

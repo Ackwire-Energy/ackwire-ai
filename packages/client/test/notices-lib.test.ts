@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Message } from "../src/index";
+import { formatShortDate } from "../src/lib/format";
 import {
   answeredNotices,
   consultationOfNotice,
@@ -109,32 +110,37 @@ describe("notices in a conversation", () => {
     expect(answeredNotices([byPerson]).size).toBe(0);
   });
 
-  test("a follow-up's line: cancelable while it waits, canceled, and the one that woke the agent", () => {
-    const at = "2026-10-30T21:30:00.000Z";
-    const time = (iso: string) => (iso === at ? "18:30" : "?");
-    const line = (refs: Record<string, string>) => {
+  test("a follow-up's line: cancelable while it waits, its day when not today, past once it came, canceled", () => {
+    const at = "2026-10-30T14:00:00.000Z";
+    const today = new Date("2026-10-30T13:00:00.000Z");
+    const dayBefore = new Date("2026-10-29T13:00:00.000Z");
+    const when = { time: (iso: string) => (iso === at ? "11:00" : "?"), locale: "pt-BR" };
+    const line = (refs: Record<string, string>, now = today) => {
       const notice = noticeOf({ notice: { kind: "follow_up", text: "Check CI run 42", refs } });
-      return notice ? followUpLine(notice, "Ari", time) : null;
+      return notice ? followUpLine(notice, "Ari", when, now) : null;
     };
-    expect(line({ runId: "r1", at, about: "ver o CI", state: "pending" })).toEqual({
+    const refs = { runId: "r1", at, about: "ver o CI" };
+    expect(line({ ...refs, state: "pending" })).toEqual({
       key: "chat.notice.followUp",
-      values: { name: "Ari", about: "ver o CI", time: "18:30" },
+      values: { name: "Ari", about: "ver o CI", time: "11:00", day: "" },
       pending: true,
     });
-    expect(line({ runId: "r1", at, about: "ver o CI", state: "done" })).toMatchObject({
-      key: "chat.notice.followUp",
-      pending: false,
+    // Set the day before: it says the day it comes back.
+    expect(line({ ...refs, state: "pending" }, dayBefore)).toEqual({
+      key: "chat.notice.followUpOn",
+      values: { name: "Ari", about: "ver o CI", time: "11:00", day: formatShortDate("pt-BR", at) },
+      pending: true,
     });
-    expect(line({ runId: "r1", at, about: "ver o CI", state: "canceled" })).toMatchObject({
-      key: "chat.notice.followUpCanceled",
-      pending: false,
-    });
-    expect(line({ runId: "r1", at, about: "ver o CI", wake: "1", followUpId: "m1" })).toMatchObject({
+    expect(line({ ...refs, state: "done" })).toMatchObject({ key: "chat.notice.followUpDone", pending: false });
+    expect(line({ ...refs, state: "done" }, dayBefore)?.key).toBe("chat.notice.followUpDoneOn");
+    expect(line({ ...refs, state: "canceled" })).toMatchObject({ key: "chat.notice.followUpCanceled", pending: false });
+    expect(line({ ...refs, state: "canceled" }, dayBefore)?.key).toBe("chat.notice.followUpCanceledOn");
+    expect(line({ ...refs, wake: "1", followUpId: "m1" })).toMatchObject({
       key: "chat.notice.followUpWake",
       pending: false,
     });
     const report = noticeOf({ notice: { kind: "routine_handoff", text: "x", refs: {} } });
-    expect(report && followUpLine(report, "Ari", time)).toBeNull();
+    expect(report && followUpLine(report, "Ari", when)).toBeNull();
   });
 });
 

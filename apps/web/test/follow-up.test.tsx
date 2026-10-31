@@ -12,7 +12,8 @@ afterEach(() => cleanup());
 
 test("an agent's follow-up shows as a quiet line with when it comes back, and anyone here can cancel it", async () => {
   const state = seedState();
-  const at = new Date(Date.now() + 30 * 60_000).toISOString();
+  // Today, so the line needs no day.
+  const at = new Date(new Date().setHours(12, 0, 0, 0)).toISOString();
   const line = (id: string, refs: Record<string, string>, minutesAgo: number) => ({
     id,
     channelId: ENG_ID,
@@ -32,8 +33,8 @@ test("an agent's follow-up shows as a quiet line with when it comes back, and an
   await settle(6);
 
   const time = formatTime("pt-BR", at);
-  expect(screen().getByText(new RegExp(`Atlas volta às ${time} para ver o CI`))).toBeTruthy();
-  expect(screen().getByText(new RegExp(`Atlas não volta mais às ${time} para ver o deploy`))).toBeTruthy();
+  expect(screen().getByText(new RegExp(`Atlas volta às ${time} para «ver o CI»`))).toBeTruthy();
+  expect(screen().getByText(new RegExp(`Atlas não volta mais às ${time} para «ver o deploy»`))).toBeTruthy();
   // Only the one still to come can be canceled.
   const cancel = screen().getAllByRole("button", { name: "Cancelar" });
   expect(cancel.length).toBe(1);

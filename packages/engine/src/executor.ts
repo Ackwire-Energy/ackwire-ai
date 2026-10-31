@@ -89,7 +89,7 @@ import {
   followThroughNudge,
   followThroughVerdict,
   promiseIn,
-  runHasFollowUp,
+  wakesLater,
 } from "./follow-through";
 import { onForumRunFinished } from "./forum";
 import type { ModelGateway } from "./gateway";
@@ -148,6 +148,7 @@ import {
   runErrorDetail,
   transitionRun,
 } from "./runs";
+import { truncateOutput } from "./sandbox";
 import { secretResult } from "./secrets";
 import { enabledSkills } from "./skills";
 import { standingErrorDetail, standingRefusal } from "./standing";
@@ -793,6 +794,8 @@ async function executeRunInner(
   // The routine that called it (`viaRoutine`) and whether the router brought it in after another agent
   // spoke (`joined`, ADR 0034): every message it posts says so, cards included (`runMessageMeta`).
   const runMeta = runMessageMeta(run, triggerMessage);
+  // Asked to implement an issue: each answer it posts is also a comment on it (a resumed run's too).
+  const issueId = triggerMessage?.meta.issueId;
   const viaRoutine = (runMeta.viaRoutine as { id: string; name: string } | undefined) ?? null;
   // Woken by a routine's report (ADR 0053 §7): its message carries the routine, and the routine run links to it.
   const report = routineReportTagOf(triggerMessage);
@@ -1023,7 +1026,8 @@ async function executeRunInner(
         } else result = toolResultFor(approval);
       }
       const line = `${call.name}${result?.isError ? " (not done)" : ""}: ${result?.content ?? ""}`;
-      decided.push(line.slice(0, DECIDED_LINE_MAX));
+      // Cut in the middle: a result in an outside envelope keeps its end and closing marker.
+      decided.push(truncateOutput(line, DECIDED_LINE_MAX));
       // A computer brain's call (through the bridge): its tool_use is in the brain's session, so the
       // result goes back as text in the resumed session.
       if (call.bridged) {
@@ -2223,13 +2227,22 @@ async function executeRunInner(
       const t = transcript;
       // Its last words promise more ("I'll send the numbers", "vou checar de novo"): one judge call, once per run,
       // says whether that promise is left with nothing to keep it. Then this answer is posted and the run goes on,
-      // told to keep it now or come back with a follow-up.
+      // told to keep it now or come back with a follow-up. Not in the agents' DM: there the last message is the
+      // whole answer another agent reads (`onConsultedRunFinished`), and nobody waits on a follow-up.
       const promise =
-        judge && said && !silent && !t.followThroughChecked && run.turns + 1 < maxTurns ? promiseIn(said) : null;
+        judge &&
+        said &&
+        !silent &&
+        !t.followThroughChecked &&
+        run.turns + 1 < maxTurns &&
+        !(channelRow && isAgentOnlyDm(channelRow))
+          ? promiseIn(said)
+          : null;
       let keep: string | null = null;
       if (judge && promise) {
         t.followThroughChecked = true;
-        const verdict = (await runHasFollowUp(db, run).catch(() => false))
+        const detached = (t as { detachedWaits?: { waitId: string }[] }).detachedWaits;
+        const verdict = (await wakesLater(db, run, detached).catch(() => false))
           ? "waiting"
           : await followThroughVerdict(judge, {
               orgId: run.orgId,
@@ -2264,6 +2277,8 @@ async function executeRunInner(
         if (posted) {
           const [view] = await withWikiLinks(db, run.orgId, [messageView(posted)]);
           if (view) await publishMessageCreated(deps.pubsub, view);
+          if (typeof issueId === "string")
+            await mirrorReplyToIssue({ db, pubsub: deps.pubsub }, run, issueId, posted.body).catch(() => {});
         }
         continue;
       }
@@ -2293,8 +2308,6 @@ async function executeRunInner(
         const [view] = await withWikiLinks(db, run.orgId, [messageView(reply)]);
         if (view) await publishMessageCreated(deps.pubsub, view);
       }
-      // Asked to implement an issue: the final reply is also a comment on it.
-      const issueId = trigger?.meta.issueId;
       if (reply && typeof issueId === "string") {
         await mirrorReplyToIssue({ db, pubsub: deps.pubsub }, run, issueId, reply.body).catch(() => {});
       }
