@@ -2,6 +2,8 @@ import { and, asc, eq, inArray, isNotNull, schema } from "@agenteschat/db";
 import { approvalCardThreads, approvalOriginOf } from "./approvals";
 import { accountablePerson, runAuthorityById } from "./authority";
 import { threadFollowChoices } from "./follows";
+import { isMediaAfterReply } from "./media";
+import { previewMediaKind } from "./message-preview";
 import {
   type NotificationActor,
   type NotificationDeps,
@@ -116,6 +118,8 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
   if (!message || message.deletedAt) return;
   const meta = message.meta;
   if (meta.questionId || meta.approvalId || meta.secretRequestId || meta.forum) return;
+  // An agent's sticker or GIF after its own reply (ADR 0091) is silent: the reply already told whoever it was for.
+  if (isMediaAfterReply(meta)) return;
   // An agent's follow-up line, and the notice that wakes it: the reply it brings notifies instead.
   if ((meta.notice as { kind?: unknown } | undefined)?.kind === "follow_up") return;
   const [channel] = await db
@@ -126,6 +130,9 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
   const actor = message.authorType === "person" ? person(message.authorUserId) : agent(message.authorAgentId);
   const authorUser = message.authorUserId;
   const text = notificationSnippet(message.body);
+  // Only a GIF or a sticker (ADR 0091): the apps and the push say which, in the person's language.
+  const media = previewMediaKind(message.body, meta);
+  const latest = media ? { text, media } : { text };
   const label = channel.kind === "channel" ? channel.name : undefined;
   const where: NotificationSource = {
     channelId: message.channelId,
@@ -154,7 +161,7 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
       groupKey: agentReplyGroup(message.channelId, message.threadId),
       actor,
       source: { ...where, ...(label ? { label } : {}) },
-      latest: { text },
+      latest,
     });
     done.add(asker);
   }
@@ -176,7 +183,7 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
       groupKey: `dm:${message.id}`,
       actor,
       source: where,
-      latest: { text },
+      latest,
     });
     return;
   }
@@ -196,7 +203,7 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
       groupKey: `mention:${message.id}`,
       actor,
       source: { ...where, label: threadLabel ?? label },
-      latest: { text },
+      latest,
     });
     for (const u of mentioned) done.add(u);
   }
@@ -234,7 +241,7 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
     groupKey: `thread:${message.threadId}`,
     actor,
     source: { ...where, label: threadLabel ?? label },
-    latest: { text },
+    latest,
   });
 }
 

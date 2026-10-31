@@ -4,6 +4,7 @@ import {
   createMemoryBlobStore,
   createMemoryPubSub,
   createPostgresSearchResolver,
+  type GifProvider,
   type KeyWrapper,
   noPlatformCredentials,
   type PlatformCredentials,
@@ -207,6 +208,8 @@ export async function setup(
     warmBrowser?: RunExecutorDeps["warmBrowser"];
     /** What the server can connect: `find_tools` names the connectors an agent lacks. None: it names none. */
     catalog?: ServerCatalog;
+    /** GIF search for the jobs (ADR 0091): an agent's GIF after its reply. None: its own stickers only. */
+    gifs?: GifProvider | null;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -347,6 +350,7 @@ export async function setup(
     sandbox: sandboxDeps,
     toolsOnDemand: options.toolsOnDemand ?? false,
     ...(options.warmBrowser ? { warmBrowser: options.warmBrowser } : {}),
+    ...(options.gifs ? { gifs: options.gifs } : {}),
   };
   const handlers = createJobHandlers(jobDeps);
 
