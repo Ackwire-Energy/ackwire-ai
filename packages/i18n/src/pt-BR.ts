@@ -107,7 +107,7 @@ export const ptBR = {
       title: "Só o dono",
       sub: "Pode tudo, sempre. Isto ninguém mais faz, nem quem é Administrador.",
       transfer: "Passar a posse do workspace",
-      transferDesc: "Outra pessoa vira dona; você escolhe se continua sendo.",
+      transferDesc: "Outra pessoa vira dona, e você escolhe se continua sendo.",
       owners: "Dar e tirar o papel de dono",
       ownersDesc: "Pode haver mais de um dono.",
       delete: "Apagar o workspace",
@@ -2407,7 +2407,7 @@ export const ptBR = {
         contextText: {
           auto: "O que o modelo aguenta.",
           "200000": "Mais barato e rápido. Resume cedo em conversas longas.",
-          "400000": "Lembra bastante; cada resposta custa menos que com 1M.",
+          "400000": "Lembra bastante, e cada resposta custa menos que com 1M.",
           "1000000": "Lembra o máximo. Cada resposta relê tudo: mais lenta e cara.",
         },
         /** "Configuração avançada": a row in the brain's card that opens a smaller dialog over "Quem pensa". */

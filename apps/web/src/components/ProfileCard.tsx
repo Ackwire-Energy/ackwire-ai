@@ -1,11 +1,12 @@
 import type { Actor, Agent } from "@agenteschat/client";
-import { useAgentDetail, useModels, usePeople, useSettings } from "@agenteschat/client";
+import { useAgentDetail, useModels, usePeople, useRoles, useSettings } from "@agenteschat/client";
 import { audienceNotice, audienceSummary, canTalk, modeOf } from "@agenteschat/client/lib/audience";
 import { brainLine } from "@agenteschat/client/lib/brain";
 import { formatPercent, formatTime, relativeTime, shortModel, whenAt } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { clearsText } from "@agenteschat/client/lib/presence";
 import { isAuto } from "@agenteschat/client/lib/providers";
+import { rolesOf } from "@agenteschat/client/lib/roles";
 import { timezoneName } from "@agenteschat/client/lib/routines";
 import { Avatar, Button, hoverPointer, Meter, PlanMeter, Popover, ProviderLogo } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
@@ -123,6 +124,10 @@ function PersonCard({ userId }: { userId: string }) {
   const member = dir.memberById.get(userId);
   const name = person?.name ?? member?.name ?? t("channel.unknownPerson");
   const role = person?.role ?? member?.role;
+  // The roles they hold, top first (ADR 0085); the owner and someone with none keep their membership's word.
+  const held = rolesOf({ roleIds: person?.roleIds ?? member?.roleIds }, useRoles(org.id).data?.roles ?? []);
+  const roleLine =
+    role === "owner" || held.length === 0 ? (role ? t(`roles.${role}`) : null) : held.map((r) => r.name).join(", ");
   // The person's own zone (the API falls back to the workspace's).
   const timezone = person?.timezone ?? member?.timezone ?? settings.data?.timezone;
   let localTime: string | null = null;
@@ -148,7 +153,7 @@ function PersonCard({ userId }: { userId: string }) {
         />
         <div className="list-col">
           <span className="profile-card__name">{name}</span>
-          {role && <span className="small muted">{t(`roles.${role}`)}</span>}
+          {roleLine && <span className="small muted">{roleLine}</span>}
         </div>
       </div>
       {line && shown?.status && (
