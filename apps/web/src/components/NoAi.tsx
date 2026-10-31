@@ -2,7 +2,14 @@ import type { Message } from "@agenteschat/client";
 import { useAiStatus } from "@agenteschat/client";
 import { withoutApiKeys } from "@agenteschat/client/lib/api-key-text";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { aiStateOf, NO_AI, noAiCardOf, opensByItself, signInAgainPlan } from "@agenteschat/client/lib/no-ai";
+import {
+  aiStateOf,
+  NO_AI,
+  noAiCardOf,
+  opensByItself,
+  planOfKind,
+  signInAgainPlan,
+} from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Button, Chip, Dialog, DialogFooter, Icon, InfoHint } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -84,6 +91,8 @@ export function NoAiCard({ message }: { message: Message }) {
   const agent = dir.agentById.get(card.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
   const again = signInAgainPlan(card, agent);
+  // The computer's own sign-in isn't there: Connect opens on an account of that CLI's plan.
+  const plan = card.own ? planOfKind(card.own) : again;
   const answer = connect?.answered[message.id];
   const answering = answer === "answering";
   const state = aiStateOf(status.data, card.agentId);
@@ -96,7 +105,9 @@ export function NoAiCard({ message }: { message: Message }) {
       ? t("noAi.card.connected", { name })
       : answer === "still_missing"
         ? t("noAi.card.stillMissing", { name })
-        : t(card.signedOut ? "noAi.signedOut" : "noAi.agent", agentGrammar(t, name));
+        : card.own
+          ? t(`noAi.notSignedIn.${card.own}`, agentGrammar(t, name))
+          : t(card.signedOut ? "noAi.signedOut" : "noAi.agent", agentGrammar(t, name));
   const action =
     !connect || answering ? null : ready || answer === "pending" ? (
       mayAnswer && (
@@ -113,7 +124,7 @@ export function NoAiCard({ message }: { message: Message }) {
             provider: card.provider,
             agentId: card.agentId,
             from: message.id,
-            ...(again ? { plan: again } : {}),
+            ...(plan ? { plan } : {}),
           })
         }
       >

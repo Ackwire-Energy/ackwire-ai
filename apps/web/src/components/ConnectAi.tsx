@@ -6,6 +6,7 @@ import {
   type AgentAi,
   type AiChoice,
   agentAi,
+  agentPlan,
   aiStateOf,
   allAgents,
   defaultChoice,
@@ -202,6 +203,8 @@ function ConnectAiDialog({
       ownsAgents: agents.length > 0,
       mayAddKey,
       claudeGate: agents.length > 0 ? gates.gateOf("claude") : { state: "loading" },
+      // Signing in on Claude's panel would move a Codex agent onto Claude Code: one agent opens on its own plan.
+      plan: agentPlan(one),
     });
   const all = setOf(choice).map((a) => ({ ...a, done: aiOf(a.id) === choice }));
   const target = defaultTarget({ ...aimed, set: all });

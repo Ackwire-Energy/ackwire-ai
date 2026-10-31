@@ -101,7 +101,8 @@ test("a tool an admin turned off by name is named as that, never as something to
   expect(turnedOff).toContain(OPEN);
   expect(turnedOff).not.toContain("request_permission");
   expect(turnedOff).not.toContain("permission");
-  expect(usable).not.toContain("browser_open");
+  // Not listed among its tools (browser_close's description may still name it).
+  expect(usable).not.toContain("- browser_open:");
 });
 
 test("a tool of a connection the agent lacks names that connection's permission; nothing of another workspace shows", async () => {

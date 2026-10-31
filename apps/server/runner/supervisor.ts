@@ -704,6 +704,8 @@ export class Supervisor {
     w.notBefore = w.attempt > 0 ? Date.now() + backoffDelay(w.attempt - 1) : 0;
     if (this.closed) return;
     this.opts.log(`[${w.user.user}] stopped${typeof code === "number" ? ` (exit ${code})` : ""}`);
+    // The live view of its agent's browser went with it: the server would otherwise keep a stream nothing sends.
+    if (this.online) this.opts.send({ type: "browser.stream.ended", agentId: w.user.id, reason: "closed" });
     if (w.waiters.size > 0 || [...this.owners.values()].some((o) => o.agentId === w.user.id)) this.launch(w);
   }
 

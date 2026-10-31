@@ -1,10 +1,13 @@
 /**
  * Who watches which agent's browser on one realtime socket (ADR 0040 §7).
  * Several views of the same agent (the card on its message, the bar, the full
- * live view) share one `browser.watch`: it goes out when the first one starts,
- * and `browser.unwatch` only a moment after the last one leaves, so a
- * re-render or a remount (React's StrictMode, a list that re-keys) doesn't
- * stop and start the stream on the computer.
+ * live view) share one watch on the server: `browser.unwatch` goes only a
+ * moment after the last one leaves, so a re-render or a remount (React's
+ * StrictMode, a list that re-keys) doesn't stop and start the stream on the
+ * computer. Each view that starts sends `browser.watch` again all the same:
+ * a view that came later never heard the server's answer to the first (who is
+ * in control, the newest page), and a page that isn't repainting sends nothing
+ * else.
  */
 
 /** How long after the last view leaves before `browser.unwatch` (a view coming back meanwhile keeps it). */
@@ -45,10 +48,8 @@ export function createBrowserWatches(options: {
           timers.clearTimeout(entry.leaving);
           entry.leaving = null;
         }
-      } else {
-        entries.set(agentId, { count: 1, leaving: null });
-        options.send({ type: "browser.watch", agentId });
-      }
+      } else entries.set(agentId, { count: 1, leaving: null });
+      options.send({ type: "browser.watch", agentId });
       let released = false;
       return () => {
         if (released) return;

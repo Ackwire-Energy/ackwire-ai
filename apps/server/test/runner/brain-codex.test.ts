@@ -6,6 +6,7 @@ import {
   CodexEventMapper,
   CodexThreads,
   codexBridgeOverrides,
+  codexContextOverride,
   codexEffort,
   codexProfileOf,
   codexThreadKey,
@@ -348,6 +349,18 @@ test("effort: model_reasoning_effort, with xhigh and max as high; nothing for an
   expect(args().some((a) => a.startsWith("model_reasoning_effort"))).toBe(false);
   // Before resume and the stdin dash, like every option.
   expect(args("medium").slice(-1)).toEqual(["-"]);
+});
+
+test("context limit (protocol 28): model_auto_compact_token_limit, nothing for a value out of range", () => {
+  const args = (contextTokens?: unknown) =>
+    codexTurnArgs({ cwd: "/w", lastFile: "/l.txt", runId: RUN, contextTokens: contextTokens as never });
+  const limited = args(400_000);
+  expect(limited[limited.indexOf("model_auto_compact_token_limit=400000") - 1]).toBe("-c");
+  expect(limited.slice(-1)).toEqual(["-"]);
+  for (const bad of [undefined, 10, 400_000.5, "400000", 50_000_000]) {
+    expect(args(bad).some((a) => a.startsWith("model_auto_compact_token_limit"))).toBe(false);
+  }
+  expect(codexContextOverride(1_000_000)).toEqual(["-c", "model_auto_compact_token_limit=1000000"]);
 });
 
 test("a not-logged-in Codex is not_logged_in (the server marks the account signed out)", () => {

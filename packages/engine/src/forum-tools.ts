@@ -11,6 +11,7 @@ import {
 } from "./forum";
 import { personBehindCall } from "./requester";
 import { replyThreadOf } from "./runs";
+import { noAgentText } from "./team";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
 export const FORUM_SCOPE = "forum:write";
@@ -66,8 +67,7 @@ export function createForumToolSource(deps: { pubsub?: PubSub; artifacts?: Artif
           if (channel[0]?.kind === "forum")
             return { content: "You are already in a forum topic: say it in your post.", isError: true };
           const { handles, rows, missing } = await agentsByHandle(ctx.db, ctx.orgId, input.agents);
-          if (missing.length > 0)
-            return { content: `No agent ${missing.map((h) => `@${h}`).join(", ")}.`, isError: true };
+          if (missing.length > 0) return { content: await noAgentText(ctx, missing), isError: true };
           const [run] = await ctx.db
             .select({ hop: schema.agentRuns.hop })
             .from(schema.agentRuns)
@@ -122,8 +122,7 @@ export function createForumToolSource(deps: { pubsub?: PubSub; artifacts?: Artif
           const requester = await personBehindCall(ctx);
           if (!requester) return { content: "Only a person's request can open a forum topic.", isError: true };
           const { handles, rows, missing } = await agentsByHandle(ctx.db, ctx.orgId, input.agents);
-          if (missing.length > 0)
-            return { content: `No agent ${missing.map((h) => `@${h}`).join(", ")}.`, isError: true };
+          if (missing.length > 0) return { content: await noAgentText(ctx, missing), isError: true };
           const topic = await createForumTopic(
             forumDeps(ctx),
             {

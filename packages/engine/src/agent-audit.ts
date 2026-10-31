@@ -1,9 +1,8 @@
-import { redactCommon } from "@agenteschat/adapters/redact";
 import { and, type Database, desc, type Executor, eq, inArray, lt, ne, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import type { RunAuthority } from "./authority";
 import { requirePermission } from "./organizations";
-import { maskCredentials } from "./tool-detail";
+import { redactCredentials as masked } from "./tool-detail";
 
 const { auditLog, agents, approvals, channels, secretRequests, users } = schema;
 
@@ -21,8 +20,6 @@ const MAX_STRING = 500;
 const MAX_ITEMS = 20;
 const MAX_DEPTH = 4;
 const MAX_INPUT = 4000;
-
-const masked = (text: string) => redactCommon(maskCredentials(text));
 
 /**
  * A call's input as the audit keeps it: values under secret-looking keys

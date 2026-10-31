@@ -137,6 +137,10 @@ test("version gate and the app-server command line: our overrides, our bridge pe
   expect(args).toContain('sandbox_workspace_write.writable_roots=["/w/shared"]');
   expect(args).toContain(`mcp_servers.${CODEX_MCP_SERVER}.args=["/r/runner.js","mcp","--run","proc-0001"]`);
   expect(args).toContain(`mcp_servers.${CODEX_MCP_SERVER}.default_tools_approval_mode="approve"`);
+  expect(args.some((a) => a.startsWith("model_auto_compact_token_limit"))).toBe(false);
+  // Protocol 28: the agent's context limit is the process's own.
+  const limited = codexAppServerArgs({ processId: "proc-0001", contextTokens: 200_000 });
+  expect(limited[limited.indexOf("model_auto_compact_token_limit=200000") - 1]).toBe("-c");
 });
 
 test.skipIf(!posix)(
