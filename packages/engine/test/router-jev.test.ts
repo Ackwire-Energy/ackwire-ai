@@ -620,6 +620,15 @@ describe("the agent a person last talked to", () => {
     }));
     expect(roadmap.selected).toEqual([t.theo.id]);
     expect(roadmap.decision?.reason).not.toContain("follow-up");
+    // Ada could do it nearly as well (0.72 to 0.96, under 0.3 apart), but the tie-break is sure it fits Theo, the PM.
+    const sprint = await t.talk(talkWithAda, "cria uma task pro sprint de amanhã com os itens do roadmap", () => ({
+      nouls: { "@theo": 0.9, "@ada": 0.75 },
+      needs: 0.9,
+      best: "theo",
+      choice: { theo: 0.95, ada: 0.03, none: 0.02 },
+    }));
+    expect(sprint.selected).toEqual([t.theo.id]);
+    expect(sprint.decision?.reason).toBe("jev: best @theo (confidence 0.95)");
     // Ada can't do it: under her bar.
     const tasks = await t.talk(talkWithAda, "e o roadmap, como está?", () => ({
       nouls: { "@theo": 0.7, "@ada": 0.2 },

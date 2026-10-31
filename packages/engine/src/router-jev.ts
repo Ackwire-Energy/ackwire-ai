@@ -17,7 +17,8 @@ import {
  * conversation as `state` and, in parallel, one Noul per candidate ("should
  * <agent> answer?"), a Noul for "does this need any agent?", and, with two or
  * more candidates, a Noul for "is it for every agent?", a Choice over the
- * candidates plus "none" to break ties, and, for a person's message, one for
+ * candidates plus "none" to break ties (its pick, `best`, also says how clearly
+ * a message fits one agent), and, for a person's message, one for
  * "which agent does it speak to?" (`asksAddressee`, `withAddressee`).
  * It only scores; policy stays in `selectAgents`. Optional (needs the
  * installation's Jev key, ADR 0073), and the first step of `routeChain`:
@@ -198,6 +199,7 @@ export function createJevRouterStrategy(options: {
         new Map(input.candidates.map((c) => [c.agentId, clamp(to[c.handle])])),
       );
       const choice = answers.best_agent?.choice;
+      const bestPlaced = input.candidates.find((c) => c.handle === choice);
       const spokenTo = input.candidates.find((c) => c.agentId === scored.addressee);
       const reason = [
         spokenTo ? `to @${spokenTo.handle} (${clamp(to[spokenTo.handle]).toFixed(2)})` : null,
@@ -211,6 +213,9 @@ export function createJevRouterStrategy(options: {
         .join("; ");
       return {
         ...scored,
+        ...(bestPlaced
+          ? { best: { agentId: bestPlaced.agentId, confidence: clamp(answers.best_agent?.confidence) } }
+          : {}),
         ...(answers.already_answered ? { alreadyAnswered: clamp(answers.already_answered.noul) } : {}),
         ...(reason ? { reason } : {}),
         strategy: "jev",

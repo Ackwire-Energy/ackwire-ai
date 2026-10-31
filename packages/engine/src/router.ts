@@ -110,6 +110,11 @@ export interface RoutingResult {
    * now, over who spoke last, and over the agent whose message they replied to once it is picked.
    */
   addressee?: string;
+  /**
+   * The agent the step's tie-break finds best placed (Jev's Choice: role and what it can do, among the agents),
+   * and how sure it is. Past `CLEAR_CHOICE` the message fits that agent better than any other.
+   */
+  best?: { agentId: string; confidence: number };
   /** The deciding step's own words (model text: stored after the step's name, never shown). */
   reason?: string;
   /** Usage record of the call the strategy made, if any. */
@@ -639,6 +644,15 @@ export interface RouteResult {
 /** A follow-up goes to another agent than the one just spoken to only when the router is this much surer of it. */
 export const NAMED_OVER_CONTINUITY = 0.3;
 
+/**
+ * From this tie-break confidence (`RoutingResult.best`) a message fits that agent better, and the agent the person
+ * last talked to doesn't keep it. Jev's Choice moves the scores by at most 0.1, so they rarely show it. Jev gave
+ * Theo 0.83 for a routine either agent could make ("me de bom dia todo dia ás 8:30 da manha", 2026-10-31; the person
+ * expected Ada); in that workspace its only picks above 0.9 that fortnight were clear in the scores too (0.99 and 1.0
+ * to 0.6).
+ */
+export const CLEAR_CHOICE = 0.9;
+
 /** An agent's message may bring in one more agent, only when it clearly should (ADR 0034). */
 export const AGENT_CHIME_IN_SCORE = 0.75;
 // An agent's message at this hop (an answer to an answer) brings in nobody; defined next to the outbox insert.
@@ -1088,16 +1102,18 @@ export async function routeMessage(
   const clearPickScore = policy.clearPickScore ?? DEFAULT_ROUTER_POLICY.clearPickScore;
   // Speaking to no agent in particular, a message the router gives another agent is for the agent this person last
   // talked to when she could do it too: she clears her own bar (`minScore`, no lower) and, on her own, the need
-  // check; unless another is clearly surer (`clearlyAnother`). "me de bom dia todo dia ás 8:30 da manha", 23 minutes
-  // after a talk with Ada, went to Theo on 0.63 to her 0.55 (2026-10-31). It only settles which of the agents that
-  // could answers: a message the router gives her already, or gives nobody, stays as it is (she may pass).
+  // check; unless it clearly fits another agent better, by the step's tie-break (`CLEAR_CHOICE`) or by the scores
+  // (`clearlyAnother`). "me de bom dia todo dia ás 8:30 da manha", 23 minutes after a talk with Ada, went to Theo on
+  // 0.63 to her 0.55 (2026-10-31). It only settles which of the agents that could answers: a message the router
+  // gives her already, or gives nobody, stays as it is (she may pass).
   const resumes =
     !addressee &&
     lastTalkedTo !== null &&
     picked.length === 1 &&
     picked[0] !== lastTalkedTo &&
     scoreOf(lastTalkedTo) >= policy.minScore &&
-    ((decided.needsAgent ?? 1) >= policy.minScore || scoreOf(lastTalkedTo) >= clearPickScore);
+    ((decided.needsAgent ?? 1) >= policy.minScore || scoreOf(lastTalkedTo) >= clearPickScore) &&
+    !(decided.best && decided.best.agentId !== lastTalkedTo && decided.best.confidence >= CLEAR_CHOICE);
   // The agent the message speaks to, when a step is sure of one, is who the person talks to now: over who spoke
   // last ("ada, pergunta pro theo…" right after Theo spoke, 2026-10-31), and over the agent whose message they
   // replied to once it clears its own bar: a reply that only hands over ("isso é com a ada") stays with the
