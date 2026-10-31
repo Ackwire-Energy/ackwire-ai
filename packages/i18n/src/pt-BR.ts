@@ -9283,6 +9283,15 @@ export const ptBR = {
     cloud: {
       review:
         "Pausado para uma análise de segurança, até a nossa equipe olhar o caso. As nossas verificações automáticas detectaram uma atividade que pode violar os nossos Termos (seção 5). Para contestar, escreva para {{email}}.",
+      /** The same hold set with what was flagged (`review.<category>`): `what` is that category's `reviewWhat`. */
+      reviewFor:
+        "Pausado para uma análise de segurança, até a nossa equipe olhar o caso. As nossas verificações automáticas detectaram uma atividade que parece envolver {{what}}, o que os nossos Termos não permitem (seção 5). Para contestar, escreva para {{email}}.",
+      reviewWhat: {
+        phishing_impersonation: "phishing ou imitação de uma marca",
+        account_takeover: "acesso indevido a contas de outras pessoas",
+        fraud: "fraude",
+        illegal_content: "conteúdo ilegal",
+      },
       blockedAbuse:
         "Esta conta está bloqueada. As nossas verificações a ligaram a uma conta encerrada por abuso (Termos, seção 5). Para contestar, escreva para {{email}}.",
       blockedLegal:
