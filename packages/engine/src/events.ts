@@ -305,7 +305,8 @@ export type ChannelEvent =
     }
   /**
    * A person pressed "Continuar" under a stopped reply (`messageId`): `newRunId` picks up where
-   * `runId` stopped (its reply's `meta.canceled.continuedRunId`), so every app hides the button.
+   * `runId` stopped (its reply's `meta.canceled.continuedRunId`, or `meta.stepLimit.continuedRunId` after
+   * its step limit), so every app hides the button.
    */
   | {
       type: "run.continued";

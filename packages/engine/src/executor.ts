@@ -138,6 +138,7 @@ import {
   bridgeToolsFor,
   invokeToolForRun,
   invokeWithChip,
+  isScreenCall,
   mergeToolEffects,
   postPauseCards,
   publishPauseCards,
@@ -313,8 +314,13 @@ export interface Transcript {
    * behind it from then on (`authority.ts`, `steeredByOf`).
    */
   steeredBy?: string;
-  /** A background run near its tool-call cap was told once to wrap up (`WRAP_UP_NOTE`). */
+  /**
+   * Near its tool-call cap it was told once to wrap up (`WRAP_UP_NOTE`, `WRAP_UP_REPLY_NOTE`): its final
+   * reply offers Continuar (`meta.stepLimit`).
+   */
   wrapUpNoted?: boolean;
+  /** Model calls whose every tool call drove the browser or the desktop: they count apart (`SCREEN_TURNS_FACTOR`). */
+  screenTurns?: number;
   /** The computer brain couldn't answer and the model brain did (ADR 0032 §5): the reply carries a quiet note. */
   fallback?: { from: BrainKind; code: string; message: string };
   /** The computer brain is unavailable and nothing can stand in: the run waits for the computer. */
@@ -420,12 +426,25 @@ export function interruptedTurnPrompt(
     .join("\n\n");
 }
 
-/** How many model calls before the cap a background run is told to wrap up (ADR 0053 §10). */
+/** How many model calls before the cap a run is told to wrap up (ADR 0053 §10). */
 export const WRAP_UP_TURNS = 2;
 
 /** What a background run near its tool-call cap reads once: hand off what it has instead of failing. */
 export const WRAP_UP_NOTE =
   "You are close to this run's limit of steps: only a couple of calls are left. Stop starting new work. If the people need to know what you found, call hand_off now with what you have; then end with your record (a short summary of what you checked). Your tools stay available for these last calls.";
+
+/** What any other run near its cap reads once: say where it stands, so the person can let it go on (Continuar). */
+export const WRAP_UP_REPLY_NOTE =
+  "You are close to this run's limit of steps: only a couple of calls are left. Stop starting new work and reply with what you did, where you stopped and what is left, so the person can let you pick up from there.";
+
+/**
+ * Each step on the browser or the desktop is a model call: calls that only drive them count apart, up to this
+ * many times the cap. A run posting on a few sites gets there, and a loop on any other tool still stops at the cap.
+ */
+export const SCREEN_TURNS_FACTOR = 2;
+
+/** The closing line of a conversation run that reached its cap mid-work (`bodyCode` `step_limit`). */
+const STEP_LIMIT_TEXT = "I ran out of steps before finishing.";
 
 /** Errors that will not get better by retrying: the run fails right away with a readable reason. */
 const userFacing = (error: unknown): string | null => {
@@ -1400,20 +1419,28 @@ async function executeRunInner(
     }
   }
 
-  /** Ends the run with a plain closing line that carries what it changed (its receipts). */
-  const endWithReceipts = async () => {
+  /** Continuar under the reply of a run that stops near or at its cap (`continueRun`); never in a forum's turns. */
+  const stepLimitMeta = (): Record<string, unknown> => (channelRow?.kind === "forum" ? {} : { stepLimit: {} });
+
+  /** Ends the run with a closing line the server writes (`code`), with what it changed (its receipts) and its cards. */
+  const closeWith = async (
+    text: string,
+    code: string,
+    step: Record<string, unknown>,
+    meta: Record<string, unknown> = {},
+  ) => {
     await deferred;
     const t = transcript as Transcript;
     const reply = await db.transaction(async (tx) => {
       const m = await post(
         tx,
         replyThreadId,
-        DONE_TEXT,
-        withFallback(t, withCode(takeMemoryUpdates(t), bodyCode("done"))),
+        text,
+        withFallback(t, withCode({ ...takeMemoryUpdates(t), ...meta }, bodyCode(code))),
       );
       t.postedUpTo = t.messages.length;
       t.postedCount++;
-      await addRunStep(tx, run, "message", { messageId: m.id, receipts: true });
+      await addRunStep(tx, run, "message", { messageId: m.id, ...step });
       const done = await transitionRun(tx, run.id, "running", "done", {
         replyMessageId: m.id,
         error: null,
@@ -1428,6 +1455,15 @@ async function executeRunInner(
     await finished("done");
     await redispatchPending("done");
   };
+
+  /** Ends the run with a plain closing line that carries what it changed (its receipts). */
+  const endWithReceipts = () => closeWith(DONE_TEXT, "done", { receipts: true });
+
+  /**
+   * A conversation run at its cap in the middle of its work: instead of failing, it says it ran out of steps (with
+   * what it changed and where it browsed), and Continuar under that line picks up from here with a fresh count.
+   */
+  const endAtStepLimit = () => closeWith(STEP_LIMIT_TEXT, "step_limit", { stepLimit: true }, stepLimitMeta());
 
   /**
    * Ends the run without a message (reply-policy.ts): nobody called it by name and it passed, or wrote
@@ -1834,7 +1870,10 @@ async function executeRunInner(
     }
   }
 
-  const maxTurns = deps.maxToolTurns ?? 25;
+  const baseTurns = deps.maxToolTurns ?? 25;
+  const capOf = (t: Transcript) => baseTurns + Math.min(t.screenTurns ?? 0, baseTurns * SCREEN_TURNS_FACTOR);
+  /** Grows with the run's screen-only calls (`screenTurns`). */
+  let maxTurns = capOf(transcript);
   let firstTurn = true;
   // Live steering (`live-steer.ts`): while a computer turn is in flight, a person's message goes to it
   // (read at its next tool boundary) instead of waiting for the turn's end; any other time, it waits.
@@ -1865,22 +1904,19 @@ async function executeRunInner(
   try {
     for (;;) {
       if (await isCanceled()) return stopCanceled("");
-      // At the cap the inbox stays as it is: a message never gets marked read and then lost (the failure
-      // hands it to a run of its own).
-      if (run.turns >= maxTurns) return fail("too_many_tool_calls");
+      // At the cap the inbox stays as it is: a message never gets marked read and then lost (the run's end
+      // hands it to a run of its own). A routine's run fails there (its ledger says so); any other says it ran
+      // out of steps, with Continuar.
+      if (run.turns >= maxTurns) return run.background ? fail("too_many_tool_calls") : endAtStepLimit();
       const steered = await deliverSteering();
       if (steered && plan.kind !== "model") {
         nextPrompt = [nextPrompt ?? (computerTurns === 0 ? triggerText : ""), steered].filter(Boolean).join("\n\n");
       }
-      // A routine's run near the cap hands off what it has instead of failing (ADR 0053 §10).
-      if (
-        run.background &&
-        plan.kind === "model" &&
-        !transcript.wrapUpNoted &&
-        run.turns >= Math.max(0, maxTurns - WRAP_UP_TURNS)
-      ) {
+      // Near the cap it is told once to wrap up: a routine's run hands off what it has (ADR 0053 §10), any other
+      // replies with where it stands.
+      if (plan.kind === "model" && !transcript.wrapUpNoted && run.turns >= Math.max(0, maxTurns - WRAP_UP_TURNS)) {
         transcript.wrapUpNoted = true;
-        appendUserText(transcript, WRAP_UP_NOTE);
+        appendUserText(transcript, run.background ? WRAP_UP_NOTE : WRAP_UP_REPLY_NOTE);
         await saveTranscript(db, transcript);
         later(() => addRunStep(db, run, "context", { wrapUp: true }));
       }
@@ -2149,6 +2185,10 @@ async function executeRunInner(
 
       const toolUses = result.toolCalls;
       if (result.stopReason === "tool_use" && toolUses.length > 0 && toolScope) {
+        if (toolUses.every(isScreenCall)) {
+          transcript.screenTurns = (transcript.screenTurns ?? 0) + 1;
+          maxTurns = capOf(transcript);
+        }
         const calls: NonNullable<Transcript["pending"]>["calls"] = [];
         const waiting: Approval[] = [];
         const asks: { id: string; toolUseId: string; text: string; choices: string[] | null; why: string }[] = [];
@@ -2395,7 +2435,8 @@ async function executeRunInner(
         .select({ pending: agentRuns.pendingMessageIds })
         .from(agentRuns)
         .where(eq(agentRuns.id, run.id));
-      if ((still?.pending.length ?? 0) > 0 || keep) {
+      // At the cap this answer ends the run instead: what came in gets a run of its own.
+      if (((still?.pending.length ?? 0) > 0 && run.turns < maxTurns) || keep) {
         const posted = text
           ? await db.transaction(async (tx) => {
               const m = await post(tx, replyThreadId, text, withFallback(t, withCode(takeMemoryUpdates(t), code)));
@@ -2415,8 +2456,14 @@ async function executeRunInner(
         continue;
       }
       const reply = await db.transaction(async (tx) => {
+        // Told to wrap up near its cap: this is where it stands, and Continuar under it goes on from here.
         const message = text
-          ? await post(tx, replyThreadId, text, withFallback(t, withCode(takeMemoryUpdates(t), code)))
+          ? await post(
+              tx,
+              replyThreadId,
+              text,
+              withFallback(t, withCode({ ...takeMemoryUpdates(t), ...(t.wrapUpNoted ? stepLimitMeta() : {}) }, code)),
+            )
           : null;
         t.postedUpTo = t.messages.length;
         if (message) t.postedCount++;
@@ -2976,6 +3023,9 @@ export function continuedTranscript(stopped: Transcript, line: string): Transcri
     postedCount: 0,
     deltaSeq: 0,
     ...(stopped.repo ? { repo: stopped.repo } : {}),
+    // The same tools and model: the thinking blocks it replays stay valid only with the same `tools`.
+    ...(stopped.toolGroups ? { toolGroups: stopped.toolGroups } : {}),
+    ...(stopped.autoModel ? { autoModel: stopped.autoModel } : {}),
   };
   const last = t.messages.at(-1);
   const unanswered =

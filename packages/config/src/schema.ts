@@ -328,7 +328,8 @@ export const envVars = {
   },
   AGENT_MAX_TOOL_TURNS: {
     schema: z.coerce.number().int().min(1).max(200).default(25),
-    description: "Maximum model calls in one agent run (each tool round trip is one). Stops runaway tool loops.",
+    description:
+      "Maximum model calls in one agent run (each tool round trip is one), plus up to twice as many that only drive the agent's browser or desktop. Stops runaway tool loops: near it the agent wraps up, and a conversation run ends with Continuar.",
     section: "Agents",
   },
   AGENT_CONTEXT_MESSAGES: {
