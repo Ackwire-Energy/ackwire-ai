@@ -8227,6 +8227,7 @@ export const en: Translations = {
     },
     title: "Settings",
     account: {
+      plans: "Your plans' limits",
       device: "On this device",
     },
     orgTitle: "Workspace",

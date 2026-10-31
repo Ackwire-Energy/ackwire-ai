@@ -51,6 +51,8 @@ export const budgetPercent = (spentNanoUsd: number, budgetNanoUsd: number) =>
 /**
  * This month's spend and effective budget of every active agent, in
  * nano-USD, keyed by agent id. The workspace's 100% is the sum of the budgets.
+ * Only the agent's own calls count: the router's and Jev's, recorded with its
+ * id, are not billed to its budget.
  */
 export async function agentBudgetsThisMonth(db: Database, orgId: string, now = new Date()) {
   const fallback = await orgDefaultAgentBudget(db, orgId);
@@ -66,6 +68,7 @@ export async function agentBudgetsThisMonth(db: Database, orgId: string, now = n
       and(
         eq(usageRecords.orgId, orgId),
         eq(usageRecords.agentId, agents.id),
+        eq(usageRecords.kind, "agent"),
         gte(usageRecords.createdAt, monthStartUtc(now)),
       ),
     )
@@ -93,7 +96,7 @@ export async function workspaceBudgetPercent(db: Database, orgId: string, now = 
 /** Start of the calendar month (UTC) containing `now`: budgets reset then. */
 export const monthStartUtc = (now: Date) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 
-/** What an agent spent this month, in nano-USD. */
+/** What an agent's own calls spent this month, in nano-USD: what its budget pays (`agentBudgetsThisMonth`). */
 export async function agentSpendThisMonth(db: Database, orgId: string, agentId: string, now = new Date()) {
   const [row] = await db
     .select({ total: sql<string>`coalesce(sum(${usageRecords.costNanoUsd}), 0)` })
@@ -102,6 +105,7 @@ export async function agentSpendThisMonth(db: Database, orgId: string, agentId: 
       and(
         eq(usageRecords.orgId, orgId),
         eq(usageRecords.agentId, agentId),
+        eq(usageRecords.kind, "agent"),
         gte(usageRecords.createdAt, monthStartUtc(now)),
       ),
     );
