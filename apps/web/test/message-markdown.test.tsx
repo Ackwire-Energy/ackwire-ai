@@ -180,7 +180,10 @@ describe("streaming words", () => {
     for (let i = 1; i <= full.length; i++) {
       r.rerender(<MessageBody body={full.slice(0, i)} live />);
       // Written so far, the backticks of a closed code span gone.
-      const shown = full.slice(0, i).replace(/`([^`]*)`/, "$1").trimEnd();
+      const shown = full
+        .slice(0, i)
+        .replace(/`([^`]*)`/, "$1")
+        .trimEnd();
       expect(r.container.textContent).toBe(shown);
     }
   });
