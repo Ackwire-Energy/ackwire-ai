@@ -4050,7 +4050,7 @@ export interface AgentSetup {
   fallback?: boolean;
   /** "Atende outras pessoas" off, for the agents that move onto the plan. */
   onlyOwner?: boolean;
-  /** Its Autonomia, for the agents that take the rest or already think this way; omitted = each keeps its own. */
+  /** Its Autonomia, wherever the caller may set it by hand, whatever the AI takes; omitted = each keeps its own. */
   autonomy?: CommandApproval;
 }
 
@@ -4067,14 +4067,14 @@ export type AgentSetupReason =
 /** What a setup does to one agent (in a preview, would do). */
 export interface AgentSetupResult {
   agentId: string;
-  /** Its AI. `same`: it already thinks this way; `skipped`: it takes nothing (`reason`). */
+  /** Its AI. `same`: it already thinks this way; `skipped`: it takes none of the AI (`reason`), maybe the Autonomia. */
   status: "applied" | "same" | "skipped";
   /** It keeps the account it has (another person's plan) and takes the rest: its name; null = its computer's own. */
   keeps?: { account: string | null };
   reason?: AgentSetupReason;
   /** `owner` (account_owner, not the caller's), `agent` (account_single), `computer`, `plan` and `model`. */
   params?: Record<string, string>;
-  /** Its Autonomia changes too: with the AI it takes, or alone when it already thinks this way. */
+  /** Its Autonomia changes, whatever its AI does: wherever the caller may set it by hand, `skipped` agents too. */
   autonomy?: { from: CommandApproval; to: CommandApproval };
 }
 

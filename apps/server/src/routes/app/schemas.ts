@@ -657,7 +657,7 @@ export const AgentSetup = z
     }),
     autonomy: CommandApproval.optional().openapi({
       description:
-        "Its Autonomia, set on the agents that take the rest or already think this way, where the caller may set it by hand (an admin or the agent's owner); omitted = each agent keeps its own.",
+        "Its Autonomia, set wherever the caller may set it by hand (an admin or the agent's owner), whatever the AI takes; omitted = each agent keeps its own.",
     }),
   })
   .openapi("AgentSetup");
@@ -667,10 +667,11 @@ export const AgentSetupResult = z
     agentId: z.uuid(),
     status: z.enum(["applied", "same", "skipped"]).openapi({
       description:
-        "Its AI: `applied` (in a preview: would be); `same`: it already thinks this way; `skipped`: it takes nothing.",
+        "Its AI: `applied` (in a preview: would be); `same`: it already thinks this way; `skipped`: it takes none of the AI (`reason`), and may still take the Autonomia (`autonomy`).",
     }),
     autonomy: z.object({ from: CommandApproval, to: CommandApproval }).optional().openapi({
-      description: "Its Autonomia changes too (in a preview: would): with the AI it takes, or alone when `same`.",
+      description:
+        "Its Autonomia changes (in a preview: would), whatever its AI does: wherever the caller may set it by hand, `skipped` agents too.",
     }),
     keeps: z.object({ account: z.string().nullable() }).optional().openapi({
       description: "It keeps the account it has (another person's plan): its name; null = its computer's own.",
