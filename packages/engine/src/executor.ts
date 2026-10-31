@@ -136,7 +136,6 @@ import {
   bridgeToolsFor,
   invokeToolForRun,
   invokeWithChip,
-  isScreenCall,
   mergeToolEffects,
   postPauseCards,
   publishPauseCards,
@@ -155,6 +154,7 @@ import {
   type RunStatus,
   replyThreadOf,
   runErrorDetail,
+  STUCK_ERROR,
   transitionRun,
 } from "./runs";
 import { truncateOutput } from "./sandbox";
@@ -162,6 +162,7 @@ import { secretResult } from "./secrets";
 import { enabledSkills } from "./skills";
 import { standingErrorDetail, standingRefusal } from "./standing";
 import { rerootRun } from "./stretch";
+import { isStuck, noteStep, STUCK_END_NOTE, STUCK_END_REPLY_NOTE, STUCK_NOTE, type StuckState } from "./stuck";
 import { archivedAgentsPrompt, FIND_AGENT_TOOL } from "./team";
 import { linkRunChecks, runChecksForReply } from "./team-actions";
 import { carriesCredential, maskCredentials } from "./tool-detail";
@@ -320,8 +321,8 @@ export interface Transcript {
    * reply offers Continuar (`meta.stepLimit`).
    */
   wrapUpNoted?: boolean;
-  /** Model calls that only drove the browser or the desktop, and worked: they count apart (`SCREEN_TURNS_FACTOR`). */
-  screenTurns?: number;
+  /** Whether it goes in circles (`stuck.ts`): its latest steps and what was found. */
+  stuck?: StuckState;
   /** The computer brain couldn't answer and the model brain did (ADR 0032 §5): the reply carries a quiet note. */
   fallback?: { from: BrainKind; code: string; message: string };
   /** The computer brain is unavailable and nothing can stand in: the run waits for the computer. */
@@ -439,15 +440,10 @@ export const WRAP_UP_NOTE =
 export const WRAP_UP_REPLY_NOTE =
   "You are close to this run's limit of steps: only a couple of calls are left. Stop starting new work and reply with what you did, where you stopped and what is left, so the person can let you pick up from there.";
 
-/**
- * Each step on the browser or the desktop is a model call: calls that only drive them, and worked, count apart, up
- * to this many times the cap. A run posting on a few sites gets there, and a loop on a step that fails, or on any
- * other tool, still stops at the cap.
- */
-export const SCREEN_TURNS_FACTOR = 2;
-
 /** The closing line of a conversation run that reached its cap mid-work (`bodyCode` `step_limit`). */
 const STEP_LIMIT_TEXT = "I ran out of steps before finishing.";
+/** The closing line of a conversation run found stuck twice that didn't say where it stands (`bodyCode` `stuck`). */
+const STUCK_TEXT = "I got stuck and stopped before finishing.";
 
 /** Errors that will not get better by retrying: the run fails right away with a readable reason. */
 const userFacing = (error: unknown): string | null => {
@@ -1271,6 +1267,8 @@ async function executeRunInner(
     const person = await lastPersonAmong(db, run.orgId, run.agentId, ids);
     if (!person) return false;
     t.answerOwed = true;
+    // What they wrote may be what it lacked: its repetition so far no longer counts, unless it is already ending.
+    if (t.stuck?.endAt === undefined) delete t.stuck;
     if (!run.background && !t.steeredBy) {
       const authority = await runAuthority(db, { ...run, transcript: t as unknown as Record<string, unknown> });
       if (authority.kind === "unattended") t.steeredBy = person.userId;
@@ -1482,6 +1480,10 @@ async function executeRunInner(
    * what it changed and where it browsed), and Continuar under that line picks up from here with a fresh count.
    */
   const endAtStepLimit = () => closeWith(STEP_LIMIT_TEXT, "step_limit", { stepLimit: true }, { stepLimit: {} });
+
+  /** Found stuck twice and still calling tools: the same ending, saying it stopped because it was stuck. */
+  const endStuck = () =>
+    closeWith(STUCK_TEXT, "stuck", { stepLimit: true, stuck: true }, { stepLimit: { stuck: true } });
 
   /**
    * Ends the run without a message (reply-policy.ts): nobody called it by name and it passed, or wrote
@@ -1875,10 +1877,9 @@ async function executeRunInner(
     }
   }
 
-  const baseTurns = deps.maxToolTurns ?? 25;
-  const capOf = (t: Transcript) => baseTurns + Math.min(t.screenTurns ?? 0, baseTurns * SCREEN_TURNS_FACTOR);
-  /** Grows with the run's screen-only calls (`screenTurns`). */
-  let maxTurns = capOf(transcript);
+  // A backstop for a run that runs away: one that goes in circles is stopped long before (`stuck.ts`).
+  const backstop = deps.maxToolTurns ?? 200;
+  let maxTurns = Math.min(backstop, transcript.stuck?.endAt ?? backstop);
   let firstTurn = true;
   // Live steering (`live-steer.ts`): while a computer turn is in flight, a person's message goes to it
   // (read at its next tool boundary) instead of waiting for the turn's end; any other time, it waits.
@@ -1911,8 +1912,12 @@ async function executeRunInner(
       if (await isCanceled()) return stopCanceled("");
       // At the cap the inbox stays as it is: a message never gets marked read and then lost (the run's end
       // hands it to a run of its own). A routine's run fails there (its ledger says so), and so does a forum's;
-      // any other says it ran out of steps, with Continuar.
-      if (run.turns >= maxTurns) return run.background || forum ? fail("too_many_tool_calls") : endAtStepLimit();
+      // any other says it ran out of steps, or that it got stuck, with Continuar.
+      if (run.turns >= maxTurns) {
+        const stuck = transcript.stuck?.endAt !== undefined;
+        if (run.background || forum) return fail(stuck ? STUCK_ERROR : "too_many_tool_calls");
+        return stuck ? endStuck() : endAtStepLimit();
+      }
       const steered = await deliverSteering();
       if (steered && plan.kind !== "model") {
         nextPrompt = [nextPrompt ?? (computerTurns === 0 ? triggerText : ""), steered].filter(Boolean).join("\n\n");
@@ -1923,6 +1928,7 @@ async function executeRunInner(
         plan.kind === "model" &&
         !forum &&
         !transcript.wrapUpNoted &&
+        transcript.stuck?.endAt === undefined &&
         run.turns >= Math.max(0, maxTurns - WRAP_UP_TURNS)
       ) {
         transcript.wrapUpNoted = true;
@@ -2266,11 +2272,6 @@ async function executeRunInner(
           return stopCanceled("");
         }
         if (waiting.length === 0 && asks.length === 0 && secretAsks.length === 0 && waits.length === 0) {
-          // Only steps that worked count apart: a loop on a failing browser or desktop counts toward the cap.
-          if (toolUses.every(isScreenCall) && calls.every((c) => c.result && !c.result.isError)) {
-            transcript.screenTurns = (transcript.screenTurns ?? 0) + 1;
-            maxTurns = capOf(transcript);
-          }
           transcript.messages.push({
             role: "user",
             content: calls.map((c) => ({
@@ -2280,6 +2281,48 @@ async function executeRunInner(
               ...(c.result?.isError ? { isError: true } : {}),
             })),
           });
+          // Going in circles (`stuck.ts`): only a step that repeats is judged, and the next verdict needs new steps.
+          if (turnPlan.kind === "model" && transcript.stuck?.endAt === undefined && !shuttingDown()) {
+            const noted = noteStep(
+              transcript.stuck,
+              run.turns,
+              calls.map((c) => ({
+                name: c.name,
+                input: toolUses.find((u) => u.id === c.toolUseId)?.input,
+                content: c.result?.content ?? "",
+                isError: c.result?.isError === true,
+              })),
+            );
+            const stuck = noted.state;
+            transcript.stuck = stuck;
+            const sign = noted.sign;
+            if (sign) {
+              const verdict = await isStuck(judge, {
+                orgId: run.orgId,
+                agentId: run.agentId,
+                runId: run.id,
+                request: triggerMessage?.body ?? triggerText,
+                sign,
+                steps: stuck.steps,
+              });
+              stuck.since = run.turns;
+              const action = !verdict.stuck ? null : !stuck.noted ? "note" : forum ? "fail" : "end";
+              later(() => addRunStep(db, run, "context", { stuckCheck: { sign, ...verdict, action } }));
+              if (action === "note") {
+                stuck.noted = true;
+                appendUserText(transcript, STUCK_NOTE);
+              } else if (action === "end") {
+                // As near the cap: a couple of calls to say where it stands, then the run ends.
+                stuck.endAt = run.turns + WRAP_UP_TURNS;
+                maxTurns = Math.min(maxTurns, stuck.endAt);
+                appendUserText(transcript, run.background ? STUCK_END_NOTE : STUCK_END_REPLY_NOTE);
+              } else if (action === "fail") {
+                // A forum's turn never wraps up (its words would be its post): it fails, and the topic stalls.
+                await saveTranscript(db, transcript);
+                return fail(STUCK_ERROR);
+              }
+            }
+          }
           await saveTranscript(db, transcript);
           // It passed and did nothing else: the run ends here, no closing call spent.
           if (transcript.passed && toolUses.every((u) => u.name === PASS_TOOL)) {
@@ -2464,14 +2507,12 @@ async function executeRunInner(
         continue;
       }
       const reply = await db.transaction(async (tx) => {
-        // Told to wrap up near its cap: this is where it stands, and Continuar under it goes on from here.
+        // Told to wrap up near its cap, or found stuck twice: this is where it stands, and Continuar under it goes
+        // on from here.
+        const ended =
+          t.stuck?.endAt !== undefined ? { stepLimit: { stuck: true } } : t.wrapUpNoted ? { stepLimit: {} } : {};
         const message = text
-          ? await post(
-              tx,
-              replyThreadId,
-              text,
-              withFallback(t, withCode({ ...takeMemoryUpdates(t), ...(t.wrapUpNoted ? { stepLimit: {} } : {}) }, code)),
-            )
+          ? await post(tx, replyThreadId, text, withFallback(t, withCode({ ...takeMemoryUpdates(t), ...ended }, code)))
           : null;
         t.postedUpTo = t.messages.length;
         if (message) t.postedCount++;

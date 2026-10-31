@@ -30,6 +30,8 @@ import {
   recoverStaleRuns,
   releaseInbox,
   runBrainOf,
+  STUCK_END_NOTE,
+  STUCK_NOTE,
   type ToolSource,
   WRAP_UP_NOTE,
 } from "../src";
@@ -458,6 +460,24 @@ describe("a routine's background run never posts by itself", () => {
     expect(requests[2]?.tools?.map((t) => t.name)).toContain("look");
     expect((await runById(run.id))?.status).toBe("done");
     expect(ends()).toEqual([{ runId: run.id, status: "done", text: "Resumo: 3 PRs abertos, nenhum novo." }]);
+  });
+
+  test("going in circles: one note, then told to hand off what it has, then it fails as stuck in its ledger", async () => {
+    f = await setup({
+      toolSources: [workTools()],
+      judge: (kind) => (kind === "stuck_run" ? 0.9 : undefined),
+      reply: () => ({ chunks: [], toolUses: [{ name: "look", input: {} }] }),
+    });
+    const { run, routineRun } = await backgroundRun();
+    await drainOutbox(f.db, f.handlers);
+
+    const requests = f.provider.calls.map((c) => c.request);
+    expect(requests).toHaveLength(8);
+    expect(lastText(requests[3] as ModelRequest)).toContain(STUCK_NOTE);
+    expect(lastText(requests[6] as ModelRequest)).toContain(STUCK_END_NOTE);
+    expect(await runById(run.id)).toMatchObject({ status: "failed", error: "stuck" });
+    expect(await agentMessages()).toEqual([]);
+    expect(await routineRunById(routineRun.id)).toMatchObject({ status: "failed", code: "stuck" });
   });
 });
 
