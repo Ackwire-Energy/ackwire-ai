@@ -191,10 +191,12 @@ function RoleList({ roles, people, onOpen }: { roles: OrgRole[]; people: Person[
 
   return (
     <div className="roles">
-      <header className="roles-head">
-        <div className="roles-head__text">
+      <header className="page__header page__header--row">
+        <div className="page__header-text">
           <h2 className="page-title">{t("settings.section.roles")}</h2>
-          <p className="muted">{t("settings.sectionText.roles")}</p>
+          <p className="muted" style={{ margin: 0 }}>
+            {t("settings.sectionText.roles")}
+          </p>
         </div>
         {manages && (
           <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>

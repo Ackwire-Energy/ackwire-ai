@@ -8122,7 +8122,7 @@ export const ptBR = {
       notifications: "A caixa de notificações guarda tudo. Aqui você escolhe o que chega como aviso, neste workspace.",
       general: "Nome, fuso e o que todo agente sabe do workspace.",
       members: "Quem está no workspace e os convites.",
-      roles: "O que cada pessoa pode fazer. Papéis se somam: quem tem dois pode o que os dois podem.",
+      roles: "O que cada pessoa pode fazer. Papéis se somam.",
       access: "O que cada agente pode usar: um nível por conector.",
       connectors: "Serviços conectados uma vez para o workspace inteiro.",
       skills: "Instruções em Markdown que os agentes abrem quando precisam.",

@@ -8083,7 +8083,7 @@ export const en: Translations = {
         "The inbox keeps everything. Here you choose what reaches you as a notification, in this workspace.",
       general: "Name, time zone and what every agent knows about the workspace.",
       members: "Who is in the workspace, and invitations.",
-      roles: "What each person can do. Roles add up: holding two lets you do what both allow.",
+      roles: "What each person can do. Roles add up.",
       access: "What each agent can use: one level per connector.",
       connectors: "Services connected once for the whole workspace.",
       skills: "Markdown instructions agents open when they need them.",

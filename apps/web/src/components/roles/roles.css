@@ -5,23 +5,6 @@
   gap: 20px;
   min-width: 0;
 }
-.roles-head {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.roles-head__text {
-  flex: 1 1 280px;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.roles-head__text p {
-  margin: 0;
-  max-width: 560px;
-}
 
 /* The list: one row per role, one line each; the base role below a label. */
 .roles-list {
@@ -109,8 +92,10 @@
   font-weight: 600;
   color: var(--faint);
 }
+/* The card has no padding (rows run edge to edge): the foot keeps the rows' 20px so its ⓘ lines up with the marks. */
 .roles-list .ac-card__foot {
   margin: 0;
+  padding-inline: 20px;
 }
 .roles-foot {
   flex: 1;
