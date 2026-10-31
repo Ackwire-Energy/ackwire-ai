@@ -1354,4 +1354,36 @@ describe("proposals for teammates (one card, a row per agent and kind of change)
     ).rejects.toBeInstanceOf(ConflictError);
     expect((await rows()).find((r) => r.agentId === lia.id)?.status).toBe("stale");
   });
+
+  test("the list's cap leaves out decided rows before a pending one, and a card's rows are read by id past it", async () => {
+    f = await setup();
+    const ada = await teammate("ada");
+    const {
+      proposals: [waiting],
+    } = await proposeFor({ target: "agent_instructions", agentIds: [ada.id], change: "Responder em português." });
+    // 201 refused ones came after it.
+    const later = await f.db
+      .insert(schema.contextProposals)
+      .values(
+        Array.from({ length: 201 }, (_, i) => ({
+          orgId: f.org.id,
+          target: "org_context" as const,
+          baseHash: "x",
+          proposedText: `v${i}`,
+          diff: "",
+          rationale: "",
+          status: "rejected" as const,
+          createdAt: new Date(Date.now() + 1000 + i),
+        })),
+      )
+      .returning();
+    const listed = await listProposals(f.db, f.owner.id, f.org.id);
+    expect(listed).toHaveLength(200);
+    expect(listed[0]).toMatchObject({ id: waiting?.id, canDecide: true });
+    const oldest = later[0]?.id ?? "";
+    expect(listed.map((p) => p.id)).not.toContain(oldest);
+    const ids = [oldest, waiting?.id ?? ""];
+    const card = await listProposals(f.db, f.owner.id, f.org.id, { ids });
+    expect(card.map((p) => p.id).sort()).toEqual(ids.sort());
+  });
 });

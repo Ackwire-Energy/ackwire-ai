@@ -72,6 +72,11 @@ async function openCard(proposals: Proposal[], tweak: (api: ReturnType<typeof cr
   await settle(2);
   return state;
 }
+/** The list holds only the newest proposals, and the card's are past it: only a read by id finds them. */
+const pastTheList = (api: ReturnType<typeof createFakeApi>) => {
+  const list = api.proposals.list;
+  api.proposals.list = async (orgId, filter) => (filter?.ids ? list(orgId, filter) : []);
+};
 const accepted = (state: { calls: { method: string; args: unknown[] }[] }) =>
   state.calls.filter((c) => c.method === "proposals.accept").map((c) => c.args[1]);
 const click = (el: HTMLElement) => act(async () => fireEvent.click(el));
@@ -129,19 +134,18 @@ describe("a change proposed for several agents in the chat", () => {
     ]);
   });
 
-  test("a card naming rows the list read before it doesn't have reads the list again", async () => {
-    let reads = 0;
-    await openCard([row("p-ada"), atlas("p-atlas")], (api) => {
-      const list = api.proposals.list;
-      api.proposals.list = async (orgId) => {
-        reads += 1;
-        const all = await list(orgId);
-        return reads === 1 ? all.filter((p) => p.id !== "p-atlas") : all;
-      };
-    });
+  test("a card reads its rows by id: older than the newest proposals the list holds, it still shows whole", async () => {
+    await openCard([row("p-ada"), atlas("p-atlas")], pastTheList);
     const card = screen().getByRole("group", { name: "Proposta de mudança de Atlas para 2 agentes" });
+    expect(within(card).getByRole("switch", { name: "Incluir Ada" })).toBeTruthy();
     expect(within(card).getByRole("switch", { name: "Incluir Atlas" })).toBeTruthy();
-    expect(reads).toBe(2);
+  });
+
+  test("a card of one row reads it by id too", async () => {
+    await openCard([adaRole("p-role")], pastTheList);
+    expect(screen().getByRole("group", { name: "Proposta de mudança de Atlas" }).textContent).toContain(
+      "Papel: Dev → Revisora de código",
+    );
   });
 
   test("one row alone keeps the single card: a new role is taken as proposed, with no Editar", async () => {

@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, desc, eq, inArray, isNull, schema } from "@agenteschat/db";
+import { and, type Database, desc, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import {
   type AccessLine,
   accessInputOf,
@@ -217,7 +217,7 @@ export async function listProposals(
   db: Database,
   actorId: string,
   orgId: string,
-  options: { status?: Proposal["status"]; agentId?: string } = {},
+  options: { status?: Proposal["status"]; agentId?: string; ids?: string[] } = {},
 ) {
   const membership = await requirePermission(db, actorId, orgId, "read");
   const all = await db
@@ -228,9 +228,11 @@ export async function listProposals(
         eq(contextProposals.orgId, orgId),
         options.status ? eq(contextProposals.status, options.status) : undefined,
         options.agentId ? eq(contextProposals.agentId, options.agentId) : undefined,
+        options.ids ? inArray(contextProposals.id, options.ids) : undefined,
       ),
     )
-    .orderBy(desc(contextProposals.createdAt))
+    // Pending first: decided ones are what the cap leaves out.
+    .orderBy(desc(sql`${contextProposals.status} = 'pending'`), desc(contextProposals.createdAt))
     .limit(200);
   const rows = can(membership, "review_memory") ? all : await proposalsVisible(db, actorId, orgId, all);
   const out: (Proposal & { canDecide: boolean })[] = [];

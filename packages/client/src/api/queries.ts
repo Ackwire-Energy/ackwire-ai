@@ -2083,20 +2083,16 @@ export const useProposals = (orgId: string) => {
 };
 
 /**
- * A proposal card's rows, in the card's order. A card that names rows the cached list doesn't have (they were just
- * proposed) reads the list again once, as a list kept fresh for a while wouldn't.
+ * A proposal card's rows, in the card's order, read by id: the list only holds the newest, and a card stays whole
+ * however many came after it. (A server without `ids` sends the list: the card's rows are picked from it.)
  */
 export function useCardProposals(orgId: string, ids: string[]) {
-  const query = useProposals(orgId);
-  const rows = (query.data ?? [])
-    .filter((p) => ids.includes(p.id))
-    .sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
-  const missing = query.isSuccess && rows.length < ids.length;
-  const { refetch } = query;
-  useEffect(() => {
-    if (missing) void refetch();
-  }, [missing, refetch]);
-  return rows;
+  const api = useApi();
+  const query = useQuery({
+    queryKey: keys.cardProposals(orgId, ids),
+    queryFn: () => api.proposals.list(orgId, { ids }),
+  });
+  return (query.data ?? []).filter((p) => ids.includes(p.id)).sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
 }
 
 export function useDecideProposal(orgId: string) {

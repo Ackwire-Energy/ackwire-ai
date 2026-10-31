@@ -167,3 +167,44 @@ test("proposals an agent made for a teammate name it and say what they change: i
   expect(await role.json()).toMatchObject({ status: "accepted", after: "Revisora" });
   expect(((await (await api(`/agents/${ada.id}`)).json()) as { role: string }).role).toBe("Revisora");
 });
+
+test("a card's rows are read by id, and deciding one answers with it however many came after", async () => {
+  t = await createTestServer();
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, agentId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  const [me] = await t.db.select().from(schema.users).where(eq(schema.users.email, "owner@example.com"));
+  const {
+    proposals: [mine],
+  } = await proposeChange(
+    { db: t.db },
+    {
+      orgId,
+      agentId,
+      target: "agent_instructions",
+      change: "Responder em português.",
+      rationale: "",
+      requesterId: me?.id ?? "",
+    },
+  );
+  const id = mine?.id ?? "";
+  // 200 newer ones, still waiting: the whole of the list.
+  await t.db.insert(schema.contextProposals).values(
+    Array.from({ length: 200 }, (_, i) => ({
+      orgId,
+      target: "org_context" as const,
+      baseHash: "x",
+      proposedText: `v${i}`,
+      diff: "",
+      rationale: "",
+      createdAt: new Date(Date.now() + 1000 + i),
+    })),
+  );
+  const card = (await (await api(`/proposals?ids=${id},not-an-id`)).json()) as { proposals: { id: string }[] };
+  expect(card.proposals.map((p) => p.id)).toEqual([id]);
+  const accepted = await api(`/proposals/${id}/accept`, { json: {} });
+  expect(accepted.status).toBe(200);
+  expect(await accepted.json()).toMatchObject({ id, status: "accepted" });
+});

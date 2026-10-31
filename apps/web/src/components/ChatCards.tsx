@@ -1,5 +1,5 @@
 import type { AgentQuestion, MemoryUpdate, Proposal, SecretRequest } from "@agenteschat/client";
-import { keys, useCardProposals, useDecideProposal, useDecideProposals, useProposals } from "@agenteschat/client";
+import { keys, useCardProposals, useDecideProposal, useDecideProposals } from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
@@ -120,12 +120,11 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
-  const proposals = useProposals(org.id);
+  const [p] = useCardProposals(org.id, [proposalId]);
   const decide = useDecideProposal(org.id);
   const toast = useToast();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string | null>(null);
-  const p = proposals.data?.find((x) => x.id === proposalId);
   if (!p) return null;
   const agentName = (id: string) => dir.anyAgent(id)?.name ?? t("channel.unknownAgent");
   const name = agentName(proposerOf(p));

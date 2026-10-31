@@ -2360,7 +2360,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
     },
     proposals: {
-      list: async () => structuredClone(state.proposals),
+      list: async (_orgId, filter) => {
+        const ids = filter?.ids;
+        return structuredClone(ids ? state.proposals.filter((p) => ids.includes(p.id)) : state.proposals);
+      },
       accept: async (orgId, id, text) => {
         log("proposals.accept", orgId, id, text);
         const p = findProposal(id);

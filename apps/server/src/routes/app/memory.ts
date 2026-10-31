@@ -448,6 +448,14 @@ export function memoryRoutes(deps: AppDeps) {
         query: z.object({
           status: z.enum(["pending", "accepted", "refused"]).optional(),
           agentId: z.uuid().optional(),
+          ids: z
+            .string()
+            .max(100 * 37)
+            .optional()
+            .openapi({
+              description:
+                "Comma-separated ids, at most 100: only these (a chat card's `proposalIds`). Without it, the newest 200, pending ones first.",
+            }),
         }),
       },
       responses: { 200: json(z.object({ proposals: z.array(Proposal) })), ...errors },
@@ -457,6 +465,7 @@ export function memoryRoutes(deps: AppDeps) {
       const rows = await listProposals(db, c.get("user").id, c.req.valid("param").orgId, {
         agentId: q.agentId,
         status: q.status === "refused" ? "rejected" : q.status,
+        ids: q.ids?.split(",").filter((id) => z.uuid().safeParse(id).success),
       });
       return c.json({ proposals: await proposalViews(db, rows) }, 200);
     },
@@ -485,7 +494,7 @@ export function memoryRoutes(deps: AppDeps) {
         await decideProposal(db, actorId, orgId, proposalId, decision === "accept" ? "accept" : "reject", {
           finalText: decision === "accept" ? c.req.valid("json").text : undefined,
         });
-        const [row] = (await listProposals(db, actorId, orgId)).filter((p) => p.id === proposalId);
+        const [row] = await listProposals(db, actorId, orgId, { ids: [proposalId] });
         if (!row) throw new NotFoundError("Proposal not found");
         const [view] = await proposalViews(db, [row]);
         return c.json(view, 200);

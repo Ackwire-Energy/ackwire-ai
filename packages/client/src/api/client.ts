@@ -717,7 +717,8 @@ export interface ApiClient {
     revert(orgId: string, memoryId: string): Promise<void>;
   };
   proposals: {
-    list(orgId: string): Promise<Proposal[]>;
+    /** The newest 200, pending ones first; with `ids`, only those (a chat card's rows). */
+    list(orgId: string, filter?: { ids?: string[] }): Promise<Proposal[]>;
     accept(orgId: string, proposalId: string, finalText?: string): Promise<Proposal>;
     refuse(orgId: string, proposalId: string): Promise<Proposal>;
   };
