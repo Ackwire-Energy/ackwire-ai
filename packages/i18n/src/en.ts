@@ -395,7 +395,7 @@ export const en: Translations = {
       ownerWaitsLead: "Open this server's owner link (it ends in /owner#claim=…), on this computer or on your phone.",
       noPassword: "This account signs in from the agentes.chat app.",
       noPasswordLead:
-        "On the computer that runs this server, open the app and choose Add a password in your account menu.",
+        "On the computer that runs this server, open the app and choose Add a password in Settings\u00a0›\u00a0Your account.",
       backToSignIn: "Back to sign in",
     },
     desktop: {
@@ -1027,7 +1027,7 @@ export const en: Translations = {
     on: "Turn on notifications",
     later: "Not now",
     done: "Notifications on in this browser",
-    failed: "Couldn't turn on notifications. Try again from your account menu.",
+    failed: "Couldn't turn on notifications. Try again in Settings\u00a0›\u00a0Notifications.",
     someone: "An agent",
     examples: "Examples of notifications",
     now: "now",
@@ -1055,8 +1055,6 @@ export const en: Translations = {
     addPasswordLabel: "New password",
     addPasswordSaved: "Password added.",
     addPasswordReauth: "Sign in again to add a password.",
-    thisMonth: "This month",
-    budgetOf: "{{name}} budget",
     yourWorkspaces: "Your workspaces",
     youAreHere: "You are here",
     newWorkspace: "New workspace",
@@ -1067,6 +1065,7 @@ export const en: Translations = {
     workspaceSettings: "Workspace settings",
     invite: "Invite people",
     profile: "Profile",
+    editProfile: "Edit profile",
     timezone: "Time zone",
     profileTitle: "Your profile in this workspace",
     handle: "Your @",
@@ -1098,7 +1097,6 @@ export const en: Translations = {
     directMessages: "Direct messages",
     createAgent: "Create agent",
     importAgents: "Bring agents from another app",
-    budgetUsedHint: "The workspace used {{percent}} of its agents' budgets this month",
     account: "Account",
     theme: "Theme",
     themeSystem: "System",
@@ -1110,7 +1108,6 @@ export const en: Translations = {
     soundSky: "Sky",
     soundPixel: "Pixel",
     soundOff: "Off",
-    browserNotices: "Notifications in this browser",
     browserNoticesHint: "Even with the tab closed",
     browserNoticesBlocked:
       "Your browser blocked them. To allow them, click the icon next to the site's address and turn notifications on.",
@@ -1760,7 +1757,6 @@ export const en: Translations = {
     hidden: "Invisible",
     offline: "Offline",
     setStatus: "Set status",
-    setStatusHint: "Busy, invisible, or what you're up to",
     seen: "seen {{when}}",
     title: "Set status",
     howOthersSee: "How people see you",
@@ -8193,6 +8189,7 @@ export const en: Translations = {
       costs: "Costs and data",
     },
     section: {
+      account: "Your account",
       notifications: "Notifications",
       general: "General",
       members: "Members and invitations",
@@ -8209,6 +8206,7 @@ export const en: Translations = {
       billing: "Plan and billing",
     },
     sectionText: {
+      account: "Your profile and how the app looks for you.",
       notifications:
         "The inbox keeps everything. Here you choose what reaches you as a notification, in this workspace.",
       general: "Name, time zone and what every agent knows about the workspace.",
@@ -8225,6 +8223,9 @@ export const en: Translations = {
       billing: "This workspace's agentes.chat plan, card and invoices are on a page of ours, outside the app.",
     },
     title: "Settings",
+    account: {
+      device: "On this device",
+    },
     orgTitle: "Workspace",
     name: "Name",
     savedShort: "Saved",
@@ -9473,9 +9474,14 @@ export const en: Translations = {
     membersOnly: "Only an owner can restore it.",
     restored: "{{name}} is back",
   },
-  /** Deleting your account (the account menu): what goes, what stays, and what has to happen first. */
+  /** Deleting your account (Configurações › Sua conta): what goes, what stays, and what has to happen first. */
   deleteAccount: {
     menu: "Delete account",
+    /** Sua conta's last card: its title is `menu`. */
+    card: {
+      text: "You leave every workspace and your account is deleted for good.",
+      button: "Delete account…",
+    },
     title: "Delete your account?",
     closes_one: "{{names}} closes now and is deleted for good on {{date}}. You're the only one there.",
     closes_other: "{{names}} close now and are deleted for good on {{date}}. You're the only one there.",

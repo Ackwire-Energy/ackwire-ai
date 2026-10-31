@@ -174,6 +174,17 @@ export function browserTimezone(): string | null {
   }
 }
 
+/** An IANA zone the browser knows ("America/Sao_Paulo"). */
+export function isTimeZone(zone: string) {
+  if (!zone) return false;
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * "horário de Brasília" (the zone's name, without the offset). A zone we don't name goes by the platform's name in
  * `locale` ("Horário da Europa Central"): its IANA id only where the platform has no name for it.

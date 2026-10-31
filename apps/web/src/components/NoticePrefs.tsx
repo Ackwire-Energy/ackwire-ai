@@ -39,7 +39,7 @@ export function NoticePrefsSection() {
         <CardHeader id="notice-where" icon="bell" title={t("noticePrefs.whereTitle")} />
         <div className="settings-rows">
           {browser.shown && !inDesktopApp() && (
-            <Row
+            <PrefRow
               id="notice-browser"
               icon="globe"
               label={t("noticePrefs.browser")}
@@ -55,7 +55,7 @@ export function NoticePrefsSection() {
               }
             />
           )}
-          <Row
+          <PrefRow
             id="notice-phone"
             icon="phone"
             label={t("noticePrefs.phone")}
@@ -71,7 +71,7 @@ export function NoticePrefsSection() {
               ))
             }
           />
-          <Row id="notice-mac" icon="computerMac" label={t("noticePrefs.mac")} help={t("noticePrefs.macHelp")} />
+          <PrefRow id="notice-mac" icon="computerMac" label={t("noticePrefs.mac")} help={t("noticePrefs.macHelp")} />
         </div>
       </Card>
 
@@ -80,7 +80,7 @@ export function NoticePrefsSection() {
         {prefs.data ? (
           <div className="settings-rows">
             {prefs.data.categories.map((c) => (
-              <Row
+              <PrefRow
                 key={c.id}
                 id={`notice-${c.id}`}
                 icon={ICONS[c.id]}
@@ -112,32 +112,53 @@ export function NoticePrefsSection() {
   );
 }
 
-/** One line: its icon, its name and what it covers, then its control (when it has one). */
-function Row({
+/**
+ * One line of the person's own settings: its icon (or their face), its name and what it covers, then its control.
+ * With `onOpen` the whole line is a button that opens something, a chevron at its end.
+ */
+export function PrefRow({
   id,
   icon,
+  lead,
   label,
   help,
   control,
+  onOpen,
 }: {
   id: string;
-  icon: IconName;
+  icon?: IconName;
+  /** In place of the icon: the person's face. */
+  lead?: ReactNode;
   label: string;
-  help: string;
+  help?: string;
   control?: ReactNode;
+  onOpen?: () => void;
 }) {
-  return (
-    <div className="settings-row">
-      <span className="notice-prefs__icon" aria-hidden="true">
-        <Icon name={icon} size={16} />
+  const body = (
+    <>
+      <span className="settings-row__icon" aria-hidden="true">
+        {lead ?? (icon && <Icon name={icon} size={16} />)}
       </span>
-      <div className="settings-row__text">
+      <span className="settings-row__text">
         <span className="settings-row__label">{label}</span>
-        <span className="settings-row__help" id={`${id}-help`}>
-          {help}
-        </span>
-      </div>
-      {control ? <div className="notice-prefs__control">{control}</div> : null}
-    </div>
+        {help && (
+          <span className="settings-row__help" id={`${id}-help`}>
+            {help}
+          </span>
+        )}
+      </span>
+      {onOpen ? (
+        <Icon name="chevronRight" size={16} className="settings-row__chevron" />
+      ) : (
+        control && <div className="settings-row__end">{control}</div>
+      )}
+    </>
+  );
+  return onOpen ? (
+    <button type="button" className="settings-row settings-row--lead settings-row--open" onClick={onOpen}>
+      {body}
+    </button>
+  ) : (
+    <div className="settings-row settings-row--lead">{body}</div>
   );
 }
