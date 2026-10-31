@@ -302,10 +302,19 @@ async function noteControlEnded(deps: HandoffDeps, row: BrowserHandoffRow) {
   else if (page) keepFacts(row.id, { returned: page });
 }
 
-/** Who had the agent's browser and for how long (from the record), with the pages this process saw. */
-async function handoffFacts(db: Executor, row: BrowserHandoffRow): Promise<HandoffFacts | undefined> {
-  if (!row.controllerUserId) return undefined;
-  const [person] = await db.select({ name: users.name }).from(users).where(eq(users.id, row.controllerUserId));
+/**
+ * Who had the agent's browser and for how long (from the record), with the pages this process saw. `answeredBy`:
+ * who answered without ever taking control (only their name).
+ */
+async function handoffFacts(
+  db: Executor,
+  row: BrowserHandoffRow,
+  answeredBy?: string,
+): Promise<HandoffFacts | undefined> {
+  const who = row.controllerUserId ?? answeredBy;
+  if (!who) return undefined;
+  const [person] = await db.select({ name: users.name }).from(users).where(eq(users.id, who));
+  if (!row.controllerUserId) return { person: person?.name ?? null };
   const kept = controlFacts.get(row.id);
   // A take over starts in control; when a person took an asked one is only known here.
   const since = kept?.since ?? (row.kind === "takeover" ? row.createdAt.getTime() : undefined);
@@ -833,12 +842,19 @@ export function createBrowserHandoffToolSource(
  * read; a run that stopped waiting on it (a person wrote meanwhile,
  * `waits.ts`) hears it as a notice instead. Idempotent.
  */
-async function resumeWaitingRun(deps: HandoffDeps, row: BrowserHandoffRow, result: BrowserHandoffResult) {
+async function resumeWaitingRun(
+  deps: HandoffDeps,
+  row: BrowserHandoffRow,
+  result: BrowserHandoffResult,
+  answeredBy?: string,
+) {
   if (!row.runId) return;
   await resumeRunWithResult(deps.db, {
     runId: row.runId,
     waitId: row.id,
-    result: { content: handoffResultText(result, row.kind, await handoffFacts(deps.db, row), row.screen) },
+    result: {
+      content: handoffResultText(result, row.kind, await handoffFacts(deps.db, row, answeredBy), row.screen),
+    },
     pubsub: deps.pubsub,
   });
 }
@@ -857,9 +873,9 @@ function endedResult(row: BrowserHandoffRow): BrowserHandoffResult {
  * Failures don't undo the end: the sweep (`expireBrowserHandoffs`) resumes
  * runs still waiting on ended handoffs.
  */
-async function settle(deps: HandoffDeps, row: BrowserHandoffRow) {
+async function settle(deps: HandoffDeps, row: BrowserHandoffRow, answeredBy?: string) {
   await noteControlEnded(deps, row).catch(() => {});
-  await resumeWaitingRun(deps, row, endedResult(row)).catch(() => {});
+  await resumeWaitingRun(deps, row, endedResult(row), answeredBy).catch(() => {});
   await afterChange(deps, row).catch(() => {});
 }
 
@@ -923,7 +939,9 @@ export async function finishHandoff(
       .set({
         status: input.result,
         note,
-        controllerUserId: current.controllerUserId ?? actorId,
+        // "Couldn't" from someone who never took control changed nothing on the page: nobody is recorded in
+        // control, so the agent isn't made to read the page first (its browser may not even be open).
+        controllerUserId: current.controllerUserId ?? (input.result === "done" ? actorId : null),
         resolvedAt: new Date(),
       })
       .where(
@@ -943,7 +961,7 @@ export async function finishHandoff(
     const now = await loadHandoff(deps.db, orgId, handoffId);
     throw new ConflictError(OPEN.includes(now.status) ? "Someone else is in control" : "This is already over");
   }
-  await settle(deps, ended);
+  await settle(deps, ended, actorId);
   return handoffView(ended);
 }
 
@@ -1122,8 +1140,10 @@ export async function requirePageRead(
     .limit(1);
   if (!changed) return null;
   const { thing, read } = SCREENS[screen];
+  // A browser closed meanwhile (its computer restarted) has nothing to read: opening a page counts as seeing it.
+  const how = screen === "browser" ? `${read}, or browser_open if your browser closed` : read;
   return {
-    content: `Read the ${thing} again first (a person changed it): call ${read}, then act on what it shows.${factsText(
+    content: `Read the ${thing} again first (a person changed it): call ${how}, then act on what it shows.${factsText(
       endedResult(changed),
       await handoffFacts(db, changed),
       screen,
@@ -1231,11 +1251,14 @@ export async function touchControl(db: Executor, handoffId: string, userId: stri
 /**
  * The person in control left this server: their control ends at `until`
  * unless they come back here or elsewhere (`touchControl` pushes it again).
+ * `extend: false`: never later than it ends already (their page never showed).
  */
-export async function setControlDeadline(db: Executor, handoffId: string, userId: string, until: Date) {
+export async function setControlDeadline(db: Executor, handoffId: string, userId: string, until: Date, extend = true) {
   await db
     .update(browserHandoffs)
-    .set({ expiresAt: until })
+    .set({
+      expiresAt: extend ? until : sql`least(${browserHandoffs.expiresAt}, ${until.toISOString()}::timestamptz)`,
+    })
     .where(
       and(
         eq(browserHandoffs.id, handoffId),
@@ -1314,6 +1337,62 @@ export async function stopAgentBrowser(
       at: new Date().toISOString(),
     })
     .catch(() => {});
+}
+
+/** What a run waiting on a person's turn in the browser reads when the agent restarted its browser meanwhile. */
+const RESTARTED_TEXT =
+  "Your browser was restarted (browser_close), so the person's turn in it ended. Open a page again (browser_open) and check where things are before going on.";
+
+/**
+ * The agent restarts its browser (`browser_close`: a person asked, or it is stuck) while a person has it or
+ * was asked to take it: that turn ends (cancelled), with nothing to read first (the page doesn't survive the
+ * restart), a run waiting on it is told why, and the conversation hears whose control ended. Null: none was open.
+ */
+export async function endHandoffForRestart(deps: HandoffDeps, ctx: { orgId: string; agentId: string; runId: string }) {
+  const open = await openHandoffOf(deps.db, ctx.orgId, ctx.agentId, "browser");
+  if (!open) return null;
+  const now = new Date();
+  const [row] = await deps.db.transaction(async (tx) => {
+    const rows = await tx
+      .update(browserHandoffs)
+      .set({ status: "cancelled", resolvedAt: now, pageReadAt: now })
+      .where(and(eq(browserHandoffs.id, open.id), inArray(browserHandoffs.status, OPEN)))
+      .returning();
+    if (rows[0]) await syncCard(tx, rows[0]);
+    return rows;
+  });
+  if (!row) return null;
+  // The run restarting it knows: only another run waiting on that turn is told.
+  if (row.runId && row.runId !== ctx.runId) {
+    await resumeRunWithResult(deps.db, {
+      runId: row.runId,
+      waitId: row.id,
+      result: { content: RESTARTED_TEXT },
+      pubsub: deps.pubsub,
+    }).catch(() => {});
+  }
+  await afterChange(deps, row).catch(() => {});
+  const controller = open.status === "active" ? open.controllerUserId : null;
+  if (controller) await postRestarted(deps, row, controller, ctx.runId).catch(() => {});
+  return row;
+}
+
+/** "Ada restarted its browser. Otto's control ended.", where the turn was (else the restarting run's conversation). */
+async function postRestarted(deps: HandoffDeps, row: BrowserHandoffRow, controller: string, runId: string) {
+  const where = (await handoffPlace(deps.db, row)) ?? (await runPlace(deps.db, row.orgId, runId));
+  const agent = await getAgentCached(deps.db, row.orgId, row.agentId);
+  const [person] = await deps.db.select({ name: users.name }).from(users).where(eq(users.id, controller));
+  if (!where || !agent || !person) return;
+  const params = { agent: agent.name, person: person.name };
+  const message = await insertMessage(deps.db, {
+    orgId: row.orgId,
+    channelId: where.channelId,
+    threadId: where.threadId,
+    author: { type: "agent", agentId: row.agentId, runId: null, hop: 0 },
+    body: `${params.agent} restarted its browser. ${params.person}'s control ended.`,
+    meta: bodyCode("browser_restarted", params),
+  });
+  if (deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(message));
 }
 
 /** A web address from what a person typed in the live view: http(s) only, a bare host gets https://. Null otherwise. */

@@ -12,6 +12,7 @@ import {
   requireBrowserControl,
   startTakeover,
   stopAgentBrowser,
+  ValidationError,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
@@ -146,6 +147,27 @@ export function browserRoutes(deps: AppDeps) {
       const { orgId, agentId } = c.req.valid("param");
       const hub = deps.extras?.sandbox?.machines?.hub;
       await stopAgentBrowser(db, hub, c.get("user").id, orgId, agentId, adapters.pubsub);
+      return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/agents/{agentId}/browser/restart",
+      tags,
+      security,
+      summary: "Restart the agent's browser on the page it showed (its logins stay); every live view gets it again",
+      description:
+        "Try again on a view whose page never came. Only who may drive the agent's browser (403 otherwise): someone who only watches watches again instead.",
+      request: { params: AgentParams },
+      responses: { 204: { description: "Restarted" }, ...errors },
+    }),
+    async (c) => {
+      const { orgId, agentId } = c.req.valid("param");
+      const live = deps.extras?.browserLive;
+      if (!live) throw new ValidationError("Connected computers are not available on this server");
+      await live.restart(c.get("user").id, orgId, agentId);
       return c.body(null, 204);
     },
   );

@@ -247,6 +247,8 @@ export interface LiveState {
   /** Someone else is in control: no page reaches this view until they hand it back. */
   hidden: boolean;
   sendInput: (events: BrowserInputEvent[]) => void;
+  /** Watches again now (Try again for someone who only watches). */
+  retry: () => void;
 }
 
 /**
@@ -293,8 +295,11 @@ export function useLiveConnection(agentId: string, enabled: boolean): LiveState 
     const offFrames = connection.onBrowserFrame((m) => live.handleMessage(m));
     // The server forgets the watch when the socket drops: watch again once it is back.
     const offStatus = connection.onStatus((status) => {
-      if (status === "open") live.resume();
-      else if (status === "reconnecting")
+      if (status === "open") {
+        // A card that opened while the socket was down (a push opening the app) starts watching now.
+        live.start();
+        live.resume();
+      } else if (status === "reconnecting")
         setUnavailable((u) => (u === "ended" || u === "forbidden" ? u : "reconnecting"));
     });
     if (connection.isOpen) live.start();
@@ -314,7 +319,8 @@ export function useLiveConnection(agentId: string, enabled: boolean): LiveState 
   const sendInput = useCallback((events: BrowserInputEvent[]) => {
     liveRef.current?.sendInput(events);
   }, []);
-  return { frame, unavailable, controllerUserId, handoff, hidden, sendInput };
+  const retry = useCallback(() => liveRef.current?.retry(), []);
+  return { frame, unavailable, controllerUserId, handoff, hidden, sendInput, retry };
 }
 
 const styles = StyleSheet.create({

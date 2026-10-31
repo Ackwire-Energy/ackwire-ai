@@ -896,7 +896,7 @@ const EMPTY_LIVE: BrowserLiveState = {
 /**
  * Watches an agent's browser on the org's socket while mounted (`enabled`):
  * frames, who is in control, and why it can't be shown. Watches again when
- * the socket reconnects. `sendInput` is for the person in control.
+ * the socket reconnects, and on `retry`. `sendInput` is for the person in control.
  */
 export function useBrowserLive(agentId: string, enabled = true) {
   const { connection } = useRealtime();
@@ -942,7 +942,8 @@ export function useBrowserLive(agentId: string, enabled = true) {
     };
   }, [connection, agentId, enabled]);
   const sendInput = useCallback((events: BrowserInputEvent[]) => liveRef.current?.sendInput(events) ?? false, []);
-  return { ...state, sendInput };
+  const retry = useCallback(() => liveRef.current?.retry(), []);
+  return { ...state, sendInput, retry };
 }
 
 export function useConnectionStatus(): ConnectionStatus {

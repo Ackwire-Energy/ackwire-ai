@@ -314,6 +314,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       open: (orgId, agentId, url) =>
         request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/open`, { json: { url } }),
       stop: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/stop`, { json: {} }),
+      restart: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/restart`, { json: {} }),
     },
     desktop: {
       status: (orgId, agentId) => request<DesktopStatus>(`${org(orgId)}/agents/${enc(agentId)}/desktop`),

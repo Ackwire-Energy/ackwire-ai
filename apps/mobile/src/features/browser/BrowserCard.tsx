@@ -9,6 +9,7 @@ import {
   useAgentBrowserHandoff,
   useAgentScreenControl,
   useBrowserHandoffActions,
+  useBrowserStuck,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { isBlankPage } from "@agenteschat/client/lib/sites";
@@ -31,7 +32,7 @@ import { agentLook, genderOf } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
 import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
-import { FAILED_REASONS, NOTE_MAX, pageGapKey, pageNoteOf, siteOf, skyBehind, stepText } from "./logic";
+import { FAILED_REASONS, NOTE_MAX, pageGapKey, pageNoteOf, siteOf, skyBehind, stepText, waitsForPage } from "./logic";
 import { AddressBar, FrameView, TypeBar, useLiveConnection } from "./parts";
 
 /** The log's last lines under the page (the design shows three). */
@@ -134,7 +135,12 @@ export function BrowserCard({
   const ready = watching && Boolean(live.frame) && !live.unavailable;
   const canTake = canTakeOver && (ready || (surface && closed));
   const goShown = surface && mine && (closed || !live.frame || isBlankPage(live.frame.metadata.url));
-  const note = pageNoteOf(live.unavailable, live.hidden, mine);
+  // Opening or reconnecting for too long says so, with Try again (as on the web).
+  const [attempt, setAttempt] = useState(0);
+  const waitingForPage =
+    watching && !live.hidden && waitsForPage(live.unavailable) && !(live.frame && !live.unavailable);
+  const stuck = useBrowserStuck(waitingForPage, attempt);
+  const note = pageNoteOf(live.unavailable, live.hidden, mine, stuck);
   // Full screen its header says who is in control, so the page says only why it hides, as the web's does.
   const hiddenNote = surface
     ? t("browser.inCard.hiddenHelp", agentGrammar(t, name))
@@ -216,6 +222,13 @@ export function BrowserCard({
         onPress: () => void actions.stop(agentId).catch(failedToast),
       },
     ]);
+  };
+  // Who may drive it restarts the browser; someone who only watches watches again.
+  const retry = () => {
+    tapHaptic();
+    setAttempt((n) => n + 1);
+    if (mayDrive) void actions.restart(agentId).catch(failedToast);
+    else live.retry();
   };
   const couldnt = () => {
     tapHaptic();
@@ -397,10 +410,13 @@ export function BrowserCard({
                         ? hiddenNote
                         : t(pageGapKey(note.say, g, cloud), { name })}
                   </Text>
-                  {note.help ? (
+                  {note.help && (note.help !== "stuckHelp" || mayDrive) ? (
                     <Text variant="caption" tone="muted" style={styles.centerText}>
                       {t(`mobile.browser.live.${note.help}${g}`, { name })}
                     </Text>
+                  ) : null}
+                  {note.say === "stuck" ? (
+                    <Button variant="secondary" size="sm" label={t("mobile.common.retry")} onPress={retry} />
                   ) : null}
                 </View>
               </View>

@@ -800,6 +800,8 @@ test("a worker that stops fails what it ran and starts again with a backoff", as
   // `dropped`: the server waits for the computer and sends an agent's cut turn again, instead of failing it.
   expect(await errorCode(() => first)).toBe("dropped");
   await waitFor(() => t.logs.some((l) => l === "[ag-a1b2c3d4] stopped (exit 1)"));
+  // The live view of Ana's browser ended with it: the server stops showing a stream nothing sends.
+  expect(t.up).toEqual([{ type: "browser.stream.ended", agentId: ANA.id, reason: "closed" }]);
   // Nothing waits for it and it has no task to watch: it stays stopped.
   await sleep(50);
   expect(t.workers).toHaveLength(1);

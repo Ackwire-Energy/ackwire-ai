@@ -92,22 +92,28 @@ export const browserGranted = (access: Pick<AgentAccess, "builtins"> | null | un
 export type PageGap = BrowserLiveUnavailable | "ended";
 
 /** The words for why the page shows nothing; the Cloud's computer is always on, so offline there isn't answering. */
-export const pageGapKey = (gap: PageGap, gender: "F" | "M", cloud: boolean) =>
+export const pageGapKey = (gap: PageGap | "stuck", gender: "F" | "M", cloud: boolean) =>
   `mobile.browser.live.unavailable.${gap === "offline" && cloud ? "offlineCloud" : gap}${gender}` as const;
 
+/** No page yet, but waiting may bring it: opening, reconnecting, or not available for now (the client retries). */
+export const waitsForPage = (gap: PageGap | null) => gap === null || gap === "reconnecting" || gap === "unavailable";
+
 export interface PageNote {
-  say: PageGap | "starting" | "hidden";
+  say: PageGap | "starting" | "hidden" | "stuck";
   /** Only while the page may still come by itself. */
   spin: boolean;
-  help: "grace" | "closedHelp" | null;
+  help: "grace" | "closedHelp" | "stuckHelp" | null;
 }
 
 /**
  * The page box with no page to show: opening, hidden while someone else is in control (their screen
  * stays theirs), or why it can't be shown, with a line of help where waiting means something. A closed
  * or ended browser holds until a frame comes, and none comes to a hidden view: there, who holds it wins.
+ * `stuck`: it waited too long for a page that waiting brings (`useBrowserStuck`): it says it couldn't open,
+ * with Try again.
  */
-export function pageNoteOf(gap: PageGap | null, hidden: boolean, mine: boolean): PageNote {
+export function pageNoteOf(gap: PageGap | null, hidden: boolean, mine: boolean, stuck = false): PageNote {
+  if (stuck && !hidden && waitsForPage(gap)) return { say: "stuck", spin: false, help: "stuckHelp" };
   if (gap && !(hidden && (gap === "closed" || gap === "ended"))) {
     const help = gap === "closed" ? "closedHelp" : gap === "reconnecting" && mine ? "grace" : null;
     return { say: gap, spin: gap === "reconnecting", help };
