@@ -88,13 +88,15 @@ export function SettingsPage({
   connected,
   review,
   mail,
+  account,
   machineId,
 }: {
   section?: SettingsSection;
   connected?: string;
   review?: boolean;
-  /** Back from Gmail/Outlook: `connected` or `failed`. */
+  /** Back from Gmail/Outlook: `connected` or `failed`, and the mailbox (`account`). */
   mail?: string;
+  account?: string;
   /** Computadores → one computer (`/settings/computers/{id}`). */
   machineId?: string;
 }) {
@@ -172,7 +174,9 @@ export function SettingsPage({
         {current === "roles" && <RolesSection />}
         {current === "audit" && <AuditSection />}
         {current === "access" && <AccessMatrixSection />}
-        {current === "connectors" && <ConnectorsSection connected={connected} review={review} mail={mail} />}
+        {current === "connectors" && (
+          <ConnectorsSection connected={connected} review={review} mail={mail} account={account} />
+        )}
         {current === "skills" && <SkillsSection />}
         {current === "keys" && (
           <>
