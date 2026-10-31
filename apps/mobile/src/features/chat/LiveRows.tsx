@@ -48,10 +48,10 @@ import {
 /**
  * An agent's turn, live: one block from "pensando" to the last word, in
  * the same place, the last thing in the conversation while it works. The header says what it is doing
- * (its pixel orbit and a breathing word, and for how long); above the words, its tools in one line that
- * opens into every call (`TurnTools`) and, under it, the wells of the messages it read;
- * then the words, revealed at a steady pace and fading in, with the thin caret. When it is done, its saved
- * reply takes the same row and keeps the same block, closed on "Usou N ferramentas" (`recentTurn`).
+ * (its pixel orbit and a breathing word, and for how long); then the words, revealed at a steady pace and fading
+ * in, with the thin caret; under them, last, its tools in one line that opens into every call (`TurnTools`) and,
+ * under it, the wells of the messages it read. When it is done, its saved reply takes the same row and keeps the
+ * same block in the same place, closed on "Usou N ferramentas" (`recentTurn`).
  */
 export const TurnRow = memo(function TurnRow({
   run,
@@ -129,8 +129,9 @@ export const TurnRow = memo(function TurnRow({
             <MessageText body={said ?? t(`mobile.chat.turn.opener${opener}`)} selectable={false} />
           </View>
         ) : null}
-        <TurnTools items={lines} agentName={agent?.name ?? ""} color={color} quoteOf={bodyOf} />
         {run.text && !wordsOnTop ? <RevealText text={run.text} live={phase === "writing"} accent={color} /> : null}
+        {/* Its tools last, where its saved reply keeps them. */}
+        <TurnTools items={lines} agentName={agent?.name ?? ""} color={color} quoteOf={bodyOf} />
       </View>
     </View>
   );

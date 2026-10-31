@@ -79,7 +79,8 @@ const MARK_ROOM = 48;
  * One message: the face and name (dropped when grouped), a pin mark when
  * pinned, what it consulted, its text, the cards it carries and the reactions. Long press opens its
  * actions (the screen's sheet). An agent's reply takes its live block's place: its tools stay one closed
- * line above the words ("Usou N ferramentas"), and a stopped one says so with "Continuar". A person's message's
+ * line under its words and what it changed ("Usou N ferramentas"), the same place live, kept and saved, and a
+ * stopped one says so with "Continuar". A person's message's
  * receipt is a mark in room the row already has (`ReceiptMark`), so it never changes the row's height: beside my
  * bubble, whether an agent read it ("lê na próxima pausa", "leu") or who read it in a DM; at the end of someone
  * else's name line, the agents' receipt of their latest message.
@@ -364,28 +365,7 @@ export const MessageRow = memo(function MessageRow({
         {consulted.map((cs) => (
           <ConsultationCard key={cs.consultationId} askerId={m.author.id ?? ""} consultation={cs} />
         ))}
-        {isAgent && m.agentRunId && !m.local && !readOnly && consulted.length === 0 ? (
-          <ConsultGroup message={m} color={color} />
-        ) : null}
         {opened?.said ? <MessageText body={opened.said} selectable={false} accent={accent} /> : null}
-        {kept ? (
-          <TurnTools
-            items={opened?.lines ?? kept.items}
-            agentName={agent?.name ?? name}
-            color={color}
-            quoteOf={(id) => kept.quotes[id]}
-            done
-            settled
-          />
-        ) : steps && m.agentRunId ? (
-          <SavedTools
-            runId={m.agentRunId}
-            meta={meta}
-            agentName={agent?.name ?? name}
-            color={color}
-            skipScreens={onCards}
-          />
-        ) : null}
         {brainWait ? (
           <BrainWait
             message={m}
@@ -431,6 +411,28 @@ export const MessageRow = memo(function MessageRow({
           />
         ) : null}
         {question ? <QuestionCard key={`${question.id}:${question.status}`} question={question} /> : null}
+        {/* Its tools last, after its words and what it changed: the same place live, kept and saved. */}
+        {isAgent && m.agentRunId && !m.local && !readOnly && consulted.length === 0 ? (
+          <ConsultGroup message={m} color={color} />
+        ) : null}
+        {kept ? (
+          <TurnTools
+            items={opened?.lines ?? kept.items}
+            agentName={agent?.name ?? name}
+            color={color}
+            quoteOf={(id) => kept.quotes[id]}
+            done
+            settled
+          />
+        ) : steps && m.agentRunId ? (
+          <SavedTools
+            runId={m.agentRunId}
+            meta={meta}
+            agentName={agent?.name ?? name}
+            color={color}
+            skipScreens={onCards}
+          />
+        ) : null}
         {cards}
       </View>
     </Pressable>

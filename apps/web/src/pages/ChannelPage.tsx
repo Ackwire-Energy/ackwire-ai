@@ -3226,16 +3226,16 @@ export const TimelineMessage = memo(function TimelineMessage({
               </MessageText>
             )
           )}
-          {/* Its tools in one line (what it does now), opening into each call; the messages it read under it. */}
-          <LiveTools
-            work={opening.work}
-            agentName={name}
-            color={colorOf(agent)}
-            steerNote={steerNote}
-            stopped={liveStopped}
-          />
-          {m.author.id && m.agentRunId && (
-            <ConsultGroup runId={m.agentRunId} askerId={m.author.id} color={colorOf(agent)} />
+          {/* The answer streams under the line it opened with, above its tools (where its saved message has it). */}
+          {!liveFailed && revealed && !wordsOnTop && (
+            <MessageText>
+              <MessageBody
+                body={revealed}
+                resolveMention={dir.mentionName}
+                live={!liveStopped}
+                accent={colorOf(agent)}
+              />
+            </MessageText>
           )}
           {liveFailed && (
             <p className="ac-msg__error" role="alert">
@@ -3259,23 +3259,24 @@ export const TimelineMessage = memo(function TimelineMessage({
               />
             </p>
           )}
-          {/* Also on a failed or stopped run, for the person still in control (they hand back from it). */}
-          <RunBrowserCard run={live} name={name} />
-          {!liveFailed && revealed && !wordsOnTop && (
-            <MessageText>
-              <MessageBody
-                body={revealed}
-                resolveMention={dir.mentionName}
-                live={!liveStopped}
-                accent={colorOf(agent)}
-              />
-            </MessageText>
-          )}
           {liveStopped ? (
             <StoppedLine runId={live.runId} byUserId={live.canceledBy} owner={live} />
           ) : (
             !liveFailed && <LiveRunStatus run={live} />
           )}
+          {/* Also on a failed or stopped run, for the person still in control (they hand back from it). */}
+          <RunBrowserCard run={live} name={name} />
+          {m.author.id && m.agentRunId && (
+            <ConsultGroup runId={m.agentRunId} askerId={m.author.id} color={colorOf(agent)} />
+          )}
+          {/* Its tools last, as on its saved message: one line (what it does now) opening into each call. */}
+          <LiveTools
+            work={opening.work}
+            agentName={name}
+            color={colorOf(agent)}
+            steerNote={steerNote}
+            stopped={liveStopped}
+          />
           {!liveFailed && !liveWaiting && !liveStopped && (
             <span className="ac-visually-hidden">{t("channel.writing")}</span>
           )}
@@ -3287,16 +3288,6 @@ export const TimelineMessage = memo(function TimelineMessage({
               <MessageBody body={keptSaid.text} resolveMention={dir.mentionName} />
             </MessageText>
           )}
-          {keptSteps?.length && seenLive ? (
-            <LiveTools
-              work={keptSteps}
-              agentName={name}
-              color={colorOf(agent)}
-              steerNote={steerNote}
-              done
-              stopped={stopped.canceled}
-            />
-          ) : null}
           {routine && report && reportOpen && <RoutineReport text={report} />}
           {quoted && <QuotedMessage reply={quoted} />}
           {m.author.id &&
@@ -3390,24 +3381,6 @@ export const TimelineMessage = memo(function TimelineMessage({
               enabled={Date.now() - Date.parse(m.createdAt) < HELD_RECENT_MS}
             />
           )}
-          {lastOfRun &&
-            m.author.type === "agent" &&
-            m.author.id &&
-            m.agentRunId &&
-            !m.local &&
-            consulted.length === 0 && (
-              <ConsultGroup runId={m.agentRunId} askerId={m.author.id} color={colorOf(agent)} saved />
-            )}
-          {/* A question to another agent (in their DM) carries the asking run: its work shows on that run's reply. */}
-          {m.author.type === "agent" && m.agentRunId && !card && !m.local && !keptAll && !m.meta?.consultation && (
-            <SavedTools
-              runId={m.agentRunId}
-              meta={m.meta}
-              agentName={agent?.name ?? name}
-              color={colorOf(agent)}
-              skipScreens={onCards}
-            />
-          )}
           {forumTopicId && !forumSuggestion && <ForumMessageCard topicId={forumTopicId} />}
           {forumSuggestion && <ForumSuggestionCard message={m} suggestion={forumSuggestion} />}
           {missionPlan && <MissionPlanCard plan={missionPlan} />}
@@ -3429,6 +3402,35 @@ export const TimelineMessage = memo(function TimelineMessage({
                 <ArtifactCard key={`${r.id}@${r.version}`} artifact={r} />
               ))}
             </div>
+          )}
+          {/* Its tools last, after its words and what it changed: the same place live, kept and saved. */}
+          {lastOfRun &&
+            m.author.type === "agent" &&
+            m.author.id &&
+            m.agentRunId &&
+            !m.local &&
+            consulted.length === 0 && (
+              <ConsultGroup runId={m.agentRunId} askerId={m.author.id} color={colorOf(agent)} saved />
+            )}
+          {keptSteps?.length && seenLive ? (
+            <LiveTools
+              work={keptSteps}
+              agentName={name}
+              color={colorOf(agent)}
+              steerNote={steerNote}
+              done
+              stopped={stopped.canceled}
+            />
+          ) : null}
+          {/* A question to another agent (in their DM) carries the asking run: its work shows on that run's reply. */}
+          {m.author.type === "agent" && m.agentRunId && !card && !m.local && !keptAll && !m.meta?.consultation && (
+            <SavedTools
+              runId={m.agentRunId}
+              meta={m.meta}
+              agentName={agent?.name ?? name}
+              color={colorOf(agent)}
+              skipScreens={onCards}
+            />
           )}
           {/* Everyone's reactions (👍/👎 on an agent's reply are its feedback, in the same pills). */}
           {!m.local && !readOnly && (
