@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import path from "node:path";
 import { Glob } from "bun";
+import { withShim } from "@/components/artifacts/HtmlFrame";
 import { atRule, declarations, rules, topLevel } from "./built-css";
 
 const ROOT = path.join(import.meta.dir, "../../..");
@@ -175,6 +176,24 @@ describe("our scrollbars, never the browser's", () => {
           for (const [p, v] of rule.declarations)
             if (p === "border-radius" && radius(v) > token("--radius-section")) rounder.push(`${file}: ${s} {${v}}`);
     expect(rounder).toEqual([]);
+  });
+
+  test("an agent's HTML page scrolls with ours: the kit's sizes, a grey for any page, the track on its own background", async () => {
+    const kit = atRule(await read(KIT), POINTER);
+    const page = atRule(withShim("<p>x</p>").match(/<style>([\s\S]*)<\/style>/)?.[1] ?? "", POINTER);
+    for (const [selector, property] of [
+      ["::-webkit-scrollbar", "width"],
+      ["::-webkit-scrollbar", "height"],
+      ["::-webkit-scrollbar-button", "display"],
+      ["::-webkit-scrollbar-thumb", "border"],
+      ["::-webkit-scrollbar-thumb:hover", "border-width"],
+    ] as const)
+      expect(value(page, selector, property)).toBe(value(kit, selector, property));
+    // The page's own scrollbar is styled from its <body>, and a clear track would show the frame's white beside it.
+    expect(value(page, "::-webkit-scrollbar-track", "background-color")).toBe("inherit");
+    expect(value(page, "::-webkit-scrollbar-thumb", "background")).toMatch(
+      /^rgba\(128,\s*128,\s*128,\s*\.\d+\) padding-box$/,
+    );
   });
 });
 
