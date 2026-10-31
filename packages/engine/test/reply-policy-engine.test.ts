@@ -1,6 +1,6 @@
 import { afterAll, afterEach, describe, expect, setDefaultTimeout, spyOn, test } from "bun:test";
 import { MACHINE_PROTOCOL_VERSION, type RealtimeEvent } from "@agenteschat/adapters";
-import { eq, schema } from "@agenteschat/db";
+import { eq, schema, sql } from "@agenteschat/db";
 import { type ModelRequest, systemText, textOf } from "@agenteschat/providers";
 import {
   ANSWER_NUDGE,
@@ -184,6 +184,33 @@ describe("a run nobody called by name may stay quiet", () => {
       "[Meanwhile Theo (@theo) replied here]: No GitHub Actions.",
     );
     expect(await agentMessages()).toEqual(["No GitHub Actions."]);
+  });
+
+  test("brought in on another agent's message stored with microseconds: that message is never its own 'meanwhile'", async () => {
+    f = await setup({ toolSources: [createPassToolSource()], reply: () => ({ chunks: ["NO_REPLY"] }) });
+    const theo = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Theo", handle: "theo", role: "Infra", instructions: "", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+    const said = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "agent", agentId: theo.id, runId: crypto.randomUUID(), hop: 1 },
+      body: "Os builds rodam no GitHub Actions.",
+    });
+    // Postgres stores now() with microseconds; read back, `createdAt` is cut to milliseconds.
+    await f.db
+      .update(schema.messages)
+      .set({ createdAt: sql`${schema.messages.createdAt} + interval '456 microseconds'` })
+      .where(eq(schema.messages.id, said.id));
+    const [trigger] = await f.db.select().from(schema.messages).where(eq(schema.messages.id, said.id));
+    await f.db.transaction((tx) => createAgentRuns(tx, trigger as typeof said, [f.agent.id], "router"));
+    await drainOutbox(f.db, f.handlers);
+    const request = f.provider.calls[0]?.request as ModelRequest;
+    expect(textOf(request.messages.at(-1)?.content ?? "")).not.toContain("[Meanwhile Theo (@theo) replied here]");
   });
 });
 
