@@ -212,22 +212,42 @@ describe("refusals in the phone's words", () => {
     const en = await translator("en");
     // Apple's native sign-in gets the server's answer itself.
     const blocked = "ACCOUNT_BLOCKED";
-    expect(socialRefusalText(en, { code: blocked, kind: "abuse", cloud: true })).toBe(
+    expect(socialRefusalText(en, { code: blocked, kind: "abuse", cloud: true }, true)).toBe(
       "This account is blocked. Our checks linked it to an account closed for abuse (Terms, section 5). To contest it, write to legal@agentes.chat.",
     );
-    expect(socialRefusalText(en, { code: blocked, kind: "other", cloud: true })).toBe(
+    expect(socialRefusalText(en, { code: blocked, kind: "other", cloud: true }, true)).toBe(
       "This account can't sign in. To contest it, write to legal@agentes.chat.",
     );
-    expect(socialRefusalText(en, { code: blocked })).toBe(en("auth.accountBlocked"));
-    expect(socialRefusalText(en, { code: "INVALID_TOKEN" })).toBe("Couldn't sign you in right now. Try again.");
-    expect(socialRefusalText(en, {})).toBe(en("mobile.auth.social.failed"));
+    expect(socialRefusalText(en, { code: blocked }, true)).toBe(en("auth.accountBlocked"));
+    expect(socialRefusalText(en, { code: "INVALID_TOKEN" }, true)).toBe("Couldn't sign you in right now. Try again.");
+    expect(socialRefusalText(en, {}, true)).toBe(en("mobile.auth.social.failed"));
   });
 
-  test("a sign-up's 403 is sign-up closed only when it isn't the bot check's", () => {
+  test("a social sign-in refused in the web's words: an unconfirmed password account, a closed sign-up, an invitation", async () => {
+    const pt = await translator("pt-BR");
+    const unconfirmed = { status: 401, code: "OAUTH_LINK_ERROR", message: "account not linked" };
+    expect(socialRefusalText(pt, unconfirmed, true)).toBe(
+      "Este e-mail já tem uma conta com senha que ainda não foi confirmada. Confirme pelo e-mail que enviamos ou entre com a senha.",
+    );
+    // A server that sends no email never confirmed it: only the password signs in.
+    expect(socialRefusalText(pt, unconfirmed, false)).toBe(
+      "Este e-mail já tem uma conta com senha. Entre com a senha.",
+    );
+    expect(socialRefusalText(pt, { code: "OAUTH_LINK_ERROR", message: "unable to link account" }, true)).toBe(
+      pt("mobile.auth.social.failed"),
+    );
+    expect(socialRefusalText(pt, { code: "SIGNUP_CLOSED" }, true)).toBe(pt("auth.flow.closedLead"));
+    expect(socialRefusalText(pt, { code: "EARLY_ACCESS_EMAIL_UNVERIFIED" }, true)).toBe(
+      pt("auth.earlyAccess.unverified"),
+    );
+  });
+
+  test("a sign-up's 403 is sign-up closed only when it isn't the bot check's or an invitation's for another address", () => {
     expect(signUpClosed({ status: 403 })).toBe(true);
     expect(signUpClosed({ status: 403, code: "FORBIDDEN" })).toBe(true);
     expect(signUpClosed({ status: 403, code: "human_check" })).toBe(false);
     expect(signUpClosed({ status: 403, code: "human_check_blocked" })).toBe(false);
+    expect(signUpClosed({ status: 403, code: "EARLY_ACCESS_OTHER_EMAIL" })).toBe(false);
     expect(signUpClosed({ status: 429 })).toBe(false);
   });
 

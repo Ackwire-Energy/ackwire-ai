@@ -6,7 +6,13 @@ import {
   useApi,
   useAuthConfig,
 } from "@agenteschat/client";
-import { authErrorText, EARLY_ACCESS_OTHER_EMAIL, knownErrorText } from "@agenteschat/client/lib/errors";
+import {
+  ACCOUNT_NOT_LINKED,
+  authErrorText,
+  EARLY_ACCESS_OTHER_EMAIL,
+  knownErrorText,
+  providerRefusalText,
+} from "@agenteschat/client/lib/errors";
 import { signInFor } from "@agenteschat/client/lib/guards";
 import { type HumanAction, isHumanCheckRefusal, withHumanCheck } from "@agenteschat/client/lib/human-check";
 import { emailTypoFix, isEmail, passwordState, webmailOf } from "@agenteschat/client/lib/text";
@@ -30,8 +36,10 @@ import {
   SIGNED_IN_PATH,
   thisMac,
 } from "@/lib/desktop";
+import { sendNewLink } from "@/lib/email-confirmation";
 import { useHumanCheck } from "@/lib/human-check";
 import { STORAGE_KEYS, sessionStore } from "@/lib/storage";
+import { useToast } from "@/lib/toast";
 
 /**
  * Sign in and sign up in one flow: the e-mail
@@ -108,7 +116,10 @@ export function AuthPage({
   email?: string;
   /** An early-access link's token (`/signup?access=`): it opens sign-up for the address it was sent to. */
   access?: string;
-  /** The code of a provider sign-in the server refused (`/login?error=`): said when the app knows it. */
+  /**
+   * The code of a provider sign-in the server refused (`/login?error=`): said when the app knows it. An unconfirmed
+   * password account's comes with its address in `email`, to send the confirmation again from here.
+   */
   refused?: string;
 }) {
   const { t } = useTranslation();
@@ -117,14 +128,16 @@ export function AuthPage({
   const navigate = useNavigate();
   const qc = useQueryClient();
   const config = useAuthConfig();
+  const toast = useToast();
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState(initialEmail ?? "");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [options, setOptions] = useState<SignInOptions | null>(null);
-  const [error, setError] = useState<string | null>(() =>
-    refused ? knownErrorText(t, new ApiError(403, refused, "")) : null,
-  );
+  const canReset = config.data?.passwordReset === true;
+  const refusal = refused ? providerRefusalText(t, refused, canReset) : null;
+  const [error, setError] = useState<string | null>(refusal);
+  const [resent, setResent] = useState(false);
   const [wrong, setWrong] = useState(false);
   const [pending, setPending] = useState(false);
   const [show, setShow] = useState(false);
@@ -135,7 +148,6 @@ export function AuthPage({
   const human = useHumanCheck(config.data?.ownerClaim ? null : (STEP_ACTIONS[step] ?? null));
   const linkedProviders = useSocialProviders(options?.providers);
   const allProviders = useSocialProviders();
-  const canReset = config.data?.passwordReset === true;
   const termsUrl = config.data?.termsUrl;
   const privacyUrl = config.data?.privacyUrl;
   const desktop = inDesktopApp();
@@ -188,6 +200,15 @@ export function AuthPage({
     setStep(next);
   };
 
+  // An unconfirmed account's refusal still in view: its address is right, and on a server that emails a new
+  // confirmation is a click away.
+  const unconfirmed = refused === ACCOUNT_NOT_LINKED && error === refusal;
+  const resendable = unconfirmed && canReset && !resent && isEmail(email);
+  const resend = async () => {
+    setResent(true);
+    if (!(await sendNewLink({ auth, t, show: toast.show }, email.trim()))) setResent(false);
+  };
+
   const fail = (e: unknown) =>
     setError(
       e instanceof ApiError && e.status === 429
@@ -214,10 +235,11 @@ export function AuthPage({
     }
   };
 
-  // Came with the e-mail (an invitation's "Entrar"): straight to the next step.
+  // Came with the e-mail (an invitation's "Entrar"): straight to the next step. Back from a refused provider, the
+  // refusal stays in view.
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, for the e-mail in the link
   useEffect(() => {
-    if (initialEmail && isEmail(initialEmail)) void lookUp(initialEmail);
+    if (initialEmail && isEmail(initialEmail) && !refused) void lookUp(initialEmail);
   }, []);
 
   // `to` is a path with its query (an email's `?open=`, `?connect=ai`): an href, not a route.
@@ -306,10 +328,10 @@ export function AuthPage({
     if (!opened) return;
     setBrowser({ provider, verifier, requestId: opened.requestId, code: opened.code });
     go("browser");
-    window.location.assign(browserSignInUrl(provider, opened.requestId));
+    window.location.assign(browserSignInUrl(provider, opened.requestId, access));
   };
   const reopenBrowser = () => {
-    if (browser) window.location.assign(browserSignInUrl(browser.provider, browser.requestId));
+    if (browser) window.location.assign(browserSignInUrl(browser.provider, browser.requestId, access));
   };
 
   // Asks every 2 s and whenever the window comes back to the front; a full load after, so everything starts signed in.
@@ -490,7 +512,7 @@ export function AuthPage({
                   placeholder={t("auth.flow.emailPlaceholder")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  invalid={error !== null}
+                  invalid={error !== null && !unconfirmed}
                   autoFocus
                 />
                 {fix && (
@@ -534,7 +556,17 @@ export function AuthPage({
             {error && (
               <p className="auth__error ac-iconline" role="alert">
                 <Icon name="alert" size={14} />
-                {error}
+                {resendable ? (
+                  <span>
+                    {error}
+                    <br />
+                    <button type="button" className="ac-link" onClick={() => void resend()}>
+                      {t("auth.sendNewLink")}
+                    </button>
+                  </span>
+                ) : (
+                  error
+                )}
               </p>
             )}
 

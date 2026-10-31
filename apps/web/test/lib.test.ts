@@ -13,7 +13,15 @@ import {
   whenAt,
 } from "@agenteschat/client/lib/format";
 import { agentGrammar, isFeminineName, providerGrammar, runErrorGrammar } from "@agenteschat/client/lib/grammar";
-import { landingFor, membershipIn, safeRedirect, settingUp, webUrl } from "@agenteschat/client/lib/guards";
+import {
+  earlyAccessHeaders,
+  earlyAccessState,
+  landingFor,
+  membershipIn,
+  safeRedirect,
+  settingUp,
+  webUrl,
+} from "@agenteschat/client/lib/guards";
 import {
   addInvites,
   aheadOf,
@@ -250,6 +258,13 @@ describe("guards and permissions", () => {
       { id: "b", name: "B", role: "member" as const },
     ],
   };
+  test("an early-access token as every app sends it: a header signing up in place, the state through a provider", () => {
+    const token = "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8S9t0U1v";
+    // What apps/server auth.ts `accessOf` reads.
+    expect(earlyAccessHeaders(token)).toEqual({ "x-early-access": token });
+    expect(earlyAccessState(token)).toEqual({ additionalData: { earlyAccess: token } });
+    expect([earlyAccessHeaders(), earlyAccessState()]).toEqual([{}, {}]);
+  });
   test("safe redirects only", () => {
     expect(safeRedirect("/org/a")).toBe("/org/a");
     expect(safeRedirect("//evil.com")).toBeUndefined();

@@ -482,6 +482,51 @@ describe("Acesso antecipado (o link do convite)", () => {
   });
 });
 
+describe("Google para um e-mail com senha não confirmada", () => {
+  const BACK = "/login?error=account_not_linked&email=ana%40acme.com";
+  const UNCONFIRMED =
+    "Este e-mail já tem uma conta com senha que ainda não foi confirmada. Confirme pelo e-mail que enviamos ou entre com a senha.";
+
+  test("says so with the address filled in, sends the confirmation again from there, and Continuar asks the password", async () => {
+    const { api, state } = authApi(ACCOUNT, { reset: true });
+    const { auth, calls } = createFakeAuth();
+    await renderApp(BACK, { api, auth });
+    await settle(6);
+    expect(state.calls.some((c) => c.method === "account.signInOptions")).toBe(false);
+    const field = screen().getByLabelText("E-mail") as HTMLInputElement;
+    // The address is right: the field isn't marked wrong.
+    expect([field.value, field.getAttribute("aria-invalid")]).toEqual(["ana@acme.com", null]);
+    expect(screen().getByRole("alert").textContent).toBe(`${UNCONFIRMED}Mandar outro link`);
+
+    await press("Mandar outro link");
+    expect(calls).toEqual([{ method: "sendVerificationEmail", args: ["ana@acme.com"] }]);
+    expect(screen().getByRole("alert").textContent).toBe(UNCONFIRMED);
+    expect(document.body.textContent).toContain("Mandamos outro link para ana@acme.com.");
+
+    await press(/^Continuar(?! com)/);
+    expect(heading()).toBe("Bom te ver de novo.");
+    expect(screen().queryByRole("alert")).toBeNull();
+  });
+
+  test("a link that didn't go out can be pressed again", async () => {
+    const { api } = authApi(ACCOUNT, { reset: true });
+    const { auth, calls } = createFakeAuth({ verification: { ok: false, status: 400, message: "" } });
+    await renderApp(BACK, { api, auth });
+    await settle(6);
+    await press("Mandar outro link");
+    await press("Mandar outro link");
+    expect(calls.filter((c) => c.method === "sendVerificationEmail")).toHaveLength(2);
+  });
+
+  test("on a server that sends no email: only the password, and no link", async () => {
+    const { api } = authApi(ACCOUNT);
+    await renderApp(BACK, { api, auth: createFakeAuth().auth });
+    await settle(6);
+    expect(screen().getByRole("alert").textContent).toBe("Este e-mail já tem uma conta com senha. Entre com a senha.");
+    expect(screen().queryByRole("button", { name: "Mandar outro link" })).toBeNull();
+  });
+});
+
 describe("Senha nova (link do e-mail)", () => {
   test("saves the new password with the link's token", async () => {
     const { auth, calls } = createFakeAuth();

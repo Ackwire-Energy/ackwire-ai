@@ -1,4 +1,5 @@
 import { invitationQuery, type SignInOptions, useApi, useAuthConfig } from "@agenteschat/client";
+import { earlyAccessHeaders } from "@agenteschat/client/lib/guards";
 import { type HumanAction, humanCheckHeaders, withHumanCheck } from "@agenteschat/client/lib/human-check";
 import { emailTypoFix, isEmail, passwordState, webmailOf } from "@agenteschat/client/lib/text";
 import { useQuery } from "@tanstack/react-query";
@@ -64,7 +65,16 @@ const STEP_ACTIONS: Partial<Record<Step, HumanAction>> = {
   forgot: "password-reset",
 };
 
-export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; email?: string }) {
+/** `access`: an early-access link's token, for the sign-up it opens (as the web's `/signup?access=`). */
+export function AuthFlow({
+  start,
+  email: initialEmail,
+  access,
+}: {
+  start: "in" | "up";
+  email?: string;
+  access?: string;
+}) {
   const { t } = useTranslation();
   const api = useApi();
   const config = useAuthConfig();
@@ -77,6 +87,7 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
   const [password, setPassword] = useState("");
   const [options, setOptions] = useState<SignInOptions | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [resent, setResent] = useState<"no" | "sending" | "sent">("no");
   const [wrong, setWrong] = useState(false);
   const [pending, setPending] = useState(false);
   const [secret, setSecret] = useState(false);
@@ -108,7 +119,7 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
     setError(null);
     try {
       const found = await withHumanCheck(human.check, (token) =>
-        api.account.signInOptions({ email: value.trim() }, token),
+        api.account.signInOptions({ email: value.trim(), ...(access ? { access } : {}) }, token),
       );
       setOptions(found);
       setPassword("");
@@ -199,7 +210,7 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
             name: name.trim(),
             email: email.trim(),
             password,
-            fetchOptions: { headers: humanCheckHeaders(token) },
+            fetchOptions: { headers: { ...humanCheckHeaders(token), ...earlyAccessHeaders(access) } },
           }),
         ),
       );
@@ -220,6 +231,16 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
     } finally {
       setPending(false);
     }
+  };
+
+  /** A new confirmation for the address in the field, after a provider refused it for its unconfirmed account. */
+  const resend = async () => {
+    if (resent === "sending") return;
+    setResent("sending");
+    const res = await authClient()
+      .sendVerificationEmail({ email: email.trim() })
+      .catch(() => null);
+    setResent(res && !res.error ? "sent" : "no");
   };
 
   const sendReset = async () => {
@@ -407,11 +428,21 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
         </Text>
       ) : null}
 
+      {canReset && error === t("auth.unconfirmed") && isEmail(email) ? (
+        resent === "sent" ? (
+          <Text variant="small" tone="muted" style={CENTER}>
+            {t("auth.newLinkSent", { email: email.trim() })}
+          </Text>
+        ) : (
+          <Quiet label={t("auth.sendNewLink")} onPress={() => void resend()} />
+        )
+      ) : null}
+
       {submitLabel[step] ? (
         <Button variant="primary" wide label={submitLabel[step]} disabled={!ready || pending} onPress={submit} />
       ) : null}
 
-      {step === "email" ? <SocialButtons providers={allProviders} onError={setError} /> : null}
+      {step === "email" ? <SocialButtons providers={allProviders} onError={setError} earlyAccess={access} /> : null}
 
       {step === "password" && canReset ? <Quiet label={t("auth.forgotPassword")} onPress={() => go("forgot")} /> : null}
 

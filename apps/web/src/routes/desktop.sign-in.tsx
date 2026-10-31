@@ -1,4 +1,5 @@
 import type { SignInProvider } from "@agenteschat/client";
+import { earlyAccessToken } from "@agenteschat/client/lib/guards";
 import { createFileRoute } from "@tanstack/react-router";
 import { DesktopSignInPage } from "@/pages/DesktopSignInPage";
 
@@ -8,14 +9,15 @@ const PROVIDERS: SignInProvider[] = ["google", "github", "apple"];
 export const Route = createFileRoute("/desktop/sign-in")({
   validateSearch: (
     search: Record<string, unknown>,
-  ): { provider?: SignInProvider; request?: string; done?: string } => ({
+  ): { provider?: SignInProvider; request?: string; done?: string; access?: string } => ({
     provider: PROVIDERS.find((p) => p === search.provider),
     request:
       typeof search.request === "string" && /^[A-Za-z0-9_-]{43}$/.test(search.request) ? search.request : undefined,
     done: search.done === "1" || search.done === 1 ? "1" : undefined,
+    access: earlyAccessToken(search.access),
   }),
   component: function DesktopSignIn() {
-    const { provider, request, done } = Route.useSearch();
-    return <DesktopSignInPage provider={provider} request={request} done={done === "1"} />;
+    const { provider, request, done, access } = Route.useSearch();
+    return <DesktopSignInPage provider={provider} request={request} done={done === "1"} access={access} />;
   },
 });

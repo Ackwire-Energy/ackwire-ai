@@ -1,5 +1,11 @@
 import { ApiError } from "@agenteschat/client";
-import { knownErrorText, type RestrictionFacts, restrictionLine } from "@agenteschat/client/lib/errors";
+import {
+  EARLY_ACCESS_OTHER_EMAIL,
+  knownErrorText,
+  providerRefusalText,
+  type RestrictionFacts,
+  restrictionLine,
+} from "@agenteschat/client/lib/errors";
 import {
   type createHumanCheck,
   HUMAN_CHECK_BLOCKED,
@@ -156,12 +162,29 @@ export const refusalOf = ({ error }: { error: ({ status: number; code?: string }
   error ? { status: error.status, code: error.code, kind: error.kind, cloud: error.cloud } : null;
 
 /**
- * A social sign-in Better Auth refused: a blocked account's line (its kind on agentes.chat Cloud), since Apple's
- * native sign-in gets the server's answer itself, else that it didn't work.
+ * A social sign-in Better Auth refused, as Apple's native sign-in gets the server's answer itself: a blocked account's
+ * line (its kind on agentes.chat Cloud), a refusal the web's sign-in says too, else that it didn't work. Better Auth
+ * names a provider's own refusal in an `OAUTH_LINK_ERROR`'s message ("account not linked" is the web's
+ * `account_not_linked`). `emails`: the server sends email.
  */
-export const socialRefusalText = (t: TFunction, error: { code?: string } & RestrictionFacts) =>
-  restrictionLine(t, error.code, error) ?? t("mobile.auth.social.failed");
+export function socialRefusalText(
+  t: TFunction,
+  error: { code?: string; message?: string } & RestrictionFacts,
+  emails: boolean,
+): string {
+  const code = error.code === "OAUTH_LINK_ERROR" ? error.message?.replace(/ /g, "_") : error.code;
+  return (
+    restrictionLine(t, code, error) ??
+    (code ? providerRefusalText(t, code, emails) : null) ??
+    t("mobile.auth.social.failed")
+  );
+}
 
-/** A refused sign-up means sign-up is closed only when it is a 403 that isn't the bot check's. */
+/**
+ * A refused sign-up means sign-up is closed only when it is a 403 that isn't the bot check's, nor an early-access
+ * link's for another address (said in its own words, as on the web).
+ */
 export const signUpClosed = (refusal: { status: number; code?: string | null }) =>
-  refusal.status === 403 && !isHumanCheckRefusal(refusal.code ?? undefined);
+  refusal.status === 403 &&
+  !isHumanCheckRefusal(refusal.code ?? undefined) &&
+  refusal.code !== EARLY_ACCESS_OTHER_EMAIL;

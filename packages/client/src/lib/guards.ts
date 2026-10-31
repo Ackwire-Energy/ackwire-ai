@@ -46,6 +46,16 @@ export const EARLY_ACCESS_HEADER = "x-early-access";
 export const earlyAccessToken = (value: unknown): string | undefined =>
   typeof value === "string" && /^[A-Za-z0-9_-]{43}$/.test(value) ? value : undefined;
 
+/** The token on a request that signs up in place: the password form's, the phone's native Apple sign-in. */
+export const earlyAccessHeaders = (token?: string): Record<string, string> =>
+  token ? { [EARLY_ACCESS_HEADER]: token } : {};
+
+/**
+ * The token on a provider sign-in through the browser: in its state, read back on the callback (apps/server auth.ts
+ * `accessOf`).
+ */
+export const earlyAccessState = (token?: string) => (token ? { additionalData: { earlyAccess: token } } : {});
+
 /** The sign-in page that comes back to `redirect`, with the address the page before already knew filled in. */
 export const signInPath = (redirect: string, email?: string) =>
   `/login?${new URLSearchParams({ redirect, ...(email ? { email } : {}) })}`;
