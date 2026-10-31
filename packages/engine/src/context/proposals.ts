@@ -77,13 +77,14 @@ export function lineDiff(before: string, after: string): string {
   return out.join("\n");
 }
 
+const LEARNED = "## Learned";
+
 /** Text with one more bullet, under a "Learned" heading (deterministic, no model). */
 export function withLearnedBullet(text: string, bullet: string) {
   const line = `- ${bullet.replace(/\s+/g, " ").trim()}`;
   if (text.includes(line)) return text;
-  const heading = "## Learned";
   const base = text.trimEnd();
-  return base.includes(heading) ? `${base}\n${line}` : `${base}${base ? "\n\n" : ""}${heading}\n${line}`;
+  return base.includes(LEARNED) ? `${base}\n${line}` : `${base}${base ? "\n\n" : ""}${LEARNED}\n${line}`;
 }
 
 /**
@@ -360,25 +361,22 @@ async function applied(db: Database, actorId: string, p: Proposal, agent: Agent,
   return true;
 }
 
-/** What a refused proposal asked for, in a line: its added text, or for another agent's role or access, that. */
-async function refusedChange(db: Database, p: Proposal) {
+/**
+ * What a refused proposal asked for, in a line that is the same whichever agent it was for, so the rows of one card
+ * make one lesson: the lines it adds (the "Learned" heading aside) or removes, the role, or the apps.
+ */
+function refusedChange(p: Proposal) {
   const lines = (sign: string) =>
     p.diff
       .split("\n")
       .filter((l) => l.startsWith(sign))
       .map((l) => l.slice(1).trim())
-      .filter(Boolean)
+      .filter((l) => l && l !== LEARNED)
       .join(" ");
-  const target =
-    p.agentId && p.proposedByAgentId && p.agentId !== p.proposedByAgentId
-      ? await getAgent(db, p.orgId, p.agentId)
-      : null;
-  const of = target ? `@${target.handle}'s ` : "";
-  if (p.target === "agent_role") return `${of}role: ${p.proposedText}`;
+  if (p.target === "agent_role") return `role: ${p.proposedText}`;
   if (p.target === "agent_access")
-    return `${of}access: ${(p.access ?? []).map((l) => `${l.label} ${l.on ? "on" : "off"}`).join(", ")}`;
-  const change = lines("+") || (lines("-") ? `removing "${lines("-")}"` : "");
-  return change && target ? `${change} (in ${of}instructions)` : change;
+    return `access: ${(p.access ?? []).map((l) => `${l.label} ${l.on ? "on" : "off"}`).join(", ")}`;
+  return lines("+") || (lines("-") ? `removing "${lines("-")}"` : "");
 }
 
 /**
@@ -388,7 +386,7 @@ async function refusedChange(db: Database, p: Proposal) {
  * can't be stored.
  */
 async function recordRefusal(db: Database, actorId: string, p: Proposal) {
-  const added = (await refusedChange(db, p)).slice(0, 400);
+  const added = refusedChange(p).slice(0, 400);
   if (!added) return;
   const agentId = p.proposedByAgentId ?? p.agentId;
   await consolidateItem(db, {

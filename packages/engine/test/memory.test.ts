@@ -1205,8 +1205,25 @@ describe("proposals for teammates (one card, a row per agent and kind of change)
     await decideProposal(f.db, f.owner.id, f.org.id, rowOf(ada.id), "reject");
     const lessons = await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.kind, "lesson"));
     expect(lessons.map((l) => l.agentId)).toEqual([f.agent.id]);
-    expect(lessons[0]?.content).toContain("Responder em português. (in @ada's instructions)");
+    expect(lessons[0]?.content).toBe("A person refused this change; don't propose it again: - Responder em português.");
     expect(await auditOf(ada.id)).toContainEqual(["proposal.refused", f.owner.id]);
+  });
+
+  test("refusing a card teaches the agent that proposed it one lesson for the change, not one per agent", async () => {
+    f = await setup();
+    const ada = await teammate("ada");
+    const lia = await teammate("lia");
+    const atlas = await teammate("atlas", { instructions: "Seja breve.\n\n## Learned\n- Outra." });
+    const { proposals } = await proposeFor({
+      target: "agent_instructions",
+      agentIds: [ada.id, lia.id, atlas.id],
+      change: "Responder sempre em português.",
+    });
+    for (const p of proposals) await decideProposal(f.db, f.owner.id, f.org.id, p.id, "reject");
+    const lessons = await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.kind, "lesson"));
+    expect(lessons.map((l) => [l.agentId, l.content])).toEqual([
+      [f.agent.id, "A person refused this change; don't propose it again: - Responder sempre em português."],
+    ]);
   });
 
   test("a new role: decided by who manages agents, applied as them through the agent page's editor; stale once the role changed", async () => {
