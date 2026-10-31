@@ -1,5 +1,6 @@
 import type {
   AgentBrain,
+  AgentBrainInput,
   BrainKind,
   Credential,
   MachineAccount,
@@ -15,7 +16,8 @@ import {
 } from "@agenteschat/client/lib/ai-accounts";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import type { PlanGate } from "@agenteschat/client/lib/no-ai";
-import { providerLabel } from "@agenteschat/client/lib/providers";
+import { brainModelChoice, brainModelChoices, type CodingPlan } from "@agenteschat/client/lib/plans";
+import { AUTO, isAuto, providerLabel } from "@agenteschat/client/lib/providers";
 import type { TFunction } from "i18next";
 
 /*
@@ -68,6 +70,64 @@ export function thinkingUsage(
 /** The other agents an account thinks for now: picking it takes it from them ("Mover para cá"). */
 export const takenFrom = (account: Pick<MachineAccount, "usedBy">, agentName: string) =>
   account.usedBy.filter((n) => n !== agentName);
+
+/** A row of the agent's model page. */
+export interface ModelRow {
+  value: string;
+  label: string;
+  /** What it does or is sold as. */
+  sub?: string;
+  /** What the plan's account must allow before it answers. */
+  note?: string;
+  /** Who makes it, on a plan of several makers' models: a provider's id or the maker's name. */
+  maker?: string;
+  checked: boolean;
+}
+
+/**
+ * The agent's model on the phone, as the web's "Quem pensa": Automático, then its brain's models (every model of
+ * its account's coding plan, each with what its maker sells it as), the one it runs checked.
+ */
+export function modelRows(
+  t: TFunction,
+  view: Pick<AgentBrain, "brain" | "effectiveModel" | "options">,
+  plan: CodingPlan | undefined,
+): ModelRow[] {
+  const option = view.options.find((o) => o.kind === view.brain);
+  const chosen = brainModelChoice(view.brain, plan, view.effectiveModel ?? option?.defaultModel ?? "");
+  const rows: Omit<ModelRow, "checked">[] = [
+    { value: AUTO, label: t("brain.auto.label"), sub: t("brain.auto.hint") },
+    ...brainModelChoices(plan, option?.models ?? []).map(({ value, label, tag, needs, maker }) => ({
+      value,
+      label,
+      ...(tag ? { sub: t(`brain.modelTag.${tag}`) } : {}),
+      ...(needs ? { note: t(`brain.modelNeeds.${needs}`) } : {}),
+      ...(maker ? { maker } : {}),
+    })),
+  ];
+  return rows.map((r) => ({ ...r, checked: r.value === chosen }));
+}
+
+/** The model page's lists: one, or on a plan of several makers' models Automático's and one per maker. */
+export function modelSections(rows: ModelRow[]): { maker?: string; rows: ModelRow[] }[] {
+  const sections: { maker?: string; rows: ModelRow[] }[] = [];
+  for (const r of rows) {
+    const last = sections.at(-1);
+    if (last && last.maker === r.maker) last.rows.push(r);
+    else sections.push({ ...(r.maker ? { maker: r.maker } : {}), rows: [r] });
+  }
+  return sections;
+}
+
+/** What picking a model saves, as the web's dialog does: Automático picks the effort too; a fixed one after it, Médio. */
+export function modelInput(
+  value: string,
+  view: Pick<AgentBrain, "effort" | "options" | "brain">,
+): Pick<AgentBrainInput, "model" | "effort"> {
+  if (isAuto(value)) return { model: AUTO, effort: AUTO };
+  const defaultModel = view.options.find((o) => o.kind === view.brain)?.defaultModel;
+  return { model: value === defaultModel ? null : value, ...(isAuto(view.effort) ? { effort: "medium" } : {}) };
+}
 
 /** An account as the agent's AI lists it (its page and Connect an AI): its name and plan, the line under it, its mark. */
 export const accountRow = (t: TFunction, choice: AccountChoice<MachineAccount>, agentName: string) => ({

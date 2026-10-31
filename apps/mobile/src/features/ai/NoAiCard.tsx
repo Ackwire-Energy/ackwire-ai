@@ -1,13 +1,13 @@
 import { type Message, useAiStatus, useApi } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { aiStateOf, noAiCardOf, signInAgainPlan } from "@agenteschat/client/lib/no-ai";
+import { aiStateOf, noAiCardOf, planOfKind, signInAgainPlan } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, Icon, Text, useTheme } from "@/ui";
+import { Button, LineIcon, Text, useTheme } from "@/ui";
 import { useDirectory, useMeId } from "../shared/hooks";
 
 type Answer = "pending" | "answering" | "still_missing";
@@ -46,10 +46,12 @@ export function NoAiCard({ message: m }: { message: Message }) {
   const agent = dir.agentById.get(card.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
   const again = signInAgainPlan(card, agent);
+  // The computer's own sign-in isn't there: Conectar opens on an account of that CLI's plan.
+  const plan = card.own ? planOfKind(card.own) : again;
   const state = aiStateOf(status.data, card.agentId);
   const ready = state !== undefined && state !== "no_ai" && answer !== "still_missing";
   const mayAnswer =
-    card.forUserId === meId || (meId !== null && agent?.ownerUserId === meId) || can(org?.role, "manage_agents");
+    card.forUserId === meId || (meId !== null && agent?.ownerUserId === meId) || can(org, "manage_agents");
   const answering = answer === "answering";
   const title = answering
     ? t("noAi.card.answering", { name })
@@ -57,7 +59,9 @@ export function NoAiCard({ message: m }: { message: Message }) {
       ? t("noAi.card.connected", { name })
       : answer === "still_missing"
         ? t("noAi.card.stillMissing", { name })
-        : t(card.signedOut ? "noAi.signedOut" : "noAi.agent", agentGrammar(t, name));
+        : card.own
+          ? t(`noAi.notSignedIn.${card.own}`, agentGrammar(t, name))
+          : t(card.signedOut ? "noAi.signedOut" : "noAi.agent", agentGrammar(t, name));
   const answerNow = async () => {
     setAnswer("pending");
     try {
@@ -71,7 +75,7 @@ export function NoAiCard({ message: m }: { message: Message }) {
   return (
     <View style={[styles.card, { backgroundColor: colors.sunken }]}>
       <View style={styles.top}>
-        <Icon name={ready || answering ? "check" : "bolt"} size={16} color={colors.ink2} />
+        <LineIcon name={ready || answering ? "check" : "bolt"} variant="subhead" size={16} color={colors.ink2} />
         <Text variant="subhead" style={styles.title}>
           {title}
         </Text>
@@ -97,7 +101,7 @@ export function NoAiCard({ message: m }: { message: Message }) {
               intent: card.intent,
               provider: card.provider,
               agentId: card.agentId,
-              ...(again ? { plan: again } : {}),
+              ...(plan ? { plan } : {}),
             })
           }
         />
@@ -108,6 +112,6 @@ export function NoAiCard({ message: m }: { message: Message }) {
 
 const styles = StyleSheet.create({
   card: { marginTop: 10, borderRadius: 14, padding: 12, gap: 8, alignItems: "flex-start" },
-  top: { flexDirection: "row", alignItems: "center", gap: 8 },
+  top: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   title: { flex: 1, fontWeight: "600" },
 });

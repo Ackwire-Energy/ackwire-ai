@@ -11,6 +11,8 @@ export interface BrainAccount {
   /** What people call it, for messages. */
   label: string;
   status: "active" | "signed_out";
+  /** A key account's coding plan (`zai`…), which names the models it runs. */
+  provider?: string;
 }
 
 /** A tool as the engine offers it to a brain (same data the Tool Gateway lists for the run). */

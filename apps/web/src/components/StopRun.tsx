@@ -52,7 +52,7 @@ export function useStopRun() {
     return root?.author.type === "person" && root.author.id === me.user.id;
   };
   const canStop = (r: RunOwner) =>
-    can(org.role, "manage_agents") || dir.agentById.get(r.agentId)?.ownerUserId === me.user.id || startedByMe(r);
+    can(org, "manage_agents") || dir.agentById.get(r.agentId)?.ownerUserId === me.user.id || startedByMe(r);
   return {
     canStop,
     stop: (r: LiveRun) => {

@@ -26,6 +26,7 @@ export const featureKeysPtBR = {
     up: "Subir",
     down: "Descer",
     position: "{{at}}ª de {{count}}.",
+    channelPosition: "{{at}}º de {{count}}.",
     itsChannels: "Canais",
     seeAll: "Ver todos",
   },
@@ -280,8 +281,6 @@ export const featureKeysPtBR = {
     sending: "Enviando…",
     failed: "Não foi enviada · Tentar de novo",
     notSent: "A mensagem não foi enviada.",
-    /** Under my latest message in a DM with a person, once they read it. */
-    seen: "Visto",
     toLatest: "Ir para as mensagens mais recentes",
     stopAgent: "Parar {{name}}",
     offlineWait: "Sai quando a conexão voltar",
@@ -794,7 +793,6 @@ export const featureKeysPtBR = {
     title: "Você",
     role: {
       owner: "dono",
-      admin: "admin",
       member: "membro",
     },
     appearance: "Aparência",
@@ -1428,8 +1426,8 @@ export const featureKeysPtBR = {
   },
   joinRequests: {
     share: "Compartilhar o link",
-    rolesHint:
-      "Membros conversam, criam tarefas e aprovam os próprios agentes. Admins também gerenciam membros, agentes e chaves.",
+    roles: "Papéis",
+    rolesHint: "A pessoa entra com os papéis ligados. Sem nenhum, ela pode o mesmo que Todos.",
   },
   humanCheck: {
     title: "Verificação rápida",
@@ -1535,6 +1533,14 @@ export const featureKeysPtBR = {
       preparing: "Preparando o arquivo…",
       failed: "Não deu para baixar o arquivo. Tente de novo.",
     },
+  },
+  status: {
+    title: "Status",
+    doing: "O que você está fazendo",
+    placeholder: "Em reunião, almoçando…",
+    noEmoji: "Sem emoji",
+    cleared: "Status limpo",
+    bySelfUntil: "Escrito por {{name}} · {{when}}",
   },
 };
 

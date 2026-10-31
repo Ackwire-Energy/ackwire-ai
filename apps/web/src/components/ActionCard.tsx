@@ -86,7 +86,7 @@ function AgentProposalCardView({ message, card }: { message: Message; card: Agen
   const toast = useToast();
   const { draft, why } = card.params;
   const status = proposalStatus(card);
-  const decides = status === "open" && can(org.role, "manage_agents");
+  const decides = status === "open" && can(org, "create_agents");
   const proposer = (message.author.id && dir.agentById.get(message.author.id)?.name) || t("channel.unknownAgent");
   return (
     <div className="waitcard" data-done={status === "created" || undefined}>
