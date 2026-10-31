@@ -70,14 +70,21 @@ const keepOnly = async (...keep: string[]) => {
   }
 };
 
-/** How often the query of this kind (its key's last part) is asked again, as its observer has it now. */
+/**
+ * How often the query of this kind (its key's last part) is asked again now: the shortest positive interval among
+ * all its observers (false when none polls), since each observer polls on its own timer and others, such as a
+ * closed dialog's `useMe`, set none.
+ */
 const pollEvery = (qc: QueryClient, key: string) => {
   const query = qc
     .getQueryCache()
     .findAll()
     .find((q) => q.queryKey.at(-1) === key && q.getObserversCount() > 0);
-  const every = query?.observers[0]?.options.refetchInterval;
-  return typeof every === "function" && query ? every(query) : every;
+  if (!query) return undefined;
+  const every = query.observers
+    .map(({ options: { refetchInterval: ms } }) => (typeof ms === "function" ? ms(query) : ms))
+    .filter((ms): ms is number => typeof ms === "number" && ms > 0);
+  return every.length > 0 ? Math.min(...every) : false;
 };
 
 /** The workspace's own computer as the server lists it: named by the server, no system, nobody paired it. */
