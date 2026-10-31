@@ -1297,6 +1297,8 @@ export const featureKeysEn: FeatureTranslations = {
       graceM: "If you leave, {{name}} waits 2 min.",
       closedHelpF: "Its sign-ins stay saved.",
       closedHelpM: "Its sign-ins stay saved.",
+      stuckHelpF: "Try again restarts the browser. Its sign-ins stay saved.",
+      stuckHelpM: "Try again restarts the browser. Its sign-ins stay saved.",
       hidden: "{{name}} is in control · screen hidden",
       key: {
         Tab: "Tab",
@@ -1321,6 +1323,10 @@ export const featureKeysEn: FeatureTranslations = {
         closedM: "{{name}}'s browser is closed.",
         offlineCloudF: "{{name}}'s computer isn't answering right now.",
         offlineCloudM: "{{name}}'s computer isn't answering right now.",
+        stuckF: "Couldn't open {{name}}'s browser.",
+        stuckM: "Couldn't open {{name}}'s browser.",
+        tooManyF: "Too many browsers open at once. This one shows when another one closes.",
+        tooManyM: "Too many browsers open at once. This one shows when another one closes.",
       },
     },
     done: {

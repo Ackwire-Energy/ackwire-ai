@@ -1302,6 +1302,8 @@ export const featureKeysPtBR = {
       graceM: "Se você sair, o {{name}} espera 2 min.",
       closedHelpF: "Os logins continuam salvos.",
       closedHelpM: "Os logins continuam salvos.",
+      stuckHelpF: "Tentar de novo reinicia o navegador. Os logins continuam salvos.",
+      stuckHelpM: "Tentar de novo reinicia o navegador. Os logins continuam salvos.",
       hidden: "{{name}} está no controle · tela oculta",
       key: {
         Tab: "Tab",
@@ -1326,6 +1328,10 @@ export const featureKeysPtBR = {
         closedM: "O navegador do {{name}} está fechado.",
         offlineCloudF: "O computador da {{name}} não está respondendo agora.",
         offlineCloudM: "O computador do {{name}} não está respondendo agora.",
+        stuckF: "Não deu para abrir o navegador da {{name}}.",
+        stuckM: "Não deu para abrir o navegador do {{name}}.",
+        tooManyF: "Muitos navegadores abertos ao mesmo tempo. Este aparece quando outro fechar.",
+        tooManyM: "Muitos navegadores abertos ao mesmo tempo. Este aparece quando outro fechar.",
       },
     },
     done: {

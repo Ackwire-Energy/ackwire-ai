@@ -1228,6 +1228,11 @@ export interface ApiClient {
     open(orgId: string, agentId: string, url: string): Promise<void>;
     /** "Parar": closes the agent's browser now (its logins stay). Its screen has no stop: it stays on. */
     stop(orgId: string, agentId: string): Promise<void>;
+    /**
+     * "Tentar de novo" on a page that never came: the browser closes and opens again where it was (its logins
+     * stay), and every live view gets it again. Resolves once it closed. Only who may drive it (403 otherwise).
+     */
+    restart(orgId: string, agentId: string): Promise<void>;
   };
   /**
    * The agent's screen (ADR 0058): its state. The screen itself is a WebSocket (`desktopSocketUrl`), which
