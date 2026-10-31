@@ -698,7 +698,7 @@ describe("external provisioning", () => {
         specs: null,
         needsAi: false,
         hasAgents: true,
-        crew: ["sky"],
+        crew: [{}],
         url: `https://chat.example.com/org/${f.org.id}`,
       },
     });

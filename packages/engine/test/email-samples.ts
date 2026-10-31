@@ -4,6 +4,11 @@ import type { EmailTemplate } from "../src";
 const APP = "https://agentes.chat";
 const ORG = "6f1d2c9a-58c1-4f7e-9d3b-2a7c1e0b9f44";
 const VERIFY = `${APP}/api/auth/verify-email?token=eyJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6ImFuYUBzb3V6YWJha2VyeS5jb20ifQ.k3J9&callbackURL=%2F%3Femail_confirmed%3D1`;
+/** The onboarding's own looks, drawn whole in the emails. */
+const THEO = { color: "indigo", eyes: "round", accessory: "cap" };
+const ADA = { color: "green", eyes: "wide", accessory: "headphones" };
+const LIA = { color: "rose", eyes: "dots", accessory: "flower" };
+const ATLAS = { color: "amber", eyes: "round", accessory: "antenna" };
 
 export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
   "verify_email.en": { kind: "verify_email", locale: "en", url: VERIFY },
@@ -16,7 +21,11 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     orgName: "Souza Bakery",
     inviterName: "Ana Souza",
     inviterEmail: "ana@souzabakery.com",
-    crew: ["sky", "violet", "teal"],
+    crew: [
+      { color: "sky", eyes: "round", accessory: "none" },
+      { color: "violet", eyes: "happy", accessory: "crown" },
+      { color: "teal", eyes: "sleepy", accessory: "none" },
+    ],
     url: `${APP}/invite/T7xQ2mVb9KpL`,
     role: "member",
   },
@@ -163,7 +172,7 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     specs: { cpus: 4, memoryGb: 8, diskGb: 100 },
     needsAi: true,
     hasAgents: true,
-    crew: ["indigo", "green", "rose", "amber"],
+    crew: [THEO, ADA, LIA, ATLAS],
     url: `${APP}/org/${ORG}`,
   },
   "computer_ready-ai.pt-BR": {
@@ -182,7 +191,11 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     specs: { cpus: 4, memoryGb: 8, diskGb: 100 },
     needsAi: false,
     hasAgents: true,
-    crew: ["teal", "sky", "violet"],
+    crew: [
+      { color: "teal", eyes: "round", accessory: "none" },
+      { color: "sky", eyes: "dots", accessory: "headset" },
+      { color: "violet", eyes: "round", accessory: "beanie" },
+    ],
     url: `${APP}/org/${ORG}`,
   },
   "computer_ready-create.en": {
@@ -219,7 +232,7 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     orgName: "Alves Studio",
     approverName: "Marina Alves",
     role: "member",
-    crew: ["graphite", "rose"],
+    crew: [{ color: "graphite", eyes: "round", accessory: "hat" }, LIA],
     url: `${APP}/org/${ORG}`,
   },
   "join_answer-invited.en": {

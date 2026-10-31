@@ -1,6 +1,6 @@
 import type { InlinePart } from "@agenteschat/adapters";
 import { dark, light, type ThemeColors } from "@agenteschat/tokens";
-import { AGENT_GRADIENTS } from "@agenteschat/ui/agent/engine";
+import { type AccessoryName, AGENT_GRADIENTS, type AgentColorName, type EyeStyle } from "@agenteschat/ui/agent/engine";
 import { COMPUTER_ART, COMPUTER_ROWS } from "@agenteschat/ui/computer/portrait";
 import { initialsOf } from "@agenteschat/ui/names";
 import { mix, opaque } from "@agenteschat/ui/sky/math";
@@ -33,13 +33,20 @@ export type Block =
   /** A one-time code to type: large in a well, selectable as one word. */
   | { code: string };
 
+/** An agent's look as the app keeps it (`appearance`): a part left out is the app's default (sky, round eyes, none). */
+export interface Look {
+  color?: string;
+  eyes?: string;
+  accessory?: string;
+}
+
 /**
  * A picture at the card's top: the agents standing on one floor, half on each side of the workspace's computer
- * (`computer`: its alt text, our words), or in a row without it. `crew`: each agent's face colour. The words never
- * depend on it, so the faces have no alt text.
+ * (`computer`: its alt text, our words), or in a row without it. The words never depend on it, so the faces have no
+ * alt text.
  */
 export interface Scene {
-  crew: string[];
+  crew: readonly Look[];
   computer?: string;
 }
 
@@ -75,6 +82,24 @@ const AGENT_FACES = Object.keys(AGENT_GRADIENTS);
  * with the pictures off. `packages/engine/scripts/email-art.ts` draws its file.
  */
 export const COMPUTER = { file: "computer.png", kind: "linux", cell: 2, t: 0.75, margin: 3 } as const;
+/**
+ * The onboarding's own agents, Theo, Ada, Lia and Atlas (`PRESET_LOOK` in apps/web/src/pages/OnboardingPage.tsx and
+ * apps/mobile/src/features/onboarding/logic.ts), each drawn whole by `packages/engine/scripts/email-art.ts`. Any other
+ * look is its colour's face.
+ */
+export const ONBOARDING_CREW = [
+  { color: "indigo", eyes: "round", accessory: "cap" },
+  { color: "green", eyes: "wide", accessory: "headphones" },
+  { color: "rose", eyes: "dots", accessory: "flower" },
+  { color: "amber", eyes: "round", accessory: "antenna" },
+] as const satisfies readonly { color: AgentColorName; eyes: EyeStyle; accessory: AccessoryName }[];
+/**
+ * A look drawn whole, in px as shown: the colour face's body (`body` wide, at `x` and `y`, as far from the left and the
+ * bottom as `agent-<colour>.png` has it) in a box with room above and to the right for any accessory (ACCESSORY_REACH
+ * in the agent engine, and a cap's brim one cell past it).
+ */
+export const WHOLE = { width: 36, height: 46, x: 2, y: 16, body: 28 } as const;
+export const wholeFile = (look: Required<Look>) => `agent-${look.color}-${look.eyes}-${look.accessory}.png`;
 /** Every picture an email may show, as the web app serves them (`apps/web/public/email/`). */
 export const EMAIL_PICTURES = [
   "logo-ink.png",
@@ -82,12 +107,20 @@ export const EMAIL_PICTURES = [
   COMPUTER.file,
   "sky-band.png",
   ...AGENT_FACES.map((c) => `agent-${c}.png`),
+  ...ONBOARDING_CREW.map(wholeFile),
 ];
 const FONT = "source-sans-3-latin.woff2";
 const LOGO = { width: 173, height: 36, alt: "agentes.chat" } as const;
 const SKY = { width: 552, height: 27 } as const;
 /** An agent's face for its colour: an unknown one is sky, as the app draws it. */
 const faceOf = (color: string) => `agent-${AGENT_FACES.includes(color) ? color : "sky"}.png`;
+/** A look's picture: drawn whole when it is one of the onboarding's, else its colour's face. */
+function pictureOf({ color = "sky", eyes = "round", accessory = "none" }: Look) {
+  const whole = ONBOARDING_CREW.find((o) => o.color === color && o.eyes === eyes && o.accessory === accessory);
+  return whole
+    ? { file: wholeFile(whole), width: WHOLE.width, height: WHOLE.height }
+    : { file: faceOf(color), width: 32, height: 32 };
+}
 
 /** Classic Outlook has no rgba: hairlines are the solid color they show over their surface. */
 const palette = (t: ThemeColors) => ({
@@ -323,10 +356,17 @@ function block(b: Block, src: (file: string) => string, last: boolean): string {
 function scene(s: Scene, src: (file: string) => string): string {
   const img = (file: string, width: number, height: number, alt: string) =>
     `<img src="${esc(src(file))}" width="${width}" height="${height}" alt="${esc(alt)}" style="display:block;border:0;outline:none;width:${width}px;height:${height}px;${P};font-size:11px;line-height:14px;color:${L.muted}">`;
-  const faces = (crew: string[], padding: string) =>
-    crew.map((c) => `<td valign="bottom" style="padding:${padding}">${img(faceOf(c), 32, 32, "")}</td>`).join("");
-  if (s.computer === undefined) return `<table ${T("margin:0 0 20px")}><tr>${faces(s.crew, "0 8px 0 0")}</tr></table>`;
-  const side = (crew: string[]) => (crew.length ? `<table ${T("")}><tr>${faces(crew, "0 4px 2px")}</tr></table>` : "");
+  // A look drawn whole is wider on the right, for its accessory: that much less room after it keeps the bodies' spacing.
+  const faces = (crew: readonly Look[], left: number, right: number, bottom: number) =>
+    crew
+      .map((look) => {
+        const p = pictureOf(look);
+        return `<td valign="bottom" style="padding:0 ${right - (p.width - 32)}px ${bottom}px ${left}px">${img(p.file, p.width, p.height, "")}</td>`;
+      })
+      .join("");
+  if (s.computer === undefined) return `<table ${T("margin:0 0 20px")}><tr>${faces(s.crew, 0, 8, 0)}</tr></table>`;
+  const side = (crew: readonly Look[]) =>
+    crew.length ? `<table ${T("")}><tr>${faces(crew, 4, 4, 2)}</tr></table>` : "";
   const half = Math.ceil(s.crew.length / 2);
   const width = (COMPUTER_ART[COMPUTER.kind][1] + 2 * COMPUTER.margin) * COMPUTER.cell;
   const height = COMPUTER_ROWS[COMPUTER.kind][1] * COMPUTER.cell;

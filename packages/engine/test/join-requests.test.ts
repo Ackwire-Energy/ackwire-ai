@@ -401,7 +401,7 @@ describe("answering", () => {
         orgName: "Acme",
         approverName: "ana",
         role: "member",
-        crew: ["sky"],
+        crew: [{}],
         url: `https://agentes.test/org/${f.org.id}`,
       },
     });
