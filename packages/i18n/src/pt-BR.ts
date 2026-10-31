@@ -1593,6 +1593,8 @@ export const ptBR = {
       renamed: "Renomeei a conversa para <b>{{to}}</b>",
       closed: "Encerrei a conversa <b>{{title}}</b>",
     },
+    /** A kind this app doesn't know yet (a newer server's). */
+    other: "Fiz uma mudança",
     issueFields: {
       title: "o título",
       description: "a descrição",

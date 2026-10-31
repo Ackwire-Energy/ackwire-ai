@@ -4,8 +4,10 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { AgentAction, MissionPlan } from "@agenteschat/client";
-import { ApiError } from "@agenteschat/client";
+import { AGENT_ACTION_KINDS, ApiError } from "@agenteschat/client";
+import { en, ptBR } from "@agenteschat/i18n";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { RECEIPT_ICONS } from "@/components/AgentActions";
 import { ADA_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -210,6 +212,26 @@ describe("receipts under the agent's reply", () => {
   test("no receipts: nothing under the message", async () => {
     await open(withActions([]));
     expect(within(article()).queryByRole("group", { name: "Mudanças de Ada" })).toBeNull();
+  });
+});
+
+describe("receipts this build doesn't expect", () => {
+  test("every kind the app knows has its icon and its sentence in pt-BR and en", () => {
+    expect(Object.keys(RECEIPT_ICONS).sort()).toEqual([...AGENT_ACTION_KINDS].sort());
+    const sentence = (strings: { agentActions: object }, kind: string) => {
+      const [group = "", name = ""] = kind.split(".");
+      return (strings.agentActions as Record<string, Record<string, unknown> | undefined>)[group]?.[name];
+    };
+    for (const strings of [ptBR, en])
+      expect(AGENT_ACTION_KINDS.filter((kind) => typeof sentence(strings, kind) !== "string")).toEqual([]);
+  });
+
+  test("a kind from a newer server: 'Fiz uma mudança' with the plain check, Desfazer still there", async () => {
+    await open(withActions([action({ kind: "something.new" as AgentAction["kind"] })]));
+    const row = receipts().querySelector(".ag-rc") as HTMLElement;
+    expect(row.textContent).toContain("Fiz uma mudança");
+    expect(row.querySelector(".ag-rc__ic svg")).not.toBeNull();
+    expect(within(receipts()).getByRole("button", { name: /^Desfazer/ })).toBeTruthy();
   });
 });
 

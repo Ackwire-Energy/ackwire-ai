@@ -16,6 +16,7 @@ import {
   Chip,
   Composer,
   Icon,
+  type IconName,
   iconNames,
   initialsOf,
   ListRow,
@@ -605,6 +606,14 @@ describe("Logo, Icon, Meter", () => {
     }
     render(<Icon name="search" label="Buscar" />);
     expect(body().getByRole("img", { name: "Buscar" })).toBeTruthy();
+  });
+
+  test("a name this build doesn't have (a table missing a newer server's kind) draws a plain ring, never an error", () => {
+    for (const name of ["something.new", "constructor", undefined]) {
+      const { container, unmount } = render(<Icon name={name as IconName} />);
+      expect(container.querySelector("svg.ac-icon > circle")).not.toBeNull();
+      unmount();
+    }
   });
 
   test("the spinner icon is the pixel orbit everywhere (no ring), decorative, 14 or 16 px", () => {

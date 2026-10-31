@@ -1580,6 +1580,7 @@ export const en: Translations = {
       renamed: "Renamed the conversation to <b>{{to}}</b>",
       closed: "Closed the conversation <b>{{title}}</b>",
     },
+    other: "Made a change",
     issueFields: {
       title: "the title",
       description: "the description",

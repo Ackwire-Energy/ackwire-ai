@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import type { AgentAction } from "@agenteschat/client";
+import { AGENT_ACTION_KINDS, type AgentAction, type AgentActionKind } from "@agenteschat/client";
 import {
   anyLive,
   boldRuns,
   groupStart,
   optimisticRedo,
   optimisticUndo,
+  RECEIPT_ICONS,
   receiptIcon,
   receiptLayout,
   receiptView,
@@ -111,5 +112,11 @@ describe("receipts under an agent's reply", () => {
       { text: " · Prompt", bold: false },
     ]);
     expect(boldRuns("sem marca")).toEqual([{ text: "sem marca", bold: false }]);
+  });
+
+  test("every kind the app knows has its icon; one it doesn't yet gets the plain check", () => {
+    expect(Object.keys(RECEIPT_ICONS).sort()).toEqual([...AGENT_ACTION_KINDS].sort());
+    expect(receiptIcon("channel.created")).toBe("hash");
+    expect(receiptIcon("something.new" as AgentActionKind)).toBe("checkc");
   });
 });
