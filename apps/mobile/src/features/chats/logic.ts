@@ -1,13 +1,16 @@
 import type {
+  Agent,
   AppNotification,
   Channel,
   DirectMessage,
   Mission,
   MissionStatus,
   PreviewMeta,
+  Role,
   ThreadActor,
   ThreadInfo,
 } from "@agenteschat/client";
+import { listsAgent } from "@agenteschat/client/lib/audience";
 import { previewOf } from "../shared/logic";
 
 /**
@@ -91,7 +94,11 @@ export function isListedThread(t: Pick<ThreadInfo, "mission" | "title" | "contex
 
 export const threadTitle = (t: Pick<ThreadInfo, "title" | "rootText">) => t.title?.trim() || previewOf(t.rootText);
 
-/** A DM with one of `hiddenAgents`, the agents my lists leave out (`listsAgent`): off the home and its badge. */
+/** The agents my lists leave out (`listsAgent`, from the server's `canTalk`): for a member, the ones not answering. */
+export const hiddenAgentIds = (role: Role | undefined, agents: readonly Pick<Agent, "id" | "canTalk">[]) =>
+  new Set(agents.filter((a) => !listsAgent(role, a)).map((a) => a.id));
+
+/** A DM with one of `hiddenAgents` (`hiddenAgentIds`): off the home and its badge. */
 const hiddenDm = (d: Pick<DirectMessage, "with">, hiddenAgents: ReadonlySet<string> | undefined) =>
   d.with.type === "agent" && hiddenAgents?.has(d.with.id) === true;
 

@@ -652,6 +652,8 @@ export const featureKeysEn: FeatureTranslations = {
     created: "{{name}} joined the team",
     createFailed: "Couldn't create the agent. Maybe that name is taken.",
     empty: "No agents yet.",
+    noneForYou: "No agent works with you yet.",
+    noneForYouHint: "Ask an admin for access.",
     freeSection: "Free",
     noGroupSection: "No group",
   },

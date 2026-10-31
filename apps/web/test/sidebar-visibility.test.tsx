@@ -5,7 +5,7 @@ setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { NEW_CHANNEL_EVENT } from "@/components/Sidebar";
-import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -75,6 +75,23 @@ describe("what a member's sidebar lists", () => {
       .map((o) => o.textContent ?? "");
     expect(offered.some((n) => n.includes("Atlas"))).toBe(true);
     expect(offered.some((n) => n.includes("Ada"))).toBe(false);
+  });
+
+  test("an empty channel's suggestions and its / commands go to an agent that answers them", async () => {
+    const state = acme("member");
+    state.channelMembers[GENERAL_ID] = [
+      { type: "person", id: "u-walter" },
+      { type: "agent", id: ADA_ID },
+      { type: "agent", id: ATLAS_ID },
+    ];
+    await go(state, `c/${GENERAL_ID}`);
+    const chips = document.querySelector(".channel__suggestions")?.textContent ?? "";
+    expect(chips).toContain("@Atlas");
+    expect(chips).not.toContain("@Ada");
+    const box = screen().getByRole("combobox", { name: /Mensagem para/ }) as HTMLTextAreaElement;
+    await typeIn(box, "/");
+    await act(async () => fireEvent.keyDown(box, { key: "Enter" }));
+    expect(box.value).toBe("@atlas monte um relatório sobre ");
   });
 
   test("Criar canal offers only the agents that answer them", async () => {

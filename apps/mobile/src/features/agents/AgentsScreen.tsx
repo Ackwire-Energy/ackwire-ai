@@ -75,7 +75,11 @@ export function AgentsScreen() {
       {...header}
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
-      {dir.loading ? null : total === 0 ? <EmptyState title={t("mobile.agents.empty")} sky /> : null}
+      {dir.loading ? null : dir.agents.length === 0 ? (
+        <EmptyState title={t("mobile.agents.empty")} sky />
+      ) : total === 0 ? (
+        <EmptyState title={t("mobile.agents.noneForYou")} subtitle={t("mobile.agents.noneForYouHint")} sky />
+      ) : null}
       {waiting.length > 0 ? (
         <>
           <SectionHeader title={t("mobile.intentAgents.waitingSection")} count={waiting.length} />

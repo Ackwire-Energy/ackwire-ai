@@ -7,12 +7,11 @@ import {
   useThreadList,
   useWorkingRuns,
 } from "@agenteschat/client";
-import { listsAgent } from "@agenteschat/client/lib/audience";
 import { useMemo } from "react";
 import { useOrg } from "@/providers/org";
 import { busyChannels, workingNow } from "../agents/logic";
 import { waitingApprovals } from "../approvals/logic";
-import { buildConversations, unreadConversationCount, unreadThreadCount } from "../chats/logic";
+import { buildConversations, hiddenAgentIds, unreadConversationCount, unreadThreadCount } from "../chats/logic";
 import { useDirectory, useNow, useOrgId } from "./hooks";
 
 /**
@@ -40,11 +39,12 @@ export function useWorkingNow() {
 /** My threads and missions, the latest 50 (Conversas' rows and the Threads tab). */
 const THREAD_LIST = { tab: "all", mine: true, limit: 50 } as const;
 
-/** The agents my lists leave out (`listsAgent`, from the server's `canTalk`): for a member, the ones not answering. */
-function useHiddenAgents() {
+/** The agents my lists leave out (`hiddenAgentIds`), and whether the directory that names them is still loading. */
+export function useHiddenAgents() {
   const role = useOrg().org?.role;
   const dir = useDirectory();
-  return useMemo(() => new Set(dir.agents.filter((a) => !listsAgent(role, a)).map((a) => a.id)), [dir.agents, role]);
+  const hidden = useMemo(() => hiddenAgentIds(role, dir.agents), [dir.agents, role]);
+  return { hidden, loading: dir.loading };
 }
 
 /** Conversas: channels, DMs and my threads and missions, newest first (agent DMs say who is working). */
@@ -54,7 +54,7 @@ export function useConversations() {
   const dms = useDms(orgId);
   const threads = useThreadList(orgId, THREAD_LIST);
   const work = useWorkingNow();
-  const hidden = useHiddenAgents();
+  const { hidden, loading: agentsLoading } = useHiddenAgents();
   const rows = useMemo(
     () =>
       buildConversations({
@@ -69,7 +69,8 @@ export function useConversations() {
   const lists = [channels, dms];
   return {
     rows,
-    loading: channels.isLoading || dms.isLoading,
+    // The directory too: before it names the agents a member doesn't see, their DMs would flash in.
+    loading: channels.isLoading || dms.isLoading || agentsLoading,
     // The server didn't answer: nothing to show (`failed`), or the kept rows weren't loaded again (`stale`).
     failed: lists.some((q) => q.isError && !q.data),
     stale: lists.some((q) => q.isError && q.data),
@@ -82,10 +83,14 @@ export function useUnreadConversations() {
   const orgId = useOrgId();
   const channels = useChannels(orgId);
   const dms = useDms(orgId);
-  const hidden = useHiddenAgents();
+  const { hidden, loading } = useHiddenAgents();
+  // Like the home, it waits for the directory, so a DM the home leaves out never counts.
   return useMemo(
-    () => unreadConversationCount({ channels: channels.data ?? [], dms: dms.data ?? [], hiddenAgents: hidden }),
-    [channels.data, dms.data, hidden],
+    () =>
+      loading
+        ? 0
+        : unreadConversationCount({ channels: channels.data ?? [], dms: dms.data ?? [], hiddenAgents: hidden }),
+    [channels.data, dms.data, hidden, loading],
   );
 }
 
