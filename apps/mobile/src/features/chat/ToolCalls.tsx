@@ -21,7 +21,7 @@ import type { TFunction } from "i18next";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import Animated, { FadeIn, FadeInDown, ZoomIn } from "react-native-reanimated";
+import Animated, { FadeIn, FadeInDown, FadeOut, ZoomIn } from "react-native-reanimated";
 import { useFrameTime } from "@/agent/live";
 import { stopBreath } from "@/agent/orbit";
 import {
@@ -125,7 +125,7 @@ function useLogo() {
 
 // ── The block ────────────────────────────────────────────────────────────────
 
-interface BlockLine {
+export interface BlockLine {
   key: string;
   state: ToolState;
   logo: ReactNode;
@@ -133,6 +133,8 @@ interface BlockLine {
   label: string;
   /** The tool's own name or the built-in's label: read aloud, not drawn (no room on a phone). */
   hint: string | null;
+  /** The start of what came back, under the phrase in two lines at most (another agent's answer). */
+  preview?: string | null;
   /** "1,2 s". */
   time?: string;
   /** "×5": several calls of the same kind in a row. */
@@ -143,9 +145,11 @@ interface BlockLine {
   detail?: ReactNode;
   /** Opens by itself (a call running code shows it as it runs). */
   defaultOpen?: boolean;
+  /** Opens somewhere else instead of in place (another agent's conversation, on a screen of its own). */
+  onOpen?: () => void;
 }
 
-type BlockItem = { kind: "line"; line: BlockLine } | { kind: "note"; key: string; node: ReactNode };
+export type BlockItem = { kind: "line"; line: BlockLine } | { kind: "note"; key: string; node: ReactNode };
 
 interface BlockHead {
   /** What it does now ("Consultando o banco…"), or "Usou 5 ferramentas" once done. */
@@ -163,16 +167,37 @@ interface BlockHead {
 const POP = ZoomIn.springify().damping(11).stiffness(320).mass(0.6);
 
 /**
+ * A block someone was just led to ("Ver" on an answer's line) wears the plate this long, the web's message focus
+ * (`ac-msg--focus`): held, then fading. With reduced motion it stays the whole time and goes at once.
+ */
+const FLASH_MS = 2400;
+const FLASH_HOLD_MS = 960;
+
+/** Whether the plate shows: for `ms` once drawn with `at` (when someone was led here), again when `at` changes. */
+function useFlash(at: number | null, ms: number) {
+  const [on, setOn] = useState(at !== null);
+  useEffect(() => {
+    setOn(at !== null);
+    if (at === null) return;
+    const timer = setTimeout(() => setOn(false), ms);
+    return () => clearTimeout(timer);
+  }, [at, ms]);
+  return on;
+}
+
+/**
  * The card: a hairline and the app's cut corner (bottom left small), one line that opens on a tap. `live`:
  * new logos pop in and the line's words come up when they change; a saved block draws still.
  */
-function ToolBlock({
+export function ToolBlock({
   logos,
   head,
   items,
   color,
   label,
   live = false,
+  defaultOpen = false,
+  flash = null,
   onToggle,
 }: {
   logos: { key: string; node: ReactNode }[];
@@ -182,15 +207,28 @@ function ToolBlock({
   /** The block's name for screen readers ("O que a Ana fez"). */
   label: string;
   live?: boolean;
+  /** Starts open (questions to other agents still out). */
+  defaultOpen?: boolean;
+  /** When someone was led here ("Ver" on an answer's line): the card wears a plate a moment, as the web does. */
+  flash?: number | null;
   /** Opened (load the saved steps) or closed. */
   onToggle?: (open: boolean) => void;
 }) {
   const c = useColors();
   const reduced = useReducedMotion();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
+  const flashing = useFlash(flash, reduced ? FLASH_MS : FLASH_HOLD_MS);
   const moving = live && !reduced;
   return (
     <View style={[styles.block, { backgroundColor: c.raised, borderColor: c.line2 }]}>
+      {/* Under the card's words (drawn first), never over them. */}
+      {flashing ? (
+        <Animated.View
+          pointerEvents="none"
+          exiting={reduced ? undefined : FadeOut.duration(FLASH_MS - FLASH_HOLD_MS)}
+          style={[StyleSheet.absoluteFill, { backgroundColor: c.plate }]}
+        />
+      ) : null}
       <Pressable
         onPress={() => {
           tapHaptic();
@@ -265,8 +303,10 @@ function Line({ line, color }: { line: BlockLine; color: AgentColorName }) {
     if (running.current && line.state !== "run") setOpen(false);
     running.current = line.state === "run";
   }, [line.state]);
-  const opens = Boolean(line.detail);
-  const said = [line.label, line.hint, line.count, line.time].filter(Boolean).join(", ");
+  const opens = Boolean(line.detail) && !line.onOpen;
+  const said = [line.label, line.hint, line.preview, line.count, line.time].filter(Boolean).join(", ");
+  // With a preview under the phrase: logo, time and mark stay level with the phrase.
+  const top = line.preview ? styles.rowTop : null;
   const row = (
     <>
       <View style={styles.logo}>{line.logo}</View>
@@ -276,6 +316,11 @@ function Line({ line, color }: { line: BlockLine; color: AgentColorName }) {
             {line.label}
           </Text>
         </Breathing>
+        {line.preview ? (
+          <Text variant="footnote" tone="muted" numberOfLines={2}>
+            {line.preview}
+          </Text>
+        ) : null}
       </View>
       {line.count ? (
         <Text variant="caption" tone="faint" style={styles.num} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
@@ -288,12 +333,25 @@ function Line({ line, color }: { line: BlockLine; color: AgentColorName }) {
         </Text>
       ) : null}
       <Mark state={line.state} color={color} />
+      {line.onOpen ? <Icon name="right" size={14} color={c.faint} /> : null}
     </>
   );
   return (
     // A failed call says so by its mark and its reason, on the block's own surface (no tinted plate).
     <View style={styles.line}>
-      {opens ? (
+      {line.onOpen ? (
+        <Pressable
+          onPress={() => {
+            tapHaptic();
+            line.onOpen?.();
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={said}
+          style={({ pressed }) => [styles.row, top, pressed && { backgroundColor: c.plateSoft }]}
+        >
+          {row}
+        </Pressable>
+      ) : opens ? (
         <Pressable
           onPress={() => {
             tapHaptic();
@@ -302,12 +360,12 @@ function Line({ line, color }: { line: BlockLine; color: AgentColorName }) {
           accessibilityRole="button"
           accessibilityState={{ expanded: open }}
           accessibilityLabel={said}
-          style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.plateSoft }]}
+          style={({ pressed }) => [styles.row, top, pressed && { backgroundColor: c.plateSoft }]}
         >
           {row}
         </Pressable>
       ) : (
-        <View style={styles.row} accessible accessibilityLabel={said}>
+        <View style={[styles.row, top]} accessible accessibilityLabel={said}>
           {row}
         </View>
       )}
@@ -680,6 +738,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 10,
   },
+  rowTop: { alignItems: "flex-start" },
   logo: { width: 20, alignItems: "center" },
   why: { marginTop: -4, paddingLeft: 37, paddingRight: 8, paddingBottom: 8 },
   detail: { marginHorizontal: 8, marginBottom: 8, gap: 8 },

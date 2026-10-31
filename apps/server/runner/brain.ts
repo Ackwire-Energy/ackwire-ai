@@ -15,6 +15,7 @@ import {
   type BrainTurnRequest,
   isAccountId,
   isBrainEffort,
+  isContextTokens,
   isRunToolToken,
   OWN_USAGE_ID,
   PERMISSION_PROMPT_TOOL,
@@ -1305,6 +1306,8 @@ export class BrainManager {
       account: ctx.accountHome ? (req.account ?? null) : null,
       key: ctx.planKey ? createHash("sha256").update(ctx.planKey.key).digest("hex").slice(0, 16) : null,
       effort: isBrainEffort(req.effort) ? req.effort : null,
+      // Another context limit: a new process (resumed), started with it.
+      context: isContextTokens(req.contextTokens) ? req.contextTokens : null,
     });
   }
 
@@ -1507,6 +1510,8 @@ export class BrainManager {
     const env = ctx.accountHome ? accountEnv("claude_code", ctx.accountHome, base) : base;
     const plan = ctx.planKey ? planOf(ctx.planKey.provider) : undefined;
     if (plan && ctx.planKey) env[plan.claudeCode.tokenEnv] = ctx.planKey.key;
+    // Protocol 28: the agent's context limit; Claude Code compacts the conversation there instead of at its window.
+    if (isContextTokens(req.contextTokens)) env.CLAUDE_CODE_AUTO_COMPACT_WINDOW = String(req.contextTokens);
     const model = plan ? planAlias(req.model) : typeof req.model === "string" ? req.model : undefined;
     if (this.opts.mcp) {
       const token = newMcpToken();

@@ -10,6 +10,7 @@ import {
   type BrainEffort,
   isAccountId,
   isBrainEffort,
+  isContextTokens,
 } from "@agenteschat/adapters/machine-protocol";
 import { ACCOUNT_MISSING_MESSAGE, accountEnv } from "./accounts";
 import { RunnerError } from "./errors";
@@ -106,6 +107,8 @@ export interface CodexBrainTurnRequest {
   account?: string;
   /** Protocol 13: how hard it thinks. */
   effort?: BrainEffort;
+  /** Protocol 28: the agent's context limit in tokens. */
+  contextTokens?: number;
   /** Protocol 16: the turn's permission profile (absent: `work`). */
   permissions?: { mode?: "plan" | "work" };
   /** Protocol 16: false for a background turn (no app-server is kept for it). */
@@ -118,6 +121,10 @@ export const codexProfileOf = (req: { permissions?: { mode?: unknown } }): Comma
 
 /** The Codex sandbox of a profile (`--sandbox`, the app-server's `sandbox`): never with the network. */
 export const codexSandbox = (profile: CommandProfile) => (profile === "plan" ? "read-only" : "workspace-write");
+
+/** The agent's context limit as Codex's own: it compacts the conversation there instead of at its window. */
+export const codexContextOverride = (tokens: unknown): string[] =>
+  isContextTokens(tokens) ? ["-c", `model_auto_compact_token_limit=${tokens}`] : [];
 
 /** Codex's `model_reasoning_effort` for a brain effort (it has no `xhigh` or `max`). */
 export function codexEffort(effort: BrainEffort): "low" | "medium" | "high" {
@@ -233,6 +240,8 @@ export function codexTurnArgs(input: {
   writableRoots?: string[];
   /** Protocol 13: `-c model_reasoning_effort` (anything else is left out). */
   effort?: BrainEffort;
+  /** Protocol 28: `-c model_auto_compact_token_limit` (anything else is left out). */
+  contextTokens?: number;
   /** Protocol 16: the sandbox (default `work`: workspace-write; `plan`: read-only). Never the network. */
   profile?: CommandProfile;
 }): string[] {
@@ -254,6 +263,7 @@ export function codexTurnArgs(input: {
     ...(isBrainEffort(input.effort)
       ? ["-c", `model_reasoning_effort=${JSON.stringify(codexEffort(input.effort))}`]
       : []),
+    ...codexContextOverride(input.contextTokens),
     ...(input.model ? ["-m", input.model] : []),
     "-o",
     input.lastFile,
@@ -497,6 +507,8 @@ export interface CodexTurnInput {
   /** Protocol 13: the account (its threads are its own) and its folder (`CODEX_HOME`). */
   account?: { id: string; home: string };
   effort?: BrainEffort;
+  /** Protocol 28: the agent's context limit in tokens. */
+  contextTokens?: number;
   /** App-server mode: the agent (one process per agent and session) and its folder (the MCP bridge's). */
   agentId?: string;
   folder?: string;
@@ -550,6 +562,7 @@ async function runCodexExec(input: CodexTurnInput, opts: CodexTurnOptions): Prom
     mcp: input.mcp.url ? { url: input.mcp.url } : { ...(opts.mcpCommand ? { command: opts.mcpCommand } : {}) },
     ...(input.writableRoots?.length ? { writableRoots: input.writableRoots } : {}),
     ...(input.effort ? { effort: input.effort } : {}),
+    ...(input.contextTokens ? { contextTokens: input.contextTokens } : {}),
     profile: input.profile ?? "work",
   });
   const base: NodeJS.ProcessEnv = {
@@ -732,6 +745,7 @@ export async function handleCodexBrainTurn(
       ...(writableRoots.length ? { writableRoots } : {}),
       ...(account ? { account } : {}),
       ...(isBrainEffort(req.effort) ? { effort: req.effort } : {}),
+      ...(isContextTokens(req.contextTokens) ? { contextTokens: req.contextTokens } : {}),
       agentId: String(req.agent.id),
       folder,
       profile: codexProfileOf(req),

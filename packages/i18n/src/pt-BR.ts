@@ -2402,6 +2402,35 @@ export const ptBR = {
           high: "Pensa mais em tarefas difíceis. Demora e gasta mais.",
           max: "Pensa o máximo que puder. Bem mais lento e caro.",
         },
+        /** The model picker's line under each Claude Code model (other models show their name only). */
+        modelLine: {
+          opus: "O mais capaz. Gasta o plano mais rápido.",
+          sonnet: "Equilibrado. Bom para quase tudo.",
+          haiku: "Rápido e leve. Para tarefas simples.",
+        },
+        /** The most context the agent reads (any brain); sizes are written `200K`, `400K`, `1M` in every language. */
+        context: "Janela de contexto",
+        contextText: {
+          auto: "O que o modelo aguenta.",
+          "200000": "Mais barato e rápido. Resume cedo em conversas longas.",
+          "400000": "Lembra bastante; cada resposta custa menos que com 1M.",
+          "1000000": "Lembra o máximo. Cada resposta relê tudo: mais lenta e cara.",
+        },
+        /** "Configuração avançada": a row in the brain's card that opens a smaller dialog over "Quem pensa". */
+        advanced: {
+          title: "Configuração avançada",
+          sub: "{{brain}}. Vale para todas as conversas.",
+          think: "Como pensa",
+          answers: "Quem atende",
+          defaults: "Voltar ao padrão",
+          done: "Pronto",
+          /** The row's line: nothing changed from the defaults, else only what did. */
+          allDefault: "Tudo no padrão",
+          effort: "Esforço {{level}}",
+          context: "Contexto de {{size}}",
+          sharing: "Atende outras pessoas",
+          waits: "Espera o computador voltar",
+        },
         add: {
           title: { claude_code: "Adicionar conta do Claude", codex: "Adicionar conta do ChatGPT" },
           stepOne: {
@@ -8381,6 +8410,40 @@ export const ptBR = {
       noAnswer: "Sem resposta em {{minutes}} min. {{theFrom}} {{from}} respondeu sem ela.",
       couldNot: "{{theTo}} {{to}} não conseguiu responder. {{theFrom}} {{from}} seguiu sem ela.",
       private: "Conversa só entre {{articleFrom}} {{from}} e {{articleTo}} {{to}}",
+    },
+    /** Inside the reply that asked: the questions the agent asked other agents in that turn, one line each. */
+    consultGroup: {
+      asked_one: "Perguntou a {{count}} colega",
+      asked_other: "Perguntou a {{count}} colegas",
+      progress: "{{done}} de {{total}}",
+      label: "Perguntas {{of}} {{name}} a outros agentes",
+      working: "{{name}} está trabalhando",
+      waitingApproval: "{{The}} {{name}} espera uma aprovação",
+      waitingInput: "{{The}} {{name}} espera uma resposta",
+      /** The consulted agent's computer is away: paused, not on a person (as the computer screen says it). */
+      waitingComputer: "{{The}} {{name}} espera o computador voltar",
+      /** An answer whose question is in a reply farther up: one line where it arrived, "Ver" goes to that reply. */
+      answeredFar: "{{to}} respondeu à pergunta {{of}} {{from}}",
+      see: "Ver",
+    },
+    /** A question opened in the panel over the conversation ("Theo ⇄ Iris"): what the two agents said, read only. */
+    consultPanel: {
+      label: "Conversa entre {{articleFrom}} {{from}} e {{articleTo}} {{to}}",
+      /** The phone's bar (the web draws the arrows as an icon between the names). */
+      title: "{{from}} ⇄ {{to}}",
+      where: "#{{channel}} · conversa entre agentes",
+      whereDm: "Conversa entre agentes",
+      messages_one: "{{count}} mensagem",
+      messages_other: "{{count}} mensagens",
+      origin: "{{from}} perguntou {{toArticle}} {{to}} em #{{channel}} · {{time}}",
+      originDm: "{{from}} perguntou {{toArticle}} {{to}} · {{time}}",
+      readOnly: "Só leitura.",
+      steer: "Para mudar o rumo, fale com {{article}} {{name}}.",
+      talk: "Falar com {{article}} {{name}}",
+      missing: "Essa conversa não está mais aqui.",
+      /** On a card the consulted agent posted where the person asked. */
+      helping: "ajudando {{article}} {{name}}",
+      see: "Ver conversa",
     },
     /** Automatic lines: what reached an agent's conversation (`meta.notice`), a routine's background start. */
     notice: {

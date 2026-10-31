@@ -149,6 +149,18 @@ export type ChannelEvent =
       status: "answered" | "expired" | "failed";
     }
   /**
+   * A question still out changed without closing: the consulted agent stopped on a person (an approval, a
+   * question, a secret) or on its computer, or went back to work. The app reloads the conversation's questions
+   * (`GET …/consultations`).
+   */
+  | {
+      type: "agent.consultation";
+      channelId: string;
+      threadId: string | null;
+      runId: string;
+      consultationId: string;
+    }
+  /**
    * The agent started a tool call (`tool` = its name; `connector` = the app, for MCP tools) or finished (`tool: null`,
    * with its `toolUseId`, `failed` when the tool answered with an error, `held` when it waits on a person).
    */

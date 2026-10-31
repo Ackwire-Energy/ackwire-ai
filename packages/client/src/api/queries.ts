@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { moveInGroups } from "../lib/agent-groups";
 import { artifactRefs } from "../lib/artifacts";
 import { newerSetup } from "../lib/computer";
+import { CONSULT_CONVERSATION_POLL_MS, CONSULT_GROUP_POLL_MS } from "../lib/consult-group";
 import { sendWaits } from "../lib/errors";
 import {
   allItems,
@@ -1645,6 +1646,37 @@ export const useRun = (orgId: string, runId: string | null) => {
     queryKey: keys.run(orgId, runId ?? ""),
     queryFn: () => api.agents.run(orgId, runId ?? ""),
     enabled: runId !== null,
+  });
+};
+
+/**
+ * The questions agents asked other agents from a conversation (`GET …/consultations`), for the block inside the
+ * reply that asked. The page reloads it on `agent.consulting`, `agent.consulted` and `agent.consultation`; while a
+ * question is out it also reloads every `CONSULT_GROUP_POLL_MS`.
+ */
+export const useConsultations = (orgId: string, channelId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.consultations(orgId, channelId),
+    queryFn: () => api.agents.consultations(orgId, channelId),
+    enabled,
+    staleTime: 10_000,
+    refetchInterval: (q) => (q.state.data?.some((c) => c.status === "open") ? CONSULT_GROUP_POLL_MS : false),
+  });
+};
+
+/**
+ * One of those questions opened beside the conversation (`GET …/consultations/{id}`). The agents' DM sends this
+ * page no events: while the question is out it reloads every `CONSULT_CONVERSATION_POLL_MS`, and with the list
+ * (its key sits under the list's) on every consult event.
+ */
+export const useConsultationConversation = (orgId: string, channelId: string, consultationId: string | null) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.consultation(orgId, channelId, consultationId ?? ""),
+    queryFn: () => api.agents.consultation(orgId, channelId, consultationId ?? ""),
+    enabled: consultationId !== null,
+    refetchInterval: (q) => (q.state.data?.consultation.status === "open" ? CONSULT_CONVERSATION_POLL_MS : false),
   });
 };
 

@@ -715,6 +715,25 @@ test("command line: --effort for a known level only", () => {
 });
 
 test.if(posix)(
+  "the context limit (protocol 28) is CLAUDE_CODE_AUTO_COMPACT_WINDOW; another one restarts the process, resumed",
+  async () => {
+    const { spawns, turn } = setup();
+    const logged = () => spawns() as unknown as { args: string[]; compactWindow: string | null }[];
+    await turn(1, "first", { contextTokens: 400_000 });
+    expect(logged()[0]?.compactWindow).toBe("400000");
+    await turn(2, "second", { contextTokens: 400_000 });
+    expect(logged()).toHaveLength(1);
+    await turn(3, "third", { contextTokens: 200_000 });
+    expect(logged()).toHaveLength(2);
+    expect(logged()[1]?.compactWindow).toBe("200000");
+    expect(logged()[1]?.args.slice(-2)).toEqual(["--resume", SESSION(1)]);
+    // None (or nonsense): the model's own window.
+    await turn(4, "fourth", { contextTokens: "lots" as never });
+    expect(logged()[2]?.compactWindow).toBeNull();
+  },
+);
+
+test.if(posix)(
   "an account turn runs in its folder (CLAUDE_CONFIG_DIR), a new session there; a change restarts the process",
   async () => {
     const accountDir = tempDir("claude-account-");

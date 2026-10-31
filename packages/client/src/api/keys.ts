@@ -53,6 +53,11 @@ export const keys = {
   /** Whether the agent has a run going now (its newest running run, if any). */
   runningRuns: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "runs", "running"] as const,
   run: (orgId: string, runId: string) => ["org", orgId, "run", runId] as const,
+  /** The questions agents asked other agents from a conversation (drawn inside the replies that asked). */
+  consultations: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "consultations"] as const,
+  /** Under `consultations`: reloading the list reloads an open one too. */
+  consultation: (orgId: string, channelId: string, consultationId: string) =>
+    ["org", orgId, "channel", channelId, "consultations", consultationId] as const,
   agentDetail: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "detail"] as const,
   agentBrain: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "brain"] as const,
   aiAccounts: (orgId: string) => ["org", orgId, "ai-accounts"] as const,

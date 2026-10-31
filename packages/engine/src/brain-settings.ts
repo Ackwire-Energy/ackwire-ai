@@ -9,7 +9,15 @@ import {
   type PlanUsage,
 } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
-import { AUTO_MODEL, isAutoModel, MODEL_CATALOG } from "@agenteschat/providers";
+import {
+  AUTO_MODEL,
+  catalogModelOf,
+  type ContextLimit,
+  contextWindowOf,
+  isAutoModel,
+  isContextLimit,
+  MODEL_CATALOG,
+} from "@agenteschat/providers";
 import { planAliases, planModel, planOf } from "@agenteschat/providers/plans";
 import { type Agent, getAgent } from "./agents";
 import { type AgentAudience, answersOthers, audienceOf, OWNER_ONLY, planSharing } from "./audience";
@@ -66,6 +74,8 @@ export interface BrainModelOption {
   /** The model id behind an alias (Claude Code's `opus` → `claude-opus-5-5`). */
   modelId?: string;
   recommended?: boolean;
+  /** Its context window in tokens: which context limits are worth offering with it. */
+  contextWindow?: number;
 }
 
 /** Claude Code's aliases (`--model opus|sonnet|haiku`), mapped to today's ids in the catalog. */
@@ -86,6 +96,12 @@ export const codexModels = (): BrainModelOption[] =>
  * coding plan keeps its aliases, named after what the plan runs for each.
  */
 export function brainModelOptions(kind: BrainKind, provider?: string | null): BrainModelOption[] {
+  return modelChoices(kind, provider).map((o) =>
+    o.modelId ? { ...o, contextWindow: contextWindowOf(catalogModelOf(o.modelId) ?? o.modelId) } : o,
+  );
+}
+
+function modelChoices(kind: BrainKind, provider?: string | null): BrainModelOption[] {
   const plan = kind === "claude_code" ? planOf(provider) : undefined;
   if (plan) {
     return planAliases(plan).map((value) => {
@@ -220,6 +236,8 @@ export interface AgentBrainView {
   account: string | null;
   /** How hard its computer brain thinks; `auto` = picked per run; null = the CLI's default. */
   effort: BrainEffortSetting | null;
+  /** The most context it reads, in tokens (`CONTEXT_LIMITS`, any brain); null = its model's window. */
+  contextTokens: ContextLimit | null;
   /**
    * The agent's owner's accounts on its computer, both kinds ([] without a computer), and the one it thinks
    * with; emails only of the caller's own. A plan thinks only for its owner's agents (ADR 0059 §3).
@@ -327,6 +345,7 @@ function view(
     canEdit: true,
     account: agent.brainAccountId,
     effort: isBrainEffortSetting(agent.brainEffort) ? agent.brainEffort : null,
+    contextTokens: isContextLimit(agent.contextTokens) ? agent.contextTokens : null,
     ...accounts,
     onlyOwner: !answersOthers(audienceOf(agent), agent.ownerUserId),
     canUsePlans: agent.ownerUserId === userId,
@@ -397,6 +416,8 @@ export interface AgentBrainInput {
   moveAccount?: unknown;
   /** `low`…`max`, `auto` (picked per run), or null for the CLI's default. Omitted = keep it. */
   effort?: unknown;
+  /** One of `CONTEXT_LIMITS`, or null for the model's window; kept through brain switches. Omitted = keep it. */
+  contextTokens?: unknown;
 }
 
 const EVERYONE: AgentAudience = { mode: "everyone", userIds: [] };
@@ -469,6 +490,11 @@ export async function setAgentBrain(
     throw new ValidationError("Choose auto, low, medium, high, xhigh or max", "brain.invalid_effort");
   }
   const effort = input.effort === undefined ? agent.brainEffort : (input.effort as BrainEffortSetting | null);
+  if (input.contextTokens !== undefined && input.contextTokens !== null && !isContextLimit(input.contextTokens)) {
+    throw new ValidationError("Choose 200000, 400000 or 1000000 tokens", "brain.invalid_context");
+  }
+  const contextTokens =
+    input.contextTokens === undefined ? agent.contextTokens : (input.contextTokens as number | null);
   const { base, to } = nextAudience(agent, brain, changed, input.onlyOwner as boolean | undefined);
   planSharing({ ...agent, brain }, userId, base, to);
   const audience = to.mode === agent.audienceMode ? null : to;
@@ -482,7 +508,8 @@ export async function setAgentBrain(
     model !== agent.brainModel ||
     fallback !== agent.brainFallback ||
     account !== agent.brainAccountId ||
-    effort !== agent.brainEffort;
+    effort !== agent.brainEffort ||
+    contextTokens !== agent.contextTokens;
   if (!thinks && !audience) return view(agent, machine, machines, accounts, userId);
   const { row, released } = await deps.db.transaction(async (tx) => {
     const released = next.from ? await releaseAgents(tx, orgId, [next.from.accountId]) : [];
@@ -494,6 +521,7 @@ export async function setAgentBrain(
         brainFallback: fallback,
         brainAccountId: account,
         brainEffort: effort,
+        contextTokens,
         // The people list stays while it is its owner's only, for when it is let out again.
         ...(audience
           ? { audienceMode: audience.mode, ...(audience.mode === "everyone" ? { audienceUserIds: [] } : {}) }
@@ -531,8 +559,9 @@ export async function setAgentBrain(
           fallback: agent.brainFallback,
           account: agent.brainAccountId,
           effort: agent.brainEffort,
+          contextTokens: agent.contextTokens,
         },
-        to: { brain, model, fallback, account, effort },
+        to: { brain, model, fallback, account, effort, contextTokens },
       },
     });
   }
@@ -562,6 +591,7 @@ export async function setAgentBrain(
     brainFallback: fallback,
     brainAccountId: account,
     brainEffort: effort,
+    contextTokens,
     ...(audience ? { audienceMode: audience.mode } : {}),
   };
   // The account's `usedBy` changed with it.
