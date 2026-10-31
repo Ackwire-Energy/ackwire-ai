@@ -3,7 +3,7 @@ import { and, eq, schema, sql } from "@agenteschat/db";
 import { auditsCall, callTitle, recordToolCall } from "../agent-audit";
 import { coveringRules, type RememberedKind } from "../approval-rules";
 import { type RunAuthority, runAuthorityById } from "../authority";
-import { actionLevel, nameWords } from "../connectors/classify";
+import { actionLevel, nameWords, openEnded } from "../connectors/classify";
 import { consultationOrigin } from "../consultations";
 import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
@@ -52,15 +52,32 @@ export const ALWAYS_SENSITIVE = /(^|[^a-z])(merge|deploy|rollback|revert_deploy|
 export const isSensitive = (tool: Pick<ToolDefinition, "name" | "scope" | "sensitive">) =>
   tool.sensitive === true || ALWAYS_SENSITIVE.test(tool.name) || ALWAYS_SENSITIVE.test(tool.scope);
 
-/** Also as a noun (`GITHUB_CREATE_A_DEPLOYMENT`, a workflow's dispatch): what is never approved for good. */
-const NEVER_FOR_GOOD = /^(merge|deploy|rollback|promote|workflow)/;
-const alwaysAsks = (name: string) => ALWAYS_SENSITIVE.test(name) || nameWords(name).some((w) => NEVER_FOR_GOOD.test(w));
+/**
+ * Also as a noun or under another name: a deployment, a build, a dispatch or a release (they start workflows), a
+ * branch's reference, an alias or a rolling release (production traffic), a re-run, a restore. Never approved for good.
+ */
+const NEVER_FOR_GOOD =
+  /^(merge|deploy|redeploy|rollback|revert|restore|promote|workflow|build|dispatch|reference|release|alias|rolling|rerun|rerequest)/;
+/**
+ * Verbs right after the app that start what then runs on its own (`RAILWAY_COMMIT_ENVIRONMENT_CHANGES` deploys) or
+ * run whatever their arguments say (`VERCEL_EXECUTE_SANDBOX_COMMAND`).
+ */
+const NEVER_LEADS = new Set(["commit", "trigger", "run", "execute", "invoke"]);
+const alwaysAsks = (name: string) => {
+  const words = nameWords(name);
+  return (
+    ALWAYS_SENSITIVE.test(name) ||
+    openEnded(name) ||
+    NEVER_LEADS.has(words[1] ?? "") ||
+    words.some((w) => NEVER_FOR_GOOD.test(w))
+  );
+};
 
 /**
  * The kind "Aprovar sempre" would cover for this call (`approval_rules`), or null when it is never offered: only
  * on a person's run whose policy didn't make the call ask, for a tool its source lets be remembered (`rememberAs`),
  * whose wrapped actions, when it runs others, are a shape we know with none sensitive, and with nothing in its
- * names that always asks (merge, deploy, rollback).
+ * names that always asks (merge, deploy, rollback and the rest above, GraphQL, SQL, a raw request).
  */
 export function rememberable(
   tool: ToolDefinition,

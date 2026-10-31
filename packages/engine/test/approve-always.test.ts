@@ -42,7 +42,7 @@ afterEach(async () => {
 });
 
 describe("what an action named by its slug does", () => {
-  test("reads only with a read verb and no other verb; sensitive on any sensitive word; else a write", () => {
+  test("reads only when the verb after the app reads and nothing else acts; sensitive on any sensitive word; else a write", () => {
     const cases: [string, ReturnType<typeof actionLevel>][] = [
       ["GITHUB_LIST_PULL_REQUESTS", "read"],
       ["GITHUB_GET_A_PULL_REQUEST", "read"],
@@ -54,10 +54,28 @@ describe("what an action named by its slug does", () => {
       ["GITHUB_CREATE_A_DEPLOYMENT", "write"],
       ["SLACK_CHANNELS", "write"],
       ["LINEAR_GET_PROMOTE_STATUS", "write"],
+      // A read verb elsewhere in the slug, or a query that may change (GraphQL mutations, SQL), is no read.
+      ["SHOPIFY_GRAPH_QL_QUERY", "write"],
+      ["GOOGLEBIGQUERY_QUERY", "write"],
+      ["GOOGLESHEETS_FIND_REPLACE", "write"],
+      ["CLOUDFLARE_REPLACE_LIST_ITEMS", "write"],
+      ["GITHUB_REREQUEST_A_CHECK_SUITE", "write"],
+      ["GITHUB_MARK_NOTIFICATIONS_AS_READ", "write"],
       ["X_LIST_AND_DELETE_Y", "sensitive"],
       ["GITHUB_MERGE_A_PULL_REQUEST", "sensitive"],
       ["GMAIL_SEND_EMAIL", "sensitive"],
       ["GOOGLEDRIVE_SHARE_FILE", "sensitive"],
+      // Sends, deletes and payments in other forms and words.
+      ["SLACK_DELETES_A_MESSAGE_FROM_A_CHAT", "sensitive"],
+      ["SLACK_CHAT_POST_MESSAGE", "sensitive"],
+      ["SLACK_SCHEDULE_MESSAGE", "sensitive"],
+      ["GMAIL_REPLY_TO_THREAD", "sensitive"],
+      ["GMAIL_FORWARD_MESSAGE", "sensitive"],
+      ["GOOGLEDRIVE_EMPTY_TRASH", "sensitive"],
+      ["SLACK_INVITE_USER_TO_WORKSPACE", "sensitive"],
+      ["VERCEL_BUY_DOMAINS", "sensitive"],
+      ["VERCEL_RENEW_DOMAIN", "sensitive"],
+      ["SHOPIFY_CREATE_ONE_TIME_APPLICATION_CHARGE", "sensitive"],
     ];
     expect(cases.map(([slug]) => [slug, actionLevel(slug)])).toEqual(cases);
   });
@@ -108,6 +126,7 @@ describe("the actions one call of Composio's executor runs", () => {
 // ── Through the Tool Gateway, with an in-process server shaped like Composio's ──────────────────────────
 
 const WORKBENCH = "COMPOSIO_REMOTE_WORKBENCH";
+const PROXY = "COMPOSIO_PROXY_EXECUTE";
 const EXEC = `composio_${COMPOSIO_EXECUTOR}`;
 const WHY = "The reporter is waiting on this issue: a short note tells them the team is on it.";
 
@@ -142,6 +161,18 @@ function composioMcp() {
       async (args) => {
         calls.push({ tool: WORKBENCH, args });
         return text("done");
+      },
+    );
+    server.registerTool(
+      PROXY,
+      {
+        description: "Sends a raw HTTP request to a connected app's own API",
+        inputSchema: { toolkit_slug: z.string(), endpoint: z.string(), method: z.string() },
+        annotations: { openWorldHint: true },
+      },
+      async (args) => {
+        calls.push({ tool: PROXY, args });
+        return text("204");
       },
     );
     server.registerTool(
@@ -403,7 +434,7 @@ describe("Aprovar sempre", () => {
     expect(mcp.calls).toHaveLength(1);
   });
 
-  test("merge, deploy, workflows and sends are never offered nor honoured, even with a rule in the table", async () => {
+  test("merge, deploy, workflows, sends, GraphQL and SQL are never offered nor honoured, even with a rule in the table", async () => {
     f = await setup();
     const { mcp, gateway, serverId } = await world(f);
     const ctx = await runOf(f);
@@ -413,6 +444,20 @@ describe("Aprovar sempre", () => {
       "GITHUB_CREATE_A_WORKFLOW_DISPATCH_EVENT",
       "VERCEL_PROMOTE_A_DEPLOYMENT",
       "GMAIL_SEND_EMAIL",
+      "SLACK_CHAT_POST_MESSAGE",
+      // Under other names: a dispatch starts workflows, a reference moves a branch, a release or an alias deploys.
+      "GITHUB_CREATE_A_REPOSITORY_DISPATCH_EVENT",
+      "GITHUB_UPDATE_A_REFERENCE",
+      "GITHUB_CREATE_A_RELEASE",
+      "VERCEL_ASSIGN_ALIAS",
+      "VERCEL_START_ROLLING_RELEASE",
+      "RAILWAY_COMMIT_ENVIRONMENT_CHANGES",
+      "SUPABASE_RESTORE_PITR_BACKUP",
+      // What their arguments say: a GraphQL mutation can merge, SQL can drop a table, a command can do anything.
+      "GITHUB_RUN_GRAPH_QL_QUERY",
+      "SUPABASE_BETA_RUN_SQL_QUERY",
+      "CLOUDFLARE_EXECUTE_D1_QUERY",
+      "VERCEL_EXECUTE_SANDBOX_COMMAND",
     ]) {
       await f.db.insert(schema.approvalRules).values({
         orgId: f.org.id,
@@ -428,34 +473,73 @@ describe("Aprovar sempre", () => {
       });
     }
     expect(mcp.calls).toEqual([]);
+    // A pull request, its labels or a commit's comment still may be.
+    for (const slug of [
+      "GITHUB_CREATE_A_PULL_REQUEST",
+      "GITHUB_ADD_LABELS_TO_AN_ISSUE",
+      "GITHUB_CREATE_A_COMMIT_COMMENT",
+    ]) {
+      const ask = asked(await invoke(gateway, ctx, EXEC, { ...exec(slug), why: WHY }));
+      expect(ask.approveAlways).toEqual({ tool: COMPOSIO_EXECUTOR, actions: [slug] });
+    }
   });
 
-  test("the workbench always asks, even set to write, and is never offered", async () => {
+  test("the workbench and the proxy always ask, even set to write, and are never offered", async () => {
     f = await setup();
     const { mcp, gateway, deps, serverId } = await world(f);
     await saveCustomTools(deps, f.owner.id, f.org.id, serverId, {
       label: "Composio",
-      tools: [{ name: WORKBENCH, access: "write", label: "Workbench" }],
+      tools: [
+        { name: WORKBENCH, access: "write", label: "Workbench" },
+        { name: PROXY, access: "write", label: "Proxy" },
+      ],
     });
     const ctx = await runOf(f);
-    const ask = asked(await invoke(gateway, ctx, `composio_${WORKBENCH}`, { code_to_execute: "print(1)", why: WHY }));
-    expect(ask.approveAlways).toBeNull();
+    const calls: [string, Record<string, unknown>][] = [
+      [WORKBENCH, { code_to_execute: "print(1)" }],
+      [PROXY, { toolkit_slug: "github", endpoint: "/repos/acme/app/pulls/12/merge", method: "PUT" }],
+    ];
+    for (const [tool, input] of calls) {
+      const ask = asked(await invoke(gateway, ctx, `composio_${tool}`, { ...input, why: WHY }));
+      expect({ tool, offered: ask.approveAlways }).toEqual({ tool, offered: null });
+    }
     expect(mcp.calls).toEqual([]);
   });
 
-  test("a plain tool of the server: its rule is the tool itself, and it outlives a renamed connection", async () => {
+  test("a plain tool of the server asks every time: approved for good, it would run with any params", async () => {
+    f = await setup();
+    const { mcp, gateway, serverId } = await world(f);
+    const ctx = await runOf(f);
+    const ask = asked(await invoke(gateway, ctx, "composio_close_ticket", { id: 1, why: WHY }));
+    expect(ask.approveAlways).toBeNull();
+    await expect(decide(f, f.owner.id, ask.id, { decision: "approve", always: true })).rejects.toMatchObject({
+      code: "approval.always_unavailable",
+    });
+    // Even a rule in the table gives it nothing.
+    await f.db.insert(schema.approvalRules).values({
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      connectionId: serverId,
+      tool: "close_ticket",
+      action: "",
+    });
+    asked(await invoke(gateway, ctx, "composio_close_ticket", { id: 2, why: WHY }));
+    expect(mcp.calls).toEqual([]);
+  });
+
+  test("a rule is kept by the server's own tool name: it outlives a renamed connection", async () => {
     f = await setup();
     const { mcp, gateway, deps, serverId } = await world(f);
     const ctx = await runOf(f);
-    const ask = asked(await invoke(gateway, ctx, "composio_close_ticket", { id: 1, why: WHY }));
-    expect(ask.approveAlways).toEqual({ tool: "close_ticket", actions: [] });
+    const ask = asked(await invoke(gateway, ctx, EXEC, { ...exec("GITHUB_CREATE_AN_ISSUE_COMMENT"), why: WHY }));
     await decide(f, f.owner.id, ask.id, { decision: "approve", always: true });
-    expect((await rules(f)).map((r) => [r.tool, r.action])).toEqual([["close_ticket", ""]]);
     await saveCustomTools(deps, f.owner.id, f.org.id, serverId, { label: "Cmposio", tools: [] });
-    expect((await invoke(gateway, ctx, "cmposio_close_ticket", { id: 2 })).type).toBe("result");
-    expect(mcp.calls).toEqual([{ tool: "close_ticket", args: { id: 2 } }]);
+    expect(
+      (await invoke(gateway, ctx, `cmposio_${COMPOSIO_EXECUTOR}`, exec("GITHUB_CREATE_AN_ISSUE_COMMENT"))).type,
+    ).toBe("result");
+    expect(mcp.calls.map((c) => c.tool)).toEqual([COMPOSIO_EXECUTOR]);
     expect(await listApprovalRules(f.db, f.owner.id, f.org.id, f.agent.id)).toMatchObject([
-      { connectionId: serverId, server: "Cmposio", tool: "close_ticket", toolLabel: "Close ticket", action: "" },
+      { connectionId: serverId, server: "Cmposio", tool: COMPOSIO_EXECUTOR, action: "GITHUB_CREATE_AN_ISSUE_COMMENT" },
     ]);
   });
 

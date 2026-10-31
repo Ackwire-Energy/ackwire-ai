@@ -8,13 +8,14 @@ import { useColors, useDirectory, useNow, useOrgId } from "../shared/hooks";
 import { genderOf } from "../shared/logic";
 import { successHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
-import { approvalAction, approvalRisk, approveAlwaysOffered, approveAlwaysToast } from "./logic";
+import { approvalAction, approvalRisk, approveAlwaysToast } from "./logic";
 import {
   ApprovalDetails,
   ApprovalEmailLetter,
   ApprovalFuse,
   ApprovalSaid,
   ApprovalTraits,
+  ApproveAlways,
   approvalTitleText,
   useOriginShort,
 } from "./parts";
@@ -180,15 +181,12 @@ export function ApprovalSheet({
                         label={t("mobile.approval.refuse")}
                         onPress={() => setRefusing(true)}
                       />
-                      {approveAlwaysOffered(a) ? (
-                        <Button
-                          variant="ghost"
-                          wide
-                          label={t("approval.always.button")}
-                          disabled={decide.isPending}
-                          onPress={() => done("approve", true)}
-                        />
-                      ) : null}
+                      <ApproveAlways
+                        approval={a}
+                        name={name}
+                        disabled={decide.isPending}
+                        onPress={() => done("approve", true)}
+                      />
                     </View>
                     <Text variant="caption" tone="faint" style={styles.note}>
                       {high ? t("mobile.approval.holdNote") : t("mobile.approval.tapNote")}

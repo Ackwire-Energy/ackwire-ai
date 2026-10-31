@@ -92,9 +92,9 @@ export interface ToolDefinition {
   /** With `actions`: the scope of the connection's reads. */
   readScope?: string;
   /**
-   * The server's own name for this tool, set only where "Aprovar sempre" may be offered on its approvals (a
-   * custom server's tool that asks without being sensitive, or a tool with `actions`). Rules are kept by it, so
-   * they outlive a renamed connection. The gateway still decides each call (`rememberable`).
+   * The server's own name for this tool, set only where "Aprovar sempre" may be offered on its approvals (custom
+   * servers: only Composio's executor, whose `actions` say what each call does). Rules are kept by it, so they
+   * outlive a renamed connection. The gateway still decides each call (`rememberable`).
    */
   rememberAs?: string;
   /** Human summary of a call, for approval cards. */

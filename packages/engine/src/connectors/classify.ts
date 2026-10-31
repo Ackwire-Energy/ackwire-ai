@@ -182,18 +182,62 @@ export function classifyByRules(tool: ToolToClassify, readTools: readonly string
   return { level: "read", source: "verb", reason: "verb_read", sensitive: false };
 }
 
+/** Sends, deletes and payments that actions name with other words (`GMAIL_REPLY_TO_THREAD`, `VERCEL_BUY_DOMAINS`). */
+const SENSITIVE_ACTIONS = new Set([
+  ...SENSITIVE_VERBS,
+  "reply",
+  "forward",
+  "trash",
+  "invite",
+  "buy",
+  "charge",
+  "purchase",
+  "renew",
+]);
+const sensitiveWord = (w: string) =>
+  SENSITIVE_ACTIONS.has(w) || SENSITIVE_ACTIONS.has(w.replace(/s$/, "")) || SENSITIVE_ACTIONS.has(w.replace(/es$/, ""));
+/** Posted or scheduled, a message is sent (`SLACK_CHAT_POST_MESSAGE`); a post alone may be a blog's. */
+const MESSAGE = /^(message|email|tweet)s?$/;
+/** The verb right after the app (`GITHUB_LIST_…`) of an action that only reads. Not `query`: it may also change. */
+const LEADING_READS = new Set([
+  "get",
+  "list",
+  "search",
+  "find",
+  "fetch",
+  "check",
+  "download",
+  "count",
+  "describe",
+  "view",
+  "lookup",
+  "read",
+]);
+const OPEN_ENDED = new Set(["graph", "ql", "graphql", "sql", "mutation", "proxy"]);
+
+/**
+ * An action whose arguments say what it does (`GITHUB_RUN_GRAPH_QL_QUERY` can merge, `GOOGLEBIGQUERY_QUERY` can
+ * drop a table): GraphQL, SQL, a raw request, a query it runs. Never a read, never approved for good.
+ */
+export function openEnded(slug: string): boolean {
+  const words = nameWords(slug);
+  return words.at(-1) === "query" || words.some((w) => OPEN_ENDED.has(w));
+}
+
 /**
  * What an action named by its slug does (`GITHUB_LIST_PULL_REQUESTS`), when a tool runs it for us (Composio's
- * executor), by every word rather than the first verb: `sensitive` when any word is a sensitive verb; `read` only
- * with a read verb and no other verb (`GITHUB_LIST_OPEN_ISSUES` opens nothing, but "open" keeps it a write) and
- * nothing that always asks; anything else, a slug without a verb too, is a `write`. A wrong guess only asks a person.
+ * executor), by every word rather than the first verb: `sensitive` when any word sends, deletes or pays, in any
+ * form (`SLACK_DELETES_A_MESSAGE_FROM_A_CHAT`); `read` only when the verb right after the app reads, no other word
+ * is a verb (`GITHUB_LIST_OPEN_ISSUES` opens nothing, but "open" keeps it a write), and nothing in it is open-ended
+ * or always asks; anything else, a slug without a verb too, is a `write`. A wrong guess only asks a person.
  */
 export function actionLevel(slug: string): "read" | "write" | "sensitive" {
   const words = nameWords(slug);
-  if (words.some((w) => SENSITIVE_VERBS.has(w))) return "sensitive";
-  const reads = words.some((w) => READ_VERBS.has(w));
-  const acts = words.some((w) => WRITE_VERBS.has(w) || OTHER_VERBS.has(w));
-  return reads && !acts && !ALWAYS_SENSITIVE.test(slug) ? "read" : "write";
+  const posts = words.some((w) => w === "post" || w === "schedule") && words.some((w) => MESSAGE.test(w));
+  if (posts || words.some(sensitiveWord)) return "sensitive";
+  const acts = words.some((w) => WRITE_VERBS.has(w) || OTHER_VERBS.has(w) || w === "query" || w === "replace");
+  const reads = LEADING_READS.has(words[1] ?? "") && !acts && !openEnded(slug) && !ALWAYS_SENSITIVE.test(slug);
+  return reads ? "read" : "write";
 }
 
 /** What we suggest when the judge can't answer: ask first. */

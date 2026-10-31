@@ -14,13 +14,14 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { Button, Count, HoldButton, Icon, Text, useReducedMotion, useToast } from "@/ui";
-import { approvalAction, approvalRisk, approveAlwaysOffered, approveAlwaysToast } from "../approvals/logic";
+import { approvalAction, approvalRisk, approveAlwaysToast } from "../approvals/logic";
 import {
   ApprovalDetails,
   ApprovalEmailLetter,
   ApprovalFuse,
   ApprovalMark,
   ApprovalTraits,
+  ApproveAlways,
   approvalTitleText,
   useOriginShort,
 } from "../approvals/parts";
@@ -139,8 +140,8 @@ export function ApprovalInline({ approvalId }: { approvalId: string }) {
  * A request waiting in the conversation, as the agent asking, no card: what it said in its
  * own words, the exact action in one line with the app's mark, "Ver o e-mail" / "Ver detalhes" opening it
  * whole, then Aprovar (held for a second when the risk is high), "Agora não" (the request's sheet, which
- * asks why: a lesson for the agent), "Aprovar sempre" where it is offered (a plain tap) and the fuse to its
- * expiry. Who can't decide sees who it waits for.
+ * asks why: a lesson for the agent), "Aprovar sempre" where it is offered (a plain tap, what it covers under
+ * it) and the fuse to its expiry. Who can't decide sees who it waits for.
  */
 function ApprovalAsk({ approval: a }: { approval: Approval }) {
   const { t } = useTranslation();
@@ -256,15 +257,7 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
           {owner ? t("approval.waitingFor", { name: owner }) : t("approval.waitingAdmin")}
         </Text>
       )}
-      {approveAlwaysOffered(a) ? (
-        <Button
-          variant="ghost"
-          wide
-          label={t("approval.always.button")}
-          disabled={decide.isPending}
-          onPress={() => approve(true)}
-        />
-      ) : null}
+      <ApproveAlways approval={a} name={name} disabled={decide.isPending} onPress={() => approve(true)} />
       <ApprovalFuse approval={a} />
     </Animated.View>
   );

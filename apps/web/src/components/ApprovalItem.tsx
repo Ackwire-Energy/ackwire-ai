@@ -8,7 +8,7 @@ import {
   approveAlwaysOffered,
 } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalWhy } from "@agenteschat/client/lib/approval-origin";
-import { approvalTitle, approveAlwaysWords } from "@agenteschat/client/lib/approval-words";
+import { approvalTitle, approveAlwaysHint } from "@agenteschat/client/lib/approval-words";
 import { timeLeft, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { ApprovalCard, Button } from "@agenteschat/ui";
@@ -102,7 +102,7 @@ export function ApproveAlways({ approval, agent }: { approval: Approval; agent: 
         {t("approval.always.button")}
       </Button>
       <p className="small muted ap-always" title={kind?.actions.join(", ") || kind?.tool}>
-        {t("approval.always.hint", { of: g.of, name: g.name, actions: approveAlwaysWords(t, approval) })}
+        {approveAlwaysHint(t, approval, g.name)}
       </p>
     </>
   );

@@ -64,13 +64,15 @@ export function suggestFor(tool: ToolToClassify, readTools: readonly string[] = 
 
 /**
  * Composio's meta tools (docs.composio.dev/reference/meta-tools). The executor runs other Composio actions by
- * slug; the workbench and bash run code in Composio's sandbox, which can call any action (merge and deploy too),
- * so they always ask a person whatever their annotations say.
+ * slug. The workbench and bash run code in Composio's sandbox, which can call any action, and the proxy sends any
+ * HTTP request to a connected app's API (`PUT …/pulls/12/merge` too): they always ask a person whatever their
+ * annotations or stored level say.
  */
 export const COMPOSIO_EXECUTOR = "COMPOSIO_MULTI_EXECUTE_TOOL";
-export const COMPOSIO_SANDBOX: ReadonlySet<string> = new Set([
+export const COMPOSIO_ANY_ACTION: ReadonlySet<string> = new Set([
   "COMPOSIO_REMOTE_WORKBENCH",
   "COMPOSIO_REMOTE_BASH_TOOL",
+  "COMPOSIO_PROXY_EXECUTE",
 ]);
 
 const COMPOSIO_SLUG = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/;

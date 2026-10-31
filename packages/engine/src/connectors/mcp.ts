@@ -6,8 +6,8 @@ import type { ToolDefinition, ToolSource } from "../tools/types";
 import { CONNECTOR_CATALOG, connectorScope, fillTitle } from "./catalog";
 import { activeConnections, type ConnectorConnection, type ConnectorDeps, connectionHeaders } from "./connections";
 import {
+  COMPOSIO_ANY_ACTION,
   COMPOSIO_EXECUTOR,
-  COMPOSIO_SANDBOX,
   classifiedTools,
   composioActions,
   customScope,
@@ -94,7 +94,7 @@ const LIST_TTL_MS = 60_000;
 
 /** Read before Composio's own words in its executor's description: what asks a person and what doesn't. */
 const EXECUTOR_NOTE =
-  "Reads such as list, get and search run without asking a person. Keep sync_response_to_workbench false unless you must script over the output: the workbench and bash ask a person every time.";
+  "Reads such as list, get and search run without asking a person. GraphQL and SQL actions ask every time. Keep sync_response_to_workbench false unless you must script over the output: the workbench and bash ask a person every time.";
 
 /**
  * Tools of the organization's connected MCP servers (layer 2 of ADR 0016). Lists
@@ -130,8 +130,8 @@ export function createConnectorToolSource(deps: ConnectorDeps & { connect?: McpC
    * never shows). `approval` and sensitive tools ask a person for every call;
    * `write` tools run on their own and each call goes to the audit log.
    * Composio's executor says which actions each call runs: reads go as the
-   * server's reads, and "Aprovar sempre" may cover its other actions; its
-   * workbench and bash always ask, never remembered.
+   * server's reads, and "Aprovar sempre" may cover its other actions (no other
+   * tool's); its workbench, bash and proxy always ask.
    */
   async function customToolsOf(connection: ConnectorConnection): Promise<ToolDefinition[]> {
     const classified = await classifiedTools(deps.db, connection.id);
@@ -154,7 +154,6 @@ export function createConnectorToolSource(deps: ConnectorDeps & { connect?: McpC
       const access = row.access as ToolAccess;
       if (!tool) return [];
       const executor = tool.name === COMPOSIO_EXECUTOR;
-      const sandbox = COMPOSIO_SANDBOX.has(tool.name);
       const said = executor
         ? [EXECUTOR_NOTE, tool.description].filter(Boolean).join(" ")
         : (tool.description ?? tool.name);
@@ -167,10 +166,12 @@ export function createConnectorToolSource(deps: ConnectorDeps & { connect?: McpC
           connectionId: connection.id,
           connectorLabel: connection.label,
           // A sensitive tool never runs without approval, whatever is stored.
-          sensitive: access === "approval" || row.sensitive || sandbox,
+          sensitive: access === "approval" || row.sensitive || COMPOSIO_ANY_ACTION.has(tool.name),
           external: true, // whatever the server returns is third-party text
-          ...(executor ? { actions: composioActions, readScope: customScope(connection.id, "read") } : {}),
-          ...(executor || (access === "approval" && !row.sensitive && !sandbox) ? { rememberAs: tool.name } : {}),
+          // Only the executor names what each call does; any other tool approved for good would run with any params.
+          ...(executor
+            ? { actions: composioActions, readScope: customScope(connection.id, "read"), rememberAs: tool.name }
+            : {}),
           describe: (input) => {
             const actions = executor ? composioActions(input) : null;
             return {

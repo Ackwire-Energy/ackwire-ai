@@ -2,6 +2,7 @@ import type { TFunction } from "i18next";
 import type { Approval, ApprovalRule } from "../api/types";
 import { approvalAction, emailTitleWords } from "./approval-kind";
 import { humanize } from "./custom-tools";
+import { agentGrammar } from "./grammar";
 import { partsOf, toolName } from "./tool-review";
 
 /**
@@ -149,6 +150,12 @@ export function approveAlwaysWords(t: TFunction, approval: Pick<Approval, "appro
   return kind.actions.length > 0
     ? kind.actions.map((slug) => actionName(t, slug)).join(", ")
     : toolName(t, partsOf(kind.tool), kind.tool);
+}
+
+/** The line under "Aprovar sempre", on every card that offers it: what approving for good covers, with any values. */
+export function approveAlwaysHint(t: TFunction, approval: Pick<Approval, "approveAlways">, agentName: string) {
+  const g = agentGrammar(t, agentName);
+  return t("approval.always.hint", { of: g.of, name: g.name, actions: approveAlwaysWords(t, approval) });
 }
 
 /** A rule the agent runs without asking, in words: its action, else the tool as the workspace labelled it. */

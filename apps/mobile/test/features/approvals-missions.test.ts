@@ -6,6 +6,7 @@ import {
   approvalSaid,
   approvalTable,
   approvalTraits,
+  approveAlwaysHint,
   approveAlwaysOffered,
   approveAlwaysToast,
   waitingApprovals,
@@ -76,6 +77,15 @@ describe("Aprovar sempre on the phone", () => {
     expect(approveAlwaysOffered({ ...offered, status: "approved" })).toBe(false);
     // High risk takes a hold, never a tap: it isn't approved for good.
     expect(approveAlwaysOffered({ ...offered, tool: "deploy_production", scope: "vercel:deploy" })).toBe(false);
+  });
+
+  test("under the button, before the tap: what it approves for good, with any values, in both languages", async () => {
+    expect(approveAlwaysHint(await translator("pt-BR"), offered, "Ada")).toBe(
+      "Aprova este e os próximos iguais da Ada: Criar comentário da issue (Github), com qualquer valor.",
+    );
+    expect(approveAlwaysHint(await translator("en"), offered, "Theo")).toBe(
+      "Approves this one and the next ones like it from Theo: Create issue comment (Github), with any values.",
+    );
   });
 
   test("its toast: it won't ask again, and where to undo it, in both languages", async () => {
