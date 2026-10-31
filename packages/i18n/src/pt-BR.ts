@@ -1516,6 +1516,11 @@ export const ptBR = {
     send: "Enviar mesmo assim",
   },
   /** An agent's card whose button opens the app's own dialog, filled in (`meta.actionCard`). */
+  /** A stretch's pause card once someone pressed Continuar (ADR 0089). */
+  stretchCard: {
+    continued: "{{name}} deixou continuar · {{time}}",
+    continuedByYou: "Você deixou continuar · {{time}}",
+  },
   actionCard: {
     connect_ai: {
       title: "Conectar uma IA para {{agents}}",
@@ -8864,6 +8869,20 @@ export const ptBR = {
       issue_work_start: "Pode fazer a tarefa #{{number}}.",
       issue_taken: "Peguei a tarefa #{{number}}.",
       done: "Pronto.",
+      /**
+       * A stretch's pause card (ADR 0089): `agents` their names, `count` how many, `steps` the steps agents may start on
+       * their own; `percent` the share of each one's monthly budget, and with `_cost` it in money (`amount`).
+       */
+      stretch_paused_runs_one: "{{agents}} parou para te consultar · {{steps}} passos sem você desde o seu pedido",
+      stretch_paused_runs_other: "{{agents}} pararam para te consultar · {{steps}} passos sozinhos desde o seu pedido",
+      stretch_paused_spend_one:
+        "{{agents}} parou para te consultar · usou {{percent}}% do orçamento do mês nisso sem você",
+      stretch_paused_spend_other:
+        "{{agents}} pararam para te consultar · usaram {{percent}}% do orçamento do mês nisso sem você",
+      stretch_paused_spend_cost_one:
+        "{{agents}} parou para te consultar · usou {{amount}} ({{percent}}% do orçamento do mês) nisso sem você",
+      stretch_paused_spend_cost_other:
+        "{{agents}} pararam para te consultar · usaram {{amount}} ({{percent}}% do orçamento do mês) nisso sem você",
       memory: {
         proposed: "Proposta criada: {{text}}",
         forgot: 'Memória atualizada: esqueci "{{text}}".',

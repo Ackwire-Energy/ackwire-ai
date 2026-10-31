@@ -148,6 +148,12 @@ export const messages = pgTable(
      * person's message, trigger hop + 1 for an agent's. Enforces AGENT_MAX_HOPS.
      */
     hop: integer().notNull().default(0),
+    /**
+     * The stretch it belongs to (ADR 0089): the work agents do on their own since a person last acted. An
+     * agent's message carries its run's; null for a root (a person's message, a routine's report), whose
+     * stretch is its own id.
+     */
+    stretchId: uuid(),
     /** The run that produced this message (agent messages only). */
     agentRunId: uuid(),
     /** Structured attachments, e.g. `{ "approvalId": "…" }` for an approval card. */

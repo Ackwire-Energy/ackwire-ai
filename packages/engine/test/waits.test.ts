@@ -175,7 +175,7 @@ describe("a person's message while a run waits for help in the browser", () => {
     expect(await notices()).toHaveLength(1);
   });
 
-  test("a promise to go on once the help is done asks no judge: the help's result will wake the agent", async () => {
+  test("a promise to go on once the help is done gets no nudge: the help's result will wake the agent", async () => {
     const ask = await startBrowser("other", {
       after: "It's the Stripe account. I'll continue as soon as you finish signing in.",
       followThrough: "unkept",
@@ -184,8 +184,11 @@ describe("a person's message while a run waits for help in the browser", () => {
     await stopChecksSettled();
     await drainOutbox(f.db, f.handlers);
     expect((await runs())[0]?.status).toBe("done");
+    // Read once as unkept (ADR 0089), but what the run waits on brings it back: no more turns.
     const judged = (f.context.judge as unknown as { calls: { kind: string }[] }).calls;
-    expect(judged.filter((j) => j.kind === "follow_through")).toEqual([]);
+    expect(judged.filter((j) => j.kind === "follow_through").length).toBe(1);
+    const steps = await f.db.select().from(schema.agentRunSteps);
+    expect(steps.filter((s) => s.data.nudged === "promise")).toEqual([]);
   });
 
   test('no judge: even "pronto" only wakes the run (the help stays open)', async () => {
@@ -530,6 +533,8 @@ describe("tell_agent", () => {
   test("a note doesn't block; a reply that says something comes back as a notice", async () => {
     f = await setup({
       askAgent: true,
+      // The judge reads the reply as one that tells the sender something (ADR 0089).
+      judge: (kind) => (kind === "note_reply" ? 0.9 : undefined),
       reply: tellReply(() => ({ chunks: ["Error rate is 0.1%, normal. I'll keep watching it for the next hour."] })),
     });
     const infra = await addInfra();

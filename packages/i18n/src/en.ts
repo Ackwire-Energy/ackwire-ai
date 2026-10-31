@@ -1502,6 +1502,10 @@ export const en: Translations = {
     remove: "Remove it",
     send: "Send anyway",
   },
+  stretchCard: {
+    continued: "{{name}} let them go on · {{time}}",
+    continuedByYou: "You let them go on · {{time}}",
+  },
   actionCard: {
     connect_ai: {
       title: "Connect an AI for {{agents}}",
@@ -8805,6 +8809,17 @@ export const en: Translations = {
       issue_work_start: "Please do task #{{number}}.",
       issue_taken: "Took task #{{number}}.",
       done: "Done.",
+      stretch_paused_runs_one: "{{agents}} stopped to check with you · {{steps}} steps without you since your request",
+      stretch_paused_runs_other:
+        "{{agents}} stopped to check with you · {{steps}} steps on their own since your request",
+      stretch_paused_spend_one:
+        "{{agents}} stopped to check with you · used {{percent}}% of the month's budget on this without you",
+      stretch_paused_spend_other:
+        "{{agents}} stopped to check with you · each used {{percent}}% of the month's budget on this without you",
+      stretch_paused_spend_cost_one:
+        "{{agents}} stopped to check with you · used {{amount}} ({{percent}}% of the month's budget) on this without you",
+      stretch_paused_spend_cost_other:
+        "{{agents}} stopped to check with you · each used {{amount}} ({{percent}}% of the month's budget) on this without you",
       memory: {
         proposed: "Proposal created: {{text}}",
         forgot: 'Memory updated: forgot "{{text}}".',

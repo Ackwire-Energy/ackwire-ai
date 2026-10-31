@@ -31,6 +31,7 @@ export type OperatorEventType =
   | "agent.deleted"
   | "mail.sent"
   | "run.finished"
+  | "run.hop_limit"
   | "task.finished"
   | "desktop_control.ended"
   | "content.viewed"

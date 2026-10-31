@@ -1,6 +1,6 @@
 # 0053. Routines and unattended work: safe and dependable on every brain
 
-- Status: Accepted. Amended 2026-10-30: §3 (one command policy on every path that runs a command on a computer; where a push goes is read with git there). Amended 2026-10-31: §3 (through our git proxy, what it refuses never runs from the computer)
+- Status: Accepted. Amended 2026-10-30: §3 (one command policy on every path that runs a command on a computer; where a push goes is read with git there). Amended 2026-10-31: §3 (through our git proxy, what it refuses never runs from the computer); by ADR 0089 §9 (a chain stays a person's for 1000 links, each message's root remembered)
 - Date: 2026-10-23
 - Builds on: ADR 0032 (one engine, swappable brains), ADR 0034 (agents consult each other), ADR 0037 (agents investigate first, act with undo), the chat-delivery work (background runs, `hand_off`, run inbox)
 - Evaluates: ADRs 0045–0052 and the `feat/agent-runtime` branch (taken where they fit, see the end)

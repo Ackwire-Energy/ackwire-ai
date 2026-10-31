@@ -444,9 +444,10 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
     }
     // `agent` is the case's agent; `@handle` another agent of the case; anything else a person.
     const author = (m: CaseMessage) => {
-      if (m.author === "agent") return { type: "agent", agentId: agent.id, runId: null, hop: 0 } as const;
+      if (m.author === "agent")
+        return { type: "agent", agentId: agent.id, runId: null, hop: 0, stretchId: null } as const;
       const other = m.author.startsWith("@") ? agentIdOf(m.author.slice(1)) : undefined;
-      if (other) return { type: "agent", agentId: other, runId: null, hop: 1 } as const;
+      if (other) return { type: "agent", agentId: other, runId: null, hop: 1, stretchId: null } as const;
       return { type: "person", userId: (people.get(m.author) ?? owner).id } as const;
     };
     let threadId: string | null = null;

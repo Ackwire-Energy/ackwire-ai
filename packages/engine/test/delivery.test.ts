@@ -246,7 +246,7 @@ describe("ending a run hands its unread messages on", () => {
         orgId: f.org.id,
         channelId: f.general.id,
         threadId: ask.id,
-        author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1 },
+        author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null },
         body,
         meta: { talker: true, notice: { kind: "talker_reply", text: body } },
       });
@@ -300,7 +300,7 @@ describe("background runs", () => {
       orgId: f.org.id,
       channelId: f.general.id,
       threadId: root.id,
-      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0 },
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0, stretchId: null },
       body: "rotina: confere o deploy",
     });
     await f.db.transaction((tx) => createAgentRuns(tx, note, [f.agent.id], "mention", { background: true }));

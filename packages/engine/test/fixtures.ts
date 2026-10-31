@@ -337,7 +337,7 @@ export async function setup(
     pubsub,
     maxOutputTokens: 1000,
     contextMessages: 30,
-    maxHops: 3,
+    maxHops: 100,
     deltaFlushMs: 0,
     tools,
     context,

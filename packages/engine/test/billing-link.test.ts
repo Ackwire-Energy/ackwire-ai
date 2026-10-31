@@ -181,7 +181,7 @@ describe("mintBillingLink", () => {
       { name: "Ops", handle: "ops", role: "Ops", instructions: "Watch.", credentialId: f.credential.id },
       { model: "claude-sonnet-5-5" },
     );
-    const dev = { type: "agent" as const, agentId: f.agent.id, runId: null, hop: 1 };
+    const dev = { type: "agent" as const, agentId: f.agent.id, runId: null, hop: 1, stretchId: null };
     await say((await openAgentDm(f.db, f.org.id, f.agent.id, ops.id)).id, dev);
     await say((await openRoutineRoom(f.db, f.org.id, f.agent.id, crypto.randomUUID())).id, ana);
 
