@@ -433,6 +433,25 @@ export function changedText(text: string, change: string, replaces?: string): st
   return text.slice(0, start) + change + text.slice(end);
 }
 
+/**
+ * What a card's rows do to the texts, each line once across the card: the lines they put in (each new role is one)
+ * and the lines they take out. A swap's own words are only a fragment, so the guards read these instead.
+ */
+function rowsChange(rows: { target: Proposal["target"]; proposedText: string; diff: string }[]) {
+  const added = new Set<string>();
+  const removed = new Set<string>();
+  for (const r of rows) {
+    if (r.target === "agent_role") added.add(r.proposedText);
+    else
+      for (const line of r.diff.split("\n")) {
+        if (!line.slice(1).trim()) continue;
+        if (line.startsWith("+")) added.add(line.slice(1));
+        else if (line.startsWith("-")) removed.add(line.slice(1));
+      }
+  }
+  return { added: [...added], removed: [...removed] };
+}
+
 /** The agents a card changes: active ones the person who asked can talk to (the proposer always). */
 async function cardAgents(db: Database, orgId: string, ids: string[], proposerId: string, requesterId: string) {
   if (ids.length > CARD_MAX_AGENTS) throw new ValidationError(`At most ${CARD_MAX_AGENTS} agents on one card`);
@@ -488,9 +507,6 @@ export async function proposeChange(
   const { orgId, change, replaces } = input;
   const roles = input.roles ?? [];
   const access = input.access ?? [];
-  const texts = [change, ...roles.map((r) => r.role)];
-  for (const text of texts) checkContent(text);
-  await checkPermissionText(deps.judge, orgId, texts.filter((t) => t.trim()).join("\n"));
   const base = {
     orgId,
     proposedByAgentId: input.agentId,
@@ -574,6 +590,9 @@ export async function proposeChange(
     }
   }
   if (rows.length === 0) return { proposals: [], skipped };
+  const { added, removed } = rowsChange(rows);
+  checkContent(added.join("\n"));
+  await checkPermissionText(deps.judge, orgId, [...added, ...removed.map((l) => `Removes: ${l}`)].join("\n"));
   const proposals = await db.insert(contextProposals).values(rows).returning();
   await announce(deps, proposals);
   const out: (Proposal & { canDecide: boolean })[] = [];

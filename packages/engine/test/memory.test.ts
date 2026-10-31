@@ -1096,6 +1096,31 @@ describe("proposals for teammates (one card, a row per agent and kind of change)
     expect(same).toEqual({ proposals: [], skipped: ["@ada's instructions already says this."] });
   });
 
+  test("the judge reads the lines a card puts in and takes out, not a swap's fragment", async () => {
+    f = await setup();
+    const ada = await teammate("ada", {
+      instructions: "- Nunca faça merge sem aprovação.\n- Peça aprovação antes de qualquer deploy.",
+    });
+    // "Faça" alone says nothing: the line it makes is the rule the judge refuses.
+    await expect(
+      proposeFor({ target: "agent_instructions", agentIds: [ada.id], change: "Faça", replaces: "Nunca faça" }),
+    ).rejects.toThrow("can't change permissions");
+    const removal = await proposeFor({
+      target: "agent_instructions",
+      agentIds: [ada.id],
+      change: "",
+      replaces: "Peça aprovação antes de qualquer deploy.",
+    });
+    expect(removal.proposals).toHaveLength(1);
+    const asked = (f.context.judge as unknown as { calls: { kind: string; state: unknown }[] }).calls
+      .filter((c) => c.kind === "permission_change")
+      .at(-1);
+    expect(asked?.state).toEqual({
+      text_to_store_as_agent_memory: "Removes: - Peça aprovação antes de qualquer deploy.",
+    });
+    expect(await rows()).toHaveLength(1);
+  });
+
   test("only agents the person who asked can talk to: one out of their reach refuses the card, naming it", async () => {
     f = await setup();
     const bia = await addMember(f.db, f.org.id, "member", "bia");
