@@ -102,8 +102,36 @@ describe("Adicionar conector: one catalog", () => {
     expect(names(dialog)).toEqual(["Google Drive", "Notion", "Não achou?"]);
     await type(within(dialog).getByRole("searchbox", { name: "Buscar conector" }), "notion");
     expect(names(dialog)).toEqual(["Notion", "Não achou?"]);
-    await type(within(dialog).getByRole("searchbox", { name: "Buscar conector" }), "zzz");
-    expect(dialog.textContent).toContain("Nenhum conector encontrado com “zzz”.");
+  });
+
+  test("nothing found: one of our agents searching, with the way in by address", async () => {
+    const { dialog } = await open();
+    const search = within(dialog).getByRole("searchbox", { name: "Buscar conector" });
+    const empty = () => dialog.querySelector<HTMLElement>(".catalog__empty");
+    await type(search, " zzz ");
+    // No grid behind it, not even "Não achou?": the empty state carries the way in.
+    expect(names(dialog)).toEqual([]);
+    const box = empty() as HTMLElement;
+    expect(box.querySelector(".ac-empty__art[aria-hidden='true'] canvas.ac-searchpx")).not.toBeNull();
+    expect(box.querySelector(".ac-empty__title")?.textContent).toBe("Nenhum conector com “zzz”");
+    expect(box.querySelector(".ac-empty__text")?.textContent).toBe(
+      "Você pode conectar qualquer serviço pelo endereço dele.",
+    );
+    // Its button opens what "Não achou?" opens.
+    const byAddress = within(box).getByRole("button", { name: "Conectar pelo endereço" });
+    expect(byAddress.getAttribute("aria-haspopup")).toBe("dialog");
+    await click(byAddress);
+    expect(within(service("Outro serviço")).getByRole("button", { name: "Conectar pelo endereço" })).toBeTruthy();
+    await pressEsc(service("Outro serviço"));
+
+    // A category with nothing in it: the same, in its own words.
+    await type(search, "");
+    expect(empty()).toBeNull();
+    const cats = within(dialog).getByRole("radiogroup", { name: "Categorias" });
+    await click(within(cats).getByRole("radio", { name: /^Conectados/ }));
+    expect(names(dialog)).toEqual([]);
+    expect(empty()?.querySelector(".ac-empty__title")?.textContent).toBe("Nenhum conector nesta categoria ainda");
+    expect(within(empty() as HTMLElement).getByRole("button", { name: "Conectar pelo endereço" })).toBeTruthy();
   });
 
   test("a tile opens its service over the catalog: what agents could do, what asks, how it connects; Esc closes the service first", async () => {
