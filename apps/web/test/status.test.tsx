@@ -22,12 +22,12 @@ const go = async (path: string, state = seedState()) => {
 const nav = () => screen().getByRole("navigation", { name: "Navegação do workspace" });
 const account = () => screen().getByRole("button", { name: /^Conta: / });
 const badgeOf = (el: Element | null | undefined) => el?.querySelector(".ac-presence")?.getAttribute("data-presence");
-/** Account menu → Definir status. */
+/** Account menu → its first item (named "Definir status", or your line once you wrote one). */
 const openDialog = async () => {
   await click(account());
   await act(() => new Promise((r) => setTimeout(r, 0)));
   const menu = screen().getAllByRole("menu")[0] as HTMLElement;
-  await click(within(menu).getByRole("menuitem", { name: /^Definir status/ }));
+  await click(within(menu).getAllByRole("menuitem")[0] as HTMLElement);
   await settle(2);
   return screen().getByRole("dialog", { name: "Definir status" });
 };
@@ -81,7 +81,7 @@ describe("Definir status", () => {
     expect(Math.abs(new Date(input?.status?.until ?? 0).getTime() - (before + 3_600_000))).toBeLessThan(60_000);
     expect(screen().queryByRole("dialog", { name: "Definir status" })).toBeNull();
     expect(screen().getByText("Status salvo")).toBeTruthy();
-    expect(account().getAttribute("aria-label")).toMatch(/^Conta: Walter · Em reunião\./);
+    expect(account().getAttribute("aria-label")).toBe("Conta: Walter · Em reunião");
     expect(account().querySelector(".sidebar__user-line")?.textContent).toContain("Em reunião");
     expect(badgeOf(account())).toBe("busy");
   });
@@ -230,11 +230,13 @@ describe("where a status shows", () => {
     ];
     const state = seedState({ agentStatuses: statuses });
     await go(`c/${ENG_ID}`, state);
+    // The sidebar: the badge, and the line in the row's title (no emoji in the list).
     const ada = within(nav()).getByRole("link", { name: /^Ada/ });
-    expect(within(ada).getByRole("img", { name: "Respondendo no #eng" }).textContent).toBe("💬");
+    expect(ada.getAttribute("title")).toContain("Respondendo no #eng");
+    expect(ada.textContent).not.toContain("💬");
     expect(badgeOf(ada)).toBe("busy");
     const atlas = within(nav()).getByRole("link", { name: /^Atlas/ });
-    expect(within(atlas).getByRole("img", { name: "Deploy da v2 em staging" }).textContent).toBe("🛠️");
+    expect(atlas.getAttribute("title")).toContain("Deploy da v2 em staging");
     expect(badgeOf(atlas)).toBe("online");
 
     await click(screen().getAllByRole("button", { name: "Perfil de Ada" })[0] as HTMLElement);
