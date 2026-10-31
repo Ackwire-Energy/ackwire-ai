@@ -55,3 +55,14 @@ export const setsAutoReply = (
   meId: string | null | undefined,
   org: Membership,
 ) => managesChannel(channel, meId, org) || (!!meId && agent?.ownerUserId === meId);
+
+/**
+ * Whether this person may put an agent in a channel or take it out of it: a channel they're in and may post in, or
+ * one they manage. Mirrors the server's `setAgentChannels` (packages/engine/src/management.ts), which also needs the
+ * agent to be theirs or `manage_agents`.
+ */
+export const addsAgentsTo = (
+  channel: { isMember?: boolean; createdByUserId?: string | null } | null | undefined,
+  meId: string | null | undefined,
+  org: Membership,
+) => (channel?.isMember === true && can(org, "post")) || managesChannel(channel, meId, org);

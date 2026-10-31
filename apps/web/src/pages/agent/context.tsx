@@ -128,6 +128,7 @@ export function LockNote({ field }: { field: Field }) {
     field === "levels" ||
     field === "repos" ||
     field === "audience" ||
+    field === "channels" ||
     field === "machine" ||
     field === "brain";
   return (

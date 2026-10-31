@@ -2573,7 +2573,8 @@ export const en: Translations = {
     readOnly: {
       member: "You see how {{name}} works. Only admins edit.",
       memberOwner: "You see how {{name}} works. Who edits: admins and {{owner}} (owner).",
-      owner: "You own {{name}}: you change the look, who can talk and the computer. The rest, only admins.",
+      owner:
+        "You own {{name}}: you change the look, who can talk, the channels and the computer. The rest, only admins.",
       ownerInstructions: "Only admins edit the instructions. As the owner, you approve proposed changes.",
       ownerAccess: "Only admins give or take away access and repositories.",
     },
@@ -2775,6 +2776,7 @@ export const en: Translations = {
       useDefault: "Use the default",
       budgetAdmins: "Only admins see what agents spend and change the limit.",
       channelsHelp: "Joins the checked channels. Elsewhere, call @{{handle}} or send a direct message.",
+      channelsYours: "You change only the channels you're in. To change another one, join it first.",
     },
     archive: {
       action: "Archive {{name}}",
@@ -3113,6 +3115,7 @@ export const en: Translations = {
     plansHelp: "Claude Code or Codex with the subscription of whoever connected the computer. No key needed.",
     planOnlyOwner:
       "On a plan, {{name}} starts answering only {{owner}}. On {{name}}'s page, {{owner}} can choose whether {{she}} answers other people.",
+    partly: "{{name}} is ready, but part of what you chose wasn't saved. {{reason}}",
     planNotSaved:
       "{{name}} is ready, but {{brain}} couldn't be set up now. Choose it again in Who thinks, on {{name}}'s page.",
     autoCost: "The cost follows each task",

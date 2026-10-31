@@ -27,7 +27,7 @@ import {
   ROLE_GROUPS,
   type RoleId,
 } from "@agenteschat/client/lib/new-agent";
-import { can } from "@agenteschat/client/lib/permissions";
+import { addsAgentsTo, can } from "@agenteschat/client/lib/permissions";
 import { AUTO } from "@agenteschat/client/lib/providers";
 import { router, usePreventRemove } from "expo-router";
 import { type ReactNode, useMemo, useRef, useState } from "react";
@@ -101,7 +101,8 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
   const api = useApi();
   const insets = useSafeAreaInsets();
   const orgId = useOrgId();
-  const mayImport = can(useOrg().org, "create_agents");
+  const { org } = useOrg();
+  const mayImport = can(org, "create_agents");
   const meId = useMeId();
   const dir = useDirectory();
   const create = useCreateAgent(orgId);
@@ -148,13 +149,13 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
   const granted = items.filter((i) => (levels[i.id] ?? "none") !== "none");
   // Revisar lists what a proposal asked for at any level, so a change can be taken back.
   const listedApps = proposed ? items.filter((i) => i.id in proposedLevels) : granted;
-  // Mine, and the public ones a proposal names that I'm not in: whoever may create agents adds one to any of them.
+  // Mine, and the ones a proposal names: only where I may put an agent (in it and posting, or managing it).
   const myChannels = useMemo(() => {
     const dmIds = new Set((dms.data ?? []).map((d) => d.channelId));
     return (channels.data ?? []).filter(
-      (ch) => (ch.isMember || proposed?.channelIds.includes(ch.id)) && !dmIds.has(ch.id),
+      (ch) => (ch.isMember || proposed?.channelIds.includes(ch.id)) && !dmIds.has(ch.id) && addsAgentsTo(ch, meId, org),
     );
-  }, [channels.data, dms.data, proposed]);
+  }, [channels.data, dms.data, proposed, meId, org]);
   const taken = useMemo(
     () =>
       new Set([

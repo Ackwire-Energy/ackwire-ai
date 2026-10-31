@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { AgentInput } from "@agenteschat/client";
+import { type AgentInput, ApiError } from "@agenteschat/client";
 import { en, ptBR } from "@agenteschat/i18n";
 import { cleanup, within } from "@testing-library/react";
 import {
@@ -666,6 +666,29 @@ describe("Criar agente: what gets created", () => {
     expect(screen().queryByRole("complementary", { name: "Prévia do agente" })).toBeNull();
     await startAs("Do zero");
     expect((screen().getByLabelText("Nome") as HTMLInputElement).value).toBe("");
+  });
+
+  test("a save refused once the agent exists is said, and the flow still ends on the agent, without the channel", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    api.agents.setChannels = async () => {
+      throw new ApiError(403, "forbidden", "Forbidden");
+    };
+    await open(state, api);
+    await startAs("QA");
+    await toReview();
+    await click(screen().getByRole("button", { name: "Criar Iris" }));
+    await settle(8);
+    expect(document.querySelector(".ac-toasts")?.textContent).toContain(
+      "A Iris já existe, mas parte do que você escolheu não foi salva. Você não tem permissão para isso. Peça a um admin do workspace.",
+    );
+    expect(screen().getByRole("heading", { name: "Iris entrou no time" })).toBeTruthy();
+    expect(document.body.textContent).toContain(
+      "Adicione Iris a um canal e mencione @iris numa conversa para começar.",
+    );
+    // What came after the channels was still saved.
+    expect(state.calls.some((c) => c.method === "access.set")).toBe(true);
+    expect(state.agents.filter((a) => a.handle === "iris")).toHaveLength(1);
   });
 });
 

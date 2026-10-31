@@ -3,9 +3,9 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { AgentDraft, AgentInput, AgentProposalCard, Message } from "@agenteschat/client";
+import type { AgentDraft, AgentInput, AgentProposalCard, Message, OrgRole } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ATLAS_ID, createFakeApi, ENG_ID, NOW, ORG_ID, seedState } from "./fake-api";
+import { ATLAS_ID, createFakeApi, ENG_ID, NOW, ORG_ID, seedRoles, seedState } from "./fake-api";
 import { railStep, title, typeIn } from "./new-agent-flow";
 import { renderApp, screen, settle } from "./render";
 
@@ -258,7 +258,7 @@ describe("Revisar: Criar agente filled in with the draft", () => {
     expect(screen().queryByText("Esta proposta já foi decidida ou expirou.")).toBeNull();
   });
 
-  test("the channels it proposes, also public ones I'm not in: shown, and the agent joins them", async () => {
+  test("the channels it proposes, also public ones I'm not in when I arrange channels: shown, and the agent joins them", async () => {
     const state = seedState();
     state.channels.push({
       id: DESIGN_ID,
@@ -277,6 +277,36 @@ describe("Revisar: Criar agente filled in with the draft", () => {
     await click(screen().getByRole("button", { name: "Criar Nina" }), 10);
     const joined = state.calls.find((c) => c.method === "agents.setChannels")?.args[2];
     expect(joined).toEqual([{ channelId: ENG_ID }, { channelId: DESIGN_ID }]);
+  });
+
+  test("with Create agents alone, a channel it proposes that I'm not in isn't offered: it joins the ones I'm in", async () => {
+    const state = seedState();
+    asMember(state);
+    const [admin, everyone] = seedRoles() as [OrgRole, OrgRole];
+    state.roles = [
+      admin,
+      { ...admin, id: "role-makers", name: "Criadores", position: 1, permissions: ["create_agents"] },
+      { ...everyone, position: 2 },
+    ];
+    const me = state.members.find((m) => m.userId === "u-walter");
+    if (me) me.roleIds = ["role-makers"];
+    state.channels.push({
+      id: DESIGN_ID,
+      name: "design",
+      topic: "",
+      visibility: "public",
+      isMember: false,
+      createdAt: NOW.toISOString(),
+    });
+    state.messages.push(proposal("p-1", {}, { channelIds: [ENG_ID, DESIGN_ID] }));
+    await renderApp(`/org/${ORG_ID}/agents/new?proposal=p-1`, { api: createFakeApi(state) });
+    await settle(8);
+    const chips = [...document.querySelectorAll(".newag__review .ac-chip")].map((c) => c.textContent);
+    expect(chips).toContain("eng");
+    expect(chips).not.toContain("design");
+    await click(screen().getByRole("button", { name: "Criar Nina" }), 10);
+    const joined = state.calls.find((c) => c.method === "agents.setChannels")?.args[2];
+    expect(joined).toEqual([{ channelId: ENG_ID }]);
   });
 
   test("changing the role keeps the rest of the draft; its words are a field of their own", async () => {

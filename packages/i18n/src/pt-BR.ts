@@ -2598,7 +2598,8 @@ export const ptBR = {
     readOnly: {
       member: "Você vê como {{article}} {{name}} trabalha. Só admins editam.",
       memberOwner: "Você vê como {{article}} {{name}} trabalha. Quem edita: admins e {{owner}} (responsável).",
-      owner: "Você é responsável {{of}} {{name}}: muda o jeito, quem pode falar e o computador. O resto, só admins.",
+      owner:
+        "Você é responsável {{of}} {{name}}: muda o jeito, quem pode falar, os canais e o computador. O resto, só admins.",
       ownerInstructions: "Só admins editam as instruções. Você, como responsável, aprova as propostas de mudança.",
       ownerAccess: "Só admins dão ou tiram acessos e repositórios.",
     },
@@ -2800,6 +2801,7 @@ export const ptBR = {
       useDefault: "Usar o padrão",
       budgetAdmins: "Só admins veem o gasto dos agentes e mudam o limite.",
       channelsHelp: "Entra nos canais marcados. Em outros, dá para chamar por @{{handle}} ou mensagem direta.",
+      channelsYours: "Você muda só os canais em que está. Para mexer em outro, entre nele antes.",
     },
     archive: {
       action: "Arquivar {{article}} {{name}}",
@@ -3142,6 +3144,7 @@ export const ptBR = {
     plansHelp: "Claude Code ou Codex com a assinatura de quem conectou o computador. Não usa chave.",
     planOnlyOwner:
       "No plano, {{article}} {{name}} começa atendendo só {{owner}}. Na página {{of}} {{name}}, {{owner}} pode escolher se {{she}} atende outras pessoas.",
+    partly: "{{The}} {{name}} já existe, mas parte do que você escolheu não foi salva. {{reason}}",
     planNotSaved:
       "{{The}} {{name}} já existe, mas não deu para usar o {{brain}} agora. Escolha de novo em Quem pensa, na página {{of}} {{name}}.",
     autoCost: "O custo acompanha cada tarefa",

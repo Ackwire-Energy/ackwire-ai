@@ -15,10 +15,12 @@ import {
   runMatches,
   type Saved,
 } from "@/lib/agent-edit";
-import { ADA_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, ENG_ID, GENERAL_ID, NOW, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
+
+const DESIGN_ID = "00000000-0000-4000-8000-0000000000c9";
 
 const go = async (query = "", state = seedState()) => {
   const r = await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}${query}`, { api: createFakeApi(state) });
@@ -374,6 +376,33 @@ describe("agent page: who edits what", () => {
     await click(within(saveBar() as HTMLElement).getByRole("button", { name: /^Salvar/ }));
     await settle(6);
     expect(updates(state)).toEqual([{ appearance: { color: "rose", eyes: "round", accessory: "none" } }]);
+  });
+
+  test("the owner puts it in and takes it out of the channels they're in; the others show as they are", async () => {
+    const state = asOwner();
+    // An admin put Ada in #design, which I'm not in.
+    state.channels.push({
+      id: DESIGN_ID,
+      name: "design",
+      topic: "",
+      visibility: "public",
+      isMember: false,
+      createdAt: NOW.toISOString(),
+    });
+    state.channelMembers[DESIGN_ID] = [{ type: "agent", id: ADA_ID }];
+    await go("?tab=settings&sec=channels", state);
+    const card = document.getElementById("agp-sec-channels") as HTMLElement;
+    expect(within(card).queryByRole("checkbox", { name: "#design" })).toBeNull();
+    expect(card.querySelector(".agp-chips")?.textContent).toBe("design");
+    expect(hintText(card, "Canais")).toBe("Você muda só os canais em que está. Para mexer em outro, entre nele antes.");
+    await click(within(card).getByRole("checkbox", { name: "#general" }));
+    await click(within(card).getByRole("checkbox", { name: "#eng" }));
+    await click(within(saveBar() as HTMLElement).getByRole("button", { name: /^Salvar/ }));
+    await settle(8);
+    expect(state.calls.find((c) => c.method === "agents.setChannels")?.args[2]).toEqual([
+      { channelId: DESIGN_ID, autoReply: true },
+      { channelId: GENERAL_ID },
+    ]);
   });
 });
 

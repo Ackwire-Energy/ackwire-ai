@@ -21,11 +21,12 @@ import { LEVELS, type Level, saveLevels } from "@agenteschat/client/lib/access-l
 import { draftLevels } from "@agenteschat/client/lib/action-cards";
 import { ownSignInReady } from "@agenteschat/client/lib/ai-accounts";
 import { type ConnectedItem, itemName } from "@agenteschat/client/lib/connected";
+import { errorText as failureText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { choiceOf, defaultPolicy, MAIL_ACTIONS, toMailLevel } from "@agenteschat/client/lib/mail";
 import { planOfKind } from "@agenteschat/client/lib/no-ai";
-import { can } from "@agenteschat/client/lib/permissions";
+import { addsAgentsTo, can } from "@agenteschat/client/lib/permissions";
 import { AUTO, isAuto, modelChoices } from "@agenteschat/client/lib/providers";
 import { scopeText } from "@agenteschat/client/lib/scopes";
 import {
@@ -272,11 +273,14 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
   const step = NEW_AGENT_STEPS[index] ?? "role";
   const total = NEW_AGENT_STEPS.length;
   const dmChannels = useMemo(() => new Set((dms.data ?? []).map((d) => d.channelId)), [dms.data]);
-  // Mine, and the public ones a proposal names that I'm not in: whoever may create agents adds one to any of them.
+  // Mine, and the ones a proposal names: only where I may put an agent (in it and posting, or managing it).
   const myChannels = useMemo(
     () =>
-      (channels.data ?? []).filter((c) => (c.isMember || draft?.channelIds.includes(c.id)) && !dmChannels.has(c.id)),
-    [channels.data, dmChannels, draft],
+      (channels.data ?? []).filter(
+        (c) =>
+          (c.isMember || draft?.channelIds.includes(c.id)) && !dmChannels.has(c.id) && addsAgentsTo(c, me.user.id, org),
+      ),
+    [channels.data, dmChannels, draft, me.user.id, org],
   );
   const choices = useMemo(
     () => modelChoices(models.data?.models ?? [], credentials.data ?? [], platform.data ?? false),
@@ -436,13 +440,29 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
         toast.show(t("newAgent.planNotSaved", { ...g, brain: t(`brain.card.${plan.kind}`) }), "error");
       }
     }
-    if (joined.length > 0) {
-      await api.agents.setChannels(
-        org.id,
-        agent.id,
-        joined.map((c) => ({ channelId: c.id })),
-      );
-    }
+    // The rest is saved one part at a time. What fails is said, and the flow still ends on the new agent: a second
+    // "Criar" would make another one.
+    const failures: unknown[] = [];
+    const attempt = async (save: () => Promise<unknown>) => {
+      try {
+        await save();
+        return true;
+      } catch (e) {
+        failures.push(e);
+        return false;
+      }
+    };
+    const inChannels =
+      joined.length > 0 &&
+      (await attempt(() =>
+        api.agents.setChannels(
+          org.id,
+          agent.id,
+          joined.map((c) => ({ channelId: c.id })),
+        ),
+      ))
+        ? joined
+        : [];
     // New agents start with the built-in defaults; the chosen connector levels go on top, in one
     // write that reads the agent's grants first (nothing written afterwards replaces them).
     const chosen = Object.fromEntries(
@@ -450,27 +470,32 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
         .filter((item) => (levels[item.id] ?? "none") !== "none")
         .map((item) => [`connector:${item.id}`, levels[item.id] as Level]),
     );
-    if (Object.keys(chosen).length > 0) await saveLevels(api, org.id, agent.id, chosen);
+    if (Object.keys(chosen).length > 0) await attempt(() => saveLevels(api, org.id, agent.id, chosen));
     // Mailboxes: the chosen level with the default rules (every send asks); rules are set on the agent page.
     for (const account of grantedMail) {
-      await api.mail.setAgent(org.id, agent.id, account.id, {
-        level: toMailLevel(mailLevels[account.id] ?? "none"),
-        canDelete: false,
-        policy: defaultPolicy(),
-      });
+      await attempt(() =>
+        api.mail.setAgent(org.id, agent.id, account.id, {
+          level: toMailLevel(mailLevels[account.id] ?? "none"),
+          canDelete: false,
+          policy: defaultPolicy(),
+        }),
+      );
     }
     const libraryList = library.data ?? [];
     if (libraryList.length > 0) {
-      await api.skills.setForAgent(
-        org.id,
-        agent.id,
-        libraryList.map((s) => ({ skillId: s.id, enabled: skillIds?.has(s.id) ?? s.defaultForNewAgents })),
+      await attempt(() =>
+        api.skills.setForAgent(
+          org.id,
+          agent.id,
+          libraryList.map((s) => ({ skillId: s.id, enabled: skillIds?.has(s.id) ?? s.defaultForNewAgents })),
+        ),
       );
     }
+    if (failures.length > 0) toast.show(t("newAgent.partly", { ...g, reason: failureText(t, failures[0]) }), "error");
     setCreated({
       agent,
       look,
-      channels: joined.map((c) => ({ id: c.id, name: c.name })),
+      channels: inChannels.map((c) => ({ id: c.id, name: c.name })),
     });
     mood.react("happy", 2200);
     scrollTop();
