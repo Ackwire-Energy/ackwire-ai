@@ -22,7 +22,7 @@ import { approvalNews, askedLabel, JOIN_REASON_MAX, sendsEmail } from "@agentesc
 import { membersFull } from "@agenteschat/client/lib/limits";
 import { can } from "@agenteschat/client/lib/permissions";
 import { rolesOf } from "@agenteschat/client/lib/roles";
-import { parseEmails } from "@agenteschat/client/lib/text";
+import { emailsFrom } from "@agenteschat/client/lib/text";
 import {
   Alert,
   ApprovalCard,
@@ -100,22 +100,25 @@ export function MembersPage({ embedded = false }: { embedded?: boolean } = {}) {
   const month = formatMonth(i18n.language, new Date());
 
   const send = async () => {
-    const emails = parseEmails(draft);
-    if (emails.length === 0) {
+    const { valid, invalid } = emailsFrom(draft);
+    if (valid.length === 0) {
       setError(t("members.invalidEmails"));
       return;
     }
     setError(null);
-    const results = await inviteMany.mutateAsync({ emails, roleIds: inviteRoles });
+    const results = await inviteMany.mutateAsync({ emails: valid, roleIds: inviteRoles });
     const links: Record<string, string> = {};
     for (const r of results) if (r.url) links[r.email] = r.url;
     setLinks((prev) => ({ ...prev, ...links }));
     const invited = results.filter((r) => r.status === "invited").length;
     const problems = results.flatMap((r) => (r.status === "invited" ? [] : [{ ...r, status: r.status }]));
     if (invited > 0) toast.show(t("members.invited", { count: invited }));
+    for (const email of invalid) toast.show(t("members.batch.invalid_email", { email }), "error");
     for (const p of problems) toast.show(t(`members.batch.${p.status}`, { email: p.email }), "error");
-    if (problems.length === 0) setDraft("");
-    else setDraft(problems.map((p) => p.email).join(", "));
+    // Only addresses to fix stay in the field: a member or a pending invitation was just said, and sending it
+    // again would only say it again.
+    const toFix = [...invalid, ...problems.filter((p) => p.status === "invalid_email").map((p) => p.email)];
+    setDraft(toFix.join(", "));
   };
 
   const resend = async (inv: InvitationWithStatus) => {

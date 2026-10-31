@@ -1,7 +1,13 @@
 import type { AskToJoinResult, InvitationPreview } from "@agenteschat/client";
 import { ApiError, invitationQuery, keys, useAuthConfig, useMe } from "@agenteschat/client";
 import { formatTimeLeft } from "@agenteschat/client/lib/actions";
-import { authErrorText, errorCode, errorText, invitedErrorText } from "@agenteschat/client/lib/errors";
+import {
+  authErrorText,
+  errorCode,
+  errorText,
+  invitedErrorText,
+  knownErrorText,
+} from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { signInPath } from "@agenteschat/client/lib/guards";
 import { withHumanCheck } from "@agenteschat/client/lib/human-check";
@@ -215,6 +221,7 @@ export function InvitePage({ token }: { token: string }) {
                 {!emails && ` ${t("invite.ask.closedText")}`}
               </p>
             </div>
+            {error && <Alert>{error}</Alert>}
             {/* Asking is an email to whoever invited: a server that sends none would never deliver it. */}
             {emails && (
               <Button
@@ -222,8 +229,14 @@ export function InvitePage({ token }: { token: string }) {
                 block
                 disabled={asked}
                 onClick={async () => {
-                  await api.invites.requestNew(token);
-                  setAsked(true);
+                  setError(null);
+                  try {
+                    await api.invites.requestNew(token);
+                    setAsked(true);
+                  } catch (e) {
+                    // A link replaced by a newer invitation, cancelled or already accepted has no one to ask.
+                    setError(knownErrorText(t, e, i18n.language) ?? t("invite.askNewFailed"));
+                  }
                 }}
               >
                 {asked ? t("invite.askedNew") : t("invite.askNew")}

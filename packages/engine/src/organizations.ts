@@ -1454,7 +1454,11 @@ export type InviteOutcome =
   | { email: string; status: "invited"; invitationId: string; token: string }
   | { email: string; status: "already_member" | "invalid_email" | "already_invited"; invitationId?: string };
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/**
+ * An address as it can be invited: nothing mail apps wrap one in (`Ana <ana@x.com>`, quotes, `mailto:`), since
+ * accepting compares the signed-in address exactly and such an invitation could never be accepted.
+ */
+const EMAIL = /^[^\s@,;:<>()[\]"]+@[^\s@,;:<>()[\]"]+\.[^\s@,;:<>()[\]"]+$/;
 
 /**
  * Invites several people at once (the Members screen takes a comma-separated

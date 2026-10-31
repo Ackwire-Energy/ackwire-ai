@@ -545,6 +545,17 @@ describe("Aceitar convite", () => {
     expect(screen().getByRole("button", { name: "Pedido enviado" }).hasAttribute("disabled")).toBe(true);
   });
 
+  test("a replaced or cancelled invitation: asking fails, and the page says so instead of a request nobody got", async () => {
+    const state = seedState({ me: null });
+    state.requestNewError = new ApiError(404, "not_found", "Invitation not found");
+    await renderApp("/invite/expired", { api: createFakeApi(state) });
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Pedir um novo convite" })));
+    await settle();
+    expect(screen().getByText(/trocado por um convite mais novo ou cancelado/)).toBeTruthy();
+    expect(screen().queryByRole("button", { name: "Pedido enviado" })).toBeNull();
+    expect(screen().getByRole("button", { name: "Pedir um novo convite" }).hasAttribute("disabled")).toBe(false);
+  });
+
   test("expired, on a server that sends no email: whom to ask, and no button for a request nobody would get", async () => {
     const state = seedState({ me: null, authConfig: { passwordReset: false } });
     await renderApp("/invite/expired", { api: createFakeApi(state) });

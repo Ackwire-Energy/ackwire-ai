@@ -458,6 +458,8 @@ export const en: Translations = {
     expiredText: "Invitations last 7 days.",
     askNew: "Ask for a new invitation",
     askedNew: "Request sent",
+    askNewFailed:
+      "We couldn't ask from here: this link may have been replaced by a newer invitation or cancelled. Look for the latest invitation email, or ask whoever invited you.",
     // An invitation link only lets people ask; an admin approves each person (ADR 0068).
     ask: {
       title: "Ask to join {{org}}",

@@ -455,6 +455,8 @@ export const ptBR = {
     expiredText: "Convites valem por 7 dias.",
     askNew: "Pedir um novo convite",
     askedNew: "Pedido enviado",
+    askNewFailed:
+      "Não deu para pedir por aqui: este link pode ter sido trocado por um convite mais novo ou cancelado. Procure o e-mail de convite mais recente ou fale com quem convidou você.",
     // Um link de convite só deixa pedir; um admin aprova cada pessoa (ADR 0068).
     ask: {
       title: "Pedir para entrar na {{org}}",

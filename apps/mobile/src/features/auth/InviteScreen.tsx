@@ -8,7 +8,7 @@ import {
   useMe,
 } from "@agenteschat/client";
 import { formatTimeLeft } from "@agenteschat/client/lib/actions";
-import { errorCode, invitedErrorText } from "@agenteschat/client/lib/errors";
+import { errorCode, invitedErrorText, knownErrorText } from "@agenteschat/client/lib/errors";
 import { type HumanCheck, withHumanCheck } from "@agenteschat/client/lib/human-check";
 import {
   ANSWER_POLL_MS,
@@ -83,18 +83,25 @@ export function InviteScreen({ token }: { token: string }) {
         subtitle={emails ? t("invite.expiredText") : `${t("invite.expiredText")} ${t("invite.ask.closedText")}`}
         expression="closed"
       >
+        {error ? (
+          <Text variant="small" tone="danger" accessibilityLiveRegion="polite" style={CENTER}>
+            {error}
+          </Text>
+        ) : null}
         {emails ? (
           <Button
             variant="primary"
             wide
             label={asked ? t("invite.askedNew") : t("invite.askNew")}
             disabled={asked}
-            onPress={() =>
-              void api.invites
-                .requestNew(token)
-                .catch(() => undefined)
-                .finally(() => setAsked(true))
-            }
+            onPress={() => {
+              setError(null);
+              void api.invites.requestNew(token).then(
+                () => setAsked(true),
+                // A link replaced by a newer invitation, cancelled or already accepted has no one to ask.
+                (e: unknown) => setError(knownErrorText(t, e) ?? t("invite.askNewFailed")),
+              );
+            }}
           />
         ) : null}
         <LeaveButton />

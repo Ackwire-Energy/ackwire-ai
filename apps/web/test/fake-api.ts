@@ -271,6 +271,8 @@ export interface FakeState {
   previews?: Record<string, InvitationPreview>;
   /** Make `invites.ask` fail with this error (`join.full`, `join.rate_limited`…). */
   askError?: ApiError;
+  /** Make `invites.requestNew` fail with this error (a replaced or cancelled invitation answers 404). */
+  requestNewError?: ApiError;
   /** The code `invites.checkCode` takes (default 123456); any other is `join.code_wrong`. */
   joinCode?: string;
   /** Make `invites.sendCode` fail with this error (`join.code_wait`, `join.code_limit`…). */
@@ -2668,6 +2670,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
       },
       requestNew: async (token) => {
         state.calls.push({ method: "invites.requestNew", args: [token] });
+        if (state.requestNewError) throw state.requestNewError;
       },
     },
     joinRequests: {
