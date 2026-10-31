@@ -1,5 +1,5 @@
 import type { Machine } from "@agenteschat/client";
-import { useAgents, useComputerSetup, useMachines } from "@agenteschat/client";
+import { useAgents, useAuthConfig, useComputerSetup, useMachines } from "@agenteschat/client";
 import {
   agentsWaitingForComputer,
   computerEdition,
@@ -48,9 +48,12 @@ import { STORAGE_KEYS, storage } from "@/lib/storage";
  * provider or tool list.
  */
 
-/** Which words the computers get here (`computerEdition`); null while the server hasn't said. */
+/**
+ * Which words the computers get here (`computerEdition`): the server's `workspaceComputer` until the workspace's
+ * setup answers, so it is known from boot; null while neither has said.
+ */
 export function useComputerEdition(orgId: string) {
-  return computerEdition(useComputerSetup(orgId).data);
+  return computerEdition(useComputerSetup(orgId).data, useAuthConfig().data?.workspaceComputer);
 }
 
 /** This workspace's computer on its way, or null where people connect their own (`pair`). */
