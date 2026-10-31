@@ -12,6 +12,7 @@ import {
   eventLineOf,
   hidesBody,
   type LineWords,
+  leavingWords,
   lineFit,
   markedParts,
   markName,
@@ -301,6 +302,24 @@ describe("working line", () => {
     expect(drawn(back.shown)).toEqual(["Ada is searching memory…", "Ada is working…"]);
     expect(back.shown.n).toBe(2);
     expect(turnPhrase(back.shown, words("Ada is working…"), 9_000)).toEqual({ shown: back.shown, wait: 0 });
+  });
+
+  test("a leaving phrase is drawn only during its crossfade, never under Reduce Motion, so it can't come back whole", () => {
+    const words = (agents: string): LineWords => [agents, "", "", ""];
+    const turned: PhraseTurn = {
+      now: words("Ada is working…"),
+      was: words("Ada is checking GitHub…"),
+      n: 3,
+      since: 2_000,
+    };
+    expect(leavingWords(turned, false, 2_000)).toEqual(words("Ada is checking GitHub…"));
+    expect(leavingWords(turned, false, 2_000 + PHRASE_FADE_MS - 1)).toEqual(words("Ada is checking GitHub…"));
+    // Over: turning Reduce Motion off later mounts nothing over the phrase shown.
+    expect(leavingWords(turned, false, 2_000 + PHRASE_FADE_MS)).toBeNull();
+    expect(leavingWords(turned, false, 9_000)).toBeNull();
+    // Reduce Motion swaps plainly: nothing leaving, even mid-crossfade.
+    expect(leavingWords(turned, true, 2_100)).toBeNull();
+    expect(leavingWords({ ...turned, was: null }, false, 2_100)).toBeNull();
   });
 
   test("one agent on its own shows how long it has been at it, as on the web; several, or a question out, don't", async () => {

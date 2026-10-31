@@ -403,6 +403,14 @@ export function turnPhrase(shown: PhraseTurn, words: LineWords, at: number): { s
   return { shown: { now: words, was: shown.now, n: shown.n + 1, since: at }, wait: 0 };
 }
 
+/**
+ * The phrase still leaving at `at`: none under Reduce Motion, and none once its crossfade is over. A phrase that left
+ * while Reduce Motion was on, or long ago, must not mount again when Reduce Motion is turned off: it would start whole,
+ * over the phrase shown.
+ */
+export const leavingWords = (shown: PhraseTurn, reduced: boolean, at: number): LineWords | null =>
+  !reduced && shown.was && at - shown.since < PHRASE_FADE_MS ? shown.was : null;
+
 // ── Reactions ────────────────────────────────────────────────────────────────
 
 /** The quick row in the long-press sheet. */

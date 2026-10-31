@@ -42,6 +42,7 @@ import { agentLook } from "../shared/logic";
 import {
   type LineDrawn,
   type LineWords,
+  leavingWords,
   lineFit,
   markedParts,
   markName,
@@ -447,6 +448,7 @@ function TurningWords({
   const [, wake] = useState(0);
   const next = turnPhrase(shown, words, Date.now());
   if (next.shown !== shown) setShown(next.shown);
+  const leaving = leavingWords(next.shown, reduced, Date.now());
   useEffect(() => {
     if (next.wait === 0) return;
     const timer = setTimeout(() => wake((k) => k + 1), next.wait);
@@ -454,7 +456,7 @@ function TurningWords({
   }, [next.wait]);
   return (
     <View style={styles.words}>
-      {shown.was && !reduced ? <BarWords key={shown.n - 1} words={shown.was} piece={piece} leaving /> : null}
+      {leaving ? <BarWords key={shown.n - 1} words={leaving} piece={piece} leaving /> : null}
       <BarWords key={shown.n} words={shown.now} piece={piece} enter={shown.n > 0 && !reduced} />
     </View>
   );
