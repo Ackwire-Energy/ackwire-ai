@@ -45,10 +45,10 @@ const API_ERROR_CHARS = 300;
  *   written with, and refuses the call otherwise (accounts created since
  *   2026-08-31). A run's tools change between calls (a computer that stops
  *   answering, a permission turned on), so the API is asked to drop such a
- *   block instead. It drops every later thinking block with it, so thinking
- *   written after a drop is a `restart` and what came before it is never sent
- *   again. A call refused for its thinking all the same goes once more
- *   without any.
+ *   block instead. It drops every later thinking block with it, so the reply
+ *   to that call is a `restart`: the thinking before it is never sent again.
+ *   A call refused for its thinking all the same goes once more without any,
+ *   and its reply is a `restart` too. Both show on `ModelResult.thinking`.
  * - Structured output: `outputSchema` maps to `output_config.format`.
  * - Models flagged `serverSideFallback` opt into Anthropic's server-side
  *   refusal fallback; the answering model is reported back for pricing.
@@ -174,18 +174,18 @@ export function createAnthropicProvider(
           onDelta(delta);
         });
         const message = await stream.finalMessage();
-        // Only a prefix mismatch takes the later blocks with it; one another model wrote (a fallback) goes alone.
-        const restart =
-          !withThinking ||
-          (message.input_transformations ?? []).some(
-            (t) => t.type === "thinking_dropped" && t.reason === "prefix_binding_mismatch",
-          );
-        const blocks = message.content.map((b) => fromContentBlock(b, id, restart));
+        const dropped: Record<string, number> = {};
+        for (const t of message.input_transformations ?? [])
+          if (t.type === "thinking_dropped") dropped[t.reason] = (dropped[t.reason] ?? 0) + 1;
+        const blocks = message.content.map((b) => fromContentBlock(b, id));
         const answer = answerSchema ? blocks.find(isAnswer) : undefined;
         // The answer as `output_config.format` gives it: the JSON as the only text, after any thinking.
         const content: ContentBlock[] = answer
           ? [...blocks.filter((b) => b.type === "opaque"), { type: "text", text: JSON.stringify(answer.input) }]
           : blocks;
+        // Only a prefix mismatch takes the later blocks with it; one another model wrote (a fallback) goes alone.
+        const [first] = content;
+        if (first && (!withThinking || dropped.prefix_binding_mismatch)) first.restart = id;
         return {
           text: content.map((b) => (b.type === "text" ? b.text : "")).join(""),
           content,
@@ -197,6 +197,7 @@ export function createAnthropicProvider(
             cacheReadTokens: message.usage.cache_read_input_tokens ?? 0,
             cacheWriteTokens: message.usage.cache_creation_input_tokens ?? 0,
           },
+          ...(Object.keys(dropped).length > 0 ? { thinking: { dropped } } : {}),
         };
       };
       const failure = (error: unknown) => {
@@ -204,15 +205,23 @@ export function createAnthropicProvider(
         if (partial.inputTokens !== null || partial.outputChars > 0) mapped.partial = partial;
         return mapped;
       };
+      let refused: string;
       try {
         return await call(true);
       } catch (error) {
         if (!refusesThinking(error)) throw failure(error);
+        refused = toProviderError(error).message;
       }
       try {
-        return await call(false);
+        return { ...(await call(false)), thinking: { refused } };
       } catch (error) {
-        throw failure(error);
+        const last = failure(error);
+        throw new ProviderError(
+          `${refused} (sent again without its thinking: ${last.message})`,
+          last.retryable,
+          last.status,
+          last.partial,
+        );
       }
     },
 
@@ -272,11 +281,7 @@ const isThinking = (data: Record<string, unknown>) => data.type === "thinking" |
 function toMessageParams(messages: ModelMessage[], provider: string, withThinking = true): BetaMessageParam[] {
   let from = 0;
   messages.forEach((m, i) => {
-    if (
-      typeof m.content !== "string" &&
-      m.content.some((b) => b.type === "opaque" && b.provider === provider && b.restart)
-    )
-      from = i;
+    if (typeof m.content !== "string" && m.content.some((b) => b.restart === provider)) from = i;
   });
   return messages
     .map((m, i) => toMessageParam(m, provider, withThinking && i >= from))
@@ -310,12 +315,11 @@ function toBlockParam(block: ContentBlock, provider: string, thinking: boolean):
   }
 }
 
-function fromContentBlock(block: BetaContentBlock, provider: string, restart: boolean): ContentBlock {
+function fromContentBlock(block: BetaContentBlock, provider: string): ContentBlock {
   if (block.type === "text") return { type: "text", text: block.text };
   if (block.type === "tool_use")
     return { type: "tool_use", id: block.id, name: block.name, input: (block.input ?? {}) as Record<string, unknown> };
-  const data = block as unknown as Record<string, unknown>;
-  return { type: "opaque", provider, data, ...(restart && isThinking(data) ? { restart: true as const } : {}) };
+  return { type: "opaque", provider, data: block as unknown as Record<string, unknown> };
 }
 
 /** A 400 about the thinking sent back (a signature it can't verify, a block out of place): worth a call without it. */

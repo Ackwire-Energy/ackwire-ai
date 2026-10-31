@@ -628,7 +628,15 @@ export function createModelGateway(deps: ModelGatewayDeps) {
         reportedCost: result.costNanoUsd,
       });
       await checkThresholds(agent, spent, record.cost);
-      return { ...result, usageRecordId: record.id, costNanoUsd: record.cost, maxTokens };
+      const refused = result.thinking?.refused;
+      return {
+        ...result,
+        // The refusal that sent the call again without its thinking: a provider's words, masked like its errors.
+        ...(refused ? { thinking: { ...result.thinking, refused: redactCredentials(refused) } } : {}),
+        usageRecordId: record.id,
+        costNanoUsd: record.cost,
+        maxTokens,
+      };
     },
 
     /**

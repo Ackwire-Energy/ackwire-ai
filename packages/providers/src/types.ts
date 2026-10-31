@@ -5,7 +5,7 @@
  */
 
 /** A piece of a message. Provider-specific blocks (thinking, fallback markers) travel as `opaque`. */
-export type ContentBlock =
+export type ContentBlock = (
   | { type: "text"; text: string }
   | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
   | { type: "tool_result"; toolUseId: string; content: string; isError?: boolean }
@@ -14,16 +14,15 @@ export type ContentBlock =
    * It must be sent back to the same provider exactly as received when the
    * conversation continues (tool loops), so we keep the raw object.
    */
-  | {
-      type: "opaque";
-      provider: string;
-      data: Record<string, unknown>;
-      /**
-       * Thinking written while the thinking before it was left out (Anthropic dropped or refused it): that earlier
-       * thinking is never sent again, or the API would drop or refuse this block with it.
-       */
-      restart?: true;
-    };
+  | { type: "opaque"; provider: string; data: Record<string, unknown> }
+) & {
+  /**
+   * On the first block of a reply written while the thinking sent back was left out (Anthropic dropped or
+   * refused it), with or without thinking of its own: the provider with this id never sends the thinking before
+   * this message again, or the API would drop or refuse the thinking written after it too.
+   */
+  restart?: string;
+};
 
 export interface ModelMessage {
   role: "user" | "assistant";
@@ -83,6 +82,11 @@ export interface ModelResult {
   usage: ModelUsage;
   /** What the provider says the call cost (OpenRouter's `usage.cost`); absent: priced from the catalog. */
   costNanoUsd?: number;
+  /**
+   * Thinking sent back that the call went without (Anthropic): the blocks the API dropped, by reason, or the
+   * refusal that sent the call again without any.
+   */
+  thinking?: { dropped?: Record<string, number>; refused?: string };
 }
 
 export interface StreamOptions {

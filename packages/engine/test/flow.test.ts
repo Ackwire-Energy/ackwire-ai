@@ -185,6 +185,24 @@ test("a refused request fails the run with the provider's words, credentials mas
   expect(steps.map((s) => s.data)).toEqual([{ reason }]);
 });
 
+test("thinking a call went without is on its model_call step, the refusal's credentials masked", async () => {
+  f = await setup({
+    reply: () => ({
+      chunks: ["ok"],
+      thinking: {
+        refused:
+          "provider rejected the request (400 invalid_request_error): key sk-ant-test-key-in-the-error is not allowed",
+      },
+    }),
+  });
+  await post(f, "@dev hi");
+  await drainOutbox(f.db, f.handlers);
+  const steps = await f.db.select().from(schema.agentRunSteps).where(eq(schema.agentRunSteps.kind, "model_call"));
+  expect(steps.map((s) => s.data.thinking)).toEqual([
+    { refused: "provider rejected the request (400 invalid_request_error): key •••• is not allowed" },
+  ]);
+});
+
 test("an agent over budget fails the run without calling the model", async () => {
   f = await setup({ budgetNanoUsd: 0 });
   const events = f.listen(f.general.id);
