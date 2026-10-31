@@ -284,6 +284,32 @@ describe("calls that only drive the browser or the desktop", () => {
     expect(line?.meta.bodyCode).toBe("step_limit");
   });
 
+  test("a step that fails counts toward the cap: a loop on a browser that isn't open stops there", async () => {
+    const closed: ToolSource = {
+      name: "browser",
+      tools: async () => [
+        {
+          name: "browser_open",
+          description: "Open a page",
+          scope: "context:read",
+          inputSchema: { type: "object", properties: {} },
+          execute: async () => ({ content: "The browser isn't open.", isError: true }),
+        },
+      ],
+    };
+    f = await setup({
+      toolSources: [closed],
+      reply: () => ({ chunks: [], toolUses: [{ name: "browser_open", input: {} }] }),
+    });
+    await ask("@dev posta no LinkedIn");
+    await drainOutbox(f.db, handlers(2));
+
+    expect(f.provider.calls).toHaveLength(2);
+    const [run] = await runs();
+    expect(run).toMatchObject({ status: "done", turns: 2 });
+    expect((run?.transcript as unknown as Transcript | undefined)?.screenTurns).toBeUndefined();
+  });
+
   test("by name, through use_tool, or from a computer brain's bridge; a call with any other tool isn't one", () => {
     expect(isScreenCall({ name: "browser_do", input: {} })).toBe(true);
     expect(isScreenCall({ name: "use_tool", input: { tool: "desktop_do", arguments: {} } })).toBe(true);

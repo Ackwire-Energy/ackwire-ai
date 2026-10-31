@@ -321,7 +321,7 @@ export interface Transcript {
    * reply offers Continuar (`meta.stepLimit`).
    */
   wrapUpNoted?: boolean;
-  /** Model calls whose every tool call drove the browser or the desktop: they count apart (`SCREEN_TURNS_FACTOR`). */
+  /** Model calls that only drove the browser or the desktop, and worked: they count apart (`SCREEN_TURNS_FACTOR`). */
   screenTurns?: number;
   /** The computer brain couldn't answer and the model brain did (ADR 0032 §5): the reply carries a quiet note. */
   fallback?: { from: BrainKind; code: string; message: string };
@@ -443,8 +443,9 @@ export const WRAP_UP_REPLY_NOTE =
   "You are close to this run's limit of steps: only a couple of calls are left. Stop starting new work and reply with what you did, where you stopped and what is left, so the person can let you pick up from there.";
 
 /**
- * Each step on the browser or the desktop is a model call: calls that only drive them count apart, up to this
- * many times the cap. A run posting on a few sites gets there, and a loop on any other tool still stops at the cap.
+ * Each step on the browser or the desktop is a model call: calls that only drive them, and worked, count apart, up
+ * to this many times the cap. A run posting on a few sites gets there, and a loop on a step that fails, or on any
+ * other tool, still stops at the cap.
  */
 export const SCREEN_TURNS_FACTOR = 2;
 
@@ -2199,10 +2200,6 @@ async function executeRunInner(
 
       const toolUses = result.toolCalls;
       if (result.stopReason === "tool_use" && toolUses.length > 0 && toolScope) {
-        if (toolUses.every(isScreenCall)) {
-          transcript.screenTurns = (transcript.screenTurns ?? 0) + 1;
-          maxTurns = capOf(transcript);
-        }
         const calls: NonNullable<Transcript["pending"]>["calls"] = [];
         const waiting: Approval[] = [];
         const asks: { id: string; toolUseId: string; text: string; choices: string[] | null; why: string }[] = [];
@@ -2273,6 +2270,11 @@ async function executeRunInner(
           return stopCanceled("");
         }
         if (waiting.length === 0 && asks.length === 0 && secretAsks.length === 0 && waits.length === 0) {
+          // Only steps that worked count apart: a loop on a failing browser or desktop counts toward the cap.
+          if (toolUses.every(isScreenCall) && calls.every((c) => c.result && !c.result.isError)) {
+            transcript.screenTurns = (transcript.screenTurns ?? 0) + 1;
+            maxTurns = capOf(transcript);
+          }
           transcript.messages.push({
             role: "user",
             content: calls.map((c) => ({
