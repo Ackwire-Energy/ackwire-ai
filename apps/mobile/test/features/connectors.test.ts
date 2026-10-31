@@ -88,12 +88,29 @@ describe("connectors gallery", () => {
     const asana = def("asana", { kind: "remote_mcp", available: false, soon: true });
     const slack = def("slack", { available: false });
     expect(
-      galleryTiles([asana, def("github"), slack, def("linear")]).map((x) => [x.def.id, x.opens, x.locked]),
+      galleryTiles([asana, def("github"), slack, def("linear")], []).map((x) => [x.def.id, x.opens, x.locked]),
     ).toEqual([
       ["github", true, false],
       ["linear", true, false],
       ["asana", false, true],
       ["slack", false, false],
+    ]);
+  });
+
+  test("a 'soon' one connected by its address (with a key) is a connection like any other: a check, no lock, it opens", () => {
+    const asana = def("asana", {
+      kind: "remote_mcp",
+      serverUrl: "https://mcp.asana.com/mcp",
+      available: false,
+      soon: true,
+    });
+    const list = [def("slack", { available: false }), asana, def("github")];
+    const items = connectedItems([], [server("https://mcp.asana.com/mcp")], list);
+    // With the ones that open, before what can't connect here.
+    expect(galleryTiles(list, items).map((x) => [x.def.id, x.connected, x.opens, x.locked])).toEqual([
+      ["asana", true, true, false],
+      ["github", false, true, false],
+      ["slack", false, false, false],
     ]);
   });
 

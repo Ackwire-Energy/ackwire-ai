@@ -173,13 +173,13 @@ function Gallery() {
             <EmptyState icon="search" title={t("mobile.connectors.noResults")} />
           ) : (
             <View style={styles.grid}>
-              {galleryTiles(rest).map(({ def: d, opens, locked }) => (
+              {galleryTiles(rest, items).map(({ def: d, connected: isConnected, opens, locked }) => (
                 <Tile
                   key={d.id}
                   def={d}
                   name={name(d)}
                   text={opens ? connectorDescription(t, d) : t("mobile.connectors.soon")}
-                  connected={Boolean(connectionOf(d, items))}
+                  connected={isConnected}
                   locked={locked}
                   onPress={opens ? open : undefined}
                 />

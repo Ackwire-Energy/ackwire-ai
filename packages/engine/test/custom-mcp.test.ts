@@ -426,7 +426,7 @@ describe("custom MCP servers", () => {
     expect(auth.seen.names).toEqual(["agentes.chat", "agentes chat"]);
   });
 
-  test("OAuth that only lets in apps it approved says so, not 'no OAuth'; a key still connects", async () => {
+  test("OAuth that only lets in apps it approved says so, not 'no OAuth' (an outage doesn't); a key still connects", async () => {
     f = await setup();
     const mcp = ticketsMcp();
     const refusals = [
@@ -470,7 +470,22 @@ describe("custom MCP servers", () => {
       // Nothing about the name: asked once.
       expect(auth.seen.names).toEqual(["agentes.chat"]);
     }
-    // No registration offered (an app registered with it, as HubSpot asks): the same.
+    // An outage at registration isn't a refusal: just a key, never "only apps it approved".
+    const outages = [
+      () => new Response("", { status: 503 }),
+      () => {
+        throw new TypeError("fetch failed");
+      },
+    ];
+    for (const register of outages) {
+      const auth = oauthServer({ register });
+      const deps = depsOf(f, { connect: mcp.connect, http: auth.http });
+      expect(await connectCustomServer(deps, f.owner.id, f.org.id, { serverUrl: SERVER })).toEqual({
+        status: "needs_key",
+      });
+      expect(auth.seen.names).toEqual(["agentes.chat"]);
+    }
+    // No registration offered (an app registered with it, as HubSpot asks): not approved either.
     const closed = depsOf(f, { connect: mcp.connect, http: oauthServer({ registration: false }).http });
     expect(await connectCustomServer(closed, f.owner.id, f.org.id, { serverUrl: SERVER })).toEqual({
       status: "needs_key",

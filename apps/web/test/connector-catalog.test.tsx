@@ -9,7 +9,7 @@ import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { authKind, searchCatalog } from "@/components/ConnectorCatalog";
 import { setNavigateAway } from "@/lib/navigate";
 import { pick, service } from "./catalog";
-import { ADA_ID, ATLAS_ID, CATALOG, createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, CATALOG, createFakeApi, type FakeState, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -44,6 +44,23 @@ const levels = (inside: HTMLElement, groups: string[]) =>
         .queryAllByRole("radio")
         .find((r) => r.getAttribute("aria-checked") === "true")?.textContent ?? null,
   );
+/** A backend whose catalog also lists Asana as the server does today: its vendor hasn't approved agentes.chat yet. */
+const withSoonAsana = (state: FakeState) => {
+  const api = createFakeApi(state);
+  const asana: ConnectorDef = {
+    ...(CATALOG.connectors.find((d) => d.id === "linear") as ConnectorDef),
+    id: "asana",
+    label: "Asana",
+    description: "Asana tasks, projects and teams.",
+    serverUrl: "https://mcp.asana.com/mcp",
+    iconUrl: "/connectors/asana.svg",
+    brandColor: "#F06A6A",
+    available: false,
+    soon: true,
+  };
+  api.connectors.catalog = async () => ({ ...CATALOG, connectors: [asana, ...CATALOG.connectors] });
+  return api;
+};
 
 describe("Adicionar conector: one catalog", () => {
   test("even tiles with no tags; suggestions on top; categories with counts and search", async () => {
@@ -106,21 +123,7 @@ describe("Adicionar conector: one catalog", () => {
 
   test("a vendor that hasn't approved agentes.chat yet: greyed, a lock and 'Em breve', last, and its tile opens nothing", async () => {
     const state = seedState({ connections: [] });
-    const api = createFakeApi(state);
-    const linear = CATALOG.connectors.find((d) => d.id === "linear") as ConnectorDef;
-    const asana: ConnectorDef = {
-      ...linear,
-      id: "asana",
-      label: "Asana",
-      description: "Asana tasks, projects and teams.",
-      serverUrl: "https://mcp.asana.com/mcp",
-      iconUrl: "/connectors/asana.svg",
-      brandColor: "#F06A6A",
-      available: false,
-      soon: true,
-    };
-    api.connectors.catalog = async () => ({ ...CATALOG, connectors: [asana, ...CATALOG.connectors] });
-    const { dialog } = await open(state, api);
+    const { dialog } = await open(state, withSoonAsana(state));
     const tile = within(dialog).getByRole("button", { name: "Asana, em breve" }) as HTMLButtonElement;
     expect([tile.hasAttribute("data-soon"), tile.disabled, tile.hasAttribute("aria-haspopup")]).toEqual([
       true,
@@ -130,7 +133,9 @@ describe("Adicionar conector: one catalog", () => {
     const chip = tile.querySelector(".ac-chip");
     expect(chip?.textContent).toBe("Em breve");
     expect(drawnAs(chip?.querySelector("svg"), "lock")).toBe(true);
-    expect(tile.textContent).toContain("Tarefas, projetos e times.");
+    // In place of the description: the name keeps its whole row.
+    expect(tile.querySelector(".catalog-tile__head")?.textContent).toBe("Asana");
+    expect(tile.textContent).not.toContain("Tarefas, projetos e times.");
     // With what can't connect here, last before "Não achou?".
     expect(names(dialog).slice(-3)).toEqual(["Asana", "Slack", "Não achou?"]);
     await click(tile);
@@ -138,6 +143,30 @@ describe("Adicionar conector: one catalog", () => {
     expect(screen().getAllByRole("dialog")).toEqual([dialog]);
     const starts = ["customConnectors.connect", "connectors.startOAuth", "connectors.connectWithKey"];
     expect(state.calls.filter((c) => starts.includes(c.method))).toEqual([]);
+  });
+
+  test("a 'soon' one connected by its address (with a key) is a connection like any other: a check, no lock, it opens", async () => {
+    const state = seedState({ connections: [] });
+    const api = withSoonAsana(state);
+    await api.customConnectors.connect(ORG_ID, {
+      serverUrl: "https://mcp.asana.com/mcp",
+      label: "Asana",
+      apiKey: "asana_key_123456",
+      returnTo: "/",
+    });
+    const { dialog } = await open(state, api);
+    const tile = within(dialog).getByRole("button", { name: "Asana, conectado" }) as HTMLButtonElement;
+    expect([tile.disabled, tile.hasAttribute("data-soon"), Boolean(tile.querySelector(".ac-chip"))]).toEqual([
+      false,
+      false,
+      false,
+    ]);
+    expect(tile.querySelector(".catalog-icon__check")).toBeTruthy();
+    expect(names(dialog).slice(-2)).toEqual(["Slack", "Não achou?"]);
+    await click(tile);
+    expect(
+      within(service("Asana")).getByRole("button", { name: "Conectar Asana de novo" }).hasAttribute("disabled"),
+    ).toBe(false);
   });
 
   test("a tile opens its service over the catalog: what agents could do, what asks, how it connects; Esc closes the service first", async () => {

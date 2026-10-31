@@ -50,13 +50,22 @@ export function searchConnectors(list: ConnectorDef[], query: string, shown: (d:
 }
 
 /**
- * The gallery's tiles: the ones that connect here first, "Em breve" last (as on the web). Only those open their
- * sheet; one whose vendor hasn't approved agentes.chat yet (`soon`) also gets a lock.
+ * The gallery's tiles: the ones that open first, "Em breve" last (as on the web). A connected one opens its
+ * connection, even one connected by its address whose vendor hasn't approved agentes.chat yet (`soon`); a `soon`
+ * one not connected gets a lock and opens nothing.
  */
-export function galleryTiles(list: ConnectorDef[]) {
-  return [...list]
-    .sort((a, b) => Number(b.available) - Number(a.available))
-    .map((def) => ({ def, opens: def.available && !def.soon, locked: def.soon === true }));
+export function galleryTiles(list: ConnectorDef[], items: ConnectedItem[]) {
+  return list
+    .map((def) => {
+      const connected = Boolean(connectionOf(def, items));
+      return {
+        def,
+        connected,
+        opens: (def.available && !def.soon) || connected,
+        locked: def.soon === true && !connected,
+      };
+    })
+    .sort((a, b) => Number(b.opens) - Number(a.opens));
 }
 
 /** Why the sheet asks for a key: the server only lets in apps it approved (`not_approved`), or it has no sign-in. */

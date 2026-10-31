@@ -92,7 +92,7 @@ interface Entry {
   category: ConnectorCategory | "email";
   connected: boolean;
   available: boolean;
-  /** The vendor hasn't approved agentes.chat yet: greyed out with a lock, and its tile opens nothing. */
+  /** Not connected, and the vendor hasn't approved agentes.chat yet: greyed out with a lock, its tile opens nothing. */
   soon: boolean;
   icon: (size: "md" | "lg") => ReactNode;
   brandColor: string | null;
@@ -214,8 +214,9 @@ export function ConnectorCatalogDialog({
         description: connectorDescription(t, d),
         category: d.category,
         connected: connected.has(d.id),
-        available: d.available,
-        soon: d.soon === true,
+        // One connected by its address (with a key) is a connection like any other: it opens, to connect again.
+        available: d.available || (d.soon === true && connected.has(d.id)),
+        soon: d.soon === true && !connected.has(d.id),
         icon: (size) => <ConnectorIcon def={d} label={d.label} size={size} />,
         brandColor: d.brandColor,
         how: authKind(d),
@@ -379,9 +380,14 @@ export function ConnectorCatalogDialog({
                         <span className="catalog-tile__head">
                           <TileIcon entry={e} size="md" />
                           <span className="catalog-tile__name">{e.name}</span>
-                          {e.soon && <Chip icon="lock">{t("connectors.soon")}</Chip>}
                         </span>
-                        <span className="catalog-tile__desc">{e.description}</span>
+                        {e.soon ? (
+                          <Chip icon="lock" className="catalog-tile__soon">
+                            {t("connectors.soon")}
+                          </Chip>
+                        ) : (
+                          <span className="catalog-tile__desc">{e.description}</span>
+                        )}
                       </button>
                     </li>
                   ))}

@@ -3473,8 +3473,10 @@ p {
   transform: none;
   box-shadow: var(--e1), var(--top);
 }
-.catalog-tile .ac-chip {
-  flex: none;
+/* In place of the description, so the name keeps the whole row. */
+.catalog-tile__soon {
+  align-self: flex-start;
+  opacity: 0.6;
 }
 .catalog-tile--other {
   background: transparent;
