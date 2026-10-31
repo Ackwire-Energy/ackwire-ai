@@ -161,10 +161,8 @@
   font-weight: 500;
   color: var(--muted);
 }
+/* .ac-iconline lays out the lock and the words. */
 .roles-note {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
   margin: 0;
   padding: 10px 12px;
   border-radius: 12px 12px 12px 3px;
@@ -174,8 +172,6 @@
   color: var(--muted);
 }
 .roles-note .ac-icon {
-  flex: none;
-  margin-top: 1px;
   color: var(--faint);
 }
 .roles-base,
@@ -499,13 +495,16 @@
 }
 
 /* The roles picker (invitations, requests to join, a person's "+"). */
+/* The names take the room, so the chevron ends the button while the button keeps its centred layout. */
 .roles-picker.ac-btn {
-  justify-content: space-between;
   width: 100%;
   min-width: 0;
   font-weight: 500;
 }
 .roles-picker__value {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
