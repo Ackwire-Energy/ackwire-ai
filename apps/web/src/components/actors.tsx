@@ -1,5 +1,5 @@
 import type { Actor } from "@agenteschat/client";
-import type { SelectOption } from "@agenteschat/ui";
+import { Icon, type SelectOption } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
@@ -19,8 +19,10 @@ export function useActors() {
   const dir = useDirectory(org.id);
   const name = (a: Actor) => dir.authorName({ type: a.type, id: a.id } as Parameters<typeof dir.authorName>[0]);
   const avatar = (a: Actor, size: "xs" | "sm" = "xs") => <ActorAvatar size={size} actor={a} name={name(a)} />;
+  // The empty choice leads with a glyph as wide as the 18px faces, so every name starts on one edge.
+  const none = <Icon name="person" size={18} className="muted" />;
   const options = (withNone: boolean): SelectOption[] => [
-    ...(withNone ? [{ value: NO_ACTOR, label: t("issues.noAssignee") }] : []),
+    ...(withNone ? [{ value: NO_ACTOR, label: t("issues.noAssignee"), leading: none }] : []),
     ...dir.members.map((m) => ({
       value: `person:${m.userId}`,
       label: m.name,

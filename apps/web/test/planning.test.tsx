@@ -126,19 +126,19 @@ describe("Issues (board and list)", () => {
     const assignee = within(dialog).getByRole("combobox", { name: "Responsável" });
     assignee.focus();
     await key(assignee, "Enter");
-    // People by their photo or initials, agents by their own face.
-    const faces = within(screen().getByRole("listbox"))
+    // People by their photo or initials, agents by their own face, no one by a glyph as wide as the faces (18px).
+    const leads = within(screen().getByRole("listbox"))
       .getAllByRole("option")
       .map((o) => {
-        const face = o.querySelector(".ac-menu__leading > .ac-avatar");
-        const kind = face?.getAttribute("data-kind");
+        const lead = o.querySelector<HTMLElement | SVGElement>(".ac-menu__leading > *");
+        const kind = lead?.getAttribute("data-kind");
         return [
           o.querySelector(".ac-menu__label")?.firstChild?.textContent,
-          kind === "agent" ? face?.getAttribute("data-accessory") : (face?.textContent ?? null),
+          kind === "agent" ? lead?.getAttribute("data-accessory") : kind ? lead?.textContent : lead?.style.width,
         ];
       });
-    expect(faces).toEqual([
-      ["Sem responsável", null],
+    expect(leads).toEqual([
+      ["Sem responsável", "18px"],
       ["Walter", "W"],
       ["João", "J"],
       ["Ada", "headphones"],
