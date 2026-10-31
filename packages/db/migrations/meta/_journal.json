@@ -932,6 +932,13 @@
       "when": 1793450903712,
       "tag": "0132_imported_agent_handles",
       "breakpoints": true
+    },
+    {
+      "idx": 133,
+      "version": "7",
+      "when": 1793450963712,
+      "tag": "0133_issues_assignee_index",
+      "breakpoints": true
     }
   ]
 }
