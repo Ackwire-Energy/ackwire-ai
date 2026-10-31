@@ -682,7 +682,7 @@ export async function approveJoinRequest(
   actorId: string,
   orgId: string,
   id: string,
-  /** Roles (`org_roles`) the person gets, below the approver's own (ADR 0084). */
+  /** Roles (`org_roles`) the person gets, below the approver's own (ADR 0085). */
   roleIds: string[] = [],
   now = new Date(),
 ): Promise<JoinApproval> {

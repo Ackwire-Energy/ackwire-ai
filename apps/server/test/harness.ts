@@ -294,7 +294,7 @@ export async function joinByInvitation(
   email: string,
   options: { role?: "member" | "admin"; as?: Browser } = {},
 ) {
-  // `admin`: invited with the workspace's role that holds `administrator` (its "Admin", ADR 0084).
+  // `admin`: invited with the workspace's role that holds `administrator` (its "Admin", ADR 0085).
   let roleIds: string[] = [];
   if (options.role === "admin") {
     const res = await admin(`/api/app/organizations/${orgId}/roles`);

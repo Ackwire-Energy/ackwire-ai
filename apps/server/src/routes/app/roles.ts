@@ -67,7 +67,7 @@ const RoleParams = OrgParams.extend({ roleId: z.uuid().openapi({ param: { name: 
 const MemberParams = OrgParams.extend({ userId: z.string().openapi({ param: { name: "userId", in: "path" } }) });
 
 /**
- * A workspace's roles (ADR 0084): read by every member, changed by who may manage roles (and only the ones below
+ * A workspace's roles (ADR 0085): read by every member, changed by who may manage roles (and only the ones below
  * their own), given to people by who may manage people.
  */
 export function roleRoutes(deps: AppDeps) {

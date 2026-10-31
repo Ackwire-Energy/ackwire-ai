@@ -379,7 +379,7 @@ export function managementRoutes(deps: AppDeps) {
               .array(z.string().uuid())
               .max(50)
               .optional()
-              .openapi({ description: "Roles they get on accepting, below your own (ADR 0084)." }),
+              .openapi({ description: "Roles they get on accepting, below your own (ADR 0085)." }),
           }),
         ),
       },

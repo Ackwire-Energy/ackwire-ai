@@ -185,7 +185,7 @@ test("org detail: owners and admins, and counts of what is in it", async () => {
   const { orgId } = acme;
   await t.db.insert(schema.users).values({ id: "admin-user", name: "Ada", email: "ada@acme.test" });
   await t.db.insert(schema.organizationMembers).values({ orgId, userId: "admin-user", role: "member" });
-  // An admin holds the role with `administrator` (ADR 0084), given the way the members screen gives it.
+  // An admin holds the role with `administrator` (ADR 0085), given the way the members screen gives it.
   const { roles } = (await (await owner(`/api/app/organizations/${orgId}/roles`)).json()) as {
     roles: { id: string; permissions: string[] }[];
   };

@@ -59,7 +59,7 @@
 .jr-link__foot > .ac-btn--ghost {
   margin: 0 calc(-1 * var(--control-px-sm)) 0 auto;
 }
-/* A person's roles (ADR 0084): the owner's chip, their roles' chips, a "+" to give or take them. */
+/* A person's roles (ADR 0085): the owner's chip, their roles' chips, a "+" to give or take them. */
 .members-roles {
   flex: 0 1 280px;
   display: flex;

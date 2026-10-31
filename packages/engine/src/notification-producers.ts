@@ -711,7 +711,7 @@ export async function resolveRoutinePaused(deps: NotificationDeps, orgId: string
   await resolveNotifications(deps, orgId, { groupKeyPrefix: `routine_paused:${routineId}:` });
 }
 
-/** Who in the organization may `permission` (ADR 0084), or only its owners. */
+/** Who in the organization may `permission` (ADR 0085), or only its owners. */
 const adminsOf = async (deps: NotificationDeps, orgId: string, permission: RolePermission | "owners") =>
   (
     await deps.db

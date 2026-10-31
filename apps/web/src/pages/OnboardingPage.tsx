@@ -853,7 +853,7 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
     mutationFn: async () => {
       if (!created) return;
       const next = new Set(sent);
-      // "Admin" invites get the workspace's administrator role (ADR 0084): the first one this person may give.
+      // "Admin" invites get the workspace's administrator role (ADR 0085): the first one this person may give.
       const roles = toSend.some((i) => i.admin) ? (await api.roles.list(created.orgId)).roles : [];
       const adminRoleId = roles.find((r) => r.givable && r.permissions.includes("administrator"))?.id;
       for (const invite of toSend) {

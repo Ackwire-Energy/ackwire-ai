@@ -64,7 +64,7 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
   const { t, i18n } = useTranslation();
   const c = useColors();
   const orgId = useOrgId();
-  // Writing in the wiki is `edit_wiki` (ADR 0084; the server checks it again).
+  // Writing in the wiki is `edit_wiki` (ADR 0085; the server checks it again).
   const writes = can(useOrg().org, "edit_wiki");
   const dir = useDirectory();
   const insets = useSafeAreaInsets();
@@ -304,7 +304,7 @@ export function WikiPageScreen({ slug }: { slug: string }) {
   const api = useApi();
   const qc = useQueryClient();
   const { orgId, org } = useOrg();
-  // Writing is `edit_wiki`; a locked page, and locking, only for who configures the workspace (ADR 0084).
+  // Writing is `edit_wiki`; a locked page, and locking, only for who configures the workspace (ADR 0085).
   const writes = can(org, "edit_wiki");
   const admin = can(org, "configure");
   const page = useWikiPage(orgId, slug);

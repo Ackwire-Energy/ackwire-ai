@@ -476,7 +476,7 @@ export function RealtimeProvider({
         refreshMission(qc, orgId, event.missionId);
       }
       // Someone joined or left, or a role changed (org broadcast): the people, Members and the sidebar's count, the
-      // roles' counts, and `me` (a role change changes what you may do, ADR 0084).
+      // roles' counts, and `me` (a role change changes what you may do, ADR 0085).
       if (event.type === "org.members") {
         void qc.invalidateQueries({ queryKey: keys.people(orgId) });
         void qc.invalidateQueries({ queryKey: keys.members(orgId) });

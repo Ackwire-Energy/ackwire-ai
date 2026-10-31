@@ -68,7 +68,7 @@ export function planSharing(
 /**
  * Can this person's message start a run of the agent? (`null` = no person: routines and webhooks check their
  * creator.) Its owner always can; anyone else needs the agent's audience and, through their roles, to talk to
- * agents at all (`talks`: `talk_to_agents`, ADR 0084; `talksToAgents` reads it).
+ * agents at all (`talks`: `talk_to_agents`, ADR 0085; `talksToAgents` reads it).
  */
 export function canTalkTo(a: AudienceFields, userId: string | null, talks = true): boolean {
   if (userId && a.ownerUserId === userId) return true;

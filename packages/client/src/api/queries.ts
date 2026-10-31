@@ -246,7 +246,7 @@ export const refreshRoles = (qc: QueryClient, orgId: string) =>
     qc.invalidateQueries({ queryKey: keys.me }),
   ]);
 
-/** The workspace's roles, top first, and the permission areas (ADR 0084). */
+/** The workspace's roles, top first, and the permission areas (ADR 0085). */
 export const useRoles = (orgId: string) => {
   const api = useApi();
   return useQuery({ queryKey: keys.roles(orgId), queryFn: () => api.roles.list(orgId), staleTime: 30_000 });

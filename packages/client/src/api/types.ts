@@ -2,7 +2,7 @@
 
 import type { OnboardingStepId } from "../lib/onboarding";
 
-/** Whether a person owns the workspace (ADR 0084); what anyone may do comes from their roles (`OrgRole`). */
+/** Whether a person owns the workspace (ADR 0085); what anyone may do comes from their roles (`OrgRole`). */
 export type Role = "owner" | "member";
 export type Edition = "selfhost" | "cloud";
 
@@ -155,7 +155,7 @@ export interface OrgSummary {
   name: string;
   role: Role;
   /**
-   * Everything the person may do here, resolved by the server from their roles (ADR 0084): read it with `can`
+   * Everything the person may do here, resolved by the server from their roles (ADR 0085): read it with `can`
    * (lib/permissions). Absent: nothing past reading.
    */
   permissions?: string[];
@@ -215,7 +215,7 @@ export interface Invitation {
   expiresAt: string;
 }
 
-/** One of a workspace's roles (ADR 0084, `GET …/roles`). */
+/** One of a workspace's roles (ADR 0085, `GET …/roles`). */
 export interface OrgRole {
   id: string;
   /** `everyone`: the base every member holds ("Todos"), always last. */

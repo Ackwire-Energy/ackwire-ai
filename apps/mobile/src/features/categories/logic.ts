@@ -1,7 +1,7 @@
 import type { Channel } from "@agenteschat/client";
 import { can } from "@agenteschat/client/lib/permissions";
 
-/** The person's membership: what they may do (`OrgSummary.permissions`, ADR 0084). */
+/** The person's membership: what they may do (`OrgSummary.permissions`, ADR 0085). */
 type Membership = Parameters<typeof can>[0];
 
 /** Who manages channels arranges the categories (ADR 0080). */

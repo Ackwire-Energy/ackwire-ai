@@ -81,7 +81,7 @@ const toAgent = (
   seesCost: boolean,
   budgetUsedPercent?: number,
   brain?: AgentBrainSummary,
-  /** Whether the viewer's roles let them talk to agents (`talksToAgents`, ADR 0084). */
+  /** Whether the viewer's roles let them talk to agents (`talksToAgents`, ADR 0085). */
   talks = true,
 ) => {
   const v = agentView(a);

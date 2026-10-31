@@ -28,7 +28,7 @@ interface Options {
 async function entryOf(o: Options = {}) {
   const state = seedState();
   const org = state.me?.organizations[0];
-  // An admin: a member with the "Admin" role (ADR 0084).
+  // An admin: a member with the "Admin" role (ADR 0085).
   if (o.role === "admin") meAsAdmin(state);
   else if (org && o.role) org.role = o.role;
   if (org && o.standing) org.standing = { state: o.standing, reason: null };

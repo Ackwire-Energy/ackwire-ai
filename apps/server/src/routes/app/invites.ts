@@ -197,7 +197,7 @@ export function inviteRoutes(deps: AppDeps) {
               .array(z.string().uuid())
               .max(50)
               .optional()
-              .openapi({ description: "Roles the person gets, below the approver's own (ADR 0084)." }),
+              .openapi({ description: "Roles the person gets, below the approver's own (ADR 0085)." }),
           }),
         ),
       },

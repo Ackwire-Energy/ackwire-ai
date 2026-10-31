@@ -280,7 +280,7 @@ export async function computerDrivers(db: Database, orgId: string, agentId: stri
   if (!agent || !machine) return [];
   const signIn = lentAccount(agent) !== null;
   const named = [agent.owner, machine.pairedByUserId].filter((id): id is string => !!id);
-  // Who may drive it (`control_computers`, ADR 0084), read once per member, and the people named above.
+  // Who may drive it (`control_computers`, ADR 0085), read once per member, and the people named above.
   const everyone = await db
     .select({
       userId: organizationMembers.userId,

@@ -470,7 +470,7 @@ describe("Members › Requests to join", () => {
 
     const sidebarCount = () => document.querySelector(".sidebar__org-meta")?.textContent;
     expect(sidebarCount()).toBe("2 membros · 2 agentes");
-    // Roles to give (ADR 0084): a menu that stays open, one switch per role below the approver's.
+    // Roles to give (ADR 0085): a menu that stays open, one switch per role below the approver's.
     const roles = within(ana).getByRole("button", { name: "Papéis para Ana Souza" });
     roles.focus();
     await act(async () => fireEvent.keyDown(roles, { key: "Enter" }));

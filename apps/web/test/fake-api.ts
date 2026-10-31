@@ -255,11 +255,11 @@ export interface FakeState {
   approval?: JoinApproval;
   /** Make `joinRequests.approve` and `deny` fail with this error (`join.answered`…). */
   answerError?: ApiError;
-  /** The workspace's roles (ADR 0084, `roles.*`); unset: a new workspace's (`seedRoles`). */
+  /** The workspace's roles (ADR 0085, `roles.*`); unset: a new workspace's (`seedRoles`). */
   roles?: OrgRole[];
 }
 
-/** A new workspace's "Admin" role (ADR 0084); João holds it. */
+/** A new workspace's "Admin" role (ADR 0085); João holds it. */
 export const ADMIN_ROLE_ID = "role-admin";
 
 /** A new workspace's roles, as the server makes them: "Admin" (`administrator`) and `everyone`. */
@@ -297,7 +297,7 @@ export function seedRoles(): OrgRole[] {
   ];
 }
 
-/** Me as a member who holds the "Admin" role (ADR 0084): what an admin was before roles. */
+/** Me as a member who holds the "Admin" role (ADR 0085): what an admin was before roles. */
 export function meAsAdmin(state: FakeState) {
   const org = state.me?.organizations[0];
   if (org) org.role = "member";
@@ -858,7 +858,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
     state.roles ??= seedRoles();
     return state.roles;
   };
-  // What each membership may do, as the server resolves it (ADR 0084): an owner everything, a member what their
+  // What each membership may do, as the server resolves it (ADR 0085): an owner everything, a member what their
   // roles and `everyone` give. A test may set `permissions` itself.
   const withPermissions = (me: Me): Me => ({
     ...me,
@@ -2240,7 +2240,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
   function proposalView(messageId: string): AgentProposal {
     const { message, card } = proposalCard(messageId);
     const expired = card.state === "pending" && Date.parse(card.expiresAt) <= Date.now();
-    // Who may create agents decides (ADR 0084).
+    // Who may create agents decides (ADR 0085).
     const mine = state.me ? withPermissions(state.me).organizations[0]?.permissions : undefined;
     const decides = mine?.includes("create_agents") === true;
     return {

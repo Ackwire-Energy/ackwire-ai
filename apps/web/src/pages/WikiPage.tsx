@@ -79,7 +79,7 @@ export function WikiPage({ slug, newTitle }: { slug?: string; newTitle?: string 
     }
   }, [slug]);
 
-  // Writing the wiki is a key (`edit_wiki`, ADR 0084): without it, new pages and imports don't start.
+  // Writing the wiki is a key (`edit_wiki`, ADR 0085): without it, new pages and imports don't start.
   const writes = can(org, "edit_wiki");
   const startNew = (title = "", folder = current?.folder ?? "") => {
     if (!writes) return;

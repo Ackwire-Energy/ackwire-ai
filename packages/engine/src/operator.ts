@@ -85,7 +85,7 @@ export async function operatorListOrgs(db: Database, query: OperatorOrgQuery) {
  * One workspace: its owners and admins, how much is in it, and its limits (ADR 0079) with what it uses of them.
  * Null when there is none with that id.
  */
-/** The operator API's role names (its contract): an owner, someone holding `administrator` (ADR 0084), a member. */
+/** The operator API's role names (its contract): an owner, someone holding `administrator` (ADR 0085), a member. */
 const operatorRole = (orgId: unknown, userId: unknown) =>
   sql<"owner" | "admin" | "member">`case when ${organizationMembers.role} = 'owner' then 'owner'
     when ${maySql(orgId, userId, "administrator")} then 'admin' else 'member' end`;

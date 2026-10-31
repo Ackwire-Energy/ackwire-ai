@@ -316,7 +316,7 @@ export const approvalView = (a: Approval, canDecide = false): ApprovalView => ({
  */
 export const adminsDecide = (approval: Pick<Approval, "tool">) => approval.tool === REQUEST_PERMISSION_TOOL;
 
-/** People who may decide: whoever may approve actions (ADR 0084), and the agent's owner (`adminsDecide` aside). */
+/** People who may decide: whoever may approve actions (ADR 0085), and the agent's owner (`adminsDecide` aside). */
 export async function approverIds(
   db: Database,
   approval: Pick<Approval, "orgId" | "ownerUserId"> & Partial<Pick<Approval, "tool">>,

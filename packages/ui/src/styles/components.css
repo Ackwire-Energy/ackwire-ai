@@ -4358,7 +4358,7 @@ a.ac-list__row:focus-visible {
   background: var(--ink);
 }
 
-/* A role's mark (RoleMark, ADR 0084): the role's color in the agents' dither, on the people tile's shape, its icon in white. */
+/* A role's mark (RoleMark, ADR 0085): the role's color in the agents' dither, on the people tile's shape, its icon in white. */
 .ac-rolemark {
   display: inline-grid;
   flex: none;

@@ -1,4 +1,4 @@
-# 0084. Workspace roles: Discord-like roles that add up
+# 0085. Workspace roles: Discord-like roles that add up
 
 - Status: Accepted (built: the server, the shared client, the web and the phone app; channel and agent exceptions, and guests, come next)
 - Date: 2026-10-30

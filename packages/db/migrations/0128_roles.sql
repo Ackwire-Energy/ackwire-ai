@@ -28,7 +28,7 @@ ALTER TABLE "organization_invite_links" ALTER COLUMN "role" SET DATA TYPE text;-
 ALTER TABLE "organization_invite_links" ALTER COLUMN "role" SET DEFAULT 'member'::text;--> statement-breakpoint
 ALTER TABLE "organization_join_requests" ALTER COLUMN "role" SET DATA TYPE text;--> statement-breakpoint
 ALTER TABLE "organization_members" ALTER COLUMN "role" SET DATA TYPE text;--> statement-breakpoint
--- ADR 0084: every workspace gets its base role ("everyone", what members could do) and an "Admin" role that
+-- ADR 0085: every workspace gets its base role ("everyone", what members could do) and an "Admin" role that
 -- holds "administrator"; today's admins hold it, and the role the enum loses becomes "member".
 INSERT INTO "org_roles" ("org_id", "kind", "name", "icon", "color", "position", "permissions") SELECT "id", 'everyone', 'everyone', 'audienceEveryone', 'graphite', 0, ARRAY['post', 'create_channels', 'talk_to_agents', 'assign_work', 'pair_computers', 'edit_wiki', 'upload_files']::text[] FROM "organizations";--> statement-breakpoint
 INSERT INTO "org_roles" ("org_id", "kind", "name", "icon", "color", "position", "permissions") SELECT "id", 'custom', 'Admin', 'shield', 'indigo', 0, ARRAY['administrator']::text[] FROM "organizations";--> statement-breakpoint

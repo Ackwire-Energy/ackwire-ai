@@ -267,7 +267,7 @@ export async function answerNow(
     // Who the agent answers may have narrowed since (an agent moved onto a plan answers only its owner until they
     // turn on Atende outras pessoas, ADR 0059 §5):
     // a run starts again only for someone it still answers.
-    // …and whose roles still let them talk to agents (`talk_to_agents`, ADR 0084).
+    // …and whose roles still let them talk to agents (`talk_to_agents`, ADR 0085).
     const talks = new Map<string | null, boolean>();
     for (const r of ready)
       if (!talks.has(r.requester)) talks.set(r.requester, await talksToAgents(deps.db, orgId, r.requester));

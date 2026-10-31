@@ -92,7 +92,7 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
     ]);
   });
 
-  test("each section opens with its permission (ADR 0084); members, the ones the web gives everyone", () => {
+  test("each section opens with its permission (ADR 0085); members, the ones the web gives everyone", () => {
     const as = (role: "owner" | "member", permissions: string[]) => ({ id: "o", name: "Acme", role, permissions });
     const ids = (permissions: string[]) => visibleSections(as("member", permissions)).map((s) => s.id);
     const all = ["read", "invite_people", "view_audit", "manage_agents", "configure", "create_agents"];

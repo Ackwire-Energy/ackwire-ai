@@ -24,7 +24,7 @@ import { requestChips } from "./logic";
 /**
  * Requests to join through the invitation link (ADR 0068), as a native form sheet: the web's Members › Requests on
  * the phone, opened by the push, Atividade's card and `agenteschat://join-requests`. Each is approved, with any of
- * the roles the approver may give (ADR 0084; none: only what everyone may do), or denied with a reason the person
+ * the roles the approver may give (ADR 0085; none: only what everyone may do), or denied with a reason the person
  * reads in the email. On a server that sends no email, approving hands the approver the invitation's link to share.
  */
 export function JoinRequestsSheet({ onClose }: { onClose: () => void }) {
