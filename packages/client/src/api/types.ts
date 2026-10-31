@@ -427,6 +427,8 @@ export interface Agent {
   appearance?: AgentLookInput;
   /** Who thinks for it (ADR 0032): the brain, a computer brain's model label, its computer (owner and admins). */
   brain?: AgentBrainLine;
+  /** It coordinates the team (ADR 0093): one per workspace; absent from an older server. */
+  coordinator?: boolean;
   /** No longer in the team (ADR 0082): only its name, role and look, from `FormerAgent`. */
   former?: "archived" | "deleted";
 }
@@ -514,6 +516,8 @@ export interface AgentInput {
   monthlyBudgetUsd?: number | null;
   audience?: AgentAudience;
   appearance?: AgentLookInput;
+  /** Editing only, admins: it coordinates the team (true takes it from whoever had it), ADR 0093. */
+  coordinator?: boolean;
   /** Created from an agent's proposal (its card's message id, ADR 0081): the card is marked created. */
   proposal?: string;
 }
@@ -719,13 +723,14 @@ export interface MessageReceipts {
 
 /**
  * Which step picked the agents for a message nobody mentioned (ADR 0074): Jev, the organization's small model
- * (its catalog id and provider), the author's own plan (`ownerId`: the author), or a rule.
+ * (its catalog id and provider), the author's own plan (`ownerId`: the author), or a rule (`coordinator`: nobody
+ * else took it, so the team's coordinator did, ADR 0093).
  */
 export type DecidedBy =
   | { step: "jev" }
   | { step: "model"; model: string; provider: string }
   | { step: "plan"; brand: "claude" | "chatgpt"; ownerId: string }
-  | { step: "rule"; rule: "reply" | "only_agent" | "follow_up" };
+  | { step: "rule"; rule: "reply" | "only_agent" | "follow_up" | "coordinator" };
 
 /**
  * Who picks the agents for a message nobody mentioned (`ai-status`, ADR 0074): `by` for the workspace, `mine` for

@@ -1239,6 +1239,7 @@ export const ptBR = {
     you: "você",
     agentState: { idle: "disponível", thinking: "pensando", writing: "escrevendo" },
     autoReplyChip: "responde sem menção",
+    coordinatorChip: "coordena o time",
     seeDetails: "Ver detalhes do canal",
     more: "Mais ações da mensagem",
     copyLink: "Copiar link",
@@ -1373,7 +1374,19 @@ export const ptBR = {
       reply: "Uma resposta {{for}} {{name}}",
       only_agent: "Só {{article}} {{name}} responde aqui sem menção",
       follow_up: "Segue a conversa com {{article}} {{name}}",
+      coordinator: "{{The}} {{name}} coordena o time",
     },
+  },
+  /** The agent that coordinates the team (ADR 0093): its switch, its chip and the lines about it. */
+  coordinator: {
+    chip: "Coordena o time",
+    help: "Pega as mensagens que pedem um agente quando nenhum outro pegou, e passa o trabalho para quem sabe. Vale nos canais em que {{she}} responde por conta própria.",
+    one: "Só um agente coordena por vez.",
+    current: "Hoje quem coordena é {{article}} {{name}}.",
+    none: "Ninguém coordena o time agora.",
+    archive: "{{The}} {{name}} coordena o time. Depois disso, ninguém coordena até alguém escolher outro agente.",
+    yes: "Sim",
+    no: "Não",
   },
   routing: {
     title: "Quem escolhe os agentes",
@@ -1749,6 +1762,7 @@ export const ptBR = {
     replyMention: "Quando alguém chama",
     replyMentionHelp: "Só responde se alguém escrever @{{handle}}",
     aloneLine: "Entra na conversa por conta própria",
+    coordinatorLine: "Coordena o time: pega o que ninguém pegou",
     mentionLine: "Espera alguém chamar @{{handle}}",
     readOnly: "Só quem criou o canal e os admins mudam os membros.",
     people: "Pessoas",
@@ -2578,6 +2592,7 @@ export const ptBR = {
       brain: "Quem pensa",
       repos: "Repositórios do GitHub",
       group: "Grupo",
+      coordinator: "Coordena o time",
     },
     lines: {
       added_one: "{{count}} linha nova",

@@ -388,6 +388,7 @@ export async function buildRunContext(
     caches.channelMembers.getOrLoad(`${run.orgId}:${run.channelId}`, () =>
       db
         .select({
+          userId: channelMembers.userId,
           userName: users.name,
           agentId: agents.id,
           agentName: agents.name,
@@ -407,6 +408,7 @@ export async function buildRunContext(
         .orderBy(asc(channelMembers.createdAt)),
     ) as Promise<
       {
+        userId: string | null;
         userName: string | null;
         agentId: string | null;
         agentName: string | null;
@@ -704,6 +706,17 @@ export async function buildRunContext(
               : `# Where you are\nChannel #${channel.name}${channel.topic ? ` (topic: ${channel.topic})` : ""}, replying ${flat ? "in the channel" : "in a thread"}. Members: ${memberList}.${
                   otherAgents
                     ? `\nOther agents here and what they can do: ${otherAgents}. Never answer for another agent or guess its permissions: say what this list shows, or ask it yourself (ask_agent) when you need its help for the task, or leave it a note without waiting for an answer (tell_agent) when it should know or do something. Never relay to another agent what the person asked that agent directly: it got the message and answers it itself. An @mention of an agent wakes it: mention one only to hand it work or ask it something, never to thank or confirm${options.followUp ? ", and to wait for something use follow_up, not a mention" : ""}. Never name your tools to people.`
+                    : ""
+                }${
+                  // The team's coordinator (ADR 0093): what nobody else took comes to it.
+                  agent.coordinator && otherAgents
+                    ? `\nYou coordinate the team. A message that needs an agent and that no other agent took comes to you, so work nobody owns is in your area. Do what is yours. Hand the rest to the agent whose job it is: mention it with what you need, one agent per line, and leave that part to it.${
+                        // What a person alone here writes reaches it when nobody else took it, as a run that may
+                        // pass: without this, "# Why you were called" reads a greeting as nothing to answer.
+                        requester && members.every((m) => m.agentId || m.userId === requester)
+                          ? "\nThis person is the only one here with the agents: what they write to the room is for the team. Answer a greeting or a question; only a thanks or an ok needs no answer."
+                          : ""
+                      }`
                     : ""
                 }${
                   alsoAnswering.length > 0
