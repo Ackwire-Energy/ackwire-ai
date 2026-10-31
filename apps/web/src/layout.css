@@ -4746,6 +4746,13 @@ p {
 .sidebar__item:hover {
   background: var(--plate);
 }
+/* A row that failed to draw (Sidebar.tsx, UnshownRow): quiet, and nothing to open. */
+.sidebar__item--unshown,
+.sidebar__item--unshown:hover {
+  background: transparent;
+  color: var(--faint);
+  cursor: default;
+}
 /* The chosen item: a frame of dithered sky rising from the right (an agent's row in its color) around one
    plate of the item's own white, 3px in with the item's corner less 3px, so the frame keeps an even width round
    the corners and the role, lock or state at the end sits on the plate like the label. A hairline outside keeps
