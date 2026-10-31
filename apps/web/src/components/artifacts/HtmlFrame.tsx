@@ -55,6 +55,7 @@ export function HtmlFrame({
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new page starts over from a blob URL
   useEffect(() => {
     setLoad("blob");
   }, [html]);

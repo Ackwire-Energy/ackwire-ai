@@ -184,7 +184,11 @@ function Preview({ content, title }: { content: ArtifactContent; title: string }
     case "html":
       // A small live picture of the page; clicks go to the card's open button.
       return (
-        <PageThumbnail html={content.html} label={t("artifacts.htmlPreview")} title={t("artifacts.htmlFrame", { title })} />
+        <PageThumbnail
+          html={content.html}
+          label={t("artifacts.htmlPreview")}
+          title={t("artifacts.htmlFrame", { title })}
+        />
       );
     case "file":
       // Files render as tiles (`ArtifactCard`), never inside a card.
