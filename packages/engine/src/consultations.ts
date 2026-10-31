@@ -26,6 +26,7 @@ import type { Notice } from "./notices";
 import { personBehindCall } from "./requester";
 import { deliverNoticeToRun, NOTICE_WAKE_MAX_HOP, resumeRunWithResult } from "./run-resume";
 import { isTerminal, replyThreadOf } from "./runs";
+import { noAgentText } from "./team";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
 const { agentConsultations, agentRuns, agents, channels, messages } = schema;
@@ -67,7 +68,7 @@ async function reachableAgent(ctx: ToolContext, input: unknown, ai?: AiCheck) {
     .select()
     .from(agents)
     .where(and(eq(agents.orgId, ctx.orgId), eq(agents.handle, handle), isNull(agents.archivedAt)));
-  if (!target) return { refused: refuse(`There is no agent @${handle} in this organization.`) };
+  if (!target) return { refused: refuse(await noAgentText(ctx, [handle])) };
   if (target.id === ctx.agentId) return { refused: refuse("That is you: answer it yourself.") };
   const person = await personBehindCall(ctx);
   if (!canTalkTo(target, person, await talksToAgents(db, ctx.orgId, person))) {

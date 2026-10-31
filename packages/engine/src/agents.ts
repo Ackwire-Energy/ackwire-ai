@@ -238,6 +238,9 @@ export async function archiveAgent(db: Database, actorId: string, orgId: string,
   }
   caches.agents.delete(`${orgId}:${agentId}`);
   caches.agents.delete(`${orgId}:team`);
+  caches.agents.delete(`${orgId}:archived`);
+  // Its channel memberships stay: what runs read of a channel's members leaves it out from now on.
+  caches.channelMembers.deletePrefix(`${orgId}:`);
 }
 
 export async function listAgents(db: Database, actorId: string, orgId: string): Promise<Agent[]> {
