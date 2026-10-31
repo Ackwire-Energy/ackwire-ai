@@ -816,25 +816,22 @@ async function executeRunInner(
     }
   }
   // What the agent shows it is doing (ADR 0084 §8–9): lines from facts everyone may see, picked by Jev in a request
-  // of its own, beside the run and never in its way. The run never waits for its statements, so they stay out of
-  // the run's count (`queryTrace`).
+  // of its own, beside the run and never in its way: its statements count apart from the run's.
   if (needsContext) {
     void queryTrace
-      .exit(async () => {
+      .run({ count: 0 }, async () => {
         const lines = await statusCandidates(db, run, granted);
-        // No line to pick: Jev isn't asked, so the recent messages aren't read for it.
-        const pick =
-          judge && lines.length > 0
-            ? await askRunStatus(judge, {
-                orgId: run.orgId,
-                agentId: agent.id,
-                runId: run.id,
-                agent: { name: agent.name, role: agent.role, instructions: agent.instructions },
-                message: trigger?.body ?? topTrigger?.body ?? "",
-                recent: await recentMessages(),
-                candidates: lines,
-              }).catch(() => null)
-            : null;
+        const pick = judge
+          ? await askRunStatus(judge, {
+              orgId: run.orgId,
+              agentId: agent.id,
+              runId: run.id,
+              agent: { name: agent.name, role: agent.role, instructions: agent.instructions },
+              message: trigger?.body ?? topTrigger?.body ?? "",
+              recent: await recentMessages(),
+              candidates: lines,
+            }).catch(() => null)
+          : null;
         await startRunStatus({ db, pubsub: deps.pubsub }, run, lines, pick);
       })
       .catch(() => {});

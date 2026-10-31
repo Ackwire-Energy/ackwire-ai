@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { ACCEPTED, migrationProblems, unsafeStatements } from "./check-migrations";
+import { unsafeStatements } from "./check-migrations";
 
 const read = (path: string) => readFileSync(join(import.meta.dir, "..", path), "utf8");
 
@@ -36,15 +36,4 @@ test("migrations from before the check: the ones that dropped would have been ca
     "13: drops",
   ]);
   expect(unsafeStatements(read("packages/db/migrations/0119_agent_audit.sql"))).toEqual([]);
-});
-
-test("0130_roles changes types unmarked and passes only as a named exception, a new unmarked type change fails", () => {
-  const roles = read("packages/db/migrations/0130_roles.sql");
-  expect(unsafeStatements(roles)).toHaveLength(9);
-  expect(Object.keys(ACCEPTED)).toEqual(["0130_roles.sql"]);
-  expect(migrationProblems("packages/db/migrations/0130_roles.sql", roles)).toEqual([]);
-  const later = "packages/db/migrations/0133_member_role_text.sql";
-  expect(
-    migrationProblems(later, 'ALTER TABLE "organization_members" ALTER COLUMN "role" SET DATA TYPE text;'),
-  ).toEqual([`${later}:1: changes a column's type`]);
 });

@@ -38,7 +38,7 @@ import { Face } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { ActionList, copyText, goBack, MONO, PushedHeader, successHaptic, Tile, useSurface } from "../shared/parts";
-import { useSheet } from "../shared/SheetHost";
+import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { foldersIn, searchWiki, wikiHome } from "./logic";
 import { WikiDoc } from "./WikiDoc";
 
@@ -295,6 +295,14 @@ interface MenuItem {
  * "Editar" (writing, the B layout) and ⋯ (Copiar link, Renomear ou mover, Fixar, Trancar, Histórico, Lixeira).
  */
 export function WikiPageScreen({ slug }: { slug: string }) {
+  return (
+    <SheetHostProvider>
+      <WikiPage slug={slug} />
+    </SheetHostProvider>
+  );
+}
+
+function WikiPage({ slug }: { slug: string }) {
   const { t, i18n } = useTranslation();
   const c = useColors();
   const dir = useDirectory();
