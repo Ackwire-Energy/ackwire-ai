@@ -2,7 +2,18 @@ import type { ConnectorCategory, ConnectorDef } from "@agenteschat/client";
 import { CONNECTOR_MARK, OWN_MARK, SERVER_ICON } from "@agenteschat/client/lib/connected";
 import type { MailChoice } from "@agenteschat/client/lib/mail";
 import { connectorDescription, connectorName, scopeText } from "@agenteschat/client/lib/scopes";
-import { Button, Chip, Dialog, Icon, type IconName, initialsOf, SearchField, Segmented } from "@agenteschat/ui";
+import {
+  AgentSearching,
+  Button,
+  Chip,
+  Dialog,
+  EmptyState,
+  Icon,
+  type IconName,
+  initialsOf,
+  SearchField,
+  Segmented,
+} from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { type CSSProperties, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -135,7 +146,8 @@ const OTHER = "other";
  * "Adicionar conector": a gallery with search and the
  * category list beside the grid (a row on phones), three suggestions on top, then every service as an even
  * tile (no tags: a check on the icon when connected). A tile opens the service over the catalog (what agents
- * could do, how it connects, Conectar); "Não achou?" connects any service by its address.
+ * could do, how it connects, Conectar); "Não achou?" connects any service by its address. A search with no match
+ * (or an empty category) is an agent searching with a magnifier, with the same way in by address.
  */
 export function ConnectorCatalogDialog({
   open,
@@ -326,6 +338,19 @@ export function ConnectorCatalogDialog({
         <div className="catalog__list" role="region" aria-label={t("connectors.catalog")}>
           {loading ? (
             <LoadingCards count={6} className="catalog-grid catalog-grid--loading" />
+          ) : shown.length === 0 && (needle || category !== "all") ? (
+            <EmptyState
+              className="catalog__empty"
+              art={<AgentSearching />}
+              title={needle ? t("connectors.empty", { q: q.trim() }) : t("connectors.emptyCategory")}
+              actions={
+                <Button icon="link" aria-haspopup="dialog" onClick={() => setSelected(OTHER)}>
+                  {t("connectors.otherConnect")}
+                </Button>
+              }
+            >
+              {t("connectors.emptyText")}
+            </EmptyState>
           ) : (
             <>
               {suggested.length > 0 && (
@@ -391,13 +416,6 @@ export function ConnectorCatalogDialog({
                       </button>
                     </li>
                   ))}
-                  {shown.length === 0 && (needle || category !== "all") && (
-                    <li className="catalog-grid__empty">
-                      <p className="ac-dialog__empty">
-                        {needle ? t("connectors.empty", { q }) : t("connectors.emptyCategory")}
-                      </p>
-                    </li>
-                  )}
                   <li>
                     <button
                       type="button"

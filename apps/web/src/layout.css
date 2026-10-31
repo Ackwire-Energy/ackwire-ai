@@ -3378,8 +3378,9 @@ p {
   display: flex;
   min-width: 0;
 }
-.catalog-grid__empty {
-  grid-column: 1 / -1;
+/* The list is a flex column: auto margins put the empty state in the middle of its height. */
+.catalog__empty {
+  margin: auto 0;
 }
 .catalog-feat__card,
 .catalog-tile {
@@ -3677,6 +3678,11 @@ p {
   }
   .catalog__search {
     max-width: none;
+  }
+  /* At the top, above the search's keyboard: iOS lays it over the sheet's lower half without resizing the page. */
+  .catalog__empty {
+    margin: 0 0 auto;
+    padding-top: 8px;
   }
   .catalog-svc__act {
     flex-direction: column;
@@ -6657,6 +6663,34 @@ a.machine-row__name:hover {
   row-gap: 2px;
   white-space: normal;
 }
+.hold-banner .outage__text b {
+  flex-shrink: 1;
+  max-width: none;
+}
+/*
+ * A hold's lines start at the top, 11px over the first and under the last, so one line keeps the 44px strip, and its
+ * lead (the pause, the spinner back from paying) stays on the first line's capitals' middle, as an `.ac-iconline`
+ * lead does. Two classes, so the phones' notice padding (responsive.css) doesn't undo the 11px.
+ */
+.outage.hold-banner {
+  align-items: flex-start;
+  padding-block: 11px;
+}
+.hold-banner > :first-child {
+  /* Browsers without the lh unit: the page's 22px line. */
+  translate: 0 calc(11px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .hold-banner > :first-child {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
+}
+/* The button stays in the middle of the lines, as a card head's action does. To the row it is one line tall, the rest
+   of it overhanging evenly, so a one-line hold keeps its strip. */
+.hold-banner > .outage__acts {
+  align-self: center;
+  margin-block: calc(11px - var(--control-h-sm) / 2);
+}
 /* Where to write for help: the address reads as part of the sentence. */
 .support-line a {
   color: inherit;
@@ -8522,6 +8556,18 @@ a.machine-row__name:hover {
   font-size: 12px;
   font-weight: 600;
   color: var(--faint);
+}
+/* The line standing in for the field and its buttons while the code goes: as tall as the field, so a row that fit on
+   one line keeps its height. It takes the focus they had, with no ring: it is not something to press. */
+.agp-addacct__busy {
+  margin: 4px 0;
+  padding-block: calc((var(--control-h-md) - 18px) / 2);
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+}
+.agp-addacct__busy:focus {
+  outline: none;
 }
 .agp-addacct__step.ac-iconline > .agp-addacct__text {
   flex-basis: calc(100% - 32px);
@@ -10591,6 +10637,11 @@ html[data-menu-overlay] .shell {
 }
 .ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__wait {
   margin-left: calc((var(--lead) - 14px) / 2);
+}
+/* The line standing in for a field leads the same way, from inside the step's words (on the text's column). */
+.ai-panel--plan .agp-addacct__busy {
+  gap: calc((var(--lead) - 14px) / 2 + 12px);
+  margin-left: calc((var(--lead) - 14px) / 2 - var(--text-edge));
 }
 /* At phone width for whom goes under the name, on the text's column. */
 @media (max-width: 640px) {

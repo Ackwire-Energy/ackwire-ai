@@ -121,14 +121,21 @@ export interface EmptyStateProps {
   className?: string;
   /** An empty place (not an error): a dithered sky glow with a pixel agent instead of the icon. */
   sky?: boolean;
+  /** A pixel picture instead of the icon (`AgentSearching`), with no dashed box. Decorative: the words say it. */
+  art?: ReactNode;
 }
 
 /** Dashed box with a short explanation (and optional icon, title and actions). */
-export function EmptyState({ icon, title, children, actions, className, sky }: EmptyStateProps) {
+export function EmptyState({ icon, title, children, actions, className, sky, art }: EmptyStateProps) {
   return (
-    <div className={cx("ac-empty", sky && "ac-empty--sky", className)}>
+    <div className={cx("ac-empty", sky && "ac-empty--sky", !!art && "ac-empty--art", className)}>
       {sky && <SkyGlow className="ac-empty__sky" surface="--empty-surface" />}
-      {icon && !sky && (
+      {!!art && (
+        <div className="ac-empty__art" aria-hidden="true">
+          {art}
+        </div>
+      )}
+      {icon && !sky && !art && (
         <span className="ac-empty__icon">
           <Icon name={icon} />
         </span>
