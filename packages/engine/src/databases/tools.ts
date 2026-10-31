@@ -146,6 +146,7 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
       scope: DATABASE_SCOPE,
       connectionId: connection.id,
       connectorLabel: connection.label,
+      service: "postgres",
       sensitive: false,
       ...extra,
     });

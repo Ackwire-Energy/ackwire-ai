@@ -188,6 +188,8 @@ describe("MCP tools through the Tool Gateway", () => {
       ["github_get_pull_request", "github:pr.read", false],
       ["github_merge_pull_request", "github:pr.merge", true],
     ]);
+    // The chat draws each call with the connector's own logo.
+    expect(new Set(all.map((t) => t.service))).toEqual(new Set(["github"]));
     expect(mcp.sessions[0]).toEqual({
       serverUrl: "https://api.githubcopilot.com/mcp/",
       headers: { authorization: "Bearer ghp_secret_123456" },

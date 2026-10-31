@@ -202,6 +202,109 @@ describe("typing bar above the composer", () => {
       { type: "typing", channelId: ENG_ID },
     ]);
   });
+
+  test("someone typing alone: the dots, their face and 'João está digitando…', gone once their message comes", async () => {
+    const { socket } = await open();
+    expect(typingBar().dataset.active).toBe("false");
+    await push(socket, { type: "user.typing", userId: "u-joao", threadId: null, ttlMs: 6000 });
+    await settle();
+    expect(typingBar().dataset.active).toBe("true");
+    expect(bar().textContent).toBe("João está digitando…");
+    // People only: the typing dots lead (the orbit is for agents), their face in the stack, no clock and no stop.
+    expect(typingBar().querySelector(".ac-typing__dots")).not.toBeNull();
+    expect(typingBar().querySelector(".ac-pixspin")).toBeNull();
+    expect(typingBar().querySelectorAll(".ac-typing__tok .ac-avatar")).toHaveLength(1);
+    expect(typingBar().querySelector(".ac-typing__elapsed, .stop-run")).toBeNull();
+    await push(socket, {
+      type: "message.created",
+      messageId: "m-joao",
+      message: {
+        id: "m-joao",
+        channelId: ENG_ID,
+        threadId: null,
+        author: { type: "person", id: "u-joao" },
+        body: "pronto, subiu",
+        mentionedAgentIds: [],
+        agentRunId: null,
+        createdAt: new Date().toISOString(),
+      },
+    });
+    await settle();
+    expect(typingBar().dataset.active).toBe("false");
+  });
+
+  test("my own typing never shows, and someone typing in a thread shows in that thread, not here", async () => {
+    const { socket } = await open();
+    await push(socket, { type: "user.typing", userId: "u-walter", threadId: null, ttlMs: 6000 });
+    await push(socket, { type: "user.typing", userId: "u-joao", threadId: "m-1", ttlMs: 6000 });
+    await settle();
+    expect(typingBar().dataset.active).toBe("false");
+  });
+
+  test("in a thread: who types there shows (not who types in the channel), and my typing frames name the thread", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    await api.threads.create(ORG_ID, {
+      id: "m-1",
+      channelId: ENG_ID,
+      firstMessageId: "m-1",
+      lastMessageId: "m-1",
+      title: "Login com 401",
+    } as Parameters<typeof api.threads.create>[1]);
+    const { sockets } = await renderApp(`/org/${ORG_ID}/threads/m-1`, { api });
+    await settle(8);
+    const socket = sockets.last();
+    await act(async () => socket.open());
+    await settle(2);
+    await push(socket, { type: "user.typing", userId: "u-joao", threadId: null, ttlMs: 6000 });
+    await settle();
+    expect(typingBar().dataset.active).toBe("false");
+    await push(socket, { type: "user.typing", userId: "u-joao", threadId: "m-1", ttlMs: 6000 });
+    await settle();
+    expect(bar().textContent).toBe("João está digitando…");
+    const reply = screen().getByRole("combobox", { name: /Responder na thread/ });
+    await act(async () => fireEvent.change(reply, { target: { value: "vou olhar" } }));
+    expect(socket.sent.filter((f) => (f as { type: string }).type === "typing")).toEqual([
+      { type: "typing", channelId: ENG_ID, threadId: "m-1" },
+    ]);
+  });
+
+  test("several agents and people: one short line, three small faces at most, no clock or stop", async () => {
+    const { socket } = await open();
+    const a = { threadId: null, runId: "r-a", agentId: ADA_ID };
+    await push(socket, {
+      type: "agent.run",
+      ...a,
+      status: "running",
+      startedAt: new Date(Date.now() - 13_000).toISOString(),
+    });
+    await push(socket, { type: "agent.tool", ...a, tool: "github_list_prs" });
+    await push(socket, { type: "agent.run", threadId: null, runId: "r-b", agentId: ATLAS_ID, status: "running" });
+    await push(socket, { type: "user.typing", userId: "u-joao", threadId: null, ttlMs: 6000 });
+    await settle();
+    expect(bar().textContent).toBe("Ada e Atlas estão trabalhando · João está digitando…");
+    // Who is typing is a piece of its own, after the agents' words and their " · " (which give way first on a short
+    // bar), then the names, never what they do.
+    expect(typingBar().querySelector(".ac-typing__agents")?.textContent).toBe("Ada e Atlas estão trabalhando · ");
+    const people = typingBar().querySelector(".ac-typing__people");
+    expect(people?.textContent).toBe("João está digitando…");
+    expect(people?.querySelector(".ac-typing__typers")?.textContent).toBe("João");
+    expect(typingBar().querySelectorAll(".ac-typing__tok")).toHaveLength(3);
+    expect(typingBar().querySelector(".ac-pixspin")).not.toBeNull();
+    // The time, "Ver" and the stop are one agent's: with two at work the line shows none (the composer still stops).
+    expect(typingBar().querySelector(".ac-typing__elapsed")).toBeNull();
+    expect(within(typingBar()).queryByRole("button", { name: "Ver" })).toBeNull();
+    expect(within(typingBar()).queryByRole("button", { name: "Parar" })).toBeNull();
+    // One leaves: the other gets its own line back, with its time.
+    await push(socket, { type: "agent.idle", threadId: null, runId: "r-b", agentId: ATLAS_ID });
+    await push(socket, { type: "run.finished", threadId: null, runId: "r-b", agentId: ATLAS_ID, status: "done" });
+    await settle();
+    expect(bar().textContent).toBe("Ada está consultando o GitHub · João está digitando…");
+    const took = typingBar().querySelector(".ac-typing__elapsed") as HTMLElement;
+    expect(took.textContent).toMatch(/^1\d s$/);
+    // Tabular figures: the seconds tick without nudging what is beside them.
+    expect(took.classList.contains("ac-num")).toBe(true);
+  });
 });
 
 describe("bottom anchoring", () => {

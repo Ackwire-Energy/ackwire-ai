@@ -172,6 +172,9 @@ export type ChannelEvent =
       runId: string;
       tool: string | null;
       connector?: string;
+      /** The service it works in, for its logo (`ToolDefinition.service`), and a custom server's own icon. */
+      service?: string;
+      serviceIcon?: string;
       /**
        * A short label (≤ 80 chars): the skill, the issue (#131 or title), the Drive file, or the command a permission
        * check is about (Claude Code's own description of it, else its program and main argument). Built-in tools only.

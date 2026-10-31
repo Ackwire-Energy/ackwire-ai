@@ -63,6 +63,7 @@ export function ConnectorIcon({
   size?: "md" | "lg";
   image?: string | null;
 }) {
+  const [failed, setFailed] = useState<string | null>(null);
   const cls = `connector-icon${size === "lg" ? " connector-icon--lg" : ""}`;
   // Only a file of ours goes into the CSS `url()`.
   if (def?.iconUrl && CONNECTOR_MARK.test(def.iconUrl)) {
@@ -78,10 +79,11 @@ export function ConnectorIcon({
   }
   const own =
     def?.iconUrl && OWN_MARK.test(def.iconUrl) ? def.iconUrl : image && SERVER_ICON.test(image) ? image : null;
-  if (own) {
+  // A saved call keeps the icon its server had then, and a newer icon deletes that file: the monogram instead.
+  if (own && own !== failed) {
     return (
       <span className={`${cls} connector-icon--brand`} aria-hidden="true">
-        <img className="connector-icon__img" src={own} alt="" />
+        <img className="connector-icon__img" src={own} alt="" onError={() => setFailed(own)} />
       </span>
     );
   }

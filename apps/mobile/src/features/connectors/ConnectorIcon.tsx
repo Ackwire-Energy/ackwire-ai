@@ -1,6 +1,6 @@
 import type { ConnectorDef } from "@agenteschat/client";
 import { Image } from "expo-image";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { appHeaders, lastCookie } from "@/lib/auth";
 import { serverUrl } from "@/lib/server";
@@ -36,6 +36,8 @@ export function ConnectorIcon({
     const at = uri ? null : serverIconUri(serverUrl(), image);
     return at ? { uri: at, headers: appHeaders(lastCookie()) } : null;
   }, [uri, mark, image]);
+  // A saved call keeps the icon its server had then, and a newer icon deletes that file: the monogram instead.
+  const [failed, setFailed] = useState<string | null>(null);
   const tint = (def ? brandOf(def.brandColor) : null) ?? c.ink;
   const radius = Math.round(size * 0.3);
   return (
@@ -53,9 +55,10 @@ export function ConnectorIcon({
           contentFit="contain"
           style={{ width: Math.round(size * 0.5), height: Math.round(size * 0.5) }}
         />
-      ) : own ? (
+      ) : own && own.uri !== failed ? (
         <Image
           source={own}
+          onError={() => setFailed(own.uri)}
           contentFit="contain"
           style={{ width: Math.round(size * 0.58), height: Math.round(size * 0.58) }}
         />

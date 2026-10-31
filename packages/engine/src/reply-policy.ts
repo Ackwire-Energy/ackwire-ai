@@ -232,7 +232,7 @@ export function createPassToolSource(): ToolSource {
 export async function repliesAfterTrigger(
   db: Executor,
   run: Pick<AgentRun, "orgId" | "agentId" | "channelId">,
-  trigger: Pick<Message, "createdAt">,
+  trigger: Pick<Message, "id" | "createdAt">,
   threadId: string | null,
 ): Promise<string | null> {
   const rows = await db
@@ -246,6 +246,8 @@ export async function repliesAfterTrigger(
         threadId ? eq(messages.threadId, threadId) : isNull(messages.threadId),
         eq(messages.authorType, "agent"),
         ne(messages.authorAgentId, run.agentId),
+        // `createdAt` is cut to milliseconds while Postgres keeps microseconds: never the trigger itself.
+        ne(messages.id, trigger.id),
         gt(messages.createdAt, trigger.createdAt),
         isNull(messages.deletedAt),
       ),

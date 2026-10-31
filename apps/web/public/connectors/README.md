@@ -4,6 +4,6 @@ One-color brand icons for the connector catalog: the app draws them as a mask in
 
 Most come from [Simple Icons](https://simpleicons.org) 16.32.0 (CC0 1.0, public domain). `square.svg` is Square's own mark, the first three subpaths (the mark without the wordmark) of `Black/Square_Logo_2025_Black.svg` in the logo set at https://squareup.com/us/en/press/logo (https://assets.ctfassets.net/2d5q1td6cyxq/3xNJXOyxBSmmJ1lUafqHGJ/0d3bcea3bf9426dbf9a54f424e3d1fab/Square_Logo.zip), unchanged and scaled to the 24×24 view box. Square shows it only in black or white, which the ink gives in each theme. The others Simple Icons doesn't have are the brand's own mark, from its site or press kit, reduced to one color and fitted like a Simple Icons icon (the drawing itself, not the canvas it came on, spans the 24×24 view box on its long side and is centred on the short one): AbacatePay, Ahrefs, Amplitude, Attio, Close, Fireflies, Gamma, Granola, Himetrica, Jam, Jotform, Klaviyo, MillionSend, monday.com, Superwall and Tally.
 
-A mark in its maker's colors, which a mask would flatten (PayPal's, Canva's, Outlook's), is in `../brands/`. The email cards' marks (Gmail, Outlook, iCloud) and colors live in `apps/web/src/components/MailConnect.tsx`.
+A mark in its maker's colors, which a mask would flatten (PayPal's, Canva's, Outlook's), is in `../brands/`. The mailboxes' marks (Gmail, Outlook, iCloud) and colors live in `MAIL_BRANDS` in `packages/client/src/lib/mail.ts`.
 
 Each icon is a trademark of its owner, used only to name the service.

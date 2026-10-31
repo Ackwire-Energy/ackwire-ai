@@ -2,7 +2,7 @@ import { keys, useChannelCategories } from "@agenteschat/client";
 import { waitingComputerByAgent } from "@agenteschat/client/lib/machine-outages";
 import { useQueryClient } from "@tanstack/react-query";
 import { router, useIsFocused } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AppState, RefreshControl, StyleSheet } from "react-native";
 import { usePush } from "@/providers/push";
@@ -10,6 +10,7 @@ import { LargeTitleScreen, Text } from "@/ui";
 import { workByAgent } from "../agents/logic";
 import { useCategoryMenus } from "../categories/menus";
 import { SetupNotice } from "../computer/SetupWait";
+import { useOpenDm } from "../new/useOpenDm";
 import { OutageNotices } from "../outages/OutageNotice";
 import { useMachineOutages } from "../outages/queries";
 import { useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
@@ -20,7 +21,14 @@ import { ConversationRowView } from "./ConversationRowView";
 import { FirstAgentEmpty, Greeting, GreetingSky } from "./Greeting";
 import { CollapsibleSection, SeeAllRow, useHomeCollapsed } from "./HomeSection";
 import { HomeServerError, HomeServerNotice } from "./HomeServerError";
-import { type ConversationRow, categoryListKind, type HomeBlock, homeLayout, type ListKind } from "./logic";
+import {
+  agentStarters,
+  type ConversationRow,
+  categoryListKind,
+  type HomeBlock,
+  homeLayout,
+  type ListKind,
+} from "./logic";
 import { useAgentRowStates, useFinished } from "./useHomeNow";
 import { useWaitingItems, WaitingStrip } from "./WaitingStrip";
 
@@ -88,13 +96,17 @@ function Home() {
   const finished = useFinished(active, list.rows);
   const agentStates = useAgentRowStates(list.rows, work, waiting.items, offline);
   const pull = usePullRefresh(() => Promise.allSettled([list.refetch(), waiting.refetch(), outages.refetch()]));
-  const sections = homeLayout(list.rows, categories.data ?? []);
+  const openDm = useOpenDm();
+  const startDm = useCallback((agentId: string) => void openDm({ agentId }), [openDm]);
+  const starters = useMemo(() => agentStarters(dir.agents, hidden), [dir.agents, hidden]);
+  const sections = homeLayout(list.rows, categories.data ?? [], undefined, starters);
   // A section's title: a fixed one by its key, a category by its name.
   const sectionTitle = (b: HomeBlock) =>
     b.name !== undefined ? b.name : t(`mobile.chats.section.${b.key as ListKind}`);
   // A list that failed to load isn't an empty workspace: it says the server didn't answer.
   const failed = list.failed && list.rows.length === 0;
-  const empty = !list.loading && !failed && list.rows.length === 0;
+  // Agents already in the team fill the home (Agentes) instead of the invitation to create the first one.
+  const empty = !list.loading && !failed && list.rows.length === 0 && starters.length === 0;
 
   const { offer, markOffered } = usePush();
   const approvalWaits = waiting.items.some((i) => i.kind === "approval");
@@ -148,6 +160,7 @@ function Home() {
                 divider={i > 0}
                 live={shown && live++ < LIVE_ROWS}
                 agent={agentStates.get(r.key)}
+                {...(r.kind === "dm" && !r.channelId ? { onStart: startDm } : {})}
                 {...(hold ? { onHold: menus.openChannelMenu, holdLabel: t("channelCategories.move") } : {})}
               />
             );

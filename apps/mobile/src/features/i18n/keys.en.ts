@@ -174,6 +174,7 @@ export const featureKeysEn: FeatureTranslations = {
     },
     empty: "No chats yet.",
     sayHi: "Say hi to {{name}}.",
+    channelEmpty: "No messages yet. Start the conversation.",
     closed: "Closed",
     working: "working…",
     missionProgress: "{{done}} of {{total}} items",

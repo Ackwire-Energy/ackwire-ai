@@ -99,27 +99,24 @@ describe("signing in", () => {
     await settle(4);
     expect(heading()).toBe("Esta conta entra pelo app do agentes.chat.");
     expect(document.querySelector(".auth__lead")?.textContent).toBe(
-      "No computador onde este servidor roda, abra o app e escolha Adicionar uma senha no menu da sua conta.",
+      "No computador onde este servidor roda, abra o app e escolha Adicionar uma senha em Configurações\u00a0›\u00a0Sua conta.",
     );
     expect(screen().getByRole("button", { name: "Usar outro e-mail" })).toBeTruthy();
   });
 });
 
-describe("Adicionar uma senha (account menu)", () => {
-  async function accountMenu(state: ReturnType<typeof seedState>) {
-    await renderApp(`/org/${ORG_ID}/issues`, { api: createFakeApi(state) });
+describe("Adicionar uma senha (Configurações › Sua conta)", () => {
+  async function yourAccount(state: ReturnType<typeof seedState>) {
+    await renderApp(`/org/${ORG_ID}/settings/account`, { api: createFakeApi(state) });
     await settle(6);
-    await click(screen().getByRole("button", { name: /^Conta: / }));
-    await act(() => new Promise((r) => setTimeout(r, 0)));
-    return screen().getAllByRole("menu")[0] as HTMLElement;
   }
 
   test("only for an account without a password; saves one", async () => {
     const state = seedState();
     if (!state.me) throw new Error("signed in");
     state.me.user.hasPassword = false;
-    const menu = await accountMenu(state);
-    await click(within(menu).getByRole("menuitem", { name: /^Adicionar uma senha/ }));
+    await yourAccount(state);
+    await click(screen().getByRole("button", { name: /^Adicionar uma senha/ }));
     await settle(4);
     const dialog = screen().getByRole("dialog", { name: "Adicionar uma senha" });
     // The menu item already says what it's for: the dialog goes straight to the field.
@@ -134,7 +131,8 @@ describe("Adicionar uma senha (account menu)", () => {
   });
 
   test("an account with a password doesn't see it", async () => {
-    const menu = await accountMenu(seedState());
-    expect(within(menu).queryByRole("menuitem", { name: /^Adicionar uma senha/ })).toBeNull();
+    await yourAccount(seedState());
+    expect(screen().getByRole("button", { name: /^Perfil/ })).toBeTruthy();
+    expect(screen().queryByRole("button", { name: /^Adicionar uma senha/ })).toBeNull();
   });
 });
