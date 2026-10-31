@@ -211,6 +211,40 @@ describe("in the chat and the sidebar", () => {
     expect(screen().queryByRole("region", { name: "Computadores desconectados" })).toBeNull();
   });
 
+  test("on the Cloud the card offers no switch: its workspace has one computer", async () => {
+    const { api, state } = setup();
+    withNotice(state);
+    fakeMachinesOf.get(api)?.setSetup({ state: "ready" });
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(10);
+    const card = document.querySelector(".waitcard") as HTMLElement;
+    expect(card.textContent).toContain("Esperando o MacBook Air voltar");
+    expect(within(card).queryByRole("button", { name: "Trocar computador" })).toBeNull();
+  });
+
+  test("while the edition isn't known nothing offers a switch; a self-hosted server says so from boot", async () => {
+    const { api, state } = setup();
+    withNotice(state);
+    // The workspace's setup never answers, and the server's config doesn't say.
+    api.machines.computerSetup = () => new Promise(() => {});
+    const first = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(10);
+    const card = document.querySelector(".waitcard") as HTMLElement;
+    expect(card.textContent).toContain("Esperando o MacBook Air voltar");
+    expect(within(card).queryByRole("button", { name: "Trocar computador" })).toBeNull();
+    const notice = screen().getByRole("region", { name: "Computadores desconectados" });
+    expect(within(notice).queryByRole("button", { name: "Trocar computador" })).toBeNull();
+    first.unmount();
+
+    state.authConfig = { ...state.authConfig, workspaceComputer: false };
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(10);
+    const again = document.querySelector(".waitcard") as HTMLElement;
+    expect(within(again).getByRole("button", { name: "Trocar computador" })).toBeTruthy();
+    const shown = screen().getByRole("region", { name: "Computadores desconectados" });
+    expect(within(shown).getByRole("button", { name: "Trocar computador" })).toBeTruthy();
+  });
+
   test("a waiting agent's sidebar row says 'esperando', not working", async () => {
     const { api } = setup();
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });

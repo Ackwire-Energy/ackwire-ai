@@ -244,8 +244,12 @@ describe("in channels and the palette", () => {
     expect(say("post_in_forum")).toBe("Iris está escrevendo no fórum…");
   });
 
-  test("Rotinas: a routine can open a forum topic with chosen agents and rounds", async () => {
-    const api = createFakeApi(seedState());
+  test("Rotinas: a routine can open a forum topic with chosen agents and rounds, each agent by its face", async () => {
+    const state = seedState();
+    const [ada, atlas] = state.agents;
+    if (ada) ada.appearance = { color: "green", accessory: "headphones" };
+    if (atlas) atlas.appearance = { color: "rose", accessory: "crown" };
+    const api = createFakeApi(state);
     const created: unknown[] = [];
     const real = api.routines.create;
     api.routines.create = (orgId, input) => {
@@ -257,11 +261,24 @@ describe("in channels and the palette", () => {
     await click(screen().getByRole("button", { name: "Nova rotina" }));
     const dialog = screen().getByRole("dialog", { name: "Nova rotina" });
     await settle(4);
+    const accessoryOf = (el: Element | null | undefined) =>
+      el?.querySelector(".ac-avatar--agent")?.getAttribute("data-accessory");
+    const agent = within(dialog).getByRole("combobox", { name: "Agente" });
+    agent.focus();
+    await act(async () => fireEvent.keyDown(agent, { key: "Enter" }));
+    const options = within(screen().getByRole("listbox")).getAllByRole("option");
+    expect(options.map((o) => [o.textContent, accessoryOf(o.querySelector(".ac-menu__leading"))])).toEqual([
+      ["AdaDev", "headphones"],
+      ["AtlasOps", "crown"],
+    ]);
+    await click(screen().getByRole("option", { name: /Ada/ }));
     const target = within(dialog).getByRole("combobox", { name: "Onde entregar" });
     target.focus();
     await act(async () => fireEvent.keyDown(target, { key: "Enter" }));
     await click(screen().getByRole("option", { name: "Um tópico no fórum" }));
     await settle();
+    const seat = (name: string) => within(dialog).getByRole("checkbox", { name }).closest("label");
+    expect([accessoryOf(seat("Ada")), accessoryOf(seat("Atlas"))]).toEqual(["headphones", "crown"]);
     await click(within(dialog).getByRole("checkbox", { name: "Atlas" }));
     await click(within(within(dialog).getByRole("radiogroup", { name: "Rodadas" })).getByRole("radio", { name: "2" }));
     await type(within(dialog).getByLabelText("O que fazer"), "Discutam o que melhorar no onboarding.");
