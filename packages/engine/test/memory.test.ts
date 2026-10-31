@@ -958,14 +958,14 @@ describe("proposals for teammates (one card, a row per agent and kind of change)
       { model: "claude-sonnet-5-5" },
     );
 
-  /** @dev's run on a message in #general from Ana, or from another agent (no person behind it). */
-  async function runOn(author: "person" | "agent"): Promise<ToolContext> {
+  /** @dev's run on a message in #general from Ana (or `userId`), or from another agent (no person behind it). */
+  async function runOn(author: "person" | "agent", userId = f.owner.id): Promise<ToolContext> {
     const trigger = await insertMessage(f.db, {
       orgId: f.org.id,
       channelId: f.general.id,
       author:
         author === "person"
-          ? { type: "person", userId: f.owner.id }
+          ? { type: "person", userId }
           : { type: "agent", agentId: f.agent.id, runId: crypto.randomUUID(), hop: 1 },
       body: "muda o time",
     });
@@ -1119,6 +1119,21 @@ describe("proposals for teammates (one card, a row per agent and kind of change)
       text_to_store_as_agent_memory: "Removes: - Peça aprovação antes de qualquer deploy.",
     });
     expect(await rows()).toHaveLength(1);
+  });
+
+  test("the tool tells the agent who decides the rows the person who asked can't", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await teammate("ada");
+    const out = await propose(await runOn("person", bia.id), {
+      target: "agents",
+      agents: ["@ada"],
+      change: "Responder em português.",
+      roles: [{ agent: "@ada", role: "Revisora" }],
+    });
+    expect(out.content).toContain(
+      "they wait for the agent's owner or someone who reviews memory (instructions), and an admin who manages agents (a role).",
+    );
   });
 
   test("only agents the person who asked can talk to: one out of their reach refuses the card, naming it", async () => {

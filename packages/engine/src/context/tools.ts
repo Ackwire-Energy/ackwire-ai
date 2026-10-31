@@ -13,7 +13,7 @@ import { noAgentText } from "../team";
 import type { ToolContext, ToolDefinition, ToolSource } from "../tools/types";
 import { type ContextItem, checkPermissionText, consolidateItem, getContextItems, supersede } from "./items";
 import { kindFamily, overlap } from "./judgments";
-import { CARD_MAX_AGENTS, proposeChange } from "./proposals";
+import { CARD_MAX_AGENTS, ownerDecides, type Proposal, proposeChange } from "./proposals";
 import { type ContextDeps, ensureThreadSummary, judgeOf, memoryJudging } from "./summaries";
 
 const { contextItems, messages, outcomes } = schema;
@@ -327,7 +327,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
     {
       name: "propose_instruction_change",
       description:
-        "When a person asks to change how agents work, propose it: your instructions (my_instructions), other agents' (agents: with their handles, all on one card), or what every agent should know now and later (org_context). Add a rule with change. To change or remove existing text, put the exact text in replaces and the new text in change (empty removes it). With target agents you can also give an agent a new role (roles) and turn an app on or off for it (access: a connected app by its name, or a built-in area such as browser:use; your own apps go through request_permission). Nothing changes until a person accepts it: each agent's owner or an admin. Never tell the person only they can make the change: propose it. Not for routines: a change to what a routine does ('a rotina', 'when a new error comes in…') is `update_routine`.",
+        "When a person asks to change how agents work, propose it: your instructions (my_instructions), other agents' (agents: with their handles, all on one card), or what every agent should know now and later (org_context). Add a rule with change. To change or remove existing text, put the exact text in replaces and the new text in change (empty removes it). With target agents you can also give an agent a new role (roles) and turn an app on or off for it (access: a connected app by its name, or a built-in area such as browser:use; your own apps go through request_permission). Nothing changes until a person who may make that change accepts it. Instructions: the agent's owner or someone who reviews memory. A role or an app: an admin who manages agents, or the agent's owner for an app only turned off. The org context: someone who reviews memory. Never tell the person only they can make the change: propose it. Not for routines: a change to what a routine does ('a rotina', 'when a new error comes in…') is `update_routine`.",
       scope: "memory:write",
       inputSchema: {
         type: "object",
@@ -433,12 +433,13 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             proposals.length === 1
               ? `Proposal ${first.id} created`
               : `${proposals.length} changes proposed on one card`;
+          const rest = [...new Set(proposals.filter((p) => !p.canDecide).map(decidedBy))].join(", and ");
           const who =
             decides === proposals.length
               ? `the person who asked can accept ${proposals.length === 1 ? "it" : "them"} right here.`
               : decides === 0
-                ? "the agent's owner or an admin will decide."
-                : "the person who asked can accept some right here, the agents' owners or an admin decide the rest.";
+                ? `${proposals.length === 1 ? "it waits" : "they wait"} for ${rest}.`
+                : `the person who asked can accept some right here, the rest wait for ${rest}.`;
           return memoryResult(
             ctx,
             `${made}; ${who}${skipped.length ? ` Left off the card: ${skipped.join(" ")}` : ""}`,
@@ -460,6 +461,16 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
   ];
   return { name: "context", tools: async () => tools };
 }
+
+/** Who accepts a row the person who asked can't, for the agent to tell them (`deciders` in proposals.ts). */
+const decidedBy = (p: Proposal) =>
+  p.target === "org_context"
+    ? "someone who reviews memory (the org context)"
+    : p.target === "agent_instructions"
+      ? "the agent's owner or someone who reviews memory (instructions)"
+      : ownerDecides(p)
+        ? "an admin who manages agents or the agent's owner (apps turned off)"
+        : `an admin who manages agents (${p.target === "agent_role" ? "a role" : "apps"})`;
 
 /** Memory tools only act on a person's request in the current turn (never on tool, webhook or document text). */
 /** The person behind the run (`authority.ts`); null for a routine's work and unattended runs. */
