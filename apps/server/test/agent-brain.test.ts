@@ -390,6 +390,44 @@ test("a new agent starts on Automático on every brain; one with a fixed model k
   });
 });
 
+test("one agent's setup on others (ADR 0089): a preview keeps nothing, each agent by its rules, new agents start with it", async () => {
+  const { api, asBia, agentId } = await workspace();
+  const eva = (await (await api("/agents", { json: { name: "Eva", handle: "eva" } })).json()) as { id: string };
+  const mac = await pairMac(api);
+  for (const id of [agentId, eva.id]) {
+    await api(`/agents/${id}/computer/target`, { method: "PUT", json: { machineId: mac.machineId } });
+  }
+  const setup = { brain: "claude_code", machineId: mac.machineId, account: null, model: "opus", effort: "high" };
+  const use = (json: Record<string, unknown>, as = api) => as("/agent-setup", { json });
+  type Results = { results: { agentId: string; status: string; reason?: string }[] };
+  const brainOf = async (id: string) => (await (await api(`/agents/${id}/brain`)).json()) as Brain;
+
+  const preview = await use({ setup, agentIds: [agentId, eva.id], preview: true });
+  expect(preview.status).toBe(200);
+  expect(((await preview.json()) as Results).results.map((r) => r.status)).toEqual(["applied", "applied"]);
+  expect((await brainOf(eva.id)).brain).toBe("model");
+  expect(((await (await api("/agent-setup")).json()) as { setup: unknown }).setup).toBeNull();
+
+  const done = (await (await use({ setup, agentIds: [agentId, eva.id] })).json()) as Results;
+  expect(done.results.map((r) => r.status)).toEqual(["applied", "applied"]);
+  expect(await brainOf(eva.id)).toMatchObject({ brain: "claude_code", model: "opus", effort: "high" });
+  expect(((await (await api("/agent-setup")).json()) as { setup: unknown }).setup).toMatchObject({
+    brain: "claude_code",
+    model: "opus",
+    computer: { machineId: mac.machineId, name: "mac" },
+    account: null,
+    ownSignIn: true,
+    effort: "high",
+  });
+
+  // A member changes only their own agents, and doesn't create agents.
+  const bia = (await (await use({ setup, agentIds: [eva.id] }, asBia)).json()) as Results;
+  expect(bia.results).toEqual([{ agentId: eva.id, status: "skipped", reason: "not_allowed" }]);
+  expect((await asBia("/agent-setup")).status).toBe(403);
+  expect((await use({ setup, agentIds: [] })).status).toBe(400);
+  expect((await use({ setup: { ...setup, effort: "hard" }, agentIds: [eva.id] })).status).toBe(400);
+});
+
 test("mission brain: from the executor by default; the brain before Start, the model any time; who may", async () => {
   const { api, asBia, agentId, channelId } = await workspace();
   const mac = await pairMac(api);

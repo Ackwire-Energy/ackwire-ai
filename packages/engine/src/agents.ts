@@ -28,7 +28,8 @@ export interface AgentInput {
   monthlyBudgetNanoUsd?: number | null;
 }
 
-async function validate(db: Database, orgId: string, input: Partial<AgentInput>) {
+/** An agent's fields as the API takes them: its handle, model, key (of the model's provider), budget and owner. */
+export async function validateAgentFields(db: Database, orgId: string, input: Partial<AgentInput>) {
   if (input.handle !== undefined && !HANDLE_PATTERN.test(input.handle)) {
     throw new ValidationError("handle must be 2–32 characters: lower-case letters, digits, - or _");
   }
@@ -68,6 +69,36 @@ async function validate(db: Database, orgId: string, input: Partial<AgentInput>)
 /** What a person's new agent thinks with when nobody picks a model: "Automático". */
 export const NEW_AGENT_DEFAULTS = { model: AUTO_MODEL } as const;
 
+/**
+ * An agent's "Quem pensa" as new agents take it (ADR 0089). Who it answers stays out: a new agent on a plan answers
+ * only its owner (ADR 0059 §5).
+ */
+export function setupOfAgent(a: Agent): schema.AgentSetup {
+  if (!isComputerBrain(a.brain)) {
+    return { brain: "model", model: a.model, key: a.credentialId, contextTokens: a.contextTokens };
+  }
+  return {
+    brain: a.brain,
+    model: a.brainModel,
+    machineId: a.machineId,
+    account: a.brainAccountId,
+    effort: a.brainEffort,
+    contextTokens: a.contextTokens,
+    fallback: a.brainFallback,
+  };
+}
+
+/** What the workspace's new agents start with from now on: the "Quem pensa" someone just saved or used on others. */
+export async function rememberAgentSetup(db: Executor, orgId: string, setup: schema.AgentSetup) {
+  await db
+    .insert(schema.organizationSettings)
+    .values({ orgId, agentSetup: setup })
+    .onConflictDoUpdate({
+      target: schema.organizationSettings.orgId,
+      set: { agentSetup: setup, updatedAt: new Date() },
+    });
+}
+
 export async function createAgent(
   db: Database,
   actorId: string,
@@ -77,7 +108,7 @@ export async function createAgent(
 ): Promise<Agent> {
   await requirePermission(db, actorId, orgId, "create_agents");
   const values = { ...input, handle: input.handle.toLowerCase(), model: input.model ?? defaults.model };
-  await validate(db, orgId, values);
+  await validateAgentFields(db, orgId, values);
   // An agent born on "Automático" is automatic on every brain: switched to Claude Code or Codex later, it
   // starts with the model and effort picked per run (written here, so agents made before Automático keep theirs).
   const brainAuto = isAutoModel(values.model) ? { brainModel: AUTO_MODEL, brainEffort: AUTO_MODEL } : {};
@@ -173,9 +204,10 @@ export async function updateAgent(
   orgId: string,
   agentId: string,
   input: Partial<Omit<AgentInput, "handle">>,
+  options: { remember?: boolean } = {},
 ): Promise<Agent> {
   await requirePermission(db, actorId, orgId, "manage_agents");
-  await validate(db, orgId, input);
+  await validateAgentFields(db, orgId, input);
   const owner = input.ownerUserId;
   const before = owner !== undefined ? await getAgent(db, orgId, agentId) : null;
   // A plan thinks only for its owner's agents (ADR 0059 §3): a new owner who doesn't own it sends the agent back
@@ -220,6 +252,11 @@ export async function updateAgent(
     });
   }
   if (input.monthlyBudgetNanoUsd !== undefined) await resyncBudgetCounter(db, orgId, agentId);
+  // Its API model or key is "Quem pensa" only while it thinks through the API.
+  const thinking = input.model !== undefined || input.credentialId !== undefined;
+  if (thinking && options.remember !== false && !isComputerBrain(agent.brain)) {
+    await rememberAgentSetup(db, orgId, setupOfAgent(agent));
+  }
   return agent;
 }
 

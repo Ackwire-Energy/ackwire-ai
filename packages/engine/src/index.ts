@@ -6,6 +6,7 @@ export * from "./agent-for-you";
 export * from "./agent-groups";
 export * from "./agent-import";
 export * from "./agent-proposals";
+export * from "./agent-setup";
 export * from "./agent-status";
 export * from "./agent-undo";
 export * from "./agents";

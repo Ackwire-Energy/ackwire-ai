@@ -622,6 +622,88 @@ export const AgentBrain = z
   })
   .openapi("AgentBrain");
 
+/** ADR 0089: one agent's "Quem pensa" as a value, to use on other agents. */
+export const AgentSetup = z
+  .object({
+    brain: BrainKind,
+    model: z.string().max(80).nullable().openapi({
+      description:
+        "The API brain: the agent's model (`auto` or a catalog id). A computer brain: its model as `PUT …/brain` takes it; null = the brain's default.",
+    }),
+    key: z.uuid().nullable().optional().openapi({
+      description: "The API brain's key; null = the workspace's default; omitted = each agent keeps its own.",
+    }),
+    machineId: z.uuid().nullable().optional().openapi({ description: "A computer brain: the computer it thinks on." }),
+    account: z
+      .uuid()
+      .nullable()
+      .optional()
+      .openapi({ description: "A computer brain: the account there; null = that computer's own sign-in." }),
+    effort: BrainEffortSetting.nullable().optional(),
+    contextTokens: ContextLimit.nullable().optional(),
+    fallback: z.boolean().optional(),
+    onlyOwner: z.boolean().optional().openapi({
+      description:
+        '"Atende outras pessoas" off, for the agents that move onto the plan (only the plan\'s owner turns it on).',
+    }),
+  })
+  .openapi("AgentSetup");
+
+export const AgentSetupResult = z
+  .object({
+    agentId: z.uuid(),
+    status: z.enum(["applied", "same", "skipped"]).openapi({
+      description:
+        "`applied` (in a preview: would be); `same`: it already thinks this way; `skipped`: it can't take it.",
+    }),
+    keeps: z.object({ account: z.string().nullable() }).optional().openapi({
+      description: "It keeps the account it has (another person's plan): its name; null = its computer's own.",
+    }),
+    reason: z
+      .enum([
+        "not_allowed",
+        "admins_only",
+        "account_owner",
+        "account_single",
+        "other_computer",
+        "model_missing",
+        "failed",
+      ])
+      .optional(),
+    params: z.record(z.string(), z.string()).optional(),
+  })
+  .openapi("AgentSetupResult");
+
+export const NewAgentSetup = z
+  .object({
+    brain: BrainKind,
+    model: z.string().nullable(),
+    key: z.uuid().nullable(),
+    contextTokens: ContextLimit.nullable(),
+    computer: z.object({ machineId: z.uuid(), name: z.string() }).optional(),
+    account: z
+      .object({
+        id: z.uuid(),
+        label: z.string(),
+        provider: z.string().nullable(),
+        mine: z.boolean(),
+        free: z.boolean().openapi({
+          description: "It can think for one more agent (made for all its owner's agents, or used by none).",
+        }),
+      })
+      .nullable()
+      .optional(),
+    ownSignIn: z
+      .boolean()
+      .optional()
+      .openapi({ description: "The computer's own sign-in thinks for the caller's agents (they connected it)." }),
+    effort: BrainEffortSetting.nullable().optional(),
+    fallback: z.boolean().optional(),
+  })
+  .openapi("NewAgentSetup", {
+    description: "What a new agent starts thinking with (ADR 0089): the last setup saved or used on other agents.",
+  });
+
 export const MissionBrain = z
   .object({
     missionId: z.uuid(),

@@ -5,6 +5,7 @@ import {
   agentBudgetsThisMonth,
   agentStatuses,
   agentView,
+  applyAgentSetup,
   archiveAgent,
   audienceOf,
   budgetPercent,
@@ -21,6 +22,7 @@ import {
   getAgent,
   getAgentBrain,
   getAgentProposal,
+  getNewAgentSetup,
   getTeam,
   listAgentGroups,
   listAgents,
@@ -64,6 +66,8 @@ import {
   AgentAppearance,
   AgentAudience,
   AgentBrain,
+  AgentSetup,
+  AgentSetupResult,
   BrainEffortSetting,
   BrainKind,
   BrainMachine,
@@ -71,6 +75,7 @@ import {
   Credential,
   FormerAgent,
   Model,
+  NewAgentSetup,
   ProviderId,
   Usage,
 } from "./schemas";
@@ -891,6 +896,55 @@ export function agentRoutes(deps: AppDeps) {
       // Its computer hears which account each agent thinks with (system mode lends the folders by it).
       if (view.computer) await publishMachineAgentsChanged(adapters.pubsub, orgId);
       return c.json(view, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/agent-setup",
+      tags,
+      security,
+      summary:
+        'What a new agent starts thinking with (ADR 0089): the last "Quem pensa" someone saved or used on other agents, as it stands now. Whoever creates agents.',
+      request: { params: OrgParams },
+      responses: { 200: json(z.object({ setup: NewAgentSetup.nullable() })), ...errors },
+    }),
+    async (c) => {
+      const setup = await getNewAgentSetup({ db }, c.get("user").id, c.req.valid("param").orgId);
+      return c.json({ setup }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/agent-setup",
+      tags,
+      security,
+      summary:
+        'Use one agent\'s "Quem pensa" on these agents (ADR 0089), each by its own rules: who may change it, whose plan thinks for it. Each change is audited as its own (`agent.brain`, `via: setup`); `preview` says what each would do and keeps nothing. Applied, it is what new agents start with.',
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            setup: AgentSetup,
+            agentIds: z.array(z.uuid()).min(1).max(200),
+            preview: z.boolean().optional(),
+          }),
+        ),
+      },
+      responses: { 200: json(z.object({ results: z.array(AgentSetupResult) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const input = c.req.valid("json");
+      const results = await applyAgentSetup({ db }, c.get("user").id, orgId, input);
+      // Their computers hear which account each agent thinks with now (system mode lends the folders by it).
+      if (!input.preview && results.some((r) => r.status === "applied")) {
+        await publishMachineAgentsChanged(adapters.pubsub, orgId);
+      }
+      return c.json({ results }, 200);
     },
   );
 

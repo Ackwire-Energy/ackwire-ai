@@ -19,7 +19,7 @@ import {
   MODEL_CATALOG,
 } from "@agenteschat/providers";
 import { claudeCodeModel, isPlanModelId, planModel, planOf } from "@agenteschat/providers/plans";
-import { type Agent, getAgent } from "./agents";
+import { type Agent, getAgent, rememberAgentSetup, setupOfAgent } from "./agents";
 import { type AgentAudience, answersOthers, audienceOf, OWNER_ONLY, planSharing } from "./audience";
 import { recordAudit } from "./audit";
 import { type BrainKind, isComputerBrain } from "./brains/types";
@@ -436,13 +436,17 @@ function nextAudience(
   return { base, to: kept ? { mode: "people", userIds: agent.audienceUserIds } : EVERYONE };
 }
 
-/** `PUT …/agents/{id}/brain` (an admin or the agent's owner). Audited. */
+/**
+ * `PUT …/agents/{id}/brain` (an admin or the agent's owner). Audited, with `options.audit` added to the entry. What it
+ * thinks with becomes what new agents start with, unless `options.remember` is false.
+ */
 export async function setAgentBrain(
   deps: BrainDeps,
   userId: string,
   orgId: string,
   agentId: string,
   input: AgentBrainInput,
+  options: { remember?: boolean; audit?: Record<string, unknown> } = {},
 ): Promise<AgentBrainView> {
   const { agent, admin } = await agentBrainAccess(deps.db, userId, orgId, agentId);
   const from = brainOf(agent.brain);
@@ -581,6 +585,7 @@ export async function setAgentBrain(
           contextTokens: agent.contextTokens,
         },
         to: { brain, model, fallback, account, effort, contextTokens },
+        ...options.audit,
       },
     });
   }
@@ -613,6 +618,7 @@ export async function setAgentBrain(
     contextTokens,
     ...(audience ? { audienceMode: audience.mode } : {}),
   };
+  if (thinks && options.remember !== false) await rememberAgentSetup(deps.db, orgId, setupOfAgent(saved));
   // The account's `usedBy` changed with it.
   const fresh =
     account !== agent.brainAccountId ? await brainAccounts(deps.db, userId, orgId, saved, machine) : accounts;
