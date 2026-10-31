@@ -2467,6 +2467,9 @@ export const ptBR = {
           keeps: "Fica com {{account}}",
           keepsOwn: "Fica com a conta do computador",
           autonomy: "Autonomia: {{from}} → {{to}}",
+          /** A switch over the agents: off, the setup leaves each agent's Autonomia as it is. */
+          withAutonomy: "Levar a autonomia",
+          withAutonomyLine: "{{value}}, como neste agente. Desligado, cada um fica com a sua.",
           reasons: {
             not_allowed: "Só admins e {{owner}} mudam",
             not_allowedNobody: "Só admins mudam",

@@ -61,7 +61,8 @@ export function setupOutcome(results: readonly AgentSetupResult[], asked: number
   return { done, autonomyOnly, missed: asked - done - autonomyOnly };
 }
 
-const autonomyName = (t: TFunction, a: CommandApproval) => t(`missions.commandApproval.${a}`);
+/** "Não pergunta": an Autonomia's name. */
+export const autonomyName = (t: TFunction, a: CommandApproval) => t(`missions.commandApproval.${a}`);
 
 /** "Autonomia: Não pergunta", the last of a setup's words. */
 export const autonomyWords = (t: TFunction, a: CommandApproval) =>

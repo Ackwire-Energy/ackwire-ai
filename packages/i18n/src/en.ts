@@ -2447,6 +2447,8 @@ export const en: Translations = {
           keeps: "Keeps {{account}}",
           keepsOwn: "Keeps its computer's account",
           autonomy: "Autonomy: {{from}} → {{to}}",
+          withAutonomy: "Include the autonomy",
+          withAutonomyLine: "{{value}}, as on this agent. Off: each keeps its own.",
           reasons: {
             not_allowed: "Only admins and {{owner}} change it",
             not_allowedNobody: "Only admins change it",

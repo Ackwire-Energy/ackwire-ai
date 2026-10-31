@@ -5,6 +5,7 @@ import type {
   BrainEffortSetting,
   BrainKind,
   BrainOption,
+  CommandApproval,
   Machine,
   MachineAccount,
 } from "@agenteschat/client";
@@ -32,6 +33,7 @@ import {
 } from "@agenteschat/client";
 import { saveLevels } from "@agenteschat/client/lib/access-levels";
 import {
+  autonomyName,
   autonomyWords,
   changes,
   setupOutcome,
@@ -671,6 +673,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   // "Configuração avançada" open: what it edits, put on the form by "Pronto" (nothing saves before "Usar").
   const [adv, setAdv] = useState<Advanced | null>(null);
   const [copying, setCopying] = useState(false);
+  // "Levar a autonomia" off: the others keep their own.
+  const [withAutonomy, setWithAutonomy] = useState(true);
   const hasOthers = (useAgents(org.id).data ?? []).some((a) => a.id !== agent.id);
   const qc = useQueryClient();
   // Adding an account: any, or (an account) one more login of it for this agent.
@@ -904,7 +908,8 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   };
   // "Usar em outros agentes" (ADR 0089): this choice and its saved Autonomia as a value, each agent taking it by its
   // own rules.
-  const autonomy = view.autonomy ? { autonomy: view.autonomy } : {};
+  const carried = withAutonomy ? view.autonomy : undefined;
+  const autonomy = carried ? { autonomy: carried } : {};
   const setup: AgentSetup | null =
     kind === "model"
       ? {
@@ -936,7 +941,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       apiKey,
       now: { effort, contextTokens: shownContext, onlyOwner, fallback },
     }),
-    ...(view.autonomy ? [autonomyWords(t, view.autonomy)] : []),
+    ...(carried ? [autonomyWords(t, carried)] : []),
   ].join(" · ");
   const copyTo = async (agentIds: string[]) => {
     if (!setup) return;
@@ -1392,6 +1397,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         <SetupCopyDialog
           setup={setup}
           setupText={setupText}
+          autonomy={view.autonomy}
+          withAutonomy={withAutonomy}
+          onWithAutonomy={setWithAutonomy}
           busy={busy}
           onClose={() => setCopying(false)}
           onUse={(agentIds) => void copyTo(agentIds)}
@@ -1403,17 +1411,25 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
 
 /**
  * "Usar em outros agentes" (ADR 0089): every other agent with what the setup would do to it (the server's preview),
- * those that can take it first, "Todos" on top for all of them. "Usar" saves this agent's choice and theirs.
+ * those that can take it first, "Todos" on top for all of them, and "Levar a autonomia" over them, which leaves each
+ * agent's own when off. "Usar" saves this agent's choice and theirs.
  */
 function SetupCopyDialog({
   setup,
   setupText,
+  autonomy,
+  withAutonomy,
+  onWithAutonomy,
   busy,
   onClose,
   onUse,
 }: {
   setup: AgentSetup;
   setupText: string;
+  /** This agent's saved Autonomia. */
+  autonomy: CommandApproval | undefined;
+  withAutonomy: boolean;
+  onWithAutonomy: (on: boolean) => void;
   busy: boolean;
   onClose: () => void;
   onUse: (agentIds: string[]) => void;
@@ -1461,6 +1477,19 @@ function SetupCopyDialog({
       closeLabel={t("common.close")}
       className="agp-copydialog"
     >
+      {autonomy && (
+        <div className="ac-dialog__tools">
+          <label htmlFor="setup-autonomy" className="agp-copydialog__all">
+            <span className="scope-row__text">
+              <b>{t("agentPage.work.brain.copy.withAutonomy")}</b>
+              <span className="small muted">
+                {t("agentPage.work.brain.copy.withAutonomyLine", { value: autonomyName(t, autonomy) })}
+              </span>
+            </span>
+            <Switch id="setup-autonomy" checked={withAutonomy} disabled={busy} onCheckedChange={onWithAutonomy} />
+          </label>
+        </div>
+      )}
       {preview.data && (
         <div className="ac-dialog__tools">
           <label htmlFor="setup-all" className="agp-copydialog__all" data-off={can.length === 0 || undefined}>

@@ -1784,11 +1784,18 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("agents.newAgentSetup", orgId);
         return structuredClone(state.newAgentSetup ?? null);
       },
-      // Each agent takes it unless `setupResults` says otherwise; applied, its brain view thinks so.
+      // Each agent takes it unless `setupResults` says otherwise; applied, its brain view thinks so. A setup without
+      // an Autonomia changes none.
       applySetup: async (orgId, input) => {
         log("agents.applySetup", orgId, input);
         return input.agentIds.map((agentId) => {
-          const result: AgentSetupResult = { agentId, status: "applied", ...state.setupResults?.[agentId] };
+          const { autonomy, ...given } = state.setupResults?.[agentId] ?? {};
+          const result: AgentSetupResult = {
+            agentId,
+            status: "applied",
+            ...given,
+            ...(input.setup.autonomy && autonomy ? { autonomy } : {}),
+          };
           if (!input.preview && result.status === "applied") {
             const b = brainOf(agentId);
             const s = input.setup;

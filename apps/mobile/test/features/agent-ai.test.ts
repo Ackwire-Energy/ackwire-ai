@@ -613,6 +613,12 @@ describe("the agent's AI", () => {
     ).text();
     expect(setup).toContain("disabled={busy || !changes(r)}");
     expect(setup).toContain('t("agentPage.work.brain.copy.autonomyOnly", { count: autonomyOnly })');
+    // "Levar a autonomia" over the agents, as on the web: off, the setup and its words leave it out.
+    expect(setup).toContain("toggle={withAutonomy}");
+    expect(setup).toContain("brain.data && !withAutonomy ? { ...brain.data, autonomy: undefined } : brain.data");
+    expect(t("agentPage.work.brain.copy.withAutonomyLine", { value: t("missions.commandApproval.never") })).toBe(
+      "Não pergunta, como neste agente. Desligado, cada um fica com a sua.",
+    );
     const screen = await Bun.file(new URL("../../src/features/ai/AgentAiScreen.tsx", import.meta.url).pathname).text();
     expect(screen).toContain("onPress={() => openAgentSetup(agentId)}");
     const route = await Bun.file(new URL("../../app/(app)/agent-setup/[id].tsx", import.meta.url).pathname).text();

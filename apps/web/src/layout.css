@@ -9033,7 +9033,7 @@ a.machine-row__name:hover {
   cursor: default;
   opacity: 0.55;
 }
-/* "Todos os repositórios" on top of the list, and "Todos" over the agents a setup is used on. */
+/* "Todos os repositórios" on top of the list, and "Levar a autonomia" and "Todos" over the agents a setup is used on. */
 .agp-repodialog__all,
 .agp-copydialog__all {
   flex: 1;
