@@ -19,6 +19,10 @@ import type { StreamSocket } from "./browser";
  * Measured 2026-10-27 on Chrome for Testing 155 against local servers: within
  * 0.2% of the bytes they sent and received (the headers). Chrome keeps no byte
  * count of its own to read instead: its histograms moved for neither way.
+ *
+ * The same connection says when a tab's page died (`Inspector.targetCrashed`
+ * on its session: Chrome's sad tab) and opens it again or shows another page
+ * there (`onCrash`), so each Chrome has one socket of ours.
  */
 
 const AUTO_ATTACH = {
@@ -45,6 +49,18 @@ export interface TrafficCounter {
   /** The bytes counted since the last call. */
   take(): { up: number; down: number };
   close(): void;
+}
+
+/** A tab whose page died. */
+export interface CrashedPage {
+  targetId: string;
+  /**
+   * Goes to the address it was on again: a page that was a form's answer is fetched again, never sent again (a
+   * reload would post the form a second time without asking, as Chrome's own Reload asks).
+   */
+  reopen(): void;
+  /** Shows `url` there instead. */
+  show(url: string): void;
 }
 
 type Params = Record<string, unknown>;
@@ -77,19 +93,25 @@ function requestBytes(headers: unknown): number {
 export function countChromeTraffic(
   wsUrl: string,
   open: (url: string) => StreamSocket = (url) => new WebSocket(url) as unknown as StreamSocket,
+  onCrash?: (page: CrashedPage) => void,
 ): TrafficCounter {
   let up = 0;
   let down = 0;
   let nextId = 1;
   /** Per session (`""`: the browser's own): each unfinished response's bytes so far, and whether a service worker served it. */
   const sessions = new Map<string, Map<string, { bytes: number; fromWorker: boolean }>>([["", new Map()]]);
+  /** The tabs' own sessions (pages attached at the browser's level), with their target. */
+  const pages = new Map<string, string>();
+  /** What waits on an answer, by the id it was asked under. */
+  const answers = new Map<number, (result: Params) => void>();
   let settle = () => {};
   const attached = new Promise<void>((resolve) => {
     settle = resolve;
   });
   let socket: StreamSocket | null = null;
-  const send = (method: string, params: Params, sessionId?: string) => {
+  const send = (method: string, params: Params, sessionId?: string, then?: (result: Params) => void) => {
     const id = nextId++;
+    if (then) answers.set(id, then);
     try {
       socket?.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
     } catch {
@@ -97,6 +119,18 @@ export function countChromeTraffic(
     }
     return id;
   };
+  const crashed = (sessionId: string, targetId: string): CrashedPage => ({
+    targetId,
+    reopen: () =>
+      send("Page.getNavigationHistory", {}, sessionId, (history) => {
+        const entries = Array.isArray(history.entries) ? history.entries : [];
+        const current: unknown = entries[typeof history.currentIndex === "number" ? history.currentIndex : -1];
+        if (isObject(current) && typeof current.url === "string" && current.url) {
+          send("Page.navigate", { url: current.url }, sessionId);
+        }
+      }),
+    show: (url) => send("Page.navigate", { url }, sessionId),
+  });
   let first = 0;
   const entry = (sessionId: string, requestId: unknown) => {
     const requests = sessions.get(sessionId);
@@ -123,19 +157,37 @@ export function countChromeTraffic(
     }
     if (!isObject(msg)) return;
     if (msg.id === first) settle();
+    if (typeof msg.id === "number") {
+      const then = answers.get(msg.id);
+      answers.delete(msg.id);
+      if (then && isObject(msg.result)) then(msg.result);
+      return;
+    }
     const p = isObject(msg.params) ? msg.params : {};
     const sessionId = typeof msg.sessionId === "string" ? msg.sessionId : "";
     switch (msg.method) {
       case "Target.attachedToTarget": {
         if (typeof p.sessionId !== "string") return;
         sessions.set(p.sessionId, new Map());
+        const target = isObject(p.targetInfo) ? p.targetInfo : {};
+        if (!sessionId && target.type === "page" && typeof target.targetId === "string") {
+          pages.set(p.sessionId, target.targetId);
+        }
         send("Network.enable", NETWORK, p.sessionId);
         send("Target.setAutoAttach", AUTO_ATTACH_RELATED, p.sessionId);
         return;
       }
       case "Target.detachedFromTarget":
-        if (typeof p.sessionId === "string") sessions.delete(p.sessionId);
+        if (typeof p.sessionId === "string") {
+          sessions.delete(p.sessionId);
+          pages.delete(p.sessionId);
+        }
         return;
+      case "Inspector.targetCrashed": {
+        const targetId = pages.get(sessionId);
+        if (targetId) onCrash?.(crashed(sessionId, targetId));
+        return;
+      }
       case "Network.requestWillBeSentExtraInfo":
         up += requestBytes(p.headers);
         return;
@@ -178,6 +230,8 @@ export function countChromeTraffic(
     socket.onclose = () => {
       settle();
       sessions.clear();
+      pages.clear();
+      answers.clear();
     };
   } catch {
     settle();
