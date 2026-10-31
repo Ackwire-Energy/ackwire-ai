@@ -293,6 +293,12 @@ export interface MachineLoad {
   memoryAvg: number;
   memoryPeak: number;
   hours: number;
+  /**
+   * Processes the kernel stopped for running out of memory in the agents' slices (system mode under systemd,
+   * `agents.slice`'s `memory.events`) over those hours. Absent where agents have no slices, or from an older
+   * runner: the server needs to know nothing new, so no protocol number.
+   */
+  oomKills?: number;
 }
 
 /** How often a computer's load is sampled (protocol 22). */
@@ -2702,7 +2708,14 @@ export function parseMachineSize(v: unknown): MachineSize | null {
 export function parseMachineLoad(v: unknown): MachineLoad | null {
   if (!isObject(v) || !between(v.loadAvg, 0, 1000) || !between(v.loadPeak, 0, 1000)) return null;
   if (!between(v.memoryAvg, 0, 1) || !between(v.memoryPeak, 0, 1) || !between(v.hours, 0, 24)) return null;
-  return { loadAvg: v.loadAvg, loadPeak: v.loadPeak, memoryAvg: v.memoryAvg, memoryPeak: v.memoryPeak, hours: v.hours };
+  return {
+    loadAvg: v.loadAvg,
+    loadPeak: v.loadPeak,
+    memoryAvg: v.memoryAvg,
+    memoryPeak: v.memoryPeak,
+    hours: v.hours,
+    ...(inRange(v.oomKills, [0, 1e9]) ? { oomKills: v.oomKills } : {}),
+  };
 }
 
 /** `pong.browserTraffic` (protocol 23): whole bytes up to 1e15 and at most 24 hours, else none. */
