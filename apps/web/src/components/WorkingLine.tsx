@@ -4,7 +4,7 @@ import {
   activitySentence,
   barAsking,
   barFaces,
-  barPhrase,
+  barWords,
   type MarkName,
   PHRASE_TURN_MS,
 } from "@agenteschat/client/lib/activity";
@@ -51,6 +51,7 @@ export function WorkingWords({ entries }: { entries: ActivityEntry[] }) {
 /**
  * The card's phrase, turning: one agent on its own gets a light line
  * while it only thinks, then what it does, an aside on a long step and what it said last, in turn.
+ * Who is typing comes last, in a piece of its own that keeps its width (`barWords`).
  */
 export function BarPhrase({ entries, runs }: { entries: ActivityEntry[]; runs: LiveRun[] }) {
   const { t } = useTranslation();
@@ -61,7 +62,23 @@ export function BarPhrase({ entries, runs }: { entries: ActivityEntry[]; runs: L
     const timer = setInterval(() => setTick((n) => n + 1), PHRASE_TURN_MS);
     return () => clearInterval(timer);
   }, [turning]);
-  return <TurnText text={barPhrase(t, entries, runs, tick, Date.now(), mark)} />;
+  const [agents, sep, typers, typing] = barWords(t, entries, runs, tick, Date.now(), mark);
+  return (
+    <>
+      {agents && (
+        <span className="ac-typing__agents">
+          <TurnText text={agents} />
+          {sep && <span className="ac-typing__and">{sep}</span>}
+        </span>
+      )}
+      {typing && (
+        <span className="ac-typing__people">
+          <span className="ac-typing__typers">{boldNames(typers)}</span>
+          {typing}
+        </span>
+      )}
+    </>
+  );
 }
 
 /**

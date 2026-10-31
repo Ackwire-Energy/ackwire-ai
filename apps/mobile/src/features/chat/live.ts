@@ -46,7 +46,7 @@ import {
 import { playSound } from "@agenteschat/client/lib/sounds";
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
-import { useConnection } from "../shared/hooks";
+import { useConnection, useMeId } from "../shared/hooks";
 import { withContinued } from "./turn";
 
 /**
@@ -313,6 +313,9 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
   const [state, dispatch] = useReducer(reduce, { streams: emptyStreams, consults: {}, receipts: {}, typing: {} });
   const stateRef = useRef(state);
   stateRef.current = state;
+  const meId = useMeId();
+  const meRef = useRef(meId);
+  meRef.current = meId;
 
   // Questions agents asked from here still out (the "asking…" line), listed with the active runs.
   useEffect(
@@ -358,6 +361,8 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
   useEffect(() => {
     if (!connection || !enabled) return;
     return connection.subscribe(channelId, (event) => {
+      // The server sends my own typing back to me too: never shown, so it never redraws.
+      if (event.type === "user.typing" && event.userId === meRef.current) return;
       dispatch({ type: "event", event, at: Date.now() });
       applyToCache(qc, orgId, channelId, event);
     });
@@ -419,17 +424,11 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
     [api, orgId, channelId, qc],
   );
 
+  // Each list keeps its identity until its own part changes: someone typing redraws the line, not the timeline.
+  const runs = useMemo(() => runsInChannel(state.streams, channelId), [state.streams, channelId]);
+  const consults = useMemo(() => consultsIn(state.consults, channelId), [state.consults, channelId]);
   return useMemo(
-    () => ({
-      runs: runsInChannel(state.streams, channelId),
-      consults: consultsIn(state.consults, channelId),
-      receipts: state.receipts,
-      expect,
-      seed,
-      stop,
-      typing: state.typing,
-      sendTyping,
-    }),
-    [state, channelId, expect, seed, stop, sendTyping],
+    () => ({ runs, consults, receipts: state.receipts, expect, seed, stop, typing: state.typing, sendTyping }),
+    [runs, consults, state.receipts, state.typing, expect, seed, stop, sendTyping],
   );
 }

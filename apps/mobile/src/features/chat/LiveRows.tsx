@@ -3,7 +3,7 @@ import {
   activitySentence,
   barAsking,
   barFaces,
-  barPhrase,
+  barWords,
   isWriting,
   PHRASE_TURN_MS,
 } from "@agenteschat/client/lib/activity";
@@ -12,7 +12,15 @@ import { formatDuration } from "@agenteschat/client/lib/work";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import { memo, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Pressable, Text as RNText, StyleSheet, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  Text as RNText,
+  type StyleProp,
+  StyleSheet,
+  type TextStyle,
+  View,
+} from "react-native";
 import Animated, { FadeIn, FadeInDown, ZoomIn } from "react-native-reanimated";
 import { useFrameTime } from "@/agent/live";
 import { Dither } from "@/sky/Dither";
@@ -248,16 +256,21 @@ export function WorkingLine({
   const solo = agents.length === 1 ? lead : undefined;
   const stoppable = solo ? stoppableInLine(runs).filter((r) => r.agentId === solo.id && canStop(r)) : [];
   const sentence = activitySentence(t, entries, markName);
-  const phrase = barPhrase(t, entries, runs, tick, Date.now(), markName);
-  const words = markedParts(phrase).map((p, i) =>
-    p.bold ? (
-      // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order
-      <RNText key={i} style={[styles.ink, { color: c.ink }]}>
-        {p.text}
-      </RNText>
-    ) : (
-      p.text
-    ),
+  const [agentWords, sep, typers, typingWords] = barWords(t, entries, runs, tick, Date.now(), markName);
+  // A piece of the line, on one line, names in ink.
+  const piece = (text: string, style?: StyleProp<TextStyle>) => (
+    <Text variant="caption" tone="muted" numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE} style={style}>
+      {markedParts(text).map((p, i) =>
+        p.bold ? (
+          // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order
+          <RNText key={i} style={[styles.ink, { color: c.ink }]}>
+            {p.text}
+          </RNText>
+        ) : (
+          p.text
+        ),
+      )}
+    </Text>
   );
   const clock = asking ? elapsedClock(now - asking.since) : null;
   const pop = reduced ? undefined : ZoomIn.springify().damping(11).stiffness(320).mass(0.6);
@@ -322,10 +335,23 @@ export function WorkingLine({
           style={styles.wordsTap}
         >
           {/* The phrase turns: the new one comes up from below. */}
-          <Animated.View key={phrase} entering={reduced ? undefined : FadeInDown.duration(380)} style={styles.words}>
-            <Text variant="caption" tone="muted" numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
-              {words}
-            </Text>
+          <Animated.View
+            key={agentWords + typers + typingWords}
+            entering={reduced ? undefined : FadeInDown.duration(380)}
+            style={styles.words}
+          >
+            {agentWords ? (
+              <View style={styles.agents}>
+                {piece(agentWords, styles.shrink)}
+                {sep ? piece(sep) : null}
+              </View>
+            ) : null}
+            {typingWords ? (
+              <View style={styles.people}>
+                {piece(typers, styles.shrink)}
+                {piece(typingWords)}
+              </View>
+            ) : null}
           </Animated.View>
           {browsing ? (
             <View style={[styles.browser, { backgroundColor: c.raised }]}>
@@ -419,8 +445,13 @@ const styles = StyleSheet.create({
   overlap: { marginLeft: -5 },
   dots: { flexDirection: "row", alignItems: "center", gap: 3, flexShrink: 0 },
   dot: { width: 4, height: 4, borderRadius: 2 },
-  words: { flexShrink: 1 },
-  // The words take what the marks and the stop leave, and end in "…".
+  // The words take what the marks and the stop leave, so the globe after them stays put while they turn. Who is
+  // typing keeps its width: the agents' words before it end in "…" first (the " · " after them goes with their
+  // last bit, so it never opens the line), then the names, never what they do.
+  words: { flex: 1, flexDirection: "row" },
+  agents: { flexDirection: "row", flexShrink: 1, overflow: "hidden" },
+  people: { flexDirection: "row", maxWidth: "100%" },
+  shrink: { flexShrink: 1 },
   wordsTap: { flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 0 },
   browser: {
     alignItems: "center",

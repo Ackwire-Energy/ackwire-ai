@@ -5500,7 +5500,7 @@ p {
    rest leaves and end in "…". Solid: a blur here would redo itself on every frame of the streaming text behind
    it. */
 .ac-typing[data-active="true"] {
-  max-width: 400px;
+  max-width: 440px;
   height: 28px;
   padding: 0 8px;
   border-radius: var(--radius-full);
@@ -5526,12 +5526,39 @@ p {
 .ac-typing[data-active="true"] > :is(.stop-run-wrap, .ac-typing__browser):last-child {
   margin-right: -6px;
 }
+/* Who is typing comes last and keeps its width: the agents' words before it end in "…" first, then the names,
+   never what they do ("Maria Fernan… está digitando…"). */
 .ac-typing[data-active="true"] .ac-typing__text {
+  display: flex;
   flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* The agents' words and the " · " after them: the words give way first, the " · " goes with their last bit, so it
+   never opens the line. */
+.ac-typing__agents {
+  display: flex;
+  overflow: hidden;
+}
+.ac-typing__people {
+  display: flex;
+  flex: none;
+  max-width: 100%;
+}
+/* They open with a space (" · ", " está digitando…") that would collapse at the start of a box. */
+.ac-typing__and,
+.ac-typing__people {
+  white-space: pre;
+}
+.ac-typing__typers {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ac-typing__people {
+    animation: ac-fade-in 160ms ease-out both;
+  }
 }
 
 /* ── Calendário: pages/calendar.css ── */

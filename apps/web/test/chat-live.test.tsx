@@ -283,6 +283,12 @@ describe("typing bar above the composer", () => {
     await push(socket, { type: "user.typing", userId: "u-joao", threadId: null, ttlMs: 6000 });
     await settle();
     expect(bar().textContent).toBe("Ada e Atlas estão trabalhando · João está digitando…");
+    // Who is typing is a piece of its own, after the agents' words and their " · " (which give way first on a short
+    // bar), then the names, never what they do.
+    expect(typingBar().querySelector(".ac-typing__agents")?.textContent).toBe("Ada e Atlas estão trabalhando · ");
+    const people = typingBar().querySelector(".ac-typing__people");
+    expect(people?.textContent).toBe("João está digitando…");
+    expect(people?.querySelector(".ac-typing__typers")?.textContent).toBe("João");
     expect(typingBar().querySelectorAll(".ac-typing__tok")).toHaveLength(3);
     expect(typingBar().querySelector(".ac-pixspin")).not.toBeNull();
     // The time, "Ver" and the stop are one agent's: with two at work the line shows none (the composer still stops).

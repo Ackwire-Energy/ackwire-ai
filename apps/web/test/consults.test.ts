@@ -15,6 +15,7 @@ import {
   barAsking,
   barEntries,
   barFaces,
+  barWords,
   listNames,
   toolActivity,
 } from "@agenteschat/client/lib/activity";
@@ -168,6 +169,30 @@ describe("the working line's sentence", () => {
     expect(ids([...four, person("Ana"), person("Bia")])).toEqual(["theo", "iris", "Ana"]);
     expect(ids([agent("theo"), person("Ana"), person("Bia"), person("Caio")])).toEqual(["theo", "Ana", "Bia"]);
     expect(ids(["Ana", "Bia", "Caio", "Dario"].map(person))).toEqual(["Ana", "Bia", "Caio"]);
+  });
+
+  test("the bar's words come in pieces that give way in turn: the agents', then who types, never what they do", () => {
+    const words = (tf: TFunction, list: ActivityEntry[]) => barWords(tf, list, [], 0, 0);
+    const busy = [agent("theo"), agent("iris")];
+    expect(words(t, [...busy, person("Ana")])).toEqual([
+      "Theo e Iris estão trabalhando",
+      " · ",
+      "Ana",
+      " está digitando…",
+    ]);
+    expect(words(tEn, [...busy, person("Ana"), person("Bia"), person("Caio")])).toEqual([
+      "Theo and Iris are working",
+      " · ",
+      "Ana and 2 more",
+      " are typing…",
+    ]);
+    expect(words(t, [person("Ana"), person("Bia")])).toEqual(["", "", "Ana e Bia", " estão digitando…"]);
+    // Nobody typing: the agents' phrase alone (it turns for one on its own).
+    expect(words(t, busy)).toEqual(["Theo e Iris estão trabalhando…", "", "", ""]);
+    // Joined, the pieces are the sentence, names marked the same.
+    const mark = (n: string) => `[${n}]`;
+    const list = [agent("theo"), person("Ana")];
+    expect(barWords(t, list, [], 0, 0, mark).join("")).toBe(activitySentence(t, list, mark));
   });
 
   test("names can be marked (bold in the bar) without changing the words", () => {
