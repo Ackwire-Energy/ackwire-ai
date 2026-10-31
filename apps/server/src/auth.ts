@@ -363,10 +363,12 @@ function noteProviderEmail(profile: { email?: unknown }) {
 }
 
 /**
- * Better Auth's handler. A provider sign-in refused as `ACCOUNT_NOT_LINKED` comes back to the sign-in page with the
- * provider's address, so the page can offer that account a new password by email.
+ * Better Auth's handler. Better Auth refuses a provider sign-in to an existing account as `ACCOUNT_NOT_LINKED` when
+ * that account's address isn't confirmed, and also when the provider hasn't confirmed its own. The first comes back to
+ * the sign-in page with the provider's address, so the page can offer that account a new password by email; the
+ * second as `PROVIDER_EMAIL_UNVERIFIED`, since a new password changes nothing there.
  */
-export function authHandler(auth: Auth) {
+export function authHandler(auth: Auth, db: Database) {
   return (request: Request) => {
     const seen: { email?: string } = {};
     return providerEmail.run(seen, async () => {
@@ -375,7 +377,12 @@ export function authHandler(auth: Auth) {
       if (!seen.email || !location) return res;
       const back = new URL(location, "http://localhost");
       if (back.searchParams.get("error") !== ACCOUNT_NOT_LINKED) return res;
-      back.searchParams.set("email", seen.email);
+      const [account] = await db
+        .select({ emailVerified: schema.users.emailVerified })
+        .from(schema.users)
+        .where(eq(schema.users.email, seen.email.toLowerCase()));
+      if (account && !account.emailVerified) back.searchParams.set("email", seen.email);
+      else back.searchParams.set("error", PROVIDER_EMAIL_UNVERIFIED);
       const headers = new Headers(res.headers);
       headers.set("location", location.startsWith("/") ? `${back.pathname}${back.search}${back.hash}` : back.href);
       return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
@@ -515,6 +522,11 @@ export const EARLY_ACCESS_EMAIL_UNVERIFIED = "EARLY_ACCESS_EMAIL_UNVERIFIED";
  * none, since whoever made that account may not own the address (mirrored in packages/client errors.ts).
  */
 export const ACCOUNT_NOT_LINKED = "account_not_linked";
+/**
+ * Ours for Better Auth's `ACCOUNT_NOT_LINKED` when the account here is confirmed: the provider hasn't confirmed its own
+ * address, so it joins no account (`authHandler`, mirrored in packages/client errors.ts).
+ */
+export const PROVIDER_EMAIL_UNVERIFIED = "provider_email_unverified";
 
 /** Every sign-up but the password form's is through a provider (the redirect's callback, or the phone's id token). */
 const isSocial = (context: { path?: string } | null | undefined) => context?.path !== "/sign-up/email";

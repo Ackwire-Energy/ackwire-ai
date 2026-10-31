@@ -519,6 +519,16 @@ describe("Google para um e-mail com senha não confirmada", () => {
     expect(screen().queryByRole("alert")).toBeNull();
   });
 
+  test("a provider that hasn't confirmed its own address is told so, with no new password to make", async () => {
+    const { api } = authApi(ACCOUNT, { reset: true });
+    await renderApp("/login?error=provider_email_unverified", { api, auth: createFakeAuth().auth });
+    await settle(6);
+    expect(screen().getByRole("alert").textContent).toBe(
+      "Seu provedor de login ainda não confirmou este endereço. Confirme lá, ou entre com o e-mail.",
+    );
+    expect(screen().queryByRole("button", { name: "Criar uma senha nova" })).toBeNull();
+  });
+
   test("on a server that sends no email: only the password, and no new one", async () => {
     const { api } = authApi(ACCOUNT);
     await renderApp(BACK, { api, auth: createFakeAuth().auth });

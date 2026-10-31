@@ -123,8 +123,8 @@ export function createApp(options: AppOptions) {
   });
 
   if (options.services) {
-    const { auth } = options.services;
-    const handleAuth = authHandler(auth);
+    const { auth, db } = options.services;
+    const handleAuth = authHandler(auth, db);
     api.on(["GET", "POST"], "/auth/*", (c) => handleAuth(c.req.raw));
     const deps: AppDeps = { log, ...options.services };
     registerInstance(api, deps, options.version);

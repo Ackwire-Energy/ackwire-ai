@@ -20,9 +20,10 @@ afterEach(async () => {
 /** The token in the last password reset email sent to `email`. */
 async function resetToken(server: TestServer, email: string) {
   await server.drain();
-  const mail = server.email.sent.filter((m) => m.to[0] === email).at(-1);
-  const link = /https?:\/\/\S+\/reset-password\S*/.exec(mail?.text ?? "")?.[0] ?? "";
-  return new URL(link, ORIGIN).searchParams.get("token") ?? "";
+  const links = server.email.sent
+    .filter((m) => m.to[0] === email)
+    .flatMap((m) => /https?:\/\/\S+\/reset-password\S*/.exec(m.text)?.[0] ?? []);
+  return new URL(links.at(-1) ?? "", ORIGIN).searchParams.get("token") ?? "";
 }
 
 test("a password account not confirmed yet: Google links nothing and signs nobody in, on every app; a new password by email ends the one nobody proved, then Google joins", async () => {
@@ -66,6 +67,26 @@ test("a password account not confirmed yet: Google links nothing and signs nobod
   expect((await web("/api/app/me")).status).toBe(200);
   const linked = await server.db.select({ providerId: schema.accounts.providerId }).from(schema.accounts);
   expect(linked.map((a) => a.providerId).sort()).toEqual(["credential", "google"]);
+});
+
+test("a provider that hasn't confirmed its own address, to a confirmed account: said as that, without the address", async () => {
+  t = await createTestServer({ env: GOOGLE_ENV });
+  const server = t;
+  await signUp(browser(server), "ana@acme.test");
+  await server.db.update(schema.users).set({ emailVerified: true });
+
+  for (const app of ["web", "desktop", "phone"] as const) {
+    const { location, browser: landed } = await googleSignIn(server, app, "ana@acme.test", { verified: false });
+    const back = new URL(location, ORIGIN);
+    expect([back.pathname, back.searchParams.get("error"), back.searchParams.get("email")]).toEqual([
+      "/login",
+      "provider_email_unverified",
+      null,
+    ]);
+    expect((await landed("/api/app/me")).status).toBe(401);
+  }
+  const accounts = await server.db.select({ providerId: schema.accounts.providerId }).from(schema.accounts);
+  expect(accounts).toEqual([{ providerId: "credential" }]);
 });
 
 test("a refusal of another kind comes back without the address", async () => {

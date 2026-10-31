@@ -129,6 +129,8 @@ const KNOWN = {
   // A provider's sign-up on a closed server comes back to /login with this code.
   SIGNUP_CLOSED: "auth.flow.closedLead",
   account_not_linked: "auth.unconfirmed",
+  // A provider that hasn't confirmed its own address, to a confirmed account here (apps/server auth.ts `authHandler`).
+  provider_email_unverified: "auth.providerUnverified",
   human_check: "errors.humanCheck",
   human_check_blocked: "errors.humanCheckBlocked",
   // TypeSafe refused the key pasted for Jev: said under its field, nothing kept.
