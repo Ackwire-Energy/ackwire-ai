@@ -6201,6 +6201,7 @@ export const en: Translations = {
     stoppedBy: "Stopped by {{name}}",
     stopped: "Stopped",
     continueRun: "Continue",
+    stepLimit: "At the step limit",
     steer: {
       waiting: "{{name}} reads it at the next pause",
       now: "{{name}} stopped to read it",
@@ -8806,6 +8807,7 @@ export const en: Translations = {
         remembered: "Memory updated: {{text}}",
       },
       interrupted: "Interrupted by a server restart. Ask again to continue.",
+      step_limit: "I ran out of steps before finishing.",
       forum_suggestion: 'Worth a forum? "{{title}}"',
       forum_concluded: 'The forum "{{title}}" is over. The synthesis is in the file below.',
       forum_concluded_issues:

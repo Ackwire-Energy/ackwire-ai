@@ -39,6 +39,7 @@ import {
   pruneMarks,
   recentTurn,
   rememberTurn,
+  stepLimitOf,
   stoppedOf,
   turnItems,
   turnOpener,
@@ -736,6 +737,16 @@ describe("an agent's turn as one block", () => {
     const next = withContinued({ canceled: { byUserId: "u1", text: "Oi" }, other: 1 }, "r2");
     expect(next).toEqual({ canceled: { byUserId: "u1", text: "Oi", continuedRunId: "r2" }, other: 1 });
     expect(stoppedOf(next)?.continuedRunId).toBe("r2");
+  });
+
+  test("a reply at the step limit: whether it was continued, marked in its own meta", () => {
+    expect(stepLimitOf({ stepLimit: {}, bodyCode: "step_limit" })).toEqual({ continuedRunId: null });
+    expect(stepLimitOf({ canceled: { byUserId: "u1" } })).toBeNull();
+    expect(stepLimitOf({})).toBeNull();
+    const next = withContinued({ stepLimit: {}, bodyCode: "step_limit" }, "r3");
+    expect(next).toEqual({ stepLimit: { continuedRunId: "r3" }, bodyCode: "step_limit" });
+    expect(stepLimitOf(next)?.continuedRunId).toBe("r3");
+    expect(stoppedOf(next)).toBeNull();
   });
 });
 
