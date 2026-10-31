@@ -254,8 +254,8 @@ describe("working line", () => {
     // What iOS drew of each: a cut-off "A" beside someone typing leaves, " · " with it.
     expect(lineFit({ agents: 4.7, typers: 170.3 }, true)).toEqual({ agents: null, typers: 171 });
     expect(lineFit({ agents: AGENT_WORDS_MIN }, true).agents).toBe(AGENT_WORDS_MIN);
-    // Alone on the line they are all it says: cut, never dropped.
-    expect(lineFit({ agents: 4.7 }, false).agents).toBe(5);
+    // Alone on the line they are all it says: never dropped, and nothing follows them to keep close to.
+    expect(lineFit({ agents: 4.7 }, false)).toEqual({});
   });
 
   test("a piece cut short keeps to what it drew, so the next comes right after its '…' (no gap)", () => {

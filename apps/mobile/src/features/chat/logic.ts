@@ -360,14 +360,15 @@ export const narrowDrawn = (drawn: LineDrawn, part: keyof LineDrawn, width: numb
 export const AGENT_WORDS_MIN = 40;
 
 /**
- * The widths the working line's pieces keep (whole points): iOS keeps a cut text's whole box, a gap before what
- * follows, so each keeps to what it drew and the next piece comes right after its "…". `agents: null` drops the
- * agents' words, their " · " with them, when beside someone typing they'd be a sliver: who types keeps the room,
- * as on the web.
+ * The widths the working line's pieces keep (whole points) while someone types: iOS keeps a cut text's whole box,
+ * a gap before what follows, so each keeps to what it drew and the next piece comes right after its "…".
+ * `agents: null` drops the agents' words, their " · " with them, when they'd be a sliver: who types keeps the room,
+ * as on the web. Alone, the agents' words keep the line as it is (nothing follows them).
  */
 export function lineFit(drawn: LineDrawn, someoneTypes: boolean): { agents?: number | null; typers?: number } {
+  if (!someoneTypes) return {};
   const whole = (width?: number) => (width === undefined ? undefined : Math.ceil(width));
-  const sliver = someoneTypes && drawn.agents !== undefined && drawn.agents < AGENT_WORDS_MIN;
+  const sliver = drawn.agents !== undefined && drawn.agents < AGENT_WORDS_MIN;
   return { agents: sliver ? null : whole(drawn.agents), typers: whole(drawn.typers) };
 }
 
