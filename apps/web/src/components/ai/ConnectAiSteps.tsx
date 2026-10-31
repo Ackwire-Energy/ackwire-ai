@@ -913,19 +913,20 @@ function PlanSteps({
   // One sign-in there thinks for all of the person's agents (ADR 0059 §2): the accounts of this plan they already
   // have there for all of their agents come first, one click each, before another account.
   const once = signsInOnce(choice, gates.row);
-  const existing = ready
-    ? groupPlans(
-        (view?.accounts ?? []).filter(
-          (a) =>
-            a.shared === true &&
-            a.mine &&
-            a.status === "active" &&
-            a.kind === kind &&
-            (coding ? a.provider === choice : !a.provider) &&
-            (everyone || a.id !== view?.account),
-        ),
-      ).flatMap((g) => g.logins.slice(0, 1))
-    : [];
+  const existing =
+    ready && !login
+      ? groupPlans(
+          (view?.accounts ?? []).filter(
+            (a) =>
+              a.shared === true &&
+              a.mine &&
+              a.status === "active" &&
+              a.kind === kind &&
+              (coding ? a.provider === choice : !a.provider) &&
+              (everyone || a.id !== view?.account),
+          ),
+        ).flatMap((g) => g.logins.slice(0, 1))
+      : [];
   const choosing = ownable || existing.length > 0;
   const otherChosen = ownable && own ? !own.chosen : other;
   const signedOut = !everyone && current?.status === "signed_out" ? current : undefined;
