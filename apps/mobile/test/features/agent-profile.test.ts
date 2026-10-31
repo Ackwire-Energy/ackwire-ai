@@ -127,14 +127,16 @@ describe("Perfil: memórias", () => {
     ...over,
   });
 
-  test("only the owner or an admin may change them", () => {
+  test("only the agent's owner or who reviews memory may change them", () => {
     const theo = { ownerUserId: "u1" };
-    expect(canEditMemories(theo, { id: "u1", role: "member" })).toBe(true);
-    expect(canEditMemories(theo, { id: "u2", role: "admin" })).toBe(true);
-    expect(canEditMemories(theo, { id: "u2", role: "owner" })).toBe(true);
-    expect(canEditMemories(theo, { id: "u2", role: "member" })).toBe(false);
-    expect(canEditMemories({ ownerUserId: null }, { id: "u2", role: "member" })).toBe(false);
-    expect(canEditMemories(theo, { id: null, role: "admin" })).toBe(false);
+    const member = { permissions: ["read", "post"] };
+    const reviewer = { permissions: ["read", "review_memory"] };
+    expect(canEditMemories(theo, { id: "u1", org: member })).toBe(true);
+    expect(canEditMemories(theo, { id: "u2", org: reviewer })).toBe(true);
+    expect(canEditMemories(theo, { id: "u2", org: member })).toBe(false);
+    expect(canEditMemories(theo, { id: "u2", org: undefined })).toBe(false);
+    expect(canEditMemories({ ownerUserId: null }, { id: "u2", org: member })).toBe(false);
+    expect(canEditMemories(theo, { id: null, org: reviewer })).toBe(false);
   });
 
   test("where it came from: said in your DM, in a channel, written by you, or learned", () => {

@@ -24,6 +24,7 @@ import {
   useMissionControl,
   usePostMessage,
   useRoster,
+  useSteerState,
   useThreadInfo,
   useThreadMessages,
   useThreadMission,
@@ -82,8 +83,10 @@ import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/h
 import { agentLook } from "../shared/logic";
 import { FocusLive, PushedHeader, Tile } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
+import { useDmStatusLine, usePresenceWord } from "../status/hooks";
+import { PersonStatusCard } from "../status/StatusCard";
 import { AgentReceiptLine } from "./AgentReceipts";
-import { receiptMessageId } from "./agent-receipts";
+import { receiptMessageId, turnHeadId } from "./agent-receipts";
 import { ChannelMembersSheet } from "./ChannelMembers";
 import { ConversationSwitcher } from "./ConversationSwitcher";
 import { DmComputerButton } from "./DmComputerButton";
@@ -278,12 +281,13 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   }, [isThread, threadId, top.data, threadMessages.data, older]);
   // Messages said in the channel itself: a "thinking" row the app guessed hangs off one of them.
   const topIds = useMemo(() => new Set(list.flatMap((m) => (m.threadId ? [] : [m.id]))), [list]);
-  // A DM with a person: "Visto" under my latest message once they read it (live: `channel.read`).
+  // A DM with a person: their face beside my latest message once they read it (live: `channel.read`).
   const reads = useDmReads(orgId, channelId, dm?.with.type === "person" && !isThread);
   const seenId = useMemo(
     () => (reads.data && meId ? seenMessageId(top.data ?? [], meId, reads.data) : null),
     [reads.data, top.data, meId],
   );
+  const seenBy = seenId ? dm?.with.id : undefined;
 
   // ── Live ──
   const live = useChatLive(orgId, channelId, member);
@@ -301,17 +305,17 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     [live.consults, isThread, threadId, topIds],
   );
 
-  // "Parar" in the working line (as on the web): admins, the agent's owner, or who started it.
-  const role = useOrg().org?.role;
+  // "Parar" in the working line (as on the web): who manages agents, the agent's owner, or who started it.
+  const manageAgents = can(useOrg().org, "manage_agents");
   const canStop = useCallback(
     (r: LiveRun) =>
       mayStopRun(r, {
         meId,
-        manageAgents: can(role, "manage_agents"),
+        manageAgents,
         agentOwnerId: dir.agentById.get(r.agentId)?.ownerUserId,
         messages: list,
       }),
-    [meId, role, dir.agentById, list],
+    [meId, manageAgents, dir.agentById, list],
   );
   const { stop } = live;
   const stopRun = useCallback(
@@ -901,6 +905,15 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     const verb = activityVerb(t, entry.activity);
     return verb.charAt(0).toUpperCase() + verb.slice(1);
   }, [dmAgentId, isThread, runs, consults, dir.agentById, t]);
+  // A DM's pill says how the other side is (ADR 0084): an agent's presence and what it does, a person's line.
+  const dmLine = useDmStatusLine(
+    dm && !isThread ? { type: dm.with.type, id: dm.with.id } : null,
+    dmDoing,
+    dmAgentId ? subtitle : undefined,
+  );
+  // The ⋯ of a DM with a person says how they appear, their line in a card under it.
+  const personDm = dm && !dmAgentId && !isThread ? dm.with.id : null;
+  const optionsLine = usePresenceWord(personDm ? { type: "person", id: personDm } : null) ?? subtitle;
   // ── Keeping the place ──
   // Something opening over the conversation must not move it: on iOS it jumped when a header button opened a sheet
   // or the agent's computer. Where the person was (the end, or a row on screen) is taken before it opens, and given
@@ -1004,11 +1017,12 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
           <ChannelOptions
             channelId={channelId}
             title={title}
-            {...(subtitle ? { subtitle } : {})}
+            {...(optionsLine ? { subtitle: optionsLine } : {})}
             leading={
               dm ? <Face who={{ type: dm.with.type, id: dm.with.id }} size={36} live={false} /> : <Tile icon="hash" />
             }
             agentId={dmAgentId}
+            about={personDm ? <PersonStatusCard userId={personDm} /> : undefined}
             onPins={openPins}
             onMembers={channel && !dm ? openMembers : undefined}
           />,
@@ -1052,13 +1066,20 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       <HeaderPill
         lead={
           dmAgentId ? (
-            <AgentFace agentId={dmAgentId} size={26} framed={false} mode={dmDoing ? "run" : "idle"} />
+            <AgentFace
+              agentId={dmAgentId}
+              size={26}
+              framed={false}
+              mode={dmDoing ? "run" : "idle"}
+              presence
+              ring={c.glassSolid}
+            />
           ) : (
-            <Face who={{ type: dm.with.type, id: dm.with.id }} size={26} live={false} />
+            <Face who={{ type: dm.with.type, id: dm.with.id }} size={26} live={false} presence ring={c.glassSolid} />
           )
         }
         title={dm.with.name}
-        subtitle={dmDoing ?? subtitle}
+        subtitle={dmLine ?? dmDoing ?? subtitle}
         color={dmAgentId ? agentLook(dmAgent).color : undefined}
         working={Boolean(dmDoing)}
         extraActions={dmAgentId ? 1 : 0}
@@ -1066,8 +1087,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         {...hold}
         label={
           dmAgentId
-            ? t("mobile.chat.headerAgent", { who: who(dm.with.name, dmDoing ?? subtitle ?? "") })
-            : t("mobile.chat.headerChannel", { who: who(dm.with.name, "") })
+            ? t("mobile.chat.headerAgent", { who: who(dm.with.name, dmLine ?? dmDoing ?? subtitle ?? "") })
+            : t("mobile.chat.headerChannel", { who: who(dm.with.name, dmLine ?? "") })
         }
       />
     ) : channel ? (
@@ -1136,8 +1157,16 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
 
   // ── Agents' receipts and "no AI" ──
   const shownMessages = useMemo(() => rows.flatMap((r) => (r.kind === "message" ? [r.message] : [])), [rows]);
-  // One receipt line, under the latest person's message on screen.
+  // One receipt, the latest person's message's on screen: a mark beside my bubble, or at the end of the name line of
+  // someone else's turn; a line under the message only for what asks something of you.
   const receiptId = useMemo(() => receiptMessageId(shownMessages), [shownMessages]);
+  const receiptMine = Boolean(meId && shownMessages.find((m) => m.id === receiptId)?.author.id === meId);
+  // Someone else's message sent into a task at work says nothing here (mine wears it: `ReceiptMark`).
+  const receiptSteered = useSteerState(orgId, channelId, receiptId && !receiptMine ? receiptId : "") !== null;
+  const markAt = useMemo(
+    () => (!receiptId || receiptSteered ? null : receiptMine ? receiptId : turnHeadId(rows, receiptId)),
+    [receiptId, receiptSteered, receiptMine, rows],
+  );
   // The line redraws when what it shows changes, not on every event that touches the receipt (typing).
   const receiptNow = receiptId ? live.receipts[receiptId] : undefined;
   const receiptKey = receiptNow
@@ -1227,6 +1256,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
                 thread={isThread ? undefined : linkThreads.get(item.message.id)}
                 onLongPress={onLongPress}
                 onRetry={onRetry}
+                receipt={item.message.id === markAt ? receipt : undefined}
+                seenBy={item.message.id === seenId ? seenBy : undefined}
               />
               {item.message.id === receiptId ? (
                 <AgentReceiptLine
@@ -1236,13 +1267,6 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
                   connectInline={connectInline}
                   onRetry={onResend}
                 />
-              ) : null}
-              {item.message.id === seenId ? (
-                <Animated.View entering={FadeIn.duration(200)}>
-                  <Text variant="caption" tone="muted" style={styles.seen} accessibilityLiveRegion="polite">
-                    {t("mobile.chat.seen")}
-                  </Text>
-                </Animated.View>
               ) : null}
             </Animated.View>
           );
@@ -1260,11 +1284,12 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       toggleBrowser,
       bodyOf,
       seenId,
+      seenBy,
       receiptId,
+      markAt,
       receipt,
       connectInline,
       onResend,
-      t,
     ],
   );
 
@@ -1683,8 +1708,6 @@ function Connection({ status }: { status: ConnectionStatus }) {
 
 const styles = StyleSheet.create({
   topFade: { position: "absolute", top: 0, left: 0, right: 0 },
-  // "Visto": right under my latest message, at the right edge (the receipts' side).
-  seen: { alignSelf: "flex-end", marginTop: -4, marginBottom: 4, paddingHorizontal: 16 },
   // Under the agent's words, like a card on its message (MessageRow: 14 + 34 avatar + 11 gap).
   browserRow: { paddingLeft: 59, paddingRight: 16, paddingBottom: 6 },
   screen: { flex: 1 },

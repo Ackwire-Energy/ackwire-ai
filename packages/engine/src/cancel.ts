@@ -1,5 +1,6 @@
 import { DESKTOP_PROTOCOL, type PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, gte, inArray, schema, sql } from "@agenteschat/db";
+import { announceAgentStatus } from "./agent-status";
 import { recordAudit } from "./audit";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent } from "./events";
@@ -201,7 +202,7 @@ export async function cancelRun(
     .leftJoin(channels, eq(channels.id, agentRuns.channelId))
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.orgId, orgId)));
   if (!row) throw new NotFoundError("Run not found");
-  const allowed = row.requester === userId || row.ownerUserId === userId || can(membership.role, "manage_agents");
+  const allowed = row.requester === userId || row.ownerUserId === userId || can(membership, "manage_agents");
   if (!allowed)
     throw new ForbiddenError("Only who asked, the agent's owner or an admin can stop it", "run.cancel_forbidden");
 
@@ -305,6 +306,8 @@ export async function stopRun(
   if (actor.type === "person" && !run.background)
     await publishChannelEvent(deps.pubsub, { type: "run.canceled", ...where, byUserId: actor.id });
   await publishChannelEvent(deps.pubsub, { type: "agent.run", ...where, ...bg, status: "canceled" });
+  // Its line ends with the run (ADR 0084 §11).
+  await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
   if (previous !== "running" && run.background) {
     await publishChannelEvent(deps.pubsub, { type: "agent.idle", ...where, ...bg });
     await publishChannelEvent(deps.pubsub, { type: "run.finished", ...where, ...bg, status: "canceled" });

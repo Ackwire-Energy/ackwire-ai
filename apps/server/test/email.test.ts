@@ -36,9 +36,7 @@ test("emails go through the outbox: invitation (create, batch, resend) and passw
   ]);
   expect(t.email.sent[0]?.text).toContain(url);
 
-  await owner(`/api/app/organizations/${orgId}/invitations/batch`, {
-    json: { emails: ["bia@example.com"], role: "admin" },
-  });
+  await owner(`/api/app/organizations/${orgId}/invitations/batch`, { json: { emails: ["bia@example.com"] } });
   const all = (await (await owner(`/api/app/organizations/${orgId}/invitations/all`)).json()) as {
     invitations: { id: string; email: string }[];
   };

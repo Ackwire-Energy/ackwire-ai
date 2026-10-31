@@ -57,7 +57,7 @@ function readDismissed(): string[] {
 export function OutageNotices() {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const manage = can(org.role, "manage_agents");
+  const manage = can(org, "manage_agents");
   const outages = useMachineOutages(org.id);
   const list = outages.data?.outages ?? [];
   const [dismissed, setDismissed] = useState(readDismissed);
@@ -330,7 +330,7 @@ export function SwitchComputerDialog({
 export function WaitingCard({ notice, agentId }: { notice: BrainUnavailable; agentId: string | null }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const manage = can(org.role, "manage_agents");
+  const manage = can(org, "manage_agents");
   const outages = useMachineOutages(org.id);
   const machines = useMachines(org.id);
   const [open, setOpen] = useState(false);

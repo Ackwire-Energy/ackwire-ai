@@ -8,11 +8,13 @@ import {
   useCustomServers,
   useDecideApproval,
   usePostMessage,
+  useRoles,
 } from "@agenteschat/client";
 import { approvalOriginShort, approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import { fromServer, itemName } from "@agenteschat/client/lib/connected";
 import { daysBetween, joinNames, relativeTime, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { everyoneOf, grants } from "@agenteschat/client/lib/roles";
 import { connectorName } from "@agenteschat/client/lib/scopes";
 import {
   Button,
@@ -969,6 +971,7 @@ function ApprovalDetails({
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
+  const roles = useRoles(org.id).data?.roles ?? [];
   const detail = useApproval(org.id, listed.id);
   // The list (kept fresh by events) wins for the state; the detail adds the trail.
   const a: Approval = { ...listed, trail: detail.data?.trail ?? listed.trail };
@@ -989,9 +992,17 @@ function ApprovalDetails({
     .slice(-12);
   const ok = record.filter((x) => x.status === "approved").length;
   const ownerId = a.ownerUserId ?? agent?.ownerUserId ?? null;
+  // What a person's roles give them, `everyone`'s included (ADR 0085); owners may everything.
+  const everyone = everyoneOf(roles);
+  const keysOf = (m: Member) =>
+    grants([
+      ...(everyone?.permissions ?? []),
+      ...roles.filter((r) => m.roleIds?.includes(r.id)).flatMap((r) => r.permissions),
+    ]);
+  const isAdmin = (m: Member) => m.role === "owner" || keysOf(m).has("administrator");
   const deciders = [
     ...dir.members.filter((m) => m.userId === ownerId),
-    ...dir.members.filter((m) => m.userId !== ownerId && (m.role === "owner" || m.role === "admin")),
+    ...dir.members.filter((m) => m.userId !== ownerId && (m.role === "owner" || keysOf(m).has("approve_actions"))),
   ].slice(0, 6);
   const pr = prLink(a);
   const decides = p === "waiting" && a.canDecide;
@@ -1151,7 +1162,7 @@ function ApprovalDetails({
                     {" · "}
                     {[
                       m.userId === ownerId ? t("approvals.panel.owner") : "",
-                      m.role === "owner" || m.role === "admin" ? t("approvals.panel.admin") : "",
+                      isAdmin(m) ? t("approvals.panel.admin") : "",
                     ]
                       .filter(Boolean)
                       .join(", ")}

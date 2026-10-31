@@ -453,7 +453,7 @@ async function placeNew(
   input: { title: string; channelId?: string | null; threadId?: string | null },
 ) {
   const membership = await requireMember(db, actor, orgId);
-  if (membership && !can(membership.role, "post")) throw new ForbiddenError();
+  if (membership && !can(membership, "upload_files")) throw new ForbiddenError();
   const title = input.title.trim().slice(0, ARTIFACT_LIMITS.titleChars);
   if (!title) throw new ValidationError("title is required");
   const channelId = actor.type === "agent" ? actor.channelId : (input.channelId ?? null);
@@ -1020,7 +1020,7 @@ export const ARTIFACT_TRASH_DAYS = 30;
  */
 async function canDeleteArtifact(db: Database, userId: string, orgId: string, a: ArtifactRow) {
   const membership = await requireActiveMembership(db, userId, orgId);
-  if (can(membership.role, "configure")) return true;
+  if (can(membership, "configure")) return true;
   if (a.createdByType === "person") return a.createdById === userId;
   const [agent] = await db
     .select({ ownerUserId: schema.agents.ownerUserId })

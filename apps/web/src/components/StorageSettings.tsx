@@ -118,7 +118,7 @@ function PathCode({ path }: { path: string }) {
 export function StorageSection() {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
-  const admin = can(org.role, "configure");
+  const admin = can(org, "configure");
   const storage = useStorage(org.id, admin);
   const limits = useWorkspaceLimits(org.id, admin);
   // Under a storage limit the meter above says what the files here take, against the limit: the option doesn't say it

@@ -110,11 +110,14 @@ describe("arranging categories", () => {
     });
   });
 
-  test("a channel's creator or an admin may move it", () => {
-    expect(movesChannel({ createdByUserId: "u1" }, "u1", "member")).toBe(true);
-    expect(movesChannel({ createdByUserId: "u2" }, "u1", "member")).toBe(false);
-    expect(movesChannel({ createdByUserId: "u2" }, "u1", "admin")).toBe(true);
-    expect(movesChannel({ createdByUserId: null }, null, "member")).toBe(false);
+  test("a channel's creator or who manages channels may move it", () => {
+    const member = { role: "member" as const, permissions: ["read", "post"] };
+    const manager = { role: "member" as const, permissions: ["read", "manage_channels"] };
+    expect(movesChannel({ createdByUserId: "u1" }, "u1", member)).toBe(true);
+    expect(movesChannel({ createdByUserId: "u2" }, "u1", member)).toBe(false);
+    expect(movesChannel({ createdByUserId: "u2" }, "u1", manager)).toBe(true);
+    expect(movesChannel({ createdByUserId: null }, null, member)).toBe(false);
+    expect(movesChannel({ createdByUserId: "u2" }, "u1", undefined)).toBe(false);
   });
 
   test("the screens' addresses", () => {

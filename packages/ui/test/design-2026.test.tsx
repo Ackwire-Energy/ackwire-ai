@@ -15,6 +15,7 @@ import {
   filterPalette,
   Kbd,
   type PaletteItem,
+  PresenceBadge,
   Reaction,
   SearchField,
   Segmented,
@@ -340,7 +341,7 @@ describe("the living agent symbol", () => {
         <Avatar kind="agent" name="Theo" />
         <Avatar kind="agent" name="Theo" state="thinking" />
         <Avatar kind="agent" name="Theo" state="writing" />
-        <Avatar name="Walter" presence />
+        <Avatar name="Walter" presence="online" />
       </>,
     );
     const [idle, thinking, writing, person] = Array.from(container.querySelectorAll(".ac-avatar"));
@@ -351,8 +352,52 @@ describe("the living agent symbol", () => {
     expect(writing?.className).toContain("ac-avatar--writing");
     expect(writing?.querySelector("canvas.ac-avatar__canvas")).not.toBeNull();
     expect(person?.textContent).toBe("W");
-    expect(person?.querySelector(".ac-avatar__presence")).not.toBeNull();
+    expect(person?.querySelector(".ac-avatar__badge .ac-presence")?.getAttribute("data-presence")).toBe("online");
     expect(person?.hasAttribute("data-state")).toBe(false);
+  });
+});
+
+describe("the presence badge (ADR 0084)", () => {
+  const badge = (el: Element | null | undefined) => el?.querySelector("svg.ac-presence");
+  const tones = (svg: Element | null | undefined) =>
+    Array.from(svg?.querySelectorAll("path") ?? []).map((p) => p.getAttribute("class"));
+
+  test("1 px pixels on small faces (11 px with the ring), 1.5 px from the profile cards' up; none when null", () => {
+    const { container } = render(
+      <>
+        <Avatar name="Walter" size="sm" presence="busy" presenceLabel="Ocupado" />
+        <Avatar name="Walter" size="lg" presence="away" />
+        <Avatar kind="agent" name="Theo" presence="online" />
+        <Avatar name="Walter" presence={null} />
+      </>,
+    );
+    const [sm, lg, agent, none] = Array.from(container.querySelectorAll(".ac-avatar"));
+    expect([badge(sm)?.getAttribute("width"), badge(lg)?.getAttribute("width")]).toEqual(["11", "16.5"]);
+    expect(sm?.querySelector(".ac-avatar__badge")?.getAttribute("title")).toBe("Ocupado");
+    expect(badge(agent)?.getAttribute("data-presence")).toBe("online");
+    expect(none?.querySelector(".ac-avatar__badge")).toBeNull();
+  });
+
+  test("busy and away carry a white mark; offline and hidden are outlines, no mark", () => {
+    const { container } = render(
+      <>
+        <PresenceBadge presence="busy" />
+        <PresenceBadge presence="away" />
+        <PresenceBadge presence="online" />
+        <PresenceBadge presence="offline" />
+        <PresenceBadge presence="hidden" ring={false} />
+      </>,
+    );
+    const [busy, away, online, offline, hidden] = Array.from(container.querySelectorAll("svg.ac-presence"));
+    expect(tones(busy)).toContain("ac-presence__mark");
+    expect(tones(away)).toContain("ac-presence__mark");
+    expect(tones(online)).not.toContain("ac-presence__mark");
+    expect(tones(online)).toContain("ac-presence__light");
+    expect(tones(offline)).not.toContain("ac-presence__mark");
+    expect(tones(offline)).toContain("ac-presence__ring");
+    // Without its ring, 9 pixels of 1 px; the dotted outline leaves its holes empty (no ring to fill them).
+    expect(hidden?.getAttribute("viewBox")).toBe("0 0 9 9");
+    expect(tones(hidden)).toEqual(["ac-presence__base", "ac-presence__light"]);
   });
 });
 

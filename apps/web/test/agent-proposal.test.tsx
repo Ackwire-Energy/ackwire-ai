@@ -208,6 +208,28 @@ describe("Revisar: Criar agente filled in with the draft", () => {
     expect(title()).toBe("Qual vai ser o papel?");
   });
 
+  test("on an account of mine it suggests: created on that account, with no plan sign-in to open", async () => {
+    const state = seedState();
+    state.messages.push(
+      proposal(
+        "p-1",
+        {},
+        { ai: { kind: "account", brain: "claude_code", machineId: "m-1", accountId: "a-1", label: "Claude Max" } },
+      ),
+    );
+    await renderApp(`/org/${ORG_ID}/agents/new?proposal=p-1`, { api: createFakeApi(state) });
+    await settle(8);
+    await click(screen().getByRole("button", { name: "Criar Nina" }), 10);
+    const agentId = state.agents.find((a) => a.handle === "nina")?.id;
+    expect(state.calls.find((c) => c.method === "agents.setBrain")?.args).toEqual([
+      ORG_ID,
+      agentId,
+      { brain: "claude_code", account: "a-1" },
+    ]);
+    // It thinks with that account, not the computer's own sign-in: nothing to connect.
+    expect(screen().queryByRole("dialog", { name: /^Conectar uma IA/ })).toBeNull();
+  });
+
   test("a proposal already decided: no flow, a way back to the conversation", async () => {
     const state = seedState();
     state.messages.push(proposal("p-1", { state: "denied" }));

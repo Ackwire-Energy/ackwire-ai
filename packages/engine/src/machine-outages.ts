@@ -121,7 +121,7 @@ export async function listMachineOutages(
   const { db } = deps;
   const now = deps.now?.() ?? new Date();
   const membership = await requirePermission(db, actorId, orgId, "read");
-  const admin = can(membership.role, "manage_agents");
+  const admin = can(membership, "manage_agents");
   const rows = await db
     .select()
     .from(machines)
@@ -258,7 +258,7 @@ export async function moveAgentsFromMachine(
   const { db } = deps;
   const now = deps.now?.() ?? new Date();
   const membership = await requirePermission(db, actorId, orgId, "read");
-  const admin = can(membership.role, "manage_agents");
+  const admin = can(membership, "manage_agents");
   const from = await getMachine(db, orgId, machineId);
   if (!from) throw new NotFoundError("Computer not found", "machine.not_found");
   const agentIds = [...new Set(input.agentIds)];
