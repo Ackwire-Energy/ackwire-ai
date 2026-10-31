@@ -143,8 +143,9 @@ describe("the agent's AI", () => {
   test("the agent's AI and a plan's page draw the same switch, line and ⓘ, and nothing asks to accept the terms", async () => {
     // The screens are components the tests can't render: what they wire in, as text.
     const read = (file: string) => Bun.file(new URL(`../../src/features/ai/${file}`, import.meta.url).pathname).text();
+    // The agent's switch is in its advanced settings (ADR 0086).
     const [screen, connect, parts] = await Promise.all([
-      read("AgentAiScreen.tsx"),
+      read("AgentAdvancedScreen.tsx"),
       read("ConnectAiSteps.tsx"),
       read("parts.tsx"),
     ]);

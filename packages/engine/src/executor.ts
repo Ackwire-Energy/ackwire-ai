@@ -1,5 +1,18 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, count, type Database, desc, type Executor, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  count,
+  type Database,
+  desc,
+  type Executor,
+  eq,
+  inArray,
+  isNull,
+  or,
+  queryTrace,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import {
   type ContentBlock,
   isAutoModel,
@@ -803,23 +816,25 @@ async function executeRunInner(
     }
   }
   // What the agent shows it is doing (ADR 0084 §8–9): lines from facts everyone may see, picked by Jev in a request
-  // of its own, beside the run and never in its way.
+  // of its own, beside the run and never in its way: its statements count apart from the run's.
   if (needsContext) {
-    void (async () => {
-      const lines = await statusCandidates(db, run, granted);
-      const pick = judge
-        ? await askRunStatus(judge, {
-            orgId: run.orgId,
-            agentId: agent.id,
-            runId: run.id,
-            agent: { name: agent.name, role: agent.role, instructions: agent.instructions },
-            message: trigger?.body ?? topTrigger?.body ?? "",
-            recent: await recentMessages(),
-            candidates: lines,
-          }).catch(() => null)
-        : null;
-      await startRunStatus({ db, pubsub: deps.pubsub }, run, lines, pick);
-    })().catch(() => {});
+    void queryTrace
+      .run({ count: 0 }, async () => {
+        const lines = await statusCandidates(db, run, granted);
+        const pick = judge
+          ? await askRunStatus(judge, {
+              orgId: run.orgId,
+              agentId: agent.id,
+              runId: run.id,
+              agent: { name: agent.name, role: agent.role, instructions: agent.instructions },
+              message: trigger?.body ?? topTrigger?.body ?? "",
+              recent: await recentMessages(),
+              candidates: lines,
+            }).catch(() => null)
+          : null;
+        await startRunStatus({ db, pubsub: deps.pubsub }, run, lines, pick);
+      })
+      .catch(() => {});
   }
 
   // Started by a routine: its answer carries the routine (the app shows a small tag on the
