@@ -13,28 +13,45 @@ afterEach(() => {
 const styles = (name: string) => Bun.file(new URL(`../src/styles/${name}`, import.meta.url).pathname).text();
 
 describe("focus rings only for the keys", () => {
-  test("Tab, or a moving key where nothing is typed, turns them on; a press turns them off; typing changes nothing", () => {
+  test("a key that moves the focus turns them on, one that moves nothing doesn't; a press turns them off", () => {
     trackInput();
     const html = document.documentElement;
-    document.body.innerHTML = '<button type="button">Ver perfil</button><textarea></textarea><input type="radio">';
-    const el = (selector: string) => document.querySelector(selector) as HTMLElement;
-    const [button, box, radio] = [el("button"), el("textarea"), el("input")];
+    document.body.innerHTML =
+      '<button type="button">Ver perfil</button><textarea></textarea><input type="radio" name="r"><input type="radio" name="r">';
+    const [button, box, radio, radio2] = [...document.querySelectorAll<HTMLElement>("button, textarea, input")];
+    if (!button || !box || !radio || !radio2) throw new Error("no controls");
     const mode = () => [html.hasAttribute("data-pointer") ? "pointer" : "keys", movesByKeys()];
+    /** A key, and where the focus goes while it is down: the browser's move, or a script's a moment later. */
+    const press = (
+      on: HTMLElement,
+      key: string,
+      to?: HTMLElement,
+      held: { metaKey?: boolean; altKey?: boolean } = {},
+    ) => {
+      fireEvent.keyDown(on, { key, ...held });
+      to?.focus();
+      fireEvent.keyUp(on, { key, ...held });
+    };
     expect(mode()).toEqual(["pointer", false]);
-    // Typing, the caret, sending, closing, a shortcut: still the pointer's.
-    for (const key of ["a", "ArrowDown", "Home", "Enter"]) fireEvent.keyDown(box, { key });
-    fireEvent.keyDown(button, { key: "Escape" });
-    fireEvent.keyDown(button, { key: "ArrowDown", metaKey: true });
+    box.focus();
+    // Typing, the caret, sending, closing, Tab that picks a mention, an arrow that scrolls: the focus stays.
+    for (const key of ["a", "ArrowDown", "Home", "Enter", "Escape", "Tab", "PageDown"]) press(box, key);
+    // Shortcuts, also one that focuses something (⌘K, the palette's field).
+    press(box, "k", button, { metaKey: true });
+    press(button, "ArrowDown", box, { metaKey: true });
+    // What a script focuses once the key is up: a card that opens under the pointer right after that Tab.
+    press(box, "Tab");
+    button.focus();
     expect(mode()).toEqual(["pointer", false]);
-    fireEvent.keyDown(box, { key: "Tab" });
+    press(button, "Tab", box);
     expect(mode()).toEqual(["keys", true]);
     fireEvent.pointerDown(button, { pointerType: "touch" });
     expect(mode()).toEqual(["pointer", false]);
     // Arrows between radios move the focus; ⌥Tab is how Safari reaches a button.
-    fireEvent.keyDown(radio, { key: "ArrowRight" });
+    press(radio, "ArrowRight", radio2);
     expect(mode()).toEqual(["keys", true]);
     fireEvent.pointerDown(button, { pointerType: "mouse" });
-    fireEvent.keyDown(button, { key: "Tab", altKey: true });
+    press(radio2, "Tab", button, { altKey: true });
     expect(mode()).toEqual(["keys", true]);
   });
 
