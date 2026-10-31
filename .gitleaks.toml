@@ -2,12 +2,14 @@
 useDefault = true
 
 # Tests never read .env and never touch the network: every key, token and password in them is made
-# up, most on purpose to check redaction, encryption at rest and masking. Only the generic rule is
-# off there: a real key in a provider's format (Anthropic, OpenAI, AWS, GitHub, a private key...)
-# pasted into a test still fails the scan.
+# up, most on purpose to check redaction, encryption at rest and masking. Only the generic rule and
+# the curl-header one are off there (a test's curl headers carry made-up tokens to check that a
+# command's label never shows what the command hides): a real key in a provider's own format
+# (Anthropic, OpenAI, AWS, GitHub, a private key...) pasted into a test, in a curl header or not,
+# still fails the scan through that format's own rule.
 [[allowlists]]
 description = "Made-up keys and tokens in tests"
-targetRules = ["generic-api-key"]
+targetRules = ["generic-api-key", "curl-auth-header"]
 paths = [
   '''(^|/)test/''',
   '''\.test\.tsx?$''',
