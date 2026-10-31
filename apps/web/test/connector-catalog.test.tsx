@@ -3,7 +3,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { AccessInput } from "@agenteschat/client";
+import type { AccessInput, ConnectorDef } from "@agenteschat/client";
+import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { authKind, searchCatalog } from "@/components/ConnectorCatalog";
 import { setNavigateAway } from "@/lib/navigate";
@@ -15,8 +16,8 @@ afterEach(() => cleanup());
 
 const click = (el: Element) => act(async () => fireEvent.click(el));
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
-const open = async (state = seedState({ connections: [] })) => {
-  await renderApp(`/org/${ORG_ID}/settings/connectors`, { api: createFakeApi(state) });
+const open = async (state = seedState({ connections: [] }), api = createFakeApi(state)) => {
+  await renderApp(`/org/${ORG_ID}/settings/connectors`, { api });
   await settle(8);
   await click(screen().getByRole("button", { name: "Adicionar conector" }));
   return { state, dialog: screen().getByRole("dialog", { name: "Adicionar conector" }) };
@@ -29,6 +30,9 @@ const filterNames = (cats: HTMLElement) =>
     .getAllByRole("radio")
     .map((b) => b.firstChild?.textContent);
 const pressEsc = (el: Element) => act(async () => fireEvent.keyDown(el, { key: "Escape" }));
+/** Whether an icon is drawn as `name` (its shape's first path). */
+const drawnAs = (svg: Element | null | undefined, name: keyof typeof icons) =>
+  svg?.querySelector("path")?.getAttribute("d") === icons[name].find(([tag]) => tag === "path")?.[1].d;
 /** A level's radio in the radiogroup named `group`. */
 const levelIn = (inside: HTMLElement, group: string, level: string) =>
   within(within(inside).getByRole("radiogroup", { name: group })).getByRole("radio", { name: level });
@@ -98,6 +102,42 @@ describe("Adicionar conector: one catalog", () => {
     expect(names(dialog)).toEqual(["Notion", "Não achou?"]);
     await type(within(dialog).getByRole("searchbox", { name: "Buscar conector" }), "zzz");
     expect(dialog.textContent).toContain("Nenhum conector encontrado com “zzz”.");
+  });
+
+  test("a vendor that hasn't approved agentes.chat yet: greyed, a lock and 'Em breve', last, and its tile opens nothing", async () => {
+    const state = seedState({ connections: [] });
+    const api = createFakeApi(state);
+    const linear = CATALOG.connectors.find((d) => d.id === "linear") as ConnectorDef;
+    const asana: ConnectorDef = {
+      ...linear,
+      id: "asana",
+      label: "Asana",
+      description: "Asana tasks, projects and teams.",
+      serverUrl: "https://mcp.asana.com/mcp",
+      iconUrl: "/connectors/asana.svg",
+      brandColor: "#F06A6A",
+      available: false,
+      soon: true,
+    };
+    api.connectors.catalog = async () => ({ ...CATALOG, connectors: [asana, ...CATALOG.connectors] });
+    const { dialog } = await open(state, api);
+    const tile = within(dialog).getByRole("button", { name: "Asana, em breve" }) as HTMLButtonElement;
+    expect([tile.hasAttribute("data-soon"), tile.disabled, tile.hasAttribute("aria-haspopup")]).toEqual([
+      true,
+      true,
+      false,
+    ]);
+    const chip = tile.querySelector(".ac-chip");
+    expect(chip?.textContent).toBe("Em breve");
+    expect(drawnAs(chip?.querySelector("svg"), "lock")).toBe(true);
+    expect(tile.textContent).toContain("Tarefas, projetos e times.");
+    // With what can't connect here, last before "Não achou?".
+    expect(names(dialog).slice(-3)).toEqual(["Asana", "Slack", "Não achou?"]);
+    await click(tile);
+    expect(screen().queryByRole("dialog", { name: "Asana" })).toBeNull();
+    expect(screen().getAllByRole("dialog")).toEqual([dialog]);
+    const starts = ["customConnectors.connect", "connectors.startOAuth", "connectors.connectWithKey"];
+    expect(state.calls.filter((c) => starts.includes(c.method))).toEqual([]);
   });
 
   test("a tile opens its service over the catalog: what agents could do, what asks, how it connects; Esc closes the service first", async () => {
@@ -365,6 +405,28 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     expect(section.textContent).toContain("Conectado como mcp.linear.app");
     expect(section.textContent).toContain("4 ferramentas");
     expect(section.textContent).toContain("1 de 2 agentes");
+  });
+
+  test("a server whose OAuth only lets in apps it approved says so, not 'no OAuth', and the key stays the way in", async () => {
+    const state = seedState({ connections: [] });
+    const api = createFakeApi(state);
+    const connect = api.customConnectors.connect;
+    api.customConnectors.connect = async (orgId, input) =>
+      input.apiKey ? connect(orgId, input) : { status: "needs_key", reason: "not_approved" };
+    const { dialog } = await open(state, api);
+    await pick(dialog, "Linear");
+    const flow = screen().getByRole("dialog", { name: "Conectar Linear" });
+    await click(within(flow).getByRole("button", { name: "Continuar no Linear" }));
+    await settle(4);
+    expect(flow.textContent).toContain(
+      "Linear só deixa entrar apps que aprovou, e o agentes.chat ainda não foi aprovado. Se ele te der uma chave de API, dá para conectar com ela.",
+    );
+    expect(flow.textContent).not.toContain("não aceita OAuth");
+    expect(flow.querySelector("details.cflow__more")?.hasAttribute("open")).toBe(true);
+    await type(within(flow).getByLabelText("Chave de API"), "lin_api_123456");
+    await click(within(flow).getByRole("button", { name: "Conectar com a chave" }));
+    await settle(4);
+    expect(screen().getByRole("dialog", { name: REVIEW })).toBeTruthy();
   });
 
   test("'Todos os agentes' is a row like an agent's, on top and raised: it sets every agent, and shows none when they differ", async () => {

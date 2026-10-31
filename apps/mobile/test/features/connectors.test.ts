@@ -8,16 +8,19 @@ import {
   connectHow,
   connectionOf,
   doneFinishing,
+  galleryTiles,
   iconUri,
   isFinishing,
   isHttpsUrl,
   markFinishing,
   monogram,
+  needsKeyText,
   ownMarkUri,
   searchConnectors,
   stateOf,
   suggestionsOf,
 } from "../../src/features/connectors/logic";
+import { translator } from "./fixtures";
 
 const def = (id: string, over: Partial<ConnectorDef> = {}): ConnectorDef => ({
   id,
@@ -79,6 +82,31 @@ describe("connectors gallery", () => {
     catalog[2] = def("notion", { available: false });
     const items = connectedItems([conn("github")], [], catalog);
     expect(suggestionsOf(catalog, items).map((d) => d.id)).toEqual(["linear", "drive", "sentry"]);
+  });
+
+  test("'Em breve': a vendor that hasn't approved agentes.chat yet is last, greyed with a lock, and opens nothing", () => {
+    const asana = def("asana", { kind: "remote_mcp", available: false, soon: true });
+    const slack = def("slack", { available: false });
+    expect(
+      galleryTiles([asana, def("github"), slack, def("linear")]).map((x) => [x.def.id, x.opens, x.locked]),
+    ).toEqual([
+      ["github", true, false],
+      ["linear", true, false],
+      ["asana", false, true],
+      ["slack", false, false],
+    ]);
+  });
+
+  test("a server whose OAuth only lets in apps it approved says so; one with no sign-in just asks for a key", async () => {
+    const pt = await translator("pt-BR");
+    expect(needsKeyText(pt, { status: "needs_key", reason: "not_approved" }, "Asana")).toBe(
+      "Asana só deixa entrar apps que aprovou, e o agentes.chat ainda não foi aprovado. Se ele te der uma chave de API, dá para conectar com ela.",
+    );
+    expect(needsKeyText(pt, { status: "needs_key" }, "Asana")).toBe("Esse servidor pede uma chave.");
+    const en = await translator("en");
+    expect(needsKeyText(en, { status: "needs_key", reason: "not_approved" }, "Asana")).toBe(
+      "Asana only lets apps it approved sign in, and agentes.chat isn't approved yet. If it gives you an API key, you can connect with that.",
+    );
   });
 
   test("search covers the name, id, description and the translated text", () => {

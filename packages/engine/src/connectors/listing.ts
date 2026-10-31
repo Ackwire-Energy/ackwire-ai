@@ -30,6 +30,7 @@ export const CONNECTOR_BRANDS: Record<string, { file: string; color: string | nu
   neon: { file: "neon", color: "#00E599" },
   prisma: { file: "prisma", color: null },
   netlify: { file: "netlify", color: "#00C7B7" },
+  vercel: { file: "vercel", color: null },
   railway: { file: "railway", color: null },
   datadog: { file: "datadog", color: "#632CA6" },
   grafana: { file: "grafana", color: "#F46800" },
@@ -39,6 +40,7 @@ export const CONNECTOR_BRANDS: Record<string, { file: string; color: string | nu
   monday: { file: "monday", color: null },
   clickup: { file: "clickup", color: "#7B68EE" },
   todoist: { file: "todoist", color: "#E44332" },
+  figma: { file: "figma", color: null },
   airtable: { file: "airtable", color: "#18BFFF" },
   dropbox: { file: "dropbox", color: "#0061FF" },
   miro: { file: "miro", color: null },
@@ -82,6 +84,8 @@ export interface ConnectorListingEntry {
   oauthConfigured: boolean;
   /** Can be connected on this server (an OAuth app or an API key). */
   available: boolean;
+  /** A one-click server whose vendor hasn't approved agentes.chat yet: listed, not connectable ("Em breve"). */
+  soon: boolean;
   needsServerUrl: boolean;
   /** The MCP endpoint of a `remote_mcp` entry. */
   serverUrl: string | null;
@@ -120,6 +124,7 @@ export function connectorListing(oauthApps: Record<string, unknown>): ConnectorL
       auth: d.auth,
       oauthConfigured,
       available: oauthConfigured || d.auth.includes("api_key"),
+      soon: false,
       needsServerUrl: d.serverUrl === null,
       serverUrl: d.serverUrl,
       ...brand(d.id),
@@ -144,7 +149,8 @@ export function connectorListing(oauthApps: Record<string, unknown>): ConnectorL
     category: p.category,
     auth: ["oauth"],
     oauthConfigured: true,
-    available: true,
+    available: !p.soon,
+    soon: p.soon === true,
     needsServerUrl: false,
     serverUrl: p.serverUrl,
     ...brand(p.icon),

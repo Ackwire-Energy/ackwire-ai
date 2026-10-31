@@ -2,7 +2,7 @@ import type { ConnectorCategory, ConnectorDef } from "@agenteschat/client";
 import { CONNECTOR_MARK, OWN_MARK, SERVER_ICON } from "@agenteschat/client/lib/connected";
 import type { MailChoice } from "@agenteschat/client/lib/mail";
 import { connectorDescription, connectorName, scopeText } from "@agenteschat/client/lib/scopes";
-import { Button, Dialog, Icon, type IconName, initialsOf, SearchField, Segmented } from "@agenteschat/ui";
+import { Button, Chip, Dialog, Icon, type IconName, initialsOf, SearchField, Segmented } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { type CSSProperties, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -92,6 +92,8 @@ interface Entry {
   category: ConnectorCategory | "email";
   connected: boolean;
   available: boolean;
+  /** The vendor hasn't approved agentes.chat yet: greyed out with a lock, and its tile opens nothing. */
+  soon: boolean;
   icon: (size: "md" | "lg") => ReactNode;
   brandColor: string | null;
   how: HowKind;
@@ -177,6 +179,7 @@ export function ConnectorCatalogDialog({
         category: "email",
         connected: mail?.connected.has(c) ?? false,
         available: true,
+        soon: false,
         icon: (size) => <MailIcon choice={c} size={size} />,
         brandColor: c === "gmail" ? "#EA4335" : c === "icloud" ? "#3693F3" : null,
         how: mailAuthKind(c),
@@ -194,6 +197,7 @@ export function ConnectorCatalogDialog({
             category: "dev",
             connected: database.connected,
             available: true,
+            soon: false,
             icon: (size: "md" | "lg") => <DatabaseIcon size={size} />,
             brandColor: null,
             how: "addressPassword",
@@ -211,6 +215,7 @@ export function ConnectorCatalogDialog({
         category: d.category,
         connected: connected.has(d.id),
         available: d.available,
+        soon: d.soon === true,
         icon: (size) => <ConnectorIcon def={d} label={d.label} size={size} />,
         brandColor: d.brandColor,
         how: authKind(d),
@@ -359,14 +364,22 @@ export function ConnectorCatalogDialog({
                       <button
                         type="button"
                         className="catalog-tile"
-                        aria-haspopup="dialog"
-                        aria-label={e.connected ? t("connectors.tileConnected", { name: e.name }) : e.name}
+                        aria-haspopup={e.soon ? undefined : "dialog"}
+                        aria-label={
+                          e.connected
+                            ? t("connectors.tileConnected", { name: e.name })
+                            : e.soon
+                              ? t("connectors.tileSoon", { name: e.name })
+                              : e.name
+                        }
                         data-soon={!e.available || undefined}
+                        disabled={e.soon}
                         onClick={() => setSelected(e.key)}
                       >
                         <span className="catalog-tile__head">
                           <TileIcon entry={e} size="md" />
                           <span className="catalog-tile__name">{e.name}</span>
+                          {e.soon && <Chip icon="lock">{t("connectors.soon")}</Chip>}
                         </span>
                         <span className="catalog-tile__desc">{e.description}</span>
                       </button>

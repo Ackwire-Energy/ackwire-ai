@@ -75,6 +75,9 @@ const CatalogEntry = z
       .boolean()
       .openapi({ description: "Signs in with OAuth here: our OAuth app, or the vendor's MCP OAuth." }),
     available: z.boolean().openapi({ description: "Can be connected on this server." }),
+    soon: z.boolean().openapi({
+      description: "A one-click server whose vendor hasn't approved agentes.chat yet: listed, not connectable.",
+    }),
     needsServerUrl: z.boolean(),
     serverUrl: z.string().nullable().openapi({ description: "The MCP endpoint (`remote_mcp`)." }),
     iconUrl: z.string().nullable().openapi({

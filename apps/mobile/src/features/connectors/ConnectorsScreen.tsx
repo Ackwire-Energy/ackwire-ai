@@ -16,7 +16,7 @@ import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { openConnection } from "./ConnectionScreen";
 import { ConnectorIcon } from "./ConnectorIcon";
 import { AddressSheet, ConnectSheet, ServerSheet } from "./ConnectSheet";
-import { brandOf, brandTones, CATEGORIES, connectionOf, searchConnectors, suggestionsOf } from "./logic";
+import { brandOf, brandTones, CATEGORIES, connectionOf, galleryTiles, searchConnectors, suggestionsOf } from "./logic";
 
 /**
  * Conectores on the phone: what is connected as a row of icons
@@ -173,14 +173,15 @@ function Gallery() {
             <EmptyState icon="search" title={t("mobile.connectors.noResults")} />
           ) : (
             <View style={styles.grid}>
-              {rest.map((d) => (
+              {galleryTiles(rest).map(({ def: d, opens, locked }) => (
                 <Tile
                   key={d.id}
                   def={d}
                   name={name(d)}
-                  text={d.available ? connectorDescription(t, d) : t("mobile.connectors.soon")}
+                  text={opens ? connectorDescription(t, d) : t("mobile.connectors.soon")}
                   connected={Boolean(connectionOf(d, items))}
-                  onPress={d.available ? open : undefined}
+                  locked={locked}
+                  onPress={opens ? open : undefined}
                 />
               ))}
             </View>
@@ -296,12 +297,14 @@ function Tile({
   name,
   text,
   connected,
+  locked,
   onPress,
 }: {
   def: ConnectorDef;
   name: string;
   text: string;
   connected: boolean;
+  locked: boolean;
   onPress?: ((def: ConnectorDef) => void) | undefined;
 }) {
   const c = useColors();
@@ -322,9 +325,12 @@ function Tile({
       <Text variant="body" numberOfLines={1} style={styles.bold}>
         {name}
       </Text>
-      <Text variant="small" tone="muted" numberOfLines={2}>
-        {text}
-      </Text>
+      <View style={styles.tileText}>
+        {locked ? <Icon name="lock" size={13} color={c.muted} /> : null}
+        <Text variant="small" tone="muted" numberOfLines={2} style={styles.grow}>
+          {text}
+        </Text>
+      </View>
     </Pressable>
   );
 }
@@ -373,6 +379,7 @@ const styles = StyleSheet.create({
   band: { width: 88, alignSelf: "stretch", minHeight: 72, alignItems: "center", justifyContent: "center" },
   cardText: { flex: 1, minWidth: 0, paddingVertical: 12, paddingRight: 14 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10, paddingHorizontal: 16, paddingTop: 10 },
+  tileText: { flexDirection: "row", alignItems: "center", gap: 4 },
   tile: {
     width: "48%",
     flexGrow: 1,

@@ -105,7 +105,8 @@ export interface CustomServerView {
 export type CustomConnectStart =
   | { status: "connected"; server: CustomServerView }
   | { status: "oauth"; authorizeUrl: string }
-  | { status: "needs_key" };
+  /** `not_approved`: it has OAuth but only lets in apps it approved, and agentes.chat isn't one yet. */
+  | { status: "needs_key"; reason?: "not_approved" };
 
 export interface CustomDeps extends McpOAuthDeps {
   /** How to open MCP sessions (tests: in-process servers). */
@@ -437,7 +438,7 @@ export async function connectCustomServer(
     return { status: "connected", server: await serverView(deps.db, c.orgId, c.id) };
   }
   if (probe.kind === "needs_key") return { status: "needs_key" };
-  const authorizeUrl = await beginMcpOAuth(deps, actorId, orgId, {
+  return beginMcpOAuth(deps, actorId, orgId, {
     connector: "custom",
     serverUrl,
     label,
@@ -446,13 +447,13 @@ export async function connectCustomServer(
     scopes: probe.scopes,
     returnTo: input.returnTo,
   });
-  return authorizeUrl ? { status: "oauth", authorizeUrl } : { status: "needs_key" };
 }
 
 /**
  * Starts an MCP-native OAuth authorization: authorization server metadata,
- * a registered client (DCR), state + PKCE S256 + `resource`. Null when the
- * server can't do it (no registration or no S256).
+ * a registered client (DCR), state + PKCE S256 + `resource`. `needs_key` when
+ * the server can't do it, with `not_approved` when it only registers clients
+ * it approved.
  */
 export async function beginMcpOAuth(
   deps: McpOAuthDeps,
@@ -467,12 +468,13 @@ export async function beginMcpOAuth(
     scopes: string[];
     returnTo?: string;
   },
-): Promise<string | null> {
+): Promise<Exclude<CustomConnectStart, { status: "connected" }>> {
   const meta = await authServerMetadata(deps, input.issuer);
-  if (!meta) return null;
+  if (!meta) return { status: "needs_key" };
   const redirectUri = oauthRedirectUri(deps.publicUrl);
   const client = await ensureOAuthClient(deps, orgId, input.issuer, meta, { redirectUri, scopes: input.scopes });
-  if (!client) return null;
+  if (client === "not_approved") return { status: "needs_key", reason: "not_approved" };
+  if (!client) return { status: "needs_key" };
   const state = randomToken(32);
   const verifier = randomToken(48);
   const challenge = createHash("sha256").update(verifier).digest("base64url");
@@ -506,7 +508,7 @@ export async function beginMcpOAuth(
   url.searchParams.set("code_challenge_method", "S256");
   url.searchParams.set("resource", input.resource);
   if (client.scope) url.searchParams.set("scope", client.scope);
-  return url.toString();
+  return { status: "oauth", authorizeUrl: url.toString() };
 }
 
 /** Lists the tools again (admins). */

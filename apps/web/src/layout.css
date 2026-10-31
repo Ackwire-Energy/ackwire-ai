@@ -3467,6 +3467,15 @@ p {
 .catalog-tile[data-soon] .catalog-tile__desc {
   opacity: 0.6;
 }
+/* "Em breve" with a lock: a tile that opens nothing, so it doesn't lift or press either. */
+.catalog-tile:disabled {
+  cursor: default;
+  transform: none;
+  box-shadow: var(--e1), var(--top);
+}
+.catalog-tile .ac-chip {
+  flex: none;
+}
 .catalog-tile--other {
   background: transparent;
   box-shadow: inset 0 0 0 1.5px var(--line2);
