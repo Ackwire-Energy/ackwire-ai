@@ -318,8 +318,12 @@ describe("receipts: a check with a popover", () => {
     expect(screen().queryByRole("dialog", { name: "Agentes" })).toBeNull();
   });
 
-  test("failure: alert icon + 'Não conseguiu responder · Tentar de novo'; nobody: 'Chamar um agente'", async () => {
-    const { socket, state } = await open();
+  test("failure: alert icon + 'Não conseguiu responder · Tentar de novo'; nobody: 'Chamar um agente', each by its face", async () => {
+    const seeded = seedState();
+    const [ada, atlas] = seeded.agents;
+    if (ada) ada.appearance = { color: "green", eyes: "happy", accessory: "headphones" };
+    if (atlas) atlas.appearance = { color: "rose", eyes: "sleepy", accessory: "crown" };
+    const { socket, state } = await open(seeded);
     await sendText("alguém viu o erro?");
     await settle(4);
     const root = lastPerson(state);
@@ -334,7 +338,20 @@ describe("receipts: a check with a popover", () => {
       call.focus();
       fireEvent.keyDown(call, { key: "Enter" });
     });
-    await act(async () => fireEvent.click(screen().getByRole("menuitem", { name: /Atlas/ })));
+    // Each agent leads with its own face (its look), not one glyph for all.
+    const menu = screen().getByRole("menu");
+    const face = (name: RegExp) =>
+      within(menu).getByRole("menuitem", { name }).querySelector(":scope > .ac-menu__leading > .ac-avatar--agent");
+    expect([face(/Ada/)?.getAttribute("data-eyes"), face(/Ada/)?.getAttribute("data-accessory")]).toEqual([
+      "happy",
+      "headphones",
+    ]);
+    expect([face(/Atlas/)?.getAttribute("data-eyes"), face(/Atlas/)?.getAttribute("data-accessory")]).toEqual([
+      "sleepy",
+      "crown",
+    ]);
+    expect(menu.querySelector(".ac-menu__item > .ac-icon")).toBeNull();
+    await act(async () => fireEvent.click(within(menu).getByRole("menuitem", { name: /Atlas/ })));
     await settle();
     expect((composer() as HTMLTextAreaElement).value).toBe("@atlas ");
 

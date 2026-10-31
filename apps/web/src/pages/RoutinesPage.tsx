@@ -1542,7 +1542,12 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
               <Select
                 value={agentId || undefined}
                 onValueChange={setAgentId}
-                options={agents.map((a) => ({ value: a.id, label: a.name, description: a.role || undefined }))}
+                options={agents.map((a) => ({
+                  value: a.id,
+                  label: a.name,
+                  description: a.role || undefined,
+                  leading: actors.avatar({ type: "agent", id: a.id }),
+                }))}
               />
             </Field>
             <Field label={t("routines.form.target")} id="nr-target">
@@ -1580,7 +1585,10 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
                       }
                     />
                     <span className="scope-row__text" aria-hidden="true">
-                      <span>{a.name}</span>
+                      <span className="ac-iconline">
+                        {actors.avatar({ type: "agent", id: a.id })}
+                        <span>{a.name}</span>
+                      </span>
                     </span>
                   </label>
                 );
