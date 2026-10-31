@@ -39,6 +39,7 @@ export function Menu({
 export function MenuItem({
   onSelect,
   icon,
+  leading,
   danger,
   disabled,
   children,
@@ -47,6 +48,8 @@ export function MenuItem({
 }: {
   onSelect?: () => void;
   icon?: IconName;
+  /** In place of the icon: whose item it is (an agent's face, a person's avatar). */
+  leading?: ReactNode;
   danger?: boolean;
   disabled?: boolean;
   children: ReactNode;
@@ -60,7 +63,13 @@ export function MenuItem({
       onSelect={onSelect}
       disabled={disabled}
     >
-      {icon && <Icon name={icon} />}
+      {leading ? (
+        <span className="ac-menu__leading" aria-hidden="true">
+          {leading}
+        </span>
+      ) : (
+        icon && <Icon name={icon} />
+      )}
       <span className="ac-menu__label">
         {children}
         {description && <span className="ac-menu__desc">{description}</span>}

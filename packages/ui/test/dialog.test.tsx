@@ -140,6 +140,27 @@ describe("Dialog", () => {
     expect(body().queryByRole("dialog")).toBeNull();
   });
 
+  test("one opened from another comes after it in the page: scrim, panel, then its own scrim and panel", async () => {
+    function Nested() {
+      const [inner, setInner] = useState(false);
+      return (
+        <Dialog open onOpenChange={() => {}} title="Adicionar conector" closeLabel="Fechar">
+          <Button onClick={() => setInner(true)}>GitHub</Button>
+          <Dialog open={inner} onOpenChange={setInner} title="GitHub" closeLabel="Fechar" width={440}>
+            <p>Código, PRs, issues e Actions.</p>
+          </Dialog>
+        </Dialog>
+      );
+    }
+    render(<Nested />);
+    await act(async () => fireEvent.click(body().getByRole("button", { name: "GitHub" })));
+    // Scrims and panels share one layer (layers.css), so this order alone keeps each scrim under its own panel.
+    const order = [...document.body.querySelectorAll(".ac-dialog__scrim, .ac-dialog")].map((el) =>
+      el.classList.contains("ac-dialog__scrim") ? "scrim" : el.querySelector(".ac-dialog__title")?.textContent,
+    );
+    expect(order).toEqual(["scrim", "Adicionar conector", "scrim", "GitHub"]);
+  });
+
   test("an ⓘ at the end of the description's line stays out of it: the dialog is described by the sentence alone", () => {
     render(
       <Dialog

@@ -1,5 +1,5 @@
 import type { Actor } from "@agenteschat/client";
-import type { SelectOption } from "@agenteschat/ui";
+import { Icon, type SelectOption } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
@@ -18,16 +18,23 @@ export function useActors() {
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const name = (a: Actor) => dir.authorName({ type: a.type, id: a.id } as Parameters<typeof dir.authorName>[0]);
+  const avatar = (a: Actor, size: "xs" | "sm" = "xs") => <ActorAvatar size={size} actor={a} name={name(a)} />;
+  // The empty choice leads with a glyph as wide as the 18px faces, so every name starts on one edge.
+  const none = <Icon name="person" size={18} className="muted" />;
   const options = (withNone: boolean): SelectOption[] => [
-    ...(withNone ? [{ value: NO_ACTOR, label: t("issues.noAssignee") }] : []),
-    ...dir.members.map((m) => ({ value: `person:${m.userId}`, label: m.name })),
+    ...(withNone ? [{ value: NO_ACTOR, label: t("issues.noAssignee"), leading: none }] : []),
+    ...dir.members.map((m) => ({
+      value: `person:${m.userId}`,
+      label: m.name,
+      leading: avatar({ type: "person", id: m.userId }),
+    })),
     ...dir.agents.map((a) => ({
       value: `agent:${a.id}`,
       label: a.name,
       description: a.role ? t("issues.agentRole", { role: a.role }) : undefined,
+      leading: avatar({ type: "agent", id: a.id }),
     })),
   ];
-  const avatar = (a: Actor, size: "xs" | "sm" = "xs") => <ActorAvatar size={size} actor={a} name={name(a)} />;
   return { dir, name, options, avatar, meId: me.user.id };
 }
 
