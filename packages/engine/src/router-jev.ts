@@ -142,7 +142,7 @@ export function createJevRouterStrategy(options: {
         criteria[NONE] = "No agent should reply.";
         questions.best_agent = {
           type: "choice",
-          instructions: "Which agent is best placed to reply to `latest_message`?",
+          instructions: `Which agent is best placed to reply to \`latest_message\`? ${WHO_FOR}`,
           criteria,
         };
         const spoken: Record<string, string> = {};

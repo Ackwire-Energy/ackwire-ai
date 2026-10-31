@@ -235,6 +235,7 @@ describe("who a message speaks to", () => {
     const questions = jev.requests[0]?.body.questions as {
       needs_agent: { instructions: string };
       agent_1: { instructions: { question: string } };
+      best_agent: { instructions: string };
       addressee: { type: string; instructions: string; criteria: Record<string, string> };
     };
     expect(questions.addressee.type).toBe("choice");
@@ -246,6 +247,7 @@ describe("who a message speaks to", () => {
     for (const text of [
       questions.needs_agent.instructions,
       questions.agent_1.instructions.question,
+      questions.best_agent.instructions,
       questions.addressee.instructions,
     ])
       expect(text).toContain(SPOKEN_TO);
@@ -255,7 +257,8 @@ describe("who a message speaks to", () => {
   });
 
   test("'ada pergunta pro theo ai qual meu email mais recente pls' is Ada's, not Theo's who has the email", async () => {
-    // Jev's answers on 2026-10-31: Theo 0.90, Ada 0.52, needs 0.78, best @theo. Now the addressee Choice hears Ada.
+    // Jev's answers on 2026-10-31: Theo 0.90, Ada 0.52, needs 0.78, best @theo, and an addressee Choice that
+    // hears Ada (assumed: the real Jev hasn't answered it yet).
     const { decided } = decide(
       () => ({
         nouls: { "@theo": 0.9, "@ada": 0.52 },
@@ -309,6 +312,22 @@ describe("who a message speaks to", () => {
     expect(
       await to(() => ({ nouls: { "@ada": 0.2, "@theo": 0.05 }, needs: 0.1, to: { none: 0.8, ada: 0.2 } })),
     ).toEqual({ picked: [], addressee: undefined });
+  });
+
+  test("unsure which agent it speaks to (under 0.6), the scores stand", async () => {
+    // That day's answers with a Choice that only leans to Ada: Theo, as before. Capped and not lifted, nobody was.
+    const day = { nouls: { "@theo": 0.9, "@ada": 0.52 }, needs: 0.78, best: "theo" };
+    const before = await decide(() => day, "x").decided;
+    const leaning = await decide(() => ({ ...day, to: { ada: 0.55, theo: 0.35, none: 0.1 } }), "x").decided;
+    expect(leaning.addressee).toBeUndefined();
+    expect(leaning.agents).toEqual(before.agents);
+    expect(selectAgents([ada, theo], leaning, policy)).toEqual(["theo"]);
+    // "alguém sabe qual meu email mais recente?" leaning a little to Ada, who can't help: still Theo, who can.
+    const anyone = await decide(
+      () => ({ nouls: { "@theo": 0.85, "@ada": 0.2 }, needs: 0.85, best: "theo", to: { ada: 0.53, none: 0.47 } }),
+      "x",
+    ).decided;
+    expect(selectAgents([ada, theo], anyone, policy)).toEqual(["theo"]);
   });
 
   /** #general with Ada and Theo besides Dev, and Jev answering as on 2026-10-31 with the addressee Choice. */

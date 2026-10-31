@@ -172,29 +172,30 @@ export const ALREADY_ANSWERED_THRESHOLD = 0.7;
  */
 export const FOR_EVERYONE_THRESHOLD = 0.5;
 
-/** From this probability that a message speaks to one agent, that agent is its `addressee`. */
+/** From this probability that a message speaks to one agent, that agent is its `addressee` and the scores follow it. */
 export const SPOKEN_TO_THRESHOLD = 0.6;
 
 /**
  * Who a message speaks to decides between the agents it names ("ada pergunta pro theo ai qual meu email mais
  * recente", 2026-10-31, went to Theo, who has the email, instead of Ada): an agent answers only as far as the
  * message speaks to it or to no agent in particular, and the agent it speaks to as far as any agent should.
- * `spokenTo`: the probability that it speaks to each agent, the rest to none. A message to every agent keeps
- * its scores.
+ * `spokenTo`: the probability that it speaks to each agent, the rest to none. Below `SPOKEN_TO_THRESHOLD` the
+ * scores stand: capping every agent without lifting one leaves the message to nobody. A message to every agent
+ * keeps its scores too.
  */
 export function withAddressee<T extends Pick<RoutingResult, "agents" | "needsAgent" | "forEveryone">>(
   result: T,
   spokenTo: ReadonlyMap<string, number>,
 ): T & Pick<RoutingResult, "addressee"> {
-  if ((result.forEveryone ?? 0) >= FOR_EVERYONE_THRESHOLD) return result;
+  const [top] = [...spokenTo].sort((a, b) => b[1] - a[1]);
+  if (!top || top[1] < SPOKEN_TO_THRESHOLD || (result.forEveryone ?? 0) >= FOR_EVERYONE_THRESHOLD) return result;
   const toAny = [...spokenTo.values()].reduce((sum, p) => sum + p, 0);
   const scoreOf = (id: string) => Math.max(0, ...result.agents.filter((a) => a.agentId === id).map((a) => a.score));
   const agents = [...new Set([...result.agents.map((a) => a.agentId), ...spokenTo.keys()])].map((agentId) => {
     const p = spokenTo.get(agentId) ?? 0;
     return { agentId, score: Math.max(Math.min(scoreOf(agentId), 1 - toAny + p), (result.needsAgent ?? 0) * p) };
   });
-  const [top] = [...spokenTo].sort((a, b) => b[1] - a[1]);
-  return { ...result, agents, ...(top && top[1] >= SPOKEN_TO_THRESHOLD ? { addressee: top[0] } : {}) };
+  return { ...result, agents, addressee: top[0] };
 }
 
 export interface RouterPolicy {
