@@ -9,7 +9,7 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createI18n } from "@/i18n";
-import { ADA_ID, ATLAS_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ADMIN_ROLE_ID, ATLAS_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { notification } from "./fakes/notifications";
 import { hintOf } from "./hint";
 import { renderApp, screen, settle } from "./render";
@@ -470,24 +470,23 @@ describe("Members › Requests to join", () => {
 
     const sidebarCount = () => document.querySelector(".sidebar__org-meta")?.textContent;
     expect(sidebarCount()).toBe("2 membros · 2 agentes");
-    const role = within(ana).getByRole("combobox", { name: "Papel de Ana Souza" });
-    role.focus();
-    await act(async () => fireEvent.keyDown(role, { key: "Enter" }));
-    await click(screen().getByRole("option", { name: /^Admin/ }));
+    // Roles to give (ADR 0085): a menu that stays open, one switch per role below the approver's.
+    const roles = within(ana).getByRole("button", { name: "Papéis para Ana Souza" });
+    roles.focus();
+    await act(async () => fireEvent.keyDown(roles, { key: "Enter" }));
+    await click(screen().getByRole("menuitemcheckbox", { name: "Admin" }));
+    await act(async () => fireEvent.keyDown(screen().getByRole("menu"), { key: "Escape" }));
+    expect(roles.textContent).toContain("Admin");
     await click(within(ana).getByRole("button", { name: "Aprovar" }));
     await settle(4);
-    expect(state.calls.find((c) => c.method === "joinRequests.approve")?.args).toEqual([ORG_ID, "r1", "admin"]);
+    expect(state.calls.find((c) => c.method === "joinRequests.approve")?.args).toEqual([ORG_ID, "r1", [ADMIN_ROLE_ID]]);
     expect(text()).toContain("Ana Souza entrou.");
     // She counts in the workspace's line too, without a reload.
     expect(sidebarCount()).toBe("3 membros · 2 agentes");
 
     await click(within(card("Bruno Lima")).getByRole("button", { name: "Aprovar" }));
     await settle(4);
-    expect(state.calls.filter((c) => c.method === "joinRequests.approve").at(-1)?.args).toEqual([
-      ORG_ID,
-      "r2",
-      "member",
-    ]);
+    expect(state.calls.filter((c) => c.method === "joinRequests.approve").at(-1)?.args).toEqual([ORG_ID, "r2", []]);
     expect(text()).toContain("Convite enviado para bruno@lima.dev.");
     expect(screen().queryByRole("region", { name: /Pedidos para entrar/ })).toBeNull();
   });
@@ -596,12 +595,12 @@ describe("Members › Invite people", () => {
       await renderApp(`/org/${ORG_ID}/settings/members`, { api: createFakeApi(state) });
       await settle(6);
       const invite = screen().getByRole("region", { name: "Convidar pessoas" });
-      return { invite, line: within(invite).queryByText("Seus agentes só respondem a você.")?.closest(".setup-line") };
+      return { invite, line: within(invite).queryByText("Seus agentes só atendem você.")?.closest(".setup-line") };
     };
     const { invite, line } = await note("owner");
     expect(line).toBeTruthy();
-    expect(hintOf("Seus agentes só respondem a você.", invite).text).toBe(
-      "Num plano, você pode deixar cada um responder a todos na página dele.",
+    expect(hintOf("Seus agentes só atendem você.", invite).text).toBe(
+      "Num plano, você pode deixar cada um atender outras pessoas na página dele.",
     );
     // Under the card's title, before the invitations it's about.
     const emails = within(invite).getByLabelText("E-mails, separados por vírgula");

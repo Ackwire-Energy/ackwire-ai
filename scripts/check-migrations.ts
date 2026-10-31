@@ -13,6 +13,11 @@ import { Glob } from "bun";
 
 /** Migrations up to this number came before the check. */
 export const CHECKED_AFTER = 119;
+/**
+ * Merged without their markers and already applied: a server refuses to start on a migration whose text changed
+ * (packages/db/src/migration-guard.ts), so the markers can't be added now. 0130 (ADR 0085) turns "admin" into a role.
+ */
+const SHIPPED_UNMARKED = new Set(["0130_roles.sql"]);
 
 const MARKER = /^--\s*deploy-safe:\s*\S/;
 
@@ -62,7 +67,7 @@ export function unsafeStatements(sql: string): string[] {
 if (import.meta.main) {
   const problems: string[] = [];
   for (const file of [...new Glob("packages/db/migrations/*.sql").scanSync()].sort()) {
-    if (Number.parseInt(basename(file), 10) <= CHECKED_AFTER) continue;
+    if (Number.parseInt(basename(file), 10) <= CHECKED_AFTER || SHIPPED_UNMARKED.has(basename(file))) continue;
     for (const hit of unsafeStatements(await Bun.file(file).text())) problems.push(`${file}:${hit}`);
   }
   if (problems.length > 0) {

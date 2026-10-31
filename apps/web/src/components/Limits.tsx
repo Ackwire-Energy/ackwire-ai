@@ -19,7 +19,7 @@ import { useToast } from "@/lib/toast";
 function useBillingAccess() {
   const { org } = useOrg();
   const billingUrl = useAuthConfig().data?.billingUrl;
-  return can(org.role, "manage_billing") && Boolean(billingUrl);
+  return can(org, "manage_billing") && Boolean(billingUrl);
 }
 
 /** No one more fits: who can make room, and how. Nothing while there is room or no limit. */

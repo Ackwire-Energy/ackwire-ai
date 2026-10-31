@@ -85,7 +85,7 @@ Use exactly this shape:
     { "kind": "app", "label": "<an app or connector you use, such as Gmail, Slack or GitHub>", "agents": ["<agent key>"] }
   ],
   "leftOut": [
-    { "kind": "routine", "label": "<anything that doesn't fit above, by its name>" }
+    { "kind": "routine", "label": "<anything that doesn't fit above, by its name, in a few words>" }
   ]
 }
 

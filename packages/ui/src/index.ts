@@ -201,10 +201,12 @@ export {
   type PlanMeterUsage,
   type PlanMeterWindow,
   type PlanState,
+  planLine,
   planState,
   planWindows,
 } from "./components/PlanMeter";
 export { Popover } from "./components/Popover";
+export { type BadgePresence, PresenceBadge, type PresenceBadgeProps } from "./components/PresenceBadge";
 export {
   ProviderLogo,
   type ProviderLogoProps,
@@ -219,6 +221,7 @@ export {
   RecurrencePicker,
   type RecurrencePickerProps,
 } from "./components/RecurrencePicker";
+export { RoleMark } from "./components/RoleMark";
 export {
   BrowserMark,
   type BrowserPixelKind,
@@ -330,7 +333,7 @@ export {
 } from "./format";
 export { useNow } from "./hooks/useNow";
 export { Icon, type IconName, type IconProps, iconNames, icons } from "./icons/Icon";
-export { initialsOf } from "./names";
+export { initialsOf, isIdHandle } from "./names";
 export {
   BUSINESS_DAYS,
   nextOccurrences,

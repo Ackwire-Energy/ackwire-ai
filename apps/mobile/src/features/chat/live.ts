@@ -7,6 +7,7 @@ import {
   applyReceiptEvent,
   type ChannelEvent,
   type ConsultsState,
+  cacheAgentProposal,
   cacheApproval,
   cacheDmRead,
   cacheMessage,
@@ -186,6 +187,12 @@ function cacheQuestion(qc: QueryClient, orgId: string, channelId: string, questi
 /** What each event changes in the caches (the run rows are the reducer's). */
 function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: ChannelEvent) {
   switch (event.type) {
+    // A question to another agent went out, came back or waits on a person: the reply that asked redraws it.
+    case "agent.consulting":
+    case "agent.consulted":
+    case "agent.consultation":
+      void qc.invalidateQueries({ queryKey: keys.consultations(orgId, channelId) });
+      break;
     case "message.created":
       if (event.message) cacheMessage(qc, orgId, event.message);
       else void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
@@ -241,6 +248,10 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
     case "question.asked":
     case "question.answered":
       cacheQuestion(qc, orgId, channelId, event.question);
+      break;
+    case "agent.proposal.updated":
+      // An agent's proposal of a new agent was created or denied (by anyone): its card.
+      cacheAgentProposal(qc, orgId, event, event);
       break;
     case "browser.handoff.updated":
       // An agent's browser request changed (ADR 0040): its card, the live view, the agent's open request.

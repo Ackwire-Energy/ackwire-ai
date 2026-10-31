@@ -2,7 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, inArray, isNull, or, type SQL, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { notifyRoutinePaused } from "./notification-producers";
-import { can, type MemberRole } from "./organizations";
+import { maySql } from "./permissions";
 
 const { routines, routineRuns, outbox, channels, channelMembers, organizationMembers } = schema;
 
@@ -67,7 +67,7 @@ export const routineJobAlive = (routineRunId: typeof routineRuns.id | SQL) => {
 /** Whether this person can still post in that conversation: a member of the organization who may post, and of it. */
 export async function personCanPost(db: Executor, orgId: string, userId: string, channelId: string): Promise<boolean> {
   const [row] = await db
-    .select({ role: organizationMembers.role, member: channelMembers.id, archivedAt: channels.archivedAt })
+    .select({ may: maySql(orgId, userId, "post"), member: channelMembers.id, archivedAt: channels.archivedAt })
     .from(organizationMembers)
     .innerJoin(channels, and(eq(channels.id, channelId), eq(channels.orgId, orgId)))
     .leftJoin(
@@ -79,7 +79,7 @@ export async function personCanPost(db: Executor, orgId: string, userId: string,
       ),
     )
     .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
-  return Boolean(row && !row.archivedAt && row.member && can(row.role as MemberRole, "post"));
+  return Boolean(row && !row.archivedAt && row.member && row.may);
 }
 
 /**

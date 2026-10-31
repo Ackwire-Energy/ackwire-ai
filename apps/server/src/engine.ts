@@ -45,6 +45,7 @@ import {
   createSandboxToolSource,
   createScheduleToolSource,
   createSessionScreening,
+  createSetStatusToolSource,
   createSetupToolSource,
   createSkillToolSource,
   createStreamBroker,
@@ -78,6 +79,7 @@ import {
   standingJudge,
   streamClosed,
   type ToolSource,
+  warmAgentBrowser,
   withJudgeFallback,
 } from "@agenteschat/engine";
 import { createVoyageEmbeddings, type EmbeddingProvider, type ModelProvider } from "@agenteschat/providers";
@@ -262,6 +264,8 @@ export function buildEngine(o: EngineOptions) {
       // An agent with no AI connected is refused at once: its answer would never come.
       createAskAgentToolSource({ pubsub: adapters.pubsub, ai: { gateway, machines: machineHub } }),
       createFindAgentToolSource({ machines: machineHub }),
+      // What the agent says it is doing, next to its name (ADR 0084).
+      createSetStatusToolSource({ pubsub: adapters.pubsub }),
       createReactToolSource({ pubsub: adapters.pubsub }),
       // Background runs (routines) speak only through it.
       createHandOffToolSource({ pubsub: adapters.pubsub }),
@@ -270,8 +274,8 @@ export function buildEngine(o: EngineOptions) {
       createArtifactToolSource(artifacts),
       createChatToolSource({ pubsub: adapters.pubsub, artifacts }),
       createWorkspaceToolSource({ pubsub: adapters.pubsub }),
-      // Setting up the workspace from the chat: Connect cards a person clicks, channels with Undo.
-      createSetupToolSource({ pubsub: adapters.pubsub }),
+      // Setting up the workspace from the chat: Connect cards a person clicks, channels with Undo, new agents proposed.
+      createSetupToolSource({ pubsub: adapters.pubsub, ai: { gateway } }),
       createIssueToolSource({ db, pubsub: adapters.pubsub }),
       createSkillToolSource({ db, blobs: artifacts.blobs }),
       createCalendarToolSource({ db, pubsub: adapters.pubsub, publicUrl: config.PUBLIC_URL }),
@@ -331,8 +335,11 @@ export function buildEngine(o: EngineOptions) {
   });
   // Mission tasks' tools and computer-brain runs' tools come through the hub's MCP bridge (ADR 0032).
   machineHub.setMissionHooks(createMissionHooks({ db, ...missionDeps, tools }));
+  // The agent's Chrome started ahead of its first command (ADR 0040 §11): a head start, so a refusal costs nothing.
+  const warmBrowser = (at: Parameters<typeof warmAgentBrowser>[2]) =>
+    void warmAgentBrowser(db, machineHub, at).catch(() => {});
   // The agent browser's live view (ADR 0040 §7): the runner's frames go to viewers in memory.
-  const browserLive = createBrowserLive({ db, pubsub: adapters.pubsub, hub: machineHub });
+  const browserLive = createBrowserLive({ db, pubsub: adapters.pubsub, hub: machineHub, warm: warmBrowser });
   machineHub.setBrowserHooks(browserLive.hubHooks);
   // agentes.chat Cloud reads the screen's text while a person is in control (ADR 0076); a self-hosted server never.
   const sessions = config.SESSION_SCREENING ? createSessionScreening({ db, hub: machineHub, log: o.log }) : null;
@@ -342,10 +349,15 @@ export function buildEngine(o: EngineOptions) {
   const streams = createStreamBroker({
     db,
     hub: machineHub,
-    authorize: async (input) =>
-      sessions && input.request.kind === "terminal"
-        ? { refused: STREAM_CLOSE.notFound, reason: NO_TERMINAL }
-        : authorizeStream({ db, hub: machineHub, rateLimiter: adapters.rateLimiter }, input),
+    authorize: async (input) => {
+      if (sessions && input.request.kind === "terminal") return { refused: STREAM_CLOSE.notFound, reason: NO_TERMINAL };
+      const target = await authorizeStream({ db, hub: machineHub, rateLimiter: adapters.rateLimiter }, input);
+      // Someone opened the agent's desktop: its browser gets ready for the agent's next command meanwhile.
+      if (input.request.kind === "desktop" && "machineId" in target && !target.held) {
+        warmBrowser({ orgId: input.orgId, agentId: input.agentId, machineId: target.machineId });
+      }
+      return target;
+    },
     recheck: (stream) => recheckStream(db, stream),
     onReady: sessions ? (stream) => sessions.ready(stream) : undefined,
     onClosed: (stream) => Promise.all([streamClosed(db, stream), sessions?.closed(stream)]),
@@ -421,6 +433,7 @@ export function buildEngine(o: EngineOptions) {
     maxToolTurns: config.AGENT_MAX_TOOL_TURNS,
     // Tools on demand (ADR 0043): each run lists what the judge expects it to need; the rest behind `find_tools`.
     toolsOnDemand: o.toolsOnDemand ?? true,
+    warmBrowser,
     brains,
     machines: machineHub,
     maxOutputTokens: config.AGENT_MAX_OUTPUT_TOKENS,

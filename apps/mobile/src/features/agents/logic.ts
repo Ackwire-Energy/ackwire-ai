@@ -2,16 +2,18 @@ import type {
   Agent,
   AgentAccess,
   AgentForYouItem,
+  AgentGroup,
   AgentUsage,
   Approval,
   DirectMessage,
   Memory,
   Mission,
+  OrgSummary,
   PreviewMeta,
-  Role,
   WorkingRun,
 } from "@agenteschat/client";
 import { asksAt, levelOf, resourcesOf } from "@agenteschat/client/lib/access-levels";
+import { agentSections } from "@agenteschat/client/lib/agent-groups";
 import { can } from "@agenteschat/client/lib/permissions";
 import { daysAgo, previewOf } from "../shared/logic";
 
@@ -193,6 +195,21 @@ export function teamLines(
   return { waiting, working, free };
 }
 
+/**
+ * Livres by the workspace's groups of agents (ADR 0083), as the web sidebar shows them: the agents in no group
+ * first (`group` null), in Livres' order, then each group with its free agents in the group's order. Empty ones are
+ * left out, so with no groups this is Livres alone.
+ */
+export function freeSections(
+  free: TeamLine[],
+  groups: readonly AgentGroup[] | undefined,
+): { group: AgentGroup | null; lines: TeamLine[] }[] {
+  const { ungrouped, groups: grouped } = agentSections(free, groups, (l) => l.agent.id);
+  return [{ group: null, lines: ungrouped }, ...grouped.map(({ group, items }) => ({ group, lines: items }))].filter(
+    (s) => s.lines.length > 0,
+  );
+}
+
 /** "há 4 min": how long ago, in the largest whole unit (under a minute: now). */
 export type Ago = { unit: "now" } | { unit: "minutes" | "hours" | "days"; count: number };
 
@@ -207,7 +224,8 @@ export function agoOf(iso: string, now = Date.now()): Ago {
 
 /**
  * "Este mês": money only when the API gives it to this person (ADR 0026: members
- * see a percentage), else the share of the budget used.
+ * see a percentage), else the share of the budget used, as the server says it
+ * (`formatPercent` writes it, "<1%" for a little).
  */
 export type Spend =
   | { kind: "money"; spentUsd: number; budgetUsd: number; fraction: number }
@@ -228,7 +246,7 @@ export function spendOf(input: {
       budgetUsd: budget,
       fraction: Math.min(1, Math.max(0, input.usage.costUsd / budget)),
     };
-  return { kind: "percent", percent: Math.round(Math.max(0, input.budgetUsedPercent)), fraction };
+  return { kind: "percent", percent: Math.max(0, input.budgetUsedPercent), fraction };
 }
 
 /** "Pode usar": the apps it may use (granted or inherited), then the built-in groups, by label. */
@@ -278,13 +296,13 @@ export function plainRole(instructions: string | null | undefined): string | nul
   return null;
 }
 
-/** Only the agent's owner or an admin may correct or forget its memories (the server checks it again). */
+/** Only the agent's owner or who reviews memory may correct or forget its memories (the server checks it again). */
 export function canEditMemories(
   agent: Pick<Agent, "ownerUserId"> | undefined,
-  viewer: { id: string | null; role: Role | null | undefined },
+  viewer: { id: string | null; org: Pick<OrgSummary, "permissions"> | null | undefined },
 ): boolean {
   if (!viewer.id) return false;
-  if (can(viewer.role ?? undefined, "configure")) return true;
+  if (can(viewer.org, "review_memory")) return true;
   return Boolean(agent?.ownerUserId && agent.ownerUserId === viewer.id);
 }
 

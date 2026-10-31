@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Channel } from "@agenteschat/client";
-import { categoryHrefs, movesChannel, stepBefore } from "../../src/features/categories/logic";
+import { categoryHrefs, channelSteps, movesChannel, stepBefore } from "../../src/features/categories/logic";
 import {
   buildConversations,
   categoryListKind,
@@ -87,11 +87,37 @@ describe("arranging categories", () => {
     expect(stepBefore(ids, "c", 1)).toBeUndefined();
   });
 
-  test("a channel's creator or an admin may move it", () => {
-    expect(movesChannel({ createdByUserId: "u1" }, "u1", "member")).toBe(true);
-    expect(movesChannel({ createdByUserId: "u2" }, "u1", "member")).toBe(false);
-    expect(movesChannel({ createdByUserId: "u2" }, "u1", "admin")).toBe(true);
-    expect(movesChannel({ createdByUserId: null }, null, "member")).toBe(false);
+  test("a channel moves one step among the ones of its category, or the ones with none", () => {
+    const list = [
+      { id: "general", categoryId: null },
+      { id: "bugs", categoryId: "eng" },
+      { id: "avisos" },
+      { id: "tech", categoryId: "eng" },
+      { id: "vendas", categoryId: null },
+    ];
+    expect(channelSteps(list, "avisos")).toEqual({
+      at: 1,
+      count: 3,
+      up: { channelId: "avisos", categoryId: null, beforeChannelId: "general" },
+      down: { channelId: "avisos", categoryId: null, beforeChannelId: null },
+    });
+    expect(channelSteps(list, "general").up).toBeUndefined();
+    expect(channelSteps(list, "tech")).toEqual({
+      at: 1,
+      count: 2,
+      up: { channelId: "tech", categoryId: "eng", beforeChannelId: "bugs" },
+      down: undefined,
+    });
+  });
+
+  test("a channel's creator or who manages channels may move it", () => {
+    const member = { role: "member" as const, permissions: ["read", "post"] };
+    const manager = { role: "member" as const, permissions: ["read", "manage_channels"] };
+    expect(movesChannel({ createdByUserId: "u1" }, "u1", member)).toBe(true);
+    expect(movesChannel({ createdByUserId: "u2" }, "u1", member)).toBe(false);
+    expect(movesChannel({ createdByUserId: "u2" }, "u1", manager)).toBe(true);
+    expect(movesChannel({ createdByUserId: null }, null, member)).toBe(false);
+    expect(movesChannel({ createdByUserId: "u2" }, "u1", undefined)).toBe(false);
   });
 
   test("the screens' addresses", () => {

@@ -1,7 +1,7 @@
 import { useAgentDetail, useMemory, useRuns, useUsage } from "@agenteschat/client";
 import { formatMonth, formatPercent, formatUsd } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { type AgentColor, Button, Icon, Menu, MenuItem, Meter } from "@agenteschat/ui";
+import { type AgentColor, Button, Icon, Menu, MenuItem, Meter, PlanMeter } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useRef } from "react";
 import { useTranslation } from "react-i18next";
@@ -11,6 +11,7 @@ import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
 import { AgentCover } from "@/components/Sky";
 import { thisMonth } from "@/lib/agent-edit";
+import { planMeterText, usageShown } from "@/lib/plan-usage";
 import { useToast } from "@/lib/toast";
 import { useStreams } from "@/realtime/context";
 import { useAgentEdit } from "./context";
@@ -35,7 +36,10 @@ function useLiveRun(agentId: string) {
   return { status, channelId, connector };
 }
 
-/** Runs, budget (money for admins, % for everyone else) and lessons: quiet lines under "Como trabalha". */
+/**
+ * Runs, usage and lessons: quiet lines under "Como trabalha". Usage is its plan's limits on a plan, and the
+ * budget (money for admins, % for everyone else) on the API or once a plan agent spent through it (ADR 0063 §5).
+ */
 export function Numbers() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
@@ -48,6 +52,7 @@ export function Numbers() {
   const month = formatMonth(locale, new Date());
   const failures = (runs.data ?? []).filter((r) => r.status === "failed" && thisMonth(r.createdAt)).length;
   const used = detail.data?.budgetUsedPercent ?? 0;
+  const shown = usageShown(agent.brain, used);
   const active = (memory.data ?? []).filter((m) => !m.archived);
   const lessons = active.filter((m) => m.kind === "lesson" || m.kind === "preference").length;
   const facts = active.length - lessons;
@@ -63,15 +68,23 @@ export function Numbers() {
           {runs.data && ` · ${t("agentPage.stats.failures", { count: failures })}`}
         </span>
       </button>
-      <button type="button" className="agp-number" onClick={() => goTo("settings", "budget")}>
-        <Icon name="wallet" size={14} />
-        <span>
-          {money
-            ? `${formatUsd(t, locale, spent)} ${t("agentPage.stats.of", { amount: usd(t, locale, limit) })}`
-            : t("agentPage.numbers.budget", { percent: formatPercent(locale, used) })}
-        </span>
-        <Meter value={Math.min(100, used)} max={100} label={t("agent.budgetUsed")} />
-      </button>
+      {shown.plan && (
+        <button type="button" className="agp-number" onClick={() => goTo("usage")}>
+          <Icon name="clock" size={14} />
+          <PlanMeter compact usage={shown.plan.usage} text={planMeterText(t, locale)} label={shown.plan.account} />
+        </button>
+      )}
+      {shown.budget && (
+        <button type="button" className="agp-number" onClick={() => goTo("settings", "budget")}>
+          <Icon name="wallet" size={14} />
+          <span>
+            {money
+              ? `${formatUsd(t, locale, spent)} ${t("agentPage.stats.of", { amount: usd(t, locale, limit) })}`
+              : t("agentPage.numbers.budget", { percent: formatPercent(locale, used) })}
+          </span>
+          <Meter value={Math.min(100, used)} max={100} label={t("agent.budgetUsed")} />
+        </button>
+      )}
       <button type="button" className="agp-number" onClick={() => goTo("memory")}>
         <Icon name="book" size={14} />
         <span>

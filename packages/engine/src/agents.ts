@@ -72,7 +72,7 @@ export async function createAgent(
   input: AgentInput,
   defaults: { model: string },
 ): Promise<Agent> {
-  await requirePermission(db, actorId, orgId, "manage_agents");
+  await requirePermission(db, actorId, orgId, "create_agents");
   const values = { ...input, handle: input.handle.toLowerCase(), model: input.model ?? defaults.model };
   await validate(db, orgId, values);
   // An agent born on "Automático" is automatic on every brain: switched to Claude Code or Codex later, it
@@ -186,7 +186,7 @@ export async function updateAgent(
   const [agent] = await db
     .update(agents)
     .set({ ...input, ...handover, updatedAt: new Date() })
-    .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)))
+    .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId), isNull(agents.deletedAt)))
     .returning();
   if (!agent) throw new NotFoundError("Agent not found");
   caches.agents.delete(`${orgId}:${agentId}`);
@@ -249,13 +249,41 @@ export async function listAgents(db: Database, actorId: string, orgId: string): 
     .orderBy(asc(agents.createdAt));
 }
 
+/** An agent, archived or not; null for a deleted one (its tombstone only names what it left, `listFormerAgents`). */
 export async function getAgent(db: Database, orgId: string, agentId: string): Promise<Agent | null> {
   const [agent] = await db
     .select()
     .from(agents)
-    .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
+    .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId), isNull(agents.deletedAt)));
   return agent ?? null;
 }
+
+/**
+ * Agents no longer in the team (archived or deleted) as what they left behind shows them: name, role and look,
+ * so their old messages, threads and reports still say who wrote them. Never offered anywhere an agent is picked.
+ */
+export async function listFormerAgents(db: Database, actorId: string, orgId: string) {
+  await requirePermission(db, actorId, orgId, "read");
+  const rows = await db
+    .select({
+      id: agents.id,
+      name: agents.name,
+      role: agents.role,
+      appearance: agents.appearance,
+      deletedAt: agents.deletedAt,
+    })
+    .from(agents)
+    .where(and(eq(agents.orgId, orgId), isNotNull(agents.archivedAt)))
+    .orderBy(asc(agents.createdAt));
+  return rows.map(({ deletedAt, ...a }) => ({
+    ...a,
+    appearance: (a.appearance ?? null) as AgentAppearance | null,
+    deleted: deletedAt !== null,
+  }));
+}
+
+/** A deleted agent's handle: longer than `HANDLE_PATTERN` allows, so nobody's and never mentioned. */
+export const deletedHandle = (agentId: string) => `deleted-${agentId}`;
 
 /** Public view of an agent (no credential id, which is admin-only detail). */
 export const agentView = (a: Agent) => ({

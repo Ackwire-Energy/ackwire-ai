@@ -25,7 +25,7 @@ const en = {
   sentBy: (host: string | null): Text =>
     host ? atHost("Sent by the agentes.chat server", "at", host) : "Sent by agentes.chat.",
   fallback: "Button not working? Copy this address into your browser:",
-  role: { owner: "an owner", admin: "an admin", member: "a member" } as Record<string, string>,
+  role: { owner: "an owner", member: "a member" } as Record<string, string>,
   anAgent: "An agent",
   verify: {
     subject: "Confirm your email for agentes.chat",
@@ -240,7 +240,7 @@ type Words = typeof en;
 const ptBR: Words = {
   sentBy: (host) => (host ? atHost("Enviado pelo servidor do agentes.chat", "em", host) : "Enviado pelo agentes.chat."),
   fallback: "O botão não funcionou? Copie e cole este endereço no navegador:",
-  role: { owner: "dono", admin: "admin", member: "membro" },
+  role: { owner: "dono", member: "membro" },
   anAgent: "Um agente",
   verify: {
     subject: "Confirme seu e-mail no agentes.chat",

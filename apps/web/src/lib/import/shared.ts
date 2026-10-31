@@ -337,7 +337,11 @@ export function scrubSecrets(text: string): { text: string; redacted: boolean } 
 
 // ── Agents ────────────────────────────────────────────────────────────────────
 
-/** Our handle rule (HANDLE_PATTERN in packages/engine/src/agents.ts): the source key when it fits. */
+/**
+ * Our handle rule (HANDLE_PATTERN in packages/engine/src/agents.ts): the source key when it fits. A key that is an
+ * id stays too: the server gives that agent a handle from its name (`isIdHandle`), and the bundle of a file imported
+ * before still hashes the same.
+ */
 export function handleOf(key: string, name: string): string {
   const k = key
     .toLowerCase()

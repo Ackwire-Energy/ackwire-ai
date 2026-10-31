@@ -6,6 +6,7 @@ import {
   Alert,
   Button,
   Card,
+  CheckboxPill,
   Chip,
   DetailsDialog,
   Dialog,
@@ -17,6 +18,7 @@ import {
   type IconName,
   Input,
   List,
+  SearchField,
   Switch,
   TabPanel,
   Tabs,
@@ -30,7 +32,7 @@ import { useOrg } from "@/components/org-context";
 import { Markdown } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
 
-/** How many skills the settings card lists before "Ver todas" (the search dialog). */
+/** How many skills show without a search: past it, the settings card gets "Ver todas" and an agent's picker a search. */
 const INLINE = 6;
 
 const SOURCE_ICON: Record<Skill["source"], IconName> = {
@@ -45,9 +47,9 @@ const sourceKey = (s: Pick<Skill, "source" | "sourceUrl">) =>
 
 const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
-export function searchSkills(skills: Skill[], query: string) {
+export function searchSkills(skills: Skill[], query: string, { nameOnly = false } = {}) {
   const q = fold(query.trim());
-  return q ? skills.filter((s) => fold(`${s.name} ${s.description}`).includes(q)) : skills;
+  return q ? skills.filter((s) => fold(nameOnly ? s.name : `${s.name} ${s.description}`).includes(q)) : skills;
 }
 
 /** A .zip as base64 (writes are JSON only). */
@@ -99,7 +101,7 @@ function SkillRow({ skill, users, onOpen }: { skill: Skill; users: number | null
 export function SkillsSection() {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const admin = can(org.role, "configure");
+  const admin = can(org, "manage_agents");
   const skills = useSkills(org.id, admin);
   const [installing, setInstalling] = useState(false);
   const [all, setAll] = useState(false);
@@ -164,6 +166,64 @@ export function SkillsSection() {
       <InstallSkillDialog open={installing} onOpenChange={setInstalling} onInstalled={(id) => setOpen(id)} />
       {open && <SkillSheet id={open} users={usage.get(open) ?? []} onClose={() => setOpen(null)} />}
     </Card>
+  );
+}
+
+/**
+ * An agent's skills (its page, Criar agente): the library as pills, with a search past INLINE. The search matches
+ * names only, since a pill shows nothing else, and only hides pills: a skill switched on stays on while hidden.
+ */
+export function SkillPicker({
+  skills,
+  selected,
+  onChange,
+  idPrefix,
+}: {
+  skills: Skill[];
+  selected: ReadonlySet<string>;
+  onChange: (next: Set<string>) => void;
+  idPrefix: string;
+}) {
+  const { t } = useTranslation();
+  const [q, setQ] = useState("");
+  const searchable = skills.length > INLINE;
+  const shown = searchable ? searchSkills(skills, q, { nameOnly: true }) : skills;
+  const toggle = (id: string, on: boolean) => {
+    const next = new Set(selected);
+    if (on) next.add(id);
+    else next.delete(id);
+    onChange(next);
+  };
+  return (
+    <div className="skill-picker">
+      {searchable && (
+        <SearchField
+          size="sm"
+          aria-label={t("skills.search")}
+          placeholder={t("skills.search")}
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onClear={() => setQ("")}
+          clearLabel={t("filters.clearSearch")}
+        />
+      )}
+      {shown.length > 0 ? (
+        <div className="newag__pills">
+          {shown.map((s) => (
+            <CheckboxPill
+              key={s.id}
+              id={`${idPrefix}-${s.id}`}
+              checked={selected.has(s.id)}
+              onCheckedChange={(on) => toggle(s.id, on)}
+            >
+              {s.name}
+            </CheckboxPill>
+          ))}
+        </div>
+      ) : (
+        <span className="small muted">{t("skills.noResults", { q })}</span>
+      )}
+    </div>
   );
 }
 

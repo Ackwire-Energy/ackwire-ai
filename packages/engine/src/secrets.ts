@@ -3,6 +3,7 @@ import { parseSecretBox, SECRET_NAME, type SecretTarget, secretAad } from "@agen
 import { and, type Database, desc, type Executor, eq, isNotNull, isNull, lt, or, schema, sql } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
+import { consultedFor } from "./consultations";
 import { isAgentOnlyDm } from "./dms";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
@@ -621,6 +622,37 @@ export async function removeAgentSecret(
 ) {
   await requireComputerManager(deps.db, actorId, orgId, agentId);
   if (!SECRET_NAME.test(name)) throw new ValidationError("Invalid secret name");
+  await removeSecret(deps, actorId, orgId, agentId, name, machineId);
+}
+
+/**
+ * An agent being deleted (ADR 0082 §4): every secret people delivered to it leaves the computer it was delivered
+ * to, as `removeAgentSecret` does. One whose computer doesn't answer now (offline) keeps its value there and its
+ * row open.
+ */
+export async function removeAgentSecrets(deps: SandboxDeps, actorId: string, orgId: string, agentId: string) {
+  const held = await deps.db
+    .selectDistinct({ name: secretRequests.name, machineId: secretRequests.machineId })
+    .from(secretRequests)
+    .where(
+      and(
+        eq(secretRequests.orgId, orgId),
+        eq(secretRequests.agentId, agentId),
+        eq(secretRequests.status, "delivered"),
+        isNull(secretRequests.removedAt),
+      ),
+    );
+  for (const s of held) await removeSecret(deps, actorId, orgId, agentId, s.name, s.machineId).catch(() => null);
+}
+
+async function removeSecret(
+  deps: SandboxDeps,
+  actorId: string,
+  orgId: string,
+  agentId: string,
+  name: string,
+  machineId: string | null,
+) {
   const live = await deps.db
     .select()
     .from(secretRequests)
@@ -683,13 +715,15 @@ export async function removeAgentSecret(
 
 /**
  * Who a secret may be asked of: the person behind the run (`authority.ts`), where they read the card.
- * Nobody for a routine's or an unattended run, nor in an agents' DM (no person reads the card there).
+ * Nobody for a routine's or an unattended run. In an agents' DM no person reads the card: only a run
+ * answering another agent's question for a person asks them, and its card goes where they asked (ADR 0034).
  */
 export async function requesterOfRun(ctx: ToolContext): Promise<string | null> {
   const [here] = await ctx.db
     .select({ kind: schema.channels.kind, dmKey: schema.channels.dmKey })
     .from(schema.channels)
     .where(and(eq(schema.channels.orgId, ctx.orgId), eq(schema.channels.id, ctx.channelId)));
-  if (!here || isAgentOnlyDm(here)) return null;
+  if (!here) return null;
+  if (isAgentOnlyDm(here)) return consultedFor(ctx);
   return personBehindCall(ctx);
 }
