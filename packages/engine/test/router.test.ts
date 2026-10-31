@@ -107,6 +107,7 @@ describe("parseRouterOutput", () => {
     ).toEqual({
       needs_agent: 0.8,
       for_everyone: 0,
+      already_answered: 0,
       scores: [{ handle: "dev", score: 0.9 }],
       reason: "r",
     });
@@ -806,9 +807,14 @@ describe("what the router reads, and a person's messages in a row", () => {
 });
 
 describe("the team's coordinator (ADR 0092)", () => {
-  /** #general with Ana, Dev, Theo (who coordinates) and Ada. Walter is in the workspace, and here with `people`. */
-  async function coordinated(options: { people?: boolean } = {}) {
-    f = await setup();
+  /**
+   * #general with Ana, Dev, Theo (who coordinates) and Ada. Walter is in the workspace, and here with `people`.
+   * `reply`: the fake model's answers.
+   */
+  async function coordinated(
+    options: { people?: boolean; reply?: NonNullable<Parameters<typeof setup>[0]>["reply"] } = {},
+  ) {
+    f = await setup({ reply: options.reply });
     const join = async (name: string) => {
       const a = await createAgent(
         f.db,
@@ -902,6 +908,37 @@ describe("the team's coordinator (ADR 0092)", () => {
     expect((await route(needs, toWalter.id)).selected).toEqual([]);
     const runs = await f.db.select().from(schema.agentRuns);
     expect(runs.map((r) => [r.agentId, r.triggerMessageId])).toEqual([[theo.id, open.id]]);
+  });
+
+  test("the small model says what was already answered too, so the coordinator doesn't answer it twice", async () => {
+    let alreadyAnswered = 0.9;
+    const { theo, walter } = await coordinated({
+      people: true,
+      reply: () => ({
+        chunks: [
+          JSON.stringify({
+            needs_agent: 0.7,
+            for_everyone: 0,
+            already_answered: alreadyAnswered,
+            scores: [],
+            reason: "no clear fit",
+          }),
+        ],
+      }),
+    });
+    const model = createLlmRouterStrategy({ gateway: f.gateway, resolveModel: async () => "claude-haiku-5-5" });
+    await post("alguém sabe a senha do wifi?");
+    await byAgent(theo.id, "É acme-2026, está no cofre de senhas.");
+    const again = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, walter.id, f.org.id, f.general.id, {
+      body: "alguém sabe a senha do wifi?",
+    });
+    expect(await route(model, again.id)).toMatchObject({ selected: [], runs: [] });
+    const asked = f.provider.calls[0]?.request;
+    expect(systemText(asked?.system ?? "")).toContain("And `already_answered`:");
+    expect(asked?.outputSchema).toMatchObject({ required: expect.arrayContaining(["already_answered"]) });
+    alreadyAnswered = 0;
+    const other = await post("alguém sabe onde ficou o contrato novo?");
+    expect((await route(model, other.id)).selected).toEqual([theo.id]);
   });
 
   test("a coordinator that waits for a mention here, is on hold, out of the person's reach or archived changes nothing", async () => {
