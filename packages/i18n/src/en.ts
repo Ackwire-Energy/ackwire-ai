@@ -2395,7 +2395,7 @@ export const en: Translations = {
         contextText: {
           auto: "What the model takes.",
           "200000": "Cheaper and faster. Summarizes early in long conversations.",
-          "400000": "Remembers a lot; each answer costs less than with 1M.",
+          "400000": "Remembers a lot. Each answer costs less than with 1M.",
           "1000000": "Remembers the most. Each answer rereads everything: slower and pricier.",
         },
         advanced: {
