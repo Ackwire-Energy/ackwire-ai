@@ -111,9 +111,9 @@ describe("Configurações → Computadores on the Cloud: one computer, nothing t
     expect(body()).toContain("Onde os agentes trabalham: um computador só deste workspace, sempre ligado.");
   });
 
-  test("an agent on it: Trabalha no Computador da Acme, with no chevron and no picker in its settings", async () => {
+  test("an agent on it: no Trabalha no to change, and no picker in its settings", async () => {
     await computers(`/org/${ORG_ID}/agents/${ADA_ID}`, { setup: { state: "preparing" } });
-    expect(document.querySelector(".agp-workcard")?.textContent).toContain("Computador da Acme");
+    expect(document.querySelector(".agp-workcard")?.textContent).not.toContain("Trabalha no");
     expect(screen().queryByRole("button", { name: "Mudar onde trabalha" })).toBeNull();
     cleanup();
     await computers(`/org/${ORG_ID}/agents/${ADA_ID}?tab=settings&sec=computer`, { setup: { state: "preparing" } });

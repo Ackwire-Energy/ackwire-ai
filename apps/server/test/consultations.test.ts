@@ -33,7 +33,7 @@ test("an opened question: its part of the agents' DM, to whoever reads the conve
   const reply = await insertMessage(t.db, {
     orgId,
     channelId,
-    author: { type: "agent", agentId, runId: null, hop: 0 },
+    author: { type: "agent", agentId, runId: null, hop: 0, stretchId: null },
     body: "Vou perguntar ao Infra.",
   });
   const [asker] = await t.db
@@ -51,10 +51,11 @@ test("an opened question: its part of the agents' DM, to whoever reads the conve
     .returning();
   const dm = await openAgentDm(t.db, orgId, agentId, infra.id);
   const consultationId = crypto.randomUUID();
+  if (!asker) throw new Error("no asking run");
   const question = await insertMessage(t.db, {
     orgId,
     channelId: dm.id,
-    author: { type: "agent", agentId, runId: asker?.id ?? null, hop: 0 },
+    author: { type: "agent", agentId, runId: asker.id, hop: 0 },
     body: "Como o staging é publicado?",
     meta: { consultation: { id: consultationId } },
   });
@@ -71,10 +72,11 @@ test("an opened question: its part of the agents' DM, to whoever reads the conve
       status: "running",
     })
     .returning();
+  if (!target) throw new Error("no consulted run");
   await insertMessage(t.db, {
     orgId,
     channelId: dm.id,
-    author: { type: "agent", agentId: infra.id, runId: target?.id ?? null, hop: 1 },
+    author: { type: "agent", agentId: infra.id, runId: target.id, hop: 1 },
     body: "Com o deploy.sh, a partir da main.",
   });
   await t.db.insert(schema.agentConsultations).values({

@@ -14,6 +14,8 @@ export interface DeliverNoticeInput {
   threadId: string | null;
   /** Hop of the notice (the run it wakes answers at hop + 1). */
   hop: number;
+  /** The stretch it belongs to (ADR 0089): the run's it is for, or null for a root (a routine's report). */
+  stretchId: string | null;
   notice: Notice;
   /** Shown to people (a compact card); the agent reads `notice.text`. Defaults to the text. */
   body?: string;
@@ -38,7 +40,7 @@ export async function deliverNotice(
     orgId: input.orgId,
     channelId: input.channelId,
     threadId: input.threadId ?? undefined,
-    author: { type: "agent", agentId: input.agentId, runId: null, hop: input.hop },
+    author: { type: "agent", agentId: input.agentId, runId: null, hop: input.hop, stretchId: input.stretchId },
     body: input.body ?? input.notice.text,
     meta: { notice: input.notice },
   });

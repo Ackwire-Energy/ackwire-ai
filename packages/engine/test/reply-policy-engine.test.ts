@@ -12,7 +12,9 @@ import {
   loadReplyPolicy,
   openDm,
   postPersonMessage,
+  queueOnRun,
   resolveBrain,
+  type ToolSource,
 } from "../src";
 import * as ledger from "../src/routine-ledger";
 import { type Fixture, setup } from "./fixtures";
@@ -143,6 +145,45 @@ describe("a run nobody called by name may stay quiet", () => {
     expect(steps.find((s) => s.data.passed)?.data.passed).toEqual({ how: "pass", reason: "Theo já respondeu" });
     await Bun.sleep(5);
     expect(events.find((e) => e.type === "agent.passed")).toMatchObject({ agentId: f.agent.id, runId: run?.id });
+  });
+
+  test("a person writing into it keeps `pass` listed, so its tools never change mid-run; the tool refuses", async () => {
+    const look: ToolSource = {
+      name: "work",
+      tools: async () => [
+        {
+          name: "look",
+          description: "Look at the builds",
+          scope: "context:read",
+          inputSchema: { type: "object", properties: {} },
+          execute: async (_input, ctx) => {
+            const m = await insertMessage(ctx.db, {
+              orgId: f.org.id,
+              channelId: f.general.id,
+              author: { type: "person", userId: f.owner.id },
+              body: "e o staging?",
+            });
+            await queueOnRun(ctx.db, ctx.runId, m.id);
+            return { content: "2 builds" };
+          },
+        },
+      ],
+    };
+    f = await setup({
+      toolSources: [createPassToolSource(), look],
+      reply: (_req, n) =>
+        n === 1
+          ? { chunks: [], toolUses: [{ name: "look", input: {} }] }
+          : n === 2
+            ? { chunks: [], toolUses: [{ name: "pass", input: { reason: "nada" } }] }
+            : { chunks: ["O staging está ok."] },
+    });
+    await routed("onde rodam os builds?");
+
+    const [first, second] = f.provider.calls.map((c) => c.request as ModelRequest);
+    expect(second?.tools).toEqual(first?.tools);
+    expect(second?.tools?.map((t) => t.name)).toContain("pass");
+    expect(await agentMessages()).toEqual(["O staging está ok."]);
   });
 
   test("ending with only the word (or nothing) is a pass too", async () => {

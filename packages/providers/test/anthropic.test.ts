@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createAnthropicProvider, ProviderError } from "../src";
+import { createAnthropicProvider, type ModelMessage, type ModelProvider, ProviderError } from "../src";
 import { scripted, sse } from "./scripted";
 
 const start = (input: number) => ({
@@ -151,8 +151,278 @@ test("effort none: Haiku 5.5 thinks not at all at low effort; a model that can't
   expect(haiku.thinking).toEqual({ type: "disabled" });
   expect(haiku.output_config).toEqual({ effort: "low" });
   const sonnet = await sent("claude-sonnet-5-5");
-  expect(sonnet).not.toHaveProperty("thinking");
+  expect(sonnet.thinking).toEqual({ type: "adaptive", block_binding: { prefix_mismatch_behavior: "drop_block" } });
   expect(sonnet.output_config).toEqual({ effort: "low" });
+});
+
+describe("preserved thinking: thinking sent back under other tools (accounts created since 2026-08-31)", () => {
+  type Block = Record<string, unknown> & { type: string };
+  type Body = { tools?: { name: string }[]; messages: { content: string | Block[] }[]; thinking?: unknown };
+  type Reply = { thinking?: true; tool?: string; text?: string; refuse?: string };
+  /** A real signature is 1.3 to 1.9 KB. */
+  const PAD = "S".repeat(1500);
+
+  /**
+   * Claude's API as it treats the thinking it gets back: a block's signature names the tools it was written
+   * with, and one sent back under other tools is refused unless the request asks to drop it (each drop
+   * reported in `input_transformations`). A signature it can't read is always refused.
+   */
+  function claudeApi(replies: Reply[]) {
+    const sent: { body: Body; beta: string | null }[] = [];
+    const refused = (message: string) =>
+      new Response(JSON.stringify({ type: "error", error: { type: "invalid_request_error", message } }), {
+        status: 400,
+        headers: { "content-type": "application/json" },
+      });
+    const fetcher = (async (_url: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as Body;
+      sent.push({ body, beta: new Headers(init?.headers).get("anthropic-beta") });
+      const tools = `tools:${(body.tools ?? []).map((t) => t.name).join(",")}`;
+      const thinking = body.messages.flatMap((m, i) =>
+        typeof m.content === "string"
+          ? []
+          : m.content.flatMap((b, j) =>
+              b.type === "thinking" ? [{ signature: String(b.signature), path: `messages.${i}.content.${j}` }] : [],
+            ),
+      );
+      const unreadable = thinking.find((b) => !b.signature.startsWith("tools:"));
+      if (unreadable) return refused(`${unreadable.path}: Invalid \`signature\` in \`thinking\` block.`);
+      const stale = thinking.filter((b) => !b.signature.startsWith(`${tools}|`));
+      const binding = body.thinking as { block_binding?: { prefix_mismatch_behavior?: string } } | undefined;
+      const drop = binding?.block_binding?.prefix_mismatch_behavior === "drop_block";
+      if (stale.length > 0 && !drop) {
+        return refused(
+          `${stale[0]?.path}: Invalid \`signature\` in \`thinking\` block. The block is bound to a different conversation. Remove the block, or set \`thinking.block_binding.prefix_mismatch_behavior\` to "drop_block".`,
+        );
+      }
+      const reply = replies.shift() ?? { text: "Done." };
+      if (reply.refuse) return refused(reply.refuse);
+      const blocks: Record<string, unknown>[] = [
+        ...(reply.thinking ? [{ type: "thinking", thinking: "", signature: `${tools}|${PAD}` }] : []),
+        ...(reply.text ? [{ type: "text", text: reply.text }] : []),
+        ...(reply.tool ? [{ type: "tool_use", id: `toolu_${sent.length}`, name: reply.tool, input: {} }] : []),
+      ];
+      const transformations = stale.map((b) => ({
+        type: "thinking_dropped",
+        path: b.path,
+        reason: "prefix_binding_mismatch",
+      }));
+      return new Response(
+        sse([
+          {
+            type: "message_start",
+            message: {
+              ...start(10).message,
+              id: `msg_${sent.length}`,
+              model: "claude-haiku-5-5",
+              ...(drop ? { input_transformations: transformations } : {}),
+            },
+          },
+          ...blocks.flatMap((content_block, index) => [
+            { type: "content_block_start", index, content_block },
+            { type: "content_block_stop", index },
+          ]),
+          {
+            type: "message_delta",
+            delta: { stop_reason: reply.tool ? "tool_use" : "end_turn", stop_sequence: null },
+            usage: { output_tokens: 5 },
+          },
+          { type: "message_stop" },
+        ]),
+        { status: 200, headers: { "content-type": "text/event-stream" } },
+      );
+    }) as unknown as typeof fetch;
+    return { fetcher, sent };
+  }
+
+  const BEFORE = ["browser_do", "browser_open", "browser_read", "find_tools", "set_status", "use_tool"];
+  // The run lists its tools again before every call, and a source can answer otherwise from one call to the next
+  // (the browser's tools go when its computer stops serving the browser, `browser/tools.ts`).
+  const AFTER = BEFORE.filter((n) => !n.startsWith("browser_"));
+  const BINDING = { type: "adaptive", block_binding: { prefix_mismatch_behavior: "drop_block" } };
+  const ask = (provider: ModelProvider, messages: ModelMessage[], tools: string[]) =>
+    provider.stream(
+      {
+        model: "claude-haiku-5-5",
+        system: [
+          { text: "org", cache: true },
+          { text: "agent", cache: true },
+        ],
+        messages,
+        maxTokens: 4096,
+        tools: tools.map((name) => ({ name, description: `${name}.`, inputSchema: { type: "object" } })),
+        effort: "low",
+      },
+      { apiKey: "k", onDelta: () => {} },
+    );
+  const thinkingIn = (body: Body | undefined) =>
+    (body?.messages ?? [])
+      .flatMap((m) => (typeof m.content === "string" ? [] : m.content))
+      .filter((b) => b.type === "thinking");
+
+  test("a call under tools that changed since its thinking asks the API to drop that thinking, and later calls leave it out", async () => {
+    const api = claudeApi([
+      { tool: "find_tools" },
+      { tool: "browser_read" },
+      { thinking: true, tool: "find_tools" },
+      { tool: "browser_do" },
+      { thinking: true, text: "My computer isn't answering, so I couldn't post it." },
+      { text: "Ok." },
+    ]);
+    const provider = createAnthropicProvider({ fetch: api.fetcher, maxRetries: 0 });
+    // Its history up to message 21 (a person's), then the run: find_tools, browser_read (the browser isn't open),
+    // find_tools after thinking (message 26), browser_do (the computer isn't answering).
+    const messages: ModelMessage[] = [
+      { role: "user", content: "earlier" },
+      ...Array.from(
+        { length: 21 },
+        (_, i): ModelMessage => ({
+          role: i % 2 === 0 ? "user" : "assistant",
+          content: `message ${i + 1}`,
+        }),
+      ),
+    ];
+    const results: [string, boolean][] = [
+      ["Tools: browser_open, browser_read, browser_do.", false],
+      ["The browser isn't open: open a page first", true],
+      ["Tools: browser_do.", false],
+      ["Ada's computer isn't answering right now.", true],
+    ];
+    for (const [content, isError] of results) {
+      const reply = await ask(provider, messages, BEFORE);
+      const use = reply.content.find((b) => b.type === "tool_use");
+      messages.push(
+        { role: "assistant", content: reply.content },
+        {
+          role: "user",
+          content: [{ type: "tool_result", toolUseId: use?.type === "tool_use" ? use.id : "", content, isError }],
+        },
+      );
+    }
+    expect(messages[26]?.content).toMatchObject([{ type: "opaque", provider: "anthropic" }, { type: "tool_use" }]);
+
+    const fifth = await ask(provider, messages, AFTER);
+    const call = api.sent[4]?.body;
+    expect(call?.tools?.map((t) => t.name)).toEqual(AFTER);
+    expect(thinkingIn(call)).toEqual([
+      { type: "thinking", thinking: "", signature: `tools:${BEFORE.join(",")}|${PAD}` },
+    ]);
+    expect(api.sent.map((s) => s.body.thinking)).toEqual(Array(5).fill(BINDING));
+    expect(api.sent.every((s) => s.beta === "thinking-binding-controls-2026-08-01")).toBe(true);
+    expect(fifth.text).toBe("My computer isn't answering, so I couldn't post it.");
+    expect(fifth.content[0]).toMatchObject({ type: "opaque", provider: "anthropic", restart: "anthropic" });
+    expect(fifth.thinking).toEqual({ dropped: { prefix_binding_mismatch: 1 } });
+
+    // The thinking from before the drop stays out from then on; the one written after it goes back.
+    messages.push({ role: "assistant", content: fifth.content }, { role: "user", content: "Try again later." });
+    await ask(provider, messages, AFTER);
+    const sixth = api.sent[5]?.body;
+    expect(sixth?.messages[26]?.content).toEqual([{ type: "tool_use", id: "toolu_3", name: "find_tools", input: {} }]);
+    expect(thinkingIn(sixth).map((b) => b.signature)).toEqual([`tools:${AFTER.join(",")}|${PAD}`]);
+    expect(api.sent).toHaveLength(6);
+  });
+
+  test("thinking the API still refuses gets one more call without any, and stays out after", async () => {
+    const api = claudeApi([{ thinking: true, text: "Posted." }, { text: "Ok." }]);
+    const provider = createAnthropicProvider({ fetch: api.fetcher, maxRetries: 0 });
+    const unreadable = { type: "thinking", thinking: "", signature: "garbled" };
+    const messages: ModelMessage[] = [
+      { role: "user", content: "Post it" },
+      // An answer that was only its thinking, and the nudge after it.
+      { role: "assistant", content: [{ type: "opaque", provider: "anthropic", data: unreadable }] },
+      { role: "user", content: "You were addressed directly; answer the person." },
+      { role: "assistant", content: [{ type: "tool_use", id: "toolu_a", name: "find_tools", input: {} }] },
+      { role: "user", content: [{ type: "tool_result", toolUseId: "toolu_a", content: "Tools: browser_do." }] },
+    ];
+    const reply = await ask(provider, messages, AFTER);
+    expect(api.sent).toHaveLength(2);
+    expect(thinkingIn(api.sent[0]?.body)).toEqual([unreadable]);
+    // The second call sends no thinking back (a message that was only thinking goes too), nor the binding the
+    // first one asked for.
+    expect(api.sent[1]?.body.messages.map((m) => m.content)).toEqual([
+      "Post it",
+      "You were addressed directly; answer the person.",
+      [{ type: "tool_use", id: "toolu_a", name: "find_tools", input: {} }],
+      [{ type: "tool_result", tool_use_id: "toolu_a", content: "Tools: browser_do." }],
+    ]);
+    expect(api.sent[1]?.body).not.toHaveProperty("thinking");
+    expect(api.sent[1]?.beta).toBeNull();
+    expect(reply.text).toBe("Posted.");
+    expect(reply.content[0]).toMatchObject({ type: "opaque", restart: "anthropic" });
+
+    messages.push({ role: "assistant", content: reply.content }, { role: "user", content: "Thanks" });
+    await ask(provider, messages, AFTER);
+    expect(api.sent).toHaveLength(3);
+    expect(thinkingIn(api.sent[2]?.body).map((b) => b.signature)).toEqual([`tools:${AFTER.join(",")}|${PAD}`]);
+  });
+
+  /** A history with thinking the API can't read: refused with or without `drop_block`. */
+  const unreadableHistory = (): ModelMessage[] => [
+    { role: "user", content: "Post it" },
+    {
+      role: "assistant",
+      content: [
+        { type: "opaque", provider: "anthropic", data: { type: "thinking", thinking: "", signature: "garbled" } },
+        { type: "text", text: "On it." },
+      ],
+    },
+    { role: "user", content: "Go on." },
+  ];
+  const REFUSAL =
+    "provider rejected the request (400 invalid_request_error): messages.1.content.0: Invalid `signature` in `thinking` block.";
+
+  test("the reply to the call without thinking marks the restart even with no thinking of its own", async () => {
+    const api = claudeApi([{ tool: "find_tools" }, { text: "Posted." }]);
+    const provider = createAnthropicProvider({ fetch: api.fetcher, maxRetries: 0 });
+    const messages = unreadableHistory();
+    const reply = await ask(provider, messages, AFTER);
+    expect(api.sent).toHaveLength(2);
+    expect(reply.content).toEqual([
+      { type: "tool_use", id: "toolu_2", name: "find_tools", input: {}, restart: "anthropic" },
+    ]);
+    expect(reply.thinking).toEqual({ refused: REFUSAL });
+
+    messages.push(
+      { role: "assistant", content: reply.content },
+      { role: "user", content: [{ type: "tool_result", toolUseId: "toolu_2", content: "Tools: browser_do." }] },
+    );
+    const next = await ask(provider, messages, AFTER);
+    // One request, with the binding and without the refused thinking: no second call without thinking.
+    expect(api.sent).toHaveLength(3);
+    expect(api.sent[2]?.body.thinking).toEqual(BINDING);
+    expect(thinkingIn(api.sent[2]?.body)).toEqual([]);
+    expect(next.text).toBe("Posted.");
+  });
+
+  test("when the call without thinking is refused too, the error keeps the first refusal", async () => {
+    const api = claudeApi([{ refuse: "prompt is too long: 1048577 tokens > 1000000 maximum" }]);
+    const provider = createAnthropicProvider({ fetch: api.fetcher, maxRetries: 0 });
+    const error = await ask(provider, unreadableHistory(), AFTER).catch((e: unknown) => e);
+    expect(api.sent).toHaveLength(2);
+    expect(error).toBeInstanceOf(ProviderError);
+    expect(error).toMatchObject({
+      retryable: false,
+      status: 400,
+      message: `${REFUSAL} (sent again without its thinking: provider rejected the request (400 invalid_request_error): prompt is too long: 1048577 tokens > 1000000 maximum)`,
+    });
+  });
+
+  test("a refused request keeps the API's error type and words, capped; one not about thinking goes once", async () => {
+    const said = `prompt is too long: 1048577 tokens > 1000000 maximum ${"x".repeat(400)}`;
+    const { fetcher, requests } = scripted(
+      JSON.stringify({ type: "error", error: { type: "invalid_request_error", message: said } }),
+      400,
+    );
+    const provider = createAnthropicProvider({ fetch: fetcher, maxRetries: 0 });
+    const error = await ask(provider, [{ role: "user", content: "hi" }], AFTER).catch((e: unknown) => e);
+    expect(requests).toHaveLength(1);
+    expect(error).toBeInstanceOf(ProviderError);
+    expect(error).toMatchObject({
+      retryable: false,
+      status: 400,
+      message: `provider rejected the request (400 invalid_request_error): ${said.slice(0, 300)}`,
+    });
+  });
 });
 
 test("a workspace id is sent as the anthropic-workspace-id header", async () => {

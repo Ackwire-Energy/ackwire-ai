@@ -45,7 +45,9 @@ async function agentFile() {
     orgId: f.org.id,
     channelId: f.general.id,
     threadId: null,
-    author: { type: "agent", agentId: f.agent.id, runId: run?.id ?? null, hop: 1 },
+    author: run
+      ? { type: "agent", agentId: f.agent.id, runId: run.id, hop: 1 }
+      : { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null },
     body: "Pronto.",
     meta: { artifacts: [{ id: file.id, version: 1 }] },
   });

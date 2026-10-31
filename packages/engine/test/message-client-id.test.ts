@@ -60,7 +60,7 @@ describe("idempotent sends (clientId)", () => {
   });
 
   test("agents' messages ignore clientId", async () => {
-    const author = { type: "agent" as const, agentId: f.agent.id, runId: null, hop: 1 };
+    const author = { type: "agent" as const, agentId: f.agent.id, runId: null, hop: 1, stretchId: null };
     const base = { orgId: f.org.id, channelId: f.general.id, author, body: "feito", clientId: "agent-1" };
     const a = await insertMessage(f.db, base);
     const b = await insertMessage(f.db, base);
