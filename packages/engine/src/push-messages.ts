@@ -33,6 +33,8 @@ export interface PushTextInput {
   title?: string | null;
   /** Snippet of what was said. */
   text?: string | null;
+  /** A GIF or a sticker sent with no words (ADR 0091): the push says so in place of the snippet. */
+  media?: "gif" | "sticker" | null;
   /** An approval of a production, irreversible or external action. */
   highRisk?: boolean;
   /** The routine that asked for an approval while nobody watched (ADR 0053 §8): the push says so. */
@@ -72,6 +74,8 @@ interface Strings {
   joinRequestBody: string;
   waitingTitle: string;
   openBody: string;
+  sentGif: string;
+  sentSticker: string;
 }
 
 /** Exported for the test that reads every text as a phone shows it. */
@@ -107,6 +111,8 @@ export const PUSH_STRINGS: Record<PushLocale, Strings> = {
     joinRequestBody: "Toque para aprovar ou recusar.",
     waitingTitle: "Tem algo esperando você",
     openBody: "Toque para abrir.",
+    sentGif: "Mandou um GIF",
+    sentSticker: "Mandou uma figurinha",
   },
   en: {
     someone: "Someone",
@@ -139,6 +145,8 @@ export const PUSH_STRINGS: Record<PushLocale, Strings> = {
     joinRequestBody: "Tap to approve or deny.",
     waitingTitle: "Something is waiting for you",
     openBody: "Tap to open.",
+    sentGif: "Sent a GIF",
+    sentSticker: "Sent a sticker",
   },
 };
 
@@ -151,7 +159,9 @@ const clip = (s: string, max: number) => {
 export function renderPush(locale: PushLocale, input: PushTextInput): { title: string; body: string } {
   const s = PUSH_STRINGS[locale];
   const actor = input.actorName?.trim() || (input.actorType === "agent" ? s.anAgent : s.someone);
-  const text = input.text?.trim() || "";
+  // A GIF or a sticker alone (ADR 0091) says what it was where its words would go.
+  const sent = input.media === "gif" ? s.sentGif : input.media === "sticker" ? s.sentSticker : "";
+  const text = input.text?.trim() || sent;
   const what = input.title?.trim() || input.label?.trim() || "";
   const out = (title: string, body: string) => ({
     title: clip(title, PUSH_TITLE_MAX),

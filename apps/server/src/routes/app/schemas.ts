@@ -3,10 +3,16 @@ import { ONBOARDING_STEPS, STANDING_STATES } from "@agenteschat/engine";
 import { CONTEXT_LIMITS, MODEL_TIERS, PROVIDER_IDS } from "@agenteschat/providers";
 import { z } from "@hono/zod-openapi";
 
+/** A last message that was only a GIF or a sticker (ADR 0091): the apps say which, translated, in its preview. */
+export const MediaKind = z.enum(["gif", "sticker"]).nullable().openapi({
+  description:
+    "The message was only a GIF or a sticker (ADR 0091): show `GIF` or `Sticker` in the reader's language where its text would be. Null for a message with text.",
+});
+
 /** A last-message preview's `meta`: what the app needs to show a server-written body in the reader's language. */
 export const PreviewMeta = z.record(z.string(), z.unknown()).nullable().openapi({
   description:
-    "For a body the server wrote (`bodyCode` + `bodyParams`, a cut-off run's notes, memory lines): show it in the reader's language, like the message itself. Null for a plain message.",
+    "For a body the server wrote (`bodyCode` + `bodyParams`, a cut-off run's notes, memory lines): show it in the reader's language, like the message itself. `media`: the message's GIF or sticker (ADR 0091), as `meta.media`, for a preview with no text. Null for a plain message.",
 });
 
 export const Role = z.enum(["owner", "member"]).openapi("Role", {
@@ -201,6 +207,10 @@ export const Agent = z
     audienceMode: z.enum(["everyone", "people", "owner"]),
     canTalk: z.boolean().openapi({ description: "Whether the current person can talk to it (mentions, DMs)." }),
     appearance: AgentAppearance.nullable().openapi({ description: "Its look; null = the default." }),
+    mediaReplies: z.boolean().openapi({
+      description:
+        "It may follow a light reply with a sticker or a GIF of its own (ADR 0091), as often as the workspace's `agentMedia` allows.",
+    }),
     brain: z
       .object({
         kind: z.enum(["model", "claude_code", "codex"]),
@@ -255,7 +265,7 @@ export const Channel = z
     position: z.number().int().optional().openapi({ description: "Order inside its category, from 0." }),
     unreadCount: z.number().int().optional().openapi({
       description:
-        "Channel list only: messages since you last read it (since you joined, if never), not yours; a thread reply counts only in a thread you follow. At most 100; 0 when you're not a member.",
+        "Channel list only: messages since you last read it (since you joined, if never), not yours; a thread reply counts only in a thread you follow; an agent's sticker or GIF after its own reply never (ADR 0091). At most 100; 0 when you're not a member.",
     }),
     lastMessage: z
       .object({
@@ -265,12 +275,14 @@ export const Channel = z
         authorName: z.string().nullable().openapi({ description: "Null when the author was deleted." }),
         preview: z.string().openapi({ description: "Plain text, at most 140 characters." }),
         meta: PreviewMeta,
+        mediaKind: MediaKind,
         createdAt: z.string(),
       })
       .nullable()
       .optional()
       .openapi({
-        description: "Channel list only: the latest top-level message; null when empty or you're not a member.",
+        description:
+          "Channel list only: the latest top-level message (an agent's sticker or GIF after its own reply is part of that reply, so the reply shows); null when empty or you're not a member.",
       }),
   })
   .openapi("Channel");
@@ -398,9 +410,10 @@ const MessageBase = z.object({
     })
     .optional()
     .openapi({ description: "People's messages: agents that saw it, picked it up, and how their runs ended." }),
-  meta: z
-    .record(z.string(), z.unknown())
-    .openapi({ description: "Attachments, e.g. `{ approvalId }` on an approval card (see /approvals)." }),
+  meta: z.record(z.string(), z.unknown()).openapi({
+    description:
+      'Attachments, e.g. `{ approvalId }` on an approval card (see /approvals). `media` (ADR 0091): a GIF `{ kind: "gif", provider, id, title, width, height }` (load it with `GET …/gifs/{id}/media`) or a sticker `{ kind: "sticker", agentId, mood }`, and the body may be empty then. `mediaAfter`: on the sticker or GIF an agent added after its own reply, that reply\'s id.',
+  }),
   usage: MessageUsage.optional(),
   reactions: z
     .array(

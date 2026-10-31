@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { getChannelCached } from "./context";
 import { type ContextDeps, isTrustedMessage, resolveSummaryModel } from "./context/summaries";
 import { publishChannelEvent } from "./events";
+import { mediaOf } from "./media";
 import { replyExcerpt } from "./messages";
 
 const { messages, threads, users, agents } = schema;
@@ -19,6 +20,8 @@ const { messages, threads, users, agents } = schema;
 const ASSESS_MESSAGES = 20;
 const ASSESS_EXCERPT = 500;
 export const ASSESS_TITLE_LENGTH = 60;
+/** What a GIF or a sticker sent alone reads as. */
+const MEDIA_WORDS = { gif: "(a GIF)", sticker: "(a sticker)" } as const;
 
 const SYSTEM = [
   "You read a conversation thread from a team chat where people and AI agents work together.",
@@ -83,7 +86,15 @@ export async function assessThread(
     await db
       .select()
       .from(messages)
-      .where(and(eq(messages.orgId, orgId), eq(messages.threadId, root.id), isNull(messages.deletedAt)))
+      .where(
+        and(
+          eq(messages.orgId, orgId),
+          eq(messages.threadId, root.id),
+          isNull(messages.deletedAt),
+          // An agent's sticker or GIF after its own reply (ADR 0091) is part of that reply, never a newer one.
+          sql`${messages.meta}->>'mediaAfter' is null`,
+        ),
+      )
       .orderBy(desc(messages.createdAt), desc(messages.id))
       .limit(ASSESS_MESSAGES)
   ).reverse();
@@ -113,9 +124,12 @@ export async function assessThread(
       : m.authorAgentId
         ? (names.get(m.authorAgentId) ?? "an agent")
         : "system";
-  const lines = all.map(
-    (m) => `${isTrustedMessage(m) ? "" : "[untrusted] "}[${author(m)}]: ${replyExcerpt(m.body, ASSESS_EXCERPT)}`,
-  );
+  // A GIF or a sticker alone says what it was (never a GIF's title: outside text, ADR 0091).
+  const said = (m: (typeof all)[number]) => {
+    const kind = mediaOf(m.meta)?.kind;
+    return replyExcerpt(m.body, ASSESS_EXCERPT) || (kind ? MEDIA_WORDS[kind] : "");
+  };
+  const lines = all.map((m) => `${isTrustedMessage(m) ? "" : "[untrusted] "}[${author(m)}]: ${said(m)}`);
 
   let answer: Record<string, unknown> | null;
   try {

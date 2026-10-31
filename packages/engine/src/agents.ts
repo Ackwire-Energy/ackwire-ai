@@ -26,6 +26,8 @@ export interface AgentInput {
   credentialId?: string | null;
   ownerUserId?: string | null;
   monthlyBudgetNanoUsd?: number | null;
+  /** It may follow a light reply with a sticker or a GIF (ADR 0091), as often as the workspace allows. */
+  mediaReplies?: boolean;
 }
 
 async function validate(db: Database, orgId: string, input: Partial<AgentInput>) {
@@ -304,6 +306,8 @@ export const agentView = (a: Agent) => ({
   monthlyBudgetNanoUsd: a.monthlyBudgetNanoUsd,
   /** Its look (color, eyes, accessory); null = the default. */
   appearance: (a.appearance ?? null) as AgentAppearance | null,
+  /** It may follow a light reply with a sticker or a GIF (ADR 0091). */
+  mediaReplies: a.mediaReplies,
   createdAt: a.createdAt,
 });
 

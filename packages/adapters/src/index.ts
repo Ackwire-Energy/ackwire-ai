@@ -1,6 +1,7 @@
 import type { BlobStore } from "./blob";
 import type { DatabaseDriver } from "./database";
 import type { EmailSender } from "./email";
+import type { GifProvider } from "./gifs";
 import type { HumanCheck } from "./human-check";
 import type { KeyWrapper, PlatformCredentials } from "./keys";
 import type { MailAdapters } from "./mail";
@@ -18,6 +19,7 @@ export * from "./command-policy";
 export * from "./composio";
 export * from "./database";
 export * from "./email";
+export * from "./gifs";
 export * from "./human-check";
 export * from "./imap";
 export * from "./keys";
@@ -68,4 +70,6 @@ export interface Adapters {
   databases?: DatabaseDriver | null;
   /** A bot check before public forms (ADR 0075): Turnstile when both of its keys are set; null/absent = none. */
   humanCheck?: HumanCheck | null;
+  /** GIF search (ADR 0091): GIPHY when `GIPHY_API_KEY` is set; null/absent = no GIFs. */
+  gifs?: GifProvider | null;
 }

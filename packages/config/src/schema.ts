@@ -24,6 +24,7 @@ export interface EnvVarDefinition {
     | "Agents"
     | "Connectors"
     | "Search"
+    | "Chat"
     | "Storage"
     | "Sandbox"
     | "Email"
@@ -392,6 +393,13 @@ export const envVars = {
     schema: z.string().default("voyage-3.5"),
     description: "Embedding model (1024 dimensions). After changing it, reindex (`search.reindex`).",
     section: "Search",
+  },
+  GIPHY_API_KEY: {
+    schema: z.string().optional(),
+    description:
+      "GIPHY API key (https://developers.giphy.com), optional. With it, people search and send GIFs in chat and agents may follow a light reply with one; each workspace can turn GIFs off and pick their rating in Settings › GIFs and stickers. This server searches GIPHY and serves every GIF itself, so browsers and the phone app never talk to GIPHY and the key never leaves the server. Unset: no GIFs anywhere; the agents' own stickers still work.",
+    section: "Chat",
+    secret: true,
   },
   CONNECTOR_GITHUB_CLIENT_ID: {
     schema: z.string().optional(),

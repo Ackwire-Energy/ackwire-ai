@@ -11,9 +11,13 @@ import {
   listChannels,
   listMessages,
   listWorkingRuns,
+  MEDIA_REFUSALS,
+  type MessageView,
   openConsultationsIn,
   postPersonMessage,
   requireChannelAccess,
+  STICKER_MOODS,
+  ValidationError,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiError, errorResponse } from "../../http/errors";
@@ -444,12 +448,22 @@ export function chatRoutes(deps: AppDeps) {
             body: z
               .string()
               .max(40_000)
-              .openapi({ description: "Markdown. May be empty only when `attachments` has files." }),
+              .openapi({ description: "Markdown. May be empty only when `attachments` has files or `media` is set." }),
             threadId: z.uuid().nullable().optional(),
             replyTo: z.uuid().nullable().optional().openapi({
               description:
-                "Quote reply: a message of this channel. Stored as `meta.replyTo` ({ messageId, threadId, author, authorName, excerpt }).",
+                "Quote reply: a message of this channel. Stored as `meta.replyTo` ({ messageId, threadId, author, authorName, excerpt, mediaKind? }); `mediaKind` (`gif` or `sticker`) when the quoted message has one (ADR 0091), so a quote of a GIF or sticker with no text still says what it was.",
             }),
+            media: z
+              .discriminatedUnion("kind", [
+                z.object({ kind: z.literal("gif"), id: z.string().max(64) }),
+                z.object({ kind: z.literal("sticker"), agentId: z.uuid(), mood: z.enum(STICKER_MOODS) }),
+              ])
+              .optional()
+              .openapi({
+                description:
+                  "A GIF (its `id` from `GET …/gifs`) or an agent's sticker (ADR 0091); `body` may be empty then. Looked up on the server and stored as `meta.media`: a GIF as { kind, provider, id, title, width, height } at the workspace's rating, a sticker as { kind, agentId, mood } of an agent of this workspace. 422 `message.media_off` (GIFs or stickers off here, or no GIF provider), 422 `message.media_not_found`.",
+              }),
             attachments: z.array(z.uuid()).max(10).optional().openapi({
               description:
                 "Files (artifact ids) you uploaded or files of this channel. Stored as `meta.artifacts` ({ id, version, title }).",
@@ -470,7 +484,12 @@ export function chatRoutes(deps: AppDeps) {
           }),
         ),
       },
-      responses: { 201: json(Message, "Created"), 429: errorResponse("Too many messages"), ...errors },
+      responses: {
+        201: json(Message, "Created"),
+        422: errorResponse("A GIF or sticker that can't be sent (`message.media_off`, `message.media_not_found`)"),
+        429: errorResponse("Too many messages"),
+        ...errors,
+      },
     }),
     async (c) => {
       const { orgId, channelId } = c.req.valid("param");
@@ -478,13 +497,28 @@ export function chatRoutes(deps: AppDeps) {
       const limit = await adapters.rateLimiter.consume(`post:${user.id}`, { limit: 30, windowMs: 10_000 });
       if (!limit.allowed) return apiError(c, 429, "rate_limited", "Slow down");
       const started = performance.now();
-      const message = await postPersonMessage(
-        { db, pubsub: adapters.pubsub, judge: deps.extras?.context?.judge, talker: deps.extras?.talker },
-        user.id,
-        orgId,
-        channelId,
-        c.req.valid("json"),
-      );
+      let message: MessageView;
+      try {
+        message = await postPersonMessage(
+          {
+            db,
+            pubsub: adapters.pubsub,
+            judge: deps.extras?.context?.judge,
+            talker: deps.extras?.talker,
+            gifs: adapters.gifs,
+          },
+          user.id,
+          orgId,
+          channelId,
+          c.req.valid("json"),
+        );
+      } catch (error) {
+        // A GIF or sticker that can't go (ADR 0091): the request was fine, what it names can't be sent.
+        if (error instanceof ValidationError && MEDIA_REFUSALS.includes(error.code)) {
+          return apiError(c, 422, error.code, error.message);
+        }
+        throw error;
+      }
       // Wake the workers now (router, runs, indexing) instead of waiting for the poll.
       deps.wakeWorkers?.();
       // post → `message.created` published (the commit and the event happen inside postPersonMessage).

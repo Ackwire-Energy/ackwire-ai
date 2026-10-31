@@ -8,6 +8,7 @@ import {
   type WebPushSender,
 } from "@agenteschat/adapters";
 import { and, asc, type Database, eq, gt, inArray, isNull, lte, or, schema } from "@agenteschat/db";
+import { mediaOf } from "./media";
 import { type NoticePrefs, noticeOn, readNoticePrefs } from "./notice-prefs";
 import type { NotificationActor, NotificationLatest, NotificationSource } from "./notifications";
 import { enqueue } from "./outbox";
@@ -244,6 +245,31 @@ async function actorName(db: Database, orgId: string, actor: NotificationActor |
   return u?.name ?? null;
 }
 
+/** Chat notifications, whose text is what the message said. */
+const SAID_KINDS = new Set(["dm", "mention", "agent_reply", "thread_reply"]);
+
+/**
+ * A chat message that was only a GIF or a sticker (ADR 0091): which, so the push says so instead of an empty line.
+ * `latest.media` when the notification carries it, else the message's own.
+ */
+async function sentMediaOf(
+  db: Database,
+  orgId: string,
+  kind: string,
+  source: NotificationSource,
+  latest: NotificationLatest,
+): Promise<"gif" | "sticker" | null> {
+  if (!SAID_KINDS.has(kind) || latest.text?.trim()) return null;
+  const carried = "media" in latest ? latest.media : undefined;
+  if (carried === "gif" || carried === "sticker") return carried;
+  if (!source.messageId) return null;
+  const [message] = await db
+    .select({ meta: schema.messages.meta })
+    .from(schema.messages)
+    .where(and(eq(schema.messages.orgId, orgId), eq(schema.messages.id, source.messageId)));
+  return mediaOf(message?.meta)?.kind ?? null;
+}
+
 /** The in-app page a browser notification opens: the inbox, which opens the notification itself. */
 export function pushPagePath(orgId: string): string {
   return `/org/${orgId}/notifications`;
@@ -333,6 +359,7 @@ export async function deliverPush(
     label: source.label,
     title: latest.title,
     text: latest.text,
+    media: await sentMediaOf(db, row.orgId, row.kind, source, latest),
     highRisk,
     routine: latest.origin?.kind === "routine" ? latest.origin.routineName : null,
     screen: source.screen ?? null,

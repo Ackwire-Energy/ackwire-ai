@@ -1,6 +1,7 @@
 import {
   type Adapters,
   createFakeEmailSender,
+  createFakeGifs,
   createFakePushSender,
   createFakeWebPushSender,
   createMemoryBlobStore,
@@ -9,6 +10,7 @@ import {
   createMemoryRateLimiter,
   createPostgresSearchResolver,
   type DatabaseDriver,
+  type GifProvider,
   type HumanCheck,
   type MailAdapters,
   noPlatformCredentials,
@@ -92,6 +94,8 @@ export async function createTestServer(
     platformKind?: string;
     /** Browser push (ADR 0071); absent = a fake that records, null = off. */
     webPush?: WebPushSender | null;
+    /** GIF search (ADR 0091); absent = the fake provider (`createFakeGifs`), null = none, as without its key. */
+    gifs?: GifProvider | null;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -120,6 +124,7 @@ export async function createTestServer(
     ...(options.mail ? { mail: options.mail } : {}),
     databases: options.databases ?? null,
     humanCheck: options.humanCheck ?? null,
+    gifs: options.gifs === undefined ? createFakeGifs() : options.gifs,
   };
   const provider = createFakeProvider(options.reply);
   const embeddings = createFakeEmbeddings();

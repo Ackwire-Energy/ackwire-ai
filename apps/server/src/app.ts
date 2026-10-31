@@ -27,6 +27,7 @@ import { databaseRoutes } from "./routes/app/databases";
 import { desktopRoutes } from "./routes/app/desktop";
 import { dmRoutes } from "./routes/app/dms";
 import { forumRoutes } from "./routes/app/forum";
+import { gifRoutes } from "./routes/app/gifs";
 import { inviteRoutes } from "./routes/app/invites";
 import { issueRoutes } from "./routes/app/issues";
 import { jevRoutes } from "./routes/app/jev";
@@ -130,6 +131,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", accessRoutes(deps));
     api.route("/app", agentRoutes(deps));
     api.route("/app", chatRoutes(deps));
+    api.route("/app", gifRoutes(deps));
     api.route("/app", actionRoutes(deps));
     api.route("/app", channelRoutes(deps));
     api.route("/app", approvalRoutes(deps));

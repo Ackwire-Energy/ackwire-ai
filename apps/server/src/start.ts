@@ -6,6 +6,7 @@ import {
   createComposioMailConnector,
   createDiskBlobStore,
   createExpoPushSender,
+  createGiphyGifs,
   createImapConnectionTester,
   createImapMailConnector,
   createImapPoller,
@@ -174,6 +175,8 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
             log,
           })
         : null,
+    // GIFs in chat (ADR 0091), only with the key: without it nothing reaches GIPHY and the app shows no GIFs.
+    gifs: config.GIPHY_API_KEY ? createGiphyGifs({ apiKey: config.GIPHY_API_KEY }) : null,
   };
   log.info("platform file storage", { kind: defaults.platformBlobs.kind });
   log.info("transactional email", { sender: defaults.email.id });
@@ -187,6 +190,7 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     createModelProviders(),
   );
   if (overridden.length > 0) log.info("adapters overridden by modules", { overridden });
+  log.info("GIFs in chat", { provider: adapters.gifs?.name ?? "off" });
   resolved = adapters;
   try {
     await checkHumanCheckAtBoot(adapters.humanCheck, log);

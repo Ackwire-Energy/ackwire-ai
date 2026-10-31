@@ -440,6 +440,8 @@ export function buildEngine(o: EngineOptions) {
     // A workspace's deletion revokes its grants at GitHub and Composio, and leaves a line in the log.
     connectors: connectorDeps,
     mail: adapters.mail,
+    // An agent's GIF after a light reply (ADR 0091): none without the server's GIF provider.
+    gifs: adapters.gifs ?? null,
     log: o.log,
     maxToolTurns: config.AGENT_MAX_TOOL_TURNS,
     // Tools on demand (ADR 0043): each run lists what the judge expects it to need; the rest behind `find_tools`.
