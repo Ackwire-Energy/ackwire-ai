@@ -14,9 +14,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { AccessibilityInfo, ActivityIndicator, Platform, StyleSheet, View } from "react-native";
 import { sealSecret } from "@/lib/secret-box";
-import { Button, Text, useTheme } from "@/ui";
+import { Button, InkOrbit, Text, useTheme } from "@/ui";
 import { useAiOrg } from "./org";
 import { Note, OpenPage, openPage, PasteField, Step, StepsCard, StepText, Waiting } from "./parts";
 
@@ -169,6 +169,20 @@ function AddAccountFlow({
   const noAnswer = startFailed || read === "noAnswer";
   const ended =
     other !== null || noAnswer || read === "failed" || result?.state === "failed" || result?.state === "expired";
+  // The code or the key on its way to the computer, then the computer signing in with it: a line stands in for the
+  // field and Enviar until the sign-in ends.
+  const busy = (sending || sent) && !ended;
+  const busyText = plan
+    ? sent
+      ? t("aiAccounts.add.keySent", { computer })
+      : t("aiAccounts.add.keySending", { computer })
+    : sent
+      ? t("agentPage.work.brain.add.sent", { computer })
+      : t("agentPage.work.brain.add.sending", { computer });
+  // VoiceOver has no live regions: the line is said as it comes and as it changes.
+  useEffect(() => {
+    if (busy && Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(busyText);
+  }, [busy, busyText]);
   // For the agent in view: the account that came back, one the person already connected there and free.
   const reuse = plan || !onUse ? null : freeDuplicate(result);
 
@@ -217,6 +231,13 @@ function AddAccountFlow({
       }
     />
   );
+  const busyLine = (
+    <View style={styles.busy}>
+      <Note icon={<InkOrbit size={15} />} live>
+        {busyText}
+      </Note>
+    </View>
+  );
   const pasteRow = (label: string, placeholder: string | undefined, secret: boolean, valid: boolean) => (
     <>
       <PasteField
@@ -226,7 +247,6 @@ function AddAccountFlow({
         label={label}
         placeholder={placeholder}
         secret={secret}
-        disabled={sent}
         returnKeyType="send"
         onSubmit={() => {
           if (valid && ready && !loading) void send();
@@ -236,8 +256,8 @@ function AddAccountFlow({
         <Button
           variant="primary"
           wide
-          label={sending ? t("mobile.ai.saving") : t("agentPage.work.brain.add.send", { computer })}
-          disabled={!valid || sent || !ready || loading || sending}
+          label={t("agentPage.work.brain.add.send", { computer })}
+          disabled={!valid || !ready || loading}
           onPress={() => void send()}
         />
       </View>
@@ -315,8 +335,10 @@ function AddAccountFlow({
         >
           {provider === "zai" ? <StepText>{t("connectAi.zaiTeam")}</StepText> : null}
         </Step>
-        <Step n={2} divider title={t("aiAccounts.add.keyTitle")} side={sent ? waiting : undefined}>
-          {pasteRow(t("aiAccounts.add.keyLabel", { plan: plan.label }), plan.placeholder, true, keyOk)}
+        <Step n={2} divider title={t("aiAccounts.add.keyTitle")} side={read === "reconnecting" ? waiting : undefined}>
+          {busy
+            ? busyLine
+            : pasteRow(t("aiAccounts.add.keyLabel", { plan: plan.label }), plan.placeholder, true, keyOk)}
           {key && !keyOk ? <Note icon="x">{t("aiAccounts.add.keyShape", { plan: plan.label })}</Note> : null}
           <StepText>{t("aiAccounts.add.keySafe", { computer })}</StepText>
         </Step>
@@ -383,24 +405,20 @@ function AddAccountFlow({
             n={2}
             divider
             title={t("agentPage.work.brain.add.stepTwo")}
-            side={sent || read === "reconnecting" ? waiting : undefined}
+            side={read === "reconnecting" ? waiting : undefined}
           >
-            {pasteRow(
-              t("agentPage.work.brain.add.codeLabel"),
-              t("agentPage.work.brain.add.codeLabel"),
-              false,
-              key.length > 0,
-            )}
-            {key && !isSignInCode(key, login.url) ? (
+            {busy
+              ? busyLine
+              : pasteRow(
+                  t("agentPage.work.brain.add.codeLabel"),
+                  t("agentPage.work.brain.add.codeLabel"),
+                  false,
+                  key.length > 0,
+                )}
+            {!busy && key && !isSignInCode(key, login.url) ? (
               <Note icon="x">{t("agentPage.work.brain.add.notCode")}</Note>
             ) : null}
-            {sent || local ? (
-              <StepText>
-                {sent
-                  ? t("agentPage.work.brain.add.sent", { computer })
-                  : t("agentPage.work.brain.add.local", { computer })}
-              </StepText>
-            ) : null}
+            {local && !busy ? <StepText>{t("agentPage.work.brain.add.local", { computer })}</StepText> : null}
           </Step>
         ) : null}
       </>
@@ -444,7 +462,7 @@ function AddAccountFlow({
       ) : (
         <StepsCard>{steps}</StepsCard>
       )}
-      {starting || loading ? <ActivityIndicator color={c.muted} style={styles.spinner} /> : null}
+      {(starting || loading) && !busy ? <ActivityIndicator color={c.muted} style={styles.spinner} /> : null}
     </View>
   );
 }
@@ -453,6 +471,8 @@ const styles = StyleSheet.create({
   flow: { gap: 10 },
   ended: { gap: 10, alignItems: "flex-start" },
   send: { marginTop: 10 },
+  // The field's place and height (`PasteField`), so the step keeps most of its size.
+  busy: { minHeight: 46, marginTop: 6, justifyContent: "center" },
   code: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 10, marginVertical: 4 },
   codeText: { fontWeight: "700", letterSpacing: 2 },
   spinner: { alignSelf: "flex-start" },

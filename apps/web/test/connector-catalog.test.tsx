@@ -40,6 +40,12 @@ const levels = (inside: HTMLElement, groups: string[]) =>
         .queryAllByRole("radio")
         .find((r) => r.getAttribute("aria-checked") === "true")?.textContent ?? null,
   );
+/** As the server leaves a first connection: every agent's, whole. */
+const everyAgent = (api: ReturnType<typeof createFakeApi>, connectionId: string) =>
+  (api.access as typeof api.access & { connected: (id: string, agents: string[]) => void }).connected(connectionId, [
+    ADA_ID,
+    ATLAS_ID,
+  ]);
 
 describe("Adicionar conector: one catalog", () => {
   test("even tiles with no tags; suggestions on top; categories with counts and search", async () => {
@@ -96,8 +102,36 @@ describe("Adicionar conector: one catalog", () => {
     expect(names(dialog)).toEqual(["Google Drive", "Notion", "Não achou?"]);
     await type(within(dialog).getByRole("searchbox", { name: "Buscar conector" }), "notion");
     expect(names(dialog)).toEqual(["Notion", "Não achou?"]);
-    await type(within(dialog).getByRole("searchbox", { name: "Buscar conector" }), "zzz");
-    expect(dialog.textContent).toContain("Nenhum conector encontrado com “zzz”.");
+  });
+
+  test("nothing found: one of our agents searching, with the way in by address", async () => {
+    const { dialog } = await open();
+    const search = within(dialog).getByRole("searchbox", { name: "Buscar conector" });
+    const empty = () => dialog.querySelector<HTMLElement>(".catalog__empty");
+    await type(search, " zzz ");
+    // No grid behind it, not even "Não achou?": the empty state carries the way in.
+    expect(names(dialog)).toEqual([]);
+    const box = empty() as HTMLElement;
+    expect(box.querySelector(".ac-empty__art[aria-hidden='true'] canvas.ac-searchpx")).not.toBeNull();
+    expect(box.querySelector(".ac-empty__title")?.textContent).toBe("Nenhum conector com “zzz”");
+    expect(box.querySelector(".ac-empty__text")?.textContent).toBe(
+      "Você pode conectar qualquer serviço pelo endereço dele.",
+    );
+    // Its button opens what "Não achou?" opens.
+    const byAddress = within(box).getByRole("button", { name: "Conectar pelo endereço" });
+    expect(byAddress.getAttribute("aria-haspopup")).toBe("dialog");
+    await click(byAddress);
+    expect(within(service("Outro serviço")).getByRole("button", { name: "Conectar pelo endereço" })).toBeTruthy();
+    await pressEsc(service("Outro serviço"));
+
+    // A category with nothing in it: the same, in its own words.
+    await type(search, "");
+    expect(empty()).toBeNull();
+    const cats = within(dialog).getByRole("radiogroup", { name: "Categorias" });
+    await click(within(cats).getByRole("radio", { name: /^Conectados/ }));
+    expect(names(dialog)).toEqual([]);
+    expect(empty()?.querySelector(".ac-empty__title")?.textContent).toBe("Nenhum conector nesta categoria ainda");
+    expect(within(empty() as HTMLElement).getByRole("button", { name: "Conectar pelo endereço" })).toBeTruthy();
   });
 
   test("a tile opens its service over the catalog: what agents could do, what asks, how it connects; Esc closes the service first", async () => {
@@ -111,7 +145,9 @@ describe("Adicionar conector: one catalog", () => {
     expect(notion.textContent).toContain("Buscar e ler páginas");
     expect(notion.textContent).toContain("Um clique: você autoriza na página do serviço");
     // What connecting changes, as one line under what it can do (no heading of its own).
-    expect(notion.textContent).toContain("Ao conectar, todos os agentes podem usar. Você muda isso depois.");
+    expect(notion.textContent).toContain(
+      "Ao conectar, todos os agentes podem usar. Em seguida, você escolhe o acesso de cada um.",
+    );
     expect(within(notion).queryByRole("heading", { level: 4, name: "Depois de conectar" })).toBeNull();
     // × goes back to the catalog; another tile opens its own.
     await click(within(notion).getByRole("button", { name: "Fechar detalhe" }));
@@ -211,8 +247,8 @@ describe("Adicionar conector: one catalog", () => {
       await pressEsc(service(name));
       return text;
     };
-    const everyone = "Ao conectar, todos os agentes podem usar. Você muda isso depois.";
-    const keeps = "Os agentes mantêm o acesso que já têm. Você muda isso depois.";
+    const everyone = "Ao conectar, todos os agentes podem usar. Em seguida, você escolhe o acesso de cada um.";
+    const keeps = "Os agentes mantêm o acesso que já têm. Em seguida, você pode mudar o de cada um.";
     expect(await detail("Notion", "Notion")).toContain(everyone);
     expect(await detail("GitHub, conectado", "GitHub")).toContain(keeps);
     expect(await detail("Zapier, conectado", "Zapier")).toContain(keeps);
@@ -446,9 +482,43 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     expect(left[0]).toStartWith("https://github.com/login/oauth/authorize");
   });
 
+  test("ours by API key, from the catalog's Conectar: what it does, then who can use it, every agent as the server left it", async () => {
+    const { state, dialog } = await open();
+    await pick(dialog, "GitHub");
+    const flow = () => screen().getAllByRole("dialog").at(-1) as HTMLElement;
+    await click(within(flow()).getByText("Conectar com uma chave de API"));
+    await type(within(flow()).getByLabelText("Chave de API"), "ghp_abcdef123456");
+    await click(within(flow()).getByRole("button", { name: "Conectar com a chave" }));
+    await settle(4);
+    expect(screen().getByRole("dialog", { name: "O que GitHub faz" })).toBeTruthy();
+    await click(within(flow()).getByRole("button", { name: "Continuar" }));
+    await settle(6);
+    expect(screen().getByRole("dialog", { name: "Quem pode usar GitHub" })).toBeTruthy();
+    expect(levels(flow(), ["Nível de todos os agentes", "Nível de Ada", "Nível de Atlas"])).toEqual([
+      "Ler e escrever",
+      "Ler e escrever",
+      "Ler e escrever",
+    ]);
+    await click(levelIn(flow(), "Nível de todos os agentes", "Ler"));
+    await click(within(flow()).getByRole("button", { name: "Liberar" }));
+    await settle(8);
+    const id = state.connections.find((c) => c.connector === "github")?.id ?? "";
+    const puts = state.calls.filter((c) => c.method === "access.set");
+    expect(puts.map((c) => c.args[1])).toEqual([ADA_ID, ATLAS_ID]);
+    for (const put of puts) {
+      const input = put.args[2] as AccessInput;
+      expect(input.connectors[id]).toBeUndefined();
+      expect(input.scopes.filter((s) => s.connectionId === id)).toEqual([
+        { connectionId: id, scope: "github:repo.read" },
+      ]);
+    }
+  });
+
   test("back from OAuth (`?connected=github`): what it does (read-only, by scope), then 'Ler' = its read scopes", async () => {
     const state = seedState();
-    await renderApp(`/org/${ORG_ID}/settings/connectors?connected=github`, { api: createFakeApi(state) });
+    const api = createFakeApi(state);
+    everyAgent(api, "conn-gh");
+    await renderApp(`/org/${ORG_ID}/settings/connectors?connected=github`, { api });
     await settle(8);
     const flow = () => screen().getAllByRole("dialog").at(-1) as HTMLElement;
     expect(screen().getByRole("dialog", { name: "O que GitHub faz" })).toBeTruthy();
@@ -461,9 +531,13 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     await type(within(flow()).getByRole("searchbox", { name: "Buscar ferramenta" }), "");
     await click(within(flow()).getByRole("button", { name: "Continuar" }));
     await settle(4);
-    await click(
-      within(within(flow()).getByRole("radiogroup", { name: "Nível de Ada" })).getByRole("radio", { name: "Ler" }),
-    );
+    expect(screen().getByRole("dialog", { name: "Quem pode usar GitHub" })).toBeTruthy();
+    expect(levels(flow(), ["Nível de todos os agentes", "Nível de Ada", "Nível de Atlas"])).toEqual([
+      "Ler e escrever",
+      "Ler e escrever",
+      "Ler e escrever",
+    ]);
+    await click(levelIn(flow(), "Nível de Ada", "Ler"));
     await click(within(flow()).getByRole("button", { name: "Liberar" }));
     await settle(8);
     const puts = state.calls.filter((c) => c.method === "access.set");
@@ -473,6 +547,57 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     expect(input.scopes.filter((s) => s.connectionId === "conn-gh")).toEqual([
       { connectionId: "conn-gh", scope: "github:repo.read" },
     ]);
+  });
+
+  test("back from OAuth in the desktop app's window, Conectores already loaded: its tools, then who can use it", async () => {
+    const state = seedState({ connections: [] });
+    const api = createFakeApi(state);
+    // As the server finishes it.
+    api.connectors.completeOAuth = async (orgId, input) => {
+      state.calls.push({ method: "connectors.completeOAuth", args: [orgId, input] });
+      state.connections.push({
+        id: "conn-new",
+        connector: "github",
+        label: "GitHub",
+        serverUrl: "https://api.githubcopilot.com/mcp/",
+        authType: "oauth",
+        accountLabel: "acme",
+        tokenExpiresAt: null,
+        createdAt: new Date().toISOString(),
+        revokedAt: null,
+      });
+      everyAgent(api, "conn-new");
+      return { connectionId: "conn-new", connector: "github", returnTo: `/org/${ORG_ID}/settings/connectors` };
+    };
+    const { router } = await renderApp(`/org/${ORG_ID}/settings/connectors`, { api });
+    await settle(8);
+    expect(screen().getByRole("region", { name: "Conectores" }).textContent).toContain("Nenhum conector ainda.");
+    // The window moves in the page (no reload): the lists read before the sign-in are still cached.
+    await act(async () => router.history.push(`/desktop/connector?org=${ORG_ID}&state=s1&code=c1`));
+    await settle(12);
+    expect(state.calls.find((c) => c.method === "connectors.completeOAuth")?.args[1]).toEqual({
+      state: "s1",
+      code: "c1",
+    });
+    const flow = () => screen().getAllByRole("dialog").at(-1) as HTMLElement;
+    expect(screen().getByRole("dialog", { name: "O que GitHub faz" })).toBeTruthy();
+    await click(within(flow()).getByRole("button", { name: "Continuar" }));
+    await settle(6);
+    expect(screen().getByRole("dialog", { name: "Quem pode usar GitHub" })).toBeTruthy();
+    expect(levels(flow(), ["Nível de todos os agentes", "Nível de Ada", "Nível de Atlas"])).toEqual([
+      "Ler e escrever",
+      "Ler e escrever",
+      "Ler e escrever",
+    ]);
+    await click(levelIn(flow(), "Nível de Atlas", "Sem acesso"));
+    await click(within(flow()).getByRole("button", { name: "Liberar" }));
+    await settle(8);
+    const puts = state.calls.filter((c) => c.method === "access.set");
+    expect(puts.map((c) => c.args[1])).toEqual([ATLAS_ID]);
+    const input = puts[0]?.args[2] as AccessInput;
+    expect(input.connectors["conn-new"]).toBeUndefined();
+    expect(input.scopes.some((s) => s.connectionId === "conn-new")).toBe(false);
+    expect(document.body.textContent).toContain("GitHub: 1 agente pode usar.");
   });
 
   test("any MCP server by address; back from its OAuth (`?connected=custom:{id}`) the review opens", async () => {
@@ -505,6 +630,10 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     await renderApp(`/org/${ORG_ID}/settings?connected=custom:${res.server.id}`, { api });
     await settle(8);
     expect(screen().getByRole("dialog", { name: REVIEW }).textContent).toContain("ferramentas do himetrica");
+    await click(within(flow()).getByRole("button", { name: "Continuar" }));
+    await settle(6);
+    expect(screen().getByRole("dialog", { name: "Quem pode usar himetrica" })).toBeTruthy();
+    expect(levels(flow(), ["Nível de Ada", "Nível de Atlas"])).toEqual(["Ler e escrever", "Ler e escrever"]);
   });
 
   test("new tools on a reviewed server: the row asks for review; disconnecting always asks first", async () => {

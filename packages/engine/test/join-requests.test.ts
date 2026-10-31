@@ -401,6 +401,7 @@ describe("answering", () => {
         orgName: "Acme",
         approverName: "ana",
         role: "member",
+        crew: [{}],
         url: `https://agentes.test/org/${f.org.id}`,
       },
     });
@@ -546,6 +547,8 @@ describe("answering", () => {
     });
     const [answer] = await joinEmails("join_answer");
     expect(answer?.template).toMatchObject({ outcome: "denied", reason: "Only <b>studio</b> people", locale: "en" });
+    // No picture of the workspace's agents for someone it turned away.
+    expect(answer?.template).not.toHaveProperty("crew");
     const rendered = renderEmail(answer?.template as EmailTemplate);
     expect(rendered.subject).toBe("Your request to join wasn't approved");
     expect(rendered.html).toContain(

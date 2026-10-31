@@ -4,6 +4,7 @@ import {
   type Member,
   type RealtimeConnection,
   useAgents,
+  useAuthConfig,
   useComputerSetup,
   useFormerAgents,
   useMe,
@@ -23,9 +24,12 @@ export function useOrgId(): string {
   return useOrg().orgId;
 }
 
-/** Which words the computers get here: the Cloud's or self-host's (`computerEdition`); null while loading. */
+/**
+ * Which words the computers get here: the Cloud's or self-host's (`computerEdition`). The server's
+ * `workspaceComputer` until the workspace's setup answers, so it is known from boot; null while neither has said.
+ */
 export function useEdition(): Edition | null {
-  return computerEdition(useComputerSetup(useOrgId()).data);
+  return computerEdition(useComputerSetup(useOrgId()).data, useAuthConfig().data?.workspaceComputer);
 }
 
 /** The signed-in person's id (null while it loads). */

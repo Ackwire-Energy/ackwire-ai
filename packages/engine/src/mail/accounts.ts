@@ -16,6 +16,7 @@ import { ConflictError, NotFoundError, ValidationError } from "../errors";
 import { isBlockedAddress, type ResolveHost, resolveHostDns } from "../net-guard";
 import { requirePermission } from "../organizations";
 import { isEmailAddress, normalizeAddress } from "./text";
+import { restartMailWatches } from "./watches";
 
 const { mailAccounts, mailAgentPolicies, mailWatches, agentScopes } = schema;
 
@@ -33,6 +34,8 @@ export interface MailDeps {
   /** DNS for the SSRF guard on custom IMAP/SMTP hosts (tests: fake). */
   resolveHost?: ResolveHost;
   now?: () => Date;
+  /** Between the callback's reads of a sign-in that is still pending (default 1 s; tests: 0). */
+  composioPollMs?: number;
 }
 
 export interface MailAccountView {
@@ -75,8 +78,9 @@ export const ASKABLE_MAIL_ACTIONS: readonly MailAction[] = ["draft", "organize"]
 const aadFor = (orgId: string, id: string) => `mail-account|${orgId}|${id}`;
 /** Our Composio user id for an organization. */
 export const composioUserId = (orgId: string) => `org_${orgId}`;
-export const composioCallbackUrl = (publicUrl: string, accountId: string) =>
-  `${publicUrl.replace(/\/$/, "")}/api/app/mail/composio/callback?account=${encodeURIComponent(accountId)}`;
+/** `from=desktop`: started in the desktop app's window, so the callback hands the return back to the app. */
+export const composioCallbackUrl = (publicUrl: string, accountId: string, desktop = false) =>
+  `${publicUrl.replace(/\/$/, "")}/api/app/mail/composio/callback?account=${encodeURIComponent(accountId)}${desktop ? "&from=desktop" : ""}`;
 
 /** The mail scopes an agent can hold on one mailbox (`agent_scopes.connection_id` = the account). */
 export const MAIL_SCOPES = {
@@ -403,41 +407,53 @@ const composioOf = (deps: MailDeps) => deps.mail?.composio ?? null;
 /**
  * Starts connecting Gmail or Outlook through Composio (admins): a pending
  * row and Composio's link; the person signs in there and comes back to
- * `/api/app/mail/composio/callback?account=<id>`.
+ * `/api/app/mail/composio/callback?account=<id>`. `desktop`: started in the
+ * desktop app's window, whose links open in the person's browser. With
+ * `accountId`, a mailbox that needs reconnecting signs in again: the new
+ * Composio account takes the refused one's place, and the mailbox keeps its
+ * agents, rules and routines.
  */
 export async function startComposioConnect(
   deps: MailDeps,
   actorId: string,
   orgId: string,
-  input: { provider: "gmail" | "outlook"; label?: string },
+  input: { provider: "gmail" | "outlook"; label?: string; accountId?: string; desktop?: boolean },
 ): Promise<{ accountId: string; redirectUrl: string }> {
   await requirePermission(deps.db, actorId, orgId, "manage_connectors");
   const composio = composioOf(deps);
   if (!composio)
     throw new ConflictError("Gmail and Outlook are not configured on this server", "mail.composio_disabled");
-  const id = crypto.randomUUID();
-  await deps.db.insert(mailAccounts).values({
-    id,
-    orgId,
-    provider: input.provider,
-    via: "composio",
-    label: input.label?.trim().slice(0, 80) ?? "",
-    status: "pending",
-    createdByUserId: actorId,
-  });
+  const again = input.accountId ? await loadAccount(deps.db, orgId, input.accountId) : null;
+  if (again && (again.via !== "composio" || again.provider !== input.provider || again.status !== "needs_reconnect"))
+    throw new ConflictError("This mailbox doesn't need reconnecting", "mail.not_reconnectable");
+  const id = again?.id ?? crypto.randomUUID();
+  if (!again) {
+    await deps.db.insert(mailAccounts).values({
+      id,
+      orgId,
+      provider: input.provider,
+      via: "composio",
+      label: input.label?.trim().slice(0, 80) ?? "",
+      status: "pending",
+      createdByUserId: actorId,
+    });
+  }
   try {
     const link = await composio.client.createConnectLink({
       toolkit: input.provider,
       userId: composioUserId(orgId),
-      callbackUrl: composioCallbackUrl(deps.publicUrl, id),
+      callbackUrl: composioCallbackUrl(deps.publicUrl, id, input.desktop === true),
     });
     await deps.db
       .update(mailAccounts)
       .set({ externalAccountId: link.connectedAccountId, updatedAt: new Date() })
       .where(eq(mailAccounts.id, id));
+    // Not revoked at Google/Microsoft: the person is signing in to the same app again.
+    if (again?.externalAccountId)
+      await composio.client.deleteConnectedAccount(again.externalAccountId, { revoke: false }).catch(() => {});
     return { accountId: id, redirectUrl: link.redirectUrl };
   } catch (error) {
-    await deps.db.delete(mailAccounts).where(eq(mailAccounts.id, id));
+    if (!again) await deps.db.delete(mailAccounts).where(eq(mailAccounts.id, id));
     throw error;
   }
 }
@@ -445,27 +461,45 @@ export async function startComposioConnect(
 /**
  * Applies Composio's state of an account to our row: active (with its
  * address) or, for an account that never worked, disconnected. Returns
- * whether it is active now.
+ * `active`, `pending` (Composio hasn't finished the sign-in, nothing
+ * changed) or `off`.
  */
 export async function applyComposioStateFor(
   deps: MailDeps,
   row: MailAccountRow,
   actorId: string | null = null,
-): Promise<boolean> {
+): Promise<"active" | "pending" | "off"> {
   const composio = composioOf(deps);
-  if (!composio || !row.externalAccountId) return false;
-  const remote = await composio.client.getConnectedAccount(row.externalAccountId);
+  if (!composio || !row.externalAccountId) return "off";
+  // An active mailbox has its address already: reading it again is a billed tool call on every
+  // reconcile pass, so only its status is checked.
+  const known = row.status === "active" && row.address !== "";
+  const remote = await composio.client.getConnectedAccount(row.externalAccountId, composioUserId(row.orgId), {
+    readAddress: !known,
+  });
+  if (known && remote.status === "active") return "active";
   const now = deps.now?.() ?? new Date();
   if (remote.status === "active" && remote.address) {
     const address = normalizeAddress(remote.address);
+    if (row.status === "needs_reconnect" && row.address && address !== row.address) {
+      // Signed in to another mailbox: it doesn't take this one's place (its agents and rules are for this
+      // address). Not revoked: that mailbox may be connected here on its own.
+      await composio.client.deleteConnectedAccount(row.externalAccountId, { revoke: false }).catch(() => {});
+      await deps.db
+        .update(mailAccounts)
+        .set({ externalAccountId: null, lastError: "other_mailbox", updatedAt: now })
+        .where(eq(mailAccounts.id, row.id));
+      return "off";
+    }
     if (!(await assertAddressFree(deps.db, row.orgId, address, row.id))) {
-      // The same mailbox is connected already: this second connection goes away.
-      await composio.client.deleteConnectedAccount(row.externalAccountId).catch(() => {});
+      // The same mailbox is connected already: this second connection goes away. Not revoked: Google
+      // revokes the app's whole grant, which would also end the connection that stays.
+      await composio.client.deleteConnectedAccount(row.externalAccountId, { revoke: false }).catch(() => {});
       await deps.db
         .update(mailAccounts)
         .set({ status: "needs_reconnect", lastError: "already_connected", revokedAt: now, updatedAt: now })
         .where(eq(mailAccounts.id, row.id));
-      return false;
+      return "off";
     }
     await deps.db
       .update(mailAccounts)
@@ -486,9 +520,10 @@ export async function applyComposioStateFor(
         details: { via: "composio", provider: row.provider, address },
       });
     }
-    return true;
+    if (row.status === "needs_reconnect") await restartMailWatches(deps, row.id);
+    return "active";
   }
-  if (remote.status === "pending") return false;
+  if (remote.status === "pending") return "pending";
   if (row.status === "pending") {
     // It never worked: nothing to keep.
     await deps.db
@@ -498,23 +533,42 @@ export async function applyComposioStateFor(
   } else {
     await markNeedsReconnect(deps.db, row.id, `composio_${remote.status}`);
   }
-  return false;
+  return "off";
 }
+
+/** Reads of the connected account before the callback leaves a sign-in that is still pending to the reconcile. */
+const CALLBACK_READS = 10;
 
 /**
  * Composio sent the person back (`GET /api/app/mail/composio/callback`):
- * reads the connected account; an admin of the account's organization only.
+ * reads the connected account. Needs no session: the browser Composio returns
+ * to may not be signed in (the desktop app opens it in the person's browser),
+ * the row's id is random, and only Composio's own state is copied onto the
+ * row, as the reconcile does. Only a sign-in under way is read (a new
+ * mailbox, still pending, or Reconectar on one that needs it): the id of a
+ * mailbox already connected, which the org's members see, never makes it call
+ * Composio. A pending account, or a read that failed for a moment, is read
+ * again for a few seconds in case Composio is still finishing.
  */
 export async function completeComposioConnect(
   deps: MailDeps,
-  actorId: string,
   accountId: string,
 ): Promise<{ orgId: string; ok: boolean }> {
   const [row] = await deps.db.select().from(mailAccounts).where(eq(mailAccounts.id, accountId));
   if (row?.via !== "composio" || row.revokedAt) throw new NotFoundError("Mailbox not found");
-  await requirePermission(deps.db, actorId, row.orgId, "manage_connectors");
-  const ok = await applyComposioStateFor(deps, row, actorId);
-  return { orgId: row.orgId, ok };
+  if (row.status !== "pending" && row.status !== "needs_reconnect") {
+    return { orgId: row.orgId, ok: row.status === "active" };
+  }
+  for (let read = 1; ; read++) {
+    const last = read === CALLBACK_READS;
+    // Composio's errors come from the read, before anything is written: the same row is read again.
+    const state = await applyComposioStateFor(deps, row, row.createdByUserId).catch((error: unknown) => {
+      if (!last && error instanceof MailError && error.retryable) return "pending" as const;
+      throw error;
+    });
+    if (state !== "pending" || last) return { orgId: row.orgId, ok: state === "active" };
+    await Bun.sleep(deps.composioPollMs ?? 1000);
+  }
 }
 
 // ── Changes ─────────────────────────────────────────────────────────────────
@@ -655,13 +709,16 @@ export async function revokeMailAccount(deps: MailDeps, actorId: string, orgId: 
   caches.scopes.deletePrefix(`${orgId}:`);
 }
 
-/** The credentials were refused: a person must reconnect (routines watching it show "Reconnect"). */
+/**
+ * The credentials were refused: a person must reconnect (routines watching it show "Reconnect"). A sign-in that
+ * never finished stays pending: it has no address to reconnect, and the reconcile removes it.
+ */
 export async function markNeedsReconnect(db: Database, accountId: string, reason: string) {
   const now = new Date();
   await db
     .update(mailAccounts)
     .set({ status: "needs_reconnect", lastError: reason.slice(0, 300), updatedAt: now })
-    .where(and(eq(mailAccounts.id, accountId), isNull(mailAccounts.revokedAt)));
+    .where(and(eq(mailAccounts.id, accountId), isNull(mailAccounts.revokedAt), ne(mailAccounts.status, "pending")));
   await db
     .update(mailWatches)
     .set({ status: "needs_reconnect", lastError: reason.slice(0, 300), updatedAt: now })
@@ -679,7 +736,9 @@ export async function accountRef(deps: MailDeps, row: MailAccountRow, password?:
     via: row.via as MailAccountRef["via"],
     address: row.address,
   };
-  if (row.via !== "imap") return { ...base, externalAccountId: row.externalAccountId };
+  if (row.via !== "imap") {
+    return { ...base, externalAccountId: row.externalAccountId, externalUserId: composioUserId(row.orgId) };
+  }
   let secret = password;
   if (secret === undefined) {
     if (!row.secretCiphertext || !row.wrappedDataKey || !row.kekId)
