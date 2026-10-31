@@ -107,7 +107,7 @@ export const ptBR = {
       title: "Só o dono",
       sub: "Pode tudo, sempre. Isto ninguém mais faz, nem quem é Administrador.",
       transfer: "Passar a posse do workspace",
-      transferDesc: "Outra pessoa vira dona; você escolhe se continua sendo.",
+      transferDesc: "Outra pessoa vira dona. Você escolhe se continua sendo.",
       owners: "Dar e tirar o papel de dono",
       ownersDesc: "Pode haver mais de um dono.",
       delete: "Apagar o workspace",

@@ -14,6 +14,20 @@ import { Glob } from "bun";
 /** Migrations up to this number came before the check. */
 export const CHECKED_AFTER = 119;
 
+/**
+ * Migrations after the check that went in unmarked, by file name, each with the window it puts a running version
+ * through: a committed migration never changes, so that window was accepted. Named one by one: raising
+ * `CHECKED_AFTER` instead would let through every migration up to it.
+ */
+export const ACCEPTED: Readonly<Record<string, string>> = {
+  "0130_roles.sql":
+    "The role columns change type and the enum is recreated without 'admin'. From the migration until the new" +
+    " version is healthy (deploy/deploy.sh, about a minute), the version before it reads former admins as plain" +
+    " members (role 'member' plus an Admin role row it doesn't know), fails on its queries that name 'admin', can't" +
+    " write 'admin', and an admin's invitation or join request it accepts makes a plain member. A rollback to it" +
+    " keeps that until the next deploy.",
+};
+
 const MARKER = /^--\s*deploy-safe:\s*\S/;
 
 const UNSAFE: [RegExp, string][] = [
@@ -59,11 +73,17 @@ export function unsafeStatements(sql: string): string[] {
   return hits;
 }
 
+/** What the check reports for one migration file: nothing for one from before the check or an accepted one. */
+export function migrationProblems(file: string, sql: string): string[] {
+  const name = basename(file);
+  if (Number.parseInt(name, 10) <= CHECKED_AFTER || Object.hasOwn(ACCEPTED, name)) return [];
+  return unsafeStatements(sql).map((hit) => `${file}:${hit}`);
+}
+
 if (import.meta.main) {
   const problems: string[] = [];
   for (const file of [...new Glob("packages/db/migrations/*.sql").scanSync()].sort()) {
-    if (Number.parseInt(basename(file), 10) <= CHECKED_AFTER) continue;
-    for (const hit of unsafeStatements(await Bun.file(file).text())) problems.push(`${file}:${hit}`);
+    problems.push(...migrationProblems(file, await Bun.file(file).text()));
   }
   if (problems.length > 0) {
     console.error(

@@ -11,6 +11,7 @@ import {
   updateIssue,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
+import { until } from "./stream-fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -25,11 +26,16 @@ afterEach(async () => {
  */
 test("claim → model request stays within 13 statements; a whole mention run within 23", async () => {
   let beforeModel = -1;
+  const statusPicked = new Set<string>();
   f = await setup({
     reply: (req) => {
       // The agent's call only: the router's (structured output) may run after an agent's answer (ADR 0034).
       if (!req.outputSchema) beforeModel = currentQueryCount();
       return { chunks: [req.outputSchema ? '{"needs_agent":0,"scores":[],"reason":"none"}' : "ok"] };
+    },
+    judge: (kind, _id, _state, _question, request) => {
+      if (kind === "agent_status" && request.runId) statusPicked.add(request.runId);
+      return undefined;
     },
   });
   // Its open tasks from private channels it isn't in: hidden from #general, in the same one statement.
@@ -43,7 +49,7 @@ test("claim → model request stays within 13 statements; a whole mention run wi
     });
   }
   enableCaches();
-  let profile: { stages: StageTiming[]; total: { queries: number } } | null = null;
+  let profile: { runId: string; stages: StageTiming[]; total: { queries: number } } | null = null;
   const handlers = createJobHandlers({
     ...f.jobDeps,
     onRunProfile: (p) => {
@@ -62,9 +68,11 @@ test("claim → model request stays within 13 statements; a whole mention run wi
   // 13 since a run's context lists the agent's open tasks (one statement however many, read while the thread is).
   expect(beforeModel).toBeLessThanOrEqual(13);
   expect(profile).not.toBeNull();
-  const p = profile as unknown as { stages: StageTiming[]; total: { queries: number } };
+  const p = profile as unknown as { runId: string; stages: StageTiming[]; total: { queries: number } };
   // 22 since the reply carries how many tool calls the run made, so the apps leave "Ver o que ele fez" out at 0.
   // 23 with the open tasks.
   expect(p.total.queries).toBeLessThanOrEqual(23);
   expect(p.stages.map((s) => s.stage)).toEqual(["claim", "context", "model#1", "persist", "events"]);
+  // Its status line is still picked, in a request of its own beside the run (ADR 0084 §8), counted in neither.
+  await until(() => statusPicked.has(p.runId), "the run's status pick");
 });

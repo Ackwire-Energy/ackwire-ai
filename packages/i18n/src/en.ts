@@ -100,7 +100,7 @@ export const en: Translations = {
       title: "Only the owner",
       sub: "Can do everything, always. Nobody else does these, not even an Administrator.",
       transfer: "Hand the workspace over",
-      transferDesc: "Someone else becomes an owner; you choose whether you stay one.",
+      transferDesc: "Someone else becomes an owner. You choose whether you stay one.",
       owners: "Give and take ownership",
       ownersDesc: "There can be more than one owner.",
       delete: "Delete the workspace",
