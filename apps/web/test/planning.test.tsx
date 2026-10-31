@@ -108,8 +108,12 @@ describe("Issues (board and list)", () => {
     expect(rows.find((r) => r.textContent?.includes("#126"))?.textContent).toContain("Feito");
   });
 
-  test("Nova issue: title, criteria from '-' lines, assignee and priority", async () => {
-    const { api } = await go("issues");
+  test("Nova issue: title, criteria from '-' lines, assignee (each by its face) and priority", async () => {
+    const state = seedState();
+    const [ada, atlas] = state.agents;
+    if (ada) ada.appearance = { color: "green", accessory: "headphones" };
+    if (atlas) atlas.appearance = { color: "rose", accessory: "crown" };
+    const { api } = await go("issues", createFakeApi(state));
     await click(screen().getByRole("button", { name: "Nova tarefa" }));
     const dialog = screen().getByRole("dialog", { name: "Nova tarefa" });
     const create = within(dialog).getByRole("button", { name: "Criar tarefa" });
@@ -119,7 +123,29 @@ describe("Issues (board and list)", () => {
       within(dialog).getByLabelText("Descrição e critérios de aceite"),
       "Pedido de 18 reviews.\n- Botão na agenda\n- PDF com o logo da clínica",
     );
-    await pick(within(dialog).getByRole("combobox", { name: "Responsável" }), /Ada/);
+    const assignee = within(dialog).getByRole("combobox", { name: "Responsável" });
+    assignee.focus();
+    await key(assignee, "Enter");
+    // People by their photo or initials, agents by their own face, no one by a glyph as wide as the faces (18px).
+    const leads = within(screen().getByRole("listbox"))
+      .getAllByRole("option")
+      .map((o) => {
+        const lead = o.querySelector<HTMLElement | SVGElement>(".ac-menu__leading > *");
+        const kind = lead?.getAttribute("data-kind");
+        return [
+          o.querySelector(".ac-menu__label")?.firstChild?.textContent,
+          kind === "agent" ? lead?.getAttribute("data-accessory") : kind ? lead?.textContent : lead?.style.width,
+        ];
+      });
+    expect(leads).toEqual([
+      ["Sem responsável", "18px"],
+      ["Walter", "W"],
+      ["João", "J"],
+      ["Ada", "headphones"],
+      ["Atlas", "crown"],
+    ]);
+    await click(within(screen().getByRole("listbox")).getByRole("option", { name: /Ada/ }));
+    await settle(3);
     await pick(within(dialog).getByRole("combobox", { name: "Prioridade" }), "Alta");
     await type(within(dialog).getByLabelText("Prazo (opcional)"), "31/02");
     expect(dialog.textContent).toContain("Use dd/mm ou dd/mm/aaaa.");

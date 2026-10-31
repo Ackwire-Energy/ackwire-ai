@@ -34,6 +34,7 @@ describe("agentes.chat Cloud's restriction lines cite the Terms this server serv
   // The section each line rests on, by its id: when the Terms are renumbered, this fails until the lines follow.
   const RESTS_ON = {
     review: "acceptable-use",
+    reviewFor: "acceptable-use",
     blockedAbuse: "acceptable-use",
     agentNetwork: "acceptable-use",
     agentOperator: "acceptable-use",
@@ -45,7 +46,7 @@ describe("agentes.chat Cloud's restriction lines cite the Terms this server serv
     test(locale, () => {
       const { sections } = legalDocuments.terms[locale];
       const cited = Object.entries(lines).flatMap(([key, line]) => {
-        const number = line.match(/(?:section|seção) (\d+)/)?.[1];
+        const number = typeof line === "string" ? line.match(/(?:section|seção) (\d+)/)?.[1] : undefined;
         return number ? [[key, number]] : [];
       });
       const served = Object.entries(RESTS_ON).map(([key, id]) => [

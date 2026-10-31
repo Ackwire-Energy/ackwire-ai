@@ -51,10 +51,17 @@ export const COMPOSIO_MAIL_TRIGGERS: Record<ComposioToolkit, string> = {
 /** How old (or how far ahead) a webhook timestamp may be, in seconds. */
 const WEBHOOK_TOLERANCE_SECONDS = 300;
 
+/** A connected account as a tool call names it. */
+export interface ComposioAccount {
+  connectedAccountId: string;
+  /** The user id it was linked for (`createConnectLink`'s `userId`). */
+  userId: string;
+}
+
 /** The client plus what only our connector uses (tool execution, file downloads). */
 export interface ComposioRestClient extends ComposioClient {
   /** Runs one tool for a connected account; returns the tool's `data`. Throws `MailAuthError`/`MailError`. */
-  executeTool(slug: string, connectedAccountId: string, args: Record<string, unknown>): Promise<unknown>;
+  executeTool(slug: string, account: ComposioAccount, args: Record<string, unknown>): Promise<unknown>;
   /** Downloads a file a tool returned as a URL (attachments). */
   fetchFile(url: string): Promise<Uint8Array>;
 }
@@ -233,9 +240,12 @@ export function createComposioClient(options: ComposioClientOptions): ComposioRe
     return pending;
   }
 
-  async function executeTool(slug: string, connectedAccountId: string, args: Record<string, unknown>) {
+  async function executeTool(slug: string, account: ComposioAccount, args: Record<string, unknown>) {
     const result = await request("POST", `/tools/execute/${encodeURIComponent(slug)}`, {
-      connected_account_id: connectedAccountId,
+      connected_account_id: account.connectedAccountId,
+      // Composio refuses a connected account without the user id it belongs to
+      // (400 ActionExecute_ConnectedAccountEntityIdRequired).
+      user_id: account.userId,
       arguments: Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)),
     });
     if (!result || result.successful === false) {
@@ -244,13 +254,13 @@ export function createComposioClient(options: ComposioClientOptions): ComposioRe
     return result.data ?? {};
   }
 
-  async function mailboxAddress(toolkit: string, connectedAccountId: string): Promise<string | null> {
+  async function mailboxAddress(toolkit: string, account: ComposioAccount): Promise<string | null> {
     if (toolkit === "gmail") {
-      const profile = unwrap(await executeTool("GMAIL_GET_PROFILE", connectedAccountId, { user_id: "me" }));
+      const profile = unwrap(await executeTool("GMAIL_GET_PROFILE", account, { user_id: "me" }));
       return str(profile.emailAddress)?.toLowerCase() ?? str(profile.email_address)?.toLowerCase() ?? null;
     }
     if (toolkit === "outlook") {
-      const profile = unwrap(await executeTool("OUTLOOK_GET_PROFILE", connectedAccountId, { user_id: "me" }));
+      const profile = unwrap(await executeTool("OUTLOOK_GET_PROFILE", account, { user_id: "me" }));
       const address = str(profile.mail) ?? str(profile.userPrincipalName) ?? str(profile.user_principal_name);
       return address?.includes("@") ? address.toLowerCase() : null;
     }
@@ -305,7 +315,7 @@ export function createComposioClient(options: ComposioClientOptions): ComposioRe
       return { connectedAccountId, redirectUrl };
     },
 
-    async getConnectedAccount(id) {
+    async getConnectedAccount(id, userId, options) {
       const account = await request("GET", `/connected_accounts/${encodeURIComponent(id)}`, undefined, {
         allowNotFound: true,
       });
@@ -314,8 +324,13 @@ export function createComposioClient(options: ComposioClientOptions): ComposioRe
       if (raw === "INITIALIZING" || raw === "INITIATED") return { status: "pending", address: null };
       if (raw === "EXPIRED") return { status: "expired", address: null };
       if (raw !== "ACTIVE" || account.is_disabled === true) return { status: "failed", address: null };
+      if (options?.readAddress === false) return { status: "active", address: null };
       try {
-        const address = await mailboxAddress((str(obj(account.toolkit).slug) ?? "").toLowerCase(), id);
+        // Not the `user_id` in this response: Composio deprecated it and stops returning it.
+        const address = await mailboxAddress((str(obj(account.toolkit).slug) ?? "").toLowerCase(), {
+          connectedAccountId: id,
+          userId,
+        });
         return { status: "active", address };
       } catch (error) {
         if (error instanceof MailAuthError) return { status: "expired", address: null };
@@ -323,9 +338,9 @@ export function createComposioClient(options: ComposioClientOptions): ComposioRe
       }
     },
 
-    async deleteConnectedAccount(id) {
-      // Also revokes the grant at Google/Microsoft: the person disconnected it.
-      await request("DELETE", `/connected_accounts/${encodeURIComponent(id)}?revoke_on_delete=true`, undefined, {
+    async deleteConnectedAccount(id, options) {
+      const revoke = options?.revoke === false ? "" : "?revoke_on_delete=true";
+      await request("DELETE", `/connected_accounts/${encodeURIComponent(id)}${revoke}`, undefined, {
         allowNotFound: true,
       });
     },
@@ -340,6 +355,8 @@ export function createComposioClient(options: ComposioClientOptions): ComposioRe
       }
       const result = await request("POST", `/trigger_instances/${COMPOSIO_MAIL_TRIGGERS[input.toolkit]}/upsert`, {
         connected_account_id: input.connectedAccountId,
+        // Checked against the connected account's owner on projects with 2FA on.
+        user_id: input.userId,
         trigger_config: triggerConfig,
       });
       const triggerId = str(result?.trigger_id);
@@ -566,8 +583,8 @@ function sentId(data: unknown): string | null {
   return str(result.id) ?? str(result.messageId) ?? str(result.message_id) ?? null;
 }
 
-function gmailProvider(client: ComposioRestClient, accountId: string): MailProvider {
-  const exec = (slug: string, args: Obj = {}) => client.executeTool(slug, accountId, { user_id: "me", ...args });
+function gmailProvider(client: ComposioRestClient, account: ComposioAccount): MailProvider {
+  const exec = (slug: string, args: Obj = {}) => client.executeTool(slug, account, { user_id: "me", ...args });
   const read = async (id: string, format: "full" | "metadata" = "full") =>
     gmailMessage(unwrap(await exec("GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID", { message_id: id, format })));
   const modify = (id: string, add: string[], remove: string[]) =>
@@ -810,8 +827,8 @@ const odataString = (value: string) => `'${value.replace(/'/g, "''")}'`;
 const kqlPhrase = (value: string) => value.replace(/["\\]/g, " ").replace(/\s+/g, " ").trim();
 const day = (iso: string) => new Date(iso).toISOString().slice(0, 10);
 
-function outlookProvider(client: ComposioRestClient, accountId: string): MailProvider {
-  const exec = (slug: string, args: Obj = {}) => client.executeTool(slug, accountId, { user_id: "me", ...args });
+function outlookProvider(client: ComposioRestClient, account: ComposioAccount): MailProvider {
+  const exec = (slug: string, args: Obj = {}) => client.executeTool(slug, account, { user_id: "me", ...args });
 
   async function listAttachments(messageId: string): Promise<MailAttachment[]> {
     const data = unwrap(await exec("OUTLOOK_LIST_OUTLOOK_ATTACHMENTS", { message_id: messageId }));
@@ -1036,15 +1053,19 @@ async function extractFile(
   throw new MailError("Composio returned no attachment content", false);
 }
 
-/** Gmail and Outlook mailboxes through Composio tools (`account.externalAccountId` is the connected account). */
+/**
+ * Gmail and Outlook mailboxes through Composio tools (`account.externalAccountId` is the connected
+ * account, `account.externalUserId` the user id it belongs to).
+ */
 export function createComposioMailConnector(client: ComposioRestClient): MailConnector {
   return {
     async open(account: MailAccountRef) {
-      if (account.via !== "composio" || !account.externalAccountId) {
+      if (account.via !== "composio" || !account.externalAccountId || !account.externalUserId) {
         throw new MailError(`mail account ${account.id} is not connected through Composio`, false);
       }
-      if (account.provider === "gmail") return gmailProvider(client, account.externalAccountId);
-      if (account.provider === "outlook") return outlookProvider(client, account.externalAccountId);
+      const ref = { connectedAccountId: account.externalAccountId, userId: account.externalUserId };
+      if (account.provider === "gmail") return gmailProvider(client, ref);
+      if (account.provider === "outlook") return outlookProvider(client, ref);
       throw new MailError(`Composio does not serve ${account.provider} mailboxes`, false);
     },
   };

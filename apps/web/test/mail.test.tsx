@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { MailAccount, RoutineInput } from "@agenteschat/client";
+import { ApiError, type MailAccount, type RoutineInput } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { setNavigateAway } from "@/lib/navigate";
 import { pick, service } from "./catalog";
@@ -99,8 +99,39 @@ describe("Conectores → Email", () => {
     expect(flow().textContent).toContain("Conectar Gmail");
     await click(within(flow()).getByRole("button", { name: "Conectar com Google" }));
     await settle(4);
-    expect(state.calls.find((c) => c.method === "mail.connectComposio")?.args[1]).toEqual({ provider: "gmail" });
+    expect(state.calls.find((c) => c.method === "mail.connectComposio")?.args[1]).toEqual({
+      provider: "gmail",
+      desktop: false,
+    });
     expect(left).toEqual(["https://composio.example/connect/gmail"]);
+  });
+
+  test("in the desktop app, Gmail's return comes back to the window: 'O que faz', or why it failed", async () => {
+    const win = window as { __agentesDesktop?: unknown };
+    win.__agentesDesktop = { version: "0.6.0", connectorReturn: true };
+    try {
+      setNavigateAway(() => {});
+      const { api, state } = mailApi();
+      await pick(await openCatalog(api), "Gmail");
+      await click(within(flow()).getByRole("button", { name: "Conectar com Google" }));
+      await settle(4);
+      expect(state.calls.find((c) => c.method === "mail.connectComposio")?.args[1]).toEqual({
+        provider: "gmail",
+        desktop: true,
+      });
+      cleanup();
+
+      const back = mailApi([{ provider: "gmail", via: "composio", preset: null, address: "new@example.com" }]);
+      await renderApp(`/desktop/connector?org=${ORG_ID}&state=mail&code=connected`, { api: back.api });
+      await settle(8);
+      expect(screen().getByRole("dialog", { name: "O que new@example.com faz" })).toBeTruthy();
+      cleanup();
+      await renderApp(`/desktop/connector?org=${ORG_ID}&state=mail&code=failed`, { api: mailApi().api });
+      await settle(8);
+      expect(screen().getByText("Não deu para conectar o email. Tente de novo.")).toBeTruthy();
+    } finally {
+      delete win.__agentesDesktop;
+    }
   });
 
   test("iCloud: address and app password; a 422 says why in plain words; then o que faz → quem pode usar", async () => {
@@ -278,7 +309,52 @@ describe("Conectores → Email", () => {
     expect(said[1]).toContain("servidor de saída");
   });
 
-  test("back from Gmail (`?mail=connected`): 'O que faz' for the newest mailbox; `failed` says so", async () => {
+  test("back from Gmail (`?mail=connected&account=<id>`): that mailbox, even with a newer one and a slow list; then who uses it", async () => {
+    const { api, state, mail } = mailApi([
+      { address: "old@acme.com.br" },
+      { provider: "gmail", via: "composio", preset: null, address: "came@example.com" },
+      // Started and left on Microsoft's page: newer, still waiting.
+      { provider: "outlook", via: "composio", preset: null, address: "", status: "pending" },
+    ]);
+    const list = mail.client.accounts;
+    let arrive = () => {};
+    const arrived = new Promise<void>((resolve) => {
+      arrive = resolve;
+    });
+    mail.client.accounts = async (orgId) => {
+      await arrived;
+      return list(orgId);
+    };
+    await renderApp(`/org/${ORG_ID}/settings/connectors?mail=connected&account=mail-2`, { api });
+    await settle(8);
+    expect(screen().queryByRole("dialog")).toBeNull();
+    await act(async () => arrive());
+    await settle(8);
+    expect(screen().getByRole("dialog", { name: "O que came@example.com faz" })).toBeTruthy();
+    await click(within(flow()).getByRole("button", { name: "Continuar" }));
+    await settle(4);
+    const who = screen().getByRole("dialog", { name: "Quem pode usar came@example.com" });
+    const level = (agent: string) =>
+      within(within(who).getByRole("radiogroup", { name: `Nível de ${agent}` }))
+        .getAllByRole("radio")
+        .find((r) => r.getAttribute("aria-checked") === "true")?.textContent;
+    // A new mailbox is nobody's until it's chosen here.
+    expect([level("Ada"), level("Atlas")]).toEqual(["Sem acesso", "Sem acesso"]);
+    await click(
+      within(within(who).getByRole("radiogroup", { name: "Nível de Ada" })).getByRole("radio", { name: "Ler" }),
+    );
+    await click(within(who).getByRole("button", { name: "Continuar" }));
+    await settle(6);
+    expect(
+      state.calls
+        .filter((c) => c.method === "mail.setAgent")
+        .map((c) => [c.args[1], c.args[2], (c.args[3] as { level: string }).level]),
+    ).toEqual([[ADA_ID, "mail-2", "read"]]);
+    // Then the optional rules.
+    expect(screen().getByRole("dialog", { name: "Regras em came@example.com" })).toBeTruthy();
+  });
+
+  test("back from Gmail without the account (`?mail=connected`): the newest mailbox; `failed` says so", async () => {
     const { api } = mailApi([
       { address: "old@acme.com.br" },
       { provider: "gmail", via: "composio", preset: null, address: "new@example.com" },
@@ -345,6 +421,12 @@ describe("Conectores → Email", () => {
     ]);
     await click(screen().getByRole("button", { name: "Reconectar bia@example.com" }));
     await settle(4);
+    // The same mailbox signs in again (a new one would be refused: the address is taken).
+    expect(state.calls.find((c) => c.method === "mail.connectComposio")?.args[1]).toEqual({
+      provider: "gmail",
+      accountId: "mail-2",
+      desktop: false,
+    });
     expect(left).toEqual(["https://composio.example/connect/gmail"]);
   });
 
@@ -408,6 +490,58 @@ describe("the agent's email rules", () => {
       },
     });
     expect(screen().getByText("Email de Ada salvo.")).toBeTruthy();
+  });
+
+  test("a Gmail still connecting: its name, 'Conectando' and the way to Conectores, no level to pick", async () => {
+    const { api } = mailApi([
+      { provider: "gmail", via: "composio", preset: null, address: "", label: "", status: "pending" },
+      { address: "ana@example.com", status: "needs_reconnect" },
+    ]);
+    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=access`, { api });
+    await settle(10);
+    const [connecting, reconnect] = within(screen().getByRole("list", { name: "Email" })).getAllByRole("listitem") as [
+      HTMLElement,
+      HTMLElement,
+    ];
+    expect(connecting.textContent).toContain("GmailConectando");
+    expect(connecting.textContent).toContain("Ainda não terminou de conectar.");
+    expect(within(connecting).queryByRole("radiogroup")).toBeNull();
+    const link = within(connecting).getByRole("link", { name: "Abrir Conectores" });
+    expect(link.getAttribute("href")).toBe(`/org/${ORG_ID}/settings/connectors`);
+    // Needing reconnection: still a level to pick, and what it means.
+    expect(reconnect.textContent).toContain("Precisa reconectar");
+    expect(reconnect.textContent).toContain("Os agentes só usam depois de reconectar.");
+    expect(within(reconnect).getByRole("radiogroup", { name: "Nível em ana@example.com" })).toBeTruthy();
+  });
+
+  test("a failed save says what happened; the generic line only for the unexpected", async () => {
+    const { api } = mailApi([{ address: "ana@example.com" }]);
+    const refusals = [
+      new ApiError(404, "mail.account_not_found", "Mailbox not found"),
+      new ApiError(400, "mail.from_not_mailbox", "fromAddress must be one of the mailbox's addresses"),
+      new ApiError(403, "forbidden", "You don't have permission to do this"),
+      new ApiError(500, "internal", "Something broke"),
+    ];
+    api.mail.setAgent = async () => {
+      throw refusals.shift();
+    };
+    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=access`, { api });
+    await settle(10);
+    const level = screen().getByRole("radiogroup", { name: "Nível em ana@example.com" });
+    await click(within(level).getByRole("radio", { name: "Ler e escrever" }));
+    const row = level.closest("li") as HTMLElement;
+    const said: (string | null)[] = [];
+    while (refusals.length > 0) {
+      await click(within(row).getByRole("button", { name: "Salvar" }));
+      await settle(4);
+      said.push(within(row).getByRole("alert").textContent);
+    }
+    expect(said).toEqual([
+      "Esta caixa de email não está mais conectada. Conecte de novo em Conectores.",
+      "“Enviar como” precisa ser um endereço desta caixa. Escolha outro.",
+      "Você não tem permissão para isso. Peça a um admin do workspace.",
+      "Não deu para salvar. Tente de novo.",
+    ]);
   });
 
   test("removing the last recipient turns 'Enviar sem pedir aprovação' off", async () => {
