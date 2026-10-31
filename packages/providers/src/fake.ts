@@ -23,6 +23,8 @@ export interface FakeReply {
   stopReason?: StopReason;
   /** Report a different answering model (simulates a server-side fallback). */
   model?: string;
+  /** Thinking the call went without (`ModelResult.thinking`). */
+  thinking?: ModelResult["thinking"];
   /** What the provider says the call cost (OpenRouter's reported cost). */
   costNanoUsd?: number;
   /**
@@ -114,6 +116,7 @@ export function createFakeProvider(reply?: (request: ModelRequest, call: number)
           cacheWriteTokens: r.usage?.cacheWriteTokens ?? 0,
         },
         ...(r.costNanoUsd !== undefined ? { costNanoUsd: r.costNanoUsd } : {}),
+        ...(r.thinking ? { thinking: r.thinking } : {}),
       };
     },
     async countTokens(request) {

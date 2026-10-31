@@ -42,9 +42,11 @@ const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const hhmm = ([h, m]: [number, number]) => `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 
+// The English text is what agents read: a workspace with no model of its own to read words can still take cron.
 const UNREADABLE = {
   ok: false as const,
-  error: 'Couldn\'t read the schedule. Try "weekdays at 9am".',
+  error:
+    'Couldn\'t read the schedule in words. Send it as a 5-field cron expression in the workspace\'s time zone instead: "0 9 * * 1-5" is weekdays at 9am, "0 1 * * *" every day at 1am.',
   code: "schedule.unreadable",
 };
 

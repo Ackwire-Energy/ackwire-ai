@@ -7,7 +7,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { type Message, steerStore } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, createFakeApi, ENG_ID, NOW, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, NOW, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -263,5 +263,29 @@ describe("its words stay reachable", () => {
     await settle(2);
     const popover = screen().getByRole("dialog", { name: "Vista por João" });
     expect(within(popover).getByText("Vista por João")).toBeTruthy();
+  });
+});
+
+describe("an agent's message that mentions agents (ADR 0089)", () => {
+  test("its mark lists whom it mentioned: one the judge read as no hand-off is 'Só mencionado', with 'Chamar um agente'", async () => {
+    const state = seedState();
+    state.messages = [
+      said("a1", "Valeu @ada, por agora basta.", 2, {
+        author: { type: "agent", id: ATLAS_ID },
+        mentionedAgentIds: [ADA_ID],
+        agentRunId: "r-atlas",
+        receipts: { seenBy: [ADA_ID], pickedBy: [], handled: [], blocked: [], referenced: [ADA_ID] },
+      }),
+    ];
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(8);
+    // A mark, never "Nenhum agente vai responder": an agent's message waits for nobody.
+    expect(row("a1").textContent).not.toContain("Nenhum agente vai responder");
+    const check = row("a1").querySelector(".ac-receipt__check") as HTMLElement;
+    await act(async () => fireEvent.click(check));
+    await settle(2);
+    const popover = screen().getByRole("dialog", { name: "Agentes" });
+    expect(within(popover).getByText("Só mencionado")).toBeTruthy();
+    expect(within(popover).getByRole("button", { name: "Chamar um agente" })).toBeTruthy();
   });
 });

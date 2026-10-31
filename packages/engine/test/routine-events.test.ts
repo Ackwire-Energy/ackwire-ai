@@ -148,7 +148,7 @@ describe("issue.created", () => {
     const note = await insertMessage(f.db, {
       orgId: f.org.id,
       channelId: f.general.id,
-      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0 },
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0, stretchId: null },
       body: "Nota interna.",
     });
     const [unattended] = await createAgentRuns(f.db, note, [f.agent.id], "mention");

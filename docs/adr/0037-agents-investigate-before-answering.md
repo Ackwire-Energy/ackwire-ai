@@ -1,6 +1,6 @@
 # 0037. Agents investigate before answering
 
-- Status: Accepted (rounds 1 and 2 built). Amended 2026-10-30: round 3, agents follow through
+- Status: Accepted (rounds 1 and 2 built). Amended 2026-10-30: round 3, agents follow through. Amended 2026-10-31 by ADR 0089: round 3's promise word list goes (the judge reads every conversation run's end) and `follow_up` is bound by the stretch's limits instead of `NOTICE_WAKE_MAX_HOP`
 - Date: 2026-10-18
 - Extends: ADR 0015 (approvals), ADR 0032 (agent engine), ADR 0034 (agents talk to each other)
 

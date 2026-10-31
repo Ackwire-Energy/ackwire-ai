@@ -40,7 +40,7 @@ export function AgentActionReceipts({ message }: { message: Message }) {
 
 type Override = Pick<AgentAction, "undoneAt" | "undoneByUserId">;
 
-const ICONS: Record<AgentAction["kind"], IconName> = {
+export const RECEIPT_ICONS: Record<AgentAction["kind"], IconName> = {
   "issue.created": "issues",
   "issue.updated": "issues",
   "issue.assigned": "person",
@@ -58,10 +58,11 @@ const ICONS: Record<AgentAction["kind"], IconName> = {
   "thread.closed": "thread",
 };
 
+/** A kind a newer server sends that this build doesn't know yet gets the plain check. */
 const iconOf = (a: AgentAction): IconName =>
   a.kind === "issue.updated" && Array.isArray(a.params.fields) && a.params.fields.join() === "priority"
     ? "flag"
-    : ICONS[a.kind];
+    : (RECEIPT_ICONS[a.kind] ?? "check");
 
 /** The clock for the countdowns: ticks each second only while the receipts are on screen and some can still change. */
 function useVisibleNow(ref: RefObject<HTMLElement | null>, live: boolean) {

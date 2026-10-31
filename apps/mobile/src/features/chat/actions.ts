@@ -17,34 +17,26 @@ export const receiptLayout = (list: readonly AgentAction[] | undefined): Receipt
   !list || list.length === 0 ? "none" : list.length === 1 ? "one" : "group";
 
 /** The icon tile per kind (issue dot, flag for a changed issue, brain for memory…). */
-export function receiptIcon(kind: AgentActionKind): IconName {
-  switch (kind) {
-    case "issue.created":
-      return "issue";
-    case "issue.updated":
-      return "flag";
-    case "issue.assigned":
-      return "agent";
-    case "memory.saved":
-    case "memory.updated":
-    case "memory.forgotten":
-      return "brain";
-    case "routine.created":
-    case "routine.updated":
-    case "routine.deleted":
-      return "clock";
-    case "channel.agent_added":
-      return "hash";
-    case "wiki.page_created":
-    case "wiki.page_edited":
-      return "doc";
-    case "thread.renamed":
-    case "thread.closed":
-      return "chat";
-    default:
-      return "checkc";
-  }
-}
+export const RECEIPT_ICONS: Record<AgentActionKind, IconName> = {
+  "issue.created": "issue",
+  "issue.updated": "flag",
+  "issue.assigned": "agent",
+  "memory.saved": "brain",
+  "memory.updated": "brain",
+  "memory.forgotten": "brain",
+  "routine.created": "clock",
+  "routine.updated": "clock",
+  "routine.deleted": "clock",
+  "channel.agent_added": "hash",
+  "channel.created": "hash",
+  "wiki.page_created": "doc",
+  "wiki.page_edited": "doc",
+  "thread.renamed": "chat",
+  "thread.closed": "chat",
+};
+
+/** A kind a newer server sends that this build doesn't know yet gets the plain check. */
+export const receiptIcon = (kind: AgentActionKind): IconName => RECEIPT_ICONS[kind] ?? "checkc";
 
 /**
  * Where tapping the target goes: the issue, the routine, the channel or the thread (the phone has no wiki or
