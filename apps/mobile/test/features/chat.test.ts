@@ -11,6 +11,7 @@ import {
   consultationsOf,
   eventLineOf,
   hidesBody,
+  type LineWords,
   lineFit,
   markedParts,
   markName,
@@ -19,6 +20,8 @@ import {
   missionCardRef,
   missionPlanOf,
   narrowDrawn,
+  PHRASE_FADE_MS,
+  type PhraseTurn,
   parseBlocks,
   parseInline,
   parseSlash,
@@ -31,6 +34,7 @@ import {
   threadFaces,
   threadTitleFrom,
   toggleReaction,
+  turnPhrase,
   workingEntries,
   workStepsOf,
 } from "../../src/features/chat/logic";
@@ -269,6 +273,32 @@ describe("working line", () => {
     expect(narrowDrawn(drawn, "typers", 100)).toEqual({ agents: 74.51, typers: 100 });
   });
 
+  test("the phrase turns as on the web: only the one shown and the one leaving are drawn, each shown whole", () => {
+    const words = (agents: string): LineWords => [agents, "", "", ""];
+    const drawn = ({ was, now }: PhraseTurn) => [was, now].flatMap((w) => (w ? [w[0]] : []));
+    const first: PhraseTurn = { now: words("Ada is working…"), was: null, n: 0, since: 1_000 };
+    // A fast tool's start turns it...
+    const searching = turnPhrase(first, words("Ada is searching memory…"), 5_000);
+    expect(searching.wait).toBe(0);
+    expect(drawn(searching.shown)).toEqual(["Ada is working…", "Ada is searching memory…"]);
+    // ...its end 30 ms later, and the next tool's start and end, wait while that phrase comes in.
+    for (const [next, at] of [
+      ["Ada is working…", 5_030],
+      ["Ada is running code…", 5_060],
+      ["Ada is working…", 5_090],
+    ] as const) {
+      const held = turnPhrase(searching.shown, words(next), at);
+      expect(held.shown).toBe(searching.shown);
+      expect(held.wait).toBe(5_000 + PHRASE_FADE_MS - at);
+    }
+    // Shown whole, it leaves for the newest words, and the first phrase is gone: never three.
+    const back = turnPhrase(searching.shown, words("Ada is working…"), 5_000 + PHRASE_FADE_MS);
+    expect(back.wait).toBe(0);
+    expect(drawn(back.shown)).toEqual(["Ada is searching memory…", "Ada is working…"]);
+    expect(back.shown.n).toBe(2);
+    expect(turnPhrase(back.shown, words("Ada is working…"), 9_000)).toEqual({ shown: back.shown, wait: 0 });
+  });
+
   test("one agent on its own shows how long it has been at it, as on the web; several, or a question out, don't", async () => {
     const [pt, en] = await Promise.all([translator("pt-BR"), translator("en")]);
     const now = 1_000_000;
@@ -296,6 +326,18 @@ describe("working line", () => {
       at: now - 5_000,
     };
     expect(barElapsed(en, workingEntries([ada], [asking], name), [ada], now)).toBeNull();
+  });
+
+  test("left on its own mid-turn, an agent's time is right from the first draw: the line reads a fresh clock", async () => {
+    const en = await translator("en");
+    const now = 1_000_000;
+    const ada = run({ runId: "r", agentId: "ada", status: "running", startedAt: now - 90_000 });
+    const atlas = run({ runId: "r2", agentId: "atlas", status: "running", startedAt: now - 60_000 });
+    expect(barElapsed(en, workingEntries([ada, atlas], [], name), [ada, atlas], now)).toBeNull();
+    // Atlas is done. With two at work the line redrew once a minute, so the clock it kept can be 50 s old.
+    const alone = workingEntries([ada], [], name);
+    expect(barElapsed(en, alone, [ada], now)).toBe("1m 30s");
+    expect(barElapsed(en, alone, [ada], now - 50_000)).toBe("40s");
   });
 
   test("Parar: real runs at work, also while they write (not a guess, not one waiting)", () => {

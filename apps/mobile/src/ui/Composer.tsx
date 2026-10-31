@@ -144,12 +144,14 @@ export function Composer({
   const button = has || stopMode;
   // The send arrow and the stop square swap in place (one turns away as the other turns in) on a button already
   // there; a button popping in (ZoomIn) shows its glyph as it is: iOS draws a glyph still turning inside that pop
-  // blurry, and with Reanimated's default mass of 4 both springs take seconds to settle.
+  // blurry. Both springs give their mass: with Reanimated 4's default of 4 they overshoot by half and take seconds
+  // to settle.
   const mode = useSharedValue(stopMode ? 1 : 0);
   const shown = useRef(button);
   useEffect(() => {
     const to = stopMode ? 1 : 0;
-    mode.value = reducedMotion || !shown.current || !button ? to : withSpring(to, { damping: 16, stiffness: 320 });
+    mode.value =
+      reducedMotion || !shown.current || !button ? to : withSpring(to, { damping: 16, stiffness: 320, mass: 1 });
     shown.current = button;
   }, [stopMode, button, reducedMotion, mode]);
   const sendGlyph = useAnimatedStyle(() => ({
@@ -303,7 +305,7 @@ export function Composer({
           />
           {button ? (
             <Animated.View
-              entering={reducedMotion ? undefined : ZoomIn.springify().damping(14).stiffness(320)}
+              entering={reducedMotion ? undefined : ZoomIn.springify().damping(14).stiffness(320).mass(1)}
               exiting={reducedMotion ? undefined : ZoomOut.duration(120)}
               style={styles.sendBox}
             >

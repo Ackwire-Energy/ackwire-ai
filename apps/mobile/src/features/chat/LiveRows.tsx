@@ -26,9 +26,9 @@ import {
 import Animated, {
   Easing,
   FadeIn,
-  FadeInDown,
-  FadeOutUp,
-  LayoutAnimationConfig,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
   ZoomIn,
 } from "react-native-reanimated";
 import { useFrameTime } from "@/agent/live";
@@ -38,7 +38,19 @@ import { CHROME_MAX_SCALE, haptics, Icon, PixelOrbit, PixelStop, Text, useReduce
 import { AgentFace, Face } from "../shared/Face";
 import { useDirectory, useNow } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
-import { type LineDrawn, lineFit, markedParts, markName, narrowDrawn, stoppableInLine, workingEntries } from "./logic";
+import {
+  type LineDrawn,
+  type LineWords,
+  lineFit,
+  markedParts,
+  markName,
+  narrowDrawn,
+  PHRASE_FADE_MS,
+  type PhraseTurn,
+  stoppableInLine,
+  turnPhrase,
+  workingEntries,
+} from "./logic";
 import { MessageText } from "./MessageText";
 import { TurnTools } from "./ToolCalls";
 import {
@@ -255,19 +267,23 @@ export function WorkingLine({
   // "Parar" and the time are one agent's: with several at work the line can't say whose (the box's own stop stops
   // them all).
   const solo = agents.length === 1 ? lead : undefined;
-  const now = useNow(asking || solo ? 1000 : 60_000);
+  // Only redraws, each second while a time or a question's clock counts: both read the clock afresh, as the one kept
+  // here can be a minute old just as the line narrows to one agent.
+  useNow(asking || solo ? 1000 : 60_000);
   const turning = entries.length === 1 && entries[0]?.type === "agent";
-  const [tick, setTick] = useState(0);
+  // The phrase reads the time of its tick, so a redraw between ticks (each second) never turns it.
+  const [tick, setTick] = useState(() => ({ n: 0, at: Date.now() }));
   useEffect(() => {
     if (!turning) return;
-    const timer = setInterval(() => setTick((n) => n + 1), PHRASE_TURN_MS);
+    const timer = setInterval(() => setTick((k) => ({ n: k.n + 1, at: Date.now() })), PHRASE_TURN_MS);
     return () => clearInterval(timer);
   }, [turning]);
   if (entries.length === 0) return null;
   const color = lead ? agentLook(dir.agentById.get(lead.id)).color : null;
   const stoppable = solo ? stoppableInLine(runs).filter((r) => r.agentId === solo.id && canStop(r)) : [];
   const sentence = activitySentence(t, entries, markName);
-  const words = barWords(t, entries, runs, tick, Date.now(), markName);
+  const words = barWords(t, entries, runs, tick.n, tick.at, markName);
+  const now = Date.now();
   const took = barElapsed(t, entries, runs, now);
   // A piece of the line, on one line, names in ink.
   const piece: LinePiece = (text, style, onTextLayout) => (
@@ -345,29 +361,26 @@ export function WorkingLine({
             );
           })}
         </View>
-        {/* An agent in its browser: tapping opens it live. The first phrase comes with the pill; the bar leaving
-            takes its words at once. */}
-        <LayoutAnimationConfig skipEntering skipExiting>
-          <Pressable
-            disabled={!browsing}
-            onPress={openBrowser}
-            accessibilityRole={browsing ? "button" : undefined}
-            accessibilityLabel={browsing ? t("browser.watch.open") : undefined}
-            style={styles.wordsTap}
-          >
-            <BarWords key={words.join("")} words={words} piece={piece} reduced={reduced} />
-            {took ? (
-              <Text variant="caption" tone="faint" maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.took}>
-                {took}
-              </Text>
-            ) : null}
-            {browsing ? (
-              <View style={[styles.browser, { backgroundColor: c.raised }]}>
-                <Icon name="globe" size={14} color={c.ink2} />
-              </View>
-            ) : null}
-          </Pressable>
-        </LayoutAnimationConfig>
+        {/* An agent in its browser: tapping opens it live. */}
+        <Pressable
+          disabled={!browsing}
+          onPress={openBrowser}
+          accessibilityRole={browsing ? "button" : undefined}
+          accessibilityLabel={browsing ? t("browser.watch.open") : undefined}
+          style={styles.wordsTap}
+        >
+          <TurningWords words={words} piece={piece} reduced={reduced} />
+          {took ? (
+            <Text variant="caption" tone="faint" maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.took}>
+              {took}
+            </Text>
+          ) : null}
+          {browsing ? (
+            <View style={[styles.browser, { backgroundColor: c.raised }]}>
+              <Icon name="globe" size={14} color={c.ink2} />
+            </View>
+          ) : null}
+        </Pressable>
         {clock ? (
           <RNText
             accessibilityLabel={t("chat.consult.clock", { time: clock })}
@@ -408,13 +421,31 @@ type LinePiece = (text: string, style?: StyleProp<TextStyle>, onTextLayout?: (e:
 
 // The phrase turns as on the web (`.ac-turn`): the old one leaves upward while the new one comes up from below,
 // crossfading, so some words always show; a short rise keeps both inside the pill.
-const TURN_EASING = Easing.bezier(0.2, 0.7, 0.2, 1);
-const TURN_IN = FadeInDown.duration(420)
-  .easing(TURN_EASING)
-  .withInitialValues({ transform: [{ translateY: 6 }] });
-const TURN_OUT = FadeOutUp.duration(420)
-  .easing(TURN_EASING)
-  .withTargetValues({ transform: [{ translateY: -6 }] });
+const TURN = { duration: PHRASE_FADE_MS, easing: Easing.bezier(0.2, 0.7, 0.2, 1) };
+
+/**
+ * The phrase as it turns (`turnPhrase`): the one shown and, over it, the one leaving, the only two drawn. A phrase
+ * keeps its key from coming in to leaving, so the words on screen are the ones that leave, at the widths they drew.
+ * The first comes with the pill, and the words go with it at once; with Reduce Motion each phrase just takes the last
+ * one's place.
+ */
+function TurningWords({ words, piece, reduced }: { words: LineWords; piece: LinePiece; reduced: boolean }) {
+  const [shown, setShown] = useState<PhraseTurn>(() => ({ now: words, was: null, n: 0, since: Date.now() }));
+  const [, wake] = useState(0);
+  const next = turnPhrase(shown, words, Date.now());
+  if (next.shown !== shown) setShown(next.shown);
+  useEffect(() => {
+    if (next.wait === 0) return;
+    const timer = setTimeout(() => wake((k) => k + 1), next.wait);
+    return () => clearTimeout(timer);
+  }, [next.wait]);
+  return (
+    <View style={styles.words}>
+      {shown.was && !reduced ? <BarWords key={shown.n - 1} words={shown.was} piece={piece} leaving /> : null}
+      <BarWords key={shown.n} words={shown.now} piece={piece} enter={shown.n > 0 && !reduced} />
+    </View>
+  );
+}
 
 /**
  * The line's words in the pieces that give way in turn (`barWords`): the agents' and the " · " after them, then
@@ -424,24 +455,33 @@ const TURN_OUT = FadeOutUp.duration(420)
 function BarWords({
   words: [agents, sep, typers, typing],
   piece,
-  reduced,
+  enter = false,
+  leaving = false,
 }: {
-  words: [agents: string, sep: string, typers: string, typing: string];
+  words: LineWords;
   piece: LinePiece;
-  reduced: boolean;
+  /** Comes up from below. */
+  enter?: boolean;
+  /** Rises and fades over the phrase taking its place. */
+  leaving?: boolean;
 }) {
   const [drawn, setDrawn] = useState<LineDrawn>({});
+  // 0 below, 1 in place, 2 gone above.
+  const at = useSharedValue(enter ? 0 : 1);
+  useEffect(() => {
+    at.value = withTiming(leaving ? 2 : 1, TURN);
+  }, [leaving, at]);
+  const turn = useAnimatedStyle(() => ({
+    opacity: 1 - Math.abs(1 - at.value),
+    transform: [{ translateY: 6 * (1 - at.value) }],
+  }));
   const measure = (part: keyof LineDrawn) => (e: TextLayoutEvent) => {
     const width = e.nativeEvent.lines[0]?.width ?? 0;
     setDrawn((d) => narrowDrawn(d, part, width));
   };
   const fit = lineFit(drawn, Boolean(typing));
   return (
-    <Animated.View
-      entering={reduced ? undefined : TURN_IN}
-      exiting={reduced ? undefined : TURN_OUT}
-      style={styles.words}
-    >
+    <Animated.View style={[styles.words, leaving && StyleSheet.absoluteFill, turn]}>
       {agents && fit.agents !== null ? (
         <View style={styles.agents}>
           {piece(agents, [styles.shrink, { maxWidth: fit.agents }], measure("agents"))}

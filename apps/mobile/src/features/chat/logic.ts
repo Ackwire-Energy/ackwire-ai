@@ -8,7 +8,7 @@ import type {
   ReactionCount,
 } from "@agenteschat/client";
 import { agentProposalOf } from "@agenteschat/client/lib/action-cards";
-import { type ActivityEntry, barEntries } from "@agenteschat/client/lib/activity";
+import { type ActivityEntry, barEntries, type barWords } from "@agenteschat/client/lib/activity";
 import { type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
 import {
   answeredNotices,
@@ -370,6 +370,37 @@ export function lineFit(drawn: LineDrawn, someoneTypes: boolean): { agents?: num
   const whole = (width?: number) => (width === undefined ? undefined : Math.ceil(width));
   const sliver = drawn.agents !== undefined && drawn.agents < AGENT_WORDS_MIN;
   return { agents: sliver ? null : whole(drawn.agents), typers: whole(drawn.typers) };
+}
+
+/** The working line's words in the pieces that give way in turn (`barWords`). */
+export type LineWords = ReturnType<typeof barWords>;
+
+/** How long the working line's phrase takes to turn (the web's `.ac-turn`). */
+export const PHRASE_FADE_MS = 420;
+
+/**
+ * The working line's phrase as it turns, as on the web (TurnText): the one shown and the one leaving, the only two
+ * drawn. `n` counts the turns: the phrase shown is the `n`th, the one leaving the one before it.
+ */
+export interface PhraseTurn {
+  now: LineWords;
+  was: LineWords | null;
+  n: number;
+  /** When the phrase shown came. */
+  since: number;
+}
+
+/**
+ * The phrase once the line's words are `words`, at `at`: new words turn it, the phrase shown leaving as they come in.
+ * A phrase stays a whole crossfade first, so it has come all the way in before it leaves (it never flashes back to
+ * full on its way out) and the one before it has gone; until then `wait` says how long, and the newest words come
+ * when it ends (any in between never show).
+ */
+export function turnPhrase(shown: PhraseTurn, words: LineWords, at: number): { shown: PhraseTurn; wait: number } {
+  if (words.join("") === shown.now.join("")) return { shown, wait: 0 };
+  const wait = shown.since + PHRASE_FADE_MS - at;
+  if (wait > 0) return { shown, wait };
+  return { shown: { now: words, was: shown.now, n: shown.n + 1, since: at }, wait: 0 };
 }
 
 // ── Reactions ────────────────────────────────────────────────────────────────

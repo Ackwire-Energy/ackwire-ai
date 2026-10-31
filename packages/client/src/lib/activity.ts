@@ -406,13 +406,19 @@ export function elapsedParts(ms: number): { m: number; s: number } | null {
   return { m: Math.floor(secs / 60), s: secs % 60 };
 }
 
+/**
+ * The turn the bar tells for one agent on its own, its phrase and its time alike: a turn it stopped, or one that
+ * failed, can still be listed beside the one at work.
+ */
+const turnAtWork = (runs: LiveRun[], agentId: string) =>
+  runs.find((r) => r.agentId === agentId && r.status !== "failed" && r.status !== "canceled");
+
 /** How long one agent on its own has been at it ("16 s", "1 min 5 s"): none for several, or while it asks another. */
 export function barElapsed(t: TFunction, entries: ActivityEntry[], runs: LiveRun[], now: number): string | null {
   const agents = entries.filter((e) => e.type === "agent");
   const only = agents.length === 1 ? agents[0] : undefined;
   if (!only || only.consult?.status === "asking") return null;
-  // A turn it stopped or that failed can still be listed beside the one at work.
-  const run = runs.find((r) => r.agentId === only.id && r.status !== "failed" && r.status !== "canceled");
+  const run = turnAtWork(runs, only.id);
   const took = run ? elapsedParts(now - (run.startedAt ?? now)) : null;
   if (!took) return null;
   return took.m > 0 ? t("run.elapsedMinutes", { m: took.m, s: took.s }) : t("run.elapsedSeconds", { n: took.s });
@@ -519,7 +525,7 @@ export function barPhrase(
   const sentence = activitySentence(t, entries, mark);
   const only = entries.length === 1 ? entries[0] : undefined;
   if (only?.type !== "agent" || only.consult || only.activity.kind === "writing") return sentence;
-  const run = runs.find((r) => r.agentId === only.id);
+  const run = turnAtWork(runs, only.id);
   if (!run) return sentence;
   const calls = (run.work ?? []).filter((w) => w.kind === "call");
   if (only.activity.kind === "thinking" && calls.length === 0) {
