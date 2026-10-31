@@ -2907,7 +2907,7 @@ p {
   flex-direction: column;
   gap: var(--space-3);
 }
-/* Workspace header as a menu button; the account row stays at the bottom with the settings gear. */
+/* Workspace header as a menu button; the account row stays at the bottom with the bell. */
 .sidebar__org-button {
   display: flex;
   align-items: center;
@@ -5682,7 +5682,7 @@ p {
 }
 .sidebar[data-rail="true"] .sidebar__unread,
 .sidebar[data-rail="true"] .sidebar__count,
-.sidebar[data-rail="true"] .sidebar__item .ac-count {
+.sidebar[data-rail="true"] :is(.sidebar__item, .sidebar__bell) .ac-count {
   position: absolute;
   top: 2px;
   right: 0;
@@ -9964,10 +9964,11 @@ html[data-menu-overlay] .shell {
 }
 
 /* ── Sidebar ──────────────────────────────────────────────────────
-   The main tools are plain rows; the rest open beside the sidebar from More. Conversations sit in
-   categories that open and close, their rows a step in under the header; closed, one shows only the open
-   page's row and a count. Dense, so a small workspace fits a laptop's screen without scrolling.
-   The icon rail ignores the headers. */
+   The tools each person keeps in sight are plain rows; the rest open beside the sidebar from More. Lines set
+   the sidebar's parts apart (tools, channels, agents, people). Conversations sit in categories that open and
+   close, every mark (an icon, a "#", a face, a category's chevron) in one column and every name in the next;
+   closed, a category shows only the open page's row and a count. Dense, so a small workspace fits a laptop's
+   screen without scrolling. The icon rail ignores the headers. */
 .sidebar:not([data-rail="true"]) .sidebar__scroll {
   gap: 4px;
 }
@@ -9998,6 +9999,14 @@ html[data-menu-overlay] .shell {
   height: 18px;
   color: var(--ink-muted);
 }
+/* A channel's "#" is no louder than a category's chevron: their size, their faint ink, centred in the icons' place,
+   so its name starts where every name does, in a category or not. */
+.sidebar:not([data-rail="true"]) .sidebar__item > .sidebar__channel-icon {
+  width: 14px;
+  height: 14px;
+  margin: 0 2px;
+  color: var(--faint);
+}
 .sidebar:not([data-rail="true"]) .sidebar__item:has(> .ac-avatar) {
   padding-left: 6px;
   gap: 6px;
@@ -10019,14 +10028,15 @@ html[data-menu-overlay] .shell {
 .sidebar__section-head:hover {
   background: var(--plate-soft);
 }
+/* A category's header is laid out as a row: its chevron centred in the icons' place, its name in the names' column. */
 .sidebar__section-toggle {
   flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 9px;
   min-height: 28px;
-  padding: 0 8px;
+  padding: 0 8px 0 9px;
   border: 0;
   border-radius: var(--control-r-sm);
   background: transparent;
@@ -10056,6 +10066,7 @@ html[data-menu-overlay] .shell {
 }
 .sidebar__section-chevron {
   flex: none;
+  margin: 0 2px;
   color: var(--faint);
   transform: rotate(-90deg);
   transition: transform 0.22s var(--out);
@@ -10063,15 +10074,27 @@ html[data-menu-overlay] .shell {
 .sidebar__section[data-open="true"] .sidebar__section-chevron {
   transform: none;
 }
+/* The sidebar's own parts (Canais with no categories, Agentes, Mensagens diretas): a title in small capitals from the
+   icons' edge, its chevron after it, so a part never reads as one of the categories in it. */
+.sidebar__section--part .sidebar__section-toggle {
+  gap: 2px;
+}
+.sidebar__section--part .sidebar__section-chevron {
+  order: 1;
+}
+.sidebar__section--part .sidebar__section-head .sidebar__label {
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.sidebar__section--part .sidebar__section-toggle:hover .sidebar__label {
+  color: var(--muted);
+}
 .sidebar__section-body {
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-/* Rows a step in: a row's icon starts under its header's name (the toggle's 8px padding, 14px chevron and 6px gap,
-   less the row's own 9px), a face centred on it as everywhere. */
-.sidebar:not([data-rail="true"]) .sidebar__section-body {
-  padding-left: 19px;
 }
 .sidebar__section[data-open="false"]
   .sidebar__section-body
@@ -10247,6 +10270,10 @@ html[data-menu-overlay] .shell {
 .sidebar__more-item[data-status="active"] {
   background: var(--surface-sunken);
 }
+.sidebar__more-item > :is(.ac-count, .ac-countchip) {
+  margin-left: auto;
+  align-self: center;
+}
 /* The tool opened from More stays in sight under it. */
 .sidebar__more-active {
   display: contents;
@@ -10254,16 +10281,99 @@ html[data-menu-overlay] .shell {
 .sidebar__more-active > :not([data-status="active"]) {
   display: none;
 }
+/* Empty, so in a list longer than its room the column would shrink it to nothing. */
 .sidebar__divider {
+  flex: none;
   height: 1px;
   margin: 4px 8px;
   background: var(--line);
+}
+/* The bell at the end of the account row: the inbox, its unread count beside it, both on the row's middle. */
+.sidebar__bell {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
+  height: var(--control-h-sm);
+  min-width: var(--control-h-sm);
+  padding: 0 7px;
+  border-radius: var(--control-r-sm);
+  color: var(--ink-muted);
+  text-decoration: none;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+.sidebar__bell > .ac-icon {
+  width: 18px;
+  height: 18px;
+}
+.sidebar__bell:hover,
+.sidebar__bell[data-status="active"] {
+  background: var(--plate);
+  color: var(--ink);
+}
+.sidebar__bell:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+/* The rail: one of its 40px tiles, the count on its corner like the other tiles'. */
+.sidebar[data-rail="true"] .sidebar__bell {
+  position: relative;
+  justify-content: center;
+  width: var(--control-h-md);
+  height: var(--control-h-md);
+  padding: 0;
+  border-radius: var(--control-r-md);
+}
+/* "Personalizar a barra lateral": a line per tool, the choices of every line starting in one column. */
+.sidebar-setup {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  column-gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sidebar-setup__row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.sidebar-setup__row:first-child {
+  border-top: 0;
+}
+.sidebar-setup__name {
+  font-size: 14px;
+  font-weight: 600;
+}
+.sidebar-setup__row > .ac-seg {
+  justify-self: start;
+}
+/* No room beside the name on a phone: the choices go under it. */
+@media (max-width: 560px) {
+  .sidebar-setup {
+    grid-template-columns: auto 1fr;
+    row-gap: 8px;
+  }
+  .sidebar-setup__row > .ac-seg {
+    grid-column: 2;
+  }
 }
 /* Phones and touch screens keep the taller rows a finger hits, and the Go to… field and its toggle at 40px. */
 @media (max-width: 760px), (pointer: coarse) {
   .sidebar:not([data-rail="true"]) :is(.sidebar__item, .sidebar__create.ac-btn) {
     height: auto;
     min-height: 36px;
+  }
+  .sidebar:not([data-rail="true"]) .sidebar__bell {
+    height: var(--control-h-md);
+    min-width: var(--control-h-md);
+    padding: 0 11px;
   }
   .sidebar__section-head,
   .sidebar__section-toggle {
