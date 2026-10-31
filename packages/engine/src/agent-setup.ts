@@ -66,7 +66,7 @@ export interface SetupResult {
   agentId: string;
   /** `applied` (in a preview, would be); `same`: it already thinks this way; `skipped`: it can't take it. */
   status: "applied" | "same" | "skipped";
-  /** It takes the rest with the account it already has (another person's plan): that account's name, null for its computer's own sign-in. */
+  /** It takes the rest with the account it has (another person's plan): its name, null for its computer's own. */
   keeps?: { account: string | null };
   reason?: SetupReason;
   params?: Record<string, string>;
@@ -161,7 +161,7 @@ function refusal(error: unknown): Pick<SetupResult, "reason" | "params"> {
 class PreviewOnly extends Error {}
 
 /**
- * `POST …/agents/brain-setup`: the setup on each agent picked, each by its own rules and in its own savepoint, audited
+ * `POST …/agent-setup`: the setup on each agent picked, each by its own rules and in its own savepoint, audited
  * as its own change (`agent.brain` with `via: "setup"`). With `preview`, the same run rolled back: what each would
  * do, nothing kept. Applied, it is what new agents start with.
  */

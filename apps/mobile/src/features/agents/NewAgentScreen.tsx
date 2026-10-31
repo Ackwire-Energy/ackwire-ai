@@ -522,34 +522,24 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
           </Text>
         ) : null}
         {start ? (
-          <>
-            <Card>
-              <Row
-                title={t("brain.title")}
-                meta={
-                  <Text variant="small" tone="muted">
-                    {useLast ? startText : t("brain.auto.label")}
-                  </Text>
-                }
-                chevron
-                onPress={() =>
-                  chooseAction(
-                    t("brain.title"),
-                    [
-                      { label: startText, onPress: () => setUseLast(true) },
-                      { label: t("brain.auto.label"), onPress: () => setUseLast(false) },
-                    ],
-                    t("common.cancel"),
-                  )
-                }
-              />
-            </Card>
-            {useLast ? (
-              <Text variant="footnote" tone="faint">
-                {t("newAgent.lastSetup", { setup: startText })}
-              </Text>
-            ) : null}
-          </>
+          <Card>
+            <Row
+              title={t("brain.title")}
+              subtitle={useLast ? t("newAgent.lastSetup", { setup: startText }) : t("brain.auto.label")}
+              subtitleLines={2}
+              chevron
+              onPress={() =>
+                chooseAction(
+                  t("brain.title"),
+                  [
+                    { label: startText, onPress: () => setUseLast(true) },
+                    { label: t("brain.auto.label"), onPress: () => setUseLast(false) },
+                  ],
+                  t("common.cancel"),
+                )
+              }
+            />
+          </Card>
         ) : null}
 
         <View style={styles.section}>
