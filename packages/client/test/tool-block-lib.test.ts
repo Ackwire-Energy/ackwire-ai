@@ -492,7 +492,8 @@ describe("each call's service and its logo", () => {
     ]);
     expect(work.steps.map((s) => [s.app, s.service, s.hint])).toEqual([
       ["Gmail", "gmail", "wnogueira search"],
-      ["GitHub", "github", "open pull request"],
+      // One of ours ("Abriu um pull request"): no app in its phrase, GitHub's logo by its service.
+      [undefined, "github", null],
     ]);
     const meta = workMeta({
       work: {
