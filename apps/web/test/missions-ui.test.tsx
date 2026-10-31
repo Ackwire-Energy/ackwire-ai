@@ -73,7 +73,9 @@ describe("Missões", () => {
       await settle(8);
       const line = document.querySelector('[data-message-id="m-task"]') as HTMLElement;
       expect(line.textContent).toStartWith(
-        computers.length > 1 ? "“Rodar os testes” terminou em 2 min no MacBook ·" : "“Rodar os testes” terminou em 2 min ·",
+        computers.length > 1
+          ? "“Rodar os testes” terminou em 2 min no MacBook ·"
+          : "“Rodar os testes” terminou em 2 min ·",
       );
       view.unmount();
     }

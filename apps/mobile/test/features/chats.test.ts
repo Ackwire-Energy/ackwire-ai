@@ -586,12 +586,12 @@ describe("last-message previews in the reader's language", () => {
       bodyCode: "machine_task_done",
       bodyParams: { title: "Rodar os testes", computer: "Computador da Acme", seconds: "120" },
     };
-    const english = "Task \"Rodar os testes\" finished on Computador da Acme.";
+    const english = 'Task "Rodar os testes" finished on Computador da Acme.';
     expect(serverBody(i18n.t, english, done)).toBe("“Rodar os testes” terminou.");
     expect(serverBody(i18n.t, english, done, true)).toBe("“Rodar os testes” terminou no Computador da Acme.");
     expect(previewBody(i18n.t, english, done)).toBe("“Rodar os testes” terminou.");
     const plan = { bodyCode: "mission_plan", bodyParams: { title: "App", computer: "Computador da Acme" } };
-    expect(serverBody(i18n.t, "Plan for \"App\"", plan)).toBe("Plano para “App”");
+    expect(serverBody(i18n.t, 'Plan for "App"', plan)).toBe("Plano para “App”");
     // A computer that is the news itself keeps its name.
     const back = { bodyCode: "machine_task_resumed", bodyParams: { title: "App", computer: "MacBook" } };
     expect(serverBody(i18n.t, "…", back)).toBe("MacBook voltou: “App” retomou de onde parou.");
