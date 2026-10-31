@@ -26,18 +26,33 @@ export const agentSlice = (uid: number) => `${AGENT_SLICE_PREFIX}${uid}.slice`;
  */
 export const agentCategorySlice = (uid: number, kind: ScopeKind) => `${AGENT_SLICE_PREFIX}${uid}-${kind}.slice`;
 /**
- * What every agent's slice may use, as a drop-in for the slice prefix (its sub-slices get it too, and the
- * agent's slice caps their sum). Memory is a share of the computer's RAM, which systemd works out each time
- * it loads the units (every boot and `daemon-reload`), so the limits fit any computer and follow one that
- * grows. Above `MemoryHigh` the kernel takes back the agent's cache and slows its allocations; `MemoryMax`
- * is the backstop where it stops a process, close above so a page that needs more fails soon instead of
- * crawling. A headed Chrome, a desktop and a coding CLI together pass 1.5 GB, and a Chrome page whose
- * allocation or thread start fails dies (SIGTRAP, the sad tab's "error code 5"): with a few tabs, the
- * desktop and a CLI's tools, an agent passes 1,000 threads.
+ * What the agents may use, as two drop-ins: `each` for the slice prefix, which every agent's slice and its
+ * sub-slices get (the agent's slice caps their sum), and `all` for `agents.slice`, all of them together (half the
+ * computer's tasks, so the system can still start a process when they run away). Memory is a share of the RAM,
+ * which systemd works out each time it loads the units (every boot and `daemon-reload`), so the files fit any
+ * computer. At `MemoryMax` the kernel takes back the slice's cache and swaps its idle memory out where it can, then
+ * stops one of its processes. No `MemoryHigh`: past it, an agent with nothing left to give back (no swap) only
+ * crawls until its commands time out, where it should fail and its page be reloaded. A slice's swap holds a third
+ * of its memory at most (`MemorySwapMax`, in bytes from the RAM at install: systemd's share there is of the swap,
+ * and only in recent versions). Swap in RAM (the Cloud's zram) holds it outside the slices, compressed: the shares
+ * count it at half its size. A headed Chrome, a desktop and a coding CLI together pass 1.5 GB, and a Chrome page
+ * whose allocation or thread start fails dies (SIGTRAP, the sad tab's "error code 5"): with a few tabs, the desktop
+ * and a CLI's tools, an agent passes 1,000 threads.
  */
-export const AGENT_SLICE_LIMITS = "[Slice]\nMemoryHigh=60%\nMemoryMax=70%\nTasksMax=4096\nCPUQuota=200%\n";
-/** All agents together (`agents.slice`): what is left (13% of the RAM, half the tasks) stays for the system, the runner and the Cloud's guard. */
-export const ALL_AGENTS_LIMITS = "[Slice]\nMemoryMax=87%\nTasksMax=50%\n";
+export function agentLimits(memoryBytes: number, host: boolean): { each: string; all: string } {
+  const shares = host ? HOST_SHARES : SHARES;
+  const slice = (share: number, rest: string) =>
+    `[Slice]\nMemoryMax=${share}%\nMemorySwapMax=${Math.floor((memoryBytes * share) / 100 / 3 / 2 ** 20)}M\n${rest}`;
+  return { each: slice(shares.each, "TasksMax=4096\nCPUQuota=200%\n"), all: slice(shares.all, "TasksMax=50%\n") };
+}
+/**
+ * Shares of the RAM for one agent and for all of them. With their swap in RAM at half its size, all of them take
+ * 87.5% at most, about 1 GiB of 8 GB left to the system, the runner and the Cloud's guard. On the server's own
+ * computer (`host`) they take 58% at most, about 1.6 GiB of 4 GB left to Docker, Postgres and the server too. One
+ * busy agent can use most of what the agents have, and the others keep 15% (10%) between them.
+ */
+const SHARES = { each: 60, all: 75 };
+const HOST_SHARES = { each: 40, all: 50 };
 /** The drop-ins sit next to the unit (`/etc/systemd/system`). */
 export const agentSliceLimitsPath = (unitPath = SYSTEM_UNIT_PATH) =>
   path.join(path.dirname(unitPath), `${AGENT_SLICE_PREFIX}.slice.d`, "limits.conf");
@@ -398,6 +413,8 @@ export interface SystemServiceIo extends ServiceIo {
   unitPath?: string;
   /** Whether systemd runs this computer (default: `/run/systemd/system` exists). */
   booted?: boolean;
+  /** The computer's RAM, which the agents' swap caps come from (default: `os.totalmem()`). */
+  memoryBytes?: number;
 }
 
 /**
@@ -431,9 +448,10 @@ export function installSystemService(io: SystemServiceIo): number {
   const file = io.unitPath ?? SYSTEM_UNIT_PATH;
   mkdirSync(path.dirname(file), { recursive: true });
   writeFileSync(file, systemdSystemUnit(launch, io.args));
+  const { each, all } = agentLimits(io.memoryBytes ?? os.totalmem(), io.args !== undefined);
   const limits: [file: string, text: string][] = [
-    [agentSliceLimitsPath(file), AGENT_SLICE_LIMITS],
-    [allAgentsLimitsPath(file), ALL_AGENTS_LIMITS],
+    [agentSliceLimitsPath(file), each],
+    [allAgentsLimitsPath(file), all],
   ];
   for (const [dropIn, text] of limits) {
     mkdirSync(path.dirname(dropIn), { recursive: true });
