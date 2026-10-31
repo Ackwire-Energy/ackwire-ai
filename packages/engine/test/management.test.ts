@@ -6,15 +6,20 @@ import {
   agentDetail,
   budgetPercent,
   ConflictError,
+  createAgent,
+  createChannel,
   createInvitation,
   createModelGateway,
+  createRole,
   DEFAULT_AGENT_BUDGET_NANO_USD,
   deleteCredential,
   drainOutbox,
   ForbiddenError,
   inviteMany,
+  joinChannel,
   listAgentChannels,
   listInvitationsWithStatus,
+  listRoles,
   listRuns,
   openDm,
   orgOverview,
@@ -22,8 +27,10 @@ import {
   resendInvitation,
   rotateCredential,
   setAgentChannels,
+  setMemberRoles,
   updateChannel,
   updateOrgSettings,
+  updateRole,
   usageReport,
   ValidationError,
 } from "../src";
@@ -235,6 +242,11 @@ describe("agents, runs and usage", () => {
       .from(schema.channelMembers)
       .where(and(eq(schema.channelMembers.channelId, agentDm.id), eq(schema.channelMembers.agentId, f.agent.id)));
     expect(participant).toBeDefined();
+    // What the agent page sends back: the GET's own list, with that DM in it.
+    const seen = await listAgentChannels(f.db, f.owner.id, f.org.id, f.agent.id);
+    expect(seen.map((c) => c.id)).toEqual([agentDm.id]);
+    const back = seen.map((c) => ({ channelId: c.id, autoReply: c.autoReply }));
+    expect(await setAgentChannels(f.db, f.owner.id, f.org.id, f.agent.id, back)).toEqual(seen);
   });
 
   test("channel updates: creator or admin, unique names, #general keeps its name", async () => {
@@ -281,5 +293,108 @@ describe("agents, runs and usage", () => {
     expect(events).toEqual([{ level: "warning", spent: 84_000_000 }]);
     await call(); // 126M: over
     expect(events.at(-1)).toEqual({ level: "exhausted", spent: 126_000_000 });
+  });
+});
+
+describe("where an agent works: its owner in their channels, Manage agents for anyone's", () => {
+  /** Bia may create agents and nothing past the base role; her @bot; #squad (Ana's, Bia in it), #sales (Bia not in it). */
+  async function start() {
+    f = await setup();
+    const makers = await createRole(f.db, f.owner.id, f.org.id, { name: "Makers", permissions: ["create_agents"] });
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await setMemberRoles(f.db, f.owner.id, f.org.id, bia.id, [makers.id]);
+    const bot = await createAgent(
+      f.db,
+      bia.id,
+      f.org.id,
+      { name: "Bot", handle: "bot" },
+      { model: "claude-haiku-5-5" },
+    );
+    const squad = await createChannel(f.db, f.owner.id, f.org.id, { name: "squad" });
+    await joinChannel(f.db, bia.id, f.org.id, squad.id);
+    const sales = await createChannel(f.db, f.owner.id, f.org.id, { name: "sales" });
+    const names = async (agentId: string) =>
+      (await listAgentChannels(f.db, f.owner.id, f.org.id, agentId)).map((c) => c.name).sort();
+    return { bia, bot, squad, sales, names };
+  }
+
+  test("its owner puts it in a channel they're in and takes it out, without Manage agents", async () => {
+    const { bia, bot, squad, names } = await start();
+    expect(await setAgentChannels(f.db, bia.id, f.org.id, bot.id, [{ channelId: squad.id }])).toEqual([
+      { id: squad.id, name: "squad", autoReply: true },
+    ]);
+    expect(await setAgentChannels(f.db, bia.id, f.org.id, bot.id, [])).toEqual([]);
+    // What she doesn't see stays: a private channel an admin put it in. Her DM with it comes back in her list.
+    const secret = await createChannel(f.db, f.owner.id, f.org.id, { name: "secret", visibility: "private" });
+    await setAgentChannels(f.db, f.owner.id, f.org.id, bot.id, [{ channelId: secret.id }]);
+    const dm = await openDm(f.db, bia.id, f.org.id, { agentId: bot.id });
+    const seen = await listAgentChannels(f.db, bia.id, f.org.id, bot.id);
+    expect(seen.map((c) => c.id)).toEqual([dm.id]);
+    await setAgentChannels(f.db, bia.id, f.org.id, bot.id, [
+      ...seen.map((c) => ({ channelId: c.id, autoReply: c.autoReply })),
+      { channelId: squad.id },
+    ]);
+    expect(await names(bot.id)).toEqual(["secret", "squad"]);
+  });
+
+  test("its owner can't put it in a channel they're not in, or can't post in, unless they arrange channels", async () => {
+    const { bia, bot, squad, sales, names } = await start();
+    await expect(setAgentChannels(f.db, bia.id, f.org.id, bot.id, [{ channelId: sales.id }])).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+    const { roles } = await listRoles(f.db, f.owner.id, f.org.id);
+    const everyone = roles.find((r) => r.kind === "everyone");
+    if (!everyone) throw new Error("no base role");
+    await updateRole(f.db, f.owner.id, f.org.id, everyone.id, {
+      permissions: everyone.permissions.filter((k) => k !== "post"),
+    });
+    await expect(setAgentChannels(f.db, bia.id, f.org.id, bot.id, [{ channelId: squad.id }])).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+    expect(await names(bot.id)).toEqual([]);
+    const arrangers = await createRole(f.db, f.owner.id, f.org.id, {
+      name: "Arrangers",
+      permissions: ["create_agents", "manage_channels"],
+    });
+    await setMemberRoles(f.db, f.owner.id, f.org.id, bia.id, [arrangers.id]);
+    await setAgentChannels(f.db, bia.id, f.org.id, bot.id, [{ channelId: squad.id }, { channelId: sales.id }]);
+    expect(await names(bot.id)).toEqual(["sales", "squad"]);
+  });
+
+  test("someone else's agent needs Manage agents, even in a channel they're in", async () => {
+    const { bia, bot, squad, names } = await start();
+    await expect(
+      setAgentChannels(f.db, bia.id, f.org.id, f.agent.id, [{ channelId: squad.id }]),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+    expect(await names(f.agent.id)).toEqual(["general"]);
+    await setAgentChannels(f.db, bia.id, f.org.id, bot.id, [{ channelId: squad.id }]);
+    expect(await names(bot.id)).toEqual(["squad"]);
+  });
+
+  test("Manage agents changes anyone's agent in the channels they're in; elsewhere it takes arranging channels", async () => {
+    const { squad, sales, names } = await start();
+    const general = f.general.id;
+    const leads = await createRole(f.db, f.owner.id, f.org.id, { name: "Agent leads", permissions: ["manage_agents"] });
+    const caio = await addMember(f.db, f.org.id, "member", "caio");
+    await setMemberRoles(f.db, f.owner.id, f.org.id, caio.id, [leads.id]);
+    await joinChannel(f.db, caio.id, f.org.id, squad.id);
+    await setAgentChannels(f.db, caio.id, f.org.id, f.agent.id, [{ channelId: general }, { channelId: squad.id }]);
+    expect(await names(f.agent.id)).toEqual(["general", "squad"]);
+    await expect(
+      setAgentChannels(f.db, caio.id, f.org.id, f.agent.id, [
+        { channelId: general },
+        { channelId: squad.id },
+        { channelId: sales.id },
+      ]),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+    // Taking it out of #general, which he isn't in, too.
+    await expect(
+      setAgentChannels(f.db, caio.id, f.org.id, f.agent.id, [{ channelId: squad.id }]),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+    // An admin (every key): anywhere, a private channel they're not in too.
+    const dora = await addMember(f.db, f.org.id, "admin", "dora");
+    const secret = await createChannel(f.db, f.owner.id, f.org.id, { name: "secret", visibility: "private" });
+    await setAgentChannels(f.db, dora.id, f.org.id, f.agent.id, [{ channelId: sales.id }, { channelId: secret.id }]);
+    expect(await names(f.agent.id)).toEqual(["sales", "secret"]);
   });
 });

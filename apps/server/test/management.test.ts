@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
+import { type Browser, browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
 beforeEach(async () => {
@@ -103,6 +103,42 @@ test("management API: settings, overview, people, invitations, credentials, agen
     json: { channels: [{ channelId, autoReply: false }] },
   });
   expect(await set.json()).toEqual({ channels: [{ id: channelId, name: "general", autoReply: false }] });
+});
+
+test("PUT an agent's channels: its owner with Create agents alone, in the channels they're in; Manage agents for anyone's", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId: general, agentId: dev } = await seedOrg(owner);
+  const ana = await joinByInvitation(t, owner, orgId, "ana@example.com");
+  const as = (b: Browser) => (path: string, init?: Parameters<Browser>[1]) =>
+    b(`/api/app/organizations/${orgId}${path}`, init);
+  const json = async <T>(res: Promise<Response>) => (await (await res).json()) as T;
+  const { id: makers } = await json<{ id: string }>(
+    as(owner)("/roles", { json: { name: "Makers", permissions: ["create_agents"] } }),
+  );
+  const { user } = await json<{ user: { id: string } }>(ana("/api/app/me"));
+  await as(owner)(`/members/${user.id}/roles`, { method: "PUT", json: { roleIds: [makers] } });
+  const { id: bot } = await json<{ id: string }>(as(ana)("/agents", { json: { name: "Bot", handle: "bot" } }));
+  const { id: squad } = await json<{ id: string }>(as(owner)("/channels", { json: { name: "squad" } }));
+  const { id: sales } = await json<{ id: string }>(as(owner)("/channels", { json: { name: "sales" } }));
+  expect((await as(ana)(`/channels/${squad}/join`, { json: {} })).status).toBe(204);
+  const put = (b: Browser, agentId: string, ids: string[]) =>
+    as(b)(`/agents/${agentId}/channels`, {
+      method: "PUT",
+      json: { channels: ids.map((channelId) => ({ channelId })) },
+    });
+
+  // Her own agent, in a channel she's in.
+  const res = await put(ana, bot, [squad]);
+  expect(res.status).toBe(200);
+  expect(await res.json()).toEqual({ channels: [{ id: squad, name: "squad", autoReply: true }] });
+  // Not in one she isn't in, and not someone else's agent.
+  expect((await put(ana, bot, [squad, sales])).status).toBe(403);
+  expect((await put(ana, dev, [general, squad])).status).toBe(403);
+  // The workspace's owner: anyone's agent, anywhere.
+  expect((await put(owner, bot, [squad, sales])).status).toBe(200);
+  const listed = await json<{ channels: { name: string }[] }>(as(owner)(`/agents/${bot}/channels`));
+  expect(listed.channels.map((c) => c.name)).toEqual(["sales", "squad"]);
 });
 
 test("channel members API: add an agent with autoReply off, turn it on, roster shows it", async () => {
