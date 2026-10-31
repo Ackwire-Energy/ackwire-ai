@@ -715,6 +715,8 @@ export type BrowserInputEvent =
       deltaX?: number;
       deltaY?: number;
       modifiers?: BrowserModifiers;
+      /** When the person made it (ms, the sender's clock): the runner keeps a drag's gaps (ADR 0040 §12). */
+      at?: number;
     }
   | {
       kind: "key";
@@ -2769,6 +2771,7 @@ export function parseBrowserInputEvent(v: unknown): BrowserInputEvent | null {
       const clickCount = finite(v.clickCount);
       const deltaX = coord(v.deltaX);
       const deltaY = coord(v.deltaY);
+      const at = finite(v.at);
       return {
         kind: "mouse",
         type,
@@ -2779,6 +2782,7 @@ export function parseBrowserInputEvent(v: unknown): BrowserInputEvent | null {
         ...(deltaX !== undefined ? { deltaX } : {}),
         ...(deltaY !== undefined ? { deltaY } : {}),
         ...modifiers,
+        ...(at !== undefined && at >= 0 ? { at } : {}),
       };
     }
     case "key": {

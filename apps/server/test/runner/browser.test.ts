@@ -27,8 +27,10 @@ import {
   chromeLabel,
   chromeLaunchArgs,
   chromeUserAgent,
+  DRAG_GAP_MAX_MS,
   defaultMaxSessions,
   domainAllowed,
+  dragDelay,
   findChrome,
   type InputState,
   isWebPage,
@@ -346,6 +348,29 @@ test("relay input: clicks as input_mouse, keys through press (chords), text inse
   expect(relayCommands({ kind: "touch", type: "touchEnd", touchPoints: [] }, state)).toMatchObject([
     { action: "input_mouse", type: "mouseReleased", x: 1, y: 2, button: "left" },
   ]);
+});
+
+test("a drag keeps the gaps the person made, each at most 100 ms; a click and the hovering pointer go at once", () => {
+  const state: InputState = { held: new Set() };
+  const mouse = (type: "mouseMoved" | "mousePressed" | "mouseReleased", at?: number, button?: "left") =>
+    ({ kind: "mouse", type, x: 1, y: 1, ...(button ? { button } : {}), ...(at === undefined ? {} : { at }) }) as const;
+  expect(dragDelay(mouse("mouseMoved", 0), state, 1000)).toBe(0);
+  expect(dragDelay(mouse("mousePressed", 0, "left"), state, 1000)).toBe(0);
+  // The drag's moves came in one batch: each waits its own gap after the one before it went.
+  expect(dragDelay(mouse("mouseMoved", 40, "left"), state, 1001)).toBe(39);
+  expect(dragDelay(mouse("mouseMoved", 80, "left"), state, 1040)).toBe(40);
+  // A two second pause plays as 100 ms; a move that came late goes at once.
+  expect(DRAG_GAP_MAX_MS).toBe(100);
+  expect(dragDelay(mouse("mouseMoved", 2080, "left"), state, 1080)).toBe(100);
+  expect(dragDelay(mouse("mouseMoved", 2100, "left"), state, 1500)).toBe(0);
+  expect(dragDelay(mouse("mouseReleased", 2110, "left"), state, 1500)).toBe(10);
+  // After the release the pointer only hovers; a click's events all say the same time.
+  expect(dragDelay(mouse("mouseMoved", 2400), state, 1501)).toBe(0);
+  expect(dragDelay(mouse("mousePressed", 2500, "left"), state, 1600)).toBe(0);
+  expect(dragDelay(mouse("mouseReleased", 2500, "left"), state, 1601)).toBe(0);
+  // A sender that says nothing of time (an older app) goes at once.
+  expect(dragDelay(mouse("mousePressed", undefined, "left"), state, 1700)).toBe(0);
+  expect(dragDelay(mouse("mouseMoved", 3000, "left"), state, 1700)).toBe(0);
 });
 
 // ── Commands ─────────────────────────────────────────────────────────────────
@@ -1374,7 +1399,14 @@ test.if(posix)("a stream that closes on the machine says so; one dropped with th
 
 /** agent-browser's command relay on the stream port: records each command and answers like the daemon. */
 function fakeRelay(answer: (body: Record<string, unknown>) => Record<string, unknown> = () => ({ success: true })) {
-  const received: { body: Record<string, unknown>; origin: string | null; type: string | null; path: string }[] = [];
+  const received: {
+    body: Record<string, unknown>;
+    origin: string | null;
+    type: string | null;
+    path: string;
+    /** When it reached the page (ms). */
+    at: number;
+  }[] = [];
   const server = Bun.serve({
     port: 0,
     hostname: "127.0.0.1",
@@ -1382,6 +1414,7 @@ function fakeRelay(answer: (body: Record<string, unknown>) => Record<string, unk
       const body = (await req.json()) as Record<string, unknown>;
       received.push({
         body,
+        at: performance.now(),
         origin: req.headers.get("origin"),
         type: req.headers.get("content-type"),
         path: new URL(req.url).pathname,
@@ -1442,6 +1475,42 @@ test.if(posix)("a person's input goes through the daemon's command relay, in ord
     relay.server.stop(true);
   }
 });
+
+test.if(posix)(
+  "a drag that arrives in one batch reaches the page in order, the button held, with its gaps",
+  async () => {
+    const t = setup();
+    const relay = fakeRelay();
+    try {
+      await t.act("open", ["https://shop.example.com"]);
+      t.page({ port: relay.port });
+      await t.manager.streamStart(dev, "control");
+      // A slider dragged right over 120 ms, its events bunched by a slow link.
+      const res = await t.manager.input(dev, [
+        { kind: "mouse", type: "mouseMoved", x: 10, y: 50, button: "none", at: 5000 },
+        { kind: "mouse", type: "mousePressed", x: 10, y: 50, button: "left", clickCount: 1, at: 5000 },
+        { kind: "mouse", type: "mouseMoved", x: 60, y: 50, button: "left", at: 5060 },
+        { kind: "mouse", type: "mouseMoved", x: 110, y: 50, button: "left", at: 5120 },
+        { kind: "mouse", type: "mouseReleased", x: 110, y: 50, button: "left", clickCount: 1, at: 5120 },
+      ]);
+      expect(res).toEqual({ accepted: 5 });
+      expect(relay.received.map((r) => [r.body.type, r.body.x, r.body.button, r.body.clickCount])).toEqual([
+        ["mouseMoved", 10, "none", 0],
+        ["mousePressed", 10, "left", 1],
+        ["mouseMoved", 60, "left", 0],
+        ["mouseMoved", 110, "left", 0],
+        ["mouseReleased", 110, "left", 1],
+      ]);
+      const at = relay.received.map((r) => r.at);
+      const gap = (i: number) => (at[i] ?? 0) - (at[i - 1] ?? 0);
+      // Each move 60 ms after the one before it (a little less for the timer's rounding), not all at once.
+      expect(gap(2)).toBeGreaterThan(50);
+      expect(gap(3)).toBeGreaterThan(50);
+    } finally {
+      relay.server.stop(true);
+    }
+  },
+);
 
 test.if(posix)("input the browser doesn't confirm is counted as failed", async () => {
   const t = setup();

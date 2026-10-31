@@ -772,6 +772,31 @@ const CHORD = [
 export interface InputState {
   pointer?: { x: number; y: number };
   held: Set<string>;
+  /** While the person drags: when they made its last event (`at`, their clock) and when it went to the page. */
+  drag?: { at: number; sent: number };
+}
+
+/** The longest gap a drag keeps between two of its events: a pause longer than this plays shorter. */
+export const DRAG_GAP_MAX_MS = 100;
+
+/**
+ * How long to wait before `e` goes to the page so a drag keeps the gaps the person made between its
+ * events: the server sends input in batches and a slow link bunches them, and a slider handed a whole
+ * drag at once jumps to its end. Notes `e` as sent once that wait is over. Clicks and anything else go at once.
+ */
+export function dragDelay(e: BrowserInputEvent, state: InputState, now: number): number {
+  if (e.kind !== "mouse" || e.type === "mouseWheel") return 0;
+  const drag = state.drag;
+  const wait =
+    drag && e.at !== undefined && e.type !== "mousePressed"
+      ? Math.max(0, drag.sent + Math.min(Math.max(e.at - drag.at, 0), DRAG_GAP_MAX_MS) - now)
+      : 0;
+  // A press starts a drag and a release ends it; a move with no press before it is the pointer hovering.
+  state.drag =
+    e.at === undefined || e.type === "mouseReleased" || (e.type === "mouseMoved" && !drag)
+      ? undefined
+      : { at: e.at, sent: now + wait };
+  return wait;
 }
 
 /**
@@ -780,7 +805,9 @@ export interface InputState {
  * active tab and answers once Chrome has it, unlike the stream socket, whose
  * input goes to the tab it attached to and is never confirmed. Keys go
  * through `press` (it fills in codes and text); a modifier held on its own is
- * a raw key-down/up pair; a tap from the phone is a left click.
+ * a raw key-down/up pair; a tap from the phone is a left click. The daemon
+ * keeps which buttons are down between commands (0.39.1's `mouse_state`), so a
+ * move after a press reaches Chrome with `buttons: 1`: the page sees a drag.
  */
 export function relayCommands(e: BrowserInputEvent, state: InputState): Record<string, unknown>[] {
   switch (e.kind) {
@@ -2604,7 +2631,8 @@ export class BrowserManager {
   /**
    * `browser.input`: a person's input during a take over, in order, through
    * the daemon's command relay (the active tab, each one confirmed before the
-   * next). The stream socket only carries frames.
+   * next), a drag with the gaps the person made (`dragDelay`). The stream
+   * socket only carries frames.
    */
   async input(agent: AgentScope, events: unknown[]): Promise<MachineReplies["browser.input"]> {
     const session = this.sessions.get(String(agent.id ?? ""));
@@ -2619,6 +2647,8 @@ export class BrowserManager {
       let accepted = 0;
       let failed = 0;
       for (const e of parsed) {
+        const wait = session.stream === stream ? dragDelay(e, stream.input, this.now()) : 0;
+        if (wait > 0) await new Promise((r) => setTimeout(r, wait));
         // The stream ended (the browser closed under it): nothing is sent to a browser that isn't there.
         if (session.stream !== stream) {
           failed += 1;

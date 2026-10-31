@@ -4,12 +4,15 @@ import {
   BROWSER_HOVER_MS,
   BROWSER_INPUT_BATCH,
   BROWSER_UNWATCH_DELAY_MS,
+  type BrowserInputEvent,
   browserHandoffOf,
   browserSiteUrl,
   browserSteps,
   clickEvents,
   createBrowserLiveConnection,
   createBrowserWatches,
+  createTouchInput,
+  dragEvent,
   fitFrame,
   frameMetadata,
   framePoint,
@@ -21,6 +24,8 @@ import {
   modifiersOf,
   pagePoint,
   parseBrowserLiveMessage,
+  pressEvents,
+  releaseEvent,
   usesBrowser,
   wheelEvent,
 } from "../src/browser";
@@ -104,6 +109,106 @@ describe("agent browser input (ADR 0040)", () => {
       x: 640,
       y: 360,
     });
+  });
+});
+
+/** What the page's mouse gets, short: "pressed@10,20", "moved+left@…", "wheel@…:dx,dy". */
+const said = (events: BrowserInputEvent[]) =>
+  events.map((e) =>
+    e.kind !== "mouse"
+      ? e.kind
+      : e.type === "mouseWheel"
+        ? `wheel@${e.x},${e.y}:${e.deltaX},${e.deltaY}`
+        : `${e.type.replace("mouse", "").toLowerCase()}${e.type === "mouseMoved" ? `+${e.button}` : ""}@${e.x},${e.y}`,
+  );
+
+describe("dragging on the page (ADR 0040 §12)", () => {
+  test("a press stays down until let go, and the moves between carry the button: the page sees a drag", () => {
+    expect(
+      said([...pressEvents({ x: 10, y: 20 }), dragEvent({ x: 60, y: 20 }), releaseEvent({ x: 60, y: 20 })]),
+    ).toEqual(["moved+none@10,20", "pressed@10,20", "moved+left@60,20", "released@60,20"]);
+    expect(pressEvents({ x: 1, y: 2 })[1]).toMatchObject({ button: "left", clickCount: 1 });
+    expect(dragEvent({ x: 1, y: 2 }, 8)).toEqual({
+      kind: "mouse",
+      type: "mouseMoved",
+      x: 1,
+      y: 2,
+      button: "left",
+      modifiers: 8,
+    });
+    // A click is the same press, let go where it went down.
+    expect(said(clickEvents({ x: 5, y: 6 }))).toEqual(["moved+none@5,6", "pressed@5,6", "released@5,6"]);
+  });
+
+  test("a drag that leaves the frame stays at its edge; a press there is off the page", () => {
+    const meta = { deviceWidth: 1280, deviceHeight: 720 };
+    const box = { left: 0, top: 0, width: 640, height: 360 };
+    expect(pagePoint({ x: 700, y: 400 }, box, meta)).toBeNull();
+    expect(pagePoint({ x: 700, y: 400 }, box, meta, "contain", true)).toEqual({ x: 1280, y: 720 });
+    expect(pagePoint({ x: -20, y: 180 }, box, meta, "contain", true)).toEqual({ x: 0, y: 360 });
+    expect(framePoint({ x: 320, y: -5 }, { width: 640, height: 360 }, meta, true)).toEqual({ x: 640, y: 0 });
+  });
+});
+
+describe("fingers on the page (ADR 0040 §12)", () => {
+  // A 640×360 page shown at half size, with 20 px of band above it: page = (frame - band) × 2.
+  const toPage = (p: { x: number; y: number }, clamp: boolean) =>
+    pagePoint(
+      p,
+      { left: 0, top: 0, width: 320, height: 220 },
+      { deviceWidth: 640, deviceHeight: 360 },
+      "contain",
+      clamp,
+    );
+
+  test("a tap clicks where the finger landed, even after a small wiggle", () => {
+    const touch = createTouchInput(toPage);
+    expect(touch.down(1, { x: 50, y: 70 })).toEqual([]);
+    expect(touch.move(1, { x: 53, y: 72 })).toEqual([]);
+    expect(touch.mode).toBe("pending");
+    expect(said(touch.up(1, { x: 53, y: 72 }))).toEqual(["moved+none@100,100", "pressed@100,100", "released@100,100"]);
+    expect(touch.mode).toBe("idle");
+  });
+
+  test("a finger that moves drags from where it landed and lets go where it lifts, at the edge past it", () => {
+    const touch = createTouchInput(toPage);
+    touch.down(1, { x: 50, y: 70 });
+    expect(said(touch.move(1, { x: 70, y: 70 }))).toEqual([
+      "moved+none@100,100",
+      "pressed@100,100",
+      "moved+left@140,100",
+    ]);
+    expect(touch.mode).toBe("drag");
+    expect(said(touch.move(1, { x: 200, y: 70 }))).toEqual(["moved+left@400,100"]);
+    // Off the right of the frame: the drag stays at the page's edge, and lets go there.
+    expect(said(touch.move(1, { x: 400, y: 70 }))).toEqual(["moved+left@640,100"]);
+    expect(said(touch.up(1, { x: 420, y: 70 }))).toEqual(["released@640,100"]);
+  });
+
+  test("two fingers scroll the page as they move, and nothing is pressed or clicked", () => {
+    const touch = createTouchInput(toPage);
+    touch.down(1, { x: 100, y: 150 });
+    touch.down(2, { x: 200, y: 150 });
+    expect(touch.mode).toBe("scroll");
+    // Both fingers up by 30 px of the frame (60 of the page): the page scrolls down by 60, half per finger.
+    expect(said(touch.move(1, { x: 100, y: 120 }))).toEqual(["wheel@300,230:0,30"]);
+    expect(said(touch.move(2, { x: 200, y: 120 }))).toEqual(["wheel@300,200:0,30"]);
+    expect(touch.up(1, { x: 100, y: 120 })).toEqual([]);
+    // The finger left behind doesn't start a drag.
+    expect(touch.move(2, { x: 260, y: 160 })).toEqual([]);
+    expect(touch.up(2, { x: 260, y: 160 })).toEqual([]);
+    expect(touch.mode).toBe("idle");
+  });
+
+  test("a finger on the band around the picture starts nothing; a drag taken away is let go where it was", () => {
+    const touch = createTouchInput(toPage);
+    touch.down(1, { x: 50, y: 5 });
+    expect(touch.move(1, { x: 120, y: 90 })).toEqual([]);
+    expect(touch.up(1, { x: 120, y: 90 })).toEqual([]);
+    touch.down(3, { x: 50, y: 70 });
+    touch.move(3, { x: 80, y: 70 });
+    expect(said(touch.cancel())).toEqual(["released@160,100"]);
+    expect(touch.mode).toBe("idle");
   });
 });
 
@@ -509,7 +614,7 @@ describe("one watch per agent on a socket (no stream flapping)", () => {
 });
 
 describe("input in bursts, not one message per event", () => {
-  type Sent = { type: string; events?: { kind: string; type?: string; deltaY?: number; x?: number }[] };
+  type Sent = { type: string; events?: { kind: string; type?: string; deltaY?: number; x?: number; at?: number }[] };
   const make = (t: ReturnType<typeof fakeTimers>, clock: { now: number }) => {
     const sent: Sent[] = [];
     const conn = createBrowserLiveConnection({
@@ -585,6 +690,27 @@ describe("input in bursts, not one message per event", () => {
     t.run();
     expect(sent).toHaveLength(2);
     expect(sent[1]?.events?.[0]?.x).toBe(3);
+  });
+
+  test("each mouse event says when it was made; a drag's merged moves keep the newest one's time", () => {
+    const t = fakeTimers();
+    const clock = { now: 1000 };
+    const { sent, conn } = make(t, clock);
+    conn.sendInput(pressEvents(at(1)));
+    clock.now = 1010;
+    conn.sendInput([dragEvent(at(2))]);
+    clock.now = 1020;
+    conn.sendInput([dragEvent(at(3))]);
+    clock.now = 1030;
+    conn.sendInput([releaseEvent(at(3)), ...keyEvents("Enter")]);
+    expect(sent.flatMap((s) => s.events?.map((e) => `${e.type}:${e.at}`) ?? [])).toEqual([
+      "mouseMoved:1000",
+      "mousePressed:1000",
+      "mouseMoved:1020",
+      "mouseReleased:1030",
+      "keyDown:undefined",
+      "keyUp:undefined",
+    ]);
   });
 
   test("closing drops what was still waiting", () => {
