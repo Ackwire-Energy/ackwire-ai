@@ -2440,6 +2440,7 @@ export function useSkillAction(orgId: string) {
     mutationFn: (
       action:
         | { type: "import"; input: { url: string } | { zipBase64: string } }
+        | { type: "importPicked"; url: string; paths: string[] }
         | { type: "create"; input: SkillInput }
         | { type: "update"; id: string; patch: SkillPatch }
         | { type: "reimport"; id: string }
@@ -2449,6 +2450,8 @@ export function useSkillAction(orgId: string) {
       switch (action.type) {
         case "import":
           return api.skills.import(orgId, action.input);
+        case "importPicked":
+          return api.skills.importPicked(orgId, action.url, action.paths);
         case "create":
           return api.skills.create(orgId, action.input);
         case "update":
