@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import { costNanoUsd } from "@agenteschat/providers";
 import {
+  agentBudgetState,
   agentBudgetsThisMonth,
   agentDetail,
   BudgetExceededError,
@@ -118,7 +119,7 @@ test("the workspace's 100% is the sum of every agent's budget (own or default)",
   });
 });
 
-test("what its budget doesn't pay (Jev's judgments, the router) leaves an agent's budget and the workspace's at 0%", async () => {
+test("what its budget doesn't pay (Jev's judgments, the router) leaves an agent's budget, the workspace's and the gateway's counter at 0%", async () => {
   const fx = await setup({ reply: () => ({ chunks: ["ok"], usage }), budgetNanoUsd: 10_000_000 });
   f = fx;
   // A plan agent's status line asks Jev (the platform's key); the router decides on the workspace's key.
@@ -148,11 +149,17 @@ test("what its budget doesn't pay (Jev's judgments, the router) leaves an agent'
   });
   expect(await used()).toEqual({ workspace: 0, list: 0, page: 0 });
 
-  // Its own call is what its budget pays.
+  // Its own call is what its budget pays. With no counter yet, as on a month's first call, the gateway starts it
+  // from the month's usage: from that call alone.
+  await fx.db.delete(schema.agentBudgetPeriods).where(eq(schema.agentBudgetPeriods.agentId, fx.agent.id));
   await call(fx);
   const spent = costNanoUsd("claude-sonnet-5-5", { ...usage, cacheReadTokens: 0, cacheWriteTokens: 0 });
   expect(budgetPercent(spent, 10_000_000)).toBe(30);
   expect(await used()).toEqual({ workspace: 30, list: spent, page: 30 });
+  expect((await agentBudgetState(fx.db, fx.org.id, fx.agent.id)).spentNanoUsd).toBe(spent);
+  // A budget changed recounts the month the same way.
+  await updateAgent(fx.db, fx.owner.id, fx.org.id, fx.agent.id, { monthlyBudgetNanoUsd: 20_000_000 });
+  expect((await agentBudgetState(fx.db, fx.org.id, fx.agent.id)).spentNanoUsd).toBe(spent);
 });
 
 test("budgetPercent rounds to one decimal and never divides by zero", () => {

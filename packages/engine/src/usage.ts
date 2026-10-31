@@ -96,7 +96,7 @@ export async function workspaceBudgetPercent(db: Database, orgId: string, now = 
 /** Start of the calendar month (UTC) containing `now`: budgets reset then. */
 export const monthStartUtc = (now: Date) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 
-/** What an agent spent this month, in nano-USD. */
+/** What an agent's own calls spent this month, in nano-USD: what its budget pays (`agentBudgetsThisMonth`). */
 export async function agentSpendThisMonth(db: Database, orgId: string, agentId: string, now = new Date()) {
   const [row] = await db
     .select({ total: sql<string>`coalesce(sum(${usageRecords.costNanoUsd}), 0)` })
@@ -105,6 +105,7 @@ export async function agentSpendThisMonth(db: Database, orgId: string, agentId: 
       and(
         eq(usageRecords.orgId, orgId),
         eq(usageRecords.agentId, agentId),
+        eq(usageRecords.kind, "agent"),
         gte(usageRecords.createdAt, monthStartUtc(now)),
       ),
     );
