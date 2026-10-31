@@ -298,7 +298,7 @@ describe("the agents' receipt line under a person's message", () => {
     expect(phaseKey("claimed")).toBe("receipts.status.claimed");
   });
 
-  test("seeded from the list: a person's message starts its receipt, an agent's doesn't", () => {
+  test("seeded from the list: a person's message starts its receipt, an agent's only when it mentions agents", () => {
     const listed = {
       ...message({ id: "m1" }),
       receipts: { seenBy: ["ada"], pickedBy: [], handled: [{ agentId: "ada", status: "done" as const }] },
@@ -307,6 +307,16 @@ describe("the agents' receipt line under a person's message", () => {
     expect(receiptLine(seeded.m1)?.mark).toBe("done");
     const agent = seedReceipt({}, message({ id: "m2", author: { type: "agent", id: "ada" } }));
     expect(agent.m2).toBeUndefined();
+    // Theo thanked Ada, read as no hand-off (ADR 0089): she is only mentioned, and that asks nothing of you.
+    const thanks = seedReceipt(
+      {},
+      {
+        ...message({ id: "m3", author: { type: "agent", id: "theo" }, mentionedAgentIds: ["ada"] }),
+        receipts: { seenBy: ["ada"], pickedBy: [], handled: [], blocked: [], referenced: ["ada"] },
+      },
+    );
+    expect(receiptRows(thanks.m3)).toEqual([{ agentId: "ada", phase: "referenced" }]);
+    expect(receiptLine(thanks.m3)?.mark).toBe("seen");
   });
 });
 
@@ -321,6 +331,9 @@ describe("which message carries the line", () => {
     expect(receiptMessageId(list)).toBe("b");
     expect(receiptMessageId([message({ id: "x", author: { type: "agent", id: "ada" } })])).toBeNull();
     expect(receiptMessageId([])).toBeNull();
+    // An agent's message that mentions another agent carries it too (ADR 0089).
+    const handedOff = message({ id: "e", author: { type: "agent", id: "theo" }, mentionedAgentIds: ["ada"] });
+    expect(receiptMessageId([...list, handedOff])).toBe("e");
   });
 });
 

@@ -1,6 +1,7 @@
 import type { TFunction } from "i18next";
 import type { Agent, AgentDraft, AgentProposalCard, AiStatus, SuggestedAi } from "../api/types";
 import type { Level } from "./access-levels";
+import { joinNames } from "./format";
 import { aiStateOf, PLAN_BRAIN } from "./no-ai";
 
 /**
@@ -27,7 +28,66 @@ export interface ConnectAiCard {
 
 const STEPS: ReadonlySet<string> = new Set<ConnectAiStep>(["claude", "chatgpt", "api_key"]);
 
-export type ActionCard = ConnectAiCard | AgentProposalCard;
+/**
+ * A stretch's pause card (ADR 0089): agents did what they may do on their own since a person last acted, and wait
+ * here. Continuar (`api.chat.answerNow` on the card) lets them go on; the card then says who did, and when.
+ */
+export interface StretchCard {
+  kind: "stretch_paused";
+  state: "paused" | "continued";
+  /** `runs`: the steps agents may start on their own (`limit`); `spend`: `limit`% of an agent's monthly budget. */
+  reason: "runs" | "spend";
+  limit: number;
+  /** The person behind the work (else the routine's creator): with the agents' owners and admins, who may go on. */
+  forUserId: string | null;
+  /** The agents that stopped. */
+  agentIds: string[];
+  continuedByUserId: string | null;
+  continuedAt: string | null;
+}
+
+export function stretchCardOf(meta: Record<string, unknown> | null | undefined): StretchCard | null {
+  const raw = meta?.actionCard as Partial<StretchCard> | undefined;
+  if (raw?.kind !== "stretch_paused" || !Array.isArray(raw.agentIds) || typeof raw.limit !== "number") return null;
+  return {
+    kind: "stretch_paused",
+    state: raw.state === "continued" ? "continued" : "paused",
+    reason: raw.reason === "spend" ? "spend" : "runs",
+    limit: raw.limit,
+    forUserId: typeof raw.forUserId === "string" ? raw.forUserId : null,
+    agentIds: raw.agentIds.filter((id): id is string => typeof id === "string"),
+    continuedByUserId: typeof raw.continuedByUserId === "string" ? raw.continuedByUserId : null,
+    continuedAt: typeof raw.continuedAt === "string" ? raw.continuedAt : null,
+  };
+}
+
+/**
+ * "Ada e Theo pararam para te consultar · 50 passos sozinhos desde o seu pedido", in the reader's language. `cost`:
+ * what the budget share is in money, for people who may see it ("US$ 10,00"); everyone else reads the percentage.
+ */
+export function stretchCardText(t: TFunction, card: StretchCard, names: string[], cost?: string | null) {
+  // Plurals by `count` and the `_cost` context are past what the typed keys can check here.
+  const say = t as unknown as (key: string, options: Record<string, unknown>) => string;
+  const agents = joinNames(names, t("newAgent.and"));
+  const count = names.length;
+  if (card.reason === "runs") return say("chat.body.stretch_paused_runs", { agents, count, steps: card.limit });
+  return say("chat.body.stretch_paused_spend", {
+    agents,
+    count,
+    percent: card.limit,
+    ...(cost ? { context: "cost", amount: cost } : {}),
+  });
+}
+
+/** Continuar is for whoever asked, the agents' owners or an admin: the same people as Continuar under a stopped reply. */
+export const mayContinueStretch = (
+  card: StretchCard,
+  meId: string | null,
+  ownerOf: (agentId: string) => string | null | undefined,
+  admin: boolean,
+) => admin || (meId !== null && (card.forUserId === meId || card.agentIds.some((id) => ownerOf(id) === meId)));
+
+export type ActionCard = ConnectAiCard | AgentProposalCard | StretchCard;
 
 /** An agent's proposal of a new agent (ADR 0081), or null. Unlike the Connect card, it keeps its state. */
 export function agentProposalOf(meta: Record<string, unknown> | null | undefined): AgentProposalCard | null {
@@ -54,7 +114,7 @@ export const draftLevels = (draft: AgentDraft): Record<string, Level> =>
   Object.fromEntries(draft.access.map((a) => [a.connectionId, a.level]));
 
 export function actionCardOf(meta: Record<string, unknown> | null | undefined): ActionCard | null {
-  const proposal = agentProposalOf(meta);
+  const proposal = agentProposalOf(meta) ?? stretchCardOf(meta);
   if (proposal) return proposal;
   const raw = meta?.actionCard;
   if (!raw || typeof raw !== "object") return null;

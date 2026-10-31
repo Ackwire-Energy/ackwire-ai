@@ -162,11 +162,15 @@ export function turnHeadId(
   return rows[at]?.message?.id ?? null;
 }
 
-/** The message the line goes under: the latest person's message on screen that the server has. */
+/**
+ * The message the line goes under: the latest on screen that the server has, a person's or an agent's that mentions
+ * agents (whom it handed work to, and who it only mentioned: ADR 0089).
+ */
 export function receiptMessageId(messages: readonly Message[]): string | null {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
-    if (m?.author.type !== "person" || m.local || isEventLine(m.meta)) continue;
+    if (!m || m.local || isEventLine(m.meta)) continue;
+    if (m.author.type !== "person" && !(m.author.type === "agent" && m.mentionedAgentIds.length > 0)) continue;
     return m.id;
   }
   return null;
