@@ -1345,6 +1345,7 @@ function AccountMenu() {
   const line = shown?.status ? personLine(shown.status) : null;
   // Under your name: your line, or how you appear (Online, Ocupado, Ausente, Oculto) when you wrote none (ADR 0084).
   const who = [me.user.name, line?.text ?? presenceWord].filter(Boolean).join(" · ");
+  const under = Boolean(line || presenceWord);
 
   const signOut = async () => {
     await auth.signOut();
@@ -1388,14 +1389,15 @@ function AccountMenu() {
         trigger={
           <button
             type="button"
-            // The face stands beside the lines under it (your status line): the name's capitals at its top.
-            className="sidebar__user ac-faceline"
+            // The face stands beside the lines under it (your status line): the name's capitals at its top. A name
+            // alone (while how you appear loads) centres on it.
+            className={cx("sidebar__user", under && "ac-faceline")}
             aria-label={`${t("shell.account")}: ${who}`}
             title={who}
           >
             <MyFace size="sm" presence={presence} presenceLabel={presenceWord} />
             <span className="sidebar__user-text">
-              <span className="sidebar__user-name ac-captop">{me.user.name}</span>
+              <span className={cx("sidebar__user-name", under && "ac-captop")}>{me.user.name}</span>
               {line ? (
                 <StatusLine emoji={line.emoji} text={line.text} className="sidebar__user-line" />
               ) : (

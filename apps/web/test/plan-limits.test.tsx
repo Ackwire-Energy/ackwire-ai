@@ -3,14 +3,16 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import { join } from "node:path";
 import type { AiAccounts, AiComputer, PlanUsage } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { declarations, topLevel } from "./built-css";
 import { ADA_ID, ATLAS_ID, createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 /*
  * Your plans' limits where the workspace's budget was (ADR 0063 §5): in Sua conta, in the account menu near a limit,
- * the budget only where the workspace uses the API.
+ * the budget only where the workspace uses the API; and the account card's lines on its face.
  */
 
 afterEach(() => cleanup());
@@ -189,5 +191,58 @@ describe("the account menu: a plan near its limit", () => {
     cleanup();
     await go("settings", onPlans(), [{ ...TEAM, usage: used(100, 40) }]);
     expect(names(await openMenu())[0]).toMatch(/^Claude TeamNo limite até /);
+  });
+});
+
+const ROOT = join(import.meta.dir, "../../..");
+const read = (file: string) => Bun.file(join(ROOT, file)).text();
+/** A selector's last value for a property in a stylesheet, as written. */
+const of = (css: string, selector: string, prop: string) =>
+  declarations(css, selector).findLast(([p]) => p === prop)?.[1] ?? "";
+const px = (value: string | undefined) => Number.parseFloat(value ?? "");
+
+describe("the account card", () => {
+  test("with a line under the name, the face starts at its capitals; a name alone centres on the face", async () => {
+    await go("settings", seedState());
+    expect(account().classList.contains("ac-faceline")).toBe(true);
+    expect(account().querySelector(".sidebar__user-name")?.classList.contains("ac-captop")).toBe(true);
+    cleanup();
+    // How you appear isn't known yet: no line under the name.
+    const api = createFakeApi(seedState());
+    api.orgs.people = () => new Promise<never>(() => {});
+    await renderApp(`/org/${ORG_ID}/settings`, { api });
+    await settle(6);
+    expect(account().querySelector(".sidebar__user-line")).toBeNull();
+    expect(account().classList.contains("ac-faceline")).toBe(false);
+    expect(account().querySelector(".sidebar__user-name")?.classList.contains("ac-captop")).toBe(false);
+  });
+
+  test("as much room over the face and the name's capitals as under the face and the last baseline", async () => {
+    const layout = topLevel(await read("apps/web/src/layout.css"));
+    const presence = topLevel(await read("apps/web/src/components/presence.css"));
+    const tokens = await read("packages/ui/src/styles/tokens.css");
+    // `ex` follows the app's font-size-adjust; a line's capitals' top and middle sit that many ex over its middle.
+    const adjust = px(/--font-size-adjust:\s*([\d.]+)/.exec(await read("apps/web/src/styles.css"))?.[1]);
+    const token = (name: string) => px(new RegExp(`${name}:\\s*([\\d.]+)ex`).exec(tokens)?.[1]);
+    const capTop = token("--cap-top");
+    const capMid = token("--cap-mid");
+    const type = (css: string, selector: string) => ({
+      size: px(of(css, selector, "font-size")),
+      line: px(of(css, selector, "line-height")),
+    });
+    const name = type(layout, ".sidebar__user-name");
+    const line = type(presence, ".sidebar__user-line");
+    // The name's capitals start the lines (`.ac-captop`); the line's baseline ends them.
+    expect(of(presence, ".sidebar__user-line", "margin-bottom")).toBe(
+      `calc(var(--cap-top) - 2 * var(--cap-mid) - ${line.line / 2}px)`,
+    );
+    const lines =
+      name.line / 2 + capTop * adjust * name.size + line.line / 2 + (capTop - 2 * capMid) * adjust * line.size;
+    const face = px(of(layout, ".sidebar__me > .sidebar__user > .ac-avatar", "height"));
+    expect(Math.abs(lines - face)).toBeLessThan(0.5);
+    // A name alone is no taller than the face: the card keeps its height while your line loads.
+    expect(name.line).toBeLessThanOrEqual(face);
+    const [top, , bottom] = of(layout, ".sidebar__me > .sidebar__user", "padding").split(/\s+/);
+    expect(top).toBe(bottom);
   });
 });

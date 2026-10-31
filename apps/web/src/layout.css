@@ -611,7 +611,7 @@ p {
   text-align: left;
   cursor: pointer;
 }
-/* A name alone centres on the face; with the status line under it the card is an `.ac-faceline`. */
+/* A name alone centres on the face; with your line under it the card is an `.ac-faceline`. */
 .sidebar__user:not(.ac-faceline) {
   align-items: center;
 }
@@ -622,7 +622,7 @@ p {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-/* Two tight lines, as in the workspace header above: the name, then the status line. */
+/* Two lines: the name, on the page's 22px line, then your line. */
 .sidebar__user-text {
   flex: 1;
   min-width: 0;
@@ -632,7 +632,7 @@ p {
 .sidebar__user-name {
   font-size: 14px;
   font-weight: 600;
-  line-height: 18px;
+  line-height: 22px;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2942,19 +2942,23 @@ p {
   align-items: center;
   gap: 4px;
 }
-/* The same insets and gap as the workspace header's button, so both cards line up. */
+/*
+ * The workspace header's side insets and gap, so both cards line up, and as much room over the face and the name's
+ * capitals as under the face and the last line's baseline.
+ */
 .sidebar__me > .sidebar__user {
   flex: 1;
   min-width: 0;
   gap: var(--space-2);
-  padding: 4px 10px 4px 8px;
+  padding: 8px 10px 8px 8px;
   border-radius: inherit;
 }
-/* The person's face about as tall as its two lines (32px). */
+/* The face as tall as the two lines from the name's capitals to the last baseline (28px, as the workspace's mark
+   above), so the face and the words fill the card's middle together. */
 .sidebar__me > .sidebar__user > .ac-avatar {
-  width: 32px;
-  height: 32px;
-  font-size: 13px;
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
 }
 
 /* Settings: a grouped left sub-nav + one section. */
