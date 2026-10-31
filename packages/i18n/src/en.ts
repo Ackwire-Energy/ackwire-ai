@@ -2423,6 +2423,7 @@ export const en: Translations = {
           codeLabel: "Claude code",
           notCode: "That doesn't look like Claude's code.",
           send: "Send to {{computer}}",
+          sending: "Sending the code to {{computer}}…",
           sent: "Code sent. Finishing the sign-in on {{computer}}.",
           local: "On {{computer}} itself? If its browser opened by itself, just authorize there.",
           deviceCode: "Code for ChatGPT",
@@ -5100,6 +5101,8 @@ export const en: Translations = {
       keyShape: "That doesn't look like a {{plan}} key. Copy the whole key.",
       keySafe: "The key goes encrypted to {{computer}} and stays only there.",
       keySendFailed: "Couldn't send the key. Check that it's whole and try again.",
+      keySending: "Sending the key to {{computer}}…",
+      keySent: "Key sent. Finishing the sign-in on {{computer}}.",
       duplicateKey: "That key is already here ({{account}}).",
     },
     connect: {
