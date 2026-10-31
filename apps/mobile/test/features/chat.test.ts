@@ -722,6 +722,37 @@ describe("automatic lines (notices) and fast replies", () => {
     expect(anon?.key).toBe("chat.notice.consultReplyAnon");
   });
 
+  test("an agent's follow-up: when it will be back and for what, then the line that woke it", () => {
+    // Today, so the line needs no day.
+    const at = new Date(new Date().setHours(12, 0, 0, 0)).toISOString();
+    const when = { time: (iso: string) => (iso === at ? "12:00" : "?"), locale: "pt-BR" };
+    const refs = { runId: "r1", at, about: "ver o CI" };
+    const set = eventLineOf(
+      agentMsg("n1", { notice: { kind: "follow_up", text: "Check CI run 42", refs: { ...refs, state: "pending" } } }),
+      names,
+      when,
+    );
+    expect(set).toEqual({
+      kind: "notice",
+      icon: "clock",
+      key: "chat.notice.followUp",
+      values: { name: "Ada", about: "ver o CI", time: "12:00", day: "" },
+      text: "Check CI run 42",
+    });
+    const canceled = eventLineOf(
+      agentMsg("n2", { notice: { kind: "follow_up", text: "x", refs: { ...refs, state: "canceled" } } }),
+      names,
+      when,
+    );
+    expect(canceled?.key).toBe("chat.notice.followUpCanceled");
+    const woke = eventLineOf(
+      agentMsg("n3", { notice: { kind: "follow_up", text: "x", refs: { ...refs, wake: "1", followUpId: "n1" } } }),
+      names,
+      when,
+    );
+    expect(woke).toMatchObject({ key: "chat.notice.followUpWake", values: { name: "Ada", about: "ver o CI" } });
+  });
+
   test("a wait's result names the agent that waited; the message's own text wins over the notice's", () => {
     const line = eventLineOf(
       agentMsg("n1", { notice: { kind: "wait_result", text: "notice text" } }, { body: "  o deploy terminou  " }),

@@ -20,6 +20,7 @@ import { isAgentOnlyDm } from "./dms";
 import { type EmailArt, sendQueuedEmail } from "./email";
 import { type DecidedBy, publishRouted } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
+import { FOLLOW_UP_JOB, wakeFollowUp } from "./follow-through";
 import { advanceForumTopic } from "./forum";
 import { FILE_JOIN_REQUEST_JOB, fileJoinRequest, forgetJoinCodeEmail } from "./invite-requests";
 import type { JevKey, JevKeySource } from "./jev-key";
@@ -413,10 +414,14 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       // Counted per run (statements per stage go into the run profile).
       const wait = typeof job.payload.wait === "string" ? job.payload.wait : undefined;
       await queryTrace.run({ count: 0 }, () =>
-        executeRun(deps, String(job.payload.runId), wait ? { ...ctx, wait, jobId: job.id } : ctx),
+        executeRun(deps, String(job.payload.runId), { ...ctx, jobId: job.id, ...(wait ? { wait } : {}) }),
       );
       // A mission's main-session turn that ended: write items queued behind it may start (ADR 0044).
       await afterMissionRunEnded(missions, String(job.payload.runId)).catch(() => 0);
+    },
+    // A follow-up's time came: the agent is woken in its conversation (follow-through.ts).
+    [FOLLOW_UP_JOB]: async (job) => {
+      await wakeFollowUp(deps, orgOf(job), String(job.payload.messageId));
     },
     "secret.activate": async (job) => {
       if (!deps.sandbox) throw new Error("Computer secret delivery is unavailable");

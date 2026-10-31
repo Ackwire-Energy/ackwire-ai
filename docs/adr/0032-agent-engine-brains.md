@@ -1,6 +1,6 @@
 # 0032. One agent engine, swappable brains (model, Claude Code, Codex)
 
-- Status: Accepted (built; computer brains are chosen per agent; missions run only on the engine, no flag). Superseded in part by ADR 0059 (§5: the plan warning shows when a plan would answer other people, not when it is chosen). Superseded in part by ADR 0077 (2026-10-28): §2's git on cloud computers (connected computers use the git proxy through the runner).
+- Status: Accepted (built; computer brains are chosen per agent; missions run only on the engine, no flag). Superseded in part by ADR 0059 (§5: the plan warning shows when a plan would answer other people, not when it is chosen). Superseded in part by ADR 0077 (2026-10-28): §2's git on cloud computers (connected computers use the git proxy through the runner). Amended 2026-10-30: §3 (a decision that comes while the turn that asked still runs, and a turn that ends on a decision without a word; ADR 0037, round 3).
 - Date: 2026-10-17
 - Extends: ADR 0008 (agent runs), ADR 0015 (Tool Gateway and approvals), ADR 0025 (connected computers and the runner), ADR 0029 (missions), ADR 0030 (runner isolation)
 
@@ -58,6 +58,11 @@ A gated tool call pauses the run (`waiting_approval` / `waiting_input`), whateve
 - computer brains: resumes the session with the tool result ("approved: …" / "refused: …").
 
 Blocking decisions and reviews in missions use the same pause/resume.
+
+*Amended 2026-10-30:* the run goes on with the result in hand, whenever the decision comes.
+
+- A computer brain's gated call is marked `inTurn` on its pending call while the turn that made it still runs. A decision's job that finds such a call while that turn's job still holds the run (an `agent_run.execute` job claimed, its lease live) leaves the run alone; the turn's end (`suspendedByBridge`) clears the mark and, when everything it waited on is already decided, queues the resume itself. The session never takes two turns at once. Any job that finds its run `running` under another live job returns too (two resumes of one pause, two decisions at once).
+- On the resume the run keeps what was decided and what came back (`transcript.decided`). When the next final answer has no word from the agent (no text, no narration since its last message) and isn't a reaction or a mission report, the run gets one more turn that says to finish the task with what the call returned, then what was decided and what came back (`decisionNudge`, once per run, `nudged: "decision"` step). Each result is cut in its middle, so one inside an outside envelope (`<external_data>`) stays closed and nothing the run is told reads as outside data. Background runs keep speaking only through `hand_off`.
 
 ### 4. Context is built once
 
@@ -158,5 +163,5 @@ A mission's main session is simply the agent's run in the mission thread with th
 
 ### Known limits
 
-- A decision that arrives while a computer brain is still finishing the turn that paused (between the bridge's pause and the brain's `done`) can start the resume while the first execution is still closing the turn.
+- ~~A decision that arrives while a computer brain is still finishing the turn that paused can start the resume while the first execution is still closing the turn.~~ Fixed 2026-10-30 (§3).
 - `personalMcp` has no setting yet (always off); the quiet fallback note and the "unavailable" note are in `meta` (the web shows the body; a dedicated chip is to do).
