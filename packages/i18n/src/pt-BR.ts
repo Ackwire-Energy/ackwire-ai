@@ -343,7 +343,8 @@ export const ptBR = {
     sendNewLink: "Mandar outro link",
     newLinkSent: "Mandamos outro link para {{email}}.",
     unconfirmed:
-      "Este e-mail já tem uma conta com senha que ainda não foi confirmada. Confirme pelo e-mail que enviamos ou entre com a senha.",
+      "Este e-mail já tem uma conta com senha que ainda não foi confirmada. Entre com a senha ou crie uma nova pelo e-mail.",
+    unconfirmedReset: "Criar uma senha nova",
     unconfirmedNoEmail: "Este e-mail já tem uma conta com senha. Entre com a senha.",
     termsBefore: "Ao continuar, você aceita os ",
     terms: "Termos",

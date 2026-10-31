@@ -87,7 +87,6 @@ export function AuthFlow({
   const [password, setPassword] = useState("");
   const [options, setOptions] = useState<SignInOptions | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [resent, setResent] = useState<"no" | "sending" | "sent">("no");
   const [wrong, setWrong] = useState(false);
   const [pending, setPending] = useState(false);
   const [secret, setSecret] = useState(false);
@@ -231,16 +230,6 @@ export function AuthFlow({
     } finally {
       setPending(false);
     }
-  };
-
-  /** A new confirmation for the address in the field, after a provider refused it for its unconfirmed account. */
-  const resend = async () => {
-    if (resent === "sending") return;
-    setResent("sending");
-    const res = await authClient()
-      .sendVerificationEmail({ email: email.trim() })
-      .catch(() => null);
-    setResent(res && !res.error ? "sent" : "no");
   };
 
   const sendReset = async () => {
@@ -428,14 +417,9 @@ export function AuthFlow({
         </Text>
       ) : null}
 
+      {/* A provider refused an unconfirmed account: a new password by email, never a new confirmation (ADR 0006). */}
       {canReset && error === t("auth.unconfirmed") && isEmail(email) ? (
-        resent === "sent" ? (
-          <Text variant="small" tone="muted" style={CENTER}>
-            {t("auth.newLinkSent", { email: email.trim() })}
-          </Text>
-        ) : (
-          <Quiet label={t("auth.sendNewLink")} onPress={() => void resend()} />
-        )
+        <Quiet label={t("auth.unconfirmedReset")} onPress={() => go("forgot")} />
       ) : null}
 
       {submitLabel[step] ? (

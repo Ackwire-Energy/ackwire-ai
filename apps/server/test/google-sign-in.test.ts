@@ -17,18 +17,20 @@ afterEach(async () => {
   t = undefined;
 });
 
-/** The confirmation emails sent to `email` so far, with their links. */
-async function confirmations(server: TestServer, email: string) {
+/** The token in the last password reset email sent to `email`. */
+async function resetToken(server: TestServer, email: string) {
   await server.drain();
-  return server.email.sent
-    .filter((m) => m.to[0] === email)
-    .flatMap((m) => /https?:\/\/\S+\/api\/auth\/verify-email\S*/.exec(m.text)?.[0] ?? []);
+  const mail = server.email.sent.filter((m) => m.to[0] === email).at(-1);
+  const link = /https?:\/\/\S+\/reset-password\S*/.exec(mail?.text ?? "")?.[0] ?? "";
+  return new URL(link, ORIGIN).searchParams.get("token") ?? "";
 }
 
-test("a password account not confirmed yet: Google links nothing and signs nobody in, on every app; the sign-in page gets the address back to send the confirmation again", async () => {
+test("a password account not confirmed yet: Google links nothing and signs nobody in, on every app; a new password by email ends the one nobody proved, then Google joins", async () => {
   t = await createTestServer({ env: GOOGLE_ENV });
   const server = t;
-  await signUp(browser(server), "ana@acme.test");
+  // Whoever made this account may not own the address.
+  const maker = browser(server);
+  await signUp(maker, "ana@acme.test");
 
   for (const app of ["web", "desktop", "phone"] as const) {
     const { location, browser: landed } = await googleSignIn(server, app, "ana@acme.test");
@@ -40,18 +42,25 @@ test("a password account not confirmed yet: Google links nothing and signs nobod
   const accounts = await server.db.select({ providerId: schema.accounts.providerId }).from(schema.accounts);
   expect(accounts).toEqual([{ providerId: "credential" }]);
 
-  // "Mandar outro link" on that page: the onboarding's request, limited as it is (email.test.ts). Links are stamped
-  // to the second, so a new second makes this one a new email.
-  expect(await confirmations(server, "ana@acme.test")).toHaveLength(1);
-  const page = browser(server);
-  await Bun.sleep(1000 - (Date.now() % 1000));
-  expect((await page("/api/auth/send-verification-email", { json: { email: "ana@acme.test" } })).status).toBe(200);
-  const links = await confirmations(server, "ana@acme.test");
-  expect(links).toHaveLength(2);
+  // "Criar uma senha nova" on that page: the forgot-password step's request, limited as it is (email.test.ts).
+  const ana = browser(server);
+  const asked = await ana("/api/auth/request-password-reset", {
+    json: { email: "ana@acme.test", redirectTo: "/reset-password" },
+  });
+  expect(asked.status).toBe(200);
+  const token = await resetToken(server, "ana@acme.test");
+  expect(
+    (await ana("/api/auth/reset-password", { json: { token, newPassword: "ana's very own password" } })).status,
+  ).toBe(200);
 
-  // Confirmed from the link, the address is hers: Google signs her in and is linked to her account.
-  const link = new URL(links.at(-1) ?? "");
-  expect((await page(`${link.pathname}${link.search}`)).status).toBe(302);
+  // The password from before signs nobody in, and the sessions it made are over.
+  const before = { email: "ana@acme.test", password: "correct horse battery" };
+  expect((await browser(server)("/api/auth/sign-in/email", { json: before })).status).toBe(401);
+  expect(await (await maker("/api/auth/get-session?disableCookieCache=true")).json()).toBeNull();
+  const users = await server.db.select({ emailVerified: schema.users.emailVerified }).from(schema.users);
+  expect(users).toEqual([{ emailVerified: true }]);
+
+  // The link reached her mailbox, so the address is hers: Google signs her in and joins her account.
   const { location, browser: web } = await googleSignIn(server, "web", "ana@acme.test");
   expect(location).toBe(GOOGLE_BACK.web);
   expect((await web("/api/app/me")).status).toBe(200);

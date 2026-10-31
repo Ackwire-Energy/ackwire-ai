@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { randomBytes, sign as signWithKey } from "node:crypto";
 import type { HumanAction, HumanCheck, RateLimiter } from "@agenteschat/adapters";
 import type { Config } from "@agenteschat/config";
-import { type Database, schema } from "@agenteschat/db";
+import { type Database, eq, schema } from "@agenteschat/db";
 import {
   accountBlock,
   countUsers,
@@ -175,6 +175,11 @@ export function createAuth(deps: {
                 to: [user.email],
                 template: { kind: "password_reset", locale, url },
               });
+            },
+            // The link reached the mailbox, as a confirmation link would, and the password nobody proved is gone with
+            // every session: the address counts as confirmed, so a provider can join the account (ADR 0006).
+            onPasswordReset: async ({ user }: { user: { id: string } }) => {
+              await db.update(schema.users).set({ emailVerified: true }).where(eq(schema.users.id, user.id));
             },
           }
         : {}),
@@ -359,7 +364,7 @@ function noteProviderEmail(profile: { email?: unknown }) {
 
 /**
  * Better Auth's handler. A provider sign-in refused as `ACCOUNT_NOT_LINKED` comes back to the sign-in page with the
- * provider's address, so the page can send that account's confirmation again.
+ * provider's address, so the page can offer that account a new password by email.
  */
 export function authHandler(auth: Auth) {
   return (request: Request) => {

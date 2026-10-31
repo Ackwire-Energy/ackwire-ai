@@ -485,9 +485,9 @@ describe("Acesso antecipado (o link do convite)", () => {
 describe("Google para um e-mail com senha não confirmada", () => {
   const BACK = "/login?error=account_not_linked&email=ana%40acme.com";
   const UNCONFIRMED =
-    "Este e-mail já tem uma conta com senha que ainda não foi confirmada. Confirme pelo e-mail que enviamos ou entre com a senha.";
+    "Este e-mail já tem uma conta com senha que ainda não foi confirmada. Entre com a senha ou crie uma nova pelo e-mail.";
 
-  test("says so with the address filled in, sends the confirmation again from there, and Continuar asks the password", async () => {
+  test("says so with the address filled in, and makes a new password by email from there, never a new confirmation", async () => {
     const { api, state } = authApi(ACCOUNT, { reset: true });
     const { auth, calls } = createFakeAuth();
     await renderApp(BACK, { api, auth });
@@ -496,34 +496,35 @@ describe("Google para um e-mail com senha não confirmada", () => {
     const field = screen().getByLabelText("E-mail") as HTMLInputElement;
     // The address is right: the field isn't marked wrong.
     expect([field.value, field.getAttribute("aria-invalid")]).toEqual(["ana@acme.com", null]);
-    expect(screen().getByRole("alert").textContent).toBe(`${UNCONFIRMED}Mandar outro link`);
+    expect(screen().getByRole("alert").textContent).toBe(`${UNCONFIRMED}Criar uma senha nova`);
 
-    await press("Mandar outro link");
-    expect(calls).toEqual([{ method: "sendVerificationEmail", args: ["ana@acme.com"] }]);
-    expect(screen().getByRole("alert").textContent).toBe(UNCONFIRMED);
-    expect(document.body.textContent).toContain("Mandamos outro link para ana@acme.com.");
+    await press("Criar uma senha nova");
+    expect(heading()).toBe("Te mando um link para criar outra senha.");
+    // The pressed link is gone with its step: the keyboard lands on the address, which is already filled in.
+    const address = screen().getByLabelText("E-mail") as HTMLInputElement;
+    expect([address.value, document.activeElement === address]).toEqual(["ana@acme.com", true]);
+    expect(screen().queryByRole("alert")).toBeNull();
+    await press(/^Enviar link/);
+    expect(calls.map((c) => c.method)).toEqual(["requestPasswordReset"]);
+    expect((calls[0]?.args[0] as { email: string } | undefined)?.email).toBe("ana@acme.com");
+    expect(heading()).toBe("Pronto. Mandei o link para ana@acme.com.");
+  });
 
+  test("Continuar asks the password", async () => {
+    const { api } = authApi(ACCOUNT, { reset: true });
+    await renderApp(BACK, { api, auth: createFakeAuth().auth });
+    await settle(6);
     await press(/^Continuar(?! com)/);
     expect(heading()).toBe("Bom te ver de novo.");
     expect(screen().queryByRole("alert")).toBeNull();
   });
 
-  test("a link that didn't go out can be pressed again", async () => {
-    const { api } = authApi(ACCOUNT, { reset: true });
-    const { auth, calls } = createFakeAuth({ verification: { ok: false, status: 400, message: "" } });
-    await renderApp(BACK, { api, auth });
-    await settle(6);
-    await press("Mandar outro link");
-    await press("Mandar outro link");
-    expect(calls.filter((c) => c.method === "sendVerificationEmail")).toHaveLength(2);
-  });
-
-  test("on a server that sends no email: only the password, and no link", async () => {
+  test("on a server that sends no email: only the password, and no new one", async () => {
     const { api } = authApi(ACCOUNT);
     await renderApp(BACK, { api, auth: createFakeAuth().auth });
     await settle(6);
     expect(screen().getByRole("alert").textContent).toBe("Este e-mail já tem uma conta com senha. Entre com a senha.");
-    expect(screen().queryByRole("button", { name: "Mandar outro link" })).toBeNull();
+    expect(screen().queryByRole("button", { name: "Criar uma senha nova" })).toBeNull();
   });
 });
 

@@ -36,10 +36,8 @@ import {
   SIGNED_IN_PATH,
   thisMac,
 } from "@/lib/desktop";
-import { sendNewLink } from "@/lib/email-confirmation";
 import { useHumanCheck } from "@/lib/human-check";
 import { STORAGE_KEYS, sessionStore } from "@/lib/storage";
-import { useToast } from "@/lib/toast";
 
 /**
  * Sign in and sign up in one flow: the e-mail
@@ -118,7 +116,7 @@ export function AuthPage({
   access?: string;
   /**
    * The code of a provider sign-in the server refused (`/login?error=`): said when the app knows it. An unconfirmed
-   * password account's comes with its address in `email`, to send the confirmation again from here.
+   * password account's comes with its address in `email`, to make a new password from here.
    */
   refused?: string;
 }) {
@@ -128,7 +126,6 @@ export function AuthPage({
   const navigate = useNavigate();
   const qc = useQueryClient();
   const config = useAuthConfig();
-  const toast = useToast();
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState(initialEmail ?? "");
   const [name, setName] = useState("");
@@ -137,7 +134,6 @@ export function AuthPage({
   const canReset = config.data?.passwordReset === true;
   const refusal = refused ? providerRefusalText(t, refused, canReset) : null;
   const [error, setError] = useState<string | null>(refusal);
-  const [resent, setResent] = useState(false);
   const [wrong, setWrong] = useState(false);
   const [pending, setPending] = useState(false);
   const [show, setShow] = useState(false);
@@ -200,14 +196,10 @@ export function AuthPage({
     setStep(next);
   };
 
-  // An unconfirmed account's refusal still in view: its address is right, and on a server that emails a new
-  // confirmation is a click away.
+  // An unconfirmed account's refusal still in view: its address is right, and on a server that emails, a new password
+  // is a click away. Never a new confirmation: that would keep the password of whoever made the account (ADR 0006).
   const unconfirmed = refused === ACCOUNT_NOT_LINKED && error === refusal;
-  const resendable = unconfirmed && canReset && !resent && isEmail(email);
-  const resend = async () => {
-    setResent(true);
-    if (!(await sendNewLink({ auth, t, show: toast.show }, email.trim()))) setResent(false);
-  };
+  const offerReset = unconfirmed && canReset && isEmail(email);
 
   const fail = (e: unknown) =>
     setError(
@@ -556,12 +548,12 @@ export function AuthPage({
             {error && (
               <p className="auth__error ac-iconline" role="alert">
                 <Icon name="alert" size={14} />
-                {resendable ? (
+                {offerReset ? (
                   <span>
                     {error}
                     <br />
-                    <button type="button" className="ac-link" onClick={() => void resend()}>
-                      {t("auth.sendNewLink")}
+                    <button type="button" className="ac-link" onClick={() => go("forgot")}>
+                      {t("auth.unconfirmedReset")}
                     </button>
                   </span>
                 ) : (

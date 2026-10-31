@@ -227,7 +227,7 @@ describe("refusals in the phone's words", () => {
     const pt = await translator("pt-BR");
     const unconfirmed = { status: 401, code: "OAUTH_LINK_ERROR", message: "account not linked" };
     expect(socialRefusalText(pt, unconfirmed, true)).toBe(
-      "Este e-mail já tem uma conta com senha que ainda não foi confirmada. Confirme pelo e-mail que enviamos ou entre com a senha.",
+      "Este e-mail já tem uma conta com senha que ainda não foi confirmada. Entre com a senha ou crie uma nova pelo e-mail.",
     );
     // A server that sends no email never confirmed it: only the password signs in.
     expect(socialRefusalText(pt, unconfirmed, false)).toBe(

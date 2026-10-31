@@ -346,7 +346,8 @@ export const en: Translations = {
     sendNewLink: "Send a new link",
     newLinkSent: "We sent a new link to {{email}}.",
     unconfirmed:
-      "This email already has an account with a password that isn't confirmed yet. Confirm it from the email we sent, or sign in with the password.",
+      "This email already has an account with a password that isn't confirmed yet. Sign in with the password, or create a new one by email.",
+    unconfirmedReset: "Create a new password",
     unconfirmedNoEmail: "This email already has an account with a password. Sign in with the password.",
     termsBefore: "By continuing you accept the ",
     terms: "Terms",
