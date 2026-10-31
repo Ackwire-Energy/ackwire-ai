@@ -1071,6 +1071,8 @@ async function executeRunInner(
     ]);
     // Per turn, like memory: a live computer session reads "# This turn", never a later system prompt.
     if (archived) system.push({ turn: true, found: true, text: archived });
+    // Who is behind it as it starts (ADR 0053): the daily report counts the runs nobody was (`autonomy-report.ts`).
+    const behind = await runAuthority(db, run);
     const stats = {
       ...context.stats,
       model: agent.model,
@@ -1078,6 +1080,8 @@ async function executeRunInner(
       ...(toolChoice ? { toolGroups: toolChoice } : {}),
       memoryItems: memory.itemIds,
       wikiPages: wikiPages.pageIds,
+      behind: behind.kind,
+      ...(behind.kind === "unattended" ? { unattended: behind.reason } : {}),
     };
     later(() => addRunStep(db, run, "context", stats));
     transcript = {
@@ -2164,6 +2168,8 @@ async function executeRunInner(
           .returning(),
         addRunStep(db, run, "model_call", {
           model: result.model,
+          // The calls a computer turn ran itself (its commands and edits): the report tells action from talk by them.
+          ...(result.executedCount > 0 ? { executed: result.executedCount } : {}),
           stopReason: result.stopReason,
           usageRecordId: result.usageRecordId,
           costNanoUsd: result.costNanoUsd,

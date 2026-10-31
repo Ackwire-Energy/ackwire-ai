@@ -20,6 +20,7 @@ export * from "./audience";
 export * from "./audit";
 export * from "./authority";
 export * from "./auto-model";
+export * from "./autonomy-report";
 export * from "./avatars";
 export * from "./billing-link";
 export * from "./brain-settings";
