@@ -1602,6 +1602,11 @@ textarea.ac-input {
 .ac-menu__leading .ac-icon {
   margin-top: 0;
 }
+/* A bare mark (14px) in the icons' 16px column: its label starts where theirs do. */
+.ac-menu__leading:has(> .ac-brand--xs) {
+  justify-content: center;
+  width: 16px;
+}
 /*
  * An option with a description under its name: a lead no taller than 1.25 of its 20px lines (an icon, a mark, a
  * small face or a stack of them) sits on the first line's capitals, as an `.ac-iconline` lead does. A 30px tile stays

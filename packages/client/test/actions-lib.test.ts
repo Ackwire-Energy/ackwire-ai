@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
-import type { AgentAction } from "../src/api/types";
+import { AGENT_ACTION_KINDS, type AgentAction } from "../src/api/types";
 import {
   actionErrorKey,
   actionPhase,
@@ -118,5 +118,12 @@ describe("receipt sentence values", () => {
     expect(actionTextValues(deleted, t)).toEqual({ name: "Daily" });
     const unknown = action({ kind: "something.new" as AgentAction["kind"] });
     expect(actionTextValues(unknown, t)).toEqual({});
+    // Its sentence: "Fiz uma mudança", never the raw key.
+    expect(actionTextKey(unknown)).toBe("agentActions.other");
+  });
+
+  test("every kind the app knows has its own case (the default gives no values)", () => {
+    const missing = AGENT_ACTION_KINDS.filter((kind) => !Object.keys(actionTextValues(action({ kind }), t)).length);
+    expect(missing).toEqual([]);
   });
 });

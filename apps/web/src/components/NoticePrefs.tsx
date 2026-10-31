@@ -130,7 +130,7 @@ export function PrefRow({
   /** In place of the icon: the person's face. */
   lead?: ReactNode;
   label: string;
-  help?: string;
+  help?: ReactNode;
   control?: ReactNode;
   onOpen?: () => void;
 }) {

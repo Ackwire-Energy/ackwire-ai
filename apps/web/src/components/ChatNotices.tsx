@@ -9,7 +9,7 @@ import {
   noticeRoutineName,
 } from "@agenteschat/client/lib/notices";
 import type { RoutineReply } from "@agenteschat/client/lib/routines";
-import { Icon, type IconName } from "@agenteschat/ui";
+import { cx, Icon, type IconName } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type ReactNode, useState } from "react";
@@ -103,6 +103,20 @@ function EventLine({
           <MessageBody body={text} resolveMention={dir.mentionName} />
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * In place of a conversation row, or a `part` of a message (a card, its receipts), that failed to draw
+ * (`ErrorBoundary`): one quiet line, the rest keeps working.
+ */
+export function UnshownLine({ part = false }: { part?: boolean }) {
+  const { t } = useTranslation();
+  return (
+    <div className={cx("cn-line ac-iconline", part && "cn-line--part")}>
+      <Icon name="alert" size={14} />
+      <span className="cn-line__text">{t(part ? "chat.unshownPart" : "chat.unshown")}</span>
     </div>
   );
 }
