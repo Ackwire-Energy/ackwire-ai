@@ -108,7 +108,7 @@ test("a workspace its owner is still setting up isn't opened: the first run resu
   // Someone invited into one still being set up, or one finished: it opens.
   expect(
     openOrgs([
-      { ...mine, role: "admin" as const },
+      { ...mine, role: "member" as const },
       { id: "f", name: "F", role: "owner" as const },
     ]),
   ).toHaveLength(2);

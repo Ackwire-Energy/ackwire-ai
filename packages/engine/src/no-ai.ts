@@ -2,7 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, gt, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { aiConnectIntent, type ConnectIntent } from "./ai-intent";
 import { type AgentAi, type AiStatusDeps, agentAiState, type NoAiReason, orgHasAi } from "./ai-status";
-import { audienceError, canTalkTo } from "./audience";
+import { audienceError, canTalkTo, talksToAgents } from "./audience";
 import { recordAudit } from "./audit";
 import { runRequester } from "./cancel";
 import { requireChannelAccess } from "./channels";
@@ -11,7 +11,7 @@ import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishRouted } from "./events";
 import type { Judge } from "./judge";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
-import { can, type MemberRole } from "./organizations";
+import { can, type Membership } from "./organizations";
 import { type RouterDeps, routeMessage } from "./router";
 import { bodyCode } from "./run-tools";
 import { type AgentRun, NO_AI, replyThreadOf } from "./runs";
@@ -226,7 +226,7 @@ async function restartNoAiRun(deps: AnswerNowDeps, userId: string, failed: Agent
  * directly (enqueueing `message.posted` again would do nothing: its dedupe key is still in the outbox).
  * Null when there is no such decision (any more).
  */
-async function rerouteNoAiMessage(deps: AnswerNowDeps, userId: string, role: MemberRole, message: Message) {
+async function rerouteNoAiMessage(deps: AnswerNowDeps, userId: string, membership: Membership, message: Message) {
   if (!deps.router) return null;
   const noAiDecision = and(
     eq(routingDecisions.orgId, message.orgId),
@@ -235,7 +235,7 @@ async function rerouteNoAiMessage(deps: AnswerNowDeps, userId: string, role: Mem
   );
   const [decision] = await deps.db.select({ id: routingDecisions.id }).from(routingDecisions).where(noAiDecision);
   if (!decision) return null;
-  if (message.authorUserId !== userId && !can(role, "manage_agents")) throw forbidden();
+  if (message.authorUserId !== userId && !can(membership, "manage_agents")) throw forbidden();
   if (!(await orgHasAi(deps, message.orgId))) throw stillMissing();
   const deleted = await deps.db.delete(routingDecisions).where(noAiDecision).returning({ id: routingDecisions.id });
   if (deleted.length === 0) return null;
@@ -273,7 +273,7 @@ export async function answerNow(
   const failed = found.filter((r) => r.run.status === "failed" && r.run.error === NO_AI && !r.run.background);
   if (failed.length > 0) {
     const allowed = failed.filter(
-      (r) => r.requester === userId || r.agent.ownerUserId === userId || can(membership.role, "manage_agents"),
+      (r) => r.requester === userId || r.agent.ownerUserId === userId || can(membership, "manage_agents"),
     );
     if (allowed.length === 0) throw forbidden();
     const ready: AnsweringRun[] = [];
@@ -282,7 +282,11 @@ export async function answerNow(
     // Who the agent answers may have narrowed since (an agent moved onto a plan answers only its owner until they
     // turn on Atende outras pessoas, ADR 0059 §5):
     // a run starts again only for someone it still answers.
-    const heard = ready.filter((r) => canTalkTo(r.agent, r.requester));
+    // …and whose roles still let them talk to agents (`talk_to_agents`, ADR 0085).
+    const talks = new Map<string | null, boolean>();
+    for (const r of ready)
+      if (!talks.has(r.requester)) talks.set(r.requester, await talksToAgents(deps.db, orgId, r.requester));
+    const heard = ready.filter((r) => canTalkTo(r.agent, r.requester, talks.get(r.requester) ?? false));
     const [first] = ready;
     if (heard.length === 0 && first) throw await audienceError(deps.db, first.agent);
     const runs: Answering = [];
@@ -296,7 +300,7 @@ export async function answerNow(
     return { runs };
   }
   if (!card && message.authorType === "person") {
-    const rerouted = await rerouteNoAiMessage(deps, userId, membership.role, message);
+    const rerouted = await rerouteNoAiMessage(deps, userId, membership, message);
     if (rerouted) return { runs: rerouted };
   }
   return { runs: found.map((r) => ({ agentId: r.run.agentId, runId: r.run.id })) };

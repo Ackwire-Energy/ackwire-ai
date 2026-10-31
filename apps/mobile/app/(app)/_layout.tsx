@@ -112,6 +112,7 @@ function AppStack() {
       {/* Você: a pushed page with a clear bar over its sky; its screens pushed over it on the grouped gray. */}
       <Stack.Screen name="me/index" options={{ ...pushed, ...coverBarOptions }} />
       <Stack.Screen name="me/account" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="me/status" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/zone" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/workspaces" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/members" options={{ ...pushed, ...scrollUnder }} />

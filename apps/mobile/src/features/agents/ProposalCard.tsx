@@ -26,7 +26,7 @@ export function ProposalCard({ message: m }: { message: Message }) {
   if (!card || m.author.type !== "agent") return null;
   const { draft, why } = card.params;
   const status = proposalStatus(card);
-  const decides = status === "open" && can(org?.role, "manage_agents");
+  const decides = status === "open" && can(org, "create_agents");
   const proposer = (m.author.id && dir.agentById.get(m.author.id)?.name) || t("channel.unknownAgent");
   const outcome =
     status === "created"

@@ -344,7 +344,7 @@ function NeedRow({ need }: { need: ForumNeed }) {
         return t("forum.need.stalled");
     }
   })();
-  const admin = can(org.role, "manage_agents");
+  const admin = can(org, "manage_agents");
   return (
     // biome-ignore lint/a11y/useSemanticElements: a row with its own buttons inside (a link can't hold them)
     <div

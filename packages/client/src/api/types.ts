@@ -2,7 +2,8 @@
 
 import type { OnboardingStepId } from "../lib/onboarding";
 
-export type Role = "owner" | "admin" | "member";
+/** Whether a person owns the workspace (ADR 0085); what anyone may do comes from their roles (`OrgRole`). */
+export type Role = "owner" | "member";
 export type Edition = "selfhost" | "cloud";
 
 export interface Health {
@@ -153,6 +154,13 @@ export interface OrgSummary {
   id: string;
   name: string;
   role: Role;
+  /**
+   * Everything the person may do here, resolved by the server from their roles (ADR 0085): read it with `can`
+   * (lib/permissions). Absent: nothing past reading.
+   */
+  permissions?: string[];
+  /** Their highest role's position (0 the top), null with none: they manage the roles and people below it. */
+  rank?: number | null;
   /** The workspace logo (`/api/app/org-logos/…`); null or absent = the agent mark. */
   logo?: string | null;
   /** From `GET /me`; absent from older servers (active). Changes come as `org.standing` events. */
@@ -189,6 +197,8 @@ export interface Member {
   /** The photo uploaded here (`PUT …/me/avatar`); wins over `image`. */
   avatarUrl?: string | null;
   role: Role;
+  /** Their roles (`OrgRole` ids), not `everyone`. */
+  roleIds?: string[];
   joinedAt: string;
   /** `@ana`: unique in the organization; mentions resolve by it. */
   handle: string;
@@ -200,7 +210,55 @@ export interface Invitation {
   id: string;
   email: string;
   role: Role;
+  /** Roles they get on accepting. */
+  roleIds?: string[];
   expiresAt: string;
+}
+
+/** One of a workspace's roles (ADR 0085, `GET …/roles`). */
+export interface OrgRole {
+  id: string;
+  /** `everyone`: the base every member holds ("Todos"), always last. */
+  kind: "custom" | "everyone";
+  name: string;
+  /** A `ROLE_ICONS` icon name. */
+  icon: string;
+  /** One of the agents' colors (not sky): the role's mark is drawn in it. */
+  color: string;
+  /** 0 the highest. */
+  position: number;
+  /** Its keys; `administrator` grants every other one. */
+  permissions: string[];
+  mentionable: boolean;
+  hoist: boolean;
+  people: number;
+  /** Whether you may change it (you manage roles and it is below your own). */
+  editable: boolean;
+  /** Whether you may give it to people: it is below your own. */
+  givable: boolean;
+}
+
+/** A permission area: its "use" keys and every key (its "manage" level). */
+export interface PermissionArea {
+  id: string;
+  use: string[];
+  keys: string[];
+}
+
+export interface OrgRoles {
+  roles: OrgRole[];
+  areas: PermissionArea[];
+  colors: string[];
+  icons: string[];
+}
+
+export interface RoleInput {
+  name: string;
+  icon?: string;
+  color?: string;
+  permissions?: string[];
+  mentionable?: boolean;
+  hoist?: boolean;
 }
 
 export interface InvitationPreview {
@@ -1215,18 +1273,91 @@ export interface Person {
   name: string;
   email: string;
   image: string | null;
+  /** The photo uploaded here (`PUT …/me/avatar`); wins over `image`. */
+  avatarUrl?: string | null;
   role: Role;
+  /** Their roles (`OrgRole` ids), not `everyone`. */
+  roleIds?: string[];
   joinedAt: string;
   lastSeenAt: string | null;
+  /** Seen as connected: `presence` is online, away or busy. */
   online: boolean;
+  /** `hidden` only for yourself; everyone else sees a hidden person as `offline` (ADR 0084). */
+  presence: MemberPresence;
+  /** What the person wrote they are doing; null = nothing (or its time is up). */
+  status: MemberStatus | null;
+  /** Only on your own row: what you picked (your `presence` reads offline while you aren't connected). */
+  availability?: Availability;
   handle: string;
   timezone: string;
+}
+
+/** A person as others see them (ADR 0084). */
+export type MemberPresence = "online" | "away" | "busy" | "hidden" | "offline";
+/** What a person picks: `auto` = online while connected, `away`, `busy`, or `hidden` (offline to everyone else). */
+export type Availability = "auto" | "away" | "busy" | "hidden";
+
+export interface MemberStatus {
+  text: string;
+  emoji: string | null;
+  /** ISO; null = until changed. */
+  until: string | null;
+}
+
+/** `PUT …/me/status`: either part may be left out; `status: null` clears the line. */
+export interface StatusInput {
+  availability?: Availability;
+  status?: { text: string; emoji?: string | null; until?: string | null } | null;
+}
+
+/** An agent's presence, from its work (ADR 0084); an agent with no AI is drawn `offline` by the apps. */
+export type AgentPresence = "online" | "busy" | "away" | "offline";
+
+/** What an agent's line says when the server picked it (ADR 0084 §8); worded by the app (`presence.agent.*`). */
+export type AgentStatusKind =
+  | "task"
+  | "routine"
+  | "mission"
+  | "channel"
+  | "browsing"
+  | "coding"
+  | "files"
+  | "wiki"
+  | "planning"
+  | "data"
+  | "mail"
+  | "connector"
+  | "computer"
+  | "waiting_approval"
+  | "waiting_answer"
+  | "waiting_computer";
+
+/** An agent's line: its own words (`by: "self"`, `text`), or one the server picked for the run (`kind` + `subject`). */
+export interface AgentStatusLine {
+  by: "self" | "auto" | "wait";
+  text: string | null;
+  kind: AgentStatusKind | null;
+  /** The task's title, the routine's name, the public channel, the connector… */
+  subject: string | null;
+  emoji: string | null;
+  /** ISO; null = until the run ends. */
+  until: string | null;
+}
+
+/** `GET …/agent-status`: one agent's presence and its line. */
+export interface AgentStatus {
+  agentId: string;
+  presence: AgentPresence;
+  status: AgentStatusLine | null;
+  /** Its last run's end (now while one is going); null = it never worked. */
+  activeAt: string | null;
 }
 
 export interface InvitationWithStatus {
   id: string;
   email: string;
   role: Role;
+  roleIds?: string[];
   status: "pending" | "expired";
   expiresAt: string;
   createdAt: string;
@@ -1475,6 +1606,7 @@ export type AgentActionKind =
   | "memory.forgotten"
   | "routine.created"
   | "routine.updated"
+  | "routine.deleted"
   | "channel.agent_added"
   | "channel.created"
   | "wiki.page_created"

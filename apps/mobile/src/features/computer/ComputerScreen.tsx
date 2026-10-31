@@ -111,7 +111,7 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
   const g = agentGrammar(t, name);
   const machine = view.machine;
   const computer = computerName(t, org?.name ?? "", machine);
-  const manages = can(org?.role, "manage_agents") || (Boolean(meId) && agent?.ownerUserId === meId);
+  const manages = can(org, "manage_agents") || (Boolean(meId) && agent?.ownerUserId === meId);
   const person = (id: string) => dir.nameOf({ type: "person", id }) || t("channel.unknownPerson");
   // What leaving hands back: the agent's browser in this person's hands (the phone never holds its screen).
   const mine =
