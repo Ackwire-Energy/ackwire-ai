@@ -3969,6 +3969,13 @@ a.ac-list__row:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+/* Shown, not changed (a member reading an admin's setting): the choice stays readable, faded. */
+.ac-seg[aria-disabled="true"] {
+  opacity: 0.55;
+}
+.ac-seg__item:disabled {
+  cursor: default;
+}
 .ac-seg__pill {
   position: absolute;
   top: var(--seg-in);
@@ -5303,6 +5310,285 @@ a.ac-list__row:focus-visible {
   }
   .ac-emoji__cell:hover {
     transform: none;
+  }
+}
+
+/*
+ * The composer's picker with tabs (ADR 0091): Emojis, GIFs and stickers in one popover of one height, so switching
+ * tabs never moves it. The tabs are the segmented control, across its width; each tab's list is its one scroll.
+ */
+.ac-emoji-popover.ac-picker {
+  width: 376px;
+  height: min(452px, var(--radix-popover-content-available-height, 452px));
+  max-height: none;
+  gap: 8px;
+  overflow: hidden;
+}
+/* The tabs' root is `display: contents`: its list and panels lay out in the popover's column. */
+.ac-picker .ac-tabs--seg {
+  --seg-h: var(--control-h-sm);
+  --seg-r: var(--control-r-sm);
+  --seg-in: 3px;
+  flex: none;
+  display: flex;
+  width: 100%;
+}
+.ac-picker .ac-tabs--seg .ac-seg__item {
+  flex: 1 1 0;
+}
+.ac-picker__panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  border-radius: var(--radius-item);
+}
+.ac-picker__panel:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-picker__panel > .ac-emoji {
+  flex: 1 1 auto;
+}
+.ac-picker .ac-emoji__scroll {
+  flex: 1 1 auto;
+  height: auto;
+  max-height: none;
+}
+/* A tab of GIFs or stickers: its search, its chips, the list that scrolls, a quiet line under it. */
+.ac-media {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.ac-media__chips {
+  flex: none;
+}
+.ac-media__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.ac-media__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 32px 12px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+.ac-media__more {
+  display: flex;
+  justify-content: center;
+  min-height: 28px;
+  padding: 6px 0 2px;
+  color: var(--faint);
+}
+.ac-media__foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 -8px -8px;
+  padding: 7px 12px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--faint);
+}
+.ac-media__foot b {
+  color: var(--muted);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.ac-media__foot span:last-child:not(:first-child) {
+  margin-left: auto;
+}
+/* GIFs in two columns of their own proportions: each holds its place before its file loads. */
+.ac-gifs__grid {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.ac-gifs__grid[data-stale] {
+  opacity: 0.6;
+}
+.ac-gifs__col {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  gap: 6px;
+  min-width: 0;
+}
+.ac-gifs__cell {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  border-radius: var(--radius-item) var(--radius-item) var(--radius-item) var(--radius-cut);
+  background: var(--sunken);
+  cursor: pointer;
+  line-height: 0;
+}
+.ac-gifs__cell img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ac-gifs__cell:hover,
+.ac-gifs__cell:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-gifs__ghost {
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-item) var(--radius-item) var(--radius-item) var(--radius-cut);
+}
+/* The agents' stickers: a section per agent, four to a row. */
+.ac-stickers + .ac-stickers {
+  margin-top: 6px;
+}
+.ac-stickers__heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 4px 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--faint);
+}
+.ac-stickers__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+.ac-stickers__cell {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  min-width: 0;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--radius-item);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.ac-stickers__cell:hover {
+  background: rgba(127, 127, 127, 0.12);
+}
+.ac-stickers__cell:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-stickers__cell > .ac-sticker {
+  max-width: 100%;
+  max-height: 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-stickers__cell {
+    transition: none;
+  }
+}
+
+/* An agent's sticker: the agent itself on a transparent canvas, blocky when scaled; no frame, no background. */
+.ac-sticker {
+  display: block;
+  flex: none;
+  image-rendering: pixelated;
+}
+/* In a message: under the name, as a picture is, a little apart from any words above it. */
+.ac-sticker.ac-msg-media {
+  margin-top: 4px;
+}
+/*
+ * A GIF in a message: the picture in the cut-corner frame, as wide as it is up to 300px (`--gif-w`), its shape
+ * held before it loads (`--gif-ar`); a small "GIF" mark on its corner and where it comes from on hover.
+ */
+.ac-gif {
+  position: relative;
+  display: block;
+  width: min(100%, var(--gif-w, 300px));
+  aspect-ratio: var(--gif-ar, 4 / 3);
+  margin-top: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) 4px;
+  background: var(--sunken);
+  box-shadow: 0 0 0 1px var(--line);
+  line-height: 0;
+}
+.ac-gif img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ac-gif:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-gif__mark,
+.ac-gif__source {
+  position: absolute;
+  bottom: 8px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1.3;
+  pointer-events: none;
+}
+.ac-gif__mark {
+  left: 8px;
+}
+.ac-gif__source {
+  right: 8px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.ac-gif:hover .ac-gif__source,
+.ac-gif:focus-visible .ac-gif__source {
+  opacity: 1;
+}
+/* Its file no longer loads (GIFs turned off, the GIF gone): a quiet card of its size, its title, the mark. */
+.ac-gif--off {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  padding: 12px 12px 32px;
+  line-height: 1.35;
+}
+.ac-gif__title {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+.ac-gif--off .ac-gif__mark {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+  color: var(--faint);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-gif__source {
+    transition: none;
   }
 }
 

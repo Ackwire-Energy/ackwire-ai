@@ -68,6 +68,7 @@ import { ImportExportSection } from "@/components/ImportFlow";
 import { BillingMeters } from "@/components/Limits";
 import { ErrorState, LoadingLine, LoadingList } from "@/components/Loading";
 import { MachinePage } from "@/components/Machines";
+import { MediaSettingsSection } from "@/components/MediaSettings";
 import { NoticePrefsSection } from "@/components/NoticePrefs";
 import { useOrg } from "@/components/org-context";
 import { PlanUsageCards } from "@/components/PlanUsage";
@@ -178,6 +179,7 @@ export function SettingsPage({
         {current === "members" && <MembersPage embedded />}
         {current === "roles" && <RolesSection />}
         {current === "audit" && <AuditSection />}
+        {current === "media" && <MediaSettingsSection />}
         {current === "access" && <AccessMatrixSection />}
         {current === "connectors" && (
           <ConnectorsSection connected={connected} review={review} mail={mail} account={account} />

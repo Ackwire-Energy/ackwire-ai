@@ -429,6 +429,11 @@ export interface Agent {
   brain?: AgentBrainLine;
   /** No longer in the team (ADR 0082): only its name, role and look, from `FormerAgent`. */
   former?: "archived" | "deleted";
+  /**
+   * It may follow a light reply with a sticker or a GIF of its own, as often as the workspace allows (ADR 0091).
+   * Absent: on (the default).
+   */
+  mediaReplies?: boolean;
 }
 
 /** An agent no longer in the team (archived or deleted): what its messages and reports still show. */
@@ -516,6 +521,8 @@ export interface AgentInput {
   appearance?: AgentLookInput;
   /** Created from an agent's proposal (its card's message id, ADR 0081): the card is marked created. */
   proposal?: string;
+  /** Its stickers and GIFs after a light reply (ADR 0091); same permission as editing the agent. */
+  mediaReplies?: boolean;
 }
 
 /**
@@ -636,6 +643,8 @@ export interface ChannelLastMessage {
   preview: string;
   /** A body the server wrote: show it in the reader's language (`previewBody`). Null for a plain message. */
   meta?: PreviewMeta | null;
+  /** It was a GIF or a sticker (ADR 0091): with no text, `previewBody` says which. */
+  mediaKind?: MediaKind | null;
   createdAt: string;
 }
 
@@ -1378,7 +1387,22 @@ export interface OrgSettings {
   actionCheck: boolean;
   /** Per provider, the models Automático picks per tier where the workspace chose its own (ADR 0087). */
   autoModels: Partial<Record<string, Partial<Record<ModelTier, string>>>>;
+  /** People can send GIFs in chat (ADR 0091); only with `gifsAvailable` too. On by default. */
+  gifs: boolean;
+  /** The most a GIF may be rated. */
+  gifRating: GifRating;
+  /** The agents' own stickers in the picker. On by default. */
+  agentStickers: boolean;
+  /** How often agents follow a light reply with a sticker or a GIF. */
+  agentMedia: AgentMediaLevel;
+  /** Read only: this server can search GIFs (it has a GIF provider). */
+  gifsAvailable: boolean;
+  /** Read only: this server can decide when agents send one (agents send none on their own without it). */
+  agentMediaAvailable: boolean;
 }
+
+/** `OrgSettings` the server works out itself: never in a PATCH. */
+export type ReadOnlyOrgSettings = "gifsAvailable" | "agentMediaAvailable";
 
 /** Automático's sizes: quick tasks, everyday work, hard work. */
 export type ModelTier = "small" | "medium" | "large";
@@ -1717,6 +1741,88 @@ export interface ReplyRef {
   author: { type: AuthorType; id: string | null };
   authorName: string;
   excerpt: string;
+  /** What it quotes was a GIF or a sticker (ADR 0091): the quote says so where its excerpt is empty. */
+  media?: MediaKind;
+}
+
+// ── GIFs and stickers in chat (ADR 0091) ──────────────────────────────────────
+
+/** A message's media: a GIF or one of an agent's stickers. */
+export type MediaKind = "gif" | "sticker";
+
+/** The agents' stickers, one animation per mood (`STICKER_MOODS` in `lib/media.ts`). */
+export type StickerMood = "celebrate" | "love" | "deal" | "thinking" | "wow" | "dizzy";
+
+/** The GIF picker's chips (`GIF_CATEGORY_IDS` in `lib/media.ts`); the server searches each with its own words. */
+export type GifCategory =
+  | "celebrate"
+  | "thanks"
+  | "ok"
+  | "applause"
+  | "wow"
+  | "coffee"
+  | "good_morning"
+  | "bye"
+  | "friday"
+  | "oops"
+  | "thinking";
+
+/** Which file of a GIF the server sends: a small one for the picker, the one a message shows, or a still frame. */
+export type GifSize = "preview" | "full" | "still";
+
+/** The most a GIF may be rated in the workspace: `g` (any age) or `pg` (up to 13). */
+export type GifRating = "g" | "pg";
+
+/** How often the workspace's agents follow a light reply with a sticker or a GIF. */
+export type AgentMediaLevel = "never" | "sometimes" | "often";
+
+/** `meta.media` of a GIF message: what the app needs to draw it, never a URL (the file comes from our server). */
+export interface GifMedia {
+  kind: "gif";
+  provider: "giphy";
+  id: string;
+  /** The provider's title (outside text). */
+  title: string;
+  width: number;
+  height: number;
+}
+
+/** `meta.media` of a sticker: each app draws it from the agent's look. */
+export interface StickerMedia {
+  kind: "sticker";
+  agentId: string;
+  mood: StickerMood;
+}
+
+/** `message.meta.media`: a message may have media and no text. */
+export type MessageMedia = GifMedia | StickerMedia;
+
+/** What `chat.post` takes for a message's media: the server looks a GIF up again and writes the real `meta.media`. */
+export type PostMedia = { kind: "gif"; id: string } | { kind: "sticker"; agentId: string; mood: StickerMood };
+
+/** A GIF the search found (`GET …/gifs`). */
+export interface Gif {
+  id: string;
+  /** The provider's title (outside text). */
+  title: string;
+  /** Of the `full` file, in pixels. */
+  width: number;
+  height: number;
+}
+
+/** A page of GIFs; `next` is the offset of the next page (null: no more). */
+export interface GifPage {
+  gifs: Gif[];
+  next: number | null;
+}
+
+/** A GIF search: free text, a category, or neither (what is trending); `lang` is the person's (two letters). */
+export interface GifQuery {
+  q?: string;
+  category?: GifCategory | null;
+  offset?: number;
+  limit?: number;
+  lang?: string;
 }
 
 /**
@@ -1875,8 +1981,15 @@ export interface DmRead {
 export interface DirectMessage {
   channelId: string;
   with: { type: AuthorType; id: string; name: string; handle: string | null };
-  /** `meta`: a body the server wrote, shown in the reader's language (`previewBody`). */
-  lastMessage: { id: string; body: string; meta?: PreviewMeta | null; createdAt: string; authorType: string } | null;
+  /** `meta`: a body the server wrote, shown in the reader's language (`previewBody`); `mediaKind`: a GIF or a sticker. */
+  lastMessage: {
+    id: string;
+    body: string;
+    meta?: PreviewMeta | null;
+    mediaKind?: MediaKind | null;
+    createdAt: string;
+    authorType: string;
+  } | null;
   unread: number;
 }
 
@@ -3572,7 +3685,14 @@ export interface ThreadInfo {
   replyCount: number;
   lastActivityAt: string;
   /** `meta`: a body the server wrote, shown in the reader's language (`previewBody`). */
-  lastMessage: { author: ThreadActor; excerpt: string; meta?: PreviewMeta | null; createdAt: string } | null;
+  lastMessage: {
+    author: ThreadActor;
+    excerpt: string;
+    meta?: PreviewMeta | null;
+    /** A GIF or a sticker (ADR 0091): with no text, `previewBody` says which. */
+    mediaKind?: MediaKind | null;
+    createdAt: string;
+  } | null;
   participants: ThreadActor[];
   /** An agent run is in progress (or waiting) in this thread. */
   working: boolean;
@@ -4435,6 +4555,8 @@ export interface NotificationSource {
 export interface NotificationLatest {
   /** Snippet of the latest message, comment, question or summary (≤ 280 chars); an approval's why. */
   text?: string;
+  /** The latest message was a GIF or a sticker (ADR 0091): with no `text`, the card names what it was. */
+  media?: MediaKind;
   /** Issue title, the approval's action title, the topic's question. */
   title?: string;
   /** Reactions: distinct emojis (≤ 5) and my message's snippet. */

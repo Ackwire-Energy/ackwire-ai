@@ -70,6 +70,7 @@ import type {
   ForumSuggestion,
   ForumTopic,
   ForumTopicDetail,
+  GifPage,
   GitHubAppInstallation,
   GitHubRepositories,
   Health,
@@ -323,6 +324,18 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     },
     desktop: {
       status: (orgId, agentId) => request<DesktopStatus>(`${org(orgId)}/agents/${enc(agentId)}/desktop`),
+    },
+    gifs: {
+      search: (orgId, query) =>
+        request<GifPage>(`${org(orgId)}/gifs`, {
+          query: {
+            q: query.q?.trim() || undefined,
+            category: query.category ?? undefined,
+            offset: query.offset || undefined,
+            limit: query.limit,
+            lang: query.lang,
+          },
+        }),
     },
     reminders: {
       create: (orgId, input) => request<Reminder>(`${org(orgId)}/reminders`, { json: input }),

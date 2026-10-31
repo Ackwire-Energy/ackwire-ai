@@ -86,6 +86,8 @@ import type {
   ForumTopic,
   ForumTopicDetail,
   ForumTopicInput,
+  GifPage,
+  GifQuery,
   GitHubAppInstallation,
   GitHubRepositories,
   Health,
@@ -160,9 +162,11 @@ import type {
   OrgSettings,
   Person,
   PhoneSignIn,
+  PostMedia,
   Proposal,
   PushDeviceInput,
   ReactionCount,
+  ReadOnlyOrgSettings,
   Reminder,
   ReminderInput,
   Role,
@@ -350,7 +354,7 @@ export interface ApiClient {
     settings(orgId: string): Promise<OrgSettings>;
     updateSettings(
       orgId: string,
-      input: Partial<Omit<OrgSettings, "name" | "autoModels">> & {
+      input: Partial<Omit<OrgSettings, "name" | "autoModels" | ReadOnlyOrgSettings>> & {
         name?: string;
         /** Per provider and tier, one of its models; null puts the tier back on its default. */
         autoModels?: Partial<Record<string, Partial<Record<ModelTier, string | null>>>>;
@@ -547,6 +551,11 @@ export interface ApiClient {
         openThread?: boolean;
         /** "Parar e mandar": an agent working here stops its current step and reads this now. */
         steer?: "now";
+        /**
+         * A GIF or a sticker (ADR 0091): `body` may then be empty. The server stores `meta.media`. 422
+         * `message.media_off` (GIFs or stickers off here) or `message.media_not_found`.
+         */
+        media?: PostMedia;
       },
     ): Promise<Message>;
     reactions(orgId: string, messageId: string): Promise<ReactionCount[]>;
@@ -1281,6 +1290,15 @@ export interface ApiClient {
    */
   desktop: {
     status(orgId: string, agentId: string): Promise<DesktopStatus>;
+  };
+  /**
+   * GIF search (ADR 0091), through our server: the browser and the phone never talk to the provider. Every member;
+   * rate limited per person (429). 404 `gifs.off` when this server has no GIF search or the workspace turned GIFs
+   * off. A GIF's file is `gifMediaUrl` (`lib/media.ts`).
+   */
+  gifs?: {
+    /** Free text (`q`), a category, or neither (what is trending), at the workspace's rating. */
+    search(orgId: string, query: GifQuery): Promise<GifPage>;
   };
   /** "Lembrar": one-off reminders in conversations (also routines in Rotinas). */
   reminders?: {

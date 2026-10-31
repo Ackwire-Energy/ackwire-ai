@@ -1,5 +1,6 @@
 import type { ChannelEvent, ConnectIntent, DecidedBy, Message, MessageReceipts, RunStatus } from "../api/types";
 import { PLATFORM_CAP } from "../lib/limits";
+import { isMediaAfterReply } from "../lib/media";
 import { NO_AI } from "../lib/no-ai";
 import type { RunSteeredEvent } from "./streams";
 
@@ -320,7 +321,14 @@ export function applyReceiptEvent(
       return setForRun(state, event.question.runId, event.threadId, event.question.agentId, "claimed", true);
     case "message.created": {
       const m = event.message;
-      if (m?.author?.type === "agent" && m.author.id && m.threadId && !m.meta?.approvalId) {
+      // An agent's sticker after its reply (ADR 0091) answers nobody: a newer message's receipt stays.
+      if (
+        m?.author?.type === "agent" &&
+        m.author.id &&
+        m.threadId &&
+        !m.meta?.approvalId &&
+        !isMediaAfterReply(m.meta)
+      ) {
         return setForRun(state, m.agentRunId, m.threadId, m.author.id, "handled");
       }
       return state;

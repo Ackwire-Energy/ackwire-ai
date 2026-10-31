@@ -18,6 +18,7 @@ import { WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { restrictionLine } from "@agenteschat/client/lib/errors";
 import { daysBetween, formatShortDate, formatTime, namesText, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
+import { mediaKindOf, mediaWord, messageMediaOf, textOrMedia } from "@agenteschat/client/lib/media";
 import {
   allItems,
   askersOf,
@@ -488,9 +489,9 @@ function ThreadReplies({ n, dir, mine }: { n: AppNotification; dir: Dir; mine: s
   const { org } = useOrg();
   const thread = useThreadMessages(org.id, channelOf(n) ?? undefined, n.source.threadId ?? "");
   if (thread.isPending) return <LoadingCards count={1} className="nt-reps" />;
-  // Replies with words (cards like an approval or a question have none of their own).
+  // Replies with words or a GIF or a sticker (cards like an approval or a question have none of their own).
   const replies = (thread.data ?? [])
-    .filter((m) => m.id !== n.source.threadId && !m.local && m.body.trim())
+    .filter((m) => m.id !== n.source.threadId && !m.local && (m.body.trim() || messageMediaOf(m.meta)))
     .slice(-n.count);
   return (
     <div className="nt-reps">
@@ -505,7 +506,7 @@ function ThreadReplies({ n, dir, mine }: { n: AppNotification; dir: Dir; mine: s
                 <small>{whenText(t, i18n.language, m.createdAt)}</small>
               </div>
               <p>
-                <Snippet text={m.body} mine={mine} />
+                <Snippet text={textOrMedia(t, m.body, m.meta)} mine={mine} />
               </p>
             </div>
           </div>
@@ -679,11 +680,13 @@ function Row({
   // run what went wrong (never the server's English).
   const why = routineNotificationWords(n);
   const restriction = restrictionOf(n);
+  // A GIF or a sticker has no words: its word stands for it (ADR 0091).
+  const media = mediaKindOf(l.media);
   const text = restriction
     ? restrictionLine(t, restriction.code, restriction.facts)
     : why
       ? sayWords(t, why, l.text ?? "")
-      : l.text;
+      : l.text || (media ? mediaWord(t, media) : l.text);
   const stopStep = steps ? (steps.failedAt ?? steps.done + 1) : 0;
   const stepWords = steps
     ? failed

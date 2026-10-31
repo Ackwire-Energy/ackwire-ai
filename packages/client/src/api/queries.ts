@@ -15,6 +15,7 @@ import { newerSetup } from "../lib/computer";
 import { CONSULT_CONVERSATION_POLL_MS, CONSULT_GROUP_POLL_MS } from "../lib/consult-group";
 import { sendWaits } from "../lib/errors";
 import { LoginReadError, loginReadPasses } from "../lib/machines";
+import { GIF_PAGE, messageMediaOf, postedMedia } from "../lib/media";
 import {
   allItems,
   matchesFilter,
@@ -71,6 +72,7 @@ import type {
   ForumSuggestionOverrides,
   ForumTopicDetail,
   ForumTopicInput,
+  GifCategory,
   IssueColumn,
   IssueInput,
   IssuePatch,
@@ -905,12 +907,13 @@ export const newClientId = () =>
     : `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 
 /**
- * What `chat.post` gets for a message of mine: the quoted message and the files by id, from which the server
- * builds the real meta (it checks them).
+ * What `chat.post` gets for a message of mine: the quoted message, the files by id and a GIF or a sticker by what
+ * names it (ADR 0091), from which the server builds the real meta (it checks them).
  */
 function postBody({ body, clientId, threadId, meta, steer }: PostInput) {
   const replyTo = replyOf(meta)?.messageId;
   const attachments = artifactRefs(meta).map((r) => r.id);
+  const media = messageMediaOf(meta);
   return {
     body,
     clientId,
@@ -919,6 +922,7 @@ function postBody({ body, clientId, threadId, meta, steer }: PostInput) {
     ...(attachments.length > 0 ? { attachments } : {}),
     ...(threadId && meta?.[OPEN_THREAD] === true ? { openThread: true } : {}),
     ...(steer ? { steer } : {}),
+    ...(media ? { media: postedMedia(media) } : {}),
   };
 }
 
@@ -1016,8 +1020,8 @@ export function usePostMessage(
 export const OPEN_THREAD = "openThread";
 
 /**
- * A message to post. `meta` is the optimistic copy's (`replyTo`, `artifacts`): only the quoted
- * message id and the file ids go to the server, which writes the real meta.
+ * A message to post. `meta` is the optimistic copy's (`replyTo`, `artifacts`, `media`): only the quoted
+ * message id, the file ids and what names a GIF or a sticker go to the server, which writes the real meta.
  */
 interface PostInput {
   body: string;
@@ -1456,6 +1460,8 @@ export function useUpdateSettings(orgId: string) {
       // The default agent budget moves every percentage that follows it.
       void qc.invalidateQueries({ queryKey: keys.usageReport(orgId) });
       void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+      // A new GIF rating (or GIFs back on) changes what every search finds (ADR 0091).
+      void qc.invalidateQueries({ queryKey: keys.gifs(orgId) });
       void qc.invalidateQueries({
         predicate: (q) => q.queryKey[0] === "org" && q.queryKey[1] === orgId && q.queryKey[4] === "detail",
       });
@@ -3439,7 +3445,7 @@ export function useNotificationReply(orgId: string) {
 // ── Phone app: read state, pins, following, working now, reminders ─────────────
 
 /** The optional parts of the client (`ApiClient.pins`…): throws when this client lacks one. */
-function part<K extends "pins" | "threadFollows" | "working" | "reminders" | "actions" | "agentForYou">(
+function part<K extends "pins" | "threadFollows" | "working" | "reminders" | "actions" | "agentForYou" | "gifs">(
   api: ApiClient,
   name: K,
 ): NonNullable<ApiClient[K]> {
@@ -3554,6 +3560,41 @@ export function useReminderAction(orgId: string) {
       void qc.invalidateQueries({ queryKey: keys.reminders(orgId) });
       void qc.invalidateQueries({ queryKey: keys.routines(orgId) });
     },
+  });
+}
+
+// ── GIFs (ADR 0091) ─────────────────────────────────────────────────────────
+
+/**
+ * The picker's GIF search, a page at a time (`fetchNextPage` while `hasNextPage`): free text, a category, or
+ * neither (what is trending), in the person's language (`lang`, two letters). Off while `enabled` is false or this
+ * client has no GIF search. A search is kept a few minutes: going back to a chip shows it at once.
+ */
+export function useGifSearch(
+  orgId: string,
+  search: { q: string; category: GifCategory | null; lang: string },
+  enabled = true,
+) {
+  const api = useApi();
+  const q = search.q.trim();
+  // Free text wins: a chip only searches with an empty box.
+  const category = q ? null : search.category;
+  return useInfiniteQuery({
+    queryKey: keys.gifSearch(orgId, q, category, search.lang),
+    queryFn: ({ pageParam }) =>
+      part(api, "gifs").search(orgId, {
+        ...(q ? { q } : {}),
+        ...(category ? { category } : {}),
+        offset: pageParam,
+        limit: GIF_PAGE,
+        lang: search.lang,
+      }),
+    initialPageParam: 0,
+    getNextPageParam: (page) => page.next ?? undefined,
+    enabled: enabled && Boolean(api.gifs),
+    staleTime: 5 * 60_000,
+    // The words already on screen stay while the next search loads (no flash of the empty state).
+    placeholderData: (prev) => prev,
   });
 }
 
