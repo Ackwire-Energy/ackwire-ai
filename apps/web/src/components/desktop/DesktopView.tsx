@@ -1,4 +1,4 @@
-import type { DesktopViewState, Edition, Machine } from "@agenteschat/client";
+import type { DesktopMode, DesktopViewState, Edition, Machine } from "@agenteschat/client";
 import {
   ApiError,
   DESKTOP_CLOSE,
@@ -26,6 +26,7 @@ import { CantShowCover, ScreenNotice } from "../computer/covers";
 import { DialogHead, FullButton, useDialogHead, useHandBack, useSayFailed } from "../computer/head";
 import { useOrg } from "../org-context";
 import { colorOf } from "../Sky";
+import { DesktopLink } from "./link";
 import { useScreenKeys } from "./screen-keys";
 import "../browser/browser.css";
 import "./desktop.css";
@@ -47,6 +48,8 @@ const PICTURE_WAIT_MS = 10_000;
  * its connection opens, so the picture must never look ready meanwhile.
  */
 const HOLD_MS = 3_000;
+/** A stream that changes mode in place and hasn't this long after the mode changed opens again in the new one. */
+const SWITCH_WAIT_MS = 3_000;
 
 /** A phone or tablet: a Keyboard button raises its keyboard. */
 const TOUCH = "(pointer: coarse)";
@@ -123,6 +126,11 @@ export function DesktopView({
   const modeNow = useRef(mode);
   modeNow.current = mode;
   const inControl = mode === "control";
+  // The screen's socket, and the mode it opened in.
+  const linkRef = useRef<DesktopLink | null>(null);
+  const openedIn = useRef(mode);
+  // The mode of noVNC's session now, which the server's switch changes.
+  const [screenMode, setScreenMode] = useState<DesktopMode | null>(null);
   const connect = blocked === null && !gaveUp;
   const { refetch } = status;
   const didntWork = () => sayFailed(t("browser.live.actionFailed"));
@@ -165,6 +173,19 @@ export function DesktopView({
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs when what blocks it changes
   useEffect(() => setGaveUp(false), [blocked]);
 
+  // A socket opens in the mode of the moment. When the mode changes, one whose stream changes mode in place (its
+  // first frame said so) stays: the server switches it, and noVNC starts again on it (ADR 0058 §17). Any other opens
+  // again in the new mode, and so does one the server didn't switch in time.
+  useEffect(() => {
+    const link = linkRef.current;
+    if (link && !link.mode && openedIn.current !== mode) setRound((r) => r + 1);
+  }, [mode]);
+  useEffect(() => {
+    if (!connect || !linkRef.current?.mode || screenMode === null || screenMode === mode) return;
+    const late = setTimeout(() => setRound((r) => r + 1), SWITCH_WAIT_MS);
+    return () => clearTimeout(late);
+  }, [connect, mode, screenMode]);
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new `round` opens the screen again
   useEffect(() => {
     const el = screenRef.current;
@@ -177,32 +198,34 @@ export function DesktopView({
     // While it retries, the cover keeps saying why; a picture held over a hand back stays live, and over control
     // opening it stays under "Assumindo o controle…"; anything else is a fresh start.
     const holding = heldPicture(el) !== null;
-    setTaking(holding && inControl);
+    setTaking(holding && modeNow.current === "control");
     setView((v) => (holding || v === "offline" || v === "busy" || v === "paused" || v === "held" ? v : "connecting"));
     let cancelled = false;
     let closed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let looking: ReturnType<typeof setInterval> | undefined;
-    const stale =
-      holding && !inControl
-        ? setTimeout(() => {
-            heldPicture(el)?.remove();
-            setView("connecting");
-          }, HOLD_MS)
-        : undefined;
-    let ws: WebSocket | null = null;
+    const goneStale = () =>
+      setTimeout(() => {
+        heldPicture(el)?.remove();
+        setView("connecting");
+      }, HOLD_MS);
+    let stale = holding && modeNow.current !== "control" ? goneStale() : undefined;
+    let link: DesktopLink | null = null;
     let rfb: RFB | null = null;
+    let session: DesktopMode = modeNow.current;
     void import("@novnc/novnc").then(
       ({ default: Rfb }) => {
         if (cancelled) return;
-        // The socket opens only once noVNC can take it in the same tick: the computer speaks first, and bytes
-        // that reach a socket before noVNC listens are lost, leaving both sides waiting until the computer gives up.
+        // The mode of the moment, which may have changed while noVNC loaded.
+        const opening = modeNow.current;
         const socket = createSocket(
-          desktopSocketUrl(window.location, { orgId: org.id, agentId, mode }),
+          desktopSocketUrl(window.location, { orgId: org.id, agentId, mode: opening, switches: true }),
         ) as unknown as WebSocket;
-        ws = socket;
-        socket.binaryType = "arraybuffer";
-        // noVNC takes the socket's `on*` handlers: the close code comes through a listener of our own.
+        const opened = new DesktopLink(socket);
+        link = opened;
+        linkRef.current = opened;
+        openedIn.current = opening;
+        // noVNC takes its channel's `on*` handlers: the close code comes through a listener of our own.
         socket.addEventListener("close", (e: CloseEvent) => {
           closed = true;
           clearInterval(looking);
@@ -225,37 +248,60 @@ export function DesktopView({
           attempts.current++;
           timer = setTimeout(() => setRound((r) => r + 1), delay);
         });
-        rfb = new Rfb(el, socket, { shared: true });
-        rfb.viewOnly = !inControl;
-        // In control, a screen that draws no pointer of its own shows noVNC's dot, never none (watching, desktop.css).
-        rfb.showDotCursor = inControl;
-        rfb.qualityLevel = inControl ? 6 : 3;
-        rfb.compressionLevel = 2;
-        rfb.scaleViewport = true;
-        rfb.resizeSession = false;
-        // The person's keys go to the field over the screen (`useScreenKeys`), never to noVNC's canvas.
-        rfb.focusOnClick = false;
-        rfb.background = "transparent";
-        rfb.addEventListener("connect", () => {
-          attempts.current = 0;
-          // Taking control puts the person's keys on the screen at once (a phone's keyboard waits for its button).
-          if (inControl && !matchesNow(TOUCH)) keysRef.current?.focus({ preventScroll: true });
-          const since = Date.now();
-          const look = () => {
-            const canvas = liveCanvas(el);
-            if (canvas && !showsPicture(canvas) && Date.now() - since < PICTURE_WAIT_MS) return;
+        /** noVNC on the socket's next session, in `m`. */
+        const start = (m: DesktopMode) => {
+          const control = m === "control";
+          session = m;
+          setScreenMode(m);
+          const next = new Rfb(el, opened.channel(), { shared: true });
+          next.viewOnly = !control;
+          // In control, a screen that draws no pointer of its own shows noVNC's dot, never none (watching, desktop.css).
+          next.showDotCursor = control;
+          next.qualityLevel = control ? 6 : 3;
+          next.compressionLevel = 2;
+          next.scaleViewport = true;
+          next.resizeSession = false;
+          // The person's keys go to the field over the screen (`useScreenKeys`), never to noVNC's canvas.
+          next.focusOnClick = false;
+          next.background = "transparent";
+          next.addEventListener("connect", () => {
+            attempts.current = 0;
+            // Taking control puts the person's keys on the screen at once (a phone's keyboard waits for its button).
+            if (control && !matchesNow(TOUCH)) keysRef.current?.focus({ preventScroll: true });
+            const since = Date.now();
+            const look = () => {
+              const canvas = liveCanvas(el);
+              if (canvas && !showsPicture(canvas) && Date.now() - since < PICTURE_WAIT_MS) return;
+              clearInterval(looking);
+              clearTimeout(stale);
+              heldPicture(el)?.remove();
+              if (cancelled) return;
+              setTaking(false);
+              setView("live");
+            };
             clearInterval(looking);
-            clearTimeout(stale);
-            heldPicture(el)?.remove();
-            if (cancelled) return;
-            setTaking(false);
-            setView("live");
-          };
-          looking = setInterval(look, PICTURE_POLL_MS);
-          look();
-        });
-        rfb.addEventListener("clipboard", (e) => copiedThere((e as CustomEvent<{ text: string }>).detail.text));
-        rfbRef.current = rfb;
+            looking = setInterval(look, PICTURE_POLL_MS);
+            look();
+          });
+          next.addEventListener("clipboard", (e) => copiedThere((e as CustomEvent<{ text: string }>).detail.text));
+          rfb = next;
+          rfbRef.current = next;
+        };
+        // The server switched the stream (taken, handed back): noVNC starts again on this socket over the picture it
+        // showed, as a new socket would in the new mode.
+        opened.onSwitch = (m) => {
+          clearInterval(looking);
+          clearTimeout(stale);
+          const held = holdPicture(el);
+          if (rfbRef.current === rfb) rfbRef.current = null;
+          rfb?.disconnect();
+          setTaking(held && m === "control");
+          stale = held && m !== "control" ? goneStale() : undefined;
+          if (!held) setView("connecting");
+          start(m);
+          void refetch();
+        };
+        start(opening);
       },
       () => {
         if (cancelled) return;
@@ -270,12 +316,13 @@ export function DesktopView({
       clearInterval(looking);
       clearTimeout(stale);
       if (rfbRef.current === rfb) rfbRef.current = null;
+      if (linkRef.current === link) linkRef.current = null;
       if (closed) return;
       closed = true;
       // Handed back or taken: the picture stays over the connection that replaces this one.
-      if (inControl !== (modeNow.current === "control")) holdPicture(el);
+      if ((session === "control") !== (modeNow.current === "control")) holdPicture(el);
       if (rfb) rfb.disconnect();
-      else ws?.close();
+      else link?.socket.close();
     };
     // A browser that keeps the page for its Back button can keep its sockets open there for minutes: a viewer
     // nobody sees, holding the screen up and counted as watching. It goes with the page; coming back opens it again.
@@ -287,7 +334,7 @@ export function DesktopView({
       window.removeEventListener("pagehide", leave);
       end();
     };
-  }, [connect, mode, round, org.id, agentId, createSocket, refetch, inControl, copiedThere]);
+  }, [connect, round, org.id, agentId, createSocket, refetch, copiedThere]);
   useEffect(() => {
     const back = (e: PageTransitionEvent) => {
       if (e.persisted) setRound((r) => r + 1);
@@ -520,7 +567,11 @@ export function DesktopView({
             onBlur={() => setTyping(false)}
           />
         )}
-        {shown !== "live" ? cover[shown] : taking && <Cover color={color} spinner text={t("desktop.taking")} />}
+        {shown !== "live"
+          ? cover[shown]
+          : (taking || (inControl && screenMode === "watch")) && (
+              <Cover color={color} spinner text={t("desktop.taking")} />
+            )}
       </div>
       {inControl &&
         (handingBack ? (
