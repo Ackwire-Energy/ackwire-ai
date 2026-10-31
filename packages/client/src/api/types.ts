@@ -1334,10 +1334,27 @@ export interface Memory {
 
 export type ProposalStatus = "pending" | "accepted" | "refused";
 
+/** An app a proposal turns on or off for an agent, as `request_permission` names it (`label` in English). */
+export interface ProposalAccessLine {
+  /** A built-in scope (`browser:use`) or `connector:<connectionId>`. */
+  id: string;
+  label: string;
+  on: boolean;
+}
+
 export interface Proposal {
   id: string;
+  /** The agent it changes; empty for the org context. */
   agentId: string;
-  target: { type: "agent_instructions"; agentId: string } | { type: "org_context" };
+  /** The agent that proposed it (older servers leave it out: `agentId`). */
+  proposedByAgentId?: string;
+  target:
+    | { type: "agent_instructions"; agentId: string }
+    | { type: "org_context" }
+    | { type: "agent_role"; agentId: string }
+    | { type: "agent_access"; agentId: string };
+  /** `agent_access`: each app turned on or off. */
+  access?: ProposalAccessLine[] | null;
   title: string;
   why: string;
   /** `type` names the source for translation; `where` is the server's English text. */
@@ -1347,14 +1364,15 @@ export interface Proposal {
     channelId?: string | null;
     type?: "outcome" | "human" | "agent" | "self";
   }[];
+  /** `agent_role`: the role then and the one proposed; `agent_access`: both empty. */
   before: string;
   after: string;
   status: ProposalStatus;
-  /** The text changed since it was proposed: it can no longer be accepted. */
+  /** What it was made against changed since (or its agent left): it can no longer be accepted. */
   stale: boolean;
-  /** You are the agent's owner or an admin (org context: admins). */
+  /** You may make this change on the agent's page (the org context: you review memory). */
   canDecide: boolean;
-  /** Who can decide: the agent's owner for instructions, admins for the org context. */
+  /** Who decides besides admins: the agent's owner, for its instructions and for access it only takes away. */
   decider: { type: "user"; userId: string; name: string } | { type: "admins" };
   createdAt: string;
   decidedBy: { userId: string; name: string } | null;
@@ -1857,8 +1875,10 @@ export interface MemoryUpdate {
   requestedByUserId: string;
   /** Undo: `POST …/memories/{itemId}/revert`. Absent for proposals. */
   undo?: { method: "POST"; path: string };
-  /** For `proposed`: the proposal to decide inline. */
+  /** For `proposed`: the proposal to decide inline (a card of several: the first). */
   proposalId?: string;
+  /** For `proposed`: every proposal on the card, one per agent and kind of change. */
+  proposalIds?: string[];
   canDecide?: boolean;
 }
 

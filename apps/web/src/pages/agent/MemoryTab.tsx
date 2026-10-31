@@ -1,6 +1,7 @@
 import type { Proposal } from "@agenteschat/client";
 import { ApiError, keys, useDecideProposal, useMemory, useProposals } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { proposalTitle } from "@agenteschat/client/lib/proposals";
 import {
   Alert,
   Button,
@@ -25,7 +26,6 @@ import { LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
 import { filterMemories, KIND_ICON, type MemoryTab as Kind, memorySource, usageLabel } from "@/pages/MemoryPage";
-import { proposalTitle } from "@/pages/ProposalsPage";
 import { CardHead, useAgentEdit } from "./context";
 import { Cell } from "./Work";
 

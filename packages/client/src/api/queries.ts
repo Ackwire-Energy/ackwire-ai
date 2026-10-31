@@ -2082,6 +2082,23 @@ export const useProposals = (orgId: string) => {
   return useQuery({ queryKey: keys.proposals(orgId), queryFn: () => api.proposals.list(orgId) });
 };
 
+/**
+ * A proposal card's rows, in the card's order. A card that names rows the cached list doesn't have (they were just
+ * proposed) reads the list again once, as a list kept fresh for a while wouldn't.
+ */
+export function useCardProposals(orgId: string, ids: string[]) {
+  const query = useProposals(orgId);
+  const rows = (query.data ?? [])
+    .filter((p) => ids.includes(p.id))
+    .sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+  const missing = query.isSuccess && rows.length < ids.length;
+  const { refetch } = query;
+  useEffect(() => {
+    if (missing) void refetch();
+  }, [missing, refetch]);
+  return rows;
+}
+
 export function useDecideProposal(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
@@ -2091,6 +2108,30 @@ export function useDecideProposal(orgId: string) {
         ? api.proposals.accept(orgId, input.id, input.text)
         : api.proposals.refuse(orgId, input.id),
     // The page explains a stale proposal (409) itself.
+    meta: { silent: true },
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.proposals(orgId) }),
+  });
+}
+
+/**
+ * A card's rows accepted or refused at once: one request per row, so each applies on its own and a stale one
+ * never stops the rest, then one refresh. Resolves with the rows that failed and why.
+ */
+export function useDecideProposals(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { ids: string[]; decision: "accept" | "refuse" }) => {
+      const failed: { id: string; error: unknown }[] = [];
+      for (const id of input.ids) {
+        try {
+          await (input.decision === "accept" ? api.proposals.accept(orgId, id) : api.proposals.refuse(orgId, id));
+        } catch (error) {
+          failed.push({ id, error });
+        }
+      }
+      return failed;
+    },
     meta: { silent: true },
     onSettled: () => qc.invalidateQueries({ queryKey: keys.proposals(orgId) }),
   });
