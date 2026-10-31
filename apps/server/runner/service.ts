@@ -26,14 +26,26 @@ export const agentSlice = (uid: number) => `${AGENT_SLICE_PREFIX}${uid}.slice`;
  */
 export const agentCategorySlice = (uid: number, kind: ScopeKind) => `${AGENT_SLICE_PREFIX}${uid}-${kind}.slice`;
 /**
- * What every agent's slice may use, as a drop-in for the slice prefix: room
- * for a desktop, a headed Chrome and one coding CLI, and no agent can starve
- * the others or the computer.
+ * What every agent's slice may use, as a drop-in for the slice prefix (its sub-slices get it too, and the
+ * agent's slice caps their sum). Memory is a share of the computer's RAM, which systemd works out each time
+ * it loads the units (every boot and `daemon-reload`), so the limits fit any computer and follow one that
+ * grows. Above `MemoryHigh` the kernel takes back the agent's cache and slows its allocations; `MemoryMax`
+ * is the backstop where it stops a process, close above so a page that needs more fails soon instead of
+ * crawling. A headed Chrome, a desktop and a coding CLI together pass 1.5 GB, and a Chrome page whose
+ * allocation or thread start fails dies (SIGTRAP, the sad tab's "error code 5"): with a few tabs, the
+ * desktop and a CLI's tools, an agent passes 1,000 threads.
  */
-export const AGENT_SLICE_LIMITS = "[Slice]\nMemoryMax=1536M\nTasksMax=1024\nCPUQuota=200%\n";
-/** The drop-in sits next to the unit (`/etc/systemd/system`). */
+export const AGENT_SLICE_LIMITS = "[Slice]\nMemoryHigh=60%\nMemoryMax=70%\nTasksMax=4096\nCPUQuota=200%\n";
+/** All agents together (`agents.slice`): what is left (13% of the RAM, half the tasks) stays for the system, the runner and the Cloud's guard. */
+export const ALL_AGENTS_LIMITS = "[Slice]\nMemoryMax=87%\nTasksMax=50%\n";
+/** The drop-ins sit next to the unit (`/etc/systemd/system`). */
 export const agentSliceLimitsPath = (unitPath = SYSTEM_UNIT_PATH) =>
   path.join(path.dirname(unitPath), `${AGENT_SLICE_PREFIX}.slice.d`, "limits.conf");
+export const allAgentsLimitsPath = (unitPath = SYSTEM_UNIT_PATH) =>
+  path.join(path.dirname(unitPath), "agents.slice.d", "limits.conf");
+/** `agents.slice` in the cgroup tree (cgroup v2), where its counters are (`memory.events`). */
+export const AGENTS_CGROUP = "/sys/fs/cgroup/agents.slice";
+export const agentCgroup = (uid: number) => path.join(AGENTS_CGROUP, agentSlice(uid));
 
 /**
  * How the service starts the runner: this runtime (node or bun) and this
@@ -419,14 +431,19 @@ export function installSystemService(io: SystemServiceIo): number {
   const file = io.unitPath ?? SYSTEM_UNIT_PATH;
   mkdirSync(path.dirname(file), { recursive: true });
   writeFileSync(file, systemdSystemUnit(launch, io.args));
-  const limits = agentSliceLimitsPath(file);
-  mkdirSync(path.dirname(limits), { recursive: true });
-  writeFileSync(limits, AGENT_SLICE_LIMITS);
-  // Readable by all whatever the umask (a provisioner's 077), also where an earlier one left them closed: PID 1
-  // warns at every read of a unit or drop-in that isn't. Regular files only, as PID 1 checks: a masked one is a
-  // link to /dev/null, which chmod would follow.
-  chmodSync(path.dirname(limits), 0o755);
-  for (const f of [file, limits]) if (statSync(f).isFile()) chmodSync(f, 0o644);
+  const limits: [file: string, text: string][] = [
+    [agentSliceLimitsPath(file), AGENT_SLICE_LIMITS],
+    [allAgentsLimitsPath(file), ALL_AGENTS_LIMITS],
+  ];
+  for (const [dropIn, text] of limits) {
+    mkdirSync(path.dirname(dropIn), { recursive: true });
+    writeFileSync(dropIn, text);
+    // Readable by all whatever the umask (a provisioner's 077), also where an earlier one left them closed: PID 1
+    // warns at every read of a unit or drop-in that isn't.
+    chmodSync(path.dirname(dropIn), 0o755);
+  }
+  // Regular files only, as PID 1 checks: a masked one is a link to /dev/null, which chmod would follow.
+  for (const f of [file, ...limits.map(([dropIn]) => dropIn)]) if (statSync(f).isFile()) chmodSync(f, 0o644);
   const start = io.start !== false;
   if (!(io.booted ?? systemdBooted())) {
     print(`Installed ${file}, but systemd isn't running here.`);
@@ -440,6 +457,8 @@ export function installSystemService(io: SystemServiceIo): number {
   } catch {
     // incomplete: same as not paired
   }
+  // The reload also applies the slices' new limits to the agents running now: nothing of theirs restarts (and
+  // `KillMode=process` keeps it through the runner's restart).
   const steps = [["daemon-reload"]];
   if (start && paired) steps.push(["enable", SERVICE_NAME], ["restart", SERVICE_NAME]);
   for (const args of steps) {
@@ -467,6 +486,7 @@ export function uninstallService(io: ServiceIo & { system?: boolean }): number {
     run("systemctl", ["disable", "--now", SERVICE_NAME]);
     if (existsSync(SYSTEM_UNIT_PATH)) rmSync(SYSTEM_UNIT_PATH);
     rmSync(agentSliceLimitsPath(), { force: true });
+    rmSync(allAgentsLimitsPath(), { force: true });
     run("systemctl", ["daemon-reload"]);
     print(`Removed ${SYSTEM_UNIT_PATH}.`);
     return 0;

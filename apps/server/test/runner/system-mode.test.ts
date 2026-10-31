@@ -27,8 +27,12 @@ import {
 } from "../../runner/install-script";
 import {
   AGENT_SLICE_LIMITS,
+  AGENTS_CGROUP,
+  ALL_AGENTS_LIMITS,
+  agentCgroup,
   agentSlice,
   agentSliceLimitsPath,
+  allAgentsLimitsPath,
   installSystemService,
   SYSTEM_UNIT_PATH,
   systemdSystemUnit,
@@ -114,6 +118,7 @@ test.if(posix)("service install --system refuses without root and off Linux, and
   expect(installSystemService({ ...io, uid: 0, platform: "darwin" })).toBe(1);
   expect(existsSync(unitPath)).toBe(false);
   expect(existsSync(agentSliceLimitsPath(unitPath))).toBe(false);
+  expect(existsSync(allAgentsLimitsPath(unitPath))).toBe(false);
   expect(readStoredConfig(h)).toBeNull();
 });
 
@@ -142,17 +147,37 @@ test.if(posix)("service install --system: a system home, and it starts only when
     });
   };
 
+  // A computer an earlier runner set up: its installer's run writes the new limits over the old, and the reload
+  // applies them to the agents running there (systemd sets a running slice's limits again as it reloads).
+  mkdirSync(path.dirname(agentSliceLimitsPath(unitPath)), { recursive: true });
+  writeFileSync(agentSliceLimitsPath(unitPath), "[Slice]\nMemoryMax=1536M\nTasksMax=1024\nCPUQuota=200%\n");
   // install.sh's first step: before pairing, nothing starts.
   expect(install({ start: false, agentUidRange: [21000, 21099] })).toBe(0);
   expect(calls).toEqual(["systemctl daemon-reload"]);
   expect(readFileSync(unitPath, "utf8")).toBe(systemdSystemUnit(launch));
   expect(readStoredConfig(h)).toEqual({ mode: "system", agentUidRange: [21000, 21099] });
-  // Every agent's slice (agents-<uid>.slice) gets the same limits, from one drop-in for the prefix.
+  // Every agent's slice (agents-<uid>.slice) gets the same limits, from one drop-in for the prefix: shares of the
+  // computer's RAM (systemd works them out as it loads the units), pressure before the backstop, room for threads.
   expect(agentSlice(21003)).toBe("agents-21003.slice");
   expect(agentSliceLimitsPath(unitPath)).toBe(path.join(h, "systemd", "agents-.slice.d", "limits.conf"));
   expect(agentSliceLimitsPath()).toBe("/etc/systemd/system/agents-.slice.d/limits.conf");
   expect(readFileSync(agentSliceLimitsPath(unitPath), "utf8")).toBe(AGENT_SLICE_LIMITS);
-  expect(AGENT_SLICE_LIMITS.split("\n")).toEqual(["[Slice]", "MemoryMax=1536M", "TasksMax=1024", "CPUQuota=200%", ""]);
+  expect(AGENT_SLICE_LIMITS.split("\n")).toEqual([
+    "[Slice]",
+    "MemoryHigh=60%",
+    "MemoryMax=70%",
+    "TasksMax=4096",
+    "CPUQuota=200%",
+    "",
+  ]);
+  // All of them together (agents.slice) leave the rest of the computer to the system, the runner and the guard.
+  expect(allAgentsLimitsPath(unitPath)).toBe(path.join(h, "systemd", "agents.slice.d", "limits.conf"));
+  expect(allAgentsLimitsPath()).toBe("/etc/systemd/system/agents.slice.d/limits.conf");
+  expect(readFileSync(allAgentsLimitsPath(unitPath), "utf8")).toBe(ALL_AGENTS_LIMITS);
+  expect(ALL_AGENTS_LIMITS.split("\n")).toEqual(["[Slice]", "MemoryMax=87%", "TasksMax=50%", ""]);
+  // Where their counters are read (memory.events).
+  expect(AGENTS_CGROUP).toBe("/sys/fs/cgroup/agents.slice");
+  expect(agentCgroup(21003)).toBe("/sys/fs/cgroup/agents.slice/agents-21003.slice");
 
   // Not connected yet: an unpaired runner would only restart in a loop.
   expect(install()).toBe(0);
@@ -210,6 +235,7 @@ test.if(posix)(
       const h = home();
       const unitPath = path.join(h, "systemd", "agentes-runner.service");
       const limits = agentSliceLimitsPath(unitPath);
+      const all = allAgentsLimitsPath(unitPath);
       // As a run under umask 077 left them: PID 1 warned at every read.
       mkdirSync(path.dirname(limits), { recursive: true, mode: 0o700 });
       writeFileSync(unitPath, "", { mode: 0o600 });
@@ -221,8 +247,16 @@ test.if(posix)(
       } finally {
         process.umask(before);
       }
-      const files = [unitPath, path.dirname(limits), limits, runnerHome, configPath(runnerHome)];
-      expect(files.map((p) => statSync(p).mode & 0o777)).toEqual([0o644, 0o755, 0o644, 0o700, 0o600]);
+      const files = [
+        unitPath,
+        path.dirname(limits),
+        limits,
+        path.dirname(all),
+        all,
+        runnerHome,
+        configPath(runnerHome),
+      ];
+      expect(files.map((p) => statSync(p).mode & 0o777)).toEqual([0o644, 0o755, 0o644, 0o755, 0o644, 0o700, 0o600]);
     }
   },
 );
@@ -231,10 +265,10 @@ test.if(posix)(
 test.if(posix && process.getuid?.() !== 0)(
   "service install --system: a unit or drop-in masked (a link to /dev/null) stays masked, /dev/null untouched",
   () => {
-    for (const dropIn of [false, true]) {
+    for (const which of [(unit: string) => unit, agentSliceLimitsPath, allAgentsLimitsPath]) {
       const h = home();
       const unitPath = path.join(h, "systemd", "agentes-runner.service");
-      const masked = dropIn ? agentSliceLimitsPath(unitPath) : unitPath;
+      const masked = which(unitPath);
       mkdirSync(path.dirname(masked), { recursive: true });
       symlinkSync("/dev/null", masked);
       expect(installNoStart(unitPath, path.join(h, "runner"))).toBe(0);
