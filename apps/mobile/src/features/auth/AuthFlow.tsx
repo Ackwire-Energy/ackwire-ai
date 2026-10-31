@@ -1,4 +1,5 @@
 import { invitationQuery, type SignInOptions, useApi, useAuthConfig } from "@agenteschat/client";
+import { INVITATION_MAIL_HEADER, INVITATION_TOKEN_HEADER } from "@agenteschat/client/lib/guards";
 import { type HumanAction, humanCheckHeaders, withHumanCheck } from "@agenteschat/client/lib/human-check";
 import { emailTypoFix, isEmail, passwordState, webmailOf } from "@agenteschat/client/lib/text";
 import { useQuery } from "@tanstack/react-query";
@@ -192,6 +193,12 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
   const signUp = async () => {
     setPending(true);
     setError(null);
+    // Opened from the invitation's own email, for this same address: it's proved, so no "confirm your email" goes and
+    // accepting confirms it (ADR 0090). A copied link has no proof, and the message goes as for anyone.
+    const proof = waiting?.mail;
+    const proved = Boolean(proof) && invitation.data?.email?.toLowerCase() === email.trim().toLowerCase();
+    const invited =
+      waiting && proof ? { [INVITATION_TOKEN_HEADER]: waiting.token, [INVITATION_MAIL_HEADER]: proof } : {};
     try {
       const refused = await withHumanCheck(human.check, async (token) =>
         refusalOf(
@@ -199,7 +206,7 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
             name: name.trim(),
             email: email.trim(),
             password,
-            fetchOptions: { headers: humanCheckHeaders(token) },
+            fetchOptions: { headers: { ...humanCheckHeaders(token), ...invited } },
           }),
         ),
       );
@@ -214,7 +221,7 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
       rememberSignIn("email");
       void writeValue(LAST_EMAIL, email.trim());
       // A server that sends email sent this address a link to confirm it: the first run says where it went.
-      if (canReset) rememberConfirmationSent(email);
+      if (canReset && !proved) rememberConfirmationSent(email);
     } catch (error) {
       thrown(error);
     } finally {

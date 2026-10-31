@@ -758,6 +758,8 @@ export const featureKeysPtBR = {
       org_standing_other: "O status do workspace mudou",
       computer_ready_one: "O computador do seu workspace está pronto",
       computer_ready_other: "O computador do seu workspace está pronto",
+      invitation_accepted_one: "{{names}} aceitou seu convite",
+      invitation_accepted_other: "{{names}} aceitaram seu convite",
     },
     markRead: "Marcar como lida",
     markUnread: "Marcar como não lida",

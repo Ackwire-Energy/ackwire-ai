@@ -32,7 +32,7 @@ Bringing someone into a workspace took too many steps and had dead ends:
 - A guessed code (ADR 0072's limits: 5 tries a code, 10 wrong a day per address) plus an admin's approval would make an account for someone else's address. The approval is the second check: admins see the address and the note before saying yes.
 - Phone builds from before this ask without a password and get ADR 0072's invitation after approval, as before; the batch still takes `emails`.
 - Links already emailed before this keep working until sent again, when they change once.
-- Someone who accepts through a copied link, or through the phone app (which doesn't pass the proof on yet), gets the usual "confirm your email" and confirms there.
+- Someone who accepts through a copied link gets the usual "confirm your email" and confirms there. Phone builds from before this pass no proof on, so the same goes for them; current ones keep it with the remembered invitation until it's accepted.
 
 ## Alternatives considered
 

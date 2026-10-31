@@ -179,7 +179,7 @@ function useAcceptPendingInvite(signedIn: boolean): boolean {
       }
       setAccepting(true);
       try {
-        const { orgId } = await api.orgs.acceptInvitation(next.accept);
+        const { orgId } = await api.orgs.acceptInvitation(next.accept, next.mail);
         await qc.invalidateQueries({ queryKey: keys.me });
         choose(orgId);
       } catch {

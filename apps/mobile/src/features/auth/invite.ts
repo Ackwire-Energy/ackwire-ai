@@ -8,8 +8,8 @@ import { afterSignIn, type InviteKind, storedInvite, storedInviteOf } from "./li
  */
 let pending: string | null = null;
 
-export function rememberInvite(token: string, kind: InviteKind) {
-  pending = storedInvite(token, kind);
+export function rememberInvite(token: string, kind: InviteKind, mail?: string) {
+  pending = storedInvite(token, kind, mail);
   void writeValue(STORED.invite, pending);
 }
 

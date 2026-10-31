@@ -85,6 +85,8 @@ export type SayWords = (w: Words, otherwise?: string) => string;
 export function subtitleOf(n: AppNotification, say: SayWords): string {
   const l = n.latest;
   if (n.kind === "reaction") return l.quote ?? "";
+  // Its title already names who joined (ADR 0090): `latest.title` would say it twice.
+  if (n.kind === "invitation_accepted") return "";
   const reason = routineNotificationWords(n);
   if (reason) return say(reason, l.text ?? "");
   if (n.kind === "approval") {

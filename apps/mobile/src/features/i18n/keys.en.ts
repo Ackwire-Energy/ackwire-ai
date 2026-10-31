@@ -752,6 +752,8 @@ export const featureKeysEn: FeatureTranslations = {
       org_standing_other: "The workspace's status changed",
       computer_ready_one: "Your workspace's computer is ready",
       computer_ready_other: "Your workspace's computer is ready",
+      invitation_accepted_one: "{{names}} accepted your invitation",
+      invitation_accepted_other: "{{names}} accepted your invitation",
     },
     markRead: "Mark as read",
     markUnread: "Mark as unread",

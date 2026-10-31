@@ -47,7 +47,7 @@ import { boldParts } from "./links";
  * "Pedir um novo convite" (the person who invited gets the request at once), or, on a server that sends no
  * email, whom to ask. A workspace's invitation link only lets people ask to join (`AskToJoin`).
  */
-export function InviteScreen({ token }: { token: string }) {
+export function InviteScreen({ token, mail }: { token: string; mail?: string }) {
   const { t } = useTranslation();
   const api = useApi();
   const qc = useQueryClient();
@@ -130,7 +130,7 @@ export function InviteScreen({ token }: { token: string }) {
     setJoining(true);
     setError(null);
     try {
-      const { orgId } = await api.orgs.acceptInvitation(token);
+      const { orgId } = await api.orgs.acceptInvitation(token, mail);
       forgetInvite();
       await qc.invalidateQueries({ queryKey: keys.me });
       gate.choose(orgId);
@@ -148,7 +148,7 @@ export function InviteScreen({ token }: { token: string }) {
 
   /** Signed out: the invitation waits, then the chosen way in. */
   const signUpWith = (path: "/sign-up" | "/sign-in") => {
-    rememberInvite(token, "email");
+    rememberInvite(token, "email", mail);
     router.push({ pathname: path, params: { email: invitation.email } });
   };
 
@@ -186,7 +186,7 @@ export function InviteScreen({ token }: { token: string }) {
               wide
               label={t("mobile.invite.otherAccount")}
               onPress={() => {
-                rememberInvite(token, "email");
+                rememberInvite(token, "email", mail);
                 void signOut();
               }}
             />
@@ -195,7 +195,7 @@ export function InviteScreen({ token }: { token: string }) {
       ) : (
         <>
           {apple.length > 0 ? (
-            <View onTouchStart={() => rememberInvite(token, "email")}>
+            <View onTouchStart={() => rememberInvite(token, "email", mail)}>
               <SocialButtons providers={apple} divider={false} onError={setError} />
             </View>
           ) : null}
