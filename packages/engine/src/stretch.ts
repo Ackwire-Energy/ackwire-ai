@@ -334,7 +334,7 @@ export async function postStretchCard(deps: { db: Database; pubsub?: PubSub }, o
       const [row] = await tx
         .update(messages)
         .set({ body: text.body, meta: { ...open.meta, ...meta } })
-        .where(and(eq(messages.orgId, orgId), eq(messages.id, open.id), eq(messages.createdAt, open.createdAt)))
+        .where(and(eq(messages.orgId, orgId), eq(messages.id, open.id)))
         .returning();
       return row ?? null;
     }
@@ -439,13 +439,7 @@ export async function continueStretch(
         await tx
           .update(messages)
           .set({ stretchId })
-          .where(
-            and(
-              eq(messages.orgId, trigger.orgId),
-              eq(messages.id, trigger.id),
-              eq(messages.createdAt, trigger.createdAt),
-            ),
-          );
+          .where(and(eq(messages.orgId, trigger.orgId), eq(messages.id, trigger.id)));
       } else runs.push(out.created);
       started.push({ agentId: h.agentId, runId: "created" in out ? out.created.id : out.joined });
     }

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { and, asc, eq, schema } from "@agenteschat/db";
+import { and, asc, eq, schema, sql } from "@agenteschat/db";
 import { type ModelRequest, systemText } from "@agenteschat/providers";
 import {
   answerNow,
@@ -113,6 +113,13 @@ const cardsOf = async (fx: Fixture) =>
   (await fx.db.select().from(schema.messages).orderBy(asc(schema.messages.createdAt))).filter((m) =>
     stretchCardOf(m.meta),
   );
+
+/** Postgres stores now() with microseconds; read back, `createdAt` is cut to milliseconds. */
+const withMicroseconds = (fx: Fixture, messageId: string) =>
+  fx.db
+    .update(schema.messages)
+    .set({ createdAt: sql`${schema.messages.createdAt} + interval '456 microseconds'` })
+    .where(eq(schema.messages.id, messageId));
 
 /** Every agent message past a person's carries its stretch: no path slips out of the count. */
 async function expectStretched(fx: Fixture) {
@@ -505,6 +512,7 @@ test("Continuar starts every wake-up the card holds, also one held there after t
   await drain(f);
   const [card] = await cardsOf(f);
   if (!card) throw new Error("no card");
+  await withMicroseconds(f, card.id);
   // Continuar reads the card, and Max's wake-up is held on it before Continuar writes.
   const read = stretchCardOf(card.meta);
   if (!read) throw new Error("no card");
@@ -550,6 +558,7 @@ test("Continuar while the agent still works there: that run writes from hop 1 in
     stop: { reason: "runs", limit: STRETCH.runs },
   });
   if (!card) throw new Error("no card");
+  await withMicroseconds(f, card.id);
   const go = await answerNow({ db: f.db, pubsub: f.pubsub, gateway: f.gateway }, f.owner.id, f.org.id, card.id);
   expect(go.runs).toEqual([{ agentId: f.agent.id, runId: working.id }]);
   const [joined] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, working.id));
