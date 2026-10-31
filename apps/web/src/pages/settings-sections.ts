@@ -64,7 +64,7 @@ export const isSettingsSection = (v: unknown): v is SettingsSection => SETTINGS_
 
 /**
  * `?connected=github` (back from OAuth), `?review=1` (a custom MCP server to
- * classify), `?mail=connected|failed` (back from Gmail/Outlook),
+ * classify), `?mail=connected|failed&account={id}` (back from Gmail/Outlook),
  * `?request={id}&do=approve|deny` (a request to join, from the admins' email) and
  * `?delete=1` (Geral's dialog that deletes the workspace).
  */
@@ -74,6 +74,7 @@ export const settingsSearch = (
   connected?: string;
   review?: string;
   mail?: string;
+  account?: string;
   request?: string;
   do?: "approve" | "deny";
   delete?: 1;
@@ -81,6 +82,7 @@ export const settingsSearch = (
   connected: typeof search.connected === "string" ? search.connected : undefined,
   review: search.review === undefined ? undefined : String(search.review),
   mail: typeof search.mail === "string" ? search.mail : undefined,
+  account: typeof search.account === "string" ? search.account : undefined,
   request: typeof search.request === "string" ? search.request : undefined,
   do: search.do === "approve" || search.do === "deny" ? search.do : undefined,
   delete: search.delete === undefined ? undefined : 1,

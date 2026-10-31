@@ -18,7 +18,7 @@ import {
 } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { inviteLinkToken, sha256 } from "./crypto";
-import { emailLocale, emailsByLocale, queueEmail } from "./email";
+import { emailCrew, emailLocale, emailsByLocale, queueEmail } from "./email";
 import {
   CODE_EMAILS,
   CODE_LIMITS,
@@ -734,6 +734,7 @@ export async function approveJoinRequest(
           orgName: context.orgName,
           approverName: context.approverName,
           role,
+          crew: await emailCrew(tx, orgId),
           url: approval.outcome === "invited" ? approval.url : `${base(publicUrl)}/org/${orgId}`,
         },
       });

@@ -244,6 +244,7 @@ export {
   STRIP_CELL,
   WorkSweep,
 } from "./components/RunPixels";
+export { AgentSearching } from "./components/SearchPixels";
 export { SearchSelect, type SearchSelectLabels, type SearchSelectProps } from "./components/SearchSelect";
 export { Segmented, type SegmentedOption, SplitButton } from "./components/Segmented";
 export { Select, type SelectOption, type SelectProps } from "./components/Select";

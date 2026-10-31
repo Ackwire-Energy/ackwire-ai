@@ -4,7 +4,7 @@ import { and, asc, type Database, type Executor, eq, inArray, isNull, schema, sq
 import { type AiStatusDeps, orgHasAi } from "./ai-status";
 import { caches } from "./cache";
 import { decodeCursor, encodeCursor } from "./cursor";
-import { type EmailLocale, emailLocale, emailsByLocale, queueEmail } from "./email";
+import { type EmailLocale, emailCrew, emailLocale, emailsByLocale, queueEmail } from "./email";
 import { ConflictError } from "./errors";
 import { publishOrgEvent } from "./events";
 import { DEVICE_CODE_TTL_MS, generateUserCode } from "./machine-device";
@@ -519,14 +519,10 @@ async function readyEmailDraft(db: Database, email: ReadyEmailDeps, orgId: strin
     .innerJoin(users, eq(users.id, organizationMembers.userId))
     .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.role, "owner")));
   if (owners.length === 0) return null;
-  const [agent] = await db
-    .select({ id: agents.id })
-    .from(agents)
-    .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))
-    .limit(1);
+  const crew = await emailCrew(db, orgId);
   // Not known now: the step that connects an AI stays in, rather than the computer's ready going unsaid.
   const hasAi = await orgHasAi({ db, gateway: email.gateway, machines: email.machines }, orgId).catch(() => false);
-  return { org, owners, hasAgents: Boolean(agent), needsAi: !hasAi, publicUrl: email.publicUrl };
+  return { org, owners, crew, needsAi: !hasAi, publicUrl: email.publicUrl };
 }
 
 /**
@@ -558,7 +554,8 @@ async function queueReadyEmail(
         orgName: draft.org.name,
         specs: row.specs ?? null,
         needsAi: draft.needsAi,
-        hasAgents: draft.hasAgents,
+        hasAgents: draft.crew.length > 0,
+        crew: draft.crew,
         url: `${draft.publicUrl.replace(/\/$/, "")}/org/${row.orgId}`,
       },
     });

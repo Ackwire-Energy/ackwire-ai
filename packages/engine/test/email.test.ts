@@ -1,16 +1,18 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { createFakeEmailSender, EmailError } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
   createJobHandlers,
   defaultEmailFrom,
   drainOutbox,
+  EMAIL_PICTURES,
   type EmailArt,
   type EmailTemplate,
   emailArtAt,
   emailArtFor,
+  emailCrew,
   grantScopes,
   postPersonMessage,
   queueApprovalDigests,
@@ -413,7 +415,162 @@ describe("the computer ready email's button: its first step", () => {
   });
 });
 
+describe("the picture over the headline", () => {
+  const ready = EMAIL_SAMPLES["computer_ready-ai.en"] as Extract<EmailTemplate, { kind: "computer_ready" }>;
+  // The onboarding's own (`PRESET_LOOK` in the web and phone apps).
+  const theo = { color: "indigo", eyes: "round", accessory: "cap" };
+  const ada = { color: "green", eyes: "wide", accessory: "headphones" };
+  const lia = { color: "rose", eyes: "dots", accessory: "flower" };
+  const atlas = { color: "amber", eyes: "round", accessory: "antenna" };
+  const ONBOARDING = [
+    "agent-indigo-round-cap.png 36×46",
+    "agent-green-wide-headphones.png 36×46",
+    "agent-rose-dots-flower.png 36×46",
+    "agent-amber-round-antenna.png 36×46",
+  ];
+  const plain = (...colors: string[]) => colors.map((color) => ({ color, eyes: "round", accessory: "none" }));
+  /** The pictures between the card's top and the headline, in order: file, size and alt text. */
+  const scene = (t: EmailTemplate) => {
+    const { html } = renderEmail(t, art);
+    const top = html.slice(html.indexOf('<td class="card"'), html.indexOf("<h1 "));
+    return [
+      ...top.matchAll(/<img src="https:\/\/x\.test\/email\/([^"]+)" width="(\d+)" height="(\d+)" alt="([^"]*)"/g),
+    ].map(([, file, width, height, alt = ""]) => `${file} ${width}×${height} ${alt.replaceAll("&#39;", "'")}`.trim());
+  };
+  const faces = (...colors: string[]) => colors.map((c) => `agent-${c}.png 32×32`);
+  const shown = (crew: typeof ready.crew) => scene({ ...ready, crew }).filter((p) => p.startsWith("agent-"));
+
+  test("the computer ready email: its computer in a well, the workspace's agents half on each side, oldest first", () => {
+    const [teal, sky, computer, violet] = scene({ ...ready, crew: plain("teal", "sky", "violet") });
+    expect([teal, sky, violet]).toEqual(faces("teal", "sky", "violet"));
+    expect(computer).toBe("computer.png 62×84 Your agents' computer");
+    expect(scene({ ...ready, locale: "pt-BR" })).toContain("computer.png 62×84 O computador dos seus agentes");
+    const { html } = renderEmail({ ...ready, crew: plain("teal") }, art);
+    expect(html).toContain('<td width="50%" align="right" valign="bottom"><table');
+    expect(html).toContain('<td width="50%" align="left" valign="bottom"></td>');
+    expect(html.indexOf('class="well"')).toBeLessThan(html.indexOf("<h1 "));
+  });
+
+  test("at most four agents; none, or a job queued before pictures: the onboarding's own; an unknown colour is sky", () => {
+    expect(shown(plain("sky", "teal", "rose", "green", "amber", "violet"))).toEqual(
+      faces("sky", "teal", "rose", "green"),
+    );
+    expect(shown([])).toEqual(ONBOARDING);
+    expect(shown(undefined)).toEqual(ONBOARDING);
+    expect(shown([{ color: "mauve" }, {}])).toEqual(faces("sky", "sky"));
+  });
+
+  test("an onboarding agent's look is drawn whole, eyes and accessory; any other look is its colour's face", () => {
+    expect(shown([theo, ada, lia, atlas])).toEqual(ONBOARDING);
+    // Eyes left out are round, as the app draws them.
+    expect(shown([{ color: "indigo", accessory: "cap" }, { ...ada, eyes: "round" }, ...plain("rose")])).toEqual([
+      "agent-indigo-round-cap.png 36×46",
+      ...faces("green", "rose"),
+    ]);
+    // A whole look's room for its accessory comes out of the gap after it: the bodies keep their spacing.
+    const stage = renderEmail({ ...ready, crew: [theo, ...plain("indigo")] }, art).html;
+    expect(stage).toContain(
+      '<td valign="bottom" style="padding:0 0px 2px 4px"><img src="https://x.test/email/agent-indigo-round-cap.png" width="36" height="46"',
+    );
+    expect(stage).toContain(
+      '<td valign="bottom" style="padding:0 4px 2px 4px"><img src="https://x.test/email/agent-indigo.png" width="32" height="32"',
+    );
+    const invitation = EMAIL_SAMPLES["invitation.en"] as Extract<EmailTemplate, { kind: "invitation" }>;
+    const row = renderEmail({ ...invitation, crew: [lia] }, art).html;
+    expect(row).toContain(
+      '<td valign="bottom" style="padding:0 4px 0px 0px"><img src="https://x.test/email/agent-rose-dots-flower.png"',
+    );
+  });
+
+  test("the welcome emails show the workspace's agents in a row, with no computer; the others show none", () => {
+    const withCrew: Record<string, string[]> = {
+      "invitation.en": faces("sky", "violet", "teal"),
+      "invitation.pt-BR": ONBOARDING,
+      "early_access.en": ONBOARDING,
+      "early_access_allowed.en": ONBOARDING,
+      "join_answer-joined.en": [...faces("graphite"), "agent-rose-dots-flower.png 36×46"],
+      "join_answer-invited.en": ONBOARDING,
+    };
+    for (const [id, sample] of Object.entries(EMAIL_SAMPLES)) {
+      const expected = id.startsWith("computer_ready")
+        ? expect.arrayContaining([expect.stringMatching(/^computer\.png/)])
+        : (withCrew[id] ?? (id.startsWith("early_access") ? ONBOARDING : []));
+      expect({ id, pictures: scene(sample) }).toEqual({ id, pictures: expected });
+    }
+    // A row on the card itself; only the computer stands in a well.
+    const top = (id: string) => {
+      const { html } = renderEmail(EMAIL_SAMPLES[id] as EmailTemplate, art);
+      return html.slice(html.indexOf('<td class="card"'), html.indexOf("<h1 "));
+    };
+    expect(top("invitation.en")).not.toContain('class="well"');
+    expect(top("computer_ready-ai.en")).toContain('class="well"');
+  });
+
+  test("the plain-text part is the same words, with no picture in it", () => {
+    const { text } = renderEmail(ready, art);
+    expect(text.startsWith("Your agents' computer is ready\n\n")).toBe(true);
+    expect(text).not.toContain(".png");
+  });
+
+  test("a picture's agents are the workspace's oldest four, each with its look, the archived left out", async () => {
+    f = await setup();
+    const at = (minute: number) => new Date(Date.UTC(2026, 9, 1, 12, minute));
+    // The fixture's agent has no look: its face is sky.
+    await f.db
+      .update(schema.agents)
+      .set({ createdAt: at(5) })
+      .where(eq(schema.agents.id, f.agent.id));
+    const agent = (name: string, minute: number, appearance: typeof theo, archived = false) => ({
+      orgId: f.org.id,
+      name,
+      handle: name.toLowerCase(),
+      model: "claude-sonnet-5-5",
+      appearance,
+      createdAt: at(minute),
+      archivedAt: archived ? at(30) : null,
+    });
+    await f.db
+      .insert(schema.agents)
+      .values([
+        agent("Lia", 3, lia),
+        agent("Theo", 1, theo),
+        agent("Gone", 0, atlas, true),
+        agent("Ada", 2, ada),
+        agent("Atlas", 9, atlas),
+      ]);
+    expect(await emailCrew(f.db, f.org.id)).toEqual([theo, ada, lia, {}]);
+  });
+});
+
 describe("where the pictures come from", () => {
+  test("every picture an email names is listed, and the web app has each one", () => {
+    expect(EMAIL_PICTURES).toContain("computer.png");
+    for (const file of EMAIL_PICTURES)
+      expect({ file, there: existsSync(join(WEB_DIR, "email", file)) }).toEqual({ file, there: true });
+    for (const sample of Object.values(EMAIL_SAMPLES))
+      for (const [, file = ""] of renderEmail(sample, art).html.matchAll(/src="https:\/\/x\.test\/email\/([^"]+)"/g))
+        expect(EMAIL_PICTURES).toContain(file);
+  });
+
+  test("attached: the computer ready email carries its computer and each face it shows once", async () => {
+    const attached = await emailArtFor("http://localhost:3000", WEB_DIR, "auto");
+    const ready = EMAIL_SAMPLES["computer_ready-ai.en"] as Extract<EmailTemplate, { kind: "computer_ready" }>;
+    const lia = { color: "rose", eyes: "dots", accessory: "flower" };
+    const teal = { color: "teal", eyes: "round", accessory: "none" };
+    const { html, inline } = renderEmail({ ...ready, crew: [lia, lia, teal, { color: "rose" }] }, attached);
+    expect(html).toContain('src="cid:computer@agentes.chat"');
+    expect(html).toContain('src="cid:agent-rose-dots-flower@agentes.chat"');
+    expect(inline.map((p) => p.filename)).toEqual([
+      "logo-ink.png",
+      "logo-bone.png",
+      "computer.png",
+      "sky-band.png",
+      "agent-rose.png",
+      "agent-teal.png",
+      "agent-rose-dots-flower.png",
+    ]);
+  });
+
   test("linked from this server's /email/, with the web font", () => {
     const { html, inline } = renderEmail(EMAIL_SAMPLES["verify_email.en"] as EmailTemplate, art);
     expect(html).toContain('src="https://x.test/email/logo-ink.png"');
@@ -641,7 +798,8 @@ describe("outbox delivery", () => {
       inviterId: f.owner.id,
     });
     const [job] = (await f.db.select().from(schema.outbox)).filter((j) => j.kind === "email.send");
-    expect(job?.payload).toMatchObject({ template: { kind: "invitation", inviterEmail } });
+    // The workspace's agents for its picture: the fixture's one, with no look (its face is sky).
+    expect(job?.payload).toMatchObject({ template: { kind: "invitation", inviterEmail, crew: [{}] } });
     const payload = job?.payload as { template: EmailTemplate } | undefined;
     const text = payload ? renderEmail(payload.template, art).text : "";
     expect(text).toContain(`(${inviterEmail.replace(/([.@])/g, `$1${BREAK}`)}) convidou você para entrar na`);

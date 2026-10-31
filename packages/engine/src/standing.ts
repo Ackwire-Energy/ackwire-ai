@@ -1,5 +1,6 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, ne, schema, sql } from "@agenteschat/db";
+import { en } from "@agenteschat/i18n/en";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { ForbiddenError } from "./errors";
@@ -109,11 +110,25 @@ const AGENT_PAUSED = "This agent is paused for now.";
 /** On agentes.chat Cloud, followed by the hold's kind: a run keeps it in its error, so its line names the kind. */
 const AGENT_HELD = "This agent is paused: ";
 
+const FLAGGED = "automated checks flagged activity that seems to involve ";
+/**
+ * On agentes.chat Cloud, what its automatic hold flagged (`review.<category>`) in the apps' English words
+ * (`standing.cloud.reviewWhat`), in the standing's text, which people read in an error's message and in a computer's
+ * refused call. A run keeps the words in its error, and `standingErrorDetail` reads the reason back from them.
+ */
+const REVIEW_FLAGGED = new Map<string, string>(
+  Object.entries(en.standing.cloud.reviewWhat).map(([category, what]) => [`review.${category}`, `${FLAGGED}${what}`]),
+);
+
+/** The told reason in a standing's text: back from the words of `REVIEW_FLAGGED`, else as it was written. */
+const reasonIn = (said: string) => [...REVIEW_FLAGGED].find(([, words]) => words === said)?.[0] ?? said;
+
 /** What the workspace reads when work is refused; silent, only that it is paused. */
 export function standingText(s: Pick<OrgStanding, "state" | "reason" | "notice">): string {
   const reason = toldReason(s);
-  if (s.state === "suspended") return reason ? `${SUSPENDED}${reason}` : UNAVAILABLE;
-  return reason ? `${ON_HOLD}${reason}` : PAUSED;
+  const said = reason && ((cloudNotices && REVIEW_FLAGGED.get(reason)) || reason);
+  if (s.state === "suspended") return said ? `${SUSPENDED}${said}` : UNAVAILABLE;
+  return said ? `${ON_HOLD}${said}` : PAUSED;
 }
 
 /**
@@ -131,8 +146,9 @@ export function standingErrorDetail(error: string): { errorCode: string; errorPa
   if (error === DELETING) return { errorCode: "run.org_deleting" };
   if (error === PAUSED) return told("run.org_paused");
   if (error === UNAVAILABLE) return told("run.org_suspended");
-  if (error.startsWith(ON_HOLD)) return told("run.org_paused", { reason: error.slice(ON_HOLD.length) });
-  if (error.startsWith(SUSPENDED)) return told("run.org_suspended", { reason: error.slice(SUSPENDED.length) });
+  if (error.startsWith(ON_HOLD)) return told("run.org_paused", { reason: reasonIn(error.slice(ON_HOLD.length)) });
+  if (error.startsWith(SUSPENDED))
+    return told("run.org_suspended", { reason: reasonIn(error.slice(SUSPENDED.length)) });
   return null;
 }
 

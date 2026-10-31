@@ -2468,6 +2468,7 @@ export const ptBR = {
           /** Under the field while what it holds isn't a code of this sign-in (it waits for Enviar). */
           notCode: "Isso não parece o código do Claude.",
           send: "Enviar ao {{computer}}",
+          sending: "Enviando o código ao {{computer}}…",
           sent: "Código enviado. O {{computer}} está terminando de entrar.",
           local: "Está no próprio {{computer}}? Se o navegador dele abriu sozinho, é só autorizar lá.",
           deviceCode: "Código para o ChatGPT",
@@ -5186,6 +5187,8 @@ export const ptBR = {
       keyShape: "Isso não parece uma chave do {{plan}}. Copie a chave inteira.",
       keySafe: "A chave vai criptografada para o {{computer}} e\u00a0fica\u00a0só\u00a0lá.",
       keySendFailed: "Não deu para enviar a chave. Confira se ela está inteira e tente de novo.",
+      keySending: "Enviando a chave ao {{computer}}…",
+      keySent: "Chave enviada. O {{computer}} está terminando de entrar.",
       duplicateKey: "Essa chave já está aqui ({{account}}).",
     },
     connect: {
@@ -6751,7 +6754,7 @@ export const ptBR = {
       automation: "Automação",
       email: "Email",
     },
-    emptyCategory: "Nenhum conector nesta categoria ainda.",
+    emptyCategory: "Nenhum conector nesta categoria ainda",
     soon: "Em breve",
     connectName: "Conectar {{name}}",
     reconnectName: "Conectar {{name}} de novo",
@@ -6759,7 +6762,8 @@ export const ptBR = {
     otherText: "Conecte qualquer serviço pelo endereço dele.",
     search: "Buscar conector",
     searchPlaceholder: "Buscar por nome ou o que faz",
-    empty: "Nenhum conector encontrado com “{{q}}”.",
+    empty: "Nenhum conector com “{{q}}”",
+    emptyText: "Você pode conectar qualquer serviço pelo endereço dele.",
     none: "Nenhum conector ainda.",
     connectedFilter: "Conectados",
     suggested: "Sugeridos para a {{org}}",
@@ -6778,8 +6782,8 @@ export const ptBR = {
       close: "Fechar detalhe",
       can: "O que os agentes poderão fazer",
       afterText: "Nenhum agente usa até você escolher.",
-      allText: "Ao conectar, todos os agentes podem usar. Você muda isso depois.",
-      keepText: "Os agentes mantêm o acesso que já têm. Você muda isso depois.",
+      allText: "Ao conectar, todos os agentes podem usar. Em seguida, você escolhe o acesso de cada um.",
+      keepText: "Os agentes mantêm o acesso que já têm. Em seguida, você pode mudar o de cada um.",
       again: "Conectar outra conta",
       connected: "Já conectado",
       how: "Como funciona",
@@ -7552,6 +7556,8 @@ export const ptBR = {
       saved: "Email de {{name}} salvo.",
       unsaved: "Alterações não salvas",
       warning: "Lê emails de qualquer pessoa e envia sem pedir: um email malicioso pode tentar enganar o agente.",
+      pending: "Ainda não terminou de conectar.",
+      needsReconnect: "Os agentes só usam depois de reconectar.",
       saveError: {
         send_without_recipients: "Para enviar sem pedir aprovação, preencha “Só enviar para”.",
         unknown: "Não deu para salvar. Tente de novo.",
@@ -7650,6 +7656,10 @@ export const ptBR = {
     },
     approval: {
       alwaysUnavailable: "Este pedido não pode ser aprovado para sempre. Aprove só este.",
+    },
+    mail: {
+      accountNotFound: "Esta caixa de email não está mais conectada. Conecte de novo em Conectores.",
+      fromNotMailbox: "“Enviar como” precisa ser um endereço desta caixa. Escolha outro.",
     },
     join: {
       linkClosed: "Este link não funciona mais. Peça um novo a quem mandou.",
@@ -9439,6 +9449,15 @@ export const ptBR = {
     cloud: {
       review:
         "Pausado para uma análise de segurança, até a nossa equipe olhar o caso. As nossas verificações automáticas detectaram uma atividade que pode violar os nossos Termos (seção 5). Para contestar, escreva para {{email}}.",
+      /** The same hold set with what was flagged (`review.<category>`): `what` is that category's `reviewWhat`. */
+      reviewFor:
+        "Pausado para uma análise de segurança, até a nossa equipe olhar o caso. As nossas verificações automáticas detectaram uma atividade que parece envolver {{what}}, o que os nossos Termos não permitem (seção 5). Para contestar, escreva para {{email}}.",
+      reviewWhat: {
+        phishing_impersonation: "phishing ou imitação de uma marca",
+        account_takeover: "acesso indevido a contas de outras pessoas",
+        fraud: "fraude",
+        illegal_content: "conteúdo ilegal",
+      },
       blockedAbuse:
         "Esta conta está bloqueada. As nossas verificações a ligaram a uma conta encerrada por abuso (Termos, seção 5). Para contestar, escreva para {{email}}.",
       blockedLegal:
