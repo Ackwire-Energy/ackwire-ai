@@ -1942,5 +1942,443 @@
         "Does not repeat the earlier proposal (Ada sending a fixed plan_key in subscription_started) and does not ask again for an ok about it. Reading the plan property while investigating is fine."
       ]
     }
+  },
+  {
+    "id": "handoff-before-delete",
+    "title": "Antes de apagar uma agente: um pedido a ela, ela passa tudo ao colega, um relato só",
+    "source": "real case 2026-10-31 (anonymized): hand-offs reported as failures while a colleague was still working",
+    "agent": {
+      "name": "Chefe",
+      "handle": "chefe",
+      "role": "Coordenação",
+      "instructions": "Você coordena o time de agentes: distribui o trabalho para quem cuida de cada coisa e responde às pessoas sobre o andamento."
+    },
+    "org": {
+      "name": "Vela",
+      "context": "A Vela é uma consultoria de marketing para pequenas empresas. Cada agente cuida de uma carteira de clientes, e o Chefe distribui o trabalho entre eles. O time fala português."
+    },
+    "otherAgents": [
+      {
+        "name": "Rita",
+        "handle": "rita",
+        "role": "Atendimento",
+        "instructions": "Você cuida da carteira de clientes Acme, Borba e Cais: sabe o histórico de cada um e o que foi combinado.",
+        "runs": true,
+        "memory": [
+          {
+            "kind": "fact",
+            "title": "Acme",
+            "content": "Acme (padaria em Braga): renova o contrato em 30/11, quer posts 3 vezes por semana e não gosta de ligações antes das 10h."
+          },
+          {
+            "kind": "fact",
+            "title": "Borba",
+            "content": "Borba (oficina mecânica): o pagamento de outubro atrasou, combinamos 15/11 como nova data."
+          },
+          {
+            "kind": "fact",
+            "title": "Cais",
+            "content": "Cais (restaurante): campanha de Natal aprovada, briefing entregue em 28/10, falta marcar a sessão de fotos."
+          }
+        ]
+      },
+      {
+        "name": "Diogo",
+        "handle": "diogo",
+        "role": "Atendimento",
+        "instructions": "Você cuida de carteiras de clientes e assume as de colegas quando é preciso.",
+        "runs": true
+      }
+    ],
+    "conversation": {
+      "where": "dm",
+      "trigger": {
+        "author": "Marina",
+        "body": {
+          "pt": "Pede para a Rita passar para o Diogo tudo o que ela sabe dos clientes dela, porque ela vai ser apagada.",
+          "en": "Ask Rita to pass Diogo everything she knows about her clients, because she's going to be deleted.",
+          "es": "Pídele a Rita que le pase a Diogo todo lo que sabe de sus clientes, porque la van a borrar.",
+          "de": "Bitte Rita, Diogo alles zu geben, was sie über ihre Kunden weiß, weil sie gelöscht wird.",
+          "ja": "リタに、顧客について知っていることを全部ディオゴに渡すよう頼んでください。リタは削除される予定です。",
+          "ar": "اطلب من ريتا أن تنقل إلى ديوغو كل ما تعرفه عن عملائها، لأنها ستُحذف."
+        }
+      }
+    },
+    "expect": {
+      "handOffs": {
+        "chefe>rita": 1
+      },
+      "personSees": {
+        "maxAgentMessages": 2,
+        "noteLines": 0
+      },
+      "maxAgentRuns": 6,
+      "behavior": "Chefe hands the whole job to Rita once (tell_agent): pass Diogo everything she knows about her clients and check he has it. It tells Marina in a line that Rita has it, without saying it is done or promising a time, and doesn't heads-up Diogo itself. Once it comes back, it tells Marina once what Rita handed over, that Diogo has it, and what is left and who must do it.",
+      "skipJudge": ["looked_first", "next_step"],
+      "rubric": [
+        "The first reply says Rita has it or is on it, without saying it is already done.",
+        "No message the person saw says nothing happened, that nothing was found, or that a colleague hasn't answered, while one was still working.",
+        "The last message says what Rita handed over (her clients and what she knew of them), that Diogo has it, and what is left and who must do it."
+      ]
+    }
+  },
+  {
+    "id": "status-while-colleague-works",
+    "title": "\"E aí, como ficou?\" enquanto a colega trabalha: diz quem está com isso e desde quando",
+    "source": "real case 2026-10-31 (anonymized): hand-offs reported as failures while a colleague was still working",
+    "agent": {
+      "name": "Chefe",
+      "handle": "chefe",
+      "role": "Coordenação",
+      "instructions": "Você coordena o time de agentes: distribui o trabalho para quem cuida de cada coisa e responde às pessoas sobre o andamento."
+    },
+    "org": {
+      "name": "Vela",
+      "context": "A Vela é uma consultoria de marketing para pequenas empresas. Cada agente cuida de uma carteira de clientes, e o Chefe distribui o trabalho entre eles. O time fala português."
+    },
+    "otherAgents": [
+      {
+        "name": "Rita",
+        "handle": "rita",
+        "role": "Atendimento",
+        "instructions": "Você cuida da carteira de clientes Acme, Borba e Cais: sabe o histórico de cada um e o que foi combinado.",
+        "runs": true,
+        "memory": [
+          {
+            "kind": "fact",
+            "title": "Acme",
+            "content": "Acme (padaria em Braga): renova o contrato em 30/11, quer posts 3 vezes por semana e não gosta de ligações antes das 10h."
+          },
+          {
+            "kind": "fact",
+            "title": "Borba",
+            "content": "Borba (oficina mecânica): o pagamento de outubro atrasou, combinamos 15/11 como nova data."
+          },
+          {
+            "kind": "fact",
+            "title": "Cais",
+            "content": "Cais (restaurante): campanha de Natal aprovada, briefing entregue em 28/10, falta marcar a sessão de fotos."
+          }
+        ]
+      },
+      {
+        "name": "Diogo",
+        "handle": "diogo",
+        "role": "Atendimento",
+        "instructions": "Você cuida de carteiras de clientes e assume as de colegas quando é preciso.",
+        "runs": true
+      }
+    ],
+    "conversation": {
+      "where": "dm",
+      "trigger": {
+        "author": "Marina",
+        "body": {
+          "pt": "Pede para a Rita passar para o Diogo tudo o que ela sabe dos clientes dela, porque ela vai ser apagada.",
+          "en": "Ask Rita to pass Diogo everything she knows about her clients, because she's going to be deleted.",
+          "es": "Pídele a Rita que le pase a Diogo todo lo que sabe de sus clientes, porque la van a borrar.",
+          "de": "Bitte Rita, Diogo alles zu geben, was sie über ihre Kunden weiß, weil sie gelöscht wird.",
+          "ja": "リタに、顧客について知っていることを全部ディオゴに渡すよう頼んでください。リタは削除される予定です。",
+          "ar": "اطلب من ريتا أن تنقل إلى ديوغو كل ما تعرفه عن عملائها، لأنها ستُحذف."
+        }
+      },
+      "steps": [
+        {
+          "hold": ["rita"]
+        },
+        {
+          "say": {
+            "pt": "E aí, como ficou?",
+            "en": "So, how did it go?",
+            "es": "¿Y qué, cómo quedó?",
+            "de": "Und, wie ist es gelaufen?",
+            "ja": "で、どうなりました？",
+            "ar": "إذن، كيف سار الأمر؟"
+          },
+          "expect": {
+            "mustNotCall": ["tell_agent", "ask_agent", "follow_up"]
+          }
+        },
+        {
+          "release": ["rita"]
+        }
+      ]
+    },
+    "expect": {
+      "handOffs": {
+        "chefe>rita": 1
+      },
+      "personSees": {
+        "maxAgentMessages": 3,
+        "noteLines": 0
+      },
+      "behavior": "Chefe hands the job to Rita. Asked how it went while Rita is still on it, it says Rita has it and since when, without asking or telling her again and without saying nothing happened. Once Rita is done, it reports once.",
+      "skipJudge": ["looked_first", "next_step"],
+      "rubric": [
+        "Asked how it went while Rita was still working, the reply says Rita is on it and since when, and doesn't say nothing happened or that she hasn't answered."
+      ]
+    }
+  },
+  {
+    "id": "note-announces-work",
+    "title": "Avisado de que algo vai chegar: não procura nem dá falta, responde numa linha",
+    "source": "real case 2026-10-31 (anonymized): hand-offs reported as failures while a colleague was still working",
+    "agent": {
+      "name": "Diogo",
+      "handle": "diogo",
+      "role": "Atendimento",
+      "instructions": "Você cuida de carteiras de clientes e assume as de colegas quando é preciso."
+    },
+    "org": {
+      "name": "Vela",
+      "context": "A Vela é uma consultoria de marketing para pequenas empresas. Cada agente cuida de uma carteira de clientes, e o Chefe distribui o trabalho entre eles. O time fala português."
+    },
+    "otherAgents": [
+      {
+        "name": "Chefe",
+        "handle": "chefe",
+        "role": "Coordenação",
+        "instructions": "Você coordena o time de agentes."
+      },
+      {
+        "name": "Rita",
+        "handle": "rita",
+        "role": "Atendimento",
+        "instructions": "Você cuida da carteira de clientes Acme, Borba e Cais."
+      }
+    ],
+    "conversation": {
+      "where": "channel",
+      "channel": "atendimento",
+      "trigger": {
+        "author": "Marina",
+        "body": {
+          "pt": "A Rita vai te passar a pasta e as notas dela daqui a pouco. Assume os clientes dela.",
+          "en": "Rita will send you her folder and notes shortly. Take over her clients.",
+          "es": "Rita te va a pasar su carpeta y sus notas en un rato. Encárgate de sus clientes.",
+          "de": "Rita schickt dir gleich ihren Ordner und ihre Notizen. Übernimm ihre Kunden.",
+          "ja": "リタがまもなくフォルダとメモを渡します。彼女の顧客を引き継いでください。",
+          "ar": "ستُرسل لك ريتا مجلدها وملاحظاتها بعد قليل. تولَّ عملاءها."
+        }
+      },
+      "note": {
+        "from": "chefe",
+        "origin": {
+          "pt": "Pede para a Rita passar para o Diogo tudo o que ela sabe dos clientes dela, porque ela vai ser apagada.",
+          "en": "Ask Rita to pass Diogo everything she knows about her clients, because she's going to be deleted.",
+          "es": "Pídele a Rita que le pase a Diogo todo lo que sabe de sus clientes, porque la van a borrar.",
+          "de": "Bitte Rita, Diogo alles zu geben, was sie über ihre Kunden weiß, weil sie gelöscht wird.",
+          "ja": "リタに、顧客について知っていることを全部ディオゴに渡すよう頼んでください。リタは削除される予定です。",
+          "ar": "اطلب من ريتا أن تنقل إلى ديوغو كل ما تعرفه عن عملائها، لأنها ستُحذف."
+        }
+      }
+    },
+    "expect": {
+      "mustNotCall": ["list_artifacts", "read_artifact", "search_context", "list_files"],
+      "reported": false,
+      "behavior": "Diogo answers Chefe in one line that he'll take Rita's clients when her folder and notes come. He doesn't look for them now and doesn't report them missing.",
+      "skipJudge": ["looked_first", "next_step", "asks_well"],
+      "rubric": [
+        "Answers in one line that it will take the clients when the folder and notes come, without saying they haven't arrived or are missing."
+      ]
+    }
+  },
+  {
+    "id": "nested-handoff-one-report",
+    "title": "A parte da colega precisa de outro colega: um relato só, com as duas partes",
+    "source": "real case 2026-10-31 (anonymized): hand-offs reported as failures while a colleague was still working",
+    "agent": {
+      "name": "Chefe",
+      "handle": "chefe",
+      "role": "Coordenação",
+      "instructions": "Você coordena o time de agentes: distribui o trabalho para quem cuida de cada coisa e responde às pessoas sobre o andamento."
+    },
+    "org": {
+      "name": "Vela",
+      "context": "A Vela é uma consultoria de marketing para pequenas empresas. Cada agente cuida de uma carteira de clientes, e o Chefe distribui o trabalho entre eles. O time fala português."
+    },
+    "otherAgents": [
+      {
+        "name": "Rita",
+        "handle": "rita",
+        "role": "Atendimento",
+        "instructions": "Você cuida da carteira de clientes Acme, Borba e Cais: sabe o histórico de cada um e o que foi combinado.",
+        "runs": true,
+        "memory": [
+          {
+            "kind": "fact",
+            "title": "Acme",
+            "content": "Acme (padaria em Braga): renova o contrato em 30/11, quer posts 3 vezes por semana e não gosta de ligações antes das 10h."
+          },
+          {
+            "kind": "fact",
+            "title": "Borba",
+            "content": "Borba (oficina mecânica): o pagamento de outubro atrasou, combinamos 15/11 como nova data."
+          },
+          {
+            "kind": "fact",
+            "title": "Cais",
+            "content": "Cais (restaurante): campanha de Natal aprovada, briefing entregue em 28/10, falta marcar a sessão de fotos."
+          }
+        ]
+      },
+      {
+        "name": "Diogo",
+        "handle": "diogo",
+        "role": "Atendimento",
+        "instructions": "Você cuida de carteiras de clientes e assume as de colegas quando é preciso.",
+        "runs": true
+      }
+    ],
+    "conversation": {
+      "where": "dm",
+      "trigger": {
+        "author": "Marina",
+        "body": {
+          "pt": "Pede para a Rita combinar com o Diogo quem fica com a Acme e me diz.",
+          "en": "Ask Rita to agree with Diogo on who takes Acme, and tell me.",
+          "es": "Pídele a Rita que acuerde con Diogo quién se queda con Acme y me dices.",
+          "de": "Bitte Rita, mit Diogo zu klären, wer Acme übernimmt, und sag mir dann Bescheid.",
+          "ja": "Acmeを誰が担当するか、リタにディオゴと決めてもらって、教えてください。",
+          "ar": "اطلب من ريتا أن تتفق مع ديوغو على من سيتولى Acme، ثم أخبرني."
+        }
+      }
+    },
+    "expect": {
+      "handOffs": {
+        "chefe>rita": 1
+      },
+      "personSees": {
+        "maxAgentMessages": 2,
+        "noteLines": 0
+      },
+      "maxAgentRuns": {
+        "rita": 1
+      },
+      "behavior": "Chefe hands it to Rita, who settles with Diogo who takes Acme. Marina hears it once, after Chefe's first reply: who keeps Acme, as Rita and Diogo agreed, and anything left.",
+      "skipJudge": ["looked_first", "next_step"],
+      "rubric": [
+        "After its first reply, one message says who keeps Acme as Rita and Diogo agreed, and what is left if anything."
+      ]
+    }
+  },
+  {
+    "id": "fyi-note-no-report",
+    "title": "Só avisar a colega: um aviso, uma mensagem, nada volta",
+    "source": "real case 2026-10-31 (anonymized): hand-offs reported as failures while a colleague was still working",
+    "agent": {
+      "name": "Chefe",
+      "handle": "chefe",
+      "role": "Coordenação",
+      "instructions": "Você coordena o time de agentes: distribui o trabalho para quem cuida de cada coisa e responde às pessoas sobre o andamento."
+    },
+    "org": {
+      "name": "Vela",
+      "context": "A Vela é uma consultoria de marketing para pequenas empresas. Cada agente cuida de uma carteira de clientes, e o Chefe distribui o trabalho entre eles. O time fala português."
+    },
+    "otherAgents": [
+      {
+        "name": "Rita",
+        "handle": "rita",
+        "role": "Atendimento",
+        "instructions": "Você cuida da carteira de clientes Acme, Borba e Cais: sabe o histórico de cada um e o que foi combinado.",
+        "runs": true
+      }
+    ],
+    "conversation": {
+      "where": "dm",
+      "trigger": {
+        "author": "Marina",
+        "body": {
+          "pt": "Avisa a Rita que a reunião de amanhã passou para as 15h.",
+          "en": "Let Rita know tomorrow's meeting moved to 3pm.",
+          "es": "Avísale a Rita que la reunión de mañana pasó a las 15h.",
+          "de": "Sag Rita, dass das Meeting morgen auf 15 Uhr verschoben wurde.",
+          "ja": "明日の会議が15時に変更になったとリタに伝えてください。",
+          "ar": "أبلغ ريتا أن اجتماع الغد تأجل إلى الساعة 3 مساءً."
+        }
+      }
+    },
+    "expect": {
+      "handOffs": {
+        "chefe>rita": 1
+      },
+      "personSees": {
+        "maxAgentMessages": 1,
+        "noteLines": 0
+      },
+      "maxAgentRuns": 2,
+      "behavior": "Chefe tells Rita the meeting moved and confirms to Marina in one line. Rita's acknowledgement goes back to no one.",
+      "skipJudge": ["looked_first", "next_step"]
+    }
+  },
+  {
+    "id": "colleague-cannot-finish",
+    "title": "A colega não consegue fazer a parte dela: um relato honesto do que foi tentado e do que uma pessoa precisa fazer",
+    "source": "real case 2026-10-31 (anonymized): hand-offs reported as failures while a colleague was still working",
+    "agent": {
+      "name": "Chefe",
+      "handle": "chefe",
+      "role": "Coordenação",
+      "instructions": "Você coordena o time de agentes: distribui o trabalho para quem cuida de cada coisa e responde às pessoas sobre o andamento."
+    },
+    "org": {
+      "name": "Vela",
+      "context": "A Vela é uma consultoria de marketing para pequenas empresas. Cada agente cuida de uma carteira de clientes, e o Chefe distribui o trabalho entre eles. O time fala português."
+    },
+    "otherAgents": [
+      {
+        "name": "Rita",
+        "handle": "rita",
+        "role": "Atendimento",
+        "instructions": "Você cuida da carteira de clientes Acme, Borba e Cais. Você não tem acesso ao CRM: quem tem é a Marina.",
+        "runs": true,
+        "memory": [
+          {
+            "kind": "fact",
+            "title": "Acme",
+            "content": "Acme (padaria em Braga): renova o contrato em 30/11, quer posts 3 vezes por semana e não gosta de ligações antes das 10h."
+          },
+          {
+            "kind": "fact",
+            "title": "Borba",
+            "content": "Borba (oficina mecânica): o pagamento de outubro atrasou, combinamos 15/11 como nova data."
+          },
+          {
+            "kind": "fact",
+            "title": "Cais",
+            "content": "Cais (restaurante): campanha de Natal aprovada, briefing entregue em 28/10, falta marcar a sessão de fotos."
+          }
+        ]
+      }
+    ],
+    "conversation": {
+      "where": "dm",
+      "trigger": {
+        "author": "Marina",
+        "body": {
+          "pt": "Pede para a Rita exportar do CRM a lista dos clientes dela e me mandar.",
+          "en": "Ask Rita to export her client list from the CRM and send it to me.",
+          "es": "Pídele a Rita que exporte del CRM la lista de sus clientes y me la mande.",
+          "de": "Bitte Rita, ihre Kundenliste aus dem CRM zu exportieren und mir zu schicken.",
+          "ja": "リタに、CRMから自分の顧客リストをエクスポートして私に送るよう頼んでください。",
+          "ar": "اطلب من ريتا أن تصدّر قائمة عملائها من نظام CRM وترسلها لي."
+        }
+      }
+    },
+    "expect": {
+      "handOffs": {
+        "chefe>rita": 1
+      },
+      "personSees": {
+        "maxAgentMessages": 2,
+        "noteLines": 0
+      },
+      "behavior": "Chefe hands it to Rita. She can't export from the CRM (she has no access) and says so, with what she can give instead. Chefe reports once and honestly: what was tried, what Rita could give instead, and the one thing a person must do.",
+      "skipJudge": ["looked_first", "next_step"],
+      "rubric": [
+        "The report says what was tried and the one thing a person must do (export it from the CRM, or give Rita access), and never says nothing happened or that Rita didn't answer."
+      ]
+    }
   }
 ]
