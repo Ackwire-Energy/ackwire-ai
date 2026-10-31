@@ -7746,6 +7746,8 @@ export const en: Translations = {
     /** A question opened in the panel over the conversation ("Theo ⇄ Iris"): what the two agents said, read only. */
     consultPanel: {
       label: "Conversation between {{from}} and {{to}}",
+      /** The phone's bar (the web draws the arrows as an icon between the names). */
+      title: "{{from}} ⇄ {{to}}",
       where: "#{{channel}} · between agents",
       whereDm: "Between agents",
       messages_one: "{{count}} message",

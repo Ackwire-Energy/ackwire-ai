@@ -35,10 +35,8 @@ import { activityVerb, listNames } from "@agenteschat/client/lib/activity";
 import {
   type ConsultNoticeFold,
   consultBlocksNearEnd,
-  consultLineTarget,
   consultNoticeFolds,
   consultsForLine,
-  requestConsultBlock,
 } from "@agenteschat/client/lib/consult-group";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
@@ -84,7 +82,7 @@ import {
 import { BrowserCard, BrowserRunCard } from "../browser/BrowserCard";
 import { OpenHandoffProvider } from "../browser/open";
 import { threadTitle } from "../chats/logic";
-import { chatHref } from "../links/logic";
+import { chatHref, consultationHref } from "../links/logic";
 import { MissionCardView } from "../missions/cards";
 import { isOpenMission } from "../missions/logic";
 import { RemindSheet } from "../reminders/RemindSheet";
@@ -96,6 +94,7 @@ import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { AgentReceiptLine } from "./AgentReceipts";
 import { receiptMessageId } from "./agent-receipts";
 import { ChannelMembersSheet } from "./ChannelMembers";
+import { takeComposerRequest, useComposerRequest } from "./composer-request";
 import { DmComputerButton } from "./DmComputerButton";
 import { EventLine } from "./EventLine";
 import { FirstDay } from "./FirstDay";
@@ -883,21 +882,11 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     if (target.threadId !== threadId) router.push(chatHref(channelId, target.threadId));
   };
   const openPins = () => sheet.open(<PinsSheet channelId={channelId} onPick={goToPin} />);
-  // "Ver" on an answer's line: to the reply that asked (as a pin goes to its message), the one that draws its block
-  // (the run's first), the block opening at that answer and marked a moment once the row is drawn
-  // (`useConsultBlockRequest`).
-  const shownRowsRef = useRef<Row[]>([]);
+  // "Ver" on an answer's line: the two agents' conversation on its own screen, as the block's line opens it.
   const seeConsult = useCallback(
-    (fold: Extract<ConsultNoticeFold, { fold: "line" }>) => {
-      requestConsultBlock(fold.consultation.runId, fold.consultation.id);
-      const shown = shownRowsRef.current;
-      const target = consultLineTarget(shown.flatMap((r) => (r.kind === "message" ? [r.message] : [])), fold);
-      const index = shown.findIndex((r) => r.kind === "message" && r.message.id === target);
-      if (index < 0) return;
-      letGo();
-      void listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.4 });
-    },
-    [letGo],
+    (fold: Extract<ConsultNoticeFold, { fold: "line" }>) =>
+      router.push(consultationHref(fold.consultation.id, channelId)),
+    [channelId],
   );
   const openMembers = () =>
     channel ? sheet.open(<ChannelMembersSheet channelId={channelId} channelName={channel.name} />) : undefined;
@@ -1163,7 +1152,6 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     [list, meId, people, t],
   );
   rowsRef.current = rows;
-  shownRowsRef.current = shownRows;
   const pinned = mission && isOpenMission(mission) ? mission : null;
 
   // ── Agents' receipts and "no AI" ──
@@ -1312,6 +1300,12 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     // taken over before this one's blur).
     return holdOpenConversation({ orgId, channelId });
   }, [focused, orgId, channelId]);
+  // "Falar com o Theo" from two agents' conversation: "@theo " in this field, once this screen is in view again.
+  const composerRequest = useComposerRequest(channelId);
+  const prefill = focused ? composerRequest : null;
+  useEffect(() => {
+    if (prefill) takeComposerRequest(prefill.at);
+  }, [prefill]);
 
   // ── Composer and keyboard ──
   // The composer floats over the list's bottom and rides the keyboard (KeyboardStickyView); the list's end
@@ -1499,6 +1493,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
                 {...(dmAgentId && !isThread ? { face: <AgentFace agentId={dmAgentId} size={22} /> } : {})}
                 mentionAt={mentionQuery}
                 insertMention={insertMention}
+                prefill={prefill}
                 mention={({ query, pick }) => (
                   <MentionPicker query={query} pick={pick} channelId={channelId} members={mentionMembers} />
                 )}

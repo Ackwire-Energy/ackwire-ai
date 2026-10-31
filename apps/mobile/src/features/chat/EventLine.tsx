@@ -17,7 +17,7 @@ import { MessageText } from "./MessageText";
  * respondeu", "Nota de Dev", "Chegou o resultado que Ada esperava"). Quiet like `IssueTakenLine`; the
  * text opens under it on "Ver". The agent's own reply, if it has one, follows as a normal message.
  * An answer the reply that asked shows (`ConsultGroup`, `fold`): nothing when that reply is close, one line
- * leading to it when it is farther up ("Atlas respondeu à pergunta da Ada · Ver": `onSee` goes there).
+ * when it is farther up ("Atlas respondeu à pergunta da Ada · Ver": `onSee` opens the two agents' conversation).
  */
 export function EventLine({
   message,

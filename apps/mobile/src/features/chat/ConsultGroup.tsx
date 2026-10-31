@@ -1,27 +1,24 @@
 import { keys, type Message, type RunConsultation, useConsultations } from "@agenteschat/client";
 import {
-  CONSULT_REQUEST_FRESH_MS,
   type ConsultLineState,
   consultGroupSummary,
   consultLineState,
   consultSeconds,
   firstOfRun,
   groupsByRun,
-  useConsultBlockRequest,
 } from "@agenteschat/client/lib/consult-group";
 import { previewOf } from "@agenteschat/client/lib/consultations";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { formatLineTime, type ToolState } from "@agenteschat/client/lib/work";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import { useQueryClient } from "@tanstack/react-query";
+import { router } from "expo-router";
 import type { TFunction } from "i18next";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { StyleSheet, View } from "react-native";
-import { Text } from "@/ui";
+import { consultationHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";
 import { useDirectory, useOrgId } from "../shared/hooks";
-import { MessageText } from "./MessageText";
 import { type BlockItem, ToolBlock } from "./ToolCalls";
 
 const BLOCK_STATE: Record<ConsultLineState, ToolState> = {
@@ -34,7 +31,13 @@ const BLOCK_STATE: Record<ConsultLineState, ToolState> = {
   expired: "fail",
 };
 
-function lineLabel(t: TFunction, state: ConsultLineState, c: RunConsultation, to: ReturnType<typeof agentGrammar>) {
+/** A question's state in words, the same in the reply's block and on the conversation's screen. */
+export function consultLineLabel(
+  t: TFunction,
+  state: ConsultLineState,
+  c: RunConsultation,
+  to: ReturnType<typeof agentGrammar>,
+) {
   switch (state) {
     case "working":
       return t("chat.consultGroup.working", { name: to.name, The: to.The });
@@ -68,8 +71,9 @@ function useTick(active: boolean) {
 
 /**
  * The questions the agent asked other agents in this turn, inside its reply, as on the web (`ConsultGroup.tsx`):
- * the tool block's card, "Perguntou a 3 colegas" (open while answers are out), a line per agent opening to the
- * question and the answer. The run's first message shows it when the run posted several.
+ * the tool block's card, "Perguntou a 3 colegas" (open while answers are out), a line per agent that opens the two
+ * agents' conversation on a screen of its own, read only (`ConsultationScreen`). The run's first message shows it
+ * when the run posted several.
  */
 export function ConsultGroup({ message: m, color }: { message: Message; color: AgentColorName }) {
   const { t, i18n } = useTranslation();
@@ -88,8 +92,6 @@ export function ConsultGroup({ message: m, color }: { message: Message; color: A
     : [];
   const first = asks ? firstOfRun(loaded, runId) : null;
   const draws = asks && (!first || first === m.id);
-  // "Ver" on an answer's line farther down: the block opens at that answer (once this row is drawn).
-  const asked = useConsultBlockRequest(draws ? runId : null);
   const live = group?.some((c) => c.status === "open") ?? false;
   const now = useTick(live);
   if (!draws || !group || !m.author.id) return null;
@@ -105,46 +107,19 @@ export function ConsultGroup({ message: m, color }: { message: Message; color: A
         key: c.id,
         state: BLOCK_STATE[state],
         logo: <AgentFace agentId={c.consultedAgentId} size={18} mode={state === "working" ? "run" : "idle"} />,
-        label: lineLabel(t, state, c, to),
+        label: consultLineLabel(t, state, c, to),
         hint: null,
         // The start of the answer, as the web shows it next to the phrase: no tap needed to know what came back.
         preview: answer ? previewOf(answer) : null,
         time: formatLineTime(i18n.language, consultSeconds(c, now) * 1000),
-        defaultOpen: asked?.consultationId === c.id,
-        detail: (
-          <View style={styles.detail}>
-            <Text variant="caption" tone="faint" style={styles.bold}>
-              {t("chat.consultation.asked", { name: from.name })}
-            </Text>
-            <Text variant="small" tone="muted">
-              {c.question}
-            </Text>
-            {answer !== null ? (
-              <>
-                <Text variant="caption" tone="faint" style={[styles.bold, styles.gap]}>
-                  {t("chat.consultation.answerOf", { name: to.name, of: to.of })}
-                </Text>
-                <MessageText body={answer} />
-              </>
-            ) : null}
-            <Text variant="caption" tone="faint" style={styles.gap}>
-              {t("chat.consultation.private", {
-                from: from.name,
-                articleFrom: from.article,
-                to: to.name,
-                articleTo: to.article,
-              })}
-            </Text>
-          </View>
-        ),
+        onOpen: () => router.push(consultationHref(c.id, m.channelId)),
       },
     };
   });
   return (
     <ToolBlock
-      // Open while answers are out; it folds by itself once the last one is in (a tap opens it again). Asked to
-      // open from an answer's line: open again, at that answer.
-      key={`${summary.open ? "out" : "in"}${asked ? `:${asked.at}` : ""}`}
+      // Open while answers are out; it folds by itself once the last one is in (a tap opens it again).
+      key={summary.open ? "out" : "in"}
       logos={group.map((c) => ({
         key: c.id,
         node: <AgentFace agentId={c.consultedAgentId} size={18} live={false} />,
@@ -160,16 +135,8 @@ export function ConsultGroup({ message: m, color }: { message: Message; color: A
       items={items}
       color={color}
       label={t("chat.consultGroup.label", { name: from.name, of: from.of })}
-      defaultOpen={summary.open || asked !== null}
-      // Where "Ver" led, marked a moment (the web marks the message); not again when an answer landing later
-      // draws the block anew.
-      flash={asked && Date.now() - asked.at < CONSULT_REQUEST_FRESH_MS ? asked.at : null}
+      defaultOpen={summary.open}
     />
   );
 }
 
-const styles = StyleSheet.create({
-  detail: { gap: 2 },
-  bold: { fontWeight: "600" },
-  gap: { marginTop: 8 },
-});

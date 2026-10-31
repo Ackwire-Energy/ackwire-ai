@@ -91,7 +91,7 @@ A question showed only its state, the question and the answer: what the consulte
 
 **5. Freshness.** The DM sends the page no events: the panel reloads every 4 s while the question is out (`CONSULT_CONVERSATION_POLL_MS`) and, its key sitting under the list's, with the list on every consult event.
 
-The phone still opens a line in place.
+**6. On the phone.** Each line pushes a screen of its own (`/consultation/<id>?channel=<id>`), the same conversation read only under the pushed bar ("Theo ⇄ Iris", where it was asked). "Falar com o Theo" goes back with "@theo " in that conversation's field, taken once by its screen in view (`composer-request.ts`). "Ver" on an answer that arrived far opens it too, and the consulted run's cards say whom they help, as on the web.
 
 Not done: the consulted agent's prompt still says no person reads the agents' DM; it should say that whoever reads the asking conversation reads what it writes for that question. That prompt change waits for an eval.
 

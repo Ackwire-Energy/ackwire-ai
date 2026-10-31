@@ -145,6 +145,8 @@ export interface BlockLine {
   detail?: ReactNode;
   /** Opens by itself (a call running code shows it as it runs). */
   defaultOpen?: boolean;
+  /** Opens somewhere else instead of in place (another agent's conversation, on a screen of its own). */
+  onOpen?: () => void;
 }
 
 export type BlockItem = { kind: "line"; line: BlockLine } | { kind: "note"; key: string; node: ReactNode };
@@ -301,7 +303,7 @@ function Line({ line, color }: { line: BlockLine; color: AgentColorName }) {
     if (running.current && line.state !== "run") setOpen(false);
     running.current = line.state === "run";
   }, [line.state]);
-  const opens = Boolean(line.detail);
+  const opens = Boolean(line.detail) && !line.onOpen;
   const said = [line.label, line.hint, line.preview, line.count, line.time].filter(Boolean).join(", ");
   // With a preview under the phrase: logo, time and mark stay level with the phrase.
   const top = line.preview ? styles.rowTop : null;
@@ -331,12 +333,25 @@ function Line({ line, color }: { line: BlockLine; color: AgentColorName }) {
         </Text>
       ) : null}
       <Mark state={line.state} color={color} />
+      {line.onOpen ? <Icon name="right" size={14} color={c.faint} /> : null}
     </>
   );
   return (
     // A failed call says so by its mark and its reason, on the block's own surface (no tinted plate).
     <View style={styles.line}>
-      {opens ? (
+      {line.onOpen ? (
+        <Pressable
+          onPress={() => {
+            tapHaptic();
+            line.onOpen?.();
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={said}
+          style={({ pressed }) => [styles.row, top, pressed && { backgroundColor: c.plateSoft }]}
+        >
+          {row}
+        </Pressable>
+      ) : opens ? (
         <Pressable
           onPress={() => {
             tapHaptic();

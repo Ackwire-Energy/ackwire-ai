@@ -7796,6 +7796,8 @@ export const ptBR = {
     /** A question opened in the panel over the conversation ("Theo ⇄ Iris"): what the two agents said, read only. */
     consultPanel: {
       label: "Conversa entre {{articleFrom}} {{from}} e {{articleTo}} {{to}}",
+      /** The phone's bar (the web draws the arrows as an icon between the names). */
+      title: "{{from}} ⇄ {{to}}",
       where: "#{{channel}} · conversa entre agentes",
       whereDm: "Conversa entre agentes",
       messages_one: "{{count}} mensagem",
