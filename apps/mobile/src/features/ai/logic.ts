@@ -199,8 +199,8 @@ export function existingRows(
 
 /**
  * "Usar em outros agentes" on the phone (ADR 0089): the agent's saved setup in words, as the web's dialog says it
- * ("Claude Code · Opus · Esforço alto · Autonomia: Não pergunta"): its brain, the model it runs, what differs in its
- * advanced settings and its Autonomia.
+ * ("Opus pelo plano do Claude · Esforço alto · Autonomia: Não pergunta"): the model by the plan that pays for it (the
+ * API's model alone), what differs in its advanced settings and its Autonomia.
  */
 export function setupWords(
   t: TFunction,

@@ -851,7 +851,7 @@ p {
 .channel__header > .ac-avatar + div:has(> .ac-captop) {
   align-self: flex-start;
 }
-/* Who thinks, after the owner: "Claude Code · Sonnet no mac" with its mark. */
+/* Who thinks, after the owner: "Sonnet pelo plano do Claude" with its mark. */
 /* The engine line (an `.ac-iconline`) inside a line of text. */
 .channel__brain,
 .profile-card__brain {

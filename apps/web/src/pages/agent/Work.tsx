@@ -752,6 +752,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       (p) => p === savedCard || allAccounts.some((a) => a.provider === p && (a.mine || a.id === view.account)),
     ),
   ];
+  // Another plan on the same program is another account, which only the agent's owner picks (the server keeps the
+  // account otherwise): anyone else moves it only onto another program or the API.
+  const ownersOnly = (c: AiChoice) => !view.canUsePlans && c !== "key" && c !== savedCard && kindOf(c) === view.brain;
   /**
    * Another card starts on what can think for the agent on its computer with that plan: that computer's own sign-in
    * where it's ready (Claude's and ChatGPT's), else one of the viewer's accounts of that plan that thinks for nobody or
@@ -1312,9 +1315,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                   ? t("agentPage.work.brain.modelText", g)
                   : !where
                     ? reason(c)
-                    : t("agentPage.work.brain.planText", { plan: planLabel(t, c) }),
+                    : ownersOnly(c) && ownerFirst
+                      ? t("agentPage.work.brain.accountLocked", { name: ownerFirst })
+                      : t("agentPage.work.brain.planText", { plan: planLabel(t, c) }),
               side: side(c),
-              disabled: c !== "key" && !where,
+              disabled: c !== "key" && (!where || ownersOnly(c)),
               children:
                 c === "key" ? (
                   orgRows

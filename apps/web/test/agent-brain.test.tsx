@@ -1305,6 +1305,21 @@ describe("Quem pensa: a coding plan's models", () => {
     expect(within(d).getByRole("combobox", { name: "Conta" }).textContent).toContain("Plano");
   });
 
+  test("a plan's card starts on a key made for all of its owner's agents there, though another agent thinks with it", async () => {
+    const { state } = await onPlan("opencode", {
+      account: null,
+      accounts: [planKey("opencode", { id: "acct_oc", usedBy: ["Theo"], shared: true })],
+    });
+    const d = await brainDialog();
+    expect(card(d, /^Claude/).getAttribute("aria-checked")).toBe("true");
+    await click(card(d, /^OpenCode Go/));
+    expect(within(d).getByRole("combobox", { name: "Conta" }).textContent).toContain("Plano");
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toMatchObject({ brain: "claude_code", account: "acct_oc" });
+    expect(brainCalls(state).at(-1)).not.toHaveProperty("moveAccount");
+  });
+
   test("a key its plan refused: said so, and its last option asks the same account for a new key", async () => {
     const { state } = await onPlan("opencode", {}, { status: "signed_out" });
     const d = await brainDialog();
@@ -1346,6 +1361,18 @@ describe("Quem pensa: a coding plan's models", () => {
     cleanup();
     await onPlan("opencode", { canUsePlans: false, canManageAccounts: false });
     expect(within(await brainDialog()).queryByRole("button", { name: "Conectar outro plano" })).toBeNull();
+  });
+
+  test("someone who isn't its owner can't swap its owner's coding plan for Claude: another account is the owner's pick", async () => {
+    await onPlan("opencode", { canUsePlans: false, canManageAccounts: false }, { mine: false });
+    const d = await brainDialog();
+    const claude = card(d, /^Claude/);
+    expect(claude.hasAttribute("disabled")).toBe(true);
+    expect(claude.textContent).toContain("Só João troca");
+    // Another program, or the API, stays theirs to choose.
+    expect(card(d, /^ChatGPT/).hasAttribute("disabled")).toBe(false);
+    expect(card(d, /^Chave de API/).hasAttribute("disabled")).toBe(false);
+    expect(card(d, /^OpenCode Go/).textContent).toContain("Usa o seu plano do OpenCode Go");
   });
 
   test("the cell names the plan's model it runs; models sold with words show them, a plan's only model too", async () => {

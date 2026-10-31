@@ -60,7 +60,7 @@ export function DmPage({ target }: { target: DmTarget }) {
     : isAuto(agent.model)
       ? t("brain.auto.label")
       : (models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model);
-  // Who thinks: a computer brain ("Claude Code · Sonnet no mac") instead of the API model.
+  // Who thinks: on a plan, the model by the plan that pays for it ("Sonnet pelo plano do Claude"), else the API model.
   const thinks = agent ? brainLine(t, agent.brain, model, owner?.name.split(" ")[0]) : null;
   const role = agent ? agent.role || `@${agent.handle}` : "";
   const header = (
