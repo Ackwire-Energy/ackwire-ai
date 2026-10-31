@@ -55,6 +55,7 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AccessMatrixSection } from "@/components/AccessLevels";
+import { AccountSection } from "@/components/AccountSettings";
 import { AuditSection } from "@/components/Audit";
 import { AutoModelsRow } from "@/components/AutoModels";
 import { AiAccountsSection } from "@/components/ai/AiAccounts";
@@ -70,7 +71,7 @@ import { MachinePage } from "@/components/Machines";
 import { NoticePrefsSection } from "@/components/NoticePrefs";
 import { useOrg } from "@/components/org-context";
 import { PlanUsageCards } from "@/components/PlanUsage";
-import { OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
+import { MyFace, OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
 import { KeyMismatch, KeySite } from "@/components/ProviderKey";
 import { RolesSection } from "@/components/roles/RolesSection";
 import { SkillsSection } from "@/components/Skills";
@@ -91,13 +92,15 @@ export function SettingsPage({
   connected,
   review,
   mail,
+  account,
   machineId,
 }: {
   section?: SettingsSection;
   connected?: string;
   review?: boolean;
-  /** Back from Gmail/Outlook: `connected` or `failed`. */
+  /** Back from Gmail/Outlook: `connected` or `failed`, and the mailbox (`account`). */
   mail?: string;
+  account?: string;
   /** Computadores → one computer (`/settings/computers/{id}`). */
   machineId?: string;
 }) {
@@ -140,7 +143,7 @@ export function SettingsPage({
                         className="settings__link"
                         aria-current={s.id === current ? "page" : undefined}
                       >
-                        <Icon name={s.icon} size={18} />
+                        {s.id === "account" ? <MyFace size="xs" /> : <Icon name={s.icon} size={18} />}
                         {t(`settings.section.${s.id}`)}
                       </Link>
                     </li>
@@ -169,13 +172,16 @@ export function SettingsPage({
             )}
           </header>
         )}
+        {current === "account" && <AccountSection />}
         {current === "notifications" && <NoticePrefsSection />}
         {current === "general" && <GeneralSection />}
         {current === "members" && <MembersPage embedded />}
         {current === "roles" && <RolesSection />}
         {current === "audit" && <AuditSection />}
         {current === "access" && <AccessMatrixSection />}
-        {current === "connectors" && <ConnectorsSection connected={connected} review={review} mail={mail} />}
+        {current === "connectors" && (
+          <ConnectorsSection connected={connected} review={review} mail={mail} account={account} />
+        )}
         {current === "skills" && <SkillsSection />}
         {current === "keys" && (
           <>

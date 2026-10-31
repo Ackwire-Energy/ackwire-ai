@@ -6,6 +6,7 @@ import {
   applyTyping,
   emptyStreams,
   expectReply,
+  expireTyping,
   receiptView,
   runsInChannel,
   seedReceipt,
@@ -59,6 +60,27 @@ describe("typing", () => {
     expect(typingIn(s, "c1", 1000, "marina")).toEqual([]);
     s = stopTyping(s, "c1", "marina");
     expect(typingIn(s, "c1", 1000)).toEqual([]);
+  });
+
+  test("typing in a thread shows in that thread only; the latest frame says where", () => {
+    let s = applyTyping({}, "c1", "marina", 1000, TYPING_TTL_MS, "t1");
+    s = applyTyping(s, "c1", "joao", 1000);
+    expect(typingIn(s, "c1", 1000)).toEqual(["joao"]);
+    expect(typingIn(s, "c1", 1000, undefined, "t1")).toEqual(["marina"]);
+    expect(typingIn(s, "c1", 1000, undefined, "t2")).toEqual([]);
+    // She moved to the conversation itself.
+    s = applyTyping(s, "c1", "marina", 2000);
+    expect(typingIn(s, "c1", 2000)).toEqual(["marina", "joao"]);
+    expect(typingIn(s, "c1", 2000, undefined, "t1")).toEqual([]);
+  });
+
+  test("what ran out is dropped on time (a store sweeping it re-renders); nothing ran out, the same state", () => {
+    let s = applyTyping({}, "c1", "marina", 1000, 5000);
+    s = applyTyping(s, "c1", "joao", 3000, 5000);
+    expect(expireTyping(s, 5999)).toBe(s);
+    const swept = expireTyping(s, 6000);
+    expect(Object.keys(swept.c1 ?? {})).toEqual(["joao"]);
+    expect(Object.keys(expireTyping(swept, 8000).c1 ?? {})).toEqual([]);
   });
 
   test("our own typing frames are throttled to one every 3 s", () => {

@@ -94,7 +94,9 @@ describe("groups of agents in the sidebar (ADR 0083)", () => {
     await click(toggle);
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     expect(root.getAttribute("data-open")).toBe("false");
-    expect(JSON.parse(localStorage.getItem("agentes.sidebar.sections") ?? "[]")).toEqual([`group:${INTEGRATIONS}`]);
+    expect(JSON.parse(localStorage.getItem(`agentes.sidebar.sections.u-walter.${ORG_ID}`) ?? "[]")).toEqual([
+      `group:${INTEGRATIONS}`,
+    ]);
     cleanup();
     await go(withGroups());
     expect(category("Integrations").toggle.getAttribute("aria-expanded")).toBe("false");

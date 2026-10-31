@@ -16,14 +16,11 @@ afterEach(() => {
 
 const click = (el: Element) => act(async () => fireEvent.click(el));
 
-/** Account menu → Abrir no celular. */
+/** Configurações › Sua conta → Abrir no celular. */
 async function openPhoneDialog(state: ReturnType<typeof seedState>) {
-  await renderApp(`/org/${ORG_ID}/issues`, { api: createFakeApi(state) });
+  await renderApp(`/org/${ORG_ID}/settings/account`, { api: createFakeApi(state) });
   await settle(6);
-  await click(screen().getByRole("button", { name: /^Conta: / }));
-  await act(() => new Promise((r) => setTimeout(r, 0)));
-  const menu = screen().getAllByRole("menu")[0] as HTMLElement;
-  await click(within(menu).getByRole("menuitem", { name: /^Abrir no celular/ }));
+  await click(screen().getByRole("button", { name: /^Abrir no celular/ }));
   await settle(4);
   return screen().getByRole("dialog", { name: "Abrir no celular" });
 }

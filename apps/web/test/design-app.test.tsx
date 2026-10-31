@@ -155,6 +155,122 @@ describe("work summary", () => {
   });
 });
 
+describe("the block's logos are the services' own", () => {
+  const call = (id: string, tool: string, over: Partial<LiveWork> = {}): LiveWork =>
+    ({
+      kind: "call",
+      id,
+      tool,
+      connector: null,
+      detail: null,
+      code: null,
+      output: [],
+      running: false,
+      ms: 1100,
+      ...over,
+    }) as LiveWork;
+  /** What a logo draws: a service's mark (its file), a server's own image, or one of our icons. */
+  const drawn = (logo: Element | null | undefined) => {
+    const mark = logo?.querySelector<HTMLElement>(".connector-icon__mark")?.style.getPropertyValue("--connector-icon");
+    if (mark) return mark.replace(/^url\("(.+)"\)$/, "$1");
+    return (
+      logo?.querySelector(".connector-icon__img")?.getAttribute("src") ??
+      (logo?.querySelector(".tool-logo") ? "ours" : null)
+    );
+  };
+
+  test("a Gmail search, a GitHub search and one of our tools: each row and the head show the real logos", async () => {
+    const api = createFakeApi(seedState());
+    await renderPage(
+      <LiveTools
+        work={[
+          call("1", "mail_wnogueira_search", { connector: "Email", service: "gmail" }),
+          call("2", "github_search_issues", { connector: "GitHub", service: "github" }),
+          call("3", "create_issue"),
+        ]}
+        agentName="Ada"
+        done
+      />,
+      { api, org: true },
+    );
+    await settle(4);
+    const block = document.querySelector(".ac-tools") as HTMLElement;
+    const head = block.querySelector(".ac-tools__head") as HTMLElement;
+    expect(head.querySelector(".ac-tools__text")?.textContent).toBe("Usou 3 ferramentas");
+    expect([...head.querySelectorAll(".ac-tools__logos > *")].map(drawn)).toEqual([
+      "/connectors/gmail.svg",
+      "/connectors/github.svg",
+      "ours",
+    ]);
+    await click(head);
+    const rows = [...block.querySelectorAll(".ac-tools__row")];
+    expect(rows.map((r) => [r.querySelector("b")?.textContent, r.querySelector("small")?.textContent ?? null])).toEqual(
+      [
+        ["Consultou o Gmail", "wnogueira search"],
+        ["Consultou o GitHub", "search issues"],
+        ["Criou uma tarefa", null],
+      ],
+    );
+    expect(rows.map((r) => drawn(r.querySelector(".ac-tools__logo")))).toEqual([
+      "/connectors/gmail.svg",
+      "/connectors/github.svg",
+      "ours",
+    ]);
+  });
+
+  test("a server's icon that no longer loads leaves its monogram, not an empty tile", async () => {
+    const api = createFakeApi(seedState());
+    const icon = `/api/app/connector-icons/${ORG_ID}/00000000-0000-4000-8000-0000000000f1/0123456789abcdef.png`;
+    await renderPage(
+      <LiveTools
+        work={[call("1", "acme_find_orders", { connector: "Acme Tools", serviceIcon: icon })]}
+        agentName="Ada"
+        done
+      />,
+      { api, org: true },
+    );
+    await settle(4);
+    const logos = document.querySelector(".ac-tools__logos") as HTMLElement;
+    const img = logos.querySelector(".connector-icon__img") as HTMLImageElement;
+    expect(img.getAttribute("src")).toBe(icon);
+    await act(async () => {
+      img.dispatchEvent(new Event("error"));
+    });
+    expect(logos.querySelector(".connector-icon__img")).toBeNull();
+    expect(logos.querySelector(".connector-icon--initial")?.textContent).toBe("AT");
+  });
+
+  test("a saved reply's closed head shows its services' logos from meta.work, before any step loads", async () => {
+    const api = createFakeApi(seedState());
+    const asked: string[] = [];
+    api.agents.run = async (_orgId, runId) => {
+      asked.push(runId);
+      throw new Error("not loaded while closed");
+    };
+    const work = {
+      steps: 4,
+      durationMs: 6000,
+      calls: [
+        { name: "mail_wnogueira_search", connector: "Email", service: "gmail" },
+        { name: "create_issue" },
+        { name: "pg_analytics_query", connector: "Analytics", service: "postgres" },
+        { name: "github_get_pr", connector: "GitHub", service: "github" },
+      ],
+    };
+    await renderPage(<SavedTools runId="r-7" meta={{ work }} agentName="Ada" />, { api, org: true });
+    await settle(4);
+    const head = document.querySelector(".ac-tools__head") as HTMLElement;
+    expect(head.querySelector(".ac-tools__text")?.textContent).toBe("Usou 4 ferramentas");
+    expect([...head.querySelectorAll(".ac-tools__logos > *")].map(drawn)).toEqual([
+      "/connectors/gmail.svg",
+      "ours",
+      "/brands/postgresql.svg",
+      "/connectors/github.svg",
+    ]);
+    expect(asked).toEqual([]);
+  });
+});
+
 describe("⌘K palette", () => {
   const press = () =>
     act(async () => {

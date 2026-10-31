@@ -11,10 +11,15 @@ import { renderApp, screen, settle } from "./render";
 afterEach(() => cleanup());
 
 const click = (el: Element) => act(async () => fireEvent.click(el));
-// The workspace and account cards open a full-screen menu (MenuOverlay): a dialog with our menu items.
-const openMenu = async (trigger: HTMLElement) => {
-  await act(async () => fireEvent.click(trigger));
-  await act(() => new Promise((r) => setTimeout(r, 0)));
+/** The account menu, from the keyboard (Radix opens it on a key or a pointer press, not on a click). */
+const openAccountMenu = async () => {
+  const row = screen().getByRole("button", { name: /^Conta: / });
+  row.focus();
+  await act(async () => {
+    fireEvent.keyDown(row, { key: "Enter" });
+    fireEvent.keyUp(row, { key: "Enter" });
+  });
+  await settle(2);
   return screen().getAllByRole("menu")[0] as HTMLElement;
 };
 
@@ -33,12 +38,11 @@ describe("profile photo", () => {
     expect(out).toEqual({ imageBase64: btoa("png-bytes"), contentType: "image/png" });
   });
 
-  test("Perfil → Trocar foto: pick an image, save; my avatar uses it", async () => {
+  test("Editar perfil → Trocar foto: pick an image, save; my avatar uses it", async () => {
     const state = seedState();
     await renderApp(`/org/${ORG_ID}/issues`, { api: createFakeApi(state) });
     await settle(6);
-    const menu = await openMenu(screen().getByRole("button", { name: /^Conta: / }));
-    await click(within(menu).getByRole("menuitem", { name: /^Perfil/ }));
+    await click(within(await openAccountMenu()).getByRole("menuitem", { name: "Editar perfil" }));
     await settle(2);
     const profile = screen().getByRole("dialog", { name: "Seu perfil neste workspace" });
     // Photo and @ need no line; the time zone's use is its ⓘ, which also describes the picker.

@@ -35,23 +35,13 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { ReconnectThisMacButton, useIsThisMac } from "@/components/ThisMac";
 import { useComputerEdition } from "@/components/WorkspaceComputer";
-import { STORAGE_KEYS, storage } from "@/lib/storage";
+import { STORAGE_KEYS, storage, storedStrings } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 
 /**
  * "Computador desconectado": the notice at the top of the work area,
  * the "Trocar o computador" dialog, and the agent's one waiting card in the chat.
  */
-
-/** Outages whose notice the person closed (until that computer comes back: a new outage shows again). */
-function readDismissed(): string[] {
-  try {
-    const v = JSON.parse(storage.get(STORAGE_KEYS.outagesDismissed) ?? "[]");
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
-  } catch {
-    return [];
-  }
-}
 
 /** Notices for everyone who can manage agents, one per offline computer, stacked. */
 export function OutageNotices() {
@@ -60,7 +50,8 @@ export function OutageNotices() {
   const manage = can(org, "manage_agents");
   const outages = useMachineOutages(org.id);
   const list = outages.data?.outages ?? [];
-  const [dismissed, setDismissed] = useState(readDismissed);
+  // Outages whose notice the person closed (until that computer comes back: a new outage shows again).
+  const [dismissed, setDismissed] = useState(() => storedStrings(STORAGE_KEYS.outagesDismissed));
   // Forget the closed ones whose computer came back (or whose agents moved away).
   const liveKeys = list.map(outageKey).join(",");
   useEffect(() => {
@@ -104,7 +95,8 @@ function OutageNotice({
   // In agentes for Mac, when it's this very Mac: say so, and reconnect from here (ADR 0036).
   const here = useIsThisMac(org.id, o.machineId);
   // The Cloud's one computer: its people are told it is being looked after, with no other computer to go to.
-  const cloud = useComputerEdition(org.id) === "cloud";
+  const edition = useComputerEdition(org.id);
+  const cloud = edition === "cloud";
   // "há 12 min" moves on by itself.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -155,7 +147,7 @@ function OutageNotice({
           </Link>
         </Button>
         {here && <ReconnectThisMacButton orgId={org.id} primary />}
-        {!cloud && (
+        {edition === "selfhost" && (
           <Button variant={here ? "ghost" : "primary"} size="sm" onClick={() => setOpen(true)}>
             {t("outage.switch")}
           </Button>
@@ -325,12 +317,15 @@ export function SwitchComputerDialog({
 
 /**
  * The agent's note "the computer brain can't answer" as one card: waiting for the computer (with what
- * waits and "Trocar computador"), then "voltou" once it is back, or "troquei" once the agent moved.
+ * waits and, on a self-host, "Trocar computador"), then "voltou" once it is back, or "troquei" once the
+ * agent moved.
  */
 export function WaitingCard({ notice, agentId }: { notice: BrainUnavailable; agentId: string | null }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const manage = can(org, "manage_agents");
+  // Only where people connect their own computers: a Cloud workspace has one, and nothing while that isn't known.
+  const selfHost = useComputerEdition(org.id) === "selfhost";
+  const switches = selfHost && can(org, "manage_agents");
   const outages = useMachineOutages(org.id);
   const machines = useMachines(org.id);
   const [open, setOpen] = useState(false);
@@ -378,7 +373,7 @@ export function WaitingCard({ notice, agentId }: { notice: BrainUnavailable; age
         <ProviderLogo id={notice.brain} size="xs" />
         {[t("outage.card.text", { brain: brainName(notice.brain) }), waiting].filter(Boolean).join(" · ")}
       </p>
-      {manage && outage && outages.data && (
+      {switches && outage && outages.data && (
         <span className="waitcard__acts">
           <Button size="sm" onClick={() => setOpen(true)}>
             {t("outage.switch")}

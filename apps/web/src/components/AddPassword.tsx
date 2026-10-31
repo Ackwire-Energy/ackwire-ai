@@ -11,7 +11,7 @@ import { useToast } from "@/lib/toast";
 import { PasswordHelp } from "@/pages/AuthPage";
 
 /**
- * "Adicionar uma senha" (account menu): for an account that signs in another way (Google or Apple, or
+ * "Adicionar uma senha" (Configurações › Sua conta): for an account that signs in another way (Google or Apple, or
  * the agentes.chat app on the computer that runs this server), so it also signs in with its email from
  * any browser. A password proves it's the person, so it needs a sign-in in the last 10 minutes: an older
  * session signs in again first.

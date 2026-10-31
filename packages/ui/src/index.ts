@@ -165,12 +165,12 @@ export {
   MenuRadioGroup,
   MenuReactions,
   MenuSeparator,
+  MenuSub,
 } from "./components/Menu";
 export {
   MenuOverlay,
   MenuOverlayGroup,
   MenuOverlayItem,
-  MenuOverlayRow,
   MenuOverlaySeparator,
 } from "./components/MenuOverlay";
 export { DayDivider, Message, type MessageProps, MessageText } from "./components/Message";
@@ -244,6 +244,7 @@ export {
   STRIP_CELL,
   WorkSweep,
 } from "./components/RunPixels";
+export { AgentSearching } from "./components/SearchPixels";
 export { SearchSelect, type SearchSelectLabels, type SearchSelectProps } from "./components/SearchSelect";
 export { Segmented, type SegmentedOption, SplitButton } from "./components/Segmented";
 export { Select, type SelectOption, type SelectProps } from "./components/Select";

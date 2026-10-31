@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { schema } from "@agenteschat/db";
+import { eq, schema } from "@agenteschat/db";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -254,10 +254,13 @@ describe("custom MCP servers", () => {
         { name: "close_ticket", access: "approval", label: "Fechar chamado" },
       ],
     });
+    // The icon the server gave is its calls' logo in the chat.
+    const icon = `/api/app/connector-icons/${f.org.id}/${server.id}/0123456789abcdef.png`;
+    await f.db.update(schema.connectorConnections).set({ icon }).where(eq(schema.connectorConnections.id, server.id));
     const offered = await source.tools(ctx);
-    expect(offered.map((t) => [t.name, t.scope, t.sensitive])).toEqual([
-      ["suporte_close_ticket", `custom:${server.id}:write`, true],
-      ["suporte_list_tickets", `custom:${server.id}:read`, false],
+    expect(offered.map((t) => [t.name, t.scope, t.sensitive, t.serviceIcon])).toEqual([
+      ["suporte_close_ticket", `custom:${server.id}:write`, true, icon],
+      ["suporte_list_tickets", `custom:${server.id}:read`, false, icon],
     ]);
     // The agent sees them only with grants.
     expect(await gateway.list(ctx)).toEqual([]);

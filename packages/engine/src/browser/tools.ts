@@ -11,7 +11,7 @@ import {
 import { and, type Database, desc, eq, isNull, schema, sql } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
 import type { Judge } from "../judge";
-import { type MachineCaller, MachineRequestError } from "../machine-hub";
+import { callWhenBack, type MachineCaller, MachineRequestError } from "../machine-hub";
 import { MachineOfflineError, MachinePausedError } from "../machines";
 import { missionOfRun } from "../mission-context";
 import { getSandboxSettings, SANDBOX_SCOPE, withConnectedMachine } from "../sandbox";
@@ -476,10 +476,16 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     const act = async (c: BrowserBatchCommand): Promise<BrowserReply> => {
       let reply: MachineReplies["browser.act"];
       try {
-        reply = await caller.call<"browser.act">(
+        reply = await callWhenBack(
+          caller,
           status.machineId,
-          { op: "browser.act", command: c.command, args: c.args, timeoutSeconds: c.timeoutSeconds, ...common },
-          { signal: ctx.signal, timeoutMs: (c.timeoutSeconds + 30) * 1000 },
+          () =>
+            caller.call<"browser.act">(
+              status.machineId,
+              { op: "browser.act", command: c.command, args: c.args, timeoutSeconds: c.timeoutSeconds, ...common },
+              { signal: ctx.signal, timeoutMs: (c.timeoutSeconds + 30) * 1000 },
+            ),
+          ctx.signal,
         );
       } catch (error) {
         return { ok: false, text: explain(error, status.machineName) };
@@ -507,10 +513,16 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
         );
         let reply: MachineReplies["browser.batch"];
         try {
-          reply = await caller.call<"browser.batch">(
+          reply = await callWhenBack(
+            caller,
             status.machineId,
-            { op: "browser.batch", commands, ...common },
-            { signal: ctx.signal, timeoutMs: (seconds + 30) * 1000 },
+            () =>
+              caller.call<"browser.batch">(
+                status.machineId,
+                { op: "browser.batch", commands, ...common },
+                { signal: ctx.signal, timeoutMs: (seconds + 30) * 1000 },
+              ),
+            ctx.signal,
           );
         } catch (error) {
           return [{ ok: false, text: explain(error, status.machineName) }];

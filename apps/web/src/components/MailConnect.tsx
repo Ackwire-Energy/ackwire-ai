@@ -15,6 +15,7 @@ import {
   defaultPolicy,
   isAddress,
   MAIL_ACTIONS,
+  MAIL_BRANDS,
   type MailChoice,
   mailActionsFrom,
   mailErrorOf,
@@ -51,6 +52,7 @@ import { LoadingList, useStepText } from "@/components/Loading";
 import { MailRulesPanel } from "@/components/MailRules";
 import { useOrg } from "@/components/org-context";
 import { reviewNote, ToolReview, type ToolReviewState } from "@/components/ToolReview";
+import { takesConnectorReturn } from "@/lib/desktop";
 import { navigateAway } from "@/lib/navigate";
 import { useToast } from "@/lib/toast";
 
@@ -62,13 +64,6 @@ import { useToast } from "@/lib/toast";
  * the rest take an app password, then say which other addresses the
  * mailbox has (replies go out from the one the email arrived at).
  */
-
-/** Each mailbox's mark: Gmail's and iCloud's in one color (Simple Icons, CC0), Outlook's in Microsoft's colors. */
-const BRAND: Partial<Record<MailChoice, { iconUrl: string; brandColor: string | null }>> = {
-  gmail: { iconUrl: "/connectors/gmail.svg", brandColor: "#EA4335" },
-  outlook: { iconUrl: "/brands/outlook.svg", brandColor: null },
-  icloud: { iconUrl: "/connectors/icloud.svg", brandColor: "#3693F3" },
-};
 
 export const mailChoiceName = (t: TFunction, choice: MailChoice) => t(`mail.choice.${choice}.name`);
 
@@ -94,7 +89,7 @@ export function MailIcon({ choice, size = "md" }: { choice: MailChoice; size?: "
       </span>
     );
   }
-  return <ConnectorIcon def={BRAND[choice] ?? null} label={mailChoiceName(t, choice)} size={size} />;
+  return <ConnectorIcon def={MAIL_BRANDS[choice] ?? null} label={mailChoiceName(t, choice)} size={size} />;
 }
 
 /** How a mailbox connects, for the card's one tag. */
@@ -210,7 +205,10 @@ function OAuthStep({ provider, onClose }: { provider: "gmail" | "outlook"; onClo
           disabled={connectComposio.isPending}
           loading={connectComposio.isPending}
           onClick={() =>
-            connectComposio.mutate({ provider }, { onSuccess: (started) => navigateAway(started.redirectUrl) })
+            connectComposio.mutate(
+              { provider, desktop: takesConnectorReturn() },
+              { onSuccess: (started) => navigateAway(started.redirectUrl) },
+            )
           }
         >
           {t("mail.continueWith", { company })}

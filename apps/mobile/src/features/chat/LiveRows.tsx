@@ -1,17 +1,32 @@
 import { elapsedClock, type LiveConsult, type LiveRun, usesBrowser } from "@agenteschat/client";
-import { activitySentence, barPhrase, isWriting, PHRASE_TURN_MS } from "@agenteschat/client/lib/activity";
+import {
+  activitySentence,
+  barAsking,
+  barFaces,
+  barWords,
+  isWriting,
+  PHRASE_TURN_MS,
+} from "@agenteschat/client/lib/activity";
 import { initialReveal, rebaseReveal, revealStep } from "@agenteschat/client/lib/reveal";
 import { formatDuration } from "@agenteschat/client/lib/work";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import { memo, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Pressable, Text as RNText, StyleSheet, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  Text as RNText,
+  type StyleProp,
+  StyleSheet,
+  type TextStyle,
+  View,
+} from "react-native";
 import Animated, { FadeIn, FadeInDown, ZoomIn } from "react-native-reanimated";
 import { useFrameTime } from "@/agent/live";
 import { Dither } from "@/sky/Dither";
 import { softTones } from "@/sky/math";
 import { CHROME_MAX_SCALE, haptics, Icon, PixelOrbit, PixelStop, Text, useReducedMotion, useTheme } from "@/ui";
-import { AgentFace } from "../shared/Face";
+import { AgentFace, Face } from "../shared/Face";
 import { useDirectory, useNow } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { markedParts, markName, stoppableInLine, workingEntries } from "./logic";
@@ -189,30 +204,30 @@ export function browsingRuns(runs: LiveRun[]): LiveRun[] {
   });
 }
 
-/** How many faces the stack shows (the sentence says "e mais N"), as on the web. */
-const STACK_MAX = 4;
-
 /**
  * The working line, as the web's activity bar above the composer (ChannelPage `ActivityBar`,
- * WorkingLine.tsx, `.ac-typing[data-active]`): a compact glass pill
- * that fits its content, with a dithered band sweeping in the first agent's color behind it; the
- * pixel orbit; the stacked live mini bodies, each on a plate and popping in (an agent asking
- * another shows both, with an arrow); the sentence with names in ink, fading in whenever what they
- * do changes ("Atlas está consultando o Sentry…"); the clock of a question that is out; and, after
- * a thin rule, "Parar" for the runs I may stop (one tap, no question: what it did stays and can
- * continue). On while they work: one agent on its own gets a turning phrase
- * (a light line while it thinks, what it does, an aside on a long step, what it said last). Nothing
- * moves with Reduce Motion or off screen.
+ * WorkingLine.tsx, `.ac-typing[data-active]`), one for everyone at work here: a low glass pill as wide
+ * as the box whatever it says, with a dithered band sweeping in the first agent's color behind it while
+ * agents work; the pixel orbit (three dots while only people type); a few small faces, each on a plate
+ * and popping in (an agent on its own asking another shows both, with an arrow); one line with names in
+ * ink, fading in whenever it changes ("Theo e mais 2 estão trabalhando · Marina está digitando…"); the
+ * clock of a question that is out; and, for one agent on its own, after a thin rule, "Parar" when I may
+ * stop it (one tap, no question: what it did stays and can continue). One agent on its own gets a turning
+ * phrase (a light line while it thinks, what it does, an aside on a long step, what it said last).
+ * Nothing moves with Reduce Motion or off screen.
  */
 export function WorkingLine({
   runs,
   consults,
+  typing,
   canStop,
   onStop,
   onOpenBrowser,
 }: {
   runs: LiveRun[];
   consults: LiveConsult[];
+  /** The people typing here (never me). */
+  typing: string[];
   canStop: (run: LiveRun) => boolean;
   onStop: (run: LiveRun) => void;
   /** An agent in its browser: tapping the line opens its card in the conversation. */
@@ -223,8 +238,8 @@ export function WorkingLine({
   const { colors: c, shadows } = useTheme();
   const reduced = useReducedMotion();
   const agentName = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
-  const entries = workingEntries(runs, consults, agentName);
-  const asking = entries.find((e) => e.consult?.status === "asking")?.consult;
+  const entries = workingEntries(runs, consults, agentName, typing, (id) => dir.memberById.get(id)?.name);
+  const asking = barAsking(entries);
   const now = useNow(asking ? 1000 : 60_000);
   const turning = entries.length === 1 && entries[0]?.type === "agent";
   const [tick, setTick] = useState(0);
@@ -233,21 +248,29 @@ export function WorkingLine({
     const timer = setInterval(() => setTick((n) => n + 1), PHRASE_TURN_MS);
     return () => clearInterval(timer);
   }, [turning]);
-  const first = entries[0];
-  if (!first) return null;
-  const color = agentLook(dir.agentById.get(first.id)).color;
-  const stoppable = stoppableInLine(runs).filter(canStop);
+  if (entries.length === 0) return null;
+  const agents = entries.filter((e) => e.type === "agent");
+  const lead = agents[0];
+  const color = lead ? agentLook(dir.agentById.get(lead.id)).color : null;
+  // "Parar" is one agent's: with several at work the line can't say whose (the box's own stop stops them all).
+  const solo = agents.length === 1 ? lead : undefined;
+  const stoppable = solo ? stoppableInLine(runs).filter((r) => r.agentId === solo.id && canStop(r)) : [];
   const sentence = activitySentence(t, entries, markName);
-  const phrase = barPhrase(t, entries, runs, tick, Date.now(), markName);
-  const words = markedParts(phrase).map((p, i) =>
-    p.bold ? (
-      // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order
-      <RNText key={i} style={[styles.ink, { color: c.ink }]}>
-        {p.text}
-      </RNText>
-    ) : (
-      p.text
-    ),
+  const [agentWords, sep, typers, typingWords] = barWords(t, entries, runs, tick, Date.now(), markName);
+  // A piece of the line, on one line, names in ink.
+  const piece = (text: string, style?: StyleProp<TextStyle>) => (
+    <Text variant="caption" tone="muted" numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE} style={style}>
+      {markedParts(text).map((p, i) =>
+        p.bold ? (
+          // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order
+          <RNText key={i} style={[styles.ink, { color: c.ink }]}>
+            {p.text}
+          </RNText>
+        ) : (
+          p.text
+        ),
+      )}
+    </Text>
   );
   const clock = asking ? elapsedClock(now - asking.since) : null;
   const pop = reduced ? undefined : ZoomIn.springify().damping(11).stiffness(320).mass(0.6);
@@ -271,12 +294,20 @@ export function WorkingLine({
           .map((p) => p.text)
           .join("")}
       >
-        <Dither kind="sweep" tones={softTones(color, c.raised)} pixel={3} style={StyleSheet.absoluteFill} />
-        <PixelOrbit color={color} size={14} />
+        {color ? (
+          <Dither kind="sweep" tones={softTones(color, c.raised)} pixel={3} style={StyleSheet.absoluteFill} />
+        ) : null}
+        {color ? <PixelOrbit color={color} size={14} /> : <TypingDots color={c.muted} />}
         <View style={styles.stack} importantForAccessibility="no-hide-descendants">
-          {entries.slice(0, STACK_MAX).map((e, i) => {
+          {barFaces(entries).map((e, i) => {
             const gap = i > 0 ? styles.overlap : undefined;
-            if (e.consult?.status === "asking")
+            if (e.type === "person")
+              return (
+                <Animated.View key={`p:${e.id}`} entering={pop} style={[plate, gap]}>
+                  <Face who={{ type: "person", id: e.id }} size={18} />
+                </Animated.View>
+              );
+            if (asking && e.consult === asking)
               return (
                 <Animated.View key={`c:${e.id}`} entering={pop} style={[styles.pair, gap]}>
                   <View style={plate}>
@@ -284,7 +315,7 @@ export function WorkingLine({
                   </View>
                   <Icon name="right" size={14} color={c.faint} />
                   <View style={plate}>
-                    <AgentFace agentId={e.consult.to} size={18} mode="think" />
+                    <AgentFace agentId={asking.to} size={18} mode="think" />
                   </View>
                 </Animated.View>
               );
@@ -304,17 +335,27 @@ export function WorkingLine({
           style={styles.wordsTap}
         >
           {/* The phrase turns: the new one comes up from below. */}
-          <Animated.View key={phrase} entering={reduced ? undefined : FadeInDown.duration(380)} style={styles.words}>
-            <Text variant="caption" tone="muted" numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
-              {words}
-            </Text>
+          <Animated.View
+            key={agentWords + typers + typingWords}
+            entering={reduced ? undefined : FadeInDown.duration(380)}
+            style={styles.words}
+          >
+            {agentWords ? (
+              <View style={styles.agents}>
+                {piece(agentWords, styles.shrink)}
+                {sep ? piece(sep) : null}
+              </View>
+            ) : null}
+            {typingWords ? (
+              <View style={styles.people}>
+                {piece(typers, styles.shrink)}
+                {piece(typingWords)}
+              </View>
+            ) : null}
           </Animated.View>
           {browsing ? (
             <View style={[styles.browser, { backgroundColor: c.raised }]}>
-              <Icon name="globe" size={12} color={c.ink2} />
-              <Text variant="caption" tone="ink2" numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
-                {t("browser.watch.title")}
-              </Text>
+              <Icon name="globe" size={14} color={c.ink2} />
             </View>
           ) : null}
         </Pressable>
@@ -354,6 +395,30 @@ export function WorkingLine({
   );
 }
 
+/** Three dots rising in turn while only people type (the web's `.ac-typing__dots`); still with Reduce Motion. */
+function TypingDots({ color }: { color: string }) {
+  const reduced = useReducedMotion();
+  const t = useFrameTime(!reduced, 0);
+  return (
+    <View style={styles.dots} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      {[0, 1, 2].map((i) => {
+        // A 1.2 s round, each dot 0.15 s after the one before: up and bright at 30% of its round.
+        const at = (((t - i * 0.15) % 1.2) + 1.2) % 1.2;
+        const up = reduced ? 0 : Math.max(0, 1 - Math.abs(at / 1.2 - 0.3) / 0.3);
+        return (
+          <View
+            key={i}
+            style={[
+              styles.dot,
+              { backgroundColor: color, opacity: 0.4 + 0.6 * up, transform: [{ translateY: -2 * up }] },
+            ]}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   // Same turn as a saved message (MessageRow): the reply replaces it in place.
   msg: { flexDirection: "row", gap: 11, paddingLeft: 14, paddingRight: 16, paddingVertical: 10, marginTop: 4 },
@@ -363,16 +428,14 @@ const styles = StyleSheet.create({
   name: { fontWeight: "600", fontSize: 14, lineHeight: 19, flexShrink: 1 },
   state: { flexDirection: "row", alignItems: "center", gap: 5, flexShrink: 0 },
   say: { marginVertical: 2 },
-  dock: { paddingHorizontal: 4, paddingBottom: 6, alignItems: "flex-start" },
+  // As wide as the box, whatever it says: a turning phrase or a face coming and going never moves its edge.
+  dock: { paddingHorizontal: 4, paddingBottom: 6 },
   pill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    maxWidth: "100%",
-    minHeight: 32,
-    paddingVertical: 2,
-    paddingLeft: 8,
-    paddingRight: 6,
+    height: 28,
+    paddingHorizontal: 8,
     borderRadius: 999,
     overflow: "hidden",
   },
@@ -380,20 +443,28 @@ const styles = StyleSheet.create({
   tok: { padding: 1.5, borderRadius: 7 },
   pair: { flexDirection: "row", alignItems: "center", gap: 1 },
   overlap: { marginLeft: -5 },
-  words: { flexShrink: 1 },
-  wordsTap: { flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 1, minWidth: 0 },
+  dots: { flexDirection: "row", alignItems: "center", gap: 3, flexShrink: 0 },
+  dot: { width: 4, height: 4, borderRadius: 2 },
+  // The words take what the marks and the stop leave, so the globe after them stays put while they turn. Who is
+  // typing keeps its width: the agents' words before it end in "…" first (the " · " after them goes with their
+  // last bit, so it never opens the line), then the names, never what they do.
+  words: { flex: 1, flexDirection: "row" },
+  agents: { flexDirection: "row", flexShrink: 1, overflow: "hidden" },
+  people: { flexDirection: "row", maxWidth: "100%" },
+  shrink: { flexShrink: 1 },
+  wordsTap: { flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 0 },
   browser: {
-    flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    justifyContent: "center",
     flexShrink: 0,
-    minHeight: 22,
-    paddingHorizontal: 8,
+    width: 22,
+    height: 22,
     borderRadius: 999,
   },
   ink: { fontWeight: "600" },
   clock: { fontSize: 12, fontWeight: "600", fontVariant: ["tabular-nums"] },
   sep: { width: StyleSheet.hairlineWidth * 2, height: 16, marginLeft: 4, marginRight: 2 },
-  stop: { width: 28, height: 28, borderRadius: 999, alignItems: "center", justifyContent: "center" },
+  // Last in the pill, in its round end: 2px from the edge all around.
+  stop: { width: 24, height: 24, marginRight: -6, borderRadius: 999, alignItems: "center", justifyContent: "center" },
   stopping: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 4 },
 });

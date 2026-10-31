@@ -302,6 +302,7 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
         scope: SCOPE_OF[effect],
         connectionId: account.id,
         connectorLabel: "Email",
+        service: account.preset ?? account.provider,
         sensitive:
           effect === "delete" || (effect === "send" && askToSend) || account.askActions.includes(actionOf(verb)),
         ...extra,

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { LiveConsult, LiveRun, LiveWork, Message, RunConsultation } from "@agenteschat/client";
+import { activitySentence, barFaces } from "@agenteschat/client/lib/activity";
 import { consultBlocksNearEnd, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { toolCalls, toolNow, toolPhrase, toolWhy } from "@agenteschat/client/lib/work";
@@ -38,6 +39,7 @@ import {
   pruneMarks,
   recentTurn,
   rememberTurn,
+  stepLimitOf,
   stoppedOf,
   turnItems,
   turnOpener,
@@ -213,6 +215,26 @@ describe("working line", () => {
   test("the tool step comes through (what it is doing, as on the web)", () => {
     const [e] = workingEntries([run({ runId: "r", agentId: "atlas", tool: "sentry_list_issues" })], [], name);
     expect(e?.activity).toEqual({ kind: "consulting", app: "Sentry" });
+  });
+
+  test("people typing join the one line after the agents, with three faces at most (as on the web)", async () => {
+    const t = await translator("pt-BR");
+    const people: Record<string, string> = { u1: "Marina", u2: "Bia", u3: "Caio" };
+    const personName = (id: string) => people[id];
+    const agents = ["atlas", "ada", "infra"].map((agentId) => run({ runId: `r-${agentId}`, agentId }));
+    // Someone the directory doesn't know (gone from the workspace) isn't named.
+    const entries = workingEntries(agents, [], name, ["u1", "u2", "u3", "gone"], personName);
+    expect(entries.map((e) => `${e.type}:${e.id}`)).toEqual([
+      "agent:atlas",
+      "agent:ada",
+      "agent:infra",
+      "person:u1",
+      "person:u2",
+      "person:u3",
+    ]);
+    expect(activitySentence(t, entries)).toBe("Atlas e mais 2 estão trabalhando · Marina e mais 2 estão digitando…");
+    expect(barFaces(entries).map((e) => e.id)).toEqual(["atlas", "ada", "u1"]);
+    expect(activitySentence(t, workingEntries([], [], name, ["u1"], personName))).toBe("Marina está digitando…");
   });
 
   test("Parar: real runs at work, also while they write (not a guess, not one waiting)", () => {
@@ -715,6 +737,16 @@ describe("an agent's turn as one block", () => {
     const next = withContinued({ canceled: { byUserId: "u1", text: "Oi" }, other: 1 }, "r2");
     expect(next).toEqual({ canceled: { byUserId: "u1", text: "Oi", continuedRunId: "r2" }, other: 1 });
     expect(stoppedOf(next)?.continuedRunId).toBe("r2");
+  });
+
+  test("a reply at the step limit: whether it was continued, marked in its own meta", () => {
+    expect(stepLimitOf({ stepLimit: {}, bodyCode: "step_limit" })).toEqual({ continuedRunId: null });
+    expect(stepLimitOf({ canceled: { byUserId: "u1" } })).toBeNull();
+    expect(stepLimitOf({})).toBeNull();
+    const next = withContinued({ stepLimit: {}, bodyCode: "step_limit" }, "r3");
+    expect(next).toEqual({ stepLimit: { continuedRunId: "r3" }, bodyCode: "step_limit" });
+    expect(stepLimitOf(next)?.continuedRunId).toBe("r3");
+    expect(stoppedOf(next)).toBeNull();
   });
 });
 

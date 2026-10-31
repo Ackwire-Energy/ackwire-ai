@@ -395,7 +395,7 @@ export const en: Translations = {
       ownerWaitsLead: "Open this server's owner link (it ends in /owner#claim=…), on this computer or on your phone.",
       noPassword: "This account signs in from the agentes.chat app.",
       noPasswordLead:
-        "On the computer that runs this server, open the app and choose Add a password in your account menu.",
+        "On the computer that runs this server, open the app and choose Add a password in Settings\u00a0›\u00a0Your account.",
       backToSignIn: "Back to sign in",
     },
     desktop: {
@@ -1027,7 +1027,7 @@ export const en: Translations = {
     on: "Turn on notifications",
     later: "Not now",
     done: "Notifications on in this browser",
-    failed: "Couldn't turn on notifications. Try again from your account menu.",
+    failed: "Couldn't turn on notifications. Try again in Settings\u00a0›\u00a0Notifications.",
     someone: "An agent",
     examples: "Examples of notifications",
     now: "now",
@@ -1055,8 +1055,6 @@ export const en: Translations = {
     addPasswordLabel: "New password",
     addPasswordSaved: "Password added.",
     addPasswordReauth: "Sign in again to add a password.",
-    thisMonth: "This month",
-    budgetOf: "{{name}} budget",
     yourWorkspaces: "Your workspaces",
     youAreHere: "You are here",
     newWorkspace: "New workspace",
@@ -1067,6 +1065,7 @@ export const en: Translations = {
     workspaceSettings: "Workspace settings",
     invite: "Invite people",
     profile: "Profile",
+    editProfile: "Edit profile",
     timezone: "Time zone",
     profileTitle: "Your profile in this workspace",
     handle: "Your @",
@@ -1098,7 +1097,6 @@ export const en: Translations = {
     directMessages: "Direct messages",
     createAgent: "Create agent",
     importAgents: "Bring agents from another app",
-    budgetUsedHint: "The workspace used {{percent}} of its agents' budgets this month",
     account: "Account",
     theme: "Theme",
     themeSystem: "System",
@@ -1110,7 +1108,6 @@ export const en: Translations = {
     soundSky: "Sky",
     soundPixel: "Pixel",
     soundOff: "Off",
-    browserNotices: "Notifications in this browser",
     browserNoticesHint: "Even with the tab closed",
     browserNoticesBlocked:
       "Your browser blocked them. To allow them, click the icon next to the site's address and turn notifications on.",
@@ -1690,6 +1687,7 @@ export const en: Translations = {
     expandAll: "Open all",
     newChannelHere: "New channel here",
     newChannelIn: "New channel in {{name}}",
+    options: "{{name}} options",
     category: "Category",
     categoryHelp: "Where the channel shows in everyone's sidebar.",
     newCategoryOption: "New category…",
@@ -1759,7 +1757,6 @@ export const en: Translations = {
     hidden: "Invisible",
     offline: "Offline",
     setStatus: "Set status",
-    setStatusHint: "Busy, invisible, or what you're up to",
     seen: "seen {{when}}",
     title: "Set status",
     howOthersSee: "How people see you",
@@ -2447,6 +2444,7 @@ export const en: Translations = {
           codeLabel: "Claude code",
           notCode: "That doesn't look like Claude's code.",
           send: "Send to {{computer}}",
+          sending: "Sending the code to {{computer}}…",
           sent: "Code sent. Finishing the sign-in on {{computer}}.",
           local: "On {{computer}} itself? If its browser opened by itself, just authorize there.",
           deviceCode: "Code for ChatGPT",
@@ -5149,6 +5147,8 @@ export const en: Translations = {
       keyShape: "That doesn't look like a {{plan}} key. Copy the whole key.",
       keySafe: "The key goes encrypted to {{computer}} and stays only there.",
       keySendFailed: "Couldn't send the key. Check that it's whole and try again.",
+      keySending: "Sending the key to {{computer}}…",
+      keySent: "Key sent. Finishing the sign-in on {{computer}}.",
       duplicateKey: "That key is already here ({{account}}).",
     },
     connect: {
@@ -6201,6 +6201,7 @@ export const en: Translations = {
     stoppedBy: "Stopped by {{name}}",
     stopped: "Stopped",
     continueRun: "Continue",
+    stepLimit: "At the step limit",
     steer: {
       waiting: "{{name}} reads it at the next pause",
       now: "{{name}} stopped to read it",
@@ -6454,6 +6455,8 @@ export const en: Translations = {
     rendering: "Drawing…",
     htmlFrame: "Page: {{title}}",
     htmlNote: "The page runs isolated, with no access to your account.",
+    htmlFailed: "The page didn't open in this browser. Download it to open elsewhere.",
+    htmlError: "The page hit an error: {{message}}",
     markdownSource: "Markdown text",
   },
   drive: {
@@ -6713,7 +6716,7 @@ export const en: Translations = {
       automation: "Automation",
       email: "Email",
     },
-    emptyCategory: "No connectors in this category yet.",
+    emptyCategory: "No connectors in this category yet",
     soon: "Soon",
     connectName: "Connect {{name}}",
     reconnectName: "Connect {{name}} again",
@@ -6721,7 +6724,8 @@ export const en: Translations = {
     otherText: "Connect any service by its address.",
     search: "Search connectors",
     searchPlaceholder: "Search by name or what it does",
-    empty: "No connector found for “{{q}}”.",
+    empty: "No connector matches “{{q}}”",
+    emptyText: "You can connect any service by its address.",
     none: "No connectors yet.",
     connectedFilter: "Connected",
     suggested: "Suggested for {{org}}",
@@ -6740,8 +6744,8 @@ export const en: Translations = {
       close: "Close details",
       can: "What agents will be able to do",
       afterText: "No agent uses it until you choose.",
-      allText: "Once connected, every agent can use it. You can change that later.",
-      keepText: "Agents keep the access they have. You can change that later.",
+      allText: "Once connected, every agent can use it. Next, you choose each agent's access.",
+      keepText: "Agents keep the access they have. Next, you can change it for each one.",
       again: "Connect another account",
       connected: "Already connected",
       how: "How it works",
@@ -7511,6 +7515,8 @@ export const en: Translations = {
       saved: "{{name}}'s email saved.",
       unsaved: "Unsaved changes",
       warning: "Reads email from anyone and sends without asking: a malicious email may try to trick the agent.",
+      pending: "It hasn't finished connecting.",
+      needsReconnect: "Agents can't use it until it's reconnected.",
       saveError: {
         send_without_recipients: "To send without asking, fill in “Only send to”.",
         unknown: "Couldn't save. Try again.",
@@ -7609,6 +7615,10 @@ export const en: Translations = {
     },
     approval: {
       alwaysUnavailable: "This request can't be approved for good. Approve just this one.",
+    },
+    mail: {
+      accountNotFound: "This mailbox is no longer connected. Connect it again in Connectors.",
+      fromNotMailbox: "“Send as” must be one of this mailbox's addresses. Pick another one.",
     },
     join: {
       linkClosed: "This link no longer works. Ask whoever sent it for a new one.",
@@ -8182,6 +8192,7 @@ export const en: Translations = {
       costs: "Costs and data",
     },
     section: {
+      account: "Your account",
       notifications: "Notifications",
       general: "General",
       members: "Members and invitations",
@@ -8198,6 +8209,7 @@ export const en: Translations = {
       billing: "Plan and billing",
     },
     sectionText: {
+      account: "Your profile and how the app looks for you.",
       notifications:
         "The inbox keeps everything. Here you choose what reaches you as a notification, in this workspace.",
       general: "Name, time zone and what every agent knows about the workspace.",
@@ -8214,6 +8226,9 @@ export const en: Translations = {
       billing: "This workspace's agentes.chat plan, card and invoices are on a page of ours, outside the app.",
     },
     title: "Settings",
+    account: {
+      device: "On this device",
+    },
     orgTitle: "Workspace",
     name: "Name",
     savedShort: "Saved",
@@ -8428,8 +8443,8 @@ export const en: Translations = {
   chat: {
     doing_one: "{{names}} is {{doing}}",
     doing_other: "{{names}} are {{doing}}",
-    /** "Theo, Iris and 2 more" (3 or more names in the working line). */
-    namesMore: "{{first}}, {{second}} and {{count}} more",
+    /** "Theo and 2 more" (3 or more names in the working line). */
+    namesMore: "{{first}} and {{count}} more",
     /** The card above the box turns its phrase. */
     phrase: {
       thinking: {
@@ -8792,6 +8807,7 @@ export const en: Translations = {
         remembered: "Memory updated: {{text}}",
       },
       interrupted: "Interrupted by a server restart. Ask again to continue.",
+      step_limit: "I ran out of steps before finishing.",
       forum_suggestion: 'Worth a forum? "{{title}}"',
       forum_concluded: 'The forum "{{title}}" is over. The synthesis is in the file below.',
       forum_concluded_issues:
@@ -9381,6 +9397,16 @@ export const en: Translations = {
     cloud: {
       review:
         "Paused for a safety review, until our team looks at it. Our automated checks flagged activity that may break our Terms (section 5). To contest it, write to {{email}}.",
+      /** The same hold set with what was flagged (`review.<category>`): `what` is that category's `reviewWhat`. */
+      reviewFor:
+        "Paused for a safety review, until our team looks at it. Our automated checks flagged activity that seems to involve {{what}}, which our Terms don't allow (section 5). To contest it, write to {{email}}.",
+      /** Also the server's own English text (`packages/engine/src/standing.ts`), which a refused run keeps. */
+      reviewWhat: {
+        phishing_impersonation: "phishing or impersonating a brand",
+        account_takeover: "getting into other people's accounts",
+        fraud: "fraud",
+        illegal_content: "illegal content",
+      },
       blockedAbuse:
         "This account is blocked. Our checks linked it to an account closed for abuse (Terms, section 5). To contest it, write to {{email}}.",
       blockedLegal:
@@ -9452,9 +9478,14 @@ export const en: Translations = {
     membersOnly: "Only an owner can restore it.",
     restored: "{{name}} is back",
   },
-  /** Deleting your account (the account menu): what goes, what stays, and what has to happen first. */
+  /** Deleting your account (Configurações › Sua conta): what goes, what stays, and what has to happen first. */
   deleteAccount: {
     menu: "Delete account",
+    /** Sua conta's last card: its title is `menu`. */
+    card: {
+      text: "You leave every workspace and your account is deleted for good.",
+      button: "Delete account…",
+    },
     title: "Delete your account?",
     closes_one: "{{names}} closes now and is deleted for good on {{date}}. You're the only one there.",
     closes_other: "{{names}} close now and are deleted for good on {{date}}. You're the only one there.",
@@ -9647,6 +9678,8 @@ export const en: Translations = {
     },
     retry: "Try again",
     takeover: "Take control",
+    /** Over the last picture while control opens. */
+    taking: "Taking control…",
     clipboard: {
       got: "Copied on {{name}}'s computer:",
       copy: "Copy",
@@ -9666,7 +9699,6 @@ export const en: Translations = {
       doneByYou: "Done by you at {{time}}. {{agent}} looked at the screen again and went on.",
     },
     control: {
-      keys: "Copy and paste as usual: {{copy}}, {{paste}}.",
       notice: "Programs on {{name}}'s computer can see the screen and what you type or paste.",
     },
     /** The ⓘ beside the control line, on agentes.chat Cloud only (ADR 0076). */

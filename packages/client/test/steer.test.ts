@@ -205,6 +205,18 @@ describe("what became of a message sent while an agent works", () => {
     s = applySteerEvent(s, { type: "run.continued", channelId: "c1", runId: "r1", newRunId: "r3", messageId: "m8" });
     expect(s.continued.m8).toBe("r3");
   });
+
+  test("a reply at the step limit is marked the same way (meta.stepLimit.continuedRunId)", () => {
+    const atLimit = {
+      id: "m7",
+      channelId: "c1",
+      author: { type: "agent", id: "ada" },
+      meta: { bodyCode: "step_limit", stepLimit: { continuedRunId: "r5" } },
+    } as unknown as Message;
+    expect(continuedRunIdOf(atLimit)).toBe("r5");
+    expect(seedSteerMessages(emptySteer, "c1", [atLimit]).continued.m7).toBe("r5");
+    expect(continuedRunIdOf({ meta: { stepLimit: {} } } as unknown as Message)).toBeNull();
+  });
 });
 
 describe("the app's steer store is fed by the socket", () => {

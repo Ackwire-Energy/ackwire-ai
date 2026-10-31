@@ -19,6 +19,9 @@ const KNOWN = {
   "agent_proposal.decided": "errors.agentProposal.decided",
   "approval.always_unavailable": "errors.approval.alwaysUnavailable",
   "agent_proposal.expired": "errors.agentProposal.expired",
+  "mail.account_not_found": "errors.mail.accountNotFound",
+  "mail.from_not_mailbox": "errors.mail.fromNotMailbox",
+  send_without_recipients: "mail.agent.saveError.send_without_recipients",
   "artifact.file_too_large": "errors.artifact.fileTooLarge",
   "artifact.file_required": "errors.artifact.fileRequired",
   "artifact.file_name_required": "errors.artifact.fileNameRequired",
@@ -157,6 +160,16 @@ export const LEGAL_EMAIL = "legal@agentes.chat";
 const REVIEW_REASON = "review";
 
 /**
+ * Mirror of what agentes.chat Cloud's automatic hold names, as `review.<category>`: the review line says it. Any other
+ * category reads as plain `review`.
+ */
+const REVIEW_FLAGGED = ["phishing_impersonation", "account_takeover", "fraud", "illegal_content"] as const;
+
+/** The category a `review.<category>` reason names when the apps know it (`standing.cloud.reviewWhat`), else undefined. */
+export const reviewFlaggedOf = (reason: string) =>
+  REVIEW_FLAGGED.find((category) => reason === `${REVIEW_REASON}.${category}`);
+
+/**
  * Reasons agentes.chat Cloud sets that rest on no Terms section, so nothing to contest: the automatic hold has a line
  * of its own, and `ended` holds a workspace whose plan ended, a billing matter.
  */
@@ -195,7 +208,11 @@ export function restrictionLine(
       // A billing hold (ADR 0079) is said in words of its own, never as the reason.
       const billing = billingHoldOf({ state: "hold", reason });
       if (billing) return t(`standing.billing.${billing}`);
-      if (cloud && reason === REVIEW_REASON) return t("standing.cloud.review", email);
+      const flagged = reviewFlaggedOf(reason);
+      if (cloud && flagged)
+        return t("standing.cloud.reviewFor", { ...email, what: t(`standing.cloud.reviewWhat.${flagged}`) });
+      if (cloud && (reason === REVIEW_REASON || reason.startsWith(`${REVIEW_REASON}.`)))
+        return t("standing.cloud.review", email);
       return reason ? contested(t("standing.onHold", { reason })) : t("standing.paused");
     }
     case "org.suspended":

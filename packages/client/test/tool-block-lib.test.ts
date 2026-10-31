@@ -2,10 +2,13 @@ import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { LiveRun, LiveWork } from "../src/index";
 import { applyChannelEvent, emptyStreams, isQuiet, QUIET_AFTER_MS } from "../src/index";
+import { type Activity, barEntries } from "../src/lib/activity";
 import {
+  callLogo,
   foldSteps,
   formatLineTime,
   stepPhrase,
+  type ToolItem,
   toolApps,
   toolCalls,
   toolHint,
@@ -14,7 +17,9 @@ import {
   toolNow,
   toolPhrase,
   toolWhy,
+  workApps,
   workFromSteps,
+  workMeta,
 } from "../src/lib/work";
 
 type Ev = Parameters<typeof applyChannelEvent>[1];
@@ -360,5 +365,182 @@ describe("a computer command (its permission check)", () => {
       ['chat.work.refused|{"app":"Run the tests"}', 1, at(5)],
       ['Chat.activity.runningCommand|{"app":"npm publish"}', 1, at(6)],
     ]);
+  });
+});
+
+describe("each call's service and its logo", () => {
+  const catalog = [
+    { id: "github", label: "GitHub", iconUrl: "/connectors/github.svg", brandColor: null },
+    { id: "drive", label: "Google Drive", iconUrl: "/connectors/googledrive.svg", brandColor: "#4285F4" },
+    { id: "linear", label: "Linear", iconUrl: "/connectors/linear.svg", brandColor: "#5E6AD2" },
+  ];
+  const icon =
+    "/api/app/connector-icons/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-0000000000f1/0123456789abcdef.png";
+  const lines = (items: ToolItem[]) => items.flatMap((i) => (i.kind === "call" ? [i.line] : []));
+  const logo = (a: Activity | undefined) => (a ? callLogo(a, catalog) : null);
+
+  test("a mailbox goes by its maker: Gmail's mark, 'Consultou o Gmail', which mailbox and the verb in grey", () => {
+    const [gmail, sales, other, old] = lines(
+      toolItemsLive([
+        call("1", "mail_wnogueira_search", { connector: "Email", service: "gmail" }),
+        { kind: "say", text: "Agora a de vendas." },
+        call("2", "mail_vendas_search", { connector: "Email", service: "gmail" }),
+        { kind: "say", text: "Agora a outra caixa." },
+        call("3", "mail_contato_read", { connector: "Email", service: "custom" }),
+        { kind: "say", text: "E a de antes." },
+        call("4", "mail_ana_read", { connector: "Email" }),
+      ]),
+    );
+    expect(gmail).toMatchObject({ kind: "consulting", app: "Gmail", service: "gmail", hint: "wnogueira search" });
+    // Two mailboxes of one maker: the same phrase and logo, the grey words say which.
+    expect(sales).toMatchObject({ app: "Gmail", service: "gmail", hint: "vendas search" });
+    expect(gmail && toolPhrase(t, { ...gmail, state: "done" })).toBe(
+      'chat.work.step.consulting|{"app":"Gmail","tool":"mail wnogueira search"}',
+    );
+    expect(logo(gmail)).toMatchObject({
+      kind: "service",
+      def: { iconUrl: "/connectors/gmail.svg", brandColor: "#EA4335" },
+      image: null,
+      label: "Gmail",
+    });
+    // A mailbox on a server of its own, or one recorded before calls named their service: our envelope, "Email".
+    expect(other).toMatchObject({ app: "Email", service: "mail", hint: "contato read" });
+    expect(old).toMatchObject({ app: "Email", service: "mail", hint: "ana read" });
+    expect(logo(other)).toEqual({ kind: "mail" });
+    // A maker's name keeps its own capitals; a connector's slug gets one.
+    const [icloud] = lines(toolItemsLive([call("5", "mail_contato_read", { connector: "Email", service: "icloud" })]));
+    expect(icloud && toolPhrase(t, { ...icloud, state: "done" })).toBe(
+      'chat.work.step.consulting|{"app":"iCloud","tool":"mail contato read"}',
+    );
+    expect(toolPhrase(t, { kind: "consulting", app: "himetrica", tool: "himetrica_get", state: "done" })).toBe(
+      'chat.work.step.consulting|{"app":"Himetrica","tool":"himetrica get"}',
+    );
+  });
+
+  test("a connector shows its mark, a server by address its own icon, a database Postgres's; ours keep our icons", () => {
+    const [github, custom, db, issue, ownDrive, googleDrive] = lines(
+      toolItemsLive([
+        call("1", "github_search_issues", { connector: "GitHub", service: "github" }),
+        call("2", "acme_tools_find_orders", { connector: "Acme Tools", serviceIcon: icon }),
+        call("3", "pg_analytics_list_tables", { connector: "Analytics", service: "postgres" }),
+        call("4", "create_issue"),
+        call("5", "read_artifact"),
+        call("6", "drive_search_files", { connector: "Google Drive", service: "drive" }),
+      ]),
+    );
+    expect(logo(github)).toMatchObject({
+      kind: "service",
+      def: { iconUrl: "/connectors/github.svg" },
+    });
+    expect(github?.hint).toBe("search issues");
+    // A server's whole label leaves its tools' names, however many words it has.
+    expect(custom?.hint).toBe("find orders");
+    expect(logo(custom)).toEqual({
+      kind: "service",
+      def: null,
+      image: icon,
+      label: "Acme Tools",
+    });
+    expect(db).toMatchObject({ app: "Analytics", hint: "list tables" });
+    expect(logo(db)).toMatchObject({
+      kind: "service",
+      def: { iconUrl: "/brands/postgresql.svg" },
+    });
+    expect(logo(issue)).toEqual({ kind: "own" });
+    // Our Drive is ours; Google Drive's calls read the same but show its mark.
+    expect([ownDrive?.kind, googleDrive?.kind]).toEqual(["readingDrive", "readingDrive"]);
+    expect(logo(ownDrive)).toEqual({ kind: "own" });
+    expect(logo(googleDrive)).toMatchObject({
+      def: { iconUrl: "/connectors/googledrive.svg" },
+    });
+  });
+
+  test("the block's logos: each service once, in order of first use, four at most", () => {
+    const items = toolItemsLive([
+      call("1", "mail_wnogueira_search", { connector: "Email", service: "gmail" }),
+      call("2", "github_get_pr", { connector: "GitHub", service: "github" }),
+      call("3", "mail_wnogueira_read", { connector: "Email", service: "gmail" }),
+      call("4", "create_issue"),
+      call("5", "read_artifact"),
+      call("6", "linear_list_issues", { connector: "Linear", service: "linear" }),
+    ]);
+    expect(toolApps(items)).toEqual([
+      { kind: "consulting", app: "Gmail", service: "gmail" },
+      { kind: "consulting", app: "GitHub", service: "github" },
+      { kind: "creatingIssue" },
+      { kind: "readingDrive" },
+    ]);
+  });
+
+  test("a saved run reads its app and service from the step; the reply's meta gives the closed block's logos", () => {
+    const at = (s: number) => new Date(Date.UTC(2026, 9, 31, 10, 0, s)).toISOString();
+    const work = workFromSteps([
+      {
+        seq: 1,
+        kind: "tool_call",
+        data: { toolUseId: "t1", name: "mail_wnogueira_search", input: {}, connector: "Email", service: "gmail" },
+        createdAt: at(0),
+      },
+      { seq: 2, kind: "tool_result", data: { toolUseId: "t1", content: "2 messages" }, createdAt: at(1) },
+      {
+        seq: 3,
+        kind: "tool_call",
+        data: { toolUseId: "t2", name: "open_pull_request", input: {}, connector: "GitHub", service: "github" },
+        createdAt: at(2),
+      },
+      { seq: 4, kind: "tool_result", data: { toolUseId: "t2", content: "opened" }, createdAt: at(3) },
+    ]);
+    expect(work.steps.map((s) => [s.app, s.service, s.hint])).toEqual([
+      ["Gmail", "gmail", "wnogueira search"],
+      // One of ours ("Abriu um pull request"): no app in its phrase, GitHub's logo by its service.
+      [undefined, "github", null],
+    ]);
+    const meta = workMeta({
+      work: {
+        steps: 3,
+        durationMs: 4000,
+        calls: [
+          { name: "mail_wnogueira_search", connector: "Email", service: "gmail" },
+          { name: "create_issue" },
+          { tool: "no name" },
+          { name: "github_get_pr", connector: "GitHub", service: "github" },
+        ],
+      },
+    });
+    expect(meta?.calls.map((c) => c.name)).toEqual(["mail_wnogueira_search", "create_issue", "github_get_pr"]);
+    expect(workApps(meta?.calls ?? [])).toEqual([
+      { kind: "consulting", app: "Gmail", service: "gmail" },
+      { kind: "creatingIssue" },
+      { kind: "consulting", app: "GitHub", service: "github" },
+    ]);
+    // Older replies carry only the count: no logos until the steps load.
+    expect(workMeta({ work: { steps: 2 } })?.calls).toEqual([]);
+  });
+
+  test("the bar names the mailbox's maker too", () => {
+    const run = {
+      runId: "r1",
+      agentId: "theo",
+      channelId: "c1",
+      threadId: "m1",
+      status: "running" as const,
+      text: "",
+      lastSeq: 0,
+      tool: "mail_wnogueira_search",
+      connector: "Email",
+      service: "gmail",
+    };
+    expect(
+      barEntries(
+        [run],
+        [],
+        () => "Theo",
+        () => undefined,
+      )[0]?.activity,
+    ).toEqual({
+      kind: "consulting",
+      app: "Gmail",
+      service: "gmail",
+    });
   });
 });

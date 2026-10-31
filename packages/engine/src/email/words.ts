@@ -159,6 +159,8 @@ const en = {
       create: "Next: create your first agent.",
     },
     headline: "Your agents' computer is ready",
+    /** The picture's alt text: the computer, with the agents around it. */
+    computer: "Your agents' computer",
     body: (org: string): Text => [
       "Thanks for waiting. ",
       { b: org },
@@ -437,6 +439,7 @@ const ptBR: Words = {
       create: "Agora: crie o primeiro agente.",
     },
     headline: "O computador dos seus agentes está pronto",
+    computer: "O computador dos seus agentes",
     body: (org) => [
       "Obrigado por esperar. O computador da ",
       { b: org },

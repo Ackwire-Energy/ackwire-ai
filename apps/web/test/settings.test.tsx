@@ -512,13 +512,14 @@ describe("Configurações do workspace", () => {
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
     await go(state);
     expect(document.body.textContent).toContain("Só admins mudam as configurações.");
-    // The sub-nav only lists what a member can open.
+    // The sub-nav only lists what a member can open (each link's words, after its icon or my face).
     const nav = screen().getByRole("navigation", { name: "Seções das configurações" });
     expect(
       within(nav)
         .getAllByRole("link")
-        .map((l) => l.textContent),
+        .map((l) => l.lastChild?.textContent),
     ).toEqual([
+      "Sua conta",
       "Notificações",
       "Geral",
       "Membros e convites",

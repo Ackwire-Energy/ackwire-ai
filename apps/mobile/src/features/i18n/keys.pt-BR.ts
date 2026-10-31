@@ -179,6 +179,8 @@ export const featureKeysPtBR = {
     empty: "Nenhuma conversa ainda.",
     // A DM with no message yet: a word to start (an agent's row says who it is instead).
     sayHi: "Diga oi para {{name}}.",
+    // A channel with no message and no topic yet.
+    channelEmpty: "Nenhuma mensagem ainda. Comece a conversa.",
     closed: "Fechada",
     working: "trabalhando…",
     missionProgress: "{{done}} de {{total}} itens",
@@ -309,6 +311,7 @@ export const featureKeysPtBR = {
       byYou: "Parado por você",
       by: "Parado por {{name}}",
       plain: "Parado",
+      limit: "No limite de passos",
       continue: "Continuar",
       failed: "Não deu para continuar. Tente de novo.",
     },

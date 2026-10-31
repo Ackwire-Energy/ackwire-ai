@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { Channel } from "@agenteschat/client";
 import { categoryHrefs, channelSteps, movesChannel, stepBefore } from "../../src/features/categories/logic";
 import {
+  agentStarters,
   buildConversations,
   categoryListKind,
   categoryOfListKind,
@@ -74,6 +75,40 @@ describe("the home with channel categories", () => {
   test("a category's Ver todos route", () => {
     expect(categoryOfListKind(categoryListKind("mkt"))).toBe("mkt");
     expect(categoryOfListKind("channels")).toBeNull();
+  });
+});
+
+describe("the home's Agentes before any conversation with an agent", () => {
+  const agents = [
+    { id: "a1", name: "Ada", handle: "ada" },
+    { id: "a2", name: "Dev", handle: "dev" },
+    { id: "a3", name: "Infra", handle: "infra" },
+  ];
+  const starters = agentStarters(agents, new Set(["a3"]));
+  const channels = buildConversations({ channels: [channel("general", 5)], dms: [], threads: [] });
+
+  test("lists the team's agents I can see, each a DM still to open, with no 'Ver todos'", () => {
+    const agentsBlock = homeLayout(channels, [], 1, starters)[0];
+    expect(agentsBlock?.key).toBe("agents");
+    expect(agentsBlock?.rows.map((r) => [r.key, r.channelId])).toEqual([["a:a1", ""]]);
+    expect(agentsBlock?.total).toBe(2);
+    expect(agentsBlock?.more).toBe(false);
+  });
+
+  test("an agent DM replaces them", () => {
+    const rows = buildConversations({
+      channels: [],
+      dms: [
+        {
+          channelId: "d1",
+          with: { type: "agent", id: "a2", name: "Dev", handle: "dev" },
+          lastMessage: null,
+          unread: 0,
+        },
+      ],
+      threads: [],
+    });
+    expect(homeLayout(rows, [], undefined, starters)[0]?.rows.map((r) => r.key)).toEqual(["d:d1"]);
   });
 });
 

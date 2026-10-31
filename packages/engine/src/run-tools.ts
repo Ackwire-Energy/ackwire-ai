@@ -152,6 +152,12 @@ const screenTool = (name: string): { tool: string; screen: TrailScreen } | null 
   return null;
 };
 
+/** A call that drives the agent's browser or desktop, by name or through `use_tool` (tools on demand). */
+export const isScreenCall = (call: { name: string; input?: unknown }): boolean => {
+  const target = call.name === ON_DEMAND_USE ? (call.input as { tool?: unknown } | undefined)?.tool : call.name;
+  return typeof target === "string" && screenTool(target) !== null;
+};
+
 const withTrail = (list: BrowserTrailStep[] | undefined, more: BrowserTrailStep[]) =>
   [...(list ?? []), ...more].slice(-BROWSER_TRAIL_MAX);
 
@@ -437,6 +443,8 @@ export async function invokeWithChip(
     ...where,
     tool: shownName,
     ...(connector ? { connector } : {}),
+    ...(def?.service ? { service: def.service } : {}),
+    ...(def?.serviceIcon ? { serviceIcon: def.serviceIcon } : {}),
     ...(detail ? { detail } : {}),
     toolUseId: use.id,
     ...(code ? { code } : {}),

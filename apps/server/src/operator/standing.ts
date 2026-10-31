@@ -41,7 +41,7 @@ const StandingInput = z.object({
   state: StandingState,
   reason: z.string().trim().min(1).max(64).openapi({
     description:
-      "Shown to the workspace with the notice `shown`, its owners' notice included. On agentes.chat Cloud, `review` reads as the automatic review hold's line, `ended` (a plan that ended) as it is, and any other reason is followed by how to contest it, so name the Terms section it rests on.",
+      "Shown to the workspace with the notice `shown`, its owners' notice included. On agentes.chat Cloud, `review` reads as the automatic review hold's line, `review.<category>` as that line naming what was flagged (`phishing_impersonation`, `account_takeover`, `fraud` or `illegal_content`, any other category reading as plain `review`), `ended` (a plan that ended) as it is, and any other reason is followed by how to contest it, so name the Terms section it rests on.",
   }),
   note: z.string().trim().max(2000).optional(),
   notice: StandingNotice,

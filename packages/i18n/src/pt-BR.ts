@@ -392,7 +392,7 @@ export const ptBR = {
       ownerWaitsLead: "Abra o link de dono deste servidor (termina em /owner#claim=…), neste computador ou no celular.",
       noPassword: "Esta conta entra pelo app do agentes.chat.",
       noPasswordLead:
-        "No computador onde este servidor roda, abra o app e escolha Adicionar uma senha no menu da sua conta.",
+        "No computador onde este servidor roda, abra o app e escolha Adicionar uma senha em Configurações\u00a0›\u00a0Sua conta.",
       backToSignIn: "Voltar para entrar",
     },
     desktop: {
@@ -1028,7 +1028,7 @@ export const ptBR = {
     on: "Ativar avisos",
     later: "Agora não",
     done: "Avisos ativados neste navegador",
-    failed: "Não deu para ativar os avisos. Tente de novo no menu da sua conta.",
+    failed: "Não deu para ativar os avisos. Tente de novo em Configurações\u00a0›\u00a0Notificações.",
     someone: "Um agente",
     examples: "Exemplos de avisos",
     now: "agora",
@@ -1056,8 +1056,6 @@ export const ptBR = {
     addPasswordLabel: "Nova senha",
     addPasswordSaved: "Senha adicionada.",
     addPasswordReauth: "Entre de novo para adicionar uma senha.",
-    thisMonth: "Este mês",
-    budgetOf: "Orçamento de {{name}}",
     yourWorkspaces: "Seus workspaces",
     youAreHere: "Você está aqui",
     newWorkspace: "Novo workspace",
@@ -1068,6 +1066,7 @@ export const ptBR = {
     workspaceSettings: "Configurações do workspace",
     invite: "Convidar pessoas",
     profile: "Perfil",
+    editProfile: "Editar perfil",
     timezone: "Fuso horário",
     profileTitle: "Seu perfil neste workspace",
     handle: "Seu @",
@@ -1099,7 +1098,6 @@ export const ptBR = {
     directMessages: "Mensagens diretas",
     createAgent: "Criar agente",
     importAgents: "Trazer agentes de outro app",
-    budgetUsedHint: "O workspace usou {{percent}} do orçamento dos agentes este mês",
     account: "Conta",
     theme: "Tema",
     themeSystem: "Do sistema",
@@ -1111,7 +1109,6 @@ export const ptBR = {
     soundSky: "Céu",
     soundPixel: "Pixel",
     soundOff: "Sem som",
-    browserNotices: "Avisos neste navegador",
     browserNoticesHint: "Mesmo com a aba fechada",
     browserNoticesBlocked:
       "O navegador bloqueou os avisos. Para permitir, clique no ícone ao lado do endereço do site e ligue as notificações.",
@@ -1703,6 +1700,7 @@ export const ptBR = {
     expandAll: "Abrir todas",
     newChannelHere: "Novo canal aqui",
     newChannelIn: "Novo canal em {{name}}",
+    options: "Opções de {{name}}",
     category: "Categoria",
     categoryHelp: "Onde o canal aparece na barra lateral de todo mundo.",
     newCategoryOption: "Nova categoria…",
@@ -1772,7 +1770,6 @@ export const ptBR = {
     hidden: "Oculto",
     offline: "Offline",
     setStatus: "Definir status",
-    setStatusHint: "Ocupado, oculto ou o que você está fazendo",
     seen: "visto {{when}}",
     title: "Definir status",
     howOthersSee: "Como as pessoas te veem",
@@ -2468,6 +2465,7 @@ export const ptBR = {
           /** Under the field while what it holds isn't a code of this sign-in (it waits for Enviar). */
           notCode: "Isso não parece o código do Claude.",
           send: "Enviar ao {{computer}}",
+          sending: "Enviando o código ao {{computer}}…",
           sent: "Código enviado. O {{computer}} está terminando de entrar.",
           local: "Está no próprio {{computer}}? Se o navegador dele abriu sozinho, é só autorizar lá.",
           deviceCode: "Código para o ChatGPT",
@@ -5186,6 +5184,8 @@ export const ptBR = {
       keyShape: "Isso não parece uma chave do {{plan}}. Copie a chave inteira.",
       keySafe: "A chave vai criptografada para o {{computer}} e\u00a0fica\u00a0só\u00a0lá.",
       keySendFailed: "Não deu para enviar a chave. Confira se ela está inteira e tente de novo.",
+      keySending: "Enviando a chave ao {{computer}}…",
+      keySent: "Chave enviada. O {{computer}} está terminando de entrar.",
       duplicateKey: "Essa chave já está aqui ({{account}}).",
     },
     connect: {
@@ -6238,6 +6238,7 @@ export const ptBR = {
     stoppedBy: "Parado por {{name}}",
     stopped: "Parado",
     continueRun: "Continuar",
+    stepLimit: "No limite de passos",
     steer: {
       waiting: "{{name}} lê na próxima pausa",
       now: "{{name}} parou para ler",
@@ -6490,6 +6491,8 @@ export const ptBR = {
     rendering: "Desenhando…",
     htmlFrame: "Página: {{title}}",
     htmlNote: "A página roda isolada, sem acesso à sua conta.",
+    htmlFailed: "A página não abriu neste navegador. Baixe para abrir em outro lugar.",
+    htmlError: "A página teve um erro: {{message}}",
     markdownSource: "Texto em Markdown",
   },
   drive: {
@@ -6751,7 +6754,7 @@ export const ptBR = {
       automation: "Automação",
       email: "Email",
     },
-    emptyCategory: "Nenhum conector nesta categoria ainda.",
+    emptyCategory: "Nenhum conector nesta categoria ainda",
     soon: "Em breve",
     connectName: "Conectar {{name}}",
     reconnectName: "Conectar {{name}} de novo",
@@ -6759,7 +6762,8 @@ export const ptBR = {
     otherText: "Conecte qualquer serviço pelo endereço dele.",
     search: "Buscar conector",
     searchPlaceholder: "Buscar por nome ou o que faz",
-    empty: "Nenhum conector encontrado com “{{q}}”.",
+    empty: "Nenhum conector com “{{q}}”",
+    emptyText: "Você pode conectar qualquer serviço pelo endereço dele.",
     none: "Nenhum conector ainda.",
     connectedFilter: "Conectados",
     suggested: "Sugeridos para a {{org}}",
@@ -6778,8 +6782,8 @@ export const ptBR = {
       close: "Fechar detalhe",
       can: "O que os agentes poderão fazer",
       afterText: "Nenhum agente usa até você escolher.",
-      allText: "Ao conectar, todos os agentes podem usar. Você muda isso depois.",
-      keepText: "Os agentes mantêm o acesso que já têm. Você muda isso depois.",
+      allText: "Ao conectar, todos os agentes podem usar. Em seguida, você escolhe o acesso de cada um.",
+      keepText: "Os agentes mantêm o acesso que já têm. Em seguida, você pode mudar o de cada um.",
       again: "Conectar outra conta",
       connected: "Já conectado",
       how: "Como funciona",
@@ -7552,6 +7556,8 @@ export const ptBR = {
       saved: "Email de {{name}} salvo.",
       unsaved: "Alterações não salvas",
       warning: "Lê emails de qualquer pessoa e envia sem pedir: um email malicioso pode tentar enganar o agente.",
+      pending: "Ainda não terminou de conectar.",
+      needsReconnect: "Os agentes só usam depois de reconectar.",
       saveError: {
         send_without_recipients: "Para enviar sem pedir aprovação, preencha “Só enviar para”.",
         unknown: "Não deu para salvar. Tente de novo.",
@@ -7650,6 +7656,10 @@ export const ptBR = {
     },
     approval: {
       alwaysUnavailable: "Este pedido não pode ser aprovado para sempre. Aprove só este.",
+    },
+    mail: {
+      accountNotFound: "Esta caixa de email não está mais conectada. Conecte de novo em Conectores.",
+      fromNotMailbox: "“Enviar como” precisa ser um endereço desta caixa. Escolha outro.",
     },
     join: {
       linkClosed: "Este link não funciona mais. Peça um novo a quem mandou.",
@@ -8229,6 +8239,7 @@ export const ptBR = {
       costs: "Custos e dados",
     },
     section: {
+      account: "Sua conta",
       notifications: "Notificações",
       general: "Geral",
       members: "Membros e convites",
@@ -8245,6 +8256,7 @@ export const ptBR = {
       billing: "Plano e cobrança",
     },
     sectionText: {
+      account: "Seu perfil e como o app fica para você.",
       notifications: "A caixa de notificações guarda tudo. Aqui você escolhe o que chega como aviso, neste workspace.",
       general: "Nome, fuso e o que todo agente sabe do workspace.",
       members: "Quem está no workspace e os convites.",
@@ -8260,6 +8272,9 @@ export const ptBR = {
       billing: "O plano do agentes.chat deste workspace, o cartão e as faturas ficam numa página nossa, fora do app.",
     },
     title: "Configurações",
+    account: {
+      device: "Neste aparelho",
+    },
     orgTitle: "Workspace",
     name: "Nome",
     savedShort: "Salvo",
@@ -8480,8 +8495,8 @@ export const ptBR = {
     /** Typing bar: "{{names}} está {{doing}}" (agents' verbs come from their tool calls). */
     doing_one: "{{names}} está {{doing}}",
     doing_other: "{{names}} estão {{doing}}",
-    /** "Theo, Iris e mais 2" (3 or more names in the working line). */
-    namesMore: "{{first}}, {{second}} e mais {{count}}",
+    /** "Theo e mais 2" (3 or more names in the working line). */
+    namesMore: "{{first}} e mais {{count}}",
     /** The card above the box turns its phrase. */
     phrase: {
       thinking: {
@@ -8847,6 +8862,7 @@ export const ptBR = {
         remembered: "Memória atualizada: {{text}}",
       },
       interrupted: "Interrompida porque o servidor reiniciou. Peça de novo para continuar.",
+      step_limit: "Meus passos acabaram antes de eu terminar.",
       forum_suggestion: 'Vale um fórum? "{{title}}"',
       forum_concluded: 'O fórum "{{title}}" terminou. A síntese está no arquivo abaixo.',
       forum_concluded_issues:
@@ -9439,6 +9455,15 @@ export const ptBR = {
     cloud: {
       review:
         "Pausado para uma análise de segurança, até a nossa equipe olhar o caso. As nossas verificações automáticas detectaram uma atividade que pode violar os nossos Termos (seção 5). Para contestar, escreva para {{email}}.",
+      /** The same hold set with what was flagged (`review.<category>`): `what` is that category's `reviewWhat`. */
+      reviewFor:
+        "Pausado para uma análise de segurança, até a nossa equipe olhar o caso. As nossas verificações automáticas detectaram uma atividade que parece envolver {{what}}, o que os nossos Termos não permitem (seção 5). Para contestar, escreva para {{email}}.",
+      reviewWhat: {
+        phishing_impersonation: "phishing ou imitação de uma marca",
+        account_takeover: "acesso indevido a contas de outras pessoas",
+        fraud: "fraude",
+        illegal_content: "conteúdo ilegal",
+      },
       blockedAbuse:
         "Esta conta está bloqueada. As nossas verificações a ligaram a uma conta encerrada por abuso (Termos, seção 5). Para contestar, escreva para {{email}}.",
       blockedLegal:
@@ -9511,9 +9536,13 @@ export const ptBR = {
     membersOnly: "Só um dono pode restaurar.",
     restored: "{{name}} voltou",
   },
-  /** Deleting your account (the account menu): what goes, what stays, and what has to happen first. */
+  /** Deleting your account (Configurações › Sua conta): what goes, what stays, and what has to happen first. */
   deleteAccount: {
     menu: "Apagar conta",
+    card: {
+      text: "Você sai de todos os workspaces e a sua conta é apagada de vez.",
+      button: "Apagar conta…",
+    },
     title: "Apagar a sua conta?",
     closes_one: "{{names}} fecha agora e é apagado de vez em {{date}}. Só você está lá.",
     closes_other: "{{names}} fecham agora e são apagados de vez em {{date}}. Só você está lá.",
@@ -9703,6 +9732,8 @@ export const ptBR = {
     },
     retry: "Tentar de novo",
     takeover: "Assumir o controle",
+    /** Over the last picture while control opens. */
+    taking: "Assumindo o controle…",
     clipboard: {
       got: "Copiado no computador {{of}} {{name}}:",
       copy: "Copiar",
@@ -9722,7 +9753,6 @@ export const ptBR = {
       doneByYou: "Feito por você às {{time}}. {{The}} {{agent}} olhou a tela de novo e seguiu.",
     },
     control: {
-      keys: "Copiar e colar como sempre: {{copy}}, {{paste}}.",
       notice: "Os programas do computador {{of}} {{name}} veem a tela e o que você digita ou cola.",
     },
     /** The ⓘ beside the control line, on agentes.chat Cloud only (ADR 0076). */
