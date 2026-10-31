@@ -184,6 +184,14 @@ export async function vncInit(vnc: VncConnection): Promise<{ width: number; heig
  * than `bufferedMax`. The data socket closes with 1011 when the desktop went
  * away (the viewer retries and learns whether it runs), 1000 when the viewer
  * broke the handshake. Settles once the stream ended.
+ *
+ * The server's side of the handshake goes out at once, the desktop's ServerInit
+ * right behind it, never waiting for the viewer's answers: each wait would be a
+ * round trip between the person and the computer through the server, three of
+ * them before noVNC connects. Each step is a frame of its own: noVNC reads no
+ * further than the version in the frame that brings it. The viewer's answers are
+ * checked as they come, and until they checked out the desktop gets nothing of
+ * the viewer's, so it sends no screen (an update needs a request).
  */
 export function serveNone(
   data: DataSocket,
@@ -231,20 +239,20 @@ export function serveNone(
 
     const handshake = async () => {
       data.send(VERSION);
-      if (!(await viewer.read(12)).equals(VERSION)) return end(STREAM_CLOSE.normal, "RFB 3.8 only");
       data.send(Uint8Array.of(1, SECURITY_NONE));
-      if ((await viewer.read(1))[0] !== SECURITY_NONE) return end(STREAM_CLOSE.normal, "security type None only");
       data.send(Uint8Array.of(0, 0, 0, 0));
-      // ClientInit: the viewer's own shared flag is not passed on.
-      await viewer.read(1);
-      clearTimeout(timer);
+      // ClientInit as shared: the viewer's own flag is not passed on.
       socket.write(Uint8Array.of(1));
-      piping = true;
-      const early = viewer.rest();
-      if (early.length > 0) socket.write(early);
       if (vnc.leftover.length > 0) data.send(vnc.leftover);
       socket.on("data", fromDesktop);
       socket.resume();
+      if (!(await viewer.read(12)).equals(VERSION)) return end(STREAM_CLOSE.normal, "RFB 3.8 only");
+      if ((await viewer.read(1))[0] !== SECURITY_NONE) return end(STREAM_CLOSE.normal, "security type None only");
+      await viewer.read(1);
+      clearTimeout(timer);
+      piping = true;
+      const early = viewer.rest();
+      if (early.length > 0) socket.write(early);
     };
     handshake().catch(() => end());
   });

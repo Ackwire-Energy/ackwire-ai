@@ -405,25 +405,29 @@ test("the runner's own stream code through the server: a watcher's RFB handshake
   try {
     await until(() => runner.online, "the runner");
 
-    // noVNC's side: the runner offers RFB 3.8 and security None, and the desktop's ServerInit follows ClientInit.
+    // noVNC's side: the runner offers RFB 3.8 and security None, the desktop's ServerInit right behind, all before
+    // the viewer answers anything; each its own frame through the server, as noVNC takes one step a frame.
     const viewer = openViewer(desktop, owner);
     const sendBytes = (bytes: Uint8Array | string) =>
       viewer.socket.send(typeof bytes === "string" ? new TextEncoder().encode(bytes) : bytes);
-    await until(() => bytesOf(viewer).length >= 12, "the desktop's version");
-    expect(bytesOf(viewer).toString("latin1")).toBe("RFB 003.008\n");
-    sendBytes("RFB 003.008\n");
-    await until(() => bytesOf(viewer).length >= 14, "the security types");
-    sendBytes(Uint8Array.of(1));
-    await until(() => bytesOf(viewer).length >= 18, "the security result");
-    sendBytes(Uint8Array.of(0));
-    await until(() => bytesOf(viewer).length >= 18 + 27, "the ServerInit");
-    expect([...bytesOf(viewer).subarray(12, 18)]).toEqual([1, 1, 0, 0, 0, 0]);
+    await until(() => bytesOf(viewer).length >= 18 + 27, "the runner's side of the handshake");
+    expect(viewer.got.slice(0, 3).map((f) => [...new Uint8Array(f as ArrayBuffer)])).toEqual([
+      [...new TextEncoder().encode("RFB 003.008\n")],
+      [1, 1],
+      [0, 0, 0, 0],
+    ]);
     expect(
       bytesOf(viewer)
         .subarray(18 + 24)
         .toString(),
     ).toBe("Dev");
     expect(xvnc.logins[0]).toMatchObject({ password: "view", shared: 1 });
+    sendBytes("RFB 003.008\n");
+    sendBytes(Uint8Array.of(1));
+    sendBytes(Uint8Array.of(0));
+    // A request once the answers checked out: the desktop's update comes back.
+    sendBytes(Uint8Array.of(3, 0, 0, 0, 0, 0, 5, 0, 3, 32));
+    await until(() => bytesOf(viewer).length === 18 + 27 + 4, "the update");
     viewer.socket.close();
     await until(() => xvnc.logins[0]?.socket.destroyed === true, "the desktop's connection to close");
 

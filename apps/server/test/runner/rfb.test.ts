@@ -32,20 +32,89 @@ async function fakeXvnc() {
 const dev: AgentScope = { id: "01a142cb-489d-7000-87a3-efb5adb382ca", handle: "dev", name: "Dev" };
 const VERSION = "RFB 003.008\n";
 
-/** The viewer's side of the handshake (as noVNC does it): version, None, ClientInit; returns the ServerInit. */
+/** The runner's side of the handshake and the desktop's ServerInit ("Dev"): 12 + 2 + 4 + 24 + 3 bytes. */
+const SERVER_SIDE = 45;
+
+/**
+ * The viewer's side of the handshake (as noVNC does it): the runner's whole side comes before the viewer says
+ * anything, then the version, None and ClientInit; returns the ServerInit.
+ */
 async function viewerHandshake(data: ReturnType<typeof memoryDataSocket>, shared = 0) {
-  await waitFor(() => data.bytes().length >= 12);
-  expect(data.bytes().toString("latin1")).toBe(VERSION);
+  await waitFor(() => data.bytes().length >= SERVER_SIDE);
+  expect([...data.bytes().subarray(0, 18)]).toEqual([...Buffer.from(VERSION, "latin1"), 1, 1, 0, 0, 0, 0]);
   data.send(VERSION);
-  await waitFor(() => data.bytes().length >= 14);
-  expect([...data.bytes().subarray(12)]).toEqual([1, 1]);
   data.send(Uint8Array.of(1));
-  await waitFor(() => data.bytes().length >= 18);
-  expect([...data.bytes().subarray(14)]).toEqual([0, 0, 0, 0]);
   data.send(Uint8Array.of(shared));
-  await waitFor(() => data.bytes().length >= 18 + 27);
   return data.bytes().subarray(18);
 }
+
+/**
+ * noVNC 1.7's handshake as its socket's messages drive it (`_handleMessage` → `_initMsg`, core/rfb.js): one pass a
+ * frame, which goes from step to step while their bytes are there, except that the version's step ends its pass.
+ * What it answers, and whether it connected (its ServerInit read).
+ */
+function noVnc() {
+  let q = Buffer.alloc(0);
+  let step: "version" | "security" | "result" | "init" | "connected" = "version";
+  const answers: number[][] = [];
+  const pass = () => {
+    for (;;) {
+      if (step === "version") {
+        if (q.length < 12) return;
+        q = q.subarray(12);
+        answers.push([...Buffer.from(VERSION, "latin1")]);
+        step = "security";
+        return;
+      }
+      if (step === "security") {
+        const n = q[0];
+        if (n === undefined || q.length < 1 + n) return;
+        q = q.subarray(1 + n);
+        answers.push([1]);
+        step = "result";
+      } else if (step === "result") {
+        if (q.length < 4) return;
+        q = q.subarray(4);
+        answers.push([1]);
+        step = "init";
+      } else if (step === "init") {
+        if (q.length < 24 || q.length < 24 + q.readUInt32BE(20)) return;
+        q = q.subarray(24 + q.readUInt32BE(20));
+        step = "connected";
+      } else return;
+    }
+  };
+  return {
+    message: (frame: Buffer) => {
+      q = Buffer.concat([q, frame]);
+      pass();
+    },
+    answers,
+    connected: () => step === "connected",
+  };
+}
+
+test("the runner's side of the handshake and the desktop's ServerInit go before the viewer answers anything, a frame a step: noVNC connects on them alone", async () => {
+  const x = await fakeXvnc();
+  const { desktops } = desktopOn(x.socketPath);
+  const data = memoryDataSocket();
+  await openDesktopStream(desktops, dev, "watch", async () => data.socket);
+  // Nothing from the viewer yet: one trip to the person, where waiting for each answer made it four.
+  await waitFor(() => data.bytes().length >= SERVER_SIDE);
+  const frames = data.sent.map((f) => Buffer.from(f));
+  expect(frames.slice(0, 3).map((f) => [...f])).toEqual([[...Buffer.from(VERSION, "latin1")], [1, 1], [0, 0, 0, 0]]);
+  expect(x.logins[0]).toMatchObject({ password: "view", shared: 1 });
+  const viewer = noVnc();
+  for (const frame of frames) viewer.message(frame);
+  expect(viewer.connected()).toBe(true);
+
+  // Its answers, then a request: the desktop gets the request once the answers checked out, and its update comes.
+  for (const answer of viewer.answers) data.send(Uint8Array.from(answer));
+  const before = data.bytes().length;
+  data.send(Uint8Array.of(3, 0, 0, 0, 0, 0, 5, 0, 3, 32));
+  await waitFor(() => data.bytes().length === before + 4);
+  expect(x.logins[0]?.got[0]).toBe(3);
+});
 
 test("VncAuth: DES-ECB of the challenge, the password as the key with each byte's bits reversed", () => {
   const challenge = Uint8Array.from({ length: 16 }, (_, i) => i);
@@ -122,15 +191,25 @@ test("either side closing ends the stream: the desktop's end closes the data soc
   await waitFor(() => holds.released === 2);
 });
 
-test("a viewer that speaks anything but RFB 3.8 is closed (1000: no retry)", async () => {
+test("a viewer that speaks anything but RFB 3.8 with None is closed (1000: no retry), and the desktop got nothing of it", async () => {
   const x = await fakeXvnc();
   const { desktops } = desktopOn(x.socketPath);
+  const request = [3, 0, 0, 0, 0, 0, 5, 0, 3, 32];
   const data = memoryDataSocket();
   await openDesktopStream(desktops, dev, "watch", async () => data.socket);
-  await waitFor(() => data.bytes().length >= 12);
-  data.send("RFB 003.003\n");
+  await waitFor(() => data.bytes().length >= SERVER_SIDE);
+  data.send(Buffer.concat([Buffer.from("RFB 003.003\n", "latin1"), Buffer.from([1, 1, ...request])]));
   await waitFor(() => data.closed !== null);
   expect(data.closed).toEqual({ code: STREAM_CLOSE.normal, reason: "RFB 3.8 only" });
+
+  const other = memoryDataSocket();
+  await openDesktopStream(desktops, dev, "watch", async () => other.socket);
+  await waitFor(() => other.bytes().length >= SERVER_SIDE);
+  other.send(Buffer.concat([Buffer.from(VERSION, "latin1"), Buffer.from([2, 1, ...request])]));
+  await waitFor(() => other.closed !== null);
+  expect(other.closed).toEqual({ code: STREAM_CLOSE.normal, reason: "security type None only" });
+  await waitFor(() => x.logins.every((l) => l.socket.destroyed));
+  expect(x.logins.map((l) => l.got.length)).toEqual([0, 0]);
 });
 
 test("reading from the desktop pauses while the data socket holds more than its limit, and goes on once it drained", async () => {
