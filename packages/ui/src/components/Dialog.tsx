@@ -97,6 +97,9 @@ export function Dialog({
           onPointerDownOutside={(e) => {
             if (onToast.current) e.preventDefault();
           }}
+          // React passes a portal's events up the component tree: a form sent in a dialog opened from another
+          // dialog's form would send that form too.
+          onSubmit={(e) => e.stopPropagation()}
           onCloseAutoFocus={(e) => {
             const target = returnTo.current;
             if (target?.isConnected) {
