@@ -1,4 +1,3 @@
-import { setTimeout as sleep } from "node:timers/promises";
 import { PERMISSION_TOOL, type PubSub } from "@agenteschat/adapters";
 import {
   and,
@@ -106,8 +105,7 @@ import { UPDATE_ISSUE_TOOL } from "./issue-tools";
 import { linkRunToIssue, mirrorReplyToIssue } from "./issues";
 import { listenLiveSteering, renderSteered } from "./live-steer";
 import { touchMachineAccount } from "./machine-accounts";
-import type { MachineStatus } from "./machine-hub";
-import { TASK_OFFLINE_GRACE_MS } from "./machine-tasks";
+import { computerBackSoon, type MachineStatus } from "./machine-hub";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import { postNoAiCard } from "./no-ai";
 import { enqueue, PermanentJobError } from "./outbox";
@@ -390,8 +388,6 @@ export class BrainFailure extends Error {
 
 /** How long a run whose computer dropped mid-turn waits quietly for it before saying it is unavailable. */
 export const COMPUTER_DROP_GRACE_MS = 2 * 60_000;
-/** How long a run waits, still working, for a computer just gone: a runner dialing again is back within seconds. */
-export const COMPUTER_BLIP_WAIT_MS = 30_000;
 /** A run resumes on its computer after this many drops at most; then it ends like any failed turn. */
 export const MAX_COMPUTER_DROPS = 3;
 /** How often a run whose computer had no room for its turn asks again (the runner admits turns by room). */
@@ -1459,23 +1455,6 @@ async function executeRunInner(
   };
 
   /**
-   * Waits for a computer gone less than the outage grace (`TASK_OFFLINE_GRACE_MS`: its runner dialing again, our
-   * own restart) to come back, up to `COMPUTER_BLIP_WAIT_MS`. The run stays `running` meanwhile (its heartbeat and
-   * its job's lease go on) and nothing is posted or stored. True: it is back. Null: the run was canceled.
-   */
-  const computerBackSoon = async (machineId: string): Promise<boolean | null> => {
-    const until = Date.now() + (deps.computerBlipWaitMs ?? COMPUTER_BLIP_WAIT_MS);
-    for (;;) {
-      const status = await deps.machines?.status(machineId).catch(() => null);
-      if (status?.online) return true;
-      const gone = status?.lastSeenAt ? Date.now() - Date.parse(status.lastSeenAt) : Number.POSITIVE_INFINITY;
-      if (gone >= TASK_OFFLINE_GRACE_MS || Date.now() >= until) return false;
-      await sleep(Math.min(1_000, until - Date.now()), undefined, { signal }).catch(() => {});
-      if (await isCanceled()) return null;
-    }
-  };
-
-  /**
    * The computer brain can't answer. On the run's first look (`firstLook`), a computer just gone is waited for
    * first (`computerBackSoon`). Still away: the model brain stands in with a quiet note, or the run waits for the
    * computer, or (nothing to think with) it fails with `no_ai`. A computer with no room for the turn (`busy`)
@@ -1490,7 +1469,11 @@ async function executeRunInner(
     const t = transcript as Transcript;
     const machineId = plan.session?.machineId ?? agent.machineId ?? null;
     if (firstLook && machineId && u.code === "machine_offline") {
-      const back = await computerBackSoon(machineId);
+      const back = await computerBackSoon(deps.machines, machineId, {
+        waitMs: deps.computerBlipWaitMs,
+        signal,
+        canceled: isCanceled,
+      });
       if (back === null) return "canceled";
       if (back) return "back";
     }

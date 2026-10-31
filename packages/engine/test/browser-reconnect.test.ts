@@ -1,9 +1,17 @@
 import { afterEach, expect, test } from "bun:test";
 import type { ServerFrame } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
-import { BROWSER_SCOPE, type BrowserLiveMessage, createBrowserLive, grantScopes, type MachineHub } from "../src";
+import {
+  BROWSER_SCOPE,
+  type BrowserLiveMessage,
+  createBrowserLive,
+  createBrowserToolSource,
+  grantScopes,
+  type MachineHub,
+} from "../src";
 import { type Fixture, setup } from "./fixtures";
 import { pairMachine, RUNNER } from "./machine-fixtures";
+import { runContext } from "./mail-fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -13,6 +21,9 @@ afterEach(async () => {
 });
 
 type Request = Extract<ServerFrame, { type: "request" }>;
+
+/** What the fake runner's browser shows after any command. */
+const PAGE = { snapshot: '- heading "agentes.chat" [ref=e1]', origin: "https://app.agentes.chat/" };
 
 /**
  * A runner over an in-memory socket that answers the live view's ops. `dead`: its socket's close never
@@ -39,6 +50,10 @@ function browserRunner(hub: MachineHub, opts: { dead?: boolean; closedBrowser?: 
         }
         if (frame.op === "browser.stream.stop") return ok({ stopped: true });
         if (frame.op === "browser.warm") return ok({ started: false });
+        if (frame.op === "browser.batch") {
+          const { commands } = frame as unknown as { commands: { command: string }[] };
+          return ok({ answers: commands.map((c) => ({ success: true, data: c.command === "snapshot" ? PAGE : {} })) });
+        }
         return ok({ success: true, data: { url: "https://facebook.com/login" } });
       }, 1);
     },
@@ -50,6 +65,7 @@ function browserRunner(hub: MachineHub, opts: { dead?: boolean; closedBrowser?: 
   return {
     conn,
     starts: () => got.filter((r) => r.op === "browser.stream.start"),
+    batches: () => got.filter((r) => r.op === "browser.batch"),
     hello: (token: string) =>
       hub.message(
         conn,
@@ -126,4 +142,64 @@ test("a runner that restarts after its socket closed: the views hear it reconnec
   expect(fresh.starts()).toHaveLength(1);
   expect(kinds(got).at(-1)).toBe("unavailable:closed");
   live.close();
+});
+
+/** The agent's browser tools on the fixture's hub, the workspace's own computer "VPS" as its computer. */
+async function toolSetup() {
+  const holder: { hub?: MachineHub } = {};
+  const hub = () => holder.hub as MachineHub;
+  f = await setup({
+    machines: true,
+    toolSources: [
+      createBrowserToolSource({
+        machines: {
+          hub: { status: (id) => hub().status(id), call: (id, request, options) => hub().call(id, request, options) },
+        },
+      }),
+    ],
+  });
+  holder.hub = f.machineHub as MachineHub;
+  const paired = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "VPS" });
+  await f.db.update(schema.machines).set({ kind: "managed" }).where(eq(schema.machines.id, paired.machineId));
+  await f.db.update(schema.agents).set({ machineId: paired.machineId }).where(eq(schema.agents.id, f.agent.id));
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: BROWSER_SCOPE }]);
+  const ctx = await runContext(f);
+  const open = async () => {
+    const r = await (f.tools as NonNullable<Fixture["tools"]>).invoke(ctx, {
+      toolUseId: `tu_${crypto.randomUUID()}`,
+      name: "browser_do",
+      input: { steps: [{ do: "open", url: "https://app.agentes.chat/" }] },
+    });
+    if (r.type !== "result") throw new Error("expected a result");
+    return r.output;
+  };
+  return { hub: hub(), paired, open };
+}
+
+test("a computer whose runner is dialing again: the browser waits for it and opens the page; one away for minutes is said at once", async () => {
+  const { hub, paired, open } = await toolSetup();
+  const old = browserRunner(hub);
+  await old.hello(paired.token);
+  // Its socket drops (a restart, the network): nothing the agent sends gets there until it says hello again.
+  await hub.close(old.conn);
+  const opening = open();
+  await Bun.sleep(50);
+  const fresh = browserRunner(hub);
+  await fresh.hello(paired.token);
+  const out = await opening;
+  expect(out.content).not.toContain("isn't answering");
+  expect(out.isError).toBeFalsy();
+  expect(out.content).toContain("agentes.chat");
+  expect(fresh.batches()).toHaveLength(1);
+
+  await hub.close(fresh.conn);
+  await f.db
+    .update(schema.machines)
+    .set({ lastSeenAt: new Date(Date.now() - 3 * 60_000) })
+    .where(eq(schema.machines.id, paired.machineId));
+  const started = Date.now();
+  const away = await open();
+  expect(Date.now() - started).toBeLessThan(1000);
+  expect(away.isError).toBe(true);
+  expect(away.content).toContain("The computer VPS isn't answering right now.");
 });

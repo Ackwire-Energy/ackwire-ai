@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from "node:timers/promises";
 import {
   ACCOUNTS_PROTOCOL,
   BROWSER_PROTOCOL,
@@ -156,6 +157,50 @@ export interface MachineCaller {
     options?: MachineCallOptions,
   ): Promise<MachineReplies[Op]>;
   status(machineId: string): Promise<MachineStatus | null>;
+}
+
+/** How long a run waits, still working, for a computer just gone: a runner dialing again is back within seconds. */
+export const COMPUTER_BLIP_WAIT_MS = 30_000;
+
+/**
+ * Waits for a computer gone less than the outage grace (`TASK_OFFLINE_GRACE_MS`: its runner dialing again, our
+ * own restart) to come back, up to `waitMs`. The run stays `running` meanwhile (its heartbeat and its job's lease
+ * go on) and nothing is posted or stored. True: it is back. Null: `canceled` said so.
+ */
+export async function computerBackSoon(
+  machines: Pick<MachineCaller, "status"> | undefined,
+  machineId: string,
+  options: { waitMs?: number; signal?: AbortSignal; canceled?: () => boolean | Promise<boolean> } = {},
+): Promise<boolean | null> {
+  const until = Date.now() + (options.waitMs ?? COMPUTER_BLIP_WAIT_MS);
+  for (;;) {
+    const status = await machines?.status(machineId).catch(() => null);
+    if (status?.online) return true;
+    const gone = status?.lastSeenAt ? Date.now() - Date.parse(status.lastSeenAt) : Number.POSITIVE_INFINITY;
+    if (gone >= TASK_OFFLINE_GRACE_MS || Date.now() >= until) return false;
+    await sleep(Math.min(1_000, until - Date.now()), undefined, { signal: options.signal }).catch(() => {});
+    if (await options.canceled?.()) return null;
+  }
+}
+
+/**
+ * `send`, and once more when it found the computer just gone (`computerBackSoon`): that request never left. One
+ * cut midway (`MachineDroppedError`) may have run, so it is never sent again.
+ */
+export async function callWhenBack<T>(
+  machines: Pick<MachineCaller, "status">,
+  machineId: string,
+  send: () => Promise<T>,
+  signal?: AbortSignal,
+): Promise<T> {
+  try {
+    return await send();
+  } catch (error) {
+    if (!(error instanceof MachineOfflineError) || error instanceof MachineDroppedError) throw error;
+    const back = await computerBackSoon(machines, machineId, { signal, canceled: () => signal?.aborted === true });
+    if (!back) throw error;
+    return send();
+  }
 }
 
 interface Pending {
