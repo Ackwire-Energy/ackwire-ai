@@ -1530,4 +1530,12 @@ export const featureKeysEn: FeatureTranslations = {
       failed: "Couldn't download the file. Try again.",
     },
   },
+  status: {
+    title: "Status",
+    doing: "What you're doing",
+    placeholder: "In a meeting, at lunch…",
+    noEmoji: "No emoji",
+    cleared: "Status cleared",
+    bySelfUntil: "Written by {{name}} · {{when}}",
+  },
 };

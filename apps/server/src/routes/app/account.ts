@@ -764,7 +764,16 @@ export function accountRoutes(deps: AppDeps) {
       const { orgId } = c.req.valid("param");
       await requirePermission(db, c.get("user").id, orgId, "read");
       const members = await listMembers(db, orgId);
-      return c.json({ members: members.map((m) => ({ ...m, joinedAt: m.joinedAt.toISOString() })) }, 200);
+      return c.json(
+        {
+          // Status and availability only go out through `/people`, where a hidden person reads as offline.
+          members: members.map(({ availability, statusText, statusEmoji, statusUntil, ...m }) => ({
+            ...m,
+            joinedAt: m.joinedAt.toISOString(),
+          })),
+        },
+        200,
+      );
     },
   );
 

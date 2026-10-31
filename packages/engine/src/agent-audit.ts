@@ -67,7 +67,7 @@ export function auditsCall(
 ): boolean {
   if (outcome === "refused" || outcome === "failed") return kind !== "directory";
   if (kind === "read") return Boolean(tool.connectionId);
-  return kind !== "directory" && kind !== "pass" && kind !== "here";
+  return kind !== "directory" && kind !== "pass" && kind !== "self" && kind !== "here";
 }
 
 const MAX_TITLE = 200;

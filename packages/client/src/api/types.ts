@@ -1218,9 +1218,77 @@ export interface Person {
   role: Role;
   joinedAt: string;
   lastSeenAt: string | null;
+  /** Seen as connected: `presence` is online, away or busy. */
   online: boolean;
+  /** `hidden` only for yourself; everyone else sees a hidden person as `offline` (ADR 0084). */
+  presence: MemberPresence;
+  /** What the person wrote they are doing; null = nothing (or its time is up). */
+  status: MemberStatus | null;
+  /** Only on your own row: what you picked (your `presence` reads offline while you aren't connected). */
+  availability?: Availability;
   handle: string;
   timezone: string;
+}
+
+/** A person as others see them (ADR 0084). */
+export type MemberPresence = "online" | "away" | "busy" | "hidden" | "offline";
+/** What a person picks: `auto` = online while connected, `away`, `busy`, or `hidden` (offline to everyone else). */
+export type Availability = "auto" | "away" | "busy" | "hidden";
+
+export interface MemberStatus {
+  text: string;
+  emoji: string | null;
+  /** ISO; null = until changed. */
+  until: string | null;
+}
+
+/** `PUT …/me/status`: either part may be left out; `status: null` clears the line. */
+export interface StatusInput {
+  availability?: Availability;
+  status?: { text: string; emoji?: string | null; until?: string | null } | null;
+}
+
+/** An agent's presence, from its work (ADR 0084); an agent with no AI is drawn `offline` by the apps. */
+export type AgentPresence = "online" | "busy" | "away" | "offline";
+
+/** What an agent's line says when the server picked it (ADR 0084 §8); worded by the app (`presence.agent.*`). */
+export type AgentStatusKind =
+  | "task"
+  | "routine"
+  | "mission"
+  | "channel"
+  | "browsing"
+  | "coding"
+  | "files"
+  | "wiki"
+  | "planning"
+  | "data"
+  | "mail"
+  | "connector"
+  | "computer"
+  | "waiting_approval"
+  | "waiting_answer"
+  | "waiting_computer";
+
+/** An agent's line: its own words (`by: "self"`, `text`), or one the server picked for the run (`kind` + `subject`). */
+export interface AgentStatusLine {
+  by: "self" | "auto" | "wait";
+  text: string | null;
+  kind: AgentStatusKind | null;
+  /** The task's title, the routine's name, the public channel, the connector… */
+  subject: string | null;
+  emoji: string | null;
+  /** ISO; null = until the run ends. */
+  until: string | null;
+}
+
+/** `GET …/agent-status`: one agent's presence and its line. */
+export interface AgentStatus {
+  agentId: string;
+  presence: AgentPresence;
+  status: AgentStatusLine | null;
+  /** Its last run's end (now while one is going); null = it never worked. */
+  activeAt: string | null;
 }
 
 export interface InvitationWithStatus {

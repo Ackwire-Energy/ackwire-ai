@@ -198,7 +198,8 @@ const SETUP_FIELDS = [
  * and the suspended screen follow without a reload, and asks for the setup again: a workspace on hold waits for no
  * computer, and one active again waits for one. `org.limits` (a new plan, ADR 0079) asks for the limits again, so a
  * full workspace's invitations open by themselves. `agent.groups` (ADR 0083) says the groups of agents changed: they
- * are read again. Returns whether the event was one of these.
+ * are read again. `member.status` and `agent.status` (ADR 0084) refetch the people and the agents' presence. Returns
+ * whether the event was one of these.
  */
 export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { type: string }): boolean {
   if (event.type === "agent.groups") {
@@ -242,6 +243,15 @@ export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { typ
   }
   if (event.type === "org.limits") {
     void qc.invalidateQueries({ queryKey: keys.limits(orgId) });
+    return true;
+  }
+  // Someone changed their availability or line, or an agent its line (ADR 0084): the lists follow.
+  if (event.type === "member.status") {
+    void qc.invalidateQueries({ queryKey: keys.people(orgId) });
+    return true;
+  }
+  if (event.type === "agent.status") {
+    void qc.invalidateQueries({ queryKey: keys.agentStatus(orgId) });
     return true;
   }
   return false;

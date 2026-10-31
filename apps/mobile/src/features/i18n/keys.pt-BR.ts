@@ -1536,6 +1536,14 @@ export const featureKeysPtBR = {
       failed: "Não deu para baixar o arquivo. Tente de novo.",
     },
   },
+  status: {
+    title: "Status",
+    doing: "O que você está fazendo",
+    placeholder: "Em reunião, almoçando…",
+    noEmoji: "Sem emoji",
+    cleared: "Status limpo",
+    bySelfUntil: "Escrito por {{name}} · {{when}}",
+  },
 };
 
 type Shape<T> = { [K in keyof T]: T[K] extends string ? string : Shape<T[K]> };

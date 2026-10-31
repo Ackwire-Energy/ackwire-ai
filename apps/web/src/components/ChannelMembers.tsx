@@ -1,13 +1,16 @@
 import type { Agent, Member } from "@agenteschat/client";
-import { agentStateIn, useAiStatus, usePeople, useRoster } from "@agenteschat/client";
+import { agentStateIn, useAiStatus, useRoster } from "@agenteschat/client";
+import { relativeTime } from "@agenteschat/client/lib/format";
 import { picksForMe } from "@agenteschat/client/lib/routing";
 import { Avatar, AvatarStack, Button, Popover } from "@agenteschat/ui";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
+import { StatusLine } from "@/components/Presence";
 import { ProfileTrigger } from "@/components/ProfileCard";
 import { useMatchMedia } from "@/hooks/useMatchMedia";
+import { agentLine, personLine, useAgentPresence, usePersonPresence } from "@/hooks/usePresence";
 import { useStreams } from "@/realtime/context";
 
 /** Opening on hover waits a little (a pointer just passing by doesn't open it). */
@@ -37,9 +40,10 @@ export function ChannelDetailsButton({ onClick }: { onClick: () => void }) {
 
 /**
  * The stacked avatars in the channel header: a button ("Membros do canal (5)")
- * whose glass popover lists the people (photo, name, @handle, presence,
- * "você") and the agents (the living symbol, state, role, "responde sem
- * menção"). Each row opens the profile card; the footer opens the details.
+ * whose glass popover lists the people (photo with the presence badge, name,
+ * "você", their line or presence) and the agents (the living symbol with its
+ * badge, its line or state, role, "responde sem menção"). Each row opens the
+ * profile card; the footer opens the details.
  */
 export function ChannelMembersStack({
   channelId,
@@ -149,10 +153,8 @@ function MembersList({
 }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
-  const presence = usePeople(org.id);
   const roster = useRoster(org.id, channelId);
   const routing = useAiStatus(org.id).data?.routing;
-  const online = new Set((presence.data ?? []).filter((p) => p.online).map((p) => p.userId));
   // "Answers without a mention" only while something reads this person's messages that mention nobody.
   const autoReply = new Set(
     picksForMe(routing) ? (roster.data ?? []).filter((r) => r.type === "agent" && r.autoReply).map((r) => r.id) : [],
@@ -173,21 +175,7 @@ function MembersList({
         <section aria-label={t("channel.membersPeople")}>
           <h2 className="members-pop__title">{t("channel.membersPeople")}</h2>
           {people.map((m) => (
-            <ProfileTrigger
-              key={m.userId}
-              actor={{ type: "person", id: m.userId }}
-              label={t("profile.of", { name: m.name })}
-              className="members-pop__row"
-            >
-              <Avatar size="sm" name={m.name} imageUrl={m.image} presence={online.has(m.userId)} />
-              <span className="members-pop__text">
-                <span className="members-pop__name">
-                  {m.name}
-                  {m.userId === me.user.id && <span className="members-pop__you"> · {t("channel.you")}</span>}
-                </span>
-                <span className="members-pop__meta">@{m.handle}</span>
-              </span>
-            </ProfileTrigger>
+            <PersonRow key={m.userId} member={m} you={m.userId === me.user.id} />
           ))}
         </section>
       )}
@@ -208,22 +196,78 @@ function MembersList({
   );
 }
 
+/** A person: the badge, and under the name their line, or how they appear ("Offline · visto há 2 h"). */
+function PersonRow({ member: m, you }: { member: Member; you: boolean }) {
+  const { t, i18n } = useTranslation();
+  const shown = usePersonPresence(m.userId);
+  const line = shown?.status ? personLine(shown.status) : null;
+  const word = shown ? t(`presence.${shown.presence}`) : null;
+  const seen = shown?.presence === "offline" ? shown.person.lastSeenAt : null;
+  return (
+    <ProfileTrigger
+      actor={{ type: "person", id: m.userId }}
+      label={t("profile.of", { name: m.name })}
+      className="members-pop__row"
+    >
+      <Avatar
+        size="sm"
+        name={m.name}
+        imageUrl={m.image}
+        presence={shown?.presence ?? null}
+        presenceLabel={word ?? undefined}
+      />
+      <span className="members-pop__text">
+        <span className="members-pop__name">
+          {m.name}
+          {you && <span className="members-pop__you"> · {t("channel.you")}</span>}
+        </span>
+        {line ? (
+          <StatusLine emoji={line.emoji} text={line.text} className="members-pop__meta" />
+        ) : (
+          <span className="members-pop__meta">
+            {seen
+              ? `${word} · ${t("presence.seen", { when: relativeTime(t, i18n.language, seen) })}`
+              : (word ?? `@${m.handle}`)}
+          </span>
+        )}
+      </span>
+    </ProfileTrigger>
+  );
+}
+
+/** An agent: the badge, and under the name its line, or what it does here, or its presence; then its role. */
 function AgentRow({ agent, channelId, autoReply }: { agent: Agent; channelId: string; autoReply: boolean }) {
   const { t } = useTranslation();
   const state = useStreams((s) => agentStateIn(s, agent.id, channelId));
+  const shown = useAgentPresence(agent.id);
+  const word = shown ? t(`presence.${shown.presence}`) : null;
+  const line = agentLine(t, shown?.line ?? null);
+  // At work in this conversation and saying nothing yet: "pensando"; at rest, how it appears.
+  const doing = state !== "idle" || !word ? t(`channel.agentState.${state}`) : word;
   return (
     <ProfileTrigger
       actor={{ type: "agent", id: agent.id }}
       label={t("profile.of", { name: agent.name })}
       className="members-pop__row"
     >
-      <AgentAvatar agentId={agent.id} channelId={channelId} size="sm" name={agent.name} />
+      <AgentAvatar
+        agentId={agent.id}
+        channelId={channelId}
+        size="sm"
+        name={agent.name}
+        presence={shown?.presence ?? null}
+        presenceLabel={word ?? undefined}
+      />
       <span className="members-pop__text">
         <span className="members-pop__name">{agent.name}</span>
-        <span className="members-pop__meta">
-          {t(`channel.agentState.${state}`)}
-          {agent.role ? ` · ${agent.role}` : ""}
-        </span>
+        {line ? (
+          <StatusLine emoji={line.emoji} text={line.text} className="members-pop__meta" />
+        ) : (
+          <span className="members-pop__meta">
+            {doing}
+            {agent.role ? ` · ${agent.role}` : ""}
+          </span>
+        )}
       </span>
       {autoReply && <span className="members-pop__chip">{t("channel.autoReplyChip")}</span>}
     </ProfileTrigger>
