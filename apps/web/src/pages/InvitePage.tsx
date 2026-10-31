@@ -1,12 +1,6 @@
 import type { AskToJoinResult, InvitationPreview } from "@agenteschat/client";
 import { ApiError, invitationQuery, invitationStateQuery, keys, useAuthConfig, useMe } from "@agenteschat/client";
-import {
-  authErrorText,
-  errorCode,
-  errorText,
-  invitedErrorText,
-  knownErrorText,
-} from "@agenteschat/client/lib/errors";
+import { authErrorText, errorCode, errorText, invitedErrorText, knownErrorText } from "@agenteschat/client/lib/errors";
 import { formatShortDate, joinNames } from "@agenteschat/client/lib/format";
 import { signInPath } from "@agenteschat/client/lib/guards";
 import { type HumanAction, type HumanCheck, withHumanCheck } from "@agenteschat/client/lib/human-check";
@@ -1276,15 +1270,7 @@ function AskSteps({
           </div>
           {human.slot}
           <ErrorLine error={error ?? (capped ? t("errors.code.limit") : null)} />
-          <Button
-            type="submit"
-            variant="primary"
-            size="lg"
-            block
-            kbd={["↵"]}
-            loading={codes.pending}
-            disabled={!ready}
-          >
+          <Button type="submit" variant="primary" size="lg" block kbd={["↵"]} loading={codes.pending} disabled={!ready}>
             {t("auth.flow.continue")}
           </Button>
           <div className="auth__or">{t("common.or")}</div>

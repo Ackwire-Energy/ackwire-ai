@@ -341,9 +341,7 @@ describe("members suggest someone (ADR 0090)", () => {
     expect(more).toEqual([]);
 
     // Turned down, the suggestion isn't Mo's: Mo hears nothing of it and may still ask through the link.
-    await fx()
-      .db.insert(schema.users)
-      .values({ id: "u_mo", name: "Mo", email: "mo@example.com", emailVerified: true });
+    await fx().db.insert(schema.users).values({ id: "u_mo", name: "Mo", email: "mo@example.com", emailVerified: true });
     expect(await joinStatus(fx().db, { id: "u_mo" }, token, NOW)).toMatchObject({ request: null });
     expect(await askToJoin(deps(), PUBLIC, { token, user: { id: "u_mo" } }, NOW)).toMatchObject({ created: true });
   });
@@ -571,7 +569,9 @@ describe("email invitations (ADR 0090)", () => {
     // Ana left #diretoria before Olga accepted: it is no longer hers to give, #produto still is.
     const olga = await invite("olga@example.com");
     const ownerRow = eq(schema.channelMembers.userId, fx().owner.id);
-    await fx().db.delete(schema.channelMembers).where(and(eq(schema.channelMembers.channelId, diretoria), ownerRow));
+    await fx()
+      .db.delete(schema.channelMembers)
+      .where(and(eq(schema.channelMembers.channelId, diretoria), ownerRow));
     const olgaIn = await accept("u_olga", "olga@example.com", olga);
     expect(olgaIn).toContain(produto);
     expect(olgaIn).not.toContain(diretoria);

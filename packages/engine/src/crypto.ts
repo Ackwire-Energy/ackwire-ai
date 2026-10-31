@@ -15,7 +15,7 @@ import type { KeyWrapper } from "@agenteschat/adapters";
  * decrypt another. Never rename an existing purpose: data protected with it
  * would become unreadable.
  */
-export type KeyPurpose = "sessions" | "provider-credentials-kek" | "git-proxy" | "invite-links";
+export type KeyPurpose = "sessions" | "provider-credentials-kek" | "git-proxy" | "invite-links" | "invitations";
 
 function deriveKey(masterSecret: string, purpose: KeyPurpose): Buffer {
   return Buffer.from(hkdfSync("sha256", masterSecret, "agentes.chat", `agentes.chat/${purpose}/v1`, 32));

@@ -289,6 +289,7 @@ type WhatKey =
   | "desktopHandoff"
   | "joinRequest"
   | "joinRequestMany"
+  | "joinSuggestion"
   | "invitationAccepted"
   | "invitationAcceptedAny"
   | "reaction";

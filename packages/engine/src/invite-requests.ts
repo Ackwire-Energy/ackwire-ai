@@ -704,9 +704,7 @@ export async function listWaitingJoinRequests(db: Database, actorId: string, org
       note: requests.note,
       verified: sql<boolean>`${requests.verifiedAt} is not null or coalesce(${users.id} = ${requests.userId} and ${users.emailVerified}, false)`,
       confirmed: sql<boolean>`coalesce(${users.emailVerified} and ${users.blockedAt} is null and (${requests.verifiedAt} is not null or ${users.id} = ${requests.userId}), false)`,
-      suggestedBy: sql<
-        string | null
-      >`(select s.name from ${users} s where s.id = ${requests.suggestedByUserId})`,
+      suggestedBy: sql<string | null>`(select s.name from ${users} s where s.id = ${requests.suggestedByUserId})`,
       createdAt: requests.createdAt,
       expiresAt: requests.expiresAt,
     })

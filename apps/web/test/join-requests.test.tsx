@@ -273,11 +273,9 @@ describe("an invitation link asks to join", () => {
   test("checks that fail for a moment keep it waiting, however many; a refused key ends it", async () => {
     // What each check meets before the fake answers, in turn: an error, or nothing (the fake's own answer).
     let meets: (Error | undefined)[] = [];
-    let checks = 0;
     const failing =
       (fake: Claim): Claim =>
       async (token, key) => {
-        checks += 1;
         const error = meets.shift();
         if (error) throw error;
         return fake(token, key);

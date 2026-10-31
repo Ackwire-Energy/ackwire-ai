@@ -142,11 +142,14 @@ const InvitationWithStatus = z
     expiresAt: z.string(),
     createdAt: z.string(),
     invitedBy: z.string().nullable().openapi({ description: "Who sent it (their name)." }),
-    url: z.string().nullable().openapi({
-      description:
-        "Its link, the same one the email carries, to copy at any time (ADR 0090). Null for an invitation sent " +
-        "before links could be shown again: sending it again gives it one.",
-    }),
+    url: z
+      .string()
+      .nullable()
+      .openapi({
+        description:
+          "Its link, the same one the email carries, to copy at any time (ADR 0090). Null for an invitation sent " +
+          "before links could be shown again: sending it again gives it one.",
+      }),
   })
   .openapi("InvitationWithStatus");
 

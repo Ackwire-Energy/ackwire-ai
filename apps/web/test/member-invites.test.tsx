@@ -291,9 +291,7 @@ describe("Members › Convites enviados", () => {
     await settle(4);
     expect(state.calls.find((c) => c.method === "orgs.resendInvitation")?.args).toEqual([ORG_ID, "inv-rafa"]);
     expect(text()).toMatch(/Mandei de novo para rafael@acme\.com\. O link é o mesmo e vale até \d+ \S+\./);
-    expect(rafael().querySelector(".members-row__state")?.textContent).toMatch(
-      /^Mandado de novo · vale até \d+ \S+$/,
-    );
+    expect(rafael().querySelector(".members-row__state")?.textContent).toMatch(/^Mandado de novo · vale até \d+ \S+$/);
     expect(within(rafael()).getByRole("button", { name: "Reenviar" }).hasAttribute("disabled")).toBe(true);
     expect(state.invitations.find((i) => i.id === "inv-rafa")?.url).toBe("http://localhost:3000/invite/tok-inv-rafa");
 

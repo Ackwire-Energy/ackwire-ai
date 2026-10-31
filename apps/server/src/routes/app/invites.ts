@@ -475,11 +475,16 @@ export function inviteRoutes(deps: AppDeps) {
             email: z.email().max(254).optional(),
             note: z.string().max(JOIN_NOTE_MAX).optional(),
             code: Code.optional(),
-            password: z.string().min(8).max(128).optional().openapi({
-              description:
-                "Signed out, with a `code`: the password of the account an approval makes (ADR 0090). The answer " +
-                "then carries `key`, which this page trades for a sign-in once approved (`…/requests/claim`).",
-            }),
+            password: z
+              .string()
+              .min(8)
+              .max(128)
+              .optional()
+              .openapi({
+                description:
+                  "Signed out, with a `code`: the password of the account an approval makes (ADR 0090). The answer " +
+                  "then carries `key`, which this page trades for a sign-in once approved (`…/requests/claim`).",
+              }),
           }),
         ),
       },

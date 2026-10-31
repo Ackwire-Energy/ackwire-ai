@@ -917,9 +917,7 @@ function Suggestions() {
                     size="sm"
                     loading={cancel.isPending && cancel.variables === s.id}
                     aria-label={t("members.suggest.cancelOf", { email: s.email })}
-                    onClick={() =>
-                      cancel.mutate(s.id, { onSuccess: () => toast.show(t("members.suggest.cancelled")) })
-                    }
+                    onClick={() => cancel.mutate(s.id, { onSuccess: () => toast.show(t("members.suggest.cancelled")) })}
                   >
                     {t("common.cancel")}
                   </Button>

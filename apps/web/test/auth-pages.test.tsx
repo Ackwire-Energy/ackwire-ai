@@ -574,7 +574,11 @@ describe("Aceitar convite", () => {
     expect(who?.textContent).toBe("rafael@acme.com.br");
     expect(who?.getAttribute("title")).toBe("O convite vale só para este e-mail.");
     expect(screen().getByRole("link", { name: "Termos" }).getAttribute("href")).toBe("/termos");
-    expect(screen().getByRole("button", { name: /^Continuar(?! com)/ }).hasAttribute("disabled")).toBe(true);
+    expect(
+      screen()
+        .getByRole("button", { name: /^Continuar(?! com)/ })
+        .hasAttribute("disabled"),
+    ).toBe(true);
     await type("Seu nome", "Rafael Costa");
     await press(/^Continuar(?! com)/, 2);
     expect(heading()).toBe("Boa, Rafael. Agora uma senha.");
