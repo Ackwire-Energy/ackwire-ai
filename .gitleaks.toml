@@ -2,18 +2,26 @@
 useDefault = true
 
 # Tests never read .env and never touch the network: every key, token and password in them is made
-# up, most on purpose to check redaction, encryption at rest and masking. Only the generic rule and
-# the curl-header one are off there (a test's curl headers carry made-up tokens to check that a
-# command's label never shows what the command hides): a real key in a provider's own format
-# (Anthropic, OpenAI, AWS, GitHub, a private key...) pasted into a test, in a curl header or not,
-# still fails the scan through that format's own rule.
+# up, most on purpose to check redaction, encryption at rest and masking. Only the generic rule is
+# off there: a real key in a provider's format (Anthropic, OpenAI, AWS, GitHub, a private key...)
+# pasted into a test still fails the scan.
 [[allowlists]]
 description = "Made-up keys and tokens in tests"
-targetRules = ["generic-api-key", "curl-auth-header"]
+targetRules = ["generic-api-key"]
 paths = [
   '''(^|/)test/''',
   '''\.test\.tsx?$''',
 ]
+
+# The curl-header rule stays on in tests: it is the only one that catches keys with no rule of their own
+# (OpenRouter's sk-or-v1-, DeepSeek's, Gemini's AQ.). Only the made-up tokens of the test that checks a
+# command's label never shows what the command hides are let through, by value.
+[[allowlists]]
+description = "Made-up curl header tokens of the command label test"
+targetRules = ["curl-auth-header"]
+condition = "AND"
+paths = ['''(^|/)test/''']
+regexes = ['''^(abc123def456ghi789|9f8e7d6c5b4a3210|sk-ant-api03-abcdefghijklmnop)$''']
 
 # A Himetrica site key only names the site to the analytics tracker, which sends it from every page.
 [[allowlists]]
