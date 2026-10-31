@@ -1138,7 +1138,7 @@ describe("Quem pensa: a coding plan's models", () => {
     expect(document.body.textContent).toContain("A Ada agora pensa com Claude Code · DeepSeek V4.1 Flash.");
   });
 
-  test("the cell names the plan's model it runs; models sold with words show them, the others keep the segments", async () => {
+  test("the cell names the plan's model it runs; models sold with words show them, a plan's only model too", async () => {
     await onPlan("kimi", { model: "k3-256k", effectiveModel: "k3-256k" });
     expect(sentence().textContent).toContain("K3 256K");
     cleanup();
@@ -1162,9 +1162,16 @@ describe("Quem pensa: a coding plan's models", () => {
     cleanup();
     await onPlan("minimax");
     d = await brainDialog();
-    const models = within(within(d).getByRole("radiogroup", { name: "Modelo" })).getAllByRole("radio");
-    expect(models.map((r) => r.textContent)).toEqual(["Automático", "MiniMax M3.1 Flash"]);
-    expect(models[1]?.getAttribute("aria-checked")).toBe("true");
+    // The model is a select on every brain, a plan of one model too.
+    const one = within(d).getByRole("combobox", { name: "Modelo" });
+    expect(one.textContent).toBe("MiniMax M3.1 Flash");
+    one.focus();
+    await act(async () => fireEvent.keyDown(one, { key: "Enter" }));
+    expect(
+      screen()
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["AutomáticoEscolhe o modelo e o esforço para cada tarefa", "MiniMax M3.1 Flash"]);
   });
 });
 

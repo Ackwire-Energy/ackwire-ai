@@ -8,12 +8,14 @@ import {
   MESSAGES_PAGE,
   type Message,
   type MessagePin,
+  type RunConsultation,
   sendHelpers,
   useAgentsBrowserHandoffs,
   useAiStatus,
   useApi,
   useChannels,
   useChannelThreads,
+  useConsultations,
   useCreateMission,
   useDmReads,
   useDms,
@@ -30,6 +32,12 @@ import {
   useThreadMission,
 } from "@agenteschat/client";
 import { activityVerb, listNames } from "@agenteschat/client/lib/activity";
+import {
+  type ConsultNoticeFold,
+  consultBlocksNearEnd,
+  consultNoticeFolds,
+  consultsForLine,
+} from "@agenteschat/client/lib/consult-group";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
 import { isEventLine } from "@agenteschat/client/lib/notices";
@@ -74,7 +82,7 @@ import {
 import { BrowserCard, BrowserRunCard } from "../browser/BrowserCard";
 import { OpenHandoffProvider } from "../browser/open";
 import { threadTitle } from "../chats/logic";
-import { chatHref } from "../links/logic";
+import { chatHref, consultationHref } from "../links/logic";
 import { MissionCardView } from "../missions/cards";
 import { isOpenMission } from "../missions/logic";
 import { RemindSheet } from "../reminders/RemindSheet";
@@ -89,6 +97,7 @@ import { AgentReceiptLine } from "./AgentReceipts";
 import { receiptMessageId, turnHeadId } from "./agent-receipts";
 import { ChannelMembersSheet } from "./ChannelMembers";
 import { ConversationSwitcher } from "./ConversationSwitcher";
+import { takeComposerRequest, useComposerRequest } from "./composer-request";
 import { DmComputerButton } from "./DmComputerButton";
 import { EventLine } from "./EventLine";
 import { FirstDay } from "./FirstDay";
@@ -189,6 +198,8 @@ const HOLD_MS = 900;
 const FREEZE_AFTER_MS = 450;
 /** The list shows by itself after this even if it never said it was placed (ms). */
 const SHOW_LIST_MS = 700;
+/** No questions to other agents here (yet): the same list each time, so the memos over it keep. */
+const NO_CONSULTATIONS: RunConsultation[] = [];
 
 /**
  * A conversation: a channel, a DM, a thread or a mission's thread (`threadId`). `handoffId`: a request
@@ -487,6 +498,23 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       ...runRowsOf(openingRuns(shownRuns)),
     ];
   }, [isThread, threadId, list, thread.data, channel?.name, dm, shownRuns, turnKeyOf, browsing, held, superseded, t]);
+  const shownMessages = useMemo(() => rows.flatMap((r) => (r.kind === "message" ? [r.message] : [])), [rows]);
+  // Questions agents asked other agents, inside the replies that asked (`ConsultGroup`): how each answer's notice
+  // draws (hidden under a reply close by, one line to one farther up), and the working line without the questions
+  // a reply near the end shows. A turn at work here doesn't show them yet: only saved replies count.
+  const consultList = useConsultations(orgId, channelId).data ?? NO_CONSULTATIONS;
+  const foldsNow = useMemo(
+    () => consultNoticeFolds(shownMessages, consultList, undefined, "first"),
+    [shownMessages, consultList],
+  );
+  // The rows redraw when a notice's fold changes, not on every message (the folds are rebuilt on each).
+  const foldsKey = [...foldsNow].map(([id, f]) => `${id}:${f.fold === "line" ? f.messageId : f.fold}`).join(" ");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `foldsKey` stands for the folds
+  const consultFolds = useMemo(() => foldsNow, [foldsKey]);
+  const lineConsults = useMemo(
+    () => consultsForLine(consults, consultBlocksNearEnd(shownMessages, consultList, undefined, "first")),
+    [consults, shownMessages, consultList],
+  );
 
   // ── Following the end ──
   // The list sticks to the end only while the person is near it (Legend List's maintainScrollAtEnd); farther
@@ -844,6 +872,12 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     if (target.threadId !== threadId) router.push(chatHref(channelId, target.threadId));
   };
   const openPins = () => sheet.open(<PinsSheet channelId={channelId} onPick={goToPin} />);
+  // "Ver" on an answer's line: the two agents' conversation on its own screen, as the block's line opens it.
+  const seeConsult = useCallback(
+    (fold: Extract<ConsultNoticeFold, { fold: "line" }>) =>
+      router.push(consultationHref(fold.consultation.id, channelId)),
+    [channelId],
+  );
   const openMembers = () =>
     channel ? sheet.open(<ChannelMembersSheet channelId={channelId} channelName={channel.name} />) : undefined;
 
@@ -898,13 +932,13 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   // An agent's DM while it works: the pill's quiet line says what it does ("Consultando o GitHub").
   const dmDoing = useMemo(() => {
     if (!dmAgentId || isThread) return null;
-    const entry = workingEntries(runs, consults, (id) => dir.agentById.get(id)?.name ?? "").find(
+    const entry = workingEntries(runs, lineConsults, (id) => dir.agentById.get(id)?.name ?? "").find(
       (e) => e.type === "agent" && e.id === dmAgentId,
     );
     if (!entry) return null;
     const verb = activityVerb(t, entry.activity);
     return verb.charAt(0).toUpperCase() + verb.slice(1);
-  }, [dmAgentId, isThread, runs, consults, dir.agentById, t]);
+  }, [dmAgentId, isThread, runs, lineConsults, dir.agentById, t]);
   // A DM's pill says how the other side is (ADR 0084): an agent's presence and what it does, a person's line.
   const dmLine = useDmStatusLine(
     dm && !isThread ? { type: dm.with.type, id: dm.with.id } : null,
@@ -1156,7 +1190,6 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const pinned = mission && isOpenMission(mission) ? mission : null;
 
   // ── Agents' receipts and "no AI" ──
-  const shownMessages = useMemo(() => rows.flatMap((r) => (r.kind === "message" ? [r.message] : [])), [rows]);
   // One receipt, the latest person's message's on screen: a mark beside my bubble, or at the end of the name line of
   // someone else's turn; a line under the message only for what asks something of you.
   const receiptId = useMemo(() => receiptMessageId(shownMessages), [shownMessages]);
@@ -1243,7 +1276,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         case "message":
           // What reached an agent's conversation (a routine's report, another agent's answer) and a routine
           // that ran in the background: quiet lines, never a person's or the agent's own voice.
-          if (isEventLine(item.message.meta)) return <EventLine message={item.message} />;
+          if (isEventLine(item.message.meta))
+            return <EventLine message={item.message} fold={consultFolds.get(item.message.id)} onSee={seeConsult} />;
           // An agent took an issue made from this conversation: one quiet line, not a voice.
           if (issueTakenOf(item.message.meta)) return <IssueTakenLine message={item.message} />;
           return (
@@ -1290,6 +1324,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       receipt,
       connectInline,
       onResend,
+      consultFolds,
+      seeConsult,
     ],
   );
 
@@ -1301,6 +1337,12 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     // taken over before this one's blur).
     return holdOpenConversation({ orgId, channelId });
   }, [focused, orgId, channelId]);
+  // "Falar com o Theo" from two agents' conversation: "@theo " in this field, once this screen is in view again.
+  const composerRequest = useComposerRequest(channelId);
+  const prefill = focused ? composerRequest : null;
+  useEffect(() => {
+    if (prefill) takeComposerRequest(prefill.at);
+  }, [prefill]);
 
   // ── Composer and keyboard ──
   // The composer floats over the list's bottom and rides the keyboard (KeyboardStickyView); the list's end
@@ -1525,7 +1567,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
             {member ? (
               <WorkingLine
                 runs={runs}
-                consults={consults}
+                consults={lineConsults}
                 canStop={canStop}
                 onStop={stopRun}
                 onOpenBrowser={(agentId) => {
@@ -1546,6 +1588,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
                 {...(dmAgentId && !isThread ? { face: <AgentFace agentId={dmAgentId} size={22} /> } : {})}
                 mentionAt={mentionQuery}
                 insertMention={insertMention}
+                prefill={prefill}
                 mention={({ query, pick }) => (
                   <MentionPicker query={query} pick={pick} channelId={channelId} members={mentionMembers} />
                 )}

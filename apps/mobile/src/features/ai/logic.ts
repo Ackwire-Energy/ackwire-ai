@@ -14,6 +14,7 @@ import {
   type ExistingAi,
   existingAi,
 } from "@agenteschat/client/lib/ai-accounts";
+import { isClaudeAlias } from "@agenteschat/client/lib/brain-advanced";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import type { PlanGate } from "@agenteschat/client/lib/no-ai";
 import { brainModelChoice, brainModelChoices, type CodingPlan } from "@agenteschat/client/lib/plans";
@@ -86,7 +87,8 @@ export interface ModelRow {
 
 /**
  * The agent's model on the phone, as the web's "Quem pensa": Automático, then its brain's models (every model of
- * its account's coding plan, each with what its maker sells it as), the one it runs checked.
+ * its account's coding plan, each with what its maker sells it as; Claude's own with what each is for), the one it
+ * runs checked.
  */
 export function modelRows(
   t: TFunction,
@@ -100,7 +102,12 @@ export function modelRows(
     ...brainModelChoices(plan, option?.models ?? []).map(({ value, label, tag, needs, maker }) => ({
       value,
       label,
-      ...(tag ? { sub: t(`brain.modelTag.${tag}`) } : {}),
+      // Claude's own models say what each is for.
+      ...(tag
+        ? { sub: t(`brain.modelTag.${tag}`) }
+        : !plan && view.brain === "claude_code" && isClaudeAlias(value)
+          ? { sub: t(`agentPage.work.brain.modelLine.${value}`) }
+          : {}),
       ...(needs ? { note: t(`brain.modelNeeds.${needs}`) } : {}),
       ...(maker ? { maker } : {}),
     })),
