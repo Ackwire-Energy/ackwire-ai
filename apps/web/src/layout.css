@@ -6627,6 +6627,10 @@ a.machine-row__name:hover {
   row-gap: 2px;
   white-space: normal;
 }
+.hold-banner .outage__text b {
+  flex-shrink: 1;
+  max-width: none;
+}
 /* Where to write for help: the address reads as part of the sentence. */
 .support-line a {
   color: inherit;
