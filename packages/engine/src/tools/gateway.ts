@@ -2,6 +2,7 @@ import { PERMISSION_TOOL } from "@agenteschat/adapters";
 import { and, eq, schema, sql } from "@agenteschat/db";
 import { auditsCall, callTitle, recordToolCall } from "../agent-audit";
 import { type RunAuthority, runAuthorityById } from "../authority";
+import { missingConnectors, type ServerCatalog } from "../connectors/listing";
 import { consultationOrigin } from "../consultations";
 import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
@@ -186,7 +187,12 @@ export type InvokeResult =
  *    computer) is held once when the team already did it to the same target,
  *    and recorded for the team once it went out (ADR 0064, `team-actions.ts`).
  */
-export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Date }) {
+export function createToolGateway(deps: {
+  sources: ToolSource[];
+  now?: () => Date;
+  /** What this server can connect: `find_tools` names each connector a search asks for that the agent lacks. */
+  catalog?: ServerCatalog;
+}) {
   const now = deps.now ?? (() => new Date());
 
   async function allTools(ctx: ToolContext) {
@@ -315,10 +321,16 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       let unknownInDirectory: string | null = null;
       if (!all.has(call.name)) {
         const usable = await grantedFor(ctx, authority, all);
-        const blocked = async () => ({
-          tools: await notAllowed(ctx, authority, all).catch(() => []),
-          ask: usable.some((t) => t.name === REQUEST_PERMISSION_TOOL) ? REQUEST_PERMISSION_TOOL : null,
-        });
+        const blocked = async () => {
+          const [tools, connectors] = await Promise.all([
+            notAllowed(ctx, authority, all).catch(() => []),
+            deps.catalog
+              ? missingConnectors(ctx.db, ctx.orgId, deps.catalog, { usable, listed: all.values() }).catch(() => [])
+              : [],
+          ]);
+          const ask = usable.some((t) => t.name === REQUEST_PERMISSION_TOOL) ? REQUEST_PERMISSION_TOOL : null;
+          return { tools, ask, connectors };
+        };
         const listed = presentTools(usable, isSensitive, ctx.loadedGroups, blocked).find((t) => t.name === call.name);
         const role = directoryRole(listed);
         if (role?.kind === "find") directoryTool = listed;

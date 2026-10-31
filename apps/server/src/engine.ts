@@ -329,6 +329,7 @@ export function buildEngine(o: EngineOptions) {
       }),
       ...(o.toolSources ?? []),
     ],
+    catalog: { oauthApps: connectorDeps.oauthApps, mail: adapters.mail },
   });
   // Mission tasks' tools and computer-brain runs' tools come through the hub's MCP bridge (ADR 0032).
   machineHub.setMissionHooks(createMissionHooks({ db, ...missionDeps, tools }));
