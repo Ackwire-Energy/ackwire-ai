@@ -1,5 +1,5 @@
 import { Dialog as RDialog } from "radix-ui";
-import { type CSSProperties, type ReactNode, useEffect, useRef } from "react";
+import { type CSSProperties, type ReactNode, type RefObject, useEffect, useRef } from "react";
 import { cx } from "../cx";
 import { lastTabbable } from "../device";
 import { Button } from "./Button";
@@ -30,6 +30,11 @@ export interface DialogProps {
   subtitle?: ReactNode;
   /** The head's own actions, before the close button. */
   actions?: ReactNode;
+  /**
+   * The field the dialog starts on. Unlike `autoFocus`, it holds when the dialog opens over another one: React gives
+   * an autoFocus field the focus before this dialog's trap is up, and the trap of the dialog under it takes it back.
+   */
+  initialFocus?: RefObject<HTMLElement | null>;
 }
 
 /**
@@ -50,6 +55,7 @@ export function Dialog({
   leading,
   subtitle,
   actions,
+  initialFocus,
 }: DialogProps) {
   // Controlled dialogs have no Radix Trigger to return focus to, so remember
   // what had focus when it opened and give focus back on close.
@@ -78,12 +84,13 @@ export function Dialog({
           className={cx("ac-dialog", className)}
           style={{ "--ac-dialog-width": `${width}px` } as CSSProperties}
           onEscapeKeyDown={onEscapeKeyDown}
-          // Focus starts on the dialog itself (the event's target), never on its first control, the head's ×: opened
-          // from a link or by itself, a ring would sit on × with nothing pressed. Tab reaches × first; a field that
-          // takes the focus on its own (autoFocus) keeps it, since Radix asks only when nothing inside has it.
+          // Focus starts on `initialFocus` or the dialog itself (the event's target), never on its first control, the
+          // head's ×: opened from a link or by itself, a ring would sit on × with nothing pressed. Tab reaches × first;
+          // a field that takes the focus on its own (autoFocus) keeps it, since Radix asks only when nothing inside
+          // has it.
           onOpenAutoFocus={(e) => {
             e.preventDefault();
-            (e.target as HTMLElement).focus();
+            (initialFocus?.current ?? (e.target as HTMLElement)).focus();
           }}
           // From there, Shift+Tab goes round to the last control, as Tab from the last goes to the first (Radix wraps
           // only from its first and last controls).
