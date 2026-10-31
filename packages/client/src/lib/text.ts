@@ -90,7 +90,7 @@ export function webmailOf(
 ): { name: "Gmail" | "Outlook" | "iCloud Mail" | "Yahoo Mail"; url: string } | null {
   const domain = email.trim().toLowerCase().split("@")[1] ?? "";
   if (domain === "gmail.com" || domain === "googlemail.com") return { name: "Gmail", url: "https://mail.google.com" };
-  if (["outlook.com", "hotmail.com", "live.com", "msn.com"].includes(domain))
+  if (["outlook.com", "hotmail.com", "live.com", "msn.com", "outlook.com.br", "hotmail.com.br"].includes(domain))
     return { name: "Outlook", url: "https://outlook.live.com/mail" };
   if (["icloud.com", "me.com", "mac.com"].includes(domain))
     return { name: "iCloud Mail", url: "https://www.icloud.com/mail" };
@@ -130,8 +130,18 @@ export function excerpt(text: string, max: number, lines = 3) {
   return `${(space > 0 ? cut.slice(0, space) : cut).replace(/[\s,;:]+$/, "")}…`;
 }
 
-const typedForm = (value: string) => value.normalize("NFC").trim().replace(/\s+/g, " ").toLocaleLowerCase();
+/** A name as a person types it to confirm: NFKC, without Unicode format characters (Cf), spaces collapsed, lower case. */
+const typedForm = (value: string) =>
+  value
+    .normalize("NFKC")
+    .replace(/\p{Cf}/gu, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
 
-/** Whether what someone typed to confirm is `name` (case and extra spaces aside): a permanent step's last check. */
-export const matchesName = (typed: string, name: string) =>
-  typedForm(name) !== "" && typedForm(typed) === typedForm(name);
+/**
+ * Whether what someone typed to confirm a permanent step is `name` (deleting a workspace or an agent): case, extra
+ * spaces and width forms aside, pasted text works, and invisible characters put in the name can't make it untypeable,
+ * so a name that is only those needs nothing typed.
+ */
+export const matchesName = (typed: string, name: string) => typedForm(typed) === typedForm(name);

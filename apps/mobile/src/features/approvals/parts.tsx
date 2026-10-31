@@ -7,12 +7,12 @@ import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Chip, Fuse, Icon, LineIcon, Text } from "@/ui";
+import { Button, Chip, Fuse, Icon, LineIcon, Text } from "@/ui";
 import { ConnectorIcon, IconTile } from "../connectors/ConnectorIcon";
 import { AgentFace } from "../shared/Face";
 import { useColors, useNow, useOrgId } from "../shared/hooks";
 import { fuseRemaining, minutesLeft } from "../shared/logic";
-import { approvalSaid, approvalTable, approvalTraits } from "./logic";
+import { approvalSaid, approvalTable, approvalTraits, approveAlwaysHint, approveAlwaysOffered } from "./logic";
 
 /**
  * The exact request, in reading order: the action in words, the action itself (an email as it will be,
@@ -290,6 +290,30 @@ export function ApprovalWhy({
   );
 }
 
+/** "Aprovar sempre" where the request offers it, and under it what one tap approves for good, as on the web. */
+export function ApproveAlways({
+  approval: a,
+  name,
+  disabled,
+  onPress,
+}: {
+  approval: Approval;
+  name: string;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  const { t } = useTranslation();
+  if (!approveAlwaysOffered(a)) return null;
+  return (
+    <View style={styles.always}>
+      <Button variant="ghost" wide label={t("approval.always.button")} disabled={disabled} onPress={onPress} />
+      <Text variant="caption" tone="faint" style={styles.alwaysHint}>
+        {approveAlwaysHint(t, a, name || t("channel.unknownAgent"))}
+      </Text>
+    </View>
+  );
+}
+
 /** The amber fuse burning to the expiry and "expira em N min" (amber: it waits on a person). */
 export function ApprovalFuse({ approval: a }: { approval: Approval }) {
   const { t } = useTranslation();
@@ -332,4 +356,6 @@ const styles = StyleSheet.create({
   underline: { textDecorationLine: "underline" },
   saidRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   expiry: { fontWeight: "500", fontVariant: ["tabular-nums"] },
+  always: { gap: 4 },
+  alwaysHint: { textAlign: "center" },
 });

@@ -105,6 +105,8 @@ export function runErrorDetail(error: string | null | undefined): {
   const unregistered = /^No provider registered for (.+)$/.exec(error);
   if (unregistered)
     return { errorCode: "run.provider_unavailable", errorParams: { detail: unregistered[1] as string } };
+  const unlisted = /^OpenRouter doesn't list (.+) anymore\./.exec(error);
+  if (unlisted) return { errorCode: "run.model_unlisted", errorParams: { model: unlisted[1] as string } };
   return { errorCode: "run.failed", errorParams: { detail: error.slice(0, 300) } };
 }
 

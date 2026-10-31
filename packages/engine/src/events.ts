@@ -1,5 +1,5 @@
 import { channelTopic, orgTopic, type PubSub, userTopic } from "@agenteschat/adapters";
-import { MODEL_CATALOG } from "@agenteschat/providers";
+import { modelProvider } from "@agenteschat/providers";
 import type { AgentActionView } from "./agent-actions";
 import type { ConnectIntent } from "./ai-intent";
 import type { ApprovalView } from "./approvals";
@@ -53,7 +53,7 @@ const RULES = new Set(["reply", "only_agent", "follow_up"]);
 export function decidedByOf(strategy: string, authorUserId: string | null): DecidedBy | undefined {
   if (strategy === "jev") return { step: "jev" };
   const [step, rest = ""] = strategy.split(/:(.*)/s);
-  if (step === "llm" && rest) return { step: "model", model: rest, provider: MODEL_CATALOG[rest]?.provider ?? "" };
+  if (step === "llm" && rest) return { step: "model", model: rest, provider: modelProvider(rest) ?? "" };
   if (step === "plan" && authorUserId && (rest === "claude_code" || rest === "codex")) {
     return { step: "plan", brand: rest === "codex" ? "chatgpt" : "claude", ownerId: authorUserId };
   }
@@ -172,16 +172,30 @@ export type ChannelEvent =
       runId: string;
       tool: string | null;
       connector?: string;
-      /** A short label (≤ 80 chars): the skill, the issue (#131 or title) or the Drive file. Built-in tools only. */
+      /**
+       * A short label (≤ 80 chars): the skill, the issue (#131 or title), the Drive file, or the command a permission
+       * check is about (Claude Code's own description of it, else its program and main argument). Built-in tools only.
+       */
       detail?: string;
       /** The model's id of this call (live output refers to it). */
       toolUseId?: string;
       /** `run_code`: the code being run (≤ 4 KB, secrets masked). */
       code?: { language: string; source: string };
+      /** `permission_prompt`: the whole command it checks, as one line (≤ 1000 chars, credentials masked). */
+      command?: string;
       /** On the end (`tool: null`): the tool answered with an error. Never the error itself (it can carry data). */
       failed?: boolean;
       /** On the end: it didn't run, it waits on a person (an approval, a question, a secret). */
       held?: boolean;
+      /** On the end of a permission check it refused (`failed`): the policy's own reason, to the agent. */
+      why?: string;
+      /** With `why`: the refusal's code (`person`, `outside`…), which the apps say in the person's words. */
+      refusal?: string;
+      /**
+       * A permission check waiting on a person: on its `held` end, its request; with no `toolUseId`, the person's
+       * answer to that request (`failed` when they said no), which ends the line that waited for it.
+       */
+      requestId?: string;
     }
   /** What a computer command prints while it runs (throttled, ≤ 64 KB per call). */
   | {
@@ -563,6 +577,17 @@ export type OrgEvent =
   | { type: "channel.archived"; orgId: string; channelId: string }
   /** Something every member of the org may see (org-wide issues, calendar): forwarded as `scope: "org"`. */
   | { type: "org.broadcast"; orgId: string; event: { type: string; [key: string]: unknown } };
+
+/**
+ * An org broadcast: an owner (`by`) deleted the workspace. It is closed now, so its people's sockets close after this
+ * event, and it goes for good at `dueAt` unless an owner restores it first.
+ */
+export type OrgDeletingEvent = {
+  type: "org.deleting";
+  orgId: string;
+  dueAt: string;
+  by: { id: string; name: string };
+};
 
 export async function publishOrgEvent(pubsub: PubSub | undefined, event: OrgEvent): Promise<void> {
   if (!pubsub) return;

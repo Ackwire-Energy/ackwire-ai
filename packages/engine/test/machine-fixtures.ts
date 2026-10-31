@@ -101,7 +101,11 @@ export interface FakeRunnerOptions {
   exec?: (
     req: Extract<Request, { op: "exec" }>,
     out: (stream: "stdout" | "stderr", chunk: string) => void,
-  ) => { exitCode: number; stdout: string; stderr: string; timedOut?: boolean } | "hang";
+  ) =>
+    | { exitCode: number; stdout: string; stderr: string; timedOut?: boolean }
+    | "hang"
+    /** The runner refuses it (`approval_needed`: its command policy held it). */
+    | { fail: { code: string; message: string } };
   push?: (req: Extract<Request, { op: "push" }>, bytes: Uint8Array, name: string) => Promise<void>;
   execAllowed?: boolean;
   /** A socket whose close never reaches the hub (a runner killed behind a proxy: half-open). */
@@ -214,6 +218,7 @@ export function fakeRunner(hub: MachineHub, options: FakeRunnerOptions = {}) {
           stderr: "",
         };
         if (r === "hang") return; // answers only to `cancel`
+        if ("fail" in r) return fail(r.fail.code, r.fail.message);
         return ok({ timedOut: false, ...r });
       }
       case "write":

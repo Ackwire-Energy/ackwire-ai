@@ -1,10 +1,10 @@
 import {
   approveJoinRequest,
   askToJoin,
+  CODE_LENGTH,
   checkJoinCode,
   denyJoinRequest,
   inviteLink,
-  JOIN_CODE_LENGTH,
   JOIN_NAME_MAX,
   JOIN_NOTE_MAX,
   JOIN_REASON_MAX,
@@ -42,7 +42,7 @@ const CODES_PER_IP = { limit: 10, windowMs: 3600_000 };
 const CODES_PER_LINK = { limit: 40, windowMs: 3600_000 };
 const CHECKS_PER_IP = { limit: 30, windowMs: 3600_000 };
 const TOO_MANY = "Too many requests from here. Try again in an hour.";
-const Code = z.string().regex(new RegExp(`^\\d{${JOIN_CODE_LENGTH}}$`));
+const Code = z.string().regex(new RegExp(`^\\d{${CODE_LENGTH}}$`));
 
 const Token = z.object({ token: z.string().min(1).max(200) });
 const LinkParams = OrgParams.extend({ linkId: z.uuid() });

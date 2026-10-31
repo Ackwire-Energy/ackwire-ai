@@ -1,30 +1,53 @@
 // A fake `claude` for brain tests: speaks stream-json in and out like
 // `claude -p --input-format stream-json --output-format stream-json`.
 // Each start appends its argv, $CLAUDE_CONFIG_DIR, its folder, $ANTHROPIC_API_KEY,
-// $ANTHROPIC_AUTH_TOKEN and its `--settings` file's `env` to $FAKE_CLAUDE_LOG
-// (one JSON line).
+// $ANTHROPIC_AUTH_TOKEN, the OAuth token it holds (`oauthToken`: read where
+// $CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR says, as Claude Code does, or $CLAUDE_CODE_OAUTH_TOKEN),
+// $CLAUDE_CODE_OAUTH_TOKEN itself (`oauthEnv`), the descriptor (`oauthFd`) and its `--settings`
+// file's `env` to $FAKE_CLAUDE_LOG (one JSON line).
 // Prompts drive it: "CRASH" exits mid-turn once (marker file in the log's
 // folder), "SLOW" answers after 300 ms, "TOOL" calls one of our tools and one
 // of its own, "LIMIT" hits the plan limit, "AUTH" fails to authenticate,
 // "RATE" says the 5-hour window is at 84%; "STEER…" and "BGSELF" below (live
-// steering, background tasks), "ECHOKEY" answers with $ANTHROPIC_AUTH_TOKEN (as an
-// agent's shell could print it), "KEY401" is refused by the endpoint and retries for good
+// steering, background tasks), "ECHOKEY" answers with $ANTHROPIC_AUTH_TOKEN and "ECHOTOKEN" with
+// the OAuth token it holds (as an agent's shell could print them), "ECHOSPLIT" with that token in two
+// deltas, each 150 ms before the next line, "KEY401" is refused by the endpoint and retries for good
 // (as Claude Code 2.1.310 does, ten times with backoff). Control requests: `initialize`, and `get_usage`
 // as $FAKE_CLAUDE_USAGE says ("" a Max plan's windows, "signed_out", "error",
 // "hang": never).
 // With `--json-schema` it is a route (`brain.route`): the prompt on stdin, one JSON result whose
 // `structured_output` gives the schema's first handle 0.9, and a line with the system prompt and the
 // prompt in the log. "SLOW_ROUTE" never answers, "BAD_ROUTE" answers no JSON.
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, readFileSync, readSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline";
 
 const args = process.argv.slice(2);
 const log = process.env.FAKE_CLAUDE_LOG;
+// As Claude Code 2.1.314: a token on a descriptor is read at the start (up to a newline), which is then closed and
+// its variable dropped.
+const oauthFd = process.env.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR ?? null;
+let fdToken = null;
+if (oauthFd) {
+  const fd = Number(oauthFd);
+  const buf = Buffer.alloc(4096);
+  let got = "";
+  while (!got.includes("\n")) {
+    const n = readSync(fd, buf);
+    if (n === 0) break;
+    got += buf.toString("utf8", 0, n);
+  }
+  closeSync(fd);
+  delete process.env.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR;
+  fdToken = got.trim() || null;
+}
+const heldToken = fdToken ?? process.env.CLAUDE_CODE_OAUTH_TOKEN ?? null;
 if (log) {
   const configDir = process.env.CLAUDE_CONFIG_DIR ?? null;
   const apiKey = process.env.ANTHROPIC_API_KEY ?? null;
   const authToken = process.env.ANTHROPIC_AUTH_TOKEN ?? null;
+  const oauthToken = heldToken;
+  const oauthEnv = process.env.CLAUDE_CODE_OAUTH_TOKEN ?? null;
   const baseUrl = process.env.ANTHROPIC_BASE_URL ?? null;
   const compactWindow = process.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW ?? null;
   const at = args.indexOf("--settings");
@@ -34,7 +57,7 @@ if (log) {
   } catch {}
   appendFileSync(
     log,
-    `${JSON.stringify({ pid: process.pid, args, configDir, cwd: process.cwd(), apiKey, authToken, baseUrl, settingsEnv, compactWindow })}\n`,
+    `${JSON.stringify({ pid: process.pid, args, configDir, cwd: process.cwd(), apiKey, authToken, oauthToken, oauthEnv, oauthFd, baseUrl, settingsEnv, compactWindow })}\n`,
   );
 }
 const flag = (name) => {
@@ -268,15 +291,21 @@ async function answer(line) {
     });
     return;
   }
+  const half = Math.floor((heldToken ?? "").length / 2);
   const said = prompt.includes("ECHOKEY")
     ? [`token ${process.env.ANTHROPIC_AUTH_TOKEN} `, "printed"]
-    : ["Hello ", "world"];
+    : prompt.includes("ECHOTOKEN")
+      ? [`token ${heldToken} `, "printed"]
+      : prompt.includes("ECHOSPLIT")
+        ? [`token ${heldToken?.slice(0, half)}`, `${heldToken?.slice(half)} printed`]
+        : ["Hello ", "world"];
   for (const text of said) {
     out({
       type: "stream_event",
       event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text } },
       parent_tool_use_id: null,
     });
+    if (prompt.includes("ECHOSPLIT")) await sleep(150);
   }
   out({ type: "assistant", message: { content: [{ type: "text", text: "Hello world" }] }, parent_tool_use_id: null });
   if (prompt.includes("TOOL")) {
@@ -305,7 +334,10 @@ async function answer(line) {
     type: "result",
     subtype: "success",
     is_error: false,
-    result: prompt.includes("ECHOKEY") ? said.join("") : `echo ${turns}: ${prompt}${steered}`,
+    result:
+      prompt.includes("ECHOKEY") || prompt.includes("ECHOTOKEN") || prompt.includes("ECHOSPLIT")
+        ? said.join("")
+        : `echo ${turns}: ${prompt}${steered}`,
     usage: { input_tokens: 10, cache_read_input_tokens: 5, cache_creation_input_tokens: 1, output_tokens: 7 },
     modelUsage: { [flag("--model") ?? "claude-sonnet"]: { inputTokens: 10, outputTokens: 7 } },
     ...(read.length && resultUuids ? { user_message_uuid: read.at(-1), user_message_uuids: read } : {}),

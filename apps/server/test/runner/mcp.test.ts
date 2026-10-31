@@ -442,18 +442,16 @@ test("an item away from the mission folder may use it (--add-dir, Read/Edit/Writ
   expect(missionFolderRules("app", ["Read"])).toEqual([]);
   expect(missionFolderRules("/Users/*", ["Read"])).toEqual([]);
   expect(missionFolderRules("/Users/ana/../bob", ["Read"])).toEqual([]);
-  const work = claudePermissionSettings("work", "agentes/abcd1234/", [], folder);
+  const work = claudePermissionSettings("work", [], folder);
   expect(work.permissions.allow).toContain("Edit(//Users/ana/agentes/app/**)");
   // Nothing broader: no bare Edit/Write, and the deny list stays.
   expect(work.permissions.allow).not.toContain("Edit");
   expect(work.permissions.allow).not.toContain("Write");
   expect(work.permissions.deny.length).toBeGreaterThan(0);
-  const plan = claudePermissionSettings("plan", "agentes/abcd1234/", [], folder);
+  const plan = claudePermissionSettings("plan", [], folder);
   expect(plan.permissions.allow).toContain("Read(//Users/ana/agentes/app/**)");
   expect(plan.permissions.allow.some((r) => r.startsWith("Edit("))).toBe(false);
-  expect(claudePermissionSettings("work", "agentes/abcd1234/").permissions.allow.some((r) => r.includes("//"))).toBe(
-    false,
-  );
+  expect(claudePermissionSettings("work").permissions.allow.some((r) => r.includes("//"))).toBe(false);
   const args = missionExecutorArgs(
     "claude",
     {

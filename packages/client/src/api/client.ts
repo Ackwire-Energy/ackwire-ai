@@ -1,6 +1,7 @@
 import type { OnboardingStepId } from "../lib/onboarding";
 import type {
   AccessInput,
+  AccountDeletionPlan,
   AccountLoginStart,
   AccountLoginStatus,
   ActiveRun,
@@ -32,6 +33,7 @@ import type {
   ApiRule,
   AppNotification,
   Approval,
+  ApprovalRule,
   Artifact,
   ArtifactContent,
   ArtifactDetail,
@@ -53,6 +55,7 @@ import type {
   Channel,
   ChannelCategory,
   ChannelMember,
+  CodeSent,
   CommandApproval,
   ComputerSetup,
   ComputerTarget,
@@ -66,6 +69,7 @@ import type {
   DatabaseConnection,
   DatabaseConnectionInput,
   DatabaseTable,
+  DeletionProofInput,
   DesktopRelease,
   DesktopStatus,
   DeviceRequest,
@@ -102,7 +106,6 @@ import type {
   IssueStatus,
   JevKey,
   JoinApproval,
-  JoinCodeSent,
   JoinRequest,
   Machine,
   MachineAccess,
@@ -142,6 +145,7 @@ import type {
   MissionSettings,
   MissionSummary,
   Model,
+  ModelTier,
   MoveAgentsInput,
   MoveAgentsResult,
   NoticeCategory,
@@ -189,6 +193,7 @@ import type {
   SkillDetail,
   SkillInput,
   SkillPatch,
+  SkillPick,
   StatusInput,
   StorageConfig,
   StorageMigration,
@@ -252,8 +257,23 @@ export interface ApiClient {
     updateMe(input: { locale: "pt-BR" | "en" }): Promise<void>;
     /** A one-time sign-in for the phone app, shown as a QR code. */
     phoneSignIn(): Promise<PhoneSignIn>;
-    /** A password for an account that has none (`password_set` 409 when it has one). */
+    /**
+     * A password for an account that has none (`password_set` 409 when it has one). `reauth.sign_in` (403) without a
+     * sign-in in the last 10 minutes.
+     */
     addPassword(password: string): Promise<void>;
+    /** What deleting my account would close, leave and remove. */
+    deletionPlan(): Promise<AccountDeletionPlan>;
+    /**
+     * Emails me the code that deleting my account takes (`reauth.code_wait` 429 with `retryIn` right after another,
+     * `reauth.no_email` 409 on a server that sends none). `sole_owner` (409) while a workspace needs me.
+     */
+    deletionCode(): Promise<CodeSent>;
+    /**
+     * Deletes my account at once, with the emailed `code`, or `password` on a server that sends no email (`reauth.*`
+     * when refused, 429 after 5 passwords). `sole_owner` (409, `params.orgIds`) while a workspace needs me.
+     */
+    delete(input?: DeletionProofInput): Promise<void>;
   };
   /** Where my pushes go: phones (ADR 0035) and browsers (ADR 0071). Per person, not per organization. */
   push: {
@@ -287,6 +307,15 @@ export interface ApiClient {
     ): Promise<{ step: OnboardingStepId; finished: boolean } | null>;
     get(orgId: string): Promise<Organization>;
     update(orgId: string, input: { name?: string; context?: string }): Promise<void>;
+    /** Owners: emails me the code that deleting this workspace takes (as `account.deletionCode`). */
+    deletionCode(orgId: string): Promise<CodeSent>;
+    /**
+     * Owners: closes the workspace for everyone now and deletes it for good 7 days later (`dueAt`); already being
+     * deleted, its date. Proof as `account.delete`'s; 429 after 3 deletions of it in a day.
+     */
+    deleteWorkspace(orgId: string, input?: DeletionProofInput): Promise<{ dueAt: string }>;
+    /** Owners, before its date: it opens again. `org.not_restorable` (409) once the date passed. */
+    restore(orgId: string): Promise<void>;
     /** My handle and time zone in this organization (`timezone: null` = the organization's). */
     updateMe(orgId: string, input: { handle?: string; timezone?: string | null }): Promise<Person>;
     /** Your availability (auto, busy, hidden) and what you are doing (ADR 0084). */
@@ -319,7 +348,14 @@ export interface ApiClient {
     previewInvitation(token: string): Promise<InvitationPreview | null>;
     acceptInvitation(token: string): Promise<{ orgId: string }>;
     settings(orgId: string): Promise<OrgSettings>;
-    updateSettings(orgId: string, input: Partial<Omit<OrgSettings, "name">> & { name?: string }): Promise<OrgSettings>;
+    updateSettings(
+      orgId: string,
+      input: Partial<Omit<OrgSettings, "name" | "autoModels">> & {
+        name?: string;
+        /** Per provider and tier, one of its models; null puts the tier back on its default. */
+        autoModels?: Partial<Record<string, Partial<Record<ModelTier, string | null>>>>;
+      },
+    ): Promise<OrgSettings>;
     overview(orgId: string): Promise<OrgOverview>;
     /** Members with presence. */
     people(orgId: string): Promise<Person[]>;
@@ -523,13 +559,20 @@ export interface ApiClient {
      * no-AI card or the person's message. 409 `ai.still_missing` while there's still no AI.
      */
     answerNow(orgId: string, messageId: string): Promise<{ runs: { agentId: string; runId: string }[] }>;
+    /** Cancels an agent's follow-up from its line (`messageId`); 409 `follow_up.not_pending` once it came. */
+    cancelFollowUp(orgId: string, messageId: string): Promise<void>;
   };
 
   approvals: {
     list(orgId: string, filter?: { status?: "pending" | "decided"; agentId?: string }): Promise<Approval[]>;
     get(orgId: string, approvalId: string): Promise<Approval>;
-    approve(orgId: string, approvalId: string, reason?: string): Promise<Approval>;
+    /** `always`: also approve this kind for good (409 `approval.always_unavailable` where it isn't offered). */
+    approve(orgId: string, approvalId: string, reason?: string, always?: boolean): Promise<Approval>;
     refuse(orgId: string, approvalId: string, reason?: string): Promise<Approval>;
+    /** What the agent runs without asking ("Aprovar sempre"), oldest first. */
+    rules(orgId: string, agentId: string): Promise<ApprovalRule[]>;
+    /** The agent asks again for that kind (admins and the agent's owner). */
+    removeRule(orgId: string, agentId: string, ruleId: string): Promise<void>;
   };
   connectors: {
     /** Connectors agentes.chat knows, with their scopes, plus the built-in scopes. */
@@ -633,8 +676,14 @@ export interface ApiClient {
     get(orgId: string, id: string): Promise<SkillDetail>;
     /** "Escrever". */
     create(orgId: string, input: SkillInput): Promise<SkillDetail>;
-    /** A GitHub link (folder or SKILL.md) or the folder as a zip in base64 (writes are JSON only). */
-    import(orgId: string, input: { url: string } | { zipBase64: string }): Promise<SkillDetail>;
+    /**
+     * A GitHub link (a skill's folder or a file in it) or the folder as a zip in base64 (writes are JSON only). A link
+     * holding several skills installs nothing and answers with them to pick from (`importPicked`), those that can't
+     * be installed apart.
+     */
+    import(orgId: string, input: { url: string } | { zipBase64: string }): Promise<SkillDetail | SkillPick>;
+    /** Installs the skills picked among a link's choices (their `path`). */
+    importPicked(orgId: string, url: string, paths: string[]): Promise<SkillDetail[]>;
     update(orgId: string, id: string, patch: SkillPatch): Promise<SkillDetail>;
     /** Fetch the link again (`url` skills). */
     reimport(orgId: string, id: string): Promise<SkillDetail>;
@@ -677,7 +726,8 @@ export interface ApiClient {
     /**
      * Connects to an https MCP server. Without `apiKey` the server tries OAuth
      * (discovery + dynamic client registration); if the MCP server doesn't
-     * support it, answers `needs_key`.
+     * support it, answers `needs_key` (`reason: "not_approved"` when it only
+     * registers apps it approved).
      */
     connect(
       orgId: string,
@@ -1081,7 +1131,7 @@ export interface ApiClient {
      * Emails a code that proves the address (ADR 0072): signed out the one typed, signed in the account's own.
      * `join.code_wait` (429) with `retryIn` seconds right after another. `humanCheck`: the bot check's token.
      */
-    sendCode(token: string, input: { email?: string }, humanCheck?: string): Promise<JoinCodeSent>;
+    sendCode(token: string, input: { email?: string }, humanCheck?: string): Promise<CodeSent>;
     /** Checks the code from the email: right, the address can ask for 30 minutes. */
     checkCode(token: string, input: { email?: string; code: string }): Promise<{ verified: true }>;
     /**
@@ -1219,6 +1269,11 @@ export interface ApiClient {
     open(orgId: string, agentId: string, url: string): Promise<void>;
     /** "Parar": closes the agent's browser now (its logins stay). Its screen has no stop: it stays on. */
     stop(orgId: string, agentId: string): Promise<void>;
+    /**
+     * "Tentar de novo" on a page that never came: the browser closes and opens again where it was (its logins
+     * stay), and every live view gets it again. Resolves once it closed. Only who may drive it (403 otherwise).
+     */
+    restart(orgId: string, agentId: string): Promise<void>;
   };
   /**
    * The agent's screen (ADR 0058): its state. The screen itself is a WebSocket (`desktopSocketUrl`), which

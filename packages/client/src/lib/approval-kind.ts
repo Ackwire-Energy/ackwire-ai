@@ -40,6 +40,13 @@ export function approvalRisk(a: Pick<Approval, "tool" | "scope">): "high" | "nor
   return action === "deploy" || action === "rollback" || action === "delete" || action === "send" ? "high" : "normal";
 }
 
+/**
+ * "Aprovar sempre" shows on the card: the server offers it on this request, the person may decide it, and approving
+ * takes no hold (what is high risk is never approved for good).
+ */
+export const approveAlwaysOffered = (a: Pick<Approval, "status" | "canDecide" | "approveAlways" | "tool" | "scope">) =>
+  a.status === "pending" && a.canDecide && Boolean(a.approveAlways) && approvalRisk(a) !== "high";
+
 /** What the action touches: only what the request itself says. */
 export function approvalTraits(a: Pick<Approval, "tool" | "scope" | "params">): ApprovalTrait[] {
   const action = approvalAction(a);

@@ -206,6 +206,8 @@ export interface BrowserLiveConnection {
   sendInput(events: BrowserInputEvent[]): boolean;
   /** After the socket reconnected: watch again (the server forgot this socket). */
   resume(): void;
+  /** Watch again now (Try again on a page that never came): the server answers with the status and the newest page. */
+  retry(): void;
   /** Stops watching (`browser.unwatch`) and any pending retry. */
   close(): void;
 }
@@ -294,6 +296,12 @@ export function createBrowserLiveConnection(options: BrowserLiveOptions): Browse
       // A shared watcher watches every agent again by itself when the socket is back.
       if (!watcher) watch();
     },
+    retry() {
+      if (closed) return;
+      clearRetry();
+      attempt = 0;
+      watch();
+    },
     handleMessage(raw) {
       if (closed) return;
       const m = parseBrowserLiveMessage(raw);
@@ -331,6 +339,8 @@ export function createBrowserLiveConnection(options: BrowserLiveOptions): Browse
           return;
         case "error":
           options.onError?.(m.code);
+          // Too many browsers watched on this socket: in again once another view leaves.
+          if (m.code === "too_many_browsers") retryLater();
           return;
       }
     },

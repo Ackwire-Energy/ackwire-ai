@@ -7,6 +7,7 @@ import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
 import { firstName, greetingKey } from "../shared/logic";
 import { Tile, useSurface } from "../shared/parts";
+import { useHiddenAgents } from "../shared/queries";
 import { FIRST_AGENT_EXAMPLES } from "./examples";
 import { type FinishedItem, finishedKey, greetingLine } from "./now";
 
@@ -38,7 +39,7 @@ export function GreetingSky() {
  * The greeting under Conversas' large title, scrolling away with the list: "Boa noite, Walter", then one short
  * line with the agents' own faces in it: what one finished (its face before its name; opens where it happened),
  * else who works now (their faces, working, before the count; opens Agentes; the list below says what each
- * does), else everyone's faces resting, eyes closed.
+ * does), else everyone's faces resting, eyes closed. Who works and who rests are the agents Agentes lists.
  */
 export function Greeting({
   working,
@@ -53,6 +54,7 @@ export function Greeting({
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
+  const { hidden } = useHiddenAgents();
   const greeting = useGreeting();
   const line = greetingLine(finished, working.length);
   const workingText =
@@ -74,7 +76,7 @@ export function Greeting({
       </Text>
     </View>
   );
-  const resting = line.kind === "idle" ? dir.agents.map((a) => a.id) : [];
+  const resting = line.kind === "idle" ? dir.agents.filter((a) => !hidden.has(a.id)).map((a) => a.id) : [];
   return (
     <View style={styles.mini}>
       <Text variant="body" tone="ink2" numberOfLines={1}>

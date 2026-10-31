@@ -1,4 +1,4 @@
-import type { PubSub } from "@agenteschat/adapters";
+import { PERMISSION_TOOL, type PubSub } from "@agenteschat/adapters";
 import {
   and,
   asc,
@@ -29,7 +29,7 @@ import { notifyIssueChanged, notifyIssueComment } from "./notification-producers
 import { can, getMembership, requireActiveMembership } from "./organizations";
 import { fireRoutineEvent } from "./routines";
 import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./search";
-import { toolDetail } from "./tool-detail";
+import { promptAnswer, promptPoll, toolDetail } from "./tool-detail";
 import { syncWikiLinks } from "./wiki-links";
 
 const { issues, issueActivity, issueCounters, channels, channelMembers, artifacts, agentRuns, agentRunSteps } = schema;
@@ -89,8 +89,11 @@ export interface IssueWork {
   state: "running" | "waiting_approval" | "waiting_input" | "stalled";
   /** When the live run started, or when the work stopped (stalled). */
   since: string;
-  /** The run's last tool calls, oldest first (safe labels only: built-in details, no connector inputs). */
-  steps: { tool: string; detail?: string; at: string }[];
+  /**
+   * The run's last tool calls, oldest first (safe labels only: built-in details, no connector inputs). A permission
+   * check also says when its command was refused or still waits on a person (`outcome`).
+   */
+  steps: { tool: string; detail?: string; at: string; outcome?: "refused" | "waiting" }[];
   /** Stalled: how the last run ended, when it did not finish on its own. */
   reason?: "failed" | "canceled" | "budget";
 }
@@ -257,18 +260,57 @@ async function workOf(db: Database, rows: IssueRow[]): Promise<Map<string, Issue
   const runIds = latest.map((r) => r.id);
   const steps = runIds.length
     ? await db
-        .select({ runId: agentRunSteps.runId, data: agentRunSteps.data, createdAt: agentRunSteps.createdAt })
+        .select({
+          runId: agentRunSteps.runId,
+          kind: agentRunSteps.kind,
+          data: agentRunSteps.data,
+          createdAt: agentRunSteps.createdAt,
+        })
         .from(agentRunSteps)
-        .where(and(inArray(agentRunSteps.runId, runIds), eq(agentRunSteps.kind, "tool_call")))
+        .where(
+          and(
+            inArray(agentRunSteps.runId, runIds),
+            or(
+              eq(agentRunSteps.kind, "tool_call"),
+              and(eq(agentRunSteps.kind, "tool_result"), sql`${agentRunSteps.data}->>'name' = ${PERMISSION_TOOL}`),
+            ),
+          ),
+        )
         .orderBy(asc(agentRunSteps.seq))
     : [];
+  // A permission check's answer, by its call: refused, or waiting on a person until the runner's asking again brings
+  // the person's answer (by its request: Claude Code may ask twice while the card is open).
+  const answers = new Map(
+    steps.flatMap((st) =>
+      st.kind === "tool_result" ? [[st.data.toolUseId, promptAnswer(String(st.data.content ?? ""))] as const] : [],
+    ),
+  );
+  const waiting = new Map<string, IssueWork["steps"]>();
   const stepsOf = new Map<string, IssueWork["steps"]>();
   for (const st of steps) {
-    const name = typeof st.data.name === "string" ? st.data.name : "";
+    const name = st.kind === "tool_call" && typeof st.data.name === "string" ? st.data.name : "";
+    const input = st.data.input as Record<string, unknown> | undefined;
     if (!name) continue;
-    const detail = toolDetail(name, st.data.input as Record<string, unknown> | undefined);
+    const answer = name === PERMISSION_TOOL ? answers.get(st.data.toolUseId) : undefined;
+    if (promptPoll(name, input)) {
+      for (const asked of answer?.behavior ? (waiting.get(String(input?.request_id)) ?? []) : []) {
+        if (answer?.behavior === "deny") asked.outcome = "refused";
+        else delete asked.outcome;
+      }
+      continue;
+    }
+    const detail = toolDetail(name, input);
+    const outcome = answer?.behavior === "deny" ? "refused" : answer?.status === "pending" ? "waiting" : null;
+    const step: IssueWork["steps"][number] = {
+      tool: name,
+      ...(detail ? { detail } : {}),
+      at: st.createdAt.toISOString(),
+      ...(outcome ? { outcome } : {}),
+    };
+    if (outcome === "waiting" && answer?.request_id)
+      waiting.set(answer.request_id, [...(waiting.get(answer.request_id) ?? []), step]);
     const list = stepsOf.get(st.runId) ?? [];
-    list.push({ tool: name, ...(detail ? { detail } : {}), at: st.createdAt.toISOString() });
+    list.push(step);
     stepsOf.set(st.runId, list);
   }
   for (const r of withAgent) {

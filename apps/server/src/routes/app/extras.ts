@@ -21,7 +21,7 @@ import type { AppleTokenRevoker } from "../../auth";
  * app's own routes don't have to provide them.
  */
 export interface AppExtras {
-  /** Outbound HTTP for OAuth token exchanges (tests inject a fake). */
+  /** Outbound HTTP: OAuth token exchanges, provider key checks (tests inject a fake). */
   http?: typeof fetch;
   /** How to open MCP sessions (tests: in-process servers). */
   mcpConnect?: McpConnect;

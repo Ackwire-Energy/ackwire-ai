@@ -129,7 +129,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
       : t("aiAccounts.done.savedAgent", { agent: name, label: lowerFirst(t("connectAi.own.shared"), i18n.language) });
     const others = a ? takenFrom(a, name) : [];
     if (!a || others.length === 0) return void save({ account: a?.id ?? null }, done);
-    // One account thinks for one agent: picking another agent's takes it from that one.
+    // A login made for one agent thinks for one: picking another agent's takes it from that one.
     Alert.alert(a.label, t("agentPage.work.brain.accountMove", { agents: others.join(", ") }), [
       { text: t("common.cancel"), style: "cancel" },
       { text: t("mobile.ai.moveHere"), onPress: () => void save({ account: a.id, moveAccount: true }, done) },

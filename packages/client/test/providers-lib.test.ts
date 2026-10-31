@@ -12,6 +12,8 @@ import {
 const ids = (key: string) => providersForKey(key).map((p) => p.id);
 const AQ = "AQ.Ab8RN6LxSampleOnlyKey_0123456789-abc";
 const AIZA = "AIzaSyD-sample0only1key2for3tests4567";
+// Joined at run time: the secret scan reads a literal OpenRouter key shape as a real key.
+const OPENROUTER = ["sk", "or", "v1", "0123456789abcdef".repeat(4)].join("-");
 
 describe("whose key is it", () => {
   test("the same providers as the server's catalog, in its order: Claude, OpenAI, Gemini, then the rest", () => {
@@ -36,7 +38,16 @@ describe("whose key is it", () => {
     expect(ids("sk-cp-abcdefghijklmnopqrst")).toEqual(["openai"]);
   });
 
-  test("the key panel's first step: where a coding plan's key goes, or to turn on billing; nothing for the others", () => {
+  test("an OpenRouter key fits OpenRouter alone, whichever provider was chosen", () => {
+    expect(ids(OPENROUTER)).toEqual(["openrouter"]);
+    expect(providerGuess(OPENROUTER, "openai")).toBe("openrouter");
+    expect(keyLooksValid("openrouter", ` ${OPENROUTER} `)).toBe(true);
+    expect(keyLooksValid("openrouter", "sk-or-v1-short")).toBe(false);
+    expect(keyLooksValid("openrouter", "sk-0123456789abcdef0123456789abcdef")).toBe(false);
+    expect(providerOf("openrouter")).toMatchObject({ label: "OpenRouter", site: "openrouter.ai/keys" });
+  });
+
+  test("the key panel's first step: where a plan's key goes, billing, OpenRouter's privacy; nothing for the others", () => {
     const hint = (id: string) => {
       const p = providerOf(id);
       return p && keyStepHint(p);
@@ -45,5 +56,7 @@ describe("whose key is it", () => {
     expect(hint("gemini")).toBe("connectAi.key.billing");
     expect(hint("anthropic")).toBeUndefined();
     expect(hint("openai")).toBeUndefined();
+    // OpenRouter passes what is sent on to other providers: its own privacy settings say who may keep it.
+    expect(hint("openrouter")).toBe("connectAi.key.privacy");
   });
 });

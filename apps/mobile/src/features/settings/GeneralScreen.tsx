@@ -22,6 +22,7 @@ import {
   type TextInputInstance,
   View,
 } from "react-native";
+import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
 import {
   Button,
@@ -35,7 +36,7 @@ import {
   Text,
   useToast,
 } from "@/ui";
-import { Note } from "../ai/parts";
+import { Note, openPage } from "../ai/parts";
 import { ZoneList } from "../me/AccountPage";
 import { PHOTO_MAX_BASE64, photoContentType } from "../me/logic";
 import { useColors } from "../shared/hooks";
@@ -75,7 +76,8 @@ function useZonePick(): string | null {
  * "Editar workspace" (the web's Geral), from the workspace's settings: its logo, name and time zone, whether agents
  * check what the team already did, the context every agent reads, and the usage report's switch for the
  * installation's owner. Every change saves by itself (the name when its field is left, the zone when picked,
- * the context while typing), and "Salvo" shows under the title; who can't change them reads them.
+ * the context while typing), and "Salvo" shows under the title; who can't change them reads them. Its owners
+ * delete it on the website, in Geral's dialog.
  */
 export function GeneralScreen() {
   const { t, i18n } = useTranslation();
@@ -353,6 +355,20 @@ export function GeneralScreen() {
       ) : null}
 
       <UsageStatistics />
+      {org?.role === "owner" ? (
+        <>
+          <Gap />
+          <GroupedList>
+            <GroupedRow
+              label={t("deleteOrg.card.title")}
+              danger
+              chevron
+              onPress={() => openPage(`${serverUrl()}/org/${orgId}/settings/general?delete=1`)}
+            />
+          </GroupedList>
+          <GroupedFooter>{t("deleteOrg.card.text", { name: org.name })}</GroupedFooter>
+        </>
+      ) : null}
     </SettingsPage>
   );
 }

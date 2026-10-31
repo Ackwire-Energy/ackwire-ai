@@ -12,12 +12,14 @@ import {
   type EmailArt,
   type EmailDoc,
   type EmailLocale,
+  type Inline,
   type Look,
   ONBOARDING_CREW,
   renderDoc,
   type Scene,
 } from "./email/layout";
 import { WORDS } from "./email/words";
+import { dayAndTime } from "./format";
 import { adminIds } from "./gateway";
 import { publicHostAddress, type ResolveHost, resolveHostDns } from "./net-guard";
 import { enqueue, PermanentJobError } from "./outbox";
@@ -117,6 +119,20 @@ export type EmailTemplate =
    */
   | { kind: "join_code"; locale?: EmailLocale; orgName: string; code: string; url: string }
   /**
+   * A code to type before deleting (ADR 0088 §2): the workspace `orgName`, or without it the account `email`. No
+   * button: the dialog is already open. `support`: whom to write to if it wasn't them, as `account_deleted`'s. Its
+   * outbox row goes like `join_code`'s.
+   */
+  | {
+      kind: "deletion_code";
+      locale: EmailLocale;
+      code: string;
+      email: string;
+      orgName?: string;
+      support: string | null;
+      url: string;
+    }
+  /**
    * Double opt-in for the landing page's waiting list, in the language they
    * joined in. `email` is the address being confirmed (absent in jobs queued
    * before it existed).
@@ -150,6 +166,38 @@ export type EmailTemplate =
       url: string;
       /** `APPROVAL_REMINDER_HOURS` when it was queued: the footer says how often it comes. */
       afterHours?: number;
+    }
+  /**
+   * An owner deleted a workspace the reader is in, one email per member: it's closed now and goes for good at `dueAt`
+   * (ISO), shown in the reader's `timeZone`. Owners get a button to restore it. `url`: the workspace in the app.
+   */
+  | {
+      kind: "workspace_deleting";
+      locale: EmailLocale;
+      orgName: string;
+      /** Who deleted it. Empty: "Someone" in the email's language. */
+      byName: string;
+      dueAt: string;
+      timeZone: string;
+      owner: boolean;
+      url: string;
+    }
+  /** An owner restored a workspace that was being deleted, one email per member. */
+  | { kind: "workspace_restored"; locale: EmailLocale; orgName: string; byName: string; url: string }
+  /**
+   * The account `email` was deleted. `orgNames`: the workspaces only they were in, which closed with it and go for
+   * good at `dueAt` (ISO, shown in `timeZone`). `support`: whom to write to if it wasn't them (`SUPPORT_EMAIL`), else
+   * the people who run the server. `url`: the server's own address, for the pictures.
+   */
+  | {
+      kind: "account_deleted";
+      locale: EmailLocale;
+      email: string;
+      orgNames: string[];
+      dueAt: string | null;
+      timeZone: string;
+      support: string | null;
+      url: string;
     }
   /** The workspace's own computer is ready after a long wait (ADR 0056 §10): what it is, and what to do next. */
   | {
@@ -522,6 +570,66 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
         c.headline,
         [{ p: c.body(org) }, { code: t.code }, { small: c.small }],
         c.why(org),
+      );
+    }
+    case "deletion_code": {
+      const c = w.deletionCode;
+      const org = t.orgName === undefined ? null : inertText(t.orgName);
+      return doc(
+        org === null ? c.subjectAccount(t.code) : c.subjectWorkspace(t.code),
+        c.preheader,
+        c.headline,
+        [
+          { p: org === null ? c.account(inertText(t.email)) : c.workspace(org) },
+          { code: t.code },
+          { small: t.support ? c.support(t.support) : c.noSupport },
+        ],
+        org === null ? c.whyAccount : c.whyWorkspace(org),
+      );
+    }
+    case "workspace_deleting": {
+      const c = w.deleting;
+      const org = inertText(t.orgName);
+      const { day, time } = dayAndTime(new Date(t.dueAt), t.timeZone, lang);
+      return doc(
+        c.subject(day),
+        c.preheader,
+        c.headline,
+        [
+          { p: c.body(inertText(t.byName) || w.someone, org, day, time) },
+          ...(t.owner ? [{ p: c.owner }, { button: c.button, url: t.url }] : [{ small: c.member }]),
+        ],
+        c.why(org),
+      );
+    }
+    case "workspace_restored": {
+      const c = w.restored;
+      const org = inertText(t.orgName);
+      return doc(
+        c.subject,
+        c.preheader,
+        c.headline,
+        [{ p: c.body(inertText(t.byName) || w.someone, org) }, { button: c.button, url: t.url }],
+        c.why(org),
+      );
+    }
+    case "account_deleted": {
+      const c = w.accountDeleted;
+      const names = new Intl.ListFormat(lang, { type: "conjunction" })
+        .formatToParts(t.orgNames.map((name) => inertText(name)))
+        .map((part): Inline => (part.type === "element" ? { b: part.value } : part.value));
+      return doc(
+        c.subject,
+        c.preheader,
+        c.headline,
+        [
+          { p: c.body(inertText(t.email)) },
+          ...(t.dueAt && t.orgNames.length > 0
+            ? [{ p: c.closes(t.orgNames.length, dayAndTime(new Date(t.dueAt), t.timeZone, lang).day, names) }]
+            : []),
+          { small: t.support ? c.support(t.support) : c.noSupport },
+        ],
+        c.why,
       );
     }
   }

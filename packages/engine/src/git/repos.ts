@@ -33,6 +33,19 @@ export function normalizeRepoEntry(input: string): string | null {
   return `${owner}/${name}`;
 }
 
+const REPO = /^([A-Za-z0-9_.-]{1,100})\/([A-Za-z0-9_.-]{1,100}?)(?:\.git)?$/;
+
+/** "owner/name", "https://github.com/owner/name(.git)" → { owner, repo } or null. */
+export function parseRepo(input: string) {
+  const s = input
+    .trim()
+    .replace(/^https:\/\/github\.com\//, "")
+    .replace(/^git@github\.com:/, "")
+    .replace(/\/$/, "");
+  const m = REPO.exec(s);
+  return m ? { owner: m[1] as string, repo: m[2] as string } : null;
+}
+
 /** Whether `owner/repo` is in the list (an empty list allows everything). Case-insensitive, like GitHub. */
 export function repoInList(list: readonly string[], owner: string, repo: string) {
   if (list.length === 0) return true;
@@ -249,7 +262,7 @@ export function codePrompt(input: {
   if (input.cwd && input.checkouts.some((c) => c.path === input.cwd)) lines.push(`You start in ${input.cwd}.`);
   if (input.checkouts.length > 0) {
     lines.push(
-      `Read it freely; to change code, create a branch agentes/${input.handle}/<topic> there, push it (git push -u origin agentes/${input.handle}/<topic>) and open a PR with open_pull_request.`,
+      `Read it freely; to change code, create a branch agentes/${input.handle}/<topic> there, push it (git push -u origin agentes/${input.handle}/<topic>) and open a PR with open_pull_request. Delete branches with delete_branches; to push to someone else's branch, ask with request_branch_push first.`,
     );
   }
   if (input.notCloned.length > 0) {

@@ -257,6 +257,8 @@ export interface StartTaskInput {
   baseCheck?: { branch: string; sha: string } | null;
   /** The mission's branch the folder is on (recorded on the row; the runner makes no branch for it). */
   worktreeBranch?: string | null;
+  /** A person approved starting this very task: a shell task's command runs even when the computer would hold it. */
+  approved?: boolean;
 }
 
 /** What a task waiting in our queue keeps to start later (`machine_tasks.start_request`). */
@@ -372,6 +374,7 @@ export async function launchTask(
       ...(input.mission ? { mission: { ...input.mission, ...(mcpToken ? { mcpToken } : {}) } } : {}),
       ...(input.commit ? { commit: input.commit } : {}),
       ...(input.baseCheck ? { baseCheck: input.baseCheck } : {}),
+      ...(input.approved ? { approved: true } : {}),
     });
     const at = new Date(started.startedAt);
     const [running] = await deps.db

@@ -410,6 +410,19 @@ describe("deleting an agent", () => {
     expect(control).toContainEqual({ type: "machine.agents", orgId: f.org.id });
   });
 
+  test("a login made for all of its owner's agents stays on the computer for the others", async () => {
+    f = await setup({ machines: true });
+    const { machineId } = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "mac" });
+    const accountId = await login(machineId);
+    await f.db.update(schema.machineAccounts).set({ shared: true }).where(eq(schema.machineAccounts.id, accountId));
+
+    await remove();
+
+    const [account] = await f.db.select().from(schema.machineAccounts).where(eq(schema.machineAccounts.id, accountId));
+    expect(account?.status).toBe("active");
+    expect((await agentRow())?.brainAccountId).toBeNull();
+  });
+
   test("an archived agent's login a live agent thinks with now stays with that agent", async () => {
     f = await setup({ machines: true });
     const { machineId } = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "mac" });

@@ -136,7 +136,9 @@ const clientAad = (orgId: string, id: string) => `oauth-client|${orgId}|${id}`;
  * active connection uses it: once every connection to that server is gone,
  * the server may have dropped the client (Supabase answered "Unrecognized
  * client_id"), so we register again and replace the row. Null when the server
- * doesn't offer registration or PKCE S256.
+ * doesn't offer PKCE S256 or the registration fails; `not_approved` when it
+ * has OAuth but only takes clients it approved (no registration for us, or a
+ * refused one).
  */
 export async function ensureOAuthClient(
   deps: McpOAuthDeps,
@@ -144,7 +146,7 @@ export async function ensureOAuthClient(
   issuer: string,
   meta: AuthServerMetadata,
   input: { redirectUri: string; scopes: string[] },
-) {
+): Promise<OAuthClientRow | "not_approved" | null> {
   const [existing] = await deps.db
     .select()
     .from(oauthClients)
@@ -159,21 +161,30 @@ export async function ensureOAuthClient(
   }
   const methods = meta.code_challenge_methods_supported;
   if (methods && !methods.includes("S256")) return null;
-  if (!meta.registration_endpoint) return null;
-  await assertPublicHttpsUrl(meta.registration_endpoint, deps.resolveHost);
-  const res = await http(deps)(meta.registration_endpoint, {
-    method: "POST",
-    redirect: "error",
-    headers: { "content-type": "application/json", accept: "application/json" },
-    body: JSON.stringify({
-      client_name: "agentes.chat",
-      redirect_uris: [input.redirectUri],
-      grant_types: ["authorization_code", "refresh_token"],
-      response_types: ["code"],
-      token_endpoint_auth_method: "none",
-      ...(input.scopes.length > 0 ? { scope: input.scopes.join(" ") } : {}),
-    }),
-  }).catch(() => null);
+  const endpoint = meta.registration_endpoint;
+  if (!endpoint) return "not_approved";
+  await assertPublicHttpsUrl(endpoint, deps.resolveHost);
+  const register = (clientName: string) =>
+    http(deps)(endpoint, {
+      method: "POST",
+      redirect: "error",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({
+        client_name: clientName,
+        redirect_uris: [input.redirectUri],
+        grant_types: ["authorization_code", "refresh_token"],
+        response_types: ["code"],
+        token_endpoint_auth_method: "none",
+        ...(input.scopes.length > 0 ? { scope: input.scopes.join(" ") } : {}),
+      }),
+    }).catch(() => null);
+  let res = await register("agentes.chat");
+  // Calendly takes only letters, digits, hyphens and spaces in a client's name. The others keep the brand's,
+  // the name people see on the consent screen.
+  const refusal = res?.status === 400 ? await res.text().catch(() => "") : "";
+  if (/\b(client_)?name\b/i.test(refusal)) res = await register("agentes chat");
+  // RFC 7591: 400 for a redirect URI or metadata it won't take, 401 or 403 for a registration closed to us.
+  if (res && [400, 401, 403].includes(res.status)) return "not_approved";
   if (!res?.ok) return null;
   const body = (await res.json().catch(() => ({}))) as { client_id?: string; client_secret?: string };
   if (!body.client_id) return null;

@@ -13,6 +13,8 @@ import { and, type Database, eq, inArray, isNotNull, isNull, or, schema } from "
 import {
   announcePresence,
   type BrowserLive,
+  closedRefusal,
+  closesWorkspace,
   ForbiddenError,
   getMembership,
   isConnected,
@@ -121,8 +123,8 @@ const MEMBERSHIP_CHECK_TIMEOUT_MS = 5_000;
 /**
  * The checks before a person's socket opens (`/api/ws`, and the desktop and
  * terminal streams): our Origin, or the phone app without one (cross-site
- * WebSocket hijacking); a session from the cookie; membership of `orgId`.
- * The person, or the refusal.
+ * WebSocket hijacking); a session from the cookie; membership of `orgId`,
+ * a workspace that isn't closed (`closedRefusal`). The person, or the refusal.
  */
 export async function personUpgrade(
   deps: Pick<RealtimeDeps, "auth" | "db">,
@@ -140,7 +142,7 @@ export async function personUpgrade(
   if (!session) return new Response("Sign in to continue", { status: 401 });
   const user = session.user as SessionUser;
   const membership = await getMembership(deps.db, user.id, orgId);
-  if (!membership || membership.standing?.state === "suspended") {
+  if (!membership || closedRefusal(membership.standing)) {
     return new Response("Not a member of this organization", { status: 403 });
   }
   return { ...user, sessionToken: session.session.token };
@@ -194,7 +196,7 @@ export async function currentSubscriptions(
   channelIds: string[],
 ): Promise<Set<string> | null> {
   const member = await getMembership(db, userId, orgId);
-  if (!member || member.standing?.state === "suspended") return null;
+  if (!member || closedRefusal(member.standing)) return null;
   if (channelIds.length === 0) return new Set();
   const rows = await db
     .select({ id: schema.channels.id })
@@ -442,9 +444,7 @@ export function createRealtime(deps: RealtimeDeps) {
             if (event.type === "channel.archived") return drop(event.channelId, "archived");
             if (event.type === "org.broadcast") {
               if (ws.readyState === 1) send(ws, { type: "event", scope: "org", event: event.event });
-              if (event.event.type === "org.standing" && event.event.state === "suspended" && ws.readyState === 1) {
-                ws.close(4403, "organization suspended");
-              }
+              if (closesWorkspace(event.event) && ws.readyState === 1) ws.close(4403, "organization closed");
               return;
             }
             if (event.type !== "membership.revoked" || event.userId !== user.id) return;

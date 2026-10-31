@@ -13,7 +13,15 @@ export function audienceOf(agent: Agent): AgentAudience {
 export const modeOf = (agent: Agent): AudienceMode => agent.audience?.mode ?? agent.audienceMode ?? "everyone";
 
 /** Whether I can talk to it (the server's `canTalk`; absent = yes). */
-export const canTalk = (agent: Agent | undefined) => agent?.canTalk !== false;
+export const canTalk = (agent: Pick<Agent, "canTalk"> | undefined) => agent?.canTalk !== false;
+
+/**
+ * Whether my lists and pickers show the agent: every agent for who manages agents, who arrange the team (the lock
+ * says who it answers), only the ones that answer me for everyone else. From the server's `canTalk` (the agent's
+ * audience and `talk_to_agents`), so a later limit per person reaches every list unchanged.
+ */
+export const listsAgent = (org: OrgSummary | null | undefined, agent: Pick<Agent, "canTalk"> | undefined) =>
+  can(org, "manage_agents") || canTalk(agent);
 
 /** Whether `to` lets someone talk to the agent whom `from` didn't; its owner always can (same rule as the backend). */
 export function audienceWidens(from: AgentAudience, to: AgentAudience, ownerUserId: string | null): boolean {

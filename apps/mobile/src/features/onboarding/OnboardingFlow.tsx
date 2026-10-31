@@ -30,6 +30,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { signOut } from "@/features/account";
 import { useConnectKey } from "@/features/ai/ConnectAi";
 import { authClient } from "@/lib/auth";
+import { serverUrl } from "@/lib/server";
 import { useOrgGate } from "@/providers/org";
 import { Dither } from "@/sky/Dither";
 import { softTones } from "@/sky/math";
@@ -46,6 +47,7 @@ import {
   Text,
   useTheme,
 } from "@/ui";
+import { openPage } from "../ai/parts";
 import { confirmationSentTo, forgetConfirmationSent } from "../auth/confirmation";
 import { chatHref } from "../links/logic";
 import { PHOTO_MAX_BASE64, photoContentType } from "../me/logic";
@@ -93,9 +95,10 @@ import {
  * walking at its front. Workspace (logo optional, time zone from the phone) → Contexto → Trazer agentes
  * (optional; brought from the web) → Agentes → IA (optional: an AI plan or an API key, skipped when the agents
  * already think with one) → Pessoas (optional: type e-mails or share a link) → Pronto: the team's welcome and the
- * first message, offered by the agent best placed to start, sent to #general. No computer step.
+ * first message, offered by the agent best placed to start, sent to #general. No computer step. `onLeave`: opened
+ * over a workspace being deleted, its first step goes back to it until a new one is made.
  */
-export function OnboardingFlow() {
+export function OnboardingFlow({ onLeave }: { onLeave?: () => void } = {}) {
   const { t, i18n } = useTranslation();
   const api = useApi();
   const qc = useQueryClient();
@@ -491,7 +494,20 @@ export function OnboardingFlow() {
               onPress={action.onPress}
             />
           ) : null}
-          {/* Until a workspace is set up this is the only screen: the way out of the account is on its first step. */}
+          {/* Until a workspace is set up this is the only screen: the ways out of the account, and of a workspace made
+              by mistake, are on its first step (deleting either on the website). */}
+          {step === "workspace" && onLeave && !created ? (
+            <Button variant="ghost" wide label={t("mobile.common.back")} disabled={pending} onPress={onLeave} />
+          ) : null}
+          {step === "workspace" && created ? (
+            <Button
+              variant="ghost"
+              wide
+              label={t("onboarding.deleteLink")}
+              disabled={pending}
+              onPress={() => openPage(`${serverUrl()}/onboarding?delete=1`)}
+            />
+          ) : null}
           {step === "workspace" ? (
             <Button
               variant="ghost"
@@ -499,6 +515,15 @@ export function OnboardingFlow() {
               label={t("mobile.org.signOut")}
               disabled={pending}
               onPress={() => void signOut()}
+            />
+          ) : null}
+          {step === "workspace" ? (
+            <Button
+              variant="ghost"
+              wide
+              label={t("deleteAccount.menu")}
+              disabled={pending}
+              onPress={() => openPage(`${serverUrl()}/onboarding?account=delete`)}
             />
           ) : null}
           {step === "import" ? (

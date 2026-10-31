@@ -62,6 +62,56 @@ export function suggestFor(tool: ToolToClassify, readTools: readonly string[] = 
   return (classifyByRules(tool, readTools) ?? UNKNOWN_CLASS).level;
 }
 
+/**
+ * Composio's meta tools (docs.composio.dev/reference/meta-tools). The executor runs other Composio actions by
+ * slug. The workbench and bash run code in Composio's sandbox, which can call any action, and the proxy sends any
+ * HTTP request to a connected app's API (`PUT …/pulls/12/merge` too): they always ask a person whatever their
+ * annotations or stored level say.
+ */
+export const COMPOSIO_EXECUTOR = "COMPOSIO_MULTI_EXECUTE_TOOL";
+export const COMPOSIO_ANY_ACTION: ReadonlySet<string> = new Set([
+  "COMPOSIO_REMOTE_WORKBENCH",
+  "COMPOSIO_REMOTE_BASH_TOOL",
+  "COMPOSIO_PROXY_EXECUTE",
+]);
+
+const COMPOSIO_SLUG = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/;
+const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+/** The executor's documented input besides `tools`, with each value's type. */
+const EXECUTOR_FIELDS: Readonly<Record<string, "string" | "boolean">> = {
+  thought: "string",
+  sync_response_to_workbench: "boolean",
+  current_step: "string",
+  current_step_metric: "string",
+  session_id: "string",
+};
+
+/**
+ * The action slugs one call of Composio's executor runs (each once), or null when its input isn't the
+ * documented shape: then nothing is guessed, and the call asks a person like any other. A slug of another
+ * meta tool (`COMPOSIO_…`, the workbench above all) never counts as one of its actions.
+ */
+export function composioActions(input: Record<string, unknown>): string[] | null {
+  for (const [key, value] of Object.entries(input)) {
+    if (key === "tools") continue;
+    const type = EXECUTOR_FIELDS[key];
+    if (!type || typeof value !== type) return null;
+  }
+  const tools = input.tools;
+  if (!Array.isArray(tools) || tools.length === 0 || tools.length > 50) return null;
+  const slugs: string[] = [];
+  for (const item of tools) {
+    if (!isPlainObject(item)) return null;
+    const { tool_slug: slug, arguments: args, ...rest } = item;
+    if (Object.keys(rest).length > 0 || (args !== undefined && !isPlainObject(args))) return null;
+    if (typeof slug !== "string" || slug.length > 128 || !COMPOSIO_SLUG.test(slug) || slug.startsWith("COMPOSIO_"))
+      return null;
+    slugs.push(slug);
+  }
+  return [...new Set(slugs)];
+}
+
 export interface CustomToolView {
   name: string;
   description: string;
@@ -105,7 +155,8 @@ export interface CustomServerView {
 export type CustomConnectStart =
   | { status: "connected"; server: CustomServerView }
   | { status: "oauth"; authorizeUrl: string }
-  | { status: "needs_key" };
+  /** `not_approved`: it has OAuth but only lets in apps it approved, and agentes.chat isn't one yet. */
+  | { status: "needs_key"; reason?: "not_approved" };
 
 export interface CustomDeps extends McpOAuthDeps {
   /** How to open MCP sessions (tests: in-process servers). */
@@ -437,7 +488,7 @@ export async function connectCustomServer(
     return { status: "connected", server: await serverView(deps.db, c.orgId, c.id) };
   }
   if (probe.kind === "needs_key") return { status: "needs_key" };
-  const authorizeUrl = await beginMcpOAuth(deps, actorId, orgId, {
+  return beginMcpOAuth(deps, actorId, orgId, {
     connector: "custom",
     serverUrl,
     label,
@@ -446,13 +497,13 @@ export async function connectCustomServer(
     scopes: probe.scopes,
     returnTo: input.returnTo,
   });
-  return authorizeUrl ? { status: "oauth", authorizeUrl } : { status: "needs_key" };
 }
 
 /**
  * Starts an MCP-native OAuth authorization: authorization server metadata,
- * a registered client (DCR), state + PKCE S256 + `resource`. Null when the
- * server can't do it (no registration or no S256).
+ * a registered client (DCR), state + PKCE S256 + `resource`. `needs_key` when
+ * the server can't do it, with `not_approved` when it only registers clients
+ * it approved.
  */
 export async function beginMcpOAuth(
   deps: McpOAuthDeps,
@@ -467,12 +518,13 @@ export async function beginMcpOAuth(
     scopes: string[];
     returnTo?: string;
   },
-): Promise<string | null> {
+): Promise<Exclude<CustomConnectStart, { status: "connected" }>> {
   const meta = await authServerMetadata(deps, input.issuer);
-  if (!meta) return null;
+  if (!meta) return { status: "needs_key" };
   const redirectUri = oauthRedirectUri(deps.publicUrl);
   const client = await ensureOAuthClient(deps, orgId, input.issuer, meta, { redirectUri, scopes: input.scopes });
-  if (!client) return null;
+  if (client === "not_approved") return { status: "needs_key", reason: "not_approved" };
+  if (!client) return { status: "needs_key" };
   const state = randomToken(32);
   const verifier = randomToken(48);
   const challenge = createHash("sha256").update(verifier).digest("base64url");
@@ -506,7 +558,7 @@ export async function beginMcpOAuth(
   url.searchParams.set("code_challenge_method", "S256");
   url.searchParams.set("resource", input.resource);
   if (client.scope) url.searchParams.set("scope", client.scope);
-  return url.toString();
+  return { status: "oauth", authorizeUrl: url.toString() };
 }
 
 /** Lists the tools again (admins). */

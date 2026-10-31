@@ -13,6 +13,7 @@ import {
   Field,
   Icon,
   ProviderLogo,
+  SearchSelect,
   Select,
   type SelectOption,
 } from "@agenteschat/ui";
@@ -44,14 +45,70 @@ export function priceTier(model: Model, models: Model[]) {
   return prices.length <= 1 ? 2 : Math.min(3, 1 + Math.floor((3 * rank) / prices.length));
 }
 
-/** Model descriptions, by model family. */
+/** Claude's own models describe themselves by family; any other, by its price. */
+const CLAUDE_FAMILIES = ["sonnet", "opus", "haiku"] as const;
+const claudeFamily = (model: Model) =>
+  model.provider === "anthropic" ? CLAUDE_FAMILIES.find((f) => model.id.toLowerCase().includes(f)) : undefined;
+
+/** Model descriptions: Claude's by family, the others by price ("Grátis" for a free one). */
 export function modelDescription(t: TFunction, locale: string, model: Model) {
-  const id = model.id.toLowerCase();
-  if (id.includes("sonnet")) return t("newAgent.modelDesc.sonnet");
-  if (id.includes("opus")) return t("newAgent.modelDesc.opus");
-  if (id.includes("haiku")) return t("newAgent.modelDesc.haiku");
+  const family = claudeFamily(model);
+  if (family) return t(`newAgent.modelDesc.${family}`);
+  if (model.inputUsdPerMTok === 0 && model.outputUsdPerMTok === 0) return t("newAgent.modelDesc.free");
   const fmt = (n: number) => new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(n);
   return t("newAgent.modelDesc.other", { input: fmt(model.inputUsdPerMTok), output: fmt(model.outputUsdPerMTok) });
+}
+
+/**
+ * The model picker's options: each provider's models under its name, OpenRouter's good picks before the rest of its
+ * list; those without a key say why.
+ */
+export function modelOptions(t: TFunction, locale: string, choices: [string, ModelChoice[]][]): SelectOption[] {
+  return choices.flatMap(([provider, list]) =>
+    list.map(({ model: m, available }) => ({
+      value: m.id,
+      label: m.label,
+      group: m.pick ? t("models.picks", { provider: providerLabel(provider) }) : providerLabel(provider),
+      disabled: !available,
+      leading: <ProviderLogo id={provider} size="sm" />,
+      description: available
+        ? modelDescription(t, locale, m)
+        : t("newAgent.modelNeedsKey", providerGrammar(t, provider)),
+    })),
+  );
+}
+
+/** A model picker for a long list: a search over the models (name, maker, id), shaped like the cards around it. */
+export function ModelSelect({
+  value,
+  onChange,
+  options,
+  className,
+  "aria-label": label,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: SelectOption[];
+  className?: string;
+  "aria-label"?: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <SearchSelect
+      className={className}
+      aria-label={label}
+      value={value}
+      onValueChange={onChange}
+      options={options}
+      labels={{
+        search: t("models.search"),
+        searchPlaceholder: t("models.searchPlaceholder"),
+        noResults: t("models.noResults"),
+        list: t("models.list"),
+      }}
+      renderValue={(o) => (o ? pickerValue(o) : value)}
+    />
+  );
 }
 
 /**
@@ -366,7 +423,7 @@ function ModelCard({
         </span>
       </span>
       {/* Other models describe themselves by price: only for those who see money. */}
-      {(money || !available || /sonnet|opus|haiku/i.test(model.id)) && (
+      {(money || !available || claudeFamily(model)) && (
         <span className="newag__model-desc">
           {available ? modelDescription(t, locale, model) : t("newAgent.modelNeedsKey", providerGrammar(t, provider))}
         </span>
@@ -420,7 +477,12 @@ export function ModelCards({
   money: boolean;
 }) {
   const { t } = useTranslation();
-  const all = choices.flatMap(([, list]) => list.map((c) => c.model));
+  // A long list (OpenRouter's) shows its good picks only: the rest is in the agent page's model picker.
+  const shown = choices.map(([provider, list]): [string, ModelChoice[]] => [
+    provider,
+    list.filter((c) => c.model.pick !== false),
+  ]);
+  const all = shown.flatMap(([, list]) => list.map((c) => c.model));
   // "Automático" picks from the line of the agent's key: usable once any model is.
   const autoAvailable = choices.some(([, list]) => list.some((c) => c.available));
   return (
@@ -442,7 +504,7 @@ export function ModelCards({
           {t("newAgent.autoCost")}
         </span>
       </button>
-      {choices.flatMap(([provider, list]) =>
+      {shown.flatMap(([provider, list]) =>
         list.map(({ model, available }) => (
           <ModelCard
             key={model.id}

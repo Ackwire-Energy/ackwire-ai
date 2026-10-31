@@ -1,8 +1,9 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import type { EventEmitter } from "node:events";
-import { accessSync, constants, existsSync, readFileSync, statSync } from "node:fs";
-import { chmod, lchown, lstat, mkdir, open, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { accessSync, constants, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { chmod, lchown, lstat, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { AGENT_WORKER_HOMES } from "@agenteschat/adapters/command-policy";
 import {
   ACCOUNT_KINDS,
@@ -25,7 +26,8 @@ import { generateSecretKeyPair, openSecret } from "@agenteschat/adapters/secret-
 import { isPlanId, type PlanId, planKeyFits, planOf } from "@agenteschat/providers/plans";
 import { errnoCode, RunnerError } from "./errors";
 import { killTree } from "./exec";
-import { resolveCommand } from "./executors";
+import { claudeKeptPlan, claudePlan, claudeTier, resolveCommand } from "./executors";
+import { readSmallJson, writeJson } from "./json-file";
 import {
   codexUsage,
   fetchPlanKeyUsage,
@@ -48,8 +50,10 @@ import {
  * - `code` opens the sealed Claude code and writes it to the waiting CLI.
  * - When the CLI exits, its status command (`claude auth status --json`,
  *   `codex login status`) in that folder decides: `done` with the email and
- *   plan, or `failed` (folder removed). After `ACCOUNT_LOGIN_TTL_MS` the sign-in
- *   is killed and its folder removed (`expired`).
+ *   plan (a Claude Max's tier from the CLI's `.claude.json` there tells Ultra
+ *   apart, `claudePlan`), or `failed` (folder removed). After
+ *   `ACCOUNT_LOGIN_TTL_MS` the sign-in is killed and its folder removed
+ *   (`expired`).
  * - `list` asks each account's CLI (cached for `ACCOUNTS_TTL_MS`), but one a
  *   turn's endpoint refused reads as signed out until it signs in again
  *   (`refused`); `remove` signs out (best effort) and deletes the folder,
@@ -64,8 +68,16 @@ import {
  * - System mode (`lending`): a folder belongs to the OS user of the agent
  *   that thinks with it, only while it does (`lendTo`, `keepLent`), else to
  *   root. Root never runs a CLI against what an agent's user could write: such
- *   a folder's status is what its turns said, signing in again starts it over,
- *   and removing it signs nothing out.
+ *   a folder's status is what its turns said and its plan what Claude Code
+ *   keeps there (`claudeKeptPlan`), signing in again starts it over, and
+ *   removing it signs nothing out.
+ * - Protocol 29, one sign-in for all of its owner's agents: every folder
+ *   where the agents are the runner's own user (the CLIs keep one sign-in for
+ *   several processes of one user). In system mode, a sign-in made `shared`
+ *   (`<id>.shared` beside its folder) is root's alone and never lent: a
+ *   Claude one is `claude setup-token`'s token (`token.json`, 600), signed in
+ *   in a terminal of its own (`spawnToken`), a coding plan's is its key, and
+ *   `grant` hands what a turn needs to the agent's worker.
  */
 
 /** A fresh look at every account's status happens at most this often (each one runs the CLI). */
@@ -88,7 +100,6 @@ const STATUS_TIMEOUT_MS = 10_000;
 const MAX_CODE_CHARS = 2000;
 const OUTPUT_KEEP = 16_000;
 const EMAIL = /^[^\s@]+@[^\s@]+$/;
-const WORD = /^[\w.-]{1,40}$/;
 
 const LABEL: Record<AccountKind, string> = { claude_code: "Claude Code", codex: "Codex" };
 const ENV_VAR: Record<AccountKind, string> = { claude_code: "CLAUDE_CONFIG_DIR", codex: "CODEX_HOME" };
@@ -112,7 +123,7 @@ export const ACCOUNT_MISSING_MESSAGE: Record<AccountKind, string> = {
 
 /** What would make a CLI think with anything but its folder's sign-in: a key, a token, another endpoint or cloud. */
 const STRAY_SIGN_IN =
-  /^(ANTHROPIC_(API_KEY|AUTH_TOKEN|BASE_URL)|CLAUDE_CODE_(OAUTH_TOKEN|USE_\w+)|OPENAI_API_KEY|CODEX_API_KEY)$/;
+  /^(ANTHROPIC_(API_KEY|AUTH_TOKEN|BASE_URL)|CLAUDE_CODE_(OAUTH_TOKEN|USE_\w+|\w+_FILE_DESCRIPTOR)|OPENAI_API_KEY|CODEX_API_KEY)$/;
 
 /** The env a CLI runs with for an account folder: `base` without any other sign-in, the folder as its home. */
 export function accountEnv(kind: AccountKind, dir: string, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
@@ -120,6 +131,22 @@ export function accountEnv(kind: AccountKind, dir: string, base: NodeJS.ProcessE
   for (const [k, v] of Object.entries(base)) if (!STRAY_SIGN_IN.test(k)) env[k] = v;
   env[ENV_VAR[kind]] = dir;
   return env;
+}
+
+/**
+ * How Claude Code gets a token root hands over: on descriptor 3, which it reads at its start, then closes, dropping
+ * this variable (Claude Code 2.1.296 to 2.1.314), so neither its environment nor any command it starts holds it.
+ */
+export const TOKEN_FD_ENV = { CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR: "3" } as const;
+
+/** The stdio of a CLI that gets a token (`TOKEN_FD_ENV`): a fourth pipe for it. */
+export const TOKEN_STDIO = ["pipe", "pipe", "pipe", "pipe"] as const;
+
+/** Writes the token to the CLI started with `TOKEN_STDIO`, and closes that pipe. */
+export function handToken(child: ChildProcess, token: string) {
+  const pipe = child.stdio[3] as NodeJS.WritableStream | null | undefined;
+  pipe?.on("error", () => {});
+  pipe?.end(`${token}\n`);
 }
 
 /**
@@ -142,27 +169,72 @@ export async function yieldRoute(kind: AccountKind, home?: string | null): Promi
 const PROVIDER_FILE = "provider.json";
 /** The longest key kept (plans' keys are tens of characters, MiniMax's JWT-like ones a few hundred). */
 const MAX_KEY_CHARS = 2048;
+/** System mode, a Claude account made for all agents: the token `claude setup-token` printed (mode 600). */
+const TOKEN_FILE = "token.json";
+/** Claude's long-lived OAuth tokens: they only make model requests, and have no refresh token. */
+const OAUTH_TOKEN = /sk-ant-oat01-[A-Za-z0-9_-]{8,400}/;
+const WHOLE_OAUTH_TOKEN = new RegExp(`^${OAUTH_TOKEN.source}$`);
+const OAUTH_TOKENS = new RegExp(OAUTH_TOKEN.source, "g");
+/** The terminal `claude setup-token` draws its screen in: wide enough that its link and token never wrap. */
+const TOKEN_TERMINAL = { cols: 500, rows: 200 } as const;
+/** Between pasting a code into that screen and pressing Enter: the field takes the paste first. */
+const PASTE_ENTER_MS = 300;
+/** After the CLI exits, how long its last output may still take to arrive. */
+const LAST_OUTPUT_MS = 500;
+
+/**
+ * What a turn of an agent thinking with an account root keeps (system mode, protocol 29) gets over its worker
+ * link: the token or the key its CLI needs, or `none` while the account has neither (signed out). Root's alone
+ * to give: never what the server sent.
+ */
+export type AccountGrant =
+  | { kind: "token"; token: string }
+  | { kind: "key"; provider: PlanId; key: string }
+  | { kind: "none" };
+
+/** A grant as the worker reads it off root's request frame; null when there is none or it isn't one. */
+export function grantOf(v: unknown): AccountGrant | null {
+  const g = v as Record<string, unknown> | null | undefined;
+  if (g?.kind === "none") return { kind: "none" };
+  if (g?.kind === "token" && typeof g.token === "string" && WHOLE_OAUTH_TOKEN.test(g.token)) {
+    return { kind: "token", token: g.token };
+  }
+  if (g?.kind === "key" && isPlanId(g.provider) && typeof g.key === "string" && g.key) {
+    return { kind: "key", provider: g.provider, key: g.key };
+  }
+  return null;
+}
 
 /** System mode: the account folders, outside root's home (its parents 711) so an agent's user reaches the one lent to it. */
 export const SYSTEM_ACCOUNTS_ROOT = path.join(AGENT_WORKER_HOMES, "accounts");
 
-/**
- * A key account's plan and key (`provider.json`); null when the folder isn't one. Never follows a link, and
- * never waits on a pipe an agent's user put there (root reads lent folders: a blocked open would hang it).
- */
+/** A key account's plan and key (`provider.json`); null when the folder isn't one. Never through a link or a pipe. */
 export async function planKeyOf(dir: string): Promise<{ provider: PlanId; key: string } | null> {
-  const flags = constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0);
-  const file = await open(path.join(dir, PROVIDER_FILE), flags).catch(() => null);
-  if (!file) return null;
+  const o = readSmallJson(path.join(dir, PROVIDER_FILE), MAX_KEY_CHARS + 200) as Record<string, unknown> | null;
+  return isPlanId(o?.provider) && typeof o.key === "string" && o.key ? { provider: o.provider, key: o.key } : null;
+}
+
+/** A Claude account's token (`token.json`, system mode); null when the folder keeps none. */
+export async function tokenOf(dir: string): Promise<string | null> {
+  const o = readSmallJson(path.join(dir, TOKEN_FILE), 1000) as Record<string, unknown> | null;
+  return typeof o?.token === "string" && WHOLE_OAUTH_TOKEN.test(o.token) ? o.token : null;
+}
+
+/** Tokens out of what people read (a CLI's error, a screen). */
+const withoutTokens = (text: string) => text.replace(OAUTH_TOKENS, "…");
+
+/**
+ * System mode, in an agent's worker: that agent's own folder for an account root keeps (`AccountGrant`), its
+ * CLI's home for it there (sessions, settings), never a sign-in. Made on first use (700).
+ */
+export function agentAccountHome(home: string, kind: AccountKind, id: string): string | null {
+  if (!isAccountKind(kind) || !isAccountId(id)) return null;
+  const dir = path.join(home, "accounts", kind, id);
   try {
-    const st = await file.stat();
-    if (!st.isFile() || st.size > MAX_KEY_CHARS + 200) return null;
-    const o = JSON.parse(await file.readFile("utf8")) as Record<string, unknown> | null;
-    return isPlanId(o?.provider) && typeof o.key === "string" && o.key ? { provider: o.provider, key: o.key } : null;
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    return dir;
   } catch {
     return null;
-  } finally {
-    await file.close().catch(() => undefined);
   }
 }
 
@@ -227,6 +299,172 @@ export function stripAnsi(text: string): string {
   return text.replace(OSC, "").replace(CSI, "").replace(FE, "").replace(/\r/g, "");
 }
 
+/**
+ * One escape at a time, only when whole: CSI (`m[1]` its parameters, `m[2]` its final byte), OSC, DCS and the
+ * like, a character set, or any other two-character escape (`m[3]`).
+ */
+const SCREEN_ESCAPE = new RegExp(
+  `${ESC}\\[([0-?]*)[ -/]*([@-~])|${ESC}\\][^${BEL}${ESC}]*(?:${BEL}|${ESC}\\\\)|${ESC}[P^_X][\\s\\S]*?${ESC}\\\\|${ESC}[()*+][ -~]|${ESC}([^\\[\\]P^_X()*+])`,
+  "y",
+);
+
+/**
+ * What a terminal shows, fed the bytes a program draws it with as they come: `claude setup-token` draws its
+ * screen only in a terminal, puts words apart with cursor moves and redraws only the cells that change, so its
+ * text is read off the screen, never off the bytes. Characters at the cursor, returns, line feeds, cursor moves
+ * and erases; colors, links and every other escape left out; one cell per character. An escape cut between two
+ * pieces waits for the rest.
+ */
+export class Screen {
+  private lines: string[][] = [];
+  private r = 0;
+  private c = 0;
+  private saved: [number, number] = [0, 0];
+  private rest = "";
+
+  constructor(private readonly rows: number = TOKEN_TERMINAL.rows) {}
+
+  write(chunk: string) {
+    const s = this.rest + chunk;
+    this.rest = "";
+    for (let i = 0; i < s.length; ) {
+      if (s[i] !== ESC) {
+        const ch = String.fromCodePoint(s.codePointAt(i) ?? 0);
+        i += ch.length;
+        this.char(ch);
+        continue;
+      }
+      SCREEN_ESCAPE.lastIndex = i;
+      const m = SCREEN_ESCAPE.exec(s);
+      if (m) {
+        i += m[0].length;
+        this.escape(m);
+      } else if (s.length - i > 4096) {
+        // Never ended: not an escape after all.
+        i++;
+      } else {
+        this.rest = s.slice(i);
+        return;
+      }
+    }
+  }
+
+  text(): string {
+    return this.lines.map((l) => l.join("").trimEnd()).join("\n");
+  }
+
+  private line(): string[] {
+    while (this.lines.length <= this.r) this.lines.push([]);
+    return this.lines[this.r] as string[];
+  }
+
+  /** Down a line; past the bottom the screen scrolls up. */
+  private feed() {
+    if (this.r < this.rows - 1) this.r++;
+    else this.lines.splice(0, 1);
+  }
+
+  private char(ch: string) {
+    if (ch === "\r") this.c = 0;
+    else if (ch === "\n") this.feed();
+    else if (ch === "\b") this.c = Math.max(0, this.c - 1);
+    else if (ch === "\t") this.c = (Math.floor(this.c / 8) + 1) * 8;
+    else if (ch >= " " && ch !== "\x7f") {
+      const l = this.line();
+      while (l.length < this.c) l.push(" ");
+      l[this.c++] = ch;
+    }
+  }
+
+  private escape(m: RegExpExecArray) {
+    if (m[3] === "7") this.saved = [this.r, this.c];
+    else if (m[3] === "8") [this.r, this.c] = this.saved;
+    else if (m[3] === "D") this.feed();
+    else if (m[3] === "E") {
+      this.feed();
+      this.c = 0;
+    } else if (m[3] === "M") this.r = Math.max(0, this.r - 1);
+    const params = m[1] ?? "";
+    // Private modes and queries (`?25l`, `>0q`) move nothing.
+    if (!m[2] || /[<=>?]/.test(params)) return;
+    const [a = 0, b = 0] = params.split(";").map((p) => Number.parseInt(p, 10) || 0);
+    const n = Math.max(1, a);
+    const l = () => this.line();
+    switch (m[2]) {
+      case "A":
+        this.r = Math.max(0, this.r - n);
+        break;
+      case "B":
+      case "e":
+        this.r = Math.min(this.rows - 1, this.r + n);
+        break;
+      case "C":
+      case "a":
+        this.c += n;
+        break;
+      case "D":
+        this.c = Math.max(0, this.c - n);
+        break;
+      case "E":
+        this.r = Math.min(this.rows - 1, this.r + n);
+        this.c = 0;
+        break;
+      case "F":
+        this.r = Math.max(0, this.r - n);
+        this.c = 0;
+        break;
+      case "G":
+      case "`":
+        this.c = n - 1;
+        break;
+      case "d":
+        this.r = Math.min(this.rows - 1, n - 1);
+        break;
+      case "H":
+      case "f":
+        this.r = Math.min(this.rows - 1, Math.max(1, a) - 1);
+        this.c = Math.max(1, b) - 1;
+        break;
+      case "K":
+        if (a === 0) l().length = Math.min(l().length, this.c);
+        else if (a === 1) l().fill(" ", 0, this.c + 1);
+        else l().length = 0;
+        break;
+      case "J":
+        if (a === 0) {
+          l().length = Math.min(l().length, this.c);
+          this.lines.length = Math.min(this.lines.length, this.r + 1);
+        } else if (a === 1) {
+          for (let k = 0; k < this.r && k < this.lines.length; k++) this.lines[k] = [];
+          l().fill(" ", 0, this.c + 1);
+        } else this.lines = [];
+        break;
+      case "X":
+        l().fill(" ", this.c, this.c + n);
+        break;
+      case "P":
+        l().splice(this.c, n);
+        break;
+      case "@":
+        if (this.c <= l().length) l().splice(this.c, 0, ...Array<string>(n).fill(" "));
+        break;
+    }
+  }
+}
+
+/**
+ * The token on `claude setup-token`'s screen: the first after "OAuth token". While it still draws (`final`
+ * false), only once the line below it ("Store this token securely") is there, so the token's own line is whole.
+ */
+export function parseSetupToken(screen: string, final = false): string | null {
+  const at = screen.indexOf("OAuth token");
+  if (at < 0) return null;
+  const rest = screen.slice(at);
+  const m = OAUTH_TOKEN.exec(rest);
+  if (!m) return null;
+  return final || /store this token/i.test(rest.slice(m.index + m[0].length)) ? m[0] : null;
+}
+
 /** An https URL up to whitespace, a quote or an escape that wasn't stripped (a hyperlink still arriving). */
 const URL_RE = new RegExp(`https://[^\\s"'<>\`${ESC}${BEL}]+`, "g");
 
@@ -283,10 +521,15 @@ export function parseCodexLogin(output: string, final = false): { url: string; u
 }
 
 /**
- * `claude auth status --json` → signed in, email and plan (short words only). Signed in means through
- * claude.ai: a folder that reports an API key isn't the account's own sign-in.
+ * `claude auth status --json` → signed in, email and plan (short words only, named by `claudePlan` with the
+ * folder's `tier`). Signed in means through claude.ai: a folder that reports an API key isn't the account's own
+ * sign-in.
  */
-export function parseClaudeStatus(status: number | null, stdout: string): Omit<RunnerAccountInfo, "id" | "kind"> {
+export function parseClaudeStatus(
+  status: number | null,
+  stdout: string,
+  tier: () => unknown = () => undefined,
+): Omit<RunnerAccountInfo, "id" | "kind"> {
   let json: unknown;
   try {
     json = JSON.parse(stdout.trim() || "null");
@@ -296,7 +539,7 @@ export function parseClaudeStatus(status: number | null, stdout: string): Omit<R
   if (!json || typeof json !== "object") return { loggedIn: false };
   const o = json as Record<string, unknown>;
   const email = typeof o.email === "string" && o.email.length <= 254 && EMAIL.test(o.email) ? o.email : undefined;
-  const plan = typeof o.subscriptionType === "string" && WORD.test(o.subscriptionType) ? o.subscriptionType : undefined;
+  const plan = claudePlan(o.subscriptionType, tier);
   return {
     loggedIn: o.loggedIn === true && status === 0 && o.authMethod === "claude.ai",
     ...(email ? { email } : {}),
@@ -396,12 +639,25 @@ export interface AccountManagerOptions {
 /** The real `lending.chown`. */
 export const lchownTree: Chown = (file, uid, gid) => lchown(file, uid, gid);
 
+/** `claude setup-token` in its terminal. */
+interface TokenProcess {
+  pid?: number;
+  kill(signal: NodeJS.Signals): unknown;
+  write(text: string): void;
+}
+
 interface Login {
   id: string;
   kind: AccountKind;
   dir: string;
   /** None for a key account: nothing signs in but the key. */
   child?: ChildProcess;
+  /** System mode, a Claude sign-in for all agents: `claude setup-token`, its screen and the token once shown. */
+  term?: TokenProcess;
+  screen?: Screen;
+  token?: string;
+  /** System mode: made for all agents (`<id>.shared` once it signs in). */
+  shared: boolean;
   /** A key account's plan. */
   provider?: PlanId;
   state: AccountLoginState;
@@ -458,9 +714,17 @@ export class AccountManager {
     return accountEnv(kind, dir);
   }
 
-  /** A file root keeps beside a folder (`<id>.invalid`, `<id>.lent`), out of reach of whoever the folder is lent to. */
-  private marker(kind: AccountKind, id: string, name: "invalid" | "lent") {
+  /**
+   * A file root keeps beside a folder (`<id>.invalid`, `<id>.lent`, `<id>.shared`), out of reach of whoever the
+   * folder is lent to.
+   */
+  private marker(kind: AccountKind, id: string, name: "invalid" | "lent" | "shared") {
     return path.join(this.opts.root, kind, `${id}.${name}`);
+  }
+
+  /** System mode: made for all agents, so root keeps it and never lends it. */
+  private isShared(kind: AccountKind, id: string) {
+    return this.opts.lending !== undefined && existsSync(this.marker(kind, id, "shared"));
   }
 
   /** System mode: the uid the folder is lent to now; 0 once it is root's again; null when it never was lent. */
@@ -471,6 +735,11 @@ export class AccountManager {
     } catch {
       return null;
     }
+  }
+
+  /** Whether an account's folder is here (signing in again included). */
+  has(id: string) {
+    return isAccountId(id) && ACCOUNT_KINDS.some((k) => existsSync(this.dirOf(k, id)));
   }
 
   /** An account's folder for a brain turn; null when it isn't here (or is still signing in). */
@@ -491,7 +760,10 @@ export class AccountManager {
    * Starts the CLI's sign-in in a new folder named `loginId`, or (`again`) in
    * the existing account `loginId` that was signed out: same account, same
    * agents, and its folder stays if this sign-in fails. `email` (Claude Code):
-   * the account to sign in to, as the CLI's login hint.
+   * the account to sign in to, as the CLI's login hint. `shared` (protocol 29,
+   * system mode): a sign-in for every agent of its owner here, which root
+   * keeps: Claude's through `claude setup-token` (no login hint there), a
+   * plan's key as it is. ChatGPT's still thinks for one agent there.
    */
   async begin(
     kind: AccountKind,
@@ -499,6 +771,7 @@ export class AccountManager {
     again = false,
     email?: string,
     provider?: string,
+    shared = false,
   ): Promise<MachineReplies["account"]> {
     if (this.closed) throw new RunnerError("internal", "The runner is stopping");
     if (!isAccountKind(kind)) throw new RunnerError("bad_request", "Unknown account kind");
@@ -513,20 +786,25 @@ export class AccountManager {
       throw new RunnerError("bad_request", "This sign-in already exists");
     }
     // Each one is a CLI waiting up to its TTL, and anyone in a workspace can start one on its shared computer.
-    const running = [...this.logins.values()].filter((l) => l.state === "waiting" && l.child).length;
+    const running = [...this.logins.values()].filter((l) => l.state === "waiting" && (l.child || l.term)).length;
     if (!provider && running >= SIGN_INS_AT_ONCE) {
       throw new RunnerError(
         "bad_request",
         "Too many sign-ins are in progress on this computer. Try again in a few minutes.",
       );
     }
+    // Elsewhere every folder thinks for all of its owner's agents anyway.
+    const forAll = this.opts.lending !== undefined && shared && kind === "claude_code";
     const dir = this.dirOf(kind, loginId);
     if (again) {
       if (!existsSync(dir) || existsSync(path.join(dir, SIGNING_IN))) {
         throw new RunnerError("not_found", "That account is no longer on this computer");
       }
-      // What an agent's user could write is never run or written by root: it starts over, as root's.
-      if (this.lentTo(kind, loginId) !== null) await this.startOver(kind, loginId);
+      // What an agent's user could write is never run or written by root, and a sign-in for all agents never
+      // keeps one agent's login (nor the other way round): it starts over, as root's.
+      if (this.lentTo(kind, loginId) !== null || forAll !== this.isShared(kind, loginId)) {
+        await this.startOver(kind, loginId);
+      }
     } else {
       if (this.logins.has(loginId) || ACCOUNT_KINDS.some((k) => existsSync(this.dirOf(k, loginId)))) {
         throw new RunnerError("bad_request", "This sign-in already exists");
@@ -553,36 +831,13 @@ export class AccountManager {
       // Until it signs in: a runner that dies mid sign-in leaves this behind, and the list skips (then clears) it.
       await writeFile(path.join(dir, SIGNING_IN), "", { mode: 0o600 });
     }
-    if (provider && pair) return this.beginKey(kind, loginId, dir, provider as PlanId, pair, again);
+    if (provider && pair) return this.beginKey(kind, loginId, dir, provider as PlanId, pair, again, forAll);
 
-    const command = this.command(kind);
-    const [file, ...pre] = command;
-    const env = this.env(kind, dir);
-    let child: ChildProcess;
-    try {
-      child = spawn(
-        resolveCommand(file ?? "", env.PATH),
-        [...pre, ...LOGIN_ARGS[kind], ...(email ? ["--email", email] : [])],
-        {
-          cwd: dir,
-          env,
-          stdio: ["pipe", "pipe", "pipe"],
-          windowsHide: true,
-          // Its own process group: a kill reaches what it started (posix).
-          detached: process.platform !== "win32",
-          shell: process.platform === "win32" && command.length === 1,
-        },
-      );
-    } catch (err) {
-      if (!again) await rm(dir, { recursive: true, force: true });
-      const why = err instanceof Error ? err.message : String(err);
-      throw new RunnerError("internal", `${LABEL[kind]} couldn't start: ${why}`);
-    }
     const login: Login = {
       id: loginId,
       kind,
       dir,
-      child,
+      shared: forAll,
       state: "waiting",
       output: "",
       ...(pair ? { privateKey: pair.privateKey } : {}),
@@ -591,28 +846,26 @@ export class AccountManager {
       timer: null,
       again,
     };
+    try {
+      if (forAll) this.spawnToken(login);
+      else this.spawnLogin(login, email);
+    } catch (err) {
+      if (!again) await rm(dir, { recursive: true, force: true });
+      const why = err instanceof Error ? err.message : String(err);
+      throw new RunnerError(
+        "internal",
+        errnoCode(err) === "ENOENT"
+          ? `${LABEL[kind]} is not installed on this computer.`
+          : `${LABEL[kind]} couldn't start: ${why}`,
+      );
+    }
     this.logins.set(loginId, login);
-    const onData = (chunk: string) => {
-      login.output = (login.output + chunk).slice(-OUTPUT_KEEP);
-      login.watch?.();
-    };
-    child.stdout?.setEncoding("utf8");
-    child.stderr?.setEncoding("utf8");
-    child.stdout?.on("data", onData);
-    child.stderr?.on("data", onData);
-    child.stdin?.on("error", () => {});
-    const events = child as unknown as EventEmitter;
-    events.on("error", (err: Error) => {
-      login.spawnError = (err as NodeJS.ErrnoException).code ?? err.message;
-      this.exited(login, null);
-    });
-    events.on("close", (code: number | null) => this.exited(login, code));
     login.timer = setTimeout(() => this.expire(login), this.opts.ttlMs ?? ACCOUNT_LOGIN_TTL_MS);
     login.timer.unref?.();
 
     const found = await new Promise<{ url: string; userCode?: string } | null>((resolve) => {
       const parse = (final: boolean) =>
-        kind === "codex" ? parseCodexLogin(login.output, final) : toUrl(parseClaudeLoginUrl(login.output, final));
+        kind === "codex" ? parseCodexLogin(login.output, final) : toUrl(parseClaudeLoginUrl(this.shown(login), final));
       let done = false;
       const finish = (v: { url: string; userCode?: string } | null) => {
         if (done) return;
@@ -651,6 +904,102 @@ export class AccountManager {
     };
   }
 
+  /** What a sign-in's CLI shows: its screen (`claude setup-token`), else what it printed. */
+  private shown(login: Login) {
+    return login.screen?.text() ?? login.output;
+  }
+
+  /** The CLI's own sign-in with plain pipes (`claude auth login`, `codex login --device-auth`). */
+  private spawnLogin(login: Login, email?: string) {
+    const command = this.command(login.kind);
+    const [file, ...pre] = command;
+    const env = this.env(login.kind, login.dir);
+    const child = spawn(
+      resolveCommand(file ?? "", env.PATH),
+      [...pre, ...LOGIN_ARGS[login.kind], ...(email ? ["--email", email] : [])],
+      {
+        cwd: login.dir,
+        env,
+        stdio: ["pipe", "pipe", "pipe"],
+        windowsHide: true,
+        // Its own process group: a kill reaches what it started (posix).
+        detached: process.platform !== "win32",
+        shell: process.platform === "win32" && command.length === 1,
+      },
+    );
+    login.child = child;
+    const onData = (chunk: string) => {
+      login.output = (login.output + chunk).slice(-OUTPUT_KEEP);
+      login.watch?.();
+    };
+    child.stdout?.setEncoding("utf8");
+    child.stderr?.setEncoding("utf8");
+    child.stdout?.on("data", onData);
+    child.stderr?.on("data", onData);
+    child.stdin?.on("error", () => {});
+    const events = child as unknown as EventEmitter;
+    events.on("error", (err: Error) => {
+      login.spawnError = (err as NodeJS.ErrnoException).code ?? err.message;
+      this.exited(login, null);
+    });
+    events.on("close", (code: number | null) => this.exited(login, code));
+  }
+
+  /**
+   * System mode, a Claude sign-in for all agents: `claude setup-token`, which draws its screen only in a
+   * terminal, in one of its own. Its link, and once signed in its token, are read off that screen; the token is
+   * taken as soon as it is whole, since the screen may be gone when the CLI ends.
+   */
+  private spawnToken(login: Login) {
+    const [file, ...pre] = this.command(login.kind);
+    const env: NodeJS.ProcessEnv = { ...this.env(login.kind, login.dir), TERM: "xterm-256color" };
+    // Held by the sign-in only, so the token on it goes once the sign-in settles.
+    login.screen = new Screen();
+    const decoder = new TextDecoder();
+    let eof: () => void = () => undefined;
+    const lastOutput = new Promise<void>((resolve) => {
+      eof = resolve;
+    });
+    const proc = Bun.spawn([resolveCommand(file ?? "", env.PATH), ...pre, "setup-token"], {
+      cwd: login.dir,
+      env,
+      terminal: {
+        ...TOKEN_TERMINAL,
+        data: (_t, bytes) => {
+          const screen = login.screen;
+          if (login.state !== "waiting" || !screen) return;
+          screen.write(decoder.decode(bytes, { stream: true }));
+          login.token ??= parseSetupToken(screen.text()) ?? undefined;
+          login.watch?.();
+        },
+        exit: () => eof(),
+      },
+    });
+    login.term = {
+      pid: proc.pid,
+      kill: (signal) => proc.kill(signal),
+      write: (text) => {
+        try {
+          proc.terminal?.write(text);
+        } catch {
+          // it ended
+        }
+      },
+    };
+    void proc.exited.then(
+      async (code) => {
+        await Promise.race([lastOutput, sleep(LAST_OUTPUT_MS)]);
+        try {
+          proc.terminal?.close();
+        } catch {
+          // closed already
+        }
+        this.exited(login, proc.signalCode === null ? code : null);
+      },
+      () => this.exited(login, null),
+    );
+  }
+
   /** A key account's sign-in: nothing runs; it waits for the plan's key, sealed to `pair`. */
   private beginKey(
     kind: AccountKind,
@@ -659,11 +1008,13 @@ export class AccountManager {
     provider: PlanId,
     pair: { publicKey: string; privateKey: string },
     again: boolean,
+    shared: boolean,
   ): MachineReplies["account"] {
     const login: Login = {
       id: loginId,
       kind,
       dir,
+      shared,
       provider,
       state: "waiting",
       output: "",
@@ -680,13 +1031,17 @@ export class AccountManager {
     return { publicKey: pair.publicKey };
   }
 
-  /** System mode, signing in again where an agent's user had the folder: root takes it back and empties it. */
+  /**
+   * System mode, signing in again where an agent's user had the folder, or for all agents where it was one
+   * agent's (or the other way round): root takes it back and empties it.
+   */
   private async startOver(kind: AccountKind, id: string) {
     const dir = this.dirOf(kind, id);
     await this.serial(id, async () => {
       if (this.lentTo(kind, id)) await this.reclaimNow(kind, id);
       for (const name of await readdir(dir)) await rm(path.join(dir, name), { recursive: true, force: true });
       await rm(this.marker(kind, id, "lent"), { force: true });
+      await rm(this.marker(kind, id, "shared"), { force: true });
     });
   }
 
@@ -714,11 +1069,26 @@ export class AccountManager {
       throw new RunnerError("bad_request", "That doesn't look like a sign-in code");
     }
     login.code = code;
+    if (login.term) {
+      // As a terminal sends a paste, then Enter: typed one key at a time, a code starting with "c" would copy the
+      // link instead (the screen's shortcut while its field holds only that letter).
+      login.term.write(`${ESC}[200~${code}${ESC}[201~`);
+      const enter = setTimeout(() => {
+        if (login.state === "waiting") login.term?.write("\r");
+      }, PASTE_ENTER_MS);
+      enter.unref?.();
+      return;
+    }
     try {
       login.child?.stdin?.write(`${code}\n`);
     } catch {
       throw new RunnerError("internal", `${LABEL[login.kind]} stopped waiting for the code`);
     }
+  }
+
+  /** Whether an account thinks for all of its owner's agents: every one where they are the runner's own user. */
+  private sharedFlag(kind: AccountKind, id: string): { shared?: true } {
+    return !this.opts.lending || this.isShared(kind, id) ? { shared: true } : {};
   }
 
   /** A plan's key, checked and kept in the folder (600, written whole): the account is signed in. Never logged. */
@@ -730,10 +1100,8 @@ export class AccountManager {
         `That doesn't look like a ${plan?.label ?? "plan"} key. Copy the whole key.`,
       );
     }
-    const file = path.join(login.dir, PROVIDER_FILE);
-    const tmp = `${file}.${process.pid}.tmp`;
-    await writeFile(tmp, JSON.stringify({ provider, key }), { mode: 0o600 });
-    await rename(tmp, file);
+    writeJson(path.join(login.dir, PROVIDER_FILE), { provider, key });
+    if (login.shared) await writeFile(this.marker(login.kind, login.id, "shared"), "", { mode: 0o600 });
     await rm(path.join(login.dir, SIGNING_IN), { force: true });
     await rm(this.marker(login.kind, login.id, "invalid"), { force: true });
     const info: RunnerAccountInfo = {
@@ -742,6 +1110,7 @@ export class AccountManager {
       loggedIn: true,
       provider,
       keyHint: key.slice(-4),
+      ...this.sharedFlag(login.kind, login.id),
     };
     this.settle(login, "done");
     login.account = info;
@@ -788,14 +1157,27 @@ export class AccountManager {
     this.log(`account sign-in ${login.id.slice(0, 8)} expired`);
   }
 
-  /** The CLI exited: its status command in that folder says whether it signed in. */
+  /**
+   * The CLI exited: its status command in that folder says whether it signed in; `claude setup-token`, the token
+   * it showed.
+   */
   private exited(login: Login, code: number | null) {
     if (login.exited) return;
     login.exited = true;
     login.watch?.();
     if (login.state !== "waiting") return;
     void (async () => {
-      if (code === 0) {
+      if (login.term) {
+        const token = parseSetupToken(this.shown(login), true) ?? login.token;
+        if (code === 0 && token && (await this.keepToken(login, token))) return;
+        if (code === 0 && login.state === "waiting") {
+          this.settle(
+            login,
+            "failed",
+            `${LABEL[login.kind]} finished, but didn't show its token. Update it, or try again.`,
+          );
+        }
+      } else if (code === 0) {
         // Signed in anew: a turn refused before (`refused`) says nothing about this sign-in.
         await rm(this.marker(login.kind, login.id, "invalid"), { force: true }).catch(() => undefined);
         const info = await this.lookUp(login.kind, login.id);
@@ -809,13 +1191,14 @@ export class AccountManager {
           return;
         }
         this.settle(login, "failed", `${LABEL[login.kind]} finished, but the account isn't signed in. Try again.`);
-      } else {
-        const tail = stripAnsi(login.output)
+      }
+      if (login.state === "waiting") {
+        const tail = withoutTokens(stripAnsi(this.shown(login)))
           .split("\n")
           .map((l) => l.trim())
           .filter(Boolean)
           .at(-1);
-        // Never the pasted code back (a CLI may repeat what it refused).
+        // Never the pasted code back (a CLI may repeat what it refused, and a screen shows it in its field).
         const safe = tail && !(login.code && tail.includes(login.code)) ? tail.slice(0, 200) : "";
         this.settle(
           login,
@@ -829,11 +1212,43 @@ export class AccountManager {
     })();
   }
 
+  /**
+   * `claude setup-token` signed in: its token is kept (600, written whole) in root's folder, which thinks for every
+   * agent of its owner here from now on. False when it couldn't be kept.
+   */
+  private async keepToken(login: Login, token: string): Promise<boolean> {
+    try {
+      writeJson(path.join(login.dir, TOKEN_FILE), { token });
+      await writeFile(this.marker(login.kind, login.id, "shared"), "", { mode: 0o600 });
+    } catch (err) {
+      if (login.state === "waiting") {
+        this.settle(
+          login,
+          "failed",
+          `${LABEL[login.kind]} signed in, but this computer couldn't keep it (${errnoCode(err) ?? "error"}).`,
+        );
+      }
+      return false;
+    }
+    await rm(path.join(login.dir, SIGNING_IN), { force: true }).catch(() => undefined);
+    // Signed in anew: a turn refused before (`refused`) says nothing about this token.
+    await rm(this.marker(login.kind, login.id, "invalid"), { force: true }).catch(() => undefined);
+    if (login.state !== "waiting") return true;
+    const info: RunnerAccountInfo = { id: login.id, kind: login.kind, loggedIn: true, shared: true };
+    this.settle(login, "done");
+    login.account = info;
+    this.added(info);
+    this.log(`account ${login.id.slice(0, 8)} (${login.kind}, for all agents) signed in`);
+    return true;
+  }
+
   private settle(login: Login, state: AccountLoginState, error?: string) {
     login.state = state;
     if (error) login.error = error;
     login.privateKey = undefined;
     login.code = undefined;
+    login.token = undefined;
+    login.screen = undefined;
     if (login.timer) clearTimeout(login.timer);
     login.timer = setTimeout(() => {
       if (this.logins.get(login.id) === login) this.logins.delete(login.id);
@@ -843,7 +1258,7 @@ export class AccountManager {
 
   /** Kills a sign-in's CLI and removes its folder (the entry stays for `status` until it is cleaned up). */
   private async drop(login: Login) {
-    const child = login.child;
+    const child = login.child ?? login.term;
     if (child && !login.exited) {
       killTree(child, "SIGTERM");
       const t = setTimeout(() => {
@@ -858,23 +1273,29 @@ export class AccountManager {
 
   /**
    * One account's status (never throws: unknown is signed out). Refused in a turn since it last signed in
-   * (`refused`), it is signed out whatever its CLI says. Otherwise a key account is signed in; a folder an agent's
-   * user had, as its turns last said; any other, as its CLI says.
+   * (`refused`), it is signed out whatever its CLI says. Otherwise a key account is signed in; a token root keeps,
+   * while it has one; a folder an agent's user had, as its turns last said, with the plan Claude Code keeps there
+   * (that user could write it, so it is only ever one of the plans' words); any other, as its CLI says.
    */
   private async lookUp(kind: AccountKind, id: string): Promise<RunnerAccountInfo> {
     const dir = this.dirOf(kind, id);
     const refused = existsSync(this.marker(kind, id, "invalid"));
+    const shared = this.sharedFlag(kind, id);
     const plan = kind === "claude_code" ? await planKeyOf(dir) : null;
-    if (plan) return { id, kind, loggedIn: !refused, provider: plan.provider, keyHint: plan.key.slice(-4) };
-    if (refused || this.lentTo(kind, id) !== null) return { id, kind, loggedIn: !refused };
+    if (plan) return { id, kind, loggedIn: !refused, provider: plan.provider, keyHint: plan.key.slice(-4), ...shared };
+    if (this.isShared(kind, id)) return { id, kind, loggedIn: !refused && (await tokenOf(dir)) !== null, ...shared };
+    if (refused || this.lentTo(kind, id) !== null) {
+      const kept = refused || kind !== "claude_code" ? undefined : claudeKeptPlan(dir);
+      return { id, kind, loggedIn: !refused, ...(kept ? { plan: kept } : {}), ...shared };
+    }
     const env = this.env(kind, dir);
     const r = await runCli(this.command(kind), STATUS_ARGS[kind], env, STATUS_TIMEOUT_MS);
     // Codex says it on stderr.
     const status =
       kind === "claude_code"
-        ? parseClaudeStatus(r.status, r.stdout)
+        ? parseClaudeStatus(r.status, r.stdout, () => claudeTier(dir))
         : parseCodexStatus(r.status, `${r.stdout}\n${r.stderr}`);
-    return { id, kind, ...status };
+    return { id, kind, ...status, ...shared };
   }
 
   private async lookAll(): Promise<RunnerAccountInfo[]> {
@@ -965,15 +1386,17 @@ export class AccountManager {
       Promise.all([
         rm(this.marker(kind, id, "invalid"), { force: true }),
         rm(this.marker(kind, id, "lent"), { force: true }),
+        rm(this.marker(kind, id, "shared"), { force: true }),
       ]);
     if (!existsSync(dir)) {
       await markers();
       return false;
     }
     const lent = this.lentTo(kind, id) !== null;
-    // A key has no sign-in to end; a folder an agent's user had is never run as root (deleting it is the sign-out).
+    // A key has no sign-in to end, nor has a token on this computer (only Claude's settings revoke it); a folder an
+    // agent's user had is never run as root (deleting it is the sign-out).
     if (lent) await this.serial(id, () => this.reclaimNow(kind, id));
-    else if (!(kind === "claude_code" && (await planKeyOf(dir)))) {
+    else if (!this.isShared(kind, id) && !(kind === "claude_code" && (await planKeyOf(dir)))) {
       const r = await runCli(this.command(kind), LOGOUT_ARGS[kind], this.env(kind, dir), STATUS_TIMEOUT_MS);
       if (r.status !== 0) this.log(`account ${id.slice(0, 8)} (${kind}): sign-out didn't finish; removing it anyway`);
     }
@@ -1023,14 +1446,31 @@ export class AccountManager {
   }
 
   /**
+   * System mode (protocol 29): what a turn of any agent thinking with this account gets from root, over its
+   * worker link: its token or its key, or `none` while it has neither or a turn's endpoint refused it. Null for an
+   * account made for one agent, whose folder is lent instead (`lendTo`).
+   */
+  async grant(kind: AccountKind, id: string): Promise<AccountGrant | null> {
+    if (!isAccountKind(kind) || !isAccountId(id) || !this.isShared(kind, id)) return null;
+    // Signing in again keeps what it has until the new one is kept: only a refusal, or nothing kept, is signed out.
+    if (existsSync(this.marker(kind, id, "invalid"))) return { kind: "none" };
+    const dir = this.dirOf(kind, id);
+    const plan = await planKeyOf(dir);
+    if (plan) return { kind: "key", provider: plan.provider, key: plan.key };
+    const token = await tokenOf(dir);
+    return token ? { kind: "token", token } : { kind: "none" };
+  }
+
+  /**
    * A brain turn of the agent whose OS user is `uid` thinks with this account: its folder becomes that user's
-   * (700), taken back from any other agent first. False when it isn't here or still signing in.
+   * (700), taken back from any other agent first. False when it isn't here, still signing in, or made for all
+   * agents (root keeps that one, `grant`).
    */
   async lendTo(kind: AccountKind, id: string, uid: number): Promise<boolean> {
     const chown = this.opts.lending?.chown;
     if (!chown || !Number.isInteger(uid) || uid <= 0) return false;
     const dir = this.accountDir(kind, id);
-    if (!dir || (await lstat(path.join(dir, SIGNING_IN)).catch(() => null))) return false;
+    if (!dir || this.isShared(kind, id) || (await lstat(path.join(dir, SIGNING_IN)).catch(() => null))) return false;
     return this.serial(id, async () => {
       const now = this.lentTo(kind, id);
       if (now === uid) return true;
@@ -1182,7 +1622,8 @@ export class AccountManager {
         ...(this.opts.fetch ? { fetch: this.opts.fetch } : {}),
       });
     }
-    if (!own && this.lentTo(target.kind, id) !== null) return null;
+    // A token makes model requests only: its usage comes from its turns.
+    if (!own && (this.lentTo(target.kind, id) !== null || this.isShared(target.kind, id))) return null;
     const probe = { command: this.command(target.kind), cwd: target.cwd, env: target.env, ...limits };
     return target.kind === "codex" ? probeCodexUsage(probe) : probeClaudeUsage(probe);
   }

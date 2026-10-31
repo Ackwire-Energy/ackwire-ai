@@ -40,10 +40,16 @@ export function SocialButtons({
   providers,
   divider = true,
   onError,
+  callbackURL = "/",
+  onSignedIn,
 }: {
   providers: SignInProvider[];
   divider?: boolean;
   onError: (message: string) => void;
+  /** Where the browser's sign-in comes back to: a screen that asked for it again stays open. */
+  callbackURL?: string;
+  /** Signed in, for a screen that asked for a new sign-in while signed in already. */
+  onSignedIn?: () => void;
 }) {
   const { t } = useTranslation();
   const { scheme } = useTheme();
@@ -64,8 +70,9 @@ export function SocialButtons({
     setBusy(true);
     rememberSignIn(provider);
     try {
-      const res = await authClient().signIn.social({ provider, callbackURL: "/" });
+      const res = await authClient().signIn.social({ provider, callbackURL });
       if (res.error) onError(socialRefusalText(t, res.error));
+      else onSignedIn?.();
     } catch {
       onError(t("mobile.auth.errors.network"));
     } finally {
@@ -89,6 +96,7 @@ export function SocialButtons({
         idToken: { token: credential.identityToken },
       });
       if (res.error) onError(socialRefusalText(t, res.error));
+      else onSignedIn?.();
     } catch (e) {
       // Closing Apple's sheet is not an error.
       if ((e as { code?: string })?.code !== "ERR_REQUEST_CANCELED") onError(t("mobile.auth.social.failed"));

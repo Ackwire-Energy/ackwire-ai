@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
-import { type Browser, browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
+import { type Browser, browser, createTestServer, deletionCode, seedOrg, signUp, type TestServer } from "./harness";
 
 /**
  * Routes the phone app needed (ADR 0035): unread and last message in the
@@ -16,6 +16,7 @@ afterEach(async () => {
 });
 
 const MOBILE = { "x-agentes-client": "mobile" };
+/** The account's password, which the app sends to prove it's them (`DELETE /account`). */
 const fromApp = (b: Browser, path: string, init: { method?: string; json?: unknown } = {}) =>
   b(path, { ...init, origin: null, headers: MOBILE });
 
@@ -207,9 +208,10 @@ describe("account deletion revokes Apple tokens", () => {
       });
     }
 
-    expect((await fromApp(owner, "/api/app/account", { method: "DELETE" })).status).toBe(409);
+    expect((await fromApp(owner, "/api/app/account", { method: "DELETE", json: {} })).status).toBe(409);
     expect(revoked).toEqual([]);
-    expect((await fromApp(bia, "/api/app/account", { method: "DELETE" })).status).toBe(204);
+    const code = await deletionCode(t, bia, null);
+    expect((await fromApp(bia, "/api/app/account", { method: "DELETE", json: { code } })).status).toBe(204);
     expect(revoked).toEqual([{ value: "refresh-bia@example.com", hint: "refresh_token" }]);
   });
 
@@ -230,6 +232,7 @@ describe("account deletion revokes Apple tokens", () => {
       userId: user?.id ?? "",
       accessToken: "access-solo",
     });
-    expect((await fromApp(person, "/api/app/account", { method: "DELETE" })).status).toBe(204);
+    const code = await deletionCode(t, person, null);
+    expect((await fromApp(person, "/api/app/account", { method: "DELETE", json: { code } })).status).toBe(204);
   });
 });

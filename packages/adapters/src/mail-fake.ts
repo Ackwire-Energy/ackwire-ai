@@ -279,6 +279,8 @@ export function createFakeComposioClient() {
     >(),
     links: [] as { toolkit: ComposioToolkit; userId: string; callbackUrl: string; connectedAccountId: string }[],
     deletedAccounts: [] as string[],
+    /** Accounts deleted with their grant at the provider left alone (`revoke: false`). */
+    grantsKept: [] as string[],
     /** The deleted accounts whose grant at Google/Microsoft was revoked too. */
     revokedAccounts: [] as string[],
     /** The accounts whose mailbox address was read (a profile tool call, billed by Composio). */
@@ -317,7 +319,8 @@ export function createFakeComposioClient() {
     },
     async deleteConnectedAccount(id, options) {
       state.deletedAccounts.push(id);
-      if (options?.revoke !== false) state.revokedAccounts.push(id);
+      if (options?.revoke === false) state.grantsKept.push(id);
+      else state.revokedAccounts.push(id);
       state.accounts.delete(id);
     },
     async createMailTrigger(input) {

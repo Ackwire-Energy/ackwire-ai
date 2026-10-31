@@ -45,6 +45,19 @@ export function suspendedOf<
   };
 }
 
+/**
+ * The chosen organization when an owner is deleting it, with the person's other organizations to go to (none
+ * suspended); null while it isn't (pure). A suspension comes first (`suspendedOf`).
+ */
+export function deletingOf<O extends Pick<OrgSummary, "id" | "deletion" | "standing">>(
+  orgs: readonly O[],
+  orgId: string | null,
+): { org: O; others: O[] } | null {
+  const org = orgs.find((o) => o.id === orgId);
+  if (!org?.deletion) return null;
+  return { org, others: orgs.filter((o) => o.id !== org.id && o.standing?.state !== "suspended") };
+}
+
 /** How long the account may load before the app asks the server itself whether it is there. */
 export const SERVER_STUCK_MS = 10_000;
 

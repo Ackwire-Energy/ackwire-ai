@@ -61,7 +61,7 @@ export function auditPhrase(t: TFunction, row: AuditRow): string {
       (guessed.kind === "consulting" || guessed.kind === "readingDrive") && kind !== "read"
         ? { kind: "usingTool" as const }
         : guessed;
-    return stepLabel(t, { ...activity, key: row.id, tool: row.target.id ?? "", ms: null, failed: false, count: 1 });
+    return stepLabel(t, { ...activity, tool: row.target.id ?? "" });
   }
   const [area = "", rest = ""] = row.action.split(".");
   if (area === "approval") {

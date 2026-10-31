@@ -10,9 +10,10 @@ import {
   useMachines,
   useModels,
 } from "@agenteschat/client";
-import { type ExistingAi, planWordOf, signInPlan } from "@agenteschat/client/lib/ai-accounts";
+import { accountTitle, type ExistingAi, groupPlans, planWordOf, signInPlan } from "@agenteschat/client/lib/ai-accounts";
 import { computerEdition, computerName, setupView } from "@agenteschat/client/lib/computer";
 import { holdText } from "@agenteschat/client/lib/errors";
+import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar, providerGrammar } from "@agenteschat/client/lib/grammar";
 import { toolOffReason } from "@agenteschat/client/lib/machines";
 import {
@@ -805,6 +806,23 @@ function PlanSteps({
   );
   // Signed in again: the agent's own login, unless this sign-in is another account's (`hint`).
   const signedOut = !hint && current?.status === "signed_out" ? current : undefined;
+  // The accounts of this plan the person already has there for all of their agents (ADR 0059 §2): one tap each,
+  // before another account.
+  const existing =
+    ready && !hint
+      ? groupPlans(
+          (view?.accounts ?? []).filter(
+            (a) =>
+              a.shared === true &&
+              a.mine &&
+              a.status === "active" &&
+              a.kind === kind &&
+              (coding ? a.provider === choice : !a.provider) &&
+              a.id !== view?.account,
+          ),
+        ).flatMap((g) => g.logins.slice(0, 1))
+      : [];
+  const choosing = ownable || existing.length > 0;
   return (
     <View style={styles.gap}>
       {wait}
@@ -815,21 +833,33 @@ function PlanSteps({
           {t("connectAi.wait.ready")}
         </InfoCard>
       ) : null}
-      {ownable ? (
+      {choosing ? (
         <GroupedList>
+          {ownable ? (
+            <GroupedRow
+              label={t("connectAi.own.shared")}
+              {...(ownPlan ? { sub: `${planLabel(t, choice)} ${ownPlan}` } : {})}
+              onPress={() => void saveOwn()}
+            />
+          ) : null}
+          {existing.map((a) => (
+            <GroupedRow
+              key={a.id}
+              label={t("connectAi.use", { label: accountTitle(a) })}
+              {...(a.usedBy.length > 0
+                ? { sub: t("agentPage.work.brain.accountAlso", { agents: joinNames(a.usedBy, t("newAgent.and")) }) }
+                : {})}
+              onPress={() => void assign(a)}
+            />
+          ))}
           <GroupedRow
-            label={t("connectAi.own.shared")}
-            {...(ownPlan ? { sub: `${planLabel(t, choice)} ${ownPlan}` } : {})}
-            onPress={() => void saveOwn()}
-          />
-          <GroupedRow
-            label={t("connectAi.own.one", agentGrammar(t, agentName))}
+            label={ownable ? t("connectAi.own.one", agentGrammar(t, agentName)) : t("connectAi.another")}
             checked={other}
             onPress={() => setOther(true)}
           />
         </GroupedList>
       ) : null}
-      {steps && (!ownable || other) ? (
+      {steps && (!choosing || other) ? (
         <AddAccount
           machineId={view?.computer?.machineId ?? ""}
           kind={kind}

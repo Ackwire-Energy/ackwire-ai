@@ -1,3 +1,4 @@
+import type { DeletionProofInput } from "@agenteschat/client";
 import { authClient, authedFetch } from "@/lib/auth";
 import { SIGN_OUT_WAIT_MS, unregisterPush } from "@/lib/push";
 import { serverUrl } from "@/lib/server";
@@ -20,14 +21,15 @@ export async function signOut(): Promise<void> {
 }
 
 /**
- * Deletes the account (App Store 5.1.1(v)). Refused while the person is the only owner of an organization
- * with other members: `{ ok: false, reason: "sole_owner", organizations }` (say
- * `t("mobile.account.deleteSoleOwner")`). On success the phone is signed out.
+ * Deletes the account (App Store 5.1.1(v)), with the proof that it's them: the code emailed to them, or their
+ * password on a server that sends no email (`reason: "proof"` when refused). Refused while the person is the only
+ * owner of an organization with other members (`sole_owner`). On success the phone is signed out.
  */
-export async function deleteAccount(): Promise<DeleteAccountResult> {
+export async function deleteAccount(proof: DeletionProofInput = {}): Promise<DeleteAccountResult> {
   const res = await authedFetch(`${serverUrl()}/api/app/account`, {
     method: "DELETE",
-    headers: { accept: "application/json" },
+    headers: { accept: "application/json", "content-type": "application/json" },
+    body: JSON.stringify(proof),
   }).catch(() => null);
   if (!res) return { ok: false, reason: "failed", status: 0 };
   const result = await readDeleteResponse(res);

@@ -561,8 +561,21 @@ export async function purgeOrgFiles(deps: StorageDeps, orgId: string, limit = 10
     .from(schema.organizations)
     .where(eq(schema.organizations.id, orgId));
   if (alive) return false;
-  const { platform } = deps;
-  const prefixes = [`orgs/${orgId}/`, `org-logos/${orgId}/`];
+  return purgePrefixes(deps.platform, [`orgs/${orgId}/`, `org-logos/${orgId}/`], limit);
+}
+
+/**
+ * Job `user.files.purge`: a deleted account's photos (`avatars/{userId}/`) leave platform storage. A new photo replaces
+ * the last one, so one page holds them all.
+ */
+export async function purgeUserFiles(deps: StorageDeps, userId: string) {
+  // Irreversible: never for an account that still exists.
+  const [alive] = await deps.db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.id, userId));
+  if (!alive) await purgePrefixes(deps.platform, [`avatars/${userId}/`], 1000);
+}
+
+/** Deletes what is under each prefix, a page of `limit` keys each where the store can't take a folder at once. */
+async function purgePrefixes(platform: BlobStore, prefixes: string[], limit: number) {
   if (platform.deletePrefix) {
     for (const prefix of prefixes) await platform.deletePrefix(prefix);
     return false;

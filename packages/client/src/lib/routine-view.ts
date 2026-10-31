@@ -83,11 +83,13 @@ export const RUN_CODES = [
   "missing_credential",
   "credential_revoked",
   "credential_wrong_provider",
+  "model_unlisted",
   "agent_archived",
   "interrupted",
   "no_ai",
   "org_paused",
   "org_suspended",
+  "org_deleting",
   "agent_paused",
   "computer_busy",
 ] as const;

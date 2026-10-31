@@ -14,13 +14,14 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { Button, Count, HoldButton, Icon, Text, useReducedMotion, useToast } from "@/ui";
-import { approvalAction, approvalRisk } from "../approvals/logic";
+import { approvalAction, approvalRisk, approveAlwaysToast } from "../approvals/logic";
 import {
   ApprovalDetails,
   ApprovalEmailLetter,
   ApprovalFuse,
   ApprovalMark,
   ApprovalTraits,
+  ApproveAlways,
   approvalTitleText,
   useOriginShort,
 } from "../approvals/parts";
@@ -139,7 +140,8 @@ export function ApprovalInline({ approvalId }: { approvalId: string }) {
  * A request waiting in the conversation, as the agent asking, no card: what it said in its
  * own words, the exact action in one line with the app's mark, "Ver o e-mail" / "Ver detalhes" opening it
  * whole, then Aprovar (held for a second when the risk is high), "Agora não" (the request's sheet, which
- * asks why: a lesson for the agent) and the fuse to its expiry. Who can't decide sees who it waits for.
+ * asks why: a lesson for the agent), "Aprovar sempre" where it is offered (a plain tap, what it covers under
+ * it) and the fuse to its expiry. Who can't decide sees who it waits for.
  */
 function ApprovalAsk({ approval: a }: { approval: Approval }) {
   const { t } = useTranslation();
@@ -156,15 +158,16 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
   const high = approvalRisk(a) === "high";
   const ownerId = a.ownerUserId ?? dir.agentById.get(a.agentId)?.ownerUserId ?? null;
   const owner = ownerId ? dir.memberById.get(ownerId)?.name : undefined;
-  const approve = () =>
+  const approve = (always = false) =>
     decide.mutate(
-      { id: a.id, decision: "approve" },
+      { id: a.id, decision: "approve", always },
       {
         onSuccess: () => {
           if (!high) successHaptic();
           toast({
-            title: t("mobile.approval.approved"),
-            subtitle: t(`mobile.approval.approvedSub${g}`, { name }),
+            ...(always
+              ? approveAlwaysToast(t, name)
+              : { title: t("mobile.approval.approved"), subtitle: t(`mobile.approval.approvedSub${g}`, { name }) }),
             agentId: a.agentId,
           });
         },
@@ -227,7 +230,7 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
               <HoldButton
                 label={t("mobile.approval.hold")}
                 holdLabel={t("mobile.approval.holding")}
-                onConfirm={approve}
+                onConfirm={() => approve()}
               />
             ) : (
               <Button
@@ -236,7 +239,7 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
                 icon="check"
                 label={approvalAction(a) === "draft" ? t("approval.approve.draft") : t("mobile.approval.approve")}
                 disabled={decide.isPending}
-                onPress={approve}
+                onPress={() => approve()}
               />
             )}
           </View>
@@ -254,6 +257,7 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
           {owner ? t("approval.waitingFor", { name: owner }) : t("approval.waitingAdmin")}
         </Text>
       )}
+      <ApproveAlways approval={a} name={name} disabled={decide.isPending} onPress={() => approve(true)} />
       <ApprovalFuse approval={a} />
     </Animated.View>
   );

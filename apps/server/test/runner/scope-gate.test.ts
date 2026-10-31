@@ -3,6 +3,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import type { EventEmitter } from "node:events";
 import { writeFileSync } from "node:fs";
 import path from "node:path";
+import type { Writable } from "node:stream";
 import { spawnGated } from "../../runner/scope-gate";
 import { removeDirs, tempDir, waitFor } from "./helpers";
 
@@ -92,6 +93,34 @@ test.if(posix)("detached, it leads its own process group as the program, so kill
   process.kill(-(child.pid as number), "SIGTERM");
   await waitFor(() => out.code !== undefined);
   expect(out.code).toBeNull();
+});
+
+test.if(posix)("a caller's own descriptor past stderr reaches the program, held all the same", async () => {
+  const dir = tempDir("gate-");
+  dirs.push(dir);
+  const file = path.join(dir, "reader");
+  writeFileSync(
+    file,
+    '#!/bin/sh\nread -r secret <&3\necho "fd3:$secret"\nif [ -e /dev/fd/4 ]; then echo fd4-open; else echo fd4-closed; fi\n',
+    { mode: 0o755 },
+  );
+  const asked: number[] = [];
+  let release = () => {};
+  const child = spawnGated("cli", file, [], { stdio: ["pipe", "pipe", "pipe", "pipe"] }, (pid) => {
+    asked.push(pid);
+    return new Promise<void>((resolve) => {
+      release = resolve;
+    });
+  });
+  const out = watch(child);
+  (child.stdio[3] as Writable).end("the-token\n");
+  await Bun.sleep(300);
+  expect(out.text).toBe("");
+  expect(asked).toEqual([child.pid as number]);
+  release();
+  await waitFor(() => out.code !== undefined);
+  // The caller's fd 3 whole; the gate's own descriptor gone before the program starts.
+  expect(out.text).toBe("fd3:the-token\nfd4-closed\n");
 });
 
 test("a program that can't run fails as it would have, and isn't held", async () => {

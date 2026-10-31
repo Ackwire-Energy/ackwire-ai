@@ -24,7 +24,7 @@ import { type AgentAudience, answersOthers, audienceOf, OWNER_ONLY, planSharing 
 import { recordAudit } from "./audit";
 import { type BrainKind, isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
-import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import {
   defaultAccountLabel,
   forgetAgents,
@@ -33,6 +33,7 @@ import {
   type MachineAccountView,
   mayAddAccounts,
   releaseAgents,
+  sharesSignIns,
 } from "./machine-accounts";
 import { getMachine, type MachineRow, machineOnline } from "./machines";
 import {
@@ -47,6 +48,7 @@ import {
   requireOpen,
 } from "./missions";
 import { can, getMembership, requirePermission } from "./organizations";
+import { closedRefusal } from "./standing";
 
 /*
  * "Quem pensa" (ADR 0032 §5): the brain an agent thinks with, its model and
@@ -508,6 +510,31 @@ export async function setAgentBrain(
     contextTokens !== agent.contextTokens;
   if (!thinks && !audience) return view(agent, machine, machines, accounts, userId);
   const { row, released } = await deps.db.transaction(async (tx) => {
+    // A login made for one agent thinks for one: the check is taken again under its row's lock, so two agents
+    // picking it at once can't both have it.
+    if (account && account !== agent.brainAccountId) {
+      const [locked] = await tx
+        .select({ shared: schema.machineAccounts.shared })
+        .from(schema.machineAccounts)
+        .where(and(eq(schema.machineAccounts.orgId, orgId), eq(schema.machineAccounts.id, account)))
+        .for("update");
+      if (locked && !locked.shared) {
+        const [other] = await tx
+          .select({ id: schema.agents.id })
+          .from(schema.agents)
+          .where(
+            and(
+              eq(schema.agents.orgId, orgId),
+              eq(schema.agents.brainAccountId, account),
+              ne(schema.agents.id, agentId),
+              isNull(schema.agents.archivedAt),
+            ),
+          );
+        if (other && other.id !== next.from?.agentId) {
+          throw new ConflictError("That account already thinks for another agent", "account.in_use");
+        }
+      }
+    }
     const released = next.from ? await releaseAgents(tx, orgId, [next.from.accountId]) : [];
     const [row] = await tx
       .update(schema.agents)
@@ -530,10 +557,6 @@ export async function setAgentBrain(
         // The account was removed meanwhile (the computer, its owner): the same answer as a stale choice.
         if (account && isForeignKeyViolation(error)) {
           throw new ValidationError("That account is no longer on this computer", "account.invalid");
-        }
-        // Another agent took it meanwhile.
-        if (account && isUniqueViolation(error)) {
-          throw new ConflictError("That account already thinks for another agent", "account.in_use");
         }
         throw error;
       });
@@ -601,8 +624,8 @@ export async function setAgentBrain(
  * when nothing asks otherwise, cleared when the brain kind changes. A plan
  * thinks only for its owner's agents, so only the agent's owner chooses: one
  * of their own accounts (on the agent's computer, of the brain's kind; one
- * another agent uses only with `move`), or the computer's own sign-in when
- * they connected it.
+ * made for one agent that another uses only with `move`), or the computer's
+ * own sign-in when they connected it.
  */
 async function nextBrainAccount(
   db: Database,
@@ -641,6 +664,8 @@ async function nextBrainAccount(
   if (!ownsAgent || row.createdBy !== userId) {
     throw new ForbiddenError("Only the owner of both the account and the agent can choose it", "account.not_owner");
   }
+  // Made for all of its owner's agents there (protocol 29): it thinks for this one too.
+  if (row.shared) return { id: row.id };
   const [other] = await db
     .select({ id: schema.agents.id, name: schema.agents.name })
     .from(schema.agents)
@@ -803,7 +828,7 @@ export interface AgentBrainSummary {
   computer?: string;
   /** A key account's coding plan (`zai`…): its maker's model thinks, through Claude Code. */
   provider?: string;
-  /** The account's name ("Claude Team 2"); a computer's own sign-in by its plan ("Claude Max"). */
+  /** The account's name ("Claude 2"); a computer's own sign-in by its maker and plan ("Claude Max"). */
   account?: string;
   /** That account's limits as the runner last reported them; absent: not known yet. */
   usage?: PlanUsage;
@@ -878,18 +903,21 @@ export async function agentBrainSummaries(
   ]);
   const live = new Map(machines.filter((m) => !m.deletedAt).map((m) => [m.id, m]));
   const accountById = new Map(accounts.map((r) => [r.id, r]));
-  const manages = membership !== null && membership.standing?.state !== "suspended" && can(membership, "manage_agents");
+  const manages = membership !== null && !closedRefusal(membership.standing) && can(membership, "manage_agents");
   for (const a of agents) {
     const kind = brainOf(a.brain);
     const machine = a.machineId ? live.get(a.machineId) : undefined;
     const computer = machine && (manages || a.ownerUserId === viewerId) ? machine.name : undefined;
     const row = kind !== "model" && a.brainAccountId ? accountById.get(a.brainAccountId) : undefined;
     const provider = kind === "claude_code" ? (row?.provider ?? undefined) : undefined;
+    const ownPlan = kind === "claude_code" ? machine?.executors?.claude?.plan : undefined;
     // With no account, the computer's own sign-in thinks only for its pairer's agents (ADR 0059 §3).
     const own =
       kind !== "model" && !a.brainAccountId && machine?.pairer && machine.pairer === a.ownerUserId
         ? {
-            account: defaultAccountLabel(kind, kind === "claude_code" ? machine.executors?.claude?.plan : null),
+            account: ownPlan
+              ? `${defaultAccountLabel(kind)} ${ownPlan[0]?.toUpperCase()}${ownPlan.slice(1)}`
+              : defaultAccountLabel(kind),
             usage: machine.executors?.ownUsage?.[kind],
           }
         : null;
@@ -919,6 +947,11 @@ export interface AiComputer {
   canAdd: boolean;
   /** Its runner takes coding plans' keys (protocol 20). */
   keys: boolean;
+  /**
+   * A new sign-in there thinks for all of the caller's agents on it (protocol 29): Claude's, ChatGPT's and a
+   * coding plan's key.
+   */
+  shares: { claude_code: boolean; codex: boolean; key: boolean };
   /** What it can think with now: Claude Code (Claude and the coding plans) and Codex (ChatGPT). */
   brains: { claude_code: boolean; codex: boolean };
   /**
@@ -969,6 +1002,11 @@ export async function listAiAccounts(deps: BrainDeps, userId: string, orgId: str
         mine: m.pairedByUserId === userId,
         canAdd: mayAddAccounts(m, userId) && m.protocol >= ACCOUNTS_PROTOCOL,
         keys: m.protocol >= PLAN_KEYS_PROTOCOL,
+        shares: {
+          claude_code: sharesSignIns(m, "claude_code"),
+          codex: sharesSignIns(m, "codex"),
+          key: sharesSignIns(m, "key"),
+        },
         brains: { claude_code: can("claude_code"), codex: can("codex") },
         own: m.pairedByUserId === userId ? ownSignIns(m.executors, can) : {},
       };

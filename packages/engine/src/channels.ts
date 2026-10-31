@@ -9,7 +9,7 @@ import { type PreviewMeta, previewMeta } from "./message-preview";
 import { notificationSnippet } from "./notifications";
 import { can, getMembership, type Membership, requireActiveMembership, requirePermission } from "./organizations";
 import { memberKeysSql, memberRankSql, resolvePermissions } from "./permissions";
-import { OrgPausedError, STANDING_COLUMNS } from "./standing";
+import { closedRefusal, STANDING_COLUMNS } from "./standing";
 
 const { channels, channelMembers, agents, organizationMembers, organizations, users } = schema;
 
@@ -231,7 +231,8 @@ export async function requireChannelAccess(db: Database, userId: string, orgId: 
     )
     .where(and(eq(organizationMembers.userId, userId), eq(organizationMembers.orgId, orgId), isNull(users.blockedAt)));
   if (!row) throw new ForbiddenError("You are not a member of this organization");
-  if (row.standing.state === "suspended") throw new OrgPausedError(row.standing);
+  const closed = closedRefusal(row.standing);
+  if (closed) throw closed;
   const channel = row.channel;
   if (!channel || channel.archivedAt) throw new NotFoundError("Channel not found");
   // Forum topics are readable by the whole organization (ADR 0022); writing goes through the forum.

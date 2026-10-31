@@ -72,6 +72,8 @@ export interface ModelResult {
   model: string;
   stopReason: StopReason;
   usage: ModelUsage;
+  /** What the provider says the call cost (OpenRouter's `usage.cost`); absent: priced from the catalog. */
+  costNanoUsd?: number;
 }
 
 export interface StreamOptions {
