@@ -6,6 +6,7 @@
 ## Decision
 
 - **Better Auth** handles people: users, sessions (HttpOnly cookie, same origin as the web app), email + password, optional Google/GitHub, rate limiting. Mounted at `/api/auth/*`, tables `users`, `sessions`, `accounts`, `verifications` via the Drizzle adapter. Its secret derives from `AGENTES_SECRET`.
+- **A provider joins an existing account** by its address only once that account's address is confirmed (Better Auth's `requireLocalEmailVerified`, kept on): whoever made an unconfirmed password account may not own the address, and linking would let them in. The refusal (`account_not_linked`) comes back to the sign-in page with the provider's address, which says to confirm from the email or use the password, and sends the confirmation again (`/api/auth/send-verification-email`, 3 an hour per address). Where the server sends no email, only the password.
 - **agentes.chat owns tenancy:** `organizations` (with `context`, injected into every agent prompt), `organization_members` (owner / admin / member) and `organization_invitations` (7-day links, only the SHA-256 of the token stored, accepted only by the invited email). The Better Auth organization plugin is not used.
 - **Permissions** (`@agenteschat/engine` `can`, `requirePermission`), checked on every request:
   - member: `read`, `post`, `create_channels`
