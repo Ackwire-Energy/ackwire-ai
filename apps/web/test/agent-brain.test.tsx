@@ -383,7 +383,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
       ["A conta que os seus agentes dividem", false],
       ["Trabalho · Teamwalt@acme.com", false],
       ["Pessoal · MaxTambém usada por Theo", false],
-      ["Claude Team 2 · TeamDe Ana", true],
+      ["Claude Team 2De Ana", true],
       ["Adicionar conta", false],
     ]);
     await click(screen().getByRole("option", { name: /^Pessoal · Max/ }));

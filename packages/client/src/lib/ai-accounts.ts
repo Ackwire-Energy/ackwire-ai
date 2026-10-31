@@ -85,9 +85,15 @@ export function accountChoices<A extends MachineAccount & { machineId?: string }
   });
 }
 
-/** An account in an agent's account choice: its name, with its plan where the CLI said it ("Claude Team · Team"). */
+/**
+ * An account by its name with its plan once ("Claude · Max", "Trabalho · Ultra"); a key account by its name. A name
+ * that already says the plan stays as it is: servers before ADR 0059's 2026-10-30 amendment name accounts after it
+ * ("Claude Max 2"), and the phone talks to those too.
+ */
 export const accountTitle = (a: Pick<MachineAccount, "label" | "plan">) =>
-  a.plan ? `${a.label} · ${planName(a.plan)}` : a.label;
+  a.plan && !a.label.toLowerCase().split(/\s+/).includes(a.plan.toLowerCase())
+    ? `${a.label} · ${planName(a.plan)}`
+    : a.label;
 
 /**
  * The line under an account in an agent's account choice (Quem pensa and Connect an AI, web and phone): whose it is
@@ -182,7 +188,7 @@ export function ownSignIns(view: Pick<AiAccounts, "computers"> | null | undefine
   return out;
 }
 
-/** The plan's name as people know it ("Max", "Pro"): the CLI's word with a capital, or nothing. */
+/** The plan's name as people know it ("Max", "Ultra", "Pro"): the runner's word with a capital, or nothing. */
 export const planWordOf = (plan: string | null) =>
   plan ? plan.charAt(0).toUpperCase() + plan.slice(1).toLowerCase() : null;
 

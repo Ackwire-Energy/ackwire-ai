@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentBrain, Credential, MachineAccount, PlanUsage } from "@agenteschat/client";
+import { accountTitle } from "@agenteschat/client/lib/ai-accounts";
 import { planOf, planReplies } from "@agenteschat/client/lib/plans";
 import type { TFunction } from "i18next";
 import {
@@ -310,11 +311,11 @@ describe("the agent's AI", () => {
     expect(
       rows.map((r) => [r.row.kind === "key" ? "key" : r.row.act, r.label, r.sub, "below" in r ? r.below : null]),
     ).toEqual([
-      ["use", "Claude Team · Team", "contato@estudio.example", null],
+      ["use", "Claude Team", "contato@estudio.example", null],
       ["also", "Claude Pessoal · Max", "Também usada por Atlas", null],
-      ["move", "ChatGPT Plus · Plus", "Em uso por Atlas · Mover para cá", null],
+      ["move", "ChatGPT Plus", "Em uso por Atlas · Mover para cá", null],
       ["key", "Claude da Acme", "Claude · termina em 7f2a", "Pela API. O uso conta no orçamento da Ada."],
-      ["locked", "Claude Max · Max", "De João", null],
+      ["locked", "Claude Max", "De João", null],
     ]);
     // The first page lists them before the plans, drawn as the agent's AI draws its accounts.
     const connect = await Bun.file(
@@ -439,6 +440,27 @@ describe("the agent's AI", () => {
         ["send", "starting", "sent", "startFailed"].map((k) => t(`agentPage.work.brain.add.${k}`, { computer })),
       ).toEqual(said[lang]);
     }
+  });
+
+  test("an account says its plan once, after its name, and Claude's plans go by Anthropic's names", async () => {
+    expect(accountTitle(account("Claude", { plan: "ultra" }))).toBe("Claude · Ultra");
+    expect(accountTitle(account("Claude 2"))).toBe("Claude 2 · Max");
+    expect(accountTitle(account("GLM Coding", { plan: null, provider: "zai" }))).toBe("GLM Coding");
+    // The agent's AI and Connect an AI (their rows), Contas de IA and Você name accounts so, and a computer's own
+    // sign-in by its maker the same way ("Claude · Max").
+    const read = (file: string) => Bun.file(new URL(`../../src/features/${file}`, import.meta.url).pathname).text();
+    expect(await read("ai/logic.ts")).toContain("label: accountTitle(choice.login),");
+    for (const [screen, row] of [
+      ["ai/AiAccountsScreen.tsx", "a"],
+      ["me/MeScreen.tsx", "first"],
+    ]) {
+      const source = await read(screen);
+      expect(source).toContain(`title={accountTitle(${row})}`);
+      expect(source).toContain("title={accountTitle({ label: t(`aiAccounts.connect.");
+      expect(source).not.toContain("planWordOf(o.plan)");
+    }
+    expect((await translator("pt-BR"))("connectAi.plan.claude.tiers")).toBe("Pro, Max, Ultra, Team ou Enterprise");
+    expect((await translator("en"))("connectAi.plan.claude.tiers")).toBe("Pro, Max, Ultra, Team or Enterprise");
   });
 
   test("its model: Automático, then every model of its plan with what it's sold as, the one it runs checked", async () => {

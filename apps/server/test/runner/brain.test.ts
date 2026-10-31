@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   BRAIN_PROFILES_PROTOCOL,
@@ -100,8 +100,29 @@ test("hello: Claude Code's login state travels (never anything else from auth st
         }
       : { status: 0, stdout: "2.1.300" };
   expect(claudeAuth(run)).toEqual({ loggedIn: true, authMethod: "claude.ai", plan: "team" });
+  // The computer's own sign-in on Ultra: `max` with the 20x tier its `.claude.json` keeps.
+  const max = () => ({ status: 0, stdout: line({ loggedIn: true, authMethod: "claude.ai", subscriptionType: "max" }) });
+  expect(claudeAuth(max, () => "default_claude_max_20x")).toMatchObject({ plan: "ultra" });
+  expect(claudeAuth(max, () => undefined)).toMatchObject({ plan: "max" });
   expect(claudeAuth(() => ({ status: 1, stdout: line({ loggedIn: false }) }))).toEqual({ loggedIn: false });
   expect(claudeAuth(() => ({ status: null, stdout: "", error: new Error("ENOENT") }))).toEqual({});
+});
+
+test.if(posix)("the computer's own sign-in: its tier read through a link, as Claude Code reads it", () => {
+  const dir = tempDir("own-claude-");
+  dirs.push(dir);
+  const kept = path.join(dir, "kept.json");
+  writeFileSync(kept, line({ oauthAccount: { organizationRateLimitTier: "default_claude_max_20x" } }));
+  symlinkSync(kept, path.join(dir, ".claude.json"));
+  const max = () => ({ status: 0, stdout: line({ loggedIn: true, authMethod: "claude.ai", subscriptionType: "max" }) });
+  const before = process.env.CLAUDE_CONFIG_DIR;
+  process.env.CLAUDE_CONFIG_DIR = dir;
+  try {
+    expect(claudeAuth(max)).toMatchObject({ plan: "ultra" });
+  } finally {
+    if (before === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+    else process.env.CLAUDE_CONFIG_DIR = before;
+  }
 });
 
 // ── Parsing Claude Code's stream ─────────────────────────────────────────────

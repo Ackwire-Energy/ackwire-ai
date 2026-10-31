@@ -236,10 +236,10 @@ export const machineAccounts = pgTable(
     machineId: uuid().notNull(),
     /** `claude_code` or `codex` (validated in code). */
     kind: text().notNull(),
-    /** What people call it ("Trabalho"); the email when nobody named it. */
+    /** What people call it ("Trabalho"); "Claude 2" when nobody named it (ADR 0059 §4). */
     label: text().notNull(),
     email: text(),
-    /** `pro`, `max`, `team`, `plus`… as the CLI says. */
+    /** `pro`, `max`, `ultra`, `team`, `enterprise`… from what the CLI says. */
     plan: text(),
     /**
      * `active`, `signed_out` (the CLI refused the sign-in, or said it isn't

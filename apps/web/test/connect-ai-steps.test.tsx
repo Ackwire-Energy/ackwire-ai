@@ -240,7 +240,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     // Right under the plans: the API key row comes after Claude's steps, never between Claude and them.
     expect(options[5]?.nextElementSibling).toBe(panel);
     expect(panel.compareDocumentPosition(tile("Chave de API")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(panel.textContent).toContain("Pro, Max, Team ou Enterprise");
+    expect(panel.textContent).toContain("Pro, Max, Ultra, Team ou Enterprise");
     expect(within(panel).getByRole("button", { name: "Entrar com Claude" })).toBeTruthy();
     // The sign-in step is its title, its ⓘ and its button: the title names the account, the button the sign-in,
     // and the ⓘ says what to do on the wrong account and where the account stays. Its one step takes no number.

@@ -3846,7 +3846,7 @@ export interface MachineAccount {
   label: string;
   /** Only for its owner. */
   email: string | null;
-  /** "Pro", "Max", "Team"… as the provider reports it. */
+  /** `pro`, `max`, `ultra`, `team`… from what the CLI says (`planWordOf` names it). */
   plan: string | null;
   status: "active" | "signed_out";
   /** Whose it is (the person who signed it in); null: nobody's. */

@@ -521,7 +521,10 @@ export const MachineAccount = z
     kind: AccountKind,
     label: z.string(),
     email: z.string().nullable().openapi({ description: "Only for its owner." }),
-    plan: z.string().nullable().openapi({ description: "`pro`, `max`, `team`, `plus`… as the CLI says." }),
+    plan: z
+      .string()
+      .nullable()
+      .openapi({ description: "`pro`, `max`, `ultra`, `team`, `enterprise`… from what the CLI says." }),
     status: z.enum(["active", "signed_out"]),
     ownerId: z.string().nullable().openapi({ description: "Whose account it is; null: nobody's." }),
     ownerName: z.string().nullable(),

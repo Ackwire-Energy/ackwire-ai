@@ -3,6 +3,7 @@ import type { TFunction } from "i18next";
 import type { AiComputer, Credential, MachineAccount, PlanUsage } from "../src/api/types";
 import {
   accountChoices,
+  accountTitle,
   existingAi,
   groupPlans,
   ownSignInListed,
@@ -231,6 +232,17 @@ describe("the computers' own sign-ins", () => {
     expect(planWordOf("max")).toBe("Max");
     expect(planWordOf("PRO")).toBe("Pro");
     expect(planWordOf(null)).toBeNull();
+  });
+
+  test("an account's title says its plan once, after its name", () => {
+    expect(accountTitle({ label: "Claude", plan: "max" })).toBe("Claude · Max");
+    expect(accountTitle({ label: "Claude 2", plan: "ultra" })).toBe("Claude 2 · Ultra");
+    expect(accountTitle({ label: "GLM Coding", plan: null })).toBe("GLM Coding");
+    // A server that still names accounts after their plan ("Claude Max 2"): the plan isn't said twice.
+    expect(accountTitle({ label: "Claude Max 2", plan: "max" })).toBe("Claude Max 2");
+    expect(accountTitle({ label: "claude team", plan: "team" })).toBe("claude team");
+    expect(accountTitle({ label: "Claude Max", plan: "ultra" })).toBe("Claude Max · Ultra");
+    expect(accountTitle({ label: "Maxwell", plan: "max" })).toBe("Maxwell · Max");
   });
 
   test("the plan an agent's sign-in is on: its account's, or with none its computer's own sign-in's", () => {

@@ -803,7 +803,7 @@ export interface AgentBrainSummary {
   computer?: string;
   /** A key account's coding plan (`zai`…): its maker's model thinks, through Claude Code. */
   provider?: string;
-  /** The account's name ("Claude Team 2"); a computer's own sign-in by its plan ("Claude Max"). */
+  /** The account's name ("Claude 2"); a computer's own sign-in by its maker and plan ("Claude Max"). */
   account?: string;
   /** That account's limits as the runner last reported them; absent: not known yet. */
   usage?: PlanUsage;
@@ -885,11 +885,14 @@ export async function agentBrainSummaries(
     const computer = machine && (manages || a.ownerUserId === viewerId) ? machine.name : undefined;
     const row = kind !== "model" && a.brainAccountId ? accountById.get(a.brainAccountId) : undefined;
     const provider = kind === "claude_code" ? (row?.provider ?? undefined) : undefined;
+    const ownPlan = kind === "claude_code" ? machine?.executors?.claude?.plan : undefined;
     // With no account, the computer's own sign-in thinks only for its pairer's agents (ADR 0059 §3).
     const own =
       kind !== "model" && !a.brainAccountId && machine?.pairer && machine.pairer === a.ownerUserId
         ? {
-            account: defaultAccountLabel(kind, kind === "claude_code" ? machine.executors?.claude?.plan : null),
+            account: ownPlan
+              ? `${defaultAccountLabel(kind)} ${ownPlan[0]?.toUpperCase()}${ownPlan.slice(1)}`
+              : defaultAccountLabel(kind),
             usage: machine.executors?.ownUsage?.[kind],
           }
         : null;

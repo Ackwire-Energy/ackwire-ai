@@ -1421,7 +1421,7 @@ export const en: Translations = {
     },
     orPayGo: "Or pay as you go",
     plan: {
-      claude: { title: "Your Claude plan", tiers: "Pro, Max, Team or Enterprise" },
+      claude: { title: "Your Claude plan", tiers: "Pro, Max, Ultra, Team or Enterprise" },
       chatgpt: { title: "Your ChatGPT plan", tiers: "Plus, Pro, Business or Enterprise" },
       zai: { tiers: "Lite, Pro or Max" },
       kimi: { tiers: "Plus, Pro, Max or Ultra" },
