@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentBrain, Credential, MachineAccount, PlanUsage } from "@agenteschat/client";
+import { newAgentStart } from "@agenteschat/client/lib/agent-setup";
 import { accountTitle } from "@agenteschat/client/lib/ai-accounts";
 import { planOf, planReplies } from "@agenteschat/client/lib/plans";
 import type { TFunction } from "i18next";
@@ -609,13 +610,26 @@ describe("the agent's AI", () => {
     expect(route).toContain("<AgentSetupScreen agentId={id");
   });
 
-  test("Criar agente on the phone thinks with the last setup: the API's model and key, or a plan saved right after", () => {
-    expect(newAgentAi(null)).toEqual({ model: "auto", credentialId: null, plan: null });
-    expect(newAgentAi({ brain: "model", model: "claude-opus-5-5", key: "k1" })).toEqual({
+  test("Criar agente on the phone thinks with the last setup: the API's model and key, or a plan saved right after", async () => {
+    expect(newAgentAi(null)).toEqual({ model: "auto", credentialId: null, contextTokens: null, plan: null });
+    const api = { brain: "model" as const, model: "claude-opus-5-5", key: "k1", contextTokens: 400_000 };
+    expect(newAgentAi(api)).toEqual({
       model: "claude-opus-5-5",
       credentialId: "k1",
+      contextTokens: 400_000,
       plan: null,
     });
+    // A model no key runs now starts on Automático, and a key the creator can't see isn't sent, as on the web.
+    const runs = { ownerIsMe: true, usable: new Set(["claude-opus-5-5"]), keys: [] };
+    expect(newAgentAi(newAgentStart(api, { ...runs, usable: new Set() }))).toMatchObject({
+      model: "auto",
+      credentialId: null,
+    });
+    expect(newAgentAi(newAgentStart(api, runs))).toMatchObject({ model: "claude-opus-5-5", credentialId: null });
+    const screen = await Bun.file(
+      new URL("../../src/features/agents/NewAgentScreen.tsx", import.meta.url).pathname,
+    ).text();
+    expect(screen).toContain('{ brain: "model", contextTokens: thinks.contextTokens }');
     const input = { brain: "claude_code" as const, account: "a1", model: "opus", effort: "high" as const };
     expect(
       newAgentAi({
@@ -625,6 +639,6 @@ describe("the agent's AI", () => {
         account: { id: "a1", label: "Claude" },
         input,
       }),
-    ).toEqual({ model: "auto", credentialId: null, plan: { machineId: "m1", input } });
+    ).toEqual({ model: "auto", credentialId: null, contextTokens: null, plan: { machineId: "m1", input } });
   });
 });

@@ -578,9 +578,9 @@ describe("Criar agente: what gets created", () => {
     ).toBe("true");
   });
 
-  test("the last setup: the API's model and key as they were; someone else's plan leaves Automático", async () => {
+  test("the last setup: the API's model, key and context window; someone else's plan leaves Automático", async () => {
     const state = seedState();
-    state.newAgentSetup = { brain: "model", model: "claude-opus-5-5", key: "cred-1", contextTokens: null };
+    state.newAgentSetup = { brain: "model", model: "claude-opus-5-5", key: "cred-1", contextTokens: 400_000 };
     await open(state);
     await startAs("Assistente");
     await proceed(4);
@@ -594,6 +594,12 @@ describe("Criar agente: what gets created", () => {
     await click(screen().getByRole("button", { name: "Criar Eva" }));
     await settle(8);
     expect(createdWith(state)).toMatchObject({ model: "claude-opus-5-5", credentialId: "cred-1" });
+    const agentId = state.agents.find((a) => a.handle === "eva")?.id;
+    expect(state.calls.find((c) => c.method === "agents.setBrain")?.args).toEqual([
+      ORG_ID,
+      agentId,
+      { brain: "model", contextTokens: 400_000 },
+    ]);
     cleanup();
 
     // A plan on someone else's account can't think for my agent: it starts as before.

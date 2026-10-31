@@ -194,14 +194,18 @@ export function setupWords(
 }
 
 /**
- * What the phone's Criar agente sends for who thinks (ADR 0089): the last setup's API model and key at creation, or
- * Automático there and the last setup's plan saved on it right after; with no setup, Automático on the API.
+ * What the phone's Criar agente sends for who thinks (ADR 0089): the last setup's API model and key at creation, and
+ * its context window right after; or Automático there and the last setup's plan saved on it right after; with no
+ * setup, Automático on the API.
  */
 export function newAgentAi(thinks: NewAgentStart | null) {
-  if (thinks?.brain === "model") return { model: thinks.model, credentialId: thinks.key, plan: null };
+  if (thinks?.brain === "model") {
+    return { model: thinks.model, credentialId: thinks.key, contextTokens: thinks.contextTokens, plan: null };
+  }
   return {
     model: AUTO,
     credentialId: null,
+    contextTokens: null,
     plan: thinks ? { machineId: thinks.machineId, input: thinks.input } : null,
   };
 }

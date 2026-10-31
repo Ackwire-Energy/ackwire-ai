@@ -100,8 +100,7 @@ export function greetingKey(now = new Date()): "morning" | "afternoon" | "evenin
   return "evening";
 }
 
-/** The first name, for the greeting. */
-export const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? "";
+export { firstName } from "@agenteschat/client/lib/format";
 
 /** Ids that are safe to put in a route. */
 export const isSafeId = (id: unknown): id is string => typeof id === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(id);

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
+import { createHttpApi } from "../src/api/http-client";
 import type { AgentBrain, AgentSetupResult, Model, NewAgentSetup } from "../src/api/types";
 import {
   newAgentStart,
@@ -55,6 +56,25 @@ describe("Usar em outros agentes", () => {
     expect(line({ agentId: "a", status: "skipped" })).toBe(`${W}.reasons.failed`);
   });
 
+  test("more agents than one call takes go in calls of 200, the results in the order asked", async () => {
+    const sent: string[][] = [];
+    const api = createHttpApi({
+      fetch: async (_url: string, init: RequestInit) => {
+        const { agentIds } = JSON.parse(String(init.body)) as { agentIds: string[] };
+        sent.push(agentIds);
+        const results = agentIds.map((agentId) => ({ agentId, status: "applied" }));
+        return new Response(JSON.stringify({ results }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    });
+    const ids = Array.from({ length: 201 }, (_, i) => `a${i}`);
+    const results = await api.agents.applySetup("o1", { setup: { brain: "model", model: "auto" }, agentIds: ids });
+    expect(sent.map((s) => s.length)).toEqual([200, 1]);
+    expect(results.map((r) => r.agentId)).toEqual(ids);
+  });
+
   test("on the phone the setup is the agent's saved one, on a computer only", () => {
     const view = {
       brain: "claude_code",
@@ -94,17 +114,26 @@ describe("a new agent starts with the last setup", () => {
     fallback: true,
   };
 
-  test("the API's model and key as they are", () => {
-    expect(newAgentStart({ brain: "model", model: "claude-opus-5-5", key: "k", contextTokens: null }, false)).toEqual({
+  const mine = { ownerIsMe: true, usable: new Set(["claude-opus-5-5"]), keys: [{ id: "k" }] };
+
+  test("the API's model, key and context window while the model runs, for anyone's agent", () => {
+    const api = { brain: "model", model: "claude-opus-5-5", key: "k", contextTokens: 400_000 } as const;
+    expect(newAgentStart(api, { ...mine, ownerIsMe: false })).toEqual({
       brain: "model",
       model: "claude-opus-5-5",
       key: "k",
+      contextTokens: 400_000,
     });
-    expect(newAgentStart(null, true)).toBeNull();
+    // A key the person doesn't see: the workspace's default. A model nothing runs now: Automático.
+    expect(newAgentStart(api, { ...mine, keys: [] })).toMatchObject({ model: "claude-opus-5-5", key: null });
+    expect(newAgentStart(api, { ...mine, usable: new Set() })).toBeNull();
+    expect(newAgentStart({ ...api, model: "auto" }, { ...mine, usable: new Set() })).toBeNull();
+    expect(newAgentStart({ ...api, model: "auto" }, mine)).toMatchObject({ model: "auto" });
+    expect(newAgentStart(null, mine)).toBeNull();
   });
 
   test("a plan only for an agent of the person's own, on their account with room or their computer's sign-in", () => {
-    expect(newAgentStart(plan, true)).toEqual({
+    expect(newAgentStart(plan, mine)).toEqual({
       brain: "claude_code",
       machineId: "m1",
       computer: "MacBook",
@@ -118,13 +147,13 @@ describe("a new agent starts with the last setup", () => {
         fallback: true,
       },
     });
-    expect(newAgentStart(plan, false)).toBeNull();
+    expect(newAgentStart(plan, { ...mine, ownerIsMe: false })).toBeNull();
     const theirs = { ...plan, account: { id: "acc", label: "Claude", provider: null, mine: false, free: true } };
-    expect(newAgentStart(theirs, true)).toBeNull();
+    expect(newAgentStart(theirs, mine)).toBeNull();
     const taken = { ...plan, account: { id: "acc", label: "Claude", provider: null, mine: true, free: false } };
-    expect(newAgentStart(taken, true)).toBeNull();
-    expect(newAgentStart({ ...plan, account: null, ownSignIn: false }, true)).toBeNull();
-    expect(newAgentStart({ ...plan, account: null, ownSignIn: true }, true)).toMatchObject({
+    expect(newAgentStart(taken, mine)).toBeNull();
+    expect(newAgentStart({ ...plan, account: null, ownSignIn: false }, mine)).toBeNull();
+    expect(newAgentStart({ ...plan, account: null, ownSignIn: true }, mine)).toMatchObject({
       account: null,
       input: { account: null },
     });
@@ -134,8 +163,8 @@ describe("a new agent starts with the last setup", () => {
     const models = [{ id: "claude-opus-5-5", label: "Claude Opus 5.5" }] as Model[];
     const say = (start: Parameters<typeof newAgentStartText>[2], provider?: string) =>
       newAgentStartText(t, "pt-BR", start, { models, machines: [], provider });
-    expect(say({ brain: "model", model: "claude-opus-5-5", key: null })).toBe("Claude Opus 5.5");
-    expect(say({ brain: "model", model: "auto", key: null })).toBe("brain.auto.label");
+    expect(say({ brain: "model", model: "claude-opus-5-5", key: null, contextTokens: null })).toBe("Claude Opus 5.5");
+    expect(say({ brain: "model", model: "auto", key: null, contextTokens: null })).toBe("brain.auto.label");
     const glm = {
       brain: "claude_code" as const,
       machineId: "m1",

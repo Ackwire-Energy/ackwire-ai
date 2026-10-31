@@ -10,6 +10,7 @@ import type {
 } from "../api/types";
 import { advancedParts, effortLevel } from "./brain-advanced";
 import { isContextLimit } from "./context-limits";
+import { firstName } from "./format";
 import { planModel, planOf } from "./plans";
 import { isAuto } from "./providers";
 
@@ -84,11 +85,9 @@ export function setupResultLine(
   }
 }
 
-const firstName = (name: string) => name.split(/\s+/)[0] ?? name;
-
-/** What "Criar agente" starts on: the API's model and key, or a plan on a computer, with what to save on it after. */
+/** What "Criar agente" starts on: the API's model, key and context window, or a plan on a computer, saved after. */
 export type NewAgentStart =
-  | { brain: "model"; model: string; key: string | null }
+  | { brain: "model"; model: string; key: string | null; contextTokens: number | null }
   | {
       brain: "claude_code" | "codex";
       machineId: string;
@@ -99,14 +98,22 @@ export type NewAgentStart =
     };
 
 /**
- * The setup a new agent starts with (ADR 0089), where it can think for it: the API's always (its model still has
- * to be usable), a plan only for an agent of the person's own, on their account with room for one more agent or on
- * a computer they connected (its own sign-in). Null: "Automático" on the API, as before.
+ * The setup a new agent starts with (ADR 0089), where it can think for it: the API's while its model runs (`usable`,
+ * as `usableModels` says), with its key where the person sees it (`keys`, else the workspace's default); a plan only
+ * for an agent of the person's own, on their account with room for one more agent or on a computer they connected
+ * (its own sign-in). Null: "Automático" on the API, as before.
  */
-export function newAgentStart(s: NewAgentSetup | null | undefined, ownerIsMe: boolean): NewAgentStart | null {
+export function newAgentStart(
+  s: NewAgentSetup | null | undefined,
+  o: { ownerIsMe: boolean; usable: ReadonlySet<string>; keys: readonly { id: string }[] },
+): NewAgentStart | null {
   if (!s) return null;
-  if (s.brain === "model") return s.model ? { brain: "model", model: s.model, key: s.key } : null;
-  if (!ownerIsMe || !s.computer) return null;
+  if (s.brain === "model") {
+    if (!s.model || !(isAuto(s.model) ? o.usable.size > 0 : o.usable.has(s.model))) return null;
+    const key = o.keys.some((k) => k.id === s.key) ? s.key : null;
+    return { brain: "model", model: s.model, key, contextTokens: s.contextTokens };
+  }
+  if (!o.ownerIsMe || !s.computer) return null;
   if (s.account ? !(s.account.mine && s.account.free) : !s.ownSignIn) return null;
   return {
     brain: s.brain,

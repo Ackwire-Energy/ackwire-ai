@@ -28,7 +28,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { choiceOf, defaultPolicy, MAIL_ACTIONS, toMailLevel } from "@agenteschat/client/lib/mail";
 import { planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import { AUTO, isAuto, modelChoices } from "@agenteschat/client/lib/providers";
+import { AUTO, isAuto, modelChoices, usableModels } from "@agenteschat/client/lib/providers";
 import { scopeText } from "@agenteschat/client/lib/scopes";
 import {
   AffixInput,
@@ -286,10 +286,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
     () => modelChoices(models.data?.models ?? [], credentials.data ?? [], platform.data ?? false),
     [models.data, credentials.data, platform.data],
   );
-  const usable = useMemo(
-    () => new Set(choices.flatMap(([, list]) => list.filter((c) => c.available).map((c) => c.model.id))),
-    [choices],
-  );
+  const usable = useMemo(() => usableModels(choices), [choices]);
   const taken = useMemo(
     () =>
       new Set([
@@ -301,12 +298,13 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
 
   // What it starts thinking with (ADR 0089): the last setup saved or used on other agents, where it can think for it.
   const startOf = (ownerId: string | null): NewAgentStart | null =>
-    from ? null : newAgentStart(lastSetup.data, ownerId === me.user.id);
+    from
+      ? null
+      : newAgentStart(lastSetup.data, { ownerIsMe: ownerId === me.user.id, usable, keys: credentials.data ?? [] });
   const startWith = (start: NewAgentStart | null) => {
     const api = start?.brain === "model" ? start : null;
-    const fits = api && (isAuto(api.model) ? usable.size > 0 : usable.has(api.model));
-    setModel(fits ? api.model : AUTO);
-    setKey(fits && api.key && (credentials.data ?? []).some((c) => c.id === api.key) ? api.key : DEFAULT_KEY);
+    setModel(api?.model ?? AUTO);
+    setKey(api?.key ?? DEFAULT_KEY);
     setPlan(
       start && start.brain !== "model"
         ? {
@@ -486,6 +484,8 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
       } catch {
         toast.show(t("newAgent.planNotSaved", { ...g, brain: t(`brain.card.${plan.kind}`) }), "error");
       }
+    } else if (start?.brain === "model" && onStart && start.contextTokens !== null) {
+      await api.agents.setBrain(org.id, agent.id, { brain: "model", contextTokens: start.contextTokens });
     }
     if (joined.length > 0) {
       await api.agents.setChannels(

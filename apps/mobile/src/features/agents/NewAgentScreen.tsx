@@ -8,11 +8,13 @@ import {
   useChannels,
   useConnections,
   useCreateAgent,
+  useCredentials,
   useCustomServers,
   useDenyAgentProposal,
   useDms,
   useModels,
   useNewAgentSetup,
+  usePlatformKey,
   useSkills,
 } from "@agenteschat/client";
 import { LEVELS, type Level, nextLevel, saveLevels } from "@agenteschat/client/lib/access-levels";
@@ -32,6 +34,7 @@ import {
   type RoleId,
 } from "@agenteschat/client/lib/new-agent";
 import { can } from "@agenteschat/client/lib/permissions";
+import { modelChoices, usableModels } from "@agenteschat/client/lib/providers";
 import { router, usePreventRemove } from "expo-router";
 import { type ReactNode, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -107,7 +110,8 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
   const api = useApi();
   const insets = useSafeAreaInsets();
   const orgId = useOrgId();
-  const mayImport = can(useOrg().org, "create_agents");
+  const { org } = useOrg();
+  const mayImport = can(org, "create_agents");
   const meId = useMeId();
   const dir = useDirectory();
   const create = useCreateAgent(orgId);
@@ -122,6 +126,8 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
   const lastSetup = useNewAgentSetup(orgId, mayImport);
   const brainMachines = useBrainMachines(orgId);
   const models = useModels();
+  const credentials = useCredentials(orgId, can(org, "manage_credentials"));
+  const platform = usePlatformKey(orgId);
 
   const suggested = suggestAgentName(dir.agents.map((a) => a.name));
   const proposed = from?.params.draft;
@@ -141,7 +147,9 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
     proposed ? draftLevels(proposed) : {},
   );
   // Who thinks (ADR 0089): the workspace's last setup where it can think for an agent of mine, unless a proposal says.
-  const start = proposed ? null : newAgentStart(lastSetup.data, true);
+  const keys = credentials.data ?? [];
+  const usable = usableModels(modelChoices(models.data?.models ?? [], keys, platform.data ?? false));
+  const start = proposed ? null : newAgentStart(lastSetup.data, { ownerIsMe: true, usable, keys });
   const [useLast, setUseLast] = useState(true);
   const thinks = newAgentAi(start && useLast ? start : null);
   const startText = start
@@ -291,10 +299,12 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
         await api.sandbox.setTarget(orgId, agent.id, ai.machineId);
         await api.agents.setBrain(orgId, agent.id, { brain: ai.brain, account: ai.accountId });
       }
-      // Or the last setup's plan, with its model, effort and the rest.
+      // Or the last setup's plan, with its model, effort and the rest; on the API, its context window.
       if (thinks.plan) {
         await api.sandbox.setTarget(orgId, agent.id, thinks.plan.machineId);
         await api.agents.setBrain(orgId, agent.id, thinks.plan.input);
+      } else if (thinks.contextTokens !== null) {
+        await api.agents.setBrain(orgId, agent.id, { brain: "model", contextTokens: thinks.contextTokens });
       }
       successHaptic();
       toast({ title: t("mobile.agents.created", { name: agent.name }), agentId: agent.id });

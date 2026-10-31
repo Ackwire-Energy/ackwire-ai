@@ -173,6 +173,8 @@ import type {
 } from "./types";
 
 const org = (orgId: string) => `/api/app/organizations/${enc(orgId)}`;
+/** The most agents one `POST …/agent-setup` takes (the server's `SETUP_AGENTS_MAX`). */
+const SETUP_AGENTS_PER_CALL = 200;
 
 /** The list's query string (booleans as "true"; nothing for what isn't set). */
 const threadQuery = (f: Partial<ThreadFilters>) => ({
@@ -516,8 +518,19 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<AgentBrain>(`${org(orgId)}/agents/${enc(agentId)}/brain`, { method: "PUT", json: input }),
       brainMachines: async (orgId) =>
         (await request<{ machines: BrainMachine[] }>(`${org(orgId)}/brain-machines`)).machines,
-      applySetup: async (orgId, input) =>
-        (await request<{ results: AgentSetupResult[] }>(`${org(orgId)}/agent-setup`, { json: input })).results,
+      // ponytail: past 200 agents each call is its own transaction, so a preview's later calls don't see a one-agent
+      // sign-in an earlier one took (the real run does). One transaction over all of them if workspaces grow so big.
+      applySetup: async (orgId, input) => {
+        const results: AgentSetupResult[] = [];
+        for (let i = 0; i < input.agentIds.length; i += SETUP_AGENTS_PER_CALL) {
+          const agentIds = input.agentIds.slice(i, i + SETUP_AGENTS_PER_CALL);
+          const page = await request<{ results: AgentSetupResult[] }>(`${org(orgId)}/agent-setup`, {
+            json: { ...input, agentIds },
+          });
+          results.push(...page.results);
+        }
+        return results;
+      },
       newAgentSetup: async (orgId) =>
         (await request<{ setup: NewAgentSetup | null }>(`${org(orgId)}/agent-setup`)).setup,
       runs: async (orgId, filter = {}) =>

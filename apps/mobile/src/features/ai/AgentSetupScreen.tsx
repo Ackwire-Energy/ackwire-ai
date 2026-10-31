@@ -1,6 +1,7 @@
 import { keys, useAgentBrain, useAiStatus, useApi, useModels, useSetupPreview } from "@agenteschat/client";
 import { setupOfBrain, setupResultLine, sortedResults, takers } from "@agenteschat/client/lib/agent-setup";
 import { brainLine } from "@agenteschat/client/lib/brain";
+import { firstName } from "@agenteschat/client/lib/format";
 import { isAuto } from "@agenteschat/client/lib/providers";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -118,7 +119,8 @@ export function AgentSetupScreen({ agentId }: { agentId: string }) {
                 {results.map((r) => {
                   const a = dir.agentById.get(r.agentId);
                   if (!a) return null;
-                  const owner = a.ownerUserId ? dir.memberById.get(a.ownerUserId)?.name.split(" ")[0] : undefined;
+                  const ownerName = a.ownerUserId ? dir.memberById.get(a.ownerUserId)?.name : undefined;
+                  const owner = ownerName ? firstName(ownerName) : undefined;
                   const api = isAuto(a.model)
                     ? t("brain.auto.label")
                     : (models.data?.models.find((m) => m.id === a.model)?.label ?? a.model);

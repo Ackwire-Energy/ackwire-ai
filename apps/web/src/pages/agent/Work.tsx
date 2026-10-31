@@ -50,7 +50,7 @@ import {
 } from "@agenteschat/client/lib/brain-advanced";
 import { setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { type ContextLimit, contextChoices, contextSize, isContextLimit } from "@agenteschat/client/lib/context-limits";
-import { lowerFirst } from "@agenteschat/client/lib/format";
+import { firstName, lowerFirst } from "@agenteschat/client/lib/format";
 import {
   allowsInApp,
   commandInReason,
@@ -1412,15 +1412,12 @@ function SetupCopyDialog({
   const models = useModels();
   const dir = useDirectory(org.id);
   const others = (agents.data ?? []).filter((a) => a.id !== agent.id);
-  const preview = useSetupPreview(
-    org.id,
-    setup,
-    others.map((a) => a.id),
-  );
+  // This agent first, as "Usar" saves it before the others: a sign-in made for one agent is its own then.
+  const preview = useSetupPreview(org.id, setup, [agent.id, ...others.map((a) => a.id)]);
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const [q, setQ] = useState("");
   const query = q.trim().toLowerCase();
-  const results = sortedResults(preview.data ?? []);
+  const results = sortedResults((preview.data ?? []).filter((r) => r.agentId !== agent.id));
   const can = takers(results);
   const chosen = can.filter((id) => picked.has(id));
   const byId = new Map(others.map((a) => [a.id, a]));
@@ -1431,7 +1428,10 @@ function SetupCopyDialog({
       : isAuto(a.model)
         ? t("brain.auto.label")
         : (models.data?.models.find((m) => m.id === a.model)?.label ?? a.model);
-  const ownerOf = (a: Agent) => (a.ownerUserId ? dir.memberById.get(a.ownerUserId)?.name.split(" ")[0] : undefined);
+  const ownerOf = (a: Agent) => {
+    const name = a.ownerUserId ? dir.memberById.get(a.ownerUserId)?.name : undefined;
+    return name ? firstName(name) : undefined;
+  };
   const toggle = (id: string, on: boolean) =>
     setPicked((p) => {
       const next = new Set(p);
@@ -1448,24 +1448,26 @@ function SetupCopyDialog({
       closeLabel={t("common.close")}
       className="agp-copydialog"
     >
-      <div className="ac-dialog__tools">
-        <label htmlFor="setup-all" className="agp-copydialog__all" data-off={can.length === 0 || undefined}>
-          <Checkbox
-            id="setup-all"
-            checked={can.length > 0 && chosen.length === can.length}
-            disabled={can.length === 0}
-            onCheckedChange={(on) => setPicked(new Set(on ? can : []))}
-          />
-          <span className="scope-row__text">
-            <b>{t("agentPage.work.brain.copy.all")}</b>
-            <span className="small muted">
-              {preview.data && can.length === 0
-                ? t("agentPage.work.brain.copy.none")
-                : t("agentPage.work.brain.copy.allLine", { count: can.length })}
+      {preview.data && (
+        <div className="ac-dialog__tools">
+          <label htmlFor="setup-all" className="agp-copydialog__all" data-off={can.length === 0 || undefined}>
+            <Checkbox
+              id="setup-all"
+              checked={can.length > 0 && chosen.length === can.length}
+              disabled={can.length === 0}
+              onCheckedChange={(on) => setPicked(new Set(on ? can : []))}
+            />
+            <span className="scope-row__text">
+              <b>{t("agentPage.work.brain.copy.all")}</b>
+              <span className="small muted">
+                {can.length === 0
+                  ? t("agentPage.work.brain.copy.none")
+                  : t("agentPage.work.brain.copy.allLine", { count: can.length })}
+              </span>
             </span>
-          </span>
-        </label>
-      </div>
+          </label>
+        </div>
+      )}
       {preview.isPending ? (
         <div className="ac-dialog__body">
           <LoadingLine width={220} />

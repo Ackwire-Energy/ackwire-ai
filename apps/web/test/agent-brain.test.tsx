@@ -1552,13 +1552,14 @@ describe("Quem pensa: Automático", () => {
 describe("Usar em outros agentes (ADR 0089)", () => {
   const LIA_ID = "00000000-0000-4000-8000-0000000000a9";
 
-  async function withOthers() {
+  async function withOthers(tweak?: (api: ReturnType<typeof createFakeApi>) => void) {
     const state = seedState();
     const [, atlas] = state.agents;
     if (!atlas) throw new Error("no Atlas");
     state.agents.push({ ...atlas, id: LIA_ID, name: "Lia", handle: "lia" });
     state.setupResults = { [LIA_ID]: { status: "skipped", reason: "other_computer", params: { computer: "PC" } } };
     const api = createFakeApi(state);
+    tweak?.(api);
     pairMac(api, true);
     await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
     reportOwn(api, { claude_code: { plan: "max" } });
@@ -1576,14 +1577,15 @@ describe("Usar em outros agentes (ADR 0089)", () => {
     await click(within(d).getByRole("button", { name: /^Usar em outros agentes/ }));
     const c = screen().getByRole("dialog", { name: "Usar em outros agentes" });
     expect(c.textContent).toContain("Eles passam a pensar com Claude Code · Opus.");
-    // What each would do, from the server's preview: nothing saved yet.
+    // What each would do, from the server's preview, Ada first as she is saved first: nothing saved yet.
     expect(copyCalls(state)).toEqual([
       {
         setup: expect.objectContaining({ brain: "claude_code", machineId: "machine_1", model: "opus" }),
-        agentIds: [ATLAS_ID, LIA_ID],
+        agentIds: [ADA_ID, ATLAS_ID, LIA_ID],
         preview: true,
       },
     ]);
+    expect(within(c).queryByRole("checkbox", { name: /^Ada/ })).toBeNull();
     expect(brainCalls(state)).toEqual([]);
     const atlas = within(c).getByRole("checkbox", { name: /^Atlas/ });
     expect(atlas.closest("label")?.textContent).toContain("Hoje: Claude Sonnet 5.5");
@@ -1609,6 +1611,29 @@ describe("Usar em outros agentes (ADR 0089)", () => {
     expect(screen().queryByRole("dialog", { name: "Quem pensa" })).toBeNull();
   });
 
+  test("Todos says how many can take it only once the preview says so", async () => {
+    let arrive = () => {};
+    const arrived = new Promise<void>((resolve) => {
+      arrive = resolve;
+    });
+    await withOthers((api) => {
+      const apply = api.agents.applySetup;
+      api.agents.applySetup = async (orgId, input) => {
+        await arrived;
+        return apply(orgId, input);
+      };
+    });
+    const d = await brainDialog();
+    await click(card(d, /^Claude Code/));
+    await click(within(d).getByRole("button", { name: /^Usar em outros agentes/ }));
+    const c = screen().getByRole("dialog", { name: "Usar em outros agentes" });
+    expect(within(c).queryByRole("checkbox", { name: /^Todos/ })).toBeNull();
+    expect(c.textContent).not.toContain("0 agente");
+    arrive();
+    await settle(4);
+    expect(c.textContent).toContain("1 agente pode usar");
+  });
+
   test("the API's model and key go too, for an admin; nothing to pick when nobody can take it", async () => {
     const state = seedState();
     state.credentials.push({
@@ -1627,7 +1652,7 @@ describe("Usar em outros agentes (ADR 0089)", () => {
     const c = screen().getByRole("dialog", { name: "Usar em outros agentes" });
     expect(copyCalls(state)[0]).toEqual({
       setup: { brain: "model", model: "claude-sonnet-5-5", key: "cred-2", contextTokens: null },
-      agentIds: [ATLAS_ID],
+      agentIds: [ADA_ID, ATLAS_ID],
       preview: true,
     });
     expect(
@@ -1636,6 +1661,7 @@ describe("Usar em outros agentes (ADR 0089)", () => {
         .closest("label")?.textContent,
     ).toContain("Já pensa assim");
     expect(c.textContent).toContain("Nenhum outro agente pode usar agora.");
+    expect(c.textContent).not.toContain("0 agente");
     expect(
       within(c)
         .getByRole("checkbox", { name: /^Todos/ })
