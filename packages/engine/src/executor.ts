@@ -11,8 +11,9 @@ import {
 } from "@agenteschat/providers";
 import { pendingConnectors } from "./access";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
+import { announceAgentStatus, askRunStatus, startRunStatus, statusCandidates } from "./agent-status";
 import { type Agent, getAgentCached } from "./agents";
-import { agentAiState, type NoAiReason, noAiReasonOf } from "./ai-status";
+import { type AgentAi, agentAiState, type NoAiReason, noAiReasonOf, ownNotSignedIn } from "./ai-status";
 import { publishApproval } from "./approvals";
 import { runAuthority } from "./authority";
 import {
@@ -609,6 +610,8 @@ async function executeRunInner(
       status,
       ...(error ? { error, ...runErrorDetail(error) } : {}),
     });
+    // Its line ends with the run (checked on read); the apps refresh now (ADR 0084 §11).
+    await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
     await publishChannelEvent(deps.pubsub, {
       type: "message.handled",
       channelId: run.channelId,
@@ -683,10 +686,10 @@ async function executeRunInner(
    * Nothing to think with (ADR 0061): the run fails with `no_ai`, and the conversation gets its agent's
    * card with Connect. Background work only fails (its routine says why).
    */
-  const failNoAi = async (why: NoAiReason) => {
+  const failNoAi = async (why: NoAiReason, own?: AgentAi["own"]) => {
     if (!run.background) {
       const cardDeps = { db, pubsub: deps.pubsub, gateway: deps.gateway, machines: deps.machines };
-      await postNoAiCard({ ...cardDeps, judge: deps.context?.judge }, run, why)
+      await postNoAiCard({ ...cardDeps, judge: deps.context?.judge }, run, why, own)
         .catch((error) => addRunStep(db, run, "error", { reason: "no_ai_card", message: String(error) }))
         .catch(() => {});
     }
@@ -734,7 +737,7 @@ async function executeRunInner(
   // before the judges below, any context or a model call.
   if (needsContext) {
     const ai = await agentAiState({ db, gateway: deps.gateway, machines: deps.machines }, agent, run);
-    if (ai.state === "no_ai") return failNoAi(ai.reason ?? "no_key");
+    if (ai.state === "no_ai") return failNoAi(ai.reason ?? "no_key", ai.own);
   }
   if (!askingForRoom) await publishChannelEvent(deps.pubsub, event("running"));
   // Tools on demand (ADR 0043): a new run lists the core tools and the groups the judge expects it to need.
@@ -789,6 +792,25 @@ async function executeRunInner(
     if (toolChoice.groups.includes(toolGroupKey({ scope: BROWSER_SCOPE }))) {
       deps.warmBrowser?.({ orgId: run.orgId, agentId: agent.id, threadRootId: run.threadRootId });
     }
+  }
+  // What the agent shows it is doing (ADR 0084 §8–9): lines from facts everyone may see, picked by Jev in a request
+  // of its own, beside the run and never in its way.
+  if (needsContext) {
+    void (async () => {
+      const lines = await statusCandidates(db, run, granted);
+      const pick = judge
+        ? await askRunStatus(judge, {
+            orgId: run.orgId,
+            agentId: agent.id,
+            runId: run.id,
+            agent: { name: agent.name, role: agent.role, instructions: agent.instructions },
+            message: trigger?.body ?? topTrigger?.body ?? "",
+            recent: await recentMessages(),
+            candidates: lines,
+          }).catch(() => null)
+        : null;
+      await startRunStatus({ db, pubsub: deps.pubsub }, run, lines, pick);
+    })().catch(() => {});
   }
 
   // Started by a routine: its answer carries the routine (the app shows a small tag on the
@@ -1412,7 +1434,7 @@ async function executeRunInner(
     // Signed out, the command-line tool missing, no computer: nothing signals that it's fixed (only the
     // computer coming back online would), so a wait would never end.
     if (!onlyThisComputer && NO_AI_CODES.has(u.code)) {
-      await failNoAi(noAiReasonOf(u.code));
+      await failNoAi(noAiReasonOf(u.code), ownNotSignedIn(u.code, from, plan.account).own);
       return "failed";
     }
     const machineId = plan.session?.machineId ?? agent.machineId ?? null;
@@ -1741,7 +1763,9 @@ async function executeRunInner(
       }
       const turnTools = firstTurn ? tools : await listRunTools(deps, ctx);
       firstTurn = false;
-      const toolScope: RunToolScope | null = deps.tools ? { deps, tools: deps.tools, ctx, where, turnTools } : null;
+      const toolScope: RunToolScope | null = deps.tools
+        ? { deps: { db, pubsub: deps.pubsub, judge }, tools: deps.tools, ctx, where, turnTools }
+        : null;
 
       const turn = run.turns + 1;
       const deltas = createDeltaPublisher(

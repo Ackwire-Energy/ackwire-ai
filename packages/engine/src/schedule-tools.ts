@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
 import { type AgentActionParams, recordAgentActions } from "./agent-actions";
 import { routineRow, routineSnapshot } from "./agent-undo";
-import { canTalkTo } from "./audience";
+import { canTalkTo, talksToAgents } from "./audience";
 import { runAuthorityById } from "./authority";
 import { consultationOrigin } from "./consultations";
 import { getChannelCached } from "./context";
@@ -580,13 +580,15 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
             agentId = found.id;
           }
           const mineOnly = agentId === ctx.agentId;
+          const talks = await talksToAgents(ctx.db, ctx.orgId, person);
           const list = (await listOrgRoutines(ctx.db, ctx.orgId, agentId ? { agentId } : {})).filter(
             (r) =>
               isRoutine(r) &&
               (!str(input.id) || r.id === str(input.id)) &&
               // Another agent's routines only when the person behind this run may talk to it.
               (r.agentId === ctx.agentId ||
-                (byId.has(r.agentId) && (!person || canTalkTo(byId.get(r.agentId) as (typeof team)[number], person)))),
+                (byId.has(r.agentId) &&
+                  (!person || canTalkTo(byId.get(r.agentId) as (typeof team)[number], person, talks)))),
           );
           if (list.length === 0) {
             if (str(input.id))

@@ -45,7 +45,7 @@ export function StorageScreen() {
   const { t, i18n } = useTranslation();
   const c = useColors();
   const { orgId, org } = useOrg();
-  const admin = can(org?.role, "configure");
+  const admin = can(org, "configure");
   const storage = useStorage(orgId, admin);
   const edition = useEdition();
   const [choice, setChoice] = useState<Choice>("agentes");

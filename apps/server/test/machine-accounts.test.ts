@@ -9,7 +9,7 @@ import {
   sealSecret,
 } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
-import { browser, createTestServer, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
+import { browser, createTestServer, joinByInvitation, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
 afterEach(() => t.close());
@@ -94,10 +94,7 @@ async function workspace() {
     owner(`/api/app/organizations/${seeded.orgId}${path}`, init);
   const admin = browser(t);
   await signUp(admin, "bia@example.com");
-  const { url } = (await (await api("/invitations", { json: { email: "bia@example.com", role: "admin" } })).json()) as {
-    url: string;
-  };
-  await admin(`/api/app/invitations/${url.split("/invite/")[1]}/accept`, { json: {} });
+  await joinByInvitation(t, owner, seeded.orgId, "bia@example.com", { role: "admin", as: admin });
   const asAdmin = (path: string, init?: Parameters<typeof admin>[1]) =>
     admin(`/api/app/organizations/${seeded.orgId}${path}`, init);
   return {

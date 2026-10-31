@@ -184,7 +184,17 @@ test("org paging: newest first, every workspace exactly once, at any page size",
 test("org detail: owners and admins, and counts of what is in it", async () => {
   const { orgId } = acme;
   await t.db.insert(schema.users).values({ id: "admin-user", name: "Ada", email: "ada@acme.test" });
-  await t.db.insert(schema.organizationMembers).values({ orgId, userId: "admin-user", role: "admin" });
+  await t.db.insert(schema.organizationMembers).values({ orgId, userId: "admin-user", role: "member" });
+  // An admin holds the role with `administrator` (ADR 0085), given the way the members screen gives it.
+  const { roles } = (await (await owner(`/api/app/organizations/${orgId}/roles`)).json()) as {
+    roles: { id: string; permissions: string[] }[];
+  };
+  const adminRole = roles.find((r) => r.permissions.includes("administrator"))?.id;
+  const given = await owner(`/api/app/organizations/${orgId}/members/admin-user/roles`, {
+    method: "PUT",
+    json: { roleIds: [adminRole] },
+  });
+  expect(given.status).toBe(200);
   await t.db.insert(schema.agents).values({ orgId, name: "Old", handle: "old", model: "x", archivedAt: new Date() });
   await t.db.insert(schema.channels).values({ orgId, name: "dm-1", kind: "dm" });
   const day = 86_400_000;

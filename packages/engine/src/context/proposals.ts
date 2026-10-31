@@ -8,6 +8,7 @@ import { publishUserEvent } from "../events";
 import type { Judge } from "../judge";
 import { can, requirePermission } from "../organizations";
 import { enqueue } from "../outbox";
+import { maySql } from "../permissions";
 import { userVisibleChannels } from "../search";
 import {
   type ContextItem,
@@ -134,12 +135,12 @@ export async function proposeFromItem(
   return proposal;
 }
 
-/** Who decides: the agent's owner and admins (instructions), admins (org context). */
+/** Who decides: the agent's owner and who reviews memory (instructions), who reviews memory (org context). */
 async function deciders(db: Database, p: Proposal) {
   const admins = await db
     .select({ userId: organizationMembers.userId })
     .from(organizationMembers)
-    .where(and(eq(organizationMembers.orgId, p.orgId), inArray(organizationMembers.role, ["owner", "admin"])));
+    .where(and(eq(organizationMembers.orgId, p.orgId), maySql(p.orgId, organizationMembers.userId, "review_memory")));
   const ids = new Set(admins.map((a) => a.userId));
   if (p.agentId) {
     const [agent] = await db.select({ owner: agents.ownerUserId }).from(agents).where(eq(agents.id, p.agentId));
@@ -168,7 +169,7 @@ async function proposalsVisible<T extends Proposal>(db: Database, actorId: strin
 
 async function mayDecide(db: Database, actorId: string, p: Proposal) {
   const membership = await requirePermission(db, actorId, p.orgId, "read");
-  if (can(membership.role, "configure")) return true;
+  if (can(membership, "review_memory")) return true;
   if (p.target === "agent_instructions" && p.agentId) {
     const agent = await getAgent(db, p.orgId, p.agentId);
     return agent?.ownerUserId === actorId && (await proposalsVisible(db, actorId, p.orgId, [p])).length > 0;
@@ -195,7 +196,7 @@ export async function listProposals(
     )
     .orderBy(desc(contextProposals.createdAt))
     .limit(200);
-  const rows = can(membership.role, "configure") ? all : await proposalsVisible(db, actorId, orgId, all);
+  const rows = can(membership, "review_memory") ? all : await proposalsVisible(db, actorId, orgId, all);
   const out: (Proposal & { canDecide: boolean })[] = [];
   for (const r of rows) out.push({ ...r, canDecide: r.status === "pending" && (await mayDecide(db, actorId, r)) });
   return out;

@@ -14,7 +14,7 @@ import {
   sql,
 } from "@agenteschat/db";
 import { type AiStatusDeps, agentAiState } from "./ai-status";
-import { canTalkTo } from "./audience";
+import { canTalkTo, talksToAgents } from "./audience";
 import { stopRun } from "./cancel";
 import { publishDelivery } from "./delivery";
 import { createAgentRuns, startOrJoinRun } from "./dispatch";
@@ -69,7 +69,7 @@ async function reachableAgent(ctx: ToolContext, input: unknown, ai?: AiCheck) {
   if (!target) return { refused: refuse(`There is no agent @${handle} in this organization.`) };
   if (target.id === ctx.agentId) return { refused: refuse("That is you: answer it yourself.") };
   const person = await personBehindCall(ctx);
-  if (!canTalkTo(target, person)) {
+  if (!canTalkTo(target, person, await talksToAgents(db, ctx.orgId, person))) {
     return {
       refused: refuse(`@${handle} only works with some people, and the person you are helping isn't one of them.`),
     };

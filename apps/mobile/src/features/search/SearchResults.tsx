@@ -1,9 +1,11 @@
 import { useApi, useChannels, useDms, useSearch } from "@agenteschat/client";
 import { previewBody } from "@agenteschat/client/lib/message-body";
+import { can } from "@agenteschat/client/lib/permissions";
 import { router } from "expo-router";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Linking, StyleSheet, View } from "react-native";
+import { useOrg } from "@/providers/org";
 import { Count, Filters, Text, useToast } from "@/ui";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
@@ -33,6 +35,7 @@ export function SearchResults({ q }: { q: string }) {
   const dir = useDirectory();
   const when = useWhen();
   const toast = useToast();
+  const createsAgents = can(useOrg().org, "create_agents");
   const [filter, setFilter] = useState<SearchFilter>("all");
   const channels = useChannels(orgId);
   const dms = useDms(orgId);
@@ -42,13 +45,15 @@ export function SearchResults({ q }: { q: string }) {
     newTask: t("mobile.find.action.newTask"),
     newAgent: t("mobile.find.action.newAgent"),
   };
-  const all = searchResults(q, {
+  const found = searchResults(q, {
     actionLabels: labels,
     agents: dir.agents,
     channels: (channels.data ?? []).filter((x) => x.isMember),
     dms: dms.data ?? [],
     hits: hits.data ?? [],
   });
+  // "Novo agente" only for who may create one (ADR 0085).
+  const all = createsAgents ? found : { ...found, actions: found.actions.filter((a) => a !== "newAgent") };
   const counts = searchCounts(all);
   const r = filterResults(all, filter);
   const runAction = (a: SearchAction) => {

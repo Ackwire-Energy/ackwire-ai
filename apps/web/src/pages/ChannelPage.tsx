@@ -34,7 +34,6 @@ import {
   MESSAGES_PAGE,
   OPEN_THREAD,
   runsInChannel,
-  type SteerState,
   type StreamsState,
   sendHelpers,
   typingIn,
@@ -58,7 +57,6 @@ import {
   usePlaceChannel,
   usePostMessage,
   useRoster,
-  useSteerState,
   usesBrowser,
   useThreadInfo,
   useThreadMessages,
@@ -182,7 +180,7 @@ import {
 import { dividerIsFar, firstNewKey, pillParts, unseenOf } from "@/chat/unseen";
 import { ActionCard } from "@/components/ActionCard";
 import { AgentActionReceipts } from "@/components/AgentActions";
-import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
+import { ActorAvatar, AgentAvatar, AgentSpinner, PersonAvatar } from "@/components/AgentAvatar";
 import { AgentPanel } from "@/components/AgentPanel";
 import { ApprovalAsk } from "@/components/ApprovalAsk";
 import { InlineApproval } from "@/components/ApprovalItem";
@@ -211,7 +209,7 @@ import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "@/compo
 import { MemoryMarks } from "@/components/MemoryMark";
 import { MessageFeedback } from "@/components/MessageFeedback";
 import { MessageMoreMenu, PersonMessageActions, ReplyButton, useMessageMenu } from "@/components/MessageMore";
-import { MessageReceipts } from "@/components/MessageReceipts";
+import { MessageReceipts, SeenMark } from "@/components/MessageReceipts";
 import { MissionPanelProvider } from "@/components/missions/MissionBits";
 import {
   AutoApprovedLine,
@@ -235,6 +233,7 @@ import { NavToggle } from "@/components/NavDrawer";
 import { CHANNEL_NAME, toChannelName } from "@/components/NewChannelDialog";
 import { KeyGuardDialog, NoAiBanner, NoAiCard, useNoAiAutoOpen } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
+import { AuthorStatus } from "@/components/Presence";
 import { ProfileTrigger } from "@/components/ProfileCard";
 import { MessageReactions, useEmojiLabels } from "@/components/Reactions";
 import { ActivitySky, ChannelWelcome, colorOf } from "@/components/Sky";
@@ -314,7 +313,7 @@ export interface ChannelChrome {
   composerTarget?: string;
   /** A DM with this agent: it answers every message (optimistic "pensando…" is allowed). */
   dmAgentId?: string;
-  /** A DM with this person: "Visto" under my latest message once they read it. */
+  /** A DM with this person: their face on my latest message once they read it. */
   dmPersonId?: string;
   /** The agent won't answer me: the composer is off and says why ("O Theo só responde a Walter."). */
   locked?: string;
@@ -522,7 +521,7 @@ function ChannelView({
   const isMember = channel.isMember;
   const members = useChannelMembers(org.id, channel.id, isMember);
   const channelMessages = useMessages(org.id, channel.id, isMember);
-  // A DM with a person: "Visto" under my latest message once they read it (live: `channel.read`).
+  // A DM with a person: their face on my latest message once they read it (live: `channel.read`).
   const reads = useDmReads(org.id, channel.id, Boolean(chrome?.dmPersonId) && isMember);
   const seenId = useMemo(
     () => (reads.data ? seenMessageId(channelMessages.data ?? [], me.user.id, reads.data) : null),
@@ -1748,6 +1747,7 @@ function ChannelView({
                         divider={divider}
                         channelId={channel.id}
                         runVisible={runVisible}
+                        dmPersonId={thread ? undefined : chrome?.dmPersonId}
                         seenId={thread ? null : seenId}
                       />
                       {!thread && (
@@ -1990,6 +1990,7 @@ const Timeline = memo(function Timeline({
   divider,
   channelId,
   runVisible,
+  dmPersonId,
   seenId = null,
 }: {
   items: ReturnType<typeof buildTimeline>;
@@ -2004,7 +2005,9 @@ const Timeline = memo(function Timeline({
   /** This conversation's channel, and which runs' threads it shows (a held browser card's place). */
   channelId: string;
   runVisible: { current: (r: { threadId: string | null; provisional?: boolean }) => boolean };
-  /** A DM with a person: my message they read last ("Visto" under it). */
+  /** A DM with this person: my rows keep the slot of their face (`SeenMark`). */
+  dmPersonId?: string;
+  /** My message they read last: their face is its receipt. */
   seenId?: string | null;
 }) {
   const { t, i18n } = useTranslation();
@@ -2140,15 +2143,11 @@ const Timeline = memo(function Timeline({
           contextMark={threadsView?.marks.has(m.id)}
           replyContext={item.context}
           lastOfRun={Boolean(m.agentRunId && lastByRun.get(m.agentRunId) === item.key)}
+          dmPersonId={dmPersonId}
+          seen={m.id === seenId}
         />
       ),
     );
-    if (m.id === seenId)
-      rows.push(
-        <p key="dm-seen" className="channel__seen" aria-live="polite">
-          {t("channel.seen")}
-        </p>,
-      );
   }
   // The first block at work follows the last message: under the agent's own, it has no header of its own.
   const lastItem = items.at(-1);
@@ -2456,53 +2455,6 @@ function StoppedLine({
   );
 }
 
-/**
- * Under a message sent while an agent worked: "Theo lê na próxima pausa" → "Theo leu" (its face);
- * "Theo parou para ler" when the person asked it to stop and read now (or it woke a wait); "Theo
- * recebeu" once handed to Claude Code mid-turn; "lê depois da sua decisão" while an approval
- * holds it; "encerrou o pedido de ajuda" when it ended the wait.
- */
-function SteerLine({ steer }: { steer: SteerState }) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const dir = useDirectory(org.id);
-  const name = dir.agentById.get(steer.agentId)?.name;
-  if (!name) return null;
-  return (
-    <p className="msg-steer" data-state={steer.state} aria-live="polite">
-      {/* Keyed by the state: each new word swaps in. */}
-      <span key={steer.state} className="msg-steer__swap">
-        {steer.state === "waiting" ? (
-          <>
-            <PixelSpinner size={14} />
-            {t("run.steer.waiting", { name })}
-          </>
-        ) : steer.state === "now" ? (
-          <>
-            <Icon name="bolt" size={14} />
-            {t("run.steer.now", { name })}
-          </>
-        ) : steer.state === "delivered" ? (
-          <>
-            <Icon name="check" size={14} />
-            {t("run.steer.delivered", { name })}
-          </>
-        ) : steer.state === "held" ? (
-          <>
-            <Icon name="waiting" size={14} />
-            {t("run.steer.held", { name })}
-          </>
-        ) : (
-          <>
-            <AgentAvatar agentId={steer.agentId} name={name} size="xs" state="idle" />
-            {t(steer.state === "resolved" ? "run.steer.resolved" : "run.steer.read", { name })}
-          </>
-        )}
-      </span>
-    </p>
-  );
-}
-
 /** Shows only after `ms` while `on` ("enviando" waits half a second: most sends never show it). */
 /** True from `from + ms` on (now when `from` is unknown, i.e. counted from the mount), while `on`. */
 function useDue(from: number | null, ms: number, on: boolean) {
@@ -2779,6 +2731,8 @@ export const TimelineMessage = memo(function TimelineMessage({
   live = null,
   seenLive,
   lastOfRun = false,
+  dmPersonId,
+  seen = false,
 }: {
   message: MessageType;
   grouped: boolean;
@@ -2794,6 +2748,10 @@ export const TimelineMessage = memo(function TimelineMessage({
   seenLive?: LiveRun;
   /** The last message of its run here: it carries the run's browser card while a take over holds it. */
   lastOfRun?: boolean;
+  /** A DM with this person: my row keeps the slot of their face (`SeenMark`). */
+  dmPersonId?: string;
+  /** My latest message, which they read: their face in that slot. */
+  seen?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
@@ -2822,6 +2780,9 @@ export const TimelineMessage = memo(function TimelineMessage({
   const [active, setActive] = useState(false);
   const agent = m.author.type === "agent" ? dir.agentById.get(m.author.id ?? "") : undefined;
   const person = m.author.type === "person" ? dir.memberById.get(m.author.id ?? "") : undefined;
+  const receipted = m.author.type === "person" && !m.local;
+  // Mine in a DM between people: the slot of their face, from the moment it is sent, so it never rewraps a line.
+  const seenSlot = dmPersonId !== undefined && m.author.type === "person" && m.author.id === me.user.id;
   const name = dir.authorName(m.author);
   // What a routine found, told by its agent (`meta.routine`): a tag that opens the routine, and the report
   // it answers on demand (that report's own line folds into this message).
@@ -2839,8 +2800,6 @@ export const TimelineMessage = memo(function TimelineMessage({
   // A short reply it gave while its task kept working (the talker): its message, "enquanto trabalha".
   const talker = m.author.type === "agent" && isTalkerReply(m.meta);
   const wikiLink = useWikiLinkRenderer();
-  // It went into a running task: "Theo lê na próxima pausa" → "Theo leu" / "Theo parou para ler".
-  const steer = useSteerState(org.id, m.channelId, m.author.type === "person" && !m.local ? m.id : "");
   /** A message that went into this run's work, as the well inside it shows it. */
   const steerNote = (messageId: string): SteerNote | undefined => {
     const lists = [
@@ -3014,14 +2973,18 @@ export const TimelineMessage = memo(function TimelineMessage({
             {m.author.type === "agent" ? (
               // At work: thinking, then writing; a saved message: the agent at rest (one no longer in the team too).
               // A person's 👍/👎 on this message plays a face on it (`applyReactions`).
+              // Both wear their presence badge (ADR 0084).
               <AgentAvatar
                 agentId={m.author.id}
                 name={name}
                 state={live ? agentStateOfRun(live) : "idle"}
                 reactionKey={live ? undefined : m.id}
+                presence
               />
+            ) : person ? (
+              <PersonAvatar id={person.userId} name={name} presence />
             ) : (
-              <Avatar kind="person" name={name} imageUrl={person?.image} />
+              <Avatar kind="person" name={name} />
             )}
           </ProfileTrigger>
         ) : m.author.type === "agent" ? (
@@ -3040,6 +3003,8 @@ export const TimelineMessage = memo(function TimelineMessage({
             >
               {name}
             </ProfileTrigger>
+            {/* The author's written status: its emoji, its words on hover (ADR 0084). */}
+            <AuthorStatus actor={{ type: m.author.type, id: m.author.id }} />
             {reminder && (
               <span className="msg-reminder">
                 <Icon name="bell" size={14} />
@@ -3084,8 +3049,15 @@ export const TimelineMessage = memo(function TimelineMessage({
               }
             : undefined
       }
-      aside={m.author.type === "person" && !m.local ? <MessageReceipts message={m} part="check" /> : undefined}
-      foot={m.author.type === "person" && !m.local ? <MessageReceipts message={m} part="line" /> : undefined}
+      aside={
+        receipted || seenSlot ? (
+          <>
+            {receipted && <MessageReceipts message={m} part="check" />}
+            {seenSlot && <SeenMark personId={seen ? dmPersonId : undefined} />}
+          </>
+        ) : undefined
+      }
+      foot={receipted ? <MessageReceipts message={m} part="line" /> : undefined}
       menu={
         barred && menu.touch.length > 0
           ? { label: t("channel.actions", { name }), items: <MenuEntries entries={menu.touch} /> }
@@ -3328,7 +3300,6 @@ export const TimelineMessage = memo(function TimelineMessage({
             />
           )}
           {feedback && <CorrectionAsk message={m} agentName={agent?.name ?? t("channel.unknownAgent")} />}
-          {steer && <SteerLine steer={steer} />}
           {m.author.type === "person" && !m.local && (
             <PersonMessageActions message={m} authorName={name} channelName={channelName ?? ""} />
           )}
@@ -3413,8 +3384,8 @@ function ChannelDetails({
   // What "on its own" means for my messages: who reads the ones that mention nobody.
   const routing = useAiStatus(org.id, open).data?.routing;
   const update = useUpdateChannel(org.id, channel.id);
-  // The channel's creator may too, but the API doesn't say who created it yet: admins only.
-  const editable = can(org.role, "configure");
+  // Who manages channels, and the channel's creator (as the server allows).
+  const editable = can(org, "manage_channels") || channel.createdByUserId === me.user.id;
   const navigate = useNavigate();
   const toast = useToast();
   const categories = useChannelCategories(org.id);
@@ -3893,7 +3864,7 @@ function AddToChannelOffer({ channelId, agentId, onDone }: { channelId: string; 
   const add = useAddChannelMember(org.id);
   const toast = useToast();
   const name = dir.agentById.get(agentId)?.name ?? t("channel.unknownAgent");
-  const admin = can(org.role, "configure");
+  const admin = can(org, "manage_channels");
   return (
     <div className="mention-offer" role="status">
       <span className="small">{t("mentions.offer", { name })}</span>

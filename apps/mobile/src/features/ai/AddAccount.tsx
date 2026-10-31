@@ -1,6 +1,13 @@
 import type { AccountLoginStart, MachineAccount, MachineAccountKind } from "@agenteschat/client";
 import { keys, useAccountLogin, useApi } from "@agenteschat/client";
-import { beginLogin, freeDuplicate, isSignInCode, otherThanHint } from "@agenteschat/client/lib/machines";
+import {
+  beginLogin,
+  freeDuplicate,
+  isSignInCode,
+  loginRead,
+  loginReadPasses,
+  otherThanHint,
+} from "@agenteschat/client/lib/machines";
 import { type PlanId, planKeyFits, planOf } from "@agenteschat/client/lib/plans";
 import { accountCodeAad } from "@agenteschat/client/lib/secret-box";
 import { useQueryClient } from "@tanstack/react-query";
@@ -20,7 +27,9 @@ import { Note, OpenPage, openPage, PasteField, Step, StepsCard, StepText, Waitin
  * sign-in's; anything else waits for "Enviar", with a line under it. Either way it is sealed on the phone to the
  * computer's key (ADR 0027). ChatGPT: device code sign-in allowed in its settings first, then
  * the device page and the one-time code to type there. A coding plan: its own key page, then the key, sealed the
- * same way; it never reaches our server. Every start is a tap; leaving stops the sign-in on the computer.
+ * same way; it never reaches our server. Every start is a tap; leaving stops the sign-in on the computer. Reads that
+ * fail while the server restarts or the computer reconnects say Reconectando, and the same sign-in goes on
+ * (`loginRead`).
  */
 
 /** Where ChatGPT allows signing in with a code (Settings › Security): Codex's device sign-in needs it. */
@@ -51,6 +60,11 @@ export interface AddAccountProps {
    * thinking for no agent, and it thinks for that agent instead ("Usar x").
    */
   onUse?: (account: MachineAccount) => void;
+  /**
+   * Whether a sign-in begun here may still finish on the computer: a place that hides this block while its computer
+   * is offline keeps it meanwhile, so the same sign-in goes on once it's back.
+   */
+  onSigningIn?: (on: boolean) => void;
 }
 
 export function AddAccount(props: AddAccountProps) {
@@ -71,6 +85,7 @@ function AddAccountFlow({
   loading = false,
   onAdded,
   onUse,
+  onSigningIn,
   onRetry,
 }: AddAccountProps & { onRetry: () => void }) {
   const { t } = useTranslation();
@@ -86,7 +101,8 @@ function AddAccountFlow({
   const [code, setCode] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
-  const [sendFailed, setSendFailed] = useState(false);
+  // The code or key didn't go: the computer away for now (`loginReadPasses`), or refused.
+  const [sendFailed, setSendFailed] = useState<"away" | "refused" | null>(null);
   const [copied, setCopied] = useState(false);
   // Signed in, but not as the account it was for (the hint): theirs to use or not.
   const [other, setOther] = useState<MachineAccount | null>(null);
@@ -96,6 +112,7 @@ function AddAccountFlow({
   const reported = useRef(false);
   const status = useAccountLogin(orgId, machineId, login?.loginId ?? null);
   const result = status.data;
+  const read = loginRead(status);
 
   const begin = async (): Promise<AccountLoginStart | null> => {
     setStarting(true);
@@ -132,6 +149,12 @@ function AddAccountFlow({
     };
   }, []);
 
+  const begun = login !== null;
+  useEffect(() => {
+    onSigningIn?.(begun);
+    return () => onSigningIn?.(false);
+  }, [begun, onSigningIn]);
+
   useEffect(() => {
     if (!result || result.state === "waiting") return;
     // Ended on the computer: nothing left to stop.
@@ -143,8 +166,9 @@ function AddAccountFlow({
     }
   }, [result, hint, onAdded]);
 
+  const noAnswer = startFailed || read === "noAnswer";
   const ended =
-    other !== null || startFailed || status.isError || result?.state === "failed" || result?.state === "expired";
+    other !== null || noAnswer || read === "failed" || result?.state === "failed" || result?.state === "expired";
   // For the agent in view: the account that came back, one the person already connected there and free.
   const reuse = plan || !onUse ? null : freeDuplicate(result);
 
@@ -153,7 +177,7 @@ function AddAccountFlow({
     const text = value.trim();
     if (!text || sending) return;
     setSending(true);
-    setSendFailed(false);
+    setSendFailed(null);
     try {
       const l = login ?? (plan ? await begin() : null);
       if (!l?.publicKey) throw new Error("no key");
@@ -162,18 +186,22 @@ function AddAccountFlow({
       setSent(true);
       setCode("");
       void qc.invalidateQueries({ queryKey: keys.accountLogin(orgId, machineId, l.loginId) });
-    } catch {
-      setSendFailed(true);
+    } catch (error) {
+      // Never sent again by itself: a call that got no answer may have reached the computer.
+      setSendFailed(loginReadPasses(error) ? "away" : "refused");
     } finally {
       setSending(false);
     }
   };
 
-  /** What the field holds now, however it got there: a code of this sign-in goes to the computer by itself. */
+  /**
+   * What the field holds now, however it got there: a code of this sign-in goes to the computer by itself, once the
+   * computer is ready. Before that it waits in the field for Enviar.
+   */
   const take = (text: string) => {
     setCode(text);
-    setSendFailed(false);
-    if (!plan && login && isSignInCode(text, login.url)) void send(text);
+    setSendFailed(null);
+    if (!plan && login && ready && !loading && isSignInCode(text, login.url)) void send(text);
   };
 
   const copy = async () => {
@@ -182,7 +210,13 @@ function AddAccountFlow({
     setCopied(true);
   };
 
-  const waiting = <Waiting label={t("agentPage.work.brain.add.waiting")} />;
+  const waiting = (
+    <Waiting
+      label={
+        read === "reconnecting" ? t("agentPage.work.brain.add.reconnecting") : t("agentPage.work.brain.add.waiting")
+      }
+    />
+  );
   const pasteRow = (label: string, placeholder: string | undefined, secret: boolean, valid: boolean) => (
     <>
       <PasteField
@@ -209,7 +243,11 @@ function AddAccountFlow({
       </View>
       {sendFailed ? (
         <Note icon="x" live>
-          {plan ? t("aiAccounts.add.keySendFailed") : t("agentPage.work.brain.add.sendFailed")}
+          {sendFailed === "away"
+            ? t("agentPage.work.brain.add.startFailed", { computer })
+            : plan
+              ? t("aiAccounts.add.keySendFailed")
+              : t("agentPage.work.brain.add.sendFailed")}
         </Note>
       ) : null}
     </>
@@ -220,7 +258,7 @@ function AddAccountFlow({
   const otherEmail = other?.email ?? (hint ? result?.signedInAs : undefined);
   const why = otherEmail
     ? t(`connectAi.otherAccount.${kind}`, { email: otherEmail, account: hint })
-    : startFailed
+    : noAnswer
       ? t("agentPage.work.brain.add.startFailed", { computer })
       : result?.state === "expired"
         ? t("agentPage.work.brain.add.expired")
@@ -341,7 +379,12 @@ function AddAccountFlow({
           {starting ? <StepText>{t("agentPage.work.brain.add.starting", { computer })}</StepText> : null}
         </Step>
         {login && opened ? (
-          <Step n={2} divider title={t("agentPage.work.brain.add.stepTwo")} side={sent ? waiting : undefined}>
+          <Step
+            n={2}
+            divider
+            title={t("agentPage.work.brain.add.stepTwo")}
+            side={sent || read === "reconnecting" ? waiting : undefined}
+          >
             {pasteRow(
               t("agentPage.work.brain.add.codeLabel"),
               t("agentPage.work.brain.add.codeLabel"),
