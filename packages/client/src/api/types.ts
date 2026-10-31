@@ -528,6 +528,8 @@ export interface Model {
   id: string;
   label: string;
   provider: string;
+  /** Its context window in tokens: which context limits are worth offering with it. */
+  contextWindow?: number;
   inputUsdPerMTok: number;
   outputUsdPerMTok: number;
   /** The workspace can use it (has a key for the provider). Expected from the backend; derived until then. */
@@ -725,6 +727,45 @@ export interface OpenConsult {
   since: string;
 }
 
+/**
+ * What a consulted agent waits on before it can answer: an approval, or a person's answer or secret (a person);
+ * `computer`: its computer coming back (no one to ask).
+ */
+export type ConsultationWait = "approval" | "input" | "computer";
+
+/**
+ * A question an agent asked another agent from a conversation (`GET …/channels/{id}/consultations`): drawn inside
+ * the reply of the run that asked ("Perguntou a 3 colegas"), each with where it is and, once closed, the answer.
+ */
+export interface RunConsultation {
+  id: string;
+  /** The asking run: its reply (`agentRunId`) shows the list. */
+  runId: string;
+  agentId: string;
+  consultedAgentId: string;
+  /** The consulted agent's run: the cards it posts here carry it (`agentRunId`), "ajudando o Theo". */
+  consultedRunId: string | null;
+  status: "open" | ConsultationStatus;
+  /** Open, and the consulted agent waits: on a person, or for its computer to come back. */
+  waiting: ConsultationWait | null;
+  question: string;
+  /** The answer once answered; why it couldn't once failed. */
+  answer: string | null;
+  createdAt: string;
+  answeredAt: string | null;
+  expiresAt: string;
+}
+
+/**
+ * One question opened beside the conversation that asked it ("Theo ⇄ Iris", `GET …/consultations/{id}`): the
+ * question as it went into the agents' DM, the consulted agent's messages there and the cards it posted where the
+ * person asked, oldest first. Read only.
+ */
+export interface ConsultationConversation {
+  consultation: RunConsultation;
+  messages: Message[];
+}
+
 export interface ActiveRun {
   runId: string;
   agentId: string;
@@ -849,6 +890,14 @@ export type ChannelEvent =
       agentId: string;
       consultedAgentId: string;
       status: ConsultationStatus;
+    }
+  /** A question still out changed without closing (the consulted agent waits on a person): reload the list. */
+  | {
+      type: "agent.consultation";
+      channelId: string;
+      threadId: string;
+      runId: string;
+      consultationId: string;
     }
   /** The agent's first words arrived. */
   | { type: "agent.typing"; channelId: string; threadId: string; agentId: string; runId: string }
@@ -3722,6 +3771,8 @@ export interface BrainModelOption {
   label: string;
   modelId?: string;
   recommended?: boolean;
+  /** Its context window in tokens. */
+  contextWindow?: number;
 }
 
 export interface BrainOption {
@@ -3760,6 +3811,8 @@ export interface AgentBrain {
   account: string | null;
   /** How much it thinks before answering; `auto` = picked per task; null = the brain's default. */
   effort: BrainEffortSetting | null;
+  /** The most context it reads, in tokens (200K, 400K or 1M), any brain; null = its model's window. */
+  contextTokens?: number | null;
   /**
    * The agent's owner's accounts on its computer (both kinds) and the one it thinks with; "Conta deste
    * computador" isn't listed. A plan thinks only for its owner's agents (ADR 0059).
@@ -3867,6 +3920,8 @@ export interface AgentBrainInput {
   /** The account thinks for another agent: take it from that one. */
   moveAccount?: boolean;
   effort?: BrainEffortSetting | null;
+  /** 200K, 400K or 1M tokens; null = the model's window; omitted = keep. */
+  contextTokens?: number | null;
 }
 
 /** `POST …/machines/{id}/account-logins` (201): what the person needs to sign in. */
