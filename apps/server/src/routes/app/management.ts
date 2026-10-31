@@ -17,6 +17,7 @@ import {
   makeDefaultCredential,
   memberPresence,
   memberStatus,
+  mySidebarItems,
   orgOverview,
   pickerModels,
   queueInvitationEmail,
@@ -24,10 +25,15 @@ import {
   resendInvitation,
   rotateCredential,
   runErrorDetail,
+  SIDEBAR_ITEMS,
+  SIDEBAR_PLACES,
+  type SidebarItem,
   STATUS_EMOJI_MAX,
   STATUS_TEXT_MAX,
   setAgentChannels,
+  setMySidebarItems,
   setMyStatus,
+  sidebarPlaceAllowed,
   talksToAgents,
   updateMyProfile,
   updateOrgSettings,
@@ -40,6 +46,16 @@ import { AgentAppearance, AgentAudience, Credential, ModelTier, ProviderId, Role
 
 const usd = (nano: number | null) => (nano === null ? null : nanoUsdToUsd(nano));
 const ModelId = z.string().max(100);
+
+const SidebarItems = z
+  .partialRecord(z.enum(SIDEBAR_ITEMS), z.enum(SIDEBAR_PLACES))
+  .refine((items) => Object.entries(items).every(([item, place]) => sidebarPlaceAllowed(item as SidebarItem, place)), {
+    message: "Only approvals and threads have a count, so only they can be `auto`",
+  })
+  .openapi("SidebarItems", {
+    description:
+      "Where each tool at the top of the sidebar goes: `always` in the list, `more` only in the More menu, `auto` in the list while its count is above zero (approvals and threads). A tool left out keeps the app's default.",
+  });
 
 const Settings = z
   .object({
@@ -399,6 +415,40 @@ export function managementRoutes(deps: AppDeps) {
       const me = (await listMembers(db, orgId)).find((m) => m.userId === userId);
       if (!me) return c.json({ error: { code: "not_found", message: "Not a member" } }, 404);
       return c.json(personView(me, new Set(await adapters.presence.online(orgId)), userId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/me/sidebar",
+      tags: ["Members"],
+      security,
+      summary: "Where you put the tools at the top of your sidebar in this workspace",
+      description: "Only the tools you moved. Yours alone, on every device you sign in on.",
+      request: { params: OrgParams },
+      responses: { 200: json(z.object({ items: SidebarItems })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ items: await mySidebarItems(db, orgId, c.get("user").id) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/me/sidebar",
+      tags: ["Members"],
+      security,
+      summary: "Put the tools at the top of your sidebar where you want them in this workspace",
+      description: "Replaces your choices: `{}` puts every tool back on the app's default.",
+      request: { params: OrgParams, body: body(z.object({ items: SidebarItems })) },
+      responses: { 200: json(z.object({ items: SidebarItems })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ items: await setMySidebarItems(db, orgId, c.get("user").id, c.req.valid("json").items) }, 200);
     },
   );
 

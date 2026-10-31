@@ -122,6 +122,11 @@ export const organizationMembers = pgTable(
      * a category not here keeps its default (`NOTICE_DEFAULTS` in packages/engine/src/notice-prefs.ts).
      */
     noticePrefs: jsonb().$type<Record<string, boolean>>().notNull().default({}),
+    /**
+     * Where the person put each tool at the top of their sidebar (`{ "wiki": "always" }`); a tool not here keeps the
+     * app's default (`sidebarItemsOf` in packages/engine/src/sidebar-items.ts).
+     */
+    sidebarItems: jsonb().$type<Record<string, string>>().notNull().default({}),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

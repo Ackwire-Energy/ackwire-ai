@@ -188,6 +188,7 @@ import type {
   SecretRequest,
   SeriesScope,
   ServerTelemetry,
+  SidebarItems,
   SignInOptions,
   Skill,
   SkillDetail,
@@ -320,6 +321,10 @@ export interface ApiClient {
     updateMe(orgId: string, input: { handle?: string; timezone?: string | null }): Promise<Person>;
     /** Your availability (auto, busy, hidden) and what you are doing (ADR 0084). */
     setStatus(orgId: string, input: StatusInput): Promise<Person>;
+    /** Where I put the tools at the top of my sidebar here (only the ones I moved). */
+    sidebarItems(orgId: string): Promise<SidebarItems>;
+    /** Replaces my choices (`{}`: every tool back on its default). */
+    setSidebarItems(orgId: string, items: SidebarItems): Promise<SidebarItems>;
     /** My profile photo: a square image (JSON only: base64), already cropped. */
     setAvatar(orgId: string, input: { imageBase64: string; contentType: string }): Promise<{ avatarUrl: string }>;
     removeAvatar(orgId: string): Promise<void>;

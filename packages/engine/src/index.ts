@@ -190,6 +190,7 @@ export * from "./search";
 export * from "./secrets";
 export * from "./session-screening";
 export * from "./setup-tools";
+export * from "./sidebar-items";
 export * from "./skill-tools";
 export * from "./skills";
 export * from "./standing";

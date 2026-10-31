@@ -63,6 +63,7 @@ import type {
   SearchHit,
   SecretRequest,
   ServerTelemetry,
+  SidebarItems,
   SignInOptions,
   StoragePlatform,
   StorageUsage,
@@ -291,6 +292,10 @@ export interface FakeState {
   codeError?: ApiError;
   /** The workspace's roles (ADR 0085, `roles.*`); unset: a new workspace's (`seedRoles`). */
   roles?: OrgRole[];
+  /** Where I put the sidebar's tools (`orgs.sidebarItems`); unset = none moved. */
+  sidebarItems?: SidebarItems;
+  /** Make `orgs.setSidebarItems` fail with this error. */
+  sidebarItemsError?: ApiError;
 }
 
 /** A new workspace's "Admin" role (ADR 0085); João holds it. */
@@ -1278,6 +1283,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
                 : null,
         });
         return { ...m, ...presenceOf(state, m.userId), lastSeenAt: new Date().toISOString() };
+      },
+      sidebarItems: async () => structuredClone(state.sidebarItems ?? {}),
+      setSidebarItems: async (orgId, items) => {
+        log("orgs.setSidebarItems", orgId, items);
+        if (state.sidebarItemsError) throw state.sidebarItemsError;
+        state.sidebarItems = structuredClone(items);
+        return structuredClone(items);
       },
       setAvatar: async (orgId, input) => {
         log("orgs.setAvatar", orgId, { contentType: input.contentType, bytes: input.imageBase64.length });

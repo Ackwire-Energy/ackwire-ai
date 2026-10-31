@@ -4567,6 +4567,13 @@ export interface NoticePrefs {
   phones: number;
 }
 
+/** A tool at the top of the sidebar (`SIDEBAR_ITEMS` in packages/engine/src/sidebar-items.ts). */
+export type SidebarItem = "approvals" | "threads" | "issues" | "wiki" | "drive" | "routines" | "calendar" | "forum";
+/** `always` in the list, `more` only in the More menu, `auto` in the list while its count is above zero. */
+export type SidebarPlace = "always" | "more" | "auto";
+/** Where I put each tool I moved, in one workspace (`GET …/me/sidebar`); the others keep their default. */
+export type SidebarItems = Partial<Record<SidebarItem, SidebarPlace>>;
+
 export interface NotificationCount {
   unread: number;
   waiting: number;

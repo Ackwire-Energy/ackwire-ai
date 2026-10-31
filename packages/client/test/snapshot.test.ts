@@ -41,6 +41,7 @@ test("keeps the lists and the latest messages of a chat, without anything off th
   const store = memory();
   qc.setQueryData(keys.me, me("u1"));
   qc.setQueryData(keys.channels("o1"), [{ id: "c1" }]);
+  qc.setQueryData(keys.sidebarItems("o1"), { wiki: "always" });
   qc.setQueryData(keys.credentials("o1"), [{ id: "secret" }]);
   const many = Array.from({ length: 60 }, (_, i) => msg(`m${i}`));
   qc.setQueryData(keys.messages("o1", "c1"), [...many, msg("local", { local: "pending" })]);
@@ -50,6 +51,8 @@ test("keeps the lists and the latest messages of a chat, without anything off th
   expect(await createSnapshot(next, store).restore()).toBe(true);
   expect(next.getQueryData<Me>(keys.me)?.user.id).toBe("u1");
   expect(next.getQueryData(keys.channels("o1"))).toEqual([{ id: "c1" }]);
+  // Where I put the sidebar's tools: they don't move when the server answers.
+  expect(next.getQueryData(keys.sidebarItems("o1"))).toEqual({ wiki: "always" });
   expect(next.getQueryData(keys.credentials("o1"))).toBeUndefined();
   const kept = next.getQueryData<Message[]>(keys.messages("o1", "c1")) ?? [];
   expect(kept).toHaveLength(50);

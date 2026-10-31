@@ -101,6 +101,7 @@ import type {
   SandboxSettingsInput,
   SearchKind,
   SeriesScope,
+  SidebarItems,
   SkillInput,
   SkillPatch,
   StatusInput,
@@ -3248,6 +3249,42 @@ export function useSetNoticePref(orgId: string) {
     },
     onError: (_error, _input, context) => qc.setQueryData(keys.noticePrefs(orgId), context?.before),
     onSuccess: (prefs) => qc.setQueryData(keys.noticePrefs(orgId), prefs),
+  });
+}
+
+/** Where I put the tools at the top of my sidebar in this workspace (only the ones I moved). */
+export const useSidebarItems = (orgId: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.sidebarItems(orgId),
+    queryFn: () => api.orgs.sidebarItems(orgId),
+    staleTime: 60_000,
+  });
+};
+
+/**
+ * Replaces my choices: the sidebar changes at once and goes back if the server refuses. The requests go one at a
+ * time, each with every choice so far, so the last one is what stays.
+ */
+export function useSetSidebarItems(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const mutationKey = ["sidebar-items", orgId];
+  return useMutation({
+    mutationKey,
+    scope: { id: `sidebar-items:${orgId}` },
+    mutationFn: (items: SidebarItems) => api.orgs.setSidebarItems(orgId, items),
+    onMutate: async (items) => {
+      await qc.cancelQueries({ queryKey: keys.sidebarItems(orgId) });
+      const before = qc.getQueryData<SidebarItems>(keys.sidebarItems(orgId));
+      qc.setQueryData<SidebarItems>(keys.sidebarItems(orgId), items);
+      return { before };
+    },
+    onError: (_error, _items, context) => qc.setQueryData(keys.sidebarItems(orgId), context?.before),
+    // A later choice still on its way keeps the screen until its own answer.
+    onSuccess: (items) => {
+      if (qc.isMutating({ mutationKey }) <= 1) qc.setQueryData(keys.sidebarItems(orgId), items);
+    },
   });
 }
 
