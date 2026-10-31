@@ -178,6 +178,29 @@ describe("our scrollbars, never the browser's", () => {
     expect(rounder).toEqual([]);
   });
 
+  test("a fade at a scroller's end spares our scrollbar: its mask adds the kit's strip, as wide as the scrollbar", async () => {
+    const source = await read(KIT);
+    const kit = atRule(source, POINTER);
+    const width = value(kit, "::-webkit-scrollbar", "width");
+    expect(value(atRule(kit, "@supports selector(::-webkit-scrollbar)"), ":root", "--scroll-strip")).toBe(
+      `linear-gradient(to left, #000 ${width}, transparent 0)`,
+    );
+    // Nothing where the kit draws no scrollbar.
+    expect(value(topLevel(source), ":root", "--scroll-strip")).toBe("linear-gradient(transparent 0 0)");
+    const scrollers = await selectorsWith((p, v) => /^overflow(-[xy])?$/.test(p) && /auto|scroll/.test(v));
+    const strips = await selectorsWith((p, v) => p === "scrollbar-width" && v === "none");
+    const on = (scroller: string, s: string) =>
+      covers(scroller, s) || s.startsWith(`${scroller}[`) || s.startsWith(`${scroller}:`);
+    const masks: [string, string][] = [];
+    for (const [file, css] of await sheets())
+      for (const rule of rules(css))
+        for (const s of rule.selectors.filter((s) => scrollers.some((t) => on(t, s)) && !strips.some((t) => on(t, s))))
+          for (const [p, v] of rule.declarations)
+            if (/^(-webkit-)?mask(-image)?$/.test(p)) masks.push([`${file}: ${s} {${p}}`, v]);
+    expect(masks.map(([at]) => at)).toContain("apps/web/src/layout.css: .channel__messages {mask-image}");
+    expect(masks.filter(([, v]) => !/,\s*var\(--scroll-strip\)$/.test(v)).map(([at]) => at)).toEqual([]);
+  });
+
   test("an agent's HTML page scrolls with ours: the kit's sizes, a grey for any page, the track on its own background", async () => {
     const kit = atRule(await read(KIT), POINTER);
     const page = atRule(withShim("<p>x</p>").match(/<style>([\s\S]*)<\/style>/)?.[1] ?? "", POINTER);

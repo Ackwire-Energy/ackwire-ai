@@ -440,20 +440,24 @@ p {
   /* Soft edges where the list runs under the top card or the foot (Sidebar.tsx sets the flags). */
   --sidebar-fade-top: 0px;
   --sidebar-fade-bottom: 0px;
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    #000 var(--sidebar-fade-top),
-    #000 calc(100% - var(--sidebar-fade-bottom)),
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    #000 var(--sidebar-fade-top),
-    #000 calc(100% - var(--sidebar-fade-bottom)),
-    transparent 100%
-  );
+  -webkit-mask-image:
+    linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 var(--sidebar-fade-top),
+      #000 calc(100% - var(--sidebar-fade-bottom)),
+      transparent 100%
+    ),
+    var(--scroll-strip);
+  mask-image:
+    linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 var(--sidebar-fade-top),
+      #000 calc(100% - var(--sidebar-fade-bottom)),
+      transparent 100%
+    ),
+    var(--scroll-strip);
 }
 .sidebar__scroll[data-fade-top="true"] {
   --sidebar-fade-top: 24px;
@@ -871,8 +875,8 @@ p {
 /* Messages fade out at the list's bottom edge, above the composer: a mask on the list itself, so a hovered
    (lifted) row, its reactions and any background fade too. The padding keeps the newest line clear of it. */
 .channel__messages {
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent), var(--scroll-strip);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent), var(--scroll-strip);
 }
 .channel__status {
   margin: 0 24px;

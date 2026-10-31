@@ -43,10 +43,20 @@ samp {
   --scroll-thumb: color-mix(in srgb, var(--ink) 18%, transparent);
   --scroll-thumb-hover: color-mix(in srgb, var(--ink) 36%, transparent);
 }
+/* A scroller that fades its content at an end with a mask adds this layer to it: the fade then spares the strip our
+   scrollbar is drawn in, and the thumb ends round. Nothing where we draw no scrollbar. */
+:root {
+  --scroll-strip: linear-gradient(transparent 0 0);
+}
 @media (hover: hover) and (pointer: fine) {
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
+  }
+  @supports selector(::-webkit-scrollbar) {
+    :root {
+      --scroll-strip: linear-gradient(to left, #000 8px, transparent 0);
+    }
   }
   ::-webkit-scrollbar-track,
   ::-webkit-scrollbar-corner {
@@ -5945,8 +5955,10 @@ button.ac-tools__row:focus-visible {
   overscroll-behavior: contain;
   padding: 6px;
   /* Soft fade at the edges of the scroll area. */
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 10px, #000 calc(100% - 10px), transparent 100%);
-  mask-image: linear-gradient(to bottom, transparent 0, #000 10px, #000 calc(100% - 10px), transparent 100%);
+  -webkit-mask-image:
+    linear-gradient(to bottom, transparent 0, #000 10px, #000 calc(100% - 10px), transparent 100%), var(--scroll-strip);
+  mask-image:
+    linear-gradient(to bottom, transparent 0, #000 10px, #000 calc(100% - 10px), transparent 100%), var(--scroll-strip);
 }
 .ac-tz__option {
   display: flex;
