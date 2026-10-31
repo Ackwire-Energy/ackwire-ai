@@ -13,10 +13,12 @@ import {
   createJobHandlers,
   drainOutbox,
   listAgents,
+  listRoles,
   type MachineStatus,
   postPersonMessage,
+  updateRole,
 } from "../src";
-import { type Fixture, setup } from "./fixtures";
+import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
 let f: Fixture;
@@ -122,6 +124,31 @@ test("an unknown handle is answered with the closest handles of the agents here"
   await drainOutbox(f.db, f.handlers);
 
   expect(results[0]).toContain("No agent @infra-codevale here. Closest handles: @infra, @qa, @design.");
+});
+
+test("the closest handles leave out the agents the person behind the run can't talk to", async () => {
+  const results: string[] = [];
+  f = await setup({
+    askAgent: true,
+    reply: callsTool("ask_agent", { agent: "@infra-codevale", question: "Pode fazer o deploy?" }, results),
+  });
+  await addAgent("QA", "qa", "Testes");
+  await addAgent("Infra", "infra", "Infrastructure");
+  await addAgent("Design", "design", "Designer");
+  // Bia's roles don't let her talk to agents: only @dev, which she owns, still answers her.
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+  await f.db.update(schema.agents).set({ ownerUserId: bia.id }).where(eq(schema.agents.id, f.agent.id));
+  const base = (await listRoles(f.db, f.owner.id, f.org.id)).roles.find((r) => r.kind === "everyone");
+  if (!base) throw new Error("no base role");
+  await updateRole(f.db, f.owner.id, f.org.id, base.id, {
+    permissions: base.permissions.filter((k) => k !== "talk_to_agents"),
+  });
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, bia.id, f.org.id, f.general.id, { body: "@dev go" });
+  await drainOutbox(f.db, f.handlers);
+
+  expect(results[0]).toContain("No agent @infra-codevale here.");
+  expect(results[0]).not.toContain("Closest handles");
 });
 
 test("the agents the @ pickers list leave an archived one out", async () => {
