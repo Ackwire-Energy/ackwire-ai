@@ -672,8 +672,8 @@ export { AGENT_CHIME_IN_MAX_HOP };
  * person's message speaks to (`addressee`) answers it, addressed, over who
  * spoke last, and over the agent replied to once the router picks it. One
  * that speaks to no agent in particular goes to the agent the person last
- * talked to in the last half hour, when the router picks another agent, she
- * could do it too and no other agent is clearly surer.
+ * talked to in the last half hour, when the router picks another agent, that
+ * one could do it too, and it doesn't clearly fit another agent better.
  *
  * When no step of the chain can read a person's message, rules in code pick
  * (ADR 0074 §4): R1 a reply to an agent, R2 the only agent when the author is
@@ -971,18 +971,17 @@ export async function routeMessage(
   const repliedAgentId = quotedAgentId ?? rootAgentId;
   if (repliedAgentId) continuityAgentId = repliedAgentId;
   const continuityHandle = candidates.find((c) => c.agentId === continuityAgentId)?.handle ?? null;
-  // The agent this person last talked to in this conversation (this thread with the message it is under, or the
-  // channel's main timeline: another thread is another conversation), among two or more agents, not in a reply to
+  // The agent this person last talked to in this conversation (the channel's main timeline, or this thread with
+  // the message it is under: another thread is another conversation), among two or more agents, not in a reply to
   // an agent and not when they speak to a person: the one agent their latest message to an agent went to, within
-  // what the router reads
-  // (`ROUTER_SLICE`: 30 minutes, 12 messages). It went to whom it @mentioned, else to the agent the router sent it
-  // to once that agent answered or while it is still at work on it (one that passed or failed was never talked
-  // to: the message went to no agent, like a "valeu"), else, never routed, to the first agent that answered it.
-  // One decided with their next message (`continued`) went where that one did. One the router hasn't decided on
-  // yet, still unanswered, leaves it unknown. Read newest first, so no other agent was addressed since; one that
-  // went to several agents is no one's. Within continuity's window it is the agent they are just talking to, or
-  // none: another agent that spoke since keeps today's follow-ups. None either when they name another agent
-  // ("theo me de bom dia…"), also when the step isn't sure the message speaks to it.
+  // what the router reads (`ROUTER_SLICE`: 30 minutes, 12 messages). It went to whom it @mentioned, else to the
+  // agent the router sent it to once that agent answered or while it is still at work on it (one that passed or
+  // failed was never talked to: the message went to no agent, like a "valeu"), else, never routed, to the first
+  // agent that answered it. One decided with their next message (`continued`) went where that one did; one the
+  // router hasn't decided on yet, still unanswered, leaves it unknown. Read newest first, so no other agent was
+  // addressed since; one that went to several agents is no one's. Within continuity's window it is the agent they
+  // are just talking to, or none: another agent that spoke since keeps today's follow-ups. None either when they
+  // name another agent ("theo me de bom dia…"), also when the step isn't sure the message speaks to it.
   let lastTalkedTo: string | null = null;
   if (continues && !namesPerson && !repliedAgentId && candidates.length >= 2) {
     const spoke = new Set<string>();
@@ -1124,11 +1123,11 @@ export async function routeMessage(
     Math.max(0, ...decided.agents.filter((a) => a.agentId === agentId).map((a) => a.score));
   const clearPickScore = policy.clearPickScore ?? DEFAULT_ROUTER_POLICY.clearPickScore;
   // Speaking to no agent in particular, a message the router gives another agent is for the agent this person last
-  // talked to when she could do it too: she clears her own bar (`minScore`, no lower) and, on her own, the need
-  // check; unless it clearly fits another agent better, by the step's tie-break (`CLEAR_CHOICE`) or by the scores
-  // (`clearlyAnother`). "me de bom dia todo dia ás 8:30 da manha", 23 minutes after a talk with Ada, went to Theo on
-  // 0.63 to her 0.55 (2026-10-31). It only settles which of the agents that could answers: a message the router
-  // gives her already, or gives nobody, stays as it is (she may pass).
+  // talked to when that one could do it too: it clears its own bar (`minScore`, no lower) and, on its own, the need
+  // check; unless the message clearly fits another agent better, by the step's tie-break (`CLEAR_CHOICE`) or by the
+  // scores (`clearlyAnother`). "me de bom dia todo dia ás 8:30 da manha", 23 minutes after a talk with Ada, went to
+  // Theo on 0.63 to her 0.55 (2026-10-31). It only settles which of the agents that could answers: a message the
+  // router gives that agent already, or gives nobody, stays as it is (it may pass).
   const resumes =
     !addressee &&
     lastTalkedTo !== null &&
