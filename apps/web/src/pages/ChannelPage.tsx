@@ -655,8 +655,10 @@ function ChannelView({
         .filter((a): a is Agent => Boolean(a)),
     [members.data, dir.agentById],
   );
-  // What the channel suggests goes to an agent people can read: one whose handle is an id only when every agent's is.
-  const suggestedAgent = channelAgents.find((a) => !isIdHandle(a.handle)) ?? channelAgents[0];
+  // What the channel suggests or picks for me goes to an agent that answers me (`canTalk`: who manages agents can't
+  // talk to a locked one either), one people can read: a handle that is an id only when every agent's is.
+  const talkable = channelAgents.filter(canTalk);
+  const suggestedAgent = talkable.find((a) => !isIdHandle(a.handle)) ?? talkable[0];
   const channelPeople = useMemo(
     () =>
       (members.data ?? [])
@@ -1234,7 +1236,7 @@ function ChannelView({
     setDraft("");
     if (cmd.command === "mission") {
       const named = mentioned(cmd.arg)[0];
-      const agentId = named ?? dmAgent?.id ?? (channelAgents.length === 1 ? channelAgents[0]?.id : undefined);
+      const agentId = named ?? dmAgent?.id ?? (talkable.length === 1 ? talkable[0]?.id : undefined);
       if (!agentId) {
         setMissionDraft(cmd.arg);
         return true;

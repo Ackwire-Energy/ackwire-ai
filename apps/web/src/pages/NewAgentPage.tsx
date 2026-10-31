@@ -593,7 +593,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
 
   /* ---------- The step's content ---------- */
 
-  const head = (title: string, lead?: string, hint?: string) => {
+  const head = (title: string, lead?: string, hint?: string, after?: ReactNode) => {
     const h1 = (
       <h1 className="onb__title newag__title" ref={heading} tabIndex={-1}>
         {title}
@@ -611,6 +611,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
           h1
         )}
         {lead && <p className="onb__lead">{lead}</p>}
+        {after}
       </header>
     );
   };
@@ -657,7 +658,23 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
   const views: Record<NewAgentStep, () => ReactNode> = {
     role: () => (
       <>
-        {head(t("newAgent.steps.role.title"), t("newAgent.steps.role.lead"))}
+        {head(
+          t("newAgent.steps.role.title"),
+          t("newAgent.steps.role.lead"),
+          undefined,
+          !from && (
+            <p className="ac-iconline newag__import">
+              <Icon name="archiveBox" size={16} />
+              <Link
+                to="/org/$orgId/settings/$section"
+                params={{ orgId: org.id, section: "import" }}
+                className="ac-link"
+              >
+                {t("shell.importAgents")}
+              </Link>
+            </p>
+          ),
+        )}
         {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
         <div className="newag__role-groups" role="group" aria-label={t("newAgent.steps.role.name")}>
           {ROLE_GROUPS.map((group) => (

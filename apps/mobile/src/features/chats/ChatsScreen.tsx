@@ -13,7 +13,7 @@ import { SetupNotice } from "../computer/SetupWait";
 import { OutageNotices } from "../outages/OutageNotice";
 import { useMachineOutages } from "../outages/queries";
 import { useDirectory, useOrgId, usePullRefresh } from "../shared/hooks";
-import { useActiveWork, useConversations, useWorkingNow } from "../shared/queries";
+import { useActiveWork, useConversations, useHiddenAgents, useWorkingNow } from "../shared/queries";
 import { SheetHostProvider } from "../shared/SheetHost";
 import { useTabHeader } from "../shared/tabHeader";
 import { ConversationRowView } from "./ConversationRowView";
@@ -79,10 +79,12 @@ function Home() {
 
   const outages = useMachineOutages();
   const offline = useMemo(() => waitingComputerByAgent(outages.outages), [outages.outages]);
-  // An agent waiting for its offline computer isn't working (its run only waits).
+  const { hidden } = useHiddenAgents();
+  // An agent waiting for its offline computer isn't working (its run only waits), and the count matches Agentes,
+  // which it opens: my lists can leave some agents out.
   const working = workByAgent(work)
     .map((w) => w.agentId)
-    .filter((id) => dir.agentById.has(id) && !offline.has(id));
+    .filter((id) => dir.agentById.has(id) && !hidden.has(id) && !offline.has(id));
   const finished = useFinished(active, list.rows);
   const agentStates = useAgentRowStates(list.rows, work, waiting.items, offline);
   const pull = usePullRefresh(() => Promise.allSettled([list.refetch(), waiting.refetch(), outages.refetch()]));

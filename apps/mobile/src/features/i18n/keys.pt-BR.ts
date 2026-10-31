@@ -655,6 +655,8 @@ export const featureKeysPtBR = {
     created: "{{name}} chegou na equipe",
     createFailed: "Não deu para criar o agente. Talvez esse nome já exista.",
     empty: "Nenhum agente ainda.",
+    noneForYou: "Nenhum agente atende você ainda.",
+    noneForYouHint: "Peça acesso a um admin.",
     freeSection: "Livres",
     noGroupSection: "Sem grupo",
   },

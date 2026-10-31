@@ -1094,6 +1094,7 @@ export const en: Translations = {
     agents: "Agents",
     directMessages: "Direct messages",
     createAgent: "Create agent",
+    importAgents: "Bring agents from another app",
     budgetUsedHint: "The workspace used {{percent}} of its agents' budgets this month",
     account: "Account",
     theme: "Theme",
