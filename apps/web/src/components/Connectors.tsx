@@ -54,18 +54,22 @@ import { useToast } from "@/lib/toast";
  *
  * Back from OAuth: `?connected=github` (or `custom:{id}`) reopens the flow at
  * "O que faz" for that connection; `?review=1` (older returns) opens the
- * newest server waiting for review. Back from Gmail/Outlook: `?mail=connected`
- * opens "O que faz" for the newest mailbox; `?mail=failed` says it didn't work.
- * Mailboxes (ADR 0038) are rows of the same list.
+ * newest server waiting for review. Back from Gmail/Outlook:
+ * `?mail=connected&account={id}` opens "O que faz" for that mailbox (older
+ * returns without `account`: the newest); `?mail=failed` says it didn't work.
+ * Each flow ends on who can use it. Mailboxes (ADR 0038) are rows of the same list.
  */
 export function ConnectorsSection({
   connected,
   review,
   mail,
+  account,
 }: {
   connected?: string;
   review?: boolean;
   mail?: string;
+  /** The mailbox Gmail/Outlook came back with. */
+  account?: string;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -107,13 +111,15 @@ export function ConnectorsSection({
     if (mailReturned.current || !mail) return;
     if (mail === "connected" && !mailAccounts.data && !mailAccounts.isError) return;
     mailReturned.current = true;
-    const newest = mail === "connected" ? newestAccount(mailAccounts.data ?? []) : null;
-    if (newest && admin) {
+    const list = mailAccounts.data ?? [];
+    // Another mailbox may be newer (one started and left on the provider's page): the one that came back, by its id.
+    const came = mail !== "connected" ? null : account ? list.find((a) => a.id === account) : newestAccount(list);
+    if (came && admin) {
       toast.show(t("mail.returned"));
-      setMailFlow({ step: 1, account: newest });
+      setMailFlow({ step: 1, account: came });
     } else if (mail !== "connected") toast.show(t("mail.failed"), "error");
     window.history.replaceState(null, "", window.location.pathname);
-  }, [mail, mailAccounts.data, mailAccounts.isError, admin, t, toast]);
+  }, [mail, account, mailAccounts.data, mailAccounts.isError, admin, t, toast]);
   const defs = catalog.data?.connectors ?? [];
   const items = connectedItems(connections.data ?? [], servers.data ?? [], defs);
   const agentList = agents.data ?? [];
@@ -123,8 +129,12 @@ export function ConnectorsSection({
 
   // Back from OAuth: open "O que faz" for the connection that just came in.
   const returned = useRef(false);
+  const listsFetching = connections.isFetching || servers.isFetching;
   useEffect(() => {
     if (returned.current || (!connected && !review) || !connections.data || !servers.data || !catalog.data) return;
+    // The desktop app's window comes back without a reload: the lists cached from before the sign-in don't have
+    // the new connection until they are read again.
+    if (listsFetching) return;
     returned.current = true;
     const all = connectedItems(connections.data, servers.data, catalog.data.connectors);
     const latest = (list: ConnectedItem[]) => [...list].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
@@ -137,7 +147,7 @@ export function ConnectorsSection({
     if (item && connected) toast.show(t("connectors.connectedToast", { name: itemName(t, item) }));
     if (item && admin) setFlow({ step: 1, item });
     window.history.replaceState(null, "", window.location.pathname);
-  }, [connected, review, connections.data, servers.data, catalog.data, admin, t, toast]);
+  }, [connected, review, connections.data, servers.data, catalog.data, listsFetching, admin, t, toast]);
 
   return (
     <Card aria-labelledby="sec-conn">

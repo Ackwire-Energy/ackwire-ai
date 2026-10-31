@@ -278,7 +278,52 @@ describe("Conectores → Email", () => {
     expect(said[1]).toContain("servidor de saída");
   });
 
-  test("back from Gmail (`?mail=connected`): 'O que faz' for the newest mailbox; `failed` says so", async () => {
+  test("back from Gmail (`?mail=connected&account=<id>`): that mailbox, even with a newer one and a slow list; then who uses it", async () => {
+    const { api, state, mail } = mailApi([
+      { address: "old@acme.com.br" },
+      { provider: "gmail", via: "composio", preset: null, address: "came@example.com" },
+      // Started and left on Microsoft's page: newer, still waiting.
+      { provider: "outlook", via: "composio", preset: null, address: "", status: "pending" },
+    ]);
+    const list = mail.client.accounts;
+    let arrive = () => {};
+    const arrived = new Promise<void>((resolve) => {
+      arrive = resolve;
+    });
+    mail.client.accounts = async (orgId) => {
+      await arrived;
+      return list(orgId);
+    };
+    await renderApp(`/org/${ORG_ID}/settings/connectors?mail=connected&account=mail-2`, { api });
+    await settle(8);
+    expect(screen().queryByRole("dialog")).toBeNull();
+    await act(async () => arrive());
+    await settle(8);
+    expect(screen().getByRole("dialog", { name: "O que came@example.com faz" })).toBeTruthy();
+    await click(within(flow()).getByRole("button", { name: "Continuar" }));
+    await settle(4);
+    const who = screen().getByRole("dialog", { name: "Quem pode usar came@example.com" });
+    const level = (agent: string) =>
+      within(within(who).getByRole("radiogroup", { name: `Nível de ${agent}` }))
+        .getAllByRole("radio")
+        .find((r) => r.getAttribute("aria-checked") === "true")?.textContent;
+    // A new mailbox is nobody's until it's chosen here.
+    expect([level("Ada"), level("Atlas")]).toEqual(["Sem acesso", "Sem acesso"]);
+    await click(
+      within(within(who).getByRole("radiogroup", { name: "Nível de Ada" })).getByRole("radio", { name: "Ler" }),
+    );
+    await click(within(who).getByRole("button", { name: "Continuar" }));
+    await settle(6);
+    expect(
+      state.calls
+        .filter((c) => c.method === "mail.setAgent")
+        .map((c) => [c.args[1], c.args[2], (c.args[3] as { level: string }).level]),
+    ).toEqual([[ADA_ID, "mail-2", "read"]]);
+    // Then the optional rules.
+    expect(screen().getByRole("dialog", { name: "Regras em came@example.com" })).toBeTruthy();
+  });
+
+  test("back from Gmail without the account (`?mail=connected`): the newest mailbox; `failed` says so", async () => {
     const { api } = mailApi([
       { address: "old@acme.com.br" },
       { provider: "gmail", via: "composio", preset: null, address: "new@example.com" },
