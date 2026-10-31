@@ -315,7 +315,7 @@ export function createComposioClient(options: ComposioClientOptions): ComposioRe
       return { connectedAccountId, redirectUrl };
     },
 
-    async getConnectedAccount(id, userId) {
+    async getConnectedAccount(id, userId, options) {
       const account = await request("GET", `/connected_accounts/${encodeURIComponent(id)}`, undefined, {
         allowNotFound: true,
       });
@@ -324,6 +324,7 @@ export function createComposioClient(options: ComposioClientOptions): ComposioRe
       if (raw === "INITIALIZING" || raw === "INITIATED") return { status: "pending", address: null };
       if (raw === "EXPIRED") return { status: "expired", address: null };
       if (raw !== "ACTIVE" || account.is_disabled === true) return { status: "failed", address: null };
+      if (options?.readAddress === false) return { status: "active", address: null };
       try {
         // Not the `user_id` in this response: Composio deprecated it and stops returning it.
         const address = await mailboxAddress((str(obj(account.toolkit).slug) ?? "").toLowerCase(), {
@@ -337,9 +338,9 @@ export function createComposioClient(options: ComposioClientOptions): ComposioRe
       }
     },
 
-    async deleteConnectedAccount(id) {
-      // Also revokes the grant at Google/Microsoft: the person disconnected it.
-      await request("DELETE", `/connected_accounts/${encodeURIComponent(id)}?revoke_on_delete=true`, undefined, {
+    async deleteConnectedAccount(id, options) {
+      const revoke = options?.revoke === false ? "" : "?revoke_on_delete=true";
+      await request("DELETE", `/connected_accounts/${encodeURIComponent(id)}${revoke}`, undefined, {
         allowNotFound: true,
       });
     },

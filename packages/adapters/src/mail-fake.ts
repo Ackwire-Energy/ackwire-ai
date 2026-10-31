@@ -279,6 +279,10 @@ export function createFakeComposioClient() {
     >(),
     links: [] as { toolkit: ComposioToolkit; userId: string; callbackUrl: string; connectedAccountId: string }[],
     deletedAccounts: [] as string[],
+    /** The deleted accounts whose grant at Google/Microsoft was revoked too. */
+    revokedAccounts: [] as string[],
+    /** The accounts whose mailbox address was read (a profile tool call, billed by Composio). */
+    profileReads: [] as string[],
     triggers: new Map<
       string,
       { toolkit: ComposioToolkit; connectedAccountId: string; userId: string; query: string | null }
@@ -300,17 +304,20 @@ export function createFakeComposioClient() {
       state.links.push({ ...input, connectedAccountId });
       return { connectedAccountId, redirectUrl: `https://composio.example/connect/${connectedAccountId}` };
     },
-    async getConnectedAccount(id, userId) {
+    async getConnectedAccount(id, userId, options) {
       if (state.failWith) throw state.failWith;
       const a = state.accounts.get(id);
       if (!a) return { status: "failed", address: null };
       if (a.status !== "active") return { status: a.status, address: null };
+      if (options?.readAddress === false) return { status: "active", address: null };
       // The address is read with a profile tool call.
       if (userId !== a.userId) throw composioUserRefused(userId);
+      state.profileReads.push(id);
       return { status: "active", address: a.address };
     },
-    async deleteConnectedAccount(id) {
+    async deleteConnectedAccount(id, options) {
       state.deletedAccounts.push(id);
+      if (options?.revoke !== false) state.revokedAccounts.push(id);
       state.accounts.delete(id);
     },
     async createMailTrigger(input) {

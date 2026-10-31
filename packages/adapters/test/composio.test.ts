@@ -268,6 +268,12 @@ describe("Composio client", () => {
       tool("OUTLOOK_GET_PROFILE", { mail: "Ana@Contoso.com", userPrincipalName: "ana@contoso.onmicrosoft.com" }),
     );
     const client = createComposioClient({ apiKey: "k", fetch });
+    // The status alone runs no tool.
+    expect(await client.getConnectedAccount("ca_gmail", "org_1", { readAddress: false })).toEqual({
+      status: "active",
+      address: null,
+    });
+    expect(calls.map((c) => c.url)).toEqual([`${BASE}/connected_accounts/ca_gmail`]);
     const state = (id: string) => client.getConnectedAccount(id, "org_1");
     expect(await state("ca_gmail")).toEqual({ status: "active", address: "ana@acme.com" });
     expect(await state("ca_outlook")).toEqual({ status: "active", address: "ana@contoso.com" });
@@ -311,9 +317,11 @@ describe("Composio client", () => {
     expect(upserts[3]?.url).toBe(`${BASE}/trigger_instances/OUTLOOK_MESSAGE_TRIGGER/upsert`);
     await client.deleteTrigger("ti_1");
     await client.deleteConnectedAccount("ca_g");
+    await client.deleteConnectedAccount("ca_o", { revoke: false });
     expect(calls.filter((c) => c.method === "DELETE").map((c) => c.url)).toEqual([
       `${BASE}/trigger_instances/manage/ti_1`,
       `${BASE}/connected_accounts/ca_g?revoke_on_delete=true`,
+      `${BASE}/connected_accounts/ca_o`,
     ]);
   });
 

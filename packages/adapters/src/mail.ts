@@ -215,12 +215,17 @@ export interface ComposioClient {
     userId: string;
     callbackUrl: string;
   }): Promise<{ connectedAccountId: string; redirectUrl: string }>;
-  /** State of a connected account and its mailbox address, when active (`userId`: the one it was linked for). */
+  /**
+   * State of a connected account and its mailbox address, when active (`userId`: the one it was linked for).
+   * The address is read with a profile tool call, which Composio bills; `readAddress: false` skips it.
+   */
   getConnectedAccount(
     id: string,
     userId: string,
+    options?: { readAddress?: boolean },
   ): Promise<{ status: "active" | "pending" | "failed" | "expired"; address: string | null }>;
-  deleteConnectedAccount(id: string): Promise<void>;
+  /** Also revokes the grant at Google/Microsoft, unless `revoke: false` (Composio only forgets the account). */
+  deleteConnectedAccount(id: string, options?: { revoke?: boolean }): Promise<void>;
   /** A "new message" trigger on the account; `query` is a Gmail search (Outlook: filtered on our side). */
   createMailTrigger(input: {
     toolkit: ComposioToolkit;

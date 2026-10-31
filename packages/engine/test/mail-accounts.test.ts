@@ -236,6 +236,7 @@ test("disconnecting removes the agents' mail grants and Composio's account; othe
 
   await revokeMailAccount(deps, f.owner.id, f.org.id, gmail.accountId);
   expect(composio.state.deletedAccounts).toEqual([gmail.connectedAccountId]);
+  expect(composio.state.revokedAccounts).toEqual([gmail.connectedAccountId]);
   expect((await listAgentScopes(f.db, f.org.id, f.agent.id)).map((g) => g.scope)).toEqual(["context:read"]);
   expect(await listMailAccounts(f.db, f.owner.id, f.org.id)).toEqual([]);
   expect(await getAgentMail(f.db, f.owner.id, f.org.id, f.agent.id)).toEqual([]);
