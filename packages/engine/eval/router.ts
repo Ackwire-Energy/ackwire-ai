@@ -4,8 +4,9 @@
  * as someone to ask or to tell ("ada pergunta pro theo ai qual meu email mais recente pls" went to Theo, who
  * has the email, on 2026-10-31). News for an agent told to nobody in particular ("someone tell Theo…") goes to
  * that agent, a reply to an agent stays with it unless it speaks to another one, a message that only talks
- * about an agent gets none, and what already worked still does (a message to anyone, to every agent, to a
- * person, small talk, a follow-up). Each case goes through the real `routeMessage` (the candidates, what each
+ * about an agent gets none, a request to nobody in particular 23 minutes after a talk with an agent goes to that
+ * agent, and what already worked still does (a message to anyone, to every agent, to a person, small talk, a
+ * follow-up). Each case goes through the real `routeMessage` (the candidates, what each
  * can use, continuity, the rules after the step) on an in-memory database, in a channel of its own: only the
  * step calls out.
  *
@@ -39,11 +40,14 @@ export interface RouterCase {
   /**
    * `asks`: to one agent, about another it should ask or tell; `direct`: to that other agent; `anyone`: to
    * nobody in particular; `about`: to nobody in particular, news for an agent; `reply`: a quote reply or a
-   * thread reply to an agent's message. The rest already worked (`person` also when it talks about an agent).
+   * thread reply to an agent's message; `resumed`: to nobody in particular, past the continuity window of a talk
+   * with an agent. The rest already worked (`person` also when it talks about an agent).
    */
-  kind: "asks" | "direct" | "anyone" | "about" | "reply" | "everyone" | "person" | "follow-up";
+  kind: "asks" | "direct" | "anyone" | "about" | "reply" | "resumed" | "everyone" | "person" | "follow-up";
   /** The conversation before it, oldest first, a minute apart: "Ana", "Walter" or an agent's "@handle". */
   before?: { from: string; text: string }[];
+  /** Minutes between the last line of `before` and the message (default 1). */
+  pause?: number;
   /** The message quotes this line of `before`. */
   replyTo?: number;
   /** The message, and the lines of `before` after its first, go in the thread of that first line. */
@@ -326,6 +330,21 @@ export const ROUTER_CASES: RouterCase[] = [
     answers: ["ada"],
   },
 
+  // 23 minutes after a talk with Ada, past the continuity window, a request any agent could do is still hers: it
+  // went to Theo, 0.63 to her 0.55, on 2026-10-31.
+  {
+    id: "pt-last-talked-to",
+    lang: "pt",
+    kind: "resumed",
+    before: [
+      { from: "Ana", text: "ada quanto ta seu limite de uso?" },
+      { from: "@ada", text: "Ana, não consigo consultar meu saldo de uso por aqui: não aparece quanto já consumi." },
+    ],
+    pause: 23,
+    message: "me de bom dia todo dia ás 8:30 da manha",
+    answers: ["ada"],
+  },
+
   // What already worked, and the day's case mirrored: a follow-up that names another agent to ask is still for
   // the agent just talking.
   {
@@ -480,7 +499,7 @@ export async function routerEval() {
           ? { type: "agent", agentId, runId: null, hop: 1, stretchId: null }
           : { type: "person", userId: line.from === "Walter" ? walter.id : f.owner.id },
         body: line.text,
-        createdAt: new Date(now - (lines.length - i) * 60_000),
+        createdAt: new Date(now - (lines.length - 1 - i + (c.pause ?? 1)) * 60_000),
       });
       posted.push(m.id);
     }

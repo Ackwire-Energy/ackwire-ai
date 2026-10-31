@@ -14,7 +14,7 @@ test("every case is well formed: known agents, no @mention, and each language as
     for (const h of c.answers) expect(handles.has(h), `${c.id}: ${h}`).toBe(true);
     expect(c.message, c.id).not.toContain("@");
     if (c.replyTo !== undefined) expect(c.before?.[c.replyTo], c.id).toBeDefined();
-    if (c.thread) expect(c.before?.length, c.id).toBeGreaterThan(0);
+    if (c.thread || c.pause !== undefined) expect(c.before?.length, c.id).toBeGreaterThan(0);
   }
   // A case can't pass by recalling the rule's own example.
   for (const a of TEAM) expect(SPOKEN_TO, a.name).not.toContain(a.name);
@@ -26,8 +26,16 @@ test("every case is well formed: known agents, no @mention, and each language as
       ).toBe(true);
 });
 
+/** Jev's answers on 2026-10-31 to "ada pergunta pro theo…" (`ASKS`) and to "me de bom dia…" (`BOM_DIA`). */
+const ASKS = { nouls: { "@theo": 0.9, "@ada": 0.52 }, needs: 0.78, choice: { theo: 0.79 } };
+const BOM_DIA = {
+  nouls: { "@theo": 0.576, "@ada": 0.576 },
+  needs: 0.54,
+  choice: { theo: 0.83, ada: 0.12, none: 0.05 },
+};
+
 /** Jev as it answered on 2026-10-31, plus the addressee Choice's probabilities when given. */
-function jevThatDay(to?: Record<string, number>) {
+function jevThatDay(to?: Record<string, number>, day: typeof ASKS = ASKS) {
   const states: unknown[] = [];
   const fetcher = (async (_url: string, init: RequestInit) => {
     const { state, questions } = JSON.parse(String(init.body)) as {
@@ -35,11 +43,11 @@ function jevThatDay(to?: Record<string, number>) {
       questions: Record<string, { instructions: { agent?: { handle: string } } }>;
     };
     states.push(state);
-    const nouls: Record<string, number> = { "@theo": 0.9, "@ada": 0.52 };
+    const nouls: Record<string, number> = day.nouls;
     const answers: Record<string, unknown> = {
-      needs_agent: { noul: 0.78 },
+      needs_agent: { noul: day.needs },
       for_everyone: { noul: 0.1 },
-      best_agent: { choice: "theo", probabilities: { theo: 0.79 }, confidence: 0.79 },
+      best_agent: { choice: "theo", probabilities: day.choice, confidence: day.choice.theo },
     };
     for (const [id, q] of Object.entries(questions))
       if (id.startsWith("agent_")) answers[id] = { noul: nouls[q.instructions.agent?.handle ?? ""] ?? 0.05 };
@@ -59,6 +67,20 @@ test("the harness: the day's case fails on that day's answers and passes once th
     expect(JSON.stringify(then.states[0])).toContain("Gmail");
     const now = jevThatDay({ ada: 0.86, theo: 0.08, none: 0.06 });
     expect(await evaluation.run(day, now.strategy)).toMatchObject({ ok: true, picked: ["ada"] });
+  } finally {
+    await evaluation.close();
+  }
+});
+
+test("the harness: 'me de bom dia…' 23 minutes after the talk with Ada is hers on that day's answers", async () => {
+  const c = ROUTER_CASES.find((r) => r.id === "pt-last-talked-to") as RouterCase;
+  const evaluation = await routerEval();
+  try {
+    const day = jevThatDay(undefined, BOM_DIA);
+    expect(await evaluation.run(c, day.strategy)).toMatchObject({ ok: true, picked: ["ada"] });
+    // Past the continuity window, as that day: nobody is "just talking", and the step still reads the talk.
+    expect(day.states[0]).toMatchObject({ agent_just_talking: null });
+    expect(JSON.stringify(day.states[0])).toContain("ada quanto ta seu limite de uso?");
   } finally {
     await evaluation.close();
   }
