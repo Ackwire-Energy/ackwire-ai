@@ -2438,7 +2438,7 @@ function LiveRunStatus({ run }: { run: LiveRun }) {
       })
       .finally(() => setChecking(false));
   };
-  const doing = run.tool ? toolActivity(run.tool, run.connector) : null;
+  const doing = run.tool ? toolActivity(run.tool, run.connector, null, run) : null;
   const showDoing =
     !quiet && doing && doing.kind !== "thinking" && !(run.work ?? []).some((w) => w.kind === "call" && w.running);
   if (!quiet && !showDoing) return null;

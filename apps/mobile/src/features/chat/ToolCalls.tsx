@@ -1,8 +1,10 @@
 import { isScreenTool, type ScreenKind, useCatalog, useRun } from "@agenteschat/client";
-import type { ActivityKind } from "@agenteschat/client/lib/activity";
+import type { Activity, ActivityKind } from "@agenteschat/client/lib/activity";
 import { formatBytes } from "@agenteschat/client/lib/files";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
+  appKey,
+  callLogo,
   formatDuration,
   formatLineTime,
   type ToolItem,
@@ -14,6 +16,7 @@ import {
   toolNow,
   toolPhrase,
   toolWhy,
+  workApps,
   workFromSteps,
   workMeta,
 } from "@agenteschat/client/lib/work";
@@ -123,18 +126,14 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
 /** How many logos the closed line stacks (a phone has no room for more). */
 const LOGOS_MAX = 4;
 
-const plain = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
-
-/** A call's logo: the connector's mark from the catalog (by id or name), or the icon of one of our tools. */
+/** A call's logo: its service's mark as the connectors screens draw it (`callLogo`), or the icon of one of our tools. */
 function useLogo() {
   const catalog = useCatalog();
-  return (a: { kind: ActivityKind; app?: string }, size = 20): ReactNode => {
-    if (a.kind === "consulting" && a.app) {
-      const key = plain(a.app);
-      const def = catalog.data?.connectors.find((d) => plain(d.id) === key || plain(d.label) === key) ?? null;
-      return <ConnectorIcon def={def} label={a.app} size={size} />;
-    }
-    return <IconTile name={KIND_ICON[a.kind] ?? "server"} size={size} />;
+  return (a: Activity, size = 20): ReactNode => {
+    const logo = callLogo(a, catalog.data?.connectors ?? []);
+    if (logo.kind === "service")
+      return <ConnectorIcon def={logo.def} label={logo.label} image={logo.image} size={size} />;
+    return <IconTile name={logo.kind === "mail" ? "mail" : (KIND_ICON[a.kind] ?? "server")} size={size} />;
   };
 }
 
@@ -526,8 +525,6 @@ function useBlockItems(items: ToolItem[]): BlockItem[] {
   );
 }
 
-const logoKey = (a: { kind: ActivityKind; app?: string }) => `${a.kind}-${a.app ?? ""}`;
-
 // ── A reply's tools, live and kept ───────────────────────────────────────────
 
 /**
@@ -588,7 +585,7 @@ export function TurnTools({
   return (
     <>
       <ToolBlock
-        logos={toolApps(items).map((a) => ({ key: logoKey(a), node: logo(a, 18) }))}
+        logos={toolApps(items).map((a) => ({ key: appKey(a), node: logo(a, 18) }))}
         head={head}
         items={blockItems}
         color={color}
@@ -641,11 +638,7 @@ export function SavedTools({
   if (!compact || compact.steps === 0) return null;
   const calls = work ? toolCalls(items) : compact.steps;
   const durationMs = work?.durationMs ?? compact.durationMs;
-  const apps = work
-    ? toolApps(items)
-    : compact.connectors.map((app) =>
-        app === "Drive" ? { kind: "readingDrive" as const } : { kind: "consulting" as const, app },
-      );
+  const apps = work ? toolApps(items) : workApps(compact.calls.filter((c) => !onCard(c.name)));
   const note = (key: string, node: ReactNode): BlockItem => ({ kind: "note", key, node });
   const status: BlockItem[] = run.isError
     ? [
@@ -680,7 +673,7 @@ export function SavedTools({
         : [];
   return (
     <ToolBlock
-      logos={apps.map((a) => ({ key: logoKey(a), node: logo(a, 18) }))}
+      logos={apps.map((a) => ({ key: appKey(a), node: logo(a, 18) }))}
       head={{
         text: calls > 0 ? t("chat.work.used", { count: calls }) : t("chat.work.see", agentGrammar(t, agentName)),
         time: durationMs !== null ? formatDuration(t, durationMs) : undefined,

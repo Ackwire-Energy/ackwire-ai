@@ -3,6 +3,7 @@ import type { LiveConsult, LiveConsultStatus } from "../realtime/consults";
 import { type LiveRun, narrationOf } from "../realtime/streams";
 import { joinNames } from "./format";
 import { agentGrammar } from "./grammar";
+import { MAIL_BRANDS } from "./mail";
 
 /**
  * What the typing bar says someone is doing: "Theo está pensando…", "Theo
@@ -90,6 +91,19 @@ export interface Activity {
   kind: ActivityKind;
   /** The app being consulted ("GitHub", "himetrica"), for `consulting`; the skill name for `openingSkill`. */
   app?: string;
+  /**
+   * The service the call works in, for its logo: a catalog connector's id (`github`, `drive`), a mailbox's maker
+   * with a mark (`gmail`), `mail` for any other mailbox, or `postgres`.
+   */
+  service?: string;
+  /** A server connected by address: its own icon (`/api/app/connector-icons/…`). */
+  icon?: string;
+}
+
+/** Where a call works, as `agent.tool` and the saved `tool_call` step say it (the engine's `ToolDefinition`). */
+export interface ToolService {
+  service?: string | null;
+  serviceIcon?: string | null;
 }
 
 /** The engine's own tools (packages/engine/src/context, issues, artifacts, calendar). */
@@ -221,15 +235,31 @@ const VERBS = new Set([
 
 const isDrive = (id: string) => id === "drive" || id === "gdrive" || id === "google_drive";
 
+/** One of the org's mailboxes' tools (`mail_<slug>_<verb>`, ADR 0038), also through the executor's MCP. */
+const MAILBOX_TOOL = /^(?:mcp__agentes__)?mail_[a-z0-9]+_[a-z]+$/;
+
 /**
  * The friendly activity of a tool call. `connector` is the app label when the
  * event carries it; otherwise it is guessed from the tool name's prefix.
+ * `where`: the service the call names, for its logo. A mailbox goes by its maker's
+ * name when the app draws its mark ("Consultou o Gmail"), else by "Email".
  */
 export function toolActivity(
   tool: string | null | undefined,
   connector?: string | null,
   detail?: string | null,
+  where?: ToolService | null,
 ): Activity {
+  const a = activityOf(tool, connector, detail);
+  const service = where?.service?.trim() || undefined;
+  if (a.kind === "consulting" && MAILBOX_TOOL.test((tool ?? "").trim().toLowerCase())) {
+    const brand = service ? MAIL_BRANDS[service] : undefined;
+    return brand ? { kind: "consulting", app: brand.name, service } : { ...a, service: "mail" };
+  }
+  return { ...a, ...(service ? { service } : {}), ...(where?.serviceIcon ? { icon: where.serviceIcon } : {}) };
+}
+
+function activityOf(tool: string | null | undefined, connector?: string | null, detail?: string | null): Activity {
   let name = (tool ?? "").trim().toLowerCase();
   if (!name) return { kind: "thinking" };
   // An executor's MCP tool (`mcp__agentes__update_plan`): ours by its own name; another server's is that app.
@@ -341,7 +371,7 @@ export function barEntries(
       id: r.agentId,
       type: "agent",
       name: agentName(r.agentId),
-      activity: writing ? { kind: "writing" } : toolActivity(r.tool, r.connector, r.toolDetail),
+      activity: writing ? { kind: "writing" } : toolActivity(r.tool, r.connector, r.toolDetail, r),
     });
   }
   for (const id of typingUserIds) {
@@ -372,10 +402,13 @@ export function barAsking(entries: ActivityEntry[]): EntryConsult | undefined {
 /** "trabalhando", "consultando o GitHub". */
 export const activityVerb = (t: TFunction, a: Activity) => t(`chat.activity.${a.kind}`, { app: appLabel(a) });
 
-/** The app as people read it: a connector's slug ("himetrica") starts with a capital ("Himetrica"). */
+/**
+ * The app as people read it: a connector's slug ("himetrica") starts with a capital ("Himetrica"); a name with
+ * capitals of its own stays as it is written ("iCloud").
+ */
 export const appLabel = (a: { kind: string; app?: string }) => {
   const app = a.app ?? "";
-  return a.kind === "consulting" ? app.charAt(0).toUpperCase() + app.slice(1) : app;
+  return a.kind === "consulting" && app === app.toLowerCase() ? app.charAt(0).toUpperCase() + app.slice(1) : app;
 };
 
 /** Wraps a name in the sentence (the bar shows names in bold); plain text by default. */
