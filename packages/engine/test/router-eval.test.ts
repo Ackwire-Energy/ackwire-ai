@@ -72,15 +72,20 @@ test("the harness: the day's case fails on that day's answers and passes once th
   }
 });
 
-test("the harness: 'me de bom dia…' 23 minutes after the talk with Ada is hers on that day's answers", async () => {
-  const c = ROUTER_CASES.find((r) => r.id === "pt-last-talked-to") as RouterCase;
+test("the harness: 'me de bom dia…' 5 and 23 minutes after the talk with Ada is hers on that day's answers", async () => {
+  const late = ROUTER_CASES.find((r) => r.id === "pt-last-talked-to") as RouterCase;
+  const soon = ROUTER_CASES.find((r) => r.id === "pt-last-talked-to-soon") as RouterCase;
   const evaluation = await routerEval();
   try {
     const day = jevThatDay(undefined, BOM_DIA);
-    expect(await evaluation.run(c, day.strategy)).toMatchObject({ ok: true, picked: ["ada"] });
+    expect(await evaluation.run(late, day.strategy)).toMatchObject({ ok: true, picked: ["ada"] });
     // Past the continuity window, as that day: nobody is "just talking", and the step still reads the talk.
     expect(day.states[0]).toMatchObject({ agent_just_talking: null });
     expect(JSON.stringify(day.states[0])).toContain("ada quanto ta seu limite de uso?");
+    // 5 minutes after it Ada is the agent just talking, and the same answers still give it to her.
+    const sooner = jevThatDay(undefined, BOM_DIA);
+    expect(await evaluation.run(soon, sooner.strategy)).toMatchObject({ ok: true, picked: ["ada"] });
+    expect(sooner.states[0]).toMatchObject({ agent_just_talking: "@ada" });
   } finally {
     await evaluation.close();
   }

@@ -4,11 +4,11 @@
  * as someone to ask or to tell ("ada pergunta pro theo ai qual meu email mais recente pls" went to Theo, who
  * has the email, on 2026-10-31). News for an agent told to nobody in particular ("someone tell Theo…") goes to
  * that agent, a reply to an agent stays with it unless it speaks to another one, a message that only talks
- * about an agent gets none, a request to nobody in particular 23 minutes after a talk with an agent goes to that
- * agent, and what already worked still does (a message to anyone, to every agent, to a person, small talk, a
- * follow-up). Each case goes through the real `routeMessage` (the candidates, what each
- * can use, continuity, the rules after the step) on an in-memory database, in a channel of its own: only the
- * step calls out.
+ * about an agent gets none, a request to nobody in particular 5 or 23 minutes after a talk with an agent goes to
+ * that agent unless it clearly fits another one, and what already worked still does (a message to anyone, to
+ * every agent, to a person, small talk, a follow-up). Each case goes through the real `routeMessage` (the
+ * candidates, what each can use, continuity, the rules after the step) on an in-memory database, in a channel of
+ * its own: only the step calls out.
  *
  * Manual, never in CI (it calls the real service and costs a little):
  *
@@ -40,8 +40,8 @@ export interface RouterCase {
   /**
    * `asks`: to one agent, about another it should ask or tell; `direct`: to that other agent; `anyone`: to
    * nobody in particular; `about`: to nobody in particular, news for an agent; `reply`: a quote reply or a
-   * thread reply to an agent's message; `resumed`: to nobody in particular, past the continuity window of a talk
-   * with an agent. The rest already worked (`person` also when it talks about an agent).
+   * thread reply to an agent's message; `resumed`: to nobody in particular, within half an hour of a talk with an
+   * agent. The rest already worked (`person` also when it talks about an agent).
    */
   kind: "asks" | "direct" | "anyone" | "about" | "reply" | "resumed" | "everyone" | "person" | "follow-up";
   /** The conversation before it, oldest first, a minute apart: "Ana", "Walter" or an agent's "@handle". */
@@ -331,7 +331,8 @@ export const ROUTER_CASES: RouterCase[] = [
   },
 
   // 23 minutes after a talk with Ada, past the continuity window, a request any agent could do is still hers: it
-  // went to Theo, 0.63 to her 0.55, on 2026-10-31.
+  // went to Theo, 0.63 to her 0.55, on 2026-10-31. So it is 5 minutes after, while she is the agent just talking,
+  // though it is no short follow-up. A request that clearly fits another agent's role goes to that agent.
   {
     id: "pt-last-talked-to",
     lang: "pt",
@@ -342,6 +343,30 @@ export const ROUTER_CASES: RouterCase[] = [
     ],
     pause: 23,
     message: "me de bom dia todo dia ás 8:30 da manha",
+    answers: ["ada"],
+  },
+  {
+    id: "pt-last-talked-to-soon",
+    lang: "pt",
+    kind: "resumed",
+    before: [
+      { from: "Ana", text: "ada quanto ta seu limite de uso?" },
+      { from: "@ada", text: "Ana, não consigo consultar meu saldo de uso por aqui: não aparece quanto já consumi." },
+    ],
+    pause: 5,
+    message: "me de bom dia todo dia ás 8:30 da manha",
+    answers: ["ada"],
+  },
+  {
+    id: "pt-last-talked-to-clear-fit",
+    lang: "pt",
+    kind: "resumed",
+    before: [
+      { from: "Ana", text: "theo, o que tenho na agenda amanhã?" },
+      { from: "@theo", text: "Amanhã: reunião com a Lumen às 10h e dentista às 15h." },
+    ],
+    pause: 23,
+    message: "escreve um script em python que conta as linhas de um csv",
     answers: ["ada"],
   },
 
