@@ -340,7 +340,7 @@ describe("the gateway applies the run policy", () => {
     const custom: ToolSource = {
       name: "connectors",
       tools: async () =>
-        ["git_clone", "open_pull_request"].map((name) => ({
+        ["git_clone", "open_pull_request", "delete_branches", "request_branch_push"].map((name) => ({
           name,
           description: `External ${name}`,
           inputSchema: { type: "object" },
@@ -355,6 +355,8 @@ describe("the gateway applies the run policy", () => {
         [
           { name: "git_clone", scope: "github:git.read" },
           { name: "open_pull_request", scope: "github:pr.write" },
+          { name: "delete_branches", scope: "github:git.write" },
+          { name: "request_branch_push", scope: "github:git.write" },
         ].map(({ name, scope }) => ({
           name,
           description: `Server ${name}`,
@@ -368,6 +370,8 @@ describe("the gateway applies the run policy", () => {
     const names = new Map((await gateway.list(ctx)).map((tool) => [tool.name, tool.description]));
     expect(names.get("git_clone")).toBe("Server git_clone");
     expect(names.get("open_pull_request")).toBe("Server open_pull_request");
+    expect(names.get("delete_branches")).toBe("Server delete_branches");
+    expect(names.get("request_branch_push")).toBe("Server request_branch_push");
   });
 
   test("routine, read: refused tools aren't listed, and a call is refused anyway with the reason", async () => {

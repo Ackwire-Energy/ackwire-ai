@@ -3,7 +3,7 @@ import type { TFunction } from "i18next";
 import { ApiError, type ApprovalEmail } from "../src/index";
 import { emailTitleWords } from "../src/lib/approval-kind";
 import { approvalOriginShort } from "../src/lib/approval-origin";
-import { actionName, approvalRuleWords, approveAlwaysWords } from "../src/lib/approval-words";
+import { actionName, approvalRuleWords, approvalValues, approveAlwaysWords } from "../src/lib/approval-words";
 import { knownErrorText } from "../src/lib/errors";
 
 const email = (over: Partial<ApprovalEmail> = {}): ApprovalEmail => ({
@@ -61,11 +61,46 @@ describe("Aprovar sempre in words", () => {
     );
     expect(approveAlwaysWords(t, { approveAlways: { tool: "close_ticket", actions: [] } })).toBe("Close ticket");
     expect(approveAlwaysWords(t, { approveAlways: null })).toBe("");
-    expect(approvalRuleWords(t, { action: "", toolLabel: "Fechar chamado" })).toBe("Fechar chamado");
+    expect(approvalRuleWords(t, { tool: "close_ticket", action: "", toolLabel: "Fechar chamado" })).toBe(
+      "Fechar chamado",
+    );
+  });
+
+  test("a remembered push says its branch and repository, never a slug made of them", () => {
+    const say = ((key: string, o?: Record<string, unknown>) => `${key} ${JSON.stringify(o)}`) as unknown as TFunction;
+    const words = 'approval.always.pushTo {"repo":"acme/app","branch":"ana/fix"}';
+    expect(
+      approveAlwaysWords(say, { approveAlways: { tool: "request_branch_push", actions: ["acme/app:ana/fix"] } }),
+    ).toBe(words);
+    expect(approvalRuleWords(say, { tool: "request_branch_push", action: "acme/app:ana/fix", toolLabel: "x" })).toBe(
+      words,
+    );
   });
 
   test("where it isn't offered, the refusal in the person's words", () => {
     const refusal = new ApiError(409, "approval.always_unavailable", "This request can't be approved for good");
     expect(knownErrorText(t, refusal)).toBe("errors.approval.alwaysUnavailable");
+  });
+});
+
+describe("an approval's values", () => {
+  test("a list of names is one value: whole in the details, cut on a card, never left out", () => {
+    const branches = ["feat/login-google", "fix/old-header", "chore/bump-deps", "spike/x", "feat/y", "old-1", "old-2"];
+    const a = { params: { repo: "acme/app", branches }, connector: "github", email: null };
+    expect(approvalValues(a, { long: true })).toEqual([
+      ["Repo", "acme/app"],
+      ["Branches", branches.join(", ")],
+    ]);
+    const [, card] = approvalValues(a);
+    expect(card?.[0]).toBe("Branches");
+    expect(card?.[1]).toHaveLength(60);
+    expect(card?.[1].startsWith("feat/login-google, fix/old-header, chore/bump-deps")).toBe(true);
+    expect(card?.[1].endsWith("…")).toBe(true);
+    expect(approvalValues({ params: { repo: "acme/app", branches: ["a", "b"] }, connector: "github" })).toEqual([
+      ["Repo", "acme/app"],
+      ["Branches", "a, b"],
+    ]);
+    // A list of objects still says nothing.
+    expect(approvalValues({ params: { tools: [{ slug: "X" }] }, connector: "x" })).toEqual([]);
   });
 });

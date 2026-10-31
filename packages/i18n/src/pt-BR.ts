@@ -1917,6 +1917,8 @@ export const ptBR = {
     always: {
       button: "Aprovar sempre",
       hint: "Aprova este e os próximos iguais {{of}} {{name}}: {{actions}}, com qualquer valor.",
+      hintTarget: "Aprova este e os próximos iguais {{of}} {{name}}: {{actions}}.",
+      pushTo: "enviar para {{branch}} em {{repo}}",
       done: "Aprovado. {{name}} não pede mais para isso.",
       undoHere: "Para desfazer, vá em Ferramentas e acesso, na página {{of}} {{name}}.",
       open: "Abrir",
@@ -1980,6 +1982,9 @@ export const ptBR = {
       run_skill_script: "Rodar o script {{path}} da skill {{skill}}",
       post_message: "Postar em #{{channel}}",
       request_permission: "Ligar: {{permission}}",
+      delete_branches_one: "Apagar {{count}} branch em {{repo}}",
+      delete_branches_other: "Apagar {{count}} branches em {{repo}}",
+      request_branch_push: "Enviar para {{branch}} em {{repo}} (24 h, sem force push)",
     },
   },
   notifications: {
@@ -3394,7 +3399,7 @@ export const ptBR = {
     github_git_write: {
       label: "Enviar branches (git push)",
       description:
-        "Enviar commits só para branches agentes/{agente}/…: nunca na branch principal, sem force push, sem tags.",
+        "Enviar commits para branches agentes/{agente}/…: nunca na branch principal, sem force push, sem tags. Apagar branches e enviar para a branch de outra pessoa pedem aprovação antes.",
     },
     custom_read: {
       label: "Ferramentas de leitura",

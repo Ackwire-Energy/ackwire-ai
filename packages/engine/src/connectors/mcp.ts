@@ -222,7 +222,7 @@ export function createConnectorToolSource(deps: ConnectorDeps & { connect?: McpC
         }
         for (const tool of listed) {
           const mapped = def.tools[tool.name];
-          if (!mapped) continue; // not in our catalog: never exposed
+          if (!mapped || mapped.ours) continue; // not in our catalog, or one we serve: never exposed
           out.push({
             name: exposedToolName(def.id, tool.name),
             description: `[${def.label}] ${tool.description ?? tool.name}`.slice(0, 1024),

@@ -1067,6 +1067,14 @@ export const SECRET_MESSAGE =
 export const PLAN_MESSAGE =
   "This turn may only read: no edits, no commands that change anything, no web. Report what you would do instead.";
 
+/** The end of every refusal that names a way out: people decide in the chat, never at a terminal. */
+export const NO_TERMINAL_COMMANDS = "Never give the person a terminal command to run.";
+/** Said to an agent deleting a branch with git, by the computer and by the git proxy. */
+export const DELETE_BRANCHES_POINTER = `agents don't delete branches with git. Ask with delete_branches (repo, branches, why): a person approves them all on one card and they're deleted on GitHub. ${NO_TERMINAL_COMMANDS}`;
+/** Said by the git proxy to an agent pushing, with no person's approval, to branches that aren't its own. */
+export const otherBranchPointer = (branches: readonly string[], handle: string) =>
+  `${branches.join(", ")} ${branches.length === 1 ? "isn't your branch" : "aren't your branches"} (yours: agentes/${handle}/…). To push there, ask with request_branch_push (repo, branch, why); once a person approves, push again. Or push to agentes/${handle}/<topic> and open a pull request. ${NO_TERMINAL_COMMANDS}`;
+
 /**
  * What the computer decides by itself, before anyone is asked: the deny list
  * and secrets are refused, plain reads allowed; in a `plan` turn everything

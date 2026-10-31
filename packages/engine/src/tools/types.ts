@@ -97,6 +97,12 @@ export interface ToolDefinition {
    * outlive a renamed connection. The gateway still decides each call (`rememberable`).
    */
   rememberAs?: string;
+  /**
+   * A tool whose every call names one exact target (`request_branch_push`: `owner/repo:branch`): "Aprovar sempre"
+   * keeps the tool's name and that target, and only a call naming the same target runs without asking. Null: this
+   * call names none and can't be remembered.
+   */
+  rememberTarget?(input: Record<string, unknown>): string | null;
   /** Human summary of a call, for approval cards. */
   describe?(input: Record<string, unknown>): { title: string; detail?: string };
   /**

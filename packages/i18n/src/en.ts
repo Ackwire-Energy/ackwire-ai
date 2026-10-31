@@ -1904,6 +1904,8 @@ export const en: Translations = {
     always: {
       button: "Always approve",
       hint: "Approves this one and the next ones like it from {{name}}: {{actions}}, with any values.",
+      hintTarget: "Approves this one and the next ones like it from {{name}}: {{actions}}.",
+      pushTo: "push to {{branch}} in {{repo}}",
       done: "Approved. {{name}} won't ask for this again.",
       undoHere: "To undo it, go to Tools and access, on {{of}} page.",
       open: "Open",
@@ -1967,6 +1969,9 @@ export const en: Translations = {
       run_skill_script: "Run script {{path}} of the skill {{skill}}",
       post_message: "Post in #{{channel}}",
       request_permission: "Turn on: {{permission}}",
+      delete_branches_one: "Delete {{count}} branch in {{repo}}",
+      delete_branches_other: "Delete {{count}} branches in {{repo}}",
+      request_branch_push: "Push to {{branch}} in {{repo}} (24 h, no force push)",
     },
   },
   notifications: {
@@ -3363,7 +3368,7 @@ export const en: Translations = {
     github_git_write: {
       label: "Push branches (git push)",
       description:
-        "Push commits only to agentes/{agent}/… branches: never to the default branch, no force push, no tags.",
+        "Push commits to agentes/{agent}/… branches: never to the default branch, no force push, no tags. Deleting branches and pushing to someone else's branch ask for approval first.",
     },
     custom_read: {
       label: "Read tools",

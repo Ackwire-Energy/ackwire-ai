@@ -7,6 +7,7 @@ import {
   forbiddenHint,
   forbiddenReason,
   inlineCodeCall,
+  NO_TERMINAL_COMMANDS,
   PERMISSION_TIMEOUT_MESSAGE,
   PERMISSION_WAIT_MS,
   readOnlyCall,
@@ -550,7 +551,7 @@ export function runPermissionPrompt(args: Record<string, unknown>, opts: { canRu
   if (scope && readOnlyCall(tool, input, scope)) return allow();
   if (!opts.canRun) {
     return deny(
-      "Running commands on this computer is turned off for you. If the request needs it, ask for it with request_permission (sandbox:run). Never give the person a terminal command to run.",
+      `Running commands on this computer is turned off for you. If the request needs it, ask for it with request_permission (sandbox:run). ${NO_TERMINAL_COMMANDS}`,
       "off",
     );
   }
@@ -558,7 +559,7 @@ export function runPermissionPrompt(args: Record<string, unknown>, opts: { canRu
   if (reason === null) return allow();
   const hint = forbiddenHint(reason);
   return deny(
-    `This command was refused because ${reason}.${hint ? ` ${hint}` : ""} Agents may not use sudo, delete or write outside their folder, upload, open remote shells or install globally. Do it another way; if there is none, tell the person in plain words what you couldn't do. Never give them a terminal command to run.`,
+    `This command was refused because ${reason}.${hint ? ` ${hint}` : ""} Agents may not use sudo, delete or write outside their folder, upload, open remote shells or install globally. Do it another way; if there is none, tell the person in plain words what you couldn't do. ${NO_TERMINAL_COMMANDS}`,
     forbiddenCode(reason),
   );
 }
