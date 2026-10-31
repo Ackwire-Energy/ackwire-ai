@@ -63,8 +63,9 @@ function OutageNotice({ outage: o, onDismiss }: { outage: MachineOutage; onDismi
   const { t } = useTranslation();
   const c = useColors();
   const surface = useSurface();
-  // The Cloud has no other computer to switch to.
-  const cloud = useEdition() === "cloud";
+  // The Cloud has no other computer to switch to, and nothing is offered while the edition isn't known.
+  const edition = useEdition();
+  const cloud = edition === "cloud";
   const text = noticeText(t, o, cloud);
   return (
     <View style={[styles.card, surface]}>
@@ -89,7 +90,7 @@ function OutageNotice({ outage: o, onDismiss }: { outage: MachineOutage; onDismi
           <IconButton icon="x" label={t("mobile.outage.dismiss")} onPress={onDismiss} />
         </View>
       </View>
-      {!cloud && (
+      {edition === "selfhost" && (
         <Button
           variant="primary"
           size="sm"

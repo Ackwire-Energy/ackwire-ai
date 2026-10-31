@@ -150,12 +150,15 @@ export function createFakeMail(log: (method: string, ...args: unknown[]) => void
         { id: "Clientes", name: "Clientes" },
       ];
     },
-    agent: async (_orgId, agentId) => clone(fake.accounts.map((a) => entry(agentId, a.id))),
+    // A mailbox still connecting has no agent access yet, as on the server.
+    agent: async (_orgId, agentId) =>
+      clone(fake.accounts.filter((a) => a.status !== "pending").map((a) => entry(agentId, a.id))),
     setAgent: async (orgId, agentId, accountId, input) => {
       log("mail.setAgent", orgId, agentId, accountId, input);
       if (input.policy.sendWithoutAsking && input.policy.allowedRecipients.length === 0)
         throw new ApiError(422, "send_without_recipients", "Allowed recipients are required");
-      const a = find(accountId);
+      const a = fake.accounts.find((x) => x.id === accountId && x.status !== "pending");
+      if (!a) throw new ApiError(404, "mail.account_not_found", "Mailbox not found");
       const saved: AgentMailbox = { accountId, ...clone(input) };
       const byAccount = fake.agentMail.get(agentId) ?? new Map<string, AgentMailbox>();
       byAccount.set(accountId, saved);

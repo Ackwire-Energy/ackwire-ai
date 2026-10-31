@@ -6,6 +6,7 @@ import { OpenAPIHono, z } from "@hono/zod-openapi";
 import { createMiddleware } from "hono/factory";
 import { type Auth, type SessionUser, sessionUser } from "../../auth";
 import { apiError, errorResponse, validationHook } from "../../http/errors";
+import type { Logger } from "../../logger";
 import type { AppExtras } from "./extras";
 
 export interface AppDeps {
@@ -17,6 +18,7 @@ export interface AppDeps {
   wakeWorkers?: () => void;
   /** Backend services (see `extras.ts`). */
   extras?: AppExtras;
+  log?: Logger;
 }
 
 export type AppEnv = { Variables: { user: SessionUser } };

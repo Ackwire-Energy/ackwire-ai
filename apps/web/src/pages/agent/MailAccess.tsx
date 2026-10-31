@@ -1,12 +1,14 @@
 import type { AgentMailbox, MailAccount, MailPolicy } from "@agenteschat/client";
 import { ApiError, useAgentMail, useMailAccounts, useSetAgentMail } from "@agenteschat/client";
 import type { Level } from "@agenteschat/client/lib/access-levels";
+import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { choiceOf, defaultPolicy, MAIL_ACTIONS, normalizePolicy, toMailLevel } from "@agenteschat/client/lib/mail";
-import { Alert, Button, Card, CountChip, Icon, Switch } from "@agenteschat/ui";
+import { Alert, Button, Card, Chip, CountChip, Icon, Switch } from "@agenteschat/ui";
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LevelRow } from "@/components/AccessLevels";
-import { MailIcon } from "@/components/MailConnect";
+import { MailIcon, mailChoiceName } from "@/components/MailConnect";
 import { MailRulesPanel, rulesCount } from "@/components/MailRules";
 import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
@@ -16,7 +18,8 @@ import { CardHead, useAgentEdit } from "./context";
  * Ferramentas e acesso → Email (ADR 0038): one row per mailbox of the
  * organization, the same level as the other connectors (Sem acesso · Ler ·
  * Ler e escrever), "Pode apagar emails" and the rules. Each mailbox saves on
- * its own ("Salvar"), outside the page's save bar.
+ * its own ("Salvar"), outside the page's save bar. A mailbox still connecting
+ * has no address and takes no access yet: its row says so and where to see it.
  */
 export function MailAccessCard() {
   const { t } = useTranslation();
@@ -36,17 +39,49 @@ export function MailAccessCard() {
         action={<span className="small muted">{t("mail.agent.help", { org: org.name })}</span>}
       />
       <ul className="level-list" aria-label={t("mail.agent.title")}>
-        {list.map((account) => (
-          <MailboxRow
-            key={account.id}
-            account={account}
-            saved={mail.data?.find((m) => m.accountId === account.id) ?? null}
-            loading={mail.isLoading}
-            editable={can("levels")}
-          />
-        ))}
+        {list.map((account) => {
+          const name = account.address || mailChoiceName(t, choiceOf(account));
+          return account.status === "pending" ? (
+            <LevelRow
+              key={account.id}
+              icon={<MailIcon choice={choiceOf(account)} />}
+              name={name}
+              tag={
+                <Chip icon="waiting" tone="waiting">
+                  {t("mail.status.pending")}
+                </Chip>
+              }
+              extra={<SeeInConnectors text={t("mail.agent.pending")} />}
+              levels={["none"]}
+              value="none"
+            />
+          ) : (
+            <MailboxRow
+              key={account.id}
+              account={account}
+              name={name}
+              saved={mail.data?.find((m) => m.accountId === account.id) ?? null}
+              loading={mail.isLoading}
+              editable={can("levels")}
+            />
+          );
+        })}
       </ul>
     </Card>
+  );
+}
+
+/** What a mailbox's state means for the agent, and the way to Conectores, where it is fixed. */
+function SeeInConnectors({ text }: { text: string }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  return (
+    <span className="small muted">
+      {text}{" "}
+      <Link className="ac-link" to="/org/$orgId/settings/$section" params={{ orgId: org.id, section: "connectors" }}>
+        {t("mail.routine.openConnectors")}
+      </Link>
+    </span>
   );
 }
 
@@ -66,11 +101,13 @@ const draftOf = (saved: AgentMailbox | null): Draft => ({
 
 function MailboxRow({
   account,
+  name,
   saved,
   loading,
   editable,
 }: {
   account: MailAccount;
+  name: string;
   saved: AgentMailbox | null;
   loading: boolean;
   editable: boolean;
@@ -101,6 +138,7 @@ function MailboxRow({
     draft.level === "write" && !draft.policy.sendWithoutAsking
       ? MAIL_ACTIONS.approval.map((a) => t(`mail.action.${a}.name`))
       : [];
+  const reconnect = account.status === "needs_reconnect";
   const save = () =>
     set.mutate(
       {
@@ -115,11 +153,8 @@ function MailboxRow({
         },
         onError: (e) =>
           setError(
-            e instanceof ApiError && e.code === "send_without_recipients"
-              ? t("mail.agent.saveError.send_without_recipients")
-              : e instanceof ApiError && e.status === 422 && e.message
-                ? e.message
-                : t("mail.agent.saveError.unknown"),
+            knownErrorText(t, e) ??
+              t(e instanceof ApiError && e.status === 403 ? "common.notAllowed" : "mail.agent.saveError.unknown"),
           ),
       },
     );
@@ -127,8 +162,16 @@ function MailboxRow({
   return (
     <LevelRow
       icon={<MailIcon choice={choiceOf(account)} />}
-      name={account.address}
+      name={name}
+      tag={
+        reconnect ? (
+          <Chip icon="alert" tone="waiting">
+            {t("mail.status.needs_reconnect")}
+          </Chip>
+        ) : undefined
+      }
       description={draft.level === "none" ? t("access.noneText") : t(`mail.agent.levelText.${draft.level}`)}
+      extra={reconnect ? <SeeInConnectors text={t("mail.agent.needsReconnect")} /> : undefined}
       asks={asks}
       levels={["none", "read", "write"]}
       value={draft.level}
@@ -155,7 +198,7 @@ function MailboxRow({
                   </span>
                 </label>
                 <details className="mail-rules">
-                  <summary aria-label={t("mail.agent.rulesOf", { address: account.address })}>
+                  <summary aria-label={t("mail.agent.rulesOf", { address: name })}>
                     <Icon name="filter" size={14} />
                     <span>{t("mail.agent.rules")}</span>
                     {count > 0 ? (
