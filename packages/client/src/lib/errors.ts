@@ -114,6 +114,9 @@ const KNOWN = {
   human_check_blocked: "errors.humanCheckBlocked",
   // TypeSafe refused the key pasted for Jev: said under its field, nothing kept.
   jev_key_invalid: "jev.steps.invalid",
+  // A provider's own check refused a key on save (OpenRouter's): nothing kept.
+  provider_key_invalid: "settings.keyRefused",
+  provider_key_management: "settings.keyManagement",
 } as const;
 
 /** Better Auth's code when a blocked account tries to sign in (the server's `session.create.before` hook). */

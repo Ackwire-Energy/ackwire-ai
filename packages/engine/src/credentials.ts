@@ -1,6 +1,15 @@
 import type { KeyWrapper } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, isNull, schema, sql } from "@agenteschat/db";
-import { isKnownProvider, type ProviderId } from "@agenteschat/providers";
+import {
+  checkOpenRouterKey,
+  ensureOpenRouterModels,
+  isKnownProvider,
+  isOpenRouterModel,
+  listedModels,
+  type ModelInfo,
+  modelInfo,
+  type ProviderId,
+} from "@agenteschat/providers";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { openSecret, sealSecret } from "./crypto";
@@ -60,6 +69,48 @@ function auditCredential(
   });
 }
 
+/** The cache key of `openRouterInUse`: about the whole server, no org's. */
+const OPENROUTER_IN_USE = "*:openrouter-in-use";
+
+/**
+ * Whether any workspace on this server has an OpenRouter key that isn't revoked: OpenRouter's model list is read
+ * only then (ADR 0087). Cached like credential rows.
+ */
+export async function openRouterInUse(db: Executor): Promise<boolean> {
+  return (await caches.credentials.getOrLoad(OPENROUTER_IN_USE, async () => {
+    const [row] = await db
+      .select({ id: providerCredentials.id })
+      .from(providerCredentials)
+      .where(and(eq(providerCredentials.provider, "openrouter"), isNull(providerCredentials.revokedAt)))
+      .limit(1);
+    return row !== undefined;
+  })) as boolean;
+}
+
+/** A model's entry, for a setting someone picks: OpenRouter's list is read first only while it is in use. */
+export async function modelInfoFor(db: Executor, model: string): Promise<ModelInfo | undefined> {
+  if (isOpenRouterModel(model) && (await openRouterInUse(db))) await ensureOpenRouterModels(model);
+  return modelInfo(model);
+}
+
+/** Every model for the pickers: the catalog's, then OpenRouter's, its list read first only while it is in use. */
+export async function pickerModels(db: Executor): Promise<[string, ModelInfo][]> {
+  if (await openRouterInUse(db)) await ensureOpenRouterModels();
+  return listedModels();
+}
+
+/**
+ * An OpenRouter key is checked with OpenRouter before it is stored (no model call): a refused key or one that only
+ * manages keys is never kept. A check that gets no answer either way lets it be saved.
+ */
+async function checkKey(provider: string, apiKey: string, http?: typeof fetch) {
+  if (provider !== "openrouter") return;
+  const state = await checkOpenRouterKey(apiKey, http);
+  if (state === "invalid") throw new ValidationError("The provider didn't accept this key.", "provider_key_invalid");
+  if (state === "management")
+    throw new ValidationError("This is a management key. Create a regular API key.", "provider_key_management");
+}
+
 /** Stores an org's provider API key, encrypted (envelope encryption). */
 export async function createCredential(
   db: Database,
@@ -77,11 +128,14 @@ export async function createCredential(
     /** Make it the workspace's default key (onboarding does this in the same call). */
     makeDefault?: boolean;
   },
+  /** Outbound HTTP for the provider's key check (tests: a fake). */
+  opts: { fetch?: typeof fetch } = {},
 ): Promise<CredentialSummary> {
   await requirePermission(db, actorId, orgId, "manage_credentials");
   if (!isKnownProvider(input.provider)) throw new ValidationError(`Unknown provider ${input.provider}`);
   const apiKey = input.apiKey.trim();
   if (apiKey.length < 8) throw new ValidationError("apiKey looks too short");
+  await checkKey(input.provider, apiKey, opts.fetch);
   const id = crypto.randomUUID();
   const sealed = await sealSecret(keyWrapper, apiKey, aadFor(orgId, id));
   const row = await db.transaction(async (tx) => {
@@ -107,6 +161,11 @@ export async function createCredential(
   });
   if (!row) throw new Error("credential insert returned nothing");
   invalidateDefaults(orgId);
+  if (input.provider === "openrouter") {
+    caches.credentials.delete(OPENROUTER_IN_USE);
+    // Its models, ready for the pickers.
+    void ensureOpenRouterModels();
+  }
   return { ...summary(row), isDefault: input.makeDefault === true };
 }
 
@@ -286,10 +345,15 @@ export async function rotateCredential(
     organization?: string | null;
     project?: string | null;
   },
+  /** Outbound HTTP for the provider's key check (tests: a fake). */
+  opts: { fetch?: typeof fetch } = {},
 ): Promise<CredentialSummary> {
   await requirePermission(db, actorId, orgId, "manage_credentials");
   const apiKey = input.apiKey.trim();
   if (apiKey.length < 8) throw new ValidationError("apiKey looks too short");
+  const current = await usableCredentialRow(db, orgId, credentialId);
+  if (!current) throw new NotFoundError("Credential not found");
+  await checkKey(current.provider, apiKey, opts.fetch);
   const sealed = await sealSecret(keyWrapper, apiKey, aadFor(orgId, credentialId));
   const [row] = await db
     .update(providerCredentials)

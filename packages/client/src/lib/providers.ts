@@ -1,4 +1,4 @@
-import type { Credential, Model } from "../api/types";
+import type { Credential, Model, ModelTier } from "../api/types";
 
 interface ProviderEntry {
   id: string;
@@ -15,6 +15,8 @@ interface ProviderEntry {
   masculine?: boolean;
   /** Its free tier lets the provider use what is sent: billing should be on. */
   billing?: boolean;
+  /** It passes what is sent on to other providers, as the account's privacy settings at it allow. */
+  privacy?: boolean;
 }
 
 /**
@@ -34,7 +36,7 @@ export const PROVIDERS = [
     id: "openai",
     label: "OpenAI",
     placeholder: "sk-…",
-    pattern: /^sk-(?!ant-)[A-Za-z0-9_-]{16,}$/,
+    pattern: /^sk-(?!ant-|or-)[A-Za-z0-9_-]{16,}$/,
     site: "platform.openai.com/api-keys",
   },
   {
@@ -73,9 +75,17 @@ export const PROVIDERS = [
     id: "minimax",
     label: "MiniMax",
     // `sk-cp-` keys are its coding plan's.
-    pattern: /^(?!sk-ant-|sk-cp-|AQ\.|AIza)[A-Za-z0-9._-]{16,}$/,
+    pattern: /^(?!sk-ant-|sk-cp-|sk-or-|AQ\.|AIza)[A-Za-z0-9._-]{16,}$/,
     site: "platform.minimax.io/user-center/basic-information/interface-key",
     plans: true,
+  },
+  {
+    id: "openrouter",
+    label: "OpenRouter",
+    placeholder: "sk-or-v1-…",
+    pattern: /^sk-or-v\d+-[A-Za-z0-9]{32,}$/,
+    site: "openrouter.ai/keys",
+    privacy: true,
   },
 ] as const satisfies readonly ProviderEntry[];
 
@@ -107,10 +117,16 @@ export function providerGuess(key: string | undefined, asked?: string): Provider
 
 /**
  * The ⓘ on the key panel's first step, web and phone: for a maker that also sells coding plans, where a plan's key
- * goes; for one whose free tier may use what is sent, to turn on billing.
+ * goes; for one whose free tier may use what is sent, to turn on billing; for a router, who may keep what is sent.
  */
 export const keyStepHint = (p: ProviderEntry) =>
-  p.plans ? "connectAi.key.notPlan" : p.billing ? "connectAi.key.billing" : undefined;
+  p.plans
+    ? "connectAi.key.notPlan"
+    : p.billing
+      ? "connectAi.key.billing"
+      : p.privacy
+        ? "connectAi.key.privacy"
+        : undefined;
 
 /** Live keys per provider. */
 export function providersWithKeys(credentials: Credential[]) {
@@ -125,13 +141,16 @@ export interface ModelChoice {
 /**
  * Models grouped by provider, each marked usable or not. Uses `model.available`
  * when the server sends it (expected on `GET …/models`); until then a model is
- * usable when the workspace has a key for its provider, or the platform key is on.
+ * usable when the workspace has a key for its provider, or, for Claude, when the
+ * platform key is on (the only one a server offers). A long list's models the
+ * workspace can't use are left out: only its good picks show, to say a key opens them.
  */
 export function modelChoices(models: Model[], credentials: Credential[], platform: boolean) {
   const withKey = providersWithKeys(credentials);
   const groups = new Map<string, ModelChoice[]>();
   for (const model of models) {
-    const available = model.available ?? (platform || withKey.has(model.provider));
+    const available = model.available ?? (withKey.has(model.provider) || (platform && model.provider === "anthropic"));
+    if (model.pick === false && !available) continue;
     groups.set(model.provider, [...(groups.get(model.provider) ?? []), { model, available }]);
   }
   return [...groups.entries()];
@@ -147,3 +166,20 @@ export const isAuto = (value: string | null | undefined) => value === AUTO;
 /** A workspace key runs this agent model: Automático (it follows the key), or one of the key's provider's. */
 export const keyRuns = (key: Pick<Credential, "provider">, model: string | undefined, models: readonly Model[]) =>
   isAuto(model) || models.some((m) => m.id === model && m.provider === key.provider);
+
+/** Automático's sizes, smallest first. */
+export const MODEL_TIERS: readonly ModelTier[] = ["small", "medium", "large"];
+
+/**
+ * The model Automático gives a tier on a provider's key when the workspace chose none, as the server picks it
+ * (`modelForTier`, packages/providers/src/catalog.ts): that tier, else the nearest smaller, else the nearest larger.
+ */
+export function tierDefault(models: readonly Model[], provider: string, tier: ModelTier): Model | undefined {
+  const own = models.filter((m) => m.provider === provider && m.tier);
+  const at = MODEL_TIERS.indexOf(tier);
+  for (const t of [...MODEL_TIERS.slice(0, at + 1).reverse(), ...MODEL_TIERS.slice(at + 1)]) {
+    const hit = own.find((m) => m.tier === t);
+    if (hit) return hit;
+  }
+  return undefined;
+}

@@ -141,6 +141,7 @@ import type {
   MissionSettings,
   MissionSummary,
   Model,
+  ModelTier,
   MoveAgentsInput,
   MoveAgentsResult,
   NoticeCategory,
@@ -317,7 +318,14 @@ export interface ApiClient {
     previewInvitation(token: string): Promise<InvitationPreview | null>;
     acceptInvitation(token: string): Promise<{ orgId: string }>;
     settings(orgId: string): Promise<OrgSettings>;
-    updateSettings(orgId: string, input: Partial<Omit<OrgSettings, "name">> & { name?: string }): Promise<OrgSettings>;
+    updateSettings(
+      orgId: string,
+      input: Partial<Omit<OrgSettings, "name" | "autoModels">> & {
+        name?: string;
+        /** Per provider and tier, one of its models; null puts the tier back on its default. */
+        autoModels?: Partial<Record<string, Partial<Record<ModelTier, string | null>>>>;
+      },
+    ): Promise<OrgSettings>;
     overview(orgId: string): Promise<OrgOverview>;
     /** Members with presence. */
     people(orgId: string): Promise<Person[]>;

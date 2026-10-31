@@ -234,5 +234,10 @@ export const organizationSettings = pgTable("organization_settings", {
   defaultAgentBudgetNanoUsd: bigint({ mode: "number" }).notNull().default(50_000_000_000),
   /** Agents check what the team already did before an outside action (ADR 0064). On unless an admin turns it off. */
   actionCheck: boolean().notNull().default(true),
+  /**
+   * The models "Automático" picks per tier on a provider's key where the workspace chose its own
+   * (`{ openrouter: { small, medium, large } }`); a tier left out is the provider's default (ADR 0087).
+   */
+  autoModels: jsonb().$type<Partial<Record<string, Partial<Record<string, string>>>>>().notNull().default({}),
   updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });

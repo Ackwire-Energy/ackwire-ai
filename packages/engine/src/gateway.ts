@@ -4,15 +4,20 @@ import {
   costNanoUsd,
   type EmbeddingProvider,
   embeddingCostNanoUsd,
+  ensureOpenRouterModels,
   estimateTokens,
   isKnownModel,
-  MODEL_CATALOG,
+  isOpenRouterModel,
+  type ModelInfo,
   type ModelMessage,
   type ModelProvider,
   type ModelRequest,
   type ModelResult,
   type ModelUsage,
   maxCostNanoUsd,
+  modelInfo,
+  modelProvider,
+  openRouterListed,
   outputTokensWithin,
   PROVIDERS,
   ProviderError,
@@ -109,7 +114,7 @@ const periodOf = (now: Date) => monthStartUtc(now).toISOString().slice(0, 10);
 /**
  * The only way to call a model (docs/adr/0007, 0012). For every call:
  * 0. refuse it for a workspace on hold or suspended, or a held agent (`standing.ts`);
- * 1. resolve the model from the catalog (agent's model, or the fixed org-call model);
+ * 1. resolve the model from the catalog or OpenRouter's list (agent's model, or the fixed org-call model);
  * 2. agent calls: atomically reserve the worst-case cost against the agent's
  *    monthly counter (row lock), shrinking `maxTokens` to fit the budget;
  * 3. decrypt the org's credential (or ask the platform-credential adapter);
@@ -219,6 +224,24 @@ export function createModelGateway(deps: ModelGatewayDeps) {
   const agentKey = (agent: Agent, provider: string) => resolveKey(agent.orgId, provider, agent.credentialId);
   const orgKey = (orgId: string, provider: string) => resolveKey(orgId, provider, null);
 
+  /** Whether the model is in the catalog or OpenRouter's list (read first when due). */
+  async function isListed(model: string) {
+    if (isOpenRouterModel(model)) await ensureOpenRouterModels(model);
+    return modelInfo(model) !== undefined;
+  }
+
+  /** A model's entry, or why there is none. Called once its key resolved: no key, no read of OpenRouter's list. */
+  async function infoFor(model: string): Promise<ModelInfo> {
+    if (await isListed(model)) return modelInfo(model) as ModelInfo;
+    if (!isOpenRouterModel(model)) throw new ValidationError(`Model ${model} is not in the catalog`);
+    // Without its list no call can be priced: like an outage, the run tries again later.
+    if (!openRouterListed()) throw new ProviderError("could not reach provider", true);
+    throw new ValidationError(`OpenRouter doesn't list ${model} anymore. Pick another model in the agent's settings.`);
+  }
+
+  /** The output cap sent: the call's, within the most the model may write. */
+  const capOf = (maxTokens: number, info: ModelInfo) => Math.min(maxTokens, info.maxOutputTokens ?? maxTokens);
+
   /** Usage of a stream that failed midway: what the provider reported, else counted or estimated. */
   async function partialUsage(
     error: ProviderError,
@@ -257,12 +280,14 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       model: string;
       requestedModel: string;
       usage: ModelUsage;
+      /** What the provider says the call cost; absent: priced from the catalog. */
+      reportedCost?: number;
       partial: boolean;
     },
   ) {
     // Price by the model that answered (a server-side fallback may differ), if we know it.
     const pricedModel = isKnownModel(input.model) ? input.model : input.requestedModel;
-    const cost = costNanoUsd(pricedModel, input.usage, now());
+    const cost = input.reportedCost ?? costNanoUsd(pricedModel, input.usage, now());
     const [record] = await tx
       .insert(usageRecords)
       .values({
@@ -444,10 +469,13 @@ export function createModelGateway(deps: ModelGatewayDeps) {
     provider: string;
     model: string;
     usage: ModelUsage;
+    reportedCost?: number;
   }) {
     const { agent, usage } = input;
     const pricedModel = isKnownModel(input.model) ? input.model : agent.model;
-    const cost = costNanoUsd(pricedModel, usage, now());
+    // ponytail: OpenRouter may route to an upstream dearer than its listed price, so a call can spend past what it
+    // reserved; the counter takes the reported cost. Its `provider.max_price` would cap the route.
+    const cost = input.reportedCost ?? costNanoUsd(pricedModel, usage, now());
     const id = Bun.randomUUIDv7();
     const period = input.reservation?.periodStart ?? periodOf(now());
     const at = now().toISOString();
@@ -501,17 +529,20 @@ export function createModelGateway(deps: ModelGatewayDeps) {
      * load must not unwrap every key (a network call per key with a KMS wrapper).
      */
     async hasModelCredential(agent: Pick<Agent, "orgId" | "model" | "credentialId">): Promise<boolean> {
-      const info = MODEL_CATALOG[agent.model];
-      if (!info || !deps.providers[info.provider]) return false;
-      const usable = async (id: string) => (await usableCredentialRow(db, agent.orgId, id))?.provider === info.provider;
-      try {
-        if (agent.credentialId) return await usable(agent.credentialId);
-        const defaultId = await orgDefaultCredentialId(agent.orgId, info.provider);
+      const provider = modelProvider(agent.model);
+      if (!provider || !deps.providers[provider]) return false;
+      const usable = async (id: string) => (await usableCredentialRow(db, agent.orgId, id))?.provider === provider;
+      const keyed = async () => {
+        if (agent.credentialId) return usable(agent.credentialId);
+        const defaultId = await orgDefaultCredentialId(agent.orgId, provider);
         if (defaultId && (await usable(defaultId))) return true;
         const platform = deps.platformCredentials;
         return platform.available
-          ? await platform.available(agent.orgId, info.provider)
-          : (await platform.resolve(agent.orgId, info.provider)) !== null;
+          ? platform.available(agent.orgId, provider)
+          : (await platform.resolve(agent.orgId, provider)) !== null;
+      };
+      try {
+        return (await keyed()) && (await isListed(agent.model));
       } catch {
         return false;
       }
@@ -527,23 +558,24 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       if (!row || row.archivedAt) throw new NotFoundError("Agent not found");
       // Every agent has a budget: its own, else the organization's default.
       const agent = await withEffectiveBudget(db, row);
-      const info = MODEL_CATALOG[agent.model];
-      if (!info) throw new ValidationError(`Model ${agent.model} is not in the catalog`);
-      const provider = providerFor(info.provider);
+      const providerId = modelProvider(agent.model);
+      if (!providerId) throw new ValidationError(`Model ${agent.model} is not in the catalog`);
+      const provider = providerFor(providerId);
+      const key = await agentKey(agent, providerId);
+      const info = await infoFor(agent.model);
 
       const request: ModelRequest = {
         model: agent.model,
         system: call.system,
         messages: call.messages,
-        maxTokens: call.maxTokens,
+        maxTokens: capOf(call.maxTokens, info),
         tools: call.tools,
         ...(call.effort ? { effort: call.effort } : {}),
         signal: call.signal,
       };
       // Conservative prompt estimate (3 chars/token) so the reservation is an upper bound in practice.
       const promptTokens = Math.ceil(promptChars(request) / 3);
-      const key = await agentKey(agent, info.provider);
-      const { reservation, maxTokens } = await reserve(agent, agent.model, promptTokens, call.maxTokens);
+      const { reservation, maxTokens } = await reserve(agent, agent.model, promptTokens, request.maxTokens);
       request.maxTokens = maxTokens;
 
       let result: ModelResult;
@@ -566,7 +598,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
               kind: "agent",
               runId: call.runId,
               credentialId: key.credentialId,
-              provider: info.provider,
+              provider: providerId,
               model: agent.model,
               requestedModel: agent.model,
               usage,
@@ -584,9 +616,10 @@ export function createModelGateway(deps: ModelGatewayDeps) {
         reservation,
         runId: call.runId,
         credentialId: key.credentialId,
-        provider: info.provider,
+        provider: providerId,
         model: result.model,
         usage: result.usage,
+        reportedCost: result.costNanoUsd,
       });
       await checkThresholds(agent, spent, record.cost);
       return { ...result, usageRecordId: record.id, costNanoUsd: record.cost, maxTokens };
@@ -660,15 +693,16 @@ export function createModelGateway(deps: ModelGatewayDeps) {
     /** A call for the organization (router, summaries). Not streamed to anyone; no agent budget. */
     async complete(call: OrgCall): Promise<GatewayResult> {
       await assertCanWork(db, call.orgId);
-      const info = MODEL_CATALOG[call.model];
-      if (!info) throw new ValidationError(`Model ${call.model} is not in the catalog`);
-      const provider = providerFor(info.provider);
-      const key = await orgKey(call.orgId, info.provider);
+      const providerId = modelProvider(call.model);
+      if (!providerId) throw new ValidationError(`Model ${call.model} is not in the catalog`);
+      const provider = providerFor(providerId);
+      const key = await orgKey(call.orgId, providerId);
+      const info = await infoFor(call.model);
       const request: ModelRequest = {
         model: call.model,
         system: call.system,
         messages: call.messages,
-        maxTokens: call.maxTokens,
+        maxTokens: capOf(call.maxTokens, info),
         outputSchema: call.outputSchema,
         effort: call.effort,
         signal: call.signal,
@@ -679,7 +713,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
         kind: call.kind,
         runId: call.runId,
         credentialId: key.credentialId,
-        provider: info.provider,
+        provider: providerId,
         requestedModel: call.model,
       };
       let result: ModelResult;
@@ -694,8 +728,14 @@ export function createModelGateway(deps: ModelGatewayDeps) {
         if (usage) await recordUsage(db, { ...base, model: call.model, usage, partial: true });
         throw error;
       }
-      const record = await recordUsage(db, { ...base, model: result.model, usage: result.usage, partial: false });
-      return { ...result, usageRecordId: record.id, costNanoUsd: record.cost, maxTokens: call.maxTokens };
+      const record = await recordUsage(db, {
+        ...base,
+        model: result.model,
+        usage: result.usage,
+        reportedCost: result.costNanoUsd,
+        partial: false,
+      });
+      return { ...result, usageRecordId: record.id, costNanoUsd: record.cost, maxTokens: request.maxTokens };
     },
   };
 }

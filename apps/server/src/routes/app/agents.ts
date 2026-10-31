@@ -32,6 +32,7 @@ import {
   newAgentBrainMachines,
   orgAiStatus,
   orgRouting,
+  pickerModels,
   publishMachineAgentsChanged,
   requirePermission,
   revokeCredential,
@@ -43,7 +44,7 @@ import {
   updateAgentGroup,
   usageSummary,
 } from "@agenteschat/engine";
-import { MODEL_CATALOG, nanoUsdToUsd, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
+import { nanoUsdToUsd, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
 import { createRoute, z } from "@hono/zod-openapi";
 import {
   type AppDeps,
@@ -106,7 +107,8 @@ const AgentFields = z.object({
   role: z.string().max(200).optional(),
   instructions: z.string().max(50_000).optional(),
   model: z.string().optional().openapi({
-    description: "A catalog model id, or `auto` (each run picks the model tier and effort). Defaults to `auto`.",
+    description:
+      "A catalog model id, an OpenRouter model id (`maker/model`, ADR 0087), or `auto` (each run picks the model tier and effort). Defaults to `auto`.",
   }),
   credentialId: z
     .uuid()
@@ -188,6 +190,8 @@ export function agentRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Models agents can use, with prices",
+      description:
+        "The catalog's models, then OpenRouter's (ADR 0087) while a workspace on this server has an OpenRouter key: its good picks first (`pick: true`), then the rest of its list (`pick: false`).",
       responses: {
         200: json(
           z.object({
@@ -198,16 +202,18 @@ export function agentRoutes(deps: AppDeps) {
         401: errors[401],
       },
     }),
-    (c) =>
+    async (c) =>
       c.json(
         {
           defaultModel: NEW_AGENT_DEFAULTS.model,
-          models: Object.entries(MODEL_CATALOG).map(([id, m]) => ({
+          models: (await pickerModels(db)).map(([id, m]) => ({
             id,
             label: m.label,
             provider: m.provider,
             inputUsdPerMTok: pricesAt(m).input / 1000,
             outputUsdPerMTok: pricesAt(m).output / 1000,
+            ...(m.pick !== undefined ? { pick: m.pick } : {}),
+            ...(m.tier ? { tier: m.tier } : {}),
           })),
         },
         200,
@@ -241,7 +247,8 @@ export function agentRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Add a provider API key",
-      description: "The key is encrypted at rest and never returned by any endpoint.",
+      description:
+        "The key is encrypted at rest and never returned by any endpoint. An OpenRouter key is checked with OpenRouter first, with no model call (ADR 0087): refused (`provider_key_invalid`) or a management key (`provider_key_management`) is never stored.",
       request: {
         params: OrgParams,
         body: body(
@@ -271,6 +278,7 @@ export function agentRoutes(deps: AppDeps) {
         c.get("user").id,
         c.req.valid("param").orgId,
         c.req.valid("json"),
+        { fetch: deps.extras?.http },
       );
       return c.json({ ...row, createdAt: row.createdAt.toISOString(), revokedAt: iso(row.revokedAt) }, 201);
     },

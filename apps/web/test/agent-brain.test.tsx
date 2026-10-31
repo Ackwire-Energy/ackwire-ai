@@ -6,7 +6,17 @@ setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { type BrainChoice, changedKeys, type Saved, sameBrain } from "@/lib/agent-edit";
-import { ADA_ID, createFakeApi, fakeAgentBrain, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
+import {
+  ADA_ID,
+  createFakeApi,
+  fakeAgentBrain,
+  fakeBrowserOf,
+  fakeMachinesOf,
+  OPENROUTER_KEY,
+  OPENROUTER_MODELS,
+  ORG_ID,
+  seedState,
+} from "./fake-api";
 import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
@@ -1050,5 +1060,58 @@ describe("Quem pensa: Automático", () => {
     await settle(6);
     expect(state.calls.filter((c) => c.method === "agents.update").map((c) => c.args[2])).toEqual([{ model: "auto" }]);
     expect(document.body.textContent).toContain("A Ada agora pensa com Automático.");
+  });
+
+  test("OpenRouter's models: a search over them, its good picks before the rest, each with its price", async () => {
+    const seeded = seedState({ extraModels: OPENROUTER_MODELS });
+    seeded.credentials.push(OPENROUTER_KEY);
+    const { state } = await open(seeded);
+    const d = await brainDialog();
+    await click(within(d).getByRole("combobox", { name: "Modelo" }));
+    const list = screen().getByRole("listbox", { name: "Modelos" });
+    const groups = within(list)
+      .getAllByRole("group")
+      .map((g) => g.getAttribute("aria-label"));
+    expect(groups).toEqual(["Claude", "OpenAI", "OpenRouter · Boas escolhas", "OpenRouter"]);
+    const search = screen().getByRole("combobox", { name: "Buscar modelos" });
+    await act(async () => fireEvent.change(search, { target: { value: "glm" } }));
+    expect(
+      within(list)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual([
+      "Z.ai: GLM LatestUS$ 0,1 / US$ 2,77 por milhão de tokens",
+      "Z.ai: GLM 5.3US$ 0,1 / US$ 2,77 por milhão de tokens",
+    ]);
+    // The maker's name and the id find them too; a free one says so.
+    await act(async () => fireEvent.change(search, { target: { value: "nvidia free" } }));
+    expect(
+      within(list)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["NVIDIA: Nemotron 3 Ultra (free)Grátis, com limite diário"]);
+    await act(async () => fireEvent.change(search, { target: { value: "glm" } }));
+    await act(async () => fireEvent.keyDown(search, { key: "Enter" }));
+    await click(within(d).getByRole("button", { name: "Usar" }));
+    await settle(6);
+    expect(state.calls.filter((c) => c.method === "agents.update").map((c) => c.args[2])).toEqual([
+      { model: "~z-ai/glm-latest" },
+    ]);
+  });
+
+  test("without an OpenRouter key its good picks show, each saying a key opens it, and not the rest of its list", async () => {
+    await open(seedState({ extraModels: OPENROUTER_MODELS }));
+    const d = await brainDialog();
+    await click(within(d).getByRole("combobox", { name: "Modelo" }));
+    const list = screen().getByRole("listbox", { name: "Modelos" });
+    const picks = within(within(list).getByRole("group", { name: "OpenRouter · Boas escolhas" })).getAllByRole(
+      "option",
+    );
+    expect(picks.map((o) => [o.textContent, o.getAttribute("aria-disabled")])).toEqual([
+      ["Z.ai: GLM LatestPrecisa de uma chave da OpenRouter", "true"],
+      ["DeepSeek: DeepSeek Flash LatestPrecisa de uma chave da OpenRouter", "true"],
+      ["Claude Sonnet LatestPrecisa de uma chave da OpenRouter", "true"],
+    ]);
+    expect(within(list).queryByRole("group", { name: "OpenRouter" })).toBeNull();
   });
 });

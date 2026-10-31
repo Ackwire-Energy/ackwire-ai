@@ -18,6 +18,7 @@ import {
   memberPresence,
   memberStatus,
   orgOverview,
+  pickerModels,
   queueInvitationEmail,
   requirePermission,
   resendInvitation,
@@ -32,13 +33,14 @@ import {
   updateOrgSettings,
   usageReport,
 } from "@agenteschat/engine";
-import { MODEL_CATALOG, nanoUsdToUsd, PROVIDERS, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
+import { MODEL_TIERS, nanoUsdToUsd, PROVIDERS, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, iso, json, OrgParams, requireSession, security } from "./context";
 import { AgentAppearance, AgentAudience, Credential, ProviderId, Role } from "./schemas";
 
 const usd = (nano: number | null) => (nano === null ? null : nanoUsdToUsd(nano));
 const ModelId = z.string().max(100);
+const Tier = z.enum(MODEL_TIERS as ["small", "medium", "large"]);
 
 const Settings = z
   .object({
@@ -62,6 +64,10 @@ const Settings = z
     }),
     actionCheck: z.boolean().openapi({
       description: "Agents check what the team already did before acting outside (ADR 0064). On by default.",
+    }),
+    autoModels: z.record(z.string(), z.partialRecord(Tier, z.string())).openapi({
+      description:
+        "Per provider, the models Automático picks per tier where the workspace chose its own (`{ openrouter: { small, medium, large } }`, ADR 0087); a tier left out is the provider's default.",
     }),
   })
   .openapi("OrgSettings");
@@ -263,6 +269,10 @@ export function managementRoutes(deps: AppDeps) {
               .optional()
               .openapi({ description: "Monthly budget of every agent without its own." }),
             actionCheck: z.boolean().optional(),
+            autoModels: z.partialRecord(ProviderId, z.partialRecord(Tier, ModelId.nullable())).optional().openapi({
+              description:
+                "Per provider and tier, one of that provider's models; null puts the tier back on its default.",
+            }),
           }),
         ),
       },
@@ -547,6 +557,7 @@ export function managementRoutes(deps: AppDeps) {
         orgId,
         credentialId,
         c.req.valid("json"),
+        { fetch: deps.extras?.http },
       );
       return c.json({ ...row, createdAt: row.createdAt.toISOString(), revokedAt: iso(row.revokedAt) }, 200);
     },
@@ -612,6 +623,13 @@ export function managementRoutes(deps: AppDeps) {
                 cheap: z.boolean(),
                 inputUsdPerMTok: z.number(),
                 outputUsdPerMTok: z.number(),
+                pick: z.boolean().optional().openapi({
+                  description:
+                    "In OpenRouter's long list (ADR 0087): a good pick, shown first. Absent: a catalog model.",
+                }),
+                tier: Tier.optional().openapi({
+                  description: "The size Automático uses it for on its provider's key, by default.",
+                }),
               }),
             ),
             providers: z.array(
@@ -630,7 +648,7 @@ export function managementRoutes(deps: AppDeps) {
       const usable = (p: string) => Boolean(access.get(p)?.own || access.get(p)?.platform);
       return c.json(
         {
-          models: Object.entries(MODEL_CATALOG).map(([id, m]) => ({
+          models: (await pickerModels(db)).map(([id, m]) => ({
             id,
             label: m.label,
             provider: m.provider,
@@ -639,6 +657,8 @@ export function managementRoutes(deps: AppDeps) {
             cheap: m.cheap === true,
             inputUsdPerMTok: pricesAt(m).input / 1000,
             outputUsdPerMTok: pricesAt(m).output / 1000,
+            ...(m.pick !== undefined ? { pick: m.pick } : {}),
+            ...(m.tier ? { tier: m.tier } : {}),
           })),
           providers: providerIds.map((id) => ({
             id,

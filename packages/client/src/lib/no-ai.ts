@@ -102,7 +102,7 @@ export const planTitle = (t: TFunction, choice: PlanChoice) =>
   isPlanId(choice) ? CODING_PLANS[choice].name : t(`connectAi.plan.${choice}.title`);
 /** The marks overlapped on the computer's plan line, and on the API key row. */
 export const PLAN_MARKS = ["claude", "openai", "zai", "kimi"] as const;
-export const KEY_MARKS = ["claude", "openai", "gemini", "deepseek"] as const;
+export const KEY_MARKS = ["claude", "openai", "gemini", "openrouter"] as const;
 
 /** What a plan's panel can do now for one agent: sign in, or why not yet. */
 export type PlanGate =

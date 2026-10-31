@@ -1,6 +1,6 @@
 import { ACCOUNT_KINDS, BRAIN_EFFORTS } from "@agenteschat/adapters";
 import { ONBOARDING_STEPS, STANDING_STATES } from "@agenteschat/engine";
-import { PROVIDER_IDS } from "@agenteschat/providers";
+import { MODEL_TIERS, PROVIDER_IDS } from "@agenteschat/providers";
 import { z } from "@hono/zod-openapi";
 
 /** A last-message preview's `meta`: what the app needs to show a server-written body in the reader's language. */
@@ -466,6 +466,13 @@ export const Model = z
     provider: z.string(),
     inputUsdPerMTok: z.number(),
     outputUsdPerMTok: z.number(),
+    pick: z.boolean().optional().openapi({
+      description: "In OpenRouter's long list (ADR 0087): a good pick, shown first. Absent: a catalog model.",
+    }),
+    tier: z
+      .enum(MODEL_TIERS as ["small", "medium", "large"])
+      .optional()
+      .openapi({ description: "The size Automático uses it for on its provider's key, by default." }),
   })
   .openapi("Model");
 

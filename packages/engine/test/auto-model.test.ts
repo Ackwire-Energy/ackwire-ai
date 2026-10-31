@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { and, asc, eq, schema } from "@agenteschat/db";
-import { AUTO_MODEL, modelForTier } from "@agenteschat/providers";
+import { AUTO_MODEL, modelForTier, parseOpenRouterModels, setOpenRouterModels } from "@agenteschat/providers";
+import fixture from "../../providers/test/fixtures/openrouter-models.json";
 import {
   answerQuestion,
   autoApplied,
@@ -19,6 +20,7 @@ import {
   normalizeBrainModel,
   postPersonMessage,
   updateAgent,
+  updateOrgSettings,
   ValidationError,
   withAuto,
 } from "../src";
@@ -26,6 +28,7 @@ import { type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
 afterEach(async () => {
+  setOpenRouterModels({}, 0);
   const current = f;
   f = undefined as unknown as Fixture;
   await current?.close();
@@ -165,6 +168,22 @@ describe("one decision, mapped per brain", () => {
     // A mission thinking with another brain than the agent's: the agent's effort doesn't apply there.
     expect(autoApplied(cc, { kind: "codex", model: "gpt-6-sol" }, choice, "anthropic")).toEqual({});
     expect(needsAutoChoice(cc, { kind: "codex", model: "gpt-6-sol" })).toBe(false);
+  });
+
+  test("an OpenRouter key: its good picks per tier, or the workspace's own while OpenRouter lists them", () => {
+    setOpenRouterModels(parseOpenRouterModels(fixture));
+    const plan: BrainPlan = { kind: "model" };
+    const pick = (tier: "small" | "medium" | "large", tiers?: Record<string, string>) =>
+      autoApplied(agent, plan, { tier, effort: "low" }, "openrouter", tiers).apiModel;
+    expect([pick("small"), pick("medium"), pick("large")]).toEqual([
+      "~deepseek/deepseek-flash-latest",
+      "~z-ai/glm-latest",
+      "~anthropic/claude-sonnet-latest",
+    ]);
+    expect(pick("medium", { medium: "tencent/hy3-preview" })).toBe("tencent/hy3-preview");
+    // One OpenRouter no longer lists, or another provider's: the default stands.
+    expect(pick("medium", { medium: "acme/retired" })).toBe("~z-ai/glm-latest");
+    expect(pick("medium", { medium: "claude-sonnet-5-5" })).toBe("~z-ai/glm-latest");
   });
 
   test("an API model on auto with a computer brain: the API model is chosen too (a fallback thinks with it)", () => {
@@ -346,6 +365,42 @@ describe("a run of an agent on Automático", () => {
     expect(f.provider.calls[0]).toMatchObject({
       apiKey: "sk-deepseek-test-1234567890",
       request: { model: "deepseek-v4-pro", effort: "high" },
+    });
+  });
+
+  test("a workspace on an OpenRouter key: the tier's model is the one it chose in Settings", async () => {
+    f = await setup({ judge: judgeAnswers({ current: "large" }), reply: () => ({ chunks: ["ok"] }) });
+    setOpenRouterModels(parseOpenRouterModels(fixture));
+    await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+    const keyCheck = (async () => new Response("{}")) as unknown as typeof fetch;
+    await createCredential(
+      f.db,
+      f.keyWrapper,
+      f.owner.id,
+      f.org.id,
+      { provider: "openrouter", label: "or", apiKey: "or-test-key-12345678", makeDefault: true },
+      { fetch: keyCheck },
+    );
+    await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { model: AUTO_MODEL, credentialId: null });
+    await expect(
+      updateOrgSettings(f.db, f.owner.id, f.org.id, { autoModels: { openrouter: { large: "claude-opus-5-5" } } }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    const saved = await updateOrgSettings(f.db, f.owner.id, f.org.id, {
+      autoModels: { openrouter: { large: "anthropic/claude-sonnet-5.5", small: "tencent/hy3-preview" } },
+    });
+    expect(saved.autoModels).toEqual({
+      openrouter: { large: "anthropic/claude-sonnet-5.5", small: "tencent/hy3-preview" },
+    });
+    // Null puts a tier back on the default; the others stay.
+    const cleared = await updateOrgSettings(f.db, f.owner.id, f.org.id, {
+      autoModels: { openrouter: { small: null } },
+    });
+    expect(cleared.autoModels).toEqual({ openrouter: { large: "anthropic/claude-sonnet-5.5" } });
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
+    await drainOutbox(f.db, f.handlers);
+    expect(f.provider.calls[0]).toMatchObject({
+      apiKey: "or-test-key-12345678",
+      request: { model: "anthropic/claude-sonnet-5.5", effort: "high" },
     });
   });
 

@@ -1,5 +1,5 @@
 import { and, asc, type Executor, eq, isNull, schema } from "@agenteschat/db";
-import { isAutoModel, modelForTier, routerModelOf } from "@agenteschat/providers";
+import { ensureOpenRouterModels, isAutoModel, modelForTier, routerModelOf } from "@agenteschat/providers";
 import type { Agent } from "./agents";
 import { autoProvider } from "./auto-model";
 import { brainOf } from "./brain-settings";
@@ -49,6 +49,8 @@ const READY: AgentAi = { state: "ready" };
 async function modelReady(deps: AiStatusDeps, agent: AiAgent): Promise<boolean> {
   if (!isAutoModel(agent.model)) return deps.gateway.hasModelCredential(agent);
   const provider = await autoProvider(deps.db, agent).catch(() => "anthropic");
+  // OpenRouter's line is its list.
+  if (provider === "openrouter") await ensureOpenRouterModels();
   const model = modelForTier(provider, "medium") ?? modelForTier("anthropic", "medium");
   return model !== null && (await deps.gateway.hasModelCredential({ ...agent, model }));
 }

@@ -1,9 +1,10 @@
-import type { Executor } from "@agenteschat/db";
-import { isAutoModel, MODEL_TIERS, type ModelTier, modelForTier } from "@agenteschat/providers";
+import { type Executor, eq, schema } from "@agenteschat/db";
+import { isAutoModel, MODEL_TIERS, type ModelTier, modelForTier, modelInfo } from "@agenteschat/providers";
 import type { Agent } from "./agents";
 import { brainOf, CLAUDE_CODE_MODELS } from "./brain-settings";
 import type { BrainPlan } from "./brains/select";
 import type { BrainKind } from "./brains/types";
+import { caches } from "./cache";
 import { usableCredentialRow } from "./credentials";
 import type { Judge } from "./judge";
 import { missionOfThread } from "./missions";
@@ -204,22 +205,43 @@ export interface AutoApplied {
   effort?: AutoEffort;
 }
 
+/** Per provider, the models a workspace chose for Automático's tiers (Settings, ADR 0087). */
+export type AutoModels = Record<string, Partial<Record<ModelTier, string>>>;
+
+/** The workspace's own models for Automático's tiers (`organization_settings.auto_models`), cached. */
+export async function orgAutoModels(db: Executor, orgId: string): Promise<AutoModels> {
+  return (await caches.orgs.getOrLoad(`${orgId}:auto-models`, async () => {
+    const [row] = await db
+      .select({ autoModels: schema.organizationSettings.autoModels })
+      .from(schema.organizationSettings)
+      .where(eq(schema.organizationSettings.orgId, orgId));
+    return row?.autoModels ?? {};
+  })) as AutoModels;
+}
+
 /**
  * Maps a choice onto the run's brain (the one place that does): the API model
- * from the catalog line of `provider`, Claude Code's alias, Codex's model, and
- * the effort where the agent left it to auto. The API brain takes the effort
- * only when its model is auto (it has no effort setting of its own). `apiModel`
- * from a resumed run's record wins, so the run keeps its model.
+ * from the line of `provider` (the workspace's own model for the tier, in
+ * `tiers`, while that provider still lists it), Claude Code's alias, Codex's
+ * model, and the effort where the agent left it to auto. The API brain takes
+ * the effort only when its model is auto (it has no effort setting of its
+ * own). `apiModel` from a resumed run's record wins, so the run keeps its model.
  */
 export function autoApplied(
   agent: AutoAgent,
   plan: Pick<BrainPlan, "kind" | "model">,
   choice: Pick<AutoModelRecord, "tier" | "effort" | "apiModel">,
   provider: string,
+  tiers?: Partial<Record<ModelTier, string>>,
 ): AutoApplied {
   const out: AutoApplied = {};
   if (isAutoModel(agent.model)) {
-    const model = choice.apiModel ?? modelForTier(provider, choice.tier) ?? modelForTier("anthropic", choice.tier);
+    const own = tiers?.[choice.tier];
+    const model =
+      choice.apiModel ??
+      (own && modelInfo(own)?.provider === provider ? own : undefined) ??
+      modelForTier(provider, choice.tier) ??
+      modelForTier("anthropic", choice.tier);
     if (model) out.apiModel = model;
   }
   if (plan.kind === "model") {

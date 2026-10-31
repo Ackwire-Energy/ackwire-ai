@@ -1,5 +1,5 @@
 import { channelTopic, orgTopic, type PubSub, userTopic } from "@agenteschat/adapters";
-import { MODEL_CATALOG } from "@agenteschat/providers";
+import { modelProvider } from "@agenteschat/providers";
 import type { AgentActionView } from "./agent-actions";
 import type { ConnectIntent } from "./ai-intent";
 import type { ApprovalView } from "./approvals";
@@ -53,7 +53,7 @@ const RULES = new Set(["reply", "only_agent", "follow_up"]);
 export function decidedByOf(strategy: string, authorUserId: string | null): DecidedBy | undefined {
   if (strategy === "jev") return { step: "jev" };
   const [step, rest = ""] = strategy.split(/:(.*)/s);
-  if (step === "llm" && rest) return { step: "model", model: rest, provider: MODEL_CATALOG[rest]?.provider ?? "" };
+  if (step === "llm" && rest) return { step: "model", model: rest, provider: modelProvider(rest) ?? "" };
   if (step === "plan" && authorUserId && (rest === "claude_code" || rest === "codex")) {
     return { step: "plan", brand: rest === "codex" ? "chatgpt" : "claude", ownerId: authorUserId };
   }

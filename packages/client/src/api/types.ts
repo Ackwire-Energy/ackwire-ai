@@ -532,6 +532,10 @@ export interface Model {
   outputUsdPerMTok: number;
   /** The workspace can use it (has a key for the provider). Expected from the backend; derived until then. */
   available?: boolean;
+  /** In a long list (OpenRouter's): `true` is a good pick, shown first. Absent: a catalog model. */
+  pick?: boolean;
+  /** The size Automático uses it for on its provider's key, by default. */
+  tier?: ModelTier;
 }
 
 export interface AgentUsage {
@@ -1255,7 +1259,12 @@ export interface OrgSettings {
   defaultAgentBudgetUsd?: number;
   /** Agents check what the team already did before acting outside (ADR 0064). On by default. */
   actionCheck: boolean;
+  /** Per provider, the models Automático picks per tier where the workspace chose its own (ADR 0087). */
+  autoModels: Partial<Record<string, Partial<Record<ModelTier, string>>>>;
 }
+
+/** Automático's sizes: quick tasks, everyday work, hard work. */
+export type ModelTier = "small" | "medium" | "large";
 
 /** Sidebar counts. */
 export interface OrgOverview {

@@ -30,7 +30,6 @@ import { saveLevels } from "@agenteschat/client/lib/access-levels";
 import { accountChoices, ownSignInName, signInPlan } from "@agenteschat/client/lib/ai-accounts";
 import { setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { lowerFirst } from "@agenteschat/client/lib/format";
-import { providerGrammar } from "@agenteschat/client/lib/grammar";
 import {
   allowsInApp,
   commandInReason,
@@ -49,7 +48,7 @@ import {
   planModelOptions,
   planOf,
 } from "@agenteschat/client/lib/plans";
-import { AUTO, isAuto, modelChoices, providerLabel } from "@agenteschat/client/lib/providers";
+import { AUTO, isAuto, modelChoices } from "@agenteschat/client/lib/providers";
 import { cleanSite, SITE } from "@agenteschat/client/lib/sites";
 import {
   BrainLogo,
@@ -80,7 +79,7 @@ import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { NO_COMPUTER, useNoComputer } from "@/components/AgentComputer";
-import { DEFAULT_KEY, keyOptions, modelDescription, pickerValue } from "@/components/AgentFields";
+import { DEFAULT_KEY, keyOptions, ModelSelect, modelOptions, pickerValue } from "@/components/AgentFields";
 import { AddAccount } from "@/components/ai/AddAccountFlow";
 import { accountOption } from "@/components/ai/ConnectAiSteps";
 import { PlanReplies, PlanRepliesOf } from "@/components/ai/PlanReplies";
@@ -712,7 +711,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       ? model === saved.model && key === (saved.key ?? DEFAULT_KEY)
       : planModel === view.effectiveModel);
   const all = models.data?.models ?? [];
-  const choices = modelChoices(all, credentials.data ?? [], platform.data ?? false);
+  const modelList = modelOptions(t, i18n.language, modelChoices(all, credentials.data ?? [], platform.data ?? false));
   const modelName = (value: string | null) =>
     isAuto(value)
       ? t("brain.auto.label")
@@ -982,12 +981,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const orgRows = can("model") ? (
     <>
       <BrainField label={t("agentPage.work.brain.planModel")}>
-        <Select
+        <ModelSelect
           className="agp-brainsel"
           aria-label={t("agentPage.work.brain.planModel")}
           value={model}
-          onValueChange={setModel}
-          renderValue={pickerValue}
+          onChange={setModel}
           options={[
             // "Automático" first: each task gets its model and effort, from the line of the agent's key.
             {
@@ -1000,18 +998,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                 </span>
               ),
             },
-            ...choices.flatMap(([provider, list]) =>
-              list.map(({ model: m, available }) => ({
-                value: m.id,
-                label: m.label,
-                group: providerLabel(provider),
-                disabled: !available,
-                leading: <ProviderLogo id={provider} size="sm" />,
-                description: available
-                  ? modelDescription(t, i18n.language, m)
-                  : t("newAgent.modelNeedsKey", providerGrammar(t, provider)),
-              })),
-            ),
+            // The model it has stays a choice when its list is out of reach (OpenRouter's) or no longer has it.
+            ...(isAuto(model) || modelList.some((o) => o.value === model) ? [] : [{ value: model, label: model }]),
+            ...modelList,
           ]}
         />
       </BrainField>

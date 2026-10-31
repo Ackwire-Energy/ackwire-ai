@@ -55,7 +55,7 @@ import {
 } from "@agenteschat/engine";
 
 import { type AgentesModule, type Edition, type ModuleContext, resolveAdapters } from "@agenteschat/modules";
-import { createModelProviders } from "@agenteschat/providers";
+import { createModelProviders, enableOpenRouterModels } from "@agenteschat/providers";
 import { createApp } from "./app";
 import { appleTokenRevoker, createAuth } from "./auth";
 import { buildEngine } from "./engine";
@@ -200,6 +200,8 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
 
   // Per-process caches for agent/org/channel config, scopes, connections, credential rows (30 s TTL).
   enableCaches();
+  // OpenRouter's public model list (ADR 0087): read only while a workspace has an OpenRouter key.
+  enableOpenRouterModels(fetch);
   applyBootSwitches(config);
   if (config.OPERATOR_API_TOKEN) {
     // Before the API serves a page: a caller restarting after a restore must find these rows first.

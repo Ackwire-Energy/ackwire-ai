@@ -847,6 +847,7 @@ export const ptBR = {
       zai: "Cole a chave inteira da Z.ai, sem espaços. Confira e cole de novo.",
       minimax:
         "Cole a chave inteira da MiniMax, sem espaços. As que começam com sk-cp- são do plano e não servem aqui.",
+      openrouter: "As chaves da OpenRouter começam com sk-or-v1-. Confira e cole de novo.",
     },
     keyFromOther: "É de outro provedor?",
     anthropicWorkspace: "ID do workspace no Claude Console",
@@ -1435,7 +1436,7 @@ export const ptBR = {
     },
     key: {
       title: "Chave de API",
-      makers: "Claude, OpenAI, Gemini e outros",
+      makers: "Claude, OpenAI, Gemini, OpenRouter e outros",
       sub: "Você paga pelo uso, direto ao provedor.",
       create: "Crie a sua chave de API {{of}} {{provider}}",
       paste: "Cole aqui",
@@ -1443,6 +1444,8 @@ export const ptBR = {
       saved: "Salva. Todo agente sem plano pensa com ela.",
       notPlan: "A chave de um plano de código vai na opção dele, acima.",
       billing: "Ative o faturamento no projeto da chave. Sem faturamento, o Google pode usar o que os agentes enviam.",
+      privacy:
+        "As configurações de privacidade da OpenRouter decidem quais provedores podem guardar o que seus agentes enviam.",
       platform: "Este servidor",
     },
     wait: {
@@ -3061,6 +3064,7 @@ export const ptBR = {
       opus: "Tarefas longas e difíceis",
       haiku: "Rápido e barato",
       other: "US$ {{input}} / US$ {{output}} por milhão de tokens",
+      free: "Grátis, com limite diário",
     },
     price: "US$ {{input}} / {{output}} por milhão de tokens",
     plans: "Pelo plano, num computador",
@@ -4753,6 +4757,13 @@ export const ptBR = {
     people_other: "{{count}} pessoas ou agentes",
     clearAll: "Limpar filtros",
     clearSearch: "Limpar busca",
+  },
+  models: {
+    search: "Buscar modelos",
+    searchPlaceholder: "Nome ou fabricante",
+    noResults: "Nenhum modelo encontrado",
+    list: "Modelos",
+    picks: "{{provider}} · Boas escolhas",
   },
   timezone: {
     search: "Buscar fuso",
@@ -8214,6 +8225,18 @@ export const ptBR = {
     workspaceIdPlaceholder: "Opcional",
     keyValue: "Chave da API",
     keyInvalid: "Cole a chave da API (pelo menos 8 caracteres).",
+    keyRefused: "O provedor não aceitou esta chave.",
+    keyManagement: "Esta é uma chave de gerenciamento. Crie uma chave de API comum.",
+    autoModels: {
+      title: "Modelos do Automático",
+      text: "Cada tarefa usa um destes, conforme a dificuldade.",
+      small: "Tarefas rápidas",
+      medium: "Trabalho do dia a dia",
+      large: "Trabalho difícil",
+      default: "Padrão · {{model}}",
+      choose: "Escolher",
+      saved: "Modelos salvos.",
+    },
     saveKey: "Salvar chave",
     rotate: "Trocar a chave",
     rotateTitle: "Trocar a chave {{label}}",

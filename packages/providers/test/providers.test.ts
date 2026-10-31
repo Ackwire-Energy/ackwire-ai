@@ -1,19 +1,28 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import {
   cheapModelOf,
+  contextWindowOf,
   costNanoUsd,
   isKnownModel,
+  listedModels,
   MODEL_CATALOG,
   MODEL_TIERS,
+  maxCostNanoUsd,
   modelForTier,
+  outputTokensWithin,
   PROVIDER_IDS,
   PROVIDERS,
+  parseOpenRouterModels,
   pricesAt,
   routerModelOf,
+  setOpenRouterModels,
   summedCostNanoUsd,
   usdToNanoUsd,
 } from "../src";
 import { createFakeProvider } from "../src/fake";
+import fixture from "./fixtures/openrouter-models.json";
+
+afterEach(() => setOpenRouterModels({}, 0));
 
 const usage = (inputTokens: number, outputTokens: number, cacheReadTokens = 0, cacheWriteTokens = 0) => ({
   inputTokens,
@@ -69,6 +78,8 @@ describe("pricing", () => {
       ["kimi-k3.1-pro"],
       ["glm-5.3"],
       ["MiniMax-M3"],
+      // OpenRouter's come from its list.
+      [],
     ]);
   });
 
@@ -97,6 +108,7 @@ describe("pricing", () => {
       "kimi-k3.1-pro",
       "glm-5.3-flash",
       "MiniMax-M3.1-Flash",
+      null,
     ]);
     const line = (provider: string) => MODEL_TIERS.map((tier) => modelForTier(provider, tier));
     expect(line("gemini")).toEqual(["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-4-argon"]);
@@ -115,10 +127,11 @@ describe("pricing", () => {
       null,
       "glm-5.3-flash",
       "MiniMax-M3",
+      null,
     ]);
     for (const provider of PROVIDER_IDS) {
       const picks = Object.values(MODEL_CATALOG).filter((m) => m.provider === provider && m.router);
-      expect(picks).toHaveLength(provider === "moonshot" ? 0 : 1);
+      expect(picks).toHaveLength(provider === "moonshot" || provider === "openrouter" ? 0 : 1);
     }
     // GLM-5.3 Flash can't stop thinking, Flash-Lite keeps a little, every other pick turns it off.
     expect(MODEL_CATALOG["glm-5.3-flash"]?.leastThinking).toBeUndefined();
@@ -159,6 +172,36 @@ describe("pricing", () => {
   test("defaults from config are in the catalog", () => {
     expect(isKnownModel("claude-sonnet-5-5")).toBe(true);
     expect(isKnownModel("claude-haiku-5-5")).toBe(true);
+  });
+});
+
+describe("models listed at run time (OpenRouter's)", () => {
+  test("unknown until the list is in place; then known, priced and tiered like the catalog's, after it", () => {
+    expect(isKnownModel("~z-ai/glm-latest")).toBe(false);
+    expect(modelForTier("openrouter", "medium")).toBeNull();
+    setOpenRouterModels(parseOpenRouterModels(fixture));
+    expect(isKnownModel("~z-ai/glm-latest")).toBe(true);
+    const line = MODEL_TIERS.map((tier) => modelForTier("openrouter", tier));
+    expect(line).toEqual(["~deepseek/deepseek-flash-latest", "~z-ai/glm-latest", "~anthropic/claude-sonnet-latest"]);
+    expect(routerModelOf("openrouter")).toBe("~openai/gpt-luna-latest");
+    expect(cheapModelOf("openrouter")).toBe("~deepseek/deepseek-flash-latest");
+    // The catalog's lines don't change.
+    expect(modelForTier("anthropic", "medium")).toBe("claude-sonnet-5-5");
+    const ids = listedModels().map(([id]) => id);
+    expect(ids.slice(0, Object.keys(MODEL_CATALOG).length)).toEqual(Object.keys(MODEL_CATALOG));
+    expect(ids.at(-1)).toBe("tencent/hy3-preview");
+    expect(contextWindowOf("~z-ai/glm-latest")).toBe(1_048_576);
+    // GPT-6 Luna through OpenRouter: dearer from 272K prompt tokens on, as OpenAI bills it.
+    const u = (inputTokens: number) => ({ inputTokens, outputTokens: 1000, cacheReadTokens: 0, cacheWriteTokens: 0 });
+    expect(costNanoUsd("openai/gpt-6-luna", u(271_999))).toBe(271_999 * 100 + 1000 * 500);
+    expect(costNanoUsd("openai/gpt-6-luna", u(272_000))).toBe(272_000 * 200 + 1000 * 750);
+    // A reservation at the worst case: every prompt token at the cache-write rate.
+    expect(maxCostNanoUsd("openai/gpt-6-luna", 1000, 500)).toBe(1000 * 125 + 500 * 500);
+    // A free model reserves nothing and is never out of budget.
+    expect(maxCostNanoUsd("nvidia/nemotron-3-ultra-550b-a55b:free", 1000, 500)).toBe(0);
+    expect(outputTokensWithin("nvidia/nemotron-3-ultra-550b-a55b:free", 1000, 1)).toBe(Number.POSITIVE_INFINITY);
+    setOpenRouterModels({}, 0);
+    expect(isKnownModel("~z-ai/glm-latest")).toBe(false);
   });
 });
 
