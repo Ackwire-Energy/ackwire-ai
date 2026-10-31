@@ -8389,8 +8389,8 @@ export const ptBR = {
     /** Typing bar: "{{names}} está {{doing}}" (agents' verbs come from their tool calls). */
     doing_one: "{{names}} está {{doing}}",
     doing_other: "{{names}} estão {{doing}}",
-    /** "Theo, Iris e mais 2" (3 or more names in the working line). */
-    namesMore: "{{first}}, {{second}} e mais {{count}}",
+    /** "Theo e mais 2" (3 or more names in the working line). */
+    namesMore: "{{first}} e mais {{count}}",
     /** The card above the box turns its phrase. */
     phrase: {
       thinking: {

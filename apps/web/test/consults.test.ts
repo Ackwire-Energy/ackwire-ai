@@ -12,8 +12,11 @@ import {
   type ActivityEntry,
   activitySentence,
   activityText,
+  barAsking,
   barEntries,
+  barFaces,
   listNames,
+  toolActivity,
 } from "@agenteschat/client/lib/activity";
 import { consultationsOf, previewOf } from "@agenteschat/client/lib/consultations";
 import type { TFunction } from "i18next";
@@ -125,6 +128,7 @@ describe("the working line's sentence", () => {
     name: nameOf(id),
     activity: { kind: "thinking" },
   });
+  const person = (name: string): ActivityEntry => ({ id: name, type: "person", name, activity: { kind: "typing" } });
   const run = (agentId: string, runId = `r-${agentId}`): LiveRun => ({
     runId,
     agentId,
@@ -138,9 +142,32 @@ describe("the working line's sentence", () => {
   test("one, two, three or more agents working (pt-BR and en)", () => {
     expect(activityText(t, [agent("theo")])).toBe("Theo está trabalhando…");
     expect(activityText(t, [agent("theo"), agent("iris")])).toBe("Theo e Iris estão trabalhando…");
-    expect(activityText(t, ["theo", "iris", "nina", "dev"].map(agent))).toBe("Theo, Iris e mais 2 estão trabalhando…");
-    expect(activityText(tEn, ["theo", "iris", "nina"].map(agent))).toBe("Theo, Iris and 1 more are working…");
-    expect(listNames(t, ["A", "B", "C"])).toBe("A, B e mais 1");
+    expect(activityText(t, ["theo", "iris", "nina", "dev"].map(agent))).toBe("Theo e mais 3 estão trabalhando…");
+    expect(activityText(tEn, ["theo", "iris", "nina"].map(agent))).toBe("Theo and 2 more are working…");
+    expect(listNames(t, ["A", "B", "C"])).toBe("A e mais 2");
+  });
+
+  test("a crowd is one short line: several agents just work, whatever each does; people type after them", () => {
+    const busy = [{ ...agent("theo"), activity: toolActivity("github_list_prs") }, agent("iris"), agent("nina")];
+    expect(activityText(t, busy.slice(0, 2))).toBe("Theo e Iris estão trabalhando…");
+    expect(activityText(tEn, [...busy, person("Ana")])).toBe("Theo and 2 more are working · Ana is typing…");
+    expect(activityText(t, [...busy, person("Ana"), person("Bia"), person("Caio")])).toBe(
+      "Theo e mais 2 estão trabalhando · Ana e mais 2 estão digitando…",
+    );
+    // One agent still says what it does, beside people typing.
+    expect(activityText(t, [busy[0] as ActivityEntry, person("Ana"), person("Bia")])).toBe(
+      "Theo está consultando o GitHub · Ana e Bia estão digitando…",
+    );
+    expect(activityText(tEn, [person("Ana")])).toBe("Ana is typing…");
+  });
+
+  test("the stack shows three faces at most: agents first, and someone typing when someone is", () => {
+    const ids = (list: ActivityEntry[]) => barFaces(list).map((e) => e.id);
+    const four = ["theo", "iris", "nina", "dev"].map(agent);
+    expect(ids(four)).toEqual(["theo", "iris", "nina"]);
+    expect(ids([...four, person("Ana"), person("Bia")])).toEqual(["theo", "iris", "Ana"]);
+    expect(ids([agent("theo"), person("Ana"), person("Bia"), person("Caio")])).toEqual(["theo", "Ana", "Bia"]);
+    expect(ids(["Ana", "Bia", "Caio", "Dario"].map(person))).toEqual(["Ana", "Bia", "Caio"]);
   });
 
   test("names can be marked (bold in the bar) without changing the words", () => {
@@ -171,12 +198,16 @@ describe("the working line's sentence", () => {
       { ...asking, consultedAgentId: "nina", status: "asking" as const },
     ]);
     expect(activityText(t, toNina)).toBe("Dev está perguntando à Nina…");
-    // Its resumed run doesn't add a second "Dev está trabalhando"; others still group.
+    // Its resumed run doesn't add a second Dev; with others at work the line just says who works (its reply tells the rest).
     expect(activityText(t, entries("answered", [run("dev", "r-dev"), run("theo"), run("nina")]))).toBe(
-      "Bento respondeu. Dev está escrevendo · Theo e Nina estão trabalhando…",
+      "Dev e mais 2 estão trabalhando…",
     );
     // Its words are on screen: the reply's row says it, not the bar.
     expect(entries("answered", [{ ...run("dev", "r-dev"), status: "running", text: "O Infra" }])).toEqual([]);
+    // The line times the question of an agent on its own; beside others it tells (and times) none.
+    expect(barAsking(entries("asking"))).toMatchObject({ to: "bento", status: "asking" });
+    expect(barAsking(entries("answered"))).toBeUndefined();
+    expect(barAsking(entries("asking", [run("theo")]))).toBeUndefined();
   });
 });
 

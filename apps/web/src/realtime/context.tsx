@@ -212,7 +212,8 @@ export function createStreamsStore(
     get: () => state,
     apply: (event: ChannelEvent) => {
       let typing = state.typing;
-      if (event.type === "user.typing") typing = applyTyping(typing, event.channelId, event.userId, now(), event.ttlMs);
+      if (event.type === "user.typing")
+        typing = applyTyping(typing, event.channelId, event.userId, now(), event.ttlMs, event.threadId);
       const memory =
         event.type === "memory.updated"
           ? {
@@ -858,12 +859,12 @@ export function useLiveStore() {
   return useRealtime().streams;
 }
 
-/** Throttled "I'm typing" for a channel. */
-export function useTypingSender(channelId: string) {
+/** Throttled "I'm typing" for a channel, or for one of its threads. */
+export function useTypingSender(channelId: string, threadId?: string) {
   const { connection } = useRealtime();
   const throttle = useMemo(() => typingThrottle(), []);
   return () => {
-    if (connection && throttle(Date.now())) connection.sendTyping(channelId);
+    if (connection && throttle(Date.now())) connection.sendTyping(channelId, threadId);
   };
 }
 

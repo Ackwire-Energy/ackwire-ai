@@ -5,6 +5,7 @@ import {
   applyChannelEvent,
   applyConsultEvent,
   applyReceiptEvent,
+  applyTyping,
   type ChannelEvent,
   type ConsultsState,
   cacheAgentProposal,
@@ -20,6 +21,7 @@ import {
   dropProvisional,
   emptyStreams,
   expectReply,
+  expireTyping,
   guessReceipt,
   keys,
   type LiveConsult,
@@ -35,6 +37,9 @@ import {
   type StreamsState,
   seedReceipt,
   staleProvisional,
+  stopTyping,
+  type TypingState,
+  typingThrottle,
   unmarkStopping,
   useApi,
 } from "@agenteschat/client";
@@ -48,15 +53,17 @@ import { withContinued } from "./turn";
  * A conversation, live: subscribes to its channel while the screen is open,
  * keeps the message caches current (new messages, reactions, approvals,
  * agents' questions, threads, missions) and holds the runs in progress (streaming text, who is
- * working, agents asking agents) and the agents' receipts on people's messages (who saw it, who answers;
- * `receipts.ts`, as on the web). The database stays the truth: on open and after a reconnect the active runs
- * come from the server, and the lists' receipts seed the rest.
+ * working, agents asking agents), who is typing, and the agents' receipts on people's messages (who saw it,
+ * who answers; `receipts.ts`, as on the web). The database stays the truth: on open and after a reconnect the
+ * active runs come from the server, and the lists' receipts seed the rest.
  */
 
 interface LiveState {
   streams: StreamsState;
   consults: ConsultsState;
   receipts: ReceiptsState;
+  /** Who is typing (`user.typing`), only while it lasts: what ran out is swept on time. */
+  typing: TypingState;
 }
 
 type Action =
@@ -68,7 +75,8 @@ type Action =
   | { type: "stopping"; runId: string; byUserId: string }
   | { type: "unstopping"; runId: string }
   | { type: "dismiss"; runId: string }
-  | { type: "sweep"; at: number };
+  | { type: "sweep"; at: number }
+  | { type: "typed"; at: number };
 
 /** A "pensando…" the server never confirmed is dropped after this long (the web's `PROVISIONAL_TTL_MS`). */
 export const PROVISIONAL_TTL_MS = 20_000;
@@ -83,10 +91,23 @@ function reduce(state: LiveState, action: Action): LiveState {
       const seeded =
         event.type === "message.created" && event.message ? seedReceipt(state.receipts, event.message) : state.receipts;
       const receipts = applyReceiptEvent(seeded, event);
-      // An event that changes none of them (a person typing) doesn't re-render.
-      return streams === state.streams && consults === state.consults && receipts === state.receipts
+      const typing =
+        event.type === "user.typing"
+          ? applyTyping(state.typing, event.channelId, event.userId, action.at, event.ttlMs, event.threadId)
+          : event.type === "message.created" && event.message?.author?.type === "person" && event.message.author.id
+            ? stopTyping(state.typing, event.channelId, event.message.author.id)
+            : state.typing;
+      // An event that changes none of them doesn't re-render.
+      return streams === state.streams &&
+        consults === state.consults &&
+        receipts === state.receipts &&
+        typing === state.typing
         ? state
-        : { streams, consults, receipts };
+        : { streams, consults, receipts, typing };
+    }
+    case "typed": {
+      const typing = expireTyping(state.typing, action.at);
+      return typing === state.typing ? state : { ...state, typing };
     }
     case "seed": {
       let receipts = state.receipts;
@@ -279,13 +300,17 @@ export interface ChatLive {
   seed: (messages: readonly Message[]) => void;
   /** "Parar" (as on the web): "Parando…" until the run's event; a run that already ended just leaves. */
   stop: (runId: string, byUserId: string) => void;
+  /** Who is typing now (`typingIn` reads it for the conversation or one of its threads). */
+  typing: TypingState;
+  /** "I'm typing" here or in a thread, throttled (at most one frame every 3 s). */
+  sendTyping: (threadId: string | null) => void;
 }
 
 export function useChatLive(orgId: string, channelId: string, enabled: boolean): ChatLive {
   const connection = useConnection();
   const qc = useQueryClient();
   const api = useApi();
-  const [state, dispatch] = useReducer(reduce, { streams: emptyStreams, consults: {}, receipts: {} });
+  const [state, dispatch] = useReducer(reduce, { streams: emptyStreams, consults: {}, receipts: {}, typing: {} });
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -352,6 +377,25 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
     return () => clearInterval(timer);
   }, [hasProvisional, qc, orgId, channelId]);
 
+  // Someone who stops typing without sending leaves the line when their last frame runs out.
+  const typingEnds = Math.min(...Object.values(state.typing[channelId] ?? {}).map((x) => x.until));
+  useEffect(() => {
+    if (!Number.isFinite(typingEnds)) return;
+    // A beat past the end, so the sweep never runs a hair early and finds it still on.
+    const timer = setTimeout(
+      () => dispatch({ type: "typed", at: Date.now() }),
+      Math.max(0, typingEnds - Date.now()) + 50,
+    );
+    return () => clearTimeout(timer);
+  }, [typingEnds]);
+  const throttle = useMemo(() => typingThrottle(), []);
+  const sendTyping = useCallback(
+    (threadId: string | null) => {
+      if (connection && throttle(Date.now())) connection.sendTyping(channelId, threadId);
+    },
+    [connection, channelId, throttle],
+  );
+
   const expect = useCallback(
     (threadId: string, agentIds: string[], messageId: string = threadId) => {
       if (agentIds.length > 0) dispatch({ type: "expect", channelId, threadId, messageId, agentIds, at: Date.now() });
@@ -383,7 +427,9 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
       expect,
       seed,
       stop,
+      typing: state.typing,
+      sendTyping,
     }),
-    [state, channelId, expect, seed, stop],
+    [state, channelId, expect, seed, stop, sendTyping],
   );
 }

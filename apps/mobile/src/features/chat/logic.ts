@@ -281,17 +281,19 @@ export const hidesBody = (m: Message) =>
 
 /**
  * Who shows in the working line, as on the web's bar (`barEntries`): agents
- * asking another agent, then agents about to answer (not writing yet), one
- * entry per agent even when it has two runs (a provisional "thinking" row and
- * the real run, or two tasks at once).
+ * asking another agent, then agents at work, one entry per agent even when it
+ * has two runs (a provisional "thinking" row and the real run, or two tasks at
+ * once), then the people typing.
  */
 export function workingEntries(
   runs: LiveRun[],
   consults: LiveConsult[],
   agentName: (id: string) => string,
+  typing: string[] = [],
+  personName: (id: string) => string | undefined = () => undefined,
 ): ActivityEntry[] {
   // Writing agents stay in: the line above the box is on while they work.
-  return barEntries(runs, [], agentName, () => undefined, consults, true);
+  return barEntries(runs, typing, agentName, personName, consults, true);
 }
 
 /**
