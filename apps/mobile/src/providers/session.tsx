@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { createContext, type ReactNode, useContext, useEffect, useMemo } from "react";
+import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import { type authClient, readCookie } from "@/lib/auth";
 
 export interface SessionState {
@@ -22,6 +22,15 @@ export function SessionProvider({ auth, children }: { auth: ReturnType<typeof au
   const queryClient = useQueryClient();
   const user = session.data?.user ?? null;
   const signedIn = Boolean(user);
+  // Pending only until the first answer. Signed out, Better Auth marks every refetch pending again (its
+  // `onRequest` sets `isPending: data === null`), and it refetches whenever the app comes back to the
+  // foreground: the gate then read "still checking", opened `(app)` and remounted the sign-in screen, which lost
+  // the e-mail, the step and what a password manager was about to fill in. Kept per client: another server's
+  // session is read from the start. The client is a callable proxy: kept through an updater, or React would call
+  // it as one.
+  const [answeredBy, setAnsweredBy] = useState<typeof auth | null>(null);
+  if (answeredBy !== auth && !session.isPending) setAnsweredBy(() => auth);
+  const answered = answeredBy === auth;
 
   useEffect(() => {
     if (signedIn) {
@@ -33,11 +42,11 @@ export function SessionProvider({ auth, children }: { auth: ReturnType<typeof au
   const value = useMemo<SessionState>(
     () => ({
       signedIn,
-      pending: session.isPending && !user,
+      pending: !answered && !user,
       user: user ? { id: user.id, name: user.name, email: user.email } : null,
       refresh: () => session.refetch(),
     }),
-    [signedIn, session.isPending, user, session.refetch],
+    [signedIn, answered, user, session.refetch],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
