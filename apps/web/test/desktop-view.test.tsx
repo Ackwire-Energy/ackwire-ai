@@ -61,8 +61,9 @@ const keyText = (e: KeyboardEvent) =>
 
 /**
  * noVNC's RFB as the screen drives it: how it was set and what it pasted; `log` holds, in order, the key events
- * replayed on its canvas and the keys it sent (`send Insert down`); `emit` plays its events. Like noVNC, it drops
- * keys and pastes until its connection opens (`emit("connect")`).
+ * replayed on its canvas, the keys it sent (`send Insert down`) and the clicks it sent (`mousedown`); `emit` plays its
+ * events. Like noVNC, it drops keys, clicks and pastes until its connection opens (`emit("connect")`), and clicks
+ * while view-only.
  */
 class FakeRfb {
   static all: FakeRfb[] = [];
@@ -101,6 +102,9 @@ class FakeRfb {
         if (this.connected) this.log.push(keyText(e as KeyboardEvent));
       });
     }
+    this.canvas.addEventListener("mousedown", () => {
+      if (this.connected && !this.viewOnly) this.log.push("mousedown");
+    });
     el.appendChild(this.canvas);
   }
   addEventListener(type: string, fn: (e: Event) => void) {
@@ -231,6 +235,8 @@ const WATCHING = "Os programas do computador da Ada veem a tela e tudo o que é 
 const said = () => document.querySelector(".dsk-line > .dsk-said")?.textContent;
 /** The last picture the screen holds over its next connection. */
 const still = () => document.querySelector(".dsk-screen > .dsk-still");
+/** Where a click on the screen lands: a cover over it takes it, a picture held over it lets it through (desktop.css). */
+const clickLandsOn = () => document.querySelector(".dsk-stage > .brw-dim") ?? rfb().canvas;
 const pasteOn = (el: Element, text: string) =>
   act(
     async () =>
@@ -301,8 +307,9 @@ afterEach(() => {
 
 /**
  * What the screen's canvas shows, read back the way the screen reads it (a small copy, off the page): black until
- * `dock()` (its dock on that black, two pixels of the copy) or `picture()` (the wallpaper drawn). The DOM here
- * draws nothing, so that copy's context is this stand-in while it's on; the canvases on the page keep their own.
+ * `dock()` (its dock on that black, two pixels of the copy) or `picture()` (the wallpaper drawn), and again after
+ * `black()` (a new session that hasn't drawn). The DOM here draws nothing, so that copy's context is this stand-in
+ * while it's on; the canvases on the page keep their own.
  */
 function screenPixels() {
   let shows: "black" | "dock" | "picture" = "black";
@@ -326,6 +333,9 @@ function screenPixels() {
     return this.isConnected ? getContext.apply(this, args) : copy;
   } as unknown as typeof proto.getContext;
   return {
+    black: () => {
+      shows = "black";
+    },
     dock: () => {
       shows = "dock";
     },
@@ -715,6 +725,34 @@ describe("the agent's screen in the computer dialog", () => {
     fireEvent.keyDown(field, { key: "b", code: "KeyB" });
     expect(rfb().log).toEqual(["keydown b KeyB"]);
     expect(t.sockets.desktops).toHaveLength(1);
+  });
+
+  test("in place, control's first click goes with its first key: the frost lifts as noVNC connects, the last picture kept until control draws", async () => {
+    const pixels = screenPixels();
+    try {
+      const t = await dialog();
+      const ws = t.sockets.desktops[0] as DesktopSocket;
+      await act(async () => ws.serverSends(MODE("watch")));
+      pixels.picture();
+      await connected();
+      await click(view().getByRole("button", { name: "Assumir o controle" }));
+      await act(async () => ws.serverSends(MODE("control")));
+      await settle(4);
+      expect(still()).not.toBeNull();
+      // A new login's first picture is a whole screen: it comes a round trip and more after noVNC connects.
+      pixels.black();
+      await connected();
+      await waitLooks();
+      expect(screen().queryByText("Assumindo o controle…")).toBeNull();
+      expect(still()).not.toBeNull();
+      fireEvent.mouseDown(clickLandsOn());
+      expect(rfb().log).toEqual(["mousedown"]);
+      pixels.picture();
+      await waitLooks();
+      expect(still()).toBeNull();
+    } finally {
+      pixels.restore();
+    }
   });
 
   test("in place, handing back: the same socket watches again after the mark, over the last picture, never Abrindo", async () => {

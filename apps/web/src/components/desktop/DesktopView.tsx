@@ -45,8 +45,9 @@ const PICTURE_WAIT_MS = 10_000;
  * Handing back opens the screen again as a watcher, on a new socket. Its last picture stays over the new connection
  * until that one draws (`holdPicture`), so the hand back shows no "Abrindo…" and the head says watching as soon as
  * the server does. A connection that hasn't drawn by this long is said to be opening. Taking control holds the picture
- * too, frosted under "Assumindo o controle…" for as long as control takes to open: noVNC drops keys and pastes until
- * its connection opens, so the picture must never look ready meanwhile.
+ * too, frosted under "Assumindo o controle…" for as long as control takes to open: noVNC drops keys, clicks and pastes
+ * until its connection opens, so the picture must never look ready meanwhile. Once it opens, the picture stays clear
+ * until control draws, and the pointer goes through it: a first click waits for nothing more than a first key.
  */
 const HOLD_MS = 3_000;
 /** A stream that changes mode in place and hasn't this long after the mode changed opens again in the new one. */
@@ -269,6 +270,8 @@ export function DesktopView({
             attempts.current = 0;
             // Taking control puts the person's keys on the screen at once (a phone's keyboard waits for its button).
             if (control && !matchesNow(TOUCH)) keysRef.current?.focus({ preventScroll: true });
+            // noVNC takes input now: a picture held over it loses its frost and lets clicks through (`HOLD_MS`).
+            if (!cancelled) setTaking(false);
             const since = Date.now();
             const look = () => {
               const canvas = liveCanvas(el);
@@ -277,7 +280,6 @@ export function DesktopView({
               clearTimeout(stale);
               heldPicture(el)?.remove();
               if (cancelled) return;
-              setTaking(false);
               setView("live");
             };
             clearInterval(looking);
