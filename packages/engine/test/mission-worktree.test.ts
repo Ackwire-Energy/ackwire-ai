@@ -515,7 +515,7 @@ describe("one worktree per mission (ADR 0044)", () => {
     expect(await missionTurnPermissions(f.db, { ...turn, threadRootId: crypto.randomUUID() })).toBeNull();
   });
 
-  test("a run a routine's report woke in the mission's thread only reads; the mission's own runs work", async () => {
+  test("a run a routine's report woke in the mission's thread works with the mission's profile, like its own runs", async () => {
     await started();
     const mission = await missionRow();
     const turn = { orgId: f.org.id, agentId: f.agent.id, threadRootId: mission.threadRootId };
@@ -532,7 +532,7 @@ describe("one worktree per mission (ADR 0044)", () => {
     );
     const woken = delivered.runs[0];
     expect(woken).toBeDefined();
-    expect(await missionTurnPermissions(f.db, { ...turn, runId: woken?.id })).toMatchObject({ mode: "plan" });
+    expect(await missionTurnPermissions(f.db, { ...turn, runId: woken?.id })).toMatchObject({ mode: "work" });
     // The mission's own run (woken by its inbox, nobody behind it) keeps the mission's profile.
     const own = (await f.db.select().from(schema.agentRuns)).find((r) => r.id !== woken?.id);
     expect(own).toBeDefined();

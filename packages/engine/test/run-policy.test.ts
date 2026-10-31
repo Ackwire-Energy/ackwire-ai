@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import {
+  addChannelMember,
   approvalView,
   bridgeToolsFor,
+  createChannel,
   createMissionRunToolSource,
   createToolGateway,
   grantScopes,
@@ -69,7 +71,10 @@ describe("run policy table", () => {
     expect(toolKind(app("mail_support_read", "mail:read")).kind).toBe("read");
     expect(toolKind(app("git_clone", "github:git.read"))).toEqual({ kind: "internal", area: "code" });
     expect(toolKind(app("open_pull_request", "github:pr.write"))).toEqual({ kind: "internal", area: "code" });
-    // A new built-in tool the table doesn't know is for people's runs only.
+    // The computer's own background task is code work; the mission's (no scope) is the mission's.
+    expect(toolKind(builtIn("start_task", "sandbox:run"))).toEqual({ kind: "internal", area: "code" });
+    expect(toolKind(builtIn("start_task")).kind).toBe("mission");
+    // A new built-in tool the table doesn't know is never a routine's.
     expect(toolKind(builtIn("brand_new_tool")).kind).toBe("unknown");
   });
 
@@ -104,41 +109,31 @@ describe("run policy table", () => {
     expect(decide(r, builtIn("update_routine", "schedule:write"))).toBe("refuse");
   });
 
-  test("unattended: reads, the reply here, issues and memory; elsewhere refused; connected apps ask", () => {
-    expect(decide(unattended, builtIn("react"))).toBe("allow");
-    expect(decide(unattended, builtIn("ask_user"))).toBe("allow");
-    expect(decide(unattended, builtIn("pass"))).toBe("allow");
-    expect(decide(unattended, builtIn("create_issue", "issues:write"))).toBe("allow");
-    expect(decide(unattended, builtIn("remember", "memory:write"))).toBe("allow");
-    expect(toolPolicy(unattended, builtIn("post_message"))).toEqual({
-      action: "refuse",
-      reason: REFUSALS.unattendedElsewhere,
-    });
-    expect(decide(unattended, builtIn("send_dm"))).toBe("refuse");
-    expect(decide(unattended, builtIn("tell_agent"))).toBe("refuse");
-    expect(decide(unattended, builtIn("schedule_reminder", "schedule:write"))).toBe("refuse");
-    expect(decide(unattended, builtIn("update_wiki_page", "wiki:write"))).toBe("refuse");
-    expect(decide(unattended, builtIn("run_code", "sandbox:run"))).toBe("refuse");
-    expect(decide(unattended, builtIn("hand_off"))).toBe("refuse");
-    expect(decide(unattended, app("github_create_issue", "github:issues.write"))).toBe("approve");
+  test("unattended: it works as the agent itself, with every tool a person's run has but hand_off", () => {
+    for (const tool of [
+      builtIn("react"),
+      builtIn("ask_user"),
+      builtIn("create_issue", "issues:write"),
+      builtIn("update_wiki_page", "wiki:write"),
+      builtIn("run_code", "sandbox:run"),
+      builtIn("start_task", "sandbox:run"),
+      builtIn("browser_do", "browser:use"),
+      builtIn("post_message"),
+      builtIn("tell_agent"),
+      builtIn("ask_agent"),
+      builtIn("schedule_reminder", "schedule:write"),
+      builtIn("brand_new_tool"),
+      app("open_pull_request", "github:pr.write"),
+      // A connected app's write follows the tool's own approvals (its access level as the workspace set it).
+      app("github_create_issue", "github:issues.write"),
+      app("github_merge_pr", "github:pr.merge", true),
+    ]) {
+      expect(decide(unattended, tool)).toBe("allow");
+    }
+    expect(toolPolicy(unattended, builtIn("hand_off"))).toEqual({ action: "refuse", reason: REFUSALS.handOffOnly });
   });
 
-  test("woken by the report of a routine that only reads: no change of its own, it proposes", () => {
-    const fromRead: RunAuthority = { ...unattended, routineAccess: "read" };
-    expect(toolPolicy(fromRead, builtIn("create_issue", "issues:write"))).toEqual({
-      action: "refuse",
-      reason: REFUSALS.reportReadOnly,
-    });
-    expect(decide(fromRead, builtIn("remember", "memory:write"))).toBe("refuse");
-    expect(decide(fromRead, builtIn("list_issues", "issues:read"))).toBe("allow");
-    expect(decide(fromRead, builtIn("react"))).toBe("allow");
-    // A connected app's write still becomes a person's decision.
-    expect(decide(fromRead, app("github_create_issue", "github:issues.write"))).toBe("approve");
-    // A routine that may act: the run its report wakes may too, with receipts.
-    expect(decide({ ...unattended, routineAccess: "act" }, builtIn("create_issue", "issues:write"))).toBe("allow");
-  });
-
-  test("the computer's own permission prompt is listed for every run; a mission's tools for its own work", () => {
+  test("the computer's own permission prompt is listed for every run; a mission's tools never for a routine", () => {
     for (const who of [routine("read"), routine("act"), unattended, person])
       expect(decide(who, builtIn("permission_prompt"))).toBe("allow");
     expect(toolKind(builtIn("get_context")).kind).toBe("read");
@@ -146,9 +141,12 @@ describe("run policy table", () => {
     for (const name of ["start_task", "upload_artifact", "update_plan", "complete_mission", "request_approval"]) {
       expect(decide(person, builtIn(name))).toBe("allow");
       expect(decide(missionWork, builtIn(name))).toBe("allow");
-      expect(decide(routine("act"), builtIn(name))).toBe("refuse");
-      expect(decide({ ...unattended, routineAccess: "act" }, builtIn(name))).toBe("refuse");
+      expect(decide(unattended, builtIn(name))).toBe("allow");
+      expect(toolPolicy(routine("act"), builtIn(name))).toEqual({ action: "refuse", reason: REFUSALS.missionOnly });
     }
+    // The computer's own background task: code work, so a routine that may act starts one.
+    expect(decide(routine("act"), builtIn("start_task", "sandbox:run"))).toBe("allow");
+    expect(decide(routine("read"), builtIn("start_task", "sandbox:run"))).toBe("refuse");
   });
 
   test("connected tools with built-in names keep their external policy", () => {
@@ -159,7 +157,8 @@ describe("run policy table", () => {
       expect(toolKind(connected)).toEqual({ kind: "external" });
       expect(decide(routine("read"), connected)).toBe("refuse");
       expect(decide(routine("act"), connected)).toBe("approve");
-      expect(decide(unattended, connected)).toBe("approve");
+      // Nobody behind the run: the connector's own approvals decide, as for a person's run.
+      expect(decide(unattended, connected)).toBe("allow");
     }
   });
 
@@ -479,28 +478,45 @@ describe("the gateway applies the run policy", () => {
     });
   });
 
-  test("unattended: posting elsewhere refused, the reply here allowed, connector writes ask", async () => {
+  test("unattended: it lists what a person's run lists and works as the agent itself", async () => {
     await gatewaySetup();
+    const tech = await createChannel(f.db, f.owner.id, f.org.id, { name: "tech" });
+    await addChannelMember(f.db, f.owner.id, f.org.id, tech.id, { agentId: f.agent.id });
+    await createChannel(f.db, f.owner.id, f.org.id, { name: "vendas" });
     const { ctx } = await runAs("unattended");
     const names = await listed(ctx);
-    expect(names.has("post_message")).toBe(false);
-    expect(names.has("send_dm")).toBe(false);
-    expect(names.has("schedule_reminder")).toBe(false);
+    for (const name of [
+      "post_message",
+      "send_dm",
+      "schedule_reminder",
+      "ask_agent",
+      "tell_agent",
+      "react",
+      "ask_user",
+    ]) {
+      expect(names.has(name)).toBe(true);
+    }
     expect(names.has("hand_off")).toBe(false);
-    expect(names.has("react")).toBe(true);
     expect(requiresWhy(names.get("ask_user"))).toBe(true);
-    expect(names.get("shop_refund_order")?.sensitive).toBe(true);
-
-    expect(await call(ctx, "post_message", { channel: "general", text: "oi" })).toMatchObject({
-      output: { isError: true, content: REFUSALS.unattendedElsewhere },
-    });
-    expect(await call(ctx, "react", { emoji: "👍" })).toMatchObject({
+    // A connected app's write follows its own approvals: this one runs without a card, as for a person.
+    expect(names.get("shop_refund_order")?.sensitive).toBeUndefined();
+    expect(await call(ctx, "shop_refund_order", { order: "9" })).toMatchObject({
       type: "result",
-      output: { data: { reacted: expect.anything() } },
+      output: { content: "refunded" },
     });
-    const result = await call(ctx, "shop_refund_order", { order: "9", why: WHY });
-    if (result.type !== "approval") throw new Error("expected an approval");
-    expect(result.approval.origin).toEqual({ kind: "unattended" });
+    expect(executed).toEqual([{ order: "9" }]);
+    // It posts as itself, only where it is a member.
+    expect(await call(ctx, "post_message", { channel: "tech", text: "Erro novo no checkout." })).toMatchObject({
+      type: "result",
+      output: { content: expect.stringContaining("Posted in #tech") },
+    });
+    expect(await call(ctx, "post_message", { channel: "vendas", text: "oi" })).toMatchObject({
+      output: { isError: true, content: "No channel #vendas that you are in." },
+    });
+    // A DM is a person's request: the tool says so.
+    expect(await call(ctx, "send_dm", { person: "ana", text: "oi" })).toMatchObject({
+      output: { isError: true, content: "Only a person's request can send a DM." },
+    });
   });
 
   test("person: unchanged, except hand_off and the why on what asks a person", async () => {
@@ -520,26 +536,26 @@ describe("the gateway applies the run policy", () => {
     expect(executed).toEqual([{ order: "3" }]);
   });
 
-  test("a run nobody is behind never sends a credential, through any tool; a person's run is unchanged", async () => {
+  test("a routine's run never sends a credential, through any tool; any other run uses the agent's own grants", async () => {
     await gatewaySetup();
     const key = "AKIAIOSFODNN7EXAMPLE";
     const privateKey =
       "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAA\n-----END OPENSSH PRIVATE KEY-----";
-    for (const kind of ["read", "unattended"] as const) {
-      const { ctx } = await runAs(kind);
-      for (const query of [`customer ${key}`, privateKey]) {
-        expect(await call(ctx, "list_issues", { query })).toMatchObject({
-          type: "result",
-          output: { isError: true, content: CREDENTIAL_REFUSAL, data: { code: "tool.credential" } },
-        });
-      }
-      // Anything else still runs.
-      const fine = await call(ctx, "list_issues", { query: "checkout" });
-      expect(fine.type === "result" && fine.output.isError).toBeFalsy();
+    const routineCtx = (await runAs("read")).ctx;
+    for (const query of [`customer ${key}`, privateKey]) {
+      expect(await call(routineCtx, "list_issues", { query })).toMatchObject({
+        type: "result",
+        output: { isError: true, content: CREDENTIAL_REFUSAL, data: { code: "tool.credential" } },
+      });
     }
-    const { ctx } = await runAs("person");
-    const asked = await call(ctx, "list_issues", { query: `customer ${key}` });
-    expect(asked.type === "result" && asked.output.content).not.toBe(CREDENTIAL_REFUSAL);
+    // Anything else still runs.
+    const fine = await call(routineCtx, "list_issues", { query: "checkout" });
+    expect(fine.type === "result" && fine.output.isError).toBeFalsy();
+    for (const kind of ["unattended", "person"] as const) {
+      const { ctx } = await runAs(kind);
+      const asked = await call(ctx, "list_issues", { query: `customer ${key}` });
+      expect(asked.type === "result" && asked.output.content).not.toBe(CREDENTIAL_REFUSAL);
+    }
   });
 
   test("credentials by their format: found in any value, masked in what people read", () => {
@@ -575,7 +591,8 @@ describe("the gateway applies the run policy", () => {
       expect(bridged.map((t) => t.name).sort()).toEqual(loop.map((t) => t.name).sort());
       const refund = bridged.find((t) => t.name === "shop_refund_order");
       if (kind === "read") expect(refund).toBeUndefined();
-      else if (kind !== "person") expect(((refund?.inputSchema.required ?? []) as string[]).includes("why")).toBe(true);
+      // Only a routine's write to a connected app is made to ask a person; the others follow the tool's own rule.
+      else expect(((refund?.inputSchema.required ?? []) as string[]).includes("why")).toBe(kind === "act");
     }
   });
 });

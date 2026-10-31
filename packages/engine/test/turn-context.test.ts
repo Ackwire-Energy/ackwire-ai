@@ -439,7 +439,10 @@ describe("a routine's background run", () => {
     const { ctx, text } = await routineRun();
     expect(text).toContain("# This is a routine run\nYour routine «Vigiar e-mails» started this run");
     expect(text).toContain("Its instructions, set up by ana:\nLeia a caixa de suporte e conte o que é novo.");
-    expect(text).toContain("What it may do: look and report.");
+    // A read-only run is told why: its creator set it to only look and tell.
+    expect(text).toContain(
+      "What it may do: look and tell. ana set this routine to only look and tell, so this run is read-only",
+    );
     expect(text).toContain("When it speaks: only when there is news.");
     expect(text).toContain("Do not manage routines from a routine run");
     // Its last record and its event: outside content, in the envelope, markers neutralised.

@@ -377,11 +377,10 @@ export function buildEngine(o: EngineOptions) {
   const brainLink = hubBrainLink({ hub: machineHub, pubsub: adapters.pubsub });
   /**
    * A computer turn's permission profile (ADR 0053 §3), the same for Claude Code and Codex: a mission run
-   * keeps its own (plan before Start, while a write item is live and for a run news from a routine or
-   * another agent woke there, work otherwise; ADR 0044); any other
-   * run follows who is behind it, read again every turn (`computerTurnProfile`: `plan` for a routine that
-   * only reads and for unattended runs, `work` for an `act` routine and a person's run). Its own branches
-   * are agentes/<handle>/… (what the git proxy accepts).
+   * keeps its own (plan before Start, while a write item is live and for a routine's run that only looks,
+   * work otherwise; ADR 0044); any other run follows who is behind it, read every turn
+   * (`computerTurnProfile`: `plan` only for a routine that only looks and tells, `work` for every other run,
+   * whoever woke it). Its own branches are agentes/<handle>/… (what the git proxy accepts).
    */
   const turnPermissions = async (turn: BrainTurn): Promise<BrainTurnRequest["permissions"]> =>
     (await missionTurnPermissions(db, turn)) ?? {

@@ -357,7 +357,7 @@ export const SCENARIOS: Scenario[] = [
   },
 
   {
-    name: "10. the run a report woke is unattended: posting in another channel is refused",
+    name: "10. the run a report woke works as the agent itself: it posts in another channel it is in",
     runs: [
       handsOff,
       {
@@ -377,10 +377,13 @@ export const SCENARIOS: Scenario[] = [
       const [, woken] = await agentRuns(h);
       expect(woken).toMatchObject({ status: "done", background: false });
       expect(await stepsOf(h, woken?.id ?? "", "tool_result")).toEqual([
-        expect.objectContaining({ name: "post_message", isError: true, content: REFUSALS.unattendedElsewhere }),
+        expect.objectContaining({ name: "post_message", isError: false }),
       ]);
-      expect(await messagesIn(h.f, h.vars.tech ?? "")).toEqual([]);
-      expect((await agentPosts(h)).map((m) => [m.channelId, m.body])).toEqual([[h.f.general.id, TOLD]]);
+      expect((await messagesIn(h.f, h.vars.tech ?? "")).map((m) => m.body)).toEqual(["Erro novo no checkout."]);
+      expect((await agentPosts(h)).map((m) => [m.channelId, m.body])).toEqual([
+        [h.vars.tech ?? "", "Erro novo no checkout."],
+        [h.f.general.id, TOLD],
+      ]);
     },
   },
 

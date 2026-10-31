@@ -4,22 +4,20 @@ import type { JsonSchema } from "./json-schema";
 import type { ToolDefinition } from "./types";
 
 /**
- * What a run may do with each tool, by who is behind it (ADR 0053 §2). One table for every brain:
- * the Tool Gateway applies it when listing (a refused tool isn't listed, for the model loop and for
- * the bridge Claude Code and Codex reach our tools through) and again on every call, and it turns
- * `approve` into an approval card whatever the agent's own settings say.
+ * What a run may do with each tool, by who is behind it (ADR 0053 §2 and its addendum of 2026-10-31). One
+ * table for every brain: the Tool Gateway applies it when listing (a refused tool isn't listed, for the
+ * model loop and for the bridge Claude Code and Codex reach our tools through) and again on every call,
+ * and it turns `approve` into an approval card whatever the agent's own settings say.
  *
- * - `person`: unchanged (scopes and the tools' own approvals decide).
+ * - `person` and `unattended` (nobody behind it: it works as the agent itself): every tool but
+ *   `hand_off`; scopes and the tools' own approvals decide. A tool that needs a person's request
+ *   refuses on its own when nobody is behind the run.
  * - `routine`, any access: nothing that speaks for someone or reaches beyond its room (posting, DMs,
  *   reactions, questions, reminders, routines, other agents, forum, channels, secrets, permissions).
  *   It speaks only through `hand_off`; the people decide.
  * - `routine`, access `read`: reads only, plus `hand_off`.
  * - `routine`, access `act`: also internal changes people can undo (issues, memory, wiki, Drive, its
  *   own branches and pull requests, its computer); every write to a connected app asks a person.
- * - `unattended`: reads, the reply where it is (`react`, `pass`, questions, cards), issues, memory and
- *   Drive files with receipts; writes to a connected app ask a person; nothing elsewhere. Woken by the
- *   report of a routine that only reads (`routineAccess: "read"`): no change of its own either, it
- *   proposes (a person's go-ahead puts them behind it).
  *
  * Tool names are written here as plain strings (not imported) so the table loads before the tool
  * modules, which import the gateway.
@@ -53,7 +51,7 @@ export type ToolKind =
   | { kind: "computer" }
   /** A mission's machine tools for its main session (`start_task`, `upload_artifact`): its own work only. */
   | { kind: "mission" }
-  /** A tool this table doesn't know (no scope it reads): only for a person's run. */
+  /** A tool this table doesn't know (no scope it reads): never a routine's. */
   | { kind: "unknown" };
 
 export type InternalArea = "issues" | "memory" | "drive" | "wiki" | "code" | "browser" | "desktop";
@@ -158,6 +156,8 @@ export function toolKind(tool: PolicyTool): ToolKind {
   // workspace-changing actions. Their exact scopes distinguish them from MCP tools.
   if (tool.name === "git_clone" && tool.scope === "github:git.read") return { kind: "internal", area: "code" };
   if (tool.name === "open_pull_request" && tool.scope === "github:pr.write") return { kind: "internal", area: "code" };
+  // The computer's own background task (`sandbox-tools.ts`) is code work; the mission's `start_task` has no scope.
+  if (tool.name === "start_task" && tool.scope === "sandbox:run") return { kind: "internal", area: "code" };
   // A connected app's tool (a catalog connector, custom server, mailbox, or database) is a read
   // only when its scope says so. Connector names can collide with built-ins (a custom MCP
   // server named "permission" exposing "prompt"). Classify by provenance
@@ -177,12 +177,9 @@ export function toolKind(tool: PolicyTool): ToolKind {
   const area = INTERNAL_BY_SCOPE[tool.scope];
   if (area) return { kind: "internal", area };
   // Anything else (a new tool without a scope this table knows): a sensitive one asks a person, like a
-  // connected app's write; any other is only for a person's run.
+  // connected app's write; any other is never a routine's.
   return tool.sensitive ? { kind: "external" } : { kind: "unknown" };
 }
-
-/** What unattended runs may change on their own: what carries a receipt and Undo, and files for their reply. */
-const UNATTENDED_INTERNAL: ReadonlySet<InternalArea> = new Set(["issues", "memory", "drive"]);
 
 export const REFUSALS = {
   routineElsewhere:
@@ -196,17 +193,10 @@ export const REFUSALS = {
     "This routine only reads and reports, and the browser can send data out: use your other tools, and say in hand_off what you'd check.",
   routineDesktopReadOnly:
     "This routine only reads and reports, and the desktop can run anything on the computer and send data out: use your other tools, and say in hand_off what you'd check.",
-  unattendedElsewhere:
-    "Nobody asked for this work (a routine's report or another agent started it): you can't post elsewhere, message people, manage routines or reminders, ask or tell other agents, or ask for secrets or permissions. Say it in your reply here; the people decide.",
-  unattendedInternal:
-    "Nobody asked for this work (a routine's report or another agent started it): say in your reply what you'd do; a person asks you to go ahead.",
-  reportReadOnly:
-    "The routine behind this report only looks and tells: change nothing yourself. Say in your reply what you'd do (the issue you'd open, with its title); a person asks you to go ahead.",
   handOffOnly: "Only background work (a routine's run) hands off: just reply.",
   missionOnly:
-    "Only the mission's own work starts its tasks or uploads its files: say in your reply what you'd do; the people decide.",
-  unknownTool:
-    "This tool is only for work a person asked for. Say what you'd do (in hand_off for a routine's work, in your reply otherwise); a person asks you to go ahead.",
+    "A routine's background work doesn't start a mission's tasks or upload its files: put what you'd do in hand_off; the people decide.",
+  unknownTool: "A routine's background work can't use this tool: put what you'd do in hand_off; the people decide.",
 } as const;
 
 /** Areas whose refusal in a read-only routine says why they aren't reads. */
@@ -221,51 +211,30 @@ export function toolPolicy(authority: RunAuthority, tool: PolicyTool): PolicyDec
   if (what.kind === "directory" || what.kind === "pass" || what.kind === "self" || what.kind === "computer") {
     return ALLOW;
   }
-  // The mission's own work (a person's run, or the run its inbox woke: nobody but the mission behind it);
-  // never a routine nor a run a report or a note woke in its thread.
-  if (what.kind === "mission") {
-    return authority.kind === "person" || (authority.kind === "unattended" && authority.reason === "agent")
-      ? ALLOW
-      : refuse(REFUSALS.missionOnly);
-  }
-  if (authority.kind === "person") return what.kind === "hand_off" ? refuse(REFUSALS.handOffOnly) : ALLOW;
-  if (authority.kind === "routine") {
-    switch (what.kind) {
-      case "hand_off":
-      case "read":
-        return ALLOW;
-      case "elsewhere":
-        return refuse(REFUSALS.routineElsewhere);
-      case "here":
-        return refuse(
-          tool.name === "ask_user"
-            ? REFUSALS.routineAskUser
-            : tool.name === "react"
-              ? REFUSALS.routineReact
-              : REFUSALS.routineHere,
-        );
-      case "internal":
-        if (authority.brief?.access === "act") return ALLOW;
-        return refuse(READ_ONLY_REFUSAL[what.area] ?? REFUSALS.routineReadOnly);
-      case "external":
-        return authority.brief?.access === "act" ? APPROVE : refuse(REFUSALS.routineReadOnly);
-      case "unknown":
-        return refuse(REFUSALS.unknownTool);
-    }
-  }
+  // A person's run and a run nobody is behind work alike: as the agent, with every tool its scopes give.
+  // The mission's own tools check that the run works for the mission (`runActsForMission`).
+  if (authority.kind !== "routine") return what.kind === "hand_off" ? refuse(REFUSALS.handOffOnly) : ALLOW;
   switch (what.kind) {
-    case "read":
-    case "here":
-      return ALLOW;
     case "hand_off":
-      return refuse(REFUSALS.handOffOnly);
+    case "read":
+      return ALLOW;
     case "elsewhere":
-      return refuse(REFUSALS.unattendedElsewhere);
+      return refuse(REFUSALS.routineElsewhere);
+    case "here":
+      return refuse(
+        tool.name === "ask_user"
+          ? REFUSALS.routineAskUser
+          : tool.name === "react"
+            ? REFUSALS.routineReact
+            : REFUSALS.routineHere,
+      );
     case "internal":
-      if (authority.kind === "unattended" && authority.routineAccess === "read") return refuse(REFUSALS.reportReadOnly);
-      return UNATTENDED_INTERNAL.has(what.area) ? ALLOW : refuse(REFUSALS.unattendedInternal);
+      if (authority.brief?.access === "act") return ALLOW;
+      return refuse(READ_ONLY_REFUSAL[what.area] ?? REFUSALS.routineReadOnly);
     case "external":
-      return APPROVE;
+      return authority.brief?.access === "act" ? APPROVE : refuse(REFUSALS.routineReadOnly);
+    case "mission":
+      return refuse(REFUSALS.missionOnly);
     case "unknown":
       return refuse(REFUSALS.unknownTool);
   }

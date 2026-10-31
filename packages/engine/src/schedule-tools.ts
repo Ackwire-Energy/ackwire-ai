@@ -46,8 +46,8 @@ const failed = (error: unknown): ToolOutput => ({
 /**
  * The person this run acts for (authority.ts): reminders and routines are
  * theirs, in their time zone. Null when nobody is behind the run (a routine's
- * work, the run its report woke, a note from another agent): then nothing is
- * scheduled or changed (the run policy refuses these tools there anyway).
+ * work, the run its report woke, an agent's own message): then nothing is
+ * scheduled or changed (a routine's run doesn't even list these tools).
  */
 async function requesterOf(ctx: ToolContext) {
   const authority = await runAuthorityById(ctx.db, ctx.orgId, ctx.runId);
@@ -146,7 +146,7 @@ async function sameRoutine(ctx: ToolContext, conv: { channelId: string; threadId
 
 const noRequester: ToolOutput = {
   content:
-    "Only a person's request can schedule or change routines and reminders, and no person is behind this run (a routine's work, its report, a note from another agent, or an agent's own message).",
+    "Only a person's request can schedule or change routines and reminders, and no person is behind this run (a routine's report or an agent's own message started it). To come back to this work yourself within a day, use follow_up.",
   isError: true,
 };
 

@@ -30,6 +30,7 @@ import { MISSION_RULES } from "./mission-rules";
 import { recordTaskFinished } from "./operator-events";
 import { enqueue } from "./outbox";
 import { personBehindCall } from "./requester";
+import { routineBriefOf } from "./routine-brief";
 import { issueRunToolToken } from "./run-tool-tokens";
 import { replyThreadOf } from "./runs";
 import { hopLimitReached, runStretchOf } from "./stretch";
@@ -1209,8 +1210,9 @@ export function taskEndNotice(row: MachineTaskRow, computer: string) {
 
 /**
  * `machine.task_done`: wakes the conversation once per task. A notice in the
- * task's thread (as its agent) carries the result for the model
- * (`meta.machineTask`), and a run of that agent starts on it, unless the hop
+ * task's thread (a routine's task: where the routine reports), as its agent,
+ * carries the result for the model (`meta.machineTask`, with the run that
+ * started it), and a run of that agent starts on it, unless the hop
  * limit or the agent's audience says no, or the agent left the
  * channel. A run of that agent already active in the thread gets it as a
  * new message instead (one run per agent and conversation).
@@ -1229,17 +1231,27 @@ export async function wakeConversationForTask(deps: TaskDeps, taskId: string, op
   const computer = machine?.name ?? "the computer";
   const [origin] = row.runId
     ? await deps.db
-        .select({ hop: agentRuns.hop, stretchId: agentRuns.stretchId, triggerMessageId: agentRuns.triggerMessageId })
+        .select({
+          hop: agentRuns.hop,
+          stretchId: agentRuns.stretchId,
+          triggerMessageId: agentRuns.triggerMessageId,
+          background: agentRuns.background,
+        })
         .from(agentRuns)
         .where(eq(agentRuns.id, row.runId))
     : [];
   const hop = origin?.hop ?? 1;
   // The work it ends is the origin run's, in its stretch (ADR 0089).
   const stretchId = origin ? runStretchOf(origin) : null;
+  // A routine's task ends where the routine reports, like its approval cards: nobody reads its room (ADR 0053 §4).
+  const report = origin?.background
+    ? routineBriefOf((await getMessage(deps.db, row.orgId, origin.triggerMessageId))?.meta)?.deliverTo
+    : undefined;
+  const channelId = report?.channelId ?? row.channelId;
   const eligible = await eligibleChannelAgents(
     deps.db,
     row.orgId,
-    row.channelId,
+    channelId,
     [row.agentId],
     row.requestedByUserId ? { requesterUserId: row.requestedByUserId } : {},
   );
@@ -1253,11 +1265,12 @@ export async function wakeConversationForTask(deps: TaskDeps, taskId: string, op
     if (!claimed) return null;
     const message = await insertMessage(tx, {
       orgId: row.orgId,
-      channelId: row.channelId,
-      threadId: row.threadRootId,
+      channelId,
+      threadId: report ? report.threadId : row.threadRootId,
       author: { type: "agent", agentId: row.agentId, runId: null, hop, stretchId },
       body: notice.body,
-      meta: notice.meta,
+      // The run that started it: the work it ends continues for whoever is behind that run (`authority.ts`).
+      meta: row.runId ? { ...notice.meta, machineTask: { ...notice.meta.machineTask, runId: row.runId } } : notice.meta,
     });
     const runs =
       eligible.length > 0 && !(await hopLimitReached(tx, message, options.maxHops))
@@ -1270,7 +1283,7 @@ export async function wakeConversationForTask(deps: TaskDeps, taskId: string, op
   for (const run of result.runs) {
     await publishChannelEvent(deps.pubsub, {
       type: "agent.thinking",
-      channelId: row.channelId,
+      channelId,
       threadId: replyThreadOf(run),
       agentId: run.agentId,
       runId: run.id,

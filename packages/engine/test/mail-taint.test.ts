@@ -69,7 +69,7 @@ const sendTool = async (ctx: ToolContext) => (await m.tools.list(ctx)).find((t) 
 const send = (ctx: ToolContext, input: Record<string, unknown>) =>
   m.tools.invoke(ctx, { toolUseId: `tu_${crypto.randomUUID()}`, name: "mail_support_send", input });
 
-test("a person's run sends without asking when the mailbox allows it; nobody's run always asks", async () => {
+test("a person's run and a run nobody is behind follow the mailbox: they send without asking when it allows it", async () => {
   m = await mailSetup();
   const account = await imapAccount(m);
   await giveMail(m, account.id, "read_write", { allowedRecipients: ["@acme.com"], sendWithoutAsking: true });
@@ -78,14 +78,18 @@ test("a person's run sends without asking when the mailbox allows it; nobody's r
   expect(person && isSensitive(person)).toBe(false);
 
   const ctx = await unwatchedRun("unattended");
-  const tainted = await sendTool(ctx);
-  expect(tainted && isSensitive(tainted)).toBe(true);
-  expect(tainted?.inputSchema.required).toContain("why");
+  const own = await sendTool(ctx);
+  expect(own && isSensitive(own)).toBe(false);
+  expect(await send(ctx, SEND)).toMatchObject({ type: "result" });
+  expect(m.box.state.sent).toHaveLength(1);
+
+  // A mailbox that asks first asks for it too: the card says nobody was watching.
+  await giveMail(m, account.id, "read_write", { allowedRecipients: ["@acme.com"], sendWithoutAsking: false });
   expect(await send(ctx, SEND)).toMatchObject({ type: "result", output: { content: WHY_REFUSAL, isError: true } });
   const asked = await send(ctx, { ...SEND, why: WHY });
   if (asked.type !== "approval") throw new Error(`expected an approval, got ${JSON.stringify(asked)}`);
   expect(asked.approval).toMatchObject({ why: WHY, origin: { kind: "unattended" }, params: SEND });
-  expect(m.box.state.sent).toEqual([]);
+  expect(m.box.state.sent).toHaveLength(1);
 });
 
 test("a routine that may act gets a card for every send; one that only reads can't send at all", async () => {

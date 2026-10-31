@@ -507,7 +507,7 @@ export const PLAN_BUILTIN_TOOLS = ["Bash", "Read", "Glob", "Grep"] as const;
  * `work`: edits accepted in its folders, every command through our prompt tool
  * (plain reads at once, the rest by the server's rules or a person), and with
  * the owner's own MCP servers (`personalMcp`) the owner's settings and tools too.
- * `plan` (a routine that only reads, an unattended run): our MCP tools only,
+ * `plan` (a routine that only reads, a mission before Start): our MCP tools only,
  * no settings files of the folder or the owner, no edits and no web, and every
  * command answered on the computer by `localVerdict` (reads only, never secrets);
  * nothing is ever asked of a person.

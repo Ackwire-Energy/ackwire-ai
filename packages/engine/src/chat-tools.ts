@@ -64,7 +64,8 @@ export async function findMember(ctx: Pick<ToolContext, "db" | "orgId">, who: st
 /**
  * `post_message`: "manda no #geral" from a DM. Posts a new message (with
  * files) in another channel, on behalf of the person who asked: they must be
- * in that channel, and the agent too unless it is public. Files are brought
+ * in that channel, and the agent too unless it is public. With nobody behind
+ * the run, the agent posts as itself, only where it is a member. Files are brought
  * the way `share_artifact` does it (the same file when it's visible there, a
  * copy from a DM or a private channel the person is in). The post is an
  * agent message like any reply (same run and hop, so mentions follow the hop
@@ -75,7 +76,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
     {
       name: POST_MESSAGE_TOOL,
       description:
-        'Post a new message in another channel, e.g. when someone in a DM says "manda no #geral". `channel` is its name (with or without #). Attach files with `artifact_ids` (from list_artifacts or files you made); a file from a DM goes as a copy. Only channels the person who asked is in. Then reply here saying where you posted. For this conversation, just reply.',
+        'Post a new message in another channel, e.g. when someone in a DM says "manda no #geral". `channel` is its name (with or without #). Attach files with `artifact_ids` (from list_artifacts or files you made); a file from a DM goes as a copy. Only channels the person who asked is in (when nobody asked, channels you are in). Then reply here saying where you posted. For this conversation, just reply.',
       scope: "",
       inputSchema: {
         type: "object",
@@ -98,7 +99,6 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
       async execute(input, ctx) {
         try {
           const requester = await personBehindCall(ctx);
-          if (!requester) return { content: "Only a person's request can post in another channel.", isError: true };
           const name = str(input.channel).trim().replace(/^#/, "").toLowerCase();
           const { channels, channelMembers } = schema;
           const [found] = await ctx.db
@@ -120,9 +120,10 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
                 .from(channelMembers)
                 .where(eq(channelMembers.channelId, channel.id))
             : [];
-          // Not in it = not found: never reveal private channels.
-          if (!channel || !members.some((m) => m.userId === requester)) {
-            return { content: `No channel #${name} that the person who asked is in.`, isError: true };
+          // Not in it = not found: never reveal private channels. Nobody behind the run: the agent's own channels.
+          if (!channel || !members.some((m) => (requester ? m.userId === requester : m.agentId === ctx.agentId))) {
+            const who = requester ? "the person who asked is" : "you are";
+            return { content: `No channel #${name} that ${who} in.`, isError: true };
           }
           if (channel.id === ctx.channelId) return { content: SAME_CONVERSATION, isError: true };
           if (channel.visibility !== "public" && !members.some((m) => m.agentId === ctx.agentId)) {

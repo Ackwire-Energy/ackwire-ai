@@ -95,13 +95,13 @@ const MESSAGE_ID = { type: "string", minLength: 1, maxLength: 500, description: 
 const utcDayStart = (now: Date) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
 /**
- * Whether nobody watches this run (ADR 0053): a routine's, or one no person started (a routine's
- * report, another agent). Then a send always asks a person, whatever the mailbox policy says: what
- * such a run read (inbound mail included) can't approve its own sends (ADR 0038).
+ * Whether this is a routine's background run (ADR 0053): then a send always asks a person, whatever the
+ * mailbox policy says, since what it read (inbound mail included) can't approve its own sends (ADR 0038).
+ * Any other run, a person behind it or not, follows the mailbox policy.
  */
 async function unwatched(ctx: ToolContext) {
   if (!ctx.runId) return false;
-  return (await runAuthorityById(ctx.db, ctx.orgId, ctx.runId)).kind !== "person";
+  return (await runAuthorityById(ctx.db, ctx.orgId, ctx.runId)).kind === "routine";
 }
 
 /** Why a message is outside what the agent may read; null = inside. */

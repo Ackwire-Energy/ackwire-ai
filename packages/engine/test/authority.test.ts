@@ -2,10 +2,13 @@ import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { countQueries, eq, schema } from "@agenteschat/db";
 import {
   accountablePerson,
+  createAgent,
   createAgentRuns,
+  createOrganization,
   enableCaches,
   insertMessage,
   messageRoot,
+  NEW_AGENT_DEFAULTS,
   personOfMessage,
   type RoutineBrief,
   routineBriefOf,
@@ -13,7 +16,7 @@ import {
   runAuthorityById,
   untrustedBlock,
 } from "../src";
-import { type Fixture, setup } from "./fixtures";
+import { addUser, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -90,22 +93,26 @@ describe("who is behind a run", () => {
     expect(await messageRoot(f.db, f.org.id, written.id)).toEqual({ kind: "routine" });
   });
 
-  test("a routine's report wakes an unattended run, and the restriction follows the chain", async () => {
+  test("a routine's report wakes a run nobody is behind, and so is what it starts", async () => {
     f = await setup();
+    const fired = await byPerson("Confira o checkout", { routineBrief: brief(), background: true });
+    const routineRun = await runFor(fired.id, { background: true });
     const report = await byAgent("Erro novo no checkout", null, {
-      notice: { kind: "routine_handoff", text: "Erro novo no checkout", from: "Routine «Sentry»", refs: {} },
+      notice: {
+        kind: "routine_handoff",
+        text: "Erro novo no checkout",
+        from: "Routine «Sentry»",
+        refs: { runId: routineRun.id },
+      },
     });
     const woken = await runFor(report.id);
-    // A report whose routine run can't be told works as one that only looks.
-    expect(await runAuthority(f.db, woken)).toEqual({
-      kind: "unattended",
-      personId: null,
-      reason: "routine_report",
-      routineAccess: "read",
-    });
+    expect(await runAuthority(f.db, woken)).toEqual({ kind: "unattended", personId: null, reason: "routine_report" });
     // Its reply mentioning someone else still roots in the report.
     const reply = await byAgent("@dev é do seu deploy?", woken.id);
-    expect(await messageRoot(f.db, f.org.id, reply.id)).toEqual({ kind: "routine_report", backgroundRunId: null });
+    expect(await messageRoot(f.db, f.org.id, reply.id)).toEqual({
+      kind: "routine_report",
+      backgroundRunId: routineRun.id,
+    });
     // A person writing into it puts them behind it from then on.
     expect(await runAuthority(f.db, { ...woken, transcript: { steeredBy: f.owner.id } })).toEqual({
       kind: "person",
@@ -113,29 +120,7 @@ describe("who is behind a run", () => {
     });
   });
 
-  test("the run a routine's report wakes works within that routine's access", async () => {
-    f = await setup();
-    for (const access of ["read", "act"] as const) {
-      const fired = await byPerson("Confira o checkout", { routineBrief: brief({ access }), background: true });
-      const routineRun = await runFor(fired.id, { background: true });
-      const report = await byAgent("Checkout quebrou", null, {
-        notice: {
-          kind: "routine_handoff",
-          text: "Checkout quebrou",
-          from: "Routine «Checkout»",
-          refs: { runId: routineRun.id },
-        },
-      });
-      expect(await runAuthority(f.db, await runFor(report.id))).toEqual({
-        kind: "unattended",
-        personId: null,
-        reason: "routine_report",
-        routineAccess: access,
-      });
-    }
-  });
-
-  test("an answer to a question continues the work of the run that asked, for its person", async () => {
+  test("an answer, or a note's reply, continues the work of the run that sent it, for its person", async () => {
     f = await setup();
     const ask = await byPerson("@dev pergunta pro infra");
     const asker = await runFor(ask.id);
@@ -143,15 +128,73 @@ describe("who is behind a run", () => {
       notice: { kind: "consult_reply", text: "Sim", from: "@infra", refs: { runId: asker.id } },
     });
     expect(await personOfMessage(f.db, f.org.id, answer.id)).toBe(f.owner.id);
-    const note = await byAgent("Recado do infra", null, {
+    // A note sent from `sender` woke a run of the other agent; that run's reply comes back naming it.
+    const replyTo = async (sender: string) => {
+      const note = await byAgent("O deploy terminou.", sender, { agentNote: { runId: sender } });
+      const replying = await runFor(note.id);
+      return byAgent("Qual branch?", null, {
+        notice: { kind: "agent_note", text: "Qual branch?", from: "@infra", refs: { runId: replying.id } },
+      });
+    };
+    const woken = await runFor((await replyTo(asker.id)).id);
+    expect(await runAuthorityById(f.db, f.org.id, woken.id)).toEqual({ kind: "person", personId: f.owner.id });
+    // A note sent from work nobody is behind stays nobody's; a reply that names no run too.
+    const own = await runFor((await byAgent("Lembrete: avisar o infra", null)).id);
+    expect(await personOfMessage(f.db, f.org.id, (await replyTo(own.id)).id)).toBeNull();
+    const legacy = await byAgent("Recado do infra", null, {
       notice: { kind: "agent_note", text: "Mudei a variável", from: "@infra", refs: {} },
     });
-    const woken = await runFor(note.id);
-    expect(await runAuthorityById(f.db, f.org.id, woken.id)).toEqual({
+    expect(await runAuthorityById(f.db, f.org.id, (await runFor(legacy.id)).id)).toEqual({
       kind: "unattended",
       personId: null,
-      reason: "agent_note",
+      reason: "agent",
     });
+  });
+
+  test("a task's end, a folder decision and a decision on a proposed agent continue the run named on them", async () => {
+    f = await setup();
+    const asked = await runFor((await byPerson("@dev roda os testes")).id);
+    const lines = [
+      { machineTask: { id: crypto.randomUUID(), status: "done", runId: asked.id } },
+      { machineAccess: { requestId: crypto.randomUUID(), decision: "granted", runId: asked.id } },
+      { notice: { kind: "proposal_result", text: "Ana criou: @ada", refs: { messageId: asked.id, runId: asked.id } } },
+    ];
+    for (const meta of lines) {
+      expect(await personOfMessage(f.db, f.org.id, (await byAgent("…", null, meta)).id)).toBe(f.owner.id);
+    }
+    // A routine's task: nobody behind it, whoever created the routine.
+    const routine = await runFor((await byPerson("Confira", { routineBrief: brief(), background: true })).id, {
+      background: true,
+    });
+    const ended = await byAgent("…", null, { machineTask: { id: crypto.randomUUID(), runId: routine.id } });
+    expect(await messageRoot(f.db, f.org.id, ended.id)).toEqual({ kind: "routine" });
+  });
+
+  test("a link to another workspace's run, or to no run id, leads to nobody", async () => {
+    f = await setup();
+    const zed = await addUser(f.db, "zed");
+    const { organization: other, general } = await createOrganization(f.db, zed.id, { name: "Outra" });
+    const theirs = await createAgent(
+      f.db,
+      zed.id,
+      other.id,
+      { name: "Zed bot", handle: "zedbot", role: "Dev", instructions: "x" },
+      NEW_AGENT_DEFAULTS,
+    );
+    const ask = await insertMessage(f.db, {
+      orgId: other.id,
+      channelId: general.id,
+      author: { type: "person", userId: zed.id },
+      body: "@zedbot faz",
+    });
+    const [run] = await f.db.transaction((tx) => createAgentRuns(tx, ask, [theirs.id], "mention"));
+    expect(run).toBeDefined();
+    for (const runId of [run?.id ?? "", "not-a-run"]) {
+      const line = await byAgent("…", null, { machineTask: { id: crypto.randomUUID(), runId } });
+      expect(await messageRoot(f.db, f.org.id, line.id)).toEqual({ kind: "agent" });
+      const notice = await byAgent("…", null, { notice: { kind: "consult_reply", text: "Sim", refs: { runId } } });
+      expect(await personOfMessage(f.db, f.org.id, notice.id)).toBeNull();
+    }
   });
 
   test("a wake an hour after the last walks only its newest link, not the chain", async () => {
