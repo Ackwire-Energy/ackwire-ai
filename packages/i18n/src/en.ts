@@ -3612,6 +3612,7 @@ export const en: Translations = {
     deleteBody: "It stops running and leaves the list. Past runs stay in the history.",
     deleteConfirm: "Delete routine",
     deleted: "Routine deleted.",
+    notFound: "This routine no longer exists or you don't have access.",
     copyWebhook: "Copy webhook URL",
     webhookCopied: "Webhook URL copied.",
     once: "Once · {{weekday}}, {{date}} at {{time}}{{zone}}",

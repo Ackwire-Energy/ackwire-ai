@@ -10,8 +10,10 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { lookOf } from "@/lib/look";
+import { inPlaceClick } from "@/lib/navigate";
 import { useToast } from "@/lib/toast";
 import { AgentAvatar } from "./AgentAvatar";
+import { useOpenAgentPanel } from "./agent-panel-context";
 import { useOrg } from "./org-context";
 
 const HOVER_OPEN_MS = 250;
@@ -48,6 +50,7 @@ function MemoryMark({ message, memory }: { message: Message; memory: MessageMemo
   const api = useApi();
   const qc = useQueryClient();
   const toast = useToast();
+  const openPanel = useOpenAgentPanel();
   const agent = dir.agentById.get(memory.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
   const canEdit = can(org, "review_memory") || agent?.ownerUserId === me.user.id;
@@ -110,7 +113,20 @@ function MemoryMark({ message, memory }: { message: Message; memory: MessageMemo
   const label = t("memoryMark.label", { name, text: short(memory.text) });
   const memoryLink = (
     <Button asChild size="sm" variant="ghost">
-      <Link to="/org/$orgId/agents/$agentId/memory" params={{ orgId: org.id, agentId: memory.agentId }}>
+      {/* In a conversation: the agent's Memória in the panel beside it. */}
+      <Link
+        to="/org/$orgId/agents/$agentId/memory"
+        params={{ orgId: org.id, agentId: memory.agentId }}
+        onClick={
+          openPanel
+            ? (e) =>
+                inPlaceClick(e, () => {
+                  setMode(null);
+                  openPanel(memory.agentId, "memory");
+                })
+            : undefined
+        }
+      >
         {t("memoryMark.view")}
       </Link>
     </Button>

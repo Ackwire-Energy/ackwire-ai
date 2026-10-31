@@ -10,8 +10,10 @@ import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { inPlaceClick } from "@/lib/navigate";
 import { useToast } from "@/lib/toast";
 import { useLive, useLiveStore } from "@/realtime/context";
+import { useOpenAgentPanel } from "./agent-panel-context";
 import { useChannelActions } from "./channel-actions";
 import { useOrg } from "./org-context";
 import { CardSky, colorOf } from "./Sky";
@@ -19,8 +21,8 @@ import { CardSky, colorOf } from "./Sky";
 /**
  * "Memória atualizada" in the chat (`memory.updated`): what the agent
  * remembered, forgot or updated because a person asked, a link to what it
- * knows, and "Desfazer" (`POST …/memories/{id}/revert`). A proposed change
- * shows the proposal inline instead.
+ * knows (its page's Memória tab in the panel beside the conversation), and "Desfazer"
+ * (`POST …/memories/{id}/revert`). A proposed change shows the proposal inline instead.
  */
 export function MemoryChangeCard({ update, agentId }: { update: MemoryUpdate; agentId: string }) {
   const { t } = useTranslation();
@@ -28,6 +30,7 @@ export function MemoryChangeCard({ update, agentId }: { update: MemoryUpdate; ag
   const api = useApi();
   const qc = useQueryClient();
   const dir = useDirectory(org.id);
+  const openPanel = useOpenAgentPanel();
   const [undone, setUndone] = useState(false);
   const revert = useMutation({
     mutationFn: () => api.memory.revert(org.id, update.itemId),
@@ -61,7 +64,11 @@ export function MemoryChangeCard({ update, agentId }: { update: MemoryUpdate; ag
       )}
       <div className="ac-approval__actions ac-acts">
         <Button asChild variant="ghost" size="sm">
-          <Link to="/org/$orgId/agents/$agentId/memory" params={{ orgId: org.id, agentId }}>
+          <Link
+            to="/org/$orgId/agents/$agentId/memory"
+            params={{ orgId: org.id, agentId }}
+            onClick={openPanel ? (e) => inPlaceClick(e, () => openPanel(agentId, "memory")) : undefined}
+          >
             {t("memoryCard.open", g)}
           </Link>
         </Button>

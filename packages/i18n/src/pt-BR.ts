@@ -3647,6 +3647,7 @@ export const ptBR = {
     deleteBody: "Ela para de rodar e sai da lista. As execuções passadas continuam no histórico.",
     deleteConfirm: "Apagar rotina",
     deleted: "Rotina apagada.",
+    notFound: "Essa rotina não existe mais ou você não tem acesso.",
     copyWebhook: "Copiar URL do webhook",
     webhookCopied: "URL do webhook copiada.",
     once: "Uma vez · {{weekday}}, {{date}} às {{time}}{{zone}}",

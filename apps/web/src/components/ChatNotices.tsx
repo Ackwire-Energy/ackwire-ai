@@ -17,8 +17,10 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { MessageBody } from "@/chat/MessageBody";
 import { ConsultationCard } from "@/components/ConsultationCard";
+import { useInPlace } from "@/components/InPlace";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { inPlaceClick } from "@/lib/navigate";
 import "./chat-notices.css";
 
 const NOTICE_ICON: Record<string, IconName> = {
@@ -182,8 +184,8 @@ function CancelFollowUp({ messageId }: { messageId: string }) {
 
 /**
  * The routine an agent's message answers (ADR 0053 §7): a small tag next to its name, "Rotina «X»",
- * that opens the routine in Rotinas; with the report it answers loaded here, "Ver relatório" unfolds it
- * (the report's own line is folded into this message).
+ * that opens the routine's details over the conversation (its link still goes to Rotinas); with the report it answers
+ * loaded here, "Ver relatório" unfolds it (the report's own line is folded into this message).
  */
 export function RoutineTag({
   routine,
@@ -198,6 +200,7 @@ export function RoutineTag({
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const inPlace = useInPlace();
   return (
     <>
       <Link
@@ -206,6 +209,7 @@ export function RoutineTag({
         search={{ open: routine.id }}
         className="msg-reminder msg-reminder--link"
         title={t("channel.routineTagTip")}
+        onClick={inPlace ? (e) => inPlaceClick(e, () => inPlace.routine(routine.id)) : undefined}
       >
         <Icon name="routines" size={14} />
         {t("channel.routineTag", { name: routine.name })}

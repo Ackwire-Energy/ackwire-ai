@@ -17,7 +17,11 @@ import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
+import { useOpenAgentPanel } from "@/components/agent-panel-context";
+import { useChannelActions } from "@/components/channel-actions";
+import { useInPlace } from "@/components/InPlace";
 import { useDirectory } from "@/hooks/useDirectory";
+import { inPlaceClick } from "@/lib/navigate";
 import { fromApiRule, ruleSentence } from "@/lib/recurrence";
 import { useToast } from "@/lib/toast";
 import { useOrg } from "./org-context";
@@ -277,20 +281,40 @@ function Receipt({
   );
 }
 
-/** The bold target in the sentence opens it: the issue, the routine, the wiki page, the channel, the thread, the memory. */
+/**
+ * The bold target in the sentence opens it: the issue, the routine, the wiki page, the channel, the thread, the memory.
+ * In a conversation the task and the routine open in their dialog over it, the thread and the memory in the panel
+ * beside it; the link still goes to their page (a new tab, a middle click).
+ */
 function ReceiptTarget({ action: a, children }: { action: AgentAction; children?: ReactNode }) {
   const { org } = useOrg();
   const orgId = org.id;
+  const inPlace = useInPlace();
+  const openPanel = useOpenAgentPanel();
+  const openThread = useChannelActions()?.openThread;
   const tg = a.target;
-  if (tg.type === "issue" && tg.number != null)
+  if (tg.type === "issue" && tg.number != null) {
+    const number = tg.number;
     return (
-      <Link to="/org/$orgId/issues/$number" params={{ orgId, number: String(tg.number) }} className="ag-rc__target">
+      <Link
+        to="/org/$orgId/issues/$number"
+        params={{ orgId, number: String(number) }}
+        className="ag-rc__target"
+        onClick={inPlace ? (e) => inPlaceClick(e, () => inPlace.issue(number)) : undefined}
+      >
         {children}
       </Link>
     );
+  }
   if (tg.type === "routine")
     return (
-      <Link to="/org/$orgId/routines" params={{ orgId }} search={{ open: tg.id }} className="ag-rc__target">
+      <Link
+        to="/org/$orgId/routines"
+        params={{ orgId }}
+        search={{ open: tg.id }}
+        className="ag-rc__target"
+        onClick={inPlace ? (e) => inPlaceClick(e, () => inPlace.routine(tg.id)) : undefined}
+      >
         {children}
       </Link>
     );
@@ -312,13 +336,23 @@ function ReceiptTarget({ action: a, children }: { action: AgentAction; children?
     );
   if (tg.type === "thread")
     return (
-      <Link to="/org/$orgId/threads/$threadId" params={{ orgId, threadId: tg.id }} className="ag-rc__target">
+      <Link
+        to="/org/$orgId/threads/$threadId"
+        params={{ orgId, threadId: tg.id }}
+        className="ag-rc__target"
+        onClick={openThread ? (e) => inPlaceClick(e, () => openThread(tg.id)) : undefined}
+      >
         {children}
       </Link>
     );
   if (tg.type === "memory")
     return (
-      <Link to="/org/$orgId/agents/$agentId/memory" params={{ orgId, agentId: a.agentId }} className="ag-rc__target">
+      <Link
+        to="/org/$orgId/agents/$agentId/memory"
+        params={{ orgId, agentId: a.agentId }}
+        className="ag-rc__target"
+        onClick={openPanel ? (e) => inPlaceClick(e, () => openPanel(a.agentId, "memory")) : undefined}
+      >
         {children}
       </Link>
     );

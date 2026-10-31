@@ -51,8 +51,14 @@ describe("Aprovar sempre on a request", () => {
     expect(toast.textContent).toContain("Aprovado. Ada não pede mais para isso.");
     expect(toast.textContent).toContain("Para desfazer, vá em Ferramentas e acesso, na página da Ada.");
     await click(within(toast).getByRole("button", { name: "Abrir" }));
-    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/agents/${ADA_ID}`);
-    expect(router.state.location.search).toMatchObject({ tab: "access" });
+    // Ada's page in the panel beside the conversation, at Ferramentas e acesso: the person stays in the channel.
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
+    const panel = screen().getByRole("complementary", { name: "Perfil da Ada" });
+    expect(
+      within(panel)
+        .getByRole("tab", { name: /^Ferramentas e acesso/ })
+        .getAttribute("aria-selected"),
+    ).toBe("true");
   });
 
   test("a request that doesn't offer it shows no button, and approving it once stays as it was", async () => {

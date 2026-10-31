@@ -68,6 +68,7 @@ import {
 } from "@agenteschat/client";
 import { actionCardOf } from "@agenteschat/client/lib/action-cards";
 import { activityVerb, barEntries, isWriting, toolActivity } from "@agenteschat/client/lib/activity";
+import type { AgentTab } from "@agenteschat/client/lib/agent-edit";
 import { looksLikeApiKey } from "@agenteschat/client/lib/api-key-text";
 import { artifactRefs } from "@agenteschat/client/lib/artifacts";
 import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
@@ -214,6 +215,7 @@ import { CorrectionAsk } from "@/components/CorrectionAsk";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfMessage } from "@/components/Forum";
+import { InPlaceProvider } from "@/components/InPlace";
 import { IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
 import { useUploadFailed } from "@/components/Limits";
 import { LiveCodeToggle, type SteerNote } from "@/components/LiveCode";
@@ -465,14 +467,17 @@ export function ChannelPage({
   return (
     // "Arquivos", "Ver plano", "Ver no arquivo": any mission card here opens the same files panel.
     <MissionPanelProvider>
-      <ChannelView
-        key={`${channel.id}:${thread?.id ?? ""}:${adjustThreadId ?? ""}`}
-        channel={channel}
-        chrome={chrome}
-        focusMessageId={focusMessageId}
-        adjustThreadId={adjustThreadId}
-        thread={thread}
-      />
+      {/* A routine or a task an agent names here opens in its dialog over the conversation. */}
+      <InPlaceProvider>
+        <ChannelView
+          key={`${channel.id}:${thread?.id ?? ""}:${adjustThreadId ?? ""}`}
+          channel={channel}
+          chrome={chrome}
+          focusMessageId={focusMessageId}
+          adjustThreadId={adjustThreadId}
+          thread={thread}
+        />
+      </InPlaceProvider>
     </MissionPanelProvider>
   );
 }
@@ -603,15 +608,16 @@ function ChannelView({
   });
   // The thread open in the panel beside the channel ("Responder", a thread's line); `reply`: to its composer.
   const [panel, setPanel] = useState<{ id: string; reply: boolean } | null>(null);
-  // "Ver perfil" (a DM's header, the profile card): the agent's page in the same place; one panel at a time.
-  const [profileId, setProfileId] = useState<string | null>(null);
+  // "Ver perfil" (a DM's header, the profile card): the agent's page in the same place, at a tab when a card asks
+  // (its memory); one panel at a time.
+  const [profile, setProfile] = useState<{ agentId: string; tab?: AgentTab } | null>(null);
   // A question an agent asked another from here, opened from its line in the reply ("Theo ⇄ Iris"): one panel too.
   const [consultId, setConsultId] = useState<string | null>(null);
   const outerPanel = useOpenAgentPanel();
-  const openAgentPanel = useCallback((agentId: string) => {
+  const openAgentPanel = useCallback((agentId: string, tab?: AgentTab) => {
     setPanel(null);
     setConsultId(null);
-    setProfileId(agentId);
+    setProfile({ agentId, tab });
   }, []);
   // "Mudar algo" on a mission's plan: the next message goes to its executor ("Respondendo: Plano").
   const [missionReply, setMissionReply] = useState<{ missionId: string; label: string } | null>(null);
@@ -1562,17 +1568,17 @@ function ChannelView({
     reply: thread
       ? () => composer.current?.focus()
       : (message) => {
-          setProfileId(null);
+          setProfile(null);
           setConsultId(null);
           setPanel({ id: message.threadId ?? message.id, reply: true });
         },
     openThread: (id) => {
-      setProfileId(null);
+      setProfile(null);
       setConsultId(null);
       setPanel({ id, reply: false });
     },
     openConsultation: (id) => {
-      setProfileId(null);
+      setProfile(null);
       setPanel(null);
       setConsultId(id);
     },
@@ -1994,7 +2000,14 @@ function ChannelView({
               <ThreadPage key={panel.id} threadId={panel.id} reply={panel.reply} onClose={() => setPanel(null)} />
             </aside>
           )}
-          {profileId && <AgentPanel key={profileId} agentId={profileId} onClose={() => setProfileId(null)} />}
+          {profile && (
+            <AgentPanel
+              key={`${profile.agentId}:${profile.tab ?? ""}`}
+              agentId={profile.agentId}
+              tab={profile.tab}
+              onClose={() => setProfile(null)}
+            />
+          )}
           {consultId && (
             <ConsultationPanel
               key={consultId}
