@@ -2098,6 +2098,11 @@ const Timeline = memo(function Timeline({
     [models.data],
   );
   const [mountedAt] = useState(() => Date.now());
+  // Rows that failed to draw: the row after one keeps its own header, or under the quiet line it would read as more of
+  // whoever's header is above. ponytail: never cleared, so a row that draws again leaves the next one its header until
+  // the conversation is reopened.
+  const [unshown, setUnshown] = useState<ReadonlySet<string>>(() => new Set());
+  const markUnshown = (key: string | null) => key !== null && setUnshown((s) => (s.has(key) ? s : new Set(s).add(key)));
   // Keys of the first load (idempotent, so a double render in StrictMode agrees).
   const initialKeys = useRef<Set<string> | null>(null);
   if (ready && initialKeys.current === null) initialKeys.current = new Set(items.map((i) => i.key));
@@ -2186,7 +2191,9 @@ const Timeline = memo(function Timeline({
     [heldPlaces, channelId, runVisible, slots, lastByRun],
   );
   const rows: ReactElement<{ message?: MessageType }>[] = [];
+  const afterUnshown = () => unshown.has(rows.at(-1)?.key ?? "");
   for (const item of items) {
+    const grouped = item.kind === "message" && item.grouped && !afterUnshown();
     if (divider?.key === item.key) {
       rows.push(
         <div key="unread-divider" className="channel__unread" data-fade={divider.fading || undefined}>
@@ -2214,7 +2221,7 @@ const Timeline = memo(function Timeline({
           key={blockKey}
           runId={m.agentRunId}
           message={m}
-          grouped={item.grouped}
+          grouped={grouped}
           entering={false}
           modelLabels={modelLabels}
           contextMark={threadsView?.marks.has(m.id)}
@@ -2225,7 +2232,7 @@ const Timeline = memo(function Timeline({
         <TimelineMessage
           key={item.key}
           message={m}
-          grouped={item.grouped}
+          grouped={grouped}
           entering={entering}
           modelLabels={modelLabels}
           contextMark={threadsView?.marks.has(m.id)}
@@ -2240,7 +2247,7 @@ const Timeline = memo(function Timeline({
   }
   // The first block at work follows the last message: under the agent's own, it has no header of its own.
   const lastItem = items.at(-1);
-  const after = lastItem?.kind === "message" ? lastItem.message : null;
+  const after = lastItem?.kind === "message" && !afterUnshown() ? lastItem.message : null;
   slots.forEach((slot, i) => {
     if (!blockEnters.current.has(slot.key)) blockEnters.current.set(slot.key, ready && Date.now() - mountedAt > 1500);
     rows.push(
@@ -2262,7 +2269,12 @@ const Timeline = memo(function Timeline({
   return (
     <ConsultGroupsProvider value={consultGroups}>
       {rows.map((row) => (
-        <ErrorBoundary key={row.key} resetKey={row.props.message} fallback={unshownLine}>
+        <ErrorBoundary
+          key={row.key}
+          resetKey={row.props.message}
+          onError={() => markUnshown(row.key)}
+          fallback={unshownLine}
+        >
           {row}
         </ErrorBoundary>
       ))}

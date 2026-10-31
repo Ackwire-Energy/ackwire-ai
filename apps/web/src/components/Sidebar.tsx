@@ -261,7 +261,16 @@ export function Sidebar() {
   // Owners and admins organize the groups, with the full sidebar (the rail shows faces only).
   const organize = arranges && !rail;
   const agentRow = (a: Agent) => (
-    <ErrorBoundary key={a.id} resetKey={a} fallback={unshownRow}>
+    <ErrorBoundary
+      key={a.id}
+      resetKey={a}
+      // Still a row the drag counts (`useAgentDrag`), so a drop below it lands where the pointer is.
+      fallback={() => (
+        <div className="sidebar__row" data-agent-row={a.id}>
+          <UnshownRow />
+        </div>
+      )}
+    >
       <AgentRow
         agent={a}
         unread={unreadWith.get(a.id) ?? 0}

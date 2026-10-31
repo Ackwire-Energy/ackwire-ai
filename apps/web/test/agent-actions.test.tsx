@@ -3,8 +3,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { AgentAction, Message, MissionPlan } from "@agenteschat/client";
-import { AGENT_ACTION_KINDS, ApiError } from "@agenteschat/client";
+import type { Agent, AgentAction, Message, MissionPlan } from "@agenteschat/client";
+import { AGENT_ACTION_KINDS, ApiError, keys } from "@agenteschat/client";
 import { en, ptBR } from "@agenteschat/i18n";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { RECEIPT_ICONS } from "@/components/AgentActions";
@@ -313,10 +313,43 @@ describe("receipts this build doesn't expect", () => {
     }
   });
 
-  test("a sidebar row that throws is one quiet row: the other rows and the conversation stay", async () => {
+  test("the message after a quiet line keeps its own header, not read as the words of whoever wrote above", async () => {
     const logged = spyOn(console, "error").mockImplementation(() => {});
     try {
+      // João, then Ada's message that can't draw, then Ada's next one a moment later (grouped with it).
       await open(
+        withActions([action()], (s) => {
+          const row = { channelId: ENG_ID, threadId: null, mentionedAgentIds: [], agentRunId: null };
+          s.messages.push(
+            {
+              ...row,
+              id: "m-joao",
+              author: { type: "person", id: "u-joao" },
+              body: "Viu o login?",
+              createdAt: inMs(-6_000),
+            },
+            {
+              ...row,
+              id: "m-broken",
+              author: { type: "agent", id: ADA_ID },
+              body: null as never,
+              createdAt: inMs(-5_000),
+            },
+          );
+        }),
+      );
+      expect(screen().getAllByText("Esta mensagem não pôde ser exibida")).toHaveLength(1);
+      expect(article().className).not.toContain("ac-msg--grouped");
+      expect(article().querySelector(".ac-msg__head")?.textContent).toContain("Ada");
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
+  test("a sidebar row that throws is one quiet row, still counted by a drag: the other rows and the conversation stay; fixed, it is back", async () => {
+    const logged = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const { services } = await open(
         withActions([action()], (s) => {
           // An object where the row draws text: React refuses it while drawing Atlas's row.
           for (const a of s.agents) if (a.id === ATLAS_ID) a.role = { unexpected: true } as never;
@@ -324,10 +357,22 @@ describe("receipts this build doesn't expect", () => {
       );
       const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
       expect(within(nav).getAllByText("Não pôde ser exibido")).toHaveLength(1);
+      // A drag finds where a row lands among the `[data-agent-row]` rows: Atlas's place is still one.
+      const unshown = within(nav).getByText("Não pôde ser exibido").closest("[data-agent-row]");
+      expect(unshown?.getAttribute("data-agent-row")).toBe(ATLAS_ID);
       expect(within(nav).getAllByText("Ada").length).toBeGreaterThan(0);
       expect(within(nav).getAllByText("general").length).toBeGreaterThan(0);
       expect(screen().getByRole("heading", { name: "# eng" })).toBeTruthy();
       expect(article().textContent).toContain("Criei a tarefa #23");
+      // Atlas comes back fixed: its row is back.
+      await act(async () =>
+        services.queryClient.setQueryData<Agent[]>(keys.agents(ORG_ID), (list) =>
+          list?.map((a) => (a.id === ATLAS_ID ? { ...a, role: "Infra" } : a)),
+        ),
+      );
+      await settle(2);
+      expect(within(nav).queryByText("Não pôde ser exibido")).toBeNull();
+      expect(within(nav).getAllByText("Atlas").length).toBeGreaterThan(0);
     } finally {
       logged.mockRestore();
     }
