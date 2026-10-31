@@ -6,6 +6,8 @@ import {
   type RouterStrategy,
   type RoutingInput,
   type RoutingResult,
+  SPOKEN_TO,
+  withAddressee,
 } from "./router";
 
 /**
@@ -13,8 +15,9 @@ import {
  * one request to `POST https://api.typesafe.ai/v1/systemone` with the
  * conversation as `state` and, in parallel, one Noul per candidate ("should
  * <agent> answer?"), a Noul for "does this need any agent?", and, with two or
- * more candidates, a Noul for "is it for every agent?" and a Choice over the
- * candidates plus "none" to break ties.
+ * more candidates, a Noul for "is it for every agent?", a Choice over the
+ * candidates plus "none" to break ties, and one for "which agent does it speak
+ * to?" (`withAddressee`).
  * It only scores; policy stays in `selectAgents`. Optional (needs the
  * installation's Jev key, ADR 0073), and the first step of `routeChain`:
  * on an error or a timeout the next step decides.
@@ -39,8 +42,7 @@ export const jevCostNanoUsd = (inputTokens: number) => Math.round(inputTokens * 
 const NONE = "none";
 
 /** How to read the state and who a message is for: the small model's rules too (`ROUTER_SYSTEM`). */
-const WHO_FOR =
-  'People are written by name, agents as @handle, and `names` lists who a message names, by @ or by name. `latest_message` may hold a few messages the same person sent in a row, one per line: they are one message. Messages a person sends in a row continue the same address: after "boa tarde walter", "como está hoje" is still for Walter. A message to a person, by @ or by name, is for that person, not for an agent. Greetings and small talk between people get no agent. When `alone_with` names an agent, the author is the only person in the channel with it: what they write to the room is for it.';
+const WHO_FOR = `People are written by name, agents as @handle, and \`names\` lists who a message names, by @ or by name. \`latest_message\` may hold a few messages the same person sent in a row, one per line: they are one message. Messages a person sends in a row continue the same address: after "boa tarde walter", "como está hoje" is still for Walter. A message to a person, by @ or by name, is for that person, not for an agent. Greetings and small talk between people get no agent. When \`alone_with\` names an agent, the author is the only person in the channel with it: what they write to the room is for it. ${SPOKEN_TO}`;
 
 interface JevAnswer {
   type: "noul" | "choice" | "score";
@@ -104,7 +106,7 @@ export function createJevRouterStrategy(options: {
               about: c.about || null,
               can: c.can ?? null,
             },
-            question: `Should \`agent\` reply to \`latest_message\`? ${WHO_FOR} Yes when the message speaks to this agent (by @, by name or by its role), asks it or anyone something its role and what it \`can\` do cover, or follows up on a conversation this agent was just part of (see \`agent_just_talking\`). Also yes when it speaks to all the agents or the whole room ("everyone", "all of you", "gente", "vocês", "agentes") and each one has its own answer (its name, its computer, its status): then every agent should reply. No when it is for a person, when it is a greeting or small talk not to this agent, when it can't actually help with this, and when the message is about an app or tool (Sentry, GitHub, the Drive…) that is not in its \`can\`: it has no access to it.`,
+            question: `Should \`agent\` reply to \`latest_message\`? ${WHO_FOR} Yes when the message speaks to this agent, even when what it asks needs another agent: it can ask that one. When it speaks to no agent in particular, yes when it asks this agent or anyone something its role and what it \`can\` do cover, or follows up on a conversation this agent was just part of (see \`agent_just_talking\`). Also yes when it speaks to all the agents or the whole room ("everyone", "all of you", "gente", "vocês", "agentes") and each one has its own answer (its name, its computer, its status): then every agent should reply. No when it speaks to another agent, even when it names this one as someone to ask, involve or hand over to; when it is for a person; when it is a greeting or small talk not to this agent; and when it speaks to no agent in particular and this agent can't actually help with it, or it is about an app or tool (Sentry, GitHub, the Drive…) that is not in its \`can\`: it has no access to it.`,
           },
           criteria: {
             true: "This agent should answer (alone, or along with the others when the message is for all of them).",
@@ -143,6 +145,14 @@ export function createJevRouterStrategy(options: {
           instructions: "Which agent is best placed to reply to `latest_message`?",
           criteria,
         };
+        const spoken: Record<string, string> = {};
+        for (const c of input.candidates) spoken[c.handle] = `${c.name} (@${c.handle})${c.role ? `, ${c.role}` : ""}`;
+        spoken[NONE] = "No agent in particular.";
+        questions.addressee = {
+          type: "choice",
+          instructions: `Which agent does \`latest_message\` speak to? ${WHO_FOR} \`${NONE}\` when it speaks to no agent in particular: to a person, to anyone, to all the agents, or a follow-up that names nobody.`,
+          criteria: spoken,
+        };
       }
 
       const body = await callJev<{
@@ -165,26 +175,36 @@ export function createJevRouterStrategy(options: {
         .catch(() => {});
       const answers = body.answers ?? {};
       const best = answers.best_agent?.probabilities ?? {};
-      const scores = input.candidates.map((c, i) => {
-        const noul = clamp(answers[`agent_${i}`]?.noul);
-        // The Choice only breaks near-ties: a small nudge toward the agent it prefers.
-        const nudge = input.candidates.length >= 2 ? 0.1 * ((best[c.handle] ?? 0) - 1 / (handles.length + 1)) : 0;
-        return { agentId: c.agentId, score: clamp(noul + nudge) };
-      });
+      const to = answers.addressee?.probabilities ?? {};
+      const scored = withAddressee(
+        {
+          agents: input.candidates.map((c, i) => {
+            const noul = clamp(answers[`agent_${i}`]?.noul);
+            // The Choice only breaks near-ties: a small nudge toward the agent it prefers.
+            const nudge = input.candidates.length >= 2 ? 0.1 * ((best[c.handle] ?? 0) - 1 / (handles.length + 1)) : 0;
+            return { agentId: c.agentId, score: clamp(noul + nudge) };
+          }),
+          needsAgent: clamp(answers.needs_agent?.noul),
+          ...(answers.for_everyone ? { forEveryone: clamp(answers.for_everyone.noul) } : {}),
+        },
+        new Map(input.candidates.map((c) => [c.agentId, clamp(to[c.handle])])),
+      );
       const choice = answers.best_agent?.choice;
+      const spokenTo = input.candidates.find((c) => c.agentId === scored.addressee);
+      const reason = [
+        spokenTo ? `to @${spokenTo.handle} (${clamp(to[spokenTo.handle]).toFixed(2)})` : null,
+        choice
+          ? choice === NONE
+            ? "no agent should reply"
+            : `best @${choice} (confidence ${(answers.best_agent?.confidence ?? 0).toFixed(2)})`
+          : null,
+      ]
+        .filter(Boolean)
+        .join("; ");
       return {
-        agents: scores,
-        needsAgent: clamp(answers.needs_agent?.noul),
+        ...scored,
         ...(answers.already_answered ? { alreadyAnswered: clamp(answers.already_answered.noul) } : {}),
-        ...(answers.for_everyone ? { forEveryone: clamp(answers.for_everyone.noul) } : {}),
-        ...(choice
-          ? {
-              reason:
-                choice === NONE
-                  ? "no agent should reply"
-                  : `best @${choice} (confidence ${(answers.best_agent?.confidence ?? 0).toFixed(2)})`,
-            }
-          : {}),
+        ...(reason ? { reason } : {}),
         strategy: "jev",
         decidedBy: { step: "jev" },
       };

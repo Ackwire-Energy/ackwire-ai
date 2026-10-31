@@ -21,6 +21,7 @@ import {
   type RoutingInput,
   routeMessage,
   routerPrompt,
+  SPOKEN_TO,
   selectAgents,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -140,6 +141,82 @@ describe("routerPrompt", () => {
     expect(prompt).toContain("<history>\n[@ada]: Campanha publicada.\n</history>");
     expect(prompt).toContain("<message>\n[Ana, names Walter]: boa tarde walter\ncomo esta hoje\n</message>");
     expect(prompt).toContain("This person is the only one here with @ada");
+  });
+});
+
+describe("who a message speaks to, for the small model", () => {
+  test("it says first which agent the message speaks to, under the rule every step reads", () => {
+    const { system, schema: answer } = routerPrompt({
+      orgId: "o",
+      channel: { id: "c", name: "geral", topic: "" },
+      message: { id: "m", author: "ana", body: "ada pergunta pro theo meu email" },
+      thread: [],
+      candidates: [cand("ada"), cand("theo")],
+    });
+    expect(system).toContain(`- ${SPOKEN_TO}`);
+    expect(system).toContain("First give `addressee`");
+    expect(Object.keys(answer.properties)[0]).toBe("addressee");
+    expect(answer.properties.addressee).toEqual({ type: "string", enum: ["ada", "theo", "none"] });
+    expect(answer.required).toContain("addressee");
+  });
+
+  test("its `addressee` decides between the agents a message names; `none` leaves the scores as they are", async () => {
+    let addressee = "ada";
+    f = await setup({
+      reply: (req) =>
+        req.outputSchema
+          ? {
+              chunks: [
+                JSON.stringify({
+                  addressee,
+                  needs_agent: 0.8,
+                  for_everyone: 0,
+                  scores: [
+                    { handle: "theo", score: 0.9 },
+                    { handle: "ada", score: 0.4 },
+                  ],
+                  reason: "email",
+                }),
+              ],
+            }
+          : { chunks: ["ok"] },
+    });
+    const make = async (name: string) => {
+      const a = await createAgent(
+        f.db,
+        f.owner.id,
+        f.org.id,
+        { name, handle: name.toLowerCase() },
+        { model: "claude-sonnet-5-5" },
+      );
+      await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: a.id });
+      return a;
+    };
+    const ada = await make("Ada");
+    const theo = await make("Theo");
+    const strategy = createLlmRouterStrategy({ gateway: f.gateway, resolveModel: async () => "claude-haiku-5-5" });
+    const route = async (body: string) => {
+      const m = await insertMessage(f.db, {
+        orgId: f.org.id,
+        channelId: f.general.id,
+        author: { type: "person", userId: f.owner.id },
+        body,
+      });
+      const routed = await routeMessage({ db: f.db, strategy, policy }, { orgId: f.org.id, messageId: m.id });
+      const [decision] = await f.db
+        .select()
+        .from(schema.routingDecisions)
+        .where(eq(schema.routingDecisions.messageId, m.id));
+      return { routed, decision };
+    };
+    const toAda = await route("ada pergunta pro theo ai qual meu email mais recente pls");
+    expect(toAda.routed.selected).toEqual([ada.id]);
+    // Theo only named: nothing. Ada spoken to: as far as an agent is needed, and addressed.
+    expect(toAda.decision?.candidates).toContainEqual({ agentId: theo.id, score: 0 });
+    expect(toAda.decision?.candidates).toContainEqual({ agentId: ada.id, score: 0.8 });
+    expect(toAda.decision?.reason).toBe("follow-up; model: email");
+    addressee = "none";
+    expect((await route("alguém sabe qual meu email mais recente?")).routed.selected).toEqual([theo.id]);
   });
 });
 
