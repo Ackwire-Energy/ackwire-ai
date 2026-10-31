@@ -2482,8 +2482,8 @@ function StoppedLine({
   byUserId: string | null | undefined;
   /** The server's line, for older messages without a person in the meta. */
   note?: string | null;
-  /** The run ended at its step limit (`meta.stepLimit`), nobody stopped it. */
-  limit?: boolean;
+  /** The run ended at its step limit, or because it got stuck (`meta.stepLimit`): nobody stopped it. */
+  limit?: "steps" | "stuck";
   /** Who may continue: the same people who may stop it. */
   owner: { agentId: string; channelId: string; threadId: string; triggerMessageId?: string | null } | null;
   /** The stopped reply, once it is saved (its meta says when it was continued). */
@@ -2497,7 +2497,7 @@ function StoppedLine({
   const continued = useWasContinued(runId, message);
   const stopper = byUserId ? dir.memberById.get(byUserId)?.name : undefined;
   const who = limit
-    ? t("run.stepLimit")
+    ? t(limit === "stuck" ? "run.stuck" : "run.stepLimit")
     : byUserId && byUserId === me.user.id
       ? t("run.stoppedByYou")
       : stopper
@@ -2906,8 +2906,9 @@ export const TimelineMessage = memo(function TimelineMessage({
   // A text the server wrote (`meta.bodyCode`, a deploy's notice) is shown in the person's language.
   const stopped = useMemo(() => splitCanceled(serverBody(t, m.body, m.meta), m.meta), [t, m.body, m.meta]);
   const body = reminderBody(stopped.body, m.meta);
-  // The reply of a run that reached its step limit: Continuar under it too.
-  const atLimit = !stopped.canceled && Boolean(m.meta?.stepLimit);
+  // The reply of a run that reached its step limit, or that stopped because it got stuck: Continuar under it too.
+  const ended = stopped.canceled ? undefined : (m.meta?.stepLimit as { stuck?: unknown } | undefined);
+  const atLimit = ended ? (ended.stuck === true ? "stuck" : "steps") : undefined;
 
   const channelName = useChannels(org.id).data?.find((c) => c.id === m.channelId)?.name;
   // A plain reminder: the agent's own message, with a small "Reminder" label.

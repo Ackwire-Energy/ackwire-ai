@@ -745,13 +745,19 @@ describe("an agent's turn as one block", () => {
   });
 
   test("a reply at the step limit: whether it was continued, marked in its own meta", () => {
-    expect(stepLimitOf({ stepLimit: {}, bodyCode: "step_limit" })).toEqual({ continuedRunId: null });
+    expect(stepLimitOf({ stepLimit: {}, bodyCode: "step_limit" })).toEqual({ continuedRunId: null, stuck: false });
     expect(stepLimitOf({ canceled: { byUserId: "u1" } })).toBeNull();
     expect(stepLimitOf({})).toBeNull();
     const next = withContinued({ stepLimit: {}, bodyCode: "step_limit" }, "r3");
     expect(next).toEqual({ stepLimit: { continuedRunId: "r3" }, bodyCode: "step_limit" });
     expect(stepLimitOf(next)?.continuedRunId).toBe("r3");
     expect(stoppedOf(next)).toBeNull();
+  });
+
+  test("a reply of a run that stopped because it got stuck: said apart, and still once it was continued", () => {
+    const stuck = { stepLimit: { stuck: true }, bodyCode: "stuck" };
+    expect(stepLimitOf(stuck)).toEqual({ continuedRunId: null, stuck: true });
+    expect(stepLimitOf(withContinued(stuck, "r4"))).toEqual({ continuedRunId: "r4", stuck: true });
   });
 });
 

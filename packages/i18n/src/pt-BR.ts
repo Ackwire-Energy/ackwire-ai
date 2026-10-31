@@ -2745,6 +2745,7 @@ export const ptBR = {
       errors: {
         budget_exceeded: "O orçamento do mês acabou.",
         too_many_tool_calls: "Passou do limite de ferramentas numa execução.",
+        stuck: "Parou porque travou.",
         empty_reply: "O modelo não respondeu nada.",
         model_refused: "O modelo se recusou a responder.",
         agent_archived: "O agente foi arquivado.",
@@ -3925,6 +3926,7 @@ export const ptBR = {
       model_refused: "O modelo se recusou a responder",
       runner_outdated: "O programa no computador precisa ser atualizado",
       too_many_tool_calls: "Passou do limite de passos numa execução",
+      stuck: "Parou porque travou",
       missing_credential: "Falta uma chave de API",
       credential_revoked: "A chave de API foi revogada",
       credential_wrong_provider: "A chave de API é de outro provedor",
@@ -6244,6 +6246,7 @@ export const ptBR = {
     stopped: "Parado",
     continueRun: "Continuar",
     stepLimit: "No limite de passos",
+    stuck: "Parou porque travou",
     steer: {
       waiting: "{{name}} lê na próxima pausa",
       now: "{{name}} parou para ler",
@@ -8882,6 +8885,7 @@ export const ptBR = {
       },
       interrupted: "Interrompida porque o servidor reiniciou. Peça de novo para continuar.",
       step_limit: "Meus passos acabaram antes de eu terminar.",
+      stuck: "Travei e parei antes de terminar.",
       forum_suggestion: 'Vale um fórum? "{{title}}"',
       forum_concluded: 'O fórum "{{title}}" terminou. A síntese está no arquivo abaixo.',
       forum_concluded_issues:
