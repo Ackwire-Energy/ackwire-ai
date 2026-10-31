@@ -4725,9 +4725,10 @@ p {
 }
 /* Nav items are default controls of the ruler (40, r12). */
 .sidebar__item {
+  --item-r: var(--control-r-md);
   min-height: var(--control-h-md);
   padding: 0 10px;
-  border-radius: var(--control-r-md);
+  border-radius: var(--item-r);
   font-size: 14.5px;
   transition:
     background-color 0.15s,
@@ -4736,10 +4737,14 @@ p {
 .sidebar__item:hover {
   background: var(--plate);
 }
-/* The chosen item: its own white with a hairline, and a small dithered sky rising from the right
-   (an agent's row in its color). Rounded like any item. */
+/* The chosen item: a frame of dithered sky rising from the right (an agent's row in its color) around one
+   plate of the item's own white, 3px in with the item's corner less 3px, so the frame keeps an even width round
+   the corners and the role, lock or state at the end sits on the plate like the label. A hairline outside keeps
+   the left edge, where the sky fades out. */
 .sidebar__item[data-status="active"],
 .sidebar__item[data-status="active"]:hover {
+  position: relative;
+  isolation: isolate;
   background-color: var(--side-active);
   background-image: var(--sel-sky, none);
   background-position: right center;
@@ -4752,18 +4757,24 @@ p {
 [data-theme="dark"] .sidebar__item[data-status="active"] {
   background-image: var(--sel-sky-dark, none);
 }
-/* The role, lock or state at the row's end lands on the sky's deepest cells: it gets a plate in the item's
-   own color so it stays readable. */
-.sidebar__item[data-status="active"] > .sidebar__item-meta {
-  padding: 2px 6px;
-  margin-right: -4px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--side-active) 90%, transparent);
-  color: var(--ink);
+.sidebar__item[data-status="active"]::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  z-index: -1;
+  border-radius: calc(var(--item-r) - 3px);
+  background: var(--side-active);
+  pointer-events: none;
 }
-/* The icon rail is too narrow for a horizon. */
+.sidebar__item[data-status="active"] > .sidebar__item-meta {
+  color: var(--ink2);
+}
+/* The icon rail is too narrow for a frame. */
 .sidebar[data-rail="true"] .sidebar__item[data-status="active"] {
   background-image: none;
+}
+.sidebar[data-rail="true"] .sidebar__item[data-status="active"]::before {
+  content: none;
 }
 .sidebar__label {
   font-size: 11.5px;
@@ -9949,10 +9960,10 @@ html[data-menu-overlay] .shell {
 /* Rows: 30px, 14px text; 18px muted icons 9px in, the 24px avatar (accessories need 24) 6px in and centred
    on the icons, every name in one column. */
 .sidebar:not([data-rail="true"]) .sidebar__item {
+  --item-r: var(--control-r-sm);
   min-height: 30px;
   padding: 0 8px 0 9px;
   gap: 9px;
-  border-radius: var(--control-r-sm);
   font-size: 14px;
 }
 /* "Criar agente" is one of the rows: their height, its + in their icons' column. */
