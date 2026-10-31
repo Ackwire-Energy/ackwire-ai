@@ -404,7 +404,7 @@
 .routine-details__pair {
   display: contents;
 }
-@container routine-details (min-width: 560px) {
+@container routine-details (min-width: 620px) {
   .routine-details__pair {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
