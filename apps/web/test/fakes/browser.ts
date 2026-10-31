@@ -150,6 +150,11 @@ export function createFakeBrowser(
     stop: async (orgId, agentId) => {
       log("browser.stop", orgId, agentId);
     },
+    // Like the server: only who may drive it.
+    restart: async (orgId, agentId) => {
+      log("browser.restart", orgId, agentId);
+      if (watchOnly.has(agentId)) throw new ApiError(403, "forbidden", "You can't use this agent's browser");
+    },
   };
   const desktop: ApiClient["desktop"] = {
     status: async (orgId, agentId) => {

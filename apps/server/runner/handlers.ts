@@ -18,7 +18,7 @@ import {
   STEER_LIMITS,
 } from "@agenteschat/adapters/machine-protocol";
 import { realFoldersFor } from "./access";
-import type { AccountManager } from "./accounts";
+import type { AccountGrant, AccountManager } from "./accounts";
 import type { BrainManager } from "./brain";
 import { type CodexBrainEvent, type CodexBrainTurnRequest, handleCodexBrainTurn } from "./brain-codex";
 import type { CodexAppServers } from "./brain-codex-app";
@@ -181,8 +181,14 @@ export interface HandlerContext {
     runs: Map<string, McpTaskInfo>;
     /** Protocol 15: long-lived `codex app-server`s (turns take messages mid-turn); without it, `codex exec`. */
     app?: CodexAppServers;
-    /** System mode, in a worker: the account folders lent to this agent (`accounts` is root's). */
-    accounts?: { accountDir(kind: "claude_code" | "codex", id: string): string | null };
+    /**
+     * System mode, in a worker: the account folders lent to this agent (`accounts` is root's), and its own folder
+     * for an account root keeps (`agentHome`, protocol 29).
+     */
+    accounts?: {
+      accountDir(kind: "claude_code" | "codex", id: string): string | null;
+      agentHome?(kind: "claude_code" | "codex", id: string): string | null;
+    };
     /** How `codex exec` starts (a worker under systemd: in the agent's AI CLIs slice, `scope-gate.ts`). */
     spawn?: Spawn;
   };
@@ -212,6 +218,8 @@ export interface HandlerContext {
   browser?: BrowserManager;
   /** Protocol 13: the computer brains' accounts (ADR 0041); without it the runner refuses `account`. */
   accounts?: AccountManager;
+  /** Set per request in a worker (protocol 29): what root handed this turn for its account (`AccountManager.grant`). */
+  grant?: AccountGrant;
   /** Protocol 18: the agents' desktops (ADR 0058); without it the runner refuses `desktop.session.*`. */
   desktops?: DesktopSessions;
   /** Protocol 18: terminals people open as an agent; without it the runner refuses terminal streams. */
@@ -486,6 +494,7 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
       if (!req.agent) throw new RunnerError("bad_request", "A route runs for an agent");
       return routeWithPlan(req, {
         accounts: ctx.accounts ?? ctx.codex?.accounts,
+        ...(ctx.grant ? { grant: ctx.grant } : {}),
         brains: ctx.brains,
         codexApp: ctx.codex?.app,
         tasks: ctx.tasks,
@@ -713,6 +722,7 @@ async function handleAccount(
         req.again === true,
         req.email === undefined ? undefined : requireString(req.email, "email"),
         req.provider === undefined ? undefined : requireString(req.provider, "provider"),
+        req.shared === true,
       );
     case "code":
       if (typeof req.box !== "object" || req.box === null) throw new RunnerError("bad_request", "box is required");
@@ -763,10 +773,11 @@ async function doBrainTurn(
   const final = await ctx.brains.turn(req, {
     agent: req.agent,
     folder: ctx.workspaceReal,
-    secrets: secrets ? { env: secrets.env, redact: secrets.redact } : null,
+    secrets: secrets ? { env: secrets.env, redact: secrets.redact, hold: secrets.hold } : null,
     signal: scope.signal,
     emit: (event) => scope.emit?.({ type: "brain.event", runId, event }),
     ...(ctx.grants ? { grants: ctx.grants } : {}),
+    ...(ctx.grant ? { grant: ctx.grant } : {}),
   });
   signedOut(ctx, req, final);
   scope.emit?.({ type: "brain.done", runId });

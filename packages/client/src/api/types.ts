@@ -1185,6 +1185,8 @@ export interface ConnectorDef {
   oauthConfigured: boolean;
   /** Can be connected on this server; `false` shows "Em breve". */
   available: boolean;
+  /** The vendor hasn't approved agentes.chat yet: greyed out with a lock, nothing to open. Older servers leave it out. */
+  soon?: boolean;
   needsServerUrl: boolean;
   /** The MCP endpoint (`remote_mcp`). */
   serverUrl: string | null;
@@ -1606,7 +1608,8 @@ export interface CustomServer {
 export type CustomConnectStart =
   | { status: "connected"; server: CustomServer }
   | { status: "oauth"; authorizeUrl: string }
-  | { status: "needs_key" };
+  /** `not_approved`: it has OAuth but only lets in apps it approved, and agentes.chat isn't one yet. */
+  | { status: "needs_key"; reason?: "not_approved" };
 
 // ── Knowledge (phase 5: apps/server/src/routes/app/knowledge.ts) ─────────────
 
@@ -2083,8 +2086,8 @@ export interface IssueWork {
   runId: string | null;
   state: "running" | "waiting_approval" | "waiting_input" | "stalled";
   since: string;
-  /** The run's last tool calls, oldest first. */
-  steps: { tool: string; detail?: string; at: string }[];
+  /** The run's last tool calls, oldest first; a computer command's check says when it was refused or waits. */
+  steps: { tool: string; detail?: string; at: string; outcome?: "refused" | "waiting" }[];
   reason?: "failed" | "canceled" | "budget";
 }
 
@@ -2554,6 +2557,29 @@ export interface SkillDetail extends Skill {
   /** SKILL.md without the front matter (Markdown). */
   body: string;
   files: SkillFile[];
+}
+
+/** A skill a GitHub link holds, offered to pick when it holds several. */
+export interface SkillChoice {
+  /** Its folder from the repository's root: what `importPicked` sends back. */
+  path: string;
+  name: string;
+  description: string;
+}
+
+/** A skill a GitHub link holds that can't be installed: its folder and the server's refusal. */
+export interface SkillSkipped {
+  path: string;
+  code: string;
+  /** English fallback. */
+  message: string;
+  params?: Record<string, unknown>;
+}
+
+/** A GitHub link holding several skills: the ones to pick from, and those that can't be installed, with why. */
+export interface SkillPick {
+  choices: SkillChoice[];
+  skipped?: SkillSkipped[];
 }
 
 /** `GET …/agents/{id}/skills`: every skill of the library, with whether this agent has it. */
@@ -3867,7 +3893,7 @@ export interface MachineAccount {
   label: string;
   /** Only for its owner. */
   email: string | null;
-  /** "Pro", "Max", "Team"… as the provider reports it. */
+  /** `pro`, `max`, `ultra`, `team`… from what the CLI says (`planWordOf` names it). */
   plan: string | null;
   status: "active" | "signed_out";
   /** Whose it is (the person who signed it in); null: nobody's. */
@@ -3875,14 +3901,18 @@ export interface MachineAccount {
   ownerName: string | null;
   /** The viewer owns it: only they rename it or pick it for an agent. */
   mine: boolean;
-  /** Names of the agents that think with it (one at most). */
+  /** Names of the agents that think with it (one at most, unless `shared`). */
   usedBy: string[];
+  /** Their ids, in the same order (absent: an older server). */
+  usedByIds?: string[];
   /** Its plan's usage limits; null: not known yet. */
   usage: PlanUsage | null;
   /** A key account's coding plan (`zai`, `kimi`, `minimax`, `opencode`); null: the CLI's own sign-in. */
   provider: string | null;
   /** The last 4 of a key account's key (its owner only). */
   keyHint: string | null;
+  /** It thinks for every agent its owner gives it on that computer, with no new sign-in (absent: an older server). */
+  shared?: boolean;
 }
 
 /** `GET …/ai-accounts`: the viewer's AI accounts on the organization's computers, and where they can add one. */
@@ -3901,6 +3931,8 @@ export interface AiComputer {
   canAdd: boolean;
   /** Its runner takes coding plans' keys. */
   keys: boolean;
+  /** A new sign-in there thinks for all of the viewer's agents on it (absent: an older server). */
+  shares?: { claude_code: boolean; codex: boolean; key: boolean };
   /** What it can think with now: Claude Code (Claude and the coding plans) and Codex (ChatGPT). */
   brains: { claude_code: boolean; codex: boolean };
   /**

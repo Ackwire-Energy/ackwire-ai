@@ -374,11 +374,13 @@ describe("prompt text and permissions", () => {
     const ask = (command: string) =>
       JSON.parse(runPermissionPrompt({ tool_name: "Bash", input: { command }, scope }, { canRun: false })) as {
         behavior: string;
+        code?: string;
       };
     expect(ask("git clone https://github.com/acme/web ../web").behavior).toBe("allow");
     expect(ask("git pull --ff-only").behavior).toBe("allow");
-    expect(ask("git push origin main").behavior).toBe("deny");
-    expect(ask("git clone https://github.com/acme/web /tmp/web").behavior).toBe("deny");
+    // A refusal carries a code, so the apps say why in the person's language.
+    expect(ask("git push origin main")).toMatchObject({ behavior: "deny", code: "never" });
+    expect(ask("git clone https://github.com/acme/web /tmp/web")).toMatchObject({ behavior: "deny", code: "off" });
   });
 
   test("a refused command says why and what to do instead, so the agent doesn't resend it", () => {
@@ -387,12 +389,15 @@ describe("prompt text and permissions", () => {
       JSON.parse(runPermissionPrompt({ tool_name: "Bash", input: { command }, scope }, { canRun: true })) as {
         behavior: string;
         message?: string;
+        code?: string;
       };
     const heredoc = ask("git checkout -b fix && cat > src/a.test.ts <<'EOF'\ntest()\nEOF");
-    expect(heredoc.behavior).toBe("deny");
+    expect(heredoc).toMatchObject({ behavior: "deny", code: "unclear" });
     expect(heredoc.message).toContain("because it can't be read plainly");
     expect(heredoc.message).toContain("Edit and Write tools");
+    expect(ask("echo hi > /etc/hosts")).toMatchObject({ code: "outside" });
     expect(ask("echo hi > /etc/hosts").message).toContain("because it writes outside the mission folder");
+    expect(ask("cat ~/.aws/credentials")).toMatchObject({ behavior: "deny", code: "secret" });
     expect(ask("git checkout -b fix").behavior).toBe("allow");
   });
 });

@@ -8,7 +8,7 @@ import type {
   MachineFolderGrant,
   MachineToolName,
 } from "../api/types";
-import { errorCode } from "./errors";
+import { errorCode, sendWaits } from "./errors";
 
 /**
  * Connected computers (ADR 0025, ADR 0036): the device code, the commands the
@@ -211,11 +211,12 @@ export async function beginLogin<T>(
 
 /**
  * The account a sign-in came back as when its person already has it on that computer (the new sign-in is removed
- * there): theirs to think with instead, while it is signed in and no agent thinks with it.
+ * there): theirs to think with instead, while it is signed in and no agent thinks with it, or it thinks for all of
+ * their agents there (`shared`).
  */
 export function freeDuplicate(status: AccountLoginStatus | undefined): MachineAccount | null {
   const account = status?.duplicate?.account;
-  return account?.status === "active" && account.usedBy.length === 0 ? account : null;
+  return account?.status === "active" && (account.usedBy.length === 0 || account.shared === true) ? account : null;
 }
 
 /**
@@ -224,3 +225,45 @@ export function freeDuplicate(status: AccountLoginStatus | undefined): MachineAc
  */
 export const otherThanHint = (hint: string | null | undefined, account: Pick<MachineAccount, "email">): boolean =>
   Boolean(hint && account.email && account.email.toLowerCase() !== hint.toLowerCase());
+
+/**
+ * How long a sign-in's status reads may keep failing before it fails: a server restart and the runner's reconnect.
+ * After a drop the runner dials again 1, 2, 4, 8, 16, then 32 s apart (`backoffDelay` in the runner, ±20 %). A restart
+ * of up to about 30 s (deploy/deploy.sh) can miss the fifth dial, at 25 to 37 s, and wait for the sixth, at up to
+ * 76 s; this covers it and the next read.
+ */
+export const LOGIN_RECONNECT_MS = 90_000;
+
+/** A read of a sign-in's status that failed while the server restarts or the computer reconnects. */
+export const loginReadPasses = (error: unknown) => {
+  const code = errorCode(error);
+  return sendWaits(error) || code === "machine.offline" || code === "machine.timeout";
+};
+
+/**
+ * A read that failed in a way that passes (`loginReadPasses`), and when this run of failed reads began: counted from
+ * its first failure, so a page back from the background isn't failed by the time it spent there.
+ */
+export class LoginReadError extends Error {
+  constructor(
+    cause: unknown,
+    readonly since: number,
+  ) {
+    super("The sign-in can't be read for now", { cause });
+    this.name = "LoginReadError";
+  }
+}
+
+/** Where reading a sign-in's status stands (`loginRead`); null while it reads. */
+export type LoginRead = "reconnecting" | "noAnswer" | "failed" | null;
+
+/**
+ * `reconnecting` while the reads fail in a way that passes, up to `LOGIN_RECONNECT_MS` from the first of them;
+ * `noAnswer` past that; `failed` at once on any other error. The sign-in goes on on the computer meanwhile, and the
+ * next answer picks it up.
+ */
+export function loginRead(status: { isError: boolean; error: unknown; errorUpdatedAt: number }): LoginRead {
+  if (!status.isError) return null;
+  if (!(status.error instanceof LoginReadError)) return "failed";
+  return status.errorUpdatedAt - status.error.since < LOGIN_RECONNECT_MS ? "reconnecting" : "noAnswer";
+}

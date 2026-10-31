@@ -157,7 +157,7 @@ function ConnectStep({
   const [label, setLabel] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [keyOpen, setKeyOpen] = useState(false);
-  const [needsKey, setNeedsKey] = useState(false);
+  const [needsKey, setNeedsKey] = useState<boolean | "not_approved">(false);
   const [touched, setTouched] = useState<"oauth" | "key" | null>(null);
 
   // A server by address (any, or a vendor's official one) or our catalog connector.
@@ -187,7 +187,7 @@ function ConnectStep({
   const byAddressResult = (result: Awaited<ReturnType<typeof connect.mutateAsync>>) => {
     if (result.status === "oauth") navigateAway(result.authorizeUrl);
     else if (result.status === "needs_key") {
-      setNeedsKey(true);
+      setNeedsKey(result.reason ?? true);
       setKeyOpen(true);
       setTouched(null);
     } else done(fromServer(result.server, catalog.data?.connectors ?? []));
@@ -230,7 +230,13 @@ function ConnectStep({
         submitKey();
       }}
     >
-      {needsKey && <Alert tone="neutral">{t("connectFlow.needsKey")}</Alert>}
+      {needsKey && (
+        <Alert tone="neutral">
+          {needsKey === "not_approved"
+            ? t("connectFlow.notApproved", { name: name ?? new URL(serverUrl).hostname })
+            : t("connectFlow.needsKey")}
+        </Alert>
+      )}
       <Field label={t("connectors.apiKey")} id="cflow-key" help={t("connectors.apiKeyHelp")} error={keyError}>
         <Input type="password" autoComplete="off" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
       </Field>

@@ -115,6 +115,16 @@ const KNOWN = {
   human_check_blocked: "errors.humanCheckBlocked",
   // TypeSafe refused the key pasted for Jev: said under its field, nothing kept.
   jev_key_invalid: "jev.steps.invalid",
+  "github.repo_missing": "errors.github.repoMissing",
+  "github.ref_missing": "errors.github.refMissing",
+  // `count`: minutes until GitHub stops limiting the server.
+  "github.limited": "errors.github.limited",
+  "skill.no_skill_md": "errors.skill.noSkillMd",
+  "skill.too_many_skills": "errors.skill.tooManySkills",
+  "skill.invalid_name": "errors.skill.invalidName",
+  "skill.invalid_description": "errors.skill.invalidDescription",
+  "skill.too_large": "errors.skill.tooLarge",
+  "skill.too_many_files": "errors.skill.tooManyFiles",
 } as const;
 
 /** Better Auth's code when a blocked account tries to sign in (the server's `session.create.before` hook). */

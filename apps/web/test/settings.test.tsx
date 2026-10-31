@@ -463,6 +463,8 @@ describe("Configurações do workspace", () => {
       "Notificações",
       "Geral",
       "Membros e convites",
+      // Every member reads what each role allows (ADR 0085).
+      "Papéis e permissões",
       "Conectores",
       "Computadores",
       "Orçamento e uso",

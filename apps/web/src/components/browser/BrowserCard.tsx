@@ -24,6 +24,7 @@ import {
   useAgentBrowserHandoff,
   useAgentScreenControl,
   useBrowserHandoffMutations,
+  useBrowserStuck,
   useDesktopStatus,
   useMachines,
   wheelEvent,
@@ -56,7 +57,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
-import { useBrowserLive, useStreams } from "@/realtime/context";
+import { useBrowserLive, useConnectionStatus, useStreams } from "@/realtime/context";
 import { DialogHead, FullButton, FullScreenButton, useDialogHead, useHandBack, useSayFailed } from "../computer/head";
 import { useOpenComputer } from "../computer/open";
 import { useOrg } from "../org-context";
@@ -348,7 +349,8 @@ export function BrowserCard({
     io.observe(el);
     return () => io.disconnect();
   }, []);
-  const live = useBrowserLive(agentId, !chat || visible || holding);
+  const watching = !chat || visible || holding;
+  const live = useBrowserLive(agentId, watching);
   const [still, setStill] = useState<typeof live.frame>(null);
   const [stoppedAt, setStoppedAt] = useState<string | null>(null);
   useEffect(() => {
@@ -600,6 +602,32 @@ export function BrowserCard({
     });
   };
 
+  const unavailable = live.unavailable;
+  const reconnecting = unavailable?.reason === "reconnecting";
+  // What can't change by waiting is said plainly; everything else is "opening" while it retries.
+  const blocker =
+    unavailable?.reason === "offline"
+      ? t(cloud ? "browser.inCard.offlineCloud" : "browser.inCard.offline", g)
+      : unavailable?.reason === "no_computer"
+        ? t(cloud ? "browser.inCard.noComputerCloud" : "browser.inCard.noComputer", g)
+        : unavailable?.reason === "forbidden" || live.error === "forbidden" || live.error === "not_found"
+          ? t("browser.inCard.forbidden")
+          : live.error === "too_many_browsers"
+            ? t("browser.inCard.tooMany")
+            : null;
+  const starting = !frame && !blocker && !reconnecting && !closed && !opening && !hidden;
+  // Opening or reconnecting for too long says so, with Try again: who may drive it restarts the browser, the
+  // others watch again. Only while this view watches on an open socket: off screen or offline no page can come.
+  const online = useConnectionStatus() === "open";
+  const [attempt, setAttempt] = useState(0);
+  const stuck = useBrowserStuck(watching && online && !hidden && (starting || reconnecting || opening), attempt);
+  const retry = () => {
+    setAttempt((n) => n + 1);
+    // Watching again after the restart too: this view's own watch may be what the server refused.
+    if (mayDrive) actions.restart.mutate(agentId, { onError: didntWork, onSettled: () => live.retry() });
+    else live.retry();
+  };
+
   // The agent's own request is open and mine: its card (under the request) is the control, not this one.
   if (!given && handoff?.kind === "ask" && inControl) return null;
 
@@ -660,18 +688,6 @@ export function BrowserCard({
     );
   }
 
-  const unavailable = live.unavailable;
-  const reconnecting = unavailable?.reason === "reconnecting";
-  // What can't change by waiting is said plainly; everything else is "opening" while it retries.
-  const blocker =
-    unavailable?.reason === "offline"
-      ? t(cloud ? "browser.inCard.offlineCloud" : "browser.inCard.offline", g)
-      : unavailable?.reason === "no_computer"
-        ? t(cloud ? "browser.inCard.noComputerCloud" : "browser.inCard.noComputer", g)
-        : unavailable?.reason === "forbidden" || live.error === "forbidden" || live.error === "not_found"
-          ? t("browser.inCard.forbidden")
-          : null;
-  const starting = !frame && !blocker && !reconnecting && !closed && !opening && !hidden;
   const src = frame ? `data:image/jpeg;base64,${frame.data}` : null;
   const lastStep = steps.at(-1);
   // The page as last seen, for the title: none while closed, opening or hidden.
@@ -686,7 +702,7 @@ export function BrowserCard({
   const goForced = closed || (Boolean(frame) && isBlankPage(frame?.metadata.url));
   const goShown = inControl && (goOpen || goForced);
 
-  const asTitle = titleKind({ inControl, ask, host, opening: starting });
+  const asTitle = titleKind({ inControl, ask, host, opening: starting && !stuck });
   const title =
     asTitle === "ask"
       ? (ask ?? "")
@@ -707,14 +723,17 @@ export function BrowserCard({
         : t("browser.inCard.subOther", { person: controllerName })
       : closed
         ? t("browser.inCard.subClosed")
-        : reconnecting
-          ? t("browser.inCard.subReconnect", g)
-          : starting || (!lastStep && !pic)
-            ? t("browser.inCard.subStarting", g)
-            : lastStep
-              ? t("browser.inCard.subWorking", { name, now: lowerFirst(stepText(t, lastStep), i18n.language) })
-              : t("browser.live.watchOnly");
-  const live_ = working && !blocker && !closed;
+        : stuck
+          ? t("browser.inCard.subStuck")
+          : reconnecting
+            ? t("browser.inCard.subReconnect", g)
+            : starting || (!lastStep && !pic)
+              ? t("browser.inCard.subStarting", g)
+              : lastStep
+                ? t("browser.inCard.subWorking", { name, now: lowerFirst(stepText(t, lastStep), i18n.language) })
+                : t("browser.live.watchOnly");
+  const live_ = working && !blocker && !closed && !stuck;
+  const spinning = live_ || (reconnecting && !stuck);
   // The dialog's sub-line: the same, but live and watching is what the dialog knows (a request, a hold). Over a cover
   // it says nothing the cover says (opening, reconnecting): only who holds the page.
   const surfaceSub = inControl
@@ -832,7 +851,7 @@ export function BrowserCard({
   );
   const subText = (
     <small>
-      {(live_ || reconnecting) && <PixelSpinner size={14} color={color} />}
+      {spinning && <PixelSpinner size={14} color={color} />}
       <span>{sub}</span>
     </small>
   );
@@ -848,6 +867,18 @@ export function BrowserCard({
       icon="globe"
       text={t("browser.inCard.closed", g)}
       help={inControl ? t("browser.inCard.closedControl") : t("browser.inCard.closedHelp", g)}
+    />
+  ) : stuck ? (
+    <Cover
+      color={color}
+      icon="alert"
+      text={t("browser.inCard.stuck", g)}
+      help={mayDrive ? t("browser.inCard.stuckHelp") : undefined}
+      action={
+        <Button size="sm" icon="refresh" loading={actions.restart.isPending} onClick={retry}>
+          {t("common.retry")}
+        </Button>
+      }
     />
   ) : opening ? (
     <Cover color={color} spinner text={t("browser.inCard.goOpening", { site: waitingFor?.site ?? "" })} />
@@ -895,7 +926,7 @@ export function BrowserCard({
           ) : (
             // Focusable so the steps also open from the keyboard.
             <span className="brw-mf__now" tabIndex={steps.length > 0 ? 0 : -1}>
-              {(live_ || reconnecting) && <PixelSpinner size={14} color={color} />}
+              {spinning && <PixelSpinner size={14} color={color} />}
               <span>{sub}</span>
               {steps.length > 0 && (
                 <span className="brw-mf__hist" role="tooltip">

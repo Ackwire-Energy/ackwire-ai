@@ -226,6 +226,7 @@ type Listed = {
   category: string;
   serverUrl: string | null;
   available: boolean;
+  soon: boolean;
   iconUrl: string | null;
   brandColor: string | null;
 };
@@ -263,6 +264,67 @@ test("catalog: one list of our connectors and the one-click MCP servers, one ent
   for (const c of connectors) {
     expect([c.id, c.iconUrl !== null && existsSync(`${publicDir}${c.iconUrl}`)]).toEqual([c.id, true]);
   }
+});
+
+test("one-click servers that haven't approved agentes.chat: `soon`, refused by id; by address, they say why", async () => {
+  const asked: string[] = [];
+  // Asana's MCP OAuth, as it answered on 2026-10-31: its registration refuses our redirect URI.
+  const http = (async (input: string | URL) => {
+    const url = String(input);
+    asked.push(url);
+    if (url === "https://mcp.asana.com/mcp") {
+      return new Response("", {
+        status: 401,
+        headers: {
+          "www-authenticate": 'Bearer resource_metadata="https://mcp.asana.com/.well-known/oauth-protected-resource"',
+        },
+      });
+    }
+    if (url === "https://mcp.asana.com/.well-known/oauth-protected-resource") {
+      return Response.json({ resource: "https://mcp.asana.com/mcp", authorization_servers: ["https://mcp.asana.com"] });
+    }
+    if (url === "https://mcp.asana.com/.well-known/oauth-authorization-server") {
+      return Response.json({
+        issuer: "https://mcp.asana.com",
+        authorization_endpoint: "https://mcp.asana.com/authorize",
+        token_endpoint: "https://mcp.asana.com/token",
+        registration_endpoint: "https://mcp.asana.com/register",
+        code_challenge_methods_supported: ["S256"],
+      });
+    }
+    if (url === "https://mcp.asana.com/register") {
+      return Response.json(
+        { error: "invalid_redirect_uri", error_description: "One or more redirect URIs are not allowed" },
+        { status: 400 },
+      );
+    }
+    return new Response("not found", { status: 404 });
+  }) as unknown as typeof fetch;
+  t = await createTestServer({ http, resolveHost: async () => ["93.184.216.34"] });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const { presets } = (await (await owner(`/api/app/organizations/${orgId}/connectors/presets`)).json()) as {
+    presets: { id: string; soon: boolean }[];
+  };
+  const soon = (id: string) => presets.find((p) => p.id === id)?.soon;
+  expect(["asana", "vercel", "figma", "linear", "calendly"].map(soon)).toEqual([true, true, true, false, false]);
+  const { connectors } = (await (await owner("/api/app/connectors/catalog")).json()) as { connectors: Listed[] };
+  expect(connectors.find((c) => c.id === "asana")).toMatchObject({ available: false, soon: true });
+  expect(connectors.find((c) => c.id === "notion")).toMatchObject({ available: true, soon: false });
+
+  // By its id: refused before anything reaches the vendor (an older client still showing it as one click).
+  const byId = await owner(`/api/app/organizations/${orgId}/connectors/presets/asana/connect`, { json: {} });
+  expect(byId.status).toBe(400);
+  expect(((await byId.json()) as { error: { code: string } }).error.code).toBe("connector.not_approved");
+  expect(asked).toEqual([]);
+
+  // By its address: the usual path, and the answer says the vendor only lets in apps it approved.
+  const byAddress = await owner(`/api/app/organizations/${orgId}/connectors/custom`, {
+    json: { serverUrl: "https://mcp.asana.com/mcp", label: "Asana" },
+  });
+  expect(await byAddress.json()).toEqual({ status: "needs_key", reason: "not_approved" });
+  expect(asked).toContain("https://mcp.asana.com/register");
 });
 
 test("catalog: with its OAuth app configured, our Linear connector replaces the one-click server", async () => {

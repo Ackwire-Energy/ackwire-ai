@@ -1,6 +1,7 @@
-import type { ConnectorCategory, ConnectorDef } from "@agenteschat/client";
+import type { ConnectorCategory, ConnectorDef, CustomConnectStart } from "@agenteschat/client";
 import { CONNECTOR_MARK, type ConnectedItem, OWN_MARK, SERVER_ICON } from "@agenteschat/client/lib/connected";
 import { mixHex } from "@agenteschat/ui/agent/engine";
+import type { TFunction } from "i18next";
 
 /**
  * The connectors gallery on the phone: pure pieces the screen and
@@ -46,6 +47,30 @@ export function suggestionsOf(catalog: ConnectorDef[], items: ConnectedItem[], c
 export function searchConnectors(list: ConnectorDef[], query: string, shown: (d: ConnectorDef) => string = () => "") {
   const q = query.trim().toLowerCase();
   return q ? list.filter((d) => `${d.label} ${d.id} ${d.description} ${shown(d)}`.toLowerCase().includes(q)) : list;
+}
+
+/**
+ * The gallery's tiles: the ones that open first, "Em breve" last (as on the web). A connected one opens its
+ * connection, even one connected by its address whose vendor hasn't approved agentes.chat yet (`soon`); a `soon`
+ * one not connected gets a lock and opens nothing.
+ */
+export function galleryTiles(list: ConnectorDef[], items: ConnectedItem[]) {
+  return list
+    .map((def) => {
+      const connected = Boolean(connectionOf(def, items));
+      return {
+        def,
+        connected,
+        opens: (def.available && !def.soon) || connected,
+        locked: def.soon === true && !connected,
+      };
+    })
+    .sort((a, b) => Number(b.opens) - Number(a.opens));
+}
+
+/** Why the sheet asks for a key: the server only lets in apps it approved (`not_approved`), or it has no sign-in. */
+export function needsKeyText(t: TFunction, start: Extract<CustomConnectStart, { status: "needs_key" }>, name: string) {
+  return start.reason === "not_approved" ? t("connectFlow.notApproved", { name }) : t("mobile.connectors.needsKey");
 }
 
 /** How a service connects on the phone: signing in in the browser, a key, or either. */

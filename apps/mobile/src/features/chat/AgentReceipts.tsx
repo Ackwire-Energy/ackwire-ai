@@ -13,19 +13,27 @@ import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
-import { Button, Card, Icon, type IconName, InkOrbit, ProviderLogo, Row, Text, useReducedMotion } from "@/ui";
+import { Button, Card, Icon, type IconName, InkOrbit, ProviderLogo, Row, Text, useReducedMotion, useToast } from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
 import { Note, OpenPage } from "../ai/parts";
-import { AgentFace } from "../shared/Face";
+import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { useSheet } from "../shared/SheetHost";
-import { phaseKey, type ReceiptLine, receiptLine, receiptRows, receiptShows } from "./agent-receipts";
+import {
+  markLabel,
+  markOf,
+  phaseKey,
+  type ReceiptLine,
+  receiptLine,
+  receiptRows,
+  receiptShows,
+} from "./agent-receipts";
 
 /**
- * Under a person's latest message: the agents' receipt as one quiet line (./agent-receipts.ts says what it
- * shows). A tap opens the sheet with each agent and its state, and the line's action: send it again after a
- * failure, or connect an AI.
+ * Under a person's latest message, for what asks something of you (./agent-receipts.ts says what): the agents'
+ * receipt as one quiet line. A tap opens the sheet with each agent and its state, and the line's action: send it
+ * again after a failure, or connect an AI. The rest of a receipt is a mark beside the message (`ReceiptMark`).
  */
 export const AgentReceiptLine = memo(function AgentReceiptLine({
   message: m,
@@ -120,6 +128,77 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
           onPress={act}
         />
       ) : null}
+    </Animated.View>
+  );
+});
+
+/**
+ * A person's message's receipt beside its text, in room its row already has, never a line of its own (`markOf`):
+ * by my bubble's last line (my rows keep their left side free) or at the end of a turn's name line. Faces and our
+ * small marks; the words are its label, and a tap says them: the agents' sheet, or a note from the top.
+ */
+export const ReceiptMark = memo(function ReceiptMark({
+  message: m,
+  mine,
+  receipt,
+  seenBy,
+}: {
+  message: Message;
+  /** My own message: it also wears what became of it in a task at work. */
+  mine: boolean;
+  /** The agents' receipt this mark shows, if any (the latest person's message's). */
+  receipt?: MessageReceipt;
+  /** A DM between people: who read this message, my latest. */
+  seenBy?: string;
+}) {
+  const { t } = useTranslation();
+  const orgId = useOrgId();
+  const dir = useDirectory();
+  const c = useColors();
+  const reduced = useReducedMotion();
+  const sheet = useSheet();
+  const toast = useToast();
+  const steer = useSteerState(orgId, m.channelId, mine ? m.id : "");
+  const view = markOf(steer, seenBy, receipt);
+  if (!view) return null;
+  const label = markLabel(t, view, {
+    agent: (id) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent"),
+    person: (id) => dir.nameOf({ type: "person", id }) || t("mobile.chat.someone"),
+  });
+  // The agents' sheet when there are agents to list (none yet while the author's plan picks), else the words.
+  const say = () =>
+    view.kind === "agents" && receiptRows(receipt).length > 0
+      ? sheet.open(<ReceiptsSheet receipt={receipt} action={null} onAction={() => sheet.close()} />)
+      : toast({ title: label, ...(view.kind === "steer" ? { agentId: view.agentId } : {}) });
+  return (
+    <Animated.View
+      // Each new mark swaps in.
+      key={view.kind === "steer" ? view.state : view.kind === "agents" ? view.mark : view.kind}
+      entering={reduced ? undefined : FadeIn.duration(200)}
+      accessibilityLiveRegion="polite"
+    >
+      <Pressable onPress={say} accessibilityRole="button" accessibilityLabel={label} hitSlop={8} style={styles.mark}>
+        {view.kind === "seen" ? (
+          <Face who={{ type: "person", id: view.personId }} size={16} live={false} />
+        ) : view.kind === "steer" ? (
+          view.state === "read" || view.state === "resolved" ? (
+            <AgentFace agentId={view.agentId} size={16} live={false} framed={false} />
+          ) : view.state === "now" ? (
+            <Icon name="bolt" size={12} color={c.muted} />
+          ) : view.state === "delivered" ? (
+            <Icon name="check" size={12} color={c.muted} />
+          ) : view.state === "held" ? (
+            <Icon name="pause" size={12} color={c.muted} />
+          ) : (
+            <InkOrbit size={10} color={c.muted} />
+          )
+        ) : (
+          <>
+            {view.agentId ? <AgentFace agentId={view.agentId} size={16} live={false} framed={false} /> : null}
+            <Mark mark={view.mark} color={c.muted} />
+          </>
+        )}
+      </Pressable>
     </Animated.View>
   );
 });
@@ -221,4 +300,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 5, flexShrink: 1 },
   faces: { flexDirection: "row", alignItems: "center", gap: 2 },
   words: { flexShrink: 1 },
+  // A face (16) and a mark (12) at most: the room beside my bubble and at the end of a name line holds it.
+  mark: { flexDirection: "row", alignItems: "center", gap: 4, height: 16 },
 });

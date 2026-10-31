@@ -16,7 +16,7 @@ import { approvalRuleWords } from "@agenteschat/client/lib/approval-words";
 import { brainLine } from "@agenteschat/client/lib/brain";
 import { formatPercent } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { aiStateOf } from "@agenteschat/client/lib/no-ai";
+import { agentPlan, aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { usageShown } from "@agenteschat/client/lib/plan-usage";
 import { useQueryClient } from "@tanstack/react-query";
@@ -314,7 +314,7 @@ function Profile({ id }: { id: string }) {
             <NowPill
               leading={<Icon name="bolt" size={15} color={c.amber} />}
               label={t("noAi.agent", agentGrammar(t, agent?.name ?? ""))}
-              onPress={() => openConnectAi({ agentId: id })}
+              onPress={() => openConnectAi({ agentId: id, plan: agentPlan(agent) ?? undefined })}
             />
           ) : null}
           {work.map((w) => (

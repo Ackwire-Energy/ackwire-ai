@@ -240,4 +240,7 @@ test("at the limit, the owner's other free accounts of the same kind and maker, 
   ]);
   // A coding plan offers only that maker's other keys.
   expect(limitOffers([...accounts, account("glm2")], "claude_code", "glm", NOW)).toEqual([]);
+  // One made for all of the owner's agents there is offered though another agent thinks with it.
+  const all = account("all", { usedBy: ["Infra"], usage: usage(1), shared: true });
+  expect(limitOffers([...accounts, all], "claude_code", "now", NOW)[0]?.account.id).toBe("all");
 });

@@ -14,6 +14,7 @@ import { artifactRefs } from "../lib/artifacts";
 import { newerSetup } from "../lib/computer";
 import { CONSULT_CONVERSATION_POLL_MS, CONSULT_GROUP_POLL_MS } from "../lib/consult-group";
 import { sendWaits } from "../lib/errors";
+import { LoginReadError, loginReadPasses } from "../lib/machines";
 import {
   allItems,
   matchesFilter,
@@ -2471,6 +2472,7 @@ export function useSkillAction(orgId: string) {
     mutationFn: (
       action:
         | { type: "import"; input: { url: string } | { zipBase64: string } }
+        | { type: "importPicked"; url: string; paths: string[] }
         | { type: "create"; input: SkillInput }
         | { type: "update"; id: string; patch: SkillPatch }
         | { type: "reimport"; id: string }
@@ -2480,6 +2482,8 @@ export function useSkillAction(orgId: string) {
       switch (action.type) {
         case "import":
           return api.skills.import(orgId, action.input);
+        case "importPicked":
+          return api.skills.importPicked(orgId, action.url, action.paths);
         case "create":
           return api.skills.create(orgId, action.input);
         case "update":
@@ -2554,13 +2558,28 @@ export const useAiAccounts = (orgId: string, enabled = true, pollMs: number | fa
   });
 };
 
-/** ADR 0041 §2: a sign-in on the computer, asked every 2 s until it ends (done, failed or expired). */
+/**
+ * ADR 0041 §2: a sign-in on the computer, asked every 2 s until it ends (done, failed or expired), through failed
+ * reads too (`loginRead` says how long they may last).
+ */
 export const useAccountLogin = (orgId: string, machineId: string, loginId: string | null) => {
   const api = useApi();
   return useQuery({
     queryKey: keys.accountLogin(orgId, machineId, loginId ?? ""),
-    queryFn: () => api.machines.accountLogin(orgId, machineId, loginId ?? ""),
+    queryFn: async ({ client, queryKey }) => {
+      try {
+        return await api.machines.accountLogin(orgId, machineId, loginId ?? "");
+      } catch (error) {
+        if (!loginReadPasses(error)) throw error;
+        // The read before this one failed too: the run goes on from its first.
+        const before = client.getQueryState(queryKey)?.error;
+        throw new LoginReadError(error, before instanceof LoginReadError ? before.since : Date.now());
+      }
+    },
     enabled: loginId !== null,
+    // Waiting from its start. With data, a read keeps the last error until an answer clears it, so a run of failed
+    // reads adds up, and the block never drops back to loading meanwhile.
+    initialData: loginId === null ? undefined : { state: "waiting" },
     retry: false,
     refetchInterval: (q) => (q.state.data && q.state.data.state !== "waiting" ? false : 2000),
     // The person is on Claude's page in another tab meanwhile.

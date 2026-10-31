@@ -1,3 +1,4 @@
+import { commandOf, commandWords, normalizedCommand, PERMISSION_TOOL, redactCommon } from "@agenteschat/adapters";
 import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
 
 const MAX = 80;
@@ -24,6 +25,78 @@ function issueRef(v: unknown) {
   if (!t) return undefined;
   const n = /^#?(\d+)$/.exec(t);
   return n ? `#${n[1]}` : t;
+}
+
+/** What a permission check (`permission_prompt`) asks about; null when the runner asks again (`request_id` only). */
+function promptAsked(i: Record<string, unknown>): { tool: string; input: Record<string, unknown> } | null {
+  const inner = i.input;
+  if (typeof i.tool_name !== "string" || !i.tool_name) return null;
+  if (!inner || typeof inner !== "object" || Array.isArray(inner)) return null;
+  return { tool: i.tool_name, input: inner as Record<string, unknown> };
+}
+
+/** The runner asking again about a command waiting on a person: no step of its own, its answer is the first ask's. */
+export const promptPoll = (name: string, input: Record<string, unknown> | undefined) =>
+  name === PERMISSION_TOOL && typeof input?.request_id === "string";
+
+/**
+ * `permission_prompt`'s answer: `{behavior}` when decided (a `deny` says why: `message` to the agent, `code` for
+ * the apps), `{status: "pending", request_id}` while a person decides.
+ */
+export function promptAnswer(content: string): {
+  behavior?: string;
+  message?: string;
+  code?: string;
+  status?: string;
+  request_id?: string;
+} {
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Parts of a command line that only set up the next one (`cd repo && npm test`). */
+const SETUP = new Set(["cd", "pushd", "popd", "export", "source", ".", "set", "unset"]);
+/** Where a command's own words end: an option or a redirection. */
+const OPTION = /^-|[<>]/;
+/** A path or a web address: the only word after an option that can be a command's main argument. */
+const PLACE = /^(?:\.{0,2}\/|~\/|[a-z][a-z0-9+.-]*:\/\/)/i;
+
+/**
+ * A command line, credentials already masked, in a few words: its first program (past `cd` and the like, wrappers
+ * and env assignments left out) and its main argument, the words before its first option ("npm run build", "git
+ * commit"), else its first path or web address ("rm /etc/x", "curl api.example.com/v1"). Never another word after
+ * an option, which could be that option's value; a web address keeps its site and path only.
+ */
+function commandGist(masked: string): string | undefined {
+  for (const argv of commandWords(masked)) {
+    const start = argv.findIndex((w) => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(w));
+    if (start < 0) continue;
+    const [program = "", ...rest] = normalizedCommand(argv.slice(start)).split(" ");
+    if (!program || SETUP.has(program)) continue;
+    const options = rest.findIndex((w) => OPTION.test(w));
+    const lead = rest.slice(0, Math.min(options < 0 ? rest.length : options, 2));
+    const args = lead.length > 0 ? lead : rest.filter((w) => PLACE.test(w)).slice(0, 1);
+    return [program, ...args].map((w) => siteOf(w) ?? w).join(" ");
+  }
+  return undefined;
+}
+
+/** A permission check's label: Claude Code's own one-line description of the command, else the command in a few words. */
+function promptLabel(i: Record<string, unknown>): string | undefined {
+  const asked = promptAsked(i);
+  if (!asked) return undefined;
+  const said = typeof asked.input.description === "string" ? short(redactCredentials(asked.input.description)) : "";
+  return said || short(commandGist(redactCredentials(commandOf(asked.tool, asked.input))));
+}
+
+/** The whole command a permission check (`permission_prompt`) is about, as one line, credentials masked. */
+export function toolCommand(name: string, input: Record<string, unknown> | undefined): string | undefined {
+  const asked = name === PERMISSION_TOOL ? promptAsked(input ?? {}) : null;
+  return asked ? redactCredentials(commandOf(asked.tool, asked.input)) || undefined : undefined;
 }
 
 /**
@@ -66,6 +139,8 @@ export function toolDetail(name: string, input: Record<string, unknown> | undefi
     case "browser_open":
     case "browser_tabs":
       return siteOf(i.url);
+    case PERMISSION_TOOL:
+      return promptLabel(i);
     default:
       return undefined;
   }
@@ -110,6 +185,20 @@ export function carriesCredential(value: unknown): boolean {
 /** `maskSecrets`, private keys too (from their first line on): text people read that must hold none. */
 export const maskCredentials = (text: string) =>
   maskSecrets(text).replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(-----END [A-Z ]*PRIVATE KEY-----|$)/g, "••••");
+
+/** An address's user and password (`postgres://user:pass@host`). */
+const USERINFO = /\b([a-z][a-z0-9+.-]*:\/\/)[^\s/?#@'"]+@/gi;
+/** The value after an option named for a secret (`--password hunter2`, `--api-key k`). */
+const SECRET_OPTION =
+  /(?<!\S)(--?[\w-]*(?:password|passwd|secret|token|api[_-]?key)[\w-]*\s+)("[^"]*"|'[^']*'|[^\s"'-]\S*)/gi;
+
+/**
+ * `maskCredentials`, an address's user and password (`postgres://***@host`, first: `redactCommon` would read a
+ * `token:` there as a value to mask up to the next space), the shapes `redactCommon` knows (bearer headers,
+ * `token=` values) and the value after a secret-named option (`--password ***`): text that leaves its place.
+ */
+export const redactCredentials = (text: string) =>
+  redactCommon(maskCredentials(text).replace(USERINFO, "$1***@")).replace(SECRET_OPTION, "$1***");
 
 export const PREVIEW_CODE_CHARS = 4096;
 
