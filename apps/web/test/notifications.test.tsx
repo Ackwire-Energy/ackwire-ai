@@ -459,6 +459,8 @@ describe("what the workspace itself tells: nobody's face, its own", () => {
       seedState({
         notifications: [
           standing("n-review", { statusTo: "hold", text: "review", cloud: true }),
+          standing("n-flagged", { statusTo: "hold", text: "review.phishing_impersonation", cloud: true }),
+          standing("n-new", { statusTo: "hold", text: "review.something_new", cloud: true }),
           standing("n-hold", { statusTo: "hold", text: "Termos 5: phishing", cloud: true }),
           standing("n-suspended", { statusTo: "suspended", text: "Termos 5: spam", cloud: true }),
           standing("n-self", { statusTo: "hold", text: "review" }),
@@ -466,12 +468,17 @@ describe("what the workspace itself tells: nobody's face, its own", () => {
       }),
     );
     const line = (id: string) => document.querySelector(`[data-n="${id}"] .nt-snip`);
-    expect(line("n-review")?.textContent).toBe(
-      `Pausado para uma análise de segurança, até a nossa equipe olhar o caso. As nossas verificações automáticas detectaram uma atividade que pode violar os nossos Termos (seção 5). ${contest}`,
+    const review =
+      "Pausado para uma análise de segurança, até a nossa equipe olhar o caso. As nossas verificações automáticas detectaram uma atividade que pode violar os nossos Termos (seção 5).";
+    expect(line("n-review")?.textContent).toBe(`${review} ${contest}`);
+    // What the automatic hold flagged, named; a category the app doesn't know reads as plain review.
+    expect(line("n-flagged")?.textContent).toBe(
+      `Pausado para uma análise de segurança, até a nossa equipe olhar o caso. As nossas verificações automáticas detectaram uma atividade que parece envolver phishing ou imitação de uma marca, o que os nossos Termos não permitem (seção 5). ${contest}`,
     );
+    expect(line("n-new")?.textContent).toBe(`${review} ${contest}`);
     expect(line("n-hold")?.textContent).toBe(`Este workspace está em espera: Termos 5: phishing. ${contest}`);
     expect(line("n-suspended")?.textContent).toBe(`Este workspace está suspenso: Termos 5: spam. ${contest}`);
-    for (const id of ["n-review", "n-hold", "n-suspended"])
+    for (const id of ["n-review", "n-flagged", "n-new", "n-hold", "n-suspended"])
       expect(line(id)?.classList.contains("nt-snip--whole")).toBe(true);
     // A self-hosted server: the reason, as it always read.
     expect(line("n-self")?.textContent).toBe("review");

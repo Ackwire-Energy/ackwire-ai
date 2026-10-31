@@ -7,6 +7,7 @@ import {
   MailAuthError,
   type MailConnectionTester,
   type MailConnector,
+  MailError,
   type MailFolder,
   type MailMessage,
   type MailPoller,
@@ -24,6 +25,18 @@ import {
  */
 
 const lower = (s: string | undefined) => (s ?? "").toLowerCase();
+
+/**
+ * Composio refuses a call on a connected account without the user id it belongs to (its real answer);
+ * the fakes also refuse someone else's user id.
+ */
+const composioUserRefused = (userId?: string | null) =>
+  new MailError(
+    userId
+      ? `Composio refused the call (400): user ${userId} does not own this connected account (fake)`
+      : "Composio POST /tools/execute failed (400 ActionExecute_ConnectedAccountEntityIdRequired): User ID is required with connected account. Please provide a user ID to identify the connected account.",
+    false,
+  );
 
 /** A fake mailbox (one for every account opened through the connector). */
 export function createFakeMailConnector(
@@ -175,6 +188,8 @@ export function createFakeMailConnector(
   const connector: MailConnector = {
     async open(account) {
       state.opened.push(account);
+      // Every call on a Composio mailbox is a tool call, which Composio refuses without the account's user id.
+      if (account.via === "composio" && !account.externalUserId) throw composioUserRefused();
       return provider;
     },
   };
@@ -264,7 +279,14 @@ export function createFakeComposioClient() {
     >(),
     links: [] as { toolkit: ComposioToolkit; userId: string; callbackUrl: string; connectedAccountId: string }[],
     deletedAccounts: [] as string[],
-    triggers: new Map<string, { toolkit: ComposioToolkit; connectedAccountId: string; query: string | null }>(),
+    /** The deleted accounts whose grant at Google/Microsoft was revoked too. */
+    revokedAccounts: [] as string[],
+    /** The accounts whose mailbox address was read (a profile tool call, billed by Composio). */
+    profileReads: [] as string[],
+    triggers: new Map<
+      string,
+      { toolkit: ComposioToolkit; connectedAccountId: string; userId: string; query: string | null }
+    >(),
     deletedTriggers: [] as string[],
     failWith: null as Error | null,
   };
@@ -282,18 +304,26 @@ export function createFakeComposioClient() {
       state.links.push({ ...input, connectedAccountId });
       return { connectedAccountId, redirectUrl: `https://composio.example/connect/${connectedAccountId}` };
     },
-    async getConnectedAccount(id) {
+    async getConnectedAccount(id, userId, options) {
       if (state.failWith) throw state.failWith;
       const a = state.accounts.get(id);
       if (!a) return { status: "failed", address: null };
-      return { status: a.status, address: a.status === "active" ? a.address : null };
+      if (a.status !== "active") return { status: a.status, address: null };
+      if (options?.readAddress === false) return { status: "active", address: null };
+      // The address is read with a profile tool call.
+      if (userId !== a.userId) throw composioUserRefused(userId);
+      state.profileReads.push(id);
+      return { status: "active", address: a.address };
     },
-    async deleteConnectedAccount(id) {
+    async deleteConnectedAccount(id, options) {
       state.deletedAccounts.push(id);
+      if (options?.revoke !== false) state.revokedAccounts.push(id);
       state.accounts.delete(id);
     },
     async createMailTrigger(input) {
       if (state.failWith) throw state.failWith;
+      const owner = state.accounts.get(input.connectedAccountId)?.userId;
+      if (!owner || input.userId !== owner) throw composioUserRefused(input.userId);
       const triggerId = `ti_${++seq}`;
       state.triggers.set(triggerId, input);
       return { triggerId };

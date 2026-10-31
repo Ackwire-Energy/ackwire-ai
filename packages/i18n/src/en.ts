@@ -2425,6 +2425,7 @@ export const en: Translations = {
           codeLabel: "Claude code",
           notCode: "That doesn't look like Claude's code.",
           send: "Send to {{computer}}",
+          sending: "Sending the code to {{computer}}…",
           sent: "Code sent. Finishing the sign-in on {{computer}}.",
           local: "On {{computer}} itself? If its browser opened by itself, just authorize there.",
           deviceCode: "Code for ChatGPT",
@@ -5107,6 +5108,8 @@ export const en: Translations = {
       keyShape: "That doesn't look like a {{plan}} key. Copy the whole key.",
       keySafe: "The key goes encrypted to {{computer}} and stays only there.",
       keySendFailed: "Couldn't send the key. Check that it's whole and try again.",
+      keySending: "Sending the key to {{computer}}…",
+      keySent: "Key sent. Finishing the sign-in on {{computer}}.",
       duplicateKey: "That key is already here ({{account}}).",
     },
     connect: {
@@ -6668,7 +6671,7 @@ export const en: Translations = {
       automation: "Automation",
       email: "Email",
     },
-    emptyCategory: "No connectors in this category yet.",
+    emptyCategory: "No connectors in this category yet",
     soon: "Coming soon",
     connectName: "Connect {{name}}",
     reconnectName: "Connect {{name}} again",
@@ -6676,7 +6679,8 @@ export const en: Translations = {
     otherText: "Connect any service by its address.",
     search: "Search connectors",
     searchPlaceholder: "Search by name or what it does",
-    empty: "No connector found for “{{q}}”.",
+    empty: "No connector matches “{{q}}”",
+    emptyText: "You can connect any service by its address.",
     none: "No connectors yet.",
     connectedFilter: "Connected",
     suggested: "Suggested for {{org}}",
@@ -6694,8 +6698,8 @@ export const en: Translations = {
       close: "Close details",
       can: "What agents will be able to do",
       afterText: "No agent uses it until you choose.",
-      allText: "Once connected, every agent can use it. You can change that later.",
-      keepText: "Agents keep the access they have. You can change that later.",
+      allText: "Once connected, every agent can use it. Next, you choose each agent's access.",
+      keepText: "Agents keep the access they have. Next, you can change it for each one.",
       again: "Connect another account",
       connected: "Already connected",
       how: "How it works",
@@ -7455,6 +7459,8 @@ export const en: Translations = {
       saved: "{{name}}'s email saved.",
       unsaved: "Unsaved changes",
       warning: "Reads email from anyone and sends without asking: a malicious email may try to trick the agent.",
+      pending: "It hasn't finished connecting.",
+      needsReconnect: "Agents can't use it until it's reconnected.",
       saveError: {
         send_without_recipients: "To send without asking, fill in “Only send to”.",
         unknown: "Couldn't save. Try again.",
@@ -7550,6 +7556,10 @@ export const en: Translations = {
     agentProposal: {
       decided: "Someone already decided this proposal.",
       expired: "This proposal expired: nobody decided it in a day.",
+    },
+    mail: {
+      accountNotFound: "This mailbox is no longer connected. Connect it again in Connectors.",
+      fromNotMailbox: "“Send as” must be one of this mailbox's addresses. Pick another one.",
     },
     join: {
       linkClosed: "This link no longer works. Ask whoever sent it for a new one.",
@@ -9300,6 +9310,16 @@ export const en: Translations = {
     cloud: {
       review:
         "Paused for a safety review, until our team looks at it. Our automated checks flagged activity that may break our Terms (section 5). To contest it, write to {{email}}.",
+      /** The same hold set with what was flagged (`review.<category>`): `what` is that category's `reviewWhat`. */
+      reviewFor:
+        "Paused for a safety review, until our team looks at it. Our automated checks flagged activity that seems to involve {{what}}, which our Terms don't allow (section 5). To contest it, write to {{email}}.",
+      /** Also the server's own English text (`packages/engine/src/standing.ts`), which a refused run keeps. */
+      reviewWhat: {
+        phishing_impersonation: "phishing or impersonating a brand",
+        account_takeover: "getting into other people's accounts",
+        fraud: "fraud",
+        illegal_content: "illegal content",
+      },
       blockedAbuse:
         "This account is blocked. Our checks linked it to an account closed for abuse (Terms, section 5). To contest it, write to {{email}}.",
       blockedLegal:
