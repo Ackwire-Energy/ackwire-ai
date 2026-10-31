@@ -29,7 +29,7 @@ import { CHROME_MAX_SCALE, haptics, Icon, PixelOrbit, PixelStop, Text, useReduce
 import { AgentFace, Face } from "../shared/Face";
 import { useDirectory, useNow } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
-import { markedParts, markName, stoppableInLine, workingEntries } from "./logic";
+import { lineStops, markedParts, markName, workingEntries } from "./logic";
 import { MessageText } from "./MessageText";
 import { TurnTools } from "./ToolCalls";
 import {
@@ -249,12 +249,10 @@ export function WorkingLine({
     return () => clearInterval(timer);
   }, [turning]);
   if (entries.length === 0) return null;
-  const agents = entries.filter((e) => e.type === "agent");
-  const lead = agents[0];
+  const lead = entries.find((e) => e.type === "agent");
   const color = lead ? agentLook(dir.agentById.get(lead.id)).color : null;
   // "Parar" is one agent's: with several at work the line can't say whose (the box's own stop stops them all).
-  const solo = agents.length === 1 ? lead : undefined;
-  const stoppable = solo ? stoppableInLine(runs).filter((r) => r.agentId === solo.id && canStop(r)) : [];
+  const stoppable = lineStops(entries, runs, canStop);
   const sentence = activitySentence(t, entries, markName);
   const [agentWords, sep, typers, typingWords] = barWords(t, entries, runs, tick, Date.now(), markName);
   // A piece of the line, on one line, names in ink.
@@ -274,11 +272,6 @@ export function WorkingLine({
   );
   const clock = asking ? elapsedClock(now - asking.since) : null;
   const pop = reduced ? undefined : ZoomIn.springify().damping(11).stiffness(320).mass(0.6);
-  // Right away, nothing asked: what it did stays and "Continuar" picks it up again.
-  const stopNow = (run: LiveRun) => {
-    haptics.firm();
-    onStop(run);
-  };
   const plate = [styles.tok, { backgroundColor: c.glassSolid }];
   // An agent working in its browser: the line says so, and a tap opens its browser card in the conversation.
   const browsing = browsingRuns(runs)[0];
@@ -368,30 +361,52 @@ export function WorkingLine({
             {clock}
           </RNText>
         ) : null}
-        {stoppable.length > 0 ? <View style={[styles.sep, { backgroundColor: c.line }]} /> : null}
-        {stoppable.map((r) =>
-          r.stopping ? (
-            <View key={r.runId} style={styles.stopping} accessible accessibilityLabel={t("run.stopping")}>
-              <ActivityIndicator size="small" color={c.muted} />
-              <Text variant="caption" tone="muted">
-                {t("run.stopping")}
-              </Text>
-            </View>
-          ) : (
-            <Pressable
-              key={r.runId}
-              onPress={() => stopNow(r)}
-              accessibilityRole="button"
-              accessibilityLabel={`${t("run.stop")} · ${agentName(r.agentId)}`}
-              hitSlop={8}
-              style={({ pressed }) => [styles.stop, pressed && { backgroundColor: `${c.danger}1F` }]}
-            >
-              {({ pressed }) => <PixelStop size={11} color={pressed ? c.danger : c.muted} />}
-            </Pressable>
-          ),
-        )}
+        <LineStop runs={stoppable} onStop={onStop} />
       </Animated.View>
     </View>
+  );
+}
+
+/**
+ * The line's own "Parar", last in its pill after a thin rule (the working line's, and the requests' line's while it
+ * takes its place): one tap stops the agent, nothing asked, and "Parando…" while it stops.
+ */
+export function LineStop({ runs, onStop }: { runs: LiveRun[]; onStop: (run: LiveRun) => void }) {
+  const { t } = useTranslation();
+  const dir = useDirectory();
+  const c = useTheme().colors;
+  if (runs.length === 0) return null;
+  const nameOf = (run: LiveRun) => dir.agentById.get(run.agentId)?.name ?? t("channel.unknownAgent");
+  // Right away, nothing asked: what it did stays and "Continuar" picks it up again.
+  const stopNow = (run: LiveRun) => {
+    haptics.firm();
+    onStop(run);
+  };
+  return (
+    <>
+      <View style={[styles.sep, { backgroundColor: c.line }]} />
+      {runs.map((r) =>
+        r.stopping ? (
+          <View key={r.runId} style={styles.stopping} accessible accessibilityLabel={t("run.stopping")}>
+            <ActivityIndicator size="small" color={c.muted} />
+            <Text variant="caption" tone="muted">
+              {t("run.stopping")}
+            </Text>
+          </View>
+        ) : (
+          <Pressable
+            key={r.runId}
+            onPress={() => stopNow(r)}
+            accessibilityRole="button"
+            accessibilityLabel={`${t("run.stop")} · ${nameOf(r)}`}
+            hitSlop={8}
+            style={({ pressed }) => [styles.stop, pressed && { backgroundColor: `${c.danger}1F` }]}
+          >
+            {({ pressed }) => <PixelStop size={11} color={pressed ? c.danger : c.muted} />}
+          </Pressable>
+        ),
+      )}
+    </>
   );
 }
 

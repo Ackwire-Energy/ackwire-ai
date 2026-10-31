@@ -15,7 +15,7 @@ afterEach(() => cleanup());
 const HANDOFF_ID = "h-card";
 
 /** Ada asked for help in its browser: the request card in #eng (its id is the handoff's). */
-function seedRequest() {
+function seedRequest(expiresAt = Date.now() + 10 * 60_000) {
   const state = seedState();
   const handoff: BrowserHandoff = {
     id: HANDOFF_ID,
@@ -28,7 +28,7 @@ function seedRequest() {
     requestedForUserId: "u-walter",
     controllerUserId: null,
     note: null,
-    expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+    expiresAt: new Date(expiresAt).toISOString(),
     createdAt: new Date().toISOString(),
     resolvedAt: null,
   };
@@ -50,6 +50,22 @@ function seedRequest() {
 const waitingRequest = () => document.querySelector(`[data-ask-id="${HANDOFF_ID}"]`) as HTMLElement;
 
 describe("a help request opens the agent's browser in its card", () => {
+  // Real time passes in it (the request's own timer), so it gets more than the default 5 s.
+  test("nobody opens it: at its time it stops waiting for you, even with no event", async () => {
+    const expiresAt = Date.now() + 3_000;
+    const { state, handoff } = seedRequest(expiresAt);
+    const api = createFakeApi(state);
+    fakeBrowserOf.get(api)?.handoffs.set(handoff.id, handoff);
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(6);
+    expect(waitingRequest().hasAttribute("data-ask-mine")).toBe(true);
+    // Nothing comes from the server: the card's own timer closes it at that moment.
+    await act(() => new Promise((r) => setTimeout(r, Math.max(0, expiresAt - Date.now()) + 50)));
+    await settle(2);
+    expect(waitingRequest()).toBeNull();
+    expect(document.querySelector(".brw-rq--settled")?.textContent).toContain("pediu ajuda · expirou");
+  }, 15_000);
+
   test("Abrir aqui takes control in place: Pronto in the header, the app's own text field, no page change", async () => {
     const { state, handoff } = seedRequest();
     const api = createFakeApi(state);

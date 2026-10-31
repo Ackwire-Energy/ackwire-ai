@@ -1,21 +1,31 @@
 import {
+  type AgentProposalCard,
   type BrowserHandoff,
   browserHandoffOf,
+  handoffIsMine,
   handoffScreen,
+  type LiveConsult,
+  type LiveRun,
   type Message,
   type SecretRequest,
   useApproval,
   useBrowserHandoff,
+  useProposals,
 } from "@agenteschat/client";
 import { agentProposalOf, proposalStatus } from "@agenteschat/client/lib/action-cards";
 import { timeLeft } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
+  type ComponentRef,
   createContext,
+  memo,
   type ReactNode,
+  useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -37,112 +47,37 @@ import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow, useOrgId } from "../shared/hooks";
 import { agentLook, fuseRemaining } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
-import { approvalIdOf, markedParts, markName, questionOf } from "./logic";
+import {
+  type AskKind,
+  type AskStore,
+  type AwayAsk,
+  approvalMayWait,
+  cardShows,
+  type Measurable,
+  mayAsk,
+  type PendingAsk,
+  secretRequestOf,
+  timerDelay,
+} from "./ask-store";
+import { LineStop } from "./LiveRows";
+import {
+  approvalIdOf,
+  changeProposalIdsOf,
+  lineStops,
+  markedParts,
+  markName,
+  proposalTarget,
+  questionOf,
+  workingEntries,
+} from "./logic";
 
 /**
  * A request in the conversation (an approval, a secret, a question, help in the agent's browser or on its
  * computer, a proposal) is one card for all: what it asks in a small label with its state, the agent's own
  * words, the thing it is about in a well (whole under "Ver …"), then a strip with when it expires and the
- * decision. While one waits out of view, the line above the composer says so and takes the person to it.
+ * decision. While one waits out of view, the line above the composer says so and takes the person to it. What
+ * waits and what shows is kept in `ask-store.ts`.
  */
-
-export type AskKind = "approval" | "secret" | "question" | "browser" | "desktop" | "proposal";
-
-// ── Which requests wait here ─────────────────────────────────────────────────
-
-/** A request the person can answer now, in this conversation. `order`: where its message sits in the list. */
-export interface PendingAsk {
-  id: string;
-  kind: AskKind;
-  agentId: string;
-  /** The thing it is about, short (the action, the secret's name, the question). */
-  what: string;
-  messageId: string;
-  order: number;
-}
-
-/** The first request out of view and how many more are. */
-export interface AwayAsk {
-  ask: PendingAsk;
-  more: number;
-}
-
-/**
- * The requests waiting here and which messages the list shows. Kept outside React so the list's
- * visibility (it changes on every scroll) only redraws what reads it, and only when the answer changes.
- */
-export class AskStore {
-  private asks = new Map<string, PendingAsk>();
-  private settled = new Set<string>();
-  private visible = new Set<string>();
-  /** The list said what it shows at least once: before that every request would look out of view. */
-  private measured = false;
-  private listeners = new Set<() => void>();
-  private away: AwayAsk | null = null;
-
-  subscribe = (listener: () => void) => {
-    this.listeners.add(listener);
-    return () => {
-      this.listeners.delete(listener);
-    };
-  };
-
-  getAway = () => this.away;
-
-  put(ask: PendingAsk) {
-    if (this.settled.has(ask.id)) return;
-    const old = this.asks.get(ask.id);
-    if (
-      old &&
-      old.kind === ask.kind &&
-      old.what === ask.what &&
-      old.messageId === ask.messageId &&
-      old.order === ask.order &&
-      old.agentId === ask.agentId
-    )
-      return;
-    this.asks.set(ask.id, ask);
-    this.update();
-  }
-
-  drop(id: string) {
-    if (this.asks.delete(id)) this.update();
-  }
-
-  /** Answered here: gone at once, before the server's own update arrives. */
-  settle(id: string) {
-    this.settled.add(id);
-    this.drop(id);
-  }
-
-  setVisible(messageIds: string[]) {
-    const next = new Set(messageIds);
-    if (this.measured && next.size === this.visible.size && [...next].every((id) => this.visible.has(id))) return;
-    this.visible = next;
-    this.measured = true;
-    this.update();
-  }
-
-  private update() {
-    const out = this.measured
-      ? [...this.asks.values()].filter((a) => !this.visible.has(a.messageId)).sort((a, b) => a.order - b.order)
-      : [];
-    const first = out[0];
-    const next = first ? { ask: first, more: out.length - 1 } : null;
-    const prev = this.away;
-    const same =
-      prev === next ||
-      (prev &&
-        next &&
-        prev.ask.id === next.ask.id &&
-        prev.ask.what === next.ask.what &&
-        prev.ask.kind === next.ask.kind &&
-        prev.more === next.more);
-    if (same) return;
-    this.away = next;
-    for (const listener of this.listeners) listener();
-  }
-}
 
 const AskStoreContext = createContext<AskStore | null>(null);
 
@@ -158,75 +93,68 @@ export function useAwayAsk(store: AskStore): AwayAsk | null {
   return useSyncExternalStore(store.subscribe, store.getAway, store.getAway);
 }
 
-/** `meta.secretRequest`, when it is one. */
-export function secretRequestOf(meta: Message["meta"]): SecretRequest | null {
-  const s = meta?.secretRequest as Partial<SecretRequest> | undefined;
-  return s && typeof s === "object" && typeof s.id === "string" && typeof s.status === "string" && s.target
-    ? (s as SecretRequest)
-    : null;
+/** Whether `at` has passed, turning true right at that moment: one timer to it, no polling. */
+export function useExpired(at: string | null | undefined): boolean {
+  const ms = at ? Date.parse(at) : Number.NaN;
+  const [now, setNow] = useState(Date.now);
+  const expired = Number.isFinite(ms) && now >= ms;
+  useEffect(() => {
+    if (!Number.isFinite(ms) || expired) return;
+    let timer: ReturnType<typeof setTimeout>;
+    // A time farther away than a timer reaches is waited for in steps.
+    const wait = () => {
+      timer = setTimeout(() => (Date.now() >= ms ? setNow(Date.now()) : wait()), timerDelay(ms, Date.now()));
+    };
+    wait();
+    return () => clearTimeout(timer);
+  }, [ms, expired]);
+  return expired;
 }
 
-const asksSomething = (m: Message) =>
-  m.author.type === "agent" &&
-  Boolean(
-    approvalIdOf(m.meta) ||
-      questionOf(m.meta) ||
-      secretRequestOf(m.meta) ||
-      browserHandoffOf(m.meta) ||
-      agentProposalOf(m.meta),
-  );
+// ── Which requests wait here ─────────────────────────────────────────────────
 
 /**
  * Reads which of the conversation's requests wait on the person, from every loaded message (not only the
- * rows on screen, which the list unmounts as they scroll away), with the same queries the cards use.
+ * rows on screen, which the list unmounts as they scroll away), with the same queries the cards use. The scan
+ * reads keys only; a message's probe draws again only when the message or its place changes, not on every
+ * word an agent streams.
  */
 export function AskProbes({ messages }: { messages: Message[] }) {
-  const asking = useMemo(
-    () => messages.flatMap((m, order) => (asksSomething(m) ? [{ m, order }] : [])),
-    [messages],
-  );
-  return (
-    <>
-      {asking.map(({ m, order }) => (
-        <AskProbe key={m.id} message={m} order={order} />
-      ))}
-    </>
-  );
+  const asking = useMemo(() => messages.flatMap((m, order) => (mayAsk(m) ? [{ m, order }] : [])), [messages]);
+  return <>{asking.map(({ m, order }) => <AskProbe key={m.id} message={m} order={order} />)}</>;
 }
 
-function AskProbe({ message: m, order }: { message: Message; order: number }) {
+const AskProbe = memo(function AskProbe({ message: m, order }: { message: Message; order: number }) {
   const approvalId = approvalIdOf(m.meta);
   const question = questionOf(m.meta);
   const secret = secretRequestOf(m.meta);
   const handoff = browserHandoffOf(m.meta);
   const proposal = agentProposalOf(m.meta);
+  const changes = changeProposalIdsOf(m.meta);
+  const asked: PendingAsk | null =
+    question?.status === "open"
+      ? { id: question.id, kind: "question", agentId: question.agentId, what: question.text, messageId: m.id, order }
+      : null;
   return (
     <>
-      {approvalId ? <ApprovalProbe id={approvalId} messageId={m.id} order={order} /> : null}
-      {question ? (
-        <Report
-          id={question.id}
-          ask={
-            question.status === "open"
-              ? { id: question.id, kind: "question", agentId: question.agentId, what: question.text, messageId: m.id, order }
-              : null
-          }
-        />
+      {/* An approval expires in a day: an older message's can't wait any more, so it isn't asked for. */}
+      {approvalId && approvalMayWait(m.createdAt, Date.now()) ? (
+        <ApprovalProbe id={approvalId} messageId={m.id} order={order} />
       ) : null}
+      {question ? <Report id={question.id} ask={asked} /> : null}
       {secret ? <SecretProbe request={secret} messageId={m.id} order={order} /> : null}
-      {handoff ? <HandoffProbe id={handoff.id} fallback={handoff} messageId={m.id} order={order} /> : null}
-      {proposal && m.author.id ? (
-        <ProposalProbe
-          id={m.id}
-          agentId={m.author.id}
-          open={proposalStatus(proposal) === "open"}
-          what={proposal.params.draft.name}
-          order={order}
-        />
+      {/* The card's own copy says when a request ended (the server keeps it, and live events patch it): only an
+          open one is asked about. */}
+      {handoff?.status === "pending" ? (
+        <HandoffProbe id={handoff.id} fallback={handoff} messageId={m.id} order={order} />
       ) : null}
+      {proposal && m.author.id ? (
+        <ProposalProbe card={proposal} agentId={m.author.id} messageId={m.id} order={order} />
+      ) : null}
+      {changes.map((id) => <ChangeProposalProbe key={id} id={id} messageId={m.id} order={order} />)}
     </>
   );
-}
+});
 
 /** Puts the request in the store while it waits on the person; takes it out when it doesn't (or unmounts). */
 function Report({ id, ask }: { id: string; ask: PendingAsk | null }) {
@@ -246,8 +174,9 @@ function ApprovalProbe({ id, messageId, order }: { id: string; messageId: string
   const { t } = useTranslation();
   const orgId = useOrgId();
   const a = useApproval(orgId, id).data;
+  const expired = useExpired(a?.expiresAt);
   const ask =
-    a && a.status === "pending" && a.canDecide
+    a && a.status === "pending" && a.canDecide && !expired
       ? { id, kind: "approval" as const, agentId: a.agentId, what: approvalTitleText(t, a), messageId, order }
       : null;
   return <Report id={id} ask={ask} />;
@@ -255,8 +184,8 @@ function ApprovalProbe({ id, messageId, order }: { id: string; messageId: string
 
 function SecretProbe({ request: s, messageId, order }: { request: SecretRequest; messageId: string; order: number }) {
   const meId = useMeId();
-  const now = useNow(60_000);
-  const waits = s.status === "pending" && Date.parse(s.expiresAt) > now && s.requestedForUserId === meId;
+  const expired = useExpired(s.expiresAt);
+  const waits = s.status === "pending" && !expired && s.requestedForUserId === meId;
   const ask = waits ? { id: s.id, kind: "secret" as const, agentId: s.agentId, what: s.name, messageId, order } : null;
   return <Report id={s.id} ask={ask} />;
 }
@@ -272,39 +201,144 @@ function HandoffProbe({
   messageId: string;
   order: number;
 }) {
-  const orgId = useOrgId();
+  const { orgId, org } = useOrg();
   const meId = useMeId();
+  const dir = useDirectory();
   const h = useBrowserHandoff(orgId, id).data ?? fallback;
-  const waits = h.status === "pending" && h.kind === "ask" && (!h.requestedForUserId || h.requestedForUserId === meId);
-  const ask = waits
-    ? {
-        id,
-        kind: handoffScreen(h) === "desktop" ? ("desktop" as const) : ("browser" as const),
-        agentId: h.agentId,
-        what: h.instructions,
-        messageId,
-        order,
-      }
-    : null;
+  const expired = useExpired(h.expiresAt);
+  // The same rule as its card (`HandoffCard`): by ids, never by a name that may not have loaded.
+  const mine =
+    meId !== null && handoffIsMine(h, meId, dir.agentById.get(h.agentId)?.ownerUserId, can(org, "control_computers"));
+  const ask =
+    h.status === "pending" && h.kind === "ask" && !expired && mine
+      ? {
+          id,
+          kind: handoffScreen(h) === "desktop" ? ("desktop" as const) : ("browser" as const),
+          agentId: h.agentId,
+          what: h.instructions,
+          messageId,
+          order,
+        }
+      : null;
   return <Report id={id} ask={ask} />;
 }
 
+/** An agent's proposal of a new agent: who may create agents decides it until it expires. */
 function ProposalProbe({
-  id,
+  card,
   agentId,
-  open,
-  what,
+  messageId,
   order,
 }: {
-  id: string;
+  card: AgentProposalCard;
   agentId: string;
-  open: boolean;
-  what: string;
+  messageId: string;
   order: number;
 }) {
   const { org } = useOrg();
-  const ask = open && can(org, "create_agents") ? { id, kind: "proposal" as const, agentId, what, messageId: id, order } : null;
+  const expired = useExpired(card.expiresAt);
+  const ask =
+    !expired && proposalStatus(card) === "open" && can(org, "create_agents")
+      ? { id: messageId, kind: "agent" as const, agentId, what: card.params.draft.name, messageId, order }
+      : null;
+  return <Report id={messageId} ask={ask} />;
+}
+
+/** An agent's proposal to change the workspace's context or an agent's instructions: who may decide it, while open. */
+function ChangeProposalProbe({ id, messageId, order }: { id: string; messageId: string; order: number }) {
+  const { t } = useTranslation();
+  const { orgId, org } = useOrg();
+  const dir = useDirectory();
+  const p = useProposals(orgId).data?.find((x) => x.id === id);
+  const ask =
+    p && p.status === "pending" && !p.stale && p.canDecide
+      ? {
+          id,
+          kind: "proposal" as const,
+          agentId: p.agentId,
+          what: proposalTarget(t, p, org?.name ?? "", (a) => dir.anyAgent(a)?.name ?? t("channel.unknownAgent")),
+          messageId,
+          order,
+        }
+      : null;
   return <Report id={id} ask={ask} />;
+}
+
+// ── What shows ───────────────────────────────────────────────────────────────
+
+/** What the conversation tells the requests' watch about its list. */
+export interface AskView {
+  /** The view the list fills: the band is measured from its frame in the window. */
+  frame: () => Measurable | null;
+  /** The band inside that frame, from its top and from its bottom (the header, the composer); null until placed. */
+  insets: () => { top: number; bottom: number } | null;
+  /** Whether the list draws this message's row now: a card it doesn't draw is out of view. */
+  drawn: (messageId: string) => boolean;
+}
+
+/**
+ * Which waiting requests are out of view, for the line above the composer (the web's rule): a request shows while
+ * 40 points of its card do, between the floating header and the composer. A look is asked for on a scroll (one a
+ * frame), on layout and when the list's size changes; it measures only the waiting requests' cards, and the store
+ * publishes only when the set changes. Nothing runs while no request waits. Returns the call that asks for a look.
+ */
+export function useAskWatch(store: AskStore, view: AskView): () => void {
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const frame = useRef<number | null>(null);
+  const look = useRef(0);
+  const watch = useCallback(() => {
+    if (frame.current !== null || !store.hasWaiting()) return;
+    frame.current = requestAnimationFrame(() => {
+      frame.current = null;
+      look.current += 1;
+      lookAtAsks(store, viewRef.current, look.current, () => look.current);
+    });
+  }, [store]);
+  // A request came, or its card was drawn or went.
+  useEffect(() => store.watch(watch), [store, watch]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `view.insets` changes when the band's edges move
+  useEffect(() => {
+    watch();
+  }, [watch, view.insets]);
+  useEffect(
+    () => () => {
+      if (frame.current !== null) cancelAnimationFrame(frame.current);
+    },
+    [],
+  );
+  return watch;
+}
+
+/** One look at the waiting requests' cards against the list's band; a newer look drops an older one's answers. */
+function lookAtAsks(store: AskStore, view: AskView, look: number, latest: () => number) {
+  const waiting = store.waiting();
+  const insets = view.insets();
+  const box = view.frame();
+  if (waiting.length === 0 || !insets || !box) return;
+  box.measureInWindow((_x, y, _width, height) => {
+    if (look !== latest() || !(height > 0)) return;
+    const band = { top: y + insets.top, bottom: y + height - insets.bottom };
+    const hidden: string[] = [];
+    let left = waiting.length;
+    const counted = () => {
+      left -= 1;
+      if (left === 0 && look === latest()) store.setHidden(hidden);
+    };
+    for (const ask of waiting) {
+      const card = store.cardOf(ask.id);
+      if (card) {
+        card.measureInWindow((_cx, cy, _cw, ch) => {
+          if (!cardShows(cy, ch, band)) hidden.push(ask.id);
+          counted();
+        });
+        continue;
+      }
+      // No card: out of view when the list doesn't draw its row; a row it draws gets its card in a moment.
+      if (!view.drawn(ask.messageId)) hidden.push(ask.id);
+      counted();
+    }
+  });
 }
 
 // ── The card ─────────────────────────────────────────────────────────────────
@@ -338,11 +372,13 @@ export interface AskWell {
 }
 
 /**
- * The request card. `waitsFor`: "you" when the person decides (amber, breathing), a name when someone else
- * does, null to say nothing. The well holds the thing it is about; `body` sits under it (a secret's field);
- * `foot` is the strip with the expiry and the decision (`AskFoot`).
+ * The request card. `waitsFor`: "you" when the person decides (amber, breathing), what to say when someone else
+ * does ("esperando Ana", "Aguardando um admin"), null to say nothing. The well holds the thing it is about; `body`
+ * sits under it (a secret's field); `foot` is the strip with the expiry and the decision (`AskFoot`), none when
+ * there is neither. In a conversation the card tells it where it is (`id`), for the line above the composer.
  */
 export function AskCard({
+  id,
   kind,
   agentId,
   waitsFor,
@@ -351,93 +387,104 @@ export function AskCard({
   body,
   foot,
 }: {
+  id: string;
   kind: AskKind;
   agentId: string;
   waitsFor: "you" | (string & {}) | null;
   lead: string;
   well?: AskWell | null;
   body?: ReactNode;
-  foot: ReactNode;
+  foot?: ReactNode;
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
   const c = useColors();
   const reduced = useReducedMotion();
+  const store = useAskStore();
+  const slot = useRef<ComponentRef<typeof View>>(null);
   const [open, setOpen] = useState(false);
   const color = agentLook(dir.agentById.get(agentId)).color;
   const label = t(`ask.kind.${kind}`);
+  useLayoutEffect(() => {
+    const card = slot.current;
+    if (!store || !card) return;
+    return store.register(id, card);
+  }, [store, id]);
   return (
-    <Animated.View
-      entering={reduced ? undefined : FadeIn.duration(300)}
-      style={[styles.card, { backgroundColor: c.raised, borderColor: c.line2 }]}
-    >
-      <Sky color={color} surface="raised" depth={0.95} fade={0} style={styles.sky} />
-      {/* Label and state share a line while they fit; the state wraps under the label, never cutting it. */}
-      <View style={styles.head}>
-        <Text variant="footnote" tone="muted" style={styles.semibold}>
-          {label}
-        </Text>
-        {waitsFor === "you" ? (
-          <View style={styles.state}>
-            <WaitMark />
-            <Text variant="caption" style={[styles.semibold, { color: c.amber }]}>
-              {t("ask.waitingYou")}
+    // A plain view the conversation measures (never flattened away), around the card that fades in.
+    <View ref={slot} collapsable={false} style={styles.slot}>
+      <Animated.View
+        entering={reduced ? undefined : FadeIn.duration(300)}
+        style={[styles.card, !foot && styles.footless, { backgroundColor: c.raised, borderColor: c.line2 }]}
+      >
+        <Sky color={color} surface="raised" depth={0.95} fade={0} style={styles.sky} />
+        {/* Label and state share a line while they fit; the state wraps under the label, never cutting it. */}
+        <View style={styles.head}>
+          <Text variant="footnote" tone="muted" style={styles.semibold}>
+            {label}
+          </Text>
+          {waitsFor === "you" ? (
+            <View style={styles.state}>
+              <WaitMark />
+              <Text variant="caption" style={[styles.semibold, { color: c.amber }]}>
+                {t("ask.waitingYou")}
+              </Text>
+            </View>
+          ) : waitsFor ? (
+            <Text variant="caption" tone="muted" style={styles.semibold}>
+              {waitsFor}
             </Text>
-          </View>
-        ) : waitsFor ? (
-          <Text variant="caption" tone="muted" style={styles.semibold}>
-            {t("ask.waitingFor", { name: waitsFor })}
+          ) : null}
+        </View>
+        {lead ? (
+          <Text variant="callout" tone="ink" style={styles.lead}>
+            {lead}
           </Text>
         ) : null}
-      </View>
-      {lead ? (
-        <Text variant="callout" tone="ink" style={styles.lead}>
-          {lead}
-        </Text>
-      ) : null}
-      {well ? (
-        <View style={[styles.well, { backgroundColor: c.sunken }]}>
-          <View style={styles.tile}>{well.tile}</View>
-          <View style={styles.wellText}>
-            <Text variant="small" tone="ink" numberOfLines={1} style={styles.wellTitle}>
-              {well.title}
-            </Text>
-            {well.detail ? (
-              <Text variant="footnote" tone="muted" numberOfLines={1}>
-                {well.detail}
+        {well ? (
+          <View style={[styles.well, { backgroundColor: c.sunken }]}>
+            <View style={styles.tile}>{well.tile}</View>
+            <View style={styles.wellText}>
+              <Text variant="small" tone="ink" numberOfLines={1} style={styles.wellTitle}>
+                {well.title}
               </Text>
-            ) : null}
-            {well.more ? (
-              // The phone has no room at the well's right: "Ver …" is its third line.
-              <Pressable
-                onPress={() => {
-                  tapHaptic();
-                  setOpen((o) => !o);
-                }}
-                accessibilityRole="button"
-                accessibilityState={{ expanded: open }}
-                hitSlop={6}
-                style={({ pressed }) => [styles.more, pressed && styles.pressed]}
-              >
-                <Text variant="footnote" tone="ink2" style={styles.semibold}>
-                  {well.more.label}
+              {well.detail ? (
+                <Text variant="footnote" tone="muted" numberOfLines={1}>
+                  {well.detail}
                 </Text>
-                <View style={open ? styles.flip : undefined}>
-                  <Icon name="chev" size={13} color={c.muted} />
-                </View>
-              </Pressable>
-            ) : null}
+              ) : null}
+              {well.more ? (
+                // The phone has no room at the well's right: "Ver …" is its third line.
+                <Pressable
+                  onPress={() => {
+                    tapHaptic();
+                    setOpen((o) => !o);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: open }}
+                  hitSlop={6}
+                  style={({ pressed }) => [styles.more, pressed && styles.pressed]}
+                >
+                  <Text variant="footnote" tone="ink2" style={styles.semibold}>
+                    {well.more.label}
+                  </Text>
+                  <View style={open ? styles.flip : undefined}>
+                    <Icon name="chev" size={13} color={c.muted} />
+                  </View>
+                </Pressable>
+              ) : null}
+            </View>
           </View>
-        </View>
-      ) : null}
-      {open && well?.more ? (
-        <Animated.View entering={reduced ? undefined : FadeIn.duration(220)} style={styles.exact}>
-          {well.more.content}
-        </Animated.View>
-      ) : null}
-      {body ? <View style={styles.body}>{body}</View> : null}
-      {foot}
-    </Animated.View>
+        ) : null}
+        {open && well?.more ? (
+          <Animated.View entering={reduced ? undefined : FadeIn.duration(220)} style={styles.exact}>
+            {well.more.content}
+          </Animated.View>
+        ) : null}
+        {body ? <View style={styles.body}>{body}</View> : null}
+        {foot}
+      </Animated.View>
+    </View>
   );
 }
 
@@ -487,9 +534,24 @@ export function ExpiryLine({ createdAt, expiresAt }: { createdAt?: string | null
 /**
  * The line above the composer while a request waits out of view (waiting beats working): the agent's face,
  * the breathing square, "Ada espera sua aprovação · Enviar e-mail", "+1" when more wait, and Ver, which
- * scrolls to it.
+ * scrolls to it. While one agent works here, the working line's "Parar" stays at its end.
  */
-export function AskBar({ away, onSee }: { away: AwayAsk; onSee: () => void }) {
+export function AskBar({
+  away,
+  onSee,
+  runs,
+  consults,
+  canStop,
+  onStop,
+}: {
+  away: AwayAsk;
+  onSee: () => void;
+  /** The work going on here, as the working line gets it: its stop follows the same rule. */
+  runs: LiveRun[];
+  consults: LiveConsult[];
+  canStop: (run: LiveRun) => boolean;
+  onStop: (run: LiveRun) => void;
+}) {
   const { t } = useTranslation();
   const dir = useDirectory();
   const { colors: c, shadows } = useTheme();
@@ -507,6 +569,7 @@ export function AskBar({ away, onSee }: { away: AwayAsk; onSee: () => void }) {
   }).replace(/<\/?b>/g, "");
   const parts = markedParts(sentence);
   const plain = parts.map((p) => p.text).join("");
+  const stops = lineStops(workingEntries(runs, consults, (id) => dir.agentById.get(id)?.name ?? ""), runs, canStop);
   const see = () => {
     tapHaptic();
     onSee();
@@ -557,15 +620,16 @@ export function AskBar({ away, onSee }: { away: AwayAsk; onSee: () => void }) {
             {t("ask.bar.see")}
           </Text>
         </Pressable>
+        <LineStop runs={stops} onStop={onStop} />
       </Animated.View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  slot: { marginTop: 12 },
   // Flat on the conversation (a hairline, no heavy shadow), with the app's cut corner at the bottom left.
   card: {
-    marginTop: 12,
     paddingTop: 12,
     paddingHorizontal: 14,
     borderRadius: 16,
@@ -573,6 +637,8 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",
   },
+  // No strip to close it (nothing to decide here, no expiry): the card's own padding does.
+  footless: { paddingBottom: 14 },
   sky: { position: "absolute", top: 0, left: 0, right: 0, height: 8, opacity: 0.7 },
   head: {
     flexDirection: "row",

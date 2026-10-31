@@ -45,14 +45,15 @@ import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/h
 import { agentLook } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
 import { ReceiptMark } from "./AgentReceipts";
-import { secretRequestOf } from "./asks";
+import { secretRequestOf } from "./ask-store";
 import { ConsultGroup } from "./ConsultGroup";
-import { ApprovalInline, ConsultationCard, QuestionCard, ThreadLink } from "./cards";
+import { ApprovalInline, ChangeProposalCard, ConsultationCard, QuestionCard, ThreadLink } from "./cards";
 import { IssueWorkCard } from "./issue-work";
 import { cacheContinued } from "./live";
 import {
   approvalIdOf,
   artifactsOf,
+  changeProposalIdsOf,
   consultationsOf,
   hidesBody,
   mayStopRun,
@@ -179,6 +180,8 @@ export const MessageRow = memo(function MessageRow({
   const question = isAgent ? questionOf(meta) : null;
   // An agent asks a person for a secret for its computer (ADR 0027).
   const secret = isAgent ? secretRequestOf(meta) : null;
+  // An agent proposes a change to the workspace's context or to an agent's instructions: decided right here.
+  const changes = isAgent ? changeProposalIdsOf(meta) : [];
   // The agent needs a person in its browser (ADR 0040): the request, live.
   const handoff = isAgent ? browserHandoffOf(meta) : null;
   // Where it browsed, or what it did on its desktop, after the run (as on the web): the steps' card.
@@ -411,6 +414,7 @@ export const MessageRow = memo(function MessageRow({
         {isAgent ? <TeamChecks message={m} /> : null}
         {isAgent ? <NoAiCard message={m} /> : null}
         {isAgent ? <ProposalCard message={m} /> : null}
+        {changes.map((id) => <ChangeProposalCard key={id} proposalId={id} />)}
         {files.length > 0 ? <MessageFiles files={files} /> : null}
         {approvalId ? <ApprovalInline approvalId={approvalId} /> : null}
         {handoff ? <HandoffCard handoff={handoff} /> : null}

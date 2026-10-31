@@ -44,7 +44,8 @@ export function ProposalCard({ message: m }: { message: Message }) {
   if (status === "open") {
     return (
       <AskCard
-        kind="proposal"
+        id={m.id}
+        kind="agent"
         agentId={m.author.id ?? ""}
         waitsFor={decides ? "you" : null}
         lead={why || t("actionCard.agentProposal.title", { agent: proposer })}

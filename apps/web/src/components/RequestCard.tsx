@@ -1,12 +1,88 @@
 import type { Agent } from "@agenteschat/client";
 import { ExpiryFuse } from "@agenteschat/ui";
-import { type FormEvent, type ReactNode, useState } from "react";
+import { createContext, type FormEvent, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CardSky, colorOf } from "./Sky";
 import "./request-card.css";
 
-/** What an agent can ask of a person in the conversation: each says so in the card's header and in the bar. */
-export type RequestKind = "approval" | "secret" | "question" | "browser" | "desktop" | "proposal";
+/**
+ * What an agent can ask of a person in the conversation: each says so in the card's header and in the bar.
+ * "proposal": a change to the workspace's context or an agent's instructions; "agent": a new agent.
+ */
+export type RequestKind = "approval" | "secret" | "question" | "browser" | "desktop" | "proposal" | "agent";
+
+/** A request waiting for the viewer, as its card registers it: the bar above the composer says it. */
+export type PendingAsk = { id: string; kind: RequestKind; agentId: string; what: string };
+
+/** The same request, said the same way: nothing for the bar to redraw. */
+export const sameAsk = (a: PendingAsk | undefined, b: PendingAsk | undefined) =>
+  a?.id === b?.id && a?.kind === b?.kind && a?.agentId === b?.agentId && a?.what === b?.what;
+
+/**
+ * The request cards waiting for the viewer in one conversation's scroller, by their root element. A card puts
+ * itself here while it waits for the viewer and takes itself out after; the bar above the composer watches them
+ * (`useAsksOutOfView`), so nothing has to scan the rows while an agent writes.
+ */
+export function createAskRegistry() {
+  const cards = new Map<HTMLElement, PendingAsk>();
+  const listeners = new Set<() => void>();
+  const changed = () => {
+    for (const listener of listeners) listener();
+  };
+  return {
+    cards: cards as ReadonlyMap<HTMLElement, PendingAsk>,
+    put(el: HTMLElement, ask: PendingAsk) {
+      if (sameAsk(cards.get(el), ask)) return;
+      cards.set(el, ask);
+      changed();
+    },
+    drop(el: HTMLElement) {
+      if (cards.delete(el)) changed();
+    },
+    subscribe(listener: () => void) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+}
+
+export type AskRegistry = ReturnType<typeof createAskRegistry>;
+
+const AskRegistryContext = createContext<AskRegistry | null>(null);
+
+/**
+ * Around one conversation's scroller, and only it: a card anywhere else (a panel beside it, a dialog) would
+ * never read as in view there. Without one, a card registers nothing.
+ */
+export const AskRegistryProvider = AskRegistryContext.Provider;
+
+/** setTimeout's longest wait (about 24.8 days): a later deadline is waited for in steps. */
+const LONGEST_WAIT = 2_147_483_647;
+
+/**
+ * Whether `expiresAt` has passed, drawn again the moment it does (one timer for that moment, no clock), so a
+ * request stops waiting on time even when no event says it expired. None: no deadline.
+ */
+export function useExpired(expiresAt: string | null | undefined) {
+  const end = expiresAt ? Date.parse(expiresAt) : Number.NaN;
+  const passed = Date.now() >= end;
+  const [, redraw] = useState(0);
+  useEffect(() => {
+    if (Number.isNaN(end) || passed) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const wait = () => {
+      const ms = end - Date.now();
+      // A timer may fire a little early: it waits out the rest.
+      if (ms > 0) timer = setTimeout(wait, Math.min(ms, LONGEST_WAIT));
+      else redraw((n) => n + 1);
+    };
+    wait();
+    return () => clearTimeout(timer);
+  }, [end, passed]);
+  return passed;
+}
 
 /**
  * One card for every request an agent makes in the conversation, so each reads the same way and its decision
@@ -14,8 +90,8 @@ export type RequestKind = "approval" | "secret" | "question" | "browser" | "desk
  * words, the object in a well of two lines with "Ver …" opening it whole, anything to fill in, and the footer
  * strip with the decision on the left and the time left on the right.
  *
- * The root carries `data-ask-*` so the bar above the composer can say a request is waiting while it is out of
- * view, and bring it back.
+ * While it waits for the viewer it registers with its conversation (`AskRegistryProvider`), so the bar above the
+ * composer can say it waits while it is out of view; `data-ask-id` lets "Ver" find it and bring it back.
  */
 export function RequestCard({
   id,
@@ -65,6 +141,19 @@ export function RequestCard({
   onSubmit?: () => void;
 }) {
   const { t } = useTranslation();
+  const registry = useContext(AskRegistryContext);
+  const root = useRef<HTMLDivElement>(null);
+  const agentId = agent?.id ?? "";
+  // Waiting for the viewer: in the conversation's list, with what the bar says (kept current in place).
+  useEffect(() => {
+    const el = root.current;
+    if (registry && mine && el) registry.put(el, { id, kind, agentId, what });
+  }, [registry, mine, id, kind, agentId, what]);
+  useEffect(() => {
+    const el = root.current;
+    if (!registry || !mine || !el) return;
+    return () => registry.drop(el);
+  }, [registry, mine]);
   const [openSelf, setOpenSelf] = useState(false);
   const open = openProp ?? openSelf;
   const toggle = () => {
@@ -135,13 +224,12 @@ export function RequestCard({
   return (
     // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
     <div
+      ref={root}
       className="rq"
       role="group"
       aria-label={label}
       data-ask-id={id}
       data-ask-kind={kind}
-      data-ask-agent={agent?.id ?? ""}
-      data-ask-what={what}
       data-ask-mine={mine ? "" : undefined}
     >
       {inner}

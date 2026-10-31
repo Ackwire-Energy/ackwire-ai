@@ -101,6 +101,11 @@
   width: 16px;
   height: 16px;
 }
+/* A face (the agent a proposal would create) stands where the tile would, at its size. */
+.rq__logo .ac-avatar {
+  width: 32px;
+  height: 32px;
+}
 /* Two lines that never wrap: the name and its detail end in "…". */
 .rq__wt {
   flex: 1;

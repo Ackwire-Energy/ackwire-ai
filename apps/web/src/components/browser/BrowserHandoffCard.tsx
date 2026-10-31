@@ -1,6 +1,7 @@
 import type { BrowserHandoff } from "@agenteschat/client";
 import {
   handoffFuse,
+  handoffIsMine,
   handoffMinutesLeft,
   handoffScreen,
   isWaitingHandoff,
@@ -10,6 +11,7 @@ import {
 } from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { can } from "@agenteschat/client/lib/permissions";
 import { Button, Icon } from "@agenteschat/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -20,7 +22,7 @@ import { useToast } from "@/lib/toast";
 import { AgentAvatar } from "../AgentAvatar";
 import { useOpenComputer } from "../computer/open";
 import { useOrg } from "../org-context";
-import { RequestCard, RequestFuse, RequestTile } from "../RequestCard";
+import { RequestCard, RequestFuse, RequestTile, useExpired } from "../RequestCard";
 import { BrowserCard } from "./BrowserCard";
 import { useBrowserCardRequest } from "./open";
 import "./browser.css";
@@ -54,7 +56,9 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
   const agent = dir.agentById.get(current.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
   const g = agentGrammar(t, name);
-  const waiting = isWaitingHandoff(current);
+  // It stops waiting the moment it expires, even before the server's event says so.
+  const expired = useExpired(current.status === "pending" ? current.expiresAt : null);
+  const waiting = !expired && isWaitingHandoff(current);
   const active = current.status === "active";
   // The minutes left move on.
   useNow(waiting ? 15_000 : false);
@@ -98,7 +102,8 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
   // the computer dialog); "Abrir aqui" takes control as before.
   if (waiting) {
     const asked = current.requestedForUserId;
-    const mine = !asked || asked === me.user.id || agent?.ownerUserId === me.user.id;
+    // Its buttons only for whom it waits on (the server checks again when they open it).
+    const mine = handoffIsMine(current, me.user.id, agent?.ownerUserId, can(org, "control_computers"));
     const askedName = asked ? dir.memberById.get(asked)?.name : undefined;
     return (
       <>
@@ -123,16 +128,18 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
           open={!onDesktop && showBrowser}
           onOpenChange={(open) => (onDesktop ? openComputer(current.agentId) : setHere(open))}
           actions={
-            <Button
-              variant="primary"
-              size="sm"
-              icon={screenIcon}
-              loading={actions.takeControl.isPending}
-              onClick={take}
-              title={t("browser.inCard.openHereHint")}
-            >
-              {t("browser.inCard.openHere")}
-            </Button>
+            mine ? (
+              <Button
+                variant="primary"
+                size="sm"
+                icon={screenIcon}
+                loading={actions.takeControl.isPending}
+                onClick={take}
+                title={t("browser.inCard.openHereHint")}
+              >
+                {t("browser.inCard.openHere")}
+              </Button>
+            ) : undefined
           }
           end={
             <RequestFuse

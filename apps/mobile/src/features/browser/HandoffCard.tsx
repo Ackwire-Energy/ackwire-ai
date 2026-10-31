@@ -1,7 +1,9 @@
-import { type BrowserHandoff, useBrowserHandoff, useBrowserHandoffActions } from "@agenteschat/client";
+import { type BrowserHandoff, handoffIsMine, useBrowserHandoff, useBrowserHandoffActions } from "@agenteschat/client";
+import { can } from "@agenteschat/client/lib/permissions";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { useOrg } from "@/providers/org";
 import { Button, Icon, Text, useToast } from "@/ui";
 import { AskButtons, AskCard, AskFoot, ExpiryLine, useAskStore } from "../chat/asks";
 import { IconTile } from "../connectors/ConnectorIcon";
@@ -79,20 +81,20 @@ function HandoffAsk({
   onOpened: (open: boolean) => void;
 }) {
   const { t } = useTranslation();
-  const orgId = useOrgId();
+  const { orgId, org } = useOrg();
   const meId = useMeId();
   const dir = useDirectory();
   const toast = useToast();
   const sheet = useSheet();
   const asks = useAskStore();
   const actions = useBrowserHandoffActions(orgId);
-  const name = dir.agentById.get(h.agentId)?.name ?? "";
+  const agent = dir.agentById.get(h.agentId);
+  const name = agent?.name ?? "";
   const g = genderOf(name);
-  // Asked of someone else: their name in the header, no buttons here.
-  const other =
-    h.requestedForUserId && h.requestedForUserId !== meId
-      ? (dir.memberById.get(h.requestedForUserId)?.name ?? null)
-      : null;
+  // Whose it is goes by ids (the same rule as the line above the composer); a name only says who, once it loads.
+  // Someone else's: who it waits for in the header when known, no buttons here.
+  const mine = meId !== null && handoffIsMine(h, meId, agent?.ownerUserId, can(org, "control_computers"));
+  const asked = h.requestedForUserId ? dir.memberById.get(h.requestedForUserId)?.name : undefined;
   const failed = () => toast({ title: t("mobile.app.failed"), icon: "x" });
 
   const take = async () => {
@@ -105,15 +107,15 @@ function HandoffAsk({
       failed();
     }
   };
-  // A push or the inbox opened this request: it takes the control once (first one wins).
+  // A push or the inbox opened this request: it takes the control once (first one wins), when it is the person's.
   const claimed = useRef(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: once per request, when it opened the conversation
   useEffect(() => {
-    if (!claim || desktop || claimed.current || h.status !== "pending") return;
+    if (!claim || desktop || !mine || claimed.current || h.status !== "pending") return;
     claimed.current = true;
     onOpened(true);
     actions.takeControl(h.id).catch(() => {});
-  }, [claim, desktop, h.id, h.status]);
+  }, [claim, desktop, mine, h.id, h.status]);
 
   // "Agora não": the agent hears it couldn't be done now, with the reason if one is given.
   const notNow = () => {
@@ -140,28 +142,29 @@ function HandoffAsk({
 
   return (
     <AskCard
+      id={h.id}
       kind={desktop ? "desktop" : "browser"}
       agentId={h.agentId}
-      waitsFor={other ?? "you"}
+      waitsFor={mine ? "you" : asked ? t("ask.waitingFor", { name: asked }) : null}
       lead={h.instructions}
       well={{
         tile: <IconTile name={desktop ? "laptop" : "globe"} size={32} />,
         title: name,
-        detail: desktop ? t("desktop.phone.fromComputer") : null,
+        detail: desktop ? t("agentComputer.phone.fromComputer") : null,
         more: desktop ? null : { label: t("ask.seeScreen"), content: <ScreenPeek agentId={h.agentId} /> },
       }}
       foot={
         <AskFoot expiry={h.expiresAt ? <ExpiryLine createdAt={h.createdAt} expiresAt={h.expiresAt} /> : null}>
-          {other ? null : desktop ? (
+          {mine && desktop ? (
             <Button variant="secondary" size="card" wide label={t("approval.notNow")} onPress={notNow} />
-          ) : (
+          ) : mine ? (
             <AskButtons
               primary={
                 <Button variant="primary" size="card" wide label={t("mobile.browser.card.open")} onPress={take} />
               }
               secondary={<Button variant="secondary" size="card" wide label={t("approval.notNow")} onPress={notNow} />}
             />
-          )}
+          ) : null}
         </AskFoot>
       }
     />

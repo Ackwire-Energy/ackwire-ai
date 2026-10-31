@@ -16,7 +16,7 @@ afterEach(() => cleanup());
 const click = (el: Element) => act(async () => fireEvent.click(el));
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
 
-async function withRequest(requestedForUserId: string, publicKey: string) {
+async function withRequest(requestedForUserId: string, publicKey: string, expiresAt = Date.now() + 15 * 60_000) {
   const state = seedState();
   const secretRequest = {
     id: "00000000-0000-4000-8000-0000000000e1",
@@ -31,7 +31,7 @@ async function withRequest(requestedForUserId: string, publicKey: string) {
     machineId: null,
     publicKey,
     status: "pending" as const,
-    expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+    expiresAt: new Date(expiresAt).toISOString(),
     deliveredAt: null,
     removed: false,
   };
@@ -109,4 +109,20 @@ describe("secret requests (ADR 0027)", () => {
     const done = screen().getByRole("group", { name: "Pedido de segredo de Ada" });
     expect(done.textContent).toContain("Recusado. O agente segue sem ele.");
   });
+
+  // Real time passes in it (the request's own timer), so it gets more than the default 5 s.
+  test("past its time with no event: the field goes and it reads as expired", async () => {
+    const pair = await generateSecretKeyPair();
+    const expiresAt = Date.now() + 3_000;
+    await withRequest("u-walter", pair.publicKey, expiresAt);
+    const card = screen().getByRole("group", { name: "Pedido de segredo de Ada" });
+    expect(card.hasAttribute("data-ask-mine")).toBe(true);
+    // Nothing comes from the server: the card's own timer closes it at that moment.
+    await act(() => new Promise((r) => setTimeout(r, Math.max(0, expiresAt - Date.now()) + 50)));
+    await settle(2);
+    const done = screen().getByRole("group", { name: "Pedido de segredo de Ada" });
+    expect(done.hasAttribute("data-ask-id")).toBe(false);
+    expect(within(done).queryByLabelText("Valor de NPM_TOKEN")).toBeNull();
+    expect(done.textContent).toContain("Ninguém respondeu a tempo.");
+  }, 15_000);
 });

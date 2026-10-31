@@ -10,12 +10,13 @@ import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { TYPED_VALUES } from "@/i18n";
 import { useToast } from "@/lib/toast";
 import { useLive, useLiveStore } from "@/realtime/context";
 import { SiteIcon } from "./browser/SiteIcon";
 import { useChannelActions } from "./channel-actions";
 import { useOrg } from "./org-context";
-import { RequestCard, RequestTile } from "./RequestCard";
+import { RequestCard, RequestTile, useExpired } from "./RequestCard";
 
 /** The host of a site the request names (`https://host`), or null. */
 const hostOf = (site: string | null | undefined) => {
@@ -205,7 +206,12 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
     <div className="ac-approval" role="group" aria-label={t("inlineProposal.group", { name })}>
       <div className="ac-approval__head">
         <span className="ac-approval__who">
-          <Trans i18nKey="proposals.proposes" values={{ agent: name, target }} components={{ b: <b /> }} />
+          <Trans
+            i18nKey="proposals.proposes"
+            values={{ agent: name, target }}
+            components={{ b: <b /> }}
+            {...TYPED_VALUES}
+          />
         </span>
         {p.stale ? (
           <Chip icon="close">{t("proposals.stale")}</Chip>
@@ -307,7 +313,7 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
     <div className="ac-approval ac-approval--done" role="group" aria-label={t("question.group", { agent: name })}>
       <div className="ac-approval__head">
         <span className="ac-approval__who">
-          <Trans i18nKey="question.asks" values={{ agent: name }} components={{ b: <b /> }} />
+          <Trans i18nKey="question.asks" values={{ agent: name }} components={{ b: <b /> }} {...TYPED_VALUES} />
         </span>
         <Chip icon="check" tone="done">
           {t("question.chipDone")}
@@ -342,7 +348,9 @@ export function SecretCard({ request }: { request: SecretRequest }) {
   const agentName = agent?.name ?? t("channel.unknownAgent");
   const mine = current.requestedForUserId === me.user.id;
   const person = dir.memberById.get(current.requestedForUserId)?.name ?? t("channel.unknownPerson");
-  const pending = current.status === "pending" && new Date(current.expiresAt).getTime() > Date.now();
+  // Past its deadline it closes as expired, even before the server's event says so.
+  const expired = useExpired(current.status === "pending" ? current.expiresAt : null);
+  const pending = current.status === "pending" && !expired;
   const failed = (err: unknown) => {
     const status = (err as { status?: number }).status;
     setError(status === 409 ? t("secret.alreadyAnswered") : t("secret.failed"));
@@ -479,9 +487,14 @@ export function SecretCard({ request }: { request: SecretRequest }) {
       <div className="ac-approval__head">
         <span className="ac-approval__who">
           {mine ? (
-            <Trans i18nKey="secret.asks" values={{ agent: agentName }} components={{ b: <b /> }} />
+            <Trans i18nKey="secret.asks" values={{ agent: agentName }} components={{ b: <b /> }} {...TYPED_VALUES} />
           ) : (
-            <Trans i18nKey="secret.asksPerson" values={{ agent: agentName, person }} components={{ b: <b /> }} />
+            <Trans
+              i18nKey="secret.asksPerson"
+              values={{ agent: agentName, person }}
+              components={{ b: <b /> }}
+              {...TYPED_VALUES}
+            />
           )}
         </span>
         {status && (

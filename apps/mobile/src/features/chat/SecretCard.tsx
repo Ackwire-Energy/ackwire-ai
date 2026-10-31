@@ -6,9 +6,9 @@ import { StyleSheet, TextInput, View } from "react-native";
 import { sealSecret } from "@/lib/secret-box";
 import { Button, Icon, Text, useToast } from "@/ui";
 import { IconTile } from "../connectors/ConnectorIcon";
-import { useColors, useDirectory, useMeId, useNow, useOrgId, useWhen } from "../shared/hooks";
+import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { successHaptic, useSurface } from "../shared/parts";
-import { AskButtons, AskCard, AskFoot, ExpiryLine, useAskStore } from "./asks";
+import { AskButtons, AskCard, AskFoot, ExpiryLine, useAskStore, useExpired } from "./asks";
 
 /**
  * An agent asks for a secret for its computer (`request_secret`, ADR 0027), as the request card. Only the
@@ -25,7 +25,6 @@ export function SecretCard({ request }: { request: SecretRequest }) {
   const toast = useToast();
   const surface = useSurface();
   const when = useWhen();
-  const now = useNow(30_000);
   const asks = useAskStore();
   // What this phone did to it (the message's copy changes only when the server says so).
   const [answered, setAnswered] = useState<SecretRequest | null>(null);
@@ -33,10 +32,12 @@ export function SecretCard({ request }: { request: SecretRequest }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"send" | "decline" | null>(null);
   const r = answered ?? request;
+  // It closes at its expiry even when no event says so (as the line above the composer stops counting it).
+  const expired = useExpired(r.expiresAt);
   const agentName = dir.agentById.get(r.agentId)?.name ?? t("channel.unknownAgent");
   const mine = r.requestedForUserId === meId;
   const person = dir.memberById.get(r.requestedForUserId)?.name ?? t("channel.unknownPerson");
-  const pending = r.status === "pending" && Date.parse(r.expiresAt) > now;
+  const pending = r.status === "pending" && !expired;
 
   const failed = (err: unknown) => {
     const status = (err as { status?: number }).status;
@@ -107,9 +108,10 @@ export function SecretCard({ request }: { request: SecretRequest }) {
       : t("secret.targetEnv", { name: r.name, agent: agentName });
   return (
     <AskCard
+      id={r.id}
       kind="secret"
       agentId={r.agentId}
-      waitsFor={mine ? "you" : person}
+      waitsFor={mine ? "you" : t("ask.waitingFor", { name: person })}
       lead={r.purpose}
       well={{ tile: <IconTile name="lock" size={32} />, title: r.name, detail: where }}
       body={
