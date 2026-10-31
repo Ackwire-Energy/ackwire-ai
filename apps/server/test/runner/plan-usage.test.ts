@@ -163,7 +163,7 @@ test("Codex's rate limits: windows told apart by their length, else primary is t
   expect(codexUsage({ primary: null, secondary: null }, "turn", NOW)).toBeNull();
 });
 
-test("people hear at once only when a limit is hit or cleared or a window crosses 80 or 100", () => {
+test("people hear at once only when a limit is hit or cleared or a window crosses 80, 90 (its bar turns red) or 100", () => {
   const u = (used: number, limited?: boolean): PlanUsage => ({
     windows: [{ kind: "five_hour", usedPercent: used }],
     ...(limited ? { limited } : {}),
@@ -173,7 +173,9 @@ test("people hear at once only when a limit is hit or cleared or a window crosse
   expect(usageCrossed(undefined, u(10))).toBe(true);
   expect(usageCrossed(u(10), u(40))).toBe(false);
   expect(usageCrossed(u(79), u(80))).toBe(true);
-  expect(usageCrossed(u(85), u(99))).toBe(false);
+  expect(usageCrossed(u(85), u(89))).toBe(false);
+  expect(usageCrossed(u(89), u(90))).toBe(true);
+  expect(usageCrossed(u(91), u(99))).toBe(false);
   expect(usageCrossed(u(99), u(100))).toBe(true);
   expect(usageCrossed(u(100), u(100, true))).toBe(true);
 });
@@ -262,11 +264,12 @@ test("coding plans: each provider's endpoint, the key only in Authorization, no 
     { kind: "seven_day", usedPercent: 30, resetsAt: "2030-01-05T00:00:00.000Z" },
     { kind: "five_hour", usedPercent: 90 },
   ]);
+  // A window that refuses requests is full, whatever its percent says.
   const opencode = scripted(200, {
     usage: {
       rolling: { status: "ok", percent: 4, resetsAt: "2030-01-01T14:00:00Z" },
-      weekly: { status: "ok", percent: 20 },
-      monthly: { status: "rate-limited", percent: 100 },
+      weekly: { status: "rate-limited", percent: 97 },
+      monthly: { status: "ok", percent: 33 },
     },
   });
   expect(
@@ -276,8 +279,8 @@ test("coding plans: each provider's endpoint, the key only in Authorization, no 
     ]),
   ).toEqual([
     ["five_hour", 4],
-    ["seven_day", 20],
-    ["monthly", 100],
+    ["seven_day", 100],
+    ["monthly", 33],
   ]);
 
   // Z.ai takes the raw key; the others a bearer. Never in the URL, and no redirect may carry it elsewhere.

@@ -1,6 +1,6 @@
 # 0063. Usage views: each plan account by computer, an agent's month, and its part of a limit
 
-- Status: Accepted. Amended 2026-10-30: §5 (a plan's limits where the budget was)
+- Status: Accepted. Amended 2026-10-30: §5 (a plan's limits where the budget was); 2026-10-31: §5 (the compact bar's color)
 - Date: 2026-10-24
 - Extends: ADR 0026 (budget visibility), ADR 0059 (AI accounts belong to people; §7 usage limits)
 
@@ -39,6 +39,8 @@ Everyone in the workspace sees tokens, percentages, windows and an account's nam
 - Settings › AI accounts draws each account and each computer's own sign-in with the same compact line.
 
 The agent list (`GET …/agents`, and the agent an edit returns) carries it in `brain`: `account`, the account's name (a computer's own sign-in by its plan, "Claude Max", only where that sign-in can think for the agent, ADR 0059 §3), and `usage`, the windows the runner last reported (absent while unknown). Everyone sees both, as §4 allows; the computer's name stays admins' and the owner's. The apps refetch the list when a computer's accounts change (`machine.updated` with `accounts`, sent only when a window moved a point or more). No migration and no protocol change. One rule (`usageShown`, `packages/client/src/lib/plan-usage.ts`) and one line (`planLine`, `packages/ui/src/plan-state.ts`, drawn by `PlanMeter compact` on the web and its twin on the phone) serve every place.
+
+*Amended 2026-10-31:* the compact line's one bar and the words under it take the color of the tightest window, or of the limit when the plan refused a request (ADR 0059 §7: amber from 80%, red from 90%), as the full meter's words do.
 
 ## Consequences
 

@@ -161,7 +161,7 @@ export function Alert({
   );
 }
 
-/** Usage meter (budget). The bar is ink, never a status color. */
+/** Usage meter (budget). The bar is ink unless a plan meter sets `--meter-fill` (`.ac-planmeter`). */
 export function Meter({
   value,
   max,

@@ -8268,16 +8268,7 @@ a.machine-row__name:hover {
 .agp-number .ac-planmeter__line {
   color: inherit;
 }
-/* The sentence's dialogs: the note by the buttons (the plan, or what the choice does). */
-.agp-wdlg__note {
-  color: var(--muted);
-  font-size: 12.5px;
-  line-height: 1.4;
-}
-.agp-wdlg__note b {
-  color: var(--ink);
-  font-weight: 600;
-}
+/* The sentence's dialogs: the link by the buttons ("Conectar outro computador"). */
 .agp-wdlg__link {
   display: inline-flex;
   align-items: center;

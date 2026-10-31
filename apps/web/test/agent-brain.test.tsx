@@ -179,6 +179,21 @@ describe("Quem pensa (its dialog)", () => {
     expect((within(d).getByRole("button", { name: "Usar" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
+  test("on the computer it already works on: no side words on the plans, no line by the buttons", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    pairMac(api, true);
+    await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
+    api.agents.brain = async () => fakeAgentBrain(ADA_ID, { brain: "claude_code", effectiveModel: "sonnet" });
+    await open(state, api);
+    const d = await brainDialog();
+    const rows = within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getAllByRole("radio");
+    expect(rows.map((r) => r.querySelector(".ac-optrow__side")?.textContent ?? null)).toEqual([null, null, null]);
+    expect(d.textContent).not.toContain("No MacBook");
+    expect(d.querySelector(".agp-wdlg__note")).toBeNull();
+    expect(d.textContent).not.toMatch(/Pensa com\s/);
+  });
+
   test("Claude Code: the agent moves to the MacBook first, then thinks there; the button says whose plan", async () => {
     const { state } = await open();
     const d = await brainDialog();

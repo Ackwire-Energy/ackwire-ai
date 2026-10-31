@@ -110,7 +110,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useId, useState } from "react";
-import { Trans, useTranslation } from "react-i18next";
+import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { NO_COMPUTER, useNoComputer } from "@/components/AgentComputer";
 import {
@@ -984,12 +984,12 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             : t("agentPage.work.brain.off", { computer: where.name })}
         </>
       );
+    // Where the agent already works goes without saying: only a move changes something.
+    if (where.machineId === work.machineId) return null;
     return (
       <>
         <Icon name="computer" size={14} />
-        {where.machineId === work.machineId
-          ? t("agentPage.work.brain.on", { computer: where.name })
-          : t("agentPage.work.brain.moves", { computer: where.name })}
+        {t("agentPage.work.brain.moves", { computer: where.name })}
       </>
     );
   };
@@ -1286,15 +1286,6 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
         )}
       </DialogBody>
       <Footer
-        note={
-          <span className="agp-wdlg__note">
-            <Trans
-              i18nKey={moves ? "agentPage.work.brain.previewMoved" : "agentPage.work.brain.preview"}
-              values={{ brain: brainName(kind), computer: moves?.name ?? "" }}
-              components={{ b: <b /> }}
-            />
-          </span>
-        }
         disabled={unchanged || needsAccount || adding !== false || (kind !== "model" && !home)}
         busy={busy}
         primary={planKind ? t(`agentPage.work.usePlan.${planKind}`) : t("agentPage.work.use")}
