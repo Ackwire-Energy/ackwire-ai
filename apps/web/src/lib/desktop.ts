@@ -88,10 +88,13 @@ export function desktopNotice(
  * `/desktop/connector` in its window to finish there (packages/engine oauth-return.ts). Apps from before say
  * nothing and keep the web's return.
  */
-export function oauthReturnPath(path: string) {
-  const desktop = (window as { __agentesDesktop?: { connectorReturn?: unknown } }).__agentesDesktop;
-  return desktop?.connectorReturn === true ? `desktop:${path}` : path;
-}
+export const takesConnectorReturn = () =>
+  (window as { __agentesDesktop?: { connectorReturn?: unknown } }).__agentesDesktop?.connectorReturn === true;
+
+export const oauthReturnPath = (path: string) => (takesConnectorReturn() ? `desktop:${path}` : path);
+
+/** A mailbox's return in that link: `state=mail`, `code=connected|failed` (packages/engine oauth-return.ts). */
+export const DESKTOP_MAIL_STATE = "mail";
 
 /** The window opens this in the browser instead of loading it (main_window.rs). */
 export const BROWSER_SIGN_IN_PATH = "/desktop/sign-in";

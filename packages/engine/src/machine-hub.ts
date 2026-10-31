@@ -134,6 +134,8 @@ export interface MachineStatus {
   /** Who connected it; null: nobody did (the workspace's own computer). */
   pairedByUserId?: string | null;
   online: boolean;
+  /** ISO: its last sign of life (null: never seen). */
+  lastSeenAt?: string | null;
   execAllowed: boolean;
   os: string;
   /** The runner's protocol (from its last hello). */
@@ -1227,6 +1229,7 @@ export function createMachineHub(deps: MachineHubDeps) {
         kind: row.kind,
         pairedByUserId: row.pairedByUserId,
         online,
+        lastSeenAt: row.lastSeenAt?.toISOString() ?? null,
         execAllowed: row.execAllowed,
         os: row.os,
         protocol: row.protocol,

@@ -61,6 +61,7 @@ export async function mailSetup(options: { composio?: boolean; imap?: boolean } 
     mail,
     publicUrl: PUBLIC_URL,
     resolveHost: async (host) => (host.endsWith("example.com") ? ["93.184.216.34"] : ["10.0.0.5"]),
+    composioPollMs: 0,
   };
   return { f, deps, mail, box, poller, tester, composio, tools: f.tools as NonNullable<Fixture["tools"]> };
 }
@@ -85,7 +86,7 @@ export async function gmailAccount(m: MailFixture, address = "team@example.com")
   const link = m.composio.state.links.at(-1);
   if (!link) throw new Error("no connect link");
   m.composio.activate(link.connectedAccountId, address);
-  await completeComposioConnect(m.deps, m.f.owner.id, started.accountId);
+  await completeComposioConnect(m.deps, started.accountId);
   return { accountId: started.accountId, connectedAccountId: link.connectedAccountId };
 }
 

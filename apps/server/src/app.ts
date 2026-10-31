@@ -124,7 +124,7 @@ export function createApp(options: AppOptions) {
   if (options.services) {
     const { auth } = options.services;
     api.on(["GET", "POST"], "/auth/*", (c) => auth.handler(c.req.raw));
-    const deps = options.services;
+    const deps: AppDeps = { log, ...options.services };
     registerInstance(api, deps, options.version);
     api.route("/app", accountRoutes(deps));
     api.route("/app", accessRoutes(deps));
@@ -136,7 +136,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", auditRoutes(deps));
     api.route("/app", customConnectorRoutes(deps));
     api.route("/app", connectorRoutes(deps));
-    api.route("/app", mailRoutes(deps));
+    api.route("/app", mailRoutes(deps, log));
     api.route("/app", databaseRoutes(deps));
     api.route("/app", managementRoutes(deps));
     api.route("/app", knowledgeRoutes(deps));
