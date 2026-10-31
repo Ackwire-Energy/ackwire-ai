@@ -36,6 +36,7 @@ export const CONNECTOR_BRANDS: Record<string, { file: string; color: string | nu
   neon: { file: "neon", color: "#00E599" },
   prisma: { file: "prisma", color: null },
   netlify: { file: "netlify", color: "#00C7B7" },
+  vercel: { file: "vercel", color: null },
   railway: { file: "railway", color: null },
   datadog: { file: "datadog", color: "#632CA6" },
   grafana: { file: "grafana", color: "#F46800" },
@@ -45,6 +46,7 @@ export const CONNECTOR_BRANDS: Record<string, { file: string; color: string | nu
   monday: { file: "monday", color: null },
   clickup: { file: "clickup", color: "#7B68EE" },
   todoist: { file: "todoist", color: "#E44332" },
+  figma: { file: "figma", color: null },
   airtable: { file: "airtable", color: "#18BFFF" },
   dropbox: { file: "dropbox", color: "#0061FF" },
   miro: { file: "miro", color: null },
@@ -88,6 +90,8 @@ export interface ConnectorListingEntry {
   oauthConfigured: boolean;
   /** Can be connected on this server (an OAuth app or an API key). */
   available: boolean;
+  /** A one-click server whose vendor hasn't approved agentes.chat yet: listed, not connectable ("Em breve"). */
+  soon: boolean;
   needsServerUrl: boolean;
   /** The MCP endpoint of a `remote_mcp` entry. */
   serverUrl: string | null;
@@ -126,6 +130,7 @@ export function connectorListing(oauthApps: Record<string, unknown>): ConnectorL
       auth: d.auth,
       oauthConfigured,
       available: oauthConfigured || d.auth.includes("api_key"),
+      soon: false,
       needsServerUrl: d.serverUrl === null,
       serverUrl: d.serverUrl,
       ...brand(d.id),
@@ -150,7 +155,8 @@ export function connectorListing(oauthApps: Record<string, unknown>): ConnectorL
     category: p.category,
     auth: ["oauth"],
     oauthConfigured: true,
-    available: true,
+    available: !p.soon,
+    soon: p.soon === true,
     needsServerUrl: false,
     serverUrl: p.serverUrl,
     ...brand(p.icon),
@@ -173,10 +179,11 @@ export interface MissingConnector {
   /** What names it in a search: its label and its ids (`drive`). */
   names: string[];
   /**
-   * `unavailable`: this server can't connect it; `not_connected`: the workspace hasn't; `not_given`: the agent lacks
-   * it; `needs_reconnect`: a mailbox of it stopped working.
+   * `unavailable`: this server can't connect it; `soon`: its vendor hasn't approved agentes.chat yet (a `soon`
+   * preset); `not_connected`: the workspace hasn't; `not_given`: the agent lacks it; `needs_reconnect`: a mailbox of
+   * it stopped working.
    */
-  state: "unavailable" | "not_connected" | "not_given" | "needs_reconnect";
+  state: "unavailable" | "soon" | "not_connected" | "not_given" | "needs_reconnect";
 }
 
 /** The mailboxes "Adicionar conector" offers, by the rule of `mailChoices` (apps/web/src/components/MailConnect.tsx). */
@@ -231,7 +238,15 @@ export async function missingConnectors(
   const [connections, mailboxes] = await Promise.all([activeConnections(db, orgId), orgMailAccounts(db, orgId)]);
   const services = new Map<
     string,
-    { label: string; description: string; names: Set<string>; offered: boolean; held: string[]; reconnect: boolean }
+    {
+      label: string;
+      description: string;
+      names: Set<string>;
+      offered: boolean;
+      soon: boolean;
+      held: string[];
+      reconnect: boolean;
+    }
   >();
   const service = (label: string, description: string) => {
     const key = label.toLowerCase();
@@ -240,6 +255,7 @@ export async function missingConnectors(
       description,
       names: new Set([label]),
       offered: false,
+      soon: false,
       held: [],
       reconnect: false,
     };
@@ -250,6 +266,7 @@ export async function missingConnectors(
     const s = service(entry.label, entry.description);
     s.names.add(entry.id);
     s.offered ||= entry.available;
+    s.soon ||= entry.soon;
   }
   const mail = mailProviders(catalog.mail);
   for (const m of MAILBOXES) {
@@ -277,7 +294,7 @@ export async function missingConnectors(
     else if (s.reconnect) state = "needs_reconnect";
     // Connected, but no tool of it listed (server down, not reviewed yet): nothing says the agent lacks it.
     else if (s.held.length > 0) return [];
-    else state = s.offered ? "not_connected" : "unavailable";
+    else state = s.offered ? "not_connected" : s.soon ? "soon" : "unavailable";
     return [{ label: s.label, description: s.description, names: [...s.names], state }];
   });
 }

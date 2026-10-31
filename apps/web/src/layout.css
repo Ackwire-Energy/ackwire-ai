@@ -3487,6 +3487,17 @@ p {
 .catalog-tile[data-soon] .catalog-tile__desc {
   opacity: 0.6;
 }
+/* "Em breve" with a lock: a tile that opens nothing, so it doesn't lift or press either. */
+.catalog-tile:disabled {
+  cursor: default;
+  transform: none;
+  box-shadow: var(--e1), var(--top);
+}
+/* In place of the description, so the name keeps the whole row. */
+.catalog-tile__soon {
+  align-self: flex-start;
+  opacity: 0.6;
+}
 .catalog-tile--other {
   background: transparent;
   box-shadow: inset 0 0 0 1.5px var(--line2);

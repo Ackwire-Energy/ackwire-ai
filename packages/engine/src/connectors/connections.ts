@@ -610,7 +610,7 @@ async function nativeAuthorizeUrl(
 ) {
   const probe = await probeMcpServer(deps, serverUrl).catch(() => null);
   if (probe?.kind !== "oauth") return null;
-  return beginMcpOAuth(deps, actorId, orgId, {
+  const started = await beginMcpOAuth(deps, actorId, orgId, {
     connector,
     serverUrl,
     resource: probe.resource,
@@ -618,6 +618,7 @@ async function nativeAuthorizeUrl(
     scopes: probe.scopes,
     returnTo,
   });
+  return started.status === "oauth" ? started.authorizeUrl : null;
 }
 
 /** Callback of an MCP-native authorization: token with PKCE and `resource`, then the connection. */

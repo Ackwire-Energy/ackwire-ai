@@ -1164,6 +1164,8 @@ export interface ConnectorDef {
   oauthConfigured: boolean;
   /** Can be connected on this server; `false` shows "Em breve". */
   available: boolean;
+  /** The vendor hasn't approved agentes.chat yet: greyed out with a lock, nothing to open. Older servers leave it out. */
+  soon?: boolean;
   needsServerUrl: boolean;
   /** The MCP endpoint (`remote_mcp`). */
   serverUrl: string | null;
@@ -1585,7 +1587,8 @@ export interface CustomServer {
 export type CustomConnectStart =
   | { status: "connected"; server: CustomServer }
   | { status: "oauth"; authorizeUrl: string }
-  | { status: "needs_key" };
+  /** `not_approved`: it has OAuth but only lets in apps it approved, and agentes.chat isn't one yet. */
+  | { status: "needs_key"; reason?: "not_approved" };
 
 // ── Knowledge (phase 5: apps/server/src/routes/app/knowledge.ts) ─────────────
 

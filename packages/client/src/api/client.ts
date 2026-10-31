@@ -686,7 +686,8 @@ export interface ApiClient {
     /**
      * Connects to an https MCP server. Without `apiKey` the server tries OAuth
      * (discovery + dynamic client registration); if the MCP server doesn't
-     * support it, answers `needs_key`.
+     * support it, answers `needs_key` (`reason: "not_approved"` when it only
+     * registers apps it approved).
      */
     connect(
       orgId: string,

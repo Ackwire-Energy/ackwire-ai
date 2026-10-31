@@ -407,6 +407,8 @@ const HOW_TO_GET: Record<MissingConnector["state"], (label: string) => string> =
   not_given: () =>
     "Connected in this workspace but not given to you: an admin gives you access on your page, in Tools and access (in Portuguese, Ferramentas e acesso).",
   unavailable: () => "Not available on this installation: whoever runs the installation has to turn it on first.",
+  soon: () =>
+    "Not open to agentes.chat yet: it only lets apps it approved connect in one click. If it gives an API key, an admin connects it with that by its address, in Settings › Connectors › Add connector › Another service (in Portuguese, Configurações › Conectores › Adicionar conector › Outro serviço).",
   needs_reconnect: () =>
     "Connected in this workspace but needs reconnecting: an admin clicks Reconnect on its row in Settings › Connectors (in Portuguese, Configurações › Conectores › Reconectar).",
 };
