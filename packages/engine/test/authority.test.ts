@@ -33,7 +33,9 @@ const byAgent = (body: string, runId: string | null, meta: Record<string, unknow
   insertMessage(f.db, {
     orgId: f.org.id,
     channelId: f.general.id,
-    author: { type: "agent", agentId: f.agent.id, runId, hop: 1 },
+    author: runId
+      ? { type: "agent", agentId: f.agent.id, runId, hop: 1 }
+      : { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null },
     body,
     meta,
   });

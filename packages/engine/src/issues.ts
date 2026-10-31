@@ -1111,7 +1111,7 @@ async function announceTaken(deps: IssueDeps, issue: IssueRow, card: IssueWorkMe
     orgId: issue.orgId,
     channelId: origin.channelId,
     threadId: origin.threadId,
-    author: { type: "agent", agentId: card.agentId, runId: null, hop: 0 },
+    author: { type: "agent", agentId: card.agentId, runId: null, hop: 0, stretchId: null },
     body: `Took issue #${card.number}: ${card.title}`.slice(0, 2_000),
     meta: { issueTaken: card, bodyCode: "issue_taken", bodyParams: { number: card.number } },
   });

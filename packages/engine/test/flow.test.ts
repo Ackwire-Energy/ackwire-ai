@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import type { RealtimeEvent } from "@agenteschat/adapters";
 import { asc, eq, schema } from "@agenteschat/db";
 import { ProviderError, systemText } from "@agenteschat/providers";
-import { createAgent, drainOutbox, listMessages, postPersonMessage } from "../src";
+import { drainOutbox, listMessages, postPersonMessage } from "../src";
 import { type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
@@ -111,41 +111,6 @@ test("vertical slice: @mention → outbox → run → streamed reply → persist
       .filter((j) => j.kind !== "threads.assess")
       .every((j) => j.status === "done"),
   ).toBe(true);
-});
-
-test("agents answer each other at most once in a row without a person", async () => {
-  f = await setup({
-    // The judge hears both "@x over to you" and "@x back to you" as hand-offs; the hop limit stops the second.
-    judge: (kind) => (kind === "mention_handoff" ? 0.9 : 0),
-    reply: (req) => ({ chunks: [systemText(req.system).includes("@dev)") ? "@qa over to you" : "@dev back to you"] }),
-  });
-  const qa = await createAgent(
-    f.db,
-    f.owner.id,
-    f.org.id,
-    { name: "QA", handle: "qa", credentialId: f.credential.id },
-    { model: "claude-sonnet-5-5" },
-  );
-  await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: qa.id });
-
-  const root = await post(f, "@dev start the ping-pong");
-  await drainOutbox(f.db, f.handlers);
-
-  // Each answers in the main timeline, where it was asked.
-  const replies = (await listMessages(f.db, f.owner.id, f.org.id, f.general.id)).slice(1);
-  // Dev hands off to QA once; QA's hand-back doesn't start another round.
-  expect(replies.map((m) => m.body)).toEqual(["@qa over to you", "@dev back to you"]);
-  expect(f.provider.calls).toHaveLength(2);
-  const runs = await f.db.select().from(schema.agentRuns).orderBy(asc(schema.agentRuns.hop));
-  expect(runs.map((r) => [r.hop, r.status])).toEqual([
-    [1, "done"],
-    [2, "done"],
-  ]);
-
-  // A person posting in the thread resets the counter.
-  await post(f, "@dev one more", root.id);
-  await drainOutbox(f.db, f.handlers);
-  expect(f.provider.calls.length).toBeGreaterThan(2);
 });
 
 test("transient provider failures retry the job; the run completes on a later attempt", async () => {

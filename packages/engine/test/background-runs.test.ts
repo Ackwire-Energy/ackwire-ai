@@ -536,6 +536,7 @@ describe("what a run owes", () => {
         channelId: f.general.id,
         threadId: null,
         hop: 0,
+        stretchId: null,
         notice: { kind: "agent_note", text, from: "@infra", refs: {} },
       }),
     );
@@ -746,7 +747,7 @@ describe("handing on unread messages", () => {
       orgId: f.org.id,
       channelId: f.general.id,
       threadId: other.threadRootId,
-      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0 },
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0, stretchId: null },
       body: "Nota",
       meta: { notice: { kind: "agent_note", text: "Nota", refs: {} } },
     });
@@ -760,7 +761,7 @@ describe("handing on unread messages", () => {
     const dmNote = await insertMessage(f.db, {
       orgId: f.org.id,
       channelId: dm.id,
-      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0 },
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0, stretchId: null },
       body: "Nota",
       meta: { notice: { kind: "agent_note", text: "Nota", refs: {} } },
     });
@@ -791,6 +792,7 @@ describe("the run a routine's report woke", () => {
         channelId: f.general.id,
         threadId: null,
         hop: 0,
+        stretchId: null,
         notice: {
           kind: "routine_handoff",
           text: "12 erros novos no checkout desde as 9h.",

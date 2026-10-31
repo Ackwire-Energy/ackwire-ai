@@ -8,6 +8,7 @@ import { holdsMessages } from "./run-hold";
 import { ACTIVE_RUN_STATUSES, queueOnRun } from "./run-inbox";
 import { inChannelRun } from "./run-scope";
 import type { AgentRun } from "./runs";
+import { holdOf, hopLimitReached, pauseStretch, stretchOf, stretchStop } from "./stretch";
 
 const { agents, channelMembers, channels, agentRuns, messages } = schema;
 
@@ -19,6 +20,12 @@ export interface DispatchResult {
   skipped?: "no_mentions" | "hop_limit" | "message_missing";
 }
 
+/** What starting a run on a message reads of it. */
+type Trigger = Pick<
+  Message,
+  "id" | "orgId" | "channelId" | "threadId" | "hop" | "stretchId" | "authorAgentId" | "agentRunId"
+>;
+
 /**
  * Creates one `agent_run` per agent for a trigger message and enqueues its
  * execution, in the caller's transaction. Shared by every way agents wake up
@@ -26,11 +33,11 @@ export interface DispatchResult {
  * `(trigger_message_id, agent_id)` is unique and the execute job has a dedupe
  * key, so a redelivered event starts nothing twice.
  *
- * Callers decide WHO may run (eligibility, hop limit); this never grants anything.
+ * Callers decide WHO may run (eligibility, the depth backstop); this never grants anything.
  */
 export async function createAgentRuns(
   tx: Executor,
-  message: Pick<Message, "id" | "orgId" | "channelId" | "threadId" | "hop">,
+  message: Trigger,
   agentIds: string[],
   trigger: RunTrigger,
   options: StartRunOptions = {},
@@ -55,17 +62,23 @@ export interface StartRunOptions {
    * conversation's active run (nor does anything ever join it).
    */
   background?: boolean;
+  /**
+   * A person let the work go on (Continuar on a stretch's pause card): the run starts at hop 1 in this fresh
+   * stretch, past the limits of the one that held it (ADR 0089).
+   */
+  granted?: string;
 }
 
 /**
  * One agent and one message: the message joins the agent's active run in that conversation (read
  * at its next step; `joined`), or a run starts on it (`created`). Null: nothing to do (a
- * redelivered event). A run that ends between the lookup and the append is never appended to:
- * the message starts a run of its own instead.
+ * redelivered event), or a run agents started on their own would pass its stretch's limits
+ * (`stretchStop`): the wake-up is held for the pause card (ADR 0089). A run that ends between the
+ * lookup and the append is never appended to: the message starts a run of its own instead.
  */
 export async function startOrJoinRun(
   tx: Executor,
-  message: Pick<Message, "id" | "orgId" | "channelId" | "threadId" | "hop">,
+  message: Trigger,
   agentId: string,
   trigger: RunTrigger,
   options: StartRunOptions = {},
@@ -114,6 +127,15 @@ export async function startOrJoinRun(
       break;
     }
   }
+  // Agents started it (its trigger is an agent's, hop 1 or more): within its stretch's limits. A forum's turns and a
+  // routine's background run keep their own.
+  if (!options.granted && trigger !== "forum" && !options.background && message.hop >= 1) {
+    const stop = await stretchStop(tx, message.orgId, stretchOf(message), agentId, message.id);
+    if (stop) {
+      await pauseStretch(tx, message.orgId, holdOf(message, agentId, trigger, stop));
+      return null;
+    }
+  }
   const [run] = await tx
     .insert(agentRuns)
     .values({
@@ -123,7 +145,8 @@ export async function startOrJoinRun(
       threadRootId: message.threadId ?? message.id,
       triggerMessageId: message.id,
       trigger,
-      hop: message.hop + 1,
+      hop: options.granted ? 1 : message.hop + 1,
+      stretchId: options.granted ?? stretchOf(message),
       ...(options.background ? { background: true } : {}),
     })
     .onConflictDoNothing()
@@ -206,9 +229,8 @@ export const requesterOf = (db: Executor, message: Pick<Message, "orgId" | "id">
 
 /**
  * Handles `message.posted` for messages with mentions: starts one run per
- * explicitly @mentioned agent. Enforces the per-thread hop limit: a message
- * whose hop already reached `maxHops` (that many consecutive agent replies
- * since a person last posted in the thread) triggers nobody.
+ * explicitly @mentioned agent. A message whose hop already reached `maxHops`
+ * (the depth backstop, `hopLimitReached`) triggers nobody.
  */
 export async function dispatchMentions(
   db: Database,
@@ -221,7 +243,7 @@ export async function dispatchMentions(
     (id) => id !== message.authorAgentId && (!options.onlyAgentIds || options.onlyAgentIds.includes(id)),
   );
   if (candidates.length === 0) return { runs: [], skipped: "no_mentions" };
-  if (message.hop >= options.maxHops) return { runs: [], skipped: "hop_limit" };
+  if (await hopLimitReached(db, message, options.maxHops)) return { runs: [], skipped: "hop_limit" };
 
   // Re-check at dispatch time: the agent may have been archived or removed from the channel since.
   // An agent asking another one acts for the person behind its run, who must be allowed to talk to it.

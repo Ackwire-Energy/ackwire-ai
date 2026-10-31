@@ -33,7 +33,7 @@ const message = (author: "person" | "agent", body: string, meta: Record<string, 
     author:
       author === "person"
         ? { type: "person", userId: f.owner.id }
-        : { type: "agent", agentId: f.agent.id, runId: null, hop: 1 },
+        : { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null },
     body,
     meta,
   });

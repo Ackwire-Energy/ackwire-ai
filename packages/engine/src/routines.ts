@@ -1587,7 +1587,7 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
           orgId: routine.orgId,
           channelId: target.channelId,
           threadId: target.threadId,
-          author: { type: "agent", agentId: agent.id, runId: null, hop: 0 },
+          author: { type: "agent", agentId: agent.id, runId: null, hop: 0, stretchId: null },
           body: `${mention}Reminder: ${routine.prompt}`,
           meta: {
             // The app shows its own "Reminder" label (translated) with this text, without the body's prefix.

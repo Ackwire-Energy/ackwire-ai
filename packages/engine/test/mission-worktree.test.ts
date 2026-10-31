@@ -526,6 +526,7 @@ describe("one worktree per mission (ADR 0044)", () => {
         channelId: mission.channelId,
         threadId: mission.threadRootId,
         hop: 0,
+        stretchId: null,
         notice: { kind: "routine_handoff", text: "3 new errors in checkout.", from: "Routine «Sentry»" },
       }),
     );

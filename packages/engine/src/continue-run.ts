@@ -95,9 +95,10 @@ export async function continueRun(
         channelId: stopped.channelId,
         threadRootId,
         triggerMessageId: reply.id,
-        // Nobody brings it in this time: a person asked for it.
+        // Nobody brings it in this time: a person asked for it, so it starts a stretch of its own (ADR 0089).
         trigger: stopped.trigger === "router" ? "mention" : stopped.trigger,
-        hop: stopped.hop,
+        hop: 1,
+        stretchId: newRunId,
         transcript: transcript as unknown as Record<string, unknown>,
         issueId: stopped.issueId,
         // A computer brain resumes the session it was stopped in.
@@ -198,7 +199,9 @@ export async function restartAfterStopAndSend(
           threadRootId: said.threadId ?? said.id,
           triggerMessageId: said.id,
           trigger: stopped.trigger === "router" ? "mention" : stopped.trigger,
-          hop: stopped.hop,
+          // The person's message is its stretch (ADR 0089).
+          hop: 1,
+          stretchId: said.id,
           transcript: continuedTranscript(transcript, line) as unknown as Record<string, unknown>,
           issueId: stopped.issueId,
           brainSessionId: stopped.brainSessionId,
