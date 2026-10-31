@@ -1,6 +1,15 @@
 import { afterEach, expect, test } from "bun:test";
 import { currentQueryCount } from "@agenteschat/db";
-import { createJobHandlers, drainOutbox, enableCaches, postPersonMessage, type StageTiming } from "../src";
+import {
+  createChannel,
+  createJobHandlers,
+  drainOutbox,
+  enableCaches,
+  issueFromMessage,
+  postPersonMessage,
+  type StageTiming,
+  updateIssue,
+} from "../src";
 import { type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
@@ -23,6 +32,16 @@ test("claim → model request stays within 13 statements; a whole mention run wi
       return { chunks: [req.outputSchema ? '{"needs_agent":0,"scores":[],"reason":"none"}' : "ok"] };
     },
   });
+  // Its open tasks from private channels it isn't in: hidden from #general, in the same one statement.
+  const deps = { db: f.db, pubsub: f.pubsub };
+  for (const n of [1, 2, 3]) {
+    const secret = await createChannel(f.db, f.owner.id, f.org.id, { name: `secreto-${n}`, visibility: "private" });
+    const said = await postPersonMessage(deps, f.owner.id, f.org.id, secret.id, { body: `Cofre ${n}` });
+    const issue = await issueFromMessage(deps, f.owner.id, f.org.id, said.id);
+    await updateIssue(deps, { type: "person", userId: f.owner.id }, f.org.id, issue.id, {
+      assignee: { type: "agent", id: f.agent.id },
+    });
+  }
   enableCaches();
   let profile: { stages: StageTiming[]; total: { queries: number } } | null = null;
   const handlers = createJobHandlers({
@@ -40,7 +59,7 @@ test("claim → model request stays within 13 statements; a whole mention run wi
   expect(beforeModel).toBeGreaterThan(0);
   // 11 since every agent has a budget (ADR 0026): the call always reserves (one statement on the fast path).
   // 12 since the run stores the brain it runs with (ADR 0053 §10).
-  // 13 since a run's context lists the agent's open tasks (one statement, read while the thread is).
+  // 13 since a run's context lists the agent's open tasks (one statement however many, read while the thread is).
   expect(beforeModel).toBeLessThanOrEqual(13);
   expect(profile).not.toBeNull();
   const p = profile as unknown as { stages: StageTiming[]; total: { queries: number } };

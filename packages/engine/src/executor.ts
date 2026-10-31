@@ -74,6 +74,7 @@ import { type ChannelEvent, type MemoryUpdate, publishChannelEvent, publishMessa
 import { onForumRunFinished } from "./forum";
 import type { ModelGateway } from "./gateway";
 import { agentRepositoryList, repositoriesPrompt } from "./git/repos";
+import { UPDATE_ISSUE_TOOL } from "./issue-tools";
 import { linkRunToIssue, mirrorReplyToIssue } from "./issues";
 import { listenLiveSteering, renderSteered } from "./live-steer";
 import { touchMachineAccount } from "./machine-accounts";
@@ -895,6 +896,8 @@ async function executeRunInner(
         capabilities: [describeCapabilities(tools, pending), repositories].filter(Boolean).join("\n\n"),
         skills: skillList,
         team: tools.some((t) => t.name === FIND_AGENT_TOOL),
+        // Granted is enough: on demand (ADR 0043) it is one `use_tool` away.
+        issueTools: granted.some((t) => t.name === UPDATE_ISSUE_TOOL),
         trigger,
         routine: Boolean(viaRoutine),
         mayPass: policy.mayPass,
@@ -917,7 +920,8 @@ async function executeRunInner(
           ).catch(() => ({ text: "", pageIds: [] as string[] }))
         : Promise.resolve({ text: "", pageIds: [] as string[] }),
     ]);
-    if (context.issueId) await linkRunToIssue({ db, pubsub: deps.pubsub }, run, context.issueId).catch(() => {});
+    const issueId = context.issueId;
+    if (issueId) later(() => linkRunToIssue({ db, pubsub: deps.pubsub }, run, issueId));
     const system: ContextBlock[] = [...context.system];
     if (contextDeps && context.stats.truncated) {
       // Long thread: the summary stands in for what didn't fit.

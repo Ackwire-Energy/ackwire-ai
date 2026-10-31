@@ -235,6 +235,8 @@ export async function buildRunContext(
     skills?: { name: string; description: string }[];
     /** `find_agent` is available: name the other agents in "# Your team". */
     team?: boolean;
+    /** `update_issue` is available: "# Your open tasks" says how to keep them updated. */
+    issueTools?: boolean;
     trigger?: Message;
     /** A routine started the run: its own task, so no "Your recent work" from other conversations. */
     routine?: boolean;
@@ -277,7 +279,9 @@ export async function buildRunContext(
     : null;
   // A routine's run keeps to its own task, as with "Your recent work" below.
   const openTasks =
-    options.routine || run.background ? null : openTasksBrief(db, run.orgId, agent.id, run.channelId).catch(() => null);
+    options.routine || run.background
+      ? null
+      : openTasksBrief(db, run.orgId, agent.id, run.channelId, options.issueTools === true).catch(() => null);
   const trigger = triggerRows[0];
   if (!org || !channel || !trigger) throw new Error("run context is incomplete (org, channel or trigger missing)");
 

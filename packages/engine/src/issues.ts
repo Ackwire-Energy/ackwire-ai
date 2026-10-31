@@ -1,5 +1,19 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, asc, type Database, desc, type Executor, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  asc,
+  type Database,
+  desc,
+  type Executor,
+  eq,
+  inArray,
+  isNull,
+  or,
+  rowsOf,
+  type SQL,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { getAgent } from "./agents";
 import { audienceError, canTalkTo } from "./audience";
 import { recordAudit } from "./audit";
@@ -170,6 +184,15 @@ async function checkAssignee(db: Database, orgId: string, a: WorkActor | null | 
   }
 }
 
+/**
+ * Asked to implement an issue, an agent works on it in the requester's DM (`dmId`): from there it sees the
+ * issue when that person can see its channel (`channelId`, an SQL expression).
+ */
+const seenFromDmSql = (orgId: string, dmId: string, channelId: SQL) => sql`exists (select 1
+    from ${channelMembers} dm_m join ${channels} dm on dm.id = dm_m.channel_id and dm.kind = 'dm'
+    where dm_m.channel_id = ${dmId}::uuid and dm_m.org_id = ${orgId}::uuid and dm_m.user_id is not null
+      and exists (select 1 from ${channelMembers} cm2 where cm2.channel_id = ${channelId} and cm2.user_id = dm_m.user_id))`;
+
 async function canSee(
   db: Database,
   actor: IssueActor,
@@ -182,22 +205,10 @@ async function canSee(
   if (actor.type === "agent") {
     if ((await agentSearchChannels(db, orgId, actor.agentId, actor.channelId)).includes(channelId)) return true;
     if (assignee?.type !== "agent" || assignee.id !== actor.agentId) return false;
-    // Asked to implement it (its work lives in the requester's DM): visible when that person can see its channel.
-    const [row] = await db
-      .select({ id: channelMembers.id })
-      .from(channelMembers)
-      .innerJoin(channels, and(eq(channels.id, channelMembers.channelId), eq(channels.kind, "dm")))
-      .where(
-        and(
-          eq(channelMembers.channelId, actor.channelId),
-          eq(channelMembers.orgId, orgId),
-          sql`${channelMembers.userId} is not null`,
-          sql`exists (select 1 from ${channelMembers} cm2 where cm2.channel_id = ${channelId}::uuid
-            and cm2.user_id = ${channelMembers.userId})`,
-        ),
-      )
-      .limit(1);
-    return Boolean(row);
+    const [row] = rowsOf<{ yes: boolean | string }>(
+      await db.execute(sql`select ${seenFromDmSql(orgId, actor.channelId, sql`${channelId}::uuid`)} as yes`),
+    );
+    return row?.yes === true || row?.yes === "t";
   }
   const [row] = await db
     .select({ visibility: channels.visibility, kind: channels.kind, memberId: channelMembers.id })
@@ -1077,7 +1088,8 @@ export async function mirrorReplyToIssue(
 
 /**
  * A run started in an issue's work thread (or on its start message) works on that issue, as if it had
- * touched it with a tool: the issue shows it working instead of stalled.
+ * touched it with a tool: the issue shows it working instead of stalled. Only while the issue is open and
+ * still this agent's.
  */
 export async function linkRunToIssue(
   deps: IssueDeps,
@@ -1088,24 +1100,29 @@ export async function linkRunToIssue(
     .select()
     .from(issues)
     .where(and(eq(issues.id, issueId), eq(issues.orgId, run.orgId)));
-  if (issue) await startedWork(deps, issue, run.agentId, [run.id]);
+  // The issue's work is its latest linked run: a run in the thread of an agent it was taken from would hide
+  // the assignee's.
+  if (issue?.assigneeType !== "agent" || issue.assigneeId !== run.agentId || !OPEN_FOR_WORK.has(issue.status)) return;
+  await startedWork(deps, issue, run.agentId, [run.id]);
 }
 
 const OPEN_TASKS_SHOWN = 5;
 
 /**
  * A run's reminder of the agent's open tasks: issues assigned to it, not done or canceled, that it can see
- * from the run's channel, newest activity first. Null when there are none.
+ * from the run's channel, newest activity first. `updates`: it has the tools to keep them updated. Null when
+ * there are none.
  */
-export async function openTasksBrief(db: Database, orgId: string, agentId: string, channelId: string) {
+export async function openTasksBrief(
+  db: Database,
+  orgId: string,
+  agentId: string,
+  channelId: string,
+  updates: boolean,
+) {
+  const visible = await agentSearchChannels(db, orgId, agentId, channelId);
   const rows = await db
-    .select({
-      number: issues.number,
-      title: issues.title,
-      status: issues.status,
-      criteria: issues.criteria,
-      channelId: issues.channelId,
-    })
+    .select({ number: issues.number, title: issues.title, status: issues.status, criteria: issues.criteria })
     .from(issues)
     .where(
       and(
@@ -1113,28 +1130,29 @@ export async function openTasksBrief(db: Database, orgId: string, agentId: strin
         eq(issues.assigneeType, "agent"),
         eq(issues.assigneeId, agentId),
         inArray(issues.status, [...OPEN_FOR_WORK]),
+        // What `canSee` lets it read from here: an issue of a private channel or DM would leak its title.
+        or(
+          isNull(issues.channelId),
+          inArray(issues.channelId, visible),
+          seenFromDmSql(orgId, channelId, sql`${issues.channelId}`),
+        ),
       ),
     )
     .orderBy(desc(issues.updatedAt))
-    // ponytail: with more than 15 of the newest 20 hidden from this channel, fewer than 5 show.
-    .limit(OPEN_TASKS_SHOWN * 4);
-  const actor: IssueActor = { type: "agent", agentId, channelId };
-  const lines: string[] = [];
-  for (const r of rows) {
-    if (lines.length === OPEN_TASKS_SHOWN) break;
-    // An issue of a private channel or DM stays out where the agent can't read it: its title would leak there.
-    if (!(await canSee(db, actor, orgId, r.channelId, { type: "agent", id: agentId }))) continue;
-    const done = r.criteria.filter((c) => c.done).length;
-    lines.push(
-      `- #${r.number} ${r.title} (${r.status}${r.criteria.length ? `, criteria ${done}/${r.criteria.length}` : ""})`,
-    );
-  }
-  if (lines.length === 0) return null;
+    .limit(OPEN_TASKS_SHOWN);
+  if (rows.length === 0) return null;
   return [
     "# Your open tasks",
     "Issues assigned to you, latest activity first:",
-    ...lines,
-    "When what you're doing belongs to one of them, keep that task updated as you go: a short progress comment (`comment_issue`), each criterion as you meet it and its status (`update_issue`). That also ties your run to it, so the team sees you working on it.",
+    ...rows.map((r) => {
+      const done = r.criteria.filter((c) => c.done).length;
+      return `- #${r.number} ${r.title} (${r.status}${r.criteria.length ? `, criteria ${done}/${r.criteria.length}` : ""})`;
+    }),
+    ...(updates
+      ? [
+          "When what you're doing belongs to one of them, keep that task updated as you go: a short progress comment (`comment_issue`) and each criterion as you meet it (`update_issue`); its status moves on its own. That also ties your run to it, so the team sees you working on it.",
+        ]
+      : []),
   ].join("\n");
 }
 

@@ -12,6 +12,7 @@ import {
   createIssue,
   createIssueToolSource,
   drainOutbox,
+  executeRun,
   ForbiddenError,
   getIssue,
   grantScopes,
@@ -214,6 +215,8 @@ describe("issues", () => {
     const runs = await f.db.select().from(schema.agentRuns);
     expect(runs).toHaveLength(1);
     expect(system).toContain("# Your task: issue #1");
+    // From the DM the agent sees the private issue, so it's among its open tasks there.
+    expect(system).toContain("- #1 Checkout quebra (in_progress)");
     const comments = (await listIssueActivity(f.db, person(f.owner.id), f.org.id, issue.id))
       .filter((a) => a.kind === "comment")
       .map((a) => a.text);
@@ -330,8 +333,31 @@ describe("issues", () => {
     expect(await runOf(elsewhere.id)).toMatchObject({ status: "done", issueId: null });
   });
 
-  test("a run's context lists the agent's open tasks, latest activity first; not closed, others' or hidden ones; none for a routine", async () => {
+  test("an issue handed to another agent: a run in the first one's work thread doesn't hide the new one's work", async () => {
     f = await setup();
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const issue = await createIssue(deps, person(f.owner.id), f.org.id, { title: "Frete lento" });
+    await askAgentToImplement(deps, f.owner.id, f.org.id, issue.id, f.agent.id);
+    await drainOutbox(f.db, f.handlers);
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    const root = (await f.db.select().from(schema.messages)).find((m) => m.channelId === dm.id && !m.threadId);
+    if (!root) throw new Error("no issue card");
+    const qa = await createAgent(f.db, f.owner.id, f.org.id, { name: "QA", handle: "qa" }, NEW_AGENT_DEFAULTS);
+    // QA's run stays queued, so it is live: only the reply below runs.
+    const handed = await askAgentToImplement(deps, f.owner.id, f.org.id, issue.id, qa.id);
+    expect(handed.work).toMatchObject({ agentId: qa.id, state: "running" });
+
+    const reply = await postPersonMessage(deps, f.owner.id, f.org.id, dm.id, { body: "e aí?", threadId: root.id });
+    const runOf = async () =>
+      (await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, reply.id)))[0];
+    await executeRun(f.jobDeps, (await runOf())?.id ?? "", { finalAttempt: true });
+    expect(await runOf()).toMatchObject({ agentId: f.agent.id, status: "done", issueId: null });
+    const work = (await getIssue(f.db, person(f.owner.id), f.org.id, { id: issue.id })).work;
+    expect(work).toMatchObject({ agentId: qa.id, state: "running", runId: handed.work?.runId });
+  });
+
+  test("a run's context lists the agent's open tasks, latest activity first; not closed, others' or hidden ones; none for a routine", async () => {
+    f = await setup({ issueTools: true });
     const deps = { db: f.db, pubsub: f.pubsub };
     let asked = "";
     const ask = async (body: string) => {
@@ -369,11 +395,17 @@ describe("issues", () => {
     await at(older.id, 5);
     await at(newer.id, 1);
 
-    const system = await ask("@dev e agora?");
-    expect(system).toContain(
-      "# Your open tasks\nIssues assigned to you, latest activity first:\n- #2 Login quebra (todo)\n- #1 Frete lento (in_progress, criteria 1/2)\nWhen what you're doing belongs to one of them",
+    const listed =
+      "# Your open tasks\nIssues assigned to you, latest activity first:\n- #2 Login quebra (todo)\n- #1 Frete lento (in_progress, criteria 1/2)";
+    // Reading issues only, like every new agent: the list, and nothing about tools it doesn't have.
+    const reading = await ask("@dev e agora?");
+    expect(reading).toContain(listed);
+    expect(reading).not.toContain("keep that task updated");
+    for (const title of ["Já feito", "Desistimos", "Do QA", "Cofre aberto"]) expect(reading).not.toContain(title);
+    await grantScopes(f.db, f.org.id, f.agent.id, ISSUES);
+    expect(await ask("@dev e agora?")).toContain(
+      `${listed}\nWhen what you're doing belongs to one of them, keep that task updated as you go: a short progress comment (\`comment_issue\`) and each criterion as you meet it (\`update_issue\`); its status moves on its own.`,
     );
-    for (const title of ["Já feito", "Desistimos", "Do QA", "Cofre aberto"]) expect(system).not.toContain(title);
     // A routine's run keeps to its own task.
     const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, asked));
     if (!run) throw new Error("no run");
