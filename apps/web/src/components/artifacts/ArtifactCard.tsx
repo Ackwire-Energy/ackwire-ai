@@ -2,6 +2,7 @@ import type { ArtifactContent, ArtifactRef } from "@agenteschat/client";
 import { useArtifact } from "@agenteschat/client";
 import { documentPreview, KIND_ICON, patchCounts } from "@agenteschat/client/lib/artifacts";
 import { Icon } from "@agenteschat/ui";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { contextMenuHandler, copyText } from "@/lib/context-menu";
@@ -9,6 +10,7 @@ import { useToast } from "@/lib/toast";
 import { useArtifactDownload } from "./ArtifactActions";
 import { artifactLink, useArtifactViewer, useAuthorName } from "./ArtifactViewer";
 import { FileCardPreview } from "./FileView";
+import { HtmlFrame } from "./HtmlFrame";
 import { MermaidDiagram } from "./Mermaid";
 
 const PREVIEW_ROWS = 3;
@@ -180,14 +182,41 @@ function Preview({ content, title }: { content: ArtifactContent; title: string }
     case "diagram":
       return <MermaidDiagram source={content.mermaid} label={t("artifacts.diagramLabel", { title })} compact />;
     case "html":
+      // A small live picture of the page; clicks go to the card's open button.
       return (
-        <div className="artifact-card__thumb">
-          <Icon name="page" />
-          <span className="small muted">{t("artifacts.htmlPreview")}</span>
-        </div>
+        <PageThumbnail html={content.html} label={t("artifacts.htmlPreview")} title={t("artifacts.htmlFrame", { title })} />
       );
     case "file":
       // Files render as tiles (`ArtifactCard`), never inside a card.
       return null;
   }
+}
+
+/** The page drawn at `PAGE_WIDTH` and scaled to the card's width. */
+const PAGE_WIDTH = 1000;
+function PageThumbnail({ html, label, title }: { html: string; label: string; title: string }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.25);
+  useEffect(() => {
+    const el = box.current;
+    if (!el || typeof ResizeObserver !== "function") return;
+    const measure = () => {
+      if (el.clientWidth > 0) setScale(el.clientWidth / PAGE_WIDTH);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <div
+      ref={box}
+      className="artifact-card__page"
+      role="img"
+      aria-label={label}
+      style={{ "--page-scale": scale } as CSSProperties}
+    >
+      <HtmlFrame html={html} title={title} className="artifact-card__page-frame" thumbnail />
+    </div>
+  );
 }

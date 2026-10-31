@@ -6457,6 +6457,8 @@ export const en: Translations = {
     rendering: "Drawing…",
     htmlFrame: "Page: {{title}}",
     htmlNote: "The page runs isolated, with no access to your account.",
+    htmlFailed: "The page didn't open in this browser. Download it to open elsewhere.",
+    htmlError: "The page hit an error: {{message}}",
     markdownSource: "Markdown text",
   },
   drive: {

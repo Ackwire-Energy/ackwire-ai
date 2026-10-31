@@ -6493,6 +6493,8 @@ export const ptBR = {
     rendering: "Desenhando…",
     htmlFrame: "Página: {{title}}",
     htmlNote: "A página roda isolada, sem acesso à sua conta.",
+    htmlFailed: "A página não abriu neste navegador. Baixe para abrir em outro lugar.",
+    htmlError: "A página teve um erro: {{message}}",
     markdownSource: "Texto em Markdown",
   },
   drive: {

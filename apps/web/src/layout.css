@@ -1386,6 +1386,27 @@ p {
   border-radius: var(--radius-sm);
   background: var(--surface-sunken);
 }
+/* A live thumbnail of an HTML page: drawn at 1000px wide and scaled down, never clickable itself. */
+.artifact-card__page {
+  position: relative;
+  height: 140px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  pointer-events: none;
+}
+.artifact-card__page-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1000px;
+  height: 560px;
+  border: 0;
+  transform: scale(var(--page-scale, 0.25));
+  transform-origin: top left;
+  background: #fff;
+}
 .artifact-diagram {
   display: flex;
   justify-content: center;
