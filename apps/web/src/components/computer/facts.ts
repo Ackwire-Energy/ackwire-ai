@@ -70,7 +70,7 @@ export function useAgentComputer(
     retry: false,
     refetchInterval: HANDOFF_POLL_MS,
   });
-  const readsRuns = can(org.role, "view_usage") || agent.ownerUserId === me.user.id;
+  const readsRuns = can(org, "view_usage") || agent.ownerUserId === me.user.id;
   const runningQ = useQuery({
     queryKey: keys.runningRuns(org.id, agent.id),
     queryFn: () => api.agents.runs(org.id, { agentId: agent.id, status: "running", limit: 1 }),

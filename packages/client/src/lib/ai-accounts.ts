@@ -1,5 +1,13 @@
 import type { TFunction } from "i18next";
-import type { AiAccounts, AiComputer, Credential, MachineAccount, MachineAccountKind, PlanUsage } from "../api/types";
+import type {
+  AgentBrain,
+  AiAccounts,
+  AiComputer,
+  Credential,
+  MachineAccount,
+  MachineAccountKind,
+  PlanUsage,
+} from "../api/types";
 import { joinNames } from "./format";
 import { loginPerAgent, planName } from "./plans";
 
@@ -190,6 +198,30 @@ export const planWordOf = (plan: string | null) =>
  */
 export const ownSignInName = (t: TFunction, mine: boolean, computer: string) =>
   mine ? t("connectAi.own.shared") : t("agentPage.work.brain.thisComputer", { computer });
+
+/**
+ * The computer's own sign-in of `kind` can think for the agent (ADR 0041, ADR 0059 §3): whoever connected that
+ * computer owns the agent, and its runner reported that CLI signed in there (`own`, the computer's `/ai-accounts`
+ * row). On a computer nobody connected (the workspace's own) it never can.
+ */
+export const ownSignInReady = (
+  brain: Pick<AgentBrain, "ownSignIn"> | undefined,
+  row: Pick<AiComputer, "own"> | undefined,
+  kind: MachineAccountKind,
+) => brain?.ownSignIn === true && row?.own?.[kind] !== undefined;
+
+/**
+ * An agent's account choice lists the computer's own sign-in where it is ready (`ownSignInReady`), and while the
+ * agent thinks with it: on a computer its owner connected, whatever that computer reported, and to someone who
+ * can't change the account.
+ */
+export const ownSignInListed = (
+  brain: Pick<AgentBrain, "ownSignIn" | "brain" | "account" | "canUsePlans">,
+  row: Pick<AiComputer, "own"> | undefined,
+  kind: MachineAccountKind,
+) =>
+  ownSignInReady(brain, row, kind) ||
+  (brain.brain === kind && brain.account === null && (brain.ownSignIn || !brain.canUsePlans));
 
 /**
  * The plan an agent's sign-in is on, as the CLI said it (`team`, `max`…): its account's, or with none (`account`

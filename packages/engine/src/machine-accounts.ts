@@ -766,7 +766,7 @@ export async function getMachineAccounts(
 ) {
   const { membership, machine } = await memberMachine(deps.db, userId, orgId, machineId);
   const adds = mayAddAccounts(machine, userId);
-  if (!adds && !can(membership.role, "configure")) {
+  if (!adds && !can(membership, "configure")) {
     throw new ForbiddenError(
       "Only an admin or the person who connected this computer can see its accounts",
       "machine.forbidden",
@@ -1116,7 +1116,7 @@ export async function removeMachineAccount(
   const allowed =
     account.createdBy === userId ||
     machine.pairedByUserId === userId ||
-    (can(membership.role, "configure") && (machine.pairedByUserId === null || account.createdBy === null));
+    (can(membership, "configure") && (machine.pairedByUserId === null || account.createdBy === null));
   if (!allowed) {
     throw new ForbiddenError(
       "Only the account's owner or the person who connected this computer can remove it",

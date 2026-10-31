@@ -125,7 +125,7 @@ export function NewChannelDialog({
             />
           </Field>
           <Field label={t("channelCategories.category")} id="ch-category" help={t("channelCategories.categoryHelp")}>
-            <CategorySelect value={categoryId} onChange={setCategoryId} canCreate={can(org.role, "configure")} />
+            <CategorySelect value={categoryId} onChange={setCategoryId} canCreate={can(org, "manage_channels")} />
           </Field>
           <fieldset style={{ margin: 0, padding: 0, border: 0, display: "flex", flexDirection: "column", gap: 8 }}>
             <legend className="ac-field__label" style={{ padding: 0, marginBottom: 8 }} id="ch-vis">

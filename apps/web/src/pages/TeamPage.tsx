@@ -179,7 +179,7 @@ export function TeamPage() {
   const data = team.data;
   const working = data?.agents.filter((a) => a.busy).length ?? 0;
   // Archived agents have no page: admins delete them for good here (ADR 0082).
-  const admin = can(org.role, "manage_agents");
+  const admin = can(org, "manage_agents");
   const former = useFormerAgents(org.id);
   const archived = (former.data ?? []).filter((a) => !a.deleted);
   const [deleting, setDeleting] = useState<FormerAgent | null>(null);
@@ -194,7 +194,7 @@ export function TeamPage() {
             </p>
           )}
         </div>
-        {can(org.role, "manage_agents") && (
+        {can(org, "create_agents") && (
           <Button asChild variant="primary" icon="plus">
             <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }}>
               {t("shell.createAgent")}

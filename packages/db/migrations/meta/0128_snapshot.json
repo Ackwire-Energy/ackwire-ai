@@ -1,5 +1,5 @@
 {
-  "id": "b3708fbd-da29-4e14-9977-a9937161b0d5",
+  "id": "ebe4e38c-1983-441c-aabe-16c0f4d846b8",
   "prevId": "0006027f-dd2d-45b7-99cf-0100306b650a",
   "version": "7",
   "dialect": "postgresql",
@@ -253,6 +253,37 @@
           "primaryKey": false,
           "notNull": true,
           "default": 0
+        },
+        "status_text": {
+          "name": "status_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_emoji": {
+          "name": "status_emoji",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_busy": {
+          "name": "status_busy",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "status_run_id": {
+          "name": "status_run_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_until": {
+          "name": "status_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -15403,6 +15434,31 @@
         "timezone": {
           "name": "timezone",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "availability": {
+          "name": "availability",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'auto'"
+        },
+        "status_text": {
+          "name": "status_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_emoji": {
+          "name": "status_emoji",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_until": {
+          "name": "status_until",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },

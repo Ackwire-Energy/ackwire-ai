@@ -731,6 +731,18 @@ describe("hub", () => {
     expect((await listMachines(f.db, f.owner.id, f.org.id))[0]?.online).toBe(false);
     await expect(hub.call(paired.machineId, { op: "list", path: "", depth: 1 })).rejects.toThrow(MachineOfflineError);
   });
+
+  test("the status says who connected the computer, and nobody for the workspace's own (its own sign-in is nobody's)", async () => {
+    f = await setup({ machines: true });
+    const hub = f.machineHub as MachineHub;
+    const paired = await pair();
+    expect((await hub.status(paired.machineId))?.pairedByUserId).toBe(f.owner.id);
+    await f.db
+      .update(schema.machines)
+      .set({ kind: "managed", pairedByUserId: null })
+      .where(eq(schema.machines.id, paired.machineId));
+    expect((await hub.status(paired.machineId))?.pairedByUserId).toBeNull();
+  });
 });
 
 describe("tools on a connected machine", () => {

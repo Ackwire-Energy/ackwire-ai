@@ -20,7 +20,7 @@ import {
   suggestAgentAi,
   type ToolContext,
 } from "../src";
-import { addMember, type Fixture, setup } from "./fixtures";
+import { addMember, type Fixture, makeAdmin, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
 let f: Fixture;
@@ -246,10 +246,7 @@ describe("the AI it suggests", () => {
     const asked = await propose(f, await runFor(f, bia.id, "cria um agente"), ADA);
     expect(asked.content).toContain("The person who asked can't create agents: an admin or owner reviews it.");
     expect(out.content).not.toContain("can't create agents");
-    await f.db
-      .update(schema.organizationMembers)
-      .set({ role: "admin" })
-      .where(eq(schema.organizationMembers.userId, bia.id));
+    await makeAdmin(f.db, f.org.id, bia.id);
     expect(await suggestAgentAi(ai, f.org.id, bia.id)).toMatchObject({ kind: "account", accountId: BIAS });
     // No key either: none, connected after it is created.
     await f.db

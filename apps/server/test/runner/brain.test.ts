@@ -25,7 +25,6 @@ import {
   claudeBrainArgs,
   claudeCapabilities,
   fallbackModelFor,
-  planAlias,
   STEER_CAPABILITY,
   STEER_NOW_CAPABILITY,
   steerSupport,
@@ -736,6 +735,25 @@ test("command line: --effort for a known level only", () => {
 });
 
 test.if(posix)(
+  "the context limit (protocol 28) is CLAUDE_CODE_AUTO_COMPACT_WINDOW; another one restarts the process, resumed",
+  async () => {
+    const { spawns, turn } = setup();
+    const logged = () => spawns() as unknown as { args: string[]; compactWindow: string | null }[];
+    await turn(1, "first", { contextTokens: 400_000 });
+    expect(logged()[0]?.compactWindow).toBe("400000");
+    await turn(2, "second", { contextTokens: 400_000 });
+    expect(logged()).toHaveLength(1);
+    await turn(3, "third", { contextTokens: 200_000 });
+    expect(logged()).toHaveLength(2);
+    expect(logged()[1]?.compactWindow).toBe("200000");
+    expect(logged()[1]?.args.slice(-2)).toEqual(["--resume", SESSION(1)]);
+    // None (or nonsense): the model's own window.
+    await turn(4, "fourth", { contextTokens: "lots" as never });
+    expect(logged()[2]?.compactWindow).toBeNull();
+  },
+);
+
+test.if(posix)(
   "an account turn runs in its folder (CLAUDE_CONFIG_DIR), a new session there; a change restarts the process",
   async () => {
     const accountDir = tempDir("claude-account-");
@@ -857,6 +875,7 @@ test.if(posix)(
         ANTHROPIC_DEFAULT_OPUS_MODEL: "glm-5.3[1m]",
         ANTHROPIC_DEFAULT_SONNET_MODEL: "glm-5.3[1m]",
         ANTHROPIC_DEFAULT_HAIKU_MODEL: "glm-5.3-flash[1m]",
+        ANTHROPIC_DEFAULT_FABLE_MODEL: "glm-5.3[1m]",
         CLAUDE_CODE_SUBAGENT_MODEL: "glm-5.3[1m]",
         CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
         API_TIMEOUT_MS: "3000000",
@@ -909,15 +928,29 @@ test.if(posix)(
       expect(runs()[4]?.apiKey).toBe("sk-ant-stray");
       await turn(5, "hi", { personalMcp: true, session: { id: SESSION(5), resume: false } });
       expect(runs()[5]?.settingsEnv).toBeNull();
+
+      // One of the plan's models chosen by id: Claude Code runs it, its subagents too; the aliases keep theirs.
+      await turn(6, "hi", { account: KIMI_ACCOUNT, model: "k3-256k", session: { id: SESSION(6), resume: false } });
+      const picked = runs()[6];
+      expect(flag(picked, "--model")).toBe("k3-256k");
+      expect(picked?.args).not.toContain("--fallback-model");
+      expect(picked?.settingsEnv).toMatchObject({
+        CLAUDE_CODE_SUBAGENT_MODEL: "k3-256k",
+        ANTHROPIC_DEFAULT_OPUS_MODEL: "k3.1-pro",
+        ANTHROPIC_DEFAULT_SONNET_MODEL: "kimi-for-coding",
+        // A subagent called with `fable` runs the plan's opus, never a Claude model the plan doesn't serve.
+        ANTHROPIC_DEFAULT_FABLE_MODEL: "k3.1-pro",
+      });
+      // Another plan's model runs the plan's own sonnet.
+      await turn(7, "hi", { account: KIMI_ACCOUNT, model: "minimax-m3", session: { id: SESSION(7), resume: false } });
+      expect(flag(runs()[7], "--model")).toBe("sonnet");
     } finally {
       for (const k of Object.keys(stray)) delete process.env[k];
     }
   },
 );
 
-test("plan aliases and the pinned env without a plan", () => {
-  expect(planAlias("haiku")).toBe("haiku");
-  for (const other of [undefined, "auto", "claude-opus-5-5", "glm-5.3"]) expect(planAlias(other)).toBe("sonnet");
+test("the pinned env without a plan", () => {
   const env = accountSettingsEnv(undefined, "opus", { HTTP_PROXY: "http://p:1", PATH: "/bin" });
   expect(env.ANTHROPIC_BASE_URL).toBe("https://api.anthropic.com");
   expect(env.HTTP_PROXY).toBe("http://p:1");

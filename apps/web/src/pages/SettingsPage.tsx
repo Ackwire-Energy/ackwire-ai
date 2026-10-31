@@ -70,6 +70,7 @@ import { useOrg } from "@/components/org-context";
 import { PlanUsageCards } from "@/components/PlanUsage";
 import { OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
 import { KeyMismatch, KeySite } from "@/components/ProviderKey";
+import { RolesSection } from "@/components/roles/RolesSection";
 import { SkillsSection } from "@/components/Skills";
 import { StorageSection } from "@/components/StorageSettings";
 import { ZoneSelect } from "@/components/ZoneSelect";
@@ -100,7 +101,7 @@ export function SettingsPage({
   const { t } = useTranslation();
   const { org } = useOrg();
   const server = useAuthConfig().data;
-  const visible = SETTINGS_SECTIONS.filter((s) => s.allowed(org.role, server));
+  const visible = SETTINGS_SECTIONS.filter((s) => s.allowed(org, server));
   const current = visible.some((s) => s.id === section) ? section : "general";
   const setup = useComputerSetup(org.id);
   const edition = computerEdition(setup.data);
@@ -148,7 +149,7 @@ export function SettingsPage({
         </div>
       </nav>
       <div className="settings__body">
-        {current !== "members" && current !== "general" && (
+        {current !== "members" && current !== "general" && current !== "roles" && (
           <header className="page__header">
             <h2 className="page-title">{t(`settings.section.${current}`)}</h2>
             {current !== "computers" ? (
@@ -168,6 +169,7 @@ export function SettingsPage({
         {current === "notifications" && <NoticePrefsSection />}
         {current === "general" && <GeneralSection />}
         {current === "members" && <MembersPage embedded />}
+        {current === "roles" && <RolesSection />}
         {current === "audit" && <AuditSection />}
         {current === "access" && <AccessMatrixSection />}
         {current === "connectors" && <ConnectorsSection connected={connected} review={review} mail={mail} />}
@@ -218,7 +220,7 @@ function GeneralSection() {
   const { org } = useOrg();
   const settings = useSettings(org.id);
   const update = useUpdateSettings(org.id);
-  const editable = can(org.role, "configure");
+  const editable = can(org, "configure");
   const [name, setName] = useState("");
   const [context, setContext] = useState("");
   const [timezone, setTimezone] = useState("");
@@ -507,15 +509,14 @@ function UsageStatisticsCard() {
 function SettingsTiles() {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
-  const role = org.role;
   const server = useAuthConfig().data;
-  const shown = (id: SettingsSection) => SETTINGS_SECTIONS.some((s) => s.id === id && s.allowed(role, server));
+  const shown = (id: SettingsSection) => SETTINGS_SECTIONS.some((s) => s.id === id && s.allowed(org, server));
   const overview = useOverview(org.id);
-  const invitations = useInvitations(org.id, can(role, "manage_members"));
+  const invitations = useInvitations(org.id, can(org, "invite_people"));
   const connections = useConnections(org.id);
   const skills = useSkills(org.id, shown("skills"));
   const machines = useMachines(org.id, shown("computers"));
-  const managesKeys = can(role, "manage_credentials");
+  const managesKeys = can(org, "manage_credentials");
   const credentials = useCredentials(org.id, managesKeys);
   const plans = useAiAccounts(org.id, shown("keys") && !managesKeys);
   const platform = usePlatformKey(org.id);
@@ -575,7 +576,7 @@ function SettingsTiles() {
   type Tile = (typeof SETTINGS_SECTIONS)[number] & { id: Exclude<SettingsSection, "general"> };
   // The workspace's areas: "Você" is the person's own.
   const tiles = SETTINGS_SECTIONS.filter(
-    (s): s is Tile => s.id !== "general" && s.group !== "you" && s.allowed(role, server),
+    (s): s is Tile => s.id !== "general" && s.group !== "you" && s.allowed(org, server),
   );
   return (
     <section className="settings-tiles" aria-labelledby="sec-tiles">
@@ -617,7 +618,7 @@ function SettingsTiles() {
 function KeysSection() {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
-  const allowed = can(org.role, "manage_credentials");
+  const allowed = can(org, "manage_credentials");
   const credentials = useCredentials(org.id, allowed);
   const settings = useSettings(org.id);
   const platform = usePlatformKey(org.id);
@@ -900,7 +901,7 @@ export function KeyDialog({
 function UsageSection() {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
-  const allowed = can(org.role, "view_usage");
+  const allowed = can(org, "view_usage");
   const report = useUsageReport(org.id, allowed);
   return (
     <>
@@ -947,7 +948,7 @@ function DefaultBudgetCard() {
   const settings = useSettings(org.id);
   const update = useUpdateSettings(org.id);
   const toast = useToast();
-  const editable = can(org.role, "configure");
+  const editable = can(org, "configure");
   const saved = settings.data?.defaultAgentBudgetUsd;
   const [value, setValue] = useState("");
   useEffect(() => {

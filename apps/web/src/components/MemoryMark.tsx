@@ -1,6 +1,7 @@
 import type { Message, MessageMemory } from "@agenteschat/client";
 import { cacheMessageMemories, keys } from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
+import { can } from "@agenteschat/client/lib/permissions";
 import { AgentReadingBook, Button, hoverPointer, Input, Popover } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -49,7 +50,7 @@ function MemoryMark({ message, memory }: { message: Message; memory: MessageMemo
   const toast = useToast();
   const agent = dir.agentById.get(memory.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
-  const canEdit = org.role === "owner" || org.role === "admin" || agent?.ownerUserId === me.user.id;
+  const canEdit = can(org, "review_memory") || agent?.ownerUserId === me.user.id;
   const [mode, setMode] = useState<"tip" | "card" | "edit" | null>(null);
   const [draft, setDraft] = useState(memory.text);
   const [active, setActive] = useState(false);

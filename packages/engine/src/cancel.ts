@@ -1,5 +1,6 @@
 import { DESKTOP_PROTOCOL, type PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, gte, inArray, schema, sql } from "@agenteschat/db";
+import { announceAgentStatus } from "./agent-status";
 import { recordAudit } from "./audit";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent } from "./events";
@@ -201,7 +202,7 @@ export async function cancelRun(
     .leftJoin(channels, eq(channels.id, agentRuns.channelId))
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.orgId, orgId)));
   if (!row) throw new NotFoundError("Run not found");
-  const allowed = row.requester === userId || row.ownerUserId === userId || can(membership.role, "manage_agents");
+  const allowed = row.requester === userId || row.ownerUserId === userId || can(membership, "manage_agents");
   if (!allowed)
     throw new ForbiddenError("Only who asked, the agent's owner or an admin can stop it", "run.cancel_forbidden");
 
@@ -213,8 +214,9 @@ export async function cancelRun(
  * secret requests close, its queued jobs are dropped, the worker running it
  * aborts, and the app hears it stopped. `actor`: the person who stopped it,
  * or the system (a consultation nobody waits for anymore, ADR 0034).
- * Its unread messages are handed on: by the worker executing it once it has
- * posted the stop (it may restart from a "Parar e mandar"), else here.
+ * Its unread messages are handed on, and an agent whose question it answered
+ * hears it couldn't: by the worker executing it once it has posted the stop
+ * (it may restart from a "Parar e mandar"), else here.
  */
 export async function stopRun(
   deps: { db: Database; pubsub?: PubSub },
@@ -305,6 +307,8 @@ export async function stopRun(
   if (actor.type === "person" && !run.background)
     await publishChannelEvent(deps.pubsub, { type: "run.canceled", ...where, byUserId: actor.id });
   await publishChannelEvent(deps.pubsub, { type: "agent.run", ...where, ...bg, status: "canceled" });
+  // Its line ends with the run (ADR 0084 §11).
+  await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
   if (previous !== "running" && run.background) {
     await publishChannelEvent(deps.pubsub, { type: "agent.idle", ...where, ...bg });
     await publishChannelEvent(deps.pubsub, { type: "run.finished", ...where, ...bg, status: "canceled" });
@@ -323,6 +327,15 @@ export async function stopRun(
     // A forum turn that never ran: the topic moves on.
     if (channelKind === "forum") {
       await onForumRunFinished({ db, pubsub: deps.pubsub }, orgId, run.channelId, run.id).catch(() => {});
+    }
+    // It may have been answering another agent's question (ADR 0034): the asker hears it couldn't now, not when
+    // the question expires. A running one is heard from its worker, once (`executor.ts`); a run its workspace
+    // stopped hands nothing on.
+    if (channelKind === "dm" && !standingErrorDetail(error)) {
+      // Loaded here: consultations stop their runs through this module.
+      const { onConsultedRunStopped } = await import("./consultations");
+      const reason = actor.type === "person" ? "stopped by a person" : actor.reason;
+      await onConsultedRunStopped(deps, run, reason).catch(() => null);
     }
     // Nobody executes it: what was sent to it and not read gets a run of its own now, unless its workspace
     // stopped it (that run would only fail too).

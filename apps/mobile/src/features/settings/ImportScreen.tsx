@@ -15,16 +15,18 @@ import { exportFileName } from "./logic";
 import { SettingsPage } from "./parts";
 
 /**
- * Importar e exportar (who manages agents), as the web's, as far as a phone goes: this workspace as a file (the
- * share sheet saves it to Arquivos or sends it on), with what it never carries and what goes in it. Bringing a
- * workspace from another app reads its folders and archives on the computer: the screen says where.
+ * Importar e exportar (who creates agents; the export, who manages them), as the web's, as far as a phone goes: this
+ * workspace as a file (the share sheet saves it to Arquivos or sends it on), with what it never carries and what goes
+ * in it. Bringing a workspace from another app reads its folders and archives on the computer: the screen says where.
  */
 export function ImportScreen() {
   const { t, i18n } = useTranslation();
   const api = useApi();
   const toast = useToast();
   const { orgId, org } = useOrg();
-  const allowed = can(org?.role, "manage_agents");
+  // Bringing agents in is `create_agents`; the workspace as a file holds every agent, so it is who manages them.
+  const allowed = can(org, "create_agents");
+  const mayExport = can(org, "manage_agents");
   const [busy, setBusy] = useState(false);
 
   const download = async () => {
@@ -63,22 +65,26 @@ export function ImportScreen() {
         </View>
       ) : (
         <>
-          <GroupedHeader>{t("settings.import.exportTitle")}</GroupedHeader>
-          <GroupedList>
-            <GroupedRow
-              icon="down"
-              label={busy ? t("mobile.settings.import.preparing") : t("settings.import.download")}
-              disabled={busy}
-              onPress={() => void download()}
-            />
-            <GroupedRow
-              icon="help"
-              label={t("settings.import.whatsIn")}
-              chevron
-              onPress={() => openPage(helpUrl("import", i18n.language, "export"))}
-            />
-          </GroupedList>
-          <GroupedFooter>{t("settings.import.neverLine")}</GroupedFooter>
+          {mayExport ? (
+            <>
+              <GroupedHeader>{t("settings.import.exportTitle")}</GroupedHeader>
+              <GroupedList>
+                <GroupedRow
+                  icon="down"
+                  label={busy ? t("mobile.settings.import.preparing") : t("settings.import.download")}
+                  disabled={busy}
+                  onPress={() => void download()}
+                />
+                <GroupedRow
+                  icon="help"
+                  label={t("settings.import.whatsIn")}
+                  chevron
+                  onPress={() => openPage(helpUrl("import", i18n.language, "export"))}
+                />
+              </GroupedList>
+              <GroupedFooter>{t("settings.import.neverLine")}</GroupedFooter>
+            </>
+          ) : null}
           <GroupedHeader>{t("settings.import.title")}</GroupedHeader>
           <GroupedList>
             <GroupedRow icon="laptop" label={t("mobile.settings.import.onComputer")} labelLines={4} />

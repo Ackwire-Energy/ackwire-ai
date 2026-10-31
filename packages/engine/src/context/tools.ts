@@ -393,7 +393,7 @@ async function changeableItem(ctx: ToolContext, id: string, requester: string): 
   if (item.agentId && item.agentId !== ctx.agentId) return "That memory belongs to another agent.";
   if (!item.agentId) {
     const membership = await getMembership(ctx.db, requester, ctx.orgId);
-    if (!membership || membership.standing?.state === "suspended" || !can(membership.role, "configure")) {
+    if (!membership || membership.standing?.state === "suspended" || !can(membership, "review_memory")) {
       return "Only an admin can change what the whole organization knows; suggest asking one.";
     }
   }
