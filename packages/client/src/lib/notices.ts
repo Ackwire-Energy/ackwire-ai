@@ -11,6 +11,7 @@ export type NoticeKind =
   | "agent_note"
   | "wait_result"
   | "talker_reply"
+  | "proposal_result"
   | "follow_up";
 
 /**

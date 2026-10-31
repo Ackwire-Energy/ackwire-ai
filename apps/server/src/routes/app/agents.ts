@@ -3,6 +3,7 @@ import {
   type Agent as AgentRow,
   agentBrainSummaries,
   agentBudgetsThisMonth,
+  agentStatuses,
   agentView,
   archiveAgent,
   audienceOf,
@@ -10,13 +11,22 @@ import {
   canTalkTo,
   canViewCost,
   createAgent,
+  createAgentFromProposal,
+  createAgentGroup,
   createCredential,
+  deleteAgent,
+  deleteAgentGroup,
   deleteCredential,
+  denyAgentProposal,
   getAgent,
   getAgentBrain,
+  getAgentProposal,
   getTeam,
+  listAgentGroups,
   listAgents,
   listCredentials,
+  listFormerAgents,
+  moveAgentToGroup,
   NEW_AGENT_DEFAULTS,
   NotFoundError,
   newAgentBrainMachines,
@@ -28,10 +38,12 @@ import {
   setAgentAppearance,
   setAgentAudience,
   setAgentBrain,
+  talksToAgents,
   updateAgent,
+  updateAgentGroup,
   usageSummary,
 } from "@agenteschat/engine";
-import { MODEL_CATALOG, nanoUsdToUsd, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
+import { contextWindowOf, MODEL_CATALOG, nanoUsdToUsd, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
 import { createRoute, z } from "@hono/zod-openapi";
 import {
   type AppDeps,
@@ -54,7 +66,9 @@ import {
   BrainEffortSetting,
   BrainKind,
   BrainMachine,
+  ContextLimit,
   Credential,
+  FormerAgent,
   Model,
   ProviderId,
   Usage,
@@ -69,6 +83,8 @@ const toAgent = (
   seesCost: boolean,
   budgetUsedPercent?: number,
   brain?: AgentBrainSummary,
+  /** Whether the viewer's roles let them talk to agents (`talksToAgents`, ADR 0085). */
+  talks = true,
 ) => {
   const v = agentView(a);
   const { monthlyBudgetNanoUsd, ...rest } = v;
@@ -82,7 +98,7 @@ const toAgent = (
     createdAt: v.createdAt.toISOString(),
     audience: audienceOf(a),
     audienceMode: a.audienceMode,
-    canTalk: canTalkTo(a, viewerId),
+    canTalk: canTalkTo(a, viewerId, talks),
   };
 };
 
@@ -113,6 +129,51 @@ const AgentFields = z.object({
 
 const budget = (usd: number | null | undefined) =>
   usd === undefined ? undefined : usd === null ? null : usdToNanoUsd(usd);
+
+const ProposalParams = OrgParams.extend({ messageId: z.uuid() });
+const AgentProposal = z
+  .object({
+    kind: z.literal("agent_proposal"),
+    messageId: z.uuid(),
+    channelId: z.uuid(),
+    threadId: z.uuid().nullable(),
+    proposedByAgentId: z.uuid(),
+    forUserId: z.string().nullable(),
+    params: z.object({
+      draft: z.object({
+        name: z.string(),
+        handle: z.string(),
+        role: z.string(),
+        instructions: z.string(),
+        appearance: AgentAppearance.nullable(),
+        channelIds: z.array(z.uuid()),
+        access: z.array(z.object({ connectionId: z.uuid(), level: z.enum(["read", "write"]) })),
+        ai: z.discriminatedUnion("kind", [
+          z.object({
+            kind: z.literal("account"),
+            brain: z.enum(["claude_code", "codex"]),
+            machineId: z.uuid(),
+            accountId: z.uuid(),
+            label: z.string(),
+          }),
+          z.object({ kind: z.literal("model") }),
+          z.object({ kind: z.literal("none") }),
+        ]),
+      }),
+      why: z.string(),
+    }),
+    state: z.enum(["pending", "creating", "created", "denied"]),
+    agentId: z.uuid().nullable(),
+    decidedByUserId: z.string().nullable(),
+    decidedAt: z.string().nullable(),
+    expiresAt: z.string(),
+    expired: z.boolean(),
+    canDecide: z.boolean(),
+  })
+  .openapi("AgentProposal", {
+    description:
+      "An agent's proposal of a new agent (`meta.actionCard` of its card, ADR 0081): the draft, the AI it suggests and what was decided.",
+  });
 
 /** Provider credentials, agents, usage and the model catalog. */
 export function agentRoutes(deps: AppDeps) {
@@ -146,6 +207,7 @@ export function agentRoutes(deps: AppDeps) {
             id,
             label: m.label,
             provider: m.provider,
+            contextWindow: contextWindowOf(id),
             inputUsdPerMTok: pricesAt(m).input / 1000,
             outputUsdPerMTok: pricesAt(m).output / 1000,
           })),
@@ -253,16 +315,36 @@ export function agentRoutes(deps: AppDeps) {
       const { orgId } = c.req.valid("param");
       const actor = c.get("user").id;
       const list = await listAgents(db, actor, orgId);
-      const [seesCost, budgets, brains] = await Promise.all([
+      const [seesCost, budgets, brains, talks] = await Promise.all([
         canViewCost(db, actor, orgId),
         agentBudgetsThisMonth(db, orgId),
         agentBrainSummaries(db, actor, orgId, list),
+        talksToAgents(db, orgId, actor),
       ]);
       const percent = (id: string) => {
         const b = budgets.get(id);
         return b ? budgetPercent(b.spentNanoUsd, b.budgetNanoUsd) : 0;
       };
-      return c.json({ agents: list.map((a) => toAgent(a, actor, seesCost, percent(a.id), brains.get(a.id))) }, 200);
+      return c.json(
+        { agents: list.map((a) => toAgent(a, actor, seesCost, percent(a.id), brains.get(a.id), talks)) },
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/former-agents",
+      tags,
+      security,
+      summary: "Agents no longer in the team (archived or deleted): the name, role and look their messages still show",
+      request: { params: OrgParams },
+      responses: { 200: json(z.object({ agents: z.array(FormerAgent) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ agents: await listFormerAgents(db, c.get("user").id, orgId) }, 200);
     },
   );
 
@@ -274,7 +356,7 @@ export function agentRoutes(deps: AppDeps) {
       security,
       summary: "Whether each agent has an AI to think with, whether the organization has any, and who picks the agents",
       description:
-        "Per agent: `ready`; `no_ai` with why (`no_key`, `not_signed_in`, `no_computer`, `cli_missing`: nothing to think with, and no fallback); `waiting` (its computer is away for now). `any`: an agent that isn't archived is ready or waiting. `routing` (ADR 0074): who picks the agents for a message nobody mentioned, for the workspace (`by`) and for the caller's own messages (`mine`): Jev, the organization's small model (`model`), people's own plans (only for their own messages), rules, or `off` (only mentions). `noSmallModel`: with `rules`, the default key's provider, which has no small model. `apiKey`: a key of its own, or the server's own Claude key. Computed on each request; no key is read.",
+        "Per agent: `ready`; `no_ai` with why (`no_key`, `not_signed_in`, `no_computer`, `cli_missing`: nothing to think with, and no fallback; `own`: with `not_signed_in`, the CLI whose own sign-in isn't there on the computer, where the agent has no account); `waiting` (its computer is away for now). `any`: an agent that isn't archived is ready or waiting. `routing` (ADR 0074): who picks the agents for a message nobody mentioned, for the workspace (`by`) and for the caller's own messages (`mine`): Jev, the organization's small model (`model`), people's own plans (only for their own messages), rules, or `off` (only mentions). `noSmallModel`: with `rules`, the default key's provider, which has no small model. `apiKey`: a key of its own, or the server's own Claude key. Computed on each request; no key is read.",
       request: { params: OrgParams },
       responses: {
         200: json(
@@ -285,6 +367,7 @@ export function agentRoutes(deps: AppDeps) {
                 agentId: z.uuid(),
                 state: z.enum(["ready", "no_ai", "waiting"]),
                 reason: z.enum(["no_key", "not_signed_in", "no_computer", "cli_missing"]).optional(),
+                own: z.enum(["claude_code", "codex"]).optional(),
               }),
             ),
             routing: z.object({
@@ -309,6 +392,69 @@ export function agentRoutes(deps: AppDeps) {
         orgRouting(status, deps.extras?.router?.routing ?? null, orgId, userId),
       ]);
       return c.json({ ...ai, ...routing }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/agent-status",
+      tags,
+      security,
+      summary: "Each agent's presence (online, busy, away, offline) and what it says it is doing",
+      description:
+        "From its work (ADR 0084): `busy` on a routine, a task, a run going for over 2 minutes or one rated heavy, or when it said so; `online` while answering, waiting on an answer or active in the last 30 minutes; `away` after that; `offline` when held. An agent with no AI is drawn offline by the apps (`ai-status`). `status`: its own words (`set_status`), a line picked for its run (`kind` + `subject`), or what its run waits on; gone when the run ends unless it set `until`. Refreshed on `agent.status` events and every 30 seconds while open.",
+      request: { params: OrgParams },
+      responses: {
+        200: json(
+          z.object({
+            agents: z.array(
+              z.object({
+                agentId: z.uuid(),
+                presence: z.enum(["online", "busy", "away", "offline"]),
+                status: z
+                  .object({
+                    by: z.enum(["self", "auto", "wait"]).openapi({
+                      description: "Its own words (`text`), a line picked for its run, or what its run waits on.",
+                    }),
+                    text: z.string().nullable(),
+                    kind: z
+                      .enum([
+                        "task",
+                        "routine",
+                        "mission",
+                        "channel",
+                        "browsing",
+                        "coding",
+                        "files",
+                        "wiki",
+                        "planning",
+                        "data",
+                        "mail",
+                        "connector",
+                        "computer",
+                        "waiting_approval",
+                        "waiting_answer",
+                        "waiting_computer",
+                      ])
+                      .nullable()
+                      .openapi({ description: "With `auto`/`wait`: what it does, worded by the app." }),
+                    subject: z.string().nullable(),
+                    emoji: z.string().nullable(),
+                    until: z.string().nullable(),
+                  })
+                  .nullable(),
+                activeAt: z.string().nullable(),
+              }),
+            ),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ agents: await agentStatuses(db, c.get("user").id, orgId) }, 200);
     },
   );
 
@@ -372,25 +518,72 @@ export function agentRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Create an agent",
-      request: { params: OrgParams, body: body(AgentFields.extend({ handle: z.string().min(2).max(32) })) },
+      request: {
+        params: OrgParams,
+        body: body(
+          AgentFields.extend({
+            handle: z.string().min(2).max(32),
+            proposal: z.uuid().optional().openapi({
+              description: "The card of an agent's proposal it comes from (ADR 0081): it is marked created.",
+            }),
+          }),
+        ),
+      },
       responses: { 201: json(Agent, "Created"), ...errors },
     }),
     async (c) => {
-      const { monthlyBudgetUsd, audience, appearance, ...input } = c.req.valid("json");
+      const { monthlyBudgetUsd, audience, appearance, proposal, ...input } = c.req.valid("json");
       const orgId = c.req.valid("param").orgId;
-      let agent = await createAgent(
-        db,
-        c.get("user").id,
-        orgId,
-        { ...input, monthlyBudgetNanoUsd: budget(monthlyBudgetUsd) },
-        // New agents start on "Automático".
-        NEW_AGENT_DEFAULTS,
-      );
+      const make = () =>
+        createAgent(
+          db,
+          c.get("user").id,
+          orgId,
+          { ...input, monthlyBudgetNanoUsd: budget(monthlyBudgetUsd) },
+          // New agents start on "Automático".
+          NEW_AGENT_DEFAULTS,
+        );
+      let agent = proposal
+        ? await createAgentFromProposal({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, proposal, make)
+        : await make();
       if (audience) agent = await setAgentAudience(db, c.get("user").id, orgId, agent.id, audience);
       if (appearance) agent = await setAgentAppearance(db, c.get("user").id, orgId, agent.id, appearance);
       // Born on the workspace's own computer: it lists its agents again.
       if (agent.machineId) await publishMachineAgentsChanged(adapters.pubsub, orgId);
       return c.json(toAgent(agent, c.get("user").id, await canViewCost(db, c.get("user").id, orgId)), 201);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/agent-proposals/{messageId}",
+      tags,
+      security,
+      summary: "An agent's proposal of a new agent (its card's message), for whoever reads its conversation",
+      request: { params: ProposalParams },
+      responses: { 200: json(AgentProposal), ...errors },
+    }),
+    async (c) => {
+      const { orgId, messageId } = c.req.valid("param");
+      const gateway = deps.extras?.context?.gateway;
+      return c.json(await getAgentProposal({ db, gateway }, c.get("user").id, orgId, messageId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/agent-proposals/{messageId}/deny",
+      tags,
+      security,
+      summary: "Say no to an agent's proposal of a new agent (who may create agents): the card stays, marked denied",
+      request: { params: ProposalParams },
+      responses: { 200: json(AgentProposal), ...errors },
+    }),
+    async (c) => {
+      const { orgId, messageId } = c.req.valid("param");
+      return c.json(await denyAgentProposal({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, messageId), 200);
     },
   );
 
@@ -440,11 +633,12 @@ export function agentRoutes(deps: AppDeps) {
       ) {
         await publishMachineAgentsChanged(adapters.pubsub, orgId);
       }
-      const [seesCost, brains] = await Promise.all([
+      const [seesCost, brains, talks] = await Promise.all([
         canViewCost(db, actor, orgId),
         agentBrainSummaries(db, actor, orgId, [agent]),
+        talksToAgents(db, orgId, actor),
       ]);
-      return c.json(toAgent(agent, actor, seesCost, undefined, brains.get(agent.id)), 200);
+      return c.json(toAgent(agent, actor, seesCost, undefined, brains.get(agent.id), talks), 200);
     },
   );
 
@@ -454,15 +648,134 @@ export function agentRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/agents/{agentId}",
       tags,
       security,
-      summary: "Archive an agent",
-      request: { params: AgentParams },
+      summary: "Archive an agent (or delete it for good with ?purge=true)",
+      description:
+        "Deleting (ADR 0082) is permanent and works on archived agents too: its instructions, memory, routines, grants, budget, channels and login on its computer go, its work stops and its DMs close; its messages, usage and audit rows stay, named by a tombstone that frees its handle. Owners and admins.",
+      request: { params: AgentParams, query: z.object({ purge: z.stringbool().optional() }) },
       responses: { 204: noContent[204], ...errors },
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      await archiveAgent(db, c.get("user").id, orgId, agentId);
+      const actor = c.get("user").id;
+      if (c.req.valid("query").purge) {
+        const hub = deps.extras?.sandbox?.machines?.hub ?? null;
+        await deleteAgent({ db, pubsub: adapters.pubsub, hub, mail: adapters.mail }, actor, orgId, agentId);
+        return c.body(null, 204);
+      }
+      await archiveAgent(db, actor, orgId, agentId);
       await publishMachineAgentsChanged(adapters.pubsub, orgId);
       return c.body(null, 204);
+    },
+  );
+
+  // ── Agent groups (ADR 0083) ───────────────────────────────────────────────
+  // Every write answers with every group and tells the workspace's open apps (`agent.groups`).
+  const groups = { db, pubsub: adapters.pubsub };
+  const Groups = z.object({
+    groups: z.array(
+      z.object({
+        id: z.uuid(),
+        name: z.string(),
+        agentIds: z.array(z.uuid()).openapi({ description: "Its agents in order (archived ones left out)." }),
+      }),
+    ),
+  });
+  const GroupParams = OrgParams.extend({ groupId: z.uuid() });
+  const GroupName = z.string().trim().min(1).max(80);
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/agent-groups",
+      tags,
+      security,
+      summary: "The workspace's groups of agents, in order; an agent is in one at most",
+      request: { params: OrgParams },
+      responses: { 200: json(Groups), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ groups: await listAgentGroups(db, c.get("user").id, orgId) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/agent-groups",
+      tags,
+      security,
+      summary: "Add a group after the others, with these agents in it in order (owners and admins)",
+      request: {
+        params: OrgParams,
+        body: body(z.object({ name: GroupName, agentIds: z.array(z.uuid()).max(200).optional() })),
+      },
+      responses: { 201: json(Groups, "Created"), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ groups: await createAgentGroup(groups, c.get("user").id, orgId, c.req.valid("json")) }, 201);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "patch",
+      path: "/organizations/{orgId}/agent-groups/{groupId}",
+      tags,
+      security,
+      summary: "Rename a group, or move it among the groups (`index`) (owners and admins)",
+      request: {
+        params: GroupParams,
+        body: body(z.object({ name: GroupName.optional(), index: z.number().int().min(0).optional() })),
+      },
+      responses: { 200: json(Groups), ...errors },
+    }),
+    async (c) => {
+      const { orgId, groupId } = c.req.valid("param");
+      return c.json(
+        { groups: await updateAgentGroup(groups, c.get("user").id, orgId, groupId, c.req.valid("json")) },
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/agent-groups/{groupId}",
+      tags,
+      security,
+      summary: "Delete a group; its agents go back to no group (owners and admins)",
+      request: { params: GroupParams },
+      responses: { 200: json(Groups), ...errors },
+    }),
+    async (c) => {
+      const { orgId, groupId } = c.req.valid("param");
+      return c.json({ groups: await deleteAgentGroup(groups, c.get("user").id, orgId, groupId) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/agents/{agentId}/group",
+      tags,
+      security,
+      summary:
+        "Move an agent into a group (at `index` among its agents, else at the end) or out of any (owners and admins)",
+      request: {
+        params: AgentParams,
+        body: body(z.object({ groupId: z.uuid().nullable(), index: z.number().int().min(0).optional() })),
+      },
+      responses: { 200: json(Groups), ...errors },
+    }),
+    async (c) => {
+      const { orgId, agentId } = c.req.valid("param");
+      return c.json(
+        { groups: await moveAgentToGroup(groups, c.get("user").id, orgId, agentId, c.req.valid("json")) },
+        200,
+      );
     },
   );
 
@@ -534,12 +847,12 @@ export function agentRoutes(deps: AppDeps) {
             brain: BrainKind.optional(),
             model: z.string().max(80).nullable().optional().openapi({
               description:
-                "Claude Code: `opus`, `sonnet`, `haiku`; Codex: a model name; `auto` (each run picks the tier). Null = the brain's default; omitted = keep (reset when the brain changes).",
+                "Claude Code: `opus`, `sonnet`, `haiku`, a Claude model id or one of a coding plan's models by id (`@agenteschat/providers/plans`; another account runs `sonnet` for it); Codex: a model name; `auto` (each run picks the tier). Null = the brain's default; omitted = keep (reset when the brain changes).",
             }),
             fallback: z.boolean().optional(),
             onlyOwner: z.boolean().optional().openapi({
               description:
-                "\"Responde a todos\" turned off (ADR 0059): true, only its owner talks to it; false, whoever its audience's people list lets in, everyone with no list (on a plan only its owner sets it, `audience.plan_owner_only`). Omitted = keep; switching onto a plan makes it the owner's only. Audited as `agent.audience_changed`.",
+                "\"Atende outras pessoas\" turned off (ADR 0059): true, only its owner talks to it; false, whoever its audience's people list lets in, everyone with no list (on a plan only its owner sets it, `audience.plan_owner_only`). Omitted = keep; switching onto a plan makes it the owner's only. Audited as `agent.audience_changed`.",
             }),
             acceptPlanTerms: z.boolean().optional().openapi({
               deprecated: true,
@@ -555,6 +868,10 @@ export function agentRoutes(deps: AppDeps) {
             effort: BrainEffortSetting.nullable()
               .optional()
               .openapi({ description: "`auto` = picked per run; null = the CLI's default; omitted = keep." }),
+            contextTokens: ContextLimit.nullable().optional().openapi({
+              description:
+                "The most context it reads, any brain (Claude Code and Codex compact there, the API brain drops old tool results); null = its model's window; omitted = keep.",
+            }),
           }),
         ),
       },

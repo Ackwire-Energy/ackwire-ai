@@ -22,6 +22,7 @@ export const featureKeysEn: FeatureTranslations = {
     up: "Move up",
     down: "Move down",
     position: "{{at}} of {{count}}.",
+    channelPosition: "{{at}} of {{count}}.",
     itsChannels: "Channels",
     seeAll: "See all",
   },
@@ -275,8 +276,6 @@ export const featureKeysEn: FeatureTranslations = {
     sending: "Sending…",
     failed: "Not sent · Try again",
     notSent: "The message wasn't sent.",
-    /** Under my latest message in a DM with a person, once they read it. */
-    seen: "Seen",
     toLatest: "Go to the latest messages",
     stopAgent: "Stop {{name}}",
     offlineWait: "Goes out when the connection is back",
@@ -652,6 +651,7 @@ export const featureKeysEn: FeatureTranslations = {
     createFailed: "Couldn't create the agent. Maybe that name is taken.",
     empty: "No agents yet.",
     freeSection: "Free",
+    noGroupSection: "No group",
   },
   agentEdit: {
     missing: "This agent no longer exists.",
@@ -680,10 +680,9 @@ export const featureKeysEn: FeatureTranslations = {
     canUse: "Can use",
     month: "This month",
     ofBudget: "of {{budget}} a month",
-    percent: "{{percent}}% of the limit",
-    ofLimit: "of the monthly limit",
-    exhaustedF: "{{name}} reached the monthly limit.",
-    exhaustedM: "{{name}} reached the monthly limit.",
+    ofMonthBudget: "of this month's budget",
+    exhaustedF: "{{name}} used all of this month's budget.",
+    exhaustedM: "{{name}} used all of this month's budget.",
     taskForF: "Task for {{name}}",
     taskForM: "Task for {{name}}",
     taskPlaceholder: "What needs to get done?",
@@ -789,7 +788,6 @@ export const featureKeysEn: FeatureTranslations = {
     title: "You",
     role: {
       owner: "owner",
-      admin: "admin",
       member: "member",
     },
     appearance: "Appearance",
@@ -1381,6 +1379,7 @@ export const featureKeysEn: FeatureTranslations = {
     connectedSub: "Now check what agents can do on their own.",
     connectedDone: "Service connected.",
     levelFailed: "Couldn't change {{name}}'s access. Try again.",
+    everyoneFailed: "Couldn't change everyone's access. Try again.",
     disconnectFailed: "Couldn't disconnect {{name}}. Try again.",
     whoTitle: "Who uses it and how far",
     level: {
@@ -1422,7 +1421,8 @@ export const featureKeysEn: FeatureTranslations = {
   },
   joinRequests: {
     share: "Share the link",
-    rolesHint: "Members chat, create tasks and approve their own agents. Admins also manage members, agents and keys.",
+    roles: "Roles",
+    rolesHint: "They join with the roles turned on. With none, they may do what Everyone may.",
   },
   humanCheck: {
     title: "Quick check",
@@ -1497,7 +1497,7 @@ export const featureKeysEn: FeatureTranslations = {
     taskNoAi: "{{name}} has no AI yet: the task waits until one is connected.",
     connect: "Connect an AI",
     moveHere: "Move it here",
-    audience: "Who {{she}} replies to",
+    audience: "Who {{she}} answers",
     another: "Another AI",
   },
   crash: {
@@ -1528,5 +1528,13 @@ export const featureKeysEn: FeatureTranslations = {
       preparing: "Preparing the file…",
       failed: "Couldn't download the file. Try again.",
     },
+  },
+  status: {
+    title: "Status",
+    doing: "What you're doing",
+    placeholder: "In a meeting, at lunch…",
+    noEmoji: "No emoji",
+    cleared: "Status cleared",
+    bySelfUntil: "Written by {{name}} · {{when}}",
   },
 };

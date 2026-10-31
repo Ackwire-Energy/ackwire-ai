@@ -6,14 +6,15 @@ import type { Message } from "./messages";
 import { holdsMessages } from "./run-hold";
 import { type AgentRun, addRunStep, replyThreadOf } from "./runs";
 
-const { agentRuns, channels, messages } = schema;
+const { agentRuns, agents, channels, messages } = schema;
 
 /**
  * A run's inbox (`agent_runs.pending_message_ids`): messages sent to the agent's conversation while
  * the run is active (one active run per agent and conversation), read at its next step. The rule
  * that makes delivery safe: a message is only ever queued on a run that is still active, and when
  * a run ends (done, failed, canceled, interrupted) whatever it hasn't read goes to a run of its own.
- * Nothing sent to an agent is dropped, nor left on a dead run; the sweeper is the safety net.
+ * Nothing sent to an agent is dropped (unless it was archived), nor left on a dead run; the sweeper is the
+ * safety net.
  */
 export const ACTIVE_RUN_STATUSES = ["queued", "running", "waiting_approval", "waiting_input"] as const;
 
@@ -124,6 +125,9 @@ async function handOn(
 ): Promise<{ runId: string; messageIds: string[] } | null> {
   const ids = taken.filter((id) => !options.exclude?.includes(id));
   if (ids.length === 0 || run.trigger === "forum") return null;
+  // An archived (or deleted) agent answers nobody: a run of its own would only fail, so what it was sent is dropped.
+  const [agent] = await db.select({ archivedAt: agents.archivedAt }).from(agents).where(eq(agents.id, run.agentId));
+  if (!agent || agent.archivedAt) return null;
   const rows = await db
     .select()
     .from(messages)
@@ -237,13 +241,9 @@ export async function sweepEndedInboxes(
     .limit(options.limit ?? 100);
   let swept = 0;
   for (const run of ended) {
-    // An archived agent answers nobody, and nobody waits for an answer this late: the inbox is just emptied.
-    const [agent] = await deps.db
-      .select({ archivedAt: schema.agents.archivedAt })
-      .from(schema.agents)
-      .where(eq(schema.agents.id, run.agentId));
+    // Nobody waits for an answer this late: the inbox is just emptied (an archived agent's always is, `handOn`).
     const endedAt = (run.finishedAt ?? run.updatedAt).getTime();
-    if (!agent || agent.archivedAt || endedAt < stale) await takeInbox(deps.db, run.id);
+    if (endedAt < stale) await takeInbox(deps.db, run.id);
     else await releaseInbox(deps.db, deps.pubsub, run, { reason: "swept" });
     swept++;
   }

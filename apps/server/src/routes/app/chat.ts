@@ -3,6 +3,8 @@ import {
   addChannelMember,
   answerNow,
   cancelFollowUp,
+  consultationConversation,
+  consultationsIn,
   createChannel,
   joinChannel,
   listChannelMembers,
@@ -31,6 +33,28 @@ import { Channel, Message } from "./schemas";
 
 const tags = ["Chat"];
 const ChannelParams = OrgParams.extend({ channelId: z.uuid() });
+
+/** A question an agent asked another from a conversation (`consultationsIn`). */
+const Consultation = z.object({
+  id: z.uuid(),
+  runId: z.uuid().openapi({ description: "The asking run: its reply (`agentRunId`) shows the list." }),
+  agentId: z.uuid(),
+  consultedAgentId: z.uuid(),
+  consultedRunId: z
+    .uuid()
+    .nullable()
+    .openapi({ description: "The consulted agent's run: the cards it posts here carry it (`agentRunId`)." }),
+  status: z.enum(["open", "answered", "expired", "failed"]),
+  waiting: z.enum(["approval", "input", "computer"]).nullable().openapi({
+    description:
+      "Open, and the consulted agent waits: on a person (`approval`; `input`: an answer or a secret), or for its computer to come back online (`computer`).",
+  }),
+  question: z.string(),
+  answer: z.string().nullable().openapi({ description: "The answer once answered; why it couldn't once failed." }),
+  createdAt: z.string(),
+  answeredAt: z.string().nullable(),
+  expiresAt: z.string(),
+});
 
 /** Channels and messages. Real-time updates arrive over the WebSocket (`/api/ws`). */
 export function chatRoutes(deps: AppDeps) {
@@ -302,6 +326,74 @@ export function chatRoutes(deps: AppDeps) {
   app.openapi(
     createRoute({
       method: "get",
+      path: "/organizations/{orgId}/channels/{channelId}/consultations",
+      tags,
+      security,
+      summary: "Questions agents asked other agents from here, latest first (drawn inside the reply that asked)",
+      request: { params: ChannelParams },
+      responses: {
+        200: json(
+          z.object({
+            consultations: z.array(Consultation),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, channelId } = c.req.valid("param");
+      await requireChannelAccess(db, c.get("user").id, orgId, channelId);
+      const list = await consultationsIn(db, orgId, channelId);
+      return c.json(
+        {
+          consultations: list.map((q) => ({
+            ...q,
+            createdAt: q.createdAt.toISOString(),
+            answeredAt: q.answeredAt?.toISOString() ?? null,
+            expiresAt: q.expiresAt.toISOString(),
+          })),
+        },
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/channels/{channelId}/consultations/{consultationId}",
+      tags,
+      security,
+      summary: "One question asked from here, opened: what the two agents said for it (read only)",
+      description:
+        "The question as it went into the agents' DM, the consulted agent's messages there and the cards it posted here (approvals, questions, secret requests), oldest first. Only this question's part of their DM. 404 when it wasn't asked from this conversation.",
+      request: { params: ChannelParams.extend({ consultationId: z.uuid() }) },
+      responses: { 200: json(z.object({ consultation: Consultation, messages: z.array(Message) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId, channelId, consultationId } = c.req.valid("param");
+      await requireChannelAccess(db, c.get("user").id, orgId, channelId);
+      const found = await consultationConversation(db, orgId, channelId, consultationId);
+      if (!found) return apiError(c, 404, "not_found", "Question not found");
+      const q = found.consultation;
+      return c.json(
+        {
+          consultation: {
+            ...q,
+            createdAt: q.createdAt.toISOString(),
+            answeredAt: q.answeredAt?.toISOString() ?? null,
+            expiresAt: q.expiresAt.toISOString(),
+          },
+          messages: found.messages,
+        },
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
       path: "/organizations/{orgId}/channels/{channelId}/messages",
       tags,
       security,
@@ -409,7 +501,7 @@ export function chatRoutes(deps: AppDeps) {
       security,
       summary: "Once an AI is connected, the agent answers what it couldn't (Responder agora)",
       description:
-        "The id is a no-AI card (`meta.noAi`: its agent's failed run in that conversation starts again on the person's message) or the person's message (its failed `no_ai` runs start again, else it is routed again). Who asked, the agent's owner or an admin. 409 `ai.still_missing` while there's still no AI; 409 `run.not_restartable` when that run had already done something (a tool, a reply, an approval), so starting over would repeat it; 403 `audience.only` or `audience.nobody` when the agent no longer answers who asked (an agent moved onto a plan answers only its owner until they turn on \"Responde a todos\"). Pressed again, it returns the runs that answer it.",
+        "The id is a no-AI card (`meta.noAi`: its agent's failed run in that conversation starts again on the person's message) or the person's message (its failed `no_ai` runs start again, else it is routed again). Who asked, the agent's owner or an admin. 409 `ai.still_missing` while there's still no AI; 409 `run.not_restartable` when that run had already done something (a tool, a reply, an approval), so starting over would repeat it; 403 `audience.only` or `audience.nobody` when the agent no longer answers who asked (an agent moved onto a plan answers only its owner until they turn on \"Atende outras pessoas\"). Pressed again, it returns the runs that answer it.",
       request: { params: OrgParams.extend({ messageId: z.uuid() }) },
       responses: {
         200: json(z.object({ runs: z.array(z.object({ agentId: z.uuid(), runId: z.uuid() })) })),

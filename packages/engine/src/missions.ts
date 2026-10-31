@@ -360,7 +360,7 @@ export async function requireMission(deps: MissionDeps, userId: string, orgId: s
     throw new NotFoundError("Mission not found", "mission.not_found");
   });
   const role = await missionRole(deps.db, mission, userId);
-  return { mission, role, isAdmin: can(membership.role, "manage_members") };
+  return { mission, role, isAdmin: can(membership, "manage_agents") };
 }
 
 export function requireAct(role: MissionRole, what = "do this") {
@@ -887,7 +887,7 @@ export async function listMissions(deps: MissionDeps, userId: string, orgId: str
     missionCounts(deps.db, userId, orgId, input),
   ]);
   return {
-    missions: await missionViews(deps.db, rows, userId, can(membership.role, "manage_members")),
+    missions: await missionViews(deps.db, rows, userId, can(membership, "manage_agents")),
     counts,
   };
 }
@@ -1150,7 +1150,7 @@ export async function createMission(
   }
   if (!channelId) throw new ValidationError("Give the conversation (channelId) or the thread (threadId)");
   const { channel, membership } = await requireChannelAccess(db, userId, orgId, channelId);
-  if (!can(membership.role, "post")) throw new ForbiddenError();
+  if (!can(membership, "post") || !can(membership, "assign_work")) throw new ForbiddenError();
   if (channel.kind === "forum") throw new ValidationError("Forum topics have no missions", "mission.invalid");
   const allowed = await eligibleChannelAgents(db, orgId, channelId, [input.agentId], { requesterUserId: userId });
   if (allowed.length === 0) {
@@ -1207,7 +1207,7 @@ export async function createMission(
       details: { userId: rootAuthor, role: "decide", reason: "thread_author" },
     });
   }
-  return viewFor(deps, mission, userId, can(membership.role, "manage_members"));
+  return viewFor(deps, mission, userId, can(membership, "manage_agents"));
 }
 
 /** Asked in the main timeline: the mission gets a thread of its own, started from the message that asked. */
@@ -3266,7 +3266,7 @@ export interface EligibleAgent {
  */
 export async function eligibleMissionAgents(deps: Pick<MissionDeps, "db">, userId: string, orgId: string) {
   const membership = await requirePermission(deps.db, userId, orgId, "read");
-  const admin = can(membership.role, "manage_agents");
+  const admin = can(membership, "manage_agents");
   const rows = rowsOf<{
     id: string;
     handle: string;

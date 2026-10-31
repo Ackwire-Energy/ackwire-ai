@@ -123,6 +123,8 @@ export interface JobDeps extends RunExecutorDeps {
      * on the Cloud (`isAgentesCloud`), where Jev is ours. Absent: no plan step.
      */
     plans?: { hub: Pick<MachineCaller, "call" | "status">; publicUrl: string };
+    /** How long a person's message waits for their next one (`ROUTER_QUIET_MS` on a server); absent: no wait. */
+    quietMs?: number;
   };
 }
 
@@ -179,6 +181,7 @@ export function messageRouter(deps: JobDeps): RouterDeps | null {
     },
     hasAi: (orgId) => orgHasAi({ db: deps.db, gateway: deps.gateway, machines: deps.machines }, orgId),
     routing: { jev: () => jevPicks(jev?.key), smallModel, plans },
+    quietMs: router.quietMs,
     // Jev bills the platform: past the workspace's platform AI for the month, only @mentions start agents.
     ...(jev ? { platformCapReached: (orgId: string) => platformCapReached(deps.db, orgId) } : {}),
   };
@@ -398,7 +401,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         }
       }
       const res = await routeMessage(routing, input);
-      if (res.skipped === "already_routed") return;
+      // Continued: the person's next message carries the decision, and its receipt.
+      if (res.skipped === "already_routed" || res.skipped === "continued") return;
       // Nobody can think: what the person asks for may be to connect an AI (Jev reads it), for the Connect step.
       if (res.reason === NO_AI) {
         const intent = await aiConnectIntent(deps.context?.judge, { orgId: message.orgId, text: message.body });

@@ -34,6 +34,8 @@ export interface Draft {
   repos: RepoChoice | undefined;
   skills: string[] | undefined;
   channels: string[] | undefined;
+  /** `NO_GROUP` or a group id; undefined until the groups load. */
+  group: string | undefined;
 }
 
 export interface AgentEdit {

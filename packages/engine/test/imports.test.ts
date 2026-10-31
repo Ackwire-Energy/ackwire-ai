@@ -1,17 +1,23 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { and, eq, schema } from "@agenteschat/db";
+import { and, eq, inArray, schema } from "@agenteschat/db";
+import { runMigration } from "@agenteschat/db/testing";
 import {
+  addChannelMember,
   applyImport,
   createAgent,
   createChannel,
+  createOrganization,
   deleteSkill,
   ForbiddenError,
   type ImportInput,
+  type ImportPlan,
+  insertMessage,
   type MigrationBundle,
   setRoutineActive,
+  updateMyProfile,
   ValidationError,
 } from "../src";
-import { addMember as addPerson, type Fixture, setup } from "./fixtures";
+import { addMember as addPerson, addUser, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -199,7 +205,7 @@ describe("planning and applying an import", () => {
     expect(updated?.instructions).toBe("Ache leads e qualifique.");
   });
 
-  test("@scout made by hand: the next free handle; an existing public channel is joined, its topic kept", async () => {
+  test("@scout made by hand: the next free handle (@scout-2); an existing public channel is joined, its topic kept", async () => {
     f = await setup();
     const mine = await createAgent(
       f.db,
@@ -211,7 +217,7 @@ describe("planning and applying an import", () => {
     const hall = await createChannel(f.db, f.owner.id, f.org.id, { name: "vendas", topic: "Nosso canal" });
 
     const plan = await run({ bundle: bundle(), dryRun: true });
-    expect(byKey(plan.items).get("agent:scout")).toMatchObject({ action: "create", renamedTo: "scout2" });
+    expect(byKey(plan.items).get("agent:scout")).toMatchObject({ action: "create", renamedTo: "scout-2" });
     expect(byKey(plan.items).get("channel:room")).toMatchObject({
       action: "update",
       reason: "exists",
@@ -224,7 +230,7 @@ describe("planning and applying an import", () => {
       .select()
       .from(schema.agents)
       .where(eq(schema.agents.id, scout2 ?? ""));
-    expect(renamed?.handle).toBe("scout2");
+    expect(renamed?.handle).toBe("scout-2");
     const [untouched] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, mine.id));
     expect(untouched).toMatchObject({ name: "Meu Scout", handle: "scout" });
     const [channel] = await f.db.select().from(schema.channels).where(eq(schema.channels.id, hall.id));
@@ -238,7 +244,7 @@ describe("planning and applying an import", () => {
 
     // The same package again finds what it made (the renamed agent, the joined channel).
     const again = await run({ bundle: bundle() });
-    expect(byKey(again.items).get("agent:scout")).toMatchObject({ action: "unchanged", renamedTo: "scout2" });
+    expect(byKey(again.items).get("agent:scout")).toMatchObject({ action: "unchanged", renamedTo: "scout-2" });
     expect(byKey(again.items).get("channel:room")?.action).toBe("unchanged");
   });
 
@@ -464,5 +470,213 @@ describe("importing the same package again", () => {
     const rows = await f.db.select().from(schema.agentSkills).where(eq(schema.agentSkills.skillId, skillId));
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.filter((r) => r.enabled)).toEqual([]);
+  });
+});
+
+describe("agents another app knows by an id", () => {
+  type Agent = MigrationBundle["agents"][number];
+  /**
+   * An OpenBot.run export as the browser reads it: each agent's id (`agent-` and a UUID) is its key, and that id
+   * cut to our 32 characters its handle. Every agent is still called "New agent" unless named.
+   */
+  const openbot = (agents: Partial<Agent>[]) =>
+    bundle({
+      source: { app: "openbotrun", ref: "grok-bot", name: "Grok Bot", files: ["openbot-import.json"] },
+      agents: agents.map((a, i) => {
+        const key = `agent-${i}5ba44fd-45b0-4b0e-9bb0-375efa7e90de`;
+        const blank = { name: "New agent", role: "", instructions: "", model: null, appearance: {}, skills: [] };
+        return { key, handle: key.slice(0, 32), ...blank, ...a };
+      }),
+      skills: [],
+      channels: [],
+      routines: [],
+      notes: [],
+    });
+  const handles = (plan: ImportPlan) =>
+    Promise.all(
+      plan.items.map(
+        async (i) =>
+          (
+            await f.db
+              .select({ handle: schema.agents.handle })
+              .from(schema.agents)
+              .where(eq(schema.agents.id, i.targetId ?? ""))
+          )[0]?.handle,
+      ),
+    );
+
+  test("each gets a handle from its name, never the id; a handle someone chose stays, also after that name", async () => {
+    f = await setup();
+    const plan = await run({
+      bundle: openbot([
+        { name: "Otávio Ofertas", role: "Vendas" },
+        { name: "Rita Revisão" },
+        { name: "Posts & Anúncios" },
+        { name: "App/UX" },
+        { name: "Inbox Router" },
+        { name: "Scout" },
+        { key: "scout", name: "Scout", handle: "scout" },
+      ]),
+    });
+    expect(plan.items.map((i) => [i.action, i.renamedTo])).toEqual([
+      ["create", "otavioofertas"],
+      ["create", "ritarevisao"],
+      ["create", "postsanuncios"],
+      ["create", "appux"],
+      ["create", "inboxrouter"],
+      ["create", "scout-2"],
+      ["create", undefined],
+    ]);
+    expect(await handles(plan)).toEqual([
+      "otavioofertas",
+      "ritarevisao",
+      "postsanuncios",
+      "appux",
+      "inboxrouter",
+      "scout-2",
+      "scout",
+    ]);
+  });
+
+  test('"New agent" (or its id as its name): from its role, else its instructions\' first sentence, else @newagent', async () => {
+    f = await setup();
+    const plan = await run({
+      bundle: openbot([
+        { role: "Account executive" },
+        { instructions: "Você revisa contratos. Nunca assina nada." },
+        { name: "agent-95ba44fd-45b0-4b0e-9bb0-375efa7e90de", role: "Ops" },
+        {},
+        {},
+      ]),
+    });
+    expect(await handles(plan)).toEqual(["accountexecutive", "vocerevisacontratos", "ops", "newagent", "newagent-2"]);
+  });
+
+  test("a name an agent or a person here already has: the next number", async () => {
+    f = await setup();
+    await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Otávio", handle: "otavioofertas" },
+      { model: DEFAULT_MODEL },
+    );
+    await updateMyProfile(f.db, f.owner.id, f.org.id, { handle: "ritarevisao" });
+    const plan = await run({
+      bundle: openbot([{ name: "Otávio Ofertas" }, { name: "Rita Revisão" }, { name: "Otávio Ofertas" }]),
+    });
+    expect(await handles(plan)).toEqual(["otavioofertas-2", "ritarevisao-2", "otavioofertas-3"]);
+  });
+
+  test("what is picked never moves a handle: an agent picked alone gets the one the list showed", async () => {
+    f = await setup();
+    const file = openbot([{}, {}]);
+    const listed = await run({ bundle: file, dryRun: true });
+    expect(listed.items.map((i) => i.renamedTo)).toEqual(["newagent", "newagent-2"]);
+    const second = await run({ bundle: file, pick: [`agent:${file.agents[1]?.key}`] });
+    expect(await handles(second)).toEqual(["newagent-2"]);
+    // The other one, brought later, gets the one the list showed for it.
+    const later = await run({ bundle: file });
+    expect(later.items.map((i) => [i.action, i.renamedTo])).toEqual([
+      ["create", "newagent"],
+      ["unchanged", "newagent-2"],
+    ]);
+  });
+
+  test("the same file again: every agent is already here, found by its id and not by its handle", async () => {
+    f = await setup();
+    const file = openbot([{ name: "Otávio Ofertas" }, {}, {}]);
+    const first = await run({ bundle: file });
+    const before = await counts();
+    const again = await run({ bundle: file });
+    expect(again.items.map((i) => [i.action, i.renamedTo, i.targetId])).toEqual([
+      ["unchanged", "otavioofertas", first.items[0]?.targetId],
+      ["unchanged", "newagent", first.items[1]?.targetId],
+      ["unchanged", "newagent-2", first.items[2]?.targetId],
+    ]);
+    expect({ ...(await counts()), audit: 0 }).toEqual({ ...before, audit: 0 });
+
+    // One an earlier version imported with the id as its handle is found the same way.
+    await f.db
+      .update(schema.agents)
+      .set({ handle: file.agents[1]?.handle })
+      .where(eq(schema.agents.id, first.items[1]?.targetId ?? ""));
+    const plan = await run({ bundle: file, dryRun: true });
+    expect(plan.items[1]).toMatchObject({ action: "unchanged", targetId: first.items[1]?.targetId });
+    expect(plan.items[1]?.renamedTo).toBeUndefined();
+  });
+
+  test("the migration names the agents an import named by an id, unique in each workspace; mentions stay by id", async () => {
+    f = await setup();
+    const file = openbot([
+      { name: "Otávio Ofertas" },
+      { name: "Rita Revisão" },
+      { role: "Account executive" },
+      { instructions: "Você revisa contratos. Nunca assina nada." },
+      {},
+      {},
+      { key: "scout", name: "Scout", handle: "scout" },
+    ]);
+    const ids = (await run({ bundle: file })).items.map((i) => i.targetId ?? "");
+    // As an import left them before: each with its id as its handle.
+    for (const [i, a] of file.agents.entries()) {
+      await f.db
+        .update(schema.agents)
+        .set({ handle: a.handle })
+        .where(eq(schema.agents.id, ids[i] ?? ""));
+    }
+    await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Otávio", handle: "otavioofertas" },
+      { model: DEFAULT_MODEL },
+    );
+    await updateMyProfile(f.db, f.owner.id, f.org.id, { handle: "ritarevisao" });
+    // Made by hand, so never renamed, whatever its handle looks like.
+    const byHand = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Bot", handle: "agent-75ba44fd-45b0-4b0e-9bb0-37" },
+      { model: DEFAULT_MODEL },
+    );
+    // Another workspace's handles don't count here.
+    const bia = await addUser(f.db, "bia");
+    const { organization: other } = await createOrganization(f.db, bia.id, { name: "Outra" });
+    await createAgent(f.db, bia.id, other.id, { name: "AE", handle: "accountexecutive" }, { model: DEFAULT_MODEL });
+    // A message that mentioned Otávio by his old handle.
+    await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId: ids[0] ?? "" });
+    const said = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "person", userId: f.owner.id },
+      body: `@${file.agents[0]?.handle} o que mudou hoje?`,
+    });
+    expect(said.mentionedAgentIds).toEqual([ids[0] ?? ""]);
+
+    await runMigration(f.db, "imported_agent_handles");
+    await runMigration(f.db, "imported_agent_handles");
+    const rows = await f.db
+      .select({ id: schema.agents.id, handle: schema.agents.handle })
+      .from(schema.agents)
+      .where(inArray(schema.agents.id, [...ids, byHand.id]));
+    const handleOf = new Map(rows.map((r) => [r.id, r.handle]));
+    expect(ids.map((id) => handleOf.get(id))).toEqual([
+      "otavioofertas-2",
+      "ritarevisao-2",
+      "accountexecutive",
+      "vocerevisacontratos",
+      "newagent",
+      "newagent-2",
+      "scout",
+    ]);
+    expect(handleOf.get(byHand.id)).toBe("agent-75ba44fd-45b0-4b0e-9bb0-37");
+    // The message keeps its text, and its mention, which is by id.
+    const [message] = await f.db
+      .select({ body: schema.messages.body, mentioned: schema.messages.mentionedAgentIds })
+      .from(schema.messages)
+      .where(eq(schema.messages.id, said.id));
+    expect(message).toEqual({ body: "@agent-05ba44fd-45b0-4b0e-9bb0-37 o que mudou hoje?", mentioned: [ids[0] ?? ""] });
   });
 });

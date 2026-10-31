@@ -33,7 +33,7 @@ export function AccessScreen() {
   const c = useColors();
   const toast = useToast();
   const { orgId, org } = useOrg();
-  const admin = can(org?.role, "configure");
+  const admin = can(org, "manage_agents");
   const agents = useAgents(orgId);
   const list = agents.data ?? [];
   const access = useAgentsAccess(list, admin);

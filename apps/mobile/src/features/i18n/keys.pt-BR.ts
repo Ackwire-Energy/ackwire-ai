@@ -26,6 +26,7 @@ export const featureKeysPtBR = {
     up: "Subir",
     down: "Descer",
     position: "{{at}}ª de {{count}}.",
+    channelPosition: "{{at}}º de {{count}}.",
     itsChannels: "Canais",
     seeAll: "Ver todos",
   },
@@ -280,8 +281,6 @@ export const featureKeysPtBR = {
     sending: "Enviando…",
     failed: "Não foi enviada · Tentar de novo",
     notSent: "A mensagem não foi enviada.",
-    /** Under my latest message in a DM with a person, once they read it. */
-    seen: "Visto",
     toLatest: "Ir para as mensagens mais recentes",
     stopAgent: "Parar {{name}}",
     offlineWait: "Sai quando a conexão voltar",
@@ -657,6 +656,7 @@ export const featureKeysPtBR = {
     createFailed: "Não deu para criar o agente. Talvez esse nome já exista.",
     empty: "Nenhum agente ainda.",
     freeSection: "Livres",
+    noGroupSection: "Sem grupo",
   },
   agentEdit: {
     missing: "Este agente não existe mais.",
@@ -685,10 +685,9 @@ export const featureKeysPtBR = {
     canUse: "Pode usar",
     month: "Este mês",
     ofBudget: "de {{budget}} por mês",
-    percent: "{{percent}}% do limite",
-    ofLimit: "do limite do mês",
-    exhaustedF: "A {{name}} chegou ao limite do mês.",
-    exhaustedM: "O {{name}} chegou ao limite do mês.",
+    ofMonthBudget: "do orçamento do mês",
+    exhaustedF: "A {{name}} usou todo o orçamento do mês.",
+    exhaustedM: "O {{name}} usou todo o orçamento do mês.",
     taskForF: "Tarefa para a {{name}}",
     taskForM: "Tarefa para o {{name}}",
     taskPlaceholder: "O que precisa ficar pronto?",
@@ -794,7 +793,6 @@ export const featureKeysPtBR = {
     title: "Você",
     role: {
       owner: "dono",
-      admin: "admin",
       member: "membro",
     },
     appearance: "Aparência",
@@ -1386,6 +1384,7 @@ export const featureKeysPtBR = {
     connectedSub: "Agora confira o que os agentes podem fazer sozinhos.",
     connectedDone: "Serviço conectado.",
     levelFailed: "Não deu para mudar o acesso de {{name}}. Tente de novo.",
+    everyoneFailed: "Não deu para mudar o acesso de todos. Tente de novo.",
     disconnectFailed: "Não deu para desconectar o {{name}}. Tente de novo.",
     whoTitle: "Quem usa e até onde",
     level: {
@@ -1427,8 +1426,8 @@ export const featureKeysPtBR = {
   },
   joinRequests: {
     share: "Compartilhar o link",
-    rolesHint:
-      "Membros conversam, criam tarefas e aprovam os próprios agentes. Admins também gerenciam membros, agentes e chaves.",
+    roles: "Papéis",
+    rolesHint: "A pessoa entra com os papéis ligados. Sem nenhum, ela pode o mesmo que Todos.",
   },
   humanCheck: {
     title: "Verificação rápida",
@@ -1503,7 +1502,7 @@ export const featureKeysPtBR = {
     taskNoAi: "{{name}} ainda não tem uma IA: a tarefa espera até uma ser conectada.",
     connect: "Conectar uma IA",
     moveHere: "Mover para cá",
-    audience: "Para quem {{she}} responde",
+    audience: "Quem {{she}} atende",
     another: "Outra IA",
   },
   crash: {
@@ -1534,6 +1533,14 @@ export const featureKeysPtBR = {
       preparing: "Preparando o arquivo…",
       failed: "Não deu para baixar o arquivo. Tente de novo.",
     },
+  },
+  status: {
+    title: "Status",
+    doing: "O que você está fazendo",
+    placeholder: "Em reunião, almoçando…",
+    noEmoji: "Sem emoji",
+    cleared: "Status limpo",
+    bySelfUntil: "Escrito por {{name}} · {{when}}",
   },
 };
 

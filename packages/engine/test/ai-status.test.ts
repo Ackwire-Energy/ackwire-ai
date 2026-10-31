@@ -109,11 +109,10 @@ test("a computer brain: signed out, missing or no computer is no_ai unless it ma
   status = statusOf({ executors: { claude: { version: "2.1.300", loggedIn: false } } });
   // The model brain stands in (ADR 0032 §5)…
   expect(await agentAiState(deps, computer)).toEqual({ state: "ready" });
-  // …unless the owner turned the fallback off, or it's background work.
-  expect(await agentAiState(deps, { ...computer, brainFallback: false })).toEqual({
-    state: "no_ai",
-    reason: "not_signed_in",
-  });
+  // …unless the owner turned the fallback off, or it's background work. With no account of its own, it's the
+  // computer's own sign-in of Claude Code that isn't there.
+  const ownOut = { state: "no_ai", reason: "not_signed_in", own: "claude_code" } as const;
+  expect(await agentAiState(deps, { ...computer, brainFallback: false })).toEqual(ownOut);
   const routine = {
     id: crypto.randomUUID(),
     orgId: f.org.id,
@@ -122,10 +121,10 @@ test("a computer brain: signed out, missing or no computer is no_ai unless it ma
     triggerMessageId: "0193dddd-0000-4000-8000-0000000000aa",
     background: true,
   };
-  expect(await agentAiState(deps, computer, routine)).toEqual({ state: "no_ai", reason: "not_signed_in" });
+  expect(await agentAiState(deps, computer, routine)).toEqual(ownOut);
 
   await revokeKeys();
-  expect(await agentAiState(deps, computer)).toEqual({ state: "no_ai", reason: "not_signed_in" });
+  expect(await agentAiState(deps, computer)).toEqual(ownOut);
   status = statusOf({ executors: { detectedAt: new Date().toISOString() } });
   expect(await agentAiState(deps, computer)).toEqual({ state: "no_ai", reason: "cli_missing" });
   expect(await agentAiState(deps, { ...computer, brain: "codex" })).toEqual({ state: "no_ai", reason: "cli_missing" });
@@ -133,6 +132,32 @@ test("a computer brain: signed out, missing or no computer is no_ai unless it ma
   // Offline or paused is "not now": the existing waiting card, not "no AI".
   status = statusOf({ online: false });
   expect(await agentAiState(deps, computer)).toEqual({ state: "waiting" });
+});
+
+test("the computer's own sign-in on a computer nobody connected (the workspace's): not signed in, never a wait", async () => {
+  f = await setup();
+  await revokeKeys();
+  const executors = {
+    claude: { version: "2.1.300", loggedIn: true },
+    codex: { version: "codex-cli 0.163.0" },
+    detectedAt: new Date().toISOString(),
+  };
+  let status = statusOf({ kind: "managed", pairedByUserId: null, executors });
+  const deps = { db: f.db, gateway: f.gateway, machines: { status: async () => status } };
+  const agent = { ...f.agent, brain: "codex", machineId: "m1" };
+  expect(await agentAiState(deps, agent)).toEqual({ state: "no_ai", reason: "not_signed_in", own: "codex" });
+  // Whatever the CLI says there: no person signs in at that computer's terminal for an agent.
+  expect(await agentAiState(deps, { ...agent, brain: "claude_code" })).toEqual({
+    state: "no_ai",
+    reason: "not_signed_in",
+    own: "claude_code",
+  });
+  // Offline too: its coming back would sign nothing in.
+  status = { ...status, online: false };
+  expect(await agentAiState(deps, agent)).toEqual({ state: "no_ai", reason: "not_signed_in", own: "codex" });
+  // A computer someone connected: its own sign-in can think (a turn finds out if it can't).
+  status = statusOf({ pairedByUserId: f.owner.id, executors });
+  expect(await agentAiState(deps, agent)).toEqual({ state: "ready" });
 });
 
 test("the organization: any agent ready or waiting; archived ones don't count", async () => {

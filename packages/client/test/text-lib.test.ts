@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { plainLines } from "../src/lib/markdown";
-import { around, emailTypoFix, excerpt, webmailOf } from "../src/lib/text";
+import { around, emailTypoFix, excerpt, matchesName, webmailOf } from "../src/lib/text";
 
 test("a misspelled webmail domain gets one fix; anything else is left alone", () => {
   expect(emailTypoFix("Marina@Gmial.com ")).toBe("marina@gmail.com");
@@ -90,4 +90,12 @@ test("instructions in Markdown read as plain words: past headings and rules, wit
       "> Run `pg_query` on my_table, see ![the map](map.png) and [[Processos/Onboarding|o onboarding]].\n\n```\nrm -rf /\n```\n\n| a | b |\n| --- | --- |\n| 1 | 2 |",
     ),
   ).toEqual(["Run pg_query on my_table, see the map and o onboarding."]);
+});
+
+test("a name typed to confirm: case and extra spaces aside, never a part or a blank", () => {
+  expect(matchesName(" new  AGENT ", "New agent")).toBe(true);
+  expect(matchesName("Jose\u0301", "José")).toBe(true);
+  expect(matchesName("New", "New agent")).toBe(false);
+  expect(matchesName("New agent 2", "New agent")).toBe(false);
+  expect(matchesName("", " ")).toBe(false);
 });

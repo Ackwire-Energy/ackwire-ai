@@ -87,7 +87,8 @@ test("a dump restores into a new folder, data and migrations included, and never
   await restored.close();
   expect(folderVersion(copy)?.pgMajor).toBe(PG_MAJOR);
   await expect(restorePglite(copy, dump)).rejects.toThrow(/already holds a database/);
-});
+  // A dump and a restore of every migration: past 5 s on a shared CI runner.
+}, 30_000);
 
 test("back-to-back queries leave room for timers", async () => {
   const { pg, ready } = openPglite(db);

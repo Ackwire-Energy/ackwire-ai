@@ -1,7 +1,18 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
-import type { AiComputer, MachineAccount, PlanUsage } from "../src/api/types";
-import { accountChoices, groupPlans, ownSignInName, ownSignIns, planWordOf, signInPlan } from "../src/lib/ai-accounts";
+import type { AiComputer, Credential, MachineAccount, PlanUsage } from "../src/api/types";
+import {
+  accountChoices,
+  accountTitle,
+  existingAi,
+  groupPlans,
+  ownSignInListed,
+  ownSignInName,
+  ownSignInReady,
+  ownSignIns,
+  planWordOf,
+  signInPlan,
+} from "../src/lib/ai-accounts";
 import { accountName, usageSourcePart } from "../src/lib/plan-usage";
 
 const usage = (at: string, usedPercent: number): PlanUsage => ({
@@ -97,8 +108,9 @@ describe("accountChoices: an agent's account choice, one entry per account", () 
     // Every login another agent's: Claude signs in once more for this one, its agents named.
     expect(choice([theo, claude("l", { usedBy: ["Lia"] })], [null])).toEqual([["t", ["Theo", "Lia"], true]]);
     expect(choice([theo, claude("a", { usedBy: ["Ada"] })], ["a"])).toEqual([["a", ["Theo", "Ada"], false]]);
-    // A login that thinks for nobody comes before a new one.
+    // A login that thinks for nobody comes before a new one, a signed-in one before one signed out.
     expect(choice([theo, claude("f")], [null])).toEqual([["f", ["Theo"], false]]);
+    expect(choice([claude("o", { status: "signed_out" }), claude("n")], [null])).toEqual([["n", [], false]]);
     // ChatGPT stays one agent per account, and someone else's is never one to sign in to.
     expect(choice([claude("c", { kind: "codex", usedBy: ["Theo"] })], [null])).toEqual([["c", ["Theo"], false]]);
     expect(choice([claude("x", { mine: false, ownerId: "u_bia", email: null, usedBy: ["Theo"] })], [null])).toEqual([
@@ -110,6 +122,60 @@ describe("accountChoices: an agent's account choice, one entry per account", () 
     const logins = [claude("a", { usedBy: ["Ada"] }), claude("b")];
     expect(choice(logins, ["b", "a"])).toEqual([["b", ["Ada"], false]]);
     expect(choice(logins, [null, "a"])).toEqual([["a", ["Ada"], false]]);
+  });
+});
+
+describe("existingAi: what a person already has for an agent with no AI", () => {
+  const claude = (id: string, email: string, over: Partial<MachineAccount & { machineId: string }> = {}) =>
+    login(id, { provider: null, keyHint: null, label: id, email, ...over });
+  const key = (id: string, revokedAt: string | null = null): Credential => ({
+    id,
+    provider: "anthropic",
+    label: id,
+    keyHint: "7f2a",
+    createdAt: "2026-10-01T00:00:00.000Z",
+    revokedAt,
+  });
+  const acts = (
+    accounts: (MachineAccount & { machineId: string })[],
+    account: string | null,
+    keys: Credential[] = [],
+  ) =>
+    existingAi({ accounts, account }, keys).map((r) =>
+      r.kind === "key" ? ["key", r.key.id] : [r.act, r.choice.login.id],
+    );
+
+  test("free accounts first, then those to sign in to or move, the keys, someone else's; never its own login", () => {
+    expect(
+      acts(
+        [
+          claude("theo", "walt@acme.com", { usedBy: ["Theo"] }),
+          claude("plus", "walt@gmail.com", { kind: "codex", usedBy: ["Theo"] }),
+          claude("out", "ti@acme.example", { status: "signed_out" }),
+          claude("free", "contato@estudio.example"),
+          claude("own", "ada@acme.com", { usedBy: ["Ada"], status: "signed_out" }),
+          claude("bia", "bia@acme.com", { mine: false, ownerId: "u_bia", email: null }),
+        ],
+        "own",
+        [key("k1"), key("gone", "2026-10-20T00:00:00.000Z")],
+      ),
+    ).toEqual([
+      ["use", "free"],
+      ["also", "theo"],
+      ["move", "plus"],
+      ["again", "out"],
+      ["key", "k1"],
+      ["locked", "bia"],
+    ]);
+  });
+
+  test("a signed-out login another agent thinks with is nobody's to use; a free login of an account comes first", () => {
+    expect(
+      acts([claude("c", "walt@gmail.com", { kind: "codex", usedBy: ["Theo"], status: "signed_out" })], null),
+    ).toEqual([]);
+    expect(acts([claude("t", "walt@acme.com", { usedBy: ["Theo"] }), claude("f", "walt@acme.com")], null)).toEqual([
+      ["use", "f"],
+    ]);
   });
 });
 
@@ -142,10 +208,41 @@ describe("the computers' own sign-ins", () => {
     expect(ownSignIns(undefined)).toEqual([]);
   });
 
+  test("an agent's account choice offers the computer's own sign-in only where it can think for the agent", () => {
+    type View = Parameters<typeof ownSignInListed>[0];
+    const theirs: View = { ownSignIn: true, brain: "model", account: null, canUsePlans: true };
+    const reported = computer({ own: { claude_code: { plan: "max" }, codex: { usage: usage("2026-10-30", 5) } } });
+    // On a computer the agent's owner connected, once that CLI's own sign-in is reported there.
+    expect(ownSignInReady(theirs, reported, "codex")).toBe(true);
+    expect(ownSignInReady(theirs, computer({ own: {} }), "codex")).toBe(false);
+    expect(ownSignInReady(theirs, undefined, "claude_code")).toBe(false);
+    expect(ownSignInListed(theirs, computer({ own: {} }), "codex")).toBe(false);
+    // On one nobody connected (the workspace's), never, whatever it reports.
+    const nobodys: View = { ...theirs, ownSignIn: false };
+    expect(ownSignInReady(nobodys, reported, "codex")).toBe(false);
+    expect(ownSignInListed({ ...nobodys, brain: "codex" }, reported, "codex")).toBe(false);
+    // While the agent thinks with it: on its owner's computer, before the computer says; to someone who can't change
+    // the account, wherever it is (what it thinks with).
+    expect(ownSignInListed({ ...theirs, brain: "codex" }, undefined, "codex")).toBe(true);
+    expect(ownSignInListed({ ...theirs, brain: "codex", account: "acct_1" }, undefined, "codex")).toBe(false);
+    expect(ownSignInListed({ ...nobodys, brain: "codex", canUsePlans: false }, undefined, "codex")).toBe(true);
+  });
+
   test("the plan's word", () => {
     expect(planWordOf("max")).toBe("Max");
     expect(planWordOf("PRO")).toBe("Pro");
     expect(planWordOf(null)).toBeNull();
+  });
+
+  test("an account's title says its plan once, after its name", () => {
+    expect(accountTitle({ label: "Claude", plan: "max" })).toBe("Claude · Max");
+    expect(accountTitle({ label: "Claude 2", plan: "ultra" })).toBe("Claude 2 · Ultra");
+    expect(accountTitle({ label: "GLM Coding", plan: null })).toBe("GLM Coding");
+    // A server that still names accounts after their plan ("Claude Max 2"): the plan isn't said twice.
+    expect(accountTitle({ label: "Claude Max 2", plan: "max" })).toBe("Claude Max 2");
+    expect(accountTitle({ label: "claude team", plan: "team" })).toBe("claude team");
+    expect(accountTitle({ label: "Claude Max", plan: "ultra" })).toBe("Claude Max · Ultra");
+    expect(accountTitle({ label: "Maxwell", plan: "max" })).toBe("Maxwell · Max");
   });
 
   test("the plan an agent's sign-in is on: its account's, or with none its computer's own sign-in's", () => {

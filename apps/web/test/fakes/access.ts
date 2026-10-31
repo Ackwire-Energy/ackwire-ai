@@ -182,7 +182,10 @@ export function createFakeAccess(
   log: (method: string, ...args: unknown[]) => void,
   /** Custom MCP servers (their classified tools join the tree). */
   servers: (orgId: string) => Promise<CustomServer[]> = async () => [],
-): ApiClient["access"] {
+): ApiClient["access"] & {
+  /** A new connection, as the backend gives it (`grantToEveryAgent`): every agent's, whole. */
+  connected: (connectionId: string, agentIds: string[]) => void;
+} {
   const inputs = new Map<string, AccessInput>();
   const of = (agentId: string) => inputs.get(agentId) ?? empty();
   const tree = async (orgId: string, input: AccessInput) =>
@@ -193,6 +196,12 @@ export function createFakeAccess(
       log("access.set", orgId, agentId, input);
       inputs.set(agentId, structuredClone(input));
       return tree(orgId, input);
+    },
+    connected: (connectionId, agentIds) => {
+      for (const agentId of agentIds) {
+        const input = of(agentId);
+        inputs.set(agentId, { ...input, connectors: { ...input.connectors, [connectionId]: true } });
+      }
     },
   };
 }
