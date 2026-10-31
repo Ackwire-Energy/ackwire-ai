@@ -5662,7 +5662,8 @@ p {
 }
 /* One 48px column (a 40px item and its focus ring) from the rail's padding, so the items stay on the rail's middle as
    the header and the foot do, whatever room the scrollbar takes at the edge. Not `scrollbar-gutter: stable
-   both-edges`: WebKit keeps both gutters on the scrollbar's side. */
+   both-edges`: WebKit keeps both gutters on the scrollbar's side. Never sideways: Firefox's thin scrollbar is 11px
+   with classic scrollbars on macOS, 1px more than the room beside the column. */
 .sidebar[data-rail="true"] .sidebar__scroll {
   display: grid;
   grid-template-columns: 48px;
@@ -5672,6 +5673,7 @@ p {
   width: auto;
   margin: -4px -10px;
   padding: 4px 0 4px 10px;
+  overflow-x: hidden;
 }
 .sidebar[data-rail="true"] .sidebar__jump-row {
   flex-direction: column;

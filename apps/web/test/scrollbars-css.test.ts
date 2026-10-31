@@ -179,10 +179,12 @@ describe("the collapsed sidebar", () => {
     expect(column).toBe(item + 2 * ring);
     // …on the rail's middle, as the header and the foot…
     expect(padding.left + column / 2).toBe(rail.width / 2);
-    // …and after it the room for the kit's scrollbar, so a scrollbar never squeezes the column.
+    // …and after it the room for the kit's scrollbar, so a scrollbar never squeezes the column…
     expect(rail.width - padding.left - column - padding.right).toBeGreaterThanOrEqual(
       px(value(kit, "::-webkit-scrollbar", "width")),
     );
+    // …nor makes the list scroll sideways, whatever an engine's takes (Firefox's thin is 11px on macOS).
+    expect(value(layout, list, "overflow-x")).toBe("hidden");
   });
 
   test("its scrollbar shows only while the pointer is on the list or the keyboard moves through it", async () => {
