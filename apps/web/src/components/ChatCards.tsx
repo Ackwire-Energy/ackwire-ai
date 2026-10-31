@@ -3,7 +3,7 @@ import { keys, useDecideProposal, useProposals } from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { MAX_SECRET_BYTES, sealSecret, secretAad } from "@agenteschat/client/lib/secret-box";
-import { Button, Chip, Diff, diffLines, Field, Input, Textarea } from "@agenteschat/ui";
+import { Button, Chip, Diff, diffLines, Field, Icon, Input, Textarea } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -12,9 +12,20 @@ import { useApi } from "@/api/context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { useLive, useLiveStore } from "@/realtime/context";
+import { SiteIcon } from "./browser/SiteIcon";
 import { useChannelActions } from "./channel-actions";
 import { useOrg } from "./org-context";
-import { CardSky, colorOf } from "./Sky";
+import { RequestCard, RequestTile } from "./RequestCard";
+
+/** The host of a site the request names (`https://host`), or null. */
+const hostOf = (site: string | null | undefined) => {
+  if (!site) return null;
+  try {
+    return new URL(site).host || null;
+  } catch {
+    return null;
+  }
+};
 
 /**
  * "Memória atualizada" in the chat (`memory.updated`): what the agent
@@ -99,7 +110,96 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
       e instanceof Error && "status" in e && e.status === 409 ? t("proposals.staleError") : t("common.unknownError"),
       "error",
     );
+  const edited = draft !== null && draft !== p.after;
+  const diff = (
+    <Diff
+      aria-label={t("proposals.changeLabel")}
+      addedLabel={t("proposals.added")}
+      removedLabel={t("proposals.removed")}
+      lines={diffLines(p.before.split("\n"), text.split("\n"))}
+    />
+  );
 
+  // Waiting: a request card, the change behind "Ver a mudança" (edited there before accepting).
+  if (pending) {
+    const before = new Set(p.before.split("\n"));
+    const firstNew = p.after.split("\n").find((line) => line.trim() && !before.has(line))?.trim();
+    return (
+      <RequestCard
+        id={p.id}
+        kind="proposal"
+        agent={dir.anyAgent(p.agentId)}
+        label={t("inlineProposal.group", { name })}
+        mine={p.canDecide}
+        waitingFor={t("proposals.waitingAdmin")}
+        lead={p.title}
+        object={{
+          logo: (
+            <RequestTile>
+              <Icon name="file" size={16} />
+            </RequestTile>
+          ),
+          title: target,
+          detail: firstNew,
+          more: t("ask.seeChange"),
+        }}
+        details={
+          <>
+            {editing ? (
+              <Field label={t("proposals.finalText")} id={`inline-prop-${p.id}`}>
+                <Textarea rows={6} value={text} onChange={(e) => setDraft(e.target.value)} />
+              </Field>
+            ) : (
+              diff
+            )}
+            <div className="ac-acts">
+              {p.canDecide && (
+                <Button variant="ghost" size="sm" onClick={() => setEditing((v) => !v)}>
+                  {editing ? t("proposals.viewDiff") : t("inlineProposal.edit")}
+                </Button>
+              )}
+              <Button asChild variant="ghost" size="sm">
+                <Link to="/org/$orgId/proposals" params={{ orgId: org.id }} search={{ agent: p.agentId }}>
+                  {t("inlineProposal.open")}
+                </Link>
+              </Button>
+            </div>
+          </>
+        }
+        actions={
+          p.canDecide ? (
+            <>
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={decide.isPending || !text.trim()}
+                loading={decide.isPending && decide.variables?.decision === "accept"}
+                onClick={() =>
+                  decide.mutate(
+                    { id: p.id, decision: "accept", text: edited ? (draft ?? undefined) : undefined },
+                    { onError },
+                  )
+                }
+              >
+                {edited ? t("proposals.acceptEdited") : t("proposals.accept")}
+              </Button>
+              <Button
+                size="sm"
+                disabled={decide.isPending}
+                loading={decide.isPending && decide.variables?.decision === "refuse"}
+                onClick={() => decide.mutate({ id: p.id, decision: "refuse" }, { onError })}
+              >
+                {t("proposals.refuse")}
+              </Button>
+            </>
+          ) : undefined
+        }
+        what={target}
+      />
+    );
+  }
+
+  // Decided, or overtaken by a newer text: the settled card with the change as it was.
   return (
     // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
     <div className="ac-approval" role="group" aria-label={t("inlineProposal.group", { name })}>
@@ -109,10 +209,6 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
         </span>
         {p.stale ? (
           <Chip icon="close">{t("proposals.stale")}</Chip>
-        ) : p.status === "pending" ? (
-          <Chip icon="waiting" tone="waiting">
-            {p.canDecide ? t("approval.waitingYou") : t("proposals.waitingAdmin")}
-          </Chip>
         ) : p.status === "accepted" ? (
           <Chip icon="check" tone="done">
             {t("proposals.accepted")}
@@ -122,47 +218,8 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
         )}
       </div>
       <p className="ac-approval__title">{p.title}</p>
-      {editing && pending ? (
-        <Field label={t("proposals.finalText")} id={`inline-prop-${p.id}`}>
-          <Textarea rows={6} value={text} onChange={(e) => setDraft(e.target.value)} />
-        </Field>
-      ) : (
-        <Diff
-          aria-label={t("proposals.changeLabel")}
-          addedLabel={t("proposals.added")}
-          removedLabel={t("proposals.removed")}
-          lines={diffLines(p.before.split("\n"), text.split("\n"))}
-        />
-      )}
+      {diff}
       <div className="ac-approval__actions ac-acts">
-        {pending && p.canDecide && (
-          <>
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={decide.isPending || !text.trim()}
-              onClick={() =>
-                decide.mutate(
-                  { id: p.id, decision: "accept", text: draft !== null && draft !== p.after ? draft : undefined },
-                  { onError },
-                )
-              }
-            >
-              {draft !== null && draft !== p.after ? t("proposals.acceptEdited") : t("proposals.accept")}
-            </Button>
-            <Button size="sm" onClick={() => setEditing((v) => !v)}>
-              {editing ? t("proposals.viewDiff") : t("inlineProposal.edit")}
-            </Button>
-            <Button
-              size="sm"
-              disabled={decide.isPending}
-              loading={decide.isPending && decide.variables?.decision === "refuse"}
-              onClick={() => decide.mutate({ id: p.id, decision: "refuse" }, { onError })}
-            >
-              {t("proposals.refuse")}
-            </Button>
-          </>
-        )}
         <Button asChild variant="ghost" size="sm">
           <Link to="/org/$orgId/proposals" params={{ orgId: org.id }} search={{ agent: p.agentId }}>
             {t("inlineProposal.open")}
@@ -199,58 +256,69 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
   const name = agent?.name ?? t("channel.unknownAgent");
   const done = current.status === "answered";
   const who = current.answeredByUserId === me.user.id ? null : dir.memberById.get(current.answeredByUserId ?? "")?.name;
+  // Open: a request card, the choices in its footer and "Outra resposta" to write one in the composer.
+  if (!done) {
+    const choices = current.choices ?? [];
+    return (
+      <RequestCard
+        id={question.id}
+        kind="question"
+        agent={agent}
+        label={t("question.group", { agent: name })}
+        mine
+        lead={current.text}
+        body={
+          error ? (
+            <p className="rq__error" role="alert">
+              {error}
+            </p>
+          ) : undefined
+        }
+        actions={
+          <>
+            {choices.map((choice) => (
+              <Button
+                key={choice}
+                size="sm"
+                data-choice=""
+                disabled={answer.isPending}
+                loading={answer.isPending && answer.variables === choice}
+                onClick={() => answer.mutate(choice)}
+              >
+                {choice}
+              </Button>
+            ))}
+            <Button
+              variant={choices.length > 0 ? "ghost" : "primary"}
+              size="sm"
+              onClick={() => actions?.focusComposer()}
+            >
+              {choices.length > 0 ? t("ask.otherAnswer") : t("question.answer")}
+            </Button>
+          </>
+        }
+        what={current.text}
+      />
+    );
+  }
+  // Answered: the settled card, who answered and what.
   return (
     // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
-    <div
-      className={done ? "ac-approval ac-approval--done" : "ac-approval"}
-      role="group"
-      aria-label={t("question.group", { agent: name })}
-    >
-      {!done && <CardSky color={colorOf(agent)} />}
+    <div className="ac-approval ac-approval--done" role="group" aria-label={t("question.group", { agent: name })}>
       <div className="ac-approval__head">
         <span className="ac-approval__who">
           <Trans i18nKey="question.asks" values={{ agent: name }} components={{ b: <b /> }} />
         </span>
-        {done ? (
-          <Chip icon="check" tone="done">
-            {t("question.chipDone")}
-          </Chip>
-        ) : (
-          <Chip icon="waiting" tone="waiting">
-            {t("question.chip")}
-          </Chip>
-        )}
+        <Chip icon="check" tone="done">
+          {t("question.chipDone")}
+        </Chip>
       </div>
       <p className="ac-approval__title">{current.text}</p>
-      {done ? (
-        <p className="small muted" style={{ margin: 0 }}>
-          {who
-            ? t("question.answered", { name: who, answer: current.answer ?? "" })
-            : t("question.answeredByYou", { answer: current.answer ?? "" })}
-        </p>
-      ) : (
-        <div className="ac-approval__actions ac-acts">
-          {(current.choices ?? []).map((choice) => (
-            <Button
-              key={choice}
-              size="sm"
-              disabled={answer.isPending}
-              loading={answer.isPending && answer.variables === choice}
-              onClick={() => answer.mutate(choice)}
-            >
-              {choice}
-            </Button>
-          ))}
-          <Button variant="ghost" size="sm" onClick={() => actions?.focusComposer()}>
-            {t("question.answer")}
-          </Button>
-        </div>
-      )}
-      {error && !done && (
-        <p className="small muted" role="alert" style={{ margin: 0 }}>
-          {error}
-        </p>
-      )}
+      <p className="small muted" style={{ margin: 0 }}>
+        {who
+          ? t("question.answered", { name: who, answer: current.answer ?? "" })
+          : t("question.answeredByYou", { answer: current.answer ?? "" })}
+      </p>
     </div>
   );
 }
@@ -323,14 +391,91 @@ export function SecretCard({ request }: { request: SecretRequest }) {
     current.target.kind === "file"
       ? t("secret.targetFile", { path: current.target.path, agent: agentName })
       : t("secret.targetEnv", { name: current.name, agent: agentName });
+  const until = t("secret.until", { time: formatTime(i18n.language, current.expiresAt) });
+  // Waiting: a request card; only the person asked gets the field (the whole card is its form).
+  if (pending) {
+    const host = hostOf(current.site);
+    return (
+      <RequestCard
+        id={current.id}
+        kind="secret"
+        agent={agent}
+        label={t("secret.group", { agent: agentName })}
+        mine={mine}
+        waitingFor={t("ask.waitingFor", { name: person })}
+        lead={current.purpose}
+        object={{
+          logo: <RequestTile>{host ? <SiteIcon host={host} /> : <Icon name="lock" size={16} />}</RequestTile>,
+          title: current.name,
+          detail: where,
+        }}
+        body={
+          mine ? (
+            <>
+              <div className="rq__field">
+                <Input
+                  type="password"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={value}
+                  placeholder={t("secret.label", { name: current.name })}
+                  aria-label={t("secret.label", { name: current.name })}
+                  invalid={Boolean(error)}
+                  onChange={(e) => setValue(e.target.value)}
+                  data-1p-ignore
+                />
+              </div>
+              {error ? (
+                <p className="rq__error" role="alert">
+                  {error}
+                </p>
+              ) : (
+                <p className="rq__note ac-iconline">
+                  <Icon name="lock" size={14} />
+                  <span>{t("secret.private")}</span>
+                </p>
+              )}
+            </>
+          ) : undefined
+        }
+        actions={
+          mine ? (
+            <>
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                loading={deliver.isPending}
+                disabled={decline.isPending}
+              >
+                {t("secret.send")}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                loading={decline.isPending}
+                disabled={deliver.isPending}
+                onClick={() => decline.mutate()}
+              >
+                {t("secret.decline")}
+              </Button>
+            </>
+          ) : undefined
+        }
+        end={until}
+        what={current.name}
+        onSubmit={mine ? submit : undefined}
+      />
+    );
+  }
+  // Closed: the settled card, how it ended.
   return (
     // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
     <div
-      className={pending ? "ac-approval secret-card" : "ac-approval ac-approval--done secret-card"}
+      className="ac-approval ac-approval--done secret-card"
       role="group"
       aria-label={t("secret.group", { agent: agentName })}
     >
-      {pending && <CardSky color={colorOf(agent)} />}
       <div className="ac-approval__head">
         <span className="ac-approval__who">
           {mine ? (
@@ -339,16 +484,12 @@ export function SecretCard({ request }: { request: SecretRequest }) {
             <Trans i18nKey="secret.asksPerson" values={{ agent: agentName, person }} components={{ b: <b /> }} />
           )}
         </span>
-        {status ? (
+        {status && (
           <Chip
             icon={current.status === "delivered" ? "check" : "close"}
             tone={current.status === "delivered" ? "done" : "neutral"}
           >
             {status.chip}
-          </Chip>
-        ) : (
-          <Chip icon="lock" tone="waiting">
-            {t("secret.chip")}
           </Chip>
         )}
       </div>
@@ -358,66 +499,12 @@ export function SecretCard({ request }: { request: SecretRequest }) {
       <p className="small muted" style={{ margin: 0 }}>
         {where}
       </p>
-      {pending && mine && (
-        <form
-          className="secret-card__form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            submit();
-          }}
-        >
-          <Field
-            label={t("secret.label", { name: current.name })}
-            help={t("secret.private")}
-            error={error ?? undefined}
-          >
-            <Input
-              type="password"
-              autoComplete="off"
-              spellCheck={false}
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              data-1p-ignore
-            />
-          </Field>
-          <div className="ac-approval__actions ac-acts">
-            <Button
-              type="submit"
-              variant="primary"
-              size="sm"
-              icon="lock"
-              loading={deliver.isPending}
-              disabled={decline.isPending}
-            >
-              {t("secret.send")}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              loading={decline.isPending}
-              disabled={deliver.isPending}
-              onClick={() => decline.mutate()}
-            >
-              {t("secret.decline")}
-            </Button>
-            <span className="small muted">
-              {t("secret.until", { time: formatTime(i18n.language, current.expiresAt) })}
-            </span>
-          </div>
-        </form>
-      )}
-      {pending && !mine && (
-        <p className="small muted" style={{ margin: 0 }}>
-          {t("secret.waitingFor", { person })}
-        </p>
-      )}
       {status && (
         <p className="small muted" style={{ margin: 0 }}>
           {status.line}
         </p>
       )}
-      {error && !pending && (
+      {error && (
         <p className="small muted" role="alert" style={{ margin: 0 }}>
           {error}
         </p>

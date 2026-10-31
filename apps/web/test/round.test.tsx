@@ -385,13 +385,18 @@ describe("agent questions (ask_user)", () => {
     );
     const card = screen().getByRole("group", { name: "Pergunta de Ada" });
     expect(card.textContent).toContain("Faço o deploy agora ou depois das 18h?");
-    expect(card.querySelector(".ac-chip--waiting")?.textContent).toBe("Esperando resposta");
-    await click(within(card).getByRole("button", { name: "Responder" }));
+    // A request card: what kind of request and that it waits for you; the choices in its footer.
+    expect(card.getAttribute("data-ask-kind")).toBe("question");
+    expect(card.querySelector(".rq__head")?.textContent).toBe("Perguntaesperando você");
+    // With choices, writing another answer is "Outra resposta": it goes to the composer.
+    await click(within(card).getByRole("button", { name: "Outra resposta" }));
     expect(document.activeElement).toBe(screen().getByRole("combobox", { name: /Mensagem para/ }));
     await click(within(card).getByRole("button", { name: "Depois das 18h" }));
     await settle(4);
-    expect(card.textContent).toContain("Você respondeu: Depois das 18h");
-    expect(card.querySelector(".ac-chip--done")?.textContent).toBe("Respondida");
+    // Answered: the settled card takes its place (another element).
+    const done = screen().getByRole("group", { name: "Pergunta de Ada" });
+    expect(done.textContent).toContain("Você respondeu: Depois das 18h");
+    expect(done.querySelector(".ac-chip--done")?.textContent).toBe("Respondida");
     expect(state.calls.find((c) => c.method === "questions.answer")?.args).toEqual([
       ORG_ID,
       "q1",
@@ -463,7 +468,8 @@ describe("agent questions (ask_user)", () => {
     const card = screen().getByRole("group", { name: "Pergunta de Ada" });
     await click(within(card).getByRole("button", { name: "staging" }));
     await settle(4);
-    expect(within(card).getByRole("alert").textContent).toBe("Alguém já respondeu esta pergunta.");
+    const after = screen().getByRole("group", { name: "Pergunta de Ada" });
+    expect(within(after).getByRole("alert").textContent).toBe("Alguém já respondeu esta pergunta.");
   });
 });
 

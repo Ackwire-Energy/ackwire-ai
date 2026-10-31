@@ -96,6 +96,7 @@ import { useDmStatusLine, usePresenceWord } from "../status/hooks";
 import { PersonStatusCard } from "../status/StatusCard";
 import { AgentReceiptLine } from "./AgentReceipts";
 import { receiptMessageId, turnHeadId } from "./agent-receipts";
+import { AskBar, AskProbes, AskStore, AskStoreProvider, useAwayAsk } from "./asks";
 import { ChannelMembersSheet } from "./ChannelMembers";
 import { ConversationSwitcher } from "./ConversationSwitcher";
 import { takeComposerRequest, useComposerRequest } from "./composer-request";
@@ -177,6 +178,8 @@ const rowType = (r: Row) => {
   return r.message.meta && Object.keys(r.message.meta).length > 0 ? `message-${size}-card` : `message-${size}`;
 };
 const DIVIDER_KEY = "unseen-divider";
+/** A message counts as on screen (its request seen) while half of it shows. */
+const VIEWABILITY = { itemVisiblePercentThreshold: 50 };
 /** The "Novas" line stays this long after the person reached it, then fades (~0.6 s). */
 const DIVIDER_FADE_MS = 3500;
 /** A dropped connection shows only past this long (a quick reconnect says nothing). */
@@ -240,6 +243,10 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const sheet = useSheet();
   const insets = useSafeAreaInsets();
   const when = useWhen();
+  // The requests waiting here and which messages are on screen: the line above the composer says when one
+  // waits out of view (waiting beats working).
+  const [asks] = useState(() => new AskStore());
+  const awayAsk = useAwayAsk(asks);
 
   const channels = useChannels(orgId);
   const dms = useDms(orgId);
@@ -615,6 +622,22 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     }
     toEnd();
   }, [shownRows, latestSeen, toEnd, letGo]);
+
+  // Which messages are on screen, for the requests' line: a request counts as seen while half its row shows.
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: { item: Row | undefined }[] }) =>
+      asks.setVisible(viewableItems.flatMap((v) => (v.item?.kind === "message" ? [v.item.message.id] : []))),
+    [asks],
+  );
+  // "Ver" on the requests' line: the list goes to the request (it stops following the end, as when reading up).
+  const seeAsk = useCallback(() => {
+    const id = awayAsk?.ask.messageId;
+    const row = id ? rows.find((r) => r.kind === "message" && r.message.id === id) : undefined;
+    if (!row) return;
+    letGo();
+    setReadHold(false);
+    void listRef.current?.scrollToKey({ key: row.key, animated: true, viewPosition: 0.3 });
+  }, [awayAsk, rows, letGo]);
 
   // Rows that arrive at the bottom while the screen is open rise in; older pages and the first load don't.
   const prevKeysRef = useRef<string[]>([]);
@@ -1449,172 +1472,179 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   }, []);
 
   return (
-    <View style={[styles.screen, { backgroundColor: c.bg }]}>
-      {/* A clear bar on every conversation (DM, channel, thread): the band behind it is ours, below, so the
-          system's scroll edge never makes one look different from another. */}
-      <PushedHeader title={pill ?? title} plate solid={false} right={right} />
-      {pinned ? (
-        // The bar is see-through (the conversation runs under it): the pinned card starts below it.
-        <View style={[styles.pin, { backgroundColor: c.bg, paddingTop: headerHeight }]}>
-          <MissionCardView mission={pinned} pinned />
-        </View>
-      ) : null}
-      {/* No `textInputNativeID`: with it the composer could stay down while the keyboard was up (iOS 26; Bluesky
-          drops it too). The offset is whole points: a fractional one made the overscroll glitch. */}
-      <KeyboardGestureArea
-        style={styles.grow}
-        interpolator="ios"
-        offset={Math.round(Math.max(0, composerHeight - lift))}
-      >
-        {loading ? (
-          <View style={[styles.center, { paddingBottom: composerHeight }]}>
-            <Text tone="faint">{t("mobile.common.loading")}</Text>
+    <AskStoreProvider store={asks}>
+      <AskProbes messages={shownMessages} />
+      <View style={[styles.screen, { backgroundColor: c.bg }]}>
+        {/* A clear bar on every conversation (DM, channel, thread): the band behind it is ours, below, so the
+            system's scroll edge never makes one look different from another. */}
+        <PushedHeader title={pill ?? title} plate solid={false} right={right} />
+        {pinned ? (
+          // The bar is see-through (the conversation runs under it): the pinned card starts below it.
+          <View style={[styles.pin, { backgroundColor: c.bg, paddingTop: headerHeight }]}>
+            <MissionCardView mission={pinned} pinned />
           </View>
-        ) : (
-          <>
-            {/* Mounted before the first message too: a list that appears while the keyboard is already up never
-                hears it open, and its first message landed under it. */}
-            <Animated.View style={[styles.grow, listFade]}>
-              <KeyboardAwareLegendList
-                ref={listRef}
-                style={styles.grow}
-                data={shownRows}
-                keyExtractor={rowKey}
-                getItemType={rowType}
-                renderItem={renderItem}
-                // The list redraws mounted rows only when this changes: what a row shows beyond its message (the
-                // thread link that loads after it, a held state) lives in `renderItem`'s dependencies.
-                extraData={renderItem}
-                estimatedItemSize={72}
-                // Opens at the latest message, short conversations sit at the bottom like any chat.
-                initialScrollAtEnd
-                alignItemsAtEnd
-                // New messages, a reply growing word by word and the working line keep the end in view, but
-                // only while the person is near it.
-                maintainScrollAtEnd={!readHold}
-                maintainScrollAtEndThreshold={STICK_TO_END_THRESHOLD}
-                // Older pages above and rows changing size keep what is on screen still.
-                maintainVisibleContentPosition
-                // Our own insets, never the system's (the keyboard library's advice for chat lists): the bar's room
-                // is the content's top padding, the indicator kept below the bar.
-                contentInsetAdjustmentBehavior="never"
-                automaticallyAdjustContentInsets={false}
-                scrollIndicatorInsets={{ top: headerHeight }}
-                // Still while a sheet or the agent's computer covers the conversation.
-                freeze={freeze}
-                onReady={revealList}
-                onStartReached={loadOlder}
-                onScrollBeginDrag={() => {
-                  dragging.current = true;
-                }}
-                onScrollEndDrag={releaseAtEnd}
-                onMomentumScrollEnd={releaseAtEnd}
-                onStartReachedThreshold={0.5}
-                keyboardDismissMode="interactive"
-                keyboardShouldPersistTaps="handled"
-                keyboardOffset={lift}
-                contentInsetEndAdjustment={contentInsetEndAdjustment}
-                contentContainerStyle={listPad}
-              />
-            </Animated.View>
-            {showList ? null : (
-              // A conversation with nothing yet: the agent's first day or a quiet line, over the empty list.
-              <View style={StyleSheet.absoluteFill}>
-                {dmAgent && !isThread ? (
-                  <FirstDay agent={dmAgent} bottomInset={composerHeight} keyboardLift={lift} onAsk={onSend} />
-                ) : (
-                  <View style={[styles.center, { paddingBottom: composerHeight }]}>
-                    <Text tone="faint" style={styles.emptyText}>
-                      {t("mobile.chat.empty")}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            )}
-          </>
-        )}
-        <KeyboardStickyView
-          offset={{ opened: lift }}
-          style={[styles.jumpDock, { bottom: composerHeight + 10 }]}
-          pointerEvents="box-none"
-        >
-          {showList && (!atEnd || readHold) ? (
-            unseen.messages > 0 || unseen.working.length > 0 ? (
-              <NewPill unseen={unseen} onPress={toUnseen} />
-            ) : (
-              <ToLatest onPress={toEnd} />
-            )
-          ) : null}
-        </KeyboardStickyView>
-        {!pinned ? (
-          // The conversation fades under the floating header, as it does under the box.
-          <LinearGradient
-            pointerEvents="none"
-            colors={[c.bg, withOpacity(c.bg, 0.86), withOpacity(c.bg, 0)]}
-            locations={[0, 0.62, 1]}
-            style={[styles.topFade, { height: headerHeight + 28 }]}
-          />
         ) : null}
-        <KeyboardStickyView offset={{ opened: lift }} style={styles.composerDock}>
-          <View
-            ref={composerRef}
-            onLayout={onComposerBoxLayout}
-            style={[styles.composer, { paddingBottom: bottomPad }]}
+        {/* No `textInputNativeID`: with it the composer could stay down while the keyboard was up (iOS 26; Bluesky
+            drops it too). The offset is whole points: a fractional one made the overscroll glitch. */}
+        <KeyboardGestureArea
+          style={styles.grow}
+          interpolator="ios"
+          offset={Math.round(Math.max(0, composerHeight - lift))}
+        >
+          {loading ? (
+            <View style={[styles.center, { paddingBottom: composerHeight }]}>
+              <Text tone="faint">{t("mobile.common.loading")}</Text>
+            </View>
+          ) : (
+            <>
+              {/* Mounted before the first message too: a list that appears while the keyboard is already up never
+                  hears it open, and its first message landed under it. */}
+              <Animated.View style={[styles.grow, listFade]}>
+                <KeyboardAwareLegendList
+                  ref={listRef}
+                  style={styles.grow}
+                  data={shownRows}
+                  keyExtractor={rowKey}
+                  getItemType={rowType}
+                  renderItem={renderItem}
+                  // The list redraws mounted rows only when this changes: what a row shows beyond its message (the
+                  // thread link that loads after it, a held state) lives in `renderItem`'s dependencies.
+                  extraData={renderItem}
+                  estimatedItemSize={72}
+                  // Opens at the latest message, short conversations sit at the bottom like any chat.
+                  initialScrollAtEnd
+                  alignItemsAtEnd
+                  // New messages, a reply growing word by word and the working line keep the end in view, but
+                  // only while the person is near it.
+                  maintainScrollAtEnd={!readHold}
+                  maintainScrollAtEndThreshold={STICK_TO_END_THRESHOLD}
+                  // Older pages above and rows changing size keep what is on screen still.
+                  maintainVisibleContentPosition
+                  // Our own insets, never the system's (the keyboard library's advice for chat lists): the bar's room
+                  // is the content's top padding, the indicator kept below the bar.
+                  contentInsetAdjustmentBehavior="never"
+                  automaticallyAdjustContentInsets={false}
+                  scrollIndicatorInsets={{ top: headerHeight }}
+                  // Still while a sheet or the agent's computer covers the conversation.
+                  freeze={freeze}
+                  onReady={revealList}
+                  onStartReached={loadOlder}
+                  onViewableItemsChanged={onViewableItemsChanged}
+                  viewabilityConfig={VIEWABILITY}
+                  onScrollBeginDrag={() => {
+                    dragging.current = true;
+                  }}
+                  onScrollEndDrag={releaseAtEnd}
+                  onMomentumScrollEnd={releaseAtEnd}
+                  onStartReachedThreshold={0.5}
+                  keyboardDismissMode="interactive"
+                  keyboardShouldPersistTaps="handled"
+                  keyboardOffset={lift}
+                  contentInsetEndAdjustment={contentInsetEndAdjustment}
+                  contentContainerStyle={listPad}
+                />
+              </Animated.View>
+              {showList ? null : (
+                // A conversation with nothing yet: the agent's first day or a quiet line, over the empty list.
+                <View style={StyleSheet.absoluteFill}>
+                  {dmAgent && !isThread ? (
+                    <FirstDay agent={dmAgent} bottomInset={composerHeight} keyboardLift={lift} onAsk={onSend} />
+                  ) : (
+                    <View style={[styles.center, { paddingBottom: composerHeight }]}>
+                      <Text tone="faint" style={styles.emptyText}>
+                        {t("mobile.chat.empty")}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </>
+          )}
+          <KeyboardStickyView
+            offset={{ opened: lift }}
+            style={[styles.jumpDock, { bottom: composerHeight + 10 }]}
+            pointerEvents="box-none"
           >
-            {/* The conversation fades under the box: no hard edge above it. */}
+            {showList && (!atEnd || readHold) ? (
+              unseen.messages > 0 || unseen.working.length > 0 ? (
+                <NewPill unseen={unseen} onPress={toUnseen} />
+              ) : (
+                <ToLatest onPress={toEnd} />
+              )
+            ) : null}
+          </KeyboardStickyView>
+          {!pinned ? (
+            // The conversation fades under the floating header, as it does under the box.
             <LinearGradient
               pointerEvents="none"
-              colors={[withOpacity(c.bg, 0), withOpacity(c.bg, 0.9), c.bg]}
-              locations={[0, 0.3, 1]}
-              style={StyleSheet.absoluteFill}
+              colors={[c.bg, withOpacity(c.bg, 0.86), withOpacity(c.bg, 0)]}
+              locations={[0, 0.62, 1]}
+              style={[styles.topFade, { height: headerHeight + 28 }]}
             />
-            <Connection status={realtime} />
-            {banner ? <NoAiBanner banner={banner} /> : null}
-            {/* Who is working, right above the composer (as on the web), while they work. */}
-            {member ? (
-              <WorkingLine
-                runs={runs}
-                consults={lineConsults}
-                typing={typing}
-                canStop={canStop}
-                onStop={stopRun}
-                onOpenBrowser={(agentId) => {
-                  // The agent's browser card opens in the conversation (at the end), not another screen.
-                  toggleBrowser(agentId, true);
-                  toEnd();
-                }}
+          ) : null}
+          <KeyboardStickyView offset={{ opened: lift }} style={styles.composerDock}>
+            <View
+              ref={composerRef}
+              onLayout={onComposerBoxLayout}
+              style={[styles.composer, { paddingBottom: bottomPad }]}
+            >
+              {/* The conversation fades under the box: no hard edge above it. */}
+              <LinearGradient
+                pointerEvents="none"
+                colors={[withOpacity(c.bg, 0), withOpacity(c.bg, 0.9), c.bg]}
+                locations={[0, 0.3, 1]}
+                style={StyleSheet.absoluteFill}
               />
-            ) : null}
-            {member ? (
-              <Composer
-                placeholder={placeholder}
-                onSend={onSend}
-                working={working}
-                onPlus={() => sheet.open(<PlusActions onPick={(p) => void onPlus(p)} />)}
-                inputNativeID={COMPOSER_INPUT_ID}
-                {...(suggestions.length > 0 ? { suggestions } : {})}
-                {...(dmAgentId && !isThread ? { face: <AgentFace agentId={dmAgentId} size={22} /> } : {})}
-                mentionAt={mentionQuery}
-                insertMention={insertMention}
-                prefill={prefill}
-                mention={({ query, pick }) => (
-                  <MentionPicker query={query} pick={pick} channelId={channelId} members={mentionMembers} />
-                )}
-                onType={() => sendTyping(threadId)}
-              />
-            ) : (
-              <Button
-                variant="primary"
-                wide
-                label={t("mobile.chat.join")}
-                disabled={join.isPending}
-                onPress={() => join.mutate()}
-              />
-            )}
-          </View>
-        </KeyboardStickyView>
-      </KeyboardGestureArea>
-    </View>
+              <Connection status={realtime} />
+              {banner ? <NoAiBanner banner={banner} /> : null}
+              {/* Who is working, right above the composer (as on the web), while they work; a request waiting out
+                  of view takes the line, with "Ver". */}
+              {member && awayAsk ? <AskBar away={awayAsk} onSee={seeAsk} /> : null}
+              {member && !awayAsk ? (
+                <WorkingLine
+                  runs={runs}
+                  consults={lineConsults}
+                  typing={typing}
+                  canStop={canStop}
+                  onStop={stopRun}
+                  onOpenBrowser={(agentId) => {
+                    // The agent's browser card opens in the conversation (at the end), not another screen.
+                    toggleBrowser(agentId, true);
+                    toEnd();
+                  }}
+                />
+              ) : null}
+              {member ? (
+                <Composer
+                  placeholder={placeholder}
+                  onSend={onSend}
+                  working={working}
+                  onPlus={() => sheet.open(<PlusActions onPick={(p) => void onPlus(p)} />)}
+                  inputNativeID={COMPOSER_INPUT_ID}
+                  {...(suggestions.length > 0 ? { suggestions } : {})}
+                  {...(dmAgentId && !isThread ? { face: <AgentFace agentId={dmAgentId} size={22} /> } : {})}
+                  mentionAt={mentionQuery}
+                  insertMention={insertMention}
+                  prefill={prefill}
+                  mention={({ query, pick }) => (
+                    <MentionPicker query={query} pick={pick} channelId={channelId} members={mentionMembers} />
+                  )}
+                  onType={() => sendTyping(threadId)}
+                />
+              ) : (
+                <Button
+                  variant="primary"
+                  wide
+                  label={t("mobile.chat.join")}
+                  disabled={join.isPending}
+                  onPress={() => join.mutate()}
+                />
+              )}
+            </View>
+          </KeyboardStickyView>
+        </KeyboardGestureArea>
+      </View>
+    </AskStoreProvider>
   );
 }
 

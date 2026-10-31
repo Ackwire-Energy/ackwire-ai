@@ -1896,6 +1896,33 @@ export const ptBR = {
     alreadyAnswered: "Alguém já respondeu esta pergunta.",
     failed: "Não foi possível enviar a resposta. Tente de novo.",
   },
+  /** A request in the conversation (approval, secret, question, help in the agent's screen, proposal): one card for all. */
+  ask: {
+    kind: {
+      approval: "Pede sua aprovação",
+      secret: "Pede um segredo",
+      question: "Pergunta",
+      browser: "Precisa de você no navegador",
+      desktop: "Precisa de você no computador",
+      proposal: "Propõe uma mudança",
+    },
+    waitingYou: "esperando você",
+    waitingFor: "esperando {{name}}",
+    seeChange: "Ver a mudança",
+    seeScreen: "Ver a tela",
+    otherAnswer: "Outra resposta",
+    /** The activity bar above the composer while a request is out of view. */
+    bar: {
+      approval: "<b>{{name}}</b> espera sua aprovação · {{what}}",
+      secret: "<b>{{name}}</b> espera um segredo · {{what}}",
+      question: "<b>{{name}}</b> espera uma resposta · {{what}}",
+      browser: "<b>{{name}}</b> precisa de você no navegador · {{what}}",
+      desktop: "<b>{{name}}</b> precisa de você no computador · {{what}}",
+      proposal: "<b>{{name}}</b> propõe uma mudança · {{what}}",
+      more: "+{{count}}",
+      see: "Ver",
+    },
+  },
   approval: {
     expiredChip: "Expirou · {{when}}",
     waitingFor: "Aguardando {{name}}",

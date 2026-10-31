@@ -281,6 +281,7 @@ export const hidesBody = (m: Message) =>
       m.meta?.threadStart ||
       m.meta?.issueWork ||
       m.meta?.browserHandoff ||
+      m.meta?.secretRequest ||
       m.meta?.missionSetup ||
       questionOf(m.meta)?.text.trim() === m.body.trim(),
   );

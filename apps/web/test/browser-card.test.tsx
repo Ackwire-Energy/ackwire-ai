@@ -46,6 +46,9 @@ function seedRequest() {
   return { state, handoff };
 }
 
+/** The waiting request: a request card (a labelled group with the handoff's id). */
+const waitingRequest = () => document.querySelector(`[data-ask-id="${HANDOFF_ID}"]`) as HTMLElement;
+
 describe("a help request opens the agent's browser in its card", () => {
   test("Abrir aqui takes control in place: Pronto in the header, the app's own text field, no page change", async () => {
     const { state, handoff } = seedRequest();
@@ -53,11 +56,17 @@ describe("a help request opens the agent's browser in its card", () => {
     fakeBrowserOf.get(api)?.handoffs.set(handoff.id, handoff);
     const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(6);
-    const request = document.querySelector(".brw-rq") as HTMLElement;
+    const request = waitingRequest();
     expect(request).toBeTruthy();
-    expect(within(request).getByText("Abre neste card, sem sair do chat.")).toBeTruthy();
+    expect(request.getAttribute("role")).toBe("group");
+    expect(request.getAttribute("data-ask-kind")).toBe("browser");
+    expect(request.textContent).toContain("Precisa de você no navegador");
+    expect(request.textContent).toContain("esperando você");
+    expect(request.textContent).toContain("Entrar no painel com a conta de teste");
+    const openHere = within(request).getByRole("button", { name: "Abrir aqui" });
+    expect(openHere.getAttribute("title")).toBe("Abre neste card, sem sair do chat.");
 
-    await act(async () => fireEvent.click(within(request).getByRole("button", { name: "Abrir aqui" })));
+    await act(async () => fireEvent.click(openHere));
     await settle(4);
     expect(state.calls.some((c) => c.method === "browser.takeControl")).toBe(true);
     expect(r.router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
@@ -137,7 +146,7 @@ describe("the card in the message", () => {
     // Taking over from the request: the card is the control.
     await act(async () =>
       fireEvent.click(
-        within(document.querySelector(".brw-rq") as HTMLElement).getByRole("button", { name: "Abrir aqui" }),
+        within(waitingRequest()).getByRole("button", { name: "Abrir aqui" }),
       ),
     );
     await settle(4);
@@ -175,7 +184,7 @@ describe("the card in the message", () => {
     await act(async () => socket.open());
     await act(async () =>
       fireEvent.click(
-        within(document.querySelector(".brw-rq") as HTMLElement).getByRole("button", { name: "Abrir aqui" }),
+        within(waitingRequest()).getByRole("button", { name: "Abrir aqui" }),
       ),
     );
     await settle(4);
@@ -289,7 +298,7 @@ describe("a card whose page doesn't come never stays on Opening", () => {
     await act(async () => r.sockets.last().open());
     await act(async () =>
       fireEvent.click(
-        within(document.querySelector(".brw-rq") as HTMLElement).getByRole("button", { name: "Abrir aqui" }),
+        within(waitingRequest()).getByRole("button", { name: "Abrir aqui" }),
       ),
     );
     await settle(4);
@@ -362,7 +371,7 @@ describe("a card whose page doesn't come never stays on Opening", () => {
     // It asked for help; Abrir aqui opens the request's own card, in control.
     await act(async () =>
       fireEvent.click(
-        within(document.querySelector(".brw-rq") as HTMLElement).getByRole("button", { name: "Abrir aqui" }),
+        within(waitingRequest()).getByRole("button", { name: "Abrir aqui" }),
       ),
     );
     await settle(4);

@@ -1883,6 +1883,33 @@ export const en: Translations = {
     alreadyAnswered: "Someone already answered this question.",
     failed: "Couldn't send the answer. Try again.",
   },
+  /** A request in the conversation (approval, secret, question, help in the agent's screen, proposal): one card for all. */
+  ask: {
+    kind: {
+      approval: "Asks for your approval",
+      secret: "Asks for a secret",
+      question: "Asks",
+      browser: "Needs you in the browser",
+      desktop: "Needs you on the computer",
+      proposal: "Proposes a change",
+    },
+    waitingYou: "waiting for you",
+    waitingFor: "waiting for {{name}}",
+    seeChange: "See the change",
+    seeScreen: "See the screen",
+    otherAnswer: "Another answer",
+    /** The activity bar above the composer while a request is out of view. */
+    bar: {
+      approval: "<b>{{name}}</b> is waiting for your approval · {{what}}",
+      secret: "<b>{{name}}</b> is waiting for a secret · {{what}}",
+      question: "<b>{{name}}</b> is waiting for an answer · {{what}}",
+      browser: "<b>{{name}}</b> needs you in the browser · {{what}}",
+      desktop: "<b>{{name}}</b> needs you on the computer · {{what}}",
+      proposal: "<b>{{name}}</b> proposes a change · {{what}}",
+      more: "+{{count}}",
+      see: "See",
+    },
+  },
   approval: {
     expiredChip: "Expired · {{when}}",
     waitingFor: "Waiting for {{name}}",

@@ -58,7 +58,11 @@ describe("secret requests (ADR 0027)", () => {
     const pair = await generateSecretKeyPair();
     const { state, secretRequest } = await withRequest("u-walter", pair.publicKey);
     const card = screen().getByRole("group", { name: "Pedido de segredo de Ada" });
-    expect(card.textContent).toContain("Ada pede um segredo a você");
+    // The request card: what kind of request, that it waits for you, and the secret it names.
+    expect(card.getAttribute("data-ask-kind")).toBe("secret");
+    expect(card.textContent).toContain("Pede um segredo");
+    expect(card.textContent).toContain("esperando você");
+    expect(card.textContent).toContain("publicar o pacote no npm");
     expect(card.textContent).toContain("NPM_TOKEN");
     expect(card.textContent).toContain("Vai como a variável NPM_TOKEN no computador de Ada.");
     const field = within(card).getByLabelText("Valor de NPM_TOKEN") as HTMLInputElement;
@@ -75,18 +79,24 @@ describe("secret requests (ADR 0027)", () => {
     const aad = secretAad({ requestId: secretRequest.id, orgId: ORG_ID, name: "NPM_TOKEN", target: { kind: "env" } });
     expect(await openSecret(pair.privateKey, box, aad)).toBe("npm_live_abc123");
 
-    expect(card.querySelector(".ac-chip--done")?.textContent).toBe("Entregue");
-    expect(card.textContent).toContain("Você entregou às");
-    expect(within(card).queryByLabelText("Valor de NPM_TOKEN")).toBeNull();
+    // Once sent, the settled card takes its place (another element): look it up again.
+    const done = screen().getByRole("group", { name: "Pedido de segredo de Ada" });
+    expect(done.querySelector(".ac-chip--done")?.textContent).toBe("Entregue");
+    expect(done.textContent).toContain("Você entregou às");
+    expect(within(done).queryByLabelText("Valor de NPM_TOKEN")).toBeNull();
+    expect(done.hasAttribute("data-ask-id")).toBe(false);
   });
 
   test("someone else sees who was asked, and no field", async () => {
     const pair = await generateSecretKeyPair();
     await withRequest("u-joao", pair.publicKey);
     const card = screen().getByRole("group", { name: "Pedido de segredo de Ada" });
-    expect(card.textContent).toContain("Ada pede um segredo a João");
-    expect(card.textContent).toContain("Só João pode responder.");
+    expect(card.textContent).toContain("esperando João");
+    expect(card.textContent).not.toContain("esperando você");
     expect(within(card).queryByLabelText("Valor de NPM_TOKEN")).toBeNull();
+    expect(within(card).queryByRole("button", { name: "Enviar" })).toBeNull();
+    // Not the viewer's to answer: the activity bar never brings it back.
+    expect(card.hasAttribute("data-ask-mine")).toBe(false);
   });
 
   test("Recusar closes it", async () => {
@@ -96,6 +106,7 @@ describe("secret requests (ADR 0027)", () => {
     await click(within(card).getByRole("button", { name: "Recusar" }));
     await settle(4);
     expect(state.calls.some((c) => c.method === "secrets.decline")).toBe(true);
-    expect(card.textContent).toContain("Recusado. O agente segue sem ele.");
+    const done = screen().getByRole("group", { name: "Pedido de segredo de Ada" });
+    expect(done.textContent).toContain("Recusado. O agente segue sem ele.");
   });
 });

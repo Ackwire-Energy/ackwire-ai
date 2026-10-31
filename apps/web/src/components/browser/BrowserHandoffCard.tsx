@@ -10,7 +10,7 @@ import {
 } from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { Button, ExpiryFuse, Icon } from "@agenteschat/ui";
+import { Button, Icon } from "@agenteschat/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -20,7 +20,7 @@ import { useToast } from "@/lib/toast";
 import { AgentAvatar } from "../AgentAvatar";
 import { useOpenComputer } from "../computer/open";
 import { useOrg } from "../org-context";
-import { colorOf } from "../Sky";
+import { RequestCard, RequestFuse, RequestTile } from "../RequestCard";
 import { BrowserCard } from "./BrowserCard";
 import { useBrowserCardRequest } from "./open";
 import "./browser.css";
@@ -42,7 +42,7 @@ export function useCurrentHandoff(orgId: string, handoff: BrowserHandoff) {
  * An agent asks a person for help in its browser (`browser_ask_person`,
  * ADR 0040 §6) or on its desktop (`desktop_ask_person`, ADR 0058): the
  * request, the time left, "Abrir" to the live view; who is helping; and how
- * it ended. Same family as the approval card.
+ * it ended. While it waits, the same request card as every other ask.
  */
 export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
   const { t, i18n } = useTranslation();
@@ -93,13 +93,69 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
   const showBrowser = !onDesktop && ((here && (waiting || active)) || mineInControl);
   const time = current.resolvedAt ? formatTime(i18n.language, current.resolvedAt) : "";
   const screenIcon = onDesktop ? "computer" : "globe";
+  const groupLabel = onDesktop ? t("desktop.card.group", g) : t("browser.card.group", g);
+  // Waiting: a request card like every other. "Ver a tela" shows the agent's browser under it (its desktop, in
+  // the computer dialog); "Abrir aqui" takes control as before.
+  if (waiting) {
+    const asked = current.requestedForUserId;
+    const mine = !asked || asked === me.user.id || agent?.ownerUserId === me.user.id;
+    const askedName = asked ? dir.memberById.get(asked)?.name : undefined;
+    return (
+      <>
+        <RequestCard
+          id={current.id}
+          kind={onDesktop ? "desktop" : "browser"}
+          agent={agent}
+          label={groupLabel}
+          mine={mine}
+          waitingFor={askedName ? t("ask.waitingFor", { name: askedName }) : undefined}
+          lead={current.instructions}
+          object={{
+            logo: (
+              <RequestTile>
+                <Icon name={screenIcon} size={16} />
+              </RequestTile>
+            ),
+            title: onDesktop ? t("desktop.card.where", g) : t("browser.card.where", g),
+            detail: agent?.handle ? `@${agent.handle}` : undefined,
+            more: t("ask.seeScreen"),
+          }}
+          open={!onDesktop && showBrowser}
+          onOpenChange={(open) => (onDesktop ? openComputer(current.agentId) : setHere(open))}
+          actions={
+            <Button
+              variant="primary"
+              size="sm"
+              icon={screenIcon}
+              loading={actions.takeControl.isPending}
+              onClick={take}
+              title={t("browser.inCard.openHereHint")}
+            >
+              {t("browser.inCard.openHere")}
+            </Button>
+          }
+          end={
+            <RequestFuse
+              left={handoffFuse(current)}
+              agent={agent}
+              text={minutes !== null ? t("browser.card.left", { count: minutes }) : null}
+            />
+          }
+          what={current.instructions}
+        />
+        {showBrowser && (
+          <BrowserCard agentId={current.agentId} name={name} handoff={current} onSettled={() => setHere(false)} />
+        )}
+      </>
+    );
+  }
   return (
     <>
       {/* biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset */}
       <div
         className={settled ? "brw-rq brw-rq--settled" : "brw-rq"}
         role="group"
-        aria-label={onDesktop ? t("desktop.card.group", g) : t("browser.card.group", g)}
+        aria-label={groupLabel}
       >
         <span className="brw-rq__face">
           <AgentAvatar
@@ -131,12 +187,6 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
             </span>
           )}
           <span className="brw-grow" />
-          {waiting && minutes !== null && (
-            <>
-              <Icon name="clock" size={14} />
-              <span>{t("browser.card.left", { count: minutes })}</span>
-            </>
-          )}
           {active && (
             <>
               <Icon name="person" size={14} />
@@ -191,14 +241,6 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
               {t("browser.card.cancelled")}
             </div>
           )}
-          {waiting && !showBrowser && (
-            <div className="brw-rq__acts">
-              <Button variant="primary" icon={screenIcon} loading={actions.takeControl.isPending} onClick={take}>
-                {t("browser.inCard.openHere")}
-              </Button>
-              <span className="brw-rq__hint">{t("browser.inCard.openHereHint")}</span>
-            </div>
-          )}
           {active && !showBrowser && (
             <div className="brw-rq__acts">
               <Button icon={screenIcon} onClick={show}>
@@ -215,7 +257,6 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
             </div>
           )}
         </div>
-        {waiting && <ExpiryFuse left={handoffFuse(current)} color={colorOf(agent)} />}
       </div>
       {showBrowser && (
         <BrowserCard agentId={current.agentId} name={name} handoff={current} onSettled={() => setHere(false)} />

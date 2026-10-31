@@ -161,6 +161,42 @@ describe("Canal", () => {
     expect(list.find((a) => a.id === "ap-deploy")?.status).toBe("refused");
   });
 
+  test("a request waiting for you out of view: the activity bar says so, and Ver brings it back", async () => {
+    // happy-dom's IntersectionObserver never answers: here every request card reads as out of view.
+    const native = globalThis.IntersectionObserver;
+    globalThis.IntersectionObserver = class {
+      answer: IntersectionObserverCallback;
+      constructor(answer: IntersectionObserverCallback) {
+        this.answer = answer;
+      }
+      observe(target: Element) {
+        if (target.matches("[data-ask-id]"))
+          this.answer([{ isIntersecting: false, target } as IntersectionObserverEntry], this as never);
+      }
+      unobserve() {}
+      disconnect() {}
+      takeRecords() {
+        return [];
+      }
+    } as unknown as typeof IntersectionObserver;
+    try {
+      await open();
+      // Cards that show up later are picked up on the next frame.
+      await act(() => new Promise((r) => setTimeout(r, 50)));
+      await settle(2);
+      const card = screen().getByRole("group", { name: "Pedido de aprovação" });
+      expect(card.getAttribute("data-ask-id")).toBe("ap-merge");
+      const bar = document.querySelector(".ac-typing") as HTMLElement;
+      expect(bar.hasAttribute("data-ask")).toBe(true);
+      expect(bar.textContent).toContain("Ada espera sua aprovação");
+      expect(bar.textContent).toContain("Merge PR #42 into main");
+      await act(async () => fireEvent.click(within(bar).getByRole("button", { name: "Ver" })));
+      expect(card.classList.contains("rq--flash")).toBe(true);
+    } finally {
+      globalThis.IntersectionObserver = native;
+    }
+  });
+
   test("not a member of a public channel: join instead of the composer", async () => {
     const state = seedState();
     const eng = state.channels.find((c) => c.id === ENG_ID);

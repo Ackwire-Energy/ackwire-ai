@@ -161,7 +161,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { tokenizeBody } from "@/chat/body";
 import { MessageBody } from "@/chat/MessageBody";
@@ -247,6 +247,7 @@ import { useOrg } from "@/components/org-context";
 import { AuthorStatus } from "@/components/Presence";
 import { ProfileTrigger } from "@/components/ProfileCard";
 import { MessageReactions, useEmojiLabels } from "@/components/Reactions";
+import { type RequestKind, showRequest, WaitMark } from "@/components/RequestCard";
 import { ActivitySky, ChannelWelcome, colorOf } from "@/components/Sky";
 import { isStoppable, StopButton, useContinueRun, useStopRun, useWasContinued } from "@/components/StopRun";
 import { TeamChecks } from "@/components/TeamChecks";
@@ -1105,6 +1106,9 @@ function ChannelView({
   // By run: a "pensando…" hands its block (same key) to the real run, and that run must count as in view.
   const inView = useBlocksInView(scroller, slots.map((x) => x.runId).join(" "));
   const outOfView = useMemo(() => (runId: string) => !inView.has(runId), [inView]);
+  // Requests waiting for you that scrolled out of view: the same line says so first (waiting beats working).
+  const asksOut = useAsksOutOfView(scroller, `${channel.id}|${thread?.id ?? ""}|${timeline.length > 0}`);
+  const seeAsk = (id: string) => showRequest(scroller.current, id, !reducedMotion);
   /** "Ver" on that line: back to the agent's block. */
   const seeRun = (runId: string) => {
     const row = Array.from(scroller.current?.querySelectorAll<HTMLElement>("[data-run-id]") ?? []).find(
@@ -1846,6 +1850,8 @@ function ChannelView({
                     visible={runVisible}
                     outOfView={outOfView}
                     onSee={seeRun}
+                    asks={asksOut}
+                    onSeeAsk={seeAsk}
                     stoppable={stopTarget?.runId}
                     consultBlocks={consultGroups.nearEnd}
                   />
@@ -2644,6 +2650,82 @@ function useBlocksInView(scroller: { current: HTMLElement | null }, key: string)
   return inView;
 }
 
+/** A request waiting for the viewer, read from its card (`RequestCard`'s `data-ask-*`). */
+type PendingAsk = { id: string; kind: RequestKind; agentId: string; what: string };
+
+const sameAsks = (a: PendingAsk[], b: PendingAsk[]) =>
+  a.length === b.length &&
+  a.every((x, i) => x.id === b[i]?.id && x.what === b[i]?.what && x.agentId === b[i]?.agentId);
+
+/**
+ * The requests waiting for the viewer whose cards are out of the scroller's view, in the conversation's order.
+ * A card counts as on screen once 40px of it show at the top or 60px at the bottom (the composer's fade).
+ * Cards come and go with the rows, so a MutationObserver keeps the IntersectionObserver's list current.
+ */
+function useAsksOutOfView(scroller: { current: HTMLElement | null }, key: string) {
+  const [out, setOut] = useState<PendingAsk[]>([]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `key` changes when the list itself is replaced
+  useEffect(() => {
+    const root = scroller.current;
+    setOut((prev) => (prev.length === 0 ? prev : []));
+    if (!root || typeof IntersectionObserver === "undefined" || typeof MutationObserver === "undefined") return;
+    // Each card: on screen (true), off (false), or not measured yet (null: not said, so no flash in the bar).
+    const seen = new Map<Element, boolean | null>();
+    const publish = () => {
+      const next: PendingAsk[] = [];
+      for (const el of root.querySelectorAll<HTMLElement>("[data-ask-mine]")) {
+        if (seen.get(el) !== false) continue;
+        next.push({
+          id: el.dataset.askId ?? "",
+          kind: (el.dataset.askKind ?? "approval") as RequestKind,
+          agentId: el.dataset.askAgent ?? "",
+          what: el.dataset.askWhat ?? "",
+        });
+      }
+      setOut((prev) => (sameAsks(prev, next) ? prev : next));
+    };
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) if (seen.has(e.target)) seen.set(e.target, e.isIntersecting);
+        publish();
+      },
+      { root, rootMargin: "-40px 0px -60px 0px", threshold: 0 },
+    );
+    let frame = 0;
+    const scan = () => {
+      frame = 0;
+      const cards = new Set<Element>(root.querySelectorAll("[data-ask-mine]"));
+      for (const el of [...seen.keys()]) {
+        if (cards.has(el)) continue;
+        io.unobserve(el);
+        seen.delete(el);
+      }
+      for (const el of cards) {
+        if (seen.has(el)) continue;
+        seen.set(el, null);
+        io.observe(el);
+      }
+      publish();
+    };
+    const mo = new MutationObserver(() => {
+      if (!frame) frame = requestAnimationFrame(scan);
+    });
+    mo.observe(root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["data-ask-mine", "data-ask-what"],
+    });
+    scan();
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      mo.disconnect();
+      io.disconnect();
+    };
+  }, [key]);
+  return out;
+}
+
 /**
  * The bar right above the composer, one for everyone at work here and always one width: a glass pill (in
  * the first agent's color while agents work) with the orbit, or the typing dots when only people type, their
@@ -2656,6 +2738,8 @@ function ActivityBar({
   visible,
   outOfView,
   onSee,
+  asks,
+  onSeeAsk,
   stoppable,
   consultBlocks,
 }: {
@@ -2668,6 +2752,10 @@ function ActivityBar({
   outOfView: (runId: string) => boolean;
   /** "Ver": back to that block. */
   onSee: (runId: string) => void;
+  /** Requests waiting for the viewer out of view: the bar says the first one instead of who works. */
+  asks: PendingAsk[];
+  /** "Ver" on a request: scrolls to it and lights it up. */
+  onSeeAsk: (id: string) => void;
   /** The run Esc stops (the pill shows its stop). */
   stoppable?: string;
   /** Runs whose questions a block near the end shows (`ConsultGroup`): the line doesn't say them again. */
@@ -2714,6 +2802,10 @@ function ActivityBar({
   // An agent working in its browser: the bar says so, and a click opens its browser card in the conversation.
   const browsing = runs.find((r) => !isWriting(r) && usesBrowser(r));
   const openBrowser = browsing ? () => requestBrowserCard({ agentId: browsing.agentId }) : undefined;
+  // A request waiting for you, out of view: the bar says that instead (waiting beats working).
+  const ask = asks[0];
+  const askName = ask ? (dir.anyAgent(ask.agentId)?.name ?? t("channel.unknownAgent")) : "";
+  const pill = !ask && active;
   return (
     <>
       {coding.map((r) =>
@@ -2731,10 +2823,11 @@ function ActivityBar({
       <div
         className="ac-typing"
         aria-live="polite"
-        data-active={active}
-        data-browser={active && openBrowser ? true : undefined}
+        data-active={active || Boolean(ask)}
+        data-ask={ask ? true : undefined}
+        data-browser={pill && openBrowser ? true : undefined}
         onClick={
-          openBrowser
+          pill && openBrowser
             ? (e) => {
                 // Its own buttons (Ver) keep their job.
                 if ((e.target as HTMLElement).closest("button, [role=dialog]")) return;
@@ -2743,7 +2836,32 @@ function ActivityBar({
             : undefined
         }
       >
-        {active && (
+        {ask && (
+          <>
+            <ActivitySky color={colorOf(dir.anyAgent(ask.agentId))} />
+            <span className="ac-typing__avatars" aria-hidden="true">
+              <span className="ac-typing__tok">
+                <AgentAvatar agentId={ask.agentId} size="xs" name={askName} state="waiting" />
+              </span>
+            </span>
+            <WaitMark />
+            <span className="ac-typing__text">
+              <Trans
+                i18nKey={`ask.bar.${ask.kind}` as const}
+                values={{ name: askName, what: ask.what }}
+                components={{ b: <b /> }}
+              />
+            </span>
+            {asks.length > 1 && (
+              <span className="ac-typing__more">{t("ask.bar.more", { count: asks.length - 1 })}</span>
+            )}
+            <span className="ac-typing__sep" aria-hidden="true" />
+            <button type="button" className="ac-typing__see" onClick={() => onSeeAsk(ask.id)}>
+              {t("ask.bar.see")}
+            </button>
+          </>
+        )}
+        {pill && (
           <>
             {firstAgent && <ActivitySky color={colorOf(dir.agentById.get(firstAgent.id))} />}
             {/* Agents at work: the pixel orbit in the first one's color; people only typing: the dots. */}
