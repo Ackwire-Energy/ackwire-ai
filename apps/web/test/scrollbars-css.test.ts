@@ -8,6 +8,8 @@ const SOURCES = ["apps/web/src", "packages/ui/src", "apps/desktop/src"];
 const KIT = "packages/ui/src/styles/components.css";
 /** The only place for the standard properties: Chrome ignores the pseudo-elements on an element that sets them. */
 const FIREFOX = "@supports not selector(::-webkit-scrollbar)";
+/** Where the kit draws ours: a touch screen keeps the platform's indicator, which takes no room. */
+const POINTER = "@media (hover: hover) and (pointer: fine)";
 
 const read = (file: string) => Bun.file(path.join(ROOT, file)).text();
 /** Every stylesheet of the web app, the kit and the desktop app, as [path, text]. */
@@ -75,9 +77,12 @@ const SIDEWAYS: Record<string, "strip" | "content"> = {
 };
 
 describe("our scrollbars, never the browser's", () => {
-  test("the kit draws one for whatever scrolls: thin and rounded on a clear track, no arrows, in the theme's ink", async () => {
+  test("the kit draws one for whatever scrolls under a mouse or a trackpad: thin and rounded on a clear track, no arrows, in the theme's ink", async () => {
     const source = await read(KIT);
-    const kit = topLevel(source);
+    const kit = atRule(source, POINTER);
+    // A touch screen keeps the platform's: nothing of ours outside that block.
+    expect(declarations(source, "::-webkit-scrollbar")).toEqual(declarations(kit, "::-webkit-scrollbar"));
+    expect(atRule(source, FIREFOX)).toBe(atRule(kit, FIREFOX));
     expect(px(value(kit, "::-webkit-scrollbar", "width"))).toBeLessThanOrEqual(10);
     expect(value(kit, "::-webkit-scrollbar", "height")).toBe(value(kit, "::-webkit-scrollbar", "width"));
     expect(value(kit, "::-webkit-scrollbar-track", "background")).toBe("transparent");
@@ -87,14 +92,15 @@ describe("our scrollbars, never the browser's", () => {
     expect(value(kit, "::-webkit-scrollbar-thumb", "background")).toStartWith("var(--scroll-thumb) ");
     expect(value(kit, "::-webkit-scrollbar-thumb:hover", "background-color")).toBe("var(--scroll-thumb-hover)");
     // Mixed from the ink on the page's root and on any subtree with its own theme; stronger under the pointer.
+    const tokens = topLevel(source);
     const share = (token: string) => {
-      const mix = value(kit, "[data-theme]", token);
-      expect(value(kit, ":root", token)).toBe(mix);
+      const mix = value(tokens, "[data-theme]", token);
+      expect(value(tokens, ":root", token)).toBe(mix);
       return Number(mix.match(/^color-mix\(in srgb, var\(--ink\) (\d+)%, transparent\)$/)?.[1]);
     };
     expect(share("--scroll-thumb")).toBeGreaterThan(0);
     expect(share("--scroll-thumb-hover")).toBeGreaterThan(share("--scroll-thumb"));
-    expect(declarations(atRule(source, FIREFOX), "*")).toEqual([
+    expect(declarations(atRule(kit, FIREFOX), "*")).toEqual([
       ["scrollbar-width", "thin"],
       ["scrollbar-color", "var(--scroll-thumb) transparent"],
     ]);
@@ -160,7 +166,7 @@ describe("the collapsed sidebar", () => {
 
   test("nothing cut: one column for an item and its focus ring, on the rail's middle, with the scrollbar's room beside it", async () => {
     const layout = topLevel(await read("apps/web/src/layout.css"));
-    const kit = topLevel(await read(KIT));
+    const kit = atRule(await read(KIT), POINTER);
     const tokens = await read("packages/ui/src/styles/tokens.css");
     const item = px(tokens.match(/--control-h-md:\s*([\d.]+)px/)?.[1] ?? "");
     const ring = Math.max(

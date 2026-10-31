@@ -31,9 +31,11 @@ samp {
 }
 
 /*
- * Scrollbars, ours wherever something scrolls. WebKit and Blink draw them from the pseudo-elements; the standard
- * properties go only to browsers without those (Firefox), since Chrome ignores the pseudo-elements on any element that
- * sets them. A strip that scrolls by swipe hides its own: `scrollbar-width: none` and its
+ * Scrollbars, ours wherever something scrolls under a mouse or a trackpad. A touch screen keeps the platform's
+ * indicator, which shows while scrolling and takes no room: ours would take 10px there, and one shown only on hover
+ * (the sidebar's) would never show. WebKit and Blink draw ours from the pseudo-elements; the standard properties go
+ * only to browsers without those (Firefox), since Chrome ignores the pseudo-elements on any element that sets them. A
+ * strip that scrolls by swipe hides its own on every device: `scrollbar-width: none` and its
  * `::-webkit-scrollbar { display: none }` (older Safari has no `scrollbar-width`).
  */
 :root,
@@ -41,37 +43,39 @@ samp {
   --scroll-thumb: color-mix(in srgb, var(--ink) 18%, transparent);
   --scroll-thumb-hover: color-mix(in srgb, var(--ink) 36%, transparent);
 }
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-::-webkit-scrollbar-track,
-::-webkit-scrollbar-corner {
-  background: transparent;
-}
-::-webkit-scrollbar-button {
-  display: none;
-}
-::-webkit-scrollbar-thumb {
-  border: 3px solid transparent;
-  border-radius: var(--radius-full);
-  background: var(--scroll-thumb) padding-box;
-}
-::-webkit-scrollbar-thumb:vertical {
-  min-height: 32px;
-}
-::-webkit-scrollbar-thumb:horizontal {
-  min-width: 32px;
-}
-::-webkit-scrollbar-thumb:hover,
-::-webkit-scrollbar-thumb:active {
-  border-width: 2px;
-  background-color: var(--scroll-thumb-hover);
-}
-@supports not selector(::-webkit-scrollbar) {
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: var(--scroll-thumb) transparent;
+@media (hover: hover) and (pointer: fine) {
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-button {
+    display: none;
+  }
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: var(--radius-full);
+    background: var(--scroll-thumb) padding-box;
+  }
+  ::-webkit-scrollbar-thumb:vertical {
+    min-height: 32px;
+  }
+  ::-webkit-scrollbar-thumb:horizontal {
+    min-width: 32px;
+  }
+  ::-webkit-scrollbar-thumb:hover,
+  ::-webkit-scrollbar-thumb:active {
+    border-width: 2px;
+    background-color: var(--scroll-thumb-hover);
+  }
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--scroll-thumb) transparent;
+    }
   }
 }
 
