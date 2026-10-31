@@ -159,6 +159,62 @@ test("mail API: IMAP account (tested), Gmail through Composio, agent access, fol
   expect(scopes).toEqual([]);
 });
 
+/** What the agent page's Email card (MailAccess.tsx) sends: its draft from the GET answer, with the level picked. */
+function emailCardSave(saved: { canDelete: boolean; policy: object } | undefined, level: "read" | "read_write") {
+  const policy = {
+    folders: [],
+    senders: [],
+    windowDays: null,
+    allowedRecipients: [],
+    dailySendCap: 25,
+    sendWithoutAsking: false,
+    fromAddress: null,
+    ...saved?.policy,
+  };
+  return { level, canDelete: saved?.canDelete ?? false, policy };
+}
+
+test("Gmail that Composio finishes just after sending the person back: the agent's Email row has its address and saves", async () => {
+  const fake = fakeMail();
+  // Composio's redirect doesn't mean the account is active yet: it is on the next read.
+  const read = fake.composio.client.getConnectedAccount;
+  let reads = 0;
+  fake.composio.client.getConnectedAccount = async (id) => {
+    if (++reads === 2) fake.composio.activate(id, "Owner@Gmail.com");
+    return read(id);
+  };
+  t = await createTestServer({ mail: fake.mail });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, agentId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  const { accountId } = (await (await api("/mail/accounts/composio", { json: { provider: "gmail" } })).json()) as {
+    accountId: string;
+  };
+  const back = await owner(`/api/app/mail/composio/callback?account=${accountId}`);
+
+  const { accounts } = (await (await api("/mail/accounts")).json()) as {
+    accounts: { id: string; address: string; status: string }[];
+  };
+  const { mailboxes } = (await (await api(`/agents/${agentId}/mail`)).json()) as {
+    mailboxes: { accountId: string; canDelete: boolean; policy: object }[];
+  };
+  const saved = mailboxes.find((m) => m.accountId === accountId);
+  const put = await api(`/agents/${agentId}/mail/${accountId}`, {
+    method: "PUT",
+    json: emailCardSave(saved, "read_write"),
+  });
+  expect({ status: put.status, body: await put.json() }).toMatchObject({
+    status: 200,
+    body: { accountId, level: "read_write", canDelete: false },
+  });
+  expect(accounts.map((a) => [a.id, a.address, a.status])).toEqual([[accountId, "owner@gmail.com", "active"]]);
+  expect(back.headers.get("location")).toBe(
+    `${t.config.PUBLIC_URL}/org/${orgId}/settings/connectors?mail=connected&account=${accountId}`,
+  );
+});
+
 test("email routines through the routines API, woken by a signed Composio webhook", async () => {
   const fake = fakeMail();
   t = await createTestServer({ mail: fake.mail });

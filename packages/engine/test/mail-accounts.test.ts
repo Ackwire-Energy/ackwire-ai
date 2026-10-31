@@ -187,8 +187,16 @@ test("Gmail through Composio: a pending row, Composio's link, then active with i
   });
   expect((await listMailAccounts(f.db, f.owner.id, f.org.id))[0]).toMatchObject({ status: "pending", address: "" });
 
-  // Not finished at Composio yet: stays pending.
+  // Not finished at Composio yet: read again for a while, then it stays pending.
+  const read = composio.client.getConnectedAccount;
+  let reads = 0;
+  composio.client.getConnectedAccount = (id) => {
+    reads++;
+    return read(id);
+  };
   expect(await completeComposioConnect(deps, f.owner.id, started.accountId)).toEqual({ orgId: f.org.id, ok: false });
+  expect(reads).toBeGreaterThan(1);
+  expect((await listMailAccounts(f.db, f.owner.id, f.org.id))[0]).toMatchObject({ status: "pending", address: "" });
   composio.activate("ca_1", "Team@Example.com");
   expect(await completeComposioConnect(deps, f.owner.id, started.accountId)).toEqual({ orgId: f.org.id, ok: true });
   expect((await listMailAccounts(f.db, f.owner.id, f.org.id))[0]).toMatchObject({

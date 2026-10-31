@@ -33,6 +33,8 @@ export interface MailDeps {
   /** DNS for the SSRF guard on custom IMAP/SMTP hosts (tests: fake). */
   resolveHost?: ResolveHost;
   now?: () => Date;
+  /** Between reads of a sign-in Composio is still finishing (default 1 s; tests: 0). */
+  composioPollMs?: number;
 }
 
 export interface MailAccountView {
@@ -445,15 +447,16 @@ export async function startComposioConnect(
 /**
  * Applies Composio's state of an account to our row: active (with its
  * address) or, for an account that never worked, disconnected. Returns
- * whether it is active now.
+ * `active`, `pending` (Composio hasn't finished the sign-in, nothing
+ * changed) or `off`.
  */
 export async function applyComposioStateFor(
   deps: MailDeps,
   row: MailAccountRow,
   actorId: string | null = null,
-): Promise<boolean> {
+): Promise<"active" | "pending" | "off"> {
   const composio = composioOf(deps);
-  if (!composio || !row.externalAccountId) return false;
+  if (!composio || !row.externalAccountId) return "off";
   const remote = await composio.client.getConnectedAccount(row.externalAccountId);
   const now = deps.now?.() ?? new Date();
   if (remote.status === "active" && remote.address) {
@@ -465,7 +468,7 @@ export async function applyComposioStateFor(
         .update(mailAccounts)
         .set({ status: "needs_reconnect", lastError: "already_connected", revokedAt: now, updatedAt: now })
         .where(eq(mailAccounts.id, row.id));
-      return false;
+      return "off";
     }
     await deps.db
       .update(mailAccounts)
@@ -486,9 +489,9 @@ export async function applyComposioStateFor(
         details: { via: "composio", provider: row.provider, address },
       });
     }
-    return true;
+    return "active";
   }
-  if (remote.status === "pending") return false;
+  if (remote.status === "pending") return "pending";
   if (row.status === "pending") {
     // It never worked: nothing to keep.
     await deps.db
@@ -498,12 +501,17 @@ export async function applyComposioStateFor(
   } else {
     await markNeedsReconnect(deps.db, row.id, `composio_${remote.status}`);
   }
-  return false;
+  return "off";
 }
+
+/** Reads of the connected account before the callback gives up on a sign-in Composio is still finishing. */
+const CALLBACK_READS = 10;
 
 /**
  * Composio sent the person back (`GET /api/app/mail/composio/callback`):
  * reads the connected account; an admin of the account's organization only.
+ * The redirect can come before Composio marks the account active (its own
+ * flow polls until then), so a pending one is read again for a few seconds.
  */
 export async function completeComposioConnect(
   deps: MailDeps,
@@ -513,8 +521,11 @@ export async function completeComposioConnect(
   const [row] = await deps.db.select().from(mailAccounts).where(eq(mailAccounts.id, accountId));
   if (row?.via !== "composio" || row.revokedAt) throw new NotFoundError("Mailbox not found");
   await requirePermission(deps.db, actorId, row.orgId, "manage_connectors");
-  const ok = await applyComposioStateFor(deps, row, actorId);
-  return { orgId: row.orgId, ok };
+  for (let read = 1; ; read++) {
+    const state = await applyComposioStateFor(deps, row, actorId);
+    if (state !== "pending" || read === CALLBACK_READS) return { orgId: row.orgId, ok: state === "active" };
+    await Bun.sleep(deps.composioPollMs ?? 1000);
+  }
 }
 
 // ── Changes ─────────────────────────────────────────────────────────────────
@@ -655,13 +666,16 @@ export async function revokeMailAccount(deps: MailDeps, actorId: string, orgId: 
   caches.scopes.deletePrefix(`${orgId}:`);
 }
 
-/** The credentials were refused: a person must reconnect (routines watching it show "Reconnect"). */
+/**
+ * The credentials were refused: a person must reconnect (routines watching it show "Reconnect"). A sign-in that
+ * never finished stays pending: it has no address to reconnect, and the reconcile removes it.
+ */
 export async function markNeedsReconnect(db: Database, accountId: string, reason: string) {
   const now = new Date();
   await db
     .update(mailAccounts)
     .set({ status: "needs_reconnect", lastError: reason.slice(0, 300), updatedAt: now })
-    .where(and(eq(mailAccounts.id, accountId), isNull(mailAccounts.revokedAt)));
+    .where(and(eq(mailAccounts.id, accountId), isNull(mailAccounts.revokedAt), ne(mailAccounts.status, "pending")));
   await db
     .update(mailWatches)
     .set({ status: "needs_reconnect", lastError: reason.slice(0, 300), updatedAt: now })

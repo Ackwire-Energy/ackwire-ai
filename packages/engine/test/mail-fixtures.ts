@@ -61,6 +61,7 @@ export async function mailSetup(options: { composio?: boolean; imap?: boolean } 
     mail,
     publicUrl: PUBLIC_URL,
     resolveHost: async (host) => (host.endsWith("example.com") ? ["93.184.216.34"] : ["10.0.0.5"]),
+    composioPollMs: 0,
   };
   return { f, deps, mail, box, poller, tester, composio, tools: f.tools as NonNullable<Fixture["tools"]> };
 }
