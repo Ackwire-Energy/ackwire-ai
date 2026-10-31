@@ -1472,6 +1472,9 @@ body[data-window="popover"] {
   overflow-x: auto;
   scrollbar-width: none;
 }
+.dk-orgpick::-webkit-scrollbar {
+  display: none;
+}
 .dk-drop {
   width: 240px;
   display: flex;

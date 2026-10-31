@@ -31,6 +31,51 @@ samp {
 }
 
 /*
+ * Scrollbars, ours wherever something scrolls. WebKit and Blink draw them from the pseudo-elements; the standard
+ * properties go only to browsers without those (Firefox), since Chrome ignores the pseudo-elements on any element that
+ * sets them. A strip that scrolls by swipe hides its own: `scrollbar-width: none` and its
+ * `::-webkit-scrollbar { display: none }` (older Safari has no `scrollbar-width`).
+ */
+:root,
+[data-theme] {
+  --scroll-thumb: color-mix(in srgb, var(--ink) 18%, transparent);
+  --scroll-thumb-hover: color-mix(in srgb, var(--ink) 36%, transparent);
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-button {
+  display: none;
+}
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: var(--radius-full);
+  background: var(--scroll-thumb) padding-box;
+}
+::-webkit-scrollbar-thumb:vertical {
+  min-height: 32px;
+}
+::-webkit-scrollbar-thumb:horizontal {
+  min-width: 32px;
+}
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+  border-width: 2px;
+  background-color: var(--scroll-thumb-hover);
+}
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scroll-thumb) transparent;
+  }
+}
+
+/*
  * Elevation context: whatever sits inside a raised container (a row or card
  * in a dialog, a secondary button on a card, a file chip in the composer) is
  * one step up (`--raised-2`), so it never melts into its container in dark
@@ -5734,9 +5779,6 @@ button.ac-tools__row:focus-visible {
 }
 .ac-recur__modes {
   align-self: flex-start;
-  max-width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
 }
 .ac-recur__row {
   display: flex;

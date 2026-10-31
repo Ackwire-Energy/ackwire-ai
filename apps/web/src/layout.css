@@ -3215,6 +3215,10 @@ p {
     padding: 2px 16px 6px;
     overflow-x: auto;
     overflow-y: hidden;
+    scrollbar-width: none;
+  }
+  .settings__groups::-webkit-scrollbar {
+    display: none;
   }
   .settings__group-label {
     display: none;
@@ -6405,7 +6409,6 @@ p {
   font-size: 12px;
   line-height: 18px;
   white-space: pre;
-  scrollbar-width: thin;
 }
 .machine-command__copy {
   flex: none;
@@ -7085,6 +7088,10 @@ a.machine-row__name:hover {
     gap: 4px;
     overflow-x: auto;
     overflow-y: hidden;
+    scrollbar-width: none;
+  }
+  .onb__steps::-webkit-scrollbar {
+    display: none;
   }
   .onb__step {
     width: auto;
@@ -7865,6 +7872,9 @@ a.machine-row__name:hover {
     scrollbar-width: none;
     padding: 2px;
   }
+  .newag .onb__steps::-webkit-scrollbar {
+    display: none;
+  }
   .newag .onb__steps li {
     flex: none;
   }
@@ -7908,6 +7918,9 @@ a.machine-row__name:hover {
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
+  }
+  .newag__tips::-webkit-scrollbar {
+    display: none;
   }
   .newag__tip {
     flex: none;
