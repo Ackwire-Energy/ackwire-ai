@@ -722,12 +722,20 @@ async function answerContext(tx: Executor, orgId: string, actorId: string, row: 
  */
 async function makeAskedAccount(tx: Executor, row: RequestRow, passwordHash: string) {
   const id = crypto.randomUUID();
-  await tx
-    .insert(users)
-    .values({ id, name: row.name, email: row.email, emailVerified: true, ...(row.locale ? { locale: row.locale } : {}) });
-  await tx
-    .insert(accounts)
-    .values({ id: crypto.randomUUID(), accountId: id, providerId: "credential", userId: id, password: passwordHash });
+  await tx.insert(users).values({
+    id,
+    name: row.name,
+    email: row.email,
+    emailVerified: true,
+    ...(row.locale ? { locale: row.locale } : {}),
+  });
+  await tx.insert(accounts).values({
+    id: crypto.randomUUID(),
+    accountId: id,
+    providerId: "credential",
+    userId: id,
+    password: passwordHash,
+  });
   return id;
 }
 
@@ -770,14 +778,11 @@ export async function approveJoinRequest(
     if (!already) await assertMemberRoom(tx, orgId);
     let approval: JoinApproval = { outcome: "joined" };
     let invitationId: string | null = null;
-    let joinedId: string | null = null;
     if (!already && context.joiner) {
       await joinOrganization(tx, orgId, context.joiner, role, given);
-      joinedId = context.joiner;
     } else if (!already && !context.hasAccount && row.passwordHash && row.verifiedAt) {
       made = await makeAskedAccount(tx, row, row.passwordHash);
       await joinOrganization(tx, orgId, made, role, given);
-      joinedId = made;
     } else if (!already) {
       const sent = await sendInvitation(tx, {
         orgId,
@@ -1041,7 +1046,9 @@ export async function suggestPerson(
       .where(and(eq(requests.orgId, orgId), eq(requests.email, email)))
       .orderBy(desc(requests.createdAt))
       .limit(1);
-    if (latest && isWaiting(latest, now)) throw new ConflictError("Someone already asked for this person", "join.waiting");
+    if (latest && isWaiting(latest, now)) {
+      throw new ConflictError("Someone already asked for this person", "join.waiting");
+    }
     if ((await waitingCount(tx, orgId, now)) >= MAX_PENDING_JOIN_REQUESTS) throw fullError();
     const values = {
       linkId: null,

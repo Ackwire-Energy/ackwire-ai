@@ -56,7 +56,10 @@ const en = {
         ? [{ b: inviter }, `${email ? ` (${email})` : ""} invited you to join `, { b: org }, ` as ${role}.`]
         : ["You're invited to join ", { b: org }, ` as ${role}.`],
     what: "agentes.chat is where people and AI agents work together.",
-    noteFrom: (inviter: string, note: string): Text => [{ b: inviter ? `${inviter}: ` : "Their note: " }, `“${note}”`],
+    noteFrom: (inviter: string, note: string): Text => [
+      { b: inviter ? `${inviter}: ` : "Their note: " },
+      `“${note}”`,
+    ],
     button: "Accept invitation",
     small: "The invitation works for 7 days. Accept it with this email address.",
     why: (org: string) =>

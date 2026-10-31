@@ -10,6 +10,7 @@ import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createI18n } from "@/i18n";
 import { ADA_ID, ADMIN_ROLE_ID, ATLAS_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { createFakeAuth } from "./fake-auth";
 import { notification } from "./fakes/notifications";
 import { hintOf } from "./hint";
 import { renderApp, screen, settle } from "./render";
@@ -32,7 +33,7 @@ const LINK: InvitationPreview = {
   kind: "link",
   invitedBy: "Marina Alves",
   agents: [
-    { id: ADA_ID, name: "Ada", appearance: null },
+    { id: ADA_ID, name: "Ada", appearance: { color: "amber", eyes: "dots", accessory: "beanie" } },
     { id: ATLAS_ID, name: "Atlas", appearance: null },
   ],
 };
@@ -42,8 +43,15 @@ const you = (patch: Partial<JoinStatus> = {}): JoinStatus => ({
   request: null,
   ...patch,
 });
+type Fake = ReturnType<typeof seedState>;
+/** The key the fake's ask answers when it carries a password, and where the page keeps it (ADR 0089). */
+const KEY = "00000000-0000-4000-8000-000000000001.page-secret";
+const ASKED = "agentes.join.asked.lnk";
 
-/** The link's page, signed out (`me: null`) or as the fake's Walter (confirmed unless `unconfirmed`). */
+/**
+ * The link's page, signed out (`me: null`) or as the fake's Walter (confirmed unless `unconfirmed`). What this tab
+ * asked before is forgotten, unless `reload` (the page opened again in the same tab).
+ */
 async function openLink(
   preview: InvitationPreview,
   options: {
@@ -52,99 +60,84 @@ async function openLink(
     askError?: ApiError;
     sendCodeError?: ApiError;
     emails?: boolean;
+    claims?: Fake["claims"];
+    reload?: boolean;
+    auth?: (state: Fake) => ReturnType<typeof createFakeAuth>["auth"];
   } = {},
 ) {
+  if (!options.reload) sessionStorage.clear();
   const state = seedState({
     previews: { lnk: preview },
     askError: options.askError,
     sendCodeError: options.sendCodeError,
     authConfig: { passwordReset: options.emails ?? true },
+    claims: options.claims,
   });
   if (!options.signedIn) state.me = null;
   else if (state.me) state.me.user.emailVerified = !options.unconfirmed;
-  const r = await renderApp("/invite/lnk", { api: createFakeApi(state) });
+  const r = await renderApp("/invite/lnk", { api: createFakeApi(state), auth: options.auth?.(state) });
   await settle(4);
   return { ...r, state };
 }
 
-/** The Verify slot's four labels share one cell; only the current one shows. */
-const slot = () => {
-  const [verify, resend, wait] = [...document.querySelectorAll<HTMLElement>(".invite-ask__slot > .ac-btn")];
-  const shows = (el: HTMLElement | undefined) => !!el && el.style.visibility !== "hidden";
-  const status = document.querySelector(".invite-ask__slot [role=status]")?.textContent;
-  if (status) return `status:${status}`;
-  return shows(verify)
-    ? "verify"
-    : shows(resend)
-      ? "resend"
-      : `wait:${wait?.textContent} ${wait?.getAttribute("aria-label")}`;
-};
+const lead = () => document.querySelector(".auth__lead")?.textContent ?? null;
+/** The link's progress, as a screen reader hears it. */
+const steps = () => document.querySelector(".invite__steps .ac-visually-hidden")?.textContent;
+const next = () => button(/^Continuar$/);
 const codeField = () => screen().queryByLabelText("Código do e-mail") as HTMLInputElement | null;
+const sends = (state: Fake) => state.calls.filter((c) => c.method === "invites.sendCode");
+
+/** Signed out where email goes out: the email, its code, a name and a password, then Ask with no note. */
+async function askThrough() {
+  await type(screen().getByLabelText("Seu e-mail"), "ana@acme.com");
+  await click(next());
+  await settle(4);
+  await type(codeField() as HTMLInputElement, "123456");
+  await settle(4);
+  await type(screen().getByLabelText("Seu nome"), "Ana Souza");
+  await click(next());
+  await type(screen().getByLabelText("Crie uma senha"), "senha-longa");
+  await click(next());
+  await click(button("Pedir para entrar"));
+  await settle(4);
+}
 
 describe("an invitation link asks to join", () => {
-  test("signed out: who shared it and who works there, the form, then sent (the answer comes by email)", async () => {
-    const { state } = await openLink(LINK, { emails: false });
-    expect(heading()).toBe("Pedir para entrar na Acme");
-    expect(text()).toContain("Marina compartilhou este link. Um admin aprova cada pessoa nova.");
-    expect(text()).toContain("Ada e Atlas já trabalham lá.");
-    // Their faces lead the line, on its first line when the names wrap.
-    const agents = screen().getByText("Ada e Atlas já trabalham lá.").parentElement;
-    expect(agents?.classList.contains("ac-iconline")).toBe(true);
-    expect(screen().getByRole("link", { name: "Entrar" }).getAttribute("href")).toBe("/login?redirect=%2Finvite%2Flnk");
-    const send = button("Pedir para entrar");
-    expect(send.hasAttribute("disabled")).toBe(true);
-
-    await type(screen().getByLabelText("Seu nome"), "  Ana Souza ");
+  test("signed out where email goes out: one question per screen, the code on its own, and the ask carries them all", async () => {
+    const { state } = await openLink(LINK, { claims: [{ status: "pending" }] });
+    // The workspace above the host: who shared the link, and the faces and names of who works there.
+    const org = document.querySelector(".invite__org");
+    expect(org?.querySelector(".invite__org-name")?.textContent).toBe("Acme");
+    expect(org?.textContent).toContain("Convite de Marina Alves");
+    expect(org?.textContent).toContain("Ada e Atlas trabalham lá");
+    expect(org?.querySelectorAll(".invite__faces .ac-avatar")).toHaveLength(2);
+    // The host is the workspace's first agent, as it looks there.
+    expect(document.querySelector(".auth__ask .ac-avatar")?.getAttribute("data-accessory")).toBe("beanie");
+    expect(heading()).toBe("Oi. Este é o convite da Acme.");
+    expect(lead()).toBe("Qual é o seu e-mail? Um admin aprova cada pessoa nova.");
+    expect(steps()).toBe("Passo 1 de 5");
+    const signIn = () => screen().getByRole("link", { name: "Já tem conta? Entrar" }).getAttribute("href");
+    expect(signIn()).toBe("/login?redirect=%2Finvite%2Flnk");
+    expect(next().hasAttribute("disabled")).toBe(true);
     await type(screen().getByLabelText("Seu e-mail"), "ana@gmial.com");
-    // No line under it: the sent screen names the address.
-    expect(screen().getByLabelText("Seu e-mail").hasAttribute("aria-describedby")).toBe(false);
-    // The answer goes to that address: a likely typo is offered first.
+    // The code goes to that address: a likely typo is offered first.
     await click(button("Você quis dizer ana@gmail.com?"));
     // Signing in instead takes the address typed here along.
-    expect(screen().getByRole("link", { name: "Entrar" }).getAttribute("href")).toBe(
-      "/login?redirect=%2Finvite%2Flnk&email=ana%40gmail.com",
-    );
-    const note = screen().getByLabelText("Algo que eles devam saber? (opcional)");
-    expect(note.getAttribute("placeholder")).toBe("Quem é você e quem te convidou");
-    expect(note.hasAttribute("aria-describedby")).toBe(false);
-    await type(note, "Designer nova da Paula");
-    expect(send.hasAttribute("disabled")).toBe(false);
-    await click(send);
+    expect(signIn()).toBe("/login?redirect=%2Finvite%2Flnk&email=ana%40gmail.com");
+    await click(next());
     await settle(4);
-    expect(state.calls.find((c) => c.method === "invites.ask")?.args).toEqual([
-      "lnk",
-      { name: "Ana Souza", email: "ana@gmail.com", note: "Designer nova da Paula" },
-    ]);
-    expect(heading()).toBe("Pedido enviado");
-    // One line: where the answer goes. Nothing about closing the page.
-    expect([...document.querySelectorAll(".invite-ask__outcome-text p")].map((p) => p.textContent)).toEqual([
-      "Avisamos em ana@gmail.com quando um admin responder.",
-    ]);
-  });
+    expect(sends(state).map((c) => c.args)).toEqual([["lnk", { email: "ana@gmail.com" }]]);
 
-  test("signed out, on a server that sends email: Verify, the code typed back, then Ask carries it", async () => {
-    const { state } = await openLink(LINK);
-    await type(screen().getByLabelText("Seu nome"), "Ana Souza");
-    expect(button("Verificar").hasAttribute("disabled")).toBe(true);
-    await type(screen().getByLabelText("Seu e-mail"), "ana@gmial.com");
-    // The suggestion comes with the address, before Verify, which would send the code to the typo.
-    const row = [...(screen().getByLabelText("Seu e-mail").parentElement?.children ?? [])];
-    expect(row.map((el) => el.className.split(" ")[0])).toEqual(["ac-input", "auth__fix", "invite-ask__slot"]);
-    await click(button("Você quis dizer ana@gmail.com?"));
-    const send = button("Pedir para entrar");
-    expect(send.hasAttribute("disabled")).toBe(true);
-    expect(codeField()).toBeNull();
-
-    await click(button("Verificar"));
-    await settle(4);
-    expect(state.calls.find((c) => c.method === "invites.sendCode")?.args).toEqual(["lnk", { email: "ana@gmail.com" }]);
-    // The code field takes the focus, and the slot counts down to Resend.
+    // The code, on a screen of its own: focused, counting down to Resend, with the webmail at hand.
+    expect(heading()).toBe("Mandei um código para ana@gmail.com.");
+    expect(lead()).toBe("Digite os 6 números. Ele vale por 10 minutos.");
+    expect(steps()).toBe("Passo 2 de 5");
     const code = codeField() as HTMLInputElement;
     expect(document.activeElement).toBe(code);
     expect(code.getAttribute("autocomplete")).toBe("one-time-code");
     expect(code.getAttribute("inputmode")).toBe("numeric");
-    expect(slot()).toMatch(/^wait:[01]:\d\d Reenviar em \d+ segundos$/);
-    expect(send.hasAttribute("disabled")).toBe(true);
+    expect(text()).toMatch(/Reenviar em \d+ segundos/);
+    expect(screen().getByRole("link", { name: "Abrir o Gmail" }).getAttribute("href")).toBe("https://mail.google.com");
 
     // A wrong code: said under the field, which empties for another try.
     await type(code, "000000");
@@ -163,75 +156,165 @@ describe("an invitation link asks to join", () => {
       "lnk",
       { email: "ana@gmail.com", code: "123456" },
     ]);
-    expect(slot()).toBe("status:Verificado");
-    expect(codeField()).toBeNull();
-    expect(screen().queryByRole("alert")).toBeNull();
-    expect(document.activeElement).toBe(screen().getByLabelText("Algo que eles devam saber? (opcional)"));
-    expect(send.hasAttribute("disabled")).toBe(false);
-    await click(send);
+
+    // Then a name, a password and a note, each on its screen.
+    expect(heading()).toBe("E-mail confirmado. Prazer.");
+    expect(lead()).toBe("Como o time te chama?");
+    expect(document.querySelector(".auth__who--ok")?.textContent).toBe("ana@gmail.com");
+    await type(screen().getByLabelText("Seu nome"), "  Ana Souza ");
+    await click(next());
+    expect(heading()).toBe("Boa, Ana. Agora uma senha.");
+    expect(lead()).toBe("É com ela que você entra quando aprovarem.");
+    expect(steps()).toBe("Passo 4 de 5");
+    await type(screen().getByLabelText("Crie uma senha"), "curta");
+    expect(next().hasAttribute("disabled")).toBe(true);
+    await type(screen().getByLabelText("Crie uma senha"), "senha-longa");
+    await click(next());
+    expect(heading()).toBe("Quer dizer algo para quem aprova?");
+    const note = screen().getByLabelText("Recado");
+    expect(note.getAttribute("placeholder")).toBe("Sou do financeiro. A Ana me passou o link.");
+    await type(note, "Designer nova");
+    await click(button("Pedir para entrar"));
     await settle(4);
     expect(state.calls.find((c) => c.method === "invites.ask")?.args).toEqual([
       "lnk",
-      { name: "Ana Souza", email: "ana@gmail.com", code: "123456" },
+      { name: "Ana Souza", email: "ana@gmail.com", note: "Designer nova", code: "123456", password: "senha-longa" },
     ]);
-    expect(heading()).toBe("Pedido enviado");
+
+    // Asked: no account yet, and the page waits for an admin, checking at once with the key the ask answered.
+    expect(heading()).toBe("Pronto. Seu pedido chegou na Acme.");
+    expect(lead()).toBe("Você entra assim que um admin aprovar. Pode fechar esta página: aviso em seu e-mail.");
+    expect(text()).toContain("Esperando um admin da Acme");
+    expect(text()).toContain("Pedido de Ana Souza · ana@gmail.com");
+    expect(text()).toContain("Sua conta só é criada quando aprovarem. Se recusarem, nada fica guardado.");
+    expect(state.calls.filter((c) => c.method === "invites.claim").map((c) => c.args)).toEqual([["lnk", KEY]]);
   });
 
-  test("editing the email starts over; Resend after the countdown; a code sent a moment ago counts down", async () => {
-    const { state } = await openLink(LINK);
-    await type(screen().getByLabelText("Seu nome"), "Ana Souza");
-    await type(screen().getByLabelText("Seu e-mail"), "ana@acme.com");
-    await click(button("Verificar"));
-    await settle(4);
-    await type(codeField() as HTMLInputElement, "123456");
-    await settle(4);
-    expect(slot()).toBe("status:Verificado");
-
-    await type(screen().getByLabelText("Seu e-mail"), "ana@acme.co");
-    expect(slot()).toBe("verify");
-    expect(codeField()).toBeNull();
-    expect(button("Pedir para entrar").hasAttribute("disabled")).toBe(true);
-    // The address the code went to, typed again: its proof still holds.
-    await type(screen().getByLabelText("Seu e-mail"), "ana@acme.com");
-    expect(slot()).toBe("status:Verificado");
-
-    await type(screen().getByLabelText("Seu e-mail"), "bia@acme.com");
-    await click(button("Verificar"));
-    await settle(4);
-    expect(slot()).toMatch(/^wait:/);
-    setSystemTime(new Date(Date.now() + 61_000));
-    await type(codeField() as HTMLInputElement, "1");
-    expect(slot()).toBe("resend");
-    await click(button("Reenviar"));
-    await settle(4);
-    expect(state.calls.filter((c) => c.method === "invites.sendCode")).toHaveLength(3);
+  test("the wait survives a reload; approved, the page signs in with its one-time sign-in and opens the workspace", async () => {
+    await openLink(LINK, { claims: [{ status: "pending" }] });
+    await askThrough();
+    expect(heading()).toBe("Pronto. Seu pedido chegou na Acme.");
+    expect(JSON.parse(sessionStorage.getItem(ASKED) ?? "{}")).toEqual({
+      key: KEY,
+      name: "Ana Souza",
+      email: "ana@acme.com",
+    });
     cleanup();
 
-    // Reopened inside the minute: the code already sent is the one to type.
-    const retry = new ApiError(429, "join.code_wait", "wait", { retryIn: 42 });
-    await openLink(LINK, { sendCodeError: retry });
-    await type(screen().getByLabelText("Seu e-mail"), "ana@acme.com");
-    await click(button("Verificar"));
+    // Opened again in this tab: still waiting, with the same key. Then an admin approves.
+    const { auth, calls } = createFakeAuth();
+    const { state, services, router } = await openLink(LINK, {
+      reload: true,
+      claims: [{ status: "pending" }, { status: "in", orgId: ORG_ID, signIn: "one-time-token" }],
+      auth: (fake) => {
+        const once = auth.signInOneTime;
+        auth.signInOneTime = async (token) => {
+          // The session of the account the approval made, now in the workspace.
+          fake.me = seedState().me;
+          return once(token);
+        };
+        return auth;
+      },
+    });
+    expect(heading()).toBe("Pronto. Seu pedido chegou na Acme.");
+    expect(state.calls.filter((c) => c.method === "invites.claim").map((c) => c.args)).toEqual([["lnk", KEY]]);
+    await act(() => services.queryClient.invalidateQueries());
     await settle(4);
-    expect(slot()).toBe("wait:0:42 Reenviar em 42 segundos");
-    expect(codeField()).toBeTruthy();
-    expect(screen().queryByRole("alert")).toBeNull();
+    // "Aprovado" for a moment, then the workspace.
+    expect(heading()).toBe("Aprovado. Você entrou na Acme.");
+    expect(text()).toContain("Entrando na Acme");
+    expect(sessionStorage.getItem(ASKED)).toBeNull();
+    await act(() => new Promise((r) => setTimeout(r, 1300)));
+    await settle(10);
+    expect(calls.filter((c) => c.method === "signInOneTime").map((c) => c.args)).toEqual([["one-time-token"]]);
+    expect(router.state.location.pathname.startsWith(`/org/${ORG_ID}`)).toBe(true);
   });
 
-  test("at phone width the email takes its row and Verify's slot goes under it, after a typo's suggestion", async () => {
-    const css = (await Bun.file(new URL("../src/pages/invite.css", import.meta.url).pathname).text()).replace(
-      /\/\*[\s\S]*?\*\//g,
-      "",
-    );
-    const phone = css.split("\n@media (max-width: 480px) {")[1]?.split("\n}")[0] ?? "";
-    const rule = (selector: string, sheet = css) =>
-      new RegExp(`\\n *${selector.replace(/[.>]/g, "\\$&")} \\{([^}]*)\\}`).exec(sheet)?.[1] ?? "";
-    // Wider, the suggestion takes a row of its own under the address and the slot.
-    expect(rule(".invite-ask__verify")).toContain("grid-template-columns: minmax(0, 1fr) auto");
-    expect(rule(".invite-ask__verify > .auth__fix")).toMatch(/grid-row: 2;\s*grid-column: 1 \/ -1;/);
-    // On a phone one column, in the markup's order: the address, the suggestion, then the slot.
-    expect(rule(".invite-ask__verify", phone)).toContain("grid-template-columns: minmax(0, 1fr);");
-    expect(rule(".invite-ask__verify > .auth__fix", phone)).toContain("grid-row: auto");
+  test("an admin's answer while the page waits: turned down with their note, or a request that ended", async () => {
+    await openLink(LINK, { claims: [{ status: "denied", reason: "Só a <i>equipe</i> do estúdio" }] });
+    await askThrough();
+    expect(heading()).toBe("Seu pedido não foi aprovado");
+    // As in the email: the label in bold, their words in quotes, as typed.
+    const note = document.querySelector(".invite__reason");
+    expect(note?.textContent).toBe("Recado: “Só a <i>equipe</i> do estúdio”");
+    expect(note?.querySelector("b")?.textContent).toBe("Recado:");
+    expect(note?.querySelector("i")).toBeNull();
+    expect(lead()).toBe("Se acha que foi engano, peça a alguém da Acme para convidar você.");
+    // The last word: a reload doesn't wait anymore.
+    expect(sessionStorage.getItem(ASKED)).toBeNull();
+    cleanup();
+
+    // Run out, its link turned off, or approved for an account that was already there: sign in as always.
+    for (const claims of [[{ status: "closed" as const }], []]) {
+      const { router } = await openLink(LINK, { claims });
+      await askThrough();
+      expect(heading()).toBe("Seu pedido terminou.");
+      expect(lead()).toBe("Se foi aprovado, entre com sua conta.");
+      await click(button("Entrar"));
+      await settle(4);
+      expect(router.state.location.pathname).toBe("/login");
+      expect(router.state.location.search).toEqual({ redirect: "/invite/lnk", email: "ana@acme.com" });
+      cleanup();
+    }
+  });
+
+  test("approved, but the one-time sign-in doesn't go through: signing in by hand, with the address chosen", async () => {
+    const { router } = await openLink(LINK, {
+      claims: [{ status: "in", orgId: ORG_ID, signIn: "spent" }],
+      auth: () => createFakeAuth({ oneTime: { ok: false, status: 401, message: "Invalid token" } }).auth,
+    });
+    await askThrough();
+    expect(heading()).toBe("Aprovado. Você entrou na Acme.");
+    await act(() => new Promise((r) => setTimeout(r, 1300)));
+    await settle(4);
+    expect(heading()).toBe("Aprovado. Agora é só entrar.");
+    expect(lead()).toBe("Use o e-mail e a senha que você escolheu.");
+    await click(button("Entrar"));
+    await settle(4);
+    expect(router.state.location.pathname).toBe("/login");
+    expect(router.state.location.search).toEqual({ redirect: `/org/${ORG_ID}`, email: "ana@acme.com" });
+  });
+
+  test("Trocar goes back to the email; one code a minute, then Resend; a proven address skips its code", async () => {
+    const { state } = await openLink(LINK);
+    await type(screen().getByLabelText("Seu e-mail"), "ana@acme.com");
+    await click(next());
+    await settle(4);
+    expect(text()).toContain("Reenviar em 60 segundos");
+    // Trocar: the email again. The same address inside the minute goes back to the code already sent.
+    await click(button("Trocar"));
+    expect(heading()).toBe("Oi. Este é o convite da Acme.");
+    expect((screen().getByLabelText("Seu e-mail") as HTMLInputElement).value).toBe("ana@acme.com");
+    await click(next());
+    await settle(4);
+    expect(heading()).toBe("Mandei um código para ana@acme.com.");
+    expect(sends(state)).toHaveLength(1);
+    // After the minute, another one.
+    setSystemTime(new Date(Date.now() + 61_000));
+    await type(codeField() as HTMLInputElement, "1");
+    await click(button("Reenviar o código"));
+    await settle(4);
+    expect(sends(state)).toHaveLength(2);
+    expect(text()).toMatch(/Reenviar em \d+ segundos/);
+    // Proven: going back to the email and on again skips the code.
+    await type(codeField() as HTMLInputElement, "123456");
+    await settle(4);
+    expect(heading()).toBe("E-mail confirmado. Prazer.");
+    await click(button("Voltar"));
+    await click(next());
+    await settle(4);
+    expect(heading()).toBe("E-mail confirmado. Prazer.");
+    expect(sends(state)).toHaveLength(2);
+    cleanup();
+
+    // Opened again inside the minute: the code already sent is the one to type.
+    await openLink(LINK, { sendCodeError: new ApiError(429, "join.code_wait", "wait", { retryIn: 42 }) });
+    await type(screen().getByLabelText("Seu e-mail"), "ana@acme.com");
+    await click(next());
+    await settle(4);
+    expect(heading()).toBe("Mandei um código para ana@acme.com.");
+    expect(text()).toContain("Reenviar em 42 segundos");
+    expect(screen().queryByRole("alert")).toBeNull();
   });
 
   test("every refusal of a code is said in both languages, never in the server's English", () => {
@@ -244,66 +327,107 @@ describe("an invitation link asks to join", () => {
     expect(errorText(createI18n("en").t, new ApiError(400, "join.code_wrong", "x"))).toBe("Wrong code. Try again.");
   });
 
-  test("too many codes for an address is said under the email, and Verify and Resend go off for it", async () => {
+  test("too many codes for an address: said on its screen, and Continue goes off for it; at the cap, Resend too", async () => {
     const limit = new ApiError(429, "join.code_limit", "limit");
     const { state } = await openLink(LINK, { sendCodeError: limit });
     await type(screen().getByLabelText("Seu e-mail"), "ana@acme.com");
-    await click(button("Verificar"));
+    await click(next());
     await settle(4);
-    expect(text()).toContain("Muitos códigos para este e-mail. Tente de novo mais tarde.");
-    expect(codeField()).toBeNull();
-    expect(slot()).toBe("verify");
-    expect(button("Verificar").hasAttribute("disabled")).toBe(true);
+    expect(screen().getByRole("alert").textContent).toBe("Muitos códigos para este e-mail. Tente de novo mais tarde.");
+    expect(heading()).toBe("Oi. Este é o convite da Acme.");
+    expect(next().hasAttribute("disabled")).toBe(true);
 
     // Another address gets one. At its cap Resend goes off, and the code already sent stays good.
     state.sendCodeError = undefined;
     await type(screen().getByLabelText("Seu e-mail"), "bia@acme.com");
-    expect(button("Verificar").hasAttribute("disabled")).toBe(false);
-    await click(button("Verificar"));
+    expect(next().hasAttribute("disabled")).toBe(false);
+    await click(next());
     await settle(4);
     setSystemTime(new Date(Date.now() + 61_000));
     await type(codeField() as HTMLInputElement, "1");
     state.sendCodeError = limit;
-    await click(button("Reenviar"));
+    await click(button("Reenviar o código"));
     await settle(4);
-    expect(slot()).toBe("resend");
-    expect(button("Reenviar").hasAttribute("disabled")).toBe(true);
-    expect(state.calls.filter((c) => c.method === "invites.sendCode")).toHaveLength(3);
+    expect(screen().getByRole("alert").textContent).toBe("Muitos códigos para este e-mail. Tente de novo mais tarde.");
+    expect(button("Reenviar o código").hasAttribute("disabled")).toBe(true);
+    expect(sends(state)).toHaveLength(3);
     await type(codeField() as HTMLInputElement, "123456");
     await settle(4);
-    expect(slot()).toBe("status:Verificado");
+    expect(heading()).toBe("E-mail confirmado. Prazer.");
   });
 
-  test("signed in with an email not confirmed: the account's address, read-only, with Verify", async () => {
-    const { state } = await openLink({ ...LINK, you: you() }, { signedIn: true, unconfirmed: true });
-    const email = screen().getByLabelText("Seu e-mail") as HTMLInputElement;
-    expect(email.value).toBe("walter@acme.com.br");
-    expect(email.readOnly).toBe(true);
-    // "Not you? Sign out" beside the label, so the address shows once.
-    expect(email.closest(".ac-field")?.querySelector(".ac-field__label-row")?.textContent).toContain(
-      "Não é você? Sair",
-    );
-    expect(text()).not.toContain("Você vai pedir como");
-    await click(button("Verificar"));
+  test("a proof that ran out by the time of asking: back to the email, and Continue sends a new code", async () => {
+    const { state } = await openLink(LINK, { askError: new ApiError(409, "join.code_expired", "expired") });
+    await askThrough();
+    expect(heading()).toBe("Oi. Este é o convite da Acme.");
+    expect(screen().getByRole("alert").textContent).toBe("Este código expirou. Peça um novo.");
+    state.askError = undefined;
+    await click(next());
     await settle(4);
-    expect(state.calls.find((c) => c.method === "invites.sendCode")?.args).toEqual(["lnk", {}]);
+    expect(heading()).toBe("Mandei um código para ana@acme.com.");
+    expect(sends(state)).toHaveLength(2);
+  });
+
+  test("signed out where no email goes out: the typed form (name, email, note), and where the answer goes", async () => {
+    const { state } = await openLink(LINK, { emails: false });
+    expect(heading()).toBe("Pedir para entrar na Acme");
+    expect(lead()).toBe("Um admin aprova cada pessoa nova.");
+    const signIn = () => screen().getByRole("link", { name: "Já tem conta? Entrar" }).getAttribute("href");
+    expect(signIn()).toBe("/login?redirect=%2Finvite%2Flnk");
+    const send = button("Pedir para entrar");
+    expect(send.hasAttribute("disabled")).toBe(true);
+    await type(screen().getByLabelText("Seu nome"), "  Ana Souza ");
+    await type(screen().getByLabelText("Seu e-mail"), "ana@gmial.com");
+    // No line under it: the sent screen names the address.
+    expect(screen().getByLabelText("Seu e-mail").hasAttribute("aria-describedby")).toBe(false);
+    // The answer goes to that address: a likely typo is offered first.
+    await click(button("Você quis dizer ana@gmail.com?"));
+    expect(signIn()).toBe("/login?redirect=%2Finvite%2Flnk&email=ana%40gmail.com");
+    const note = screen().getByLabelText("Algo que eles devam saber? (opcional)");
+    expect(note.getAttribute("placeholder")).toBe("Quem é você e quem te convidou");
+    await type(note, "Designer nova da Paula");
+    expect(send.hasAttribute("disabled")).toBe(false);
+    await click(send);
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "invites.ask")?.args).toEqual([
+      "lnk",
+      { name: "Ana Souza", email: "ana@gmail.com", note: "Designer nova da Paula" },
+    ]);
+    expect(state.calls.some((c) => c.method === "invites.sendCode")).toBe(false);
+    expect(heading()).toBe("Pedido enviado");
+    expect(lead()).toBe("Avisamos em ana@gmail.com quando um admin responder.");
+  });
+
+  test("signed in with an email not confirmed: Continue sends a code to the account's own address, and the ask carries it", async () => {
+    const { state } = await openLink({ ...LINK, you: you() }, { signedIn: true, unconfirmed: true });
+    expect(heading()).toBe("Pedir para entrar na Acme");
+    expect(lead()).toBe("Você vai pedir como walter@acme.com.br. Antes, mando um código para confirmar o e-mail.");
+    expect(screen().queryByLabelText("Seu e-mail")).toBeNull();
+    await click(next());
+    await settle(4);
+    expect(sends(state).map((c) => c.args)).toEqual([["lnk", {}]]);
+    expect(heading()).toBe("Mandei um código para walter@acme.com.br.");
+    // The account's own address: nothing to change it to here.
+    expect(screen().queryByRole("button", { name: "Trocar" })).toBeNull();
     await type(codeField() as HTMLInputElement, "123456");
     await settle(4);
-    await click(button("Pedir para entrar"));
-    await settle(4);
+    expect(state.calls.find((c) => c.method === "invites.checkCode")?.args).toEqual(["lnk", { code: "123456" }]);
     expect(state.calls.find((c) => c.method === "invites.ask")?.args).toEqual(["lnk", { code: "123456" }]);
+    expect(heading()).toBe("Pedido enviado");
   });
 
   test("signed in: one tap as the account; the page follows the answer", async () => {
     const { state, services } = await openLink({ ...LINK, you: you() }, { signedIn: true });
-    expect(text()).toContain("Você vai pedir como walter@acme.com.br.");
+    expect(heading()).toBe("Pedir para entrar na Acme");
+    expect(lead()).toBe("Você vai pedir como walter@acme.com.br.");
     expect(button("Não é você? Sair")).toBeTruthy();
     expect(screen().queryByLabelText("Seu e-mail")).toBeNull();
     await click(button("Pedir para entrar"));
     await settle(4);
     expect(state.calls.find((c) => c.method === "invites.ask")?.args).toEqual(["lnk", {}]);
     expect(heading()).toBe("Pedido enviado");
-    expect(text()).toContain("Você entra assim que um admin aprovar.");
+    expect(lead()).toBe("Você entra assim que um admin aprovar.");
+    expect(text()).toContain("Esperando um admin da Acme");
 
     // Approved: the next check finds them in.
     state.previews = {
@@ -318,23 +442,33 @@ describe("an invitation link asks to join", () => {
     expect(button("Abrir Acme")).toBeTruthy();
   });
 
-  test("the answers: denied with the admin's note, approved by invitation, already in, a link that no longer works", async () => {
+  test("Não é você? Sair: signs out and stays on the link, at its first question", async () => {
+    const { auth, calls } = createFakeAuth();
+    const { router } = await openLink({ ...LINK, you: you() }, { signedIn: true, auth: () => auth });
+    await click(button("Não é você? Sair"));
+    await settle(4);
+    expect(calls.map((c) => c.method)).toEqual(["signOut"]);
+    expect(heading()).toBe("Oi. Este é o convite da Acme.");
+    expect(router.state.location.pathname).toBe("/invite/lnk");
+  });
+
+  test("the answers, signed in: denied with the admin's note, approved by invitation, already in, a link that no longer works", async () => {
     await openLink(
       { ...LINK, you: you({ request: { status: "denied", reason: "Só a <i>equipe</i> do estúdio" } }) },
       { signedIn: true },
     );
     expect(heading()).toBe("Seu pedido não foi aprovado");
     // As in the email: the label in bold, their words in quotes, as typed.
-    const note = document.querySelector(".invite-ask__reason");
+    const note = document.querySelector(".invite__reason");
     expect(note?.textContent).toBe("Recado: “Só a <i>equipe</i> do estúdio”");
     expect(note?.querySelector("b")?.textContent).toBe("Recado:");
     expect(note?.querySelector("i")).toBeNull();
-    expect(text()).toContain("Se acha que foi engano, peça a alguém da Acme para convidar você.");
+    expect(lead()).toBe("Se acha que foi engano, peça a alguém da Acme para convidar você.");
     cleanup();
 
     await openLink({ ...LINK, you: you({ request: { status: "approved", reason: null } }) }, { signedIn: true });
     expect(heading()).toBe("Aprovado");
-    expect(text()).toContain("Para terminar, abra o convite que mandamos para walter@acme.com.br.");
+    expect(lead()).toBe("Para terminar, abra o convite que mandamos para walter@acme.com.br.");
     cleanup();
 
     // A server that sends no email: the admin hands them the link.
@@ -343,8 +477,7 @@ describe("an invitation link asks to join", () => {
       { signedIn: true, emails: false },
     );
     expect(heading()).toBe("Aprovado");
-    expect(text()).toContain("Um admin vai mandar um link para você terminar.");
-    expect(text()).not.toContain("convite que mandamos");
+    expect(lead()).toBe("Um admin vai mandar um link para você terminar.");
     cleanup();
 
     await openLink({ ...LINK, you: you({ member: true, orgId: ORG_ID }) }, { signedIn: true });
@@ -353,9 +486,9 @@ describe("an invitation link asks to join", () => {
 
     await openLink({ ...LINK, invitedBy: null, agents: [], closed: true });
     expect(heading()).toBe("Este link não funciona mais");
-    expect(text()).toContain("Peça um novo a quem mandou.");
+    expect(lead()).toBe("Peça um novo a quem mandou.");
     expect(screen().queryByRole("button", { name: "Pedir um novo convite" })).toBeNull();
-    expect(screen().queryByLabelText("Seu nome")).toBeNull();
+    expect(screen().queryByLabelText("Seu e-mail")).toBeNull();
     cleanup();
 
     // A member opening a link that no longer works: they're in, with the way there.
@@ -370,11 +503,11 @@ describe("an invitation link asks to join", () => {
   test("whoever works there is counted: the first four by name, then how many more", async () => {
     const agents = ["Ada", "Atlas", "Lia", "Theo"].map((name, i) => ({ id: `a${i}`, name, appearance: null }));
     await openLink({ ...LINK, agents, moreAgents: 2 });
-    expect(text()).toContain("Ada, Atlas, Lia, Theo e mais 2 já trabalham lá.");
-    expect(document.querySelectorAll(".invite-ask__agents .ac-avatar")).toHaveLength(4);
+    expect(text()).toContain("Ada, Atlas, Lia, Theo e mais 2 trabalham lá");
+    expect(document.querySelectorAll(".invite__faces .ac-avatar")).toHaveLength(4);
   });
 
-  test("a full workspace or too many asks, from here or through the link: said in the form, which stays", async () => {
+  test("a full workspace or too many asks, from here or through the link: said on the ask, which stays", async () => {
     for (const [error, words] of [
       [new ApiError(409, "join.full", "full"), "Este workspace tem muitos pedidos esperando."],
       [new ApiError(429, "join.rate_limited", "slow down"), "Muitos pedidos daqui. Tente de novo daqui a uma hora."],
@@ -390,8 +523,8 @@ describe("an invitation link asks to join", () => {
   });
 
   test("the workspace's logo in place of its initial, on a link and an invitation alike; the initial without one", async () => {
-    const mark = () => document.querySelector<HTMLImageElement>(".invite-card img.org-mark");
-    const initial = () => document.querySelector(".invite-card .org-badge");
+    const mark = () => document.querySelector<HTMLImageElement>(".invite__org img.org-mark");
+    const initial = () => document.querySelector(".invite__org .org-badge");
     const logo = "/api/app/invitations/lnk/logo/0123456789abcdef.png";
     await openLink({ ...LINK, logo });
     expect(mark()?.getAttribute("src")).toBe(logo);
@@ -412,6 +545,19 @@ describe("an invitation link asks to join", () => {
     await openLink(LINK);
     expect(mark()).toBeNull();
     expect(initial()?.textContent).toBe("A");
+  });
+
+  test("at phone width the step bars take the column; wider, they start where the bubble does", async () => {
+    const css = (await Bun.file(new URL("../src/pages/invite.css", import.meta.url).pathname).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    const phone = css.split("\n@media (max-width: 560px) {")[1]?.split("\n}")[0] ?? "";
+    const rule = (selector: string, sheet = css) =>
+      new RegExp(`\\n *${selector.replace(/[.>]/g, "\\$&")} \\{([^}]*)\\}`).exec(sheet)?.[1] ?? "";
+    // The host's 56px and the 14px beside it.
+    expect(rule(".invite__steps")).toContain("margin: 0 0 18px 70px");
+    expect(rule(".invite__steps", phone)).toContain("margin-left: 0");
   });
 });
 
@@ -450,28 +596,51 @@ async function members(query = "", patch: Parameters<typeof seedState>[0] = {}) 
 }
 const card = (name: string) => screen().getByRole("group", { name: `${name} pede para entrar` });
 
-describe("Members › Requests to join", () => {
-  test("each card keeps who asks and the answer; approve with a role, or an invitation goes out", async () => {
-    const { state } = await members();
-    const section = screen().getByRole("region", { name: "Pedidos para entrar 2" });
+/** A member's suggestion (ADR 0089): through no link, nothing proved, from João; named by its address. */
+const suggestion = (): JoinRequest => ({
+  id: "r3",
+  name: "carla.dias",
+  email: "carla.dias@estudio.com",
+  note: "Freelancer de design, vai ajudar no site novo.",
+  verified: false,
+  confirmed: false,
+  suggestedBy: "João",
+  createdAt: new Date(Date.now() - 30 * 60_000).toISOString(),
+  expiresAt: new Date(Date.now() + 14 * 86_400_000).toISOString(),
+});
+const stateOf = (row: HTMLElement) => row.querySelector(".members-row__state")?.textContent;
+const noteOf = (row: HTMLElement) => row.querySelector(".members-row__note")?.textContent ?? null;
+
+describe("Members › Esperando você", () => {
+  test("who asked through the link and whom a member suggested: how and when, the note in a well; approve with roles", async () => {
+    setSystemTime(MIDDAY);
+    const { state } = await members("", { joinRequests: [...requests(), suggestion()] });
+    const section = screen().getByRole("region", { name: "Esperando você" });
+    expect(section.querySelector(".members-head .ac-countchip")?.textContent).toBe("3");
     const ana = within(section).getByRole("group", { name: "Ana Souza pede para entrar" });
-    expect(ana.textContent).toContain("Ana Souza pede para entrar");
+    expect(ana.querySelector(".members-row__name")?.textContent).toBe("Ana Souza");
     expect(ana.textContent).toContain("ana@estudio.com");
-    expect(ana.textContent).toContain("“Designer nova da Paula”");
-    // The top and the bottom only: no proof line, no closing date.
-    expect(ana.querySelector(".ac-approval__detail")).toBeNull();
-    expect(ana.textContent).not.toMatch(/E-mail (não )?confirmado|Fecha em/);
+    expect(stateOf(ana)).toBe("Pediu pelo link há 2 h");
+    // What they wrote, as they wrote it, in a well under the row.
+    expect(noteOf(ana)).toBe("“Designer nova da Paula”");
     const chips = (el: HTMLElement) => [...el.querySelectorAll(".ac-chip")].map((c) => c.textContent);
-    expect(chips(ana)).toEqual(["Pediu há 2 h"]);
-    // Nobody proved Bruno's address: "Not verified" beside "Asked …", the only hint approving can't add him at once.
+    expect(chips(ana)).toEqual([]);
+    // Nobody proved Bruno's address: "Não verificado", the only hint approving can't add him at once.
     const bruno = card("Bruno Lima");
-    expect(chips(bruno)).toEqual(["Não verificado", expect.stringMatching(/^Pediu em \d/)]);
-    expect(bruno.querySelector(".jr-chips")?.children).toHaveLength(2);
+    expect(chips(bruno)).toEqual(["Não verificado"]);
+    expect(stateOf(bruno)).toMatch(/^Pediu pelo link em \d+ \S+$/);
+    expect(noteOf(bruno)).toBeNull();
+    // A member's suggestion says who suggested it, and never "Não verificado": nobody was asked to prove anything.
+    const carla = within(section).getByRole("group", { name: "João sugeriu carla.dias" });
+    expect(stateOf(carla)).toBe("João sugeriu há 30 min");
+    expect(chips(carla)).toEqual([]);
+    expect(noteOf(carla)).toBe("“Freelancer de design, vai ajudar no site novo.”");
 
     const sidebarCount = () => document.querySelector(".sidebar__org-meta")?.textContent;
     expect(sidebarCount()).toBe("2 membros · 2 agentes");
-    // Roles to give (ADR 0085): a menu that stays open, one switch per role below the approver's.
+    // Roles to give (ADR 0085), "Membro" with none: a menu that stays open, one switch per role below the approver's.
     const roles = within(ana).getByRole("button", { name: "Papéis para Ana Souza" });
+    expect(roles.textContent).toBe("Membro");
     roles.focus();
     await act(async () => fireEvent.keyDown(roles, { key: "Enter" }));
     await click(screen().getByRole("menuitemcheckbox", { name: "Admin" }));
@@ -488,7 +657,13 @@ describe("Members › Requests to join", () => {
     await settle(4);
     expect(state.calls.filter((c) => c.method === "joinRequests.approve").at(-1)?.args).toEqual([ORG_ID, "r2", []]);
     expect(text()).toContain("Convite enviado para bruno@lima.dev.");
-    expect(screen().queryByRole("region", { name: /Pedidos para entrar/ })).toBeNull();
+    // Approving a suggestion emails the person an invitation.
+    const suggested = within(section).getByRole("group", { name: "João sugeriu carla.dias" });
+    await click(within(suggested).getByRole("button", { name: "Aprovar" }));
+    await settle(4);
+    expect(state.calls.filter((c) => c.method === "joinRequests.approve").at(-1)?.args).toEqual([ORG_ID, "r3", []]);
+    expect(text()).toContain("Convite enviado para carla.dias@estudio.com.");
+    expect(screen().queryByRole("region", { name: "Esperando você" })).toBeNull();
   });
 
   test("on a server without email, approving hands the admin the invitation to send", async () => {
@@ -555,7 +730,7 @@ describe("Members › Requests to join", () => {
 test("a name typed with markup reads as typed, in Members and in the inbox", async () => {
   const name = "Ana <strong>CEO</strong><br/>x";
   await members("", { joinRequests: [{ ...(requests()[0] as JoinRequest), name }] });
-  const who = card(name).querySelector(".ac-approval__who b");
+  const who = card(name).querySelector(".members-row__name");
   expect(who?.textContent).toBe(name);
   expect(who?.children.length).toBe(0);
   cleanup();
@@ -581,7 +756,31 @@ test("a name typed with markup reads as typed, in Members and in the inbox", asy
   expect(headline?.children.length).toBe(0);
 });
 
-describe("Members › Invite people", () => {
+/** Members' "Convidar pessoas" (the page's own, the first of that name): the workspace's invite dialog (ADR 0089). */
+async function openInvite() {
+  const [open] = screen().getAllByRole("button", { name: "Convidar pessoas" });
+  await click(open as HTMLElement);
+  await settle(2);
+  return screen().getByRole("dialog", { name: "Convidar para a Acme" });
+}
+/** Swaps the clipboard for one that keeps what's written, while `run` runs. */
+async function withClipboard(run: () => Promise<unknown>) {
+  const writes: string[] = [];
+  const clipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText: async (s: string) => void writes.push(s) },
+  });
+  try {
+    await run();
+  } finally {
+    if (clipboard) Object.defineProperty(navigator, "clipboard", clipboard);
+    else Reflect.deleteProperty(navigator, "clipboard");
+  }
+  return writes;
+}
+
+describe("Members › Convidar pessoas", () => {
   test("says no agent answers someone invited now, as the Team step does, while every agent with an AI is only yours", async () => {
     const note = async (audience: "owner" | "everyone") => {
       cleanup();
@@ -594,7 +793,7 @@ describe("Members › Invite people", () => {
       if (first) first.audience = { mode: audience, userIds: [] };
       await renderApp(`/org/${ORG_ID}/settings/members`, { api: createFakeApi(state) });
       await settle(6);
-      const invite = screen().getByRole("region", { name: "Convidar pessoas" });
+      const invite = await openInvite();
       return { invite, line: within(invite).queryByText("Seus agentes só atendem você.")?.closest(".setup-line") };
     };
     const { invite, line } = await note("owner");
@@ -602,50 +801,58 @@ describe("Members › Invite people", () => {
     expect(hintOf("Seus agentes só atendem você.", invite).text).toBe(
       "Num plano, você pode deixar cada um atender outras pessoas na página dele.",
     );
-    // Under the card's title, before the invitations it's about.
-    const emails = within(invite).getByLabelText("E-mails, separados por vírgula");
+    // Before the addresses it's about.
+    const emails = within(invite).getByLabelText("E-mails");
     expect((line as Element).compareDocumentPosition(emails) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(invite.querySelector(".ac-card__title + .setup-line")).toBe(line as Element);
     // One agent that answers everyone: someone invited gets an answer, so nothing to say.
     expect((await note("everyone")).line).toBeFalsy();
   });
+
+  test("a server that sends no email: the link alone, nothing to type; one that does: the addresses, then the link", async () => {
+    const link = {
+      id: "link-1",
+      url: "http://localhost:3000/invite/k3J",
+      expiresAt: new Date(Date.now() + 20 * 86_400_000).toISOString(),
+      createdAt: new Date().toISOString(),
+      createdBy: "Walter",
+      waiting: 0,
+    };
+    await members("", { joinRequests: [], inviteLinks: [link], authConfig: { passwordReset: false } });
+    let invite = await openInvite();
+    expect(invite.textContent).toContain("Quem abrir o link pede para entrar, e você aprova cada pessoa.");
+    expect(within(invite).queryByLabelText("E-mails")).toBeNull();
+    expect(within(invite).queryByRole("button", { name: /^Convidar/ })).toBeNull();
+    expect(invite.querySelector(".invite-or")).toBeNull();
+    expect((within(invite).getByLabelText("Link de convite") as HTMLInputElement).value).toBe(link.url);
+    cleanup();
+
+    await members("", {
+      joinRequests: [],
+      inviteLinks: [link],
+      edition: "selfhost",
+      authConfig: { passwordReset: true },
+    });
+    invite = await openInvite();
+    expect(invite.textContent).toContain("Por e-mail a pessoa entra direto. Pelo link, ela pede e você aprova.");
+    expect(within(invite).getByLabelText("E-mails")).toBeTruthy();
+    // Nothing to send yet.
+    expect(within(invite).getByRole("button", { name: "Convidar" }).hasAttribute("disabled")).toBe(true);
+    expect(invite.querySelector(".invite-or")?.textContent).toBe("ou mande o link");
+    expect((within(invite).getByLabelText("Link de convite") as HTMLInputElement).value).toBe(link.url);
+  });
 });
 
-describe("Members › Invite people, by email when the server sends it", () => {
-  const inviteCard = async (state: ReturnType<typeof seedState>) => {
-    await renderApp(`/org/${ORG_ID}/settings/members`, { api: createFakeApi(state) });
-    await settle(6);
-    return screen().getByRole("region", { name: "Convidar pessoas" });
-  };
-
-  test("no email to send invitations with: the link is the only way in, without the hairline over it", async () => {
-    const invite = await inviteCard(seedState({ joinRequests: [], authConfig: { passwordReset: false } }));
-    expect(within(invite).queryByLabelText("E-mails, separados por vírgula")).toBeNull();
-    expect(within(invite).queryByRole("button", { name: "Convidar" })).toBeNull();
-    expect(invite.querySelector(".jr-link--alone")).toBeTruthy();
-  });
-
-  test("a self-hosted server that sends email invites by email too, the link under it", async () => {
-    const invite = await inviteCard(
-      seedState({ joinRequests: [], edition: "selfhost", authConfig: { passwordReset: true } }),
-    );
-    expect(within(invite).getByLabelText("E-mails, separados por vírgula")).toBeTruthy();
-    expect(within(invite).getByRole("button", { name: "Convidar" })).toBeTruthy();
-    expect(invite.querySelector(".jr-link:not(.jr-link--alone)")).toBeTruthy();
-  });
-});
-
-describe("Members › Invitation link", () => {
-  test("Turn off's word ends where Copy ends above it: the text button's padding hangs past the edge", async () => {
+describe("Members › the invitation link", () => {
+  test("Desativar's word ends where Copiar link ends above it: the text button's padding hangs past the edge", async () => {
     const read = (path: string) => Bun.file(new URL(path, import.meta.url).pathname).text();
-    expect(await read("../src/pages/members.css")).toMatch(
-      /\.jr-link__foot > \.ac-btn--ghost \{\s*margin: 0 calc\(-1 \* var\(--control-px-sm\)\) 0 auto;\s*\}/,
+    expect(await read("../src/components/invite/invite.css")).toMatch(
+      /\.invite-link__foot > \.ac-btn--ghost:last-child \{\s*margin-right: calc\(-1 \* var\(--control-px-sm\)\);\s*\}/,
     );
     const ui = await read("../../../packages/ui/src/styles/components.css");
     expect(ui.split("\n.ac-btn--sm {").at(-1)?.split("}")[0]).toContain("padding: 0 var(--control-px-sm);");
   });
 
-  test("the link to copy, what it does, turning it off with its requests, an earlier link, making a new one", async () => {
+  test("copy it from the page or the dialog, until when, Renovar keeps it, Desativar closes its requests, a new one", async () => {
     const until = new Date(Date.now() + 20 * 86_400_000).toISOString();
     const { state } = await members("", {
       joinRequests: [],
@@ -668,37 +875,28 @@ describe("Members › Invitation link", () => {
         },
       ],
     });
-    const invite = screen().getByRole("region", { name: "Convidar pessoas" });
-    // Inviting by email lets people straight in: the Emails field's ⓘ says so, and describes the field.
-    const about = within(invite).getByRole("button", { name: "Sobre E-mails, separados por vírgula" });
-    const joins = document.getElementById(about.getAttribute("aria-describedby") ?? "");
-    expect(joins?.textContent).toBe("Quem você convida por e-mail entra direto.");
-    expect(within(invite).getByLabelText("E-mails, separados por vírgula").getAttribute("aria-describedby")).toBe(
-      joins?.id ?? null,
-    );
+    // The page's own button copies it: the word and its icon both say so.
+    const fromPage = await withClipboard(() => click(screen().getByRole("button", { name: "Copiar link de convite" })));
+    expect(fromPage).toEqual(["http://localhost:3000/invite/k3J"]);
+    const copied = screen().getByRole("button", { name: "Copiado" });
+    expect(copied.querySelector("svg path")?.getAttribute("d")).toBe(icons.check[0]?.[1].d);
+    // An active link was there: none was made.
+    expect(state.calls.some((c) => c.method === "invites.createLink")).toBe(false);
+
+    const invite = await openInvite();
     expect((within(invite).getByLabelText("Link de convite") as HTMLInputElement).value).toBe(
       "http://localhost:3000/invite/k3J",
     );
-    // Copied: the word and its icon both say it.
-    const writes: string[] = [];
-    const clipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText: async (s: string) => void writes.push(s) },
-    });
-    try {
-      await click(within(invite).getByRole("button", { name: "Copiar" }));
-    } finally {
-      if (clipboard) Object.defineProperty(navigator, "clipboard", clipboard);
-      else Reflect.deleteProperty(navigator, "clipboard");
-    }
-    const copied = within(invite).getByRole("button", { name: "Copiado" });
-    expect(writes).toEqual(["http://localhost:3000/invite/k3J"]);
-    expect(copied.querySelector("svg path")?.getAttribute("d")).toBe(icons.check[0]?.[1].d);
-    // Who can get in through a shared link stays on screen, not behind an ⓘ.
-    const linkLine = within(invite).getByText(/^Um admin aprova cada pessoa que pedir\. Vale até \S+/);
-    expect(linkLine.closest("[hidden]")).toBeNull();
+    const fromDialog = await withClipboard(() => click(within(invite).getByRole("button", { name: "Copiar link" })));
+    expect(fromDialog).toEqual(["http://localhost:3000/invite/k3J"]);
+    expect(within(invite).getByRole("button", { name: "Copiado" })).toBeTruthy();
+    expect(invite.querySelector(".invite-link__foot")?.textContent).toMatch(/^Vale até \d+ \S+RenovarDesativar$/);
     expect(invite.textContent).toMatch(/Link anterior, criado por João .+\. Vale até /);
+
+    await click(within(invite).getByRole("button", { name: "Renovar" }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "invites.renewLink")?.args).toEqual([ORG_ID, "link-1"]);
+    expect(text()).toMatch(/O link vale até \d+ \S+\. Continua o mesmo\./);
 
     const [turnOff] = within(invite).getAllByRole("button", { name: "Desativar" });
     await click(turnOff as HTMLElement);
@@ -709,10 +907,12 @@ describe("Members › Invitation link", () => {
     await click(within(dialog).getByRole("button", { name: "Desativar" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "invites.turnOff")?.args).toEqual([ORG_ID, "link-1"]);
-    await click(within(invite).getByRole("button", { name: "Criar link" }));
+    const after = screen().getByRole("dialog", { name: "Convidar para a Acme" });
+    expect(after.textContent).toContain("Nenhum link ativo.");
+    await click(within(after).getByRole("button", { name: "Criar link" }));
     await settle(4);
     expect(state.calls.some((c) => c.method === "invites.createLink")).toBe(true);
-    expect((within(invite).getByLabelText("Link de convite") as HTMLInputElement).value).toMatch(
+    expect((within(after).getByLabelText("Link de convite") as HTMLInputElement).value).toMatch(
       /^http:\/\/localhost:3000\/invite\/link-/,
     );
   });
@@ -776,4 +976,64 @@ test("the admins' notice names the first two who asked and counts the rest", asy
     expect(notice.querySelector(".nt-wr__l1")?.textContent).toContain(said);
     cleanup();
   }
+});
+
+test("the inviter's notice when someone joins: their face and name, a Members chip; Abrir opens a conversation with them", async () => {
+  const accepted = (latest: NotificationLatest) =>
+    seedState({
+      notifications: [
+        notification({
+          id: "n-in",
+          kind: "invitation_accepted",
+          actors: [{ type: "user", id: "u-carla" }],
+          source: { label: "Acme" },
+          latest,
+        }),
+      ],
+    });
+  // Just joined: the members list hasn't caught up yet, so the notice's own name is the one said.
+  const { router } = await renderApp(`/org/${ORG_ID}/notifications`, {
+    api: createFakeApi(accepted({ title: "Carla <b>Dias</b>" })),
+  });
+  await settle(6);
+  const row = document.querySelector('[data-n="n-in"]') as HTMLElement;
+  expect(row.getAttribute("aria-label")).toBe("Carla <b>Dias</b>, não lida");
+  expect(row.querySelector(".nt-what")?.textContent).toBe("Carla <b>Dias</b> aceitou seu convite e entrou na Acme");
+  // Typed by a person: text, never markup.
+  expect(row.querySelector(".nt-what b")?.textContent).toBe("Carla <b>Dias</b>");
+  expect(row.querySelector(".nt-what b")?.children.length).toBe(0);
+  expect(row.querySelector(".nt-tags .ac-chip")?.textContent).toBe("Membros");
+  expect(row.querySelector(".nt-who .ac-avatar")).toBeTruthy();
+  await click(within(row).getByRole("button", { name: "Abrir" }));
+  await settle(6);
+  expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/dm/person/u-carla`);
+  cleanup();
+
+  // In the members list: the name it has there; the person's initials on their face.
+  const state = accepted({ title: "Carla" });
+  const carla = { ...(state.members[1] as Member), userId: "u-carla", name: "Carla Dias", email: "carla@acme.com" };
+  state.members.push(carla);
+  await renderApp(`/org/${ORG_ID}/notifications`, { api: createFakeApi(state) });
+  await settle(6);
+  const known = document.querySelector('[data-n="n-in"]') as HTMLElement;
+  expect(known.querySelector(".nt-what")?.textContent).toBe("Carla Dias aceitou seu convite e entrou na Acme");
+  expect(known.querySelector(".nt-who .ac-avatar")?.textContent).toBe("CD");
+  // No workspace on it: who joined, all the same.
+  cleanup();
+  await renderApp(`/org/${ORG_ID}/notifications`, {
+    api: createFakeApi(
+      seedState({
+        notifications: [
+          notification({
+            id: "n-in",
+            kind: "invitation_accepted",
+            actors: [{ type: "user", id: "u-carla" }],
+            latest: { title: "Carla Dias" },
+          }),
+        ],
+      }),
+    ),
+  });
+  await settle(6);
+  expect(document.querySelector('[data-n="n-in"] .nt-what')?.textContent).toBe("Carla Dias aceitou seu convite");
 });

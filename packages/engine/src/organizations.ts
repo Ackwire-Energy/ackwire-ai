@@ -1116,7 +1116,12 @@ export async function invitableChannelIds(db: Executor, actorId: string, orgId: 
     })
     .from(channels)
     .where(
-      and(eq(channels.orgId, orgId), inArray(channels.id, wanted), isNull(channels.archivedAt), ne(channels.kind, "dm")),
+      and(
+        eq(channels.orgId, orgId),
+        inArray(channels.id, wanted),
+        isNull(channels.archivedAt),
+        ne(channels.kind, "dm"),
+      ),
     );
   const ok = rows.filter((r) => r.visibility === "public" || r.member).map((r) => r.id);
   if (ok.length !== wanted.length) {

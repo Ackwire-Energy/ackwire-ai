@@ -334,7 +334,9 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
         c.headline,
         [
           { p: c.body(inertText(t.inviterName), t.inviterEmail ? inertText(t.inviterEmail) : null, org, role) },
-          ...(t.note?.trim() ? [{ note: c.noteFrom(inertText(t.inviterName), inertText(t.note, INVITE_NOTE_SHOWN)) }] : []),
+          ...(t.note?.trim()
+            ? [{ note: c.noteFrom(inertText(t.inviterName), inertText(t.note, INVITE_NOTE_SHOWN)) }]
+            : []),
           { p: c.what },
           { button: c.button, url: t.url },
           { small: c.small },

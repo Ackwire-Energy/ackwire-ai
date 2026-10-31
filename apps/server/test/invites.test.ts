@@ -494,7 +494,7 @@ test("request a new invitation: the inviter is emailed once; valid or unknown to
   expect(t.email.sent[0]?.text).toContain(`/org/${orgId}/settings/members`);
 });
 
-test("asked with a password, an approval makes the account and the page that asked signs in once (ADR 0089)", async () => {
+test("an ask with a password: approval makes the account, and the asking page signs in once (ADR 0089)", async () => {
   const { owner, orgId, token } = await start();
   const anon = browser(t);
   const code = await codeFor(anon, token, "rafa@example.com");

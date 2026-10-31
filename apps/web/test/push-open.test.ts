@@ -305,6 +305,26 @@ describe("a pushed notification that can't be read", () => {
     expect(fallbackTarget(data({}))).toBeNull();
   });
 
+  test("someone who joined by an invitation: a conversation with them, or Members when only the push is left", () => {
+    // The notification names the person (ADR 0089): their DM.
+    const accepted = openTarget(
+      notification({
+        id: ID,
+        kind: "invitation_accepted",
+        actors: [{ type: "user", id: "u-carla" }],
+        source: { label: "Acme" },
+        latest: { title: "Carla Dias" },
+      }),
+    );
+    expect(accepted).toEqual({ to: "/org/$orgId/dm/person/$userId", params: { userId: "u-carla" } });
+    expect(ROUTES.has("/org/$orgId/dm/person/$userId")).toBe(true);
+    // A push names no person: Members, where they now are.
+    expect(fallbackTarget(data({ kind: "invitation_accepted" }))).toEqual({
+      to: "/org/$orgId/settings/$section",
+      params: { section: "members" },
+    });
+  });
+
   test("every place it picks is a real page", () => {
     for (const { kind } of PUSHED) {
       const target = fallbackTarget(data({ kind, channelId: "c1", threadId: "t1", missionId: "x1" }));

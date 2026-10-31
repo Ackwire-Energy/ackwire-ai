@@ -137,7 +137,9 @@ describe("asking through a link with a password (ADR 0089)", () => {
 
   test("an address with an account signs in as always; a denial keeps nothing of what they chose", async () => {
     const { token } = await start();
-    await fx().db.insert(schema.users).values({ id: "u_bia", name: "Bia", email: "bia@example.com", emailVerified: true });
+    await fx()
+      .db.insert(schema.users)
+      .values({ id: "u_bia", name: "Bia", email: "bia@example.com", emailVerified: true });
     const asked = await askWithPassword(token, "bia@example.com", "hash:bia", "bia-secret");
     const id = "requestId" in asked ? (asked.requestId ?? "") : "";
     await approveJoinRequest(deps(), PUBLIC, fx().owner.id, fx().org.id, id, [], NOW);
@@ -286,7 +288,11 @@ describe("email invitations (ADR 0089)", () => {
     const [user] = await fx().db.select().from(schema.users).where(eq(schema.users.id, "u_rita"));
     expect(user?.emailVerified).toBe(true);
 
-    await noticeInvitationAccepted(deps(), { orgId: fx().org.id, inviterId: joined.invitedBy, userId: "u_rita" }, at(1));
+    await noticeInvitationAccepted(
+      deps(),
+      { orgId: fx().org.id, inviterId: joined.invitedBy, userId: "u_rita" },
+      at(1),
+    );
     const [notice] = await fx()
       .db.select()
       .from(schema.notifications)

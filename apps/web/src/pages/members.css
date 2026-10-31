@@ -1,64 +1,83 @@
 /*
- * Members › Requests to join and the invitation link (ADR 0068). Tokens only, so light and dark follow the theme;
- * the request cards are the design system's approval cards, whose actions wrap at phone width.
+ * Configurações › Membros e convites (ADR 0068, 0085, 0089). Tokens only, so light and dark follow the theme.
  */
-.jr-count {
-  margin-left: 4px;
+
+/* The page's own actions, beside its title; under it on a narrow screen. */
+.members-acts {
+  flex: none;
+}
+/* "Esperando você" and how many. */
+.members-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* A request or an invitation: face, two lines, its state, its actions; a note in a well under the words. */
+.members-row__name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.members-row__sub {
+  overflow-wrap: anywhere;
+}
+.members-row[data-off] .members-row__name {
+  color: var(--muted);
   font-weight: 500;
+}
+.members-row__state {
+  flex: 0 1 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font-size: 12.5px;
   color: var(--muted);
 }
-.jr-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+.members-row__state > .ac-icon {
+  flex: none;
+  color: var(--faint);
 }
-/* Who asks, then "Not verified" beside "Asked …" at the head's end: the two chips wrap together. */
-.jr-list .ac-approval__who {
-  flex: 1;
+.members-row__state[data-tone="soon"],
+.members-row__state[data-tone="soon"] > .ac-icon {
+  color: var(--attention);
+}
+.members-row__state[data-tone="ok"],
+.members-row__state[data-tone="ok"] > .ac-icon {
+  color: var(--ok);
+}
+.members-row__acts {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
-}
-.jr-chips {
-  display: flex;
-  gap: var(--space-2);
+  justify-content: flex-end;
+  gap: 6px;
   margin-left: auto;
 }
-.jr-role {
-  width: 180px;
+/* Ghost buttons in a row of their own keep their plates' rhythm (`.ac-acts`). */
+.members-row__acts.ac-acts {
+  gap: 0;
+  column-gap: calc(2 * var(--ghost-plate));
 }
-/* The link's part of the "Invite people" card, under a hairline. */
-.jr-link {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--line);
+/* What the person wrote: under the words, as quoted, in a well. Its edge on the words' edge (the face and the gap). */
+.members-row__note {
+  flex-basis: 100%;
+  margin: 0 0 2px calc(24px + var(--space-3));
+  padding: 8px 12px;
+  border-radius: 12px 12px 12px 3px;
+  background: var(--card-well);
+  box-shadow: var(--card-well-shadow);
+  font-size: 13.5px;
+  color: var(--ink2);
 }
-.jr-link--alone {
-  padding-top: 0;
-  border-top: 0;
-}
-.jr-copy {
-  display: flex;
-  gap: var(--space-2);
-}
-.jr-copy > .ac-input {
-  flex: 1;
-  min-width: 0;
-}
-.jr-link__foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+/* Nothing sent yet: the sentence and the way to invite, on one line. */
+.members-empty {
   justify-content: space-between;
-  gap: var(--space-2);
+  font-size: 14px;
 }
-/* Turn off is a text button: its word ends where Copy ends above it (its padding hangs past), on its own line too. */
-.jr-link__foot > .ac-btn--ghost {
-  margin: 0 calc(-1 * var(--control-px-sm)) 0 auto;
-}
+
 /* A person's roles (ADR 0085): the owner's chip, their roles' chips, a "+" to give or take them. */
 .members-roles {
   flex: 0 1 280px;
@@ -68,4 +87,17 @@
   justify-content: flex-end;
   gap: 6px;
   min-width: 0;
+}
+@media (max-width: 760px) {
+  /* The state and the actions go under the words, on the words' edge. */
+  .members-row__state,
+  .members-row__acts {
+    margin-left: calc(24px + var(--space-3));
+  }
+  .members-row__acts {
+    justify-content: flex-start;
+  }
+  .members-row__note {
+    margin-left: calc(24px + var(--space-3));
+  }
 }

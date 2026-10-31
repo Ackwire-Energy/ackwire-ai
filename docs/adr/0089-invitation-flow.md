@@ -1,9 +1,9 @@
 # 0089. Bringing a teammate in: a link asks with a password, invitations keep their link
 
-- Status: Accepted (built: the server and the shared client; the web screens in progress; the phone app follows)
+- Status: Accepted (built: the server, the shared client and the web; the phone app follows)
 - Date: 2026-10-31
 - Revises: ADR 0068 §4 and §5 (an approval also makes the account a proven ask chose a password for), ADR 0072 §2 and §6 (for an address with no account, the code that proved the request is what confirms the new account)
-- Code: `packages/engine/src/invite-requests.ts` (`askToJoin`, `approveJoinRequest`, `claimJoinRequest`, `suggestPerson`, `listMySuggestions`, `cancelSuggestion`, `renewInviteLink`, `noticeInvitationAccepted`), `packages/engine/src/organizations.ts` (`sendInvitation`, `createInvitation`, `inviteMany`, `invitableChannelIds`, `setInvitationRoles`, `resendInvitation`, `listInvitationsWithStatus`, `previewInvitation`, `invitationState`, `acceptInvitation`, `hasWaitingInvitation`), `packages/engine/src/crypto.ts` (`invitationToken`), `packages/engine/src/email.ts` (`queueInvitationEmail`), `apps/server/src/auth.ts` (`hashPassword`, `mintUserSignIn`), `apps/server/src/routes/app/invites.ts`, `management.ts`, `account.ts`, `packages/db/migrations/0139_invitation_flow.sql`
+- Code: `packages/engine/src/invite-requests.ts` (`askToJoin`, `approveJoinRequest`, `claimJoinRequest`, `suggestPerson`, `listMySuggestions`, `cancelSuggestion`, `renewInviteLink`, `noticeInvitationAccepted`), `packages/engine/src/organizations.ts` (`sendInvitation`, `createInvitation`, `inviteMany`, `invitableChannelIds`, `setInvitationRoles`, `resendInvitation`, `listInvitationsWithStatus`, `previewInvitation`, `invitationState`, `acceptInvitation`, `hasWaitingInvitation`), `packages/engine/src/crypto.ts` (`invitationToken`), `packages/engine/src/email.ts` (`queueInvitationEmail`), `apps/server/src/auth.ts` (`hashPassword`, `mintUserSignIn`), `apps/server/src/routes/app/invites.ts`, `management.ts`, `account.ts`, `packages/db/migrations/0139_invitation_flow.sql`; the screens: `apps/web/src/pages/InvitePage.tsx`, `apps/web/src/pages/MembersPage.tsx`, `apps/web/src/components/invite/` (the invite dialog, the address chips shared with the onboarding, the link panel, the arrival card), `apps/web/src/components/WelcomeCard.tsx`
 
 ## Context
 

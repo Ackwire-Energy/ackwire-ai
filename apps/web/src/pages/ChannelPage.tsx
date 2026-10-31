@@ -212,6 +212,8 @@ import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@
 import { MenuEntries } from "@/components/DesktopMenus";
 import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfMessage } from "@/components/Forum";
 import { IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
+import { ArrivalCard, useArrival } from "@/components/invite/Arrival";
+import { InviteOfferRow, useInviteOffer } from "@/components/invite/InviteDialog";
 import { useUploadFailed } from "@/components/Limits";
 import { LiveCodeToggle, type SteerNote } from "@/components/LiveCode";
 import { ErrorState, LoadingConversation } from "@/components/Loading";
@@ -561,6 +563,9 @@ function ChannelView({
   const scopedRuns = (s: StreamsState) => runsInChannel(s, channel.id).filter((r) => runVisible.current(r));
   const live = useLiveStore();
   const join = useJoinChannel(org.id, channel.id);
+  // A newcomer's first #general greets them (ADR 0089), in the place of the day's greeting.
+  const arrival = useArrival(channel);
+  const arriving = arrival.show && !thread;
   const sendTyping = useTypingSender(channel.id, thread?.id);
   // ⌘K "Pedir a um agente" leaves the text for this DM's composer.
   const draftKey = chrome?.dmAgentId ? `agent:${chrome.dmAgentId}` : null;
@@ -1650,7 +1655,10 @@ function ChannelView({
                 </div>
               </header>
             )}
-            {!chrome && isMember && (
+            {!chrome && isMember && arriving && (
+              <ArrivalCard channel={channel} onSayHi={() => composer.current?.focus()} onClose={arrival.close} />
+            )}
+            {!chrome && isMember && !arriving && (
               <ChannelWelcome channelId={channel.id} messages={messages.data} agents={channelAgents} />
             )}
 
@@ -3887,6 +3895,8 @@ function AddMembersDialog({
     }
   }, [open]);
   const rows = useMemberRows(q, exclude);
+  // An address nobody here has: invite them to the workspace and this channel (ADR 0089).
+  const invite = useInviteOffer(q);
   const add = useMutation({
     mutationFn: async () => {
       for (const key of selected) await api.chat.addMember(org.id, channel.id, memberOf(key));
@@ -3908,7 +3918,7 @@ function AddMembersDialog({
         onQueryChange={setQ}
         searchLabel={t("channelMembers.addSearch")}
         searchPlaceholder={t("channelMembers.addSearch")}
-        isEmpty={rows.length === 0}
+        isEmpty={rows.length === 0 && !invite}
         emptyText={t("channelMembers.addEmpty", { q })}
       >
         <MemberPickerRows
@@ -3923,6 +3933,7 @@ function AddMembersDialog({
             })
           }
         />
+        {invite && <InviteOfferRow email={invite} channel={channel} onPick={onClose} />}
       </DialogSearchList>
       <DialogFooter bar>
         <Button onClick={onClose}>{t("common.cancel")}</Button>

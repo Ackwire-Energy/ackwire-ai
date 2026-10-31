@@ -508,69 +508,281 @@ describe("Senha nova (link do e-mail)", () => {
 });
 
 describe("Aceitar convite", () => {
-  test("valid invitation: email is fixed; sign up then accept and enter the org", async () => {
-    const state = seedState({ me: null });
+  const INVITED: InvitationPreview = {
+    orgName: "Acme",
+    email: "rafael@acme.com.br",
+    role: "member",
+    kind: "email",
+    invitedBy: "Ana Souza",
+    agents: [
+      { id: ADA_ID, name: "Ada", appearance: { color: "amber", eyes: "dots", accessory: "beanie" } },
+      { id: "agent-theo", name: "Theo", appearance: null },
+    ],
+    account: { exists: false, password: false, providers: [] },
+  };
+  const EXPIRED = {
+    state: "expired" as const,
+    orgName: "Acme",
+    invitedBy: "Ana Souza",
+    at: "2026-10-24T15:00:00.000Z",
+  };
+  type Fake = ReturnType<typeof seedState>;
+  /** An email invitation's page (`/invite/inv`, or `path`), its preview `patch`ed; signed out unless `seed` says. */
+  const openInvite = async (
+    patch: Partial<InvitationPreview> = {},
+    options: {
+      seed?: Parameters<typeof seedState>[0];
+      auth?: (state: Fake) => ReturnType<typeof createFakeAuth>["auth"];
+      path?: string;
+    } = {},
+  ) => {
+    const state = seedState({ me: null, ...options.seed, previews: { inv: { ...INVITED, ...patch } } });
+    const r = await renderApp(options.path ?? "/invite/inv", {
+      api: createFakeApi(state),
+      auth: options.auth?.(state),
+    });
+    await settle(4);
+    return { ...r, state };
+  };
+
+  test("a new address: its name, then a password; signing up accepts and opens the workspace", async () => {
     const { auth, calls } = createFakeAuth();
-    const api = createFakeApi(state);
-    await renderApp("/invite/valid", { api, auth });
-    expect(screen().getByRole("heading", { name: "Você foi convidado para a Acme" })).toBeTruthy();
-    expect(screen().getByText("membro").tagName).toBe("B");
-    const email = screen().getByLabelText("E-mail") as HTMLInputElement;
-    expect(email.value).toBe("marina@acme.com.br");
-    expect(email.readOnly).toBe(true);
-    // Why it can't change is behind its ⓘ; the password keeps what it needs under the field.
-    expect(email.getAttribute("aria-describedby")).toBe("inv-email-hint");
-    expect(document.getElementById("inv-email-hint")?.textContent).toBe("O convite vale só para este e-mail.");
-    expect(screen().getByRole("button", { name: "Sobre E-mail" })).toBeTruthy();
-    expect([...document.querySelectorAll(".ac-field__help")].map((h) => h.textContent)).toEqual([
-      "Pelo menos 8 caracteres.",
-    ]);
-    const accept = screen().getByRole("button", { name: "Aceitar e entrar na Acme" });
-    expect(accept.hasAttribute("disabled")).toBe(true);
-    await type("Seu nome", "Marina");
+    const { state, router } = await openInvite(
+      {},
+      {
+        seed: { authConfig: { termsUrl: "/termos", privacyUrl: "/privacidade" } },
+        auth: (fake) => {
+          const signUp = auth.signUp;
+          auth.signUp = async (input, humanCheck) => {
+            fake.me = seedState().me;
+            return signUp(input, humanCheck);
+          };
+          return auth;
+        },
+      },
+    );
+    // The workspace above the host: who invited, and the faces and names of who works there.
+    const org = document.querySelector(".invite__org")?.textContent;
+    expect(org).toContain("Convite de Ana Souza");
+    expect(org).toContain("Ada e Theo trabalham lá");
+    // The host is the workspace's first agent, as it looks there.
+    expect(document.querySelector(".auth__ask .ac-avatar")?.getAttribute("data-accessory")).toBe("beanie");
+    expect(heading()).toBe("Oi. Ana chamou você para a Acme.");
+    expect(lead()).toBe("Para começar: como o time te chama?");
+    // The address can't change: the invitation is for it.
+    const who = document.querySelector(".auth__who");
+    expect(who?.textContent).toBe("rafael@acme.com.br");
+    expect(who?.getAttribute("title")).toBe("O convite vale só para este e-mail.");
+    expect(screen().getByRole("link", { name: "Termos" }).getAttribute("href")).toBe("/termos");
+    expect(screen().getByRole("button", { name: /^Continuar(?! com)/ }).hasAttribute("disabled")).toBe(true);
+    await type("Seu nome", "Rafael Costa");
+    await press(/^Continuar(?! com)/, 2);
+    expect(heading()).toBe("Boa, Rafael. Agora uma senha.");
+    expect(lead()).toBe("Com ela você entra na Acme agora e nas próximas vezes.");
+    expect(screen().getByRole("button", { name: "Entrar na Acme" }).hasAttribute("disabled")).toBe(true);
     await type("Crie uma senha", "senha-exemplo");
-    await act(async () => fireEvent.click(accept));
-    await settle(6);
-    expect(calls[0]?.args[0]).toEqual({ name: "Marina", email: "marina@acme.com.br", password: "senha-exemplo" });
-    expect(state.calls.find((c) => c.method === "orgs.acceptInvitation")?.args).toEqual(["valid"]);
+    await press("Entrar na Acme", 10);
+    expect(calls.filter((c) => c.method === "signUp").map((c) => c.args)).toEqual([
+      [{ name: "Rafael Costa", email: "rafael@acme.com.br", password: "senha-exemplo" }],
+    ]);
+    expect(state.calls.filter((c) => c.method === "orgs.acceptInvitation").map((c) => c.args)).toEqual([["inv"]]);
+    expect(router.state.location.pathname.startsWith(`/org/${ORG_ID}`)).toBe(true);
   });
 
-  test("expired invitation offers to ask for a new one", async () => {
-    await renderApp("/invite/expired", { api: createFakeApi(seedState({ me: null })) });
-    expect(screen().getByRole("heading", { name: "Este convite expirou" })).toBeTruthy();
-    expect(document.querySelector(".page-sub")?.textContent).toBe("Convites valem por 7 dias.");
-    const ask = screen().getByRole("button", { name: "Pedir um novo convite" });
-    await act(async () => fireEvent.click(ask));
-    await settle();
+  test("an account with a password: only its password, Esqueci a senha in place, its provider too; then in", async () => {
+    let tries = 0;
+    const { auth, calls } = createFakeAuth();
+    const { state, router } = await openInvite(
+      { account: { exists: true, password: true, providers: ["github"] } },
+      {
+        seed: { authConfig: { passwordReset: true } },
+        auth: (fake) => {
+          const signIn = auth.signIn;
+          auth.signIn = async (input, humanCheck) => {
+            if (++tries === 1) {
+              calls.push({ method: "signIn", args: [input] });
+              return { ok: false, status: 401, message: "Invalid" };
+            }
+            fake.me = seedState().me;
+            return signIn(input, humanCheck);
+          };
+          return auth;
+        },
+      },
+    );
+    expect(heading()).toBe("Bom te ver de novo.");
+    expect(lead()).toBe("Ana chamou você para a Acme. Sua senha, e você já entra.");
+    expect(screen().queryByLabelText("Seu nome")).toBeNull();
+    expect(screen().getByRole("button", { name: /Continuar com GitHub/ })).toBeTruthy();
+    await type("Senha", "senha-errada");
+    await press("Entrar na Acme");
+    expect(heading()).toBe("Hmm, essa senha não bateu.");
+    expect(lead()).toBeNull();
+    expect(screen().getByLabelText("Senha").getAttribute("aria-invalid")).toBe("true");
+    expect(state.calls.some((c) => c.method === "orgs.acceptInvitation")).toBe(false);
+
+    // Esqueci a senha: the sign-in's own reset, in place, for the invited address.
+    await press("Esqueci a senha", 2);
+    expect(heading()).toBe("Te mando um link para criar outra senha.");
+    await press(/^Enviar link/);
+    expect(calls.find((c) => c.method === "requestPasswordReset")?.args).toEqual([
+      { email: "rafael@acme.com.br", redirectTo: `${window.location.origin}/reset-password` },
+    ]);
+    expect(heading()).toBe("Pronto. Mandei o link para rafael@acme.com.br.");
+    await press("Voltar para entrar", 2);
+    await type("Senha", "senha-certa");
+    await press("Entrar na Acme", 10);
+    expect(calls.filter((c) => c.method === "signIn").map((c) => c.args[0])).toEqual([
+      { email: "rafael@acme.com.br", password: "senha-errada" },
+      { email: "rafael@acme.com.br", password: "senha-certa" },
+    ]);
+    expect(state.calls.filter((c) => c.method === "orgs.acceptInvitation")).toHaveLength(1);
+    expect(router.state.location.pathname.startsWith(`/org/${ORG_ID}`)).toBe(true);
+  });
+
+  test("a provider signs in or up and comes back here to accept; an account with no password gets only its own", async () => {
+    const { auth, calls } = createFakeAuth();
+    try {
+      await openInvite({}, { auth: () => auth });
+      await press(/Continuar com GitHub/);
+      cleanup();
+
+      await openInvite({ account: { exists: true, password: false, providers: ["github"] } }, { auth: () => auth });
+      expect(heading()).toBe("Ana chamou você para a Acme.");
+      expect(lead()).toBe("Sua conta entra com GitHub. Continue por aqui.");
+      expect(screen().queryByLabelText("Senha")).toBeNull();
+      await press(/Continuar com GitHub/);
+      expect(calls).toEqual([
+        { method: "signInSocial", args: ["github", "/invite/inv?join=1"] },
+        { method: "signInSocial", args: ["github", "/invite/inv?join=1"] },
+      ]);
+    } finally {
+      storage.remove(STORAGE_KEYS.lastSignIn);
+    }
+  });
+
+  test("signed in as the invited address: one step; back from a provider's sign-in, accepted by itself", async () => {
+    // The fake's Walter is the one invited here.
+    const mine = { email: "walter@acme.com.br" };
+    const { state, router } = await openInvite(mine, { seed: { me: seedState().me } });
+    expect(heading()).toBe("Ana chamou você para a Acme.");
+    expect(lead()).toBe("Você está como walter@acme.com.br. É só entrar.");
+    expect(screen().getByRole("button", { name: "Não é você? Sair" })).toBeTruthy();
+    await press("Entrar na Acme", 10);
+    expect(state.calls.filter((c) => c.method === "orgs.acceptInvitation").map((c) => c.args)).toEqual([["inv"]]);
+    expect(router.state.location.pathname.startsWith(`/org/${ORG_ID}`)).toBe(true);
+    cleanup();
+
+    const back = await openInvite(mine, { seed: { me: seedState().me }, path: "/invite/inv?join=1" });
+    await settle(10);
+    expect(back.state.calls.filter((c) => c.method === "orgs.acceptInvitation")).toHaveLength(1);
+    expect(back.router.state.location.pathname.startsWith(`/org/${ORG_ID}`)).toBe(true);
+  });
+
+  test("signed in as someone else: whose invitation it is, and signing in as that address happens right here", async () => {
+    const { auth, calls } = createFakeAuth();
+    const { router } = await openInvite(
+      { account: { exists: true, password: true, providers: [] } },
+      { seed: { me: seedState().me }, auth: () => auth },
+    );
+    expect(heading()).toBe("Este convite é para rafael@acme.com.br.");
+    expect(lead()).toBe("Você está como walter@acme.com.br. Entre com o e-mail do convite e você já cai na Acme.");
+    await press("Entrar como rafael@acme.com.br");
+    expect(calls.map((c) => c.method)).toEqual(["signOut"]);
+    expect(heading()).toBe("Bom te ver de novo.");
+    expect(document.querySelector(".auth__who")?.textContent).toBe("rafael@acme.com.br");
+    expect(router.state.location.pathname).toBe("/invite/inv");
+  });
+
+  test("accepting refused: said in the invited person's words, never the server's", async () => {
+    const state = seedState({ previews: { inv: { ...INVITED, email: "walter@acme.com.br" } } });
+    const api = createFakeApi(state);
+    api.orgs.acceptInvitation = async () => {
+      throw new ApiError(409, "org.members_full", "Members limit reached");
+    };
+    await renderApp("/invite/inv", { api });
+    await settle(4);
+    await press("Entrar na Acme");
+    expect(screen().getByRole("alert").textContent).toBe(
+      "Este workspace está sem lugar para mais pessoas agora. Avise quem convidou você.",
+    );
+  });
+
+  test("a full workspace says so before any account is made; a paused one's invitation takes nobody", async () => {
+    await openInvite({ full: true });
+    expect(heading()).toBe("A Acme está sem lugar agora.");
+    expect(lead()).toBe("Seu convite continua valendo. Quando abrir um lugar, você entra por este mesmo link.");
+    expect(document.querySelector(".invite button, .invite input")).toBeNull();
+    cleanup();
+
+    await openInvite({ closed: true, invitedBy: null, agents: [] });
+    expect(heading()).toBe("Este link não funciona mais");
+    expect(lead()).toBe("Peça um novo a quem mandou.");
+    expect(document.querySelector(".invite button, .invite input")).toBeNull();
+  });
+
+  test("an invitation that no longer opens says what happened: used (open the workspace), or nothing to go on", async () => {
+    const used = { state: "accepted" as const, orgId: ORG_ID, orgName: "Acme", at: "2026-10-12T15:00:00.000Z" };
+    const { router } = await renderApp("/invite/used", {
+      api: createFakeApi(seedState({ invitationStates: { used } })),
+    });
+    await settle(4);
+    expect(heading()).toBe("Você já está na Acme.");
+    expect(lead()).toBe("Este convite já foi usado, em 12 out. É só abrir.");
+    await press("Abrir a Acme", 10);
+    expect(router.state.location.pathname.startsWith(`/org/${ORG_ID}`)).toBe(true);
+    cleanup();
+
+    // Signed out: signing in on the way.
+    const out = await renderApp("/invite/used", {
+      api: createFakeApi(seedState({ me: null, invitationStates: { used } })),
+    });
+    await settle(4);
+    await press("Abrir a Acme");
+    expect(out.router.state.location.pathname).toBe("/login");
+    expect(out.router.state.location.search).toEqual({ redirect: `/org/${ORG_ID}` });
+    cleanup();
+
+    // Cancelled, or never one: only that it doesn't work.
+    await renderApp("/invite/nope", { api: createFakeApi(seedState({ me: null })) });
+    await settle(4);
+    expect(heading()).toBe("Este convite não vale mais.");
+    expect(lead()).toBe("Pode ter sido cancelado. Fale com quem te convidou.");
+    expect(document.querySelector(".invite button")).toBeNull();
+  });
+
+  test("expired: asks whoever invited for a new one, by name, where email goes out", async () => {
+    const state = seedState({ me: null, invitationStates: { old: EXPIRED } });
+    await renderApp("/invite/old", { api: createFakeApi(state) });
+    await settle(4);
+    expect(heading()).toBe("Este convite expirou em 24 out.");
+    expect(lead()).toBe("Ana pode mandar outro. Quer que eu peça?");
+    expect(document.querySelector(".invite__org")?.textContent).toContain("Convite de Ana Souza");
+    await press("Pedir um novo convite");
+    expect(state.calls.filter((c) => c.method === "invites.requestNew").map((c) => c.args)).toEqual([["old"]]);
+    expect(lead()).toBe("Pronto. Ana recebeu seu pedido por e-mail.");
     expect(screen().getByRole("button", { name: "Pedido enviado" }).hasAttribute("disabled")).toBe(true);
   });
 
   test("a replaced or cancelled invitation: asking fails, and the page says so instead of a request nobody got", async () => {
-    const state = seedState({ me: null });
+    const state = seedState({ me: null, invitationStates: { old: EXPIRED } });
     state.requestNewError = new ApiError(404, "not_found", "Invitation not found");
-    await renderApp("/invite/expired", { api: createFakeApi(state) });
-    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Pedir um novo convite" })));
-    await settle();
-    expect(screen().getByText(/trocado por um convite mais novo ou cancelado/)).toBeTruthy();
+    await renderApp("/invite/old", { api: createFakeApi(state) });
+    await settle(4);
+    await press("Pedir um novo convite");
+    expect(screen().getByRole("alert").textContent).toMatch(/trocado por um convite mais novo ou cancelado/);
     expect(screen().queryByRole("button", { name: "Pedido enviado" })).toBeNull();
     expect(screen().getByRole("button", { name: "Pedir um novo convite" }).hasAttribute("disabled")).toBe(false);
   });
 
   test("expired, on a server that sends no email: whom to ask, and no button for a request nobody would get", async () => {
-    const state = seedState({ me: null, authConfig: { passwordReset: false } });
-    await renderApp("/invite/expired", { api: createFakeApi(state) });
-    expect(screen().getByRole("heading", { name: "Este convite expirou" })).toBeTruthy();
-    expect(document.querySelector(".page-sub")?.textContent).toBe(
-      "Convites valem por 7 dias. Peça um novo a quem mandou.",
-    );
+    const state = seedState({ me: null, authConfig: { passwordReset: false }, invitationStates: { old: EXPIRED } });
+    await renderApp("/invite/old", { api: createFakeApi(state) });
+    await settle(4);
+    expect(heading()).toBe("Este convite expirou em 24 out.");
+    expect(lead()).toBe("Peça um novo a Ana.");
     expect(screen().queryByRole("button", { name: "Pedir um novo convite" })).toBeNull();
     expect(state.calls.some((c) => c.method === "invites.requestNew")).toBe(false);
-  });
-
-  test("signed in with another email: explains and offers to sign out", async () => {
-    await renderApp("/invite/valid", { api: createFakeApi() });
-    expect(screen().getByRole("status").textContent).toContain("Este convite foi enviado para marina@acme.com.br");
-    expect(screen().getByRole("button", { name: "Sair" })).toBeTruthy();
   });
 });
 
@@ -706,14 +918,22 @@ describe("A verificação contra robôs (agentes.chat Cloud)", () => {
 
   test("an email invitation's sign-up, and an invitation link's code, carry the token", async () => {
     installTurnstile();
-    const state = seedState({ me: null, authConfig: { turnstileSiteKey: SITE_KEY, passwordReset: true } });
+    const invited: InvitationPreview = { orgName: "Acme", email: "marina@acme.com.br", role: "member", kind: "email" };
+    const state = seedState({
+      me: null,
+      authConfig: { turnstileSiteKey: SITE_KEY, passwordReset: true },
+      previews: { inv: invited },
+    });
     const { auth, calls } = createFakeAuth();
-    await renderApp("/invite/valid", { api: createFakeApi(state), auth });
+    await renderApp("/invite/inv", { api: createFakeApi(state), auth });
     await settle();
-    expect(document.querySelector(".invite-card .human-check")).toBeTruthy();
+    // The name guards nothing; the password that makes the account does.
+    expect(document.querySelector(".invite .human-check")).toBeNull();
     await type("Seu nome", "Marina");
+    await press(/^Continuar(?! com)/, 2);
+    expect(document.querySelector(".invite .human-check")).toBeTruthy();
     await type("Crie uma senha", "senha-exemplo");
-    await press("Aceitar e entrar na Acme");
+    await press("Entrar na Acme");
     expect(calls.find((c) => c.method === "signUp")?.args[1]).toBe("w1-1");
     cleanup();
     removeTurnstile();
@@ -723,29 +943,35 @@ describe("A verificação contra robôs (agentes.chat Cloud)", () => {
     await renderApp("/invite/lnk", { api: createFakeApi(state) });
     await settle();
     await type("Seu e-mail", "walter@acme.com.br");
-    await press("Verificar");
+    await press(/^Continuar/);
     expect(state.calls.find((c) => c.method === "invites.sendCode")?.args).toEqual([
       "lnk",
       { email: "walter@acme.com.br" },
       "w1-1",
     ]);
-    expect(cf.widgets.map((w) => w.options.action)).toEqual(["ask-code"]);
+    expect(cf.widgets.every((w) => w.options.action === "ask-code")).toBe(true);
   });
 
   test("an email invitation's sign-up is busy while the check waits for its token: a second press signs up nobody", async () => {
     const cf = installTurnstile({ gives: false });
-    const state = seedState({ me: null, authConfig: { turnstileSiteKey: SITE_KEY, passwordReset: true } });
+    const invited: InvitationPreview = { orgName: "Acme", email: "marina@acme.com.br", role: "member", kind: "email" };
+    const state = seedState({
+      me: null,
+      authConfig: { turnstileSiteKey: SITE_KEY, passwordReset: true },
+      previews: { inv: invited },
+    });
     const { auth, calls } = createFakeAuth();
-    await renderApp("/invite/valid", { api: createFakeApi(state), auth });
+    await renderApp("/invite/inv", { api: createFakeApi(state), auth });
     await settle();
     await type("Seu nome", "Marina");
+    await press(/^Continuar(?! com)/, 2);
     await type("Crie uma senha", "senha-exemplo");
-    await press("Aceitar e entrar na Acme");
-    const accept = screen().getByRole("button", { name: "Aceitar e entrar na Acme" });
-    expect(accept.getAttribute("aria-busy")).toBe("true");
-    expect(accept.hasAttribute("disabled")).toBe(true);
+    await press("Entrar na Acme");
+    const enter = screen().getByRole("button", { name: "Entrar na Acme" });
+    expect(enter.getAttribute("aria-busy")).toBe("true");
+    expect(enter.hasAttribute("disabled")).toBe(true);
     // A submit that reaches the form anyway, as Enter would.
-    await act(async () => fireEvent.submit(accept.closest("form") as HTMLFormElement));
+    await act(async () => fireEvent.submit(enter.closest("form") as HTMLFormElement));
     expect(calls.filter((c) => c.method === "signUp")).toEqual([]);
 
     cf.give("w1");
@@ -955,7 +1181,7 @@ describe("Onboarding", () => {
     expect(screen().getByRole("heading", { name: "Boas-vindas à Acme Saúde" })).toBeTruthy();
   };
   /** Done: the welcome's sentences, the first message's box, who offers it, and the line under it. */
-  const welcome = () => document.querySelector(".onb__welcome-lead")?.textContent;
+  const welcome = () => document.querySelector(".welcome-card__lead")?.textContent;
   const ASK = "Sua primeira mensagem no #general";
   const askBox = () => screen().getByRole("textbox", { name: ASK }) as HTMLTextAreaElement;
   const asker = () => document.querySelector(".onb__answer .onb__host-name")?.textContent;
@@ -2130,7 +2356,7 @@ describe("Onboarding", () => {
     expect(button("Enviar para Lia")).toBeTruthy();
     expect(screen().getByRole("img", { name: "Computador deste servidor" }).getAttribute("data-state")).toBe("online");
     // Each face says who it is under the pointer; screen readers have the lead's names instead.
-    const faces = [...document.querySelectorAll(".onb__crew .ac-avatar")];
+    const faces = [...document.querySelectorAll(".welcome-card__crew .ac-avatar")];
     expect(faces.map((f) => [f.getAttribute("title"), f.getAttribute("aria-hidden")])).toEqual([
       ["Theo · PM", "true"],
       ["Ada · Dev", "true"],

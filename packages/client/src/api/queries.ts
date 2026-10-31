@@ -1558,7 +1558,8 @@ export function useSetInvitationRoles(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { id: string; roleIds: string[] }) => api.orgs.setInvitationRoles(orgId, input.id, input.roleIds),
+    mutationFn: (input: { id: string; roleIds: string[] }) =>
+      api.orgs.setInvitationRoles(orgId, input.id, input.roleIds),
     onSettled: () => qc.invalidateQueries({ queryKey: keys.invitations(orgId) }),
   });
 }
@@ -1579,12 +1580,16 @@ export const useMySuggestions = (orgId: string, enabled = true) => {
   return useQuery({ queryKey: keys.mySuggestions(orgId), queryFn: () => api.joinRequests.mine(orgId), enabled });
 };
 
-/** A member suggests someone to the people who may invite (ADR 0089). */
+/**
+ * A member suggests someone to the people who may invite (ADR 0089). Its refusals are about the person suggested
+ * (`join.member`: they're in already), so the screen says them in its own words, never the generic toast's.
+ */
 export function useSuggestPerson(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: { email: string; note?: string }) => api.joinRequests.suggest(orgId, input),
+    meta: { silent: true },
     onSettled: () => qc.invalidateQueries({ queryKey: keys.invitations(orgId) }),
   });
 }
