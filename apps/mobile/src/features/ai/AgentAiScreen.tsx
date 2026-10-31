@@ -1,9 +1,8 @@
-import type { AgentBrainInput, MachineAccount } from "@agenteschat/client";
+import type { AgentBrain, AgentBrainInput, MachineAccount } from "@agenteschat/client";
 import { keys, useAgentBrain, useAiAccounts, useAiStatus, useApi, useMachines } from "@agenteschat/client";
 import { accountChoices, ownSignInListed, ownSignInName } from "@agenteschat/client/lib/ai-accounts";
 import { brainLine, thinksWith } from "@agenteschat/client/lib/brain";
 import { advancedSummary } from "@agenteschat/client/lib/brain-advanced";
-import { lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiChoiceOf, planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -27,6 +26,7 @@ import {
   accountInput,
   accountKindOf,
   accountRow,
+  accountSaved,
   agentAccounts,
   modelInput,
   modelRows,
@@ -63,11 +63,12 @@ function useSaveBrain(agentId: string) {
   const qc = useQueryClient();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
-  const save = async (input: AgentBrainInput, done: string) => {
+  const save = async (input: AgentBrainInput, done: string | ((saved: AgentBrain) => string)) => {
     setBusy(true);
     try {
-      qc.setQueryData(keys.agentBrain(orgId, agentId), await api.agents.setBrain(orgId, agentId, input));
-      toast({ title: done, icon: "check" });
+      const saved = await api.agents.setBrain(orgId, agentId, input);
+      qc.setQueryData(keys.agentBrain(orgId, agentId), saved);
+      toast({ title: typeof done === "string" ? done : done(saved), icon: "check" });
     } catch {
       toast({ title: t("agentPage.work.failed"), icon: "x" });
     } finally {
@@ -127,11 +128,8 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
   const mayPick = view?.canUsePlans === true && !busy;
   const choose = (a: MachineAccount | null) => {
     if (!view || !mayPick || (a?.id ?? null) === view.account) return;
-    // The computer's own sign-in is chosen only where it is its owner's: the account their agents share.
-    const done = a
-      ? t("agentPage.work.saved.account", { ...g, account: a.label })
-      : t("aiAccounts.done.savedAgent", { agent: name, label: lowerFirst(t("connectAi.own.shared"), i18n.language) });
     const input = accountInput(view, a);
+    const done = (saved: AgentBrain) => accountSaved(t, i18n.language, name, a, input, saved);
     const others = a ? takenFrom(a, name) : [];
     if (!a || others.length === 0) return void save(input, done);
     // A login made for one agent thinks for one: picking another agent's takes it from that one.

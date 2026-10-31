@@ -17,6 +17,7 @@ import {
 } from "@agenteschat/client/lib/ai-accounts";
 import { thinksWith } from "@agenteschat/client/lib/brain";
 import { type Advanced, advancedParts, isClaudeAlias } from "@agenteschat/client/lib/brain-advanced";
+import { lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiChoiceOf, type PlanGate, planOfAccount } from "@agenteschat/client/lib/no-ai";
 import {
@@ -154,6 +155,35 @@ export function accountInput(
   return { account: a?.id ?? null, model: isAuto(view.effectiveModel) ? AUTO : null };
 }
 
+type ThinkingView = Pick<AgentBrain, "brain" | "effectiveModel" | "options" | "accounts" | "account">;
+
+/** What thinks, in the one sentence every place says it: the model by the plan that pays for it, or the API's model. */
+function thinksNow(t: TFunction, view: ThinkingView): string | undefined {
+  const model = modelRows(t, view, brainPlan(view)).find((r) => r.checked)?.label;
+  const ai = aiChoiceOf(view);
+  return ai === "key" || !model ? model : thinksWith(t, ai, model);
+}
+
+/**
+ * What the agent's page says once an account is saved (`saved`: the view the save returned): the account it now uses
+ * (the computer's own sign-in as the account its owner's agents share), or, when the account was another plan's, what
+ * thinks now, since its model changed with it (`accountInput`), as the web's cards say it.
+ */
+export function accountSaved(
+  t: TFunction,
+  language: string,
+  agentName: string,
+  a: Pick<MachineAccount, "label"> | null,
+  input: Pick<AgentBrainInput, "model">,
+  saved: ThinkingView,
+): string {
+  const g = agentGrammar(t, agentName);
+  if ("model" in input) return t("agentPage.work.saved.brain", { ...g, brain: thinksNow(t, saved) ?? "" });
+  return a
+    ? t("agentPage.work.saved.account", { ...g, account: a.label })
+    : t("aiAccounts.done.savedAgent", { agent: agentName, label: lowerFirst(t("connectAi.own.shared"), language) });
+}
+
 /** What picking a model saves, as the web's dialog does: Automático picks the effort too; a fixed one after it, Médio. */
 export function modelInput(
   value: string,
@@ -208,7 +238,6 @@ export function setupWords(
   view: Pick<AgentBrain, "brain" | "effectiveModel" | "options" | "accounts" | "account" | "autonomy">,
   o: { apiKey: boolean; now: Advanced },
 ): string {
-  const model = modelRows(t, view, brainPlan(view)).find((r) => r.checked)?.label;
   const parts = advancedParts(t, language, {
     kind: view.brain,
     autoModel: isAuto(view.effectiveModel),
@@ -216,9 +245,7 @@ export function setupWords(
     now: o.now,
   });
   const autonomy = view.autonomy ? autonomyWords(t, view.autonomy) : null;
-  const ai = aiChoiceOf(view);
-  const head = ai === "key" || !model ? model : thinksWith(t, ai, model);
-  return [head, ...parts, autonomy].filter(Boolean).join(" · ");
+  return [thinksNow(t, view), ...parts, autonomy].filter(Boolean).join(" · ");
 }
 
 /**

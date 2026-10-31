@@ -8,6 +8,7 @@ import {
   accountInput,
   accountKindOf,
   accountRow,
+  accountSaved,
   agentAccounts,
   existingRows,
   modelInput,
@@ -552,6 +553,52 @@ describe("the agent's AI", () => {
       account: "oc2",
     });
     expect(accountInput(view("opus", null), claude)).toEqual({ account: "cl" });
+  });
+
+  test("an account of another plan says what thinks now, its model changed with it; one of the same plan, the account", async () => {
+    const t = await translator("pt-BR");
+    const options: AgentBrain["options"] = [
+      {
+        kind: "claude_code",
+        available: true,
+        experimental: false,
+        models: [
+          { value: "opus", label: "Opus" },
+          { value: "sonnet", label: "Sonnet", recommended: true },
+        ],
+        defaultModel: "sonnet",
+      },
+    ];
+    const opencode = account("oc", { provider: "opencode", label: "Plano", keyHint: "Ex2b" });
+    const work = account("cl2", { label: "Trabalho" });
+    const opus = {
+      brain: "claude_code" as const,
+      effectiveModel: "opus",
+      options,
+      accounts: [account("cl", { label: "Pessoal" }), work, opencode],
+      account: "cl",
+    };
+    // What the save returned: on OpenCode Go, the plan's default model.
+    const saved = (account: string | null) => ({ ...opus, account, effectiveModel: "sonnet" });
+    expect(accountSaved(t, "pt-BR", "Ada", opencode, accountInput(opus, opencode), saved("oc"))).toBe(
+      "A Ada agora pensa com MiniMax M3 pelo OpenCode Go.",
+    );
+    // Back to the computer's own sign-in: Claude's default.
+    expect(accountSaved(t, "pt-BR", "Ada", null, accountInput(saved("oc"), null), saved(null))).toBe(
+      "A Ada agora pensa com Sonnet pelo plano do Claude.",
+    );
+    // The same plan keeps the model: the account, or the computer's own sign-in as the account the agents share.
+    expect(accountSaved(t, "pt-BR", "Ada", work, accountInput(opus, work), { ...opus, account: "cl2" })).toBe(
+      "A Ada agora usa a conta Trabalho.",
+    );
+    expect(accountSaved(t, "pt-BR", "Ada", null, accountInput(opus, null), { ...opus, account: null })).toBe(
+      "Ada agora pensa com a conta que os seus agentes dividem.",
+    );
+    const screen = await Bun.file(new URL("../../src/features/ai/AgentAiScreen.tsx", import.meta.url).pathname).text();
+    expect(screen).toContain(
+      "const done = (saved: AgentBrain) => accountSaved(t, i18n.language, name, a, input, saved);",
+    );
+    expect(screen).toContain('toast({ title: typeof done === "string" ? done : done(saved), icon: "check" });');
   });
 
   test("its page: the account first (the plan choice), then the model with how to give what it needs, a refused key's own row", async () => {
