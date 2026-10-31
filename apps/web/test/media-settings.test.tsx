@@ -43,8 +43,8 @@ describe("Configurações › GIFs e figurinhas (ADR 0091)", () => {
     expect(any.getAttribute("aria-checked")).toBe("true");
     await click(screen().getByRole("radio", { name: "Até 13 anos" }));
     expect(lastSettings(state)).toEqual({ gifRating: "pg" });
-    expect(screen().getByRole("radio", { name: "De vez em quando" }).getAttribute("aria-checked")).toBe("true");
-    await click(screen().getByRole("radio", { name: "Mais à vontade" }));
+    expect(screen().getByRole("radio", { name: "Às vezes" }).getAttribute("aria-checked")).toBe("true");
+    await click(screen().getByRole("radio", { name: "Bastante" }));
     expect(lastSettings(state)).toEqual({ agentMedia: "often" });
     const stickers = screen().getByRole("switch", { name: "Figurinhas dos agentes" });
     expect(stickers.getAttribute("aria-checked")).toBe("true");
@@ -73,11 +73,11 @@ describe("Configurações › GIFs e figurinhas (ADR 0091)", () => {
     expect(screen().getByText("Só admins mudam as configurações.")).toBeTruthy();
     for (const name of ["GIFs", "Figurinhas dos agentes", "Ada manda GIFs e figurinhas"])
       expect(disabled(screen().getByRole("switch", { name }))).toBe(true);
-    for (const name of ["Qualquer idade", "Até 13 anos", "Nunca", "De vez em quando", "Mais à vontade"])
+    for (const name of ["Qualquer idade", "Até 13 anos", "Nunca", "Às vezes", "Bastante"])
       expect(disabled(screen().getByRole("radio", { name }))).toBe(true);
     // Still what the workspace chose.
     expect(screen().getByRole("switch", { name: "GIFs" }).getAttribute("aria-checked")).toBe("true");
-    await act(async () => fireEvent.click(screen().getByRole("radio", { name: "Mais à vontade" })));
+    await act(async () => fireEvent.click(screen().getByRole("radio", { name: "Bastante" })));
     expect(lastSettings(state)).toBeUndefined();
   });
 
@@ -89,7 +89,7 @@ describe("Configurações › GIFs e figurinhas (ADR 0091)", () => {
     expect(document.getElementById("media-gifs-help")?.textContent).toBe("Este servidor ainda não tem busca de GIFs.");
     expect(gifs.getAttribute("aria-describedby")).toBe("media-gifs-help");
     expect(screen().getByRole("radio", { name: "Nunca" }).getAttribute("aria-checked")).toBe("true");
-    expect(disabled(screen().getByRole("radio", { name: "De vez em quando" }))).toBe(true);
+    expect(disabled(screen().getByRole("radio", { name: "Às vezes" }))).toBe(true);
     expect(document.getElementById("media-level-help")?.textContent).toBe("Ainda não disponível neste servidor.");
     // Each agent's own switch still decides whether it sends one when asked (its sticker, here).
     expect(disabled(screen().getByRole("switch", { name: "Ada manda GIFs e figurinhas" }))).toBe(false);
