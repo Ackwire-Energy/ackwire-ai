@@ -272,6 +272,12 @@ describe("links everywhere", () => {
     expect(within(list).getAllByRole("option")[0]?.textContent).toContain("Onboarding");
     await act(async () => fireEvent.keyDown(box, { key: "Enter" }));
     expect(box.value).toBe("leia [[Onboarding]] ");
+    // Esc closes the list and leaves the text.
+    await type(box, "leia [[Onb");
+    expect(screen().getByRole("listbox", { name: "Páginas" })).toBeTruthy();
+    await act(async () => fireEvent.keyDown(box, { key: "Escape" }));
+    expect(screen().queryByRole("listbox", { name: "Páginas" })).toBeNull();
+    expect(box.value).toBe("leia [[Onb");
   });
 
   test("Salvar na wiki from an agent's message appends it with the source", async () => {

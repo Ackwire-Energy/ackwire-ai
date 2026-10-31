@@ -505,7 +505,15 @@ export function Composer({
     ref.current?.focus();
   };
 
+  const dismiss = () => setDismissed(isSlash ? -1 : isLink ? (linkToken?.start ?? null) : (token?.start ?? null));
+
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // A layer above already closed on this Esc: the suggestions, or a card that opened under the pointer and left the
+    // focus here. It is spent: it stops no agent, and the page's own Esc (an inbox reply closes on it) never sees it.
+    if (e.key === "Escape" && e.defaultPrevented) {
+      e.stopPropagation();
+      return;
+    }
     const kind = format ? formatShortcut(e) : null;
     if (kind) {
       // Also keeps ⌘K (link) from reaching the command palette.
@@ -532,7 +540,7 @@ export function Composer({
       if (e.key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
-        setDismissed(isSlash ? -1 : isLink ? (linkToken?.start ?? null) : (token?.start ?? null));
+        dismiss();
         return;
       }
     }
@@ -632,7 +640,7 @@ export function Composer({
       <RPopover.Root
         open={open}
         onOpenChange={(o) => {
-          if (!o && open) setDismissed(isSlash ? -1 : (token?.start ?? null));
+          if (!o && open) dismiss();
         }}
       >
         <RPopover.Anchor asChild>
