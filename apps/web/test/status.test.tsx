@@ -39,8 +39,8 @@ const setStatusCalls = (state: ReturnType<typeof seedState>) =>
 describe("Definir status", () => {
   test("a suggestion fills the line, its end and how you appear; Salvar sends them to the account row", async () => {
     const { state } = await go(`c/${ENG_ID}`);
-    // Nothing written: the row offers to set one.
-    expect(account().querySelector(".sidebar__user-line")).toBeNull();
+    // Nothing written: the row says how I appear.
+    expect(account().querySelector(".sidebar__user-line")?.textContent).toBe("Online");
     expect(badgeOf(account())).toBe("online");
     const dialog = await openDialog();
     expect(dialog.textContent).toContain("Como as pessoas te veem");
@@ -115,7 +115,7 @@ describe("Definir status", () => {
     await click(within(dialog).getByRole("button", { name: "Limpar status" }));
     await settle(4);
     expect(setStatusCalls(state)[1]).toEqual([ORG_ID, { availability: "auto", status: null }]);
-    expect(account().querySelector(".sidebar__user-line")).toBeNull();
+    expect(account().querySelector(".sidebar__user-line")?.textContent).toBe("Online");
   });
 
   test("Aparecer como alone: hidden, the preview says others see you offline; the toast, how you appear", async () => {
@@ -127,10 +127,9 @@ describe("Definir status", () => {
     await settle(4);
     expect(setStatusCalls(state)).toEqual([[ORG_ID, { availability: "hidden", status: null }]]);
     expect(screen().getByText("Você aparece como oculto")).toBeTruthy();
-    // To myself: hidden (the dotted outline) says it, and the title; nothing under my name without a line.
+    // To myself: hidden (the dotted outline), and the row says so under my name.
     expect(badgeOf(account())).toBe("hidden");
-    expect(account().querySelector(".sidebar__user-line")).toBeNull();
-    expect(account().getAttribute("title")).toContain("Oculto");
+    expect(account().querySelector(".sidebar__user-line")?.textContent).toBe("Oculto");
   });
 
   test("the account menu's first item: my line, when it clears, how I appear", async () => {
@@ -155,7 +154,8 @@ describe("Definir status", () => {
       ["u-walter", { availability: "auto", status: { text: "Almoçando", emoji: "🍽️", until: past } }],
     ]);
     await go(`c/${ENG_ID}`, state);
-    expect(account().querySelector(".sidebar__user-line")).toBeNull();
+    // Its time is up: how I appear instead.
+    expect(account().querySelector(".sidebar__user-line")?.textContent).toBe("Online");
   });
 });
 

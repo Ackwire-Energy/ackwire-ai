@@ -27,7 +27,7 @@ import { formatPercent } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { waitingAgents } from "@agenteschat/client/lib/outages";
 import { can } from "@agenteschat/client/lib/permissions";
-import { clearsText } from "@agenteschat/client/lib/presence";
+import { clearsText, presenceOfAvailability } from "@agenteschat/client/lib/presence";
 import { browserTimezone, timezoneName, zoneDisplayName } from "@agenteschat/client/lib/routines";
 import {
   AffixInput,
@@ -1342,14 +1342,14 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
   const mine = dir.memberById.get(me.user.id);
   const photo = mine?.image ?? me.user.image;
   const zone = mine?.timezone || browserTimezone() || "UTC";
-  // How you appear to yourself (hidden stays hidden) and your line.
+  // How you appear to yourself (hidden stays hidden; what you picked, even before your socket is up) and your line.
   const shown = usePersonPresence(me.user.id);
-  const presence = shown?.presence ?? null;
+  const picked = shown?.person.availability;
+  const presence = picked ? presenceOfAvailability(picked) : (shown?.presence ?? null);
   const presenceWord = presence ? t(`presence.${presence}`) : undefined;
   const line = shown?.status ? personLine(shown.status) : null;
-  // How you appear is the badge's (and the title's); under your name only your line, when you wrote one.
-  const chosen = presence === "away" || presence === "busy" || presence === "hidden" ? presenceWord : undefined;
-  const who = [me.user.name, line?.text ?? chosen].filter(Boolean).join(" · ");
+  // Under your name: your line, or how you appear (Online, Ocupado, Ausente, Oculto) when you wrote none (ADR 0084).
+  const who = [me.user.name, line?.text ?? presenceWord].filter(Boolean).join(" · ");
   // Closes the menu first, then does what was picked (a dialog opens over the app, not over the menu).
   const pick = (run: () => void) => () => {
     setOpen(false);
@@ -1378,7 +1378,11 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
         <Avatar name={me.user.name} size="sm" imageUrl={photo} presence={presence} presenceLabel={presenceWord} />
         <span className="sidebar__user-text">
           <span className="sidebar__user-name ac-captop">{me.user.name}</span>
-          {line && <StatusLine emoji={line.emoji} text={line.text} className="sidebar__user-line" />}
+          {line ? (
+            <StatusLine emoji={line.emoji} text={line.text} className="sidebar__user-line" />
+          ) : (
+            presenceWord && <StatusLine text={presenceWord} className="sidebar__user-line" />
+          )}
         </span>
       </button>
       <MenuOverlay
