@@ -407,6 +407,8 @@ const HOW_TO_GET: Record<MissingConnector["state"], (label: string) => string> =
   not_given: () =>
     "Connected in this workspace but not given to you: an admin gives you access on your page, in Tools and access (in Portuguese, Ferramentas e acesso).",
   unavailable: () => "Not available on this installation: whoever runs the installation has to turn it on first.",
+  needs_reconnect: () =>
+    "Connected in this workspace but needs reconnecting: an admin clicks Reconnect on its row in Settings › Connectors (in Portuguese, Configurações › Conectores › Reconectar).",
 };
 
 /** The connectors the agent lacks that the query names (every word of a label or of an id), with how to get each. */
@@ -449,8 +451,7 @@ function findTools(
   const notAllowed = ranked.slice(0, limit).flatMap((t) => blockedOf.get(t) ?? []);
   const toGet = connectorsToGet(query, blocked.connectors);
   if (matches.length === 0 && notAllowed.length === 0) {
-    const none = `No ${label} tool matches "${query}".`;
-    return toGet ? `${none}\n\n${toGet}` : `${none} Try other words (${areas.slice(0, 12).join(", ")}).`;
+    return `No ${label} tool matches "${query}". Try other words (${areas.slice(0, 12).join(", ")}).${toGet ? `\n\n${toGet}` : ""}`;
   }
   const listed = new Set(loaded);
   const lead = matches.findIndex((t) => !listed.has(t));

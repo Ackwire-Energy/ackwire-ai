@@ -172,8 +172,11 @@ export interface MissingConnector {
   description: string;
   /** What names it in a search: its label and its ids (`drive`). */
   names: string[];
-  /** `unavailable`: this server can't connect it; `not_connected`: the workspace hasn't; `not_given`: the agent lacks it. */
-  state: "unavailable" | "not_connected" | "not_given";
+  /**
+   * `unavailable`: this server can't connect it; `not_connected`: the workspace hasn't; `not_given`: the agent lacks
+   * it; `needs_reconnect`: a mailbox of it stopped working.
+   */
+  state: "unavailable" | "not_connected" | "not_given" | "needs_reconnect";
 }
 
 /** The mailboxes "Adicionar conector" offers, by the rule of `mailChoices` (apps/web/src/components/MailConnect.tsx). */
@@ -228,11 +231,18 @@ export async function missingConnectors(
   const [connections, mailboxes] = await Promise.all([activeConnections(db, orgId), orgMailAccounts(db, orgId)]);
   const services = new Map<
     string,
-    { label: string; description: string; names: Set<string>; offered: boolean; held: string[] }
+    { label: string; description: string; names: Set<string>; offered: boolean; held: string[]; reconnect: boolean }
   >();
   const service = (label: string, description: string) => {
     const key = label.toLowerCase();
-    const found = services.get(key) ?? { label, description, names: new Set([label]), offered: false, held: [] };
+    const found = services.get(key) ?? {
+      label,
+      description,
+      names: new Set([label]),
+      offered: false,
+      held: [],
+      reconnect: false,
+    };
     services.set(key, found);
     return found;
   };
@@ -241,28 +251,33 @@ export async function missingConnectors(
     s.names.add(entry.id);
     s.offered ||= entry.available;
   }
-  // A server connected by address is its preset's service, or the one it was named after.
+  const mail = mailProviders(catalog.mail);
+  for (const m of MAILBOXES) {
+    const s = service(m.label, m.description);
+    for (const name of m.names ?? []) s.names.add(name);
+    s.offered ||= m.offered(mail);
+    const own = mailboxes.filter(m.holds);
+    s.held.push(...own.filter(usableAccount).map((a) => a.id));
+    // Connecting the same mailbox again fails as already connected: only Reconnect on its row brings it back.
+    s.reconnect ||= own.some((a) => a.status === "needs_reconnect");
+  }
+  // A server connected by address is its preset's service, or the one it was named after (a mailbox's too).
   for (const c of connections) {
     const label = isCustom(c)
       ? (presetForServer(c.serverUrl)?.label ?? c.label)
       : (CONNECTOR_CATALOG[c.connector]?.label ?? c.label);
     services.get(label.toLowerCase())?.held.push(c.id);
   }
-  const mail = mailProviders(catalog.mail);
-  const active = mailboxes.filter(usableAccount);
-  for (const m of MAILBOXES) {
-    const s = service(m.label, m.description);
-    for (const name of m.names ?? []) s.names.add(name);
-    s.offered ||= m.offered(mail);
-    s.held.push(...active.filter(m.holds).map((a) => a.id));
-  }
   const ids = (list: Tools) => new Set([...list].map((t) => t.connectionId));
   const [usable, listed] = [ids(tools.usable), ids(tools.listed)];
   return [...services.values()].flatMap((s): MissingConnector[] => {
     if (s.held.some((id) => usable.has(id))) return [];
+    let state: MissingConnector["state"];
+    if (s.held.some((id) => listed.has(id))) state = "not_given";
+    else if (s.reconnect) state = "needs_reconnect";
     // Connected, but no tool of it listed (server down, not reviewed yet): nothing says the agent lacks it.
-    if (s.held.length > 0 && !s.held.some((id) => listed.has(id))) return [];
-    const state = s.held.length > 0 ? "not_given" : s.offered ? "not_connected" : "unavailable";
+    else if (s.held.length > 0) return [];
+    else state = s.offered ? "not_connected" : "unavailable";
     return [{ label: s.label, description: s.description, names: [...s.names], state }];
   });
 }

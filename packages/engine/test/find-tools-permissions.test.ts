@@ -15,6 +15,7 @@ import {
   grantScopes,
   listApprovals,
   postPersonMessage,
+  storeCustomConnection,
   type ToolContext,
   type ToolDefinition,
   toolDenyScope,
@@ -307,18 +308,23 @@ test("an app connected in the workspace but not given to the agent says an admin
   expect(given).not.toContain(TO_GET);
 });
 
-test("an app this installation can't connect says whoever runs it turns it on; one it can, that an admin connects it", async () => {
-  // IMAP only, no Composio: this server connects iCloud and other mailboxes, never Gmail or Outlook.
-  const imap = {
+/** IMAP only, no Composio: this server connects iCloud and other mailboxes, never Gmail or Outlook. */
+const imapOnly = () => ({
+  composio: null,
+  imap: {
     connector: createFakeMailConnector().connector,
     poller: createFakeMailPoller().poller,
     tester: createFakeMailTester().tester,
     presets: [ICLOUD],
-  };
-  f = await setup({ issueTools: true, catalog: { oauthApps: {}, mail: { composio: null, imap } } });
+  },
+});
+
+test("an app this installation can't connect says whoever runs it turns it on; one it can, that an admin connects it", async () => {
+  f = await setup({ issueTools: true, catalog: { oauthApps: {}, mail: imapOnly() } });
   const ctx = await nothingLoaded();
+  // Nothing matches: the groups to search again still come first.
   expect(await findTools(ctx, "gmail")).toBe(
-    `No other tool matches "gmail".\n\n${TO_GET}\n- Gmail: Read, organize and answer Gmail email. Not available on this installation: whoever runs the installation has to turn it on first.`,
+    `No other tool matches "gmail". Try other words (Issues).\n\n${TO_GET}\n- Gmail: Read, organize and answer Gmail email. Not available on this installation: whoever runs the installation has to turn it on first.`,
   );
   expect(await findTools(ctx, "icloud")).toEndWith(
     "\n- iCloud: iCloud email, custom domains included. Not connected in this workspace: an admin connects it in Settings › Connectors › Add connector › iCloud (in Portuguese, Configurações › Conectores › Adicionar conector › iCloud).",
@@ -326,6 +332,60 @@ test("an app this installation can't connect says whoever runs it turns it on; o
   expect(await findTools(ctx, "send an e-mail")).toContain(
     "\n- Email: A mailbox: Gmail, Outlook, iCloud or another provider. Not connected in this workspace: an admin connects it in Settings › Connectors › Add connector › Email",
   );
+});
+
+test("a mailbox that needs reconnecting says an admin reconnects it, never to connect it again", async () => {
+  f = await setup({ issueTools: true, catalog: { oauthApps: {}, mail: imapOnly() } });
+  // Its app password stopped working: connecting the same address again fails as already connected.
+  await f.db.insert(schema.mailAccounts).values({
+    orgId: f.org.id,
+    provider: "imap",
+    via: "imap",
+    preset: "icloud",
+    address: "ana@icloud.example.com",
+    label: "Caixa da Ana",
+    status: "needs_reconnect",
+  });
+  const ctx = await nothingLoaded();
+  const RECONNECT =
+    "Connected in this workspace but needs reconnecting: an admin clicks Reconnect on its row in Settings › Connectors (in Portuguese, Configurações › Conectores › Reconectar).";
+  const text = await findTools(ctx, "icloud");
+  expect(text).toEndWith(`\n- iCloud: iCloud email, custom domains included. ${RECONNECT}`);
+  for (const detail of ["ana@icloud.example.com", "Caixa da Ana"]) expect(text).not.toContain(detail);
+  expect(await findTools(ctx, "email")).toEndWith(
+    `\n- Email: A mailbox: Gmail, Outlook, iCloud or another provider. ${RECONNECT}`,
+  );
+});
+
+test("a server connected by address and named after a mailbox's service is that service: its tools, nothing to get", async () => {
+  let gmailId = "";
+  const searchMail = (): ToolDefinition => ({
+    name: "gmail_search_mail",
+    description: "[Gmail] Search mail",
+    inputSchema: { type: "object", properties: { query: { type: "string" } } },
+    scope: `custom:${gmailId}:read`,
+    connectionId: gmailId,
+    connectorLabel: "Gmail",
+    execute: async () => ({ content: "No mail." }),
+  });
+  f = await setup({
+    issueTools: true,
+    catalog: { oauthApps: {}, mail: imapOnly() },
+    toolSources: [{ name: "gmail", tools: async () => (gmailId ? [searchMail()] : []) }],
+  });
+  // A new server is every agent's.
+  const gmail = await storeCustomConnection(connectorDeps(), {
+    orgId: f.org.id,
+    actorId: f.owner.id,
+    serverUrl: "https://gmail-mcp.example.com/mcp",
+    label: "Gmail",
+    authType: "none",
+    secret: null,
+  });
+  gmailId = gmail.id;
+  const text = await findTools(await nothingLoaded(), "gmail");
+  expect(text).toContain("- gmail_search_mail: [Gmail] Search mail");
+  expect(text).not.toContain(TO_GET);
 });
 
 test("what another workspace connected never shows: the search answers for this workspace only", async () => {
