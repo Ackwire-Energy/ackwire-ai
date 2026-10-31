@@ -193,6 +193,24 @@ describe("chat over HTTP", () => {
     expect(usage.usage[0]?.costUsd).toBeGreaterThan(0);
   });
 
+  test("a channel created with a category is placed in it", async () => {
+    const owner = browser(t);
+    await signUp(owner, "owner@example.com");
+    const { orgId } = await seedOrg(owner);
+    const org = `/api/app/organizations/${orgId}`;
+    const category = (await (await owner(`${org}/channel-categories`, { json: { name: "Produto" } })).json()) as {
+      id: string;
+    };
+    const res = await owner(`${org}/channels`, { json: { name: "roadmap", categoryId: category.id } });
+    expect(res.status).toBe(201);
+    const channel = (await res.json()) as { id: string; categoryId: string | null };
+    expect(channel.categoryId).toBe(category.id);
+    const list = (await (await owner(`${org}/channels`)).json()) as {
+      channels: { id: string; categoryId: string | null }[];
+    };
+    expect(list.channels.filter((c) => c.categoryId === category.id).map((c) => c.id)).toEqual([channel.id]);
+  });
+
   test("organizations are isolated: another org's owner can't read or post", async () => {
     await t.close();
     t = await createTestServer({ env: { ALLOW_SIGNUP: "true" } });

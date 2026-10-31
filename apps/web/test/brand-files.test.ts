@@ -4,6 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { existsSync, readdirSync } from "node:fs";
+import { POSTGRES_MARK } from "@agenteschat/client/lib/databases";
 import { PROVIDER_MARKS } from "@agenteschat/ui/brand/marks";
 import { cleanup, render } from "@testing-library/react";
 import { createElement } from "react";
@@ -12,7 +13,6 @@ import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { DatabaseIcon } from "@/components/DatabaseConnect";
 import { MailIcon, mailChoices } from "@/components/MailConnect";
 import { createI18n } from "@/i18n";
-import { POSTGRES_MARK } from "@/lib/brands";
 import { MAIL_PROVIDERS } from "./fakes/mail";
 
 afterEach(() => cleanup());

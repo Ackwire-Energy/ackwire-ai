@@ -437,6 +437,8 @@ export async function invokeWithChip(
     ...where,
     tool: shownName,
     ...(connector ? { connector } : {}),
+    ...(def?.service ? { service: def.service } : {}),
+    ...(def?.serviceIcon ? { serviceIcon: def.serviceIcon } : {}),
     ...(detail ? { detail } : {}),
     toolUseId: use.id,
     ...(code ? { code } : {}),

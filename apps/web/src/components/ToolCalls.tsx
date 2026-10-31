@@ -1,7 +1,9 @@
 import { isScreenTool, type LiveWork, type ScreenKind, useCatalog, useRun } from "@agenteschat/client";
-import type { ActivityKind } from "@agenteschat/client/lib/activity";
+import type { Activity, ActivityKind } from "@agenteschat/client/lib/activity";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
+  appKey,
+  callLogo,
   formatDuration,
   formatLineTime,
   type ToolItem,
@@ -13,6 +15,7 @@ import {
   toolNow,
   toolPhrase,
   toolWhy,
+  workApps,
   workFromSteps,
   workMeta,
 } from "@agenteschat/client/lib/work";
@@ -100,29 +103,15 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
   queryingDatabase: "database",
 };
 
-/** Apps of ours that aren't in the connector catalog (the org's mailboxes): their icon, not an initial. */
-const OWN_APP_ICON: Record<string, IconName> = { email: "mail" };
-
-const plain = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
-
-/** A call's logo: the connector's mark from the catalog (by id or name), or the icon of one of our tools. */
+/** A call's logo: its service's mark as the connectors screens draw it (`callLogo`), or the icon of one of our tools. */
 function useLogo() {
   const catalog = useCatalog();
-  return (a: { kind: ActivityKind; app?: string }) => {
-    if (a.kind === "consulting" && a.app) {
-      const key = plain(a.app);
-      const def = catalog.data?.connectors.find((c) => plain(c.id) === key || plain(c.label) === key) ?? null;
-      const own = def ? undefined : OWN_APP_ICON[key];
-      if (!own) return <ConnectorIcon def={def} label={a.app} />;
-      return (
-        <span className="tool-logo" aria-hidden="true">
-          <Icon name={own} size={14} />
-        </span>
-      );
-    }
+  return (a: Activity) => {
+    const logo = callLogo(a, catalog.data?.connectors ?? []);
+    if (logo.kind === "service") return <ConnectorIcon def={logo.def} label={logo.label} image={logo.image} />;
     return (
       <span className="tool-logo" aria-hidden="true">
-        <Icon name={KIND_ICON[a.kind] ?? "plug"} size={14} />
+        <Icon name={logo.kind === "mail" ? "mail" : (KIND_ICON[a.kind] ?? "plug")} size={14} />
       </span>
     );
   };
@@ -252,7 +241,7 @@ export function LiveTools({
   return (
     <>
       <ToolBlock
-        logos={toolApps(items).map((a) => <span key={`${a.kind}-${a.app ?? ""}`}>{logo(a)}</span>)}
+        logos={toolApps(items).map((a) => <span key={appKey(a)}>{logo(a)}</span>)}
         head={head}
         items={blockItems}
         color={color}
@@ -302,11 +291,7 @@ export function SavedTools({
   if (compact && compact.steps === 0) return null;
   const calls = work ? toolCalls(items) : (compact?.steps ?? 0);
   const durationMs = work?.durationMs ?? compact?.durationMs ?? null;
-  const apps = work
-    ? toolApps(items)
-    : (compact?.connectors ?? []).map((app) =>
-        app === "Drive" ? { kind: "readingDrive" as const } : { kind: "consulting" as const, app },
-      );
+  const apps = work ? toolApps(items) : workApps((compact?.calls ?? []).filter((c) => !onCard(c.name)));
   const status: ToolBlockItem[] = run.isError
     ? [{ kind: "note", key: "error", node: t("chat.work.failed") }]
     : !work
@@ -322,7 +307,7 @@ export function SavedTools({
         : [];
   return (
     <ToolBlock
-      logos={apps.map((a) => <span key={`${a.kind}-${a.app ?? ""}`}>{logo(a)}</span>)}
+      logos={apps.map((a) => <span key={appKey(a)}>{logo(a)}</span>)}
       head={{
         text: calls > 0 ? t("chat.work.used", { count: calls }) : t("chat.work.see", agentGrammar(t, agentName)),
         time: durationMs !== null ? formatDuration(t, durationMs) : undefined,

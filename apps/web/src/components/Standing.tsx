@@ -191,7 +191,7 @@ function SignOutButton() {
   );
 }
 
-/** Apagar conta, from a workspace closed to its people: its account menu isn't there. */
+/** Apagar conta, from a workspace closed to its people: its settings aren't there. */
 function DeleteAccountButton() {
   const { t } = useTranslation();
   return (

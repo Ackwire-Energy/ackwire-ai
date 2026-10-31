@@ -27,6 +27,16 @@ export const storage = safe(() => localStorage);
 /** sessionStorage (this tab only), the same way. */
 export const sessionStore = safe(() => sessionStorage);
 
+/** The JSON list of strings saved under `key` in `storage` (nothing, or anything else saved there: empty). */
+export function storedStrings(key: string): string[] {
+  try {
+    const v = JSON.parse(storage.get(key) ?? "[]");
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 export const STORAGE_KEYS = {
   theme: "agentes.theme",
   lastOrg: "agentes.lastOrg",
@@ -36,7 +46,7 @@ export const STORAGE_KEYS = {
   driveView: "agentes.drive.view",
   /** "1" when the person shrank the sidebar to its icon rail (desktop). */
   sidebarCollapsed: "agentes.sidebar.collapsed",
-  /** The sidebar categories the person closed (JSON array of ids). */
+  /** Prefix (`.<user id>.<org id>`): the sidebar categories that person closed in that workspace (JSON array of ids). */
   sidebarSections: "agentes.sidebar.sections",
   /** Offline-computer notices the person closed (`machineId@offlineSince`), until that computer comes back. */
   outagesDismissed: "agentes.outages.dismissed",

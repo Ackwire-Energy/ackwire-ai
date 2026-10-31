@@ -12,7 +12,7 @@ import { useNow } from "@/components/missions/MissionBits";
 const RENEW_BEFORE_MS = 20_000;
 
 /**
- * "Abrir no celular" (account menu): a QR code that opens the phone app on this server, signed in as this
+ * "Abrir no celular" (Configurações › Sua conta): a QR code that opens the phone app on this server, signed in as this
  * person. Each code works once for a few minutes, and a new one takes its place while the dialog is open.
  */
 export function OpenOnPhoneDialog({ open, onClose }: { open: boolean; onClose: () => void }) {

@@ -86,6 +86,8 @@ export interface ComposerProps {
    * empty, and the field focused. Once per request (`at`).
    */
   prefill?: { text: string; at: number } | null;
+  /** Each change that leaves text in the field ("está digitando…" for the others; the screen throttles it). */
+  onType?: () => void;
 }
 
 /** The pill's height, the "+" and the send button's. */
@@ -117,6 +119,7 @@ export function Composer({
   mentionAt,
   insertMention,
   prefill,
+  onType,
 }: ComposerProps) {
   const theme = useTheme();
   const { colors, shadows, reducedMotion } = theme;
@@ -276,7 +279,10 @@ export function Composer({
             ref={input}
             {...(inputNativeID ? { nativeID: inputNativeID } : {})}
             value={text}
-            onChangeText={setText}
+            onChangeText={(next) => {
+              setText(next);
+              if (next.trim()) onType?.();
+            }}
             {...(selection ? { selection } : {})}
             onSelectionChange={(e) => {
               setCaret(e.nativeEvent.selection.end);

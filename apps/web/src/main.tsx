@@ -36,7 +36,7 @@ if (platform) {
   if (asksForPhone(window.location.search)) askForPhone();
 }
 const toasts = createToastStore();
-// The app's sounds (ADR 0070): a click or a key switches audio on; the person's choice is in the account menu.
+// The app's sounds (ADR 0070): a click or a key switches audio on; the person's choice is in Sua conta.
 installSounds();
 const api = createApiClient();
 

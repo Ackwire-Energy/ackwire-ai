@@ -6,6 +6,7 @@ import type { IconName } from "@agenteschat/ui";
 // the sections without loading the page itself.
 
 export type SettingsSection =
+  | "account"
   | "notifications"
   | "general"
   | "members"
@@ -30,7 +31,9 @@ export const SETTINGS_SECTIONS: {
   group: SettingsGroup;
   allowed: (org: OrgSummary, server: AuthConfig | undefined) => boolean;
 }[] = [
-  // Mine, not the workspace's: what reaches my devices as a notification here (ADR 0071 §8).
+  // Mine, not the workspace's: my profile here and what this device keeps (the nav shows my face for it).
+  { id: "account", icon: "person", group: "you", allowed: () => true },
+  // What reaches my devices as a notification here (ADR 0071 §8).
   { id: "notifications", icon: "bell", group: "you", allowed: () => true },
   { id: "general", icon: "settings", group: "org", allowed: () => true },
   { id: "members", icon: "members", group: "org", allowed: () => true },
