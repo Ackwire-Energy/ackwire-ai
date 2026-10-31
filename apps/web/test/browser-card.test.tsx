@@ -246,7 +246,7 @@ describe("the card in the message", () => {
     // A click into the page takes the wheel: the hint says how to scroll it, and the page keeps the wheel.
     await act(async () => fireEvent.pointerDown(page, pointer(1, 100, 100)));
     await act(async () => fireEvent.pointerUp(page, pointer(1, 100, 100)));
-    expect(card.querySelector(".brw-ac__capture")?.textContent).toBe("A roda rola a página · Esc para sair");
+    expect(card.querySelector(".brw-ac__capture")?.textContent).toBe("Rolar agora move a página. Esc para sair");
     expect((await wheelOn()).defaultPrevented).toBe(true);
 
     // Esc gives the wheel back to the conversation.
@@ -282,7 +282,7 @@ describe("the card in the message", () => {
     expect(sentToPage()).toEqual([]);
     await act(async () => fireEvent.pointerMove(page, pointer(1, 130, 100, "touch")));
     expect(sentToPage()).toEqual(["moved+none@200,200", "pressed@200,200", "moved+left@260,200"]);
-    expect(hint()).toBe("Arraste com um dedo · role com dois");
+    expect(hint()).toBe("Arraste com um dedo. Role com dois");
     await act(async () => fireEvent.pointerUp(page, pointer(1, 130, 100, "touch")));
     expect(sentToPage().slice(3)).toEqual(["released@260,200"]);
     expect(hint()).toBeNull();
