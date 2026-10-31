@@ -13,6 +13,7 @@ import {
   type CodexTurnOptions,
   codexBridgeOverrides,
   codexCommandCall,
+  codexContextOverride,
   codexEffort,
   codexFileChangeCall,
   codexProblem,
@@ -166,10 +167,13 @@ export function codexAppServerArgs(input: {
   processId: string;
   mcp?: { command?: string[] };
   writableRoots?: string[];
+  /** Protocol 28: the agent's context limit (a process serves one). */
+  contextTokens?: number;
 }): string[] {
   return [
     "app-server",
     ...(input.writableRoots?.length ? ["-c", codexWritableRoots(input.writableRoots)] : []),
+    ...codexContextOverride(input.contextTokens),
     ...(input.mcp ? codexBridgeOverrides({ runId: input.processId, ...input.mcp }).flatMap((o) => ["-c", o]) : []),
   ];
 }
@@ -764,6 +768,8 @@ export class CodexAppServers implements CodexAppRunner {
       env: opts.env ?? {},
       // A thread's sandbox is set when it opens: another profile is another process.
       profile: input.profile ?? "work",
+      // The context limit is the process's (`-c`): another one is another process.
+      context: input.contextTokens ?? null,
     });
   }
 
@@ -826,6 +832,7 @@ export class CodexAppServers implements CodexAppRunner {
       processId: id,
       mcp: { ...(opts.mcpCommand ? { command: opts.mcpCommand } : {}) },
       ...(input.writableRoots?.length ? { writableRoots: input.writableRoots } : {}),
+      ...(input.contextTokens ? { contextTokens: input.contextTokens } : {}),
     });
     const brokenKey = `${opts.bin ?? "codex"}@${input.version}`;
     let client: CodexAppClient;

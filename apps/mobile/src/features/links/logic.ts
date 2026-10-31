@@ -19,6 +19,7 @@ export type AppHref =
   | `/handoff/${string}`
   | `/issues/${number}`
   | `/routines/${string}`
+  | `/consultation/${string}?channel=${string}`
   | "/routines"
   | "/activity"
   | "/threads"
@@ -28,6 +29,10 @@ export type AppHref =
 
 export const chatHref = (channelId: string, threadId?: string | null): AppHref =>
   threadId && threadId !== channelId ? `/chat/${channelId}?thread=${threadId}` : `/chat/${channelId}`;
+
+/** Two agents' conversation for a question asked in a conversation, read only. */
+export const consultationHref = (consultationId: string, channelId: string): AppHref =>
+  `/consultation/${consultationId}?channel=${channelId}`;
 
 /** A routine's screen, or Rotinas when the id isn't one. */
 export const routineHref = (routineId: unknown): AppHref =>

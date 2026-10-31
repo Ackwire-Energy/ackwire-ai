@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 27;
+export const MACHINE_PROTOCOL_VERSION = 28;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -340,6 +340,13 @@ export const DESKTOP_TEXT_MAX = 16_000;
 export const BROWSER_WARM_PROTOCOL = 27;
 
 /**
+ * From this protocol on: `brain.turn` carries `contextTokens`, the most context the agent's model reads
+ * (Claude Code compacts there, `CLAUDE_CODE_AUTO_COMPACT_WINDOW`; Codex too, `model_auto_compact_token_limit`).
+ * An older runner never sees it.
+ */
+export const CONTEXT_LIMIT_PROTOCOL = 28;
+
+/**
  * Protocol 27: what an agent's browser request waited on before it ran, in
  * milliseconds, each only when it happened: its worker starting (system mode),
  * `agent-browser` and Chrome for Testing being found or installed, the
@@ -378,6 +385,10 @@ export type BrainEffort = "low" | "medium" | "high" | "xhigh" | "max";
 export const BRAIN_EFFORTS: readonly BrainEffort[] = ["low", "medium", "high", "xhigh", "max"];
 export const isBrainEffort = (v: unknown): v is BrainEffort =>
   typeof v === "string" && (BRAIN_EFFORTS as readonly string[]).includes(v);
+
+/** A `brain.turn`'s `contextTokens` the runner applies (protocol 28): a whole number of tokens in a sane range. */
+export const isContextTokens = (v: unknown): v is number =>
+  typeof v === "number" && Number.isInteger(v) && v >= 50_000 && v <= 10_000_000;
 
 /** An account on the machine, as the runner sees it (`hello.accounts`, `account` replies). No secrets. */
 export interface RunnerAccountInfo {
@@ -1025,6 +1036,8 @@ export interface BrainTurnRequest {
   account?: string;
   /** Protocol 13: how hard it thinks; absent: the CLI's default. */
   effort?: BrainEffort;
+  /** Protocol 28: the most context it reads, in tokens; absent: the model's own window. */
+  contextTokens?: number;
 }
 
 /** Largest strings of a `brain.event` (tool inputs and results are cut, text deltas are small). */
