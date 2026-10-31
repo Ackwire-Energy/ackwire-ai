@@ -6,6 +6,7 @@ import {
   cancelRun,
   continuedTranscript,
   continueRun,
+  createAgent,
   createAgentRuns,
   createForumTopic,
   createJobHandlers,
@@ -258,6 +259,63 @@ describe("a conversation run that reaches its step limit mid-work", () => {
     expect((await agentMessages(second))[0]?.meta.bodyCode).toBe("step_limit");
     const { runId: third } = await continueRun(deps(), bia.id, f.org.id, second);
     await expect(cancelRun(deps(), bia.id, f.org.id, third)).resolves.toMatchObject({ status: "canceled" });
+  });
+
+  test("a run another agent woke: the member behind the work may stop it and continue it, another member may not", async () => {
+    f = await setup({
+      toolSources: [workTools()],
+      reply: () => ({ chunks: [], toolUses: [{ name: "look", input: {} }] }),
+    });
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const carl = await addMember(f.db, f.org.id, "member", "carl");
+    const theo = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Theo", handle: "theo", role: "QA", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: theo.id });
+    const asked = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "person", userId: bia.id },
+      body: "@dev olha os PRs",
+    });
+    const [dev] = await f.db
+      .insert(schema.agentRuns)
+      .values({
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        channelId: f.general.id,
+        threadRootId: asked.id,
+        triggerMessageId: asked.id,
+        trigger: "mention",
+        hop: 1,
+        status: "done",
+      })
+      .returning();
+    const devWakesTheo = async (body: string) => {
+      const handed = await insertMessage(f.db, {
+        orgId: f.org.id,
+        channelId: f.general.id,
+        threadId: asked.id,
+        author: { type: "agent", agentId: f.agent.id, runId: dev?.id ?? "", hop: 1 },
+        body,
+      });
+      const [run] = await f.db.transaction((tx) => createAgentRuns(tx, handed, [theo.id], "mention"));
+      return run?.id ?? "";
+    };
+
+    const queued = await devWakesTheo("@theo roda os testes");
+    await expect(cancelRun(deps(), bia.id, f.org.id, queued)).resolves.toMatchObject({ status: "canceled" });
+    const capped = await devWakesTheo("@theo revisa o #42");
+    await drainOutbox(f.db, handlers(2));
+    expect((await agentMessages(capped))[0]?.meta.bodyCode).toBe("step_limit");
+    await expect(continueRun(deps(), carl.id, f.org.id, capped)).rejects.toMatchObject({
+      code: "run.continue_forbidden",
+    });
+    await expect(continueRun(deps(), bia.id, f.org.id, capped)).resolves.toMatchObject({ runId: expect.any(String) });
   });
 
   test("a run that ended done any other way can't be continued", async () => {

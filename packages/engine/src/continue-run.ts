@@ -2,12 +2,12 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { runBrainOf } from "./brains/select";
-import { canceledBy, runRequester } from "./cancel";
+import { canceledBy, mayStopRun, runRequester } from "./cancel";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { continuedTranscript, type Transcript } from "./executor";
 import { getMessage } from "./messages";
-import { can, requireActiveMembership } from "./organizations";
+import { requireActiveMembership } from "./organizations";
 import { enqueue } from "./outbox";
 import { ACTIVE_RUN_STATUSES, takeInbox } from "./run-inbox";
 
@@ -17,12 +17,12 @@ const { agentRuns, agents, messages, channels, users } = schema;
  * "Continuar" under a reply a person stopped (`POST …/runs/{runId}/continue`):
  * a new run of the same agent, in the same conversation, picks up from the
  * stopped run's conversation plus "[Ana asked you to continue from where you
- * stopped.]". Same people as stopping it: who asked, the agent's owner, or an
- * admin. Only a run a person stopped while it ran, or one that ended at its
- * step limit (its reply has `meta.stepLimit`); its reply is the new run's
- * trigger, so it continues once, and never while the agent already works in
- * that conversation. The reply gets `continuedRunId` in that meta
- * (`meta.canceled` or `meta.stepLimit`) and the app hears `run.continued`. Audited.
+ * stopped.]". Same people as stopping it (`mayStopRun`). Only a run a person
+ * stopped while it ran, or one that ended at its step limit (its reply has
+ * `meta.stepLimit`); its reply is the new run's trigger, so it continues once,
+ * and never while the agent already works in that conversation. The reply gets
+ * `continuedRunId` in that meta (`meta.canceled` or `meta.stepLimit`) and the
+ * app hears `run.continued`. Audited.
  */
 export async function continueRun(
   deps: { db: Database; pubsub?: PubSub },
@@ -45,8 +45,7 @@ export async function continueRun(
     .leftJoin(channels, eq(channels.id, agentRuns.channelId))
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.orgId, orgId)));
   if (!row) throw new NotFoundError("Run not found");
-  const allowed = row.requester === userId || row.ownerUserId === userId || can(membership, "manage_agents");
-  if (!allowed)
+  if (!(await mayStopRun(db, userId, membership, row)))
     throw new ForbiddenError("Only who asked, the agent's owner or an admin can continue it", "run.continue_forbidden");
 
   const stopped = row.run;
