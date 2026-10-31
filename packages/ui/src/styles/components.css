@@ -55,6 +55,14 @@ samp {
   ::-webkit-scrollbar-button {
     display: none;
   }
+  /* The thumb stops short of the box's ends: Chrome draws a scrollbar over its own box's rounded corners, and half the
+     largest radius a box takes keeps it inside every curve. */
+  ::-webkit-scrollbar-track:vertical {
+    margin: calc(var(--radius-section) / 2) 0;
+  }
+  ::-webkit-scrollbar-track:horizontal {
+    margin: 0 calc(var(--radius-section) / 2);
+  }
   ::-webkit-scrollbar-thumb {
     border: 2px solid transparent;
     border-radius: var(--radius-full);

@@ -149,6 +149,33 @@ describe("our scrollbars, never the browser's", () => {
     const kinds = Object.keys(SIDEWAYS).map((s) => [s, none.some((h) => covers(h, s)) ? "strip" : "content"]);
     expect(Object.fromEntries(kinds)).toEqual(SIDEWAYS);
   });
+
+  test("the thumb stops short of a box's ends, inside the curve of any corner a box that scrolls rounds", async () => {
+    const kit = atRule(await read(KIT), POINTER);
+    const tokens = await read("packages/ui/src/styles/tokens.css");
+    const token = (name: string) => px(tokens.match(new RegExp(`${name}:\\s*([\\d.]+)px`))?.[1] ?? "");
+    // Chrome draws a scrollbar over its own box's rounded corners: half the largest radius off each end…
+    expect(value(kit, "::-webkit-scrollbar-track:vertical", "margin")).toBe("calc(var(--radius-section) / 2) 0");
+    expect(value(kit, "::-webkit-scrollbar-track:horizontal", "margin")).toBe("0 calc(var(--radius-section) / 2)");
+    // …and nothing that scrolls with a bar rounds its corners more than that.
+    const radius = (v: string) =>
+      Math.max(
+        0,
+        ...v
+          .split(/[\s/]+/)
+          .map((r) => (r.startsWith("var(") ? token(r.slice(4, -1)) : px(r)))
+          .filter(Number.isFinite),
+      );
+    const scrollers = new Set(await selectorsWith((p, v) => /^overflow(-[xy])?$/.test(p) && /auto|scroll/.test(v)));
+    const strips = await selectorsWith((p, v) => p === "scrollbar-width" && v === "none");
+    const rounder: string[] = [];
+    for (const [file, css] of await sheets())
+      for (const rule of rules(css))
+        for (const s of rule.selectors.filter((s) => scrollers.has(s) && !strips.some((h) => covers(h, s))))
+          for (const [p, v] of rule.declarations)
+            if (p === "border-radius" && radius(v) > token("--radius-section")) rounder.push(`${file}: ${s} {${v}}`);
+    expect(rounder).toEqual([]);
+  });
 });
 
 describe("the collapsed sidebar", () => {
