@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { ROUTER_CASES, type RouterCase, routerEval, TEAM } from "../eval/router";
-import { createJevRouterStrategy } from "../src";
+import { createJevRouterStrategy, SPOKEN_TO } from "../src";
 
 // The router eval's cases and harness, with a fake Jev (no network). The eval itself is manual:
 // `bun run eval:router`.
@@ -11,10 +11,13 @@ test("every case is well formed: known agents, no @mention, and each language as
   for (const c of ROUTER_CASES) {
     expect(ids.has(c.id), c.id).toBe(false);
     ids.add(c.id);
-    expect(c.answers !== undefined || c.not !== undefined, c.id).toBe(true);
-    for (const h of [...(c.answers ?? []), ...(c.not ?? [])]) expect(handles.has(h), `${c.id}: ${h}`).toBe(true);
+    for (const h of c.answers) expect(handles.has(h), `${c.id}: ${h}`).toBe(true);
     expect(c.message, c.id).not.toContain("@");
+    if (c.replyTo !== undefined) expect(c.before?.[c.replyTo], c.id).toBeDefined();
+    if (c.thread) expect(c.before?.length, c.id).toBeGreaterThan(0);
   }
+  // A case can't pass by recalling the rule's own example.
+  for (const a of TEAM) expect(SPOKEN_TO, a.name).not.toContain(a.name);
   for (const lang of ["pt", "en", "es", "de", "ja", "ar"])
     for (const kind of ["asks", "direct", "anyone", "about"])
       expect(
@@ -56,6 +59,27 @@ test("the harness: the day's case fails on that day's answers and passes once th
     expect(JSON.stringify(then.states[0])).toContain("Gmail");
     const now = jevThatDay({ ada: 0.86, theo: 0.08, none: 0.06 });
     expect(await evaluation.run(day, now.strategy)).toMatchObject({ ok: true, picked: ["ada"] });
+  } finally {
+    await evaluation.close();
+  }
+});
+
+test("the harness: a reply case quotes the agent's message or answers in its thread, as people do", async () => {
+  // Every agent quiet: only the rule for a reply to an agent picks.
+  const quiet = createJevRouterStrategy({
+    key: "k",
+    recordUsage: async () => {},
+    fetch: (async (_url: string, init: RequestInit) => {
+      const { questions } = JSON.parse(String(init.body)) as { questions: Record<string, unknown> };
+      return Response.json({ answers: Object.fromEntries(Object.keys(questions).map((id) => [id, { noul: 0.05 }])) });
+    }) as unknown as typeof fetch,
+  });
+  const evaluation = await routerEval();
+  try {
+    for (const id of ["pt-reply-hand-over", "en-thread-asks"]) {
+      const c = ROUTER_CASES.find((r) => r.id === id) as RouterCase;
+      expect((await evaluation.run(c, quiet)).picked, id).toEqual(["theo"]);
+    }
   } finally {
     await evaluation.close();
   }

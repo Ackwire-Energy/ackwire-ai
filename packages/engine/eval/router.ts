@@ -1,11 +1,13 @@
 /**
- * Router eval (ADR 0074, addendum of 2026-10-31): who answers a message nobody @mentions. The agent a
- * message speaks to answers, and an agent it only names as someone to ask or to tell, or talks about, doesn't,
- * in Portuguese, English, Spanish, German, Japanese and Arabic ("ada pergunta pro theo ai qual meu email mais
- * recente pls" went to Theo, who has the email, on 2026-10-31); what already worked still does (a message to
- * anyone, to every agent, to a person, small talk, a follow-up). Each case goes through the real `routeMessage`
- * (the candidates, what each can use, continuity, the rules after the step) on an in-memory database, in a
- * channel of its own: only the step calls out.
+ * Router eval (ADR 0074, addendum of 2026-10-31): who answers a message nobody @mentions, in Portuguese,
+ * English, Spanish, German, Japanese and Arabic. The agent a message speaks to answers, not one it only names
+ * as someone to ask or to tell ("ada pergunta pro theo ai qual meu email mais recente pls" went to Theo, who
+ * has the email, on 2026-10-31). News for an agent told to nobody in particular ("someone tell Theo…") goes to
+ * that agent, a reply to an agent stays with it unless it speaks to another one, a message that only talks
+ * about an agent gets none, and what already worked still does (a message to anyone, to every agent, to a
+ * person, small talk, a follow-up). Each case goes through the real `routeMessage` (the candidates, what each
+ * can use, continuity, the rules after the step) on an in-memory database, in a channel of its own: only the
+ * step calls out.
  *
  * Manual, never in CI (it calls the real service and costs a little):
  *
@@ -25,6 +27,7 @@ import {
   DEFAULT_ROUTER_POLICY,
   insertMessage,
   type ModelGateway,
+  postPersonMessage,
   type RouterStrategy,
   routeMessage,
 } from "../src";
@@ -35,17 +38,20 @@ export interface RouterCase {
   lang: "pt" | "en" | "es" | "de" | "ja" | "ar";
   /**
    * `asks`: to one agent, about another it should ask or tell; `direct`: to that other agent; `anyone`: to
-   * nobody in particular; `about`: to the team, about an agent. The rest already worked.
+   * nobody in particular; `about`: to nobody in particular, news for an agent; `reply`: a quote reply or a
+   * thread reply to an agent's message. The rest already worked (`person` also when it talks about an agent).
    */
-  kind: "asks" | "direct" | "anyone" | "about" | "everyone" | "person" | "follow-up";
+  kind: "asks" | "direct" | "anyone" | "about" | "reply" | "everyone" | "person" | "follow-up";
   /** The conversation before it, oldest first, a minute apart: "Ana", "Walter" or an agent's "@handle". */
   before?: { from: string; text: string }[];
+  /** The message quotes this line of `before`. */
+  replyTo?: number;
+  /** The message, and the lines of `before` after its first, go in the thread of that first line. */
+  thread?: boolean;
   /** What Ana writes, with no @mention. */
   message: string;
   /** Exactly these answer ([]: nobody). */
-  answers?: string[];
-  /** None of these answers; anyone else may. */
-  not?: string[];
+  answers: string[];
 }
 
 /** The agents of every case's channel, with Ana and Walter: what each does and the apps it can use. */
@@ -122,7 +128,7 @@ export const ROUTER_CASES: RouterCase[] = [
     lang: "pt",
     kind: "about",
     message: "Alguém avisa o Theo que a reunião com o cliente mudou para as 15h",
-    not: ["theo"],
+    answers: ["theo"],
   },
   {
     id: "pt-asks-tell",
@@ -158,7 +164,7 @@ export const ROUTER_CASES: RouterCase[] = [
     lang: "en",
     kind: "about",
     message: "Someone let Theo know the client call moved to 3pm",
-    not: ["theo"],
+    answers: ["theo"],
   },
   {
     id: "en-asks-other",
@@ -194,7 +200,7 @@ export const ROUTER_CASES: RouterCase[] = [
     lang: "es",
     kind: "about",
     message: "Que alguien le diga a Theo que la reunión con el proveedor pasó al jueves",
-    not: ["theo"],
+    answers: ["theo"],
   },
 
   {
@@ -223,7 +229,7 @@ export const ROUTER_CASES: RouterCase[] = [
     lang: "de",
     kind: "about",
     message: "Kann jemand Theo sagen, dass das Kundenmeeting auf 15 Uhr verschoben wurde?",
-    not: ["theo"],
+    answers: ["theo"],
   },
   {
     id: "de-asks-tell",
@@ -259,7 +265,7 @@ export const ROUTER_CASES: RouterCase[] = [
     lang: "ja",
     kind: "about",
     message: "誰かTheoさんに、顧客との打ち合わせが15時に変更になったと伝えてください",
-    not: ["theo"],
+    answers: ["theo"],
   },
   {
     id: "ja-asks-other",
@@ -295,10 +301,70 @@ export const ROUTER_CASES: RouterCase[] = [
     lang: "ar",
     kind: "about",
     message: "ليخبر أحدكم Theo أن اجتماع العميل تأجل إلى الساعة الثالثة",
-    not: ["theo"],
+    answers: ["theo"],
   },
 
-  // What already worked.
+  // A reply stays with the agent replied to, unless it speaks to another one.
+  {
+    id: "pt-reply-hand-over",
+    lang: "pt",
+    kind: "reply",
+    before: [{ from: "@theo", text: "Resumo de hoje: 3 emails novos do cliente, e o deploy de ontem falhou no CI." }],
+    replyTo: 0,
+    message: "isso do deploy é com a ada",
+    answers: ["theo"],
+  },
+  {
+    id: "en-thread-asks",
+    lang: "en",
+    kind: "reply",
+    before: [
+      { from: "@theo", text: "Today's summary: 3 new emails from the client, and yesterday's deploy failed in CI." },
+    ],
+    thread: true,
+    message: "Ada, the deploy failure is yours: can you check the CI logs?",
+    answers: ["ada"],
+  },
+
+  // What already worked, and the day's case mirrored: a follow-up that names another agent to ask is still for
+  // the agent just talking.
+  {
+    id: "pt-follow-up-asks-other",
+    lang: "pt",
+    kind: "follow-up",
+    before: [
+      { from: "Ana", text: "Theo, o cliente respondeu o email do contrato?" },
+      { from: "@theo", text: "Ainda não, Ana. O último email dele é de segunda." },
+    ],
+    message: "pergunta pra Ada se o PR do contrato já subiu",
+    answers: ["theo"],
+  },
+  {
+    id: "en-follow-up-asks-other",
+    lang: "en",
+    kind: "follow-up",
+    before: [
+      { from: "Ana", text: "Theo, did the client answer the contract email?" },
+      { from: "@theo", text: "Not yet, Ana. Their last email is from Monday." },
+    ],
+    message: "ask Ada whether the contract PR is merged",
+    answers: ["theo"],
+  },
+  {
+    id: "pt-person-about-agent",
+    lang: "pt",
+    kind: "person",
+    message: "Walter, a Ada já terminou o relatório?",
+    answers: [],
+  },
+  {
+    id: "en-room-about-agent",
+    lang: "en",
+    kind: "person",
+    before: [{ from: "Walter", text: "the client loved the summary this morning" }],
+    message: "yeah, Theo did a great job with it",
+    answers: [],
+  },
   {
     id: "pt-everyone",
     lang: "pt",
@@ -403,24 +469,26 @@ export async function routerEval() {
     for (const id of ids.values()) await addChannelMember(f.db, f.owner.id, f.org.id, channel.id, { agentId: id });
     const now = Date.now();
     const lines = c.before ?? [];
+    const posted: string[] = [];
     for (const [i, line] of lines.entries()) {
       const agentId = line.from.startsWith("@") ? ids.get(line.from.slice(1)) : undefined;
-      await insertMessage(f.db, {
+      const m = await insertMessage(f.db, {
         orgId: f.org.id,
         channelId: channel.id,
+        threadId: c.thread && i > 0 ? posted[0] : null,
         author: agentId
           ? { type: "agent", agentId, runId: null, hop: 1, stretchId: null }
           : { type: "person", userId: line.from === "Walter" ? walter.id : f.owner.id },
         body: line.text,
         createdAt: new Date(now - (lines.length - i) * 60_000),
       });
+      posted.push(m.id);
     }
-    const message = await insertMessage(f.db, {
-      orgId: f.org.id,
-      channelId: channel.id,
-      author: { type: "person", userId: f.owner.id },
+    // As a person posts it, so a quote reply carries the quote it does in production.
+    const message = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, channel.id, {
       body: c.message,
-      createdAt: new Date(now),
+      threadId: c.thread ? posted[0] : null,
+      replyTo: c.replyTo === undefined ? null : posted[c.replyTo],
     });
     const routed = await routeMessage(
       { db: f.db, strategy, policy: { ...DEFAULT_ROUTER_POLICY, maxHops: 3 } },
@@ -434,8 +502,7 @@ export async function routerEval() {
     const scores = Object.fromEntries(
       (decision?.candidates ?? []).map((s) => [handleOf.get(s.agentId) ?? s.agentId, Math.round(s.score * 100) / 100]),
     );
-    const exact = c.answers ? [...picked].sort().join() === [...c.answers].sort().join() : true;
-    const ok = exact && !(c.not ?? []).some((h) => picked.includes(h));
+    const ok = [...picked].sort().join() === [...c.answers].sort().join();
     return { c, ok, picked, scores, reason: decision?.reason ?? decision?.error ?? null };
   }
 
@@ -473,7 +540,7 @@ if (import.meta.main) {
     const scores = Object.entries(r.scores)
       .map(([h, s]) => `${h} ${s.toFixed(2)}`)
       .join(" · ");
-    const want = c.answers ? c.answers.join(", ") || "nobody" : `not ${c.not?.join(", ")}`;
+    const want = c.answers.join(", ") || "nobody";
     console.log(
       `${r.ok ? "PASS" : "FAIL"}  ${c.lang}  ${c.kind.padEnd(9)} ${c.id.padEnd(26)} → ${r.picked.join(", ") || "nobody"} (want ${want})  ${scores}  ${r.reason ?? ""}`,
     );
