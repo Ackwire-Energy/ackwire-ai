@@ -198,6 +198,15 @@ export function withAddressee<T extends Pick<RoutingResult, "agents" | "needsAge
   return { ...result, agents, addressee: top[0] };
 }
 
+/**
+ * Whether the steps ask who a message speaks to: only of a person's message, among two or more agents. An
+ * agent's message brings another agent in only past its own bar (ADR 0034), and the addressee's floor would
+ * lift one past it; the only agent of a room would lose its `pass`.
+ */
+export function asksAddressee(input: Pick<RoutingInput, "candidates" | "authorUserId">) {
+  return input.authorUserId !== null && input.candidates.length >= 2;
+}
+
 export interface RouterPolicy {
   /** Minimum score to be picked. */
   minScore: number;
@@ -350,12 +359,12 @@ export function routerPrompt(input: RoutingInput) {
 
 /** A router answer's scores by agent (unknown handles dropped), clamped, and who it speaks to (`withAddressee`). */
 export function scoresOf(
-  input: Pick<RoutingInput, "candidates">,
+  input: Pick<RoutingInput, "candidates" | "authorUserId">,
   parsed: ReturnType<typeof parseRouterOutput>,
 ): Pick<RoutingResult, "agents" | "needsAgent" | "forEveryone" | "addressee"> {
   const byHandle = new Map(input.candidates.map((c) => [c.handle, c.agentId]));
   const idOf = (handle: string) => byHandle.get(handle.replace(/^@/, "").toLowerCase());
-  const to = parsed.addressee ? idOf(parsed.addressee) : undefined;
+  const to = parsed.addressee && asksAddressee(input) ? idOf(parsed.addressee) : undefined;
   return withAddressee(
     {
       agents: parsed.scores.flatMap((s) => {

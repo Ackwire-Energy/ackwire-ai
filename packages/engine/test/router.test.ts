@@ -22,6 +22,7 @@ import {
   routeMessage,
   routerPrompt,
   SPOKEN_TO,
+  scoresOf,
   selectAgents,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -158,6 +159,25 @@ describe("who a message speaks to, for the small model", () => {
     expect(Object.keys(answer.properties)[0]).toBe("addressee");
     expect(answer.properties.addressee).toEqual({ type: "string", enum: ["ada", "theo", "none"] });
     expect(answer.required).toContain("addressee");
+  });
+
+  test("like Jev, it counts only for a person's message among two or more agents", () => {
+    const answer = {
+      addressee: "theo",
+      needs_agent: 0.85,
+      for_everyone: 0,
+      scores: [{ handle: "theo", score: 0.4 }],
+      reason: "",
+    };
+    const kept = { agents: [{ agentId: "theo", score: 0.4 }], needsAgent: 0.85, forEveryone: 0 };
+    expect(scoresOf({ candidates: [cand("ada"), cand("theo")] }, answer)).toMatchObject({
+      addressee: "theo",
+      agents: [{ agentId: "theo", score: 0.85 }],
+    });
+    // An agent's message: another agent comes in only past its own bar (ADR 0034).
+    expect(scoresOf({ candidates: [cand("ada"), cand("theo")], authorUserId: null }, answer)).toEqual(kept);
+    // The only agent of a room: nobody to tell it from, and it keeps its `pass`.
+    expect(scoresOf({ candidates: [cand("theo")] }, answer)).toEqual(kept);
   });
 
   test("its `addressee` decides between the agents a message names; `none` leaves the scores as they are", async () => {

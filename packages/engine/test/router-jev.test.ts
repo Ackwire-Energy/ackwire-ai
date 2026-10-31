@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import { systemText } from "@agenteschat/providers";
 import {
+  AGENT_CHIME_IN_SCORE,
   createAgent,
   createJevJudge,
   createJevKey,
@@ -214,7 +215,7 @@ describe("Jev's questions", () => {
 describe("who a message speaks to", () => {
   const ada = { ...cand("ada"), name: "Ada", role: "Engenharia" };
   const theo = { ...cand("theo"), name: "Theo" };
-  const decide = (answer: Parameters<typeof fakeJev>[0], body: string) => {
+  const decide = (answer: Parameters<typeof fakeJev>[0], body: string, more: Partial<RoutingInput> = {}) => {
     const jev = fakeJev(answer);
     const strategy = createJevRouterStrategy({ key: "k", recordUsage: async () => {}, fetch: jev.fetcher });
     const decided = strategy.decide({
@@ -223,6 +224,7 @@ describe("who a message speaks to", () => {
       message: { id: "m", author: "ana", body },
       thread: [],
       candidates: [ada, theo],
+      ...more,
     });
     return { jev, decided };
   };
@@ -328,6 +330,19 @@ describe("who a message speaks to", () => {
       "x",
     ).decided;
     expect(selectAgents([ada, theo], anyone, policy)).toEqual(["theo"]);
+  });
+
+  test("an agent's message isn't asked who it speaks to: another agent chimes in only past its own bar", async () => {
+    // "@ada: Theo, confere a agenda?" with Theo at 0.6: the floor from who it speaks to would lift him past 0.75.
+    const { jev, decided } = decide(
+      () => ({ nouls: { "@theo": 0.6, "@ada": 0.1 }, needs: 0.85, to: { theo: 0.92, none: 0.08 } }),
+      "Theo, confere a agenda?",
+      { message: { id: "m", author: "@dev", body: "Theo, confere a agenda?" }, authorUserId: null },
+    );
+    const result = await decided;
+    expect(jev.requests[0]?.body.questions).not.toHaveProperty("addressee");
+    expect(result.addressee).toBeUndefined();
+    expect(scores(result).theo).toBeLessThan(AGENT_CHIME_IN_SCORE);
   });
 
   /** #general with Ada and Theo besides Dev, and Jev answering as on 2026-10-31 with the addressee Choice. */

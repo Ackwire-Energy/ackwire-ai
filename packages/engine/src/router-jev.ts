@@ -1,5 +1,6 @@
 import { callJev, type JevKeySource, JevOffError } from "./jev-key";
 import {
+  asksAddressee,
   ROUTER_MESSAGE_CHARS,
   RouterChainEnd,
   RouterSkip,
@@ -16,8 +17,8 @@ import {
  * conversation as `state` and, in parallel, one Noul per candidate ("should
  * <agent> answer?"), a Noul for "does this need any agent?", and, with two or
  * more candidates, a Noul for "is it for every agent?", a Choice over the
- * candidates plus "none" to break ties, and one for "which agent does it speak
- * to?" (`withAddressee`).
+ * candidates plus "none" to break ties, and, for a person's message, one for
+ * "which agent does it speak to?" (`asksAddressee`, `withAddressee`).
  * It only scores; policy stays in `selectAgents`. Optional (needs the
  * installation's Jev key, ADR 0073), and the first step of `routeChain`:
  * on an error or a timeout the next step decides.
@@ -145,6 +146,8 @@ export function createJevRouterStrategy(options: {
           instructions: `Which agent is best placed to reply to \`latest_message\`? ${WHO_FOR}`,
           criteria,
         };
+      }
+      if (asksAddressee(input)) {
         const spoken: Record<string, string> = {};
         for (const c of input.candidates) spoken[c.handle] = `${c.name} (@${c.handle})${c.role ? `, ${c.role}` : ""}`;
         spoken[NONE] = "No agent in particular.";
