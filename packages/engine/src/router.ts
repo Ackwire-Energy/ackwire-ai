@@ -979,7 +979,8 @@ export async function routeMessage(
   // One decided with their next message (`continued`) went where that one did. One the router hasn't decided on
   // yet, still unanswered, leaves it unknown. Read newest first, so no other agent was addressed since; one that
   // went to several agents is no one's. Within continuity's window it is the agent they are just talking to, or
-  // none: another agent that spoke since keeps today's follow-ups.
+  // none: another agent that spoke since keeps today's follow-ups. None either when they name another agent
+  // ("theo me de bom dia…"), also when the step isn't sure the message speaks to it.
   let lastTalkedTo: string | null = null;
   if (continues && !namesPerson && !repliedAgentId && candidates.length >= 2) {
     const spoke = new Set<string>();
@@ -1012,7 +1013,11 @@ export async function routeMessage(
       lastTalkedTo = to.length === 1 && only && candidateIds.has(only) ? only : null;
       break;
     }
-    if (continuityAgentId !== null && continuityAgentId !== lastTalkedTo) lastTalkedTo = null;
+    if (
+      (continuityAgentId !== null && continuityAgentId !== lastTalkedTo) ||
+      address.some((n) => n.agent && n.id !== lastTalkedTo)
+    )
+      lastTalkedTo = null;
   }
   // R2: a person alone in the channel with its one agent.
   const onlyAgentId =

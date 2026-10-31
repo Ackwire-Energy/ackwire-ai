@@ -707,6 +707,26 @@ describe("the agent a person last talked to", () => {
     expect(working.selected).toEqual([t.theo.id]);
   });
 
+  test("a message that names another agent isn't kept for the one before, even when the step isn't sure it speaks to it", async () => {
+    const t = await privateRoom();
+    // Jev only 0.55 sure it speaks to Theo (under 0.6), and Theo at 0.80, just under a clear pick.
+    const { selected } = await t.talk(
+      [
+        [null, "ada quanto ta seu limite de uso?", 23.4, [t.ada]],
+        [t.ada, "Não consigo ver meu saldo por aqui.", 23],
+      ],
+      `theo ${BOM_DIA}`,
+      () => ({
+        nouls: { "@theo": 0.75, "@ada": 0.576 },
+        needs: 0.7,
+        best: "theo",
+        choice: { theo: 0.83, ada: 0.12, none: 0.05 },
+        to: { theo: 0.55, none: 0.45 },
+      }),
+    );
+    expect(selected).toEqual([t.theo.id]);
+  });
+
   test("an agent the router sent a message to that stayed quiet wasn't talked to", async () => {
     const t = await privateRoom();
     // The room asked since; the router sent it to Theo, who passed. This time Jev leans to Ada.
