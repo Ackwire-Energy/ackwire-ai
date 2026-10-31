@@ -12,6 +12,7 @@ import {
   emailLocale,
   ForbiddenError,
   holdsInvitation,
+  INVITATION_MAIL_HEADER,
   INVITATION_TOKEN_HEADER,
   isAgentesCloud,
   onUserCreated,
@@ -196,12 +197,14 @@ export function createAuth(deps: {
               },
               request?: Request,
             ) => {
-              // Signing up from an email invitation's page, with its token (`x-invitation-token`): accepting it
-              // confirms the address (ADR 0090), so no "confirm your email" follows. Without the token of a waiting
-              // invitation to that same address, or asked for later, it goes as always.
+              // Signing up from an email invitation's page opened from its email (`x-invitation-token` and the proof
+              // only the message carries, `x-invitation-mail`): accepting it confirms the address (ADR 0090), so no
+              // "confirm your email" follows. From a copied link, another address's invitation, or asked for later, it
+              // goes as always.
               const signingUp = request ? new URL(request.url).pathname.endsWith("/sign-up/email") : false;
               const invitation = request?.headers.get(INVITATION_TOKEN_HEADER);
-              if (signingUp && invitation && (await holdsInvitation(db, user.email, invitation))) return;
+              const mail = { secret: config.AGENTES_SECRET, proof: request?.headers.get(INVITATION_MAIL_HEADER) };
+              if (signingUp && invitation && (await holdsInvitation(db, user.email, invitation, mail))) return;
               if (!(await emailAllowed("verify-email", user.email))) return;
               const locale = emailLocale(user.locale ?? requestLocale(request?.headers.get("accept-language")));
               await queueEmail(db, {

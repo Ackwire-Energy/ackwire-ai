@@ -14,6 +14,7 @@ import {
 } from "@agenteschat/client/lib/format";
 import { agentGrammar, isFeminineName, providerGrammar, runErrorGrammar } from "@agenteschat/client/lib/grammar";
 import {
+  INVITATION_MAIL_HEADER,
   INVITATION_TOKEN_HEADER,
   landingFor,
   membershipIn,
@@ -494,13 +495,16 @@ describe("the confirmation email", () => {
     }
   });
 
-  test("an email invitation's sign-up carries its token in a header, never in the body (ADR 0090)", async () => {
-    const sent: { path: string; invitation: string | null; body: Record<string, unknown> | null }[] = [];
+  test("an email invitation's sign-up carries its token and its email's proof in headers, never in the body (ADR 0090)", async () => {
+    type Sent = { path: string; invitation: string | null; mail: string | null; body: Record<string, unknown> | null };
+    const sent: Sent[] = [];
     const real = globalThis.fetch;
     globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
       sent.push({
         path: new URL(String(url)).pathname,
-        invitation: new Headers(init?.headers).get(INVITATION_TOKEN_HEADER),
+        invitation: headers.get(INVITATION_TOKEN_HEADER),
+        mail: headers.get(INVITATION_MAIL_HEADER),
         body: typeof init?.body === "string" ? JSON.parse(init.body) : null,
       });
       return Response.json({ token: null, user: { id: "u", name: "Bia", email: "bia@example.com" } });
@@ -508,11 +512,17 @@ describe("the confirmation email", () => {
     try {
       const auth = createBetterAuthClient("http://localhost:3000");
       const bia = { name: "Bia", email: "bia@example.com", password: "senha-longa" };
-      await auth.signUp({ ...bia, invitation: "inv-token" });
+      await auth.signUp({ ...bia, invitation: { token: "inv-token", mail: "inv-proof" } });
+      await auth.signUp({ ...bia, invitation: { token: "copied-token" } });
       await auth.signUp(bia);
       const signUps = sent.filter((r) => r.path === "/api/auth/sign-up/email");
       expect(INVITATION_TOKEN_HEADER).toBe("x-invitation-token");
-      expect(signUps.map((r) => r.invitation)).toEqual(["inv-token", null]);
+      expect(INVITATION_MAIL_HEADER).toBe("x-invitation-mail");
+      expect(signUps.map((r) => [r.invitation, r.mail])).toEqual([
+        ["inv-token", "inv-proof"],
+        ["copied-token", null],
+        [null, null],
+      ]);
       expect(signUps[0]?.body).toMatchObject(bia);
       expect(signUps[0]?.body).not.toHaveProperty("invitation");
     } finally {

@@ -408,8 +408,11 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       previewInvitation: (token) => nullOn(404, () => request<InvitationPreview>(`/api/app/invitations/${enc(token)}`)),
       invitationState: (token) =>
         nullOn(404, () => request<InvitationState>(`/api/app/invitations/${enc(token)}/state`)),
-      acceptInvitation: (token) =>
-        request<{ orgId: string }>(`/api/app/invitations/${enc(token)}/accept`, { json: {} }),
+      acceptInvitation: (token, mail) =>
+        request<{ orgId: string }>(
+          `/api/app/invitations/${enc(token)}/accept${mail ? `?${new URLSearchParams({ mail })}` : ""}`,
+          { json: {} },
+        ),
       settings: (orgId) => request<OrgSettings>(`${org(orgId)}/settings`),
       updateSettings: (orgId, input) =>
         request<OrgSettings>(`${org(orgId)}/settings`, { method: "PATCH", json: input }),

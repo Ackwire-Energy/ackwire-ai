@@ -5,6 +5,7 @@ import { and, asc, type Database, type Executor, eq, inArray, isNull, lt, schema
 import { appLocale } from "@agenteschat/i18n/locale";
 import { z } from "zod";
 import { approverIds } from "./approvals";
+import { invitationMailProof } from "./crypto";
 import { inertText } from "./email/inert";
 import {
   type Block,
@@ -841,13 +842,34 @@ export async function queueApprovalDigests(db: Database, publicUrl: string, afte
   return queued;
 }
 
+/** The query parameter an emailed invitation link carries its `invitationMailProof` in (ADR 0090). */
+export const INVITATION_MAIL_PARAM = "mail";
+
+/**
+ * An invitation's link as its own email carries it (ADR 0090): `url` (the link anyone it's shown to can copy) with the
+ * proof that only the message has, so accepting from it confirms the address.
+ */
+export function invitationMailLink(secret: string, invitationId: string, url: string): string {
+  return `${url}?${INVITATION_MAIL_PARAM}=${invitationMailProof(secret, invitationId)}`;
+}
+
 /**
  * Invitation email (create, batch and resend). The key changes with each new link.
- * In the invitee's language when they already have an account, else the inviter's.
+ * In the invitee's language when they already have an account, else the inviter's. With `secret` (`AGENTES_SECRET`,
+ * always there on a server), its link carries the proof that it came by email (`invitationMailLink`); without it, the
+ * link alone, which confirms no address.
  */
 export async function queueInvitationEmail(
   db: Executor,
-  input: { orgId: string; invitationId: string; email: string; role: string; url: string; inviterId: string },
+  input: {
+    orgId: string;
+    invitationId: string;
+    email: string;
+    role: string;
+    url: string;
+    inviterId: string;
+    secret?: string;
+  },
 ) {
   const [invitation] = await db
     .select({ note: organizationInvitations.note, expiresAt: organizationInvitations.expiresAt })
@@ -877,7 +899,7 @@ export async function queueInvitationEmail(
       inviterName: inviter?.name ?? "",
       inviterEmail: inviter?.email,
       crew: await emailCrew(db, input.orgId),
-      url: input.url,
+      url: input.secret ? invitationMailLink(input.secret, input.invitationId, input.url) : input.url,
       role: input.role,
       note: invitation?.note ?? null,
     },

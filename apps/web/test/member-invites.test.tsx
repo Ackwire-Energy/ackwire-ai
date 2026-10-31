@@ -236,7 +236,9 @@ describe("the invite dialog", () => {
     await type(search, " Nova@Estudio.com ");
     await click(within(add).getByRole("button", { name: "Convidar nova@estudio.com para a Acme e para #eng" }));
     await settle(2);
+    // The invite dialog takes over: Adicionar and the channel's details close, so neither opens again over it.
     expect(screen().queryByRole("dialog", { name: "Adicionar a #eng" })).toBeNull();
+    expect(screen().queryByRole("dialog", { name: "#eng" })).toBeNull();
     // The dialog opens with that address and that channel chosen.
     const invite = dialog();
     expect(chipsIn(invite)).toEqual(["nova@estudio.com"]);

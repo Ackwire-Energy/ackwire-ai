@@ -160,8 +160,11 @@ test("a link only asks: the same link every time, no sign-up from it, and an app
   expect(me.organizations).toEqual([expect.objectContaining({ id: orgId, role: "member" })]);
   const [used] = await t.db.select().from(schema.organizationInviteLinks);
   expect(used?.uses).toBe(1);
-  const after = (await (await owner(`/api/app/organizations/${orgId}/notifications`)).json()) as { items: unknown[] };
-  expect(after.items).toEqual([]);
+  const after = (await (await owner(`/api/app/organizations/${orgId}/notifications`)).json()) as {
+    items: { kind: string }[];
+  };
+  // The request's notice went as she joined; the approval sent the invitation, so the owner hears she accepted it.
+  expect(after.items.map((n) => n.kind)).toEqual(["invitation_accepted"]);
   // Joining with the link itself is refused: it only asks.
   expect((await (await ana(`/api/app/invitations/${token}/accept`, { json: {} })).json()) as object).toMatchObject({
     error: { code: "invitation.ask_to_join" },
@@ -435,7 +438,8 @@ test("joining by an email invitation closes the person's request and the admins'
   expect((await inbox()).map((n) => n.kind)).toEqual(["join_request"]);
   await joinByInvitation(t, owner, orgId, "rui@example.com");
   expect(await requests(owner, orgId)).toEqual([]);
-  expect(await inbox()).toEqual([]);
+  // The request's notice is gone; what's left is that Rui accepted the owner's invitation (ADR 0090).
+  expect((await inbox()).map((n) => n.kind)).toEqual(["invitation_accepted"]);
 });
 
 test("a link turned off: its requests close quietly, its page says it no longer works", async () => {
@@ -534,30 +538,54 @@ test("an ask with a password: approval makes the account, and the asking page si
   expect(signIn.status).toBe(200);
 });
 
-test("sign-up with the invitation's token: no 'confirm your email'; without it, it goes (ADR 0090)", async () => {
+test("sign-up from the invitation's email: no 'confirm your email'; from a copied link or none, it goes (ADR 0090)", async () => {
   const { owner, orgId } = await start();
   const invite = async (email: string) => {
     const res = await owner(`/api/app/organizations/${orgId}/invitations`, { json: { email } });
     return ((await res.json()) as { url: string }).url.split("/invite/")[1] ?? "";
   };
   const ana = await invite("ana@example.com");
+  const dani = await invite("dani@example.com");
   await invite("bia@example.com");
   await invite("caio@example.com");
   await t.drain();
+  // The email's link is the copied one plus the proof only the message carries.
+  const emailed = mailTo("ana@example.com")[0]?.text.match(/\/invite\/([\w-]+)\?mail=([\w-]{43})/);
+  expect(emailed?.[1]).toBe(ana);
+  const mail = emailed?.[2] ?? "";
   t.email.sent.length = 0;
-  const signUpWith = (email: string, token?: string) =>
-    browser(t)("/api/auth/sign-up/email", {
+  // Each signs up in a browser of their own, signed in from then on.
+  const people = new Map<string, Browser>();
+  const signUpWith = (email: string, invitation?: { token: string; mail?: string }) => {
+    const b = browser(t);
+    people.set(email, b);
+    return b("/api/auth/sign-up/email", {
       json: { email, password: "correct horse battery", name: email.split("@")[0] },
-      ...(token ? { headers: { "x-invitation-token": token } } : {}),
+      headers: {
+        ...(invitation ? { "x-invitation-token": invitation.token } : {}),
+        ...(invitation?.mail ? { "x-invitation-mail": invitation.mail } : {}),
+      },
     });
-  // Ana's own link: accepting confirms her address, so no message asks her to.
-  expect((await signUpWith("ana@example.com", ana)).status).toBe(200);
-  // Another address's link, or none: the message goes as always.
-  expect((await signUpWith("bia@example.com", ana)).status).toBe(200);
+  };
+  // From Ana's own email: accepting confirms her address, so no message asks her to.
+  expect((await signUpWith("ana@example.com", { token: ana, mail })).status).toBe(200);
+  // Dani's link as an admin copies it, another address's email, or nothing: the message goes as always.
+  expect((await signUpWith("dani@example.com", { token: dani })).status).toBe(200);
+  expect((await signUpWith("bia@example.com", { token: ana, mail })).status).toBe(200);
   expect((await signUpWith("caio@example.com")).status).toBe(200);
   await t.drain();
   const confirmations = t.email.sent.filter((m) => m.subject === "Confirme seu e-mail no agentes.chat");
-  expect(confirmations.map((m) => m.to[0]).sort()).toEqual(["bia@example.com", "caio@example.com"]);
+  expect(confirmations.map((m) => m.to[0]).sort()).toEqual(["bia@example.com", "caio@example.com", "dani@example.com"]);
+
+  // Accepting confirms only from the email: Dani, with the copied link, still has her own message to open.
+  const verified = async (b: Browser) =>
+    ((await (await b("/api/app/me")).json()) as { user: { emailVerified: boolean } }).user.emailVerified;
+  const asAna = people.get("ana@example.com") ?? browser(t);
+  expect((await asAna(`/api/app/invitations/${ana}/accept?mail=${mail}`, { json: {} })).status).toBe(200);
+  expect(await verified(asAna)).toBe(true);
+  const asDani = people.get("dani@example.com") ?? browser(t);
+  expect((await asDani(`/api/app/invitations/${dani}/accept`, { json: {} })).status).toBe(200);
+  expect(await verified(asDani)).toBe(false);
 });
 
 test("a batch of invitations takes `emails` or `invites`, never both nor neither", async () => {

@@ -3617,6 +3617,14 @@ function ChannelDetails({
       },
     );
   };
+  // Inviting someone from Adicionar hands over to the invite dialog (ADR 0090): the details close as well, or they
+  // would open again over it.
+  const inviteInstead = () => {
+    saveTopic();
+    saveName();
+    setAdding(false);
+    onOpenChange(false);
+  };
   const moveTo = (categoryId: string | null) =>
     place.mutate(
       { channelId: channel.id, categoryId },
@@ -3918,6 +3926,7 @@ function ChannelDetails({
       <AddMembersDialog
         open={open && adding}
         onClose={() => setAdding(false)}
+        onInvite={inviteInstead}
         channel={channel}
         exclude={inChannel}
         onAdded={refresh}
@@ -3930,12 +3939,15 @@ function ChannelDetails({
 function AddMembersDialog({
   open,
   onClose,
+  onInvite,
   channel,
   exclude,
   onAdded,
 }: {
   open: boolean;
   onClose: () => void;
+  /** An address nobody here has was picked: the invite dialog takes over, so this closes with what opened it. */
+  onInvite: () => void;
   channel: Channel;
   exclude: Set<PickKey>;
   onAdded: () => void;
@@ -3990,7 +4002,7 @@ function AddMembersDialog({
             })
           }
         />
-        {invite && <InviteOfferRow email={invite} channel={channel} onPick={onClose} />}
+        {invite && <InviteOfferRow email={invite} channel={channel} onPick={onInvite} />}
       </DialogSearchList>
       <DialogFooter bar>
         <Button onClick={onClose}>{t("common.cancel")}</Button>

@@ -352,7 +352,8 @@ export interface ApiClient {
     previewInvitation(token: string): Promise<InvitationPreview | null>;
     /** An email invitation that no longer opens: accepted or expired (ADR 0090); null for any other token. */
     invitationState(token: string): Promise<InvitationState | null>;
-    acceptInvitation(token: string): Promise<{ orgId: string }>;
+    /** `mail`: the proof on its own email's link (ADR 0090); accepted with it, the address counts as confirmed. */
+    acceptInvitation(token: string, mail?: string): Promise<{ orgId: string }>;
     settings(orgId: string): Promise<OrgSettings>;
     updateSettings(
       orgId: string,

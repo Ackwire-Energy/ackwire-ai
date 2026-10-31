@@ -2,7 +2,7 @@ import type { AskToJoinResult, InvitationPreview } from "@agenteschat/client";
 import { ApiError, invitationQuery, invitationStateQuery, keys, useAuthConfig, useMe } from "@agenteschat/client";
 import { authErrorText, errorCode, errorText, invitedErrorText, knownErrorText } from "@agenteschat/client/lib/errors";
 import { formatShortDate, joinNames } from "@agenteschat/client/lib/format";
-import { signInPath } from "@agenteschat/client/lib/guards";
+import { INVITATION_MAIL_PARAM, signInPath } from "@agenteschat/client/lib/guards";
 import { type HumanAction, type HumanCheck, withHumanCheck } from "@agenteschat/client/lib/human-check";
 import {
   ANSWER_POLL_MS,
@@ -41,7 +41,7 @@ import "./invite.css";
  * a new account, the password of one that has it, the provider of one that signs in without) and accepts; one that no
  * longer opens says what happened to it. An invitation link only asks to join (`LinkInvitation`).
  */
-export function InvitePage({ token, join = false }: { token: string; join?: boolean }) {
+export function InvitePage({ token, join = false, mail }: { token: string; join?: boolean; mail?: string }) {
   const api = useApi();
   const me = useMe();
   const preview = useQuery(invitationQuery(api, token));
@@ -53,7 +53,7 @@ export function InvitePage({ token, join = false }: { token: string; join?: bool
   // A paused or deleting workspace's invitation takes nobody, as a closed link says.
   if (invitation.closed) return <ClosedInvitation preview={invitation} />;
   if (invitation.full) return <FullWorkspace preview={invitation} />;
-  return <EmailInvitation token={token} preview={invitation} join={join} />;
+  return <EmailInvitation token={token} preview={invitation} join={join} proof={mail} />;
 }
 
 /* ---------- The page's parts ---------- */
@@ -425,10 +425,20 @@ const NO_ACCOUNT: NonNullable<InvitationPreview["account"]> = { exists: false, p
  * An email invitation (ADR 0090). Signed in as its address: one press accepts. As another address: whose it is, and
  * signing out here leads to that address's own step. Signed out: a new address gives a name, then a password; one
  * with a password types it ("Esqueci a senha" is the sign-in's reset); one that signs in only with a provider gets
- * that provider. A provider comes back to `?join=1`, which accepts by itself for the invited address. Accepting
- * confirms the address, and the workspace opens.
+ * that provider. A provider comes back to `?join=1`, which accepts by itself for the invited address. Opened from its
+ * own email (`proof`, that link's `?mail=`), accepting confirms the address; then the workspace opens.
  */
-function EmailInvitation({ token, preview, join }: { token: string; preview: InvitationPreview; join: boolean }) {
+function EmailInvitation({
+  token,
+  preview,
+  join,
+  proof,
+}: {
+  token: string;
+  preview: InvitationPreview;
+  join: boolean;
+  proof?: string;
+}) {
   const { t, i18n } = useTranslation();
   const api = useApi();
   const auth = useAuth();
@@ -470,7 +480,8 @@ function EmailInvitation({ token, preview, join }: { token: string; preview: Inv
   const providers = desktop ? [] : linked;
   const anyProvider = desktop ? [] : configured;
   const canReset = config?.passwordReset === true;
-  const back = `/invite/${token}?join=1`;
+  // The proof is base64url (the route takes no other shape): it goes in the address as it is.
+  const back = `/invite/${token}?join=1${proof ? `&${INVITATION_MAIL_PARAM}=${proof}` : ""}`;
 
   const go = (next: EmailStep) => {
     setError(null);
@@ -498,7 +509,7 @@ function EmailInvitation({ token, preview, join }: { token: string; preview: Inv
   /** Accepts as the account signed in now, then opens the workspace from the host. */
   const accept = async (signedInNow = false): Promise<boolean> => {
     try {
-      const { orgId } = await api.orgs.acceptInvitation(token);
+      const { orgId } = await api.orgs.acceptInvitation(token, proof);
       const burst = prepareBurst(header.current ?? document.body);
       await qc.invalidateQueries({ queryKey: keys.me });
       burst();
@@ -518,11 +529,12 @@ function EmailInvitation({ token, preview, join }: { token: string; preview: Inv
     }
   };
 
-  // With the invitation's token, which proves the address: the new account gets no "confirm your email" (ADR 0090 §6).
+  // With the invitation's token and its email's proof, the address is proved: the new account gets no "confirm your
+  // email" (ADR 0090 §6). Opened from a copied link, there's no proof and the message goes as for anyone.
   const signUp = () =>
     run(async () => {
       const result = await withHumanCheck(human.check, (humanCheck) =>
-        auth.signUp({ name: name.trim(), email: invited, password, invitation: token }, humanCheck),
+        auth.signUp({ name: name.trim(), email: invited, password, invitation: { token, mail: proof } }, humanCheck),
       );
       if (!result.ok) {
         setError(authErrorText(t, result));
@@ -1540,7 +1552,7 @@ function Waiting({ token, preview, asked }: { token: string; preview: Invitation
         title={t("invite.ask.waitCard", { org })}
         sub={asked.name ? t("invite.ask.waitBy", { name: asked.name, email: asked.email }) : asked.email}
       />
-      <span className="auth__help invite__lock ac-iconline">
+      <span className="invite__lock ac-iconline">
         <Icon name="lock" size={14} />
         {t("invite.ask.waitLock")}
       </span>

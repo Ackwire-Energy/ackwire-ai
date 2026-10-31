@@ -1,4 +1,4 @@
-import { EARLY_ACCESS_HEADER, INVITATION_TOKEN_HEADER } from "@agenteschat/client/lib/guards";
+import { EARLY_ACCESS_HEADER, INVITATION_MAIL_HEADER, INVITATION_TOKEN_HEADER } from "@agenteschat/client/lib/guards";
 import { humanCheckHeaders } from "@agenteschat/client/lib/human-check";
 import { createAuthClient } from "better-auth/client";
 import type { AuthClient, AuthResult } from "./client";
@@ -48,7 +48,8 @@ export function createBetterAuthClient(origin = window.location.origin, language
               headers: {
                 ...humanCheckHeaders(humanCheck),
                 ...(access ? { [EARLY_ACCESS_HEADER]: access } : {}),
-                ...(invitation ? { [INVITATION_TOKEN_HEADER]: invitation } : {}),
+                ...(invitation ? { [INVITATION_TOKEN_HEADER]: invitation.token } : {}),
+                ...(invitation?.mail ? { [INVITATION_MAIL_HEADER]: invitation.mail } : {}),
               },
             },
           })

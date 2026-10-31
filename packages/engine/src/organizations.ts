@@ -18,7 +18,7 @@ import {
 import { appLocale } from "@agenteschat/i18n/locale";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
-import { invitationToken, inviteLinkToken, randomToken, sha256 } from "./crypto";
+import { invitationMailProof, invitationToken, inviteLinkToken, randomToken, safeEqual, sha256 } from "./crypto";
 import { earlyAccessLink, hasWorkspaceAllowance, recordFirstWorkspace, signupMode } from "./early-access";
 import { ConflictError, ForbiddenError, UnauthorizedError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
@@ -1108,13 +1108,12 @@ export const INVITE_NOTE_MAX = 300;
 export async function invitableChannelIds(db: Executor, actorId: string, orgId: string, ids: readonly string[]) {
   const wanted = [...new Set(ids)];
   if (wanted.length === 0) return [];
+  // The sender's own row in each channel, joined: a subquery in a single-table select names its columns bare, so
+  // `channels.id` in it would read the inner table's id.
   const rows = await db
-    .select({
-      id: channels.id,
-      visibility: channels.visibility,
-      member: sql<boolean>`exists (select 1 from ${channelMembers} where ${channelMembers.channelId} = ${channels.id} and ${channelMembers.userId} = ${actorId})`,
-    })
+    .select({ id: channels.id, visibility: channels.visibility, member: channelMembers.userId })
     .from(channels)
+    .leftJoin(channelMembers, and(eq(channelMembers.channelId, channels.id), eq(channelMembers.userId, actorId)))
     .where(
       and(
         eq(channels.orgId, orgId),
@@ -1123,7 +1122,7 @@ export async function invitableChannelIds(db: Executor, actorId: string, orgId: 
         ne(channels.kind, "dm"),
       ),
     );
-  const ok = rows.filter((r) => r.visibility === "public" || r.member).map((r) => r.id);
+  const ok = rows.filter((r) => r.visibility === "public" || r.member !== null).map((r) => r.id);
   if (ok.length !== wanted.length) {
     throw new ValidationError("One of these channels can't go with an invitation", "invitation.channel");
   }
@@ -1532,16 +1531,33 @@ export async function invitedOrgId(db: Executor, token: string, now = new Date()
   return link && inviteLinkOpen(link, now) ? link.link.orgId : null;
 }
 
+/** The proof an emailed invitation link carries (`invitationMailLink`), with the secret to check it (ADR 0090). */
+export interface InvitationMail {
+  secret: string;
+  proof?: string | null;
+}
+
+/**
+ * Whether `mail` holds the proof only this invitation's own email carries (ADR 0090). The link itself doesn't show
+ * it: an admin can copy that one and hand it to anyone.
+ */
+function cameByEmail(invitationId: string, mail: InvitationMail | undefined): boolean {
+  const proof = mail?.proof;
+  if (!mail || !proof || proof.length > 100) return false;
+  return safeEqual(invitationMailProof(mail.secret, invitationId), proof);
+}
+
 /**
  * Accepts an invitation. The signed-in user's email must match the invited one. Joins `general`. Not for
  * a blocked account, nor into a workspace on hold, suspended or being deleted. An invitation link only lets people
- * ask (`invitation.ask_to_join`, ADR 0068).
+ * ask (`invitation.ask_to_join`, ADR 0068). Accepted from its own email (`mail`), it confirms the address.
  */
 export async function acceptInvitation(
   db: Database,
   user: { id: string; email: string },
   token: string,
   now = new Date(),
+  mail?: InvitationMail,
 ) {
   if (await isUserBlocked(db, user.id)) throw new ForbiddenError();
   return db.transaction(async (tx) => {
@@ -1593,11 +1609,14 @@ export async function acceptInvitation(
           .onConflictDoNothing();
       }
     }
-    // The token reached that mailbox: the address is confirmed, and no "confirm your email" follows (ADR 0090).
-    await tx
-      .update(users)
-      .set({ emailVerified: true })
-      .where(and(eq(users.id, user.id), eq(users.emailVerified, false)));
+    // From its own email, the message reached that mailbox: the address is confirmed, and no "confirm your email"
+    // follows (ADR 0090). From a copied link nothing shows that, so confirming goes as for any sign-up.
+    if (cameByEmail(invitation.id, mail)) {
+      await tx
+        .update(users)
+        .set({ emailVerified: true })
+        .where(and(eq(users.id, user.id), eq(users.emailVerified, false)));
+    }
     await auditMember(tx, invitation.orgId, user.id, "member.joined", user.id, {
       role: invitation.role,
       roleIds: invitation.roleIds,
@@ -1611,15 +1630,23 @@ export async function acceptInvitation(
   });
 }
 
-/** The header a sign-up from an email invitation's page carries its token in (ADR 0090, `holdsInvitation`). */
+/** Headers a sign-up from an email invitation's page carries its token and proof in (ADR 0090, `holdsInvitation`). */
 export const INVITATION_TOKEN_HEADER = "x-invitation-token";
+export const INVITATION_MAIL_HEADER = "x-invitation-mail";
 
 /**
- * Whether a sign-up holds an email invitation to its own address (ADR 0090): `token` is the link of one to `email`
- * that can still be accepted (`invitedOrgId`). Such a sign-up skips the "confirm your email" message, since accepting
- * confirms the address; an invited address signed up for without its link gets the message as always.
+ * Whether a sign-up holds an email invitation to its own address, from that invitation's email (ADR 0090): `token` is
+ * the link of one to `email` that can still be accepted, and `mail` the proof only its message carries. Such a sign-up
+ * skips the "confirm your email" message, since accepting from the email confirms the address. With a copied link, or
+ * none, the message goes as always.
  */
-export async function holdsInvitation(db: Database, email: string, token: string, now = new Date()) {
+export async function holdsInvitation(
+  db: Database,
+  email: string,
+  token: string,
+  mail: InvitationMail,
+  now = new Date(),
+) {
   if (!token || token.length > 200) return false;
   const [row] = await db
     .select({ id: organizationInvitations.id })
@@ -1634,7 +1661,7 @@ export async function holdsInvitation(db: Database, email: string, token: string
         openOrg,
       ),
     );
-  return row !== undefined;
+  return row !== undefined && cameByEmail(row.id, mail);
 }
 
 /**

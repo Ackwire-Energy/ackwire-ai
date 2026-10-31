@@ -1237,6 +1237,7 @@ export function accountRoutes(deps: AppDeps) {
         role: invitation.role,
         url,
         inviterId: c.get("user").id,
+        secret: config.AGENTES_SECRET,
       });
       deps.wakeWorkers?.();
       return c.json(
@@ -1279,12 +1280,26 @@ export function accountRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Accept an invitation (signed in with the invited email)",
-      request: { params: z.object({ token: z.string() }) },
+      request: {
+        params: z.object({ token: z.string() }),
+        query: z.object({
+          mail: z
+            .string()
+            .max(100)
+            .optional()
+            .openapi({
+              description:
+                "The `mail` of the link in the invitation's own email (ADR 0090): accepted with it, the address counts " +
+                "as confirmed. A copied link has none.",
+            }),
+        }),
+      },
       responses: { 200: json(z.object({ orgId: z.uuid() })), ...errors },
     }),
     async (c) => {
       const user = c.get("user");
-      const joined = await acceptInvitation(db, user, c.req.valid("param").token);
+      const mail = { secret: config.AGENTES_SECRET, proof: c.req.valid("query").mail };
+      const joined = await acceptInvitation(db, user, c.req.valid("param").token, new Date(), mail);
       await announceMembers(deps.adapters.pubsub, joined.orgId);
       // A request to join they had waiting closed as they joined: the admins' notice goes with the last one.
       await settleJoinRequests({ db, pubsub: deps.adapters.pubsub }, joined.orgId);

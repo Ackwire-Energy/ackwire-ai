@@ -20,7 +20,7 @@ import {
 } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { inviteLinkToken, safeEqual, sha256 } from "./crypto";
-import { emailCrew, emailLocale, emailsByLocale, queueEmail, queueInvitationEmail } from "./email";
+import { emailCrew, emailLocale, emailsByLocale, invitationMailLink, queueEmail, queueInvitationEmail } from "./email";
 import {
   CODE_EMAILS,
   CODE_LIMITS,
@@ -892,6 +892,7 @@ export async function approveJoinRequest(
           role,
           url: approval.url,
           inviterId: actorId,
+          secret: deps.secret,
         });
       }
     } else if (!already) {
@@ -907,7 +908,13 @@ export async function approveJoinRequest(
           approverName: context.approverName,
           role,
           crew: await emailCrew(tx, orgId),
-          url: approval.outcome === "invited" ? approval.url : `${base(publicUrl)}/org/${orgId}`,
+          // The invitation as its own email would carry it: accepted from here, the address counts as confirmed.
+          url:
+            approval.outcome !== "invited"
+              ? `${base(publicUrl)}/org/${orgId}`
+              : deps.secret && invitationId
+                ? invitationMailLink(deps.secret, invitationId, approval.url)
+                : approval.url,
         },
       });
     }

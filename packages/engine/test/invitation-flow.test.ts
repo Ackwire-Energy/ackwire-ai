@@ -10,6 +10,7 @@ import {
   denyJoinRequest,
   type EmailTemplate,
   holdsInvitation,
+  invitationMailProof,
   invitationState,
   invitationToken,
   inviteLink,
@@ -337,7 +338,9 @@ describe("members suggest someone (ADR 0090)", () => {
     expect(sent.filter((e) => e.to.includes("mo@example.com"))).toEqual([]);
     const [toLu, ...more] = sent.filter((e) => e.to.includes("lu@example.com"));
     const url = approval.outcome === "invited" ? approval.url : "";
-    expect(toLu?.template).toMatchObject({ kind: "invitation", inviterName: "ana", url });
+    // The link the approval shows, with the proof only the email carries (ADR 0090).
+    expect(toLu?.template).toMatchObject({ kind: "invitation", inviterName: "ana" });
+    expect((toLu?.template as { url?: string } | undefined)?.url).toMatch(new RegExp(`^${url}\\?mail=[\\w-]{43}$`));
     expect(more).toEqual([]);
 
     // Turned down, the suggestion isn't Mo's: Mo hears nothing of it and may still ask through the link.
@@ -437,9 +440,11 @@ describe("email invitations (ADR 0090)", () => {
       account: { exists: false, password: false, providers: [] },
     });
     await fx().db.insert(schema.users).values({ id: "u_rita", name: "Rita", email: "rita@example.com" });
-    const joined = await acceptInvitation(fx().db, { id: "u_rita", email: "rita@example.com" }, rita.token, at(1));
+    const fromEmail = { secret: SECRET, proof: invitationMailProof(SECRET, rita.invitationId) };
+    const ritaUser = { id: "u_rita", email: "rita@example.com" };
+    const joined = await acceptInvitation(fx().db, ritaUser, rita.token, at(1), fromEmail);
     expect(joined).toEqual({ orgId: fx().org.id, invitedBy: fx().owner.id });
-    // In #produto too, and the address counts as confirmed: the token reached that mailbox.
+    // In #produto too, and the address counts as confirmed: accepted from its email, the message reached that mailbox.
     const channels = await fx()
       .db.select({ channelId: schema.channelMembers.channelId })
       .from(schema.channelMembers)
@@ -485,6 +490,7 @@ describe("email invitations (ADR 0090)", () => {
         role: "member",
         url: `${PUBLIC}/invite/${result.token}`,
         inviterId: fx().owner.id,
+        secret: SECRET,
       });
     await send();
     await resendInvitation(fx().db, fx().owner.id, fx().org.id, result.invitationId, at(1), SECRET);
@@ -492,6 +498,9 @@ describe("email invitations (ADR 0090)", () => {
     const sent = (await outboxEmails()).filter((e) => e.template.kind === "invitation");
     expect(sent).toHaveLength(2);
     expect(sent[0]?.template).toMatchObject({ note: "Oi Lia" });
+    // The email's link is the one an admin copies plus the proof only the message carries.
+    const proof = invitationMailProof(SECRET, result.invitationId);
+    expect(sent[0]?.template).toMatchObject({ url: `${PUBLIC}/invite/${result.token}?mail=${proof}` });
   });
 
   test("a channel the sender can't give refuses the invitation; a full workspace says so first", async () => {
@@ -588,15 +597,37 @@ describe("email invitations (ADR 0090)", () => {
     expect(piaIn).not.toContain(diretoria);
   });
 
-  test("a sign-up holds an invitation only with its link, to its own address, while it can be accepted", async () => {
+  test("only an invitation's own email proves the address: the sign-up skips confirming, accepting confirms", async () => {
     await start();
     const emails = ["nina@example.com", "olga@example.com"];
     const [nina, olga] = await inviteMany(fx().db, fx().owner.id, fx().org.id, { emails }, NOW);
     if (nina?.status !== "invited" || olga?.status !== "invited") throw new Error("expected invitations");
-    expect(await holdsInvitation(fx().db, " Nina@Example.com", nina.token, NOW)).toBe(true);
-    // Another address's link, none, or one run out: the sign-up holds nothing.
-    expect(await holdsInvitation(fx().db, "nina@example.com", olga.token, NOW)).toBe(false);
-    expect(await holdsInvitation(fx().db, "nina@example.com", "", NOW)).toBe(false);
-    expect(await holdsInvitation(fx().db, "nina@example.com", nina.token, at(8))).toBe(false);
+    const fromEmail = (invitationId: string) => ({ secret: SECRET, proof: invitationMailProof(SECRET, invitationId) });
+    const holds = (email: string, token: string, mail: { secret: string; proof?: string }, now = NOW) =>
+      holdsInvitation(fx().db, email, token, mail, now);
+    expect(await holds(" Nina@Example.com", nina.token, fromEmail(nina.invitationId))).toBe(true);
+    // The link alone, as an admin copies it: nothing shows the mailbox got the message.
+    expect(await holds("nina@example.com", nina.token, { secret: SECRET })).toBe(false);
+    // Another invitation's proof, another address's link, none, or one run out: the sign-up holds nothing.
+    expect(await holds("nina@example.com", nina.token, fromEmail(olga.invitationId))).toBe(false);
+    expect(await holds("nina@example.com", olga.token, fromEmail(olga.invitationId))).toBe(false);
+    expect(await holds("nina@example.com", "", fromEmail(nina.invitationId))).toBe(false);
+    expect(await holds("nina@example.com", nina.token, fromEmail(nina.invitationId), at(8))).toBe(false);
+
+    // Accepted with the copied link, the address isn't confirmed (its own sign-up's message does that); from the
+    // email, it is.
+    await fx()
+      .db.insert(schema.users)
+      .values([
+        { id: "u_nina", name: "Nina", email: "nina@example.com" },
+        { id: "u_olga", name: "Olga", email: "olga@example.com" },
+      ]);
+    const verified = async (id: string) =>
+      (await fx().db.select().from(schema.users).where(eq(schema.users.id, id)))[0]?.emailVerified;
+    await acceptInvitation(fx().db, { id: "u_olga", email: "olga@example.com" }, olga.token, NOW, { secret: SECRET });
+    expect(await verified("u_olga")).toBe(false);
+    const ninaUser = { id: "u_nina", email: "nina@example.com" };
+    await acceptInvitation(fx().db, ninaUser, nina.token, NOW, fromEmail(nina.invitationId));
+    expect(await verified("u_nina")).toBe(true);
   });
 });

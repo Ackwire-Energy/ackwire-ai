@@ -1352,8 +1352,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.previews?.[token] ??
         (token === "valid" ? { orgName: "Acme", email: "marina@acme.com.br", role: "member" } : null),
       invitationState: async (token) => state.invitationStates?.[token] ?? null,
-      acceptInvitation: async (token) => {
-        log("orgs.acceptInvitation", token);
+      acceptInvitation: async (token, mail) => {
+        // With its email's proof only when the page had one (ADR 0090).
+        if (mail) log("orgs.acceptInvitation", token, mail);
+        else log("orgs.acceptInvitation", token);
         return { orgId: ORG_ID };
       },
       settings: async (orgId) => ({

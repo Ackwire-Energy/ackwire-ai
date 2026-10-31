@@ -117,9 +117,10 @@
   color: var(--muted);
   overflow-wrap: anywhere;
 }
-/* A help line long enough to wrap: its icon stays on the first line. */
+/* A help line long enough to wrap, on `.ac-iconline` (its icon stays on the first line): the help lines' type. */
 .invite__lock {
-  align-items: flex-start;
+  font-size: 13px;
+  color: var(--muted);
 }
 /* The admin's note to someone turned down, in their words. */
 .invite__reason {

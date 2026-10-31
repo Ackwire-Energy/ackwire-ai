@@ -531,6 +531,7 @@ export function managementRoutes(deps: AppDeps) {
           role: "member",
           url: inviteUrl(r.token),
           inviterId: c.get("user").id,
+          secret: config.AGENTES_SECRET,
         });
       }
       deps.wakeWorkers?.();
@@ -575,6 +576,7 @@ export function managementRoutes(deps: AppDeps) {
         role: invitation.role,
         url: inviteUrl(token),
         inviterId: c.get("user").id,
+        secret: config.AGENTES_SECRET,
       });
       deps.wakeWorkers?.();
       return c.json({ url: inviteUrl(token), expiresAt: invitation.expiresAt.toISOString() }, 200);

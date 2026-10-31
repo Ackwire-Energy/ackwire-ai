@@ -547,9 +547,12 @@ describe("Aceitar convite", () => {
 
   test("a new address: its name, then a password; signing up accepts and opens the workspace", async () => {
     const { auth, calls } = createFakeAuth();
+    // Opened from its email: the link carries the proof only the message has (ADR 0090).
+    const proof = "p".repeat(43);
     const { state, router } = await openInvite(
       {},
       {
+        path: `/invite/inv?mail=${proof}`,
         seed: { authConfig: { termsUrl: "/termos", privacyUrl: "/privacidade" } },
         auth: (fake) => {
           const signUp = auth.signUp;
@@ -586,11 +589,21 @@ describe("Aceitar convite", () => {
     expect(screen().getByRole("button", { name: "Entrar na Acme" }).hasAttribute("disabled")).toBe(true);
     await type("Crie uma senha", "senha-exemplo");
     await press("Entrar na Acme", 10);
-    // The invitation's token goes along: it proves the address, so no "confirm your email" follows (ADR 0090).
+    // The invitation's token and its email's proof go along: the address is proved, so no "confirm your email"
+    // follows, and accepting confirms it (ADR 0090).
     expect(calls.filter((c) => c.method === "signUp").map((c) => c.args)).toEqual([
-      [{ name: "Rafael Costa", email: "rafael@acme.com.br", password: "senha-exemplo", invitation: "inv" }],
+      [
+        {
+          name: "Rafael Costa",
+          email: "rafael@acme.com.br",
+          password: "senha-exemplo",
+          invitation: { token: "inv", mail: proof },
+        },
+      ],
     ]);
-    expect(state.calls.filter((c) => c.method === "orgs.acceptInvitation").map((c) => c.args)).toEqual([["inv"]]);
+    expect(state.calls.filter((c) => c.method === "orgs.acceptInvitation").map((c) => c.args)).toEqual([
+      ["inv", proof],
+    ]);
     expect(router.state.location.pathname.startsWith(`/org/${ORG_ID}`)).toBe(true);
   });
 
