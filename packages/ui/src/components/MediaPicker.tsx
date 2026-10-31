@@ -332,7 +332,7 @@ export interface StickerPickerLabels {
   moods: Record<StickerMood, string>;
   /** Other words each mood is found by ("festa parabéns" for celebrate). */
   moodWords?: Partial<Record<StickerMood, string>>;
-  /** A sticker's accessible name ("Figurinha do Theo: comemorando"). */
+  /** A sticker's accessible name ("Figurinha do Dev: comemorando"). */
   sticker: (agentName: string, mood: StickerMood) => string;
 }
 

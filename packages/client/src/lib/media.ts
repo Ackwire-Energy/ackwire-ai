@@ -149,7 +149,7 @@ export function quoteText(t: TFunction, reply: Pick<ReplyRef, "excerpt" | "media
 /** A mood's name, as the picker and a sticker's name say it ("comemorando"). */
 export const moodLabel = (t: TFunction, mood: StickerMood) => t(`media.moods.${mood}`);
 
-/** A sticker's name for screen readers: "Figurinha do Theo: comemorando". */
+/** A sticker's name for screen readers: "Figurinha do Dev: comemorando". */
 export const stickerLabel = (t: TFunction, agentName: string, mood: StickerMood) =>
   t("media.stickerOf", { ...agentGrammar(t, agentName), mood: moodLabel(t, mood) });
 

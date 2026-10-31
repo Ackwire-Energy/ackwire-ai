@@ -163,7 +163,7 @@ describe("the word for a GIF or a sticker where text shows", () => {
     expect(gifLabel(t, "party cat")).toBe("GIF: party cat");
     expect(gifLabel(t, "  ")).toBe("GIF");
     expect(stickerLabel(t, "Ada", "love")).toBe("Figurinha da Ada: amei");
-    expect(stickerLabel(t, "Theo", "celebrate")).toBe("Figurinha do Theo: comemorando");
+    expect(stickerLabel(t, "Dev", "celebrate")).toBe("Figurinha do Dev: comemorando");
   });
 });
 

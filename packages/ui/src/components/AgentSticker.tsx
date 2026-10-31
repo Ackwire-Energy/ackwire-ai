@@ -12,7 +12,7 @@ export interface AgentStickerProps {
   size?: number;
   /** Keeps stickers side by side out of step: the agent's id. */
   seed?: string;
-  /** The accessible name ("Figurinha do Theo: comemorando"); without it the sticker is decorative. */
+  /** The accessible name ("Figurinha do Dev: comemorando"); without it the sticker is decorative. */
   label?: string;
   className?: string;
 }

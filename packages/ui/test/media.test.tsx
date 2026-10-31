@@ -133,11 +133,11 @@ describe("the agents' stickers (ADR 0091)", () => {
     const before = liveStickerCount();
     const { container, unmount } = render(
       <>
-        <AgentSticker appearance={{ color: "amber" }} mood="love" size={120} label="Figurinha do Theo: amei" />
+        <AgentSticker appearance={{ color: "amber" }} mood="love" size={120} label="Figurinha do Dev: amei" />
         <AgentSticker mood="wow" size={72} />
       </>,
     );
-    const named = body().getByRole("img", { name: "Figurinha do Theo: amei" });
+    const named = body().getByRole("img", { name: "Figurinha do Dev: amei" });
     expect(named.tagName).toBe("CANVAS");
     expect((named as HTMLElement).style.width).toBe("120px");
     expect(named.getAttribute("data-mood")).toBe("love");
@@ -440,16 +440,16 @@ const STICKER_LABELS: StickerPickerLabels = {
 
 describe("the stickers tab", () => {
   const agents = [
-    { id: "ag-theo", name: "Theo", appearance: { color: "amber" as const } },
-    { id: "ag-lia", name: "Lia", appearance: { color: "rose" as const } },
+    { id: "ag-dev", name: "Dev", appearance: { color: "amber" as const } },
+    { id: "ag-infra", name: "Infra", appearance: { color: "rose" as const } },
   ];
 
   test("a search finds an agent by name (all six) or the moods by their words", () => {
-    expect(stickerMoodsFor("", "Theo", STICKER_LABELS)).toHaveLength(6);
-    expect(stickerMoodsFor("the", "Theo", STICKER_LABELS)).toHaveLength(6);
-    expect(stickerMoodsFor("valeu", "Theo", STICKER_LABELS)).toEqual(["love"]);
-    expect(stickerMoodsFor("Pensando", "Theo", STICKER_LABELS)).toEqual(["thinking"]);
-    expect(stickerMoodsFor("xyz", "Theo", STICKER_LABELS)).toEqual([]);
+    expect(stickerMoodsFor("", "Dev", STICKER_LABELS)).toHaveLength(6);
+    expect(stickerMoodsFor("de", "Dev", STICKER_LABELS)).toHaveLength(6);
+    expect(stickerMoodsFor("valeu", "Dev", STICKER_LABELS)).toEqual(["love"]);
+    expect(stickerMoodsFor("Pensando", "Dev", STICKER_LABELS)).toEqual(["thinking"]);
+    expect(stickerMoodsFor("xyz", "Dev", STICKER_LABELS)).toEqual([]);
   });
 
   test("a section per agent with its six moods; a click picks; nothing found says so", async () => {
@@ -457,14 +457,14 @@ describe("the stickers tab", () => {
     render(
       <StickerPicker labels={STICKER_LABELS} agents={agents} onPick={(a, mood) => picked.push(`${a.id}:${mood}`)} />,
     );
-    const theo = body().getByRole("region", { name: "Theo" });
-    expect(within(theo).getAllByRole("button")).toHaveLength(6);
-    expect(body().getByRole("region", { name: "Lia" })).toBeTruthy();
-    await act(async () => fireEvent.click(within(theo).getByRole("button", { name: "Figurinha de Theo: amei" })));
-    expect(picked).toEqual(["ag-theo:love"]);
+    const dev = body().getByRole("region", { name: "Dev" });
+    expect(within(dev).getAllByRole("button")).toHaveLength(6);
+    expect(body().getByRole("region", { name: "Infra" })).toBeTruthy();
+    await act(async () => fireEvent.click(within(dev).getByRole("button", { name: "Figurinha de Dev: amei" })));
+    expect(picked).toEqual(["ag-dev:love"]);
     const search = body().getByRole("searchbox", { name: "Buscar figurinhas" });
-    await act(async () => fireEvent.change(search, { target: { value: "lia" } }));
-    expect(body().queryByRole("region", { name: "Theo" })).toBeNull();
+    await act(async () => fireEvent.change(search, { target: { value: "infra" } }));
+    expect(body().queryByRole("region", { name: "Dev" })).toBeNull();
     await act(async () => fireEvent.change(search, { target: { value: "nada assim" } }));
     expect(body().getByRole("status").textContent).toBe("Nenhuma figurinha encontrada.");
   });
