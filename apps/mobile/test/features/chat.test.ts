@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import type { LiveConsult, LiveRun, Message } from "@agenteschat/client";
+import type { LiveConsult, LiveRun, LiveWork, Message, RunConsultation } from "@agenteschat/client";
+import { consultBlocksNearEnd, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
-import { toolCalls, toolNow } from "@agenteschat/client/lib/work";
+import { toolCalls, toolNow, toolPhrase, toolWhy } from "@agenteschat/client/lib/work";
 import {
   artifactsOf,
   buildRows,
@@ -45,7 +46,7 @@ import {
   withContinued,
   withOpacity,
 } from "../../src/features/chat/turn";
-import { at, message } from "./fixtures";
+import { at, message, translator } from "./fixtures";
 
 describe("timeline", () => {
   test("top-level messages and loaded thread replies, in time order, no duplicates", () => {
@@ -158,6 +159,42 @@ describe("working line", () => {
     const entries = workingEntries([run({ runId: "r1", agentId: "atlas" })], [consult], name);
     expect(entries).toHaveLength(1);
     expect(entries[0]?.consult).toMatchObject({ to: "infra", toName: "Infra", status: "asking" });
+  });
+
+  test("a question its reply shows near the end leaves the line; farther up, the line still says it", () => {
+    const consult: LiveConsult = {
+      runId: "r1",
+      agentId: "atlas",
+      consultedAgentId: "infra",
+      channelId: "c1",
+      threadId: "m1",
+      status: "asking",
+      since: 1,
+      at: 1,
+    };
+    const asked: RunConsultation = {
+      id: "q1",
+      runId: "r1",
+      agentId: "atlas",
+      consultedAgentId: "infra",
+      consultedRunId: "r-infra",
+      status: "open",
+      waiting: null,
+      question: "Como está o deploy?",
+      answer: null,
+      createdAt: at(5),
+      answeredAt: null,
+      expiresAt: at(-10),
+    };
+    // The phone's rows: saved replies only (a turn at work doesn't show its questions yet).
+    const reply = message({ id: "m-ask", author: { type: "agent", id: "atlas" }, agentRunId: "r1" });
+    const near = consultBlocksNearEnd([message({ id: "m0" }), reply], [asked]);
+    // Atlas at work on a new turn: its own entry, not the question.
+    const entries = workingEntries([run({ runId: "r2", agentId: "atlas" })], consultsForLine([consult], near), name);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.consult).toBeUndefined();
+    const far = consultBlocksNearEnd([reply, ...["a", "b", "c"].map((id) => message({ id }))], [asked]);
+    expect(workingEntries([], consultsForLine([consult], far), name)[0]?.consult?.status).toBe("asking");
   });
 
   test("a writing agent stays on the line ('escrevendo'); failed and waiting runs leave it", () => {
@@ -529,6 +566,43 @@ describe("an agent's turn as one block", () => {
     expect(items[0]).toMatchObject({ kind: "call", line: { state: "run", count: 2 } });
   });
 
+  test("a computer command in the phone's words: what it ran, a refusal and why", async () => {
+    const pt = await translator("pt-BR");
+    const en = await translator("en");
+    const check = (id: string, detail: string, more: Partial<Extract<LiveWork, { kind: "call" }>> = {}) => ({
+      ...call(id, "permission_prompt", false),
+      detail,
+      ...more,
+    });
+    const items = turnItems(
+      run({
+        runId: "r",
+        work: [
+          check("1", "Rerun new unit tests after formatting", { command: "npx jest a.test.ts" }),
+          check("2", "rm /etc/agentes", {
+            failed: true,
+            why: "This command was refused because it changes files outside the mission folder. Do it another way.",
+            refusal: "outside",
+          }),
+        ],
+      }),
+    );
+    const lines = items.flatMap((x) => (x.kind === "call" ? [x.line] : []));
+    expect(lines.map((l) => toolPhrase(pt, l))).toEqual([
+      "Rodou: Rerun new unit tests after formatting",
+      "Recusado: rm /etc/agentes",
+    ]);
+    expect(lines.map((l) => toolPhrase(en, l))).toEqual([
+      "Ran: Rerun new unit tests after formatting",
+      "Refused: rm /etc/agentes",
+    ]);
+    expect(lines[0]?.input).toBe("npx jest a.test.ts");
+    expect(lines.map((l) => [toolWhy(pt, l), toolWhy(en, l)])).toEqual([
+      [null, null],
+      ["Mexe em arquivos fora da pasta do agente", "It changes files outside the agent's folder"],
+    ]);
+  });
+
   test("it opens as if it had answered: a generic phrase, then the first thing it said", () => {
     const quiet = run({ runId: "r" });
     const generic = turnOpener(quiet, turnItems(quiet));
@@ -683,6 +757,37 @@ describe("automatic lines (notices) and fast replies", () => {
     expect(unknown).toMatchObject({ icon: "chat", key: "chat.notice.agentNote", values: { from: "zed" } });
     const anon = eventLineOf(agentMsg("n3", { notice: { kind: "consult_reply", text: "ok" } }), names);
     expect(anon?.key).toBe("chat.notice.consultReplyAnon");
+  });
+
+  test("an agent's follow-up: when it will be back and for what, then the line that woke it", () => {
+    // Today, so the line needs no day.
+    const at = new Date(new Date().setHours(12, 0, 0, 0)).toISOString();
+    const when = { time: (iso: string) => (iso === at ? "12:00" : "?"), locale: "pt-BR" };
+    const refs = { runId: "r1", at, about: "ver o CI" };
+    const set = eventLineOf(
+      agentMsg("n1", { notice: { kind: "follow_up", text: "Check CI run 42", refs: { ...refs, state: "pending" } } }),
+      names,
+      when,
+    );
+    expect(set).toEqual({
+      kind: "notice",
+      icon: "clock",
+      key: "chat.notice.followUp",
+      values: { name: "Ada", about: "ver o CI", time: "12:00", day: "" },
+      text: "Check CI run 42",
+    });
+    const canceled = eventLineOf(
+      agentMsg("n2", { notice: { kind: "follow_up", text: "x", refs: { ...refs, state: "canceled" } } }),
+      names,
+      when,
+    );
+    expect(canceled?.key).toBe("chat.notice.followUpCanceled");
+    const woke = eventLineOf(
+      agentMsg("n3", { notice: { kind: "follow_up", text: "x", refs: { ...refs, wake: "1", followUpId: "n1" } } }),
+      names,
+      when,
+    );
+    expect(woke).toMatchObject({ key: "chat.notice.followUpWake", values: { name: "Ada", about: "ver o CI" } });
   });
 
   test("a wait's result names the agent that waited; the message's own text wins over the notice's", () => {

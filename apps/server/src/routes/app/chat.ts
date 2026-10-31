@@ -2,6 +2,9 @@ import {
   activeRunsIn,
   addChannelMember,
   answerNow,
+  cancelFollowUp,
+  consultationConversation,
+  consultationsIn,
   createChannel,
   joinChannel,
   listChannelMembers,
@@ -30,6 +33,28 @@ import { Channel, Message } from "./schemas";
 
 const tags = ["Chat"];
 const ChannelParams = OrgParams.extend({ channelId: z.uuid() });
+
+/** A question an agent asked another from a conversation (`consultationsIn`). */
+const Consultation = z.object({
+  id: z.uuid(),
+  runId: z.uuid().openapi({ description: "The asking run: its reply (`agentRunId`) shows the list." }),
+  agentId: z.uuid(),
+  consultedAgentId: z.uuid(),
+  consultedRunId: z
+    .uuid()
+    .nullable()
+    .openapi({ description: "The consulted agent's run: the cards it posts here carry it (`agentRunId`)." }),
+  status: z.enum(["open", "answered", "expired", "failed"]),
+  waiting: z.enum(["approval", "input", "computer"]).nullable().openapi({
+    description:
+      "Open, and the consulted agent waits: on a person (`approval`; `input`: an answer or a secret), or for its computer to come back online (`computer`).",
+  }),
+  question: z.string(),
+  answer: z.string().nullable().openapi({ description: "The answer once answered; why it couldn't once failed." }),
+  createdAt: z.string(),
+  answeredAt: z.string().nullable(),
+  expiresAt: z.string(),
+});
 
 /** Channels and messages. Real-time updates arrive over the WebSocket (`/api/ws`). */
 export function chatRoutes(deps: AppDeps) {
@@ -301,6 +326,74 @@ export function chatRoutes(deps: AppDeps) {
   app.openapi(
     createRoute({
       method: "get",
+      path: "/organizations/{orgId}/channels/{channelId}/consultations",
+      tags,
+      security,
+      summary: "Questions agents asked other agents from here, latest first (drawn inside the reply that asked)",
+      request: { params: ChannelParams },
+      responses: {
+        200: json(
+          z.object({
+            consultations: z.array(Consultation),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, channelId } = c.req.valid("param");
+      await requireChannelAccess(db, c.get("user").id, orgId, channelId);
+      const list = await consultationsIn(db, orgId, channelId);
+      return c.json(
+        {
+          consultations: list.map((q) => ({
+            ...q,
+            createdAt: q.createdAt.toISOString(),
+            answeredAt: q.answeredAt?.toISOString() ?? null,
+            expiresAt: q.expiresAt.toISOString(),
+          })),
+        },
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/channels/{channelId}/consultations/{consultationId}",
+      tags,
+      security,
+      summary: "One question asked from here, opened: what the two agents said for it (read only)",
+      description:
+        "The question as it went into the agents' DM, the consulted agent's messages there and the cards it posted here (approvals, questions, secret requests), oldest first. Only this question's part of their DM. 404 when it wasn't asked from this conversation.",
+      request: { params: ChannelParams.extend({ consultationId: z.uuid() }) },
+      responses: { 200: json(z.object({ consultation: Consultation, messages: z.array(Message) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId, channelId, consultationId } = c.req.valid("param");
+      await requireChannelAccess(db, c.get("user").id, orgId, channelId);
+      const found = await consultationConversation(db, orgId, channelId, consultationId);
+      if (!found) return apiError(c, 404, "not_found", "Question not found");
+      const q = found.consultation;
+      return c.json(
+        {
+          consultation: {
+            ...q,
+            createdAt: q.createdAt.toISOString(),
+            answeredAt: q.answeredAt?.toISOString() ?? null,
+            expiresAt: q.expiresAt.toISOString(),
+          },
+          messages: found.messages,
+        },
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
       path: "/organizations/{orgId}/channels/{channelId}/messages",
       tags,
       security,
@@ -430,6 +523,25 @@ export function chatRoutes(deps: AppDeps) {
       );
       deps.wakeWorkers?.();
       return c.json(result, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/messages/{messageId}/cancel-follow-up",
+      tags,
+      security,
+      summary: "Cancel an agent's follow-up from its line",
+      description:
+        "The id is the follow-up's line (`meta.notice.kind` `follow_up`). Anyone who can read the conversation. The line changes in place (`message.created` with the same id); at its time the agent isn't woken. 409 `follow_up.not_pending` once it came or was canceled.",
+      request: { params: OrgParams.extend({ messageId: z.uuid() }) },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, messageId } = c.req.valid("param");
+      await cancelFollowUp({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, messageId);
+      return c.body(null, 204);
     },
   );
 

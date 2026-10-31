@@ -246,6 +246,30 @@ describe("Issue detail", () => {
     await go("issues/999");
     expect(screen().getByText("Esta tarefa não existe ou você não tem acesso.")).toBeTruthy();
   });
+
+  test("the agent's work: the same step in a row once with how many; a refused command says so", async () => {
+    const api = createFakeApi(seedState());
+    const get = api.issues.get;
+    const step = (detail: string, minutes: number, outcome?: "refused") => ({
+      tool: "permission_prompt",
+      detail,
+      at: new Date(Date.now() - minutes * 60_000).toISOString(),
+      ...(outcome ? { outcome } : {}),
+    });
+    api.issues.get = async (orgId, number) => {
+      const issue = await get(orgId, number);
+      if (!issue.work) return issue;
+      const steps = [3, 2, 1].map((m) => step("Run the unit tests", m)).concat(step("rm /etc/agentes", 0, "refused"));
+      return { ...issue, work: { ...issue.work, steps } };
+    };
+    await go("issues/129", api);
+    const lines = [...document.querySelectorAll(".issue-work__steps li")];
+    // Each line: its mark, its words, its time.
+    expect(lines.map((li) => li.children[1]?.textContent)).toEqual([
+      "Rodou: Run the unit tests ×3",
+      "Recusado: rm /etc/agentes",
+    ]);
+  });
 });
 
 describe("Rotinas", () => {

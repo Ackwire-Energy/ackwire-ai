@@ -1,7 +1,18 @@
 import type { AiAccounts as AiAccountsView, Credential } from "@agenteschat/client";
-import { keys, useAiAccounts, useApi, useCredentials, useSettings, useUpdateSettings } from "@agenteschat/client";
-import { ownSignIns, planWordOf } from "@agenteschat/client/lib/ai-accounts";
-import { relativeTime } from "@agenteschat/client/lib/format";
+import {
+  keys,
+  useAiAccounts,
+  useAiStatus,
+  useApi,
+  useCredentials,
+  useMachines,
+  useSettings,
+  useUpdateSettings,
+} from "@agenteschat/client";
+import { accountTitle, agentsToGive, endsOnClaude, ownSignIns } from "@agenteschat/client/lib/ai-accounts";
+import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { agentAi, aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isPlanId, planOf } from "@agenteschat/client/lib/plans";
 import { providerLabel } from "@agenteschat/client/lib/providers";
@@ -12,7 +23,7 @@ import { ActionSheetIOS, ActivityIndicator, Alert, Platform, ScrollView, StyleSh
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import { Button, Card, Chip, InfoHint, ProviderLogo, Row, Text, useToast } from "@/ui";
-import { useColors } from "../shared/hooks";
+import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { PushedHeader } from "../shared/parts";
 import { PlanMeter } from "../usage/parts";
 import { AddAccount } from "./AddAccount";
@@ -22,8 +33,9 @@ import { Note } from "./parts";
 /*
  * Contas de IA, as the web's Settings › Contas de IA (ADR 0059, ADR 0061): "Seus planos", first the sign-ins of the
  * computers the person connected ("Conta deste computador", the agents there think with them), then their own
- * accounts on every computer, each with its plan's meter and the agent it thinks for, renamed, signed in again (a new
- * key for a coding plan) or disconnected here; then the workspace's API keys (admins), the default one, a key
+ * accounts on every computer, each with its plan's meter and the agents it thinks for, renamed, signed in again (a new
+ * key for a coding plan), given to one more agent where it thinks for all of them, or disconnected here; then the
+ * workspace's API keys (admins), the default one, a key
  * swapped or deleted. Connecting a new one is the same picker as everywhere ("Conectar uma IA").
  */
 
@@ -67,6 +79,10 @@ export function AiAccountsScreen() {
   const c = useColors();
   const insets = useSafeAreaInsets();
   const ai = useAiAccounts(orgId);
+  const machines = useMachines(orgId);
+  const dir = useDirectory();
+  const meId = useMeId();
+  const status = useAiStatus(orgId);
   const [again, setAgain] = useState<Account | null>(null);
   // Looking at the plans: their usage is looked up again (it comes back as `machine.updated`).
   useEffect(() => {
@@ -101,12 +117,29 @@ export function AiAccountsScreen() {
       a.label,
     );
   };
+  const names = (list: string[]) => joinNames(list, t("newAgent.and"));
+  const machineOf = (a: Account) => machines.data?.find((m) => m.id === a.machineId);
+  // One more of the person's agents thinks with an account made for all of them there: no sign-in.
+  const give = (a: Account, agent: { id: string; name: string }) =>
+    api.agents.setBrain(orgId, agent.id, { brain: a.kind, account: a.id }).then(() => {
+      toast({ title: t("aiAccounts.done.savedAgent", { agent: agent.name, label: a.label }), icon: "check" });
+      refetch();
+      for (const key of [keys.agents(orgId), keys.aiStatus(orgId), keys.agentBrain(orgId, agent.id)])
+        void qc.invalidateQueries({ queryKey: key });
+    }, failed);
   const remove = (a: Account) =>
     Alert.alert(
       t("aiAccounts.page.disconnectTitle", { label: a.label }),
-      a.usedBy[0]
-        ? t("aiAccounts.page.disconnectAgent", { agent: a.usedBy[0], computer: a.computer })
-        : t("aiAccounts.page.disconnectNone", { computer: a.computer }),
+      [
+        a.usedBy.length > 0
+          ? t("aiAccounts.page.disconnectAgents", {
+              count: a.usedBy.length,
+              agents: names(a.usedBy),
+              computer: a.computer,
+            })
+          : t("aiAccounts.page.disconnectNone", { computer: a.computer }),
+        ...(endsOnClaude(a, machineOf(a)) ? [t("aiAccounts.page.revokeOnClaude")] : []),
+      ].join(" "),
       [
         { text: t("common.cancel"), style: "cancel" },
         {
@@ -124,9 +157,22 @@ export function AiAccountsScreen() {
   const actions = (a: Account) => {
     const plan = planOf(a.provider);
     const out = a.status === "signed_out";
+    const toGive = meId
+      ? agentsToGive({
+          account: a,
+          agents: dir.agents,
+          machine: machineOf(a),
+          viewerId: meId,
+          onKey: (id) => agentAi(dir.agentById.get(id), aiStateOf(status.data, id)) === "key",
+        })
+      : [];
     choose(
       a.label,
       [
+        ...toGive.map((g) => ({
+          label: t("aiAccounts.page.useFor", agentGrammar(t, g.name)),
+          onPress: () => void give(a, g),
+        })),
         ...(Platform.OS === "ios" ? [{ label: t("aiAccounts.page.rename"), onPress: () => rename(a) }] : []),
         ...(out || plan
           ? [
@@ -173,7 +219,7 @@ export function AiAccountsScreen() {
               <Row
                 key={o.key}
                 leading={<ProviderLogo id={o.kind} size="sm" />}
-                title={[t(`aiAccounts.connect.${o.kind}`), planWordOf(o.plan)].filter(Boolean).join(" ")}
+                title={accountTitle({ label: t(`aiAccounts.connect.${o.kind}`), plan: o.plan })}
                 subtitle={t("aiAccounts.page.ownOn", { computer: o.computer })}
                 below={
                   o.usage ? (
@@ -194,13 +240,15 @@ export function AiAccountsScreen() {
               const facts = [
                 a.email ?? (a.keyHint ? t("aiAccounts.page.keyEnds", { hint: a.keyHint }) : null),
                 several ? t("aiAccounts.page.on", { computer: a.computer }) : null,
-                a.usedBy[0] ? t("aiAccounts.page.thinksFor", { agent: a.usedBy[0] }) : t("aiAccounts.page.noAgent"),
+                a.usedBy.length > 0
+                  ? t("aiAccounts.page.usedBy", { count: a.usedBy.length, agents: names(a.usedBy) })
+                  : t("aiAccounts.page.noAgent"),
               ].filter(Boolean);
               return (
                 <Row
                   key={a.id}
                   leading={<ProviderLogo id={a.provider ?? a.kind} size="sm" off={out} />}
-                  title={a.label}
+                  title={accountTitle(a)}
                   subtitle={facts.join(" · ")}
                   chevron
                   onPress={() => actions(a)}

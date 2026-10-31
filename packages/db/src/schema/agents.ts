@@ -10,7 +10,6 @@ import {
   text,
   timestamp,
   unique,
-  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { users } from "./auth";
@@ -137,11 +136,18 @@ export const agents = pgTable(
      * The account its computer brain runs with (ADR 0041), on its machine and
      * of its brain's kind (checked in code); null = the computer's own sign-in.
      * Cleared when the agent changes computer or brain kind, or the account goes.
-     * An account thinks for one agent at most (ADR 0059 §2).
+     * An account the runner doesn't say thinks for all of its owner's agents
+     * (`machine_accounts.shared`) thinks for one at most (ADR 0059 §2, checked
+     * in code under a lock on the account's row).
      */
     brainAccountId: uuid(),
     /** How hard its computer brain thinks (`low`…`max`, ADR 0041); null = the CLI's default. */
     brainEffort: text(),
+    /**
+     * The most context its model reads, in tokens (`200000`, `400000`, `1000000`; validated in code): the API
+     * brain compacts past it, Claude Code and Codex compact there too. Null = the model's own window.
+     */
+    contextTokens: integer(),
     /** Sites its browser may open (ADR 0040, `*.example.com` matches the domain too); null = any site. */
     browserAllowedDomains: text().array(),
     /**
@@ -196,9 +202,6 @@ export const agents = pgTable(
       columns: [t.orgId, t.brainAccountId],
       foreignColumns: [machineAccounts.orgId, machineAccounts.id],
     }),
-    uniqueIndex("agents_brain_account_unique")
-      .on(t.orgId, t.brainAccountId)
-      .where(sql`${t.brainAccountId} is not null and ${t.archivedAt} is null`),
   ],
 );
 

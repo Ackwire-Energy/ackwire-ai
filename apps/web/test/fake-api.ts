@@ -23,6 +23,7 @@ import type {
   Connection,
   ConnectorCatalog,
   ConnectorDef,
+  ConsultationConversation,
   Credential,
   Edition,
   FormerAgent,
@@ -52,6 +53,7 @@ import type {
   ReactionCount,
   Role,
   Run,
+  RunConsultation,
   ScopeGrant,
   SearchHit,
   SecretRequest,
@@ -179,6 +181,10 @@ export interface FakeState {
   runs: Run[];
   /** `GET …/channels/{id}/active-runs`; unset = the endpoint doesn't exist yet (404). */
   activeRuns?: Record<string, ActiveRun[]>;
+  /** `GET …/channels/{id}/consultations`, by channel; unset = none. */
+  consultations?: Record<string, RunConsultation[]>;
+  /** By consultation id: what `agents.consultation` returns. */
+  consultationConversations?: Record<string, ConsultationConversation>;
   platformKey: boolean;
   /** What `agents.importFromGithub` returns per link (else a 400 like the backend's). */
   githubFiles?: Record<string, { path: string; text: string }[]>;
@@ -1684,6 +1690,14 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("agents.activeRuns", channelId);
         return state.activeRuns ? (state.activeRuns[channelId] ?? []) : null;
       },
+      consultations: async (_orgId, channelId) => {
+        log("agents.consultations", channelId);
+        return state.consultations?.[channelId] ?? [];
+      },
+      consultation: async (_orgId, _channelId, consultationId) => {
+        log("agents.consultation", consultationId);
+        return state.consultationConversations?.[consultationId] ?? null;
+      },
       run: async (_orgId, runId) => {
         const r = state.runs.find((x) => x.id === runId);
         if (!r) throw new ApiError(404, "not_found", "Run not found");
@@ -1827,6 +1841,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const c = state.channels.find((x) => x.id === channelId);
         if (!c) throw new ApiError(404, "not_found", "Channel not found");
         c.categoryId = input.categoryId;
+        // Like the server: before `beforeChannelId`, else at the end; the list comes back in that order.
+        const rest = state.channels.filter((x) => x !== c);
+        const at = rest.findIndex((x) => x.id === input.beforeChannelId);
+        rest.splice(at >= 0 ? at : rest.length, 0, c);
+        state.channels = rest;
       },
       join: async (orgId, channelId) => {
         log("chat.join", orgId, channelId);
@@ -1878,6 +1897,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("chat.answerNow", orgId, messageId);
         if (state.answerNowError) throw state.answerNowError;
         return { runs: [] };
+      },
+      cancelFollowUp: async (orgId, messageId) => {
+        log("chat.cancelFollowUp", orgId, messageId);
+        const line = state.messages.find((m) => m.id === messageId);
+        const notice = line?.meta?.notice as { refs?: Record<string, string> } | undefined;
+        if (notice?.refs) notice.refs = { ...notice.refs, state: "canceled" };
       },
       roster: async (_orgId, channelId) =>
         (state.channelMembers[channelId] ?? []).map((m) =>

@@ -263,6 +263,22 @@ describe("Configurações da missão", () => {
     expect(trigger.textContent).not.toContain("auto");
   });
 
+  test("an agent on one of its coding plan's models: the mission's model reads its name, never its id", async () => {
+    const { api } = await missionThread();
+    const brain = api.missions.brain;
+    api.missions.brain = async (orgId, missionId) => ({
+      ...(await brain(orgId, missionId)),
+      model: null,
+      effectiveModel: "deepseek-v4.1-flash",
+    });
+    await render(api);
+    const dialog = await openSettings();
+    await click(within(dialog).getByRole("button", { name: /Mais opções/ }));
+    await settle(4);
+    const trigger = within(dialog).getByRole("combobox", { name: "Modelo" });
+    expect(trigger.textContent).toBe("DeepSeek V4.1 Flash");
+  });
+
   test("Retomar sozinho: the switch saves resumeTasks", async () => {
     const { api, state } = await missionThread();
     await render(api);

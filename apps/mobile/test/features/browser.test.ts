@@ -10,6 +10,7 @@ import {
   siteLetter,
   siteOf,
   skyBehind,
+  waitsForPage,
 } from "../../src/features/browser/logic";
 import { featureKeysEn } from "../../src/features/i18n/keys.en";
 import { featureKeysPtBR } from "../../src/features/i18n/keys.pt-BR";
@@ -115,8 +116,22 @@ describe("the page box with no page to show", () => {
     expect(skyBehind(pageNoteOf("closed", true, false))).toBe(false);
   });
 
+  test("opening, reconnecting or not available for too long says it couldn't open, with Try again; nothing else does", () => {
+    for (const gap of [null, "reconnecting", "unavailable"] as const) {
+      expect(pageNoteOf(gap, false, true, true)).toEqual({ say: "stuck", spin: false, help: "stuckHelp" });
+      expect(waitsForPage(gap)).toBe(true);
+    }
+    // What waiting can't change keeps its own words, and a page someone else holds stays theirs.
+    for (const gap of ["closed", "offline", "no_computer", "forbidden", "ended", "tooMany"] as const) {
+      expect(pageNoteOf(gap, false, false, true).say).toBe(gap);
+      expect(waitsForPage(gap)).toBe(false);
+    }
+    expect(pageNoteOf(null, true, false, true).say).toBe("hidden");
+    expect(skyBehind(pageNoteOf(null, false, false, true))).toBe(false);
+  });
+
   test("every reason has its words in both languages (the key is built from the reason)", () => {
-    const reasons: PageGap[] = [
+    const reasons: (PageGap | "stuck")[] = [
       "reconnecting",
       "offline",
       "no_computer",
@@ -124,11 +139,17 @@ describe("the page box with no page to show", () => {
       "unavailable",
       "forbidden",
       "ended",
+      "tooMany",
+      "stuck",
     ];
     for (const keys of [featureKeysPtBR, featureKeysEn]) {
       const words = keys.browser.live.unavailable as Record<string, string>;
       for (const r of reasons) for (const g of ["F", "M"]) expect(words[`${r}${g}`]).toBeTruthy();
+      const live = keys.browser.live as Record<string, unknown>;
+      for (const g of ["F", "M"]) expect(live[`stuckHelp${g}`]).toBeTruthy();
     }
+    expect(featureKeysPtBR.browser.live.unavailable.stuckF).toBe("Não deu para abrir o navegador da {{name}}.");
+    expect(featureKeysEn.browser.live.stuckHelpM).toBe("Try again restarts the browser. Its sign-ins stay saved.");
   });
 });
 

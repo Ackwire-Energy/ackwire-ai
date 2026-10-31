@@ -1,11 +1,20 @@
 import type { ConnectIntent } from "@agenteschat/client";
-import { keys, useAddCredential, useAiStatus, useApi, useCredentials, useMachines } from "@agenteschat/client";
+import {
+  keys,
+  useAddCredential,
+  useAiAccounts,
+  useAiStatus,
+  useApi,
+  useCredentials,
+  useMachines,
+} from "@agenteschat/client";
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   type AgentAi,
   type AiChoice,
   agentAi,
+  agentPlan,
   aiStateOf,
   allAgents,
   defaultChoice,
@@ -13,6 +22,7 @@ import {
   type ExistingSignIn,
   gateDims,
   type PlanChoice,
+  signsInOnce,
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { providerGuess, providerLabel } from "@agenteschat/client/lib/providers";
@@ -175,7 +185,21 @@ function ConnectAiDialog({
   // By the AI status, as its "Sem IA" chip: an agent on a plan whose sign-in is gone has none either.
   const noAi = (id: string) => !linked[id] && (aiStateOf(status.data, id) ?? "no_ai") === "no_ai";
   const machineOf = (id: string) => machines.data?.find((m) => m.agents.some((a) => a.id === id))?.id;
-  const setOf = (c: AiChoice) => (c === "key" ? [] : allAgents({ choice: c, agents, aiOf, machineOf }));
+  const accounts = useAiAccounts(org.id);
+  const setOf = (c: AiChoice) =>
+    c === "key"
+      ? []
+      : allAgents({
+          choice: c,
+          agents,
+          aiOf,
+          machineOf,
+          sharedOn: (id) =>
+            signsInOnce(
+              c,
+              accounts.data?.computers.find((m) => m.machineId === id),
+            ),
+        });
   // Only a pick is kept; else whom it's for is worked out on each render (a link opens this before the agents load).
   const [pickedTarget, setPickedTarget] = useState<string>();
   // Held once a sign-in starts (`onStart`): every move it makes gives an agent an AI, which would move the default.
@@ -202,6 +226,8 @@ function ConnectAiDialog({
       ownsAgents: agents.length > 0,
       mayAddKey,
       claudeGate: agents.length > 0 ? gates.gateOf("claude") : { state: "loading" },
+      // Signing in on Claude's panel would move a Codex agent onto Claude Code: one agent opens on its own plan.
+      plan: agentPlan(one),
     });
   const all = setOf(choice).map((a) => ({ ...a, done: aiOf(a.id) === choice }));
   const target = defaultTarget({ ...aimed, set: all });

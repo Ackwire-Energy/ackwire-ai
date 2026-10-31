@@ -1,5 +1,11 @@
+import type { MailAdapters } from "@agenteschat/adapters";
+import type { Database } from "@agenteschat/db";
+import { type MailAccountRow, mailProviders, orgMailAccounts, usableAccount } from "../mail/accounts";
+import type { ToolDefinition } from "../tools/types";
 import { CONNECTOR_CATALOG, type ConnectorCategory } from "./catalog";
-import { MCP_PRESETS } from "./presets";
+import { activeConnections } from "./connections";
+import { isCustom } from "./custom";
+import { MCP_PRESETS, presetForServer } from "./presets";
 
 /**
  * Brand icons the web app serves, keyed by icon name. One color, from
@@ -158,4 +164,137 @@ export function connectorListing(oauthApps: Record<string, unknown>): ConnectorL
     tools: [],
   }));
   return [...builtins, ...presets];
+}
+
+/** What this server's "Adicionar conector" can connect: its OAuth apps (`connectorOAuthApps`) and its mail paths. */
+export interface ServerCatalog {
+  oauthApps: Record<string, unknown>;
+  mail?: MailAdapters | null;
+}
+
+/** A connector of "Adicionar conector" the agent has no tool of, as `find_tools` names it (ADR 0043). */
+export interface MissingConnector {
+  label: string;
+  description: string;
+  /** What names it in a search: its label and its ids (`drive`). */
+  names: string[];
+  /**
+   * `unavailable`: this server can't connect it; `soon`: its vendor hasn't approved agentes.chat yet (a `soon`
+   * preset); `not_connected`: the workspace hasn't; `not_given`: the agent lacks it; `needs_reconnect`: a mailbox of
+   * it stopped working.
+   */
+  state: "unavailable" | "soon" | "not_connected" | "not_given" | "needs_reconnect";
+}
+
+/** The mailboxes "Adicionar conector" offers, by the rule of `mailChoices` (apps/web/src/components/MailConnect.tsx). */
+const MAILBOXES: {
+  label: string;
+  description: string;
+  /** Words besides its label that name it in a search. */
+  names?: string[];
+  offered: (mail: ReturnType<typeof mailProviders>) => boolean;
+  holds: (account: MailAccountRow) => boolean;
+}[] = [
+  {
+    label: "Gmail",
+    description: "Read, organize and answer Gmail email.",
+    offered: (m) => m.composio,
+    holds: (a) => a.provider === "gmail",
+  },
+  {
+    label: "Outlook",
+    description: "Outlook and Microsoft 365 email.",
+    offered: (m) => m.composio,
+    holds: (a) => a.provider === "outlook",
+  },
+  {
+    label: "iCloud",
+    description: "iCloud email, custom domains included.",
+    offered: (m) => m.imap && m.presets.some((p) => p.id === "icloud"),
+    holds: (a) => a.preset === "icloud",
+  },
+  {
+    label: "Email",
+    description: "A mailbox: Gmail, Outlook, iCloud or another provider.",
+    names: ["mail", "mailbox"],
+    offered: (m) => m.composio || m.imap,
+    holds: () => true,
+  },
+];
+
+type Tools = Iterable<Pick<ToolDefinition, "connectionId">>;
+
+/**
+ * The connectors of "Adicionar conector" (`connectorListing` and the mailboxes) the agent has no tool of, and why.
+ * `usable`: the agent's tools; `listed`: every tool this server lists for the workspace. Names and states only:
+ * never a connection's account, address or key.
+ */
+export async function missingConnectors(
+  db: Database,
+  orgId: string,
+  catalog: ServerCatalog,
+  tools: { usable: Tools; listed: Tools },
+): Promise<MissingConnector[]> {
+  const [connections, mailboxes] = await Promise.all([activeConnections(db, orgId), orgMailAccounts(db, orgId)]);
+  const services = new Map<
+    string,
+    {
+      label: string;
+      description: string;
+      names: Set<string>;
+      offered: boolean;
+      soon: boolean;
+      held: string[];
+      reconnect: boolean;
+    }
+  >();
+  const service = (label: string, description: string) => {
+    const key = label.toLowerCase();
+    const found = services.get(key) ?? {
+      label,
+      description,
+      names: new Set([label]),
+      offered: false,
+      soon: false,
+      held: [],
+      reconnect: false,
+    };
+    services.set(key, found);
+    return found;
+  };
+  for (const entry of connectorListing(catalog.oauthApps)) {
+    const s = service(entry.label, entry.description);
+    s.names.add(entry.id);
+    s.offered ||= entry.available;
+    s.soon ||= entry.soon;
+  }
+  const mail = mailProviders(catalog.mail);
+  for (const m of MAILBOXES) {
+    const s = service(m.label, m.description);
+    for (const name of m.names ?? []) s.names.add(name);
+    s.offered ||= m.offered(mail);
+    const own = mailboxes.filter(m.holds);
+    s.held.push(...own.filter(usableAccount).map((a) => a.id));
+    // Connecting the same mailbox again fails as already connected: only Reconnect on its row brings it back.
+    s.reconnect ||= own.some((a) => a.status === "needs_reconnect");
+  }
+  // A server connected by address is its preset's service, or the one it was named after (a mailbox's too).
+  for (const c of connections) {
+    const label = isCustom(c)
+      ? (presetForServer(c.serverUrl)?.label ?? c.label)
+      : (CONNECTOR_CATALOG[c.connector]?.label ?? c.label);
+    services.get(label.toLowerCase())?.held.push(c.id);
+  }
+  const ids = (list: Tools) => new Set([...list].map((t) => t.connectionId));
+  const [usable, listed] = [ids(tools.usable), ids(tools.listed)];
+  return [...services.values()].flatMap((s): MissingConnector[] => {
+    if (s.held.some((id) => usable.has(id))) return [];
+    let state: MissingConnector["state"];
+    if (s.held.some((id) => listed.has(id))) state = "not_given";
+    else if (s.reconnect) state = "needs_reconnect";
+    // Connected, but no tool of it listed (server down, not reviewed yet): nothing says the agent lacks it.
+    else if (s.held.length > 0) return [];
+    else state = s.offered ? "not_connected" : s.soon ? "soon" : "unavailable";
+    return [{ label: s.label, description: s.description, names: [...s.names], state }];
+  });
 }

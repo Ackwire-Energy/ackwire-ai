@@ -294,7 +294,7 @@ describe("team actions in the Tool Gateway", () => {
     const mine = await runIn(f, qa.id, f.general.id);
     prs.answers.push(JSON.stringify({ behavior: "allow" }));
     const held = JSON.parse(outputOf(await call(tools, mine, "permission_prompt", push)).content);
-    expect(held.behavior).toBe("deny");
+    expect(held).toMatchObject({ behavior: "deny", code: "team" });
     expect(held.message).toContain("Dev already acted on acme/app@fix/login");
     expect(prs.answers).toHaveLength(1);
     prs.answers.length = 0;

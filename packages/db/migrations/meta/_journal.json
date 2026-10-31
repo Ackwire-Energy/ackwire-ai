@@ -918,6 +918,41 @@
       "when": 1793440843712,
       "tag": "0130_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 131,
+      "version": "7",
+      "when": 1793450843712,
+      "tag": "0131_agent_context_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 132,
+      "version": "7",
+      "when": 1793450903712,
+      "tag": "0132_imported_agent_handles",
+      "breakpoints": true
+    },
+    {
+      "idx": 133,
+      "version": "7",
+      "when": 1793450963712,
+      "tag": "0133_issues_assignee_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 134,
+      "version": "7",
+      "when": 1793451023712,
+      "tag": "0134_claude_account_names",
+      "breakpoints": true
+    },
+    {
+      "idx": 135,
+      "version": "7",
+      "when": 1793451083712,
+      "tag": "0135_shared_accounts",
+      "breakpoints": true
     }
   ]
 }

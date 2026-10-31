@@ -43,7 +43,7 @@ import {
   updateAgentGroup,
   usageSummary,
 } from "@agenteschat/engine";
-import { MODEL_CATALOG, nanoUsdToUsd, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
+import { contextWindowOf, MODEL_CATALOG, nanoUsdToUsd, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
 import { createRoute, z } from "@hono/zod-openapi";
 import {
   type AppDeps,
@@ -66,6 +66,7 @@ import {
   BrainEffortSetting,
   BrainKind,
   BrainMachine,
+  ContextLimit,
   Credential,
   FormerAgent,
   Model,
@@ -206,6 +207,7 @@ export function agentRoutes(deps: AppDeps) {
             id,
             label: m.label,
             provider: m.provider,
+            contextWindow: contextWindowOf(id),
             inputUsdPerMTok: pricesAt(m).input / 1000,
             outputUsdPerMTok: pricesAt(m).output / 1000,
           })),
@@ -354,7 +356,7 @@ export function agentRoutes(deps: AppDeps) {
       security,
       summary: "Whether each agent has an AI to think with, whether the organization has any, and who picks the agents",
       description:
-        "Per agent: `ready`; `no_ai` with why (`no_key`, `not_signed_in`, `no_computer`, `cli_missing`: nothing to think with, and no fallback); `waiting` (its computer is away for now). `any`: an agent that isn't archived is ready or waiting. `routing` (ADR 0074): who picks the agents for a message nobody mentioned, for the workspace (`by`) and for the caller's own messages (`mine`): Jev, the organization's small model (`model`), people's own plans (only for their own messages), rules, or `off` (only mentions). `noSmallModel`: with `rules`, the default key's provider, which has no small model. `apiKey`: a key of its own, or the server's own Claude key. Computed on each request; no key is read.",
+        "Per agent: `ready`; `no_ai` with why (`no_key`, `not_signed_in`, `no_computer`, `cli_missing`: nothing to think with, and no fallback; `own`: with `not_signed_in`, the CLI whose own sign-in isn't there on the computer, where the agent has no account); `waiting` (its computer is away for now). `any`: an agent that isn't archived is ready or waiting. `routing` (ADR 0074): who picks the agents for a message nobody mentioned, for the workspace (`by`) and for the caller's own messages (`mine`): Jev, the organization's small model (`model`), people's own plans (only for their own messages), rules, or `off` (only mentions). `noSmallModel`: with `rules`, the default key's provider, which has no small model. `apiKey`: a key of its own, or the server's own Claude key. Computed on each request; no key is read.",
       request: { params: OrgParams },
       responses: {
         200: json(
@@ -365,6 +367,7 @@ export function agentRoutes(deps: AppDeps) {
                 agentId: z.uuid(),
                 state: z.enum(["ready", "no_ai", "waiting"]),
                 reason: z.enum(["no_key", "not_signed_in", "no_computer", "cli_missing"]).optional(),
+                own: z.enum(["claude_code", "codex"]).optional(),
               }),
             ),
             routing: z.object({
@@ -844,7 +847,7 @@ export function agentRoutes(deps: AppDeps) {
             brain: BrainKind.optional(),
             model: z.string().max(80).nullable().optional().openapi({
               description:
-                "Claude Code: `opus`, `sonnet`, `haiku`; Codex: a model name; `auto` (each run picks the tier). Null = the brain's default; omitted = keep (reset when the brain changes).",
+                "Claude Code: `opus`, `sonnet`, `haiku`, a Claude model id or one of a coding plan's models by id (`@agenteschat/providers/plans`; another account runs `sonnet` for it); Codex: a model name; `auto` (each run picks the tier). Null = the brain's default; omitted = keep (reset when the brain changes).",
             }),
             fallback: z.boolean().optional(),
             onlyOwner: z.boolean().optional().openapi({
@@ -865,6 +868,10 @@ export function agentRoutes(deps: AppDeps) {
             effort: BrainEffortSetting.nullable()
               .optional()
               .openapi({ description: "`auto` = picked per run; null = the CLI's default; omitted = keep." }),
+            contextTokens: ContextLimit.nullable().optional().openapi({
+              description:
+                "The most context it reads, any brain (Claude Code and Codex compact there, the API brain drops old tool results); null = its model's window; omitted = keep.",
+            }),
           }),
         ),
       },

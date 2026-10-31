@@ -12,7 +12,16 @@ import {
   ROUTE_LIMITS,
   ROUTE_TIMEOUT_MS,
 } from "@agenteschat/adapters/machine-protocol";
-import { accountEnv, planKeyOf, routesRunning, signInKey } from "./accounts";
+import {
+  type AccountGrant,
+  accountEnv,
+  handToken,
+  planKeyOf,
+  routesRunning,
+  signInKey,
+  TOKEN_FD_ENV,
+  TOKEN_STDIO,
+} from "./accounts";
 import { accountSettingsEnv } from "./brain";
 import { RunnerError } from "./errors";
 import { killTree } from "./exec";
@@ -172,8 +181,13 @@ export function codexRouteUsage(stdout: string) {
 }
 
 export interface RouteDeps {
-  /** The account folders: root's, or those lent to this agent's worker. */
-  accounts?: { accountDir(kind: AccountKind, id: string): string | null };
+  /** The account folders: root's, or those lent to this agent's worker, and its own for one root keeps. */
+  accounts?: {
+    accountDir(kind: AccountKind, id: string): string | null;
+    agentHome?(kind: AccountKind, id: string): string | null;
+  };
+  /** System mode, in a worker (protocol 29): what root handed this route for its account. */
+  grant?: AccountGrant;
   /** The processes kept for turns: a sign-in with one open is busy. */
   brains?: { holds(account: string | null): boolean };
   codexApp?: { holds(account: string | null): boolean };
@@ -212,7 +226,12 @@ export async function routeWithPlan(req: BrainRouteRequest, deps: RouteDeps): Pr
   }
   const account = req.account ?? null;
   if (account !== null && !isAccountId(account)) throw new RunnerError("bad_request", "Invalid account id");
-  const home = account ? deps.accounts?.accountDir(req.kind, account) : null;
+  if (account && deps.grant?.kind === "none") throw new RunnerError("not_found", "That account is signed out here");
+  const home = !account
+    ? null
+    : deps.grant
+      ? deps.accounts?.agentHome?.(req.kind, account)
+      : deps.accounts?.accountDir(req.kind, account);
   if (account && !home) throw new RunnerError("not_found", "That account isn't on this computer anymore");
   const key = signInKey(req.kind, home);
   const open = req.kind === "codex" ? deps.codexApp : deps.brains;
@@ -231,7 +250,7 @@ export async function routeWithPlan(req: BrainRouteRequest, deps: RouteDeps): Pr
 }
 
 async function route(req: BrainRouteRequest, deps: RouteDeps, home: string | null, key: string) {
-  if (home && (await planKeyOf(home))) {
+  if (home && (deps.grant?.kind === "key" || (!deps.grant && (await planKeyOf(home))))) {
     throw new RunnerError("not_allowed", "A sign-in made with a key doesn't pick who answers");
   }
   const dir = mkdtempSync(path.join(deps.tmpDir ?? os.tmpdir(), "agentes-route-"));
@@ -248,8 +267,13 @@ async function claudeRoute(req: BrainRouteRequest, o: RouteDeps & { dir: string;
   const systemFile = path.join(o.dir, "system.txt");
   writeFileSync(systemFile, req.system, { mode: 0o600 });
   // An account's folder is the CLI's home, and requests go only to Claude's own endpoint.
+  const token = o.grant?.kind === "token" ? o.grant.token : undefined;
   const env = o.home
-    ? { ...accountEnv("claude_code", o.home), ...accountSettingsEnv(undefined, "haiku") }
+    ? {
+        ...accountEnv("claude_code", o.home),
+        ...accountSettingsEnv(undefined, "haiku"),
+        ...(token ? TOKEN_FD_ENV : {}),
+      }
     : process.env;
   const started = Date.now();
   const run = await runCli(o.claudeCommand ?? ["claude"], claudeRouteArgs({ systemFile, schema: req.schema }), {
@@ -258,6 +282,7 @@ async function claudeRoute(req: BrainRouteRequest, o: RouteDeps & { dir: string;
     input: req.prompt,
     timeoutMs: o.timeoutMs ?? ROUTE_TIMEOUT_MS,
     signal: o.signal,
+    ...(token ? { token } : {}),
   });
   const answer = claudeRouteAnswer(run.stdout);
   if (!answer) throw new RunnerError("internal", `Claude Code didn't answer${run.why(started)}`);
@@ -316,7 +341,15 @@ async function codexLuna(o: RouteDeps & { dir: string; key: string }, env: NodeJ
 function runCli(
   command: string[],
   args: string[],
-  o: { cwd: string; env: NodeJS.ProcessEnv; input: string; timeoutMs: number; signal?: AbortSignal },
+  o: {
+    cwd: string;
+    env: NodeJS.ProcessEnv;
+    input: string;
+    timeoutMs: number;
+    signal?: AbortSignal;
+    /** A token root handed over, on its own descriptor (`TOKEN_FD_ENV`). */
+    token?: string;
+  },
 ): Promise<{ stdout: string; why(started: number): string }> {
   const [file, ...pre] = command;
   return new Promise((resolve) => {
@@ -355,13 +388,14 @@ function runCli(
       child = spawn(resolveCommand(file ?? "", o.env.PATH), [...pre, ...args], {
         cwd: o.cwd,
         env: o.env,
-        stdio: ["pipe", "pipe", "pipe"],
+        stdio: o.token ? [...TOKEN_STDIO] : ["pipe", "pipe", "pipe"],
         detached: true,
         windowsHide: true,
       });
     } catch (error) {
       return done(null, error instanceof Error ? error : new Error(String(error)));
     }
+    if (o.token) handToken(child, o.token);
     timer = setTimeout(() => kill("timeout"), o.timeoutMs);
     if (o.signal?.aborted) onAbort();
     else o.signal?.addEventListener("abort", onAbort, { once: true });

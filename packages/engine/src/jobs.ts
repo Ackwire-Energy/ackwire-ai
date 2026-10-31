@@ -20,6 +20,7 @@ import { isAgentOnlyDm } from "./dms";
 import { type EmailArt, sendQueuedEmail } from "./email";
 import { type DecidedBy, publishRouted } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
+import { FOLLOW_UP_JOB, wakeFollowUp } from "./follow-through";
 import { advanceForumTopic } from "./forum";
 import { FILE_JOIN_REQUEST_JOB, fileJoinRequest, forgetJoinCodeEmail } from "./invite-requests";
 import type { JevKey, JevKeySource } from "./jev-key";
@@ -122,6 +123,8 @@ export interface JobDeps extends RunExecutorDeps {
      * on the Cloud (`isAgentesCloud`), where Jev is ours. Absent: no plan step.
      */
     plans?: { hub: Pick<MachineCaller, "call" | "status">; publicUrl: string };
+    /** How long a person's message waits for their next one (`ROUTER_QUIET_MS` on a server); absent: no wait. */
+    quietMs?: number;
   };
 }
 
@@ -178,6 +181,7 @@ export function messageRouter(deps: JobDeps): RouterDeps | null {
     },
     hasAi: (orgId) => orgHasAi({ db: deps.db, gateway: deps.gateway, machines: deps.machines }, orgId),
     routing: { jev: () => jevPicks(jev?.key), smallModel, plans },
+    quietMs: router.quietMs,
     // Jev bills the platform: past the workspace's platform AI for the month, only @mentions start agents.
     ...(jev ? { platformCapReached: (orgId: string) => platformCapReached(deps.db, orgId) } : {}),
   };
@@ -397,7 +401,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         }
       }
       const res = await routeMessage(routing, input);
-      if (res.skipped === "already_routed") return;
+      // Continued: the person's next message carries the decision, and its receipt.
+      if (res.skipped === "already_routed" || res.skipped === "continued") return;
       // Nobody can think: what the person asks for may be to connect an AI (Jev reads it), for the Connect step.
       if (res.reason === NO_AI) {
         const intent = await aiConnectIntent(deps.context?.judge, { orgId: message.orgId, text: message.body });
@@ -409,10 +414,14 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       // Counted per run (statements per stage go into the run profile).
       const wait = typeof job.payload.wait === "string" ? job.payload.wait : undefined;
       await queryTrace.run({ count: 0 }, () =>
-        executeRun(deps, String(job.payload.runId), wait ? { ...ctx, wait, jobId: job.id } : ctx),
+        executeRun(deps, String(job.payload.runId), { ...ctx, jobId: job.id, ...(wait ? { wait } : {}) }),
       );
       // A mission's main-session turn that ended: write items queued behind it may start (ADR 0044).
       await afterMissionRunEnded(missions, String(job.payload.runId)).catch(() => 0);
+    },
+    // A follow-up's time came: the agent is woken in its conversation (follow-through.ts).
+    [FOLLOW_UP_JOB]: async (job) => {
+      await wakeFollowUp(deps, orgOf(job), String(job.payload.messageId));
     },
     "secret.activate": async (job) => {
       if (!deps.sandbox) throw new Error("Computer secret delivery is unavailable");

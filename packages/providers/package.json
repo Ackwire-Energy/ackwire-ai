@@ -8,6 +8,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./plans": "./src/plans.ts",
+    "./context-limits": "./src/context-limits.ts",
     "./testing": "./src/fake.ts"
   },
   "scripts": {
