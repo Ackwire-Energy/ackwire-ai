@@ -15,9 +15,12 @@ import {
   type RunnerAccess,
   type RunnerFrame,
 } from "@agenteschat/adapters/machine-protocol";
+import { browserErrorText, formatPlanReport, runPlan } from "@agenteschat/engine";
+import { type BrowserLink, type BrowserReply, browserSurface } from "../../../../packages/engine/src/browser/surface";
 import { reduceAccess, setTool, TOOL_NAMES, widens } from "../../runner/access";
 import {
   agentBrowserTarget,
+  type BrowserAnswer,
   BrowserManager,
   type BrowserManagerOptions,
   browserSetupText,
@@ -682,7 +685,7 @@ const OUT_OF_MEMORY_UNDER =
   "The page ran out of memory while this ran, and was reloaded. Read it again before you go on.";
 
 test.if(posix)(
-  "a page that dies is opened again once, and the agent's next command is told instead of running on it",
+  "a page that dies is opened again once: a look runs on it, and the agent's next action is told instead of running",
   async () => {
     const devtools = fakeDevtools([]);
     try {
@@ -694,10 +697,17 @@ test.if(posix)(
       await waitFor(() => devtools.navigated.length === 1);
       expect(devtools.asked).toContain("Page.getNavigationHistory page-0");
       expect(devtools.navigated).toEqual(["https://heavy.example/"]);
-      const ran = t.logged().length;
-      expect(await t.act("snapshot")).toMatchObject({ success: false, data: null, error: RELOADED });
-      expect(t.logged()).toHaveLength(ran);
+      // A look and a wait run on the page as it is now: the server ignores their failures (its own looks too).
       expect(await t.act("snapshot")).toMatchObject({ success: true });
+      expect(await t.act("wait", ["100"])).toMatchObject({ success: true });
+      // A person in control opening a site isn't told either: the agent hears it after their turn.
+      t.manager.setHandoff(dev.id, { status: "active", controller: "Ana" });
+      expect(await t.act("open", ["https://heavy.example/"])).toMatchObject({ success: true });
+      t.manager.setHandoff(dev.id, null);
+      const clicks = () => t.logged().filter((l) => l.args.includes("click")).length;
+      expect(await t.act("click", ["@e1"])).toMatchObject({ success: false, data: null, error: RELOADED });
+      expect(clicks()).toBe(0);
+      expect(await t.act("click", ["@e1"])).toMatchObject({ success: true });
 
       // The agent heard: the next one is reloaded too. Dying twice before it hears shows our notice, no loop.
       devtools.crash(0);
@@ -724,7 +734,7 @@ test.if(posix)(
 );
 
 test.if(posix)(
-  "a page that died of memory says so to the command it died under; in a batch, only an action's answer does",
+  "a page that died of memory says so to the action it died under; in a batch, the action's answer says it",
   async () => {
     const dir = tempDir("cgroup-");
     dirs.push(dir);
@@ -759,21 +769,70 @@ test.if(posix)(
       await waitFor(() => ran("click") === 2);
       devtools.crash(0);
       expect((await first).answers).toEqual([{ success: false, data: null, error: RELOADED_UNDER }]);
-      // Under the wait after it: the server doesn't show a wait's failure, so the next request is told instead.
+      // Under the settling after it, whose failure the server ignores: the action's answer says it, in place of its
+      // own and the settling's, and the look doesn't run.
       const second = batch();
       await waitFor(() => ran("eval") === 1);
       devtools.crash(0);
-      const answers = (await second).answers;
-      expect(answers).toHaveLength(2);
-      expect(answers[0]).toMatchObject({ success: true });
+      expect((await second).answers).toEqual([{ success: false, data: null, error: RELOADED_UNDER }]);
       t.page({ delayMs: 0 });
       expect(ran("snapshot")).toBe(0);
-      expect(await t.act("snapshot")).toMatchObject({ success: false, error: RELOADED });
-      expect(devtools.navigated).toEqual([
-        "https://heavy.example/",
-        "https://heavy.example/",
-        "https://heavy.example/",
+      // Before a batch: one with no action (a pause) runs, and the next one's action is told instead of running.
+      devtools.crash(0);
+      await waitFor(() => devtools.navigated.length === 4);
+      const pause = await t.manager.batch(dev, folder, {
+        op: "browser.batch",
+        commands: [{ command: "wait", args: ["100"], timeoutSeconds: 5 }],
+      });
+      expect(pause.answers).toEqual([expect.objectContaining({ success: true })]);
+      expect((await batch()).answers).toEqual([{ success: false, data: null, error: RELOADED }]);
+      expect(ran("click")).toBe(3);
+      expect(devtools.navigated).toEqual(Array(4).fill("https://heavy.example/"));
+    } finally {
+      devtools.stop();
+    }
+  },
+);
+
+test.if(posix)(
+  "a plan's click whose page dies while it settles stops there, and the agent's report says so",
+  async () => {
+    const devtools = fakeDevtools([]);
+    try {
+      const t = setup({ startChrome: chromesAt(devtools).start });
+      await t.act("open", ["https://heavy.example/"]);
+      await waitFor(() => devtools.asked.includes("Network.enable page-0"));
+      const folder = await t.folder();
+      // The server's link to the runner, as its browser tools make it.
+      const reply = (a: BrowserAnswer): BrowserReply =>
+        a.success ? { ok: true, data: a.data } : { ok: false, text: browserErrorText(a.error || "the command failed") };
+      const link: BrowserLink = {
+        act: async (c) =>
+          reply(
+            await t.manager.act(dev, folder, {
+              op: "browser.act",
+              command: c.command,
+              args: c.args,
+              timeoutSeconds: c.timeoutSeconds,
+            }),
+          ),
+        batch: async (commands) =>
+          (await t.manager.batch(dev, folder, { op: "browser.batch", commands })).answers.map(reply),
+        capture: async () => null,
+      };
+      const ran = (command: string) => t.logged().filter((l) => l.args.includes(command)).length;
+      const evals = ran("eval");
+      t.page({ delayMs: 400 });
+      const judge = { name: "none", ask: () => Promise.reject(new Error("no judge here")) };
+      const plan = runPlan({ judge, orgId: "o", surface: browserSurface({ link }), scope: "s" }, [
+        { do: "click", target: "e1" },
       ]);
+      // The click went through, and the page died while the plan waited for it to settle.
+      await waitFor(() => ran("eval") === evals + 1);
+      devtools.crash(0);
+      const report = await plan;
+      expect(report.steps.map((s) => s.status)).toEqual(["failed"]);
+      expect(formatPlanReport(report).summary).toBe(`Couldn't click "e1": The browser said: ${RELOADED_UNDER}`);
     } finally {
       devtools.stop();
     }

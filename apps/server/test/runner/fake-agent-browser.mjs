@@ -129,6 +129,9 @@ switch (command) {
   case "upload":
     out({ success: true, data: { files: args.slice(1) } });
     break;
+  case "wait":
+    out({ success: true, data: {} });
+    break;
   default:
     out({ success: false, data: null, error: `unknown command ${command}` });
     process.exitCode = 1;

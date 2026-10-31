@@ -96,10 +96,11 @@ import type { Spawn } from "./scope-gate";
  *   click brings that same Chrome there, started, moved or in front, and is
  *   answered once its window shows there.
  * - A page that dies (its renderer crashed or ran out of memory: Chrome's sad
- *   tab) is opened again at once, and the agent's next command is answered
- *   with what happened instead of running on a page that changed under it. One
- *   that dies again before the agent heard of it shows our own notice there,
- *   never a reload loop (`pageCrashed`).
+ *   tab) is opened again at once, and the agent's next action is answered
+ *   with what happened instead of running on a page that changed under it
+ *   (looks and waits run, on the page as it is now). One that dies again
+ *   before the agent heard of it shows our own notice there, never a reload
+ *   loop (`pageCrashed`).
  */
 
 /** A session with no command for this long is closed (its Chrome stops; the profile stays). */
@@ -194,6 +195,12 @@ const COMMANDS = new Set([
 
 /** Commands that only look: they need an open browser and must not launch a blank one. */
 const READS = new Set(["snapshot", "get", "is", "screenshot", "pdf", "console", "errors"]);
+/**
+ * A command that acts on the page: what a page that died since refuses, or what it died under. A look or a wait
+ * acts on nothing, and a tolerated command's failure is one the server ignores, as it ignores a look's or a wait's
+ * (the settling after an action, the server's own looks): an answer there would be lost.
+ */
+const actsOnPage = (p: Prepared) => !p.tolerate && !READS.has(p.command) && p.command !== "wait";
 /** Commands whose argument is a URL to go to. */
 const NAVIGATIONS = new Set(["open", "goto", "navigate", "read"]);
 /** Commands that write files (paths must stay in the agent's folder). */
@@ -990,7 +997,7 @@ interface Session {
   link?: string;
   /** When its desktop last failed to start for it (`desktopFor`). */
   desktopFailedAt?: number;
-  /** How its page died since the agent's last command (`pageCrashed`), for its next answer. */
+  /** How its page died since the agent last heard (`pageCrashed`), for its next action's answer. */
   crash?: PageCrash;
   /** Tabs opened again after their page died, since the agent last heard of it. */
   reopened: Set<string>;
@@ -1392,13 +1399,14 @@ export class BrowserManager {
     const session = await this.timedSession(agent, folder, setup);
     const desktop = req.desktop === true;
     const queuedAt = this.now();
+    const acts = actsOnPage(prepared);
     const answer = await this.enqueue(session, async () => {
       this.mark(setup, "queued", queuedAt);
-      // A page that died since the last command, or while this one ran, is the answer: the page changed under it.
-      const before = this.takeCrash(session, false);
+      // A page that died since the agent last heard, or while this ran, is an action's answer: it changed under it.
+      const before = acts ? this.takeCrash(session, false) : null;
       if (before) return before;
       const done = await this.perform(agent, session, prepared, allowed, req.link, desktop, signal, setup);
-      return this.takeCrash(session, true) ?? done;
+      return (acts ? this.takeCrash(session, true) : null) ?? done;
     });
     return { ...answer, ...withSetup(setup) };
   }
@@ -1426,11 +1434,27 @@ export class BrowserManager {
     const queuedAt = this.now();
     return this.enqueue(session, async (): Promise<MachineReplies["browser.batch"]> => {
       this.mark(setup, "queued", queuedAt);
-      const before = this.takeCrash(session, false);
-      if (before) return { answers: [before], ...withSetup(setup) };
       const answers: BrowserAnswer[] = [];
+      /** Where this batch's last action answered. */
+      let acted = -1;
+      /**
+       * A page that died since the agent last heard stops the batch with an action's answer: after an action of
+       * this batch, it died under that one (the settling after a click, say), whose answer says so in place of
+       * its own and of what followed; before any, the action about to run says so instead of running. Without an
+       * action to tell, it waits for the agent's next one.
+       */
+      const died = () => {
+        const notice = this.takeCrash(session, acted >= 0);
+        if (!notice) return false;
+        if (acted >= 0) answers.length = acted;
+        answers.push(notice);
+        return true;
+      };
       for (const p of prepared) {
         if (signal?.aborted) break;
+        const acts = actsOnPage(p);
+        if (acts && died()) break;
+        if (acts) acted = answers.length;
         let answer: BrowserAnswer;
         try {
           answer = await this.perform(agent, session, p, allowed, req.link, desktop, signal, setup);
@@ -1443,16 +1467,11 @@ export class BrowserManager {
             data: null,
             error: (err instanceof Error ? err.message : String(err)).slice(0, 2000),
           });
-          break;
-        }
-        // The page died meanwhile: nothing more runs on it. The server shows an action's failure, not a wait's
-        // or a look's, so only an action's answer says so; otherwise the next request is answered with it.
-        if (session.crash) {
-          answers.push((!p.tolerate && !READS.has(p.command) && this.takeCrash(session, true)) || answer);
+          if (acted >= 0) died();
           break;
         }
         answers.push(answer);
-        if (!answer.success && !p.tolerate) break;
+        if ((acted >= 0 && died()) || (!answer.success && !p.tolerate)) break;
       }
       return { answers, ...withSetup(setup) };
     });
@@ -1906,10 +1925,14 @@ export class BrowserManager {
     return this.opts.memoryEvents ? cgroupCounters(this.opts.memoryEvents) : null;
   }
 
-  /** How the agent's page died since its last command, said once: after it, a page that dies is reloaded again. */
+  /**
+   * How the agent's page died since it last heard, said once: after it, a page that dies is reloaded again. Not
+   * while a person has its browser or is asked to take it: what comes then is theirs or the server's (a person
+   * opening a site), and the agent hears it at its first action after their turn.
+   */
   private takeCrash(session: Session, ran: boolean): BrowserAnswer | null {
     const crash = session.crash;
-    if (!crash) return null;
+    if (!crash || this.handoffs.has(session.agentId)) return null;
     session.crash = undefined;
     session.reopened.clear();
     return { success: false, data: null, error: crashNotice(crash, ran) };
