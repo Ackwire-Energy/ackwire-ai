@@ -630,8 +630,8 @@ describe("what a run owes", () => {
     expect(after?.status).toBe("done");
     expect(after?.transcript).not.toHaveProperty("answerOwed");
     expect(after?.transcript).not.toHaveProperty("steeredBy");
-    // It passed: the person was talking to QA.
-    expect(await agentMessages()).toEqual([]);
+    // It passed: the person was talking to QA (whose own run answers them).
+    expect((await agentMessages()).filter((m) => m.authorAgentId === f.agent.id)).toEqual([]);
   });
 
   test("a run that changed something posts its receipts instead of passing", async () => {
@@ -697,8 +697,8 @@ describe("what a run owes", () => {
     const events = f.listen(f.general.id);
     await drainOutbox(f.db, handlers);
 
-    expect(await runById(first?.id ?? "")).toMatchObject({ status: "failed", error: "too_many_tool_calls" });
-    // Never marked read by the run that failed at the cap.
+    expect(await runById(first?.id ?? "")).toMatchObject({ status: "done", error: null });
+    // Never marked read by the run that ended at the cap.
     const read = events.filter((e) => e.type === "agent.run.read" && e.runId === first?.id) as {
       messageIds?: string[];
     }[];

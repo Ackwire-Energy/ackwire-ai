@@ -18,10 +18,11 @@ const { agentRuns, agents, messages, channels, users } = schema;
  * a new run of the same agent, in the same conversation, picks up from the
  * stopped run's conversation plus "[Ana asked you to continue from where you
  * stopped.]". Same people as stopping it: who asked, the agent's owner, or an
- * admin. Only a run a person stopped while it ran (its stopped reply is the
- * new run's trigger, so it continues once); never while the agent already
- * works in that conversation. The stopped reply gets `meta.canceled.continuedRunId`
- * and the app hears `run.continued`. Audited.
+ * admin. Only a run a person stopped while it ran, or one that ended at its
+ * step limit (its reply has `meta.stepLimit`); its reply is the new run's
+ * trigger, so it continues once, and never while the agent already works in
+ * that conversation. The reply gets `continuedRunId` in that meta
+ * (`meta.canceled` or `meta.stepLimit`) and the app hears `run.continued`. Audited.
  */
 export async function continueRun(
   deps: { db: Database; pubsub?: PubSub },
@@ -52,11 +53,14 @@ export async function continueRun(
   const notContinuable = () => new ConflictError("This task can't be continued", "run.not_continuable");
   // A forum turn belongs to the topic's order (ADR 0022): it is never picked up by hand.
   const byPerson = stopped.status === "canceled" && Boolean(canceledBy(stopped.error));
-  if (!byPerson || row.channelKind === "forum" || !stopped.transcript) throw notContinuable();
+  if (!(byPerson || stopped.status === "done") || row.channelKind === "forum" || !stopped.transcript)
+    throw notContinuable();
   if (!stopped.replyMessageId) throw notContinuable();
   const reply = await getMessage(db, orgId, stopped.replyMessageId);
-  const canceled = reply?.meta.canceled as { continuedRunId?: unknown } | undefined;
-  if (!reply || reply.deletedAt || !canceled || canceled.continuedRunId) throw notContinuable();
+  // Its reply says how it ended: stopped by a person (`meta.canceled`), or at its step limit (`meta.stepLimit`).
+  const ending = byPerson ? "canceled" : "stepLimit";
+  const ended = reply?.meta[ending] as { continuedRunId?: unknown } | undefined;
+  if (!reply || reply.deletedAt || !ended || ended.continuedRunId) throw notContinuable();
 
   // The new run answers where the stopped reply is: its thread, or (flat: a DM) the reply itself.
   const threadRootId = reply.threadId ?? reply.id;
@@ -109,7 +113,9 @@ export async function continueRun(
     const mark = JSON.stringify({ continuedRunId: newRunId, continuedByUserId: userId });
     await tx
       .update(messages)
-      .set({ meta: sql`jsonb_set(${messages.meta}, '{canceled}', (${messages.meta}->'canceled') || ${mark}::jsonb)` })
+      .set({
+        meta: sql`jsonb_set(${messages.meta}, array[${ending}::text], (${messages.meta}->${ending}::text) || ${mark}::jsonb)`,
+      })
       .where(and(eq(messages.orgId, orgId), eq(messages.id, reply.id)));
     await enqueue(tx, {
       orgId,

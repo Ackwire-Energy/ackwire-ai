@@ -6238,6 +6238,7 @@ export const ptBR = {
     stoppedBy: "Parado por {{name}}",
     stopped: "Parado",
     continueRun: "Continuar",
+    stepLimit: "No limite de passos",
     steer: {
       waiting: "{{name}} lê na próxima pausa",
       now: "{{name}} parou para ler",
@@ -8861,6 +8862,7 @@ export const ptBR = {
         remembered: "Memória atualizada: {{text}}",
       },
       interrupted: "Interrompida porque o servidor reiniciou. Peça de novo para continuar.",
+      step_limit: "Meus passos acabaram antes de eu terminar.",
       forum_suggestion: 'Vale um fórum? "{{title}}"',
       forum_concluded: 'O fórum "{{title}}" terminou. A síntese está no arquivo abaixo.',
       forum_concluded_issues:
