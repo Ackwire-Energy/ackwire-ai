@@ -16,7 +16,11 @@ const READY_MS = 4000;
  * `sessionStorage` and `document.cookie` throw, and a page that touches them
  * dies before drawing anything (a blank frame): give it in-memory stand-ins.
  * It also tells us the page started (so a load the browser refused can be
- * retried) and passes on its errors, as plain text.
+ * retried) and passes on its errors, as plain text. Its style gives the page
+ * our scrollbars (the kit's, in `packages/ui` components.css) in a grey that
+ * reads on any page's colours. The track takes its element's background: Chrome
+ * styles the page's own scrollbar from its `<body>`, and a clear one would show
+ * the frame's white beside a dark page. The page's own rules come after it and win.
  */
 const SHIM = `<script>(function(){
 function mem(){var d={};return{getItem:function(k){k=String(k);return Object.prototype.hasOwnProperty.call(d,k)?d[k]:null},setItem:function(k,v){d[String(k)]=String(v)},removeItem:function(k){delete d[String(k)]},clear:function(){d={}},key:function(i){var k=Object.keys(d)[i];return k===undefined?null:k},get length(){return Object.keys(d).length}}}
@@ -25,7 +29,14 @@ try{void document.cookie}catch(e){try{Object.defineProperty(document,"cookie",{g
 function post(m){try{parent.postMessage(m,"*")}catch(_){}}
 window.addEventListener("error",function(e){post({agentesHtml:"error",message:String(e&&e.message||"").slice(0,300)})});
 post({agentesHtml:"ready"});
-})();</script>`;
+})();</script><style>@media (hover:hover) and (pointer:fine){
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track,::-webkit-scrollbar-corner{background-color:inherit}
+::-webkit-scrollbar-button{display:none}
+::-webkit-scrollbar-thumb{border:2px solid transparent;border-radius:999px;background:rgba(128,128,128,.4) padding-box}
+::-webkit-scrollbar-thumb:hover,::-webkit-scrollbar-thumb:active{border-width:1px;background-color:rgba(128,128,128,.65)}
+@supports not selector(::-webkit-scrollbar){*{scrollbar-width:thin;scrollbar-color:rgba(128,128,128,.4) transparent}}
+}</style>`;
 
 /** The page with the shim first: after `<head>`, else after the doctype (a script before it would switch to quirks mode), else at the top. */
 export function withShim(html: string): string {
@@ -45,7 +56,7 @@ export function HtmlFrame({
   html: string;
   title: string;
   className?: string;
-  /** A small non-interactive picture of the page (message cards): no notes, out of the tab order. */
+  /** A small non-interactive picture of the page (message cards): no notes, no scrollbar, out of the tab order. */
   thumbnail?: boolean;
 }) {
   const { t } = useTranslation();
@@ -103,6 +114,7 @@ export function HtmlFrame({
         referrerPolicy="no-referrer"
         tabIndex={thumbnail ? -1 : undefined}
         aria-hidden={thumbnail || undefined}
+        scrolling={thumbnail ? "no" : undefined}
       />
     ) : null;
   if (thumbnail) return iframe;
