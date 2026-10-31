@@ -1029,13 +1029,16 @@ export async function routeMessage(
     return { runs: [], selected: [], seenBy: candidates.map((c) => c.agentId), reason: MENTION_NEEDED };
   }
   const decided = result;
-  // The agent the message speaks to, when a step is sure of one, is who the person talks to now: over who spoke
-  // last and the message they replied to ("ada, pergunta pro theo…" right after Theo spoke, 2026-10-31).
-  const talkingTo =
-    !byAgent && decided.addressee && candidateIds.has(decided.addressee) ? decided.addressee : continuityAgentId;
+  const addressee = !byAgent && decided.addressee && candidateIds.has(decided.addressee) ? decided.addressee : null;
 
   // The router's own pick; when it picks several agents, the message speaks to several.
-  const picked = selectAgents(candidates, decided, policy, { continuityAgentId: talkingTo });
+  const picked = selectAgents(candidates, decided, policy, { continuityAgentId: addressee ?? continuityAgentId });
+  // The agent the message speaks to, when a step is sure of one, is who the person talks to now: over who spoke
+  // last ("ada, pergunta pro theo…" right after Theo spoke, 2026-10-31), and over the agent whose message they
+  // replied to once it clears its own bar: a reply that only hands over ("isso é com a ada") stays with the
+  // agent replied to.
+  const talkingTo =
+    addressee && (repliedAgentId === null || picked.includes(addressee)) ? addressee : continuityAgentId;
   // A short follow-up without a mention ("and now?"), or a reply to an agent (quote or thread), goes only to the agent
   // the person is talking to, unless the router heard it as for several agents, or (not replying) clearly
   // for another one ("tem sim ada, tenta dnv" right after Theo spoke: a name beats who spoke last). So does a
@@ -1055,7 +1058,7 @@ export async function routeMessage(
   const followUp =
     talkingTo !== null &&
     (repliedAgentId !== null ||
-      (talkingTo === decided.addressee && picked.includes(talkingTo)) ||
+      (talkingTo === addressee && picked.includes(talkingTo)) ||
       (isShortFollowUp([...run.map((m) => m.body), message.body].join(" ")) && picked.length > 0)) &&
     picked.length < 2 &&
     !clearlyAnother;

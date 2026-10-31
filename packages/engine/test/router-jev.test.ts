@@ -438,6 +438,34 @@ describe("who a message speaks to", () => {
     expect((await route(reply.id)).selected).toEqual([t.ada.id]);
     expect((await decisionOf(reply.id))?.reason).toStartWith("follow-up");
   });
+
+  test("a reply to Theo that only hands over to Ada stays Theo's: Ada takes a reply only past her own bar", async () => {
+    const t = await team();
+    // The Choice hears Ada in "isso do deploy é com a ada", but no agent should answer it as for itself.
+    const jev = fakeJev(() => ({ nouls: { "@ada": 0.1, "@theo": 0.2 }, needs: 0.15, to: { ada: 0.65, none: 0.35 } }));
+    const strategy = createJevRouterStrategy({ key: "k", recordUsage: async () => {}, fetch: jev.fetcher });
+    const report = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "agent", agentId: t.theo.id, runId: null, hop: 1, stretchId: null },
+      body: "Resumo de hoje: 3 emails novos do cliente, e o deploy de ontem falhou no CI.",
+      createdAt: new Date(Date.now() - 60_000),
+    });
+    const handOver = async (where: { threadId?: string; meta?: Record<string, unknown> }) => {
+      const m = await insertMessage(f.db, {
+        orgId: f.org.id,
+        channelId: f.general.id,
+        author: { type: "person", userId: f.owner.id },
+        body: "isso do deploy é com a ada",
+        ...where,
+      });
+      const policy = { ...DEFAULT_ROUTER_POLICY, maxHops: 3 };
+      return (await routeMessage({ db: f.db, strategy, policy }, { orgId: f.org.id, messageId: m.id })).selected;
+    };
+    const quoted = { messageId: report.id, author: { type: "agent", id: t.theo.id }, authorName: "Theo", excerpt: "" };
+    expect(await handOver({ meta: { replyTo: quoted } })).toEqual([t.theo.id]);
+    expect(await handOver({ threadId: report.id })).toEqual([t.theo.id]);
+  });
 });
 
 describe("Jev strategy end to end", () => {
