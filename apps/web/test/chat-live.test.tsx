@@ -395,16 +395,28 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
     expect(pop.querySelectorAll(".who-by")).toHaveLength(1);
   });
 
-  test("'Escolhendo quem responde' with the clock while the author's plan reads it, then who picked", async () => {
+  test("'Escolhendo quem responde': the clock where the check goes while the author's plan reads it, then who picked", async () => {
     const { socket, state } = await open();
     await sendText("revisa o PR?");
     await settle(4);
     const root = lastPerson(state);
     await push(socket, { type: "message.routing", messageId: root?.id, step: "plan" });
-    const picking = receiptOf("revisa o PR?");
-    expect(picking.textContent).toBe("Escolhendo quem responde·Chamar um agente");
-    expect(picking.querySelector(".ac-receipt__clock path")?.getAttribute("d")).toBe("M10 6v4l2.6 1.8");
-    expect(picking.querySelector(".ac-receipt__check")).toBeNull();
+    // A mark, not a line: its words are its name and its popover's line, with "Chamar um agente".
+    const clock = receiptOf("revisa o PR?").querySelector(".ac-receipt__check") as HTMLElement;
+    expect(clock.getAttribute("aria-label")).toBe("Escolhendo quem responde");
+    expect(clock.querySelector("path")?.getAttribute("d")).toBe("M10 6v4l2.6 1.8");
+    expect(rowsWith("revisa o PR?")[0]?.querySelector(".ac-msg__foot")?.textContent).toBe("");
+    const picking = await popoverOf("revisa o PR?");
+    expect(picking.querySelector(".who-by")?.textContent).toBe("Escolhendo quem responde·Chamar um agente");
+    await act(async () => {
+      const call = within(picking).getByRole("button", { name: "Chamar um agente" });
+      call.focus();
+      fireEvent.keyDown(call, { key: "Enter" });
+    });
+    await act(async () => fireEvent.click(screen().getByRole("menuitem", { name: /Atlas/ })));
+    await settle();
+    expect((composer() as HTMLTextAreaElement).value).toBe("@atlas ");
+    await closePopover(picking);
     await push(socket, {
       type: "message.routed",
       messageId: root?.id,
@@ -413,8 +425,12 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
       strategy: "router",
       decidedBy: { step: "plan", brand: "claude", ownerId: "u-walter" },
     });
-    expect(receiptOf("revisa o PR?").textContent).not.toContain("Escolhendo");
+    // The check takes the clock's place.
+    const check = receiptOf("revisa o PR?").querySelector(".ac-receipt__check") as HTMLElement;
+    expect(check.getAttribute("aria-label")).toBe("Vista por Ada e Atlas. Ada vai responder");
+    expect(check.querySelector("path")?.getAttribute("d")).toBe("m5.5 10.5 3 3 6-7");
     const pop = await popoverOf("revisa o PR?");
+    expect(pop.textContent).not.toContain("Escolhendo");
     const by = pop.querySelector(".who-by") as HTMLElement;
     expect(by.textContent).toBe("Escolhido pelo seu plano do Claude");
     expect(by.querySelector(".ac-brand")?.getAttribute("data-mark")).toBe("claude");

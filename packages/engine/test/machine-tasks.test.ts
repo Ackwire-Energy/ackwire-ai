@@ -46,10 +46,16 @@ type TaskStartRequest = Extract<Request, { op: "task.start" }>;
 /**
  * A runner over an in-memory socket that answers task ops (and nothing else) on a later tick. `dropOnStart`:
  * it takes a `task.start` and its socket drops before the answer. `journal`: its answer to `task.status`.
+ * `holds`: its command policy, why it holds a shell task a person hasn't approved (null: it starts).
  */
 function taskRunner(
   hub: MachineHub,
-  options: { noSlot?: boolean; dropOnStart?: boolean; journal?: () => RunnerTask[] } = {},
+  options: {
+    noSlot?: boolean;
+    dropOnStart?: boolean;
+    journal?: () => RunnerTask[];
+    holds?: (command: string) => string | null;
+  } = {},
 ) {
   const sent: ServerFrame[] = [];
   const started: TaskStartRequest[] = [];
@@ -68,6 +74,15 @@ function taskRunner(
               id: frame.id,
               ok: false,
               error: { code: "no_slot", message: "This computer already runs 3 background tasks (its limit)" },
+            });
+          }
+          const held = frame.executor === "shell" && !frame.approved ? options.holds?.(frame.command ?? "") : null;
+          if (held) {
+            return void reply({
+              type: "result",
+              id: frame.id,
+              ok: false,
+              error: { code: "approval_needed", message: held },
             });
           }
           started.push(frame);
@@ -207,6 +222,59 @@ describe("background tasks (ADR 0029)", () => {
     await drainOutbox(f.db, f.handlers);
     expect(f.provider.calls).toHaveLength(3);
     expect((await taskRow(start.taskId))?.wokeAt).not.toBeNull();
+  });
+
+  test("a background task's push the computer holds: it says why and how to ask; with why it asks in the chat, and the approved task starts", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    const paired = await pairedMachine();
+    const hub = f.machineHub as MachineHub;
+    const HELD =
+      "This push goes to the default branch main: a person approves it first. To ask them, make the same call again with why set to your reason: it waits for their decision in the chat. Or push to a branch of your own (agentes/dev/…) and open a pull request.";
+    // Like the runner's command policy: pushes to main wait for a person; a pull request's branch doesn't.
+    const runner = taskRunner(hub, { holds: (command) => (command.includes("origin main") ? HELD : null) });
+    await runner.hello(paired.token);
+    const msg = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev oi",
+    });
+    await drainOutbox(f.db, f.handlers);
+    const [run] = await f.db.select().from(schema.agentRuns);
+    if (!run) throw new Error("no run");
+    const ctx = {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: run.id,
+      channelId: f.general.id,
+      threadRootId: run.threadRootId,
+      triggerMessageId: msg.id,
+    };
+    const WHY = "The fix is reviewed and its checks passed; main is where the person asked for it to go.";
+    const invoke = (input: Record<string, unknown>) =>
+      f.tools?.invoke(ctx, { toolUseId: crypto.randomUUID(), name: "start_task", input });
+    const held = await invoke({ title: "Push", executor: "shell", command: "git push origin main" });
+    expect(held).toMatchObject({
+      type: "result",
+      output: { content: `Not started: ${HELD}`, isError: true, data: { code: "command.approval_needed" } },
+    });
+    expect(runner.started).toHaveLength(0);
+    // A pull request's branch is ordinary work: it starts at once.
+    const pr = await invoke({
+      title: "Push the fix",
+      executor: "shell",
+      command: "git push origin cursor/pap-582-fix",
+    });
+    expect(pr?.type).toBe("result");
+    expect(runner.started).toHaveLength(1);
+    // The same call with why: an approval card in the chat, nothing started.
+    const asked = await invoke({ title: "Push", executor: "shell", command: "git push origin main", why: WHY });
+    if (asked?.type !== "approval") throw new Error(`expected an approval, got ${asked?.type}`);
+    expect(asked.approval).toMatchObject({ tool: "start_task", why: WHY, channelId: f.general.id });
+    expect(runner.started).toHaveLength(1);
+    // A person approved it: that exact task starts, and the computer is told a person approved it.
+    const ran = await f.tools?.executeApproved(ctx, { ...asked.approval, status: "approved" });
+    expect(ran?.content).toContain("Started background task");
+    expect(runner.started[1]).toMatchObject({ executor: "shell", command: "git push origin main", approved: true });
+    expect(runner.started[0]).not.toHaveProperty("approved");
   });
 
   test("tools: list_tasks, task_status and cancel_task; a full computer answers task.no_slot", async () => {

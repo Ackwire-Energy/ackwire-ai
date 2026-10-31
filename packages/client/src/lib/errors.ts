@@ -12,6 +12,7 @@ import { endSentence } from "./text";
  */
 const KNOWN = {
   "agent_proposal.decided": "errors.agentProposal.decided",
+  "approval.always_unavailable": "errors.approval.alwaysUnavailable",
   "agent_proposal.expired": "errors.agentProposal.expired",
   "artifact.file_too_large": "errors.artifact.fileTooLarge",
   "artifact.file_required": "errors.artifact.fileRequired",
@@ -117,6 +118,16 @@ const KNOWN = {
   // A provider's own check refused a key on save (OpenRouter's): nothing kept.
   provider_key_invalid: "settings.keyRefused",
   provider_key_management: "settings.keyManagement",
+  "github.repo_missing": "errors.github.repoMissing",
+  "github.ref_missing": "errors.github.refMissing",
+  // `count`: minutes until GitHub stops limiting the server.
+  "github.limited": "errors.github.limited",
+  "skill.no_skill_md": "errors.skill.noSkillMd",
+  "skill.too_many_skills": "errors.skill.tooManySkills",
+  "skill.invalid_name": "errors.skill.invalidName",
+  "skill.invalid_description": "errors.skill.invalidDescription",
+  "skill.too_large": "errors.skill.tooLarge",
+  "skill.too_many_files": "errors.skill.tooManyFiles",
 } as const;
 
 /** Better Auth's code when a blocked account tries to sign in (the server's `session.create.before` hook). */

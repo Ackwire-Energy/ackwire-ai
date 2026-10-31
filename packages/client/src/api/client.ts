@@ -32,6 +32,7 @@ import type {
   ApiRule,
   AppNotification,
   Approval,
+  ApprovalRule,
   Artifact,
   ArtifactContent,
   ArtifactDetail,
@@ -58,6 +59,7 @@ import type {
   ComputerTarget,
   Connection,
   ConnectorCatalog,
+  ConsultationConversation,
   Credential,
   CustomConnectStart,
   CustomServer,
@@ -170,6 +172,7 @@ import type {
   RoutineRun,
   RuleInfo,
   Run,
+  RunConsultation,
   RunStep,
   S3Input,
   SandboxSettings,
@@ -188,6 +191,7 @@ import type {
   SkillDetail,
   SkillInput,
   SkillPatch,
+  SkillPick,
   StatusInput,
   StorageConfig,
   StorageMigration,
@@ -445,6 +449,10 @@ export interface ApiClient {
     continueRun(orgId: string, runId: string): Promise<{ runId: string }>;
     /** Runs still active in a channel (reconciles the live rows); `null` while the server lacks the endpoint. */
     activeRuns(orgId: string, channelId: string): Promise<ActiveRun[] | null>;
+    /** The questions agents asked other agents from a conversation, latest first; `[]` while the server lacks it. */
+    consultations(orgId: string, channelId: string): Promise<RunConsultation[]>;
+    /** One of those questions opened: what the two agents said for it (read only); `null` once it's gone. */
+    consultation(orgId: string, channelId: string, consultationId: string): Promise<ConsultationConversation | null>;
     /** This month's usage per agent; `null` without the `view_usage` permission. */
     usage(orgId: string): Promise<AgentUsage[] | null>;
   };
@@ -525,13 +533,20 @@ export interface ApiClient {
      * no-AI card or the person's message. 409 `ai.still_missing` while there's still no AI.
      */
     answerNow(orgId: string, messageId: string): Promise<{ runs: { agentId: string; runId: string }[] }>;
+    /** Cancels an agent's follow-up from its line (`messageId`); 409 `follow_up.not_pending` once it came. */
+    cancelFollowUp(orgId: string, messageId: string): Promise<void>;
   };
 
   approvals: {
     list(orgId: string, filter?: { status?: "pending" | "decided"; agentId?: string }): Promise<Approval[]>;
     get(orgId: string, approvalId: string): Promise<Approval>;
-    approve(orgId: string, approvalId: string, reason?: string): Promise<Approval>;
+    /** `always`: also approve this kind for good (409 `approval.always_unavailable` where it isn't offered). */
+    approve(orgId: string, approvalId: string, reason?: string, always?: boolean): Promise<Approval>;
     refuse(orgId: string, approvalId: string, reason?: string): Promise<Approval>;
+    /** What the agent runs without asking ("Aprovar sempre"), oldest first. */
+    rules(orgId: string, agentId: string): Promise<ApprovalRule[]>;
+    /** The agent asks again for that kind (admins and the agent's owner). */
+    removeRule(orgId: string, agentId: string, ruleId: string): Promise<void>;
   };
   connectors: {
     /** Connectors agentes.chat knows, with their scopes, plus the built-in scopes. */
@@ -635,8 +650,14 @@ export interface ApiClient {
     get(orgId: string, id: string): Promise<SkillDetail>;
     /** "Escrever". */
     create(orgId: string, input: SkillInput): Promise<SkillDetail>;
-    /** A GitHub link (folder or SKILL.md) or the folder as a zip in base64 (writes are JSON only). */
-    import(orgId: string, input: { url: string } | { zipBase64: string }): Promise<SkillDetail>;
+    /**
+     * A GitHub link (a skill's folder or a file in it) or the folder as a zip in base64 (writes are JSON only). A link
+     * holding several skills installs nothing and answers with them to pick from (`importPicked`), those that can't
+     * be installed apart.
+     */
+    import(orgId: string, input: { url: string } | { zipBase64: string }): Promise<SkillDetail | SkillPick>;
+    /** Installs the skills picked among a link's choices (their `path`). */
+    importPicked(orgId: string, url: string, paths: string[]): Promise<SkillDetail[]>;
     update(orgId: string, id: string, patch: SkillPatch): Promise<SkillDetail>;
     /** Fetch the link again (`url` skills). */
     reimport(orgId: string, id: string): Promise<SkillDetail>;
@@ -679,7 +700,8 @@ export interface ApiClient {
     /**
      * Connects to an https MCP server. Without `apiKey` the server tries OAuth
      * (discovery + dynamic client registration); if the MCP server doesn't
-     * support it, answers `needs_key`.
+     * support it, answers `needs_key` (`reason: "not_approved"` when it only
+     * registers apps it approved).
      */
     connect(
       orgId: string,
@@ -1217,6 +1239,11 @@ export interface ApiClient {
     open(orgId: string, agentId: string, url: string): Promise<void>;
     /** "Parar": closes the agent's browser now (its logins stay). Its screen has no stop: it stays on. */
     stop(orgId: string, agentId: string): Promise<void>;
+    /**
+     * "Tentar de novo" on a page that never came: the browser closes and opens again where it was (its logins
+     * stay), and every live view gets it again. Resolves once it closed. Only who may drive it (403 otherwise).
+     */
+    restart(orgId: string, agentId: string): Promise<void>;
   };
   /**
    * The agent's screen (ADR 0058): its state. The screen itself is a WebSocket (`desktopSocketUrl`), which

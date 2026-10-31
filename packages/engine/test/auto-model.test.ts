@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { and, asc, eq, schema } from "@agenteschat/db";
-import { AUTO_MODEL, modelForTier, parseOpenRouterModels, setOpenRouterModels } from "@agenteschat/providers";
+import {
+  AUTO_MODEL,
+  MODEL_TIERS,
+  modelForTier,
+  parseOpenRouterModels,
+  setOpenRouterModels,
+} from "@agenteschat/providers";
+import { CODING_PLANS, planModel } from "@agenteschat/providers/plans";
 import fixture from "../../providers/test/fixtures/openrouter-models.json";
 import {
   answerQuestion,
@@ -121,6 +128,16 @@ describe("one decision, mapped per brain", () => {
     expect(brainModelForTier("codex", "small")).toBe("gpt-6-luna");
     expect(brainModelForTier("codex", "large")).toBe("gpt-6.1-sol");
     expect(brainModelForTier("model", "large")).toBeUndefined();
+  });
+
+  test("on a coding plan the tier's alias runs the plan's model for it, whatever else the plan has", () => {
+    const tiers = (plan: keyof typeof CODING_PLANS) =>
+      MODEL_TIERS.map((tier) => planModel(CODING_PLANS[plan], brainModelForTier("claude_code", tier)).label);
+    // Small, medium, large.
+    expect(tiers("zai")).toEqual(["GLM-5.3 Flash", "GLM-5.3", "GLM-5.3"]);
+    expect(tiers("kimi")).toEqual(["Kimi for Coding", "Kimi for Coding", "K3.1 Pro"]);
+    expect(tiers("minimax")).toEqual(["MiniMax M3.1 Flash", "MiniMax M3.1 Flash", "MiniMax M3.1 Flash"]);
+    expect(tiers("opencode")).toEqual(["Claude Haiku 5.5", "MiniMax M3", "MiniMax M3"]);
   });
 
   test("the API brain: the model of the tier from the agent's key's line, and the effort", () => {

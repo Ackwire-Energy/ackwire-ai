@@ -6,14 +6,17 @@ import {
   useAgentForYou,
   useAiStatus,
   useApi,
+  useApprovalRules,
   useMemoryAboutMe,
   useMemoryAction,
+  useRemoveApprovalRule,
   useUsage,
 } from "@agenteschat/client";
+import { approvalRuleWords } from "@agenteschat/client/lib/approval-words";
 import { brainLine } from "@agenteschat/client/lib/brain";
 import { formatPercent } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { aiStateOf } from "@agenteschat/client/lib/no-ai";
+import { agentPlan, aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { usageShown } from "@agenteschat/client/lib/plan-usage";
 import { useQueryClient } from "@tanstack/react-query";
@@ -30,6 +33,7 @@ import {
   Card,
   EmptyState,
   Icon,
+  IconButton,
   type IconName,
   PixelOrbit,
   ProviderLogo,
@@ -310,7 +314,7 @@ function Profile({ id }: { id: string }) {
             <NowPill
               leading={<Icon name="bolt" size={15} color={c.amber} />}
               label={t("noAi.agent", agentGrammar(t, agent?.name ?? ""))}
-              onPress={() => openConnectAi({ agentId: id })}
+              onPress={() => openConnectAi({ agentId: id, plan: agentPlan(agent) ?? undefined })}
             />
           ) : null}
           {work.map((w) => (
@@ -509,6 +513,8 @@ function Profile({ id }: { id: string }) {
           </Section>
         ) : null}
 
+        <AlwaysApproved agentId={id} name={name} mayRemove={mine || can(org, "approve_actions")} />
+
         <Section title={t("mobile.agent.month")}>
           <View style={styles.monthCards}>
             {shown.plan ? (
@@ -581,6 +587,72 @@ function Profile({ id }: { id: string }) {
         />
       </View>
     </View>
+  );
+}
+
+/**
+ * "Aprovado sempre", as on the web's Ferramentas e acesso: what the agent runs without asking, approved for good
+ * from a request, by whom and when. Its owner and whoever decides approvals take one back with its ×, at once.
+ * Shown only when there is something.
+ */
+function AlwaysApproved({ agentId, name, mayRemove }: { agentId: string; name: string; mayRemove: boolean }) {
+  const { t } = useTranslation();
+  const orgId = useOrgId();
+  const toast = useToast();
+  const when = useWhen();
+  const dir = useDirectory();
+  const connected = useConnectedById();
+  const rules = useApprovalRules(orgId, agentId);
+  const remove = useRemoveApprovalRule(orgId, agentId);
+  const list = rules.data ?? [];
+  if (list.length === 0) return null;
+  return (
+    <Section title={t("agentPage.access.always.title")}>
+      <Card>
+        {list.map((rule) => {
+          const what = approvalRuleWords(t, rule);
+          const who = rule.createdByUserId ? dir.memberById.get(rule.createdByUserId)?.name : undefined;
+          const at = when.short(rule.createdAt);
+          return (
+            <Row
+              key={rule.id}
+              leading={
+                <ConnectorIcon
+                  def={connected.get(rule.connectionId)?.def ?? null}
+                  image={connected.get(rule.connectionId)?.image}
+                  label={rule.server}
+                  size={36}
+                />
+              }
+              title={what}
+              subtitle={
+                who
+                  ? t("agentPage.access.always.by", { name: who, when: at })
+                  : t("agentPage.access.always.byNobody", { when: at })
+              }
+              meta={
+                mayRemove ? (
+                  <IconButton
+                    icon="x"
+                    label={t("agentPage.access.always.remove", { what })}
+                    disabled={remove.isPending}
+                    onPress={() =>
+                      remove.mutate(rule.id, {
+                        onSuccess: () => toast({ title: t("agentPage.access.always.removed", { name }), agentId }),
+                        onError: () => toast({ title: t("mobile.app.failed"), icon: "x" }),
+                      })
+                    }
+                  />
+                ) : undefined
+              }
+            />
+          );
+        })}
+      </Card>
+      <Text variant="small" tone="muted" style={styles.foot}>
+        {t("agentPage.access.always.help")}
+      </Text>
+    </Section>
   );
 }
 

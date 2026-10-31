@@ -4,6 +4,7 @@ import type { Agent } from "./agents";
 import { autoModelFor, autoProvider } from "./auto-model";
 import { brainOf } from "./brain-settings";
 import { brainAccountFor, computerBrainUnavailable, mayFallBack, NO_AI_CODES } from "./brains/select";
+import { type BrainKind, isComputerBrain } from "./brains/types";
 import type { ModelGateway } from "./gateway";
 import type { MachineStatus } from "./machine-hub";
 import { missionTurnFor } from "./missions-engine";
@@ -26,6 +27,11 @@ export interface AgentAi {
   state: AiState;
   /** With `no_ai`. */
   reason?: NoAiReason;
+  /**
+   * With `not_signed_in`: the CLI whose own sign-in isn't there on the computer, the agent having no account of its
+   * own (ADR 0041 §1).
+   */
+  own?: "claude_code" | "codex";
 }
 
 export interface AiStatusDeps {
@@ -61,6 +67,10 @@ async function modelReady(deps: AiStatusDeps, agent: AiAgent): Promise<boolean> 
 export const noAiReasonOf = (code: string): NoAiReason =>
   code === "not_logged_in" ? "not_signed_in" : code === "no_computer" ? "no_computer" : "cli_missing";
 
+/** `not_logged_in` with no account of the agent's: the computer's own sign-in of that CLI isn't there (`own`). */
+export const ownNotSignedIn = (code: string, kind: BrainKind, account: unknown): Pick<AgentAi, "own"> =>
+  code === "not_logged_in" && !account && isComputerBrain(kind) ? { own: kind } : {};
+
 /** One agent (for one run, when given: right after its row is read, before any judge or model call). */
 export async function agentAiState(deps: AiStatusDeps, agent: AiAgent, run?: AiRun): Promise<AgentAi> {
   const mission = run ? await missionTurnFor(deps.db, run).catch(() => null) : null;
@@ -76,7 +86,7 @@ export async function agentAiState(deps: AiStatusDeps, agent: AiAgent, run?: AiR
   if (!unavailable) return READY;
   if (mayFallBack(agent, { background: run?.background ?? false }) && (await modelReady(deps, agent))) return READY;
   return NO_AI_CODES.has(unavailable.code)
-    ? { state: "no_ai", reason: noAiReasonOf(unavailable.code) }
+    ? { state: "no_ai", reason: noAiReasonOf(unavailable.code), ...ownNotSignedIn(unavailable.code, kind, account) }
     : { state: "waiting" };
 }
 

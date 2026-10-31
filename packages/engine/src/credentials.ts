@@ -351,6 +351,12 @@ export async function rotateCredential(
   await requirePermission(db, actorId, orgId, "manage_credentials");
   const apiKey = input.apiKey.trim();
   if (apiKey.length < 8) throw new ValidationError("apiKey looks too short");
+  // The values are checked before the credential is read: a bad one is refused whatever the credential.
+  const values = {
+    ...(input.label ? { label: input.label } : {}),
+    ...(input.workspaceId !== undefined ? { workspaceId: cleanWorkspaceId(input.workspaceId) } : {}),
+    ...(input.organization !== undefined || input.project !== undefined ? { options: cleanOptions(input) } : {}),
+  };
   const current = await usableCredentialRow(db, orgId, credentialId);
   if (!current) throw new NotFoundError("Credential not found");
   await checkKey(current.provider, apiKey, opts.fetch);
@@ -362,9 +368,7 @@ export async function rotateCredential(
       wrappedDataKey: sealed.wrappedDataKey,
       kekId: sealed.kekId,
       keyHint: apiKey.slice(-4),
-      ...(input.label ? { label: input.label } : {}),
-      ...(input.workspaceId !== undefined ? { workspaceId: cleanWorkspaceId(input.workspaceId) } : {}),
-      ...(input.organization !== undefined || input.project !== undefined ? { options: cleanOptions(input) } : {}),
+      ...values,
     })
     .where(
       and(

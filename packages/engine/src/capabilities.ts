@@ -129,7 +129,7 @@ export function describeCapabilities(
     if (onDemand) {
       const more = deferrableGroups(onDemand.tools).map((g) => `${g.label} (${g.tools.length})`);
       lines.push(
-        `- On demand: ${more.join(", ")}. Find the one you need with \`${ON_DEMAND_FIND}\` and run it with \`${ON_DEMAND_USE}\` (also any tool named here that isn't in your tool list). Search before saying you can't do something.`,
+        `- On demand: ${more.join(", ")}. Find the one you need with \`${ON_DEMAND_FIND}\` and run it with \`${ON_DEMAND_USE}\` (also any tool named here that isn't in your tool list). Search before saying you can't do something. For an app you have no tools for (Google Drive, Gmail…), \`${ON_DEMAND_FIND}\` also says how to get it: guide the person to connect it instead of saying it doesn't exist.`,
       );
     }
     // What the guidance below is about: every tool the run can reach, loaded or on demand.

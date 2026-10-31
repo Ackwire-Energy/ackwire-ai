@@ -178,6 +178,18 @@ describe("agent browser live connection (ADR 0040)", () => {
     again.start();
     again.handleMessage({ type: "browser.unavailable", agentId: AGENT, reason: "forbidden" });
     expect(t.pending).toHaveLength(0);
+    // Too many browsers watched on the socket: tried again the same way, for when another view leaves.
+    const crowded = createBrowserLiveConnection({
+      send: () => {},
+      agentId: AGENT,
+      onFrame: () => {},
+      onStatus: () => {},
+      timers: t.timers,
+      backoffMs: [100],
+    });
+    crowded.start();
+    crowded.handleMessage({ type: "error", agentId: AGENT, code: "too_many_browsers" });
+    expect(t.pending[0]?.ms).toBe(100);
   });
 
   test("an ended stream (the browser closed) is watched again after a backoff; a stop we asked for isn't", () => {
@@ -406,7 +418,11 @@ describe("one watch per agent on a socket (no stream flapping)", () => {
     const full = live(watches, sent);
     card.start();
     full.start();
-    expect(sent).toEqual([{ type: "browser.watch", agentId: AGENT }]);
+    // Each view asks (so each hears the server's answer); the server keeps one watch per agent and socket.
+    expect(sent).toEqual([
+      { type: "browser.watch", agentId: AGENT },
+      { type: "browser.watch", agentId: AGENT },
+    ]);
     card.close();
     full.close();
     // Not yet: a view coming back meanwhile keeps the stream.
@@ -417,7 +433,7 @@ describe("one watch per agent on a socket (no stream flapping)", () => {
     expect(watches.watching()).toEqual([]);
   });
 
-  test("a remount (StrictMode, a re-render) neither unwatches nor watches again", () => {
+  test("a remount (StrictMode, a re-render) never unwatches; it watches again, for the page it hasn't seen", () => {
     const sent: { type: string; agentId?: string }[] = [];
     const t = fakeTimers();
     const watches = createBrowserWatches({ send: (f) => sent.push(f), timers: t.timers });
@@ -427,12 +443,68 @@ describe("one watch per agent on a socket (no stream flapping)", () => {
     const again = live(watches, sent);
     again.start();
     t.run();
-    expect(sent).toEqual([{ type: "browser.watch", agentId: AGENT }]);
+    expect(sent.map((f) => f.type)).toEqual(["browser.watch", "browser.watch"]);
     expect(watches.watching()).toEqual([AGENT]);
     // After the socket comes back, every agent someone looks at is watched again, once.
     watches.resumeAll();
-    expect(sent.filter((f) => f.type === "browser.watch")).toHaveLength(2);
+    expect(sent.filter((f) => f.type === "browser.watch")).toHaveLength(3);
     again.close();
+  });
+
+  test("a view that starts after another got the page (Abrir aqui, the computer dialog) gets it too", () => {
+    const sent: { type: string }[] = [];
+    const watches = createBrowserWatches({ send: (f) => sent.push(f) });
+    const views: ReturnType<typeof createBrowserLiveConnection>[] = [];
+    const seen: Record<"first" | "second", string[]> = { first: [], second: [] };
+    const view = (name: "first" | "second") => {
+      const v = createBrowserLiveConnection({
+        send: (f) => sent.push(f),
+        watcher: watches,
+        agentId: AGENT,
+        onFrame: () => seen[name].push("frame"),
+        onStatus: () => seen[name].push("status"),
+      });
+      views.push(v);
+      v.start();
+    };
+    /** The server's answer to each `browser.watch`, to every view on the socket: who is in control, the newest page. */
+    let answered = 0;
+    const serve = () => {
+      for (; answered < sent.filter((f) => f.type === "browser.watch").length; answered++) {
+        const status = { type: "browser.status", mode: "watch", controllerUserId: null, handoff: null, hidden: false };
+        const frame = {
+          type: "browser.frame",
+          seq: 1,
+          data: "/9j/",
+          metadata: { deviceWidth: 1280, deviceHeight: 720 },
+        };
+        for (const m of [status, frame]) for (const v of views) v.handleMessage({ agentId: AGENT, ...m });
+      }
+    };
+    view("first");
+    serve();
+    // The page isn't repainting: nothing else comes by itself.
+    view("second");
+    serve();
+    expect(seen.second).toEqual(["status", "frame"]);
+  });
+
+  test("Try again watches again at once, after a retry was set for later", () => {
+    const sent: { type: string }[] = [];
+    const t = fakeTimers();
+    const conn = createBrowserLiveConnection({
+      send: (f) => sent.push(f),
+      agentId: AGENT,
+      onFrame: () => {},
+      onStatus: () => {},
+      timers: t.timers,
+    });
+    conn.start();
+    conn.handleMessage({ type: "browser.unavailable", agentId: AGENT, reason: "unavailable" });
+    expect(t.pending).toHaveLength(1);
+    conn.retry();
+    expect(sent.map((f) => f.type)).toEqual(["browser.watch", "browser.watch"]);
+    expect(t.pending).toHaveLength(0);
   });
 });
 

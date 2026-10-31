@@ -13,6 +13,7 @@ import type {
   ApiClient,
   AppNotification,
   Approval,
+  ApprovalRule,
   AuditRow,
   AuthConfig,
   Availability,
@@ -23,6 +24,7 @@ import type {
   Connection,
   ConnectorCatalog,
   ConnectorDef,
+  ConsultationConversation,
   Credential,
   Edition,
   FormerAgent,
@@ -55,6 +57,7 @@ import type {
   ReactionCount,
   Role,
   Run,
+  RunConsultation,
   ScopeGrant,
   SearchHit,
   SecretRequest,
@@ -175,6 +178,8 @@ export interface FakeState {
   /** The code a new key is refused with, as a provider's own check refuses it (`provider_key_invalid`). */
   keyRefusal?: string;
   approvals: Approval[];
+  /** What each agent runs without asking ("Aprovar sempre"), by agent id; unset = none. */
+  approvalRules?: Record<string, ApprovalRule[]>;
   connections: Connection[];
   /** GitHub App installations bound to the org (`githubApp.info`); undefined = none, app not installable. */
   githubApp?: { installable: boolean; installations: GitHubAppInstallation[] };
@@ -186,6 +191,10 @@ export interface FakeState {
   runs: Run[];
   /** `GET …/channels/{id}/active-runs`; unset = the endpoint doesn't exist yet (404). */
   activeRuns?: Record<string, ActiveRun[]>;
+  /** `GET …/channels/{id}/consultations`, by channel; unset = none. */
+  consultations?: Record<string, RunConsultation[]>;
+  /** By consultation id: what `agents.consultation` returns. */
+  consultationConversations?: Record<string, ConsultationConversation>;
   platformKey: boolean;
   /** What `agents.importFromGithub` returns per link (else a 400 like the backend's). */
   githubFiles?: Record<string, { path: string; text: string }[]>;
@@ -1770,6 +1779,14 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("agents.activeRuns", channelId);
         return state.activeRuns ? (state.activeRuns[channelId] ?? []) : null;
       },
+      consultations: async (_orgId, channelId) => {
+        log("agents.consultations", channelId);
+        return state.consultations?.[channelId] ?? [];
+      },
+      consultation: async (_orgId, _channelId, consultationId) => {
+        log("agents.consultation", consultationId);
+        return state.consultationConversations?.[consultationId] ?? null;
+      },
       run: async (_orgId, runId) => {
         const r = state.runs.find((x) => x.id === runId);
         if (!r) throw new ApiError(404, "not_found", "Run not found");
@@ -1913,6 +1930,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const c = state.channels.find((x) => x.id === channelId);
         if (!c) throw new ApiError(404, "not_found", "Channel not found");
         c.categoryId = input.categoryId;
+        // Like the server: before `beforeChannelId`, else at the end; the list comes back in that order.
+        const rest = state.channels.filter((x) => x !== c);
+        const at = rest.findIndex((x) => x.id === input.beforeChannelId);
+        rest.splice(at >= 0 ? at : rest.length, 0, c);
+        state.channels = rest;
       },
       join: async (orgId, channelId) => {
         log("chat.join", orgId, channelId);
@@ -1964,6 +1986,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("chat.answerNow", orgId, messageId);
         if (state.answerNowError) throw state.answerNowError;
         return { runs: [] };
+      },
+      cancelFollowUp: async (orgId, messageId) => {
+        log("chat.cancelFollowUp", orgId, messageId);
+        const line = state.messages.find((m) => m.id === messageId);
+        const notice = line?.meta?.notice as { refs?: Record<string, string> } | undefined;
+        if (notice?.refs) notice.refs = { ...notice.refs, state: "canceled" };
       },
       roster: async (_orgId, channelId) =>
         (state.channelMembers[channelId] ?? []).map((m) =>
@@ -2074,8 +2102,40 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (!a) throw new ApiError(404, "not_found", "Approval not found");
         return structuredClone(a);
       },
-      approve: async (orgId, id, reason) => decide(orgId, id, "approved", reason),
+      approve: async (orgId, approvalId, reason, always) => {
+        if (!always) return decide(orgId, approvalId, "approved", reason);
+        const a = state.approvals.find((x) => x.id === approvalId);
+        const kind = a?.approveAlways;
+        if (!a || !kind)
+          throw new ApiError(409, "approval.always_unavailable", "This request can't be approved for good");
+        const decided = await decide(orgId, approvalId, "approved", reason, true);
+        const mine = state.approvalRules?.[a.agentId] ?? [];
+        state.approvalRules = { ...state.approvalRules, [a.agentId]: mine };
+        for (const action of kind.actions.length > 0 ? kind.actions : [""]) {
+          mine.push({
+            id: id("rule"),
+            connectionId: "conn-composio",
+            server: "Composio",
+            tool: kind.tool,
+            toolLabel: kind.tool,
+            action,
+            createdByUserId: state.me?.user.id ?? null,
+            createdAt: new Date().toISOString(),
+          });
+        }
+        return decided;
+      },
       refuse: async (orgId, id, reason) => decide(orgId, id, "refused", reason),
+      rules: async (orgId, agentId) => {
+        log("approvals.rules", orgId, agentId);
+        return structuredClone(state.approvalRules?.[agentId] ?? []);
+      },
+      removeRule: async (orgId, agentId, ruleId) => {
+        log("approvals.removeRule", orgId, agentId, ruleId);
+        const list = state.approvalRules?.[agentId] ?? [];
+        if (!list.some((r) => r.id === ruleId)) throw new ApiError(404, "not_found", "Rule not found");
+        if (state.approvalRules) state.approvalRules[agentId] = list.filter((r) => r.id !== ruleId);
+      },
     },
     connectors: {
       catalog: async () => CATALOG,
@@ -2397,8 +2457,14 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
     };
   }
 
-  function decide(orgId: string, approvalId: string, status: "approved" | "refused", reason?: string) {
-    log(`approvals.${status === "approved" ? "approve" : "refuse"}`, orgId, approvalId, reason);
+  function decide(orgId: string, approvalId: string, status: "approved" | "refused", reason?: string, always?: true) {
+    log(
+      `approvals.${status === "approved" ? "approve" : "refuse"}`,
+      orgId,
+      approvalId,
+      reason,
+      ...(always ? [always] : []),
+    );
     const a = state.approvals.find((x) => x.id === approvalId);
     if (!a) throw new ApiError(404, "not_found", "Approval not found");
     if (a.status !== "pending") throw new ApiError(409, "conflict", "Already decided");

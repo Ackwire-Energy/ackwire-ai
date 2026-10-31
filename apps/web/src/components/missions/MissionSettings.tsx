@@ -342,12 +342,14 @@ function SettingsBody({
                     label: o.label,
                     description: o.recommended ? t("brain.recommended") : undefined,
                   })),
-                  // The agent's own model when it isn't one of the list (a typed one, or "Automático").
+                  // The agent's own model when it isn't one of the list (a typed one, a coding plan's, "Automático").
                   ...(brainView.effectiveModel && !brainOption.models.some((o) => o.value === brainView.effectiveModel)
                     ? [
                         {
                           value: brainView.effectiveModel,
-                          label: isAuto(brainView.effectiveModel) ? t("brain.auto.label") : brainView.effectiveModel,
+                          label: isAuto(brainView.effectiveModel)
+                            ? t("brain.auto.label")
+                            : brainModelLabel(brainOption, brainView.effectiveModel),
                         },
                       ]
                     : []),

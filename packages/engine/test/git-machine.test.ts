@@ -186,7 +186,7 @@ describe("git on a connected machine through the proxy (ADR 0024 addendum)", () 
         method: "POST",
         body: new Uint8Array(Buffer.from(`${pkt(`${ZERO_OID} ${"b".repeat(40)} ${ref}\0report-status\n`)}0000`)),
       });
-    expect(await (await push("refs/heads/main")).text()).toContain("agents push only to branches agentes/dev/");
+    expect(await (await push("refs/heads/main")).text()).toContain("agents create only branches agentes/dev/");
     expect(upstream.calls.some((u) => u.endsWith("git-receive-pack"))).toBe(false);
     const [refused] = await f.db
       .select()
@@ -331,7 +331,7 @@ describe("git on a connected machine through the proxy (ADR 0024 addendum)", () 
         `acme/app is checked out at ${FOLDER}/repos/acme/app (default branch main, updated before this turn).`,
         `acme/web is checked out at ${FOLDER}/repos/acme/web (default branch main; it couldn't be updated before this turn: network unreachable).`,
         `You start in ${FOLDER}/repos/acme/web.`,
-        "Read it freely; to change code, create a branch agentes/dev/<topic> there, push it (git push -u origin agentes/dev/<topic>) and open a PR with open_pull_request.",
+        "Read it freely; to change code, create a branch agentes/dev/<topic> there, push it (git push -u origin agentes/dev/<topic>) and open a PR with open_pull_request. Delete branches with delete_branches; to push to someone else's branch, ask with request_branch_push first.",
         "Not cloned yet: acme/infra. To work on one, call git_clone first; it needs no approval.",
       ].join("\n"),
     );
@@ -374,11 +374,15 @@ describe("prompt text and permissions", () => {
     const ask = (command: string) =>
       JSON.parse(runPermissionPrompt({ tool_name: "Bash", input: { command }, scope }, { canRun: false })) as {
         behavior: string;
+        code?: string;
       };
     expect(ask("git clone https://github.com/acme/web ../web").behavior).toBe("allow");
     expect(ask("git pull --ff-only").behavior).toBe("allow");
-    expect(ask("git push origin main").behavior).toBe("deny");
-    expect(ask("git clone https://github.com/acme/web /tmp/web").behavior).toBe("deny");
+    // A refusal carries a code, so the apps say why in the person's language.
+    // A push is read on the computer first (command-gate.ts); here it is one more command this brain may not run.
+    expect(ask("git push origin main")).toMatchObject({ behavior: "deny", code: "off" });
+    expect(ask("gh pr merge 12")).toMatchObject({ behavior: "deny", code: "never" });
+    expect(ask("git clone https://github.com/acme/web /tmp/web")).toMatchObject({ behavior: "deny", code: "off" });
   });
 
   test("a refused command says why and what to do instead, so the agent doesn't resend it", () => {
@@ -387,12 +391,15 @@ describe("prompt text and permissions", () => {
       JSON.parse(runPermissionPrompt({ tool_name: "Bash", input: { command }, scope }, { canRun: true })) as {
         behavior: string;
         message?: string;
+        code?: string;
       };
     const heredoc = ask("git checkout -b fix && cat > src/a.test.ts <<'EOF'\ntest()\nEOF");
-    expect(heredoc.behavior).toBe("deny");
+    expect(heredoc).toMatchObject({ behavior: "deny", code: "unclear" });
     expect(heredoc.message).toContain("because it can't be read plainly");
     expect(heredoc.message).toContain("Edit and Write tools");
+    expect(ask("echo hi > /etc/hosts")).toMatchObject({ code: "outside" });
     expect(ask("echo hi > /etc/hosts").message).toContain("because it writes outside the mission folder");
+    expect(ask("cat ~/.aws/credentials")).toMatchObject({ behavior: "deny", code: "secret" });
     expect(ask("git checkout -b fix").behavior).toBe("allow");
   });
 });

@@ -1,4 +1,10 @@
-import { expect, test } from "bun:test";
+import { afterEach, expect, test } from "bun:test";
+import {
+  ASK_AFTER_TASK,
+  ASK_IN_CHAT,
+  approvalMessage,
+  DELETE_BRANCHES_POINTER,
+} from "@agenteschat/adapters/command-policy";
 import {
   allowedBy,
   PERMISSION_PROMPT_TOOL,
@@ -13,12 +19,17 @@ import {
   DENY_RULES,
   handleMcpMessage,
   type IpcReply,
+  mcpContextFromEnv,
   mcpProfileFromEnv,
   mcpScopeFromEnv,
   missionExecutorArgs,
   permissionPrompt,
 } from "../../runner/mcp";
 import { claudeDenials, parseOutputLine } from "../../runner/tasks";
+import { gitRepo, hasGit, removeDirs } from "./helpers";
+
+const dirs: string[] = [];
+afterEach(() => removeDirs(dirs));
 
 const TASK = "0193aaaa-0000-7000-8000-000000000001";
 const bash = (command: string) => ({ tool_name: "Bash", input: { command } });
@@ -38,8 +49,9 @@ const instant = { sleep: async () => {}, pollMs: 1 };
 
 test("rules: deny matches any part of a command, allow needs every part; Aprovar sempre keeps the first word or two", () => {
   expect(ruleMatches("Bash(git merge *)", "Bash", { command: "git status && git merge main" })).toBe(true);
-  expect(DENY_RULES.some((r) => ruleMatches(r, "Bash", { command: "git -C /w push origin main" }))).toBe(true);
-  expect(DENY_RULES.some((r) => ruleMatches(r, "Bash", { command: "git push origin agentes/x/nav" }))).toBe(false);
+  expect(DENY_RULES.some((r) => ruleMatches(r, "Bash", { command: "git -C /w merge feature" }))).toBe(true);
+  // Pushes aren't on the deny list: the computer reads where each one goes (`commandApproval`).
+  expect(DENY_RULES.some((r) => ruleMatches(r, "Bash", { command: "git push origin main" }))).toBe(false);
   expect(allowedBy(["Bash(swift *)"], "Bash", { command: "swift build" })).toBe(true);
   expect(allowedBy(["Bash(swift *)"], "Bash", { command: "swift build && rm -rf out" })).toBe(false);
   expect(allowedBy(["Bash(ls *)"], "Bash", { command: "ls" })).toBe(true);
@@ -50,10 +62,12 @@ test("rules: deny matches any part of a command, allow needs every part; Aprovar
   expect(rulesFor("WebFetch", { url: "https://docs.example.com/x" })).toEqual(["WebFetch(domain:docs.example.com)"]);
 });
 
-test("the prompt tool: a deny-list command is refused at once, never asked", async () => {
+test("the prompt tool: a deny-list command is refused at once with its kind, never asked", async () => {
   const s = server([]);
-  const out = await permissionPrompt(bash("git push origin main"), s.call, instant);
-  expect(out.behavior).toBe("deny");
+  const out = await permissionPrompt(bash("gh pr merge 914"), s.call, instant);
+  expect(out).toEqual({ behavior: "deny", message: approvalMessage("This is a merge", ASK_IN_CHAT) });
+  // A push with nowhere to read the repository from (no scope) waits for a person too.
+  expect((await permissionPrompt(bash("git push origin main"), s.call, instant)).behavior).toBe("deny");
   expect(s.calls).toHaveLength(0);
 });
 
@@ -85,9 +99,8 @@ test("deploys, cluster changes and package publishes are on the deny list (any p
     "docker push ghcr.io/acme/web:1",
     "gh release create v1.0.0",
     "npm test && npm publish",
-    "git -C /w push origin main",
-    "git -C /w push origin master",
-    "git -C /w push -u origin main --tags",
+    "helm rollback web 3",
+    "vercel rollback",
   ]) {
     expect(denied(command)).toBe(true);
   }
@@ -162,7 +175,7 @@ test("the prompt tool: plain reads are allowed at once (no card, nothing posted)
     expect((await permissionPrompt(bash(command), local.call, { ...instant, scope: system })).behavior).toBe("deny");
   }
   expect(local.calls).toHaveLength(0);
-  const settings = claudePermissionSettings("work", "agentes/x/", [], undefined, {
+  const settings = claudePermissionSettings("work", [], undefined, {
     promptReads: true,
     runnerHome: "/var/lib/agentes-runner",
   }).permissions;
@@ -264,13 +277,98 @@ test("work turns: the prompt tool flag and the mission's allowed commands in the
     "linux",
   );
   expect(plain.join(" ")).not.toContain("--permission-prompt-tool");
-  const work = claudePermissionSettings("work", "agentes/x/", ["Bash(swift *)", "Bash", "Bash(a) && rm"]).permissions;
+  const work = claudePermissionSettings("work", ["Bash(swift *)", "Bash", "Bash(a) && rm"]).permissions;
   expect(work.allow).toContain("Bash(swift *)");
   expect(work.allow).not.toContain("Bash");
   expect(work.deny).toContain("Bash(git merge *)");
-  const plan = claudePermissionSettings("plan", "agentes/x/", ["Bash(swift *)"]).permissions;
+  const plan = claudePermissionSettings("plan", ["Bash(swift *)"]).permissions;
   expect(plan.allow).not.toContain("Bash(swift *)");
 });
+
+test.skipIf(!hasGit)(
+  "ADR 0053 §3: a push is read with git on the computer: the default branch or a force push is refused there with why, its own branches go through, the rest goes to the server",
+  async () => {
+    const { work } = gitRepo(dirs);
+    const scope = { cwd: work, folders: [work] };
+    const turn = { ...instant, scope, branches: ["agentes/dev/"] };
+    const held = server([]);
+    expect(await permissionPrompt(bash("git push origin develop"), held.call, turn)).toEqual({
+      behavior: "deny",
+      message: approvalMessage(
+        "This push goes to the default branch develop",
+        ASK_IN_CHAT,
+        "Or push to a branch of your own (agentes/dev/…) and open a pull request.",
+      ),
+    });
+    expect((await permissionPrompt(bash("git push --force origin cursor/pap-582-fix"), held.call, turn)).behavior).toBe(
+      "deny",
+    );
+    expect(held.calls).toHaveLength(0);
+    // Its own branches need nobody; a pull request's branch is ordinary work the server allows like any command.
+    const own = server([]);
+    expect(await permissionPrompt(bash("git push -u origin agentes/dev/fix"), own.call, turn)).toEqual({
+      behavior: "allow",
+      updatedInput: { command: "git push -u origin agentes/dev/fix" },
+    });
+    expect(own.calls).toHaveLength(0);
+    const pr = server([{ behavior: "allow" }]);
+    expect((await permissionPrompt(bash("git push origin HEAD"), pr.call, turn)).behavior).toBe("allow");
+    expect(pr.calls).toHaveLength(1);
+    // Inside a background task outside a mission nobody answers but this computer: an ordinary push goes
+    // through, a held one says to stop and report.
+    const alone = { ...turn, task: true, local: true };
+    const local = server([]);
+    expect((await permissionPrompt(bash("git push origin HEAD"), local.call, alone)).behavior).toBe("allow");
+    expect(await permissionPrompt(bash("git push origin develop"), local.call, alone)).toMatchObject({
+      behavior: "deny",
+      message: expect.stringContaining(ASK_AFTER_TASK),
+    });
+    expect(local.calls).toHaveLength(0);
+    // What the MCP process reads from its env.
+    expect(
+      mcpContextFromEnv({ AGENTES_MCP_BRANCHES: "agentes/dev/,agentes/0193aaaa/", AGENTES_MCP_TASK: "local" }),
+    ).toEqual({ branches: ["agentes/dev/", "agentes/0193aaaa/"], task: true, local: true });
+    expect(mcpContextFromEnv({ AGENTES_MCP_TASK: "mission", AGENTES_MCP_BRANCHES: "bad branch" })).toEqual({
+      task: true,
+    });
+    expect(mcpContextFromEnv({})).toEqual({});
+  },
+);
+
+test.skipIf(!hasGit)(
+  "through our git proxy: a delete or the default branch is refused here pointing to the server's way; a plain push to someone else's branch goes up to it",
+  async () => {
+    const { work, git } = gitRepo(dirs);
+    git(
+      "remote",
+      "set-url",
+      "--push",
+      "origin",
+      "https://agentes.test/api/git/0190a7b2-3c4d-7e5f-8a9b-0c1d2e3f4a5b/0190a7b2-3c4d-7e5f-8a9b-0c1d2e3f4a5c/acme/app.git",
+    );
+    // A mission's task: anything not decided here would go to the mission's command card.
+    const mission = { ...instant, scope: { cwd: work, folders: [work] }, branches: ["agentes/dev/"], task: true };
+    const s = server([]);
+    expect(await permissionPrompt(bash("git push origin --delete cursor/pap-582-fix"), s.call, mission)).toEqual({
+      behavior: "deny",
+      message: `This deletes the remote branch cursor/pap-582-fix: ${DELETE_BRANCHES_POINTER}`,
+    });
+    expect(await permissionPrompt(bash("git push origin develop"), s.call, mission)).toMatchObject({
+      behavior: "deny",
+      message: expect.stringContaining("our git proxy never lets it through"),
+    });
+    expect(await permissionPrompt(bash("git push origin cursor/pap-582-fix"), s.call, mission)).toEqual({
+      behavior: "allow",
+      updatedInput: { command: "git push origin cursor/pap-582-fix" },
+    });
+    expect(s.calls).toHaveLength(0);
+    // With anything else in the command, the push is no longer alone: the server decides, as before.
+    const more = server([{ behavior: "allow" }]);
+    await permissionPrompt(bash("npm test && git push origin cursor/pap-582-fix"), more.call, mission);
+    expect(more.calls).toHaveLength(1);
+  },
+  30_000,
+);
 
 test("refused commands: Claude Code's permission_denials and Codex's declined commands; task.done carries them", () => {
   expect(

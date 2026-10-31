@@ -61,7 +61,7 @@ import {
 } from "@agenteschat/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
@@ -100,9 +100,13 @@ const firstSentence = (text: string) => {
 /** "Começou" over a card for a moment after a click (reduced motion: none). */
 function useStamp() {
   const [stamp, setStamp] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // A card that leaves takes its stamp's timer along.
+  useEffect(() => () => clearTimeout(timer.current), []);
   const show = (text: string) => {
     setStamp(text);
-    setTimeout(() => setStamp(null), 900);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setStamp(null), 900);
   };
   const node = stamp ? (
     <div className="mi-stamp" role="status">

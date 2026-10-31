@@ -42,9 +42,16 @@ export function serverBody(t: TFunction, body: string, meta: Meta): string {
   }
   const params =
     m.bodyParams && typeof m.bodyParams === "object" ? (m.bodyParams as Record<string, unknown>) : ({} as const);
-  // Waiting for room on a busy computer, not for one that went away; no AI because its sign-in ended, not none at all.
+  // Waiting for room on a busy computer, not for one that went away; no AI because its sign-in ended, or because the
+  // computer's own sign-in of that CLI isn't there (`own`), not none at all.
   const busy = code === "brain_unavailable" && (m.brainUnavailable as { code?: unknown } | undefined)?.code === "busy";
-  const signedOut = code === "no_ai" && (m.noAi as { reason?: unknown } | undefined)?.reason === "not_signed_in";
+  const noAi = code === "no_ai" ? (m.noAi as { reason?: unknown; own?: unknown } | undefined) : undefined;
+  const signedOut = noAi?.reason === "not_signed_in";
+  const own = signedOut && (noAi?.own === "codex" || noAi?.own === "claude_code") ? noAi.own : null;
+  if (own) {
+    const brain = own === "codex" ? "Codex" : "Claude Code";
+    return t("chat.body.no_ai_not_signed_in", { brain, defaultValue: body });
+  }
   const shown = busy ? "brain_busy" : signedOut ? "no_ai_signed_out" : code;
   return t(`chat.body.${shown}`, { ...params, defaultValue: body });
 }

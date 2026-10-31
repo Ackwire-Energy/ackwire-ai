@@ -573,6 +573,13 @@
 .ap-decide__buttons > * {
   flex: 1;
 }
+.ap-decide__always {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+}
 .ap-bound {
   margin: 0;
   font-size: 12.5px;

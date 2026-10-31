@@ -1,5 +1,5 @@
 {
-  "id": "124aaa16-6130-4e96-8fb8-51e73403d4a4",
+  "id": "cff6a52f-7717-460d-9617-19997afdd773",
   "prevId": "a76bcbd2-c672-49a0-99f8-619accdc1cf9",
   "version": "7",
   "dialect": "postgresql",
@@ -214,6 +214,12 @@
         "brain_effort": {
           "name": "brain_effort",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "context_tokens": {
+          "name": "context_tokens",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
@@ -528,13 +534,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": true
-        },
-        "auto_models": {
-          "name": "auto_models",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
         },
         "updated_at": {
           "name": "updated_at",

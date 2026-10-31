@@ -98,6 +98,8 @@ const HERE = new Set([
   "update_thread",
   "offer_connect_ai",
   "propose_agent",
+  "follow_up",
+  "cancel_follow_up",
 ]);
 
 /** Reads under a scope that also writes, by name. */

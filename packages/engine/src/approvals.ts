@@ -1,5 +1,6 @@
 import { MAIL_PRESETS, type PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, inArray, lt, ne, or, schema, sql } from "@agenteschat/db";
+import { addApprovalRules, type RememberedKind, rememberedKindOf } from "./approval-rules";
 import { recordAudit } from "./audit";
 import { learnFromRefusal } from "./context/feedback";
 import type { MemoryJudging } from "./context/items";
@@ -80,6 +81,8 @@ export interface ApprovalView {
   issue: { id: string; number: number; title: string } | null;
   /** How the run got here: what the agent said at each turn before asking (one approval only). */
   trail?: { text: string; at: string }[];
+  /** "Aprovar sempre" is offered: the server's tool and the actions approving for good covers; null: not offered. */
+  approveAlways: RememberedKind | null;
 }
 
 /** What the approval row alone doesn't say: the connector, the issue (and, for one, the trail). */
@@ -308,6 +311,7 @@ export const approvalView = (a: Approval, canDecide = false): ApprovalView => ({
   why: a.why.trim() || null,
   origin: approvalOriginOf(a.origin),
   issue: null,
+  approveAlways: a.connectionId ? rememberedKindOf(a.approveAlways) : null,
 });
 
 /**
@@ -383,7 +387,9 @@ async function mayDecide(db: Database, actorId: string, approval: Approval) {
  * Approves or refuses a pending approval. Only the agent's owner and org
  * admins may (a `request_permission` one: admins only, `adminsDecide`). The decision and the job that resumes the run commit together;
  * the run then executes exactly the hashed action, or tells the model it was
- * refused (with the reason).
+ * refused (with the reason). `always` ("Aprovar sempre", only where the
+ * approval offers it) also keeps its kind for good in the same transaction:
+ * the agent's next calls of that kind run without asking.
  */
 export async function decideApproval(
   /** `memory`: how the lesson from a refusal is judged (context/items.ts `MemoryJudging`). */
@@ -391,7 +397,7 @@ export async function decideApproval(
   actorId: string,
   orgId: string,
   approvalId: string,
-  input: { decision: "approve" | "refuse"; reason?: string },
+  input: { decision: "approve" | "refuse"; reason?: string; always?: boolean },
 ): Promise<ApprovalView> {
   const { db } = deps;
   const at = deps.now?.() ?? new Date();
@@ -406,6 +412,10 @@ export async function decideApproval(
         ? "Only an admin can give an agent new access"
         : "Only the agent's owner or an admin can decide this",
     );
+  }
+  const kind = input.always ? rememberedKindOf(current.approveAlways) : null;
+  if (input.always && (input.decision !== "approve" || !kind || !current.connectionId)) {
+    throw new ConflictError("This request can't be approved for good", "approval.always_unavailable");
   }
 
   const outcome = await db.transaction(async (tx) => {
@@ -427,7 +437,11 @@ export async function decideApproval(
       .where(eq(approvals.id, approvalId))
       .returning();
     await enqueueResume(tx, row);
-    if (updated) await auditDecision(tx, updated, expired ? null : actorId);
+    const always = !expired && kind && row.connectionId ? { connectionId: row.connectionId, ...kind } : null;
+    if (always) {
+      await addApprovalRules(tx, { orgId, agentId: row.agentId, connectionId: always.connectionId }, always, actorId);
+    }
+    if (updated) await auditDecision(tx, updated, expired ? null : actorId, always);
     return expired ? { error: "This request has expired" as const, row: updated } : { row: updated };
   });
   if (outcome.row) await publishApproval(deps, outcome.row, "approval.decided");
@@ -442,7 +456,12 @@ export async function decideApproval(
  * An approval's ending in the audit log: the person who approved or refused it, or the system when it
  * expired unanswered. The action it then ran is the agent's own row (`tool.call`, agent-audit.ts).
  */
-function auditDecision(tx: Executor, row: Approval, personId: string | null) {
+function auditDecision(
+  tx: Executor,
+  row: Approval,
+  personId: string | null,
+  always: (RememberedKind & { connectionId: string }) | null = null,
+) {
   return recordAudit(tx, {
     orgId: row.orgId,
     actor: personId ? { type: "person", id: personId } : { type: "system", id: null },
@@ -453,6 +472,7 @@ function auditDecision(tx: Executor, row: Approval, personId: string | null) {
       agentId: row.agentId,
       title: row.title,
       ...(row.reason ? { reason: row.reason } : {}),
+      ...(always ? { always } : {}),
     },
     runId: row.runId,
     channelId: row.channelId,

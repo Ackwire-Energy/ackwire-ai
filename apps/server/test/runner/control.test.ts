@@ -750,8 +750,9 @@ test.if(process.platform !== "win32")(
     writeFileSync(path.join(dir, "signed-in"), "");
     const c = control(home, { accountCommands: { claude_code: fakeCli, codex: fakeCli } });
     // Connects once the first look is done, so `hello` lists what it found whatever the CLIs' speed.
+    // Every agent there is the runner's own user: the account thinks for all of them.
     expect(await c.data({ type: "accounts.list" })).toEqual({
-      accounts: [{ id: existing, kind: "codex", loggedIn: true }],
+      accounts: [{ id: existing, kind: "codex", loggedIn: true, shared: true }],
     });
     const s = await c.connect();
     expect(s.of("hello")[0]?.accounts).toMatchObject([{ id: existing, kind: "codex", loggedIn: true }]);
@@ -808,7 +809,7 @@ test.if(process.platform !== "win32")(
       process.execPath,
       path.join(import.meta.dir, "fake-account-cli.mjs"),
     ];
-    const found = [{ id: existing, kind: "codex", loggedIn: true }];
+    const found = [{ id: existing, kind: "codex", loggedIn: true, shared: true }];
     const c = control(home, { accountCommands: { claude_code: fakeCli, codex: fakeCli } });
     await waitFor(() => c.sockets.length === 1);
     const s = c.sockets[0] as FakeSocket;

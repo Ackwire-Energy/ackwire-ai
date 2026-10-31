@@ -12,7 +12,9 @@ import { useCallback, useEffect, useRef } from "react";
 import { moveInGroups } from "../lib/agent-groups";
 import { artifactRefs } from "../lib/artifacts";
 import { newerSetup } from "../lib/computer";
+import { CONSULT_CONVERSATION_POLL_MS, CONSULT_GROUP_POLL_MS } from "../lib/consult-group";
 import { sendWaits } from "../lib/errors";
+import { LoginReadError, loginReadPasses } from "../lib/machines";
 import {
   allItems,
   matchesFilter,
@@ -1096,17 +1098,50 @@ export function cacheApproval(qc: ReturnType<typeof useQueryClient>, orgId: stri
   );
 }
 
+/** `always` ("Aprovar sempre"): approves this one and the agent's next calls of its kind. */
 export function useDecideApproval(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, decision, reason }: { id: string; decision: "approve" | "refuse"; reason?: string }) =>
-      decision === "approve" ? api.approvals.approve(orgId, id, reason) : api.approvals.refuse(orgId, id, reason),
-    onSuccess: (approval, { decision }) => {
+    mutationFn: ({
+      id,
+      decision,
+      reason,
+      always,
+    }: {
+      id: string;
+      decision: "approve" | "refuse";
+      reason?: string;
+      always?: boolean;
+    }) =>
+      decision === "approve"
+        ? api.approvals.approve(orgId, id, reason, always)
+        : api.approvals.refuse(orgId, id, reason),
+    onSuccess: (approval, { decision, always }) => {
       playSound(decision === "approve" ? "approved" : "error");
       cacheApproval(qc, orgId, approval);
       void qc.invalidateQueries({ queryKey: keys.approvals(orgId) });
+      if (always) void qc.invalidateQueries({ queryKey: keys.approvalRules(orgId, approval.agentId) });
     },
+  });
+}
+
+/** What the agent runs without asking ("Aprovar sempre"), on its page. */
+export const useApprovalRules = (orgId: string, agentId: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.approvalRules(orgId, agentId),
+    queryFn: () => api.approvals.rules(orgId, agentId),
+    staleTime: 30_000,
+  });
+};
+
+export function useRemoveApprovalRule(orgId: string, agentId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ruleId: string) => api.approvals.removeRule(orgId, agentId, ruleId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.approvalRules(orgId, agentId) }),
   });
 }
 
@@ -1648,6 +1683,37 @@ export const useRun = (orgId: string, runId: string | null) => {
     queryKey: keys.run(orgId, runId ?? ""),
     queryFn: () => api.agents.run(orgId, runId ?? ""),
     enabled: runId !== null,
+  });
+};
+
+/**
+ * The questions agents asked other agents from a conversation (`GET …/consultations`), for the block inside the
+ * reply that asked. The page reloads it on `agent.consulting`, `agent.consulted` and `agent.consultation`; while a
+ * question is out it also reloads every `CONSULT_GROUP_POLL_MS`.
+ */
+export const useConsultations = (orgId: string, channelId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.consultations(orgId, channelId),
+    queryFn: () => api.agents.consultations(orgId, channelId),
+    enabled,
+    staleTime: 10_000,
+    refetchInterval: (q) => (q.state.data?.some((c) => c.status === "open") ? CONSULT_GROUP_POLL_MS : false),
+  });
+};
+
+/**
+ * One of those questions opened beside the conversation (`GET …/consultations/{id}`). The agents' DM sends this
+ * page no events: while the question is out it reloads every `CONSULT_CONVERSATION_POLL_MS`, and with the list
+ * (its key sits under the list's) on every consult event.
+ */
+export const useConsultationConversation = (orgId: string, channelId: string, consultationId: string | null) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.consultation(orgId, channelId, consultationId ?? ""),
+    queryFn: () => api.agents.consultation(orgId, channelId, consultationId ?? ""),
+    enabled: consultationId !== null,
+    refetchInterval: (q) => (q.state.data?.consultation.status === "open" ? CONSULT_CONVERSATION_POLL_MS : false),
   });
 };
 
@@ -2409,6 +2475,7 @@ export function useSkillAction(orgId: string) {
     mutationFn: (
       action:
         | { type: "import"; input: { url: string } | { zipBase64: string } }
+        | { type: "importPicked"; url: string; paths: string[] }
         | { type: "create"; input: SkillInput }
         | { type: "update"; id: string; patch: SkillPatch }
         | { type: "reimport"; id: string }
@@ -2418,6 +2485,8 @@ export function useSkillAction(orgId: string) {
       switch (action.type) {
         case "import":
           return api.skills.import(orgId, action.input);
+        case "importPicked":
+          return api.skills.importPicked(orgId, action.url, action.paths);
         case "create":
           return api.skills.create(orgId, action.input);
         case "update":
@@ -2492,13 +2561,28 @@ export const useAiAccounts = (orgId: string, enabled = true, pollMs: number | fa
   });
 };
 
-/** ADR 0041 §2: a sign-in on the computer, asked every 2 s until it ends (done, failed or expired). */
+/**
+ * ADR 0041 §2: a sign-in on the computer, asked every 2 s until it ends (done, failed or expired), through failed
+ * reads too (`loginRead` says how long they may last).
+ */
 export const useAccountLogin = (orgId: string, machineId: string, loginId: string | null) => {
   const api = useApi();
   return useQuery({
     queryKey: keys.accountLogin(orgId, machineId, loginId ?? ""),
-    queryFn: () => api.machines.accountLogin(orgId, machineId, loginId ?? ""),
+    queryFn: async ({ client, queryKey }) => {
+      try {
+        return await api.machines.accountLogin(orgId, machineId, loginId ?? "");
+      } catch (error) {
+        if (!loginReadPasses(error)) throw error;
+        // The read before this one failed too: the run goes on from its first.
+        const before = client.getQueryState(queryKey)?.error;
+        throw new LoginReadError(error, before instanceof LoginReadError ? before.since : Date.now());
+      }
+    },
     enabled: loginId !== null,
+    // Waiting from its start. With data, a read keeps the last error until an answer clears it, so a run of failed
+    // reads adds up, and the block never drops back to loading meanwhile.
+    initialData: loginId === null ? undefined : { state: "waiting" },
     retry: false,
     refetchInterval: (q) => (q.state.data && q.state.data.state !== "waiting" ? false : 2000),
     // The person is on Claude's page in another tab meanwhile.

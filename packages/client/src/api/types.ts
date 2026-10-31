@@ -528,6 +528,8 @@ export interface Model {
   id: string;
   label: string;
   provider: string;
+  /** Its context window in tokens: which context limits are worth offering with it. */
+  contextWindow?: number;
   inputUsdPerMTok: number;
   outputUsdPerMTok: number;
   /** The workspace can use it (has a key for the provider). Expected from the backend; derived until then. */
@@ -729,6 +731,45 @@ export interface OpenConsult {
   since: string;
 }
 
+/**
+ * What a consulted agent waits on before it can answer: an approval, or a person's answer or secret (a person);
+ * `computer`: its computer coming back (no one to ask).
+ */
+export type ConsultationWait = "approval" | "input" | "computer";
+
+/**
+ * A question an agent asked another agent from a conversation (`GET …/channels/{id}/consultations`): drawn inside
+ * the reply of the run that asked ("Perguntou a 3 colegas"), each with where it is and, once closed, the answer.
+ */
+export interface RunConsultation {
+  id: string;
+  /** The asking run: its reply (`agentRunId`) shows the list. */
+  runId: string;
+  agentId: string;
+  consultedAgentId: string;
+  /** The consulted agent's run: the cards it posts here carry it (`agentRunId`), "ajudando o Theo". */
+  consultedRunId: string | null;
+  status: "open" | ConsultationStatus;
+  /** Open, and the consulted agent waits: on a person, or for its computer to come back. */
+  waiting: ConsultationWait | null;
+  question: string;
+  /** The answer once answered; why it couldn't once failed. */
+  answer: string | null;
+  createdAt: string;
+  answeredAt: string | null;
+  expiresAt: string;
+}
+
+/**
+ * One question opened beside the conversation that asked it ("Theo ⇄ Iris", `GET …/consultations/{id}`): the
+ * question as it went into the agents' DM, the consulted agent's messages there and the cards it posted where the
+ * person asked, oldest first. Read only.
+ */
+export interface ConsultationConversation {
+  consultation: RunConsultation;
+  messages: Message[];
+}
+
 export interface ActiveRun {
   runId: string;
   agentId: string;
@@ -853,6 +894,14 @@ export type ChannelEvent =
       agentId: string;
       consultedAgentId: string;
       status: ConsultationStatus;
+    }
+  /** A question still out changed without closing (the consulted agent waits on a person): reload the list. */
+  | {
+      type: "agent.consultation";
+      channelId: string;
+      threadId: string;
+      runId: string;
+      consultationId: string;
     }
   /** The agent's first words arrived. */
   | { type: "agent.typing"; channelId: string; threadId: string; agentId: string; runId: string }
@@ -1060,6 +1109,27 @@ export interface Approval {
   issue?: { id: string; number: number; title: string } | null;
   /** One approval only: what the agent said at each turn before asking. */
   trail?: { text: string; at: string }[];
+  /**
+   * "Aprovar sempre" is offered: approving with `always` lets the agent run this server tool (each of these wrapped
+   * actions; none: the tool itself) without asking again, with any values. Null or absent: not offered.
+   */
+  approveAlways?: { tool: string; actions: string[] } | null;
+}
+
+/** A kind of call the agent runs without asking, approved for good by someone who decides its approvals. */
+export interface ApprovalRule {
+  id: string;
+  connectionId: string;
+  /** The connection's name ("Composio"). */
+  server: string;
+  /** The server's own tool name. */
+  tool: string;
+  /** How the workspace labelled that tool. */
+  toolLabel: string;
+  /** The wrapped action (`GITHUB_CREATE_AN_ISSUE_COMMENT`); empty: the tool itself. */
+  action: string;
+  createdByUserId: string | null;
+  createdAt: string;
 }
 
 /** The email a mail approval writes (draft, send, reply, forward), as its card shows it. */
@@ -1119,6 +1189,8 @@ export interface ConnectorDef {
   oauthConfigured: boolean;
   /** Can be connected on this server; `false` shows "Em breve". */
   available: boolean;
+  /** The vendor hasn't approved agentes.chat yet: greyed out with a lock, nothing to open. Older servers leave it out. */
+  soon?: boolean;
   needsServerUrl: boolean;
   /** The MCP endpoint (`remote_mcp`). */
   serverUrl: string | null;
@@ -1545,7 +1617,8 @@ export interface CustomServer {
 export type CustomConnectStart =
   | { status: "connected"; server: CustomServer }
   | { status: "oauth"; authorizeUrl: string }
-  | { status: "needs_key" };
+  /** `not_approved`: it has OAuth but only lets in apps it approved, and agentes.chat isn't one yet. */
+  | { status: "needs_key"; reason?: "not_approved" };
 
 // ── Knowledge (phase 5: apps/server/src/routes/app/knowledge.ts) ─────────────
 
@@ -2022,8 +2095,8 @@ export interface IssueWork {
   runId: string | null;
   state: "running" | "waiting_approval" | "waiting_input" | "stalled";
   since: string;
-  /** The run's last tool calls, oldest first. */
-  steps: { tool: string; detail?: string; at: string }[];
+  /** The run's last tool calls, oldest first; a computer command's check says when it was refused or waits. */
+  steps: { tool: string; detail?: string; at: string; outcome?: "refused" | "waiting" }[];
   reason?: "failed" | "canceled" | "budget";
 }
 
@@ -2493,6 +2566,29 @@ export interface SkillDetail extends Skill {
   /** SKILL.md without the front matter (Markdown). */
   body: string;
   files: SkillFile[];
+}
+
+/** A skill a GitHub link holds, offered to pick when it holds several. */
+export interface SkillChoice {
+  /** Its folder from the repository's root: what `importPicked` sends back. */
+  path: string;
+  name: string;
+  description: string;
+}
+
+/** A skill a GitHub link holds that can't be installed: its folder and the server's refusal. */
+export interface SkillSkipped {
+  path: string;
+  code: string;
+  /** English fallback. */
+  message: string;
+  params?: Record<string, unknown>;
+}
+
+/** A GitHub link holding several skills: the ones to pick from, and those that can't be installed, with why. */
+export interface SkillPick {
+  choices: SkillChoice[];
+  skipped?: SkillSkipped[];
 }
 
 /** `GET …/agents/{id}/skills`: every skill of the library, with whether this agent has it. */
@@ -3731,6 +3827,8 @@ export interface BrainModelOption {
   label: string;
   modelId?: string;
   recommended?: boolean;
+  /** Its context window in tokens. */
+  contextWindow?: number;
 }
 
 export interface BrainOption {
@@ -3769,6 +3867,8 @@ export interface AgentBrain {
   account: string | null;
   /** How much it thinks before answering; `auto` = picked per task; null = the brain's default. */
   effort: BrainEffortSetting | null;
+  /** The most context it reads, in tokens (200K, 400K or 1M), any brain; null = its model's window. */
+  contextTokens?: number | null;
   /**
    * The agent's owner's accounts on its computer (both kinds) and the one it thinks with; "Conta deste
    * computador" isn't listed. A plan thinks only for its owner's agents (ADR 0059).
@@ -3802,7 +3902,7 @@ export interface MachineAccount {
   label: string;
   /** Only for its owner. */
   email: string | null;
-  /** "Pro", "Max", "Team"… as the provider reports it. */
+  /** `pro`, `max`, `ultra`, `team`… from what the CLI says (`planWordOf` names it). */
   plan: string | null;
   status: "active" | "signed_out";
   /** Whose it is (the person who signed it in); null: nobody's. */
@@ -3810,14 +3910,18 @@ export interface MachineAccount {
   ownerName: string | null;
   /** The viewer owns it: only they rename it or pick it for an agent. */
   mine: boolean;
-  /** Names of the agents that think with it (one at most). */
+  /** Names of the agents that think with it (one at most, unless `shared`). */
   usedBy: string[];
+  /** Their ids, in the same order (absent: an older server). */
+  usedByIds?: string[];
   /** Its plan's usage limits; null: not known yet. */
   usage: PlanUsage | null;
   /** A key account's coding plan (`zai`, `kimi`, `minimax`, `opencode`); null: the CLI's own sign-in. */
   provider: string | null;
   /** The last 4 of a key account's key (its owner only). */
   keyHint: string | null;
+  /** It thinks for every agent its owner gives it on that computer, with no new sign-in (absent: an older server). */
+  shared?: boolean;
 }
 
 /** `GET …/ai-accounts`: the viewer's AI accounts on the organization's computers, and where they can add one. */
@@ -3836,6 +3940,8 @@ export interface AiComputer {
   canAdd: boolean;
   /** Its runner takes coding plans' keys. */
   keys: boolean;
+  /** A new sign-in there thinks for all of the viewer's agents on it (absent: an older server). */
+  shares?: { claude_code: boolean; codex: boolean; key: boolean };
   /** What it can think with now: Claude Code (Claude and the coding plans) and Codex (ChatGPT). */
   brains: { claude_code: boolean; codex: boolean };
   /**
@@ -3876,6 +3982,8 @@ export interface AgentBrainInput {
   /** The account thinks for another agent: take it from that one. */
   moveAccount?: boolean;
   effort?: BrainEffortSetting | null;
+  /** 200K, 400K or 1M tokens; null = the model's window; omitted = keep. */
+  contextTokens?: number | null;
 }
 
 /** `POST …/machines/{id}/account-logins` (201): what the person needs to sign in. */

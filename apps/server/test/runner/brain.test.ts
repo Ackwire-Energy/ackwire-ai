@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { PUSH_ASK_RULES } from "@agenteschat/adapters/command-policy";
 import {
   BRAIN_PROFILES_PROTOCOL,
   BRAIN_PROTOCOL,
@@ -19,16 +20,17 @@ import {
   BRAIN_BUILTIN_TOOLS,
   BrainManager,
   type BrainManagerOptions,
+  type BrainTurnContext,
   brainProfileLaunch,
   ClaudeStreamParser,
   carryClaudeSession,
   claudeBrainArgs,
   claudeCapabilities,
   fallbackModelFor,
-  planAlias,
   STEER_CAPABILITY,
   STEER_NOW_CAPABILITY,
   steerSupport,
+  TOKEN_REFUSED,
   userMessageLine,
 } from "../../runner/brain";
 import { claudeAuth } from "../../runner/executors";
@@ -101,8 +103,29 @@ test("hello: Claude Code's login state travels (never anything else from auth st
         }
       : { status: 0, stdout: "2.1.300" };
   expect(claudeAuth(run)).toEqual({ loggedIn: true, authMethod: "claude.ai", plan: "team" });
+  // The computer's own sign-in on Ultra: `max` with the 20x tier its `.claude.json` keeps.
+  const max = () => ({ status: 0, stdout: line({ loggedIn: true, authMethod: "claude.ai", subscriptionType: "max" }) });
+  expect(claudeAuth(max, () => "default_claude_max_20x")).toMatchObject({ plan: "ultra" });
+  expect(claudeAuth(max, () => undefined)).toMatchObject({ plan: "max" });
   expect(claudeAuth(() => ({ status: 1, stdout: line({ loggedIn: false }) }))).toEqual({ loggedIn: false });
   expect(claudeAuth(() => ({ status: null, stdout: "", error: new Error("ENOENT") }))).toEqual({});
+});
+
+test.if(posix)("the computer's own sign-in: its tier read through a link, as Claude Code reads it", () => {
+  const dir = tempDir("own-claude-");
+  dirs.push(dir);
+  const kept = path.join(dir, "kept.json");
+  writeFileSync(kept, line({ oauthAccount: { organizationRateLimitTier: "default_claude_max_20x" } }));
+  symlinkSync(kept, path.join(dir, ".claude.json"));
+  const max = () => ({ status: 0, stdout: line({ loggedIn: true, authMethod: "claude.ai", subscriptionType: "max" }) });
+  const before = process.env.CLAUDE_CONFIG_DIR;
+  process.env.CLAUDE_CONFIG_DIR = dir;
+  try {
+    expect(claudeAuth(max)).toMatchObject({ plan: "ultra" });
+  } finally {
+    if (before === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+    else process.env.CLAUDE_CONFIG_DIR = before;
+  }
 });
 
 // ── Parsing Claude Code's stream ─────────────────────────────────────────────
@@ -318,7 +341,13 @@ function setup(over: Partial<BrainManagerOptions> = {}) {
   };
   // One lookup shared by every turn: turns started together reach the manager in the order they started.
   let folderOnce: Promise<string> | null = null;
-  const turn = async (n: number, prompt: string, extra: Partial<BrainTurnRequest> = {}, signal?: AbortSignal) => {
+  const turn = async (
+    n: number,
+    prompt: string,
+    extra: Partial<BrainTurnRequest> = {},
+    signal?: AbortSignal,
+    context: Partial<BrainTurnContext> = {},
+  ) => {
     folderOnce ??= agentWorkspace(ws, AGENT);
     const folder = await folderOnce;
     const events: WireBrainEvent[] = [];
@@ -333,7 +362,7 @@ function setup(over: Partial<BrainManagerOptions> = {}) {
         mcp: { token: `agr_${"t".repeat(24)}${n}` },
         ...extra,
       },
-      { agent: AGENT, folder, emit: (e) => events.push(e), ...(signal ? { signal } : {}) },
+      { agent: AGENT, folder, emit: (e) => events.push(e), ...(signal ? { signal } : {}), ...context },
     );
     return { final, events };
   };
@@ -570,16 +599,20 @@ test.if(posix)(
     const wargs = work.spawns()[0]?.args ?? [];
     expect(wargs[wargs.indexOf("--permission-mode") + 1]).toBe("acceptEdits");
     const wsettings = JSON.parse(readFileSync(wargs[wargs.indexOf("--settings") + 1] as string, "utf8")) as {
-      permissions: { allow: string[]; deny: string[] };
+      permissions: { allow: string[]; ask: string[]; deny: string[] };
     };
     expect(wsettings.permissions.deny).toContain("Bash(python3 -c*)");
     expect(wsettings.permissions.deny).toContain("Bash(gh auth token*)");
     expect(wsettings.permissions.deny).not.toContain("Edit");
     expect(wsettings.permissions.allow).not.toContain("Bash(cat *)");
+    // Every push reaches the prompt tool, even past the owner's allow rules, which reads where it goes.
+    expect(wsettings.permissions.ask).toEqual([...PUSH_ASK_RULES]);
     const wconfig = JSON.parse(readFileSync(wargs[wargs.indexOf("--mcp-config") + 1] as string, "utf8")) as {
       mcpServers: { agentes: { env: Record<string, string> } };
     };
     expect(wconfig.mcpServers.agentes.env.AGENTES_MCP_PROFILE).toBeUndefined();
+    // Its own branches: a push there needs nobody.
+    expect(wconfig.mcpServers.agentes.env.AGENTES_MCP_BRANCHES).toBe("agentes/dev/,agentes/ffff0000/");
   },
 );
 
@@ -715,6 +748,25 @@ test("command line: --effort for a known level only", () => {
 });
 
 test.if(posix)(
+  "the context limit (protocol 28) is CLAUDE_CODE_AUTO_COMPACT_WINDOW; another one restarts the process, resumed",
+  async () => {
+    const { spawns, turn } = setup();
+    const logged = () => spawns() as unknown as { args: string[]; compactWindow: string | null }[];
+    await turn(1, "first", { contextTokens: 400_000 });
+    expect(logged()[0]?.compactWindow).toBe("400000");
+    await turn(2, "second", { contextTokens: 400_000 });
+    expect(logged()).toHaveLength(1);
+    await turn(3, "third", { contextTokens: 200_000 });
+    expect(logged()).toHaveLength(2);
+    expect(logged()[1]?.compactWindow).toBe("200000");
+    expect(logged()[1]?.args.slice(-2)).toEqual(["--resume", SESSION(1)]);
+    // None (or nonsense): the model's own window.
+    await turn(4, "fourth", { contextTokens: "lots" as never });
+    expect(logged()[2]?.compactWindow).toBeNull();
+  },
+);
+
+test.if(posix)(
   "an account turn runs in its folder (CLAUDE_CONFIG_DIR), a new session there; a change restarts the process",
   async () => {
     const accountDir = tempDir("claude-account-");
@@ -836,6 +888,7 @@ test.if(posix)(
         ANTHROPIC_DEFAULT_OPUS_MODEL: "glm-5.3[1m]",
         ANTHROPIC_DEFAULT_SONNET_MODEL: "glm-5.3[1m]",
         ANTHROPIC_DEFAULT_HAIKU_MODEL: "glm-5.3-flash[1m]",
+        ANTHROPIC_DEFAULT_FABLE_MODEL: "glm-5.3[1m]",
         CLAUDE_CODE_SUBAGENT_MODEL: "glm-5.3[1m]",
         CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
         API_TIMEOUT_MS: "3000000",
@@ -888,15 +941,167 @@ test.if(posix)(
       expect(runs()[4]?.apiKey).toBe("sk-ant-stray");
       await turn(5, "hi", { personalMcp: true, session: { id: SESSION(5), resume: false } });
       expect(runs()[5]?.settingsEnv).toBeNull();
+
+      // One of the plan's models chosen by id: Claude Code runs it, its subagents too; the aliases keep theirs.
+      await turn(6, "hi", { account: KIMI_ACCOUNT, model: "k3-256k", session: { id: SESSION(6), resume: false } });
+      const picked = runs()[6];
+      expect(flag(picked, "--model")).toBe("k3-256k");
+      expect(picked?.args).not.toContain("--fallback-model");
+      expect(picked?.settingsEnv).toMatchObject({
+        CLAUDE_CODE_SUBAGENT_MODEL: "k3-256k",
+        ANTHROPIC_DEFAULT_OPUS_MODEL: "k3.1-pro",
+        ANTHROPIC_DEFAULT_SONNET_MODEL: "kimi-for-coding",
+        // A subagent called with `fable` runs the plan's opus, never a Claude model the plan doesn't serve.
+        ANTHROPIC_DEFAULT_FABLE_MODEL: "k3.1-pro",
+      });
+      // Another plan's model runs the plan's own sonnet.
+      await turn(7, "hi", { account: KIMI_ACCOUNT, model: "minimax-m3", session: { id: SESSION(7), resume: false } });
+      expect(flag(runs()[7], "--model")).toBe("sonnet");
     } finally {
       for (const k of Object.keys(stray)) delete process.env[k];
     }
   },
 );
 
-test("plan aliases and the pinned env without a plan", () => {
-  expect(planAlias("haiku")).toBe("haiku");
-  for (const other of [undefined, "auto", "claude-opus-5-5", "glm-5.3"]) expect(planAlias(other)).toBe("sonnet");
+test.if(posix)(
+  "a token root hands over: only on a descriptor the CLI reads, in the agent's own folder, Anthropic's endpoint pinned, refused at once",
+  async () => {
+    process.env.CLAUDE_CODE_OAUTH_TOKEN = "sk-ant-oat01-stray-from-the-runner";
+    process.env.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR = "9";
+    try {
+      const TOKEN = "sk-ant-oat01-fake-token-for-tests-only";
+      const NEXT = "sk-ant-oat01-fake-token-for-tests-next";
+      const own = tempDir("agent-account-");
+      const lent = tempDir("lent-account-");
+      dirs.push(own, lent);
+      const { spawns, turn } = setup({
+        accounts: {
+          // A lent folder of that id exists too: a grant never uses it.
+          accountDir: (kind, id) => (kind === "claude_code" && id === ACCOUNT ? lent : null),
+          agentHome: (kind, id) => (kind === "claude_code" && id === ACCOUNT ? own : null),
+        },
+      });
+      type Run = {
+        args: string[];
+        configDir: string | null;
+        oauthToken: string | null;
+        oauthEnv: string | null;
+        oauthFd: string | null;
+        authToken: string | null;
+        settingsEnv: Record<string, string> | null;
+      };
+      const runs = () => spawns() as unknown as Run[];
+      const grant = { grant: { kind: "token" as const, token: TOKEN } };
+      const r = await turn(1, "ECHOTOKEN", { account: ACCOUNT }, undefined, grant);
+      expect(r.final).toMatchObject({ type: "done" });
+      const first = runs()[0];
+      expect(first?.configDir).toBe(own);
+      // Read off its descriptor at the start: never in its environment, nor in what its commands inherit.
+      expect(first?.oauthToken).toBe(TOKEN);
+      expect(first?.oauthFd).toBe("3");
+      expect(first?.oauthEnv).toBeNull();
+      expect(first?.authToken).toBeNull();
+      // Never in a file the CLI or the agent reads.
+      expect(JSON.stringify(first?.settingsEnv)).not.toContain("oat01");
+      expect(first?.settingsEnv?.ANTHROPIC_BASE_URL).toBe("https://api.anthropic.com");
+      expect(first?.settingsEnv?.CLAUDE_CODE_USE_BEDROCK).toBe("");
+      // What the CLI printed with it comes back redacted.
+      const sent = JSON.stringify([r.final, ...r.events]);
+      expect(sent).not.toContain(TOKEN);
+      expect(sent).toContain("[secret:CLAUDE_CODE_OAUTH_TOKEN]");
+      // The same token keeps its process; a new one starts another.
+      await turn(2, "hi", { account: ACCOUNT }, undefined, grant);
+      expect(runs()).toHaveLength(1);
+      await turn(3, "hi", { account: ACCOUNT }, undefined, { grant: { kind: "token", token: NEXT } });
+      expect(runs()).toHaveLength(2);
+      expect(runs()[1]?.oauthToken).toBe(NEXT);
+      // Its endpoint refuses it: the turn ends at once, as signed out (the CLI would retry for minutes).
+      const started = Date.now();
+      const refused = await turn(4, "KEY401", { account: ACCOUNT }, undefined, grant);
+      expect(refused.final).toEqual({ type: "error", code: "not_logged_in", message: TOKEN_REFUSED, retryable: true });
+      expect(Date.now() - started).toBeLessThan(10_000);
+      // Nothing to sign in with on the computer: signed out, no CLI started.
+      const before = runs().length;
+      const none = await turn(5, "hi", { account: ACCOUNT }, undefined, { grant: { kind: "none" } });
+      expect(none.final).toMatchObject({ type: "error", code: "not_logged_in" });
+      expect(runs()).toHaveLength(before);
+      // A key root hands over thinks through its plan's endpoint the same way.
+      const KEY = "0123456789abcdef0123456789abcdef.AbCdEfGhIjKlMnOp";
+      await turn(6, "hi", { account: ACCOUNT, session: { id: SESSION(6), resume: false } }, undefined, {
+        grant: { kind: "key", provider: "zai", key: KEY },
+      });
+      const key = runs().at(-1);
+      expect(key?.authToken).toBe(KEY);
+      expect(key?.oauthToken).toBeNull();
+      expect(key?.oauthFd).toBeNull();
+      expect(key?.configDir).toBe(own);
+      expect(key?.settingsEnv?.ANTHROPIC_BASE_URL).toBe("https://api.z.ai/api/anthropic");
+    } finally {
+      delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+      delete process.env.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR;
+    }
+  },
+);
+
+test.if(posix)(
+  "a secret streamed in pieces never leaves in pieces: each batch keeps back what could start one",
+  async () => {
+    const TOKEN = "sk-ant-oat01-fake-token-for-tests-only";
+    const own = tempDir("agent-account-");
+    dirs.push(own);
+    const { turn } = setup({
+      accounts: {
+        accountDir: () => null,
+        agentHome: (kind, id) => (kind === "claude_code" && id === ACCOUNT ? own : null),
+      },
+    });
+    const r = await turn(1, "ECHOSPLIT", { account: ACCOUNT }, undefined, { grant: { kind: "token", token: TOKEN } });
+    expect(r.final).toMatchObject({ type: "done", text: "token [secret:CLAUDE_CODE_OAUTH_TOKEN] printed" });
+    const deltas = r.events.flatMap((e) => (e.type === "text_delta" ? [e.text] : []));
+    expect(deltas.join("")).toBe("token [secret:CLAUDE_CODE_OAUTH_TOKEN] printed");
+    // Still streamed: what can't start a secret goes at once.
+    expect(deltas.length).toBeGreaterThan(1);
+  },
+);
+
+test.if(posix)(
+  "the agent thinks with another account now: its processes on any other close, a busy one once its turn ends",
+  async () => {
+    const OTHER = "0193ffff-0000-7000-8000-000000000002";
+    const homes: Record<string, string> = { [ACCOUNT]: tempDir("keep-a-"), [OTHER]: tempDir("keep-b-") };
+    dirs.push(...Object.values(homes));
+    const { m, turn } = setup({
+      accounts: {
+        accountDir: () => null,
+        agentHome: (kind, id) => (kind === "claude_code" ? (homes[id] ?? null) : null),
+      },
+    });
+    const grant = { grant: { kind: "token" as const, token: "sk-ant-oat01-fake-token-for-tests-only" } };
+    const on = (n: number, account?: string) => ({
+      session: { id: SESSION(n), resume: false },
+      ...(account ? { account } : {}),
+    });
+    await turn(1, "hi", on(1, ACCOUNT), undefined, grant);
+    await turn(2, "hi", on(2, OTHER), undefined, grant);
+    // The computer's own sign-in is no account: it stays whatever root says.
+    await turn(3, "hi", on(3));
+    expect(m.size).toBe(3);
+    const left = m.process(AGENT.id, SESSION(1));
+    m.keepAccount(OTHER);
+    await waitFor(() => left?.exited === true, 8000);
+    expect(m.size).toBe(2);
+    expect(m.process(AGENT.id, SESSION(2))).toBeDefined();
+    // A turn the server sent on the account it left still runs; its process isn't kept after it.
+    const r = await turn(4, "SLOW", on(4, ACCOUNT), undefined, grant);
+    expect(r.final).toMatchObject({ type: "done" });
+    expect(m.process(AGENT.id, SESSION(4))).toBeUndefined();
+    m.keepAccount(null);
+    await waitFor(() => m.size === 1, 8000);
+    expect(m.process(AGENT.id, SESSION(3))).toBeDefined();
+  },
+);
+
+test("the pinned env without a plan", () => {
   const env = accountSettingsEnv(undefined, "opus", { HTTP_PROXY: "http://p:1", PATH: "/bin" });
   expect(env.ANTHROPIC_BASE_URL).toBe("https://api.anthropic.com");
   expect(env.HTTP_PROXY).toBe("http://p:1");

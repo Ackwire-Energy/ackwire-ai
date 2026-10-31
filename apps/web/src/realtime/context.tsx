@@ -896,7 +896,7 @@ const EMPTY_LIVE: BrowserLiveState = {
 /**
  * Watches an agent's browser on the org's socket while mounted (`enabled`):
  * frames, who is in control, and why it can't be shown. Watches again when
- * the socket reconnects. `sendInput` is for the person in control.
+ * the socket reconnects, and on `retry`. `sendInput` is for the person in control.
  */
 export function useBrowserLive(agentId: string, enabled = true) {
   const { connection } = useRealtime();
@@ -910,8 +910,11 @@ export function useBrowserLive(agentId: string, enabled = true) {
       // Shared per socket: the card, the bar and the full view of one agent are one watch.
       watcher: connection.browserWatcher,
       agentId,
-      onFrame: (frame) => setState((s) => ({ ...s, frame, unavailable: null, ended: false, endedBy: null })),
-      onStatus: (status) => setState((s) => ({ ...s, status, unavailable: null, ended: false, endedBy: null })),
+      // An answer means the watch went through: an earlier refusal (too many browsers) no longer holds.
+      onFrame: (frame) =>
+        setState((s) => ({ ...s, frame, unavailable: null, ended: false, endedBy: null, error: null })),
+      onStatus: (status) =>
+        setState((s) => ({ ...s, status, unavailable: null, ended: false, endedBy: null, error: null })),
       onUnavailable: (reason, message) =>
         setState((s) => ({ ...s, unavailable: { reason, ...(message ? { message } : {}) } })),
       onEnded: (reason, _message, by) =>
@@ -942,7 +945,8 @@ export function useBrowserLive(agentId: string, enabled = true) {
     };
   }, [connection, agentId, enabled]);
   const sendInput = useCallback((events: BrowserInputEvent[]) => liveRef.current?.sendInput(events) ?? false, []);
-  return { ...state, sendInput };
+  const retry = useCallback(() => liveRef.current?.retry(), []);
+  return { ...state, sendInput, retry };
 }
 
 export function useConnectionStatus(): ConnectionStatus {

@@ -49,10 +49,17 @@ export const keys = {
   agentRepos: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "repositories"] as const,
   customServers: (orgId: string) => ["org", orgId, "custom-servers"] as const,
   scopes: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "scopes"] as const,
+  /** What the agent runs without asking ("Aprovar sempre"). */
+  approvalRules: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "approval-rules"] as const,
   runs: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "runs"] as const,
   /** Whether the agent has a run going now (its newest running run, if any). */
   runningRuns: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "runs", "running"] as const,
   run: (orgId: string, runId: string) => ["org", orgId, "run", runId] as const,
+  /** The questions agents asked other agents from a conversation (drawn inside the replies that asked). */
+  consultations: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "consultations"] as const,
+  /** Under `consultations`: reloading the list reloads an open one too. */
+  consultation: (orgId: string, channelId: string, consultationId: string) =>
+    ["org", orgId, "channel", channelId, "consultations", consultationId] as const,
   agentDetail: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "detail"] as const,
   agentBrain: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "brain"] as const,
   aiAccounts: (orgId: string) => ["org", orgId, "ai-accounts"] as const,
