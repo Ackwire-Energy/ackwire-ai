@@ -1,7 +1,8 @@
 import type { TFunction } from "i18next";
-import type { Approval } from "../api/types";
+import type { Approval, ApprovalRule } from "../api/types";
 import { approvalAction, emailTitleWords } from "./approval-kind";
 import { humanize } from "./custom-tools";
+import { agentGrammar } from "./grammar";
 import { partsOf, toolName } from "./tool-review";
 
 /**
@@ -128,3 +129,35 @@ export function approvalValues(
   walk(approval.params ?? {}, true);
   return out.slice(0, max);
 }
+
+/** Articles in an action's slug (`GITHUB_CREATE_AN_ISSUE_COMMENT`) that only make its words longer. */
+const SLUG_ARTICLES = new Set(["a", "an", "the"]);
+
+/**
+ * An action a tool runs for the agent (Composio's slugs), in words: what it does, then its app ("Criar issue
+ * comment (Github)"). The slug itself is for a title on hover.
+ */
+export function actionName(t: TFunction, slug: string) {
+  const [app = "", ...rest] = slug.toLowerCase().split("_");
+  const name = rest.filter((w) => !SLUG_ARTICLES.has(w)).join("_");
+  return name ? `${toolName(t, partsOf(name), name)} (${humanize(app)})` : humanize(slug);
+}
+
+/** What "Aprovar sempre" covers on a card, in words: each action the tool runs, else the tool itself. */
+export function approveAlwaysWords(t: TFunction, approval: Pick<Approval, "approveAlways">) {
+  const kind = approval.approveAlways;
+  if (!kind) return "";
+  return kind.actions.length > 0
+    ? kind.actions.map((slug) => actionName(t, slug)).join(", ")
+    : toolName(t, partsOf(kind.tool), kind.tool);
+}
+
+/** The line under "Aprovar sempre", on every card that offers it: what approving for good covers, with any values. */
+export function approveAlwaysHint(t: TFunction, approval: Pick<Approval, "approveAlways">, agentName: string) {
+  const g = agentGrammar(t, agentName);
+  return t("approval.always.hint", { of: g.of, name: g.name, actions: approveAlwaysWords(t, approval) });
+}
+
+/** A rule the agent runs without asking, in words: its action, else the tool as the workspace labelled it. */
+export const approvalRuleWords = (t: TFunction, rule: Pick<ApprovalRule, "action" | "toolLabel">) =>
+  rule.action ? actionName(t, rule.action) : rule.toolLabel;

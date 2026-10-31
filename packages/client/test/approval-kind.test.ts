@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import type { ApprovalEmail } from "../src/index";
+import type { TFunction } from "i18next";
+import { ApiError, type ApprovalEmail } from "../src/index";
 import { emailTitleWords } from "../src/lib/approval-kind";
 import { approvalOriginShort } from "../src/lib/approval-origin";
+import { actionName, approvalRuleWords, approveAlwaysWords } from "../src/lib/approval-words";
+import { knownErrorText } from "../src/lib/errors";
 
 const email = (over: Partial<ApprovalEmail> = {}): ApprovalEmail => ({
   verb: "draft",
@@ -43,5 +46,26 @@ describe("a mail approval in words", () => {
     );
     expect(approvalOriginShort({ origin: { kind: "unattended" } })?.key).toBe("approval.originShort.unattended");
     expect(approvalOriginShort({ origin: null })).toBeNull();
+  });
+});
+
+describe("Aprovar sempre in words", () => {
+  /** No translations: each word falls back to the default the code gives, else its key. */
+  const t = ((key: string, o?: { defaultValue?: string }) =>
+    o && "defaultValue" in o ? o.defaultValue : key) as unknown as TFunction;
+
+  test("an action's slug without its articles, its app after it; the tool itself when it wraps none", () => {
+    expect(actionName(t, "GITHUB_CREATE_AN_ISSUE_COMMENT")).toBe("Create issue comment (Github)");
+    expect(approveAlwaysWords(t, { approveAlways: { tool: "X", actions: ["GITHUB_ADD_A_LABEL", "SLACK_X"] } })).toBe(
+      "Add label (Github), X (Slack)",
+    );
+    expect(approveAlwaysWords(t, { approveAlways: { tool: "close_ticket", actions: [] } })).toBe("Close ticket");
+    expect(approveAlwaysWords(t, { approveAlways: null })).toBe("");
+    expect(approvalRuleWords(t, { action: "", toolLabel: "Fechar chamado" })).toBe("Fechar chamado");
+  });
+
+  test("where it isn't offered, the refusal in the person's words", () => {
+    const refusal = new ApiError(409, "approval.always_unavailable", "This request can't be approved for good");
+    expect(knownErrorText(t, refusal)).toBe("errors.approval.alwaysUnavailable");
   });
 });

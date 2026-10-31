@@ -953,6 +953,13 @@
       "when": 1793451083712,
       "tag": "0135_shared_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 136,
+      "version": "7",
+      "when": 1793451143712,
+      "tag": "0136_approval_rules",
+      "breakpoints": true
     }
   ]
 }

@@ -1901,6 +1901,13 @@ export const en: Translations = {
     seeEmail: "See the email",
     seeDetails: "See details",
     notNow: "Not now",
+    always: {
+      button: "Always approve",
+      hint: "Approves this one and the next ones like it from {{name}}: {{actions}}, with any values.",
+      done: "Approved. {{name}} won't ask for this again.",
+      undoHere: "To undo it, go to Tools and access, on {{of}} page.",
+      open: "Open",
+    },
     email: {
       from: "From",
       to: "To",
@@ -2646,6 +2653,14 @@ export const en: Translations = {
       clear: "Clear the search or the filter.",
       library: "Skills library",
       fineTune: "Fine-tuning, tool by tool, lives in the connector. Here it's one level per app.",
+      always: {
+        title: "Always approved",
+        help: "Runs without asking, with any values.",
+        by: "Approved by {{name}} · {{when}}",
+        byNobody: "Approved · {{when}}",
+        remove: "Ask again: {{what}}",
+        removed: "{{name}} will ask for this again.",
+      },
     },
     memory: {
       counts: "What's in memory",
@@ -7576,6 +7591,9 @@ export const en: Translations = {
     agentProposal: {
       decided: "Someone already decided this proposal.",
       expired: "This proposal expired: nobody decided it in a day.",
+    },
+    approval: {
+      alwaysUnavailable: "This request can't be approved for good. Approve just this one.",
     },
     mail: {
       accountNotFound: "This mailbox is no longer connected. Connect it again in Connectors.",

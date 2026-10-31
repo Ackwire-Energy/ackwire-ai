@@ -101,6 +101,8 @@ export const featureKeysEn: FeatureTranslations = {
     refused: "Declined",
     refusedSubF: "{{name}} will remember next time.",
     refusedSubM: "{{name}} will remember next time.",
+    alwaysUndoF: "To undo it, open her page on the web, in Tools and access.",
+    alwaysUndoM: "To undo it, open his page on the web, in Tools and access.",
     via: "Through",
     why: "{{name}} said before: “{{text}}”",
     saidText: "“{{text}}”",

@@ -32,6 +32,7 @@ import type {
   ApiRule,
   AppNotification,
   Approval,
+  ApprovalRule,
   Artifact,
   ArtifactContent,
   ArtifactDetail,
@@ -531,8 +532,13 @@ export interface ApiClient {
   approvals: {
     list(orgId: string, filter?: { status?: "pending" | "decided"; agentId?: string }): Promise<Approval[]>;
     get(orgId: string, approvalId: string): Promise<Approval>;
-    approve(orgId: string, approvalId: string, reason?: string): Promise<Approval>;
+    /** `always`: also approve this kind for good (409 `approval.always_unavailable` where it isn't offered). */
+    approve(orgId: string, approvalId: string, reason?: string, always?: boolean): Promise<Approval>;
     refuse(orgId: string, approvalId: string, reason?: string): Promise<Approval>;
+    /** What the agent runs without asking ("Aprovar sempre"), oldest first. */
+    rules(orgId: string, agentId: string): Promise<ApprovalRule[]>;
+    /** The agent asks again for that kind (admins and the agent's owner). */
+    removeRule(orgId: string, agentId: string, ruleId: string): Promise<void>;
   };
   connectors: {
     /** Connectors agentes.chat knows, with their scopes, plus the built-in scopes. */

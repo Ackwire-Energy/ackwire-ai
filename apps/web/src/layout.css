@@ -7988,6 +7988,13 @@ a.machine-row__name:hover {
   }
 }
 
+/* "Aprovar sempre": what it covers, on a line of its own after the approval's buttons. */
+.ap-always {
+  order: 1;
+  flex-basis: 100%;
+  margin: 0;
+}
+
 /* Secrets (ADR 0027): the card's private field and the agent page's list. */
 .secret-card__form {
   display: grid;

@@ -84,6 +84,19 @@ export interface ToolDefinition {
   external?: boolean;
   /** A mission's tool (agent mode, ADR 0029): its approvals are bound to that mission too. */
   missionId?: string;
+  /**
+   * A tool that runs other actions by name (Composio's executor): the actions a call runs, or null when its
+   * input isn't a shape we know. A call whose actions all only read runs as the connection's read (`readScope`).
+   */
+  actions?(input: Record<string, unknown>): string[] | null;
+  /** With `actions`: the scope of the connection's reads. */
+  readScope?: string;
+  /**
+   * The server's own name for this tool, set only where "Aprovar sempre" may be offered on its approvals (custom
+   * servers: only Composio's executor, whose `actions` say what each call does). Rules are kept by it, so they
+   * outlive a renamed connection. The gateway still decides each call (`rememberable`).
+   */
+  rememberAs?: string;
   /** Human summary of a call, for approval cards. */
   describe?(input: Record<string, unknown>): { title: string; detail?: string };
   /**

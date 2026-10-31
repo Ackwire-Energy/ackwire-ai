@@ -12,6 +12,7 @@ export * from "./agents";
 export * from "./ai-intent";
 export * from "./ai-status";
 export * from "./appearance";
+export * from "./approval-rules";
 export * from "./approvals";
 export * from "./artifact-tools";
 export * from "./artifacts";

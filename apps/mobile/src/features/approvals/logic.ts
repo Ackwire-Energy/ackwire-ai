@@ -1,5 +1,7 @@
 import type { Approval } from "@agenteschat/client";
 import { approvalValues } from "@agenteschat/client/lib/approval-words";
+import type { TFunction } from "i18next";
+import { genderOf } from "../shared/logic";
 
 /**
  * A request an agent makes before a sensitive action: how risky it is (high
@@ -14,7 +16,14 @@ export {
   approvalAction,
   approvalRisk,
   approvalTraits,
+  approveAlwaysOffered,
 } from "@agenteschat/client/lib/approval-kind";
+export { approveAlwaysHint } from "@agenteschat/client/lib/approval-words";
+
+/** The toast after "Aprovar sempre": the agent won't ask for this again, and where to undo it (no list on the phone). */
+export function approveAlwaysToast(t: TFunction, name: string) {
+  return { title: t("approval.always.done", { name }), subtitle: t(`mobile.approval.alwaysUndo${genderOf(name)}`) };
+}
 
 /** Waiting on you: pending ones you may decide, the one closest to expiring first. */
 export function waitingApprovals(list: Approval[], now = Date.now()): Approval[] {

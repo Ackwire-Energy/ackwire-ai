@@ -1,7 +1,9 @@
 import { PERMISSION_TOOL } from "@agenteschat/adapters";
 import { and, eq, schema, sql } from "@agenteschat/db";
 import { auditsCall, callTitle, recordToolCall } from "../agent-audit";
+import { coveringRules, type RememberedKind } from "../approval-rules";
 import { type RunAuthority, runAuthorityById } from "../authority";
+import { actionLevel, nameWords, openEnded } from "../connectors/classify";
 import { missingConnectors, type ServerCatalog } from "../connectors/listing";
 import { consultationOrigin } from "../consultations";
 import { recordOutcome } from "../context/outcomes";
@@ -50,6 +52,47 @@ export const ALWAYS_SENSITIVE = /(^|[^a-z])(merge|deploy|rollback|revert_deploy|
 
 export const isSensitive = (tool: Pick<ToolDefinition, "name" | "scope" | "sensitive">) =>
   tool.sensitive === true || ALWAYS_SENSITIVE.test(tool.name) || ALWAYS_SENSITIVE.test(tool.scope);
+
+/**
+ * Also as a noun or under another name: a deployment, a build, a dispatch or a release (they start workflows), a
+ * branch's reference, an alias or a rolling release (production traffic), a re-run, a restore. Never approved for good.
+ */
+const NEVER_FOR_GOOD =
+  /^(merge|deploy|redeploy|rollback|revert|restore|promote|workflow|build|dispatch|reference|release|alias|rolling|rerun|rerequest)/;
+/**
+ * Verbs right after the app that start what then runs on its own (`RAILWAY_COMMIT_ENVIRONMENT_CHANGES` deploys) or
+ * run whatever their arguments say (`VERCEL_EXECUTE_SANDBOX_COMMAND`).
+ */
+const NEVER_LEADS = new Set(["commit", "trigger", "run", "execute", "invoke"]);
+const alwaysAsks = (name: string) => {
+  const words = nameWords(name);
+  return (
+    ALWAYS_SENSITIVE.test(name) ||
+    openEnded(name) ||
+    NEVER_LEADS.has(words[1] ?? "") ||
+    words.some((w) => NEVER_FOR_GOOD.test(w))
+  );
+};
+
+/**
+ * The kind "Aprovar sempre" would cover for this call (`approval_rules`), or null when it is never offered: only
+ * on a person's run whose policy didn't make the call ask, for a tool its source lets be remembered (`rememberAs`),
+ * whose wrapped actions, when it runs others, are a shape we know with none sensitive, and with nothing in its
+ * names that always asks (merge, deploy, rollback and the rest above, GraphQL, SQL, a raw request).
+ */
+export function rememberable(
+  tool: ToolDefinition,
+  input: Record<string, unknown>,
+  authority: RunAuthority | null,
+  decision: PolicyDecision,
+): RememberedKind | null {
+  if (authority?.kind !== "person" || decision.action === "approve") return null;
+  if (!tool.rememberAs || !tool.connectionId) return null;
+  const actions = tool.actions ? tool.actions(input) : [];
+  if (!actions || actions.some((a) => actionLevel(a) === "sensitive")) return null;
+  if ([tool.name, tool.rememberAs, tool.scope, ...actions].some(alwaysAsks)) return null;
+  return { tool: tool.rememberAs, actions };
+}
 
 /** Hash an approval is bound to: tool, scope, connection and the exact parameters. */
 export const actionHash = (action: {
@@ -171,7 +214,10 @@ export type InvokeResult =
  * 5. a call that asks a person (an approval, `ask_user`) must say why: the
  *    `why` is taken out of the input and kept on the approval or question;
  * 6. sensitive tools create an `approvals` row bound to the action hash and
- *    stop there; others run, with errors turned into error results;
+ *    stop there, unless a rule someone approved for good covers the call
+ *    ("Aprovar sempre", `approval_rules`); others run, with errors turned into
+ *    error results. A tool that runs other actions (Composio's executor) is
+ *    the connection's read when every action it runs only reads;
  * 7. `tool_call` / `tool_result` / `approval` steps are recorded;
  * 8. an outside call (a connected app's write, a command that leaves the
  *    computer) is held once when the team already did it to the same target,
@@ -358,7 +404,9 @@ export function createToolGateway(deps: {
         ...(detail ? { detail } : {}),
         ...(command ? { command } : {}),
       });
-      const tool = unknownInDirectory ? undefined : (all.get(call.name) ?? directoryTool);
+      let tool = unknownInDirectory ? undefined : (all.get(call.name) ?? directoryTool);
+      /** The rules ("Aprovar sempre") this call ran under instead of asking. */
+      let approvedBy: string[] | null = null;
       // The audit (agent-audit.ts): every call that matters, with how it ended. A routine's belongs where it
       // delivers, never to its room.
       const actionChannel =
@@ -382,6 +430,7 @@ export function createToolGateway(deps: {
           title: callTitle(tool, call.input),
           input: call.input,
           outcome,
+          approvalRules: approvedBy,
           ...extra,
         });
       };
@@ -400,6 +449,20 @@ export function createToolGateway(deps: {
 
       if (unknownInDirectory) return finish({ content: unknownInDirectory, isError: true });
       if (!tool) return finish({ content: `Unknown tool ${call.name}`, isError: true });
+      // A tool that runs other actions (Composio's executor): a call whose actions all only read is the
+      // connection's read, when the agent may read the connection. Everything below then sees a read.
+      if (tool.actions && tool.readScope) {
+        const bare = takeWhy(tool.inputSchema, call.input).input;
+        const actions = tool.actions(bare);
+        if (actions?.length && actions.every((a) => actionLevel(a) === "read")) {
+          const read: ToolDefinition = { ...tool, scope: tool.readScope, sensitive: false };
+          const keys = await freshGrantedKeys(ctx.db, ctx.orgId, ctx.agentId);
+          if (isAllowed(accessWithNeeds(keys, read).state)) {
+            tool = read;
+            call = { ...call, input: bare };
+          }
+        }
+      }
       const builtIn = isBuiltIn(tool);
       const decision = policyFor(authority, tool);
       if (decision.action === "refuse") {
@@ -419,7 +482,7 @@ export function createToolGateway(deps: {
       // A call that asks a person says why (shown on its card); the tool itself never sees it. It is
       // asked for last: a call refused for any other reason (its input, a repository outside the agent's
       // list) gets that reason first.
-      const approves = decision.action === "approve" || isSensitive(tool);
+      let approves = decision.action === "approve" || isSensitive(tool);
       let why = "";
       let whyMissing = false;
       if (asksPerson(tool, decision)) {
@@ -452,7 +515,15 @@ export function createToolGateway(deps: {
       // The call's arguments (GitHub repositories, mail folders and recipients…), before running or asking anyone.
       const check = await checkToolCall(tool, call.input, ctx);
       if (!check.ok) return finish({ content: check.message, isError: true, data: check.data ?? {} }, "refused");
-      if (whyMissing) return finish({ content: WHY_REFUSAL, isError: true, data: { code: "tool.why_missing" } });
+      // "Aprovar sempre": a call of a kind someone approved for good runs like an allowed one, why or not.
+      const remember = approves ? rememberable(tool, call.input, authority, decision) : null;
+      if (remember && tool.connectionId) {
+        const at = { orgId: ctx.orgId, agentId: ctx.agentId, connectionId: tool.connectionId };
+        approvedBy = await coveringRules(ctx.db, at, remember);
+        if (approvedBy) approves = false;
+      }
+      if (whyMissing && !approvedBy)
+        return finish({ content: WHY_REFUSAL, isError: true, data: { code: "tool.why_missing" } });
       const withRepo = (output: ToolOutput): ToolOutput =>
         check.data ? { ...output, data: { ...output.data, ...check.data } } : output;
 
@@ -524,6 +595,7 @@ export function createToolGateway(deps: {
             origin: authority ? approvalOrigin(authority) : null,
             ownerUserId: owner,
             expiresAt: new Date(now().getTime() + APPROVAL_TTL_MS),
+            approveAlways: remember,
           })
           .onConflictDoNothing()
           .returning();

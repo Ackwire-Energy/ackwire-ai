@@ -105,6 +105,8 @@ export const featureKeysPtBR = {
     refused: "Recusado",
     refusedSubF: "A {{name}} vai lembrar disso da próxima vez.",
     refusedSubM: "O {{name}} vai lembrar disso da próxima vez.",
+    alwaysUndoF: "Para desfazer, abra a página dela na web, em Ferramentas e acesso.",
+    alwaysUndoM: "Para desfazer, abra a página dele na web, em Ferramentas e acesso.",
     via: "Por onde",
     why: "{{name}} disse antes: “{{text}}”",
     saidText: "“{{text}}”",

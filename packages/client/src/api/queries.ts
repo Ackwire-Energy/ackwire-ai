@@ -1095,17 +1095,50 @@ export function cacheApproval(qc: ReturnType<typeof useQueryClient>, orgId: stri
   );
 }
 
+/** `always` ("Aprovar sempre"): approves this one and the agent's next calls of its kind. */
 export function useDecideApproval(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, decision, reason }: { id: string; decision: "approve" | "refuse"; reason?: string }) =>
-      decision === "approve" ? api.approvals.approve(orgId, id, reason) : api.approvals.refuse(orgId, id, reason),
-    onSuccess: (approval, { decision }) => {
+    mutationFn: ({
+      id,
+      decision,
+      reason,
+      always,
+    }: {
+      id: string;
+      decision: "approve" | "refuse";
+      reason?: string;
+      always?: boolean;
+    }) =>
+      decision === "approve"
+        ? api.approvals.approve(orgId, id, reason, always)
+        : api.approvals.refuse(orgId, id, reason),
+    onSuccess: (approval, { decision, always }) => {
       playSound(decision === "approve" ? "approved" : "error");
       cacheApproval(qc, orgId, approval);
       void qc.invalidateQueries({ queryKey: keys.approvals(orgId) });
+      if (always) void qc.invalidateQueries({ queryKey: keys.approvalRules(orgId, approval.agentId) });
     },
+  });
+}
+
+/** What the agent runs without asking ("Aprovar sempre"), on its page. */
+export const useApprovalRules = (orgId: string, agentId: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.approvalRules(orgId, agentId),
+    queryFn: () => api.approvals.rules(orgId, agentId),
+    staleTime: 30_000,
+  });
+};
+
+export function useRemoveApprovalRule(orgId: string, agentId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ruleId: string) => api.approvals.removeRule(orgId, agentId, ruleId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.approvalRules(orgId, agentId) }),
   });
 }
 
