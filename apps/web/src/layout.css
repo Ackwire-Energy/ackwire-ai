@@ -3107,6 +3107,14 @@ p {
 .settings-row:first-child {
   border-top: 0;
 }
+/* Under a card's title the rows start below it, a hairline above the first as between the others: a row's hover
+   plate never reaches the title. */
+.ac-card__head + .settings-rows {
+  margin-top: 0;
+}
+.ac-card__head + .settings-rows > .settings-row:first-child {
+  border-top: 1px solid var(--line);
+}
 .settings-row__text {
   flex: 1;
   min-width: 0;
