@@ -2,12 +2,15 @@
  * The one layering scale. Anything that floats uses these, never a raw
  * number. Floating layers (select lists, menus, popovers, date pickers,
  * tooltips) sit above dialogs and sheets so they open inside them.
+ * Scrims share the dialogs' layer, where later portals stack above earlier
+ * ones: each scrim lies under its own dialog and over anything opened before
+ * it, so a dialog opened from another dims that one.
  */
 :root {
   --z-raised: 1;
   --z-lifted: 2;
   --z-sticky: 1;
-  --z-scrim: 40;
+  --z-scrim: 41;
   --z-dialog: 41;
   --z-floating: 50;
   --z-toast: 60;
