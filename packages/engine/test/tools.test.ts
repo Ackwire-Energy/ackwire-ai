@@ -426,6 +426,50 @@ describe("approval flow (end to end)", () => {
     ]);
   });
 
+  test("a lone call's time and whether it failed ride in meta.work (its line reads before the steps load), not two", async () => {
+    const tool = (name: string, fails: boolean): ToolDefinition => ({
+      name,
+      description: `${name} (fake)`,
+      scope: "",
+      inputSchema: { type: "object" },
+      execute: async () => {
+        await Bun.sleep(5);
+        return { content: fails ? `${name} broke` : `${name} ok`, isError: fails };
+      },
+    });
+    const calling = (...names: string[]): Parameters<typeof setup>[0] => ({
+      toolSources: [{ name: "fake", tools: async () => [tool("make_note", false), tool("make_broken", true)] }],
+      reply: (req) => {
+        const last = req.messages.at(-1);
+        if (typeof last?.content !== "string" && last?.content.some((b) => b.type === "tool_result"))
+          return { chunks: ["Done."] };
+        return { chunks: ["On it."], toolUses: names.map((name) => ({ name, input: {} })) };
+      },
+    });
+    // One workspace per reply: the last one is closed after the test, the others here.
+    let opened = false;
+    const workOf = async (...names: string[]) => {
+      if (opened) await f.close();
+      f = await setup(calling(...names));
+      opened = true;
+      await post(f, "@dev go");
+      await drainOutbox(f.db, f.handlers);
+      return (await listMessages(f.db, f.owner.id, f.org.id, f.general.id)).at(-1)?.meta?.work as
+        | Record<string, unknown>
+        | undefined;
+    };
+    const done = await workOf("make_note");
+    expect(done).toMatchObject({ steps: 1, calls: [{ name: "make_note" }] });
+    expect(done?.ms).toBeGreaterThanOrEqual(5);
+    expect(done?.failed).toBeUndefined();
+    expect(await workOf("make_broken")).toMatchObject({ steps: 1, calls: [{ name: "make_broken" }], failed: true });
+    // Two calls keep the block, which says how many: no lone call to time.
+    const two = await workOf("make_note", "make_note");
+    expect(two).toMatchObject({ steps: 2 });
+    expect(two?.ms).toBeUndefined();
+    expect(two?.failed).toBeUndefined();
+  });
+
   test("mention → tool call → approval → approve → resumed run → merged", async () => {
     const gh = fakeGithub();
     f = await setup({ toolSources: [gh.source], reply: script });

@@ -136,6 +136,8 @@ export function ConsultGroup({ message: m, color }: { message: Message; color: A
       color={color}
       label={t("chat.consultGroup.label", { name: from.name, of: from.of })}
       defaultOpen={summary.open}
+      // One question: its own line ("Atlas respondeu"), with no "Perguntou a 1 colega" to open.
+      one={group.length === 1}
     />
   );
 }
