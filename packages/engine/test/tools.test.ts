@@ -329,6 +329,61 @@ describe("approval flow (end to end)", () => {
     expect(main[1]?.meta?.work).toMatchObject({ steps: 0 });
   });
 
+  test("each call names its app and service, live, in its step and in the reply's meta.work (the logos)", async () => {
+    const icon = "/api/app/connector-icons/o1/c1/0123456789abcdef.png";
+    const tool = (name: string, extra: Partial<ToolDefinition>): ToolDefinition => ({
+      name,
+      description: `${name} (fake)`,
+      scope: "",
+      inputSchema: { type: "object" },
+      execute: async () => ({ content: `${name} ok` }),
+      ...extra,
+    });
+    const tools = [
+      tool("mail_ana_search", { connectorLabel: "Email", service: "gmail" }),
+      tool("acme_find_orders", { connectorLabel: "Acme", serviceIcon: icon }),
+    ];
+    f = await setup({
+      toolSources: [{ name: "fake-services", tools: async () => tools }],
+      reply: (req) => {
+        const last = req.messages.at(-1);
+        if (typeof last?.content !== "string" && last?.content.some((b) => b.type === "tool_result"))
+          return { chunks: ["Found two emails and one order."] };
+        return {
+          chunks: ["Looking."],
+          toolUses: [
+            { name: "mail_ana_search", input: {} },
+            { name: "mail_ana_search", input: {} },
+            { name: "acme_find_orders", input: {} },
+          ],
+        };
+      },
+    });
+    const events = f.listen(f.general.id);
+    await post(f, "@dev any news?");
+    await drainOutbox(f.db, f.handlers);
+    expect(events.filter((e) => e.type === "agent.tool" && e.tool)).toMatchObject([
+      { tool: "mail_ana_search", connector: "Email", service: "gmail" },
+      { tool: "mail_ana_search", connector: "Email", service: "gmail" },
+      { tool: "acme_find_orders", connector: "Acme", serviceIcon: icon },
+    ]);
+    const steps = await f.db.select().from(schema.agentRunSteps).orderBy(asc(schema.agentRunSteps.seq));
+    expect(steps.filter((s) => s.kind === "tool_call").map((s) => s.data)).toMatchObject([
+      { name: "mail_ana_search", connector: "Email", service: "gmail" },
+      { name: "mail_ana_search", connector: "Email", service: "gmail" },
+      { name: "acme_find_orders", connector: "Acme", serviceIcon: icon },
+    ]);
+    const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(main.at(-1)?.body).toBe("Found two emails and one order.");
+    expect(main.at(-1)?.meta?.work).toMatchObject({
+      steps: 3,
+      calls: [
+        { name: "mail_ana_search", connector: "Email", service: "gmail" },
+        { name: "acme_find_orders", connector: "Acme", serviceIcon: icon },
+      ],
+    });
+  });
+
   test("mention → tool call → approval → approve → resumed run → merged", async () => {
     const gh = fakeGithub();
     f = await setup({ toolSources: [gh.source], reply: script });

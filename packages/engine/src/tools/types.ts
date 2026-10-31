@@ -73,6 +73,14 @@ export interface ToolDefinition {
   needs?: { name: string; scope: string };
   /** The app's name for connector tools ("GitHub", "himetrica"), for activity indicators. */
   connectorLabel?: string;
+  /**
+   * The service it works in, for its logo in the chat: a catalog connector's or one-click preset's id (`github`),
+   * a mailbox's provider (`gmail`, `outlook`) or IMAP preset (`icloud`; `custom` for a server of its own), or
+   * `postgres`.
+   */
+  service?: string;
+  /** A server connected by address: its own icon (`/api/app/connector-icons/…`). */
+  serviceIcon?: string;
   /** Needs a person's approval for every call. Merge, deploy and rollback always do. */
   sensitive?: boolean;
   /**

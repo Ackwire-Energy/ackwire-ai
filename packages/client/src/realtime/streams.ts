@@ -138,6 +138,9 @@ export interface LiveRun {
   tool?: string | null;
   /** The app of that tool, when the event names it ("GitHub"). */
   connector?: string | null;
+  /** Its service and a custom server's own icon, when the event names them (see `toolActivity`). */
+  service?: string | null;
+  serviceIcon?: string | null;
   /** What the tool works on, when the event says (the skill name for `load_skill`). */
   toolDetail?: string | null;
   /** "Parar" was pressed and the server hasn't confirmed yet. */
@@ -171,6 +174,8 @@ export type LiveWork =
       id: string;
       tool: string;
       connector: string | null;
+      service?: string | null;
+      serviceIcon?: string | null;
       detail: string | null;
       code: LiveCode | null;
       output: LiveOutput[];
@@ -249,6 +254,9 @@ export interface AgentToolEvent {
   agentId: string;
   tool: string | null;
   connector?: string | null;
+  /** The service it works in (`gmail`, `github`, `postgres`…) and a custom server's own icon, for its logo. */
+  service?: string | null;
+  serviceIcon?: string | null;
   /** E.g. the skill being opened by `load_skill`. */
   detail?: string | null;
   /** The code it runs (`run_code`, skill scripts), expected from the backend. */
@@ -506,6 +514,8 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
             id: event.toolUseId ?? `call-${work.length}`,
             tool: event.tool ?? "",
             connector: event.connector ?? null,
+            ...(event.service ? { service: event.service } : {}),
+            ...(event.serviceIcon ? { serviceIcon: event.serviceIcon } : {}),
             detail: event.detail ?? null,
             code: event.code ?? null,
             output: [],
@@ -531,6 +541,8 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
         ...(said ? { text: "" } : {}),
         tool: event.tool,
         connector: event.connector ?? null,
+        service: event.service ?? null,
+        serviceIcon: event.serviceIcon ?? null,
         toolDetail: event.detail ?? null,
         ...(newCall ? { code: event.code ?? null, output: [] } : {}),
       });

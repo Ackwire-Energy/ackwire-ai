@@ -15,6 +15,7 @@ import {
   defaultPolicy,
   isAddress,
   MAIL_ACTIONS,
+  MAIL_BRANDS,
   type MailChoice,
   mailActionsFrom,
   mailErrorOf,
@@ -63,13 +64,6 @@ import { useToast } from "@/lib/toast";
  * mailbox has (replies go out from the one the email arrived at).
  */
 
-/** Each mailbox's mark: Gmail's and iCloud's in one color (Simple Icons, CC0), Outlook's in Microsoft's colors. */
-const BRAND: Partial<Record<MailChoice, { iconUrl: string; brandColor: string | null }>> = {
-  gmail: { iconUrl: "/connectors/gmail.svg", brandColor: "#EA4335" },
-  outlook: { iconUrl: "/brands/outlook.svg", brandColor: null },
-  icloud: { iconUrl: "/connectors/icloud.svg", brandColor: "#3693F3" },
-};
-
 export const mailChoiceName = (t: TFunction, choice: MailChoice) => t(`mail.choice.${choice}.name`);
 
 /** The catalog cards this server can connect (Gmail/Outlook need Composio; the rest IMAP). */
@@ -94,7 +88,7 @@ export function MailIcon({ choice, size = "md" }: { choice: MailChoice; size?: "
       </span>
     );
   }
-  return <ConnectorIcon def={BRAND[choice] ?? null} label={mailChoiceName(t, choice)} size={size} />;
+  return <ConnectorIcon def={MAIL_BRANDS[choice] ?? null} label={mailChoiceName(t, choice)} size={size} />;
 }
 
 /** How a mailbox connects, for the card's one tag. */

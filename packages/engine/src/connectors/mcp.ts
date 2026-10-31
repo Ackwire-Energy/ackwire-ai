@@ -6,6 +6,7 @@ import type { ToolDefinition, ToolSource } from "../tools/types";
 import { CONNECTOR_CATALOG, connectorScope, fillTitle } from "./catalog";
 import { activeConnections, type ConnectorConnection, type ConnectorDeps, connectionHeaders } from "./connections";
 import { classifiedTools, customScope, isCustom, type ToolAccess } from "./custom";
+import { presetForServer } from "./presets";
 import type { McpServerInfo } from "./server-icon";
 
 /** A tool as an MCP server lists it. */
@@ -134,6 +135,7 @@ export function createConnectorToolSource(deps: ConnectorDeps & { connect?: McpC
         .replace(/[^a-z0-9]+/g, "_")
         .replace(/^_|_$/g, "")
         .slice(0, 24) || "mcp";
+    const preset = presetForServer(connection.serverUrl)?.id;
     return classified.flatMap((row): ToolDefinition[] => {
       const tool = byName.get(row.name);
       const access = row.access as ToolAccess;
@@ -146,6 +148,8 @@ export function createConnectorToolSource(deps: ConnectorDeps & { connect?: McpC
           scope: customScope(connection.id, access),
           connectionId: connection.id,
           connectorLabel: connection.label,
+          service: preset,
+          serviceIcon: connection.icon ?? undefined,
           // A sensitive tool never runs without approval, whatever is stored.
           sensitive: access === "approval" || row.sensitive,
           external: true, // whatever the server returns is third-party text
@@ -204,6 +208,7 @@ export function createConnectorToolSource(deps: ConnectorDeps & { connect?: McpC
             scope: connectorScope(def.id, mapped.scope),
             connectionId: connection.id,
             connectorLabel: def.label,
+            service: def.id,
             sensitive: mapped.sensitive === true,
             external: true, // whatever the server returns is third-party text
             describe: (input) => ({

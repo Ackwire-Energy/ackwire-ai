@@ -345,16 +345,19 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
       // A mission task's call through the bridge has no run (ADR 0032): nothing to record steps on.
       const record: typeof addRunStep = (db, run, kind, data) =>
         ctx.runId ? addRunStep(db, run, kind, data) : Promise.resolve();
-      // The same short label the live chip shows (built-in tools only, never a connector's input): the chat's
-      // line of this call says it after the run too.
+      const tool = unknownInDirectory ? undefined : (all.get(call.name) ?? directoryTool);
+      // What the live chip shows (the short label of a built-in tool, never a connector's input; the app and its
+      // service): the chat's line of this call says the same after the run.
       const detail = toolDetail(call.name, call.input);
       await record(ctx.db, step, "tool_call", {
         toolUseId: call.toolUseId,
         name: call.name,
         input: call.input,
         ...(detail ? { detail } : {}),
+        ...(tool?.connectorLabel ? { connector: tool.connectorLabel } : {}),
+        ...(tool?.service ? { service: tool.service } : {}),
+        ...(tool?.serviceIcon ? { serviceIcon: tool.serviceIcon } : {}),
       });
-      const tool = unknownInDirectory ? undefined : (all.get(call.name) ?? directoryTool);
       // The audit (agent-audit.ts): every call that matters, with how it ended. A routine's belongs where it
       // delivers, never to its room.
       const actionChannel =

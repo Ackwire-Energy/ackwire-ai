@@ -1,17 +1,17 @@
 import type { TFunction } from "i18next";
-import type { Run, RunStep } from "../api/types";
+import type { ConnectorDef, Run, RunStep } from "../api/types";
 import type { LiveCode, LiveOutput, LiveWork } from "../realtime/streams";
-import { type ActivityKind, activityVerb, appLabel, toolActivity } from "./activity";
+import { type Activity, type ActivityKind, activityVerb, appLabel, toolActivity } from "./activity";
+import { POSTGRES_MARK } from "./databases";
 import { joinNames } from "./format";
+import { MAIL_BRANDS } from "./mail";
 
 /** Fallback when a tool has no label: "github_merge_pull_request" → "github merge pull request". */
 export const toolLabel = (name: string) => name.replace(/[_-]+/g, " ").trim();
 
-/** One thing the agent did (a tool call), for the work summary. */
-export interface WorkItem {
+/** One thing the agent did (a tool call), for the work summary: what it did, in which service. */
+export interface WorkItem extends Activity {
   key: string;
-  kind: ActivityKind;
-  app?: string;
   tool: string;
   ms: number | null;
   failed: boolean;
@@ -49,10 +49,19 @@ export interface Work {
   durationMs: number | null;
 }
 
-/** The compact form the backend may put on the message (`meta.work`), before the steps are loaded. */
+/** A tool's first call in a reply's `meta.work`: its name, app and service (as the `tool_call` step says them). */
+export interface WorkCall {
+  name: string;
+  connector?: string;
+  service?: string;
+  serviceIcon?: string;
+}
+
+/** The compact form the backend puts on the message (`meta.work`), before the steps are loaded. */
 export interface WorkMeta {
   steps: number;
-  connectors: string[];
+  /** Each tool's first call, in order (a dozen at most): the closed block's logos. */
+  calls: WorkCall[];
   durationMs: number | null;
 }
 
@@ -61,10 +70,15 @@ export function workMeta(meta: Record<string, unknown> | undefined): WorkMeta | 
   if (!w || typeof w.steps !== "number") return null;
   return {
     steps: w.steps,
-    connectors: Array.isArray(w.connectors) ? w.connectors.filter((c): c is string => typeof c === "string") : [],
+    calls: Array.isArray(w.calls)
+      ? w.calls.filter((c): c is WorkCall => typeof (c as Partial<WorkCall> | null)?.name === "string")
+      : [],
     durationMs: typeof w.durationMs === "number" ? w.durationMs : null,
   };
 }
+
+/** A saved reply's apps before its steps load (`meta.work.calls`): the ones `toolApps` gives once they do. */
+export const workApps = (calls: WorkCall[]) => uniqueApps(calls.map((c) => toolActivity(c.name, c.connector, null, c)));
 
 const DRIVE: ActivityKind[] = ["readingDrive", "writingDrive", "exportingFile", "importingFile"];
 const time = (iso: string) => new Date(iso).getTime();
@@ -95,7 +109,10 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
     const name = typeof s.data.name === "string" ? s.data.name : "";
     const id = typeof s.data.toolUseId === "string" ? s.data.toolUseId : `${s.seq}`;
     const result = results.get(id);
-    const a = toolActivity(name);
+    const a = toolActivity(name, typeof s.data.connector === "string" ? s.data.connector : null, null, {
+      service: typeof s.data.service === "string" ? s.data.service : null,
+      serviceIcon: typeof s.data.serviceIcon === "string" ? s.data.serviceIcon : null,
+    });
     // A reaction already shows on the message it reacts to: never a step (the server's `meta.work` skips it too).
     if (a.kind === "reacting") continue;
     const app = a.kind === "consulting" ? a.app : DRIVE.includes(a.kind) ? "Drive" : undefined;
@@ -113,7 +130,7 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
       prev &&
       source === null &&
       !prev.code &&
-      sameActivity(prev, { kind: a.kind, app: a.app, tool: name }) &&
+      sameActivity(prev, { ...a, tool: name }) &&
       narration[narration.length - 1]?.at !== items.length
     ) {
       prev.count += 1;
@@ -124,8 +141,7 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
     }
     items.push({
       key: id,
-      kind: a.kind,
-      app: a.app,
+      ...a,
       tool: name,
       ms,
       failed,
@@ -162,11 +178,12 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
   return { steps: items, narration, connectors, durationMs };
 }
 
-/** Calls that read as the same line ("Usou o navegador"); an unknown tool's line names the tool. */
-export const sameActivity = (
-  a: { kind: ActivityKind; app?: string; tool: string },
-  b: { kind: ActivityKind; app?: string; tool: string },
-) => a.kind === b.kind && (a.app ?? "") === (b.app ?? "") && (a.kind !== "usingTool" || a.tool === b.tool);
+/** Calls that read as the same line ("Usou o navegador") with the same logo; an unknown tool's line names the tool. */
+export const sameActivity = (a: Activity & { tool: string }, b: Activity & { tool: string }) =>
+  a.kind === b.kind &&
+  (a.app ?? "") === (b.app ?? "") &&
+  (a.service ?? "") === (b.service ?? "") &&
+  (a.kind !== "usingTool" || a.tool === b.tool);
 
 /** How many tool calls the work stands for (folded lines count each call). */
 export const workCalls = (w: Work) => w.steps.reduce((n, s) => n + s.count, 0);
@@ -178,7 +195,7 @@ export const workCalls = (w: Work) => w.steps.reduce((n, s) => n + s.count, 0);
 export function foldLiveWork(work: LiveWork[]): LiveWork[] {
   const plain = (w: LiveWork | undefined) =>
     w?.kind === "call" && !w.code && w.output.length === 0
-      ? { ...toolActivity(w.tool, w.connector, w.detail), tool: w.tool }
+      ? { ...toolActivity(w.tool, w.connector, w.detail, w), tool: w.tool }
       : null;
   return work.filter((w, i) => {
     const a = plain(w);
@@ -259,28 +276,33 @@ export const firstLine = (text: string) => {
 /**
  * The grey words after a line's phrase: a built-in tool's own short label (the skill, the issue, the file; the
  * engine's `toolDetail`), or a connector tool's own name without its app ("github_search_issues" → "search
- * issues"). Never a connector's input: the live event doesn't carry it either.
+ * issues", a server's whole label too: "acme_tools_find_orders" → "find orders"; a mailbox's or a database's
+ * without the account it names: "mail_ana_search" → "search"). Never a connector's input: the live event doesn't
+ * carry it either.
  */
-export function toolHint(tool: string, activity: { kind: ActivityKind; app?: string }, detail?: string | null) {
+export function toolHint(tool: string, activity: Activity, detail?: string | null) {
   if (detail?.trim()) return detail.trim();
   if (activity.kind !== "consulting") return null;
-  let name = tool.trim().replace(/^mcp__[^_]+(?:_[^_]+)*?__/, "");
+  const name = tool.trim().replace(/^mcp__[^_]+(?:_[^_]+)*?__/, "");
+  if (activity.service === "mail" || activity.service === "postgres" || MAIL_BRANDS[activity.service ?? ""])
+    return toolLabel(name.replace(/^(?:mail|pg)_[a-z0-9]+_/, "")) || null;
   const app = (activity.app ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
-  const [head, ...rest] = name.split(/[_.:]/);
-  if (rest.length > 0 && head && app && (app.startsWith(head.toLowerCase()) || head.toLowerCase().startsWith(app)))
-    name = rest.join("_");
-  const words = toolLabel(name);
-  return words || null;
+  const parts = name.split(/[_.:]/);
+  let lead = 0;
+  for (let joined = ""; app && lead < parts.length - 1 && joined !== app; lead++) {
+    const next = joined + (parts[lead] ?? "").toLowerCase();
+    if (!app.startsWith(next) && !(lead === 0 && next.startsWith(app))) break;
+    joined = next;
+  }
+  return toolLabel(parts.slice(lead).join("_")) || null;
 }
 
 /** A line's state: working on it, done, it failed, or it didn't end (stopped during it, or it waits on a person). */
 export type ToolState = "run" | "done" | "fail" | "stop";
 
 /** One line of the tool block: a call (or several of the same in a row). */
-export interface ToolLine {
+export interface ToolLine extends Activity {
   key: string;
-  kind: ActivityKind;
-  app?: string;
   tool: string;
   state: ToolState;
   hint: string | null;
@@ -299,7 +321,7 @@ export type ToolItem =
   | { kind: "say"; key: string; text: string }
   | { kind: "steer"; key: string; messageId: string; now: boolean };
 
-const sameLine = (a: ToolLine, b: { kind: ActivityKind; app?: string; tool: string }) =>
+const sameLine = (a: ToolLine, b: Activity & { tool: string }) =>
   a.state !== "fail" && !a.code && !a.output && sameActivity(a, b);
 
 /**
@@ -319,7 +341,7 @@ export function toolItemsLive(work: LiveWork[], stopped = false): ToolItem[] {
       items.push({ kind: "steer", key: `steer-${w.messageId}`, messageId: w.messageId, now: w.now === true });
       return;
     }
-    const a = toolActivity(w.tool, w.connector, w.detail);
+    const a = toolActivity(w.tool, w.connector, w.detail, w);
     if (a.kind === "reacting") return;
     // Held (it waits on a person, so it never ran) reads like a call stopped before it ended.
     const state: ToolState = w.running ? (stopped ? "stop" : "run") : w.failed ? "fail" : w.held ? "stop" : "done";
@@ -336,8 +358,7 @@ export function toolItemsLive(work: LiveWork[], stopped = false): ToolItem[] {
       key: w.id,
       line: {
         key: w.id,
-        kind: a.kind,
-        app: a.app,
+        ...a,
         tool: w.tool,
         state,
         hint: toolHint(w.tool, a, w.detail),
@@ -364,7 +385,9 @@ export function toolItemsSaved(work: Work): ToolItem[] {
       line: {
         key: s.key,
         kind: s.kind,
-        app: s.app,
+        ...(s.app ? { app: s.app } : {}),
+        ...(s.service ? { service: s.service } : {}),
+        ...(s.icon ? { icon: s.icon } : {}),
         tool: s.tool,
         state: s.failed ? "fail" : s.held ? "stop" : "done",
         hint: s.hint ?? null,
@@ -384,15 +407,61 @@ const linesOf = (items: ToolItem[]) => items.flatMap((i) => (i.kind === "call" ?
 /** How many calls the items stand for (a folded line counts each). */
 export const toolCalls = (items: ToolItem[]) => linesOf(items).reduce((n, l) => n + l.count, 0);
 
-/** The apps it used, in order of first use (the block's logos). */
-export function toolApps(items: ToolItem[]) {
-  const apps: { kind: ActivityKind; app?: string }[] = [];
-  for (const l of linesOf(items)) {
-    const key = l.kind === "consulting" ? `app:${l.app ?? ""}` : `kind:${l.kind}`;
-    if (!apps.some((a) => (a.kind === "consulting" ? `app:${a.app ?? ""}` : `kind:${a.kind}`) === key))
-      apps.push({ kind: l.kind, ...(l.app ? { app: l.app } : {}) });
+/** How many logos the block's line stacks: a few, so its words keep the room. */
+const LOGOS_MAX = 4;
+
+/** What makes an app one logo of the block: its service, else its name, else what one of our tools does. */
+export const appKey = (a: Activity) =>
+  a.service ? `service:${a.service}` : a.kind === "consulting" ? `app:${a.app ?? ""}` : `kind:${a.kind}`;
+
+/** Each app once, in order of first use, the first few. */
+function uniqueApps(activities: Activity[]) {
+  const apps: Activity[] = [];
+  for (const a of activities) {
+    if (apps.length === LOGOS_MAX) break;
+    if (apps.some((b) => appKey(b) === appKey(a))) continue;
+    apps.push({
+      kind: a.kind,
+      ...(a.app ? { app: a.app } : {}),
+      ...(a.service ? { service: a.service } : {}),
+      ...(a.icon ? { icon: a.icon } : {}),
+    });
   }
   return apps;
+}
+
+/** The apps it used, in order of first use (the block's logos, a few at most). */
+export const toolApps = (items: ToolItem[]) => uniqueApps(linesOf(items));
+
+/**
+ * How a call's logo is drawn, as the connectors screens draw the service: our own icon for one of our tools
+ * (`own`), our envelope for a mailbox whose maker has no mark here (`mail`), or the service's tile: its mark,
+ * else a server's own icon, else a monogram of its name.
+ */
+export type CallLogo =
+  | { kind: "own" }
+  | { kind: "mail" }
+  | {
+      kind: "service";
+      def: Pick<ConnectorDef, "iconUrl" | "brandColor"> | null;
+      image: string | null;
+      label: string;
+    };
+
+const plain = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
+
+/** A call's logo: its service's mark (a mailbox's maker, Postgres, the catalog's by id or name), or ours. */
+export function callLogo(
+  a: Activity,
+  catalog: Pick<ConnectorDef, "id" | "label" | "iconUrl" | "brandColor">[],
+): CallLogo {
+  if (a.service === "mail") return { kind: "mail" };
+  const mark = a.service === "postgres" ? { iconUrl: POSTGRES_MARK, brandColor: null } : MAIL_BRANDS[a.service ?? ""];
+  if (mark) return { kind: "service", def: mark, image: null, label: a.app ?? "" };
+  const names = [a.service, a.kind === "consulting" ? a.app : undefined].flatMap((n) => (n ? [plain(n)] : []));
+  const def = catalog.find((d) => names.includes(plain(d.id)) || names.includes(plain(d.label))) ?? null;
+  if (!def && a.kind !== "consulting") return { kind: "own" };
+  return { kind: "service", def, image: a.icon ?? null, label: a.app ?? def?.label ?? "" };
 }
 
 /** The line the closed block shows while it works: the call running now, else the last one. */

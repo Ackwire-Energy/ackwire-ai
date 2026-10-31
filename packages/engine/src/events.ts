@@ -172,6 +172,9 @@ export type ChannelEvent =
       runId: string;
       tool: string | null;
       connector?: string;
+      /** The service it works in, for its logo (`ToolDefinition.service`), and a custom server's own icon. */
+      service?: string;
+      serviceIcon?: string;
       /** A short label (≤ 80 chars): the skill, the issue (#131 or title) or the Drive file. Built-in tools only. */
       detail?: string;
       /** The model's id of this call (live output refers to it). */

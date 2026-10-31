@@ -81,6 +81,7 @@ test("tools follow the agent's access; never part of 'all tools' nor replaced by
   const query = (await d.tools.list(ctx)).find((t) => t.name === "pg_producao_query");
   expect(query && isSensitive(query)).toBe(false);
   expect(query?.connectorLabel).toBe("Produção");
+  expect(query?.service).toBe("postgres");
   // Replacing the agent's other grants keeps the database one.
   await setAgentScopes(d.f.db, d.f.owner.id, d.f.org.id, d.f.agent.id, [{ connectionId: null, scope: "context:read" }]);
   expect(await names()).toHaveLength(3);

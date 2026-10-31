@@ -13,6 +13,9 @@ import type {
 } from "../api/types";
 import type { ReviewTool } from "./tool-review";
 
+/** PostgreSQL's own elephant (`apps/web/public/brands/README.md`), for the product, never for databases in general. */
+export const POSTGRES_MARK = "/brands/postgresql.svg";
+
 /** "Onde fica o banco", in the order the connect step offers them. */
 export const DATABASE_PROVIDERS: DatabaseProvider[] = ["supabase", "neon", "railway", "rds", "render", "other"];
 

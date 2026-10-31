@@ -96,6 +96,7 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
           scope: connectorScope("github", "git.read"),
           connectionId: connection.id,
           connectorLabel: connection.label,
+          service: "github",
           inputSchema: {
             type: "object",
             properties: {
@@ -169,6 +170,7 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
           scope: connectorScope("github", "pr.write"),
           connectionId: connection.id,
           connectorLabel: connection.label,
+          service: "github",
           inputSchema: {
             type: "object",
             properties: {

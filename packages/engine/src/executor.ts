@@ -172,6 +172,8 @@ const {
 } = schema;
 /** A bridged call can land a moment after the text the brain streamed before it: its text up to this much later counts as before. */
 const ASKED_GRACE_MS = 250;
+/** How many tools a reply's `meta.work.calls` names: its closed block stacks only a few logos. */
+const WORK_CALLS = 12;
 
 /**
  * What the agent engine needs (ADR 0032). The engine is this file: it owns the
@@ -876,19 +878,38 @@ async function executeRunInner(
         : body;
     // Team actions (ADR 0064): what the run didn't repeat because the team already did it rides on its reply.
     const teamChecks = note ? [] : await runChecksForReply(tx, run.orgId, run.id);
-    // "Ver o que ele fez" under the reply: how many tool calls so far, so the apps leave it out at 0. A reaction
-    // already shows on the message it reacts to: it isn't counted.
-    const [calls] = await tx
-      .select({ n: count() })
+    // "Ver o que ele fez" under the reply: how many tool calls so far, so the apps leave it out at 0, and each
+    // tool's first call (its app and service), for the logos of the closed block. A reaction already shows on the
+    // message it reacts to: it isn't counted.
+    const name = sql<string>`${agentRunSteps.data}->>'name'`;
+    const tools = await tx
+      .select({
+        name,
+        connector: sql<string | null>`min(${agentRunSteps.data}->>'connector')`,
+        service: sql<string | null>`min(${agentRunSteps.data}->>'service')`,
+        serviceIcon: sql<string | null>`min(${agentRunSteps.data}->>'serviceIcon')`,
+        n: count(),
+      })
       .from(agentRunSteps)
       .where(
         and(
           eq(agentRunSteps.runId, run.id),
           eq(agentRunSteps.kind, "tool_call"),
-          sql`${agentRunSteps.data}->>'name' is distinct from ${REACT_TOOL}`,
+          sql`${name} is distinct from ${REACT_TOOL}`,
         ),
-      );
-    const work = { steps: calls?.n ?? 0, durationMs: Math.max(0, Date.now() - run.createdAt.getTime()) };
+      )
+      .groupBy(name)
+      .orderBy(sql`min(${agentRunSteps.seq})`);
+    const work = {
+      steps: tools.reduce((n, t) => n + t.n, 0),
+      durationMs: Math.max(0, Date.now() - run.createdAt.getTime()),
+      calls: tools.slice(0, WORK_CALLS).map((t) => ({
+        name: t.name,
+        ...(t.connector ? { connector: t.connector } : {}),
+        ...(t.service ? { service: t.service } : {}),
+        ...(t.serviceIcon ? { serviceIcon: t.serviceIcon } : {}),
+      })),
+    };
     const m = await postAgentMessage(
       tx,
       run,

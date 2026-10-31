@@ -99,7 +99,7 @@ export function runContext(t: TFunction, run: LiveRun, now = Date.now()) {
   };
   const call = [...(run.work ?? [])].reverse().find((w) => w.kind === "call" && w.running);
   if (call?.kind === "call") {
-    const doing = toolActivity(call.tool, call.connector, call.detail);
+    const doing = toolActivity(call.tool, call.connector, call.detail, call);
     return call.code || doing.kind === "runningCode"
       ? t("run.ctx.code", { time: ago(call.since) })
       : t("run.ctx.tool", { doing: activityVerb(t, doing), time: ago(call.since) });
