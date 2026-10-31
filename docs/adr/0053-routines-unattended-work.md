@@ -1,6 +1,6 @@
 # 0053. Routines and unattended work: safe and dependable on every brain
 
-- Status: Accepted. Amended 2026-10-30: §3 (one command policy on every path that runs a command on a computer; where a push goes is read with git there). Amended 2026-10-31: §3 (through our git proxy, what it refuses never runs from the computer); by ADR 0089 §9 (a chain stays a person's for 1000 links, each message's root remembered)
+- Status: Accepted. Amended 2026-10-30: §3 (one command policy on every path that runs a command on a computer; where a push goes is read with git there). Amended 2026-10-31: §3 (through our git proxy, what it refuses never runs from the computer), §11 (where it runs only where the workspace has more than one computer, by its name; "Quando posta" with its ⓘ); by ADR 0089 §9 (a chain stays a person's for 1000 links, each message's root remembered)
 - Date: 2026-10-23
 - Builds on: ADR 0032 (one engine, swappable brains), ADR 0034 (agents consult each other), ADR 0037 (agents investigate first, act with undo), the chat-delivery work (background runs, `hand_off`, run inbox)
 - Evaluates: ADRs 0045–0052 and the `feat/agent-runtime` branch (taken where they fit, see the end)
@@ -120,7 +120,9 @@ Rotinas shows a routine's prompt, records and reports only to its creator, admin
 
 ### 11. Product
 
-Rotinas shows per routine: its state (active, paused with the reason and a one-tap fix, failing, waiting for a computer, running with Stop), a week's health ("12 de 14 OK esta semana · 2 puladas"), its access level and report policy in plain words, where it runs ("Claude Code no MacBook do Walter"), its usage (tokens for a plan, cost for the API) and each run with its plain-language outcome and a link to the conversation. The form asks two plain questions: "Quando falar" (toda vez / só quando tiver novidade) and "O que pode fazer sozinha" (só olhar e contar / pode agir). Chat tools create, update, delete (with Undo), run and list routines with these settings, and can set an email or event trigger instead of polling. No internal names in the UI.
+Rotinas shows per routine: its state (active, paused with the reason and a one-tap fix, failing, waiting for a computer, running with Stop), a week's health ("12 de 14 OK esta semana · 2 puladas"), its access level and report policy in plain words, where it runs ("MacBook do Walter"), its usage (tokens for a plan, cost for the API) and each run with its plain-language outcome and a link to the conversation. The form asks two plain questions: "Quando posta" (toda vez / só quando tiver novidade) and "O que pode fazer sozinha" (só olhar e contar / pode agir), each explained behind its ⓘ.
+
+*Amended 2026-10-31:* a computer is named only where the workspace has more than one (`namesComputers`, from the computers every member lists): the Cloud's own, or a server's only one, tells nobody anything. So "Onde roda" shows only then, as the computer's name alone; the state chip says "Esperando o computador desde 09:12"; and the note on a routine that runs hourly or more often ("que precisa ficar ligado") shows only where people connect their own computers, beside when it runs. Chat tools create, update, delete (with Undo), run and list routines with these settings, and can set an email or event trigger instead of polling. No internal names in the UI.
 
 ### 12. Tests and evals
 

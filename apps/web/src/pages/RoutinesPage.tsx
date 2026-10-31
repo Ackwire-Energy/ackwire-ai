@@ -87,7 +87,7 @@ import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { SwitchComputerDialog } from "@/components/MachineOutages";
 import { useOrg } from "@/components/org-context";
-import { useComputerEdition } from "@/components/WorkspaceComputer";
+import { useComputerEdition, useNamesComputers } from "@/components/WorkspaceComputer";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { lookOf } from "@/lib/look";
 import { useOpenParam } from "@/lib/open-param";
@@ -553,9 +553,11 @@ function useRoutineControls(r: Routine) {
 /** The state as a chip ("Pausada: o agente não está mais no canal", "Falhando (3 seguidas)"…). */
 function RoutineStateChip({ routine: r, className }: { routine: Routine; className?: string }) {
   const { t, i18n } = useTranslation();
+  const { org } = useOrg();
   const say = useSay();
+  const names = useNamesComputers(org.id);
   const since = r.waitingFor ? whenAt(t, i18n.language, r.waitingFor.since) : "";
-  const state = routineStateWords(r, since);
+  const state = routineStateWords(r, since, names);
   return (
     <Chip
       icon={state.icon}
@@ -946,7 +948,11 @@ function AgentFace({ agentId }: { agentId: string }) {
   return actors.avatar({ type: "agent", id: agentId }, "xs");
 }
 
-/** The routine's details: its state, the week, what it does, when, where, how it works and its runs. */
+/**
+ * The routine's details: its state, the week, what it does, when, where, how it works and its runs. Where it runs
+ * only where the workspace has more than one computer, by its name. Short sections sit two to a row when the dialog
+ * is wide enough (`routine-details__pair`).
+ */
 function RoutineDetails({
   routine: r,
   now,
@@ -1003,8 +1009,10 @@ function RoutineDetails({
         .filter(Boolean)
         .join(" · ")
     : null;
+  const namesComputer = useNamesComputers(org.id);
+  const runsOn = whereItRuns(r.brain, namesComputer);
   const perDay = r.trigger.type === "schedule" ? runsPerDay(r.trigger.rule ?? null, r.trigger.cron) : 0;
-  const busy = r.active ? busyOnComputer(r.brain, perDay) : null;
+  const busy = r.active ? busyOnComputer(r.brain, perDay, { selfHost, namesComputer }) : null;
   const whereHint =
     r.target.type === "conversation"
       ? r.target.threadId
@@ -1062,10 +1070,30 @@ function RoutineDetails({
       {outage && outages.data && (
         <SwitchComputerDialog open={switching} onOpenChange={setSwitching} outage={outage} data={outages.data} />
       )}
-      <DetailsSection title={t("routines.panel.week")}>
-        <p className="routine-details__sentence">{health ? health.map(say).join(" · ") : t("routines.health.none")}</p>
-        {usageText && <p className="small muted">{`${t("routines.panel.usage")}: ${usageText}`}</p>}
-      </DetailsSection>
+      <div className="routine-details__pair">
+        <DetailsSection title={t("routines.panel.week")}>
+          <p className="routine-details__sentence">
+            {health ? health.map(say).join(" · ") : t("routines.health.none")}
+          </p>
+          {usageText && <p className="small muted">{`${t("routines.panel.usage")}: ${usageText}`}</p>}
+        </DetailsSection>
+        <DetailsSection title={t("routines.panel.where")}>
+          <div className="routine-details__where">
+            <span className="routine-details__where-icon">
+              <Icon name={targetIcon(r.target)} size={16} />
+            </span>
+            <span>
+              <b>{target(r.target)}</b>
+              <small>{t(`routines.panel.whereHint.${whereHint}`)}</small>
+            </span>
+          </div>
+        </DetailsSection>
+      </div>
+      {runsOn && (
+        <DetailsSection title={t("routines.panel.runsOn")}>
+          <p className="routine-details__sentence">{runsOn}</p>
+        </DetailsSection>
+      )}
       <DetailsSection title={t("routines.panel.what", agentGrammar(t, name))}>
         {r.canSeeDetails && r.prompt !== null ? (
           <p className="routine-details__prompt">{r.prompt}</p>
@@ -1095,20 +1123,6 @@ function RoutineDetails({
           )
         )}
         {!done && <p className="small muted">{nextText(r, now)}</p>}
-      </DetailsSection>
-      <DetailsSection title={t("routines.panel.where")}>
-        <div className="routine-details__where">
-          <span className="routine-details__where-icon">
-            <Icon name={targetIcon(r.target)} size={16} />
-          </span>
-          <span>
-            <b>{target(r.target)}</b>
-            <small>{t(`routines.panel.whereHint.${whereHint}`)}</small>
-          </span>
-        </div>
-      </DetailsSection>
-      <DetailsSection title={t("routines.panel.runsOn")}>
-        <p className="routine-details__sentence">{say(whereItRuns(r.brain))}</p>
         {busy && (
           <p className="routine-note small ac-iconline">
             <Icon name="computer" size={14} />
@@ -1116,19 +1130,28 @@ function RoutineDetails({
           </p>
         )}
       </DetailsSection>
-      <DetailsSection title={t("routines.panel.access")}>
-        <p className="routine-details__sentence">
-          <span className="ac-hintline">
-            {t(`routines.access.${r.access}`)}
-            <InfoHint name={t("common.about", { label: t("routines.panel.access") })}>
-              {t("routines.access.hint")}
-            </InfoHint>
-          </span>
-        </p>
-      </DetailsSection>
-      <DetailsSection title={t("routines.panel.report")}>
-        <p className="routine-details__sentence">{t(`routines.report.${r.report}`)}</p>
-      </DetailsSection>
+      <div className="routine-details__pair">
+        <DetailsSection title={t("routines.panel.access")}>
+          <p className="routine-details__sentence">
+            <span className="ac-hintline">
+              {t(`routines.access.${r.access}`)}
+              <InfoHint name={t("common.about", { label: t("routines.panel.access") })}>
+                {t("routines.access.hint")}
+              </InfoHint>
+            </span>
+          </p>
+        </DetailsSection>
+        <DetailsSection title={t("routines.panel.report")}>
+          <p className="routine-details__sentence">
+            <span className="ac-hintline">
+              {t(`routines.report.${r.report}`)}
+              <InfoHint name={t("common.about", { label: t("routines.panel.report") })}>
+                {t("routines.report.hint")}
+              </InfoHint>
+            </span>
+          </p>
+        </DetailsSection>
+      </div>
       <DetailsSection title={t("routines.panel.runs")}>
         {runs.isLoading && list.length === 0 && <LoadingList count={3} avatar={false} />}
         {list.length > 0 && (
@@ -1310,7 +1333,7 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
     routine?.trigger.type === "event" ? routine.trigger.event : "sentry.issue_created",
   );
   const [active, setActive] = useState(routine?.active ?? true);
-  // The two plain questions: when it speaks, and what it may do on its own.
+  // The two plain questions: when it posts, and what it may do on its own.
   const [report, setReport] = useState<RoutineReport>(routine?.report ?? "when_new");
   const [access, setAccess] = useState<RoutineAccess>(routine?.access ?? "read");
   const say = useSay();
@@ -1430,9 +1453,14 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
   };
   // A routine on someone's computer that runs hourly or more often: say how often it wakes that computer.
   const brain = actors.dir.agentById.get(agentId)?.brain;
+  const selfHost = useComputerEdition(org.id) === "selfhost";
+  const namesComputer = useNamesComputers(org.id);
   const busy =
     kind === "schedule" && !once && brain
-      ? busyOnComputer({ kind: brain.kind, machineName: brain.computer ?? null }, runsPerDay(toApiRule(rule)))
+      ? busyOnComputer({ kind: brain.kind, machineName: brain.computer ?? null }, runsPerDay(toApiRule(rule)), {
+          selfHost,
+          namesComputer,
+        })
       : null;
   // Only a phrase that wasn't understood says something here; the sentence above already says what was.
   const phraseError = () => {
@@ -1720,7 +1748,12 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
             </p>
           )}
           <div className="routine-kind">
-            <span className="ac-field__label">{t("routines.form.report")}</span>
+            <span className="ac-hintline">
+              <span className="ac-field__label">{t("routines.form.report")}</span>
+              <InfoHint name={t("common.about", { label: t("routines.form.report") })}>
+                {t("routines.report.hint")}
+              </InfoHint>
+            </span>
             <Segmented
               label={t("routines.form.report")}
               value={report}

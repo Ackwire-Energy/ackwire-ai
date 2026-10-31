@@ -167,6 +167,12 @@ export const machineTitle = (m: Pick<Machine, "name" | "kind">, hostLabel: strin
   m.name || (m.kind === "host" ? hostLabel : "");
 
 /**
+ * Whether a line about where something runs names the computer (`GET …/machines`, every member's list): only
+ * where the workspace has more than one. The Cloud's own computer, or a server's only one, tells nothing.
+ */
+export const namesComputers = (machines: readonly unknown[] | null | undefined) => (machines?.length ?? 0) > 1;
+
+/**
  * A code pasted for a Claude sign-in is this sign-in's when it ends with `#<state>` of its link (what
  * Claude's page shows). Only then does a paste go to the computer without a tap: anything else from the
  * clipboard (a password) waits for the person.

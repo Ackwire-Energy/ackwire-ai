@@ -7,11 +7,13 @@ import {
   useAuthConfig,
   useComputerSetup,
   useFormerAgents,
+  useMachines,
   useMe,
   useMembers,
 } from "@agenteschat/client";
 import { computerEdition } from "@agenteschat/client/lib/computer";
 import { formerById } from "@agenteschat/client/lib/directory";
+import { namesComputers } from "@agenteschat/client/lib/machines";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/providers/org";
@@ -30,6 +32,11 @@ export function useOrgId(): string {
  */
 export function useEdition(): Edition | null {
   return computerEdition(useComputerSetup(useOrgId()).data, useAuthConfig().data?.workspaceComputer);
+}
+
+/** Whether lines about where things run name the computer here (`namesComputers`); false while the list loads. */
+export function useNamesComputers(): boolean {
+  return namesComputers(useMachines(useOrgId()).data);
 }
 
 /** The signed-in person's id (null while it loads). */
