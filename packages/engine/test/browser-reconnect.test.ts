@@ -7,7 +7,11 @@ import {
   createBrowserLive,
   createBrowserToolSource,
   grantScopes,
+  type MachineCaller,
+  MachineDroppedError,
   type MachineHub,
+  MachineOfflineError,
+  withConnectedMachine,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
 import { pairMachine, RUNNER } from "./machine-fixtures";
@@ -148,12 +152,30 @@ test("a runner that restarts after its socket closed: the views hear it reconnec
 async function toolSetup() {
   const holder: { hub?: MachineHub } = {};
   const hub = () => holder.hub as MachineHub;
+  /** The ops of the tools' calls that found the computer gone, and when the first one did. */
+  const offline: string[] = [];
+  let found!: () => void;
+  const foundOffline = new Promise<void>((resolve) => {
+    found = resolve;
+  });
   f = await setup({
     machines: true,
     toolSources: [
       createBrowserToolSource({
         machines: {
-          hub: { status: (id) => hub().status(id), call: (id, request, options) => hub().call(id, request, options) },
+          hub: {
+            status: (id) => hub().status(id),
+            call: (id, request, options) =>
+              hub()
+                .call(id, request, options)
+                .catch((error: unknown) => {
+                  if (error instanceof MachineOfflineError) {
+                    offline.push(request.op);
+                    found();
+                  }
+                  throw error;
+                }),
+          },
         },
       }),
     ],
@@ -173,20 +195,22 @@ async function toolSetup() {
     if (r.type !== "result") throw new Error("expected a result");
     return r.output;
   };
-  return { hub: hub(), paired, open };
+  return { hub: hub(), paired, open, offline, foundOffline };
 }
 
 test("a computer whose runner is dialing again: the browser waits for it and opens the page; one away for minutes is said at once", async () => {
-  const { hub, paired, open } = await toolSetup();
+  const { hub, paired, open, offline, foundOffline } = await toolSetup();
   const old = browserRunner(hub);
   await old.hello(paired.token);
   // Its socket drops (a restart, the network): nothing the agent sends gets there until it says hello again.
   await hub.close(old.conn);
   const opening = open();
-  await Bun.sleep(50);
+  // The runner is back only once the open has found it gone.
+  await foundOffline;
   const fresh = browserRunner(hub);
   await fresh.hello(paired.token);
   const out = await opening;
+  expect(offline).toEqual(["browser.batch"]);
   expect(out.content).not.toContain("isn't answering");
   expect(out.isError).toBeFalsy();
   expect(out.content).toContain("agentes.chat");
@@ -202,4 +226,54 @@ test("a computer whose runner is dialing again: the browser waits for it and ope
   expect(Date.now() - started).toBeLessThan(1000);
   expect(away.isError).toBe(true);
   expect(away.content).toContain("The computer VPS isn't answering right now.");
+  // Asked once, not again.
+  expect(offline).toEqual(["browser.batch", "browser.batch"]);
+});
+
+test("a request whose socket closes while the hub checks it fails at once as never sent, not as a timeout", async () => {
+  const { hub, paired } = await toolSetup();
+  const runner = browserRunner(hub);
+  await runner.hello(paired.token);
+  // `hub.call` reads the workspace's standing first: the socket closes meanwhile.
+  const sent = hub.call(paired.machineId, { op: "list", path: "", depth: 1 }, { timeoutMs: 3_000 });
+  await hub.close(runner.conn);
+  const error = await sent.catch((e: unknown) => e);
+  expect(error).toBeInstanceOf(MachineOfflineError);
+  expect(error).not.toBeInstanceOf(MachineDroppedError);
+  expect((error as Error).message).toBe(
+    "The computer VPS isn't answering right now. It usually comes back within minutes.",
+  );
+});
+
+test("a run's call on a computer just gone waits for its runner to say hello again; a person's is answered at once", async () => {
+  const { hub, paired } = await toolSetup();
+  const old = browserRunner(hub);
+  await old.hello(paired.token);
+  await hub.close(old.conn);
+  let found!: () => void;
+  const foundOffline = new Promise<void>((resolve) => {
+    found = resolve;
+  });
+  const watched: MachineCaller = {
+    call: (id, request, options) => hub.call(id, request, options),
+    status: async (id) => {
+      const status = await hub.status(id);
+      if (status && !status.online) found();
+      return status;
+    },
+  };
+  const target = { machineId: paired.machineId, handle: "dev" };
+  const run = { orgId: f.org.id, agentId: f.agent.id, signal: new AbortController().signal };
+  const reached = withConnectedMachine(watched, run, target, async (computer) => computer.machineId);
+  await foundOffline;
+  const fresh = browserRunner(hub);
+  await fresh.hello(paired.token);
+  expect(await reached).toBe(paired.machineId);
+
+  await hub.close(fresh.conn);
+  const started = Date.now();
+  const person = { orgId: f.org.id, agentId: f.agent.id };
+  const refused = await withConnectedMachine(hub, person, target, async () => "reached").catch((e: unknown) => e);
+  expect(Date.now() - started).toBeLessThan(1000);
+  expect(refused).toBeInstanceOf(MachineOfflineError);
 });

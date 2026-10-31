@@ -219,6 +219,8 @@ export interface MachineConnection {
   machineId: string | null;
   orgId: string | null;
   name: string;
+  /** The machine's kind (from its hello): an offline error words the workspace's own computer differently. */
+  kind: string | null;
   authing: boolean;
   closed: boolean;
   pending: Map<string, Pending>;
@@ -508,6 +510,7 @@ export function createMachineHub(deps: MachineHubDeps) {
     conn.machineId = machine.id;
     conn.orgId = machine.orgId;
     conn.name = machine.name;
+    conn.kind = machine.kind;
     conn.protocol = frame.protocol;
     // Protocol 9: a runner that says nothing about the pause isn't paused.
     conn.pause = frame.protocol >= PAUSE_PROTOCOL ? pauseOf(frame.paused) : null;
@@ -826,6 +829,9 @@ export function createMachineHub(deps: MachineHubDeps) {
     return new Promise((resolve, reject) => {
       const { signal } = options;
       if (signal?.aborted) return reject(new MachineRequestError("canceled", "canceled"));
+      // Its socket closed while the caller awaited (`hub.call`'s checks): `closeConn` already failed what it had,
+      // and this would never be sent or answered. Never sent, so offline: `callWhenBack` may send it again.
+      if (conn.closed) return reject(new MachineOfflineError(conn.name, conn.kind));
       const id = crypto.randomUUID();
       const timeoutMs = options.timeoutMs ?? requestTimeoutMs(request);
       const turn = request.op === "brain.turn" ? (request as Extract<MachineRequest, { op: "brain.turn" }>) : null;
@@ -1123,6 +1129,7 @@ export function createMachineHub(deps: MachineHubDeps) {
         machineId: null,
         orgId: null,
         name: "",
+        kind: null,
         authing: false,
         closed: false,
         pending: new Map(),
