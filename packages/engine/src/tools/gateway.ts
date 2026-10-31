@@ -108,6 +108,8 @@ export const actionHash = (action: {
 }) => sha256(canonicalJson(action));
 
 export const APPROVAL_TTL_MS = 24 * 3600_000;
+/** How much of a call's `describe().detail` an approval card keeps. */
+export const APPROVAL_DETAIL_CHARS = 2000;
 const TOOL_NAME = /^[a-zA-Z0-9_-]{1,64}$/;
 const MAX_RESULT_CHARS = 50_000;
 /** Server-owned Git tools have a connection ID only to use that connection's credential. */
@@ -591,7 +593,7 @@ export function createToolGateway(deps: { sources: ToolSource[]; now?: () => Dat
             params: call.input,
             actionHash: actionHash({ tool: tool.name, scope: tool.scope, connectionId, params: call.input }),
             title: described.title.slice(0, 300),
-            detail: (described.detail ?? "").slice(0, 2000),
+            detail: (described.detail ?? "").slice(0, APPROVAL_DETAIL_CHARS),
             why,
             origin: authority ? approvalOrigin(authority) : null,
             ownerUserId: owner,

@@ -7,6 +7,7 @@ import { computerPreparing } from "../machine-provisioning";
 import { missionOfRun } from "../mission-context";
 import { replyThreadOf } from "../runs";
 import { NO_COMPUTER_MESSAGE, PREPARING_COMPUTER_MESSAGE, type SandboxDeps } from "../sandbox";
+import { APPROVAL_DETAIL_CHARS } from "../tools/gateway";
 import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
 import {
   BRANCH_PUSH_TOOL,
@@ -125,6 +126,10 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
         const twice = [...new Set(branches.filter((b, i) => branches.indexOf(b) !== i))];
         if (twice.length > 0)
           return { ok: false, message: `Named more than once: ${twice.join(", ")}. Name each branch once.` };
+        // The card lists every name it deletes: a list it would cut is refused.
+        if (branches.join("\n").length > APPROVAL_DETAIL_CHARS) {
+          return { ok: false, message: "These names don't fit on one card. Ask in smaller batches." };
+        }
         const facts = await factsOf(c, repo, branches);
         if (typeof facts === "string") return { ok: false, message: facts };
         const blocked = branches.flatMap((b) => {

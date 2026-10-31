@@ -109,6 +109,9 @@ export async function listApprovalRules(
   return rows.map((r) => ({ ...r, toolLabel: r.toolLabel || r.tool, createdAt: r.createdAt.toISOString() }));
 }
 
+/** The audit row of a removed rule, `details` `{ connectionId, tool, action }`: the git proxy reads it too (`pushGrants`). */
+export const RULE_REMOVED_AUDIT = "agent.approval_rule_removed";
+
 /** Removes one rule: the next call of that kind asks again. Whoever decides its approvals (`approve_actions`, the agent's owner). */
 export async function removeApprovalRule(
   db: Database,
@@ -132,7 +135,7 @@ export async function removeApprovalRule(
     await recordAudit(tx, {
       orgId,
       actor: { type: "person", id: actorId },
-      action: "agent.approval_rule_removed",
+      action: RULE_REMOVED_AUDIT,
       target: { type: "agent", id: agentId },
       details: { connectionId: gone.connectionId, tool: gone.tool, action: gone.action },
     });

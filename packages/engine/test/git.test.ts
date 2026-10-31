@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createHash, randomBytes } from "node:crypto";
 import { deflateSync, gzipSync } from "node:zlib";
-import { DELETE_BRANCHES_POINTER, otherBranchPointer } from "@agenteschat/adapters/command-policy";
+import {
+  DELETE_BRANCHES_POINTER,
+  NO_TERMINAL_COMMANDS,
+  otherBranchPointer,
+} from "@agenteschat/adapters/command-policy";
 import { and, eq, schema } from "@agenteschat/db";
 import {
   agentCommitEmail,
@@ -14,6 +18,7 @@ import {
   decideApproval,
   drainOutbox,
   type GitProxyDeps,
+  getAgentAccess,
   handleGitProxy,
   type InvokeResult,
   inflateZlib,
@@ -23,12 +28,13 @@ import {
   parseReceivePackRequest,
   pkt,
   postPersonMessage,
-  pushGrant,
   pushGrantKey,
+  pushGrants,
   type RoutineBrief,
   readPack,
   refRule,
   removeApprovalRule,
+  setAgentAccess,
   setAgentComputerTarget,
   setAgentHold,
   setAgentRepositories,
@@ -58,13 +64,15 @@ const sha1 = (type: string, data: Uint8Array) =>
   createHash("sha1").update(`${type} ${data.length}\0`).update(data).digest("hex");
 const enc = (s: string) => new TextEncoder().encode(s);
 
-function commitObject(parents: string[], message: string) {
+/** `late`: `parent` lines after the committer, a header git ignores (to git, those aren't parents). */
+function commitObject(parents: string[], message: string, late: string[] = []) {
   const data = enc(
     [
       `tree ${"4b825dc642cb6eb9a060e54bf8d69288fbee4904"}`,
       ...parents.map((p) => `parent ${p}`),
       "author Dev (agentes) <dev@agents.agentes.chat> 1760000000 +0000",
       "committer Dev (agentes) <dev@agents.agentes.chat> 1760000000 +0000",
+      ...late.map((p) => `parent ${p}`),
       "",
       message,
       "",
@@ -301,10 +309,16 @@ async function world(scopes: string[] = ["github:git.read", "github:git.write"],
   const auth = `Basic ${Buffer.from(`agentes:${token}`).toString("base64")}`;
   const call = (
     path: string,
-    init: { method?: string; body?: Uint8Array; auth?: string | null; query?: string } = {},
+    init: {
+      method?: string;
+      body?: Uint8Array;
+      auth?: string | null;
+      query?: string;
+      limits?: GitProxyDeps["limits"];
+    } = {},
   ) =>
     handleGitProxy(
-      deps,
+      init.limits ? { ...deps, limits: init.limits } : deps,
       new Request(`${PUBLIC_URL}/api/git/${f.org.id}/${connection.id}/${path}${init.query ?? ""}`, {
         method: init.method ?? "GET",
         headers: {
@@ -557,10 +571,20 @@ describe("branches that aren't the agent's own", () => {
     expect(report.split(`agentes: ${DELETE_BRANCHES_POINTER}`)).toHaveLength(2);
     expect(DELETE_BRANCHES_POINTER).toContain("Ask with delete_branches (repo, branches, why)");
     expect(DELETE_BRANCHES_POINTER).toContain("Never give the person a terminal command to run.");
+    expect(report.split(NO_TERMINAL_COMMANDS)).toHaveLength(2);
     for (const ref of refs) expect(report).toContain(`ng ${ref} branches are deleted with delete_branches`);
-    expect(receivePacks(w)).toBe(0);
     const [refused] = await audits("git.push_refused");
     expect(refused?.details.refs).toEqual(refs);
+    // More refs than one push may carry: refused before any is looked up.
+    const many = await w.call("acme/app.git/git-receive-pack", {
+      method: "POST",
+      body: pushBody(refs.map((ref) => ({ old, new: ZERO_OID, ref }))),
+      limits: { maxCommands: 6 },
+    });
+    expect(many.status).toBe(413);
+    expect(await many.text()).toBe("agentes: a push may update at most 6 refs at once\n");
+    expect(receivePacks(w)).toBe(0);
+    expect(await audits("git.push_refused")).toHaveLength(1);
   });
 
   test("proxy: someone else's branch waits for a person, then goes for 24 h, for that agent, repository and branch only", async () => {
@@ -603,12 +627,11 @@ describe("branches that aren't the agent's own", () => {
     expect(await push("refs/heads/bob/x")).toContain("bob/x isn't your branch");
     const at = { orgId: f.org.id, agentId: f.agent.id, connectionId: w.connection.id };
     const now = new Date();
-    expect(await pushGrant(f.db, at, pushGrantKey({ owner: "Acme", repo: "App" }, "ana/fix"), now)).toEqual({
-      approvalId: request.id,
-    });
-    expect(await pushGrant(f.db, at, "acme/other:ana/fix", now)).toBeNull();
-    expect(await pushGrant(f.db, at, "acme/app:ana/Fix", now)).toBeNull();
-    expect(await pushGrant(f.db, { ...at, agentId: crypto.randomUUID() }, "acme/app:ana/fix", now)).toBeNull();
+    const key = pushGrantKey({ owner: "Acme", repo: "App" }, "ana/fix");
+    expect(key).toBe("acme/app:ana/fix");
+    const grants = await pushGrants(f.db, at, [key, "acme/other:ana/fix", "acme/app:ana/Fix"], now);
+    expect([...grants]).toEqual([[key, { approvalId: request.id }]]);
+    expect((await pushGrants(f.db, { ...at, agentId: crypto.randomUUID() }, [key], now)).size).toBe(0);
 
     // An hour after the decision it still goes; a day and an hour after, it doesn't.
     const decidedAgo = (hours: number) =>
@@ -648,23 +671,47 @@ describe("branches that aren't the agent's own", () => {
       createdByUserId: f.owner.id,
     });
     // Approved more than a day ago, the rule still lets it go.
-    await f.db
-      .update(schema.approvals)
-      .set({ decidedAt: new Date(Date.now() - 48 * 3600_000) })
-      .where(eq(schema.approvals.id, request.id));
+    const decidedAgo = (hours: number) =>
+      f.db
+        .update(schema.approvals)
+        .set({ decidedAt: new Date(Date.now() - hours * 3600_000) })
+        .where(eq(schema.approvals.id, request.id));
+    await decidedAgo(48);
     expect(await push()).toContain("unpack ok");
     const [pushed] = await audits("git.push");
     expect(pushed?.details.grants).toEqual({ "refs/heads/release-x": { ruleId: rule?.id } });
+    // Turned off for the agent, by the name its access lists, the rule lets nothing through; back on, it does.
+    const listed = (await getAgentAccess(f.db, f.owner.id, f.org.id, f.agent.id)).connectors.flatMap((c) =>
+      c.scopes.flatMap((s) => s.tools.map((tool) => tool.name)),
+    );
+    expect(listed).toEqual(expect.arrayContaining(["git_clone", "delete_branches", "request_branch_push"]));
+    const denying = (deny: string[]) =>
+      setAgentAccess(f.db, f.owner.id, f.org.id, f.agent.id, {
+        all: false,
+        connectors: {},
+        scopes: ["github:git.read", "github:git.write"].map((scope) => ({ connectionId: w.connection.id, scope })),
+        tools: { allow: [], deny: deny.map((name) => ({ connectionId: w.connection.id, name })) },
+      });
+    await denying(["request_branch_push"]);
+    expect(await push()).toContain("release-x isn't your branch");
+    await denying([]);
+    expect(await push()).toContain("unpack ok");
     // Asking again runs with no card; another branch asks.
     const again = answered(await t.invoke("request_branch_push", { repo: "acme/app", branch: "release-x" }));
     expect(again.content).toContain("Approved: push to release-x");
     asked(await t.invoke("request_branch_push", { repo: "acme/app", branch: "ana/fix", why: WHY }));
     expect(await f.db.select().from(schema.approvals)).toHaveLength(2);
 
+    // Removed, it asks again at once: the approval the rule came from, an hour old, doesn't let it push either.
+    await decidedAgo(1);
     await removeApprovalRule(f.db, f.owner.id, f.org.id, f.agent.id, rule?.id ?? "");
     expect(await push()).toContain("release-x isn't your branch");
     const [removed] = await audits("agent.approval_rule_removed");
     expect(removed?.details).toMatchObject({ tool: "request_branch_push", action: "acme/app:release-x" });
+    // A person's approval after the removal does.
+    const later = asked(await t.invoke("request_branch_push", { repo: "acme/app", branch: "release-x", why: WHY }));
+    await t.decide(later.id);
+    expect(await push()).toContain("unpack ok");
   });
 
   test("proxy: granted, still refused for the default branch, a protected one, a new branch, a force push or no answer", async () => {
@@ -701,7 +748,13 @@ describe("branches that aren't the agent's own", () => {
     github.options.branches = { main: {}, "ana/fix": { rules: ["deletion", "non_fast_forward"] } };
     expect(await push("refs/heads/ana/fix")).toContain("unpack ok");
     const rewritten = commitObject([], "rewritten");
-    expect(await push("refs/heads/ana/fix", b.oid, rewritten)).toContain("not a fast-forward");
+    const force = await push("refs/heads/ana/fix", b.oid, rewritten);
+    expect(force).toContain("not a fast-forward");
+    expect(force.split(`agentes: ${NO_TERMINAL_COMMANDS}`)).toHaveLength(2);
+    // A root commit with a `parent` line after its committer: git reads no parent there, so it's a force push too.
+    expect(await push("refs/heads/ana/fix", b.oid, commitObject([], "forged", [b.oid]))).toContain(
+      "not a fast-forward",
+    );
     github.options.down = true;
     expect(await push("refs/heads/ana/fix")).toContain("GitHub didn't say whether ana/fix is protected");
     expect(receivePacks(w)).toBe(1);
@@ -741,6 +794,11 @@ describe("branches that aren't the agent's own", () => {
     expect(
       answered(await t.invoke("delete_branches", { repo: "acme/app", branches: ["refs/heads/x"], why: WHY })).content,
     ).toContain("Not branch names: refs/heads/x");
+    // Names the card would cut: the person must see every branch it deletes.
+    const long = Array.from({ length: 11 }, (_, i) => `agentes/dev/${"x".repeat(180)}-${i}`);
+    expect(answered(await t.invoke("delete_branches", { repo: "acme/app", branches: long, why: WHY })).content).toBe(
+      "These names don't fit on one card. Ask in smaller batches.",
+    );
     expect(await f.db.select().from(schema.approvals)).toEqual([]);
 
     const request = asked(await t.invoke("delete_branches", { repo: "acme/app", branches: names, why: WHY }));
@@ -764,6 +822,7 @@ describe("branches that aren't the agent's own", () => {
       .filter((r) => r.targetId === "delete_branches")
       .sort((x, y) => x.id.localeCompare(y.id));
     expect(calls.map((r) => [r.outcome, r.details.approvalId ?? null])).toEqual([
+      ["refused", null],
       ["refused", null],
       ["refused", null],
       ["refused", null],
