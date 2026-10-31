@@ -8292,6 +8292,16 @@ a.machine-row__name:hover {
   font-weight: 650;
   color: var(--ink);
 }
+/* In the dialog "Atende outras pessoas" lines up like the switch under it: its line beside the switch, centered. */
+.agp-advgroup .plan-replies__terms {
+  grid-column: 1;
+}
+.agp-advgroup .plan-replies > .ac-switch {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  translate: none;
+}
 .agp-advswitch {
   display: flex;
   align-items: center;
