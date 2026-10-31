@@ -81,6 +81,7 @@ import {
 import { consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { consultationsOf } from "@agenteschat/client/lib/consultations";
 import { clearDraft, peekDraft } from "@agenteschat/client/lib/drafts";
+import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { errorCode, errorText, restrictionLine } from "@agenteschat/client/lib/errors";
 import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@agenteschat/client/lib/files";
 import { dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
@@ -125,7 +126,6 @@ import {
   DialogFooter,
   DialogSearchList,
   EmptyState,
-  ErrorBoundary,
   Field,
   FORMAT_KINDS,
   type FormatKind,
@@ -1766,7 +1766,7 @@ function ChannelView({
                       adjust={adjust}
                       scroller={scroller}
                       renderMessage={(m) => (
-                        <ErrorBoundary fallback={<UnshownLine />}>
+                        <ErrorBoundary fallback={unshownLine}>
                           <TimelineMessage message={m} grouped={false} entering={false} modelLabels={NO_LABELS} />
                         </ErrorBoundary>
                       )}
@@ -2010,7 +2010,7 @@ function ChannelView({
                 actions.focusComposer();
               }}
               renderMessage={(m, grouped) => (
-                <ErrorBoundary fallback={<UnshownLine />}>
+                <ErrorBoundary fallback={unshownLine}>
                   <TimelineMessage message={m} grouped={grouped} entering={false} modelLabels={NO_LABELS} readOnly />
                 </ErrorBoundary>
               )}
@@ -2035,6 +2035,8 @@ function ungroupAfter(items: TimelineItem[], special: (m: MessageType) => boolea
     return out;
   });
 }
+
+const unshownLine = () => <UnshownLine />;
 
 /**
  * Persisted rows, then the agents' live blocks (always last while they work: new messages go above
@@ -2242,7 +2244,7 @@ const Timeline = memo(function Timeline({
   return (
     <ConsultGroupsProvider value={consultGroups}>
       {rows.map((row) => (
-        <ErrorBoundary key={row.key} fallback={<UnshownLine />}>
+        <ErrorBoundary key={row.key} fallback={unshownLine}>
           {row}
         </ErrorBoundary>
       ))}

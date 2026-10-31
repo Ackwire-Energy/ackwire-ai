@@ -22,6 +22,7 @@ import {
 } from "@agenteschat/client";
 import { agentSections } from "@agenteschat/client/lib/agent-groups";
 import { audienceChip, audienceNotice, listsAgent } from "@agenteschat/client/lib/audience";
+import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { waitingAgents } from "@agenteschat/client/lib/outages";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -33,7 +34,6 @@ import {
   CountBadge,
   CountChip,
   cx,
-  ErrorBoundary,
   Icon,
   type IconName,
   Kbd,
@@ -134,6 +134,7 @@ function UnshownRow() {
     </span>
   );
 }
+const unshownRow = () => <UnshownRow />;
 
 /** Tablet widths: the sidebar is always an icon rail (NavDrawer.tsx has the other breakpoints). */
 export const TABLET_QUERY = "(min-width: 761px) and (max-width: 1199px)";
@@ -260,7 +261,7 @@ export function Sidebar() {
   // Owners and admins organize the groups, with the full sidebar (the rail shows faces only).
   const organize = arranges && !rail;
   const agentRow = (a: Agent) => (
-    <ErrorBoundary key={a.id} fallback={<UnshownRow />}>
+    <ErrorBoundary key={a.id} fallback={unshownRow}>
       <AgentRow
         agent={a}
         unread={unreadWith.get(a.id) ?? 0}
@@ -517,7 +518,7 @@ export function Sidebar() {
             summary={peopleUnread > 0 && <UnreadCount count={peopleUnread} />}
           >
             {people.map((m) => (
-              <ErrorBoundary key={m.userId} fallback={<UnshownRow />}>
+              <ErrorBoundary key={m.userId} fallback={unshownRow}>
                 <PersonRow
                   member={m}
                   unread={unreadWith.get(m.userId) ?? 0}
