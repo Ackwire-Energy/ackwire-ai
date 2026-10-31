@@ -610,7 +610,7 @@ export function agentRoutes(deps: AppDeps) {
           AgentFields.partial().extend({
             coordinator: z.boolean().optional().openapi({
               description:
-                "It coordinates the team (ADR 0092): true takes it from whoever had it, false leaves the team with none. Admins (audited); the workspace's open apps hear `agent.coordinator`.",
+                "It coordinates the team (ADR 0093): true takes it from whoever had it, false leaves the team with none. Admins (audited); the workspace's open apps hear `agent.coordinator`.",
             }),
             acceptPlanTerms: z.boolean().optional().openapi({
               deprecated: true,

@@ -18,7 +18,7 @@ export const openAgentDelete = (id: string) => router.push({ pathname: "/agent-d
 
 /**
  * Deleting an agent for good (ADR 0082), as the web's Configurações › Zona de perigo: what goes and what stays
- * (and that the team has no coordinator after it, ADR 0092), its name typed to confirm, then the row that deletes
+ * (and that the team has no coordinator after it, ADR 0093), its name typed to confirm, then the row that deletes
  * it. Admins reach it from "Editar agente", and an archived agent's (it has no profile) from Agentes › Arquivados.
  */
 export function DeleteAgentScreen({ id }: { id: string }) {

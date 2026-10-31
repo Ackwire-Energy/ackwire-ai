@@ -1377,7 +1377,7 @@ export const ptBR = {
       coordinator: "{{The}} {{name}} coordena o time",
     },
   },
-  /** The agent that coordinates the team (ADR 0092): its switch, its chip and the lines about it. */
+  /** The agent that coordinates the team (ADR 0093): its switch, its chip and the lines about it. */
   coordinator: {
     chip: "Coordena o time",
     help: "Pega as mensagens que pedem um agente quando nenhum outro pegou, e passa o trabalho para quem sabe. Vale nos canais em que {{she}} responde por conta própria.",

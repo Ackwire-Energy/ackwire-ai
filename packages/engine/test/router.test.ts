@@ -806,7 +806,7 @@ describe("what the router reads, and a person's messages in a row", () => {
   });
 });
 
-describe("the team's coordinator (ADR 0092)", () => {
+describe("the team's coordinator (ADR 0093)", () => {
   /**
    * #general with Ana, Dev, Theo (who coordinates) and Ada. Walter is in the workspace, and here with `people`.
    * `reply`: the fake model's answers.

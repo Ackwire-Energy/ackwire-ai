@@ -52,7 +52,7 @@ describe("deleting an agent (ADR 0082)", () => {
     expect(document.body.textContent).toContain("A Ada foi apagada.");
   });
 
-  test("the team's coordinator: deleting or archiving it says nobody coordinates after it (ADR 0092)", async () => {
+  test("the team's coordinator: deleting or archiving it says nobody coordinates after it (ADR 0093)", async () => {
     const state = seedState();
     const ada = state.agents.find((a) => a.id === ADA_ID);
     if (ada) ada.coordinator = true;

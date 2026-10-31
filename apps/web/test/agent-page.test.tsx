@@ -377,7 +377,7 @@ describe("agent page: who edits what", () => {
   });
 });
 
-describe("agent page: who coordinates the team (ADR 0092)", () => {
+describe("agent page: who coordinates the team (ADR 0093)", () => {
   /** Atlas coordinates the team. */
   const withAtlas = (state = seedState()) => {
     const atlas = state.agents.find((a) => a.id === ATLAS_ID);

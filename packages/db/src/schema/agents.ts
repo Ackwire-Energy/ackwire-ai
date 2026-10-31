@@ -167,7 +167,7 @@ export const agents = pgTable(
     /** Order inside its group. */
     groupPosition: integer().notNull().default(0),
     /**
-     * It coordinates the team (ADR 0092): a person's message that needs an agent and that no other agent took goes
+     * It coordinates the team (ADR 0093): a person's message that needs an agent and that no other agent took goes
      * to it. One per workspace among its active agents (the index below).
      */
     coordinator: boolean().notNull().default(false),

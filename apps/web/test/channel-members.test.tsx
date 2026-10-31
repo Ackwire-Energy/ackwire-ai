@@ -177,7 +177,7 @@ describe("answering without a mention, as true for my own messages as who picks 
   });
 });
 
-describe("the team's coordinator here (ADR 0092)", () => {
+describe("the team's coordinator here (ADR 0093)", () => {
   test("its chip says it coordinates the team, and its line in the details what that means", async () => {
     const state = seedState();
     const atlas = state.agents.find((a) => a.id === ATLAS_ID);

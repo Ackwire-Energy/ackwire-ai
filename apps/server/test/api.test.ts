@@ -152,7 +152,7 @@ describe("organizations, agents and credentials", () => {
     expect((await ana(`/api/app/organizations/${orgId}/agents`)).status).toBe(200);
   });
 
-  test("who coordinates the team (ADR 0092): on every agent listed, moved by an admin's PATCH, never by an agent's owner", async () => {
+  test("who coordinates the team (ADR 0093): on every agent listed, moved by an admin's PATCH, never by an agent's owner", async () => {
     const owner = browser(t);
     await signUp(owner, "owner@example.com");
     const { orgId, agentId: devId } = await seedOrg(owner);

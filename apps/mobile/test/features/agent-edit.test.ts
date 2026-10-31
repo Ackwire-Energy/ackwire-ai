@@ -89,7 +89,7 @@ describe("editing an agent", () => {
     expect(agentChanges(saved, { ...saved, name: "  " }, all)).toBeNull();
   });
 
-  test("who coordinates the team (ADR 0092): admins switch it, its person can't; the line says who does now", async () => {
+  test("who coordinates the team (ADR 0093): admins switch it, its person can't; the line says who does now", async () => {
     const turnedOn = { ...saved, coordinator: true };
     expect(agentChanges(saved, turnedOn, editableFields({ admin: true, owner: false }))).toEqual({ coordinator: true });
     expect(agentChanges(saved, turnedOn, editableFields({ admin: false, owner: true }))).toBeNull();

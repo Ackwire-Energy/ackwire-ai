@@ -51,7 +51,7 @@ export interface Saved {
   brain?: BrainChoice;
   /** Its group (ADR 0083): `NO_GROUP` or a group id; absent until the groups load. */
   group?: string;
-  /** It coordinates the team (ADR 0092). */
+  /** It coordinates the team (ADR 0093). */
   coordinator: boolean;
 }
 

@@ -35,7 +35,7 @@ interface Who {
   handle: string;
   email: string;
   autoReply: boolean;
-  /** It coordinates the team (ADR 0092). */
+  /** It coordinates the team (ADR 0093). */
   coordinator: boolean;
 }
 

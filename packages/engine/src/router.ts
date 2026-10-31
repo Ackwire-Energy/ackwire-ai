@@ -608,7 +608,7 @@ export { AGENT_CHIME_IN_MAX_HOP };
  * their next one; when it comes and the router decides on it too
  * (`routable`), that one decides for both (`continued`). A person's message
  * the policy gives to nobody goes to the team's coordinator when it needs an
- * agent or the person is alone here with the agents (ADR 0092).
+ * agent or the person is alone here with the agents (ADR 0093).
  *
  * When no step of the chain can read a person's message, rules in code pick
  * (ADR 0074 §4): R1 a reply to an agent, R2 the only agent when the author is
@@ -686,7 +686,7 @@ export async function routeMessage(
     about: r.instructions.slice(0, 300),
   }));
   if (candidates.length === 0) return { runs: [], skipped: "no_candidates" };
-  // The team's coordinator (ADR 0092), when it is a candidate here: never for an agent's message.
+  // The team's coordinator (ADR 0093), when it is a candidate here: never for an agent's message.
   const coordinatorId = byAgent ? null : (rows.find((r) => r.coordinator)?.agentId ?? null);
   // Routed to nobody without asking the strategy, and why (the receipts say it).
   const unrouted = async (reason: typeof NO_AI | typeof PLATFORM_CAP): Promise<RouteResult> => {
@@ -1037,7 +1037,7 @@ export async function routeMessage(
     (decided.alreadyAnswered ?? 0) >= ALREADY_ANSWERED_THRESHOLD;
   const selected = followUp && continuityAgentId ? [continuityAgentId] : duplicate ? [] : picked;
   // Nobody took a message that needs an agent, or one from a person alone here with the agents: the coordinator
-  // takes it (ADR 0092), as a router run it may pass. Not a message for a person, nor one already answered.
+  // takes it (ADR 0093), as a router run it may pass. Not a message for a person, nor one already answered.
   const coordinates =
     coordinatorId !== null &&
     selected.length === 0 &&

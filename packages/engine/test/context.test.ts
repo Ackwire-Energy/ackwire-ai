@@ -179,7 +179,7 @@ test("history is capped at maxMessages, keeping the most recent", async () => {
   expect(ctx.messages[0]?.content).toBe("[ana]: m3\n\n[ana]: m4\n\n(current message) [ana]: @dev go");
 });
 
-test("the team's coordinator hears that what nobody took comes to it, only where other agents are (ADR 0092)", async () => {
+test("the team's coordinator hears that what nobody took comes to it, only where other agents are (ADR 0093)", async () => {
   const trigger = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
     body: "@dev what do you think?",
   });

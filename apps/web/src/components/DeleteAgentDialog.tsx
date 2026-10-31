@@ -12,7 +12,7 @@ import { useToast } from "@/lib/toast";
 
 /**
  * Deleting an agent for good (ADR 0082), from its page or, archived, from Equipe: what goes and what stays (and that
- * the team has no coordinator after it, ADR 0092), then its name typed to confirm. `onDeleted` runs after the toast,
+ * the team has no coordinator after it, ADR 0093), then its name typed to confirm. `onDeleted` runs after the toast,
  * before the dialog closes.
  */
 export function DeleteAgentDialog({

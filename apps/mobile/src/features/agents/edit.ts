@@ -59,7 +59,7 @@ export interface AgentDraft {
   role: string;
   instructions: string;
   look: FullLook;
-  /** It coordinates the team (ADR 0092). */
+  /** It coordinates the team (ADR 0093). */
   coordinator: boolean;
 }
 

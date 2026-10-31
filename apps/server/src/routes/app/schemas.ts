@@ -203,7 +203,7 @@ export const Agent = z
     appearance: AgentAppearance.nullable().openapi({ description: "Its look; null = the default." }),
     coordinator: z.boolean().openapi({
       description:
-        "It coordinates the team (ADR 0092): a message that needs an agent and that no other agent took goes to it, in the channels where it answers on its own. One per workspace.",
+        "It coordinates the team (ADR 0093): a message that needs an agent and that no other agent took goes to it, in the channels where it answers on its own. One per workspace.",
     }),
     brain: z
       .object({
@@ -377,7 +377,7 @@ const MessageBase = z.object({
         .optional()
         .openapi({
           description:
-            "Who picked the agents for a message nobody mentioned (ADR 0074): Jev, a small model, the author's own plan (`ownerId`), or a rule (`coordinator`: nobody else took it, so the team's coordinator did, ADR 0092). Absent before the chain.",
+            "Who picked the agents for a message nobody mentioned (ADR 0074): Jev, a small model, the author's own plan (`ownerId`), or a rule (`coordinator`: nobody else took it, so the team's coordinator did, ADR 0093). Absent before the chain.",
         }),
       reason: z
         .literal("mention_needed")

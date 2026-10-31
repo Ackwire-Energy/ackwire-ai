@@ -110,7 +110,7 @@ export async function createAgent(
       })
       .returning();
     if (!agent) throw new Error("agent insert returned nothing");
-    // The first agent of a team coordinates it (ADR 0092): no active agent is older, so of two first agents made at
+    // The first agent of a team coordinates it (ADR 0093): no active agent is older, so of two first agents made at
     // once only the older claims it. In a savepoint: with the same time both try, and the unique index turns the
     // second claim down without failing its creation.
     const [first] = await db
@@ -249,7 +249,7 @@ export async function archiveAgent(db: Database, actorId: string, orgId: string,
   await requirePermission(db, actorId, orgId, "manage_agents");
   const [gone] = await db
     .update(agents)
-    // An archived agent coordinates nothing: the team has no coordinator until someone picks one (ADR 0092).
+    // An archived agent coordinates nothing: the team has no coordinator until someone picks one (ADR 0093).
     .set({ archivedAt: new Date(), coordinator: false })
     .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId), isNull(agents.archivedAt)))
     .returning({ name: agents.name, handle: agents.handle });
@@ -270,7 +270,7 @@ export async function archiveAgent(db: Database, actorId: string, orgId: string,
 }
 
 /**
- * Picks the agent that coordinates the team, or (`on` false) leaves the team with none (ADR 0092). Owners and admins.
+ * Picks the agent that coordinates the team, or (`on` false) leaves the team with none (ADR 0093). Owners and admins.
  * Turning it on takes it from whoever had it in the same transaction, under a lock per workspace, so of two saves at
  * once the last one wins. Audited, and every open app of the workspace reads its agents again (`agent.coordinator`).
  */

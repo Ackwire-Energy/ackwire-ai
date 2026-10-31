@@ -46,7 +46,7 @@ async function workspace() {
 const coordinators = async (w: Awaited<ReturnType<typeof workspace>>) =>
   (await listAgents(w.db, w.member.id, w.org.id)).filter((a) => a.coordinator).map((a) => a.name);
 
-describe("the team's coordinator (ADR 0092)", () => {
+describe("the team's coordinator (ADR 0093)", () => {
   test("the first agent of a new workspace coordinates it, the next ones don't", async () => {
     const w = await workspace();
     expect(w.theo.coordinator).toBe(true);

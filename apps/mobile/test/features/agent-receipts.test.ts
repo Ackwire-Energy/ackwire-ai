@@ -163,7 +163,7 @@ describe("the agents' receipt line under a person's message", () => {
     const pt = await translator("pt-BR");
     const reply = receiptView(routed({}, { decidedBy: { step: "rule", rule: "reply" } }).m1);
     expect(deciderOf(pt, reply, names)?.text).toBe("Uma resposta para a Ada");
-    // Nobody else took it, so the team's coordinator did (ADR 0092).
+    // Nobody else took it, so the team's coordinator did (ADR 0093).
     const coordinated = receiptView(
       routed({}, { pickedBy: ["theo"], decidedBy: { step: "rule", rule: "coordinator" } }).m1,
     );

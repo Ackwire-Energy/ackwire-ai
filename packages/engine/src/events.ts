@@ -39,7 +39,7 @@ export type DecidedBy =
   | { step: "model"; model: string; provider: string }
   /** The author's own plan: `ownerId` is the author. */
   | { step: "plan"; brand: "claude" | "chatgpt"; ownerId: string }
-  /** `coordinator`: nobody else took it, so the team's coordinator did (ADR 0092). */
+  /** `coordinator`: nobody else took it, so the team's coordinator did (ADR 0093). */
   | { step: "rule"; rule: RouterRule };
 
 type RouterRule = "reply" | "only_agent" | "follow_up" | "coordinator";

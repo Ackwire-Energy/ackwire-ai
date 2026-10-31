@@ -3,7 +3,7 @@ import type { Agent } from "../api/types";
 import { agentGrammar } from "./grammar";
 
 /**
- * The line under an agent's "Coordena o time" switch (ADR 0092): who coordinates the team when it isn't this agent,
+ * The line under an agent's "Coordena o time" switch (ADR 0093): who coordinates the team when it isn't this agent,
  * and, with the switch turned on, that one agent coordinates at a time. Null when this agent already does.
  */
 export function coordinatorNote(
