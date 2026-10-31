@@ -54,6 +54,8 @@ export type ActivityKind =
   | "uploadingArtifact"
   | "gettingContext"
   | "cancelingReminder"
+  | "followingUp"
+  | "cancelingFollowUp"
   | "listingReminders"
   | "listingRoutines"
   | "checkingComputer"
@@ -172,6 +174,8 @@ const BUILTIN: Record<string, ActivityKind> = {
   request_folder_access: "requestingAccess",
   request_secret: "requestingSecret",
   use_tool: "findingTools",
+  follow_up: "followingUp",
+  cancel_follow_up: "cancelingFollowUp",
 };
 
 /** Catalog connectors (packages/engine/src/connectors/catalog.ts): tools are exposed as `<id>_<tool>`. */
