@@ -81,7 +81,7 @@ const statusCalls = (state: ReturnType<typeof seedState>) =>
   state.calls.filter((c) => c.method === "orgs.setStatus").map((c) => c.args);
 
 describe("the account menu", () => {
-  test("Enter opens it: me on top, then five items; focus goes in, Esc closes it and focus is back on the row", async () => {
+  test("Enter opens it: me on top, then four items; focus goes in, Esc closes it and focus is back on the row", async () => {
     await go();
     const row = account();
     expect(row.getAttribute("aria-haspopup")).toBe("menu");
@@ -97,7 +97,6 @@ describe("the account menu", () => {
       "Definir status",
       "Editar perfil",
       "Configurações",
-      "Apagar conta",
       "Sair",
     ]);
     expect(document.activeElement?.textContent).toBe("Definir status");
@@ -198,7 +197,6 @@ describe("the account menu", () => {
       "O que você está fazendo?",
       "Editar perfil",
       "Configurações",
-      "Apagar conta",
       "Sair",
     ]);
   });

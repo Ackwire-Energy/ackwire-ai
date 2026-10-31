@@ -9473,9 +9473,14 @@ export const en: Translations = {
     membersOnly: "Only an owner can restore it.",
     restored: "{{name}} is back",
   },
-  /** Deleting your account (the account menu): what goes, what stays, and what has to happen first. */
+  /** Deleting your account (Configurações › Sua conta): what goes, what stays, and what has to happen first. */
   deleteAccount: {
     menu: "Delete account",
+    /** Sua conta's last card: its title is `menu`. */
+    card: {
+      text: "You leave every workspace and your account is deleted for good.",
+      button: "Delete account…",
+    },
     title: "Delete your account?",
     closes_one: "{{names}} closes now and is deleted for good on {{date}}. You're the only one there.",
     closes_other: "{{names}} close now and are deleted for good on {{date}}. You're the only one there.",

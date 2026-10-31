@@ -35,7 +35,7 @@ import { useToast } from "@/lib/toast";
 /**
  * Configurações › Sua conta: your profile in this workspace, your time zone, opening the phone app and a password
  * for an account without one, then what this device keeps for itself (theme, language, sounds, the desktop app's
- * menus).
+ * menus), and last, deleting the account.
  */
 export function AccountSection() {
   const { t, i18n } = useTranslation();
@@ -46,7 +46,8 @@ export function AccountSection() {
   const sounds = useSyncExternalStore(onSoundChoiceChange, soundChoice, soundChoice);
   const [profile, setProfile] = useState<"handle" | "timezone" | null>(null);
   const [phone, setPhone] = useState(false);
-  // Its dialog is the account button's, kept in the address so a sign-in again comes back to it.
+  // Adding a password and deleting the account: their dialogs are the account button's, kept in the address so a
+  // sign-in again comes back to them.
   const [, setAccount] = useOpenParam("account");
   const mine = dir.memberById.get(me.user.id);
   const zone = mine?.timezone || browserTimezone() || "UTC";
@@ -160,6 +161,19 @@ export function AccountSection() {
             />
           )}
         </div>
+      </Card>
+      <Card aria-labelledby="account-delete" className="settings-danger">
+        <CardHeader
+          id="account-delete"
+          icon="trash"
+          title={t("deleteAccount.menu")}
+          subtitle={t("deleteAccount.card.text")}
+          action={
+            <Button size="sm" variant="danger" onClick={() => setAccount("delete")}>
+              {t("deleteAccount.card.button")}
+            </Button>
+          }
+        />
       </Card>
       <ProfileDialog focus={profile} onClose={() => setProfile(null)} />
       <OpenOnPhoneDialog open={phone} onClose={() => setPhone(false)} />

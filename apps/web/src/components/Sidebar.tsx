@@ -1308,9 +1308,10 @@ function UnreadCount({ count }: { count: number }) {
 /**
  * The account button: your face with your presence badge; under the name, your line (or how you appear). It opens a
  * menu right above it: you on top (face, name, @ and how you appear, your line in a well), then your status (how you
- * appear, or what you're up to), your profile, your settings (Configurações › Sua conta), deleting the account and
- * signing out. Adding a password (in Sua conta) and deleting the account keep their dialogs in the address
- * (`?account=password`, `?account=delete`) on any page: adding a password may ask for a sign-in again, which comes back.
+ * appear, or what you're up to), your profile, your settings (Configurações › Sua conta) and signing out. Deleting the
+ * account starts at the bottom of Sua conta, not here beside Sair, where a slip would open it. It and adding a password
+ * keep their dialogs here, in the address (`?account=delete`, `?account=password`) on any page: adding a password may
+ * ask for a sign-in again, which comes back.
  */
 function AccountMenu() {
   const { t, i18n } = useTranslation();
@@ -1450,9 +1451,6 @@ function AccountMenu() {
           </MenuItem>
         )}
         <MenuSeparator />
-        <MenuItem icon="trash" danger onSelect={openAfter(() => setAccount("delete"))}>
-          {t("deleteAccount.menu")}
-        </MenuItem>
         <MenuItem icon="arrowRight" danger onSelect={() => void signOut()}>
           {t("auth.signOut")}
         </MenuItem>

@@ -9531,9 +9531,13 @@ export const ptBR = {
     membersOnly: "Só um dono pode restaurar.",
     restored: "{{name}} voltou",
   },
-  /** Deleting your account (the account menu): what goes, what stays, and what has to happen first. */
+  /** Deleting your account (Configurações › Sua conta): what goes, what stays, and what has to happen first. */
   deleteAccount: {
     menu: "Apagar conta",
+    card: {
+      text: "Você sai de todos os workspaces e a sua conta é apagada de vez.",
+      button: "Apagar conta…",
+    },
     title: "Apagar a sua conta?",
     closes_one: "{{names}} fecha agora e é apagado de vez em {{date}}. Só você está lá.",
     closes_other: "{{names}} fecham agora e são apagados de vez em {{date}}. Só você está lá.",
