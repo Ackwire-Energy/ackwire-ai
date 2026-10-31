@@ -10206,7 +10206,7 @@ html[data-menu-overlay] .shell {
   margin: 4px 8px;
   background: var(--line);
 }
-/* Phones and touch screens keep the taller rows a finger hits. */
+/* Phones and touch screens keep the taller rows a finger hits, and the Go to… field and its toggle at 40px. */
 @media (max-width: 760px), (pointer: coarse) {
   .sidebar:not([data-rail="true"]) :is(.sidebar__item, .sidebar__create.ac-btn) {
     height: auto;
@@ -10215,6 +10215,23 @@ html[data-menu-overlay] .shell {
   .sidebar__section-head,
   .sidebar__section-toggle {
     min-height: var(--control-h-sm);
+  }
+  .sidebar:not([data-rail="true"]) :is(.sidebar__jump, .sidebar__collapse.ac-btn) {
+    height: var(--control-h-md);
+    border-radius: var(--control-r-md);
+  }
+  .sidebar:not([data-rail="true"]) .sidebar__collapse.ac-btn {
+    width: var(--control-h-md);
+  }
+  /* Its icon and words still in the rows' columns: 9px in, the 18px icon, 9px to the words. */
+  .sidebar:not([data-rail="true"]) .sidebar__jump {
+    padding-left: 9px;
+    font-size: var(--control-fs-md);
+  }
+  .sidebar:not([data-rail="true"]) .sidebar__jump > .ac-icon {
+    width: var(--control-icon-md);
+    height: var(--control-icon-md);
+    margin-right: 1px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

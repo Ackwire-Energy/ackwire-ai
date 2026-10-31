@@ -177,4 +177,33 @@ describe("a category in the sidebar (ADR 0080)", () => {
     await go(joao);
     expect(category("Engenharia").toggle.getAttribute("aria-expanded")).toBe("true");
   });
+
+  test("another workspace has its own, also when you switch to it with the sidebar on screen", async () => {
+    const BETA_ID = "00000000-0000-4000-8000-0000000000b2";
+    const state = seedState();
+    state.me?.organizations.push({ id: BETA_ID, name: "Beta", role: "owner" });
+    const { router } = await renderApp(`/org/${ORG_ID}/c/${GENERAL_ID}`, { api: createFakeApi(state) });
+    await settle(8);
+    const saved = (orgId: string) =>
+      JSON.parse(localStorage.getItem(`agentes.sidebar.sections.u-walter.${orgId}`) ?? "[]");
+    const open = (name: string) => category(name).toggle.getAttribute("aria-expanded");
+    const switchTo = async (orgId: string) => {
+      await act(() => router.navigate({ to: "/org/$orgId/c/$channelId", params: { orgId, channelId: GENERAL_ID } }));
+      await settle(8);
+    };
+    const sidebar = nav();
+    await click(category("Agentes").toggle);
+    expect(saved(ORG_ID)).toEqual(["agents"]);
+
+    await switchTo(BETA_ID);
+    expect(nav()).toBe(sidebar);
+    expect(open("Agentes")).toBe("true");
+    await click(category("Canais").toggle);
+    expect(saved(BETA_ID)).toEqual(["channels"]);
+    expect(saved(ORG_ID)).toEqual(["agents"]);
+
+    await switchTo(ORG_ID);
+    expect(open("Agentes")).toBe("false");
+    expect(open("Canais")).toBe("true");
+  });
 });
