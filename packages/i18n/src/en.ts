@@ -2384,6 +2384,31 @@ export const en: Translations = {
           high: "Thinks more on hard tasks. Slower and costs more.",
           max: "Thinks as much as possible. Much slower and pricier.",
         },
+        modelLine: {
+          opus: "The most capable. Uses up the plan faster.",
+          sonnet: "Balanced. Good for almost everything.",
+          haiku: "Fast and light. For simple tasks.",
+        },
+        context: "Context window",
+        contextText: {
+          auto: "What the model takes.",
+          "200000": "Cheaper and faster. Summarizes early in long conversations.",
+          "400000": "Remembers a lot; each answer costs less than with 1M.",
+          "1000000": "Remembers the most. Each answer rereads everything: slower and pricier.",
+        },
+        advanced: {
+          title: "Advanced settings",
+          sub: "{{brain}}. Applies to every conversation.",
+          think: "How it thinks",
+          answers: "Who it answers",
+          defaults: "Back to defaults",
+          done: "Done",
+          allDefault: "All defaults",
+          effort: "Effort: {{level}}",
+          context: "Context: {{size}}",
+          sharing: "Answers other people",
+          waits: "Waits for the computer",
+        },
         add: {
           title: { claude_code: "Add a Claude account", codex: "Add a ChatGPT account" },
           stepOne: {

@@ -1827,6 +1827,7 @@ async function executeRunInner(
           runId: run.id,
           model: thinker.model,
           windowTokens: deps.contextWindowTokens,
+          limitTokens: agent.contextTokens,
           maxOutputTokens: deps.maxOutputTokens,
           system: transcript.system,
           messages: transcript.messages,
@@ -2363,6 +2364,7 @@ function brainTurnOf(
     ...(plan.session ? { session: plan.session } : {}),
     ...(plan.account ? { account: plan.account } : {}),
     ...(plan.effort ? { effort: plan.effort } : {}),
+    ...(agent.contextTokens ? { contextTokens: agent.contextTokens } : {}),
     trigger,
   };
 }

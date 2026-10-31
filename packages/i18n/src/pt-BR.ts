@@ -2396,6 +2396,35 @@ export const ptBR = {
           high: "Pensa mais em tarefas difíceis. Demora e gasta mais.",
           max: "Pensa o máximo que puder. Bem mais lento e caro.",
         },
+        /** The model picker's line under each Claude Code model (other models show their name only). */
+        modelLine: {
+          opus: "O mais capaz. Gasta o plano mais rápido.",
+          sonnet: "Equilibrado. Bom para quase tudo.",
+          haiku: "Rápido e leve. Para tarefas simples.",
+        },
+        /** The most context the agent reads (any brain); sizes are written `200K`, `400K`, `1M` in every language. */
+        context: "Janela de contexto",
+        contextText: {
+          auto: "O que o modelo aguenta.",
+          "200000": "Mais barato e rápido. Resume cedo em conversas longas.",
+          "400000": "Lembra bastante; cada resposta custa menos que com 1M.",
+          "1000000": "Lembra o máximo. Cada resposta relê tudo: mais lenta e cara.",
+        },
+        /** "Configuração avançada": a row in the brain's card that opens a smaller dialog over "Quem pensa". */
+        advanced: {
+          title: "Configuração avançada",
+          sub: "{{brain}}. Vale para todas as conversas.",
+          think: "Como pensa",
+          answers: "Quem atende",
+          defaults: "Voltar ao padrão",
+          done: "Pronto",
+          /** The row's line: nothing changed from the defaults, else only what did. */
+          allDefault: "Tudo no padrão",
+          effort: "Esforço {{level}}",
+          context: "Contexto de {{size}}",
+          sharing: "Atende outras pessoas",
+          waits: "Espera o computador voltar",
+        },
         add: {
           title: { claude_code: "Adicionar conta do Claude", codex: "Adicionar conta do ChatGPT" },
           stepOne: {

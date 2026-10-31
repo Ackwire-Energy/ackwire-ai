@@ -8261,6 +8261,43 @@ a.machine-row__name:hover {
   color: var(--ink2);
 }
 /* "Quem pensa": the opened brain's settings full width, a small label above each. */
+/* The brain's card: model, account and "Configuração avançada", one stack of pickers. */
+.agp-brainpicks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.agp-advrow .ac-select__trigger {
+  cursor: pointer;
+}
+.agp-advrow__chev {
+  margin-left: auto;
+  flex: none;
+  color: var(--faint);
+}
+/* "Configuração avançada": its groups (how it thinks, who it answers) under a hairline each. */
+.agp-advgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.agp-advgroup + .agp-advgroup {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.agp-advgroup__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--ink);
+}
+.agp-advswitch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
 .agp-brainfield {
   display: flex;
   flex-direction: column;

@@ -528,6 +528,8 @@ export interface Model {
   id: string;
   label: string;
   provider: string;
+  /** Its context window in tokens: which context limits are worth offering with it. */
+  contextWindow?: number;
   inputUsdPerMTok: number;
   outputUsdPerMTok: number;
   /** The workspace can use it (has a key for the provider). Expected from the backend; derived until then. */
@@ -3721,6 +3723,8 @@ export interface BrainModelOption {
   label: string;
   modelId?: string;
   recommended?: boolean;
+  /** Its context window in tokens. */
+  contextWindow?: number;
 }
 
 export interface BrainOption {
@@ -3759,6 +3763,8 @@ export interface AgentBrain {
   account: string | null;
   /** How much it thinks before answering; `auto` = picked per task; null = the brain's default. */
   effort: BrainEffortSetting | null;
+  /** The most context it reads, in tokens (200K, 400K or 1M), any brain; null = its model's window. */
+  contextTokens?: number | null;
   /**
    * The agent's owner's accounts on its computer (both kinds) and the one it thinks with; "Conta deste
    * computador" isn't listed. A plan thinks only for its owner's agents (ADR 0059).
@@ -3866,6 +3872,8 @@ export interface AgentBrainInput {
   /** The account thinks for another agent: take it from that one. */
   moveAccount?: boolean;
   effort?: BrainEffortSetting | null;
+  /** 200K, 400K or 1M tokens; null = the model's window; omitted = keep. */
+  contextTokens?: number | null;
 }
 
 /** `POST …/machines/{id}/account-logins` (201): what the person needs to sign in. */
