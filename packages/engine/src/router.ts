@@ -655,9 +655,9 @@ export { AGENT_CHIME_IN_MAX_HOP };
  * (`routable`), that one decides for both (`continued`). The agent a
  * person's message speaks to (`addressee`) answers it, addressed, over who
  * spoke last, and over the agent replied to once the router picks it. One
- * that speaks to no agent in particular goes, past continuity's window, to
- * the agent the person last talked to, when it could do it too and no other
- * agent is clearly surer.
+ * that speaks to no agent in particular goes to the agent the person last
+ * talked to in the last half hour, when the router picks another agent, she
+ * could do it too and no other agent is clearly surer.
  *
  * When no step of the chain can read a person's message, rules in code pick
  * (ADR 0074 §4): R1 a reply to an agent, R2 the only agent when the author is
@@ -953,13 +953,14 @@ export async function routeMessage(
   const repliedAgentId = quotedAgentId ?? rootAgentId;
   if (repliedAgentId) continuityAgentId = repliedAgentId;
   const continuityHandle = candidates.find((c) => c.agentId === continuityAgentId)?.handle ?? null;
-  // With no continuity, the agent this person last talked to here, among two or more agents and not when they
-  // speak to a person: the one agent their latest message to an agent went to, within what the router reads
+  // The agent this person last talked to here, among two or more agents, not in a reply to an agent and not when
+  // they speak to a person: the one agent their latest message to an agent went to, within what the router reads
   // (`ROUTER_SLICE`: 30 minutes, 12 messages). It went to whom it @mentioned, else to whom the router sent it
   // (one still at work counts), else, never routed, to the first agent that answered it. Read newest first, so
-  // no other agent was addressed since; one that went to several agents is no one's.
+  // no other agent was addressed since; one that went to several agents is no one's. Within continuity's window
+  // it is the agent they are just talking to, or none: another agent that spoke since keeps today's follow-ups.
   let lastTalkedTo: string | null = null;
-  if (continues && !namesPerson && !continuityAgentId && candidates.length >= 2) {
+  if (continues && !namesPerson && !repliedAgentId && candidates.length >= 2) {
     let answeredBy: string | null = null;
     for (const m of [...before, ...(root ? [root] : [])]) {
       if (message.createdAt.getTime() - m.createdAt.getTime() > ROUTER_SLICE.maxAgeMs) break;
@@ -972,6 +973,7 @@ export async function routeMessage(
       lastTalkedTo = to.length === 1 && only && candidateIds.has(only) ? only : null;
       break;
     }
+    if (continuityAgentId !== null && continuityAgentId !== lastTalkedTo) lastTalkedTo = null;
   }
   // R2: a person alone in the channel with its one agent.
   const onlyAgentId =

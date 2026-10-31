@@ -588,6 +588,15 @@ describe("the agent a person last talked to", () => {
     expect(thanked.selected).toEqual([t.ada.id]);
     // Past what the router reads (30 minutes), the scores decide, as they did that day.
     expect((await t.talk(talkWithAda(30.5), BOM_DIA, bomDia("theo", "ada"))).selected).toEqual([t.theo.id]);
+    // Sooner, while she is still the agent just talking (5 minutes), the same, though it is no short follow-up.
+    expect((await t.talk(talkWithAda(5), BOM_DIA, bomDia("theo", "ada"))).selected).toEqual([t.ada.id]);
+    // Right after Theo spoke on his own, he is the one just talking: the scores decide, as before.
+    const afterTheo = await t.talk(
+      [...talkWithAda(5), [t.theo, "Lembrete: a daily começa em 10 minutos.", 1]],
+      BOM_DIA,
+      bomDia("theo", "ada"),
+    );
+    expect(afterTheo.selected).toEqual([t.theo.id]);
   });
 
   test("a message that clearly fits the other agent still goes to it", async () => {
