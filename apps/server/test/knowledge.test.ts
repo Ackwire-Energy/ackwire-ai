@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
+import { proposeChange } from "@agenteschat/engine";
 import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
@@ -93,6 +94,8 @@ test("knowledge API: search, context items (add, pin, edit), reactions, correcti
   expect(proposals.proposals).toHaveLength(1);
   expect(proposals.proposals[0]).toMatchObject({
     title: "Update Dev's instructions",
+    proposedByAgentId: agentId,
+    access: null,
     before: "",
     decider: { type: "user" },
     canDecide: true,
@@ -105,4 +108,62 @@ test("knowledge API: search, context items (add, pin, edit), reactions, correcti
   const agent = (await (await api(`/agents/${agentId}`)).json()) as { instructions: string };
   expect(agent.instructions).toBe("Our CI is Buildkite.");
   expect((await api("/search/reindex", { json: {} })).status).toBe(202);
+});
+
+test("proposals an agent made for a teammate name it and say what they change: instructions, role, apps", async () => {
+  t = await createTestServer();
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, agentId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  const ada = (await (
+    await api("/agents", {
+      json: { name: "Ada", handle: "ada", role: "Dev", instructions: "Seja breve.", model: "claude-sonnet-5-5" },
+    })
+  ).json()) as { id: string };
+  const [me] = await t.db.select().from(schema.users).where(eq(schema.users.email, "owner@example.com"));
+  await proposeChange(
+    { db: t.db },
+    {
+      orgId,
+      agentId,
+      target: "agent_instructions",
+      agentIds: [ada.id],
+      change: "Responder em português.",
+      roles: [{ agentId: ada.id, role: "Revisora" }],
+      access: [{ agentId: ada.id, lines: [{ id: "issues:write", label: "Issues", on: true }] }],
+      rationale: "",
+      requesterId: me?.id ?? "",
+    },
+  );
+  type View = { id: string; target: { type: string }; [key: string]: unknown };
+  const { proposals } = (await (await api("/proposals?status=pending")).json()) as { proposals: View[] };
+  const of = (type: string) => proposals.find((p) => p.target.type === type) as View;
+  expect(of("agent_instructions")).toMatchObject({
+    agentId: ada.id,
+    proposedByAgentId: agentId,
+    target: { agentId: ada.id },
+    access: null,
+    decider: { type: "user" },
+  });
+  expect(of("agent_role")).toMatchObject({
+    title: "Change Ada's role",
+    proposedByAgentId: agentId,
+    before: "Dev",
+    after: "Revisora",
+    decider: { type: "admins" },
+    canDecide: true,
+  });
+  expect(of("agent_access")).toMatchObject({
+    title: "Change Ada's access",
+    access: [{ id: "issues:write", label: "Issues", on: true }],
+    before: "",
+    decider: { type: "admins" },
+  });
+  // A role is taken as proposed or refused: only instructions and the org context are edited first.
+  expect((await api(`/proposals/${of("agent_role").id}/accept`, { json: { text: "Outra" } })).status).toBe(400);
+  const role = await api(`/proposals/${of("agent_role").id}/accept`, { json: {} });
+  expect(await role.json()).toMatchObject({ status: "accepted", after: "Revisora" });
+  expect(((await (await api(`/agents/${ada.id}`)).json()) as { role: string }).role).toBe("Revisora");
 });
