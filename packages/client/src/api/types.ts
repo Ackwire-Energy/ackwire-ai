@@ -1606,6 +1606,7 @@ export type AgentActionKind =
   | "memory.forgotten"
   | "routine.created"
   | "routine.updated"
+  | "routine.deleted"
   | "channel.agent_added"
   | "channel.created"
   | "wiki.page_created"
