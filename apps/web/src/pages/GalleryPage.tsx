@@ -255,8 +255,11 @@ export function GalleryPage() {
       <Section title="Avatar · Chip · Badge">
         <div className="row">
           <Avatar name="Marina" />
-          <Avatar name="João" presence />
-          <AgentAvatar name="Ada" />
+          <Avatar name="João" presence="online" />
+          <Avatar name="Ana" size="sm" presence="away" />
+          <Avatar name="Bruno" size="sm" presence="busy" />
+          <Avatar name="Lia" size="lg" presence="offline" />
+          <AgentAvatar name="Ada" presence="busy" />
           <AgentAvatar name="Atlas" initials="At" running />
           <AgentAvatar name="Lia" size="lg" />
           <AgentAvatar name="Theo" size="sm" />

@@ -73,6 +73,7 @@ import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { MailIcon } from "@/components/MailConnect";
 import { useMediaQuery } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
+import { SkillPicker } from "@/components/Skills";
 import { AgentBornSky, AgentPreviewSky, OnboardingHorizon } from "@/components/Sky";
 import { StepRail } from "@/components/StepRail";
 import {
@@ -966,18 +967,12 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
               </h2>
               <span className="small muted">{t("newAgent.skillsHelp", g)}</span>
             </div>
-            <div className="newag__pills">
-              {(library.data ?? []).map((s) => (
-                <CheckboxPill
-                  key={s.id}
-                  id={`ag-skill-${s.id}`}
-                  checked={skillIds?.has(s.id) ?? false}
-                  onCheckedChange={(on) => setSkillIds((prev) => toggle(prev ?? new Set(), s.id, on))}
-                >
-                  {s.name}
-                </CheckboxPill>
-              ))}
-            </div>
+            <SkillPicker
+              skills={library.data ?? []}
+              selected={skillIds ?? new Set()}
+              onChange={setSkillIds}
+              idPrefix="ag-skill"
+            />
           </section>
         )}
       </>

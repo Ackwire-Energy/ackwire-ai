@@ -645,10 +645,6 @@ p {
   gap: var(--space-2);
   line-height: 16px;
 }
-.sidebar__usage-label {
-  font-size: 11px;
-  color: var(--ink-muted);
-}
 /* A track that shows even at 0% (the sunken fill vanished on the sidebar's sky). */
 .sidebar__usage-track {
   flex: 1;
@@ -2892,6 +2888,11 @@ p {
 .skill-viewer > .row code {
   font-family: var(--font-mono);
   font-size: 12.5px;
+}
+.skill-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 /* Workspace header as a menu button; the account row stays at the bottom with the settings gear. */
 .sidebar__org-button {

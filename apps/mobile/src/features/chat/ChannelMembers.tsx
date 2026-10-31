@@ -110,7 +110,7 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
             return (
               <Row
                 key={`${w.kind}:${w.id}`}
-                leading={<Face who={{ type: w.kind, id: w.id }} size={30} live={false} />}
+                leading={<Face who={{ type: w.kind, id: w.id }} size={30} live={false} presence ring={c.raised} />}
                 title={mine ? `${w.name}${t("common.youSuffix")}` : w.name}
                 subtitle={lineOf(t, w, routing)}
                 subtitleLines={w.kind === "agent" ? 2 : 1}

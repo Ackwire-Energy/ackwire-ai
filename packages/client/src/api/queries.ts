@@ -100,6 +100,7 @@ import type {
   SeriesScope,
   SkillInput,
   SkillPatch,
+  StatusInput,
   StorageMigration,
   ThreadAction,
   ThreadCreateInput,
@@ -1366,6 +1367,69 @@ export function useUpdateSettings(orgId: string) {
 export const usePeople = (orgId: string) => {
   const api = useApi();
   return useQuery({ queryKey: keys.people(orgId), queryFn: () => api.orgs.people(orgId), staleTime: 30_000 });
+};
+
+/**
+ * Your availability and line (ADR 0084), shown at once in the people (yours is the only row that changes);
+ * the server's answer replaces it, and everyone else's list follows on `member.status`.
+ */
+export function useSetMyStatus(orgId: string, userId: string | undefined) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: StatusInput) => api.orgs.setStatus(orgId, input),
+    onMutate: async (input) => {
+      await qc.cancelQueries({ queryKey: keys.people(orgId) });
+      const before = qc.getQueryData<Person[]>(keys.people(orgId));
+      qc.setQueryData<Person[]>(keys.people(orgId), (people) =>
+        people?.map((p) => (p.userId === userId ? withStatus(p, input) : p)),
+      );
+      return { before };
+    },
+    onError: (_e, _input, ctx) => {
+      if (ctx?.before) qc.setQueryData(keys.people(orgId), ctx.before);
+    },
+    onSuccess: (me) => {
+      qc.setQueryData<Person[]>(keys.people(orgId), (people) => people?.map((p) => (p.userId === me.userId ? me : p)));
+    },
+  });
+}
+
+/** Your own row with a status change applied, as the server will answer it. */
+function withStatus(p: Person, input: StatusInput): Person {
+  const presence = input.availability === undefined ? p.presence : AVAILABILITY_PRESENCE[input.availability];
+  const status =
+    input.status === undefined
+      ? p.status
+      : input.status?.text.trim()
+        ? { text: input.status.text.trim(), emoji: input.status.emoji ?? null, until: input.status.until ?? null }
+        : null;
+  const availability = input.availability ?? p.availability;
+  return {
+    ...p,
+    presence,
+    online: presence !== "offline" && presence !== "hidden",
+    status,
+    ...(availability ? { availability } : {}),
+  };
+}
+
+/** How you appear for what you picked (to yourself: hidden stays hidden). */
+const AVAILABILITY_PRESENCE = { auto: "online", away: "away", busy: "busy", hidden: "hidden" } as const;
+
+/**
+ * Each agent's presence and line (ADR 0084). Refetched on `agent.status`, and every 30 s: presence also follows
+ * time (busy after 2 minutes on one run, away after 30 idle) and runs elsewhere in the workspace.
+ */
+export const useAgentStatuses = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.agentStatus(orgId),
+    queryFn: () => api.agents.statuses(orgId),
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+    enabled: enabled && orgId.length > 0,
+  });
 };
 
 export const useAllInvitations = (orgId: string, enabled = true) => {

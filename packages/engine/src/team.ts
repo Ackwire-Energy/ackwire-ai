@@ -1,4 +1,5 @@
 import { and, asc, type Database, desc, eq, gte, inArray, isNull, schema } from "@agenteschat/db";
+import { type AgentStatusView, lineInEnglish, loadAgentStatuses } from "./agent-status";
 import type { AgentAppearance } from "./appearance";
 import { canTalkTo, talksToAgents } from "./audience";
 import { agentBrowserStatus } from "./browser/status";
@@ -194,29 +195,20 @@ export function createFindAgentToolSource(deps: { machines?: Pick<MachineCaller,
       }
       const ids = scored.map((x) => x.a.id);
       const ownerIds = [...new Set(scored.map((x) => x.a.ownerUserId).filter((id): id is string => !!id))];
-      const [scopes, owners, busy] = await Promise.all([
+      const [scopes, owners, statuses] = await Promise.all([
         rosterScopeNames(db, deps.machines, ctx.orgId, ids),
         ownerIds.length
           ? db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, ownerIds))
           : Promise.resolve([]),
-        db
-          .select({ agentId: agentRuns.agentId })
-          .from(agentRuns)
-          .where(
-            and(
-              eq(agentRuns.orgId, ctx.orgId),
-              inArray(agentRuns.agentId, ids),
-              inArray(agentRuns.status, ["running", "waiting_approval", "waiting_input"]),
-            ),
-          ),
+        loadAgentStatuses(db, ctx.orgId, new Date(), ids),
       ]);
-      const busyIds = new Set(busy.map((r) => r.agentId));
+      const statusOf = new Map(statuses.map((s) => [s.agentId, s]));
       const content = scored
         .map(({ a }) => {
           const about = a.instructions.trim().replace(/\s+/g, " ");
           const owner = owners.find((o) => o.id === a.ownerUserId)?.name;
           return [
-            `@${a.handle}: ${a.name}${a.role ? `, ${a.role}` : ""}${busyIds.has(a.id) ? " (working now)" : ""}`,
+            `@${a.handle}: ${a.name}${a.role ? `, ${a.role}` : ""}${presenceNote(statusOf.get(a.id))}`,
             `  Can: ${summarizeScopes(scopes.filter((s) => s.agentId === a.id).map((s) => s.scope))}`,
             owner ? `  Responsible person: ${owner}` : "",
             about ? `  About: ${about.length > 240 ? `${about.slice(0, 237)}…` : about}` : "",
@@ -229,6 +221,14 @@ export function createFindAgentToolSource(deps: { machines?: Pick<MachineCaller,
     },
   };
   return { name: "team", tools: async () => [tool] };
+}
+
+/** " (busy: Revisando o PR #12)" after an agent's name in `find_agent`; its line is its own words. */
+function presenceNote(s: AgentStatusView | undefined) {
+  if (!s) return "";
+  const what = { online: "online", busy: "busy, on heavy work", away: "away", offline: "paused" }[s.presence];
+  const line = s.status ? lineInEnglish(s.status) : null;
+  return ` (${what}${line ? `: ${line.replace(/[()\n]/g, " ")}` : ""})`;
 }
 
 /** Consultations shown on the team screen: the last day. */

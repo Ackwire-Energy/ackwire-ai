@@ -163,7 +163,7 @@ export function MembersPage() {
           {membersByName(members.data, i18n.language).map((m) => (
             <GroupedRow
               key={m.userId}
-              leading={<Face who={{ type: "person", id: m.userId }} size={30} live={false} />}
+              leading={<Face who={{ type: "person", id: m.userId }} size={30} live={false} presence ring={c.raised} />}
               label={m.name}
               sub={m.email}
               value={roleLine(t, m, roles)}

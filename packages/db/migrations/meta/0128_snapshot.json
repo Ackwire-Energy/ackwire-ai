@@ -1,5 +1,5 @@
 {
-  "id": "3570d2ab-a221-46cb-be81-84371a1f57a3",
+  "id": "ebe4e38c-1983-441c-aabe-16c0f4d846b8",
   "prevId": "0006027f-dd2d-45b7-99cf-0100306b650a",
   "version": "7",
   "dialect": "postgresql",
@@ -253,6 +253,37 @@
           "primaryKey": false,
           "notNull": true,
           "default": 0
+        },
+        "status_text": {
+          "name": "status_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_emoji": {
+          "name": "status_emoji",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_busy": {
+          "name": "status_busy",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "status_run_id": {
+          "name": "status_run_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_until": {
+          "name": "status_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -14712,155 +14743,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.org_roles": {
-      "name": "org_roles",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "org_id": {
-          "name": "org_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'custom'"
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "icon": {
-          "name": "icon",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'shield'"
-        },
-        "color": {
-          "name": "color",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'graphite'"
-        },
-        "position": {
-          "name": "position",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "permissions": {
-          "name": "permissions",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::text[]"
-        },
-        "mentionable": {
-          "name": "mentionable",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "hoist": {
-          "name": "hoist",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "org_roles_everyone": {
-          "name": "org_roles_everyone",
-          "columns": [
-            {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"org_roles\".\"kind\" = 'everyone'",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "org_roles_org_id_position_index": {
-          "name": "org_roles_org_id_position_index",
-          "columns": [
-            {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "position",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "org_roles_org_id_organizations_id_fk": {
-          "name": "org_roles_org_id_organizations_id_fk",
-          "tableFrom": "org_roles",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "org_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "org_roles_orgId_id_unique": {
-          "name": "org_roles_orgId_id_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "org_id",
-            "id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.organization_invitations": {
       "name": "organization_invitations",
       "schema": "",
@@ -14890,13 +14772,6 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
-        },
-        "role_ids": {
-          "name": "role_ids",
-          "type": "uuid[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::uuid[]"
         },
         "token_hash": {
           "name": "token_hash",
@@ -15365,13 +15240,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "role_ids": {
-          "name": "role_ids",
-          "type": "uuid[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::uuid[]"
-        },
         "reason": {
           "name": "reason",
           "type": "text",
@@ -15528,106 +15396,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.organization_member_roles": {
-      "name": "organization_member_roles",
-      "schema": "",
-      "columns": {
-        "org_id": {
-          "name": "org_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "role_id": {
-          "name": "role_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "organization_member_roles_org_id_role_id_index": {
-          "name": "organization_member_roles_org_id_role_id_index",
-          "columns": [
-            {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "role_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "organization_member_roles_org_id_user_id_organization_members_org_id_user_id_fk": {
-          "name": "organization_member_roles_org_id_user_id_organization_members_org_id_user_id_fk",
-          "tableFrom": "organization_member_roles",
-          "tableTo": "organization_members",
-          "columnsFrom": [
-            "org_id",
-            "user_id"
-          ],
-          "columnsTo": [
-            "org_id",
-            "user_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "organization_member_roles_org_id_role_id_org_roles_org_id_id_fk": {
-          "name": "organization_member_roles_org_id_role_id_org_roles_org_id_id_fk",
-          "tableFrom": "organization_member_roles",
-          "tableTo": "org_roles",
-          "columnsFrom": [
-            "org_id",
-            "role_id"
-          ],
-          "columnsTo": [
-            "org_id",
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "organization_member_roles_org_id_user_id_role_id_pk": {
-          "name": "organization_member_roles_org_id_user_id_role_id_pk",
-          "columns": [
-            "org_id",
-            "user_id",
-            "role_id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.organization_members": {
       "name": "organization_members",
       "schema": "",
@@ -15666,6 +15434,31 @@
         "timezone": {
           "name": "timezone",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "availability": {
+          "name": "availability",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'auto'"
+        },
+        "status_text": {
+          "name": "status_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_emoji": {
+          "name": "status_emoji",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_until": {
+          "name": "status_until",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
@@ -18415,6 +18208,7 @@
       "schema": "public",
       "values": [
         "owner",
+        "admin",
         "member"
       ]
     },

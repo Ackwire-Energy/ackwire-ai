@@ -57,7 +57,7 @@ export interface RoleView {
   givable: boolean;
 }
 
-/** The base role and an "Admin" that holds `administrator`, for a new workspace (as migration 0128 did for the rest). */
+/** The base role and an "Admin" that holds `administrator`, for a new workspace (as migration 0130 did for the rest). */
 export async function createDefaultRoles(tx: Executor, orgId: string) {
   await tx.insert(orgRoles).values([
     {

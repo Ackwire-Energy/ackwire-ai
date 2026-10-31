@@ -551,6 +551,10 @@ export async function listMembers(db: Database, orgId: string) {
         joinedAt: organizationMembers.createdAt,
         lastSeenAt: organizationMembers.lastSeenAt,
         handle: organizationMembers.handle,
+        availability: organizationMembers.availability,
+        statusText: organizationMembers.statusText,
+        statusEmoji: organizationMembers.statusEmoji,
+        statusUntil: organizationMembers.statusUntil,
         ownTimezone: organizationMembers.timezone,
         orgTimezone: schema.organizationSettings.timezone,
       })
@@ -1369,11 +1373,18 @@ export async function joinOrganization(
 }
 
 /** Marks a person as seen now in an organization (WebSocket connect/disconnect). */
+/** Not while the person is hidden: a "last seen" that keeps moving would give them away. */
 export async function touchLastSeen(db: Database, orgId: string, userId: string, at = new Date()) {
   await db
     .update(organizationMembers)
     .set({ lastSeenAt: at })
-    .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+    .where(
+      and(
+        eq(organizationMembers.orgId, orgId),
+        eq(organizationMembers.userId, userId),
+        ne(organizationMembers.availability, "hidden"),
+      ),
+    );
 }
 
 export type InviteOutcome =
