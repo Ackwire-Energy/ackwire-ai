@@ -125,8 +125,9 @@ describe("Conectores → Email", () => {
     mail.nextError = "auth";
     await click(within(flow()).getByRole("button", { name: "Conectar" }));
     await settle(4);
+    // iCloud's own two things to check: the iCloud Mail address and an app password.
     expect(within(flow()).getByRole("alert").textContent).toBe(
-      "O email ou a senha de app não conferem. Confira e tente de novo.",
+      "O iCloud não aceitou. Confira se o endereço é o do Mail do iCloud, como nome@icloud.com, e se a senha é uma senha de app, não a da sua Conta Apple.",
     );
     // No error toast on top of the inline message.
     expect(screen().queryByText("auth")).toBeNull();
@@ -187,6 +188,38 @@ describe("Conectores → Email", () => {
     expect(row.textContent).toContain("iCloud");
     expect(row.textContent).toContain("Ativo");
     expect(row.textContent).toContain("Conectado como ana@example.com");
+  });
+
+  test("iCloud with a Gmail address: where to find the iCloud Mail one, before sending; other emails keep their copy", async () => {
+    const { api } = mailApi();
+    const dialog = await openCatalog(api);
+    await pick(dialog, "iCloud");
+    const address = () => within(flow()).getByLabelText("Endereço de email");
+    const hint = () => document.getElementById(address().getAttribute("aria-describedby") ?? "")?.textContent ?? null;
+    await type(address(), "Ana@Gmail.com");
+    expect(hint()).toBe(
+      "Use o endereço do Mail do iCloud, como nome@icloud.com, mesmo que a sua Conta Apple use o Gmail. No iPhone ele está em Ajustes\u00a0›\u00a0seu nome\u00a0›\u00a0iCloud\u00a0›\u00a0Mail do iCloud, ou veja em icloud.com/mail.",
+    );
+    await type(address(), "ana@hotmail.com");
+    expect(hint()).toContain("use o Outlook");
+    // Apple's domains and custom ones (iCloud+ domains) get no hint.
+    for (const typed of ["ana@icloud.com", "ana@acme.com.br"]) {
+      await type(address(), typed);
+      expect(hint()).toBeNull();
+    }
+    cleanup();
+
+    const other = mailApi();
+    await pick(await openCatalog(other.api), "Outro email");
+    await type(within(flow()).getByLabelText("Endereço de email"), "ana@gmail.com");
+    expect(flow().textContent).not.toContain("Mail do iCloud");
+    await type(within(flow()).getByLabelText("Senha de app"), "abcd-efgh-ijkl-mnop");
+    other.mail.nextError = "auth";
+    await click(within(flow()).getByRole("button", { name: "Conectar" }));
+    await settle(4);
+    expect(within(flow()).getByRole("alert").textContent).toBe(
+      "O email ou a senha de app não conferem. Confira e tente de novo.",
+    );
   });
 
   test("iCloud with its own domain: the sent folder's addresses come filled in, then the default From", async () => {

@@ -1,14 +1,14 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { BrowserHandoff } from "@agenteschat/client";
+import { BROWSER_STUCK_MS, type BrowserHandoff } from "@agenteschat/client";
 import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { titleKind } from "@/components/browser/BrowserCard";
 import { ADA_ID, createFakeApi, ENG_ID, fakeBrowserOf, ORG_ID, seedState } from "./fake-api";
-import { renderApp, screen, settle } from "./render";
+import { onScreen, renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
 
@@ -258,5 +258,208 @@ describe("the card's title", () => {
     expect(titleKind({ inControl: false, ask: null, host: "acme.example", opening: false })).toBe("host");
     expect(titleKind({ inControl: true, ask: "Entrar no painel", host: "acme.example", opening: false })).toBe("ask");
     expect(titleKind({ inControl: true, ask: null, host: "acme.example", opening: false })).toBe("host");
+  });
+});
+
+describe("a card whose page doesn't come never stays on Opening", () => {
+  let offScreen = () => {};
+  afterEach(() => {
+    setSystemTime();
+    offScreen();
+    offScreen = () => {};
+  });
+
+  const page = (seq = 1) => ({
+    type: "browser.frame",
+    agentId: ADA_ID,
+    seq,
+    data: FRAME_DATA,
+    metadata: { deviceWidth: 1280, deviceHeight: 800 },
+  });
+  const watches = (socket: { sent: unknown[] }) =>
+    socket.sent.filter((f) => (f as { type: string }).type === "browser.watch").length;
+  const later = () => setSystemTime(new Date(Date.now() + BROWSER_STUCK_MS + 1000));
+
+  test("after a server restart the page never comes: in 75 s it says so, and Tentar de novo restarts the browser", async () => {
+    const { state, handoff } = seedRequest();
+    const api = createFakeApi(state);
+    fakeBrowserOf.get(api)?.handoffs.set(handoff.id, handoff);
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(6);
+    await act(async () => r.sockets.last().open());
+    await act(async () =>
+      fireEvent.click(
+        within(document.querySelector(".brw-rq") as HTMLElement).getByRole("button", { name: "Abrir aqui" }),
+      ),
+    );
+    await settle(4);
+    const card = document.querySelector(".brw-ac") as HTMLElement;
+    const cover = () => card.querySelector(".brw-dim__box")?.textContent ?? "";
+    expect(cover()).toContain("Na primeira vez neste computador pode levar um minuto.");
+    // The server restarts: the socket comes back and the card watches again, but its page doesn't come.
+    await act(async () => r.sockets.last().drop());
+    await act(() => new Promise((done) => setTimeout(done, 650)));
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
+    await settle(2);
+    expect(watches(socket)).toBe(1);
+    const active = { ...handoff, status: "active", controllerUserId: "u-walter", expiresAt: null };
+    const status = { type: "browser.status", agentId: ADA_ID, mode: "control", controllerUserId: "u-walter" };
+    await act(async () => socket.push({ ...status, handoff: active, hidden: false }));
+    expect(cover()).toContain("Abrindo o navegador da Ada…");
+    later();
+    // The client's retries are answered with the computer's reason, with no page.
+    await act(async () =>
+      socket.push({
+        type: "browser.unavailable",
+        agentId: ADA_ID,
+        reason: "unavailable",
+        message: "the computer VPS did not answer within 120 s",
+      }),
+    );
+    expect(cover()).toContain("Não deu para abrir o navegador da Ada.");
+    expect(cover()).toContain("Tentar de novo reinicia o navegador. Os logins continuam salvos.");
+    expect(card.querySelector(".brw-mf__top b")?.textContent).toBe("Entrar no painel com a conta de teste");
+    const before = watches(socket);
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Tentar de novo" })));
+    await settle(3);
+    expect(state.calls.filter((c) => c.method === "browser.restart").map((c) => c.args)).toEqual([[ORG_ID, ADA_ID]]);
+    // And it watches again: its own watch may be what the server refused.
+    expect(watches(socket)).toBe(before + 1);
+    // It waits again, from the start, and the page shows when it comes.
+    expect(cover()).toContain("Abrindo o navegador da Ada…");
+    await act(async () => socket.push(page()));
+    expect(card.querySelector(".brw-dim")).toBeNull();
+    expect(card.querySelector(".brw-ac__page img")).toBeTruthy();
+  });
+
+  test("Abrir aqui while the agent's own card watches its browser: the request's card gets the page too", async () => {
+    offScreen = onScreen(".brw-ac");
+    const { state, handoff } = seedRequest();
+    const api = createFakeApi(state);
+    fakeBrowserOf.get(api)?.handoffs.set(handoff.id, handoff);
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(6);
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
+    /** The server answers each `browser.watch` on the socket: who is in control, and the newest page. */
+    let answered = 0;
+    const serve = async (status: Record<string, unknown>) => {
+      for (; answered < watches(socket); answered++) {
+        await act(async () => socket.push({ type: "browser.status", agentId: ADA_ID, hidden: false, ...status }));
+        await act(async () => socket.push(page()));
+      }
+    };
+    // Ada works in its browser: its run's card watches it, and shows the page (one that isn't repainting).
+    const run = { channelId: ENG_ID, threadId: null, runId: "r-ask", agentId: ADA_ID };
+    await act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { type: "agent.thinking", ...run } }));
+    await act(async () =>
+      socket.push({ type: "event", channelId: ENG_ID, event: { type: "agent.tool", tool: "browser_open", ...run } }),
+    );
+    await settle(3);
+    await serve({ mode: "watch", controllerUserId: null, handoff: null });
+    expect(document.querySelector(".brw-ac .brw-ac__page img")).toBeTruthy();
+    // It asked for help; Abrir aqui opens the request's own card, in control.
+    await act(async () =>
+      fireEvent.click(
+        within(document.querySelector(".brw-rq") as HTMLElement).getByRole("button", { name: "Abrir aqui" }),
+      ),
+    );
+    await settle(4);
+    const active = { ...handoff, status: "active", controllerUserId: "u-walter", expiresAt: null };
+    await serve({ mode: "control", controllerUserId: "u-walter", handoff: active });
+    const cards = [...document.querySelectorAll(".brw-ac")] as HTMLElement[];
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.classList.contains("is-control")).toBe(true);
+    expect(cards[0]?.querySelector(".brw-dim")).toBeNull();
+    expect(cards[0]?.querySelector(".brw-ac__page img")).toBeTruthy();
+  });
+
+  test("Reconectando… for 75 s says it couldn't open: someone who only watches tries again by watching", async () => {
+    offScreen = onScreen(".brw-ac");
+    const state = seedState();
+    const api = createFakeApi(state);
+    fakeBrowserOf.get(api)?.watchOnly.add(ADA_ID);
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(5);
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
+    const run = { channelId: ENG_ID, threadId: null, runId: "r-watch", agentId: ADA_ID };
+    await act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { type: "agent.thinking", ...run } }));
+    await act(async () =>
+      socket.push({ type: "event", channelId: ENG_ID, event: { type: "agent.tool", tool: "browser_open", ...run } }),
+    );
+    await settle(3);
+    const card = document.querySelector(".brw-ac") as HTMLElement;
+    const cover = () => card.querySelector(".brw-dim__box")?.textContent ?? "";
+    // The agent's computer restarted and doesn't come back.
+    await act(async () => socket.push({ type: "browser.unavailable", agentId: ADA_ID, reason: "reconnecting" }));
+    expect(cover()).toContain("Reconectando");
+    later();
+    await act(async () => socket.push({ type: "browser.unavailable", agentId: ADA_ID, reason: "reconnecting" }));
+    expect(cover()).toContain("Não deu para abrir o navegador da Ada.");
+    // Watching doesn't restart anyone's browser: no word about it.
+    expect(cover()).not.toContain("reinicia");
+    const before = watches(socket);
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Tentar de novo" })));
+    await settle(2);
+    expect(watches(socket)).toBe(before + 1);
+    expect(state.calls.some((c) => c.method === "browser.restart")).toBe(false);
+    await act(async () =>
+      socket.push({ type: "browser.status", agentId: ADA_ID, mode: "watch", controllerUserId: null, handoff: null }),
+    );
+    await act(async () => socket.push(page()));
+    expect(card.querySelector(".brw-dim")).toBeNull();
+  });
+
+  test("off screen the wait doesn't count: shown after 75 s it's still opening; too many browsers says so", async () => {
+    // The card's observer, answered by the test: off screen until shown.
+    let show = () => {};
+    const native = globalThis.IntersectionObserver;
+    globalThis.IntersectionObserver = class {
+      constructor(readonly answer: IntersectionObserverCallback) {}
+      observe(target: Element) {
+        if (!target.matches(".brw-ac")) return;
+        show = () => this.answer([{ isIntersecting: true, target } as IntersectionObserverEntry], this as never);
+      }
+      unobserve() {}
+      disconnect() {}
+      takeRecords() {
+        return [];
+      }
+    } as unknown as typeof IntersectionObserver;
+    offScreen = () => {
+      globalThis.IntersectionObserver = native;
+    };
+    const state = seedState();
+    const api = createFakeApi(state);
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(5);
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
+    const run = { channelId: ENG_ID, threadId: null, runId: "r-off", agentId: ADA_ID };
+    await act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { type: "agent.thinking", ...run } }));
+    await act(async () =>
+      socket.push({ type: "event", channelId: ENG_ID, event: { type: "agent.tool", tool: "browser_open", ...run } }),
+    );
+    await settle(3);
+    const card = document.querySelector(".brw-ac") as HTMLElement;
+    const cover = () => card.querySelector(".brw-dim__box")?.textContent ?? "";
+    later();
+    await act(async () => show());
+    await settle(2);
+    expect(cover()).toContain("Abrindo o navegador da Ada…");
+    // Its watch refused (a fifth browser on this socket): that, not an opening that never ends.
+    await act(async () => socket.push({ type: "error", agentId: ADA_ID, code: "too_many_browsers" }));
+    expect(cover()).toContain("Muitos navegadores abertos ao mesmo tempo. Este aparece quando outro fechar.");
+    later();
+    await act(async () => socket.push({ type: "error", agentId: ADA_ID, code: "too_many_browsers" }));
+    expect(cover()).not.toContain("Não deu para abrir");
+    // Let in (another view left): the page shows.
+    await act(async () =>
+      socket.push({ type: "browser.status", agentId: ADA_ID, mode: "watch", controllerUserId: null, handoff: null }),
+    );
+    await act(async () => socket.push(page()));
+    expect(card.querySelector(".brw-dim")).toBeNull();
   });
 });

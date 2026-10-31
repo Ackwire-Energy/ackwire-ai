@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { ACCOUNTS_PROTOCOL, channelTopic, MACHINE_PROTOCOL_VERSION } from "@agenteschat/adapters";
-import { eq, schema } from "@agenteschat/db";
+import { and, eq, schema } from "@agenteschat/db";
 import { systemText } from "@agenteschat/providers";
 import {
   addChannelMember,
@@ -12,6 +12,7 @@ import {
   brainFor,
   brainModelFor,
   brainSessionId,
+  type ChannelEvent,
   COMPUTER_BUSY_RETRY_MS,
   COMPUTER_BUSY_WAIT_MS,
   COMPUTER_REACT_NOTE,
@@ -359,6 +360,230 @@ test("a gated call through the bridge leaves the run waiting; the decision resum
   expect(seen[1]?.trigger).toContain("github_merge_pr ok: acme/app#42");
 });
 
+/**
+ * A connector call that asks a person every time, answering like a remote workbench that gave only a preview.
+ * `external`: an MCP server's answer, which reaches the model inside `<external_data>`.
+ */
+function workbench(options: { content?: string; external?: boolean } = {}) {
+  const ran: Record<string, unknown>[] = [];
+  const source: ToolSource = {
+    name: "fake-workbench",
+    tools: async () => [
+      {
+        name: "ci_workbench",
+        description: "Runs code against the CI provider (fake)",
+        scope: "ci:run",
+        sensitive: true,
+        ...(options.external ? { external: true } : {}),
+        inputSchema: {
+          type: "object",
+          properties: { run: { type: "integer" } },
+          required: ["run"],
+          additionalProperties: false,
+        },
+        async execute(input) {
+          ran.push(input);
+          return { content: options.content ?? "Response schema: {jobs: [...]} Data Preview: (2 rows hidden)" };
+        },
+      },
+    ],
+  };
+  return { source, ran };
+}
+
+const WORKBENCH_WHY = "The CI run is slow and its per-job times answer the question: this call reads them.";
+
+test("approved, it ran, and the brain ended its turn without a word: one more turn with the result, then the answer", async () => {
+  // A remote workbench's long preview, an MCP server's words: the run reads them as data, never as instructions.
+  const preview = `Response schema: {jobs: [...]} Data Preview: ${"x".repeat(2500)} (2 rows hidden)`;
+  const bench = workbench({ content: preview, external: true });
+  f = await setup({ toolSources: [bench.source] });
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "ci:run" }]);
+  const machineId = await computerAgent(f);
+  const promised =
+    "The card above fetches how long each job took and what's left. When you approve, I'll give you the numbers.";
+  const { brain, seen } = scriptedComputerBrain(async function* (n, turn) {
+    if (n === 0) {
+      yield { type: "text_delta", text: promised };
+      const result = await executeToolForRun(
+        f.jobDeps,
+        { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId },
+        { id: "wb-1", name: "ci_workbench", input: { run: 42, why: WORKBENCH_WHY } },
+      );
+      yield { type: "tool_call", id: "wb-1", name: "ci_workbench", input: {}, executed: result };
+      yield { type: "done", text: promised };
+      return;
+    }
+    // What production saw: the result came back and the turn ended with nothing.
+    if (n === 1) return yield { type: "done", text: "" };
+    yield { type: "done", text: "The preview hid the rows, so I read them again: tests took 9 min, lint 2." };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev o ci demora tanto assim?");
+  await drainOutbox(f.db, handlers);
+  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("waiting_approval");
+
+  const [approval] = await listApprovals(f.db, f.owner.id, f.org.id, { status: "pending" });
+  await decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, approval?.id ?? "", {
+    decision: "approve",
+  });
+  await drainOutbox(f.db, handlers);
+
+  expect(bench.ran).toEqual([{ run: 42 }]);
+  expect(seen.length).toBe(3);
+  expect(seen[1]?.trigger).toContain("Response schema");
+  // Told what was decided and what came back, and to finish what it said it would do: what it is told comes
+  // first, and the result keeps its envelope (cut in the middle, its end and closing marker kept).
+  const nudge = seen[2]?.trigger ?? "";
+  expect(nudge).toContain("ended your turn without telling them anything");
+  expect(nudge).toContain("Data Preview");
+  expect(nudge).toContain("(2 rows hidden)\n</external_data>");
+  expect(nudge).toContain("characters cut");
+  expect(nudge.indexOf("Go on with the task")).toBeGreaterThan(-1);
+  expect(nudge.indexOf("Go on with the task")).toBeLessThan(nudge.indexOf("<external_data"));
+  const [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("done");
+  const fromAgent = (await timeline(f)).filter((m) => m.author.type === "agent" && !m.meta.approvalId);
+  expect(fromAgent.map((m) => m.body)).toEqual([
+    promised,
+    "The preview hid the rows, so I read them again: tests took 9 min, lint 2.",
+  ]);
+  const steps = await f.db
+    .select()
+    .from(schema.agentRunSteps)
+    .where(eq(schema.agentRunSteps.runId, run?.id ?? ""));
+  expect(steps.filter((s) => s.data.nudged === "decision").length).toBe(1);
+});
+
+test("told once after a decision: a second silent turn ends the run, never a loop", async () => {
+  const bench = workbench();
+  f = await setup({ toolSources: [bench.source] });
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "ci:run" }]);
+  const machineId = await computerAgent(f);
+  const { brain, seen } = scriptedComputerBrain(async function* (n, turn) {
+    if (n === 0) {
+      const result = await executeToolForRun(
+        f.jobDeps,
+        { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId },
+        { id: "wb-1", name: "ci_workbench", input: { run: 7, why: WORKBENCH_WHY } },
+      );
+      yield { type: "tool_call", id: "wb-1", name: "ci_workbench", input: {}, executed: result };
+      return yield { type: "done", text: "Asked for the CI numbers." };
+    }
+    yield { type: "done", text: "" };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev quanto tempo levou o CI?");
+  await drainOutbox(f.db, handlers);
+  const [approval] = await listApprovals(f.db, f.owner.id, f.org.id, { status: "pending" });
+  await decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, approval?.id ?? "", {
+    decision: "approve",
+  });
+  await drainOutbox(f.db, handlers);
+  expect(seen.length).toBe(3);
+  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("done");
+});
+
+test("decided while the turn that asked still runs: the run goes on once that turn ends, never two turns at once", async () => {
+  const bench = workbench();
+  f = await setup({ toolSources: [bench.source] });
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "ci:run" }]);
+  const machineId = await computerAgent(f);
+  let turnsWhileFirstRan = -1;
+  const { brain, seen } = scriptedComputerBrain(async function* (n, turn) {
+    if (n > 0) return yield { type: "done", text: "Tests took 9 min, lint 2." };
+    const result = await executeToolForRun(
+      f.jobDeps,
+      { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId },
+      { id: "wb-1", name: "ci_workbench", input: { run: 42, why: WORKBENCH_WHY } },
+    );
+    // The person approves seven seconds later, before this turn has ended: the decision's job runs now.
+    const [approval] = await listApprovals(f.db, f.owner.id, f.org.id, { status: "pending" });
+    await decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, approval?.id ?? "", {
+      decision: "approve",
+    });
+    await drainOutbox(f.db, handlers);
+    turnsWhileFirstRan = seen.length;
+    yield { type: "tool_call", id: "wb-1", name: "ci_workbench", input: {}, executed: result };
+    yield { type: "done", text: "When you approve, I'll give you the numbers." };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev o ci demora tanto assim?");
+  await drainOutbox(f.db, handlers);
+
+  expect(turnsWhileFirstRan).toBe(1);
+  expect(seen.length).toBe(2);
+  expect(seen[1]?.session?.id).toBe(seen[0]?.session?.id);
+  expect(seen[1]?.trigger).toContain("ci_workbench: Response schema");
+  expect(bench.ran).toEqual([{ run: 42 }]);
+  const [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("done");
+  expect((await timeline(f)).at(-1)?.body).toBe("Tests took 9 min, lint 2.");
+});
+
+test("two decisions of one pause: the resume that finds the run running under the other's job leaves it alone", async () => {
+  const bench = workbench();
+  let nested: Promise<number> | null = null;
+  f = await setup({
+    toolSources: [bench.source],
+    reply: (_request, call) => {
+      if (call === 1)
+        return {
+          chunks: ["Reading both CI runs."],
+          toolUses: [41, 42].map((n) => ({ name: "ci_workbench", input: { run: n, why: WORKBENCH_WHY } })),
+        };
+      if (call > 2) return { chunks: ["A second turn beside the first."] };
+      // The second decision's job runs while this resumed turn still thinks.
+      nested = (async () => {
+        await f.db
+          .update(schema.outbox)
+          .set({ nextAttemptAt: new Date() })
+          .where(eq(schema.outbox.kind, "agent_run.execute"));
+        return drainOutbox(f.db, f.handlers);
+      })();
+      return { chunks: ["Tests took 9 min, lint 2."], hold: nested };
+    },
+  });
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "ci:run" }]);
+  await post(f, "@dev compara os dois últimos CIs");
+  await drainOutbox(f.db, f.handlers);
+  const pending = await listApprovals(f.db, f.owner.id, f.org.id, { status: "pending" });
+  expect(pending.length).toBe(2);
+  for (const a of pending)
+    await decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, a.id, { decision: "approve" });
+  // Two resume jobs: the second one is held back until the first one's turn is under way.
+  const resumes = await f.db
+    .select()
+    .from(schema.outbox)
+    .where(and(eq(schema.outbox.kind, "agent_run.execute"), eq(schema.outbox.status, "pending")));
+  expect(resumes.length).toBe(2);
+  await f.db
+    .update(schema.outbox)
+    .set({ nextAttemptAt: new Date(Date.now() + 3600_000) })
+    .where(eq(schema.outbox.id, resumes[1]?.id ?? ""));
+  await drainOutbox(f.db, f.handlers);
+  await nested;
+
+  expect(bench.ran).toEqual([{ run: 41 }, { run: 42 }]);
+  expect(f.provider.calls.length).toBe(2);
+  const [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("done");
+  const fromAgent = (await timeline(f)).filter((m) => m.author.type === "agent" && !m.meta.approvalId);
+  expect(fromAgent.map((m) => m.body)).toEqual(["Reading both CI runs.", "Tests took 9 min, lint 2."]);
+});
+
 test("a question asked through the bridge: the text written before it comes first, what follows isn't posted", async () => {
   f = await setup({ askUser: true });
   const machineId = await computerAgent(f);
@@ -501,6 +726,18 @@ test("the agent's account and effort apply to its own brain; signed out or an ol
   if (!agent || !run) throw new Error("missing rows");
   const plan = await resolveBrain({ db: f.db }, agent, run, question.id);
   expect(plan).toMatchObject({ kind: "claude_code", account: { id: ACCOUNT, status: "active" }, effort: "low" });
+  // One of a coding plan's models by id thinks on that plan; kept while Claude's sign-in thinks, it runs Sonnet.
+  const picked = { ...agent, brainModel: "k3-256k" };
+  await f.db.update(schema.machineAccounts).set({ provider: "kimi" });
+  expect(await resolveBrain({ db: f.db }, picked, run, question.id)).toMatchObject({
+    model: "k3-256k",
+    account: { provider: "kimi" },
+  });
+  await f.db.update(schema.machineAccounts).set({ provider: "zai" });
+  expect((await resolveBrain({ db: f.db }, picked, run, question.id)).model).toBe("sonnet");
+  await f.db.update(schema.machineAccounts).set({ provider: null });
+  expect((await resolveBrain({ db: f.db }, picked, run, question.id)).model).toBe("sonnet");
+  expect((await resolveBrain({ db: f.db }, { ...agent, brainModel: "auto" }, run, question.id)).model).toBe("auto");
   // Another brain (a mission's choice): neither applies; an account of another kind is no account.
   expect(brainEffortFor(agent, "codex")).toBeUndefined();
   expect(brainEffortFor(agent, "claude_code")).toBe("low");
@@ -1179,6 +1416,161 @@ test("a routine's run: a bridged gated call posts its card and events in the mai
   const chips = events.filter((e) => e.type === "agent.tool") as { threadId?: string | null }[];
   expect(chips.length).toBeGreaterThan(0);
   expect(chips.every((e) => e.threadId === null)).toBe(true);
+});
+
+/**
+ * The computer's permission check, answering by the command: `rm` refused, `npm publish` waits on a person who
+ * says no (`req-1`), `npm version` on one who says yes on the second time it is asked again (`req-2`).
+ */
+function permissionTool() {
+  let polls = 0;
+  const source: ToolSource = {
+    name: "permission",
+    tools: async () => [
+      {
+        name: "permission_prompt",
+        description: "Claude Code's permission prompt",
+        scope: "",
+        inputSchema: { type: "object" },
+        execute: async (input) => {
+          const command = String((input.input as { command?: unknown } | undefined)?.command ?? "");
+          const answer = (a: Record<string, unknown>) => ({ content: JSON.stringify(a) });
+          if (input.request_id === "req-1")
+            return answer({ behavior: "deny", message: "A person said no. Don't try it again.", code: "person" });
+          if (input.request_id === "req-2")
+            return answer(++polls < 2 ? { status: "pending", request_id: "req-2" } : { behavior: "allow" });
+          if (command.startsWith("rm "))
+            return answer({
+              behavior: "deny",
+              message:
+                "This command was refused because it changes files outside the mission folder. Do it another way.",
+              code: "outside",
+            });
+          if (command === "npm publish") return answer({ status: "pending", request_id: "req-1" });
+          if (command === "npm version patch") return answer({ status: "pending", request_id: "req-2" });
+          return answer({ behavior: "allow" });
+        },
+      },
+    ],
+  };
+  return source;
+}
+
+/** Commands whose label could show what their whole command hides, and what it must never show. */
+const LABEL_PROBES = [
+  {
+    command: 'curl -s https://api.example.com/v1/items -H "Authorization: Bearer abc123def456ghi789"',
+    label: "curl api.example.com/v1/items",
+    secret: "abc123def456ghi789",
+  },
+  {
+    command: 'curl -sS https://api.example.com/v1 -H "X-Api-Key: 9f8e7d6c5b4a3210"',
+    label: "curl api.example.com/v1",
+    secret: "9f8e7d6c5b4a3210",
+  },
+  { command: "mysql -h db -u root --password hunter2", label: "mysql", secret: "hunter2" },
+  { command: 'node -e "console.log(1)"', label: "node", secret: null },
+  {
+    command: "psql postgres://user:pass@host:5432/db -c 'select 1'",
+    label: "psql postgres://***@host:5432/db",
+    secret: "user:pass",
+  },
+  {
+    command: "git clone https://x-token:s3cr3tvalue@github.com/acme/app.git",
+    label: "git clone github.com/acme/app.git",
+    secret: "s3cr3tvalue",
+  },
+];
+
+test("a bridged permission check: its line says the command, opens on it masked, says why it was refused", async () => {
+  f = await setup({ toolSources: [permissionTool()] });
+  const machineId = await computerAgent(f);
+  const run = await runningRun(f, await post(f, "Roda os testes"));
+  const events = f.listen(f.general.id);
+  const ask = (id: string, input: Record<string, unknown>) =>
+    invokeToolForRun(
+      { db: f.db, pubsub: f.pubsub, tools: f.tools },
+      { orgId: f.org.id, agentId: f.agent.id, runId: run.id, machineId },
+      { id, name: "permission_prompt", input },
+    );
+  const bash = (command: string, description?: string) => ({
+    tool_name: "Bash",
+    input: { command, ...(description ? { description } : {}) },
+  });
+  await ask("p1", bash("cd /w/app && npx jest src/a.test.ts --watch=false", "Rerun new unit tests after formatting"));
+  await ask(
+    "p2",
+    bash('curl -s -H "Authorization: Bearer sk-ant-api03-abcdefghijklmnop" https://api.example.com/v1/items?token=abc'),
+  );
+  await ask("p3", bash("rm -rf /etc/agentes"));
+  await ask("p4", bash("npm publish"));
+  // The runner asking again about the one waiting on a person: no line of its own, the person's answer ends it.
+  await ask("p5", { request_id: "req-1" });
+  for (const [i, probe] of LABEL_PROBES.entries()) await ask(`q${i}`, bash(probe.command));
+
+  const chips = events.filter((e) => e.type === "agent.tool") as Extract<ChannelEvent, { type: "agent.tool" }>[];
+  const started = chips.filter((e) => e.tool !== null);
+  expect(started.map((e) => [e.toolUseId, e.detail])).toEqual([
+    ["p1", "Rerun new unit tests after formatting"],
+    ["p2", "curl api.example.com/v1/items"],
+    ["p3", "rm /etc/agentes"],
+    ["p4", "npm publish"],
+    ...LABEL_PROBES.map((p, i) => [`q${i}`, p.label]),
+  ]);
+  expect(started[0]?.command).toBe("cd /w/app && npx jest src/a.test.ts --watch=false");
+  expect(started[1]?.command).toContain("curl -s -H");
+  expect(started[1]?.command).not.toContain("sk-ant-api03");
+  expect(started[1]?.command).not.toContain("token=abc");
+  for (const [i, probe] of LABEL_PROBES.entries()) {
+    const shown = started.find((e) => e.toolUseId === `q${i}`)?.command ?? "";
+    expect(shown.split(" ")[0]).toBe(probe.command.split(" ")[0]);
+    if (probe.secret) expect(shown).not.toContain(probe.secret);
+  }
+  const ends = chips.filter((e) => e.tool === null && e.toolUseId?.startsWith("p"));
+  expect(ends.map((e) => [e.toolUseId, e.failed ?? false, e.held ?? false, e.refusal ?? null])).toEqual([
+    ["p1", false, false, null],
+    ["p2", false, false, null],
+    ["p3", true, false, "outside"],
+    ["p4", false, true, null],
+  ]);
+  expect(ends[2]?.why).toBe(
+    "This command was refused because it changes files outside the mission folder. Do it another way.",
+  );
+  expect(ends[3]?.requestId).toBe("req-1");
+  // The person's answer reaches the line that waited for it, by its request.
+  const answered = chips.filter((e) => e.tool === null && !e.toolUseId);
+  expect(answered).toMatchObject([{ requestId: "req-1", failed: true, refusal: "person" }]);
+  // The steps keep the same label, and the command masked for the line's open view.
+  const steps = await f.db.select().from(schema.agentRunSteps).where(eq(schema.agentRunSteps.runId, run.id));
+  const call = (id: string) => steps.find((s) => s.kind === "tool_call" && s.data.toolUseId === id)?.data;
+  expect(call("p2")).toMatchObject({ detail: "curl api.example.com/v1/items" });
+  expect(call("p2")?.command).toBe(started[1]?.command);
+  expect(call("p5")?.detail).toBeUndefined();
+});
+
+test("a reply's tool count leaves out the runner asking again about a command waiting on a person", async () => {
+  f = await setup({ toolSources: [permissionTool()] });
+  const machineId = await computerAgent(f);
+  const { brain } = scriptedComputerBrain(async function* (_n, turn) {
+    const id = { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId };
+    const ask = (call: string, input: Record<string, unknown>) =>
+      executeToolForRun(f.jobDeps, id, { id: call, name: "permission_prompt", input });
+    await ask("v1", { tool_name: "Bash", input: { command: "npm version patch" } });
+    await ask("v2", { request_id: "req-2" });
+    await ask("v3", { request_id: "req-2" });
+    yield { type: "done", text: "Versão nova." };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev sobe a versão");
+  await drainOutbox(f.db, handlers);
+
+  const reply = (await timeline(f)).at(-1);
+  expect(reply?.body).toBe("Versão nova.");
+  expect((reply?.meta.work as { steps?: number } | undefined)?.steps).toBe(1);
 });
 
 test("bridged side effects reach the engine: a bridged react ends the turn silently (no Done.)", async () => {

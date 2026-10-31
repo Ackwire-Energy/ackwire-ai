@@ -7,6 +7,7 @@ import {
   loginOf,
   mailErrorOf,
   normalizePolicy,
+  notIcloudMail,
   splitAddresses,
 } from "../src/lib/mail";
 
@@ -124,5 +125,18 @@ describe("mail rules", () => {
     expect(choiceOf({ provider: "gmail", preset: null })).toBe("gmail");
     expect(choiceOf({ provider: "imap", preset: "icloud" })).toBe("icloud");
     expect(choiceOf({ provider: "imap", preset: "locaweb" })).toBe("other");
+  });
+
+  test("the iCloud form's hint: a big provider's address, never Apple's own or a custom domain", () => {
+    expect(notIcloudMail(" Ana@Gmail.com ")).toBe("Gmail");
+    expect(notIcloudMail("ana@googlemail.com")).toBe("Gmail");
+    expect(notIcloudMail("ana@outlook.com")).toBe("Outlook");
+    expect(notIcloudMail("ana@live.com")).toBe("Outlook");
+    expect(notIcloudMail("ana@hotmail.com.br")).toBe("Outlook");
+    expect(notIcloudMail("ana@outlook.com.br")).toBe("Outlook");
+    expect(notIcloudMail("ana@yahoo.com.br")).toBe("Yahoo Mail");
+    for (const address of ["ana@icloud.com", "ana@me.com", "ana@mac.com", "ana@acme.com.br", "gmail.com", ""]) {
+      expect(notIcloudMail(address)).toBeNull();
+    }
   });
 });

@@ -12,6 +12,7 @@ import {
   toolItemsSaved,
   toolNow,
   toolPhrase,
+  toolWhy,
   workFromSteps,
   workMeta,
 } from "@agenteschat/client/lib/work";
@@ -83,6 +84,18 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
   creatingChannel: "channel",
   offeringConnectAi: "plug",
   findingTools: "search",
+  runningCommand: "code",
+  runningCommandAny: "code",
+  usingScreen: "computer",
+  cloningRepo: "repo",
+  openingPullRequest: "pullRequest",
+  handingOff: "routines",
+  recordingFindings: "flag",
+  deliveringMission: "flag",
+  suggestingForumTopic: "message",
+  requestingAccess: "key",
+  requestingSecret: "lock",
+  queryingDatabase: "database",
 };
 
 /** Apps of ours that aren't in the connector catalog (the org's mailboxes): their icon, not an initial. */
@@ -128,11 +141,12 @@ function blockLine(t: TFunction, locale: string, l: ToolLine, logo: ReactNode) {
           ),
         })
       : toolPhrase(t, l);
+  const why = toolWhy(t, l);
   const detail = l.code ? (
     <CodePanel code={l.code} output={output} live={l.state === "run"} />
   ) : output.length > 0 ? (
     <OutputView output={output} live={l.state === "run"} />
-  ) : l.input || l.result || l.why ? (
+  ) : l.input || l.result || why ? (
     <div className="ac-tools__io">
       {l.input && (
         <>
@@ -140,10 +154,10 @@ function blockLine(t: TFunction, locale: string, l: ToolLine, logo: ReactNode) {
           <span>{l.input}</span>
         </>
       )}
-      {(l.result || l.why) && (
+      {(l.result || why) && (
         <>
           <b>{l.state === "fail" ? t("chat.work.error") : t("chat.work.answered")}</b>
-          <span>{l.result ?? l.why}</span>
+          <span>{l.result ?? why}</span>
         </>
       )}
     </div>
@@ -156,7 +170,7 @@ function blockLine(t: TFunction, locale: string, l: ToolLine, logo: ReactNode) {
     hint: l.code ? null : l.hint,
     time: l.ms !== null && l.state !== "run" ? formatLineTime(locale, l.ms) : undefined,
     count: l.count > 1 ? t("chat.work.times", { count: l.count }) : undefined,
-    why: l.state === "fail" ? l.why : null,
+    why: l.state === "fail" ? why : null,
     detail,
     defaultOpen: l.state === "run" && Boolean(l.code),
   };

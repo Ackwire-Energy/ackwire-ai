@@ -318,6 +318,7 @@ jobs:
   # Whole-history secret scan with the pinned gitleaks image (the GitHub action needs a license key
   # for organization repos; the CLI does not), and the boundaries check: no cloud/ or ee/ imports, no
   # internal notes in public files. Every change runs this job, docs included; the check needs no install.
+  # --verbose with --redact names each finding's file, line, commit and rule, never its value.
   secrets:
     name: Secret scan and boundaries
     if: github.event.pull_request.draft != true
@@ -329,7 +330,7 @@ jobs:
           fetch-depth: 0
       # Bun first: the boundaries check below still runs when the scan fails.
       - *setup-bun
-      - run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f git --config /repo/.gitleaks.toml --no-banner --redact --exit-code 1 /repo
+      - run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f git --config /repo/.gitleaks.toml --no-banner --redact --verbose --exit-code 1 /repo
       - name: Boundaries (no cloud/ or ee/ imports, no internal notes in public files)
         if: success() || failure()
         run: bun run check:boundaries

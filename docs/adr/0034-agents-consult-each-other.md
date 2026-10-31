@@ -95,3 +95,16 @@ A question showed only its state, the question and the answer: what the consulte
 
 Not done: the consulted agent's prompt still says no person reads the agents' DM; it should say that whoever reads the asking conversation reads what it writes for that question. That prompt change waits for an eval.
 
+## Addendum (2026-10-30): archived agents are out of reach
+
+Archiving an agent (`archiveAgent`) keeps its channel memberships, history and memory. Runs kept reaching for it: the channel's members in "Where you are" came from the memberships with no archived check, so the other agents saw it as present, with what it could do, and mentioned or asked it. `ask_agent` and `tell_agent` answered "There is no agent @x in this organization" both for an archived agent and for a handle nobody has.
+
+**1. Rosters.** What a run reads of its channel's members leaves archived agents out, as "# Your team" and `find_agent` (`loadTeam`) already did. Archiving drops the cached members of the org's channels at once.
+
+**2. One answer for a handle that reaches no agent** (`noAgentText` in `team.ts`), in every tool that takes agents' handles: `ask_agent`, `tell_agent`, `add_agent_to_channel`, `list_routines`, `offer_connect_ai`, `create_channel`, `suggest_forum_topic` and `open_forum_topic`. An archived agent: "@x is archived: nothing you send reaches it. Don't try it again. If the work needs it, tell the person." Any other handle: "No agent @x here." with up to three closest handles (edit distance) among the agents the person behind the run can talk to, the ones `find_agent` lists.
+
+**3. Named in what the run reads.** When the instructions, memory, wiki pages or the conversation name an archived agent's @handle, a "# Archived agents" block says it is archived, not to ask or mention it, and to tell the person when the work counted on it. A handle that a person holds now is not called archived (people's handles don't check agents'). The archived handles are cached per process like the team, so a run costs no extra statement on a warm server. The block is per turn, like the memory found for the trigger (ADR 0053 §10): a computer brain (Claude Code, Codex) reads it in "# This turn" on each run's first turn, so a session that started earlier, which reads its system prompt only when it starts, gets it too.
+
+**4. Unchanged.** A mention of an archived agent already started nothing (the message insert, the mention dispatch and the router skip archived agents), and the "@" pickers on the web and the phone list only active agents (`GET …/agents`).
+
+Not done: restoring an archived agent (there is no restore, so the refusal points to none). Issue assignees and calendar participants, where one field takes people and agents, still answer that nobody has the name. A computer brain's session keeps the "# Your team" it started with, so an agent archived since can stay listed there until the session ends; `ask_agent` and `tell_agent` still refuse it with the archived answer.

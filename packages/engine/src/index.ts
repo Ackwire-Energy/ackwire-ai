@@ -82,6 +82,7 @@ export * from "./errors";
 export * from "./events";
 export * from "./executor";
 export * from "./exports";
+export * from "./follow-through";
 export * from "./follows";
 export * from "./forum";
 export * from "./forum-tools";
