@@ -43,6 +43,7 @@ import {
   createLocalKeyWrapper,
   defaultEmailFrom,
   drainLocalRuns,
+  EMAIL_PICTURES,
   emailArtFor,
   enableCaches,
   enableOperatorEvents,
@@ -220,8 +221,10 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
   // A failed lookup attaches them for the whole run, though the host may well be public.
   if (emailArt.attached === "unreachable") log.warn("email pictures", pictures);
   else log.info("email pictures", pictures);
-  if (!existsSync(join(webDir, "email", "logo-ink.png"))) {
-    log.warn("emails' pictures not found: their logo and art won't show", { dir: join(webDir, "email") });
+  // One missing picture leaves them all linked, even where they should go attached (`emailArtFor`).
+  const missing = EMAIL_PICTURES.filter((f) => !existsSync(join(webDir, "email", f)));
+  if (missing.length > 0) {
+    log.warn("emails' pictures not found: they won't show", { dir: join(webDir, "email"), missing });
   }
   const engine = buildEngine({
     db: database.db,

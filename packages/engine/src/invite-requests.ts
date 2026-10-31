@@ -19,7 +19,7 @@ import {
 } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { inviteLinkToken, sha256 } from "./crypto";
-import { emailLocale, emailsByLocale, queueEmail } from "./email";
+import { emailCrew, emailLocale, emailsByLocale, queueEmail } from "./email";
 import { ConflictError, ForbiddenError, NotFoundError, TooManyError, ValidationError } from "./errors";
 import { adminIds } from "./gateway";
 import { assertMemberRoom } from "./limits";
@@ -744,6 +744,7 @@ export async function approveJoinRequest(
           orgName: context.orgName,
           approverName: context.approverName,
           role,
+          crew: await emailCrew(tx, orgId),
           url: approval.outcome === "invited" ? approval.url : `${base(publicUrl)}/org/${orgId}`,
         },
       });

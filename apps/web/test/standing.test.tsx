@@ -263,6 +263,22 @@ describe("on agentes.chat Cloud: what it is, the Terms section and how to contes
     expect(banner().textContent).not.toContain("contestar");
   });
 
+  test("the automatic hold names what was flagged, and a category the app doesn't know reads the plain review line", async () => {
+    const reason = "review.phishing_impersonation";
+    const { set } = await open({ state: "hold", reason, cloud: true }, false, null, { cloud: true });
+    const banner = () => screen().getByRole("region", { name: STATUS });
+    expect(banner().textContent).toContain(
+      `Pausado para uma análise de segurança, até a nossa equipe olhar o caso. As nossas verificações automáticas detectaram uma atividade que parece envolver phishing ou imitação de uma marca, o que os nossos Termos não permitem (seção 5). ${CONTEST}`,
+    );
+    expect(banner().textContent).not.toContain("review");
+
+    await set({ state: "hold", reason: "review.something_new", cloud: true });
+    expect(banner().textContent).toContain(
+      `Pausado para uma análise de segurança, até a nossa equipe olhar o caso. As nossas verificações automáticas detectaram uma atividade que pode violar os nossos Termos (seção 5). ${CONTEST}`,
+    );
+    expect(banner().textContent).not.toContain("review");
+  });
+
   test("suspended with a reason: why, then how to contest it", async () => {
     await open({ state: "suspended", reason: "Termos 5: spam", cloud: true }, false, null, { cloud: true });
     expect(document.body.textContent).toContain(`Este workspace está suspenso: Termos 5: spam. ${CONTEST}`);

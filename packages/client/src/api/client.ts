@@ -1151,10 +1151,14 @@ export interface ApiClient {
     accounts(orgId: string): Promise<MailAccount[]>;
     /** Tests the login and both servers first; a `422` carries `MailConnectError` as its code. */
     connectImap(orgId: string, input: MailImapInput): Promise<MailAccount>;
-    /** Gmail/Outlook: the page to open; the server sends the person back with `?mail=connected|failed`. */
+    /**
+     * Gmail/Outlook: the page to open; the server sends the person back with `?mail=connected|failed`.
+     * `desktop`: started in the desktop app's window, which opens the page in the browser and gets the return back.
+     * `accountId` reconnects that mailbox (one that needs it) instead of adding one.
+     */
     connectComposio(
       orgId: string,
-      input: { provider: "gmail" | "outlook"; label?: string },
+      input: { provider: "gmail" | "outlook"; label?: string; accountId?: string; desktop?: boolean },
     ): Promise<{ accountId: string; redirectUrl: string }>;
     /** A new name, actions, other addresses and the default From, or a new app password (reconnects an IMAP mailbox). */
     update(orgId: string, accountId: string, input: MailAccountUpdate): Promise<MailAccount>;
