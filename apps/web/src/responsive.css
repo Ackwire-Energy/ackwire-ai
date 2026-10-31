@@ -499,6 +499,10 @@
   .outage__acts {
     flex-basis: 100%;
   }
+  /* A hold's button has a row of its own here: it takes its whole height. */
+  .hold-banner > .outage__acts {
+    margin-block: 0;
+  }
   .outage__acts > .ac-btn:not(.ac-btn--icon) {
     flex: 1;
   }
