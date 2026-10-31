@@ -2,6 +2,7 @@ import {
   type Message,
   type MessageReceipt,
   type ReceiptPhase,
+  type ReceiptsState,
   receiptView,
   type SteerPhase,
   type SteerState,
@@ -164,16 +165,23 @@ export function turnHeadId(
 
 /**
  * The message the line goes under: the latest on screen that the server has, a person's or an agent's that mentions
- * agents (whom it handed work to, and who it only mentioned: ADR 0089).
+ * agents (whom it handed work to, and who it only mentioned: ADR 0089). An agent's never takes it from the latest
+ * person's message while that one's line asks something of you (`keepsLine`: send it again, connect an AI, nobody
+ * will answer).
  */
-export function receiptMessageId(messages: readonly Message[]): string | null {
+export function receiptMessageId(messages: readonly Message[], receipts: ReceiptsState = {}): string | null {
+  let byAgent: string | null = null;
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
     if (!m || m.local || isEventLine(m.meta)) continue;
-    if (m.author.type !== "person" && !(m.author.type === "agent" && m.mentionedAgentIds.length > 0)) continue;
-    return m.id;
+    if (m.author.type === "person") {
+      if (!byAgent) return m.id;
+      const line = receiptLine(receipts[m.id]);
+      return line && keepsLine(line) ? m.id : byAgent;
+    }
+    if (!byAgent && m.author.type === "agent" && m.mentionedAgentIds.length > 0) byAgent = m.id;
   }
-  return null;
+  return byAgent;
 }
 
 /** Each agent's line in the sheet: its phase, "only mentioned" for one the message just names. */

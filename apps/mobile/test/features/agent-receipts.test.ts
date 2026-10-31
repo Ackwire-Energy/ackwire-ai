@@ -335,6 +335,23 @@ describe("which message carries the line", () => {
     const handedOff = message({ id: "e", author: { type: "agent", id: "theo" }, mentionedAgentIds: ["ada"] });
     expect(receiptMessageId([...list, handedOff])).toBe("e");
   });
+
+  test("a later hand-off between agents never takes the line of a person's message that asks something of you", () => {
+    const list = [
+      message({ id: "b", author: { type: "person", id: "u2" } }),
+      message({ id: "e", author: { type: "agent", id: "theo" }, mentionedAgentIds: ["ada"] }),
+    ];
+    const asks = {
+      failed: handled(routed({}), "ada", "failed").m1,
+      nobody: routed({}, { pickedBy: [] }).m1,
+      noAi: routed({}, { seenBy: [], pickedBy: [], reason: "no_ai" }).m1,
+      platformCap: routed({}, { seenBy: [], pickedBy: [], reason: "platform_cap" }).m1,
+    };
+    for (const receipt of Object.values(asks)) expect(receiptMessageId(list, { b: receipt })).toBe("b");
+    // Answered, or still nothing to say: the hand-off carries it.
+    expect(receiptMessageId(list, { b: handled(routed({}), "ada", "done").m1 })).toBe("e");
+    expect(receiptMessageId(list)).toBe("e");
+  });
 });
 
 describe("the no-AI banner above the box", () => {
