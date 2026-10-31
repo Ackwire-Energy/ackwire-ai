@@ -536,6 +536,7 @@ describe("what a run owes", () => {
         channelId: f.general.id,
         threadId: null,
         hop: 0,
+        stretchId: null,
         notice: { kind: "agent_note", text, from: "@infra", refs: {} },
       }),
     );
@@ -630,8 +631,8 @@ describe("what a run owes", () => {
     expect(after?.status).toBe("done");
     expect(after?.transcript).not.toHaveProperty("answerOwed");
     expect(after?.transcript).not.toHaveProperty("steeredBy");
-    // It passed: the person was talking to QA.
-    expect(await agentMessages()).toEqual([]);
+    // It passed: the person was talking to QA (whose own run answers them).
+    expect((await agentMessages()).filter((m) => m.authorAgentId === f.agent.id)).toEqual([]);
   });
 
   test("a run that changed something posts its receipts instead of passing", async () => {
@@ -697,8 +698,8 @@ describe("what a run owes", () => {
     const events = f.listen(f.general.id);
     await drainOutbox(f.db, handlers);
 
-    expect(await runById(first?.id ?? "")).toMatchObject({ status: "failed", error: "too_many_tool_calls" });
-    // Never marked read by the run that failed at the cap.
+    expect(await runById(first?.id ?? "")).toMatchObject({ status: "done", error: null });
+    // Never marked read by the run that ended at the cap.
     const read = events.filter((e) => e.type === "agent.run.read" && e.runId === first?.id) as {
       messageIds?: string[];
     }[];
@@ -746,7 +747,7 @@ describe("handing on unread messages", () => {
       orgId: f.org.id,
       channelId: f.general.id,
       threadId: other.threadRootId,
-      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0 },
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0, stretchId: null },
       body: "Nota",
       meta: { notice: { kind: "agent_note", text: "Nota", refs: {} } },
     });
@@ -760,7 +761,7 @@ describe("handing on unread messages", () => {
     const dmNote = await insertMessage(f.db, {
       orgId: f.org.id,
       channelId: dm.id,
-      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0 },
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0, stretchId: null },
       body: "Nota",
       meta: { notice: { kind: "agent_note", text: "Nota", refs: {} } },
     });
@@ -791,6 +792,7 @@ describe("the run a routine's report woke", () => {
         channelId: f.general.id,
         threadId: null,
         hop: 0,
+        stretchId: null,
         notice: {
           kind: "routine_handoff",
           text: "12 erros novos no checkout desde as 9h.",

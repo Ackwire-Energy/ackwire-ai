@@ -137,14 +137,14 @@ const InvitationWithStatus = z
     email: z.string(),
     role: Role,
     roleIds: z.array(z.string()),
-    channelIds: z.array(z.string()).openapi({ description: "Channels it adds them to, besides #general (ADR 0089)." }),
+    channelIds: z.array(z.string()).openapi({ description: "Channels it adds them to, besides #general (ADR 0090)." }),
     status: z.enum(["pending", "expired"]),
     expiresAt: z.string(),
     createdAt: z.string(),
     invitedBy: z.string().nullable().openapi({ description: "Who sent it (their name)." }),
     url: z.string().nullable().openapi({
       description:
-        "Its link, the same one the email carries, to copy at any time (ADR 0089). Null for an invitation sent " +
+        "Its link, the same one the email carries, to copy at any time (ADR 0090). Null for an invitation sent " +
         "before links could be shown again: sending it again gives it one.",
     }),
   })
@@ -454,7 +454,7 @@ export function managementRoutes(deps: AppDeps) {
       security,
       summary: "Invite several emails at once",
       description:
-        "One outcome per email: exactly one of `invites`, each address with its own roles (ADR 0089), or `emails`, " +
+        "One outcome per email: exactly one of `invites`, each address with its own roles (ADR 0090), or `emails`, " +
         "all with `roleIds`. `channelIds` and `note` go with every one. Only a hash of each token is stored " +
         "(7-day expiry); the link can be copied again from the list.",
       request: {
@@ -482,12 +482,12 @@ export function managementRoutes(deps: AppDeps) {
                 .array(z.string().uuid())
                 .max(20)
                 .optional()
-                .openapi({ description: "Channels they join on accepting, besides #general (ADR 0089)." }),
+                .openapi({ description: "Channels they join on accepting, besides #general (ADR 0090)." }),
               note: z
                 .string()
                 .max(INVITE_NOTE_MAX)
                 .optional()
-                .openapi({ description: "Your words, in the invitation email (ADR 0089)." }),
+                .openapi({ description: "Your words, in the invitation email (ADR 0090)." }),
             })
             .refine((b) => b.emails !== undefined || b.invites !== undefined, {
               message: "Send `emails` or `invites`",
@@ -550,7 +550,7 @@ export function managementRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/invitations/{invitationId}/resend",
       tags: ["Members"],
       security,
-      summary: "Resend: the same link, a new 7-day expiry (ADR 0089)",
+      summary: "Resend: the same link, a new 7-day expiry (ADR 0090)",
       description: "An invitation sent before links could be shown again gets a new link: the old one stops working.",
       request: { params: OrgParams.extend({ invitationId: z.uuid() }), body: body(z.object({})) },
       responses: { 200: json(z.object({ url: z.string(), expiresAt: z.string() })), ...errors },
@@ -584,7 +584,7 @@ export function managementRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/invitations/{invitationId}",
       tags: ["Members"],
       security,
-      summary: "Change the roles a pending invitation gives (ADR 0089): the same link, nothing is sent",
+      summary: "Change the roles a pending invitation gives (ADR 0090): the same link, nothing is sent",
       request: {
         params: OrgParams.extend({ invitationId: z.uuid() }),
         body: body(z.object({ roleIds: z.array(z.string().uuid()).max(50) })),
@@ -952,9 +952,9 @@ export function managementRoutes(deps: AppDeps) {
       tags: ["Usage"],
       security,
       summary:
-        "Continue a run a person stopped (same people as stopping it): a new run of the agent picks up where it stopped",
+        "Continue a run a person stopped, or one that reached its step limit (same people as stopping it): a new run of the agent picks up where it stopped",
       description:
-        "Only for a run stopped by a person while it worked; once per stopped reply (`meta.canceled.continuedRunId`). 409 `run.not_continuable` otherwise, 409 `run.agent_busy` while the agent already works in that conversation. The channel hears `run.continued`.",
+        "Only for a run stopped by a person while it worked, or one that ended at its step limit (its reply has `meta.stepLimit`); once per reply (`meta.canceled.continuedRunId`, `meta.stepLimit.continuedRunId`). 409 `run.not_continuable` otherwise, 409 `run.agent_busy` while the agent already works in that conversation. The channel hears `run.continued`.",
       request: { params: OrgParams.extend({ runId: z.uuid() }) },
       responses: { 200: json(z.object({ runId: z.uuid() })), ...errors },
     }),

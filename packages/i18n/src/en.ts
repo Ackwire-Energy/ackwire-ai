@@ -460,7 +460,7 @@ export const en: Translations = {
     askedNew: "Request sent",
     askNewFailed:
       "We couldn't ask from here: this link may have been replaced by a newer invitation or cancelled. Look for the latest invitation email, or ask whoever invited you.",
-    // The invitation's page, in the sign-in's language: the workspace on top, its first agent asking (ADR 0089).
+    // The invitation's page, in the sign-in's language: the workspace on top, its first agent asking (ADR 0090).
     from: "Invited by {{name}}",
     crew_one: "{{names}} works there",
     crew_other: "{{names}} work there",
@@ -533,7 +533,7 @@ export const en: Translations = {
       reasonSaid: "<b>Their note:</b> “{{reason}}”",
       closedTitle: "This link no longer works",
       closedText: "Ask whoever sent it for a new one.",
-      // Signed out where email goes out: one question per screen, then the page waits for the answer (ADR 0089).
+      // Signed out where email goes out: one question per screen, then the page waits for the answer (ADR 0090).
       hello: "Hi. This is {{org}}'s invitation.",
       emailLead: "What's your email? An admin approves each new person.",
       haveAccountSignIn: "Already have an account? Sign in",
@@ -1098,6 +1098,7 @@ export const en: Translations = {
   shell: {
     // The Mac app's own title bar (ADR 0036).
     titleBar: { back: "Back", forward: "Forward" },
+    unshown: "Couldn't be shown",
     more: "More",
     moreGroups: { schedule: "Schedule", decisions: "Decisions" },
     moreWhat: {
@@ -1560,6 +1561,10 @@ export const en: Translations = {
     remove: "Remove it",
     send: "Send anyway",
   },
+  stretchCard: {
+    continued: "{{name}} let them go on · {{time}}",
+    continuedByYou: "You let them go on · {{time}}",
+  },
   actionCard: {
     connect_ai: {
       title: "Connect an AI for {{agents}}",
@@ -1639,6 +1644,7 @@ export const en: Translations = {
       renamed: "Renamed the conversation to <b>{{to}}</b>",
       closed: "Closed the conversation <b>{{title}}</b>",
     },
+    other: "Made a change",
     issueFields: {
       title: "the title",
       description: "the description",
@@ -1766,7 +1772,7 @@ export const en: Translations = {
   },
   channelMembers: {
     addRow: "Add people or agents",
-    /** An address nobody in the workspace has, typed in the search (ADR 0089). */
+    /** An address nobody in the workspace has, typed in the search (ADR 0090). */
     invite: "Invite {{email}} to {{org}} and #{{channel}}",
     inviteOrg: "Invite {{email}} to {{org}}",
     addTitle: "Add to #{{channel}}",
@@ -3260,7 +3266,7 @@ export const en: Translations = {
     /** When something happened, after a verb: "Asked through the link on Oct 22". */
     when: { on: "on {{date}}" },
     waitingTitle: "Waiting for you",
-    // Addresses as chips, in the invite dialog and the onboarding's Team step (ADR 0089).
+    // Addresses as chips, in the invite dialog and the onboarding's Team step (ADR 0090).
     chips: {
       check: "check",
       roleOf: "Role of {{email}}",
@@ -3268,7 +3274,7 @@ export const en: Translations = {
       member: "already in {{org}}",
       invited: "already invited",
     },
-    // The invite dialog, opened from Members, the workspace menu, ⌘K and a channel (ADR 0089).
+    // The invite dialog, opened from Members, the workspace menu, ⌘K and a channel (ADR 0090).
     dialog: {
       title: "Invite to {{org}}",
       sub: "By email they join directly. Through the link, they ask and you approve.",
@@ -3291,7 +3297,7 @@ export const en: Translations = {
       sentMany: "{{count}} invitations sent.",
       alsoIn: "They also join {{channels}}.",
     },
-    // Sent invitations: each one's link at any time, sent again with the same link, its role, cancel (ADR 0089).
+    // Sent invitations: each one's link at any time, sent again with the same link, its role, cancel (ADR 0090).
     invitations: {
       title: "Sent invitations",
       empty: "No open invitations.",
@@ -3306,7 +3312,7 @@ export const en: Translations = {
       copiedNoEmail: "Link to {{email}}'s invitation copied.",
       resent: "Sent to {{email}} again. The link is the same and works until {{date}}.",
       resentNoEmail: "{{email}}'s invitation works until {{date}}. The link is the same.",
-      // One sent before links lasted gets a lasting one when sent again: the old link stops opening (ADR 0089).
+      // One sent before links lasted gets a lasting one when sent again: the old link stops opening (ADR 0090).
       newLink: "Sent to {{email}} again, with a new link that works until {{date}}. The old link no longer opens.",
       newLinkNoEmail: "{{email}}'s invitation works until {{date}}, with a new link. Copy it and send it to them.",
       renew: "Renew",
@@ -3317,14 +3323,14 @@ export const en: Translations = {
       more: "More for {{email}}",
       changeRole: "Change the role",
       cancel: "Cancel invitation",
-      // Under Cancel invitation: sending again keeps the link, so one that leaked stops only by cancelling (ADR 0089).
+      // Under Cancel invitation: sending again keeps the link, so one that leaked stops only by cancelling (ADR 0090).
       linkStays: "Resending keeps the link. If it reached the wrong person, cancel and invite again.",
       cancelled: "{{email}}'s invitation cancelled.",
       roleTitle: "{{email}}'s role",
       roleText: "Changes what they get when they join. The link stays the same.",
       roleSaved: "{{email}} joins as {{roles}}.",
     },
-    // A member who may not invite suggests someone: a request for whoever invites (ADR 0089).
+    // A member who may not invite suggests someone: a request for whoever invites (ADR 0090).
     suggest: {
       title: "Want to bring someone to {{org}}?",
       lead_one:
@@ -3356,7 +3362,7 @@ export const en: Translations = {
       cancelOf: "Cancel the suggestion for {{email}}",
       cancelled: "Suggestion cancelled.",
     },
-    // A newcomer's first #general (ADR 0089).
+    // A newcomer's first #general (ADR 0090).
     arrival: {
       title: "Welcome to {{org}}, {{name}}",
       lead: "Here the team and the agents work together: write in #{{channel}} or call an agent by name.",
@@ -6369,6 +6375,7 @@ export const en: Translations = {
     stoppedBy: "Stopped by {{name}}",
     stopped: "Stopped",
     continueRun: "Continue",
+    stepLimit: "At the step limit",
     steer: {
       waiting: "{{name}} reads it at the next pause",
       now: "{{name}} stopped to read it",
@@ -8394,6 +8401,7 @@ export const en: Translations = {
     },
     title: "Settings",
     account: {
+      plans: "Your plans' limits",
       device: "On this device",
     },
     orgTitle: "Workspace",
@@ -8679,6 +8687,8 @@ export const en: Translations = {
       helping: "helping {{name}}",
       see: "See conversation",
     },
+    unshown: "This message couldn't be shown",
+    unshownPart: "Part of this message couldn't be shown",
     /** Automatic lines: what reached an agent's conversation (`meta.notice`), a routine's background start. */
     notice: {
       routineHandoff: "Routine «{{routine}}» delivered a report",
@@ -8967,6 +8977,17 @@ export const en: Translations = {
       issue_work_start: "Please do task #{{number}}.",
       issue_taken: "Took task #{{number}}.",
       done: "Done.",
+      stretch_paused_runs_one: "{{agents}} stopped to check with you · {{steps}} steps without you since your request",
+      stretch_paused_runs_other:
+        "{{agents}} stopped to check with you · {{steps}} steps on their own since your request",
+      stretch_paused_spend_one:
+        "{{agents}} stopped to check with you · used {{percent}}% of the month's budget on this without you",
+      stretch_paused_spend_other:
+        "{{agents}} stopped to check with you · each used {{percent}}% of the month's budget on this without you",
+      stretch_paused_spend_cost_one:
+        "{{agents}} stopped to check with you · used {{amount}} ({{percent}}% of the month's budget) on this without you",
+      stretch_paused_spend_cost_other:
+        "{{agents}} stopped to check with you · each used {{amount}} ({{percent}}% of the month's budget) on this without you",
       memory: {
         proposed: "Proposal created: {{text}}",
         forgot: 'Memory updated: forgot "{{text}}".',
@@ -8974,6 +8995,7 @@ export const en: Translations = {
         remembered: "Memory updated: {{text}}",
       },
       interrupted: "Interrupted by a server restart. Ask again to continue.",
+      step_limit: "I ran out of steps before finishing.",
       forum_suggestion: 'Worth a forum? "{{title}}"',
       forum_concluded: 'The forum "{{title}}" is over. The synthesis is in the file below.',
       forum_concluded_issues:
@@ -9844,6 +9866,8 @@ export const en: Translations = {
     },
     retry: "Try again",
     takeover: "Take control",
+    /** Over the last picture while control opens. */
+    taking: "Taking control…",
     clipboard: {
       got: "Copied on {{name}}'s computer:",
       copy: "Copy",
@@ -9863,7 +9887,6 @@ export const en: Translations = {
       doneByYou: "Done by you at {{time}}. {{agent}} looked at the screen again and went on.",
     },
     control: {
-      keys: "Copy and paste as usual: {{copy}}, {{paste}}.",
       notice: "Programs on {{name}}'s computer can see the screen and what you type or paste.",
     },
     /** The ⓘ beside the control line, on agentes.chat Cloud only (ADR 0076). */

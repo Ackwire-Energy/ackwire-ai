@@ -39,6 +39,7 @@ import {
   pruneMarks,
   recentTurn,
   rememberTurn,
+  stepLimitOf,
   stoppedOf,
   turnItems,
   turnOpener,
@@ -491,6 +492,11 @@ describe("an agent's question (ask_user)", () => {
     expect(hidesBody(message({ id: "a2", author: { type: "agent", id: "dev" }, meta: { actionCard: connect } }))).toBe(
       false,
     );
+    // A stretch's pause card says who stopped and why itself (ADR 0089).
+    const paused = { kind: "stretch_paused", state: "paused", reason: "runs", limit: 50, agentIds: ["ada"] };
+    expect(hidesBody(message({ id: "a3", author: { type: "agent", id: "dev" }, meta: { actionCard: paused } }))).toBe(
+      true,
+    );
     const rows = buildRows([message({ id: "p", author: { type: "agent", id: "dev" }, createdAt: at(11) }), asked]);
     expect(rows.filter((r) => r.kind === "message").map((r) => r.kind === "message" && r.grouped)).toEqual([
       false,
@@ -736,6 +742,16 @@ describe("an agent's turn as one block", () => {
     const next = withContinued({ canceled: { byUserId: "u1", text: "Oi" }, other: 1 }, "r2");
     expect(next).toEqual({ canceled: { byUserId: "u1", text: "Oi", continuedRunId: "r2" }, other: 1 });
     expect(stoppedOf(next)?.continuedRunId).toBe("r2");
+  });
+
+  test("a reply at the step limit: whether it was continued, marked in its own meta", () => {
+    expect(stepLimitOf({ stepLimit: {}, bodyCode: "step_limit" })).toEqual({ continuedRunId: null });
+    expect(stepLimitOf({ canceled: { byUserId: "u1" } })).toBeNull();
+    expect(stepLimitOf({})).toBeNull();
+    const next = withContinued({ stepLimit: {}, bodyCode: "step_limit" }, "r3");
+    expect(next).toEqual({ stepLimit: { continuedRunId: "r3" }, bodyCode: "step_limit" });
+    expect(stepLimitOf(next)?.continuedRunId).toBe("r3");
+    expect(stoppedOf(next)).toBeNull();
   });
 });
 

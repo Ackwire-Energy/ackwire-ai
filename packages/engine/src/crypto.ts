@@ -125,7 +125,7 @@ export function inviteLinkToken(masterSecret: string, linkId: string): string {
 }
 
 /**
- * The token of an email invitation (ADR 0089): an HMAC of its id, as a workspace's link, so its link can be copied
+ * The token of an email invitation (ADR 0090): an HMAC of its id, as a workspace's link, so its link can be copied
  * again and sending it again keeps it, while only its hash is stored.
  */
 export function invitationToken(masterSecret: string, invitationId: string): string {

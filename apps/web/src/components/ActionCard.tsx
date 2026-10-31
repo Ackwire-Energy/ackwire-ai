@@ -10,6 +10,7 @@ import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useConnectAi } from "@/components/ConnectAi";
 import { useOrg } from "@/components/org-context";
+import { StretchCardView } from "@/components/StretchCard";
 import { useDirectory } from "@/hooks/useDirectory";
 import { lookOf } from "@/lib/look";
 import { useToast } from "@/lib/toast";
@@ -18,7 +19,7 @@ import { useToast } from "@/lib/toast";
  * An agent's action card (ADR 0061, `meta.actionCard`) in place of its text: what needs a person's
  * credentials or consent, one click away. "Conectar uma IA" opens the Connect dialog at the card's step for
  * the agents it names (the dialog says what each person may do), and reads "Conectado" once they can think.
- * A proposal of a new agent (ADR 0081) is its own card.
+ * A proposal of a new agent (ADR 0081) is its own card, and so is a stretch's pause with Continuar (ADR 0089).
  */
 export function ActionCard({ message }: { message: Message }) {
   const { t } = useTranslation();
@@ -29,6 +30,7 @@ export function ActionCard({ message }: { message: Message }) {
   const card = actionCardOf(message.meta);
   if (!card) return null;
   if (card.kind === "agent_proposal") return <AgentProposalCardView message={message} card={card} />;
+  if (card.kind === "stretch_paused") return <StretchCardView message={message} card={card} />;
   const done = connectAiDone(card, status.data, dir.agentById);
   const agents = joinNames(
     card.agentIds.map((id) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent")),

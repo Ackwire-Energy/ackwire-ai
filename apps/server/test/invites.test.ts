@@ -494,7 +494,7 @@ test("request a new invitation: the inviter is emailed once; valid or unknown to
   expect(t.email.sent[0]?.text).toContain(`/org/${orgId}/settings/members`);
 });
 
-test("an ask with a password: approval makes the account, and the asking page signs in once (ADR 0089)", async () => {
+test("an ask with a password: approval makes the account, and the asking page signs in once (ADR 0090)", async () => {
   const { owner, orgId, token } = await start();
   const anon = browser(t);
   const code = await codeFor(anon, token, "rafa@example.com");
@@ -534,7 +534,7 @@ test("an ask with a password: approval makes the account, and the asking page si
   expect(signIn.status).toBe(200);
 });
 
-test("sign-up with the invitation's token: no 'confirm your email'; without it, it goes (ADR 0089)", async () => {
+test("sign-up with the invitation's token: no 'confirm your email'; without it, it goes (ADR 0090)", async () => {
   const { owner, orgId } = await start();
   const invite = async (email: string) => {
     const res = await owner(`/api/app/organizations/${orgId}/invitations`, { json: { email } });

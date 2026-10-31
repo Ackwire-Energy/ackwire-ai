@@ -276,11 +276,11 @@ export interface FakeState {
   askError?: ApiError;
   /** Make `invites.requestNew` fail with this error (a replaced or cancelled invitation answers 404). */
   requestNewError?: ApiError;
-  /** What `orgs.invitationState` answers per token (ADR 0089): an accepted or expired invitation; unset: null. */
+  /** What `orgs.invitationState` answers per token (ADR 0090): an accepted or expired invitation; unset: null. */
   invitationStates?: Record<string, InvitationState>;
   /** What `invites.claim` answers, in turn (the last one repeats); unset: null (the key matches nothing). */
   claims?: JoinClaim[];
-  /** A member's suggestions that still wait (`joinRequests.mine`, ADR 0089). */
+  /** A member's suggestions that still wait (`joinRequests.mine`, ADR 0090). */
   suggestions?: MySuggestion[];
   /** Make `joinRequests.suggest` fail with this error (`join.member`, `join.waiting`…). */
   suggestError?: ApiError;
@@ -1432,7 +1432,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (inv) {
           inv.status = "pending";
           inv.expiresAt = new Date(Date.now() + 7 * 86_400_000).toISOString();
-          // The same link, as the server keeps it (ADR 0089).
+          // The same link, as the server keeps it (ADR 0090).
           inv.url ??= `http://localhost:3000/invite/tok-${invitationId}`;
         }
         return { url: inv?.url ?? `http://localhost:3000/invite/tok-${invitationId}`, expiresAt: inv?.expiresAt ?? "" };
@@ -2700,7 +2700,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
           status: "pending",
           email: (input.email ?? state.me?.user.email ?? "").toLowerCase(),
           emailed: true,
-          // With a password the server answers the page's key (ADR 0089).
+          // With a password the server answers the page's key (ADR 0090).
           ...(input.password ? { key: "00000000-0000-4000-8000-000000000001.page-secret" } : {}),
         };
       },

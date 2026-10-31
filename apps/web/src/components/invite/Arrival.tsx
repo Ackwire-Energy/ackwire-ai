@@ -20,7 +20,7 @@ const closedKey = (userId: string, orgId: string) => `${STORAGE_KEYS.arrivalClos
 const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
 
 /**
- * Whether #general greets this person (ADR 0089): someone who came in by an invitation or an approved request in
+ * Whether #general greets this person (ADR 0090): someone who came in by an invitation or an approved request in
  * the last day (the workspace's owner made it), until they close the welcome, which this browser keeps per person
  * and workspace.
  */

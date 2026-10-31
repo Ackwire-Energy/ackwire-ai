@@ -77,11 +77,11 @@ export const JOIN_REQUEST_TTL_DAYS = 14;
 /** At most this many asks through a link wait in one workspace; the next ask is refused (`join.full`). */
 export const MAX_PENDING_JOIN_REQUESTS = 50;
 /**
- * Members' suggestions waiting in one workspace (ADR 0089), counted apart from the asks so neither crowds out the
+ * Members' suggestions waiting in one workspace (ADR 0090), counted apart from the asks so neither crowds out the
  * other; the next is refused (`join.full`).
  */
 export const MAX_PENDING_SUGGESTIONS = 20;
-/** One member's suggestions waiting at once (ADR 0089); the next is refused as a full workspace (`join.full`). */
+/** One member's suggestions waiting at once (ADR 0090); the next is refused as a full workspace (`join.full`). */
 export const MAX_SUGGESTIONS_PER_MEMBER = 5;
 /** Answered or expired requests are deleted after this; a denial blocks asking again through a link until then. */
 export const JOIN_REQUEST_KEEP_DAYS = 90;
@@ -121,7 +121,7 @@ const isWaiting = (r: Pick<RequestRow, "status" | "expiresAt">, now: Date) =>
   r.status === "pending" && r.expiresAt > now;
 /**
  * A denial still kept: the address can't ask again through a link until it is deleted. Not a member's suggestion
- * turned down (ADR 0089): nobody at the address asked, so it isn't theirs to hear, nor to be held to.
+ * turned down (ADR 0090): nobody at the address asked, so it isn't theirs to hear, nor to be held to.
  */
 const isKeptDenial = (r: Pick<RequestRow, "status" | "decidedAt" | "createdAt" | "suggestedByUserId">, now: Date) =>
   r.status === "denied" &&
@@ -150,7 +150,7 @@ async function addressIsMember(db: Executor, orgId: string, email: string) {
   return row !== undefined;
 }
 
-/** Members' suggestions (ADR 0089), and the asks: every other request, made through a link. */
+/** Members' suggestions (ADR 0090), and the asks: every other request, made through a link. */
 const suggestions = isNotNull(requests.suggestedByUserId);
 const asks = isNull(requests.suggestedByUserId);
 
@@ -373,7 +373,7 @@ export interface AskToJoinInput {
   /** The code from the address's mailbox (`sendJoinCode`), checked or not. */
   code?: string;
   /**
-   * Signed out, with a code: the password they chose, hashed as Better Auth does (ADR 0089). An approval makes
+   * Signed out, with a code: the password they chose, hashed as Better Auth does (ADR 0090). An approval makes
    * their account with it, when the address has none.
    */
   passwordHash?: string | null;
@@ -381,7 +381,7 @@ export interface AskToJoinInput {
   claimHash?: string | null;
 }
 
-/** What a proven ask keeps for its approval (ADR 0089): the chosen password's hash and the page's key. */
+/** What a proven ask keeps for its approval (ADR 0090): the chosen password's hash and the page's key. */
 interface Keep {
   passwordHash?: string | null;
   claimHash?: string | null;
@@ -410,7 +410,7 @@ interface Ask {
  * requests an hour (`join.link_busy`): a proven ask counts only when it files one, an unproven ask whenever it
  * asks, so asks without a right code can't use up the hour for the people it was shared with. `created` is false
  * only when a request for the address already waited. Signed out with a code, the ask may carry the password the
- * person chose and the hash of the page's key (ADR 0089): `requestId` names the request they went with.
+ * person chose and the hash of the page's key (ADR 0090): `requestId` names the request they went with.
  */
 export async function askToJoin(
   deps: Deps & { rateLimiter: RateLimiter },
@@ -474,7 +474,7 @@ export async function fileJoinRequest(deps: Deps, payload: Record<string, unknow
 
 /**
  * Who to tell of a new request: the people who may answer it, as a notice merged per workspace. A suggestion names
- * who suggested it (ADR 0089), so a row of one reads "Carla suggested …", not "… asks to join".
+ * who suggested it (ADR 0090), so a row of one reads "Carla suggested …", not "… asks to join".
  */
 async function noticeAdmins(
   deps: Deps,
@@ -506,7 +506,7 @@ async function noticeAdmins(
  * good) and takes over a request still waiting for that address. An unproven ask changes nothing that exists: a
  * member's, a waiting or a denied address files nothing. Admins are told of a new request by an email at most once
  * an hour per workspace and a notice merged while unread (one push per burst). `keep` (a proven ask signed out,
- * ADR 0089) goes on the request it files or takes over. Returns whether a new request waits, and the request a
+ * ADR 0090) goes on the request it files or takes over. Returns whether a new request waits, and the request a
  * proven ask went with.
  */
 async function file(
@@ -554,7 +554,7 @@ async function file(
         throw new ConflictError("You're already in this workspace", "join.member");
       if (denied) throw new ConflictError("Your request wasn't approved", "join.denied");
       if (waiting) {
-        // A member's suggestion becomes the person's own ask (ADR 0089): through this link, answered to them,
+        // A member's suggestion becomes the person's own ask (ADR 0090): through this link, answered to them,
         // and its page signs in once approved, as any ask's.
         const own = waiting.suggestedByUserId
           ? { linkId: ask.linkId, suggestedByUserId: null, locale: ask.locale ?? waiting.locale }
@@ -691,7 +691,7 @@ export async function joinStatus(db: Database, user: { id: string }, token: stri
  * Requests waiting in a workspace, oldest first (`manage_members`). `verified`: a code proved the address, or a
  * confirmed account with it asked; false only on a server without email, or for a request typed before codes.
  * `confirmed` (read by phone builds from before `verified`): approving lets an account in at once, as
- * `approveJoinRequest` decides. `suggestedBy`: the member who suggested the person (ADR 0089), whose request came
+ * `approveJoinRequest` decides. `suggestedBy`: the member who suggested the person (ADR 0090), whose request came
  * through no link.
  */
 export async function listWaitingJoinRequests(db: Database, actorId: string, orgId: string, now = new Date()) {
@@ -753,13 +753,13 @@ async function answerContext(tx: Executor, orgId: string, actorId: string, row: 
     approverName: approver?.name ?? "",
     locale: emailLocale(account?.locale ?? row.locale),
     joiner: account?.verified && !account.blockedAt && proven ? account.id : null,
-    /** Whether the address has an account at all: an approval makes one only when it has none (ADR 0089). */
+    /** Whether the address has an account at all: an approval makes one only when it has none (ADR 0090). */
     hasAccount: account !== undefined,
   };
 }
 
 /**
- * The account an approved request makes (ADR 0089): the address its code proved, confirmed, with the name and the
+ * The account an approved request makes (ADR 0090): the address its code proved, confirmed, with the name and the
  * password the person chose, written as Better Auth writes one. The sign-up hooks' work follows the transaction
  * (`welcomeAccount`); the sign-up policy (`isSignupAllowed`) doesn't run, on purpose, as an invitation's doesn't. Null
  * when the address got an account meanwhile (a sign-up a moment ago): that one is never written over, and the
@@ -800,9 +800,9 @@ export type JoinApproval = { outcome: "joined" } | { outcome: "invited"; url: st
 /**
  * Approves a request with a role (member or admin, ADR 0068, 0072). Only whoever controls the address gets in: a
  * confirmed account with it joins at once when the address was proven; a proven ask with no account made with the
- * password it chose (ADR 0089) is made and joins at once; any other request gets an email invitation to it
+ * password it chose (ADR 0090) is made and joins at once; any other request gets an email invitation to it
  * (7 days), which opens sign-up for that address. A person who asked is told by email either way; a member's
- * suggestion gets the invitation email itself, since nobody at that address asked (ADR 0089).
+ * suggestion gets the invitation email itself, since nobody at that address asked (ADR 0090).
  */
 export async function approveJoinRequest(
   /** `secret`: `AGENTES_SECRET`, so an invitation an approval sends has a link that can be copied again. */
@@ -885,7 +885,7 @@ export async function approveJoinRequest(
       details: { roleIds: given, joined: approval.outcome === "joined" },
     });
     if (!already && row.suggestedByUserId) {
-      // Nobody at the address asked (ADR 0089): no answer, only the invitation, as anyone invited gets it.
+      // Nobody at the address asked (ADR 0090): no answer, only the invitation, as anyone invited gets it.
       if (approval.outcome === "invited" && invitationId) {
         await queueInvitationEmail(tx, {
           orgId,
@@ -924,7 +924,7 @@ export async function approveJoinRequest(
 /**
  * Denies a request (`manage_members`), with an optional reason the person reads in the email (ADR 0068). Allowed
  * while the workspace is on hold too: it lets nobody in. A member's suggestion is denied quietly: nobody at that
- * address asked, so nothing is sent to it (ADR 0089).
+ * address asked, so nothing is sent to it (ADR 0090).
  */
 export async function denyJoinRequest(
   deps: Deps,
@@ -939,7 +939,7 @@ export async function denyJoinRequest(
   await deps.db.transaction(async (tx) => {
     const row = await waitingRequest(tx, orgId, id, now);
     const context = await answerContext(tx, orgId, actorId, row);
-    // Nothing of what they chose stays (ADR 0089): the page that asked only hears the answer.
+    // Nothing of what they chose stays (ADR 0090): the page that asked only hears the answer.
     await tx
       .update(requests)
       .set({ status: "denied", reason: why, decidedByUserId: actorId, decidedAt: now, passwordHash: null })
@@ -1017,7 +1017,7 @@ export async function listInviteLinks(db: Database, secret: string, actorId: str
   });
 }
 
-/** Gives an active invitation link 30 more days from now (ADR 0089): the same link, so whoever has it keeps it. */
+/** Gives an active invitation link 30 more days from now (ADR 0090): the same link, so whoever has it keeps it. */
 export async function renewInviteLink(db: Database, actorId: string, orgId: string, linkId: string, now = new Date()) {
   assertInviting(await requirePermission(db, actorId, orgId, "invite_people"));
   const expiresAt = new Date(now.getTime() + INVITE_LINK_TTL_DAYS * DAY_MS);
@@ -1044,7 +1044,7 @@ export async function renewInviteLink(db: Database, actorId: string, orgId: stri
 }
 
 /**
- * Where the page that asked stands (ADR 0089), by the key it kept (`{requestId}.{secret}`), through the link it
+ * Where the page that asked stands (ADR 0090), by the key it kept (`{requestId}.{secret}`), through the link it
  * asked with: waiting; `in` once, for an account the approval made (the caller signs that page in, and the key is
  * spent); denied, with the reason; or closed (run out, turned off, joined another way, approved for an address that
  * signs in as it always did, or its key already traded). A spent key (`spentClaimHash`) still finds its request and
@@ -1083,7 +1083,7 @@ export async function claimJoinRequest(db: Database, token: string, key: string,
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * A member who may not invite suggests someone (ADR 0089): a request with no link and no proof, from them, which the
+ * A member who may not invite suggests someone (ADR 0090): a request with no link and no proof, from them, which the
  * people who may invite answer as any other. Approving it sends an email invitation: nobody proved the address. At
  * most 20 suggestions wait in a workspace and 5 from one member (`join.full`), apart from the asks through a link.
  */
@@ -1178,7 +1178,7 @@ export async function suggestPerson(
   return { id: row.id };
 }
 
-/** The suggestions a member made that still wait (ADR 0089), newest first. */
+/** The suggestions a member made that still wait (ADR 0090), newest first. */
 export async function listMySuggestions(db: Database, actorId: string, orgId: string, now = new Date()) {
   if (!(await getMembership(db, actorId, orgId))) throw new ForbiddenError();
   return db
@@ -1195,7 +1195,7 @@ export async function listMySuggestions(db: Database, actorId: string, orgId: st
     .orderBy(desc(requests.createdAt));
 }
 
-/** Takes back a suggestion that still waits (its author only, ADR 0089): it closes, telling nobody. */
+/** Takes back a suggestion that still waits (its author only, ADR 0090): it closes, telling nobody. */
 export async function cancelSuggestion(deps: Deps, actorId: string, orgId: string, id: string, now = new Date()) {
   const [row] = await deps.db
     .update(requests)
@@ -1214,7 +1214,7 @@ export async function cancelSuggestion(deps: Deps, actorId: string, orgId: strin
 }
 
 /**
- * Tells whoever sent an email invitation that it was accepted (ADR 0089): one notice in their inbox per person who
+ * Tells whoever sent an email invitation that it was accepted (ADR 0090): one notice in their inbox per person who
  * joined, never a push.
  */
 export async function noticeInvitationAccepted(
@@ -1299,7 +1299,7 @@ export async function pruneJoinRequests(deps: Deps, now = new Date()) {
         lt(outbox.createdAt, dayAgo),
       ),
     );
-  // What a request kept for its approval goes once nothing can use it (ADR 0089): a password nobody approved in time
+  // What a request kept for its approval goes once nothing can use it (ADR 0090): a password nobody approved in time
   // the day its request runs out, with the page's key; an answered request's password at once, and its key a day
   // after the answer (the page checks every 15 s while open).
   const pending = eq(requests.status, "pending");

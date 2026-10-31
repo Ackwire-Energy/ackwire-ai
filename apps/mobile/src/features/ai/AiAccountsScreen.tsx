@@ -9,7 +9,13 @@ import {
   useSettings,
   useUpdateSettings,
 } from "@agenteschat/client";
-import { accountTitle, agentsToGive, endsOnClaude, ownSignIns } from "@agenteschat/client/lib/ai-accounts";
+import {
+  accountTitle,
+  agentsToGive,
+  endsOnClaude,
+  ownSignIns,
+  ownSignInTitle,
+} from "@agenteschat/client/lib/ai-accounts";
 import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { agentAi, aiStateOf } from "@agenteschat/client/lib/no-ai";
@@ -219,7 +225,7 @@ export function AiAccountsScreen() {
               <Row
                 key={o.key}
                 leading={<ProviderLogo id={o.kind} size="sm" />}
-                title={accountTitle({ label: t(`aiAccounts.connect.${o.kind}`), plan: o.plan })}
+                title={ownSignInTitle(t, o)}
                 subtitle={t("aiAccounts.page.ownOn", { computer: o.computer })}
                 below={
                   o.usage ? (

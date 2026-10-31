@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { AgentAction, ApiRule } from "../api/types";
+import { AGENT_ACTION_KINDS, type AgentAction, type ApiRule } from "../api/types";
 
 /** A receipt's `params.rule` when it is a rule (`freq`, `timezone`); anything else is none. */
 function ruleOf(value: unknown): ApiRule | null {
@@ -47,8 +47,14 @@ export function canUndoAction(
 export const undoableNow = (list: AgentAction[], now = Date.now()) =>
   list.filter((a) => actionPhase(a, now) === "undo");
 
-/** The i18n key of a receipt's sentence: `agentActions.issue.created`… (params: `action.params`). */
-export const actionTextKey = (a: Pick<AgentAction, "kind">) => `agentActions.${a.kind}`;
+const KNOWN_KINDS = new Set<string>(AGENT_ACTION_KINDS);
+
+/**
+ * The i18n key of a receipt's sentence: `agentActions.issue.created`… (params: `action.params`). A kind this build
+ * doesn't know (an open tab, an older app) says `agentActions.other`, never its raw key.
+ */
+export const actionTextKey = (a: Pick<AgentAction, "kind">) =>
+  KNOWN_KINDS.has(a.kind) ? `agentActions.${a.kind}` : "agentActions.other";
 
 /** The i18n key of an undo/redo error code (`action.changed_since` → `agentActions.errors.changed_since`). */
 export const actionErrorKey = (code: string) => `agentActions.errors.${code.replace(/^action\./, "")}`;

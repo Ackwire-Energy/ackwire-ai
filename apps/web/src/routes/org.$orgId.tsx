@@ -122,7 +122,7 @@ function OrgLayout() {
           <NavDrawerProvider>
             {inDesktopApp() && <DesktopTitleBar />}
             {inDesktopApp() && <MenuBarActions orgId={membership.id} />}
-            {/* One invite dialog for the workspace (ADR 0089): the menu, ⌘K, Members and a channel open it. */}
+            {/* One invite dialog for the workspace (ADR 0090): the menu, ⌘K, Members and a channel open it. */}
             <InviteDialogProvider>
               <div className="shell">
                 <RefetchBar />

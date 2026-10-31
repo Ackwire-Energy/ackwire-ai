@@ -31,7 +31,7 @@ export interface PushTextInput {
   label?: string | null;
   /** Title of the thing (approval, mission, routine, topic). */
   title?: string | null;
-  /** `join_request` from a member's suggestion (ADR 0089): who suggested. */
+  /** `join_request` from a member's suggestion (ADR 0090): who suggested. */
   suggestedBy?: string | null;
   /** Snippet of what was said. */
   text?: string | null;

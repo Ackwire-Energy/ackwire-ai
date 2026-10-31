@@ -12,7 +12,7 @@ import { ADA_ID, ADMIN_ROLE_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedS
 import { renderApp, screen, settle } from "./render";
 
 /*
- * Bringing a teammate in (ADR 0089): the one invite dialog and where it opens from, the invitations sent, a member's
+ * Bringing a teammate in (ADR 0090): the one invite dialog and where it opens from, the invitations sent, a member's
  * suggestions, and a newcomer's first #general.
  */
 

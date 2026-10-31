@@ -156,7 +156,7 @@ export function CommandMenu() {
         onSelect: () => void navigate({ to: "/org/$orgId/settings/$section", params: { orgId, section: s.id } }),
       });
     }
-    // Things to do, not places: the workspace's invite dialog (ADR 0089).
+    // Things to do, not places: the workspace's invite dialog (ADR 0090).
     if (invite && can(org, "invite_people"))
       list.push({
         key: "do:invite",

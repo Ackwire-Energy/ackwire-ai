@@ -3,6 +3,8 @@ declare module "@novnc/novnc" {
   export default class RFB extends EventTarget {
     constructor(target: HTMLElement, urlOrChannel: string | WebSocket, options?: { shared?: boolean });
     viewOnly: boolean;
+    /** A dot in place of a pointer the desktop draws as nothing. */
+    showDotCursor: boolean;
     scaleViewport: boolean;
     resizeSession: boolean;
     /** 0–9. */

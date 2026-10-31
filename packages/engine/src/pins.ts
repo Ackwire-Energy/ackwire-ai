@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, count, type Database, desc, eq, or, schema } from "@agenteschat/db";
+import { and, count, type Database, desc, eq, gte, lt, or, schema } from "@agenteschat/db";
 import { requireChannelAccess } from "./channels";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
@@ -138,7 +138,16 @@ async function pinViews(db: Database, orgId: string, pins: (typeof messagePins.$
     .where(
       and(
         eq(messages.orgId, orgId),
-        or(...pins.map((p) => and(eq(messages.id, p.messageId), eq(messages.createdAt, p.messageCreatedAt)))),
+        // `messageCreatedAt` was read back cut to milliseconds while Postgres keeps microseconds: its millisecond.
+        or(
+          ...pins.map((p) =>
+            and(
+              eq(messages.id, p.messageId),
+              gte(messages.createdAt, p.messageCreatedAt),
+              lt(messages.createdAt, new Date(p.messageCreatedAt.getTime() + 1)),
+            ),
+          ),
+        ),
       ),
     );
   const views = await withMessageDetails(

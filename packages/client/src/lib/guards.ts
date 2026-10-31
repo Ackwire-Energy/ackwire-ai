@@ -44,7 +44,7 @@ export const EARLY_ACCESS_HEADER = "x-early-access";
 
 /**
  * The password sign-up's header with an email invitation's token (mirrors `packages/engine/src/organizations.ts`):
- * whoever holds it proved the invited address, so the server sends no "confirm your email" (ADR 0089 §6).
+ * whoever holds it proved the invited address, so the server sends no "confirm your email" (ADR 0090 §6).
  */
 export const INVITATION_TOKEN_HEADER = "x-invitation-token";
 

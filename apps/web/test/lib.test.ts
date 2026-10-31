@@ -494,7 +494,7 @@ describe("the confirmation email", () => {
     }
   });
 
-  test("an email invitation's sign-up carries its token in a header, never in the body (ADR 0089)", async () => {
+  test("an email invitation's sign-up carries its token in a header, never in the body (ADR 0090)", async () => {
     const sent: { path: string; invitation: string | null; body: Record<string, unknown> | null }[] = [];
     const real = globalThis.fetch;
     globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {

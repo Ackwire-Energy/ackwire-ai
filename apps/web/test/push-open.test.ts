@@ -306,7 +306,7 @@ describe("a pushed notification that can't be read", () => {
   });
 
   test("someone who joined by an invitation: a conversation with them, or Members when only the push is left", () => {
-    // The notification names the person (ADR 0089): their DM.
+    // The notification names the person (ADR 0090): their DM.
     const accepted = openTarget(
       notification({
         id: ID,

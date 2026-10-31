@@ -13,6 +13,9 @@ export const icons: Record<keyof typeof sourceIcons | keyof typeof extraIcons, I
 export type IconName = keyof typeof icons;
 export const iconNames = Object.keys(icons) as IconName[];
 
+/** For a name this build doesn't have (a table missing a kind a newer server sends): a plain ring, never a crash. */
+const UNKNOWN: IconShape[] = [["circle", { cx: "10", cy: "10", r: "6" }]];
+
 export interface IconProps extends Omit<SVGProps<SVGSVGElement>, "name"> {
   name: IconName;
   /** 20 (default), 16 or 14 px. */
@@ -42,7 +45,9 @@ export function Icon({ name, size = 20, label, className, style, ...rest }: Icon
       focusable="false"
       {...rest}
     >
-      {icons[name].map(([tag, attrs], i) => createElement(tag, { key: i, ...attrs }))}
+      {(Object.hasOwn(icons, name) ? icons[name] : UNKNOWN).map(([tag, attrs], i) =>
+        createElement(tag, { key: i, ...attrs }),
+      )}
     </svg>
   );
 }

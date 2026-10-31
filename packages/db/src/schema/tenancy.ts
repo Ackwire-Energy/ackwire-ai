@@ -207,9 +207,9 @@ export const organizationInvitations = pgTable(
     roleIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
     tokenHash: text().notNull().unique(),
     invitedByUserId: text().references(() => users.id, { onDelete: "set null" }),
-    /** Channels the person also joins on accepting, besides `general` (ADR 0089); ids no longer there are skipped. */
+    /** Channels the person also joins on accepting, besides `general` (ADR 0090); ids no longer there are skipped. */
     channelIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
-    /** The inviter's words, in the invitation email (ADR 0089). */
+    /** The inviter's words, in the invitation email (ADR 0090). */
     note: text(),
     expiresAt: timestamp({ withTimezone: true }).notNull(),
     acceptedAt: timestamp({ withTimezone: true }),
@@ -279,14 +279,14 @@ export const organizationJoinRequests = pgTable(
     decidedAt: timestamp({ withTimezone: true }),
     /** The invitation an approval sent, when the address wasn't proven. */
     invitationId: uuid().references(() => organizationInvitations.id, { onDelete: "set null" }),
-    /** A member who suggested this person (ADR 0089): no link, no proof, so an approval sends an invitation. */
+    /** A member who suggested this person (ADR 0090): no link, no proof, so an approval sends an invitation. */
     suggestedByUserId: text().references(() => users.id, { onDelete: "set null" }),
     /**
-     * The password a proven ask chose (ADR 0089), hashed as Better Auth does: an approval makes the account with
+     * The password a proven ask chose (ADR 0090), hashed as Better Auth does: an approval makes the account with
      * it. Cleared once used, and when the request is denied, closes or expires.
      */
     passwordHash: text(),
-    /** sha256 of the key the asking page keeps, traded once for a sign-in after an approval (ADR 0089). */
+    /** sha256 of the key the asking page keeps, traded once for a sign-in after an approval (ADR 0090). */
     claimHash: text(),
     expiresAt: timestamp({ withTimezone: true }).notNull(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),

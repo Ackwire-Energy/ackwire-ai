@@ -47,9 +47,9 @@ const ASKS_PER_IP = { limit: 10, windowMs: 3600_000 };
 const CODES_PER_IP = { limit: 10, windowMs: 3600_000 };
 const CODES_PER_LINK = { limit: 40, windowMs: 3600_000 };
 const CHECKS_PER_IP = { limit: 30, windowMs: 3600_000 };
-/** The page that asked checks every 15 s while open (ADR 0089): a few hours of it from one place. */
+/** The page that asked checks every 15 s while open (ADR 0090): a few hours of it from one place. */
 const CLAIMS_PER_IP = { limit: 600, windowMs: 3600_000 };
-/** Suggestions from one member (ADR 0089). */
+/** Suggestions from one member (ADR 0090). */
 const SUGGESTIONS_PER_MEMBER = { limit: 20, windowMs: 3600_000 };
 const TOO_MANY = "Too many requests from here. Try again in an hour.";
 const Code = z.string().regex(new RegExp(`^\\d{${CODE_LENGTH}}$`));
@@ -80,7 +80,7 @@ const JoinRequest = z.object({
     description: "Approving lets an account in at once. Read `verified` instead.",
   }),
   suggestedBy: z.string().nullable().openapi({
-    description: "The member who suggested this person (their name, ADR 0089): no link, no proof.",
+    description: "The member who suggested this person (their name, ADR 0090): no link, no proof.",
   }),
   createdAt: z.string(),
   expiresAt: z.string(),
@@ -91,13 +91,13 @@ const Asked = z.object({
   email: z.string(),
   emailed: z.boolean(),
   key: z.string().optional().openapi({
-    description: "With a `password` (ADR 0089): what this page keeps to sign in once approved. Shown once.",
+    description: "With a `password` (ADR 0090): what this page keeps to sign in once approved. Shown once.",
   }),
 });
 
 /**
  * The workspace's invitation link and the requests to join it brings (ADR 0068), suggestions from members and the
- * page that asked signing in once approved (ADR 0089), and "ask for a new invitation" from an expired email
+ * page that asked signing in once approved (ADR 0090), and "ask for a new invitation" from an expired email
  * invitation.
  */
 export function inviteRoutes(deps: AppDeps) {
@@ -183,7 +183,7 @@ export function inviteRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Give an invitation link 30 more days (admins)",
-      description: "The same link: whoever already has it keeps it (ADR 0089).",
+      description: "The same link: whoever already has it keeps it (ADR 0090).",
       request: { params: LinkParams },
       responses: { 200: json(z.object({ expiresAt: z.string() })), ...errors },
     }),
@@ -200,7 +200,7 @@ export function inviteRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/join-requests/suggest",
       tags,
       security,
-      summary: "Suggest someone to the people who may invite (any member, ADR 0089)",
+      summary: "Suggest someone to the people who may invite (any member, ADR 0090)",
       description:
         "Waits among the requests to join, with who suggested it. Approving it sends the person an email " +
         "invitation; denying it tells them nothing (they never asked). `join.member`, `join.invited` (an " +
@@ -228,7 +228,7 @@ export function inviteRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/join-requests/mine",
       tags,
       security,
-      summary: "The suggestions this member made that still wait (ADR 0089)",
+      summary: "The suggestions this member made that still wait (ADR 0090)",
       request: { params: OrgParams },
       responses: {
         200: json(
@@ -253,7 +253,7 @@ export function inviteRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/join-requests/{requestId}",
       tags,
       security,
-      summary: "Take back a suggestion that still waits (its author, ADR 0089)",
+      summary: "Take back a suggestion that still waits (its author, ADR 0090)",
       request: { params: RequestParams },
       responses: { 204: noContent[204], ...errors },
     }),
@@ -299,7 +299,7 @@ export function inviteRoutes(deps: AppDeps) {
       description:
         "A confirmed account with this address joins at once when the address was proven (a code from its " +
         "mailbox, or that account asking), and so does a proven ask with a password and no account, whose account " +
-        "this makes (ADR 0089). Anyone else gets an email invitation to the address: in the answer to their ask, " +
+        "this makes (ADR 0090). Anyone else gets an email invitation to the address: in the answer to their ask, " +
         "or, for a member's suggestion, as the invitation email itself. `emailed: false` on a server that doesn't " +
         "send email: hand them `url` yourself.",
       request: {
@@ -355,7 +355,7 @@ export function inviteRoutes(deps: AppDeps) {
       summary: "Deny a request to join (admins)",
       description:
         "The person is told by email, with the reason when one is given. A member's suggestion is denied " +
-        "quietly: nobody at that address asked (ADR 0089).",
+        "quietly: nobody at that address asked (ADR 0090).",
       request: {
         params: RequestParams,
         body: body(z.object({ reason: z.string().max(JOIN_REASON_MAX).optional() })),
@@ -477,7 +477,7 @@ export function inviteRoutes(deps: AppDeps) {
             code: Code.optional(),
             password: z.string().min(8).max(128).optional().openapi({
               description:
-                "Signed out, with a `code`: the password of the account an approval makes (ADR 0089). The answer " +
+                "Signed out, with a `code`: the password of the account an approval makes (ADR 0090). The answer " +
                 "then carries `key`, which this page trades for a sign-in once approved (`…/requests/claim`).",
             }),
           }),
@@ -535,7 +535,7 @@ export function inviteRoutes(deps: AppDeps) {
       method: "post",
       path: "/invitations/{token}/requests/claim",
       tags,
-      summary: "Where the request this page made stands, and its sign-in once approved (ADR 0089)",
+      summary: "Where the request this page made stands, and its sign-in once approved (ADR 0090)",
       description:
         "Public: the `key` the ask answered is the proof. `in` once, with `signIn` for " +
         "`POST /api/auth/sign-in/one-time-token`, when the approval made the account; after that the key is spent " +

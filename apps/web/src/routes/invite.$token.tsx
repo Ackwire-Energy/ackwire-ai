@@ -3,7 +3,7 @@ import { InvitePage } from "@/pages/InvitePage";
 
 /**
  * The server builds invitation links as `${PUBLIC_URL}/invite/${token}`. `?join=1`: back from a provider's sign-in
- * started on the page, which then accepts by itself for the invited address (ADR 0089).
+ * started on the page, which then accepts by itself for the invited address (ADR 0090).
  */
 export const Route = createFileRoute("/invite/$token")({
   validateSearch: (search: Record<string, unknown>): { join?: true } =>

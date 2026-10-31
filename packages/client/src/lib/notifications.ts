@@ -272,7 +272,7 @@ export function openTarget(n: AppNotification): OpenTarget | null {
   if (n.kind === "approval") return { to: "/org/$orgId/approvals" };
   // Requests to join are answered in Members (ADR 0068).
   if (n.kind === "join_request") return { to: "/org/$orgId/settings/$section", params: { section: "members" } };
-  // Someone accepted an invitation (ADR 0089): a conversation with them, to say hi.
+  // Someone accepted an invitation (ADR 0090): a conversation with them, to say hi.
   if (n.kind === "invitation_accepted") {
     const who = n.actors[0];
     return who?.type === "user"

@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
-import { mkdtempSync, statfsSync } from "node:fs";
+import { mkdtempSync, statfsSync, writeFileSync } from "node:fs";
 import os, { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  cgroupCounters,
   combineLoads,
   combineTraffic,
   diskSpace,
@@ -89,8 +90,40 @@ describe("the load sampler", () => {
       memoryPeak: 0.95,
       hours: 18,
     });
-    expect(combineLoads([null, a])).toBe(a);
+    expect(combineLoads([null, a])).toEqual(a);
     expect(combineLoads([null])).toBeNull();
+    // What else a computer says stays out of the usage report, one computer or several.
+    expect(combineLoads([{ ...a, oomKills: 4 }])).toEqual(a);
+    expect(combineLoads([{ ...a, oomKills: 4 }, b])).not.toHaveProperty("oomKills");
+  });
+
+  test("the agents' slices' OOM kills: what the kernel's counter rose by over the day, a reboot's reset included", () => {
+    const dir = mkdtempSync(join(tmpdir(), "cgroup-"));
+    const events = join(dir, "memory.events");
+    writeFileSync(events, "low 0\nhigh 12\nmax 3\noom 2\noom_kill 7\noom_group_kill 0\n");
+    expect(cgroupCounters(events)).toEqual({ low: 0, high: 12, max: 3, oom: 2, oom_kill: 7, oom_group_kill: 0 });
+    // No such cgroup here (a runner outside system mode, or no systemd).
+    expect(cgroupCounters(join(dir, "none", "memory.events"))).toBeNull();
+
+    const w = new LoadWindow();
+    const t0 = Date.UTC(2026, 10, 1, 12);
+    // Kills before the first sample aren't the day's: unknown when they were.
+    w.add({ load: 0.2, memory: 0.3, oomKills: 7 }, t0);
+    expect(w.summary()?.oomKills).toBe(0);
+    w.add({ load: 0.2, memory: 0.3, oomKills: 9 }, t0 + LOAD_SAMPLE_MS);
+    // A sample whose counter couldn't be read is skipped over.
+    w.add({ load: 0.2, memory: 0.3 }, t0 + 2 * LOAD_SAMPLE_MS);
+    w.add({ load: 0.2, memory: 0.3, oomKills: 10 }, t0 + 3 * LOAD_SAMPLE_MS);
+    // Rebooted: the counter started again from zero.
+    w.add({ load: 0.2, memory: 0.3, oomKills: 1 }, t0 + 4 * LOAD_SAMPLE_MS);
+    expect(w.summary()?.oomKills).toBe(4);
+    // A day later only the rises inside the day count.
+    w.add({ load: 0.2, memory: 0.3, oomKills: 1 }, t0 + 24 * HOUR + LOAD_SAMPLE_MS);
+    expect(w.summary()?.oomKills).toBe(1);
+    // Where agents have no slices, nothing is said.
+    const plain = new LoadWindow();
+    plain.add({ load: 0.2, memory: 0.3 }, t0);
+    expect(plain.summary()).not.toHaveProperty("oomKills");
   });
 
   test("in a container with limits: the machine's size with the limit beside it, the load per machine CPU", async () => {
@@ -175,6 +208,14 @@ describe("protocol 22 on the wire", () => {
       type: "pong",
       at: 1,
     });
+  });
+
+  test("the load carries the agents' OOM kills when the runner counts them; a bad count is left out", () => {
+    const load = { loadAvg: 0.4, loadPeak: 1.2, memoryAvg: 0.5, memoryPeak: 0.7, hours: 6 };
+    const pong = (l: Record<string, unknown>) => parseRunnerFrame(JSON.stringify({ type: "pong", at: 1, load: l }));
+    expect(pong({ ...load, oomKills: 3 })).toEqual({ type: "pong", at: 1, load: { ...load, oomKills: 3 } });
+    for (const bad of [-1, 1.5, "3", 2e9])
+      expect(pong({ ...load, oomKills: bad })).toEqual({ type: "pong", at: 1, load });
   });
 });
 

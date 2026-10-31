@@ -4,7 +4,7 @@ import { aiConnectIntent, type ConnectIntent } from "./ai-intent";
 import { type AgentAi, type AiStatusDeps, agentAiState, type NoAiReason, orgHasAi } from "./ai-status";
 import { audienceError, canTalkTo, talksToAgents } from "./audience";
 import { recordAudit } from "./audit";
-import { runRequester } from "./cancel";
+import { mayStopRun, runRequester } from "./cancel";
 import { requireChannelAccess } from "./channels";
 import { requesterOf, startOrJoinRun } from "./dispatch";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
@@ -15,6 +15,7 @@ import { can, type Membership } from "./organizations";
 import { type RouterDeps, routeMessage } from "./router";
 import { bodyCode } from "./run-tools";
 import { type AgentRun, NO_AI, replyThreadOf } from "./runs";
+import { continueStretch, stretchCardOf } from "./stretch";
 import { withWikiLinks } from "./wiki-links";
 
 const { agentRunSteps, agentRuns, agents, messages, routingDecisions } = schema;
@@ -196,7 +197,14 @@ async function restartNoAiRun(deps: AnswerNowDeps, userId: string, failed: Agent
       .where(and(eq(agentRuns.id, failed.id), eq(agentRuns.status, "failed"), eq(agentRuns.error, NO_AI)))
       .returning({ id: agentRuns.id });
     if (!gone) return null;
-    const next = await startOrJoinRun(tx, trigger, failed.agentId, failed.trigger);
+    // A person's click: an agent's message it answers starts a stretch of its own (ADR 0089).
+    const next = await startOrJoinRun(
+      tx,
+      trigger,
+      failed.agentId,
+      failed.trigger,
+      trigger.hop >= 1 ? { granted: Bun.randomUUIDv7() } : {},
+    );
     if (!next) return null;
     const runId = "created" in next ? next.created.id : next.joined;
     await recordAudit(tx, {
@@ -255,10 +263,10 @@ async function rerouteNoAiMessage(deps: AnswerNowDeps, userId: string, membershi
  * "Responder agora" (`POST …/messages/{id}/answer-now`, ADR 0061), once an AI is connected. The id is a
  * no-AI card (its agent's newest run in that conversation) or the person's message (the runs it started,
  * else its `no_ai` routing decision). A failed `no_ai` run that did nothing starts again on the person's
- * own message (one that did something: 409 `run.not_restartable`); a `no_ai` decision is routed again. Who
- * asked, the agent's owner or an admin (like "Continuar"). 409 `ai.still_missing` while there's still none;
+ * own message (one that did something: 409 `run.not_restartable`); a `no_ai` decision is routed again. The
+ * same people as "Continuar" (`mayStopRun`). 409 `ai.still_missing` while there's still none;
  * 403 `audience.*` when the agent no longer answers who asked; pressed again, it returns what answers the
- * message.
+ * message. On a stretch's pause card it is that card's Continuar (`continueStretch`, ADR 0089).
  */
 export async function answerNow(
   deps: AnswerNowDeps,
@@ -269,13 +277,15 @@ export async function answerNow(
   const message = await getMessage(deps.db, orgId, messageId);
   if (!message || message.deletedAt) throw new NotFoundError("Message not found");
   const { membership } = await requireChannelAccess(deps.db, userId, orgId, message.channelId);
+  const paused = message.authorType === "agent" ? stretchCardOf(message.meta) : null;
+  if (paused) return continueStretch(deps, userId, membership, message, paused);
   const card = noAiCardOf(message);
   const found = await answeringRuns(deps.db, message, card);
   const failed = found.filter((r) => r.run.status === "failed" && r.run.error === NO_AI && !r.run.background);
   if (failed.length > 0) {
-    const allowed = failed.filter(
-      (r) => r.requester === userId || r.agent.ownerUserId === userId || can(membership, "manage_agents"),
-    );
+    const allowed: AnsweringRun[] = [];
+    for (const r of failed)
+      if (await mayStopRun(deps.db, userId, membership, { ...r, ownerUserId: r.agent.ownerUserId })) allowed.push(r);
     if (allowed.length === 0) throw forbidden();
     const ready: AnsweringRun[] = [];
     for (const r of allowed) if ((await agentAiState(deps, r.agent, r.run)).state !== "no_ai") ready.push(r);

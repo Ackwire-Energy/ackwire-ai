@@ -11,7 +11,7 @@ import { useCopied } from "./copied";
 import "./invite.css";
 
 /**
- * The workspace's invitation link (ADR 0068, 0089) in the invite dialog: whoever opens it only asks to join, and
+ * The workspace's invitation link (ADR 0068, 0090) in the invite dialog: whoever opens it only asks to join, and
  * someone who may invite approves each person. The address to copy, until when it works, "Renovar" (30 more days,
  * the same link) and "Desativar" (with how many waiting requests close with it); "Criar link" when there's none.
  * Links made before links could be shown again are listed to turn off.

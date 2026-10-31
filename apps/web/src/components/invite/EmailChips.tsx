@@ -13,7 +13,7 @@ export interface ChipAddress {
 const LIST = /[\s,;<]/;
 
 /**
- * Addresses as chips (ADR 0089), in the onboarding's Team step and the invite dialog. Enter, a comma, a semicolon
+ * Addresses as chips (ADR 0090), in the onboarding's Team step and the invite dialog. Enter, a comma, a semicolon
  * or leaving the field hands what was typed to `onAdd`, which reads it with `addressesIn` (the way mail apps and
  * spreadsheets copy addresses: `Ana Silva <ana@x.com>`, quotes, `mailto:`); a pasted list goes at once; Backspace in
  * an empty field takes the last chip back. Each chip shows its face and address, then `aside` (its role, or why it

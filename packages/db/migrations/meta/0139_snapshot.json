@@ -1,5 +1,5 @@
 {
-  "id": "18fb442e-5097-4dcc-a631-688432ef9c20",
+  "id": "7370c9c5-68b3-4e46-b77d-1f97637b0b87",
   "prevId": "efde0308-b150-4d23-99b5-968a1a5346b9",
   "version": "7",
   "dialect": "postgresql",
@@ -2108,6 +2108,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": 0
+        },
+        "stretch_id": {
+          "name": "stretch_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         },
         "agent_run_id": {
           "name": "agent_run_id",
@@ -10705,6 +10711,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "stretch_id": {
+          "name": "stretch_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "status": {
           "name": "status",
           "type": "agent_run_status",
@@ -10890,6 +10902,28 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "agent_runs_org_id_stretch_id_index": {
+          "name": "agent_runs_org_id_stretch_id_index",
+          "columns": [
+            {
+              "expression": "org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "stretch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"agent_runs\".\"stretch_id\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -15119,19 +15153,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "channel_ids": {
-          "name": "channel_ids",
-          "type": "uuid[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::uuid[]"
-        },
-        "note": {
-          "name": "note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "expires_at": {
           "name": "expires_at",
           "type": "timestamp with time zone",
@@ -15618,24 +15639,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "suggested_by_user_id": {
-          "name": "suggested_by_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "password_hash": {
-          "name": "password_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "claim_hash": {
-          "name": "claim_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "expires_at": {
           "name": "expires_at",
           "type": "timestamp with time zone",
@@ -15754,19 +15757,6 @@
           "tableTo": "organization_invitations",
           "columnsFrom": [
             "invitation_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "organization_join_requests_suggested_by_user_id_users_id_fk": {
-          "name": "organization_join_requests_suggested_by_user_id_users_id_fk",
-          "tableFrom": "organization_join_requests",
-          "tableTo": "users",
-          "columnsFrom": [
-            "suggested_by_user_id"
           ],
           "columnsTo": [
             "id"

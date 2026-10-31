@@ -120,7 +120,7 @@ const nameOf = (t: TFunction, dir: Dir, a: NotificationActor | undefined) =>
       : (dir.memberById.get(a.id)?.name ?? t("channel.unknownPerson"));
 
 /**
- * Who an accepted invitation brought in (ADR 0089): the directory's name, else the one the notice carries, while
+ * Who an accepted invitation brought in (ADR 0090): the directory's name, else the one the notice carries, while
  * the members list catches up with someone who just joined.
  */
 const joinerOf = (t: TFunction, dir: Dir, n: AppNotification) => {
@@ -357,7 +357,7 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
     case "join_request": {
       // Merged while unread: the first ones to ask, by name, then how many more.
       const asked = askersOf(n);
-      // A member's suggestion says who suggested it (ADR 0089); a merged row counts everyone as asking.
+      // A member's suggestion says who suggested it (ADR 0090); a merged row counts everyone as asking.
       if (asked.total === 1 && n.latest.suggestedBy)
         return k("joinSuggestion", { by: n.latest.suggestedBy, name: asked.names[0] });
       return asked.total > 1
@@ -656,7 +656,7 @@ function Row({
   const { t, i18n } = useTranslation();
   const unread = n.readAt === null;
   const first = n.actors[0];
-  // Someone who just joined may not be in the members list yet: the notice names them (ADR 0089).
+  // Someone who just joined may not be in the members list yet: the notice names them (ADR 0090).
   const joiner = n.kind === "invitation_accepted" ? joinerOf(t, dir, n) : undefined;
   const name = joiner ?? nameOf(t, dir, first);
   const own = workspaceHeadline(n);

@@ -332,7 +332,7 @@ export function accountRoutes(deps: AppDeps) {
               .optional()
               .openapi({
                 description:
-                  "An email invitation: how its address signs in (ADR 0089), so the page asks only what is missing.",
+                  "An email invitation: how its address signs in (ADR 0090), so the page asks only what is missing.",
               }),
             full: z.literal(true).optional().openapi({
               description: "An email invitation to a workspace with no seat left: said before anyone makes an account.",
@@ -378,7 +378,7 @@ export function accountRoutes(deps: AppDeps) {
       method: "get",
       path: "/invitations/{token}/state",
       tags,
-      summary: "What an email invitation that no longer opens says (ADR 0089)",
+      summary: "What an email invitation that no longer opens says (ADR 0090)",
       description:
         "Public, for the token's holder. `accepted` (with the workspace's id, to open it when signed in as a " +
         "member) or `expired` (when, and who invited). 404 for a token that matches none, a cancelled " +

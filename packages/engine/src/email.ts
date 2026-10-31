@@ -62,7 +62,7 @@ export type EmailTemplate =
       crew?: Look[];
       url: string;
       role: string;
-      /** The inviter's words (ADR 0089), made inert in the body. */
+      /** The inviter's words (ADR 0090), made inert in the body. */
       note?: string | null;
     }
   | { kind: "password_reset"; locale?: EmailLocale; url: string }
@@ -272,7 +272,7 @@ export async function emailCrew(db: Executor, orgId: string): Promise<Look[]> {
 /** A picture's agents: a job's own (cut to `CREW`), or the onboarding's when it has none. */
 const crewOr = (crew: Look[] | undefined) => (crew?.length ? crew.slice(0, CREW) : ONBOARDING_CREW);
 
-/** The inviter's note as the invitation shows it (ADR 0089). */
+/** The inviter's note as the invitation shows it (ADR 0090). */
 const INVITE_NOTE_SHOWN = 300;
 /** A name typed on an invitation link's page, as the admins' email shows it (ADR 0068). */
 const JOIN_NAME_SHOWN = 60;
@@ -867,7 +867,7 @@ export async function queueInvitationEmail(
     .where(eq(organizations.id, input.orgId));
   await queueEmail(db, {
     orgId: input.orgId,
-    // One per sending: the link stays the same when sent again (ADR 0089), its expiry doesn't.
+    // One per sending: the link stays the same when sent again (ADR 0090), its expiry doesn't.
     key: `invite:${input.invitationId}:${invitation?.expiresAt.getTime() ?? input.url.slice(-16)}`,
     to: [input.email],
     template: {

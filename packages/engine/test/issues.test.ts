@@ -372,7 +372,7 @@ describe("issues", () => {
         orgId: f.org.id,
         channelId: dm.id,
         threadId: root.id,
-        author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1 },
+        author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null },
         body: 'Task "Rodar os testes" finished on mac after 2 min.',
         meta: { machineTask: { id: crypto.randomUUID(), title: "Rodar os testes", status: "done" } },
       });

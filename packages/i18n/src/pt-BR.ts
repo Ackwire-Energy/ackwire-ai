@@ -457,7 +457,7 @@ export const ptBR = {
     askedNew: "Pedido enviado",
     askNewFailed:
       "Não deu para pedir por aqui: este link pode ter sido trocado por um convite mais novo ou cancelado. Procure o e-mail de convite mais recente ou fale com quem convidou você.",
-    // The invitation's page, in the sign-in's language: the workspace on top, its first agent asking (ADR 0089).
+    // The invitation's page, in the sign-in's language: the workspace on top, its first agent asking (ADR 0090).
     from: "Convite de {{name}}",
     crew_one: "{{names}} trabalha lá",
     crew_other: "{{names}} trabalham lá",
@@ -530,7 +530,7 @@ export const ptBR = {
       reasonSaid: "<b>Recado:</b> “{{reason}}”",
       closedTitle: "Este link não funciona mais",
       closedText: "Peça um novo a quem mandou.",
-      // Signed out where email goes out: one question per screen, then the page waits for the answer (ADR 0089).
+      // Signed out where email goes out: one question per screen, then the page waits for the answer (ADR 0090).
       hello: "Oi. Este é o convite da {{org}}.",
       emailLead: "Qual é o seu e-mail? Um admin aprova cada pessoa nova.",
       haveAccountSignIn: "Já tem conta? Entrar",
@@ -1099,6 +1099,8 @@ export const ptBR = {
   shell: {
     // The Mac app's own title bar (ADR 0036).
     titleBar: { back: "Voltar", forward: "Avançar" },
+    /** In place of a sidebar row (an agent, a person) that failed to draw. */
+    unshown: "Não pôde ser exibido",
     more: "Mais",
     moreGroups: { schedule: "Agenda", decisions: "Decisões" },
     moreWhat: {
@@ -1573,6 +1575,11 @@ export const ptBR = {
     send: "Enviar mesmo assim",
   },
   /** An agent's card whose button opens the app's own dialog, filled in (`meta.actionCard`). */
+  /** A stretch's pause card once someone pressed Continuar (ADR 0089). */
+  stretchCard: {
+    continued: "{{name}} deixou continuar · {{time}}",
+    continuedByYou: "Você deixou continuar · {{time}}",
+  },
   actionCard: {
     connect_ai: {
       title: "Conectar uma IA para {{agents}}",
@@ -1652,6 +1659,8 @@ export const ptBR = {
       renamed: "Renomeei a conversa para <b>{{to}}</b>",
       closed: "Encerrei a conversa <b>{{title}}</b>",
     },
+    /** A kind this app doesn't know yet (a newer server's). */
+    other: "Fiz uma mudança",
     issueFields: {
       title: "o título",
       description: "a descrição",
@@ -1779,7 +1788,7 @@ export const ptBR = {
   },
   channelMembers: {
     addRow: "Adicionar pessoa ou agente",
-    /** An address nobody in the workspace has, typed in the search (ADR 0089). */
+    /** An address nobody in the workspace has, typed in the search (ADR 0090). */
     invite: "Convidar {{email}} para a {{org}} e para #{{channel}}",
     inviteOrg: "Convidar {{email}} para a {{org}}",
     addTitle: "Adicionar a #{{channel}}",
@@ -3287,7 +3296,7 @@ export const ptBR = {
     /** When something happened, after a verb: "Pediu pelo link em 22 out". */
     when: { on: "em {{date}}" },
     waitingTitle: "Esperando você",
-    // Addresses as chips, in the invite dialog and the onboarding's Team step (ADR 0089).
+    // Addresses as chips, in the invite dialog and the onboarding's Team step (ADR 0090).
     chips: {
       check: "confira",
       roleOf: "Papel de {{email}}",
@@ -3295,7 +3304,7 @@ export const ptBR = {
       member: "já está na {{org}}",
       invited: "já convidado",
     },
-    // The invite dialog, opened from Members, the workspace menu, ⌘K and a channel (ADR 0089).
+    // The invite dialog, opened from Members, the workspace menu, ⌘K and a channel (ADR 0090).
     dialog: {
       title: "Convidar para a {{org}}",
       sub: "Por e-mail a pessoa entra direto. Pelo link, ela pede e você aprova.",
@@ -3318,7 +3327,7 @@ export const ptBR = {
       sentMany: "{{count}} convites enviados.",
       alsoIn: "Entram também em {{channels}}.",
     },
-    // Sent invitations: each one's link at any time, sent again with the same link, its role, cancel (ADR 0089).
+    // Sent invitations: each one's link at any time, sent again with the same link, its role, cancel (ADR 0090).
     invitations: {
       title: "Convites enviados",
       empty: "Nenhum convite aberto.",
@@ -3333,7 +3342,7 @@ export const ptBR = {
       copiedNoEmail: "Link do convite de {{email}} copiado.",
       resent: "Mandei de novo para {{email}}. O link é o mesmo e vale até {{date}}.",
       resentNoEmail: "O convite de {{email}} vale até {{date}}. O link é o mesmo.",
-      // One sent before links lasted gets a lasting one when sent again: the old link stops opening (ADR 0089).
+      // One sent before links lasted gets a lasting one when sent again: the old link stops opening (ADR 0090).
       newLink: "Mandei de novo para {{email}}, com um link novo que vale até {{date}}. O link anterior não abre mais.",
       newLinkNoEmail: "O convite de {{email}} vale até {{date}}, com um link novo. Copie e mande para a pessoa.",
       renew: "Renovar",
@@ -3344,14 +3353,14 @@ export const ptBR = {
       more: "Mais ações para {{email}}",
       changeRole: "Mudar o papel",
       cancel: "Cancelar convite",
-      // Under Cancelar convite: sending again keeps the link, so one that leaked stops only by cancelling (ADR 0089).
+      // Under Cancelar convite: sending again keeps the link, so one that leaked stops only by cancelling (ADR 0090).
       linkStays: "O link não muda ao reenviar. Se ele foi parar com quem não devia, cancele e convide de novo.",
       cancelled: "Convite de {{email}} cancelado.",
       roleTitle: "Papel de {{email}}",
       roleText: "Muda o que a pessoa recebe ao entrar. O link continua o mesmo.",
       roleSaved: "{{email}} entra como {{roles}}.",
     },
-    // A member who may not invite suggests someone: a request for whoever invites (ADR 0089).
+    // A member who may not invite suggests someone: a request for whoever invites (ADR 0090).
     suggest: {
       title: "Quer trazer alguém para a {{org}}?",
       lead_one: "Quem convida aqui é {{names}}. Sugira a pessoa: a sugestão chega e é aprovada com um clique.",
@@ -3381,7 +3390,7 @@ export const ptBR = {
       cancelOf: "Cancelar a sugestão de {{email}}",
       cancelled: "Sugestão cancelada.",
     },
-    // A newcomer's first #general (ADR 0089).
+    // A newcomer's first #general (ADR 0090).
     arrival: {
       title: "Boas-vindas à {{org}}, {{name}}",
       lead: "Aqui o time e os agentes trabalham juntos: escreva no #{{channel}} ou chame um agente pelo nome.",
@@ -6404,6 +6413,7 @@ export const ptBR = {
     stoppedBy: "Parado por {{name}}",
     stopped: "Parado",
     continueRun: "Continuar",
+    stepLimit: "No limite de passos",
     steer: {
       waiting: "{{name}} lê na próxima pausa",
       now: "{{name}} parou para ler",
@@ -8438,6 +8448,7 @@ export const ptBR = {
     },
     title: "Configurações",
     account: {
+      plans: "Limites dos seus planos",
       device: "Neste aparelho",
     },
     orgTitle: "Workspace",
@@ -8729,6 +8740,10 @@ export const ptBR = {
       helping: "ajudando {{article}} {{name}}",
       see: "Ver conversa",
     },
+    /** In place of a row of the conversation that failed to draw (the rest keeps working). */
+    unshown: "Esta mensagem não pôde ser exibida",
+    /** In place of a part of a message (a card, its receipts) that failed to draw (the text and the rest stay). */
+    unshownPart: "Parte desta mensagem não pôde ser exibida",
     /** Automatic lines: what reached an agent's conversation (`meta.notice`), a routine's background start. */
     notice: {
       routineHandoff: "Rotina «{{routine}}» entregou um relatório",
@@ -9020,6 +9035,20 @@ export const ptBR = {
       issue_work_start: "Pode fazer a tarefa #{{number}}.",
       issue_taken: "Peguei a tarefa #{{number}}.",
       done: "Pronto.",
+      /**
+       * A stretch's pause card (ADR 0089): `agents` their names, `count` how many, `steps` the steps agents may start on
+       * their own; `percent` the share of each one's monthly budget, and with `_cost` it in money (`amount`).
+       */
+      stretch_paused_runs_one: "{{agents}} parou para te consultar · {{steps}} passos sem você desde o seu pedido",
+      stretch_paused_runs_other: "{{agents}} pararam para te consultar · {{steps}} passos sozinhos desde o seu pedido",
+      stretch_paused_spend_one:
+        "{{agents}} parou para te consultar · usou {{percent}}% do orçamento do mês nisso sem você",
+      stretch_paused_spend_other:
+        "{{agents}} pararam para te consultar · usaram {{percent}}% do orçamento do mês nisso sem você",
+      stretch_paused_spend_cost_one:
+        "{{agents}} parou para te consultar · usou {{amount}} ({{percent}}% do orçamento do mês) nisso sem você",
+      stretch_paused_spend_cost_other:
+        "{{agents}} pararam para te consultar · usaram {{amount}} ({{percent}}% do orçamento do mês) nisso sem você",
       memory: {
         proposed: "Proposta criada: {{text}}",
         forgot: 'Memória atualizada: esqueci "{{text}}".',
@@ -9027,6 +9056,7 @@ export const ptBR = {
         remembered: "Memória atualizada: {{text}}",
       },
       interrupted: "Interrompida porque o servidor reiniciou. Peça de novo para continuar.",
+      step_limit: "Meus passos acabaram antes de eu terminar.",
       forum_suggestion: 'Vale um fórum? "{{title}}"',
       forum_concluded: 'O fórum "{{title}}" terminou. A síntese está no arquivo abaixo.',
       forum_concluded_issues:
@@ -9896,6 +9926,8 @@ export const ptBR = {
     },
     retry: "Tentar de novo",
     takeover: "Assumir o controle",
+    /** Over the last picture while control opens. */
+    taking: "Assumindo o controle…",
     clipboard: {
       got: "Copiado no computador {{of}} {{name}}:",
       copy: "Copiar",
@@ -9915,7 +9947,6 @@ export const ptBR = {
       doneByYou: "Feito por você às {{time}}. {{The}} {{agent}} olhou a tela de novo e seguiu.",
     },
     control: {
-      keys: "Copiar e colar como sempre: {{copy}}, {{paste}}.",
       notice: "Os programas do computador {{of}} {{name}} veem a tela e o que você digita ou cola.",
     },
     /** The ⓘ beside the control line, on agentes.chat Cloud only (ADR 0076). */

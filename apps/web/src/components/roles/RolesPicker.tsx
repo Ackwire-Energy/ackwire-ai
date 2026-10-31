@@ -7,7 +7,7 @@ import "./roles.css";
 
 /**
  * Picks roles (ADR 0085) from a menu that stays open: only the ones the person may give (below their own). The
- * trigger is a field-like button that names what's picked ("Membro" with none: everyone's base alone, ADR 0089),
+ * trigger is a field-like button that names what's picked ("Membro" with none: everyone's base alone, ADR 0090),
  * or `trigger` (a "+" on a person's row).
  */
 export function RolesPicker({

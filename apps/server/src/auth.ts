@@ -197,7 +197,7 @@ export function createAuth(deps: {
               request?: Request,
             ) => {
               // Signing up from an email invitation's page, with its token (`x-invitation-token`): accepting it
-              // confirms the address (ADR 0089), so no "confirm your email" follows. Without the token of a waiting
+              // confirms the address (ADR 0090), so no "confirm your email" follows. Without the token of a waiting
               // invitation to that same address, or asked for later, it goes as always.
               const signingUp = request ? new URL(request.url).pathname.endsWith("/sign-up/email") : false;
               const invitation = request?.headers.get(INVITATION_TOKEN_HEADER);
@@ -559,7 +559,7 @@ export async function mintPhoneSignIn(auth: Auth, sessionToken: string) {
 }
 
 /**
- * A one-time sign-in for an account an approved request made (ADR 0089), traded by the page that asked through
+ * A one-time sign-in for an account an approved request made (ADR 0090), traded by the page that asked through
  * `POST /api/auth/sign-in/one-time-token`, as the phone's.
  */
 export async function mintUserSignIn(auth: Auth, userId: string) {
@@ -567,7 +567,7 @@ export async function mintUserSignIn(auth: Auth, userId: string) {
   return mintSignIn(internalAdapter, `${FOR_USER}${userId}`);
 }
 
-/** The password hash Better Auth would store for `password` (ADR 0089: a request keeps it until an approval). */
+/** The password hash Better Auth would store for `password` (ADR 0090: a request keeps it until an approval). */
 export async function hashPassword(auth: Auth, password: string) {
   const context = await auth.$context;
   return context.password.hash(password);

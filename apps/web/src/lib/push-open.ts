@@ -104,7 +104,7 @@ export function pushOpenFrom(
 export function fallbackTarget(data: PushOpenData): OpenTarget | null {
   const kind = data.kind;
   if (kind === "approval") return { to: "/org/$orgId/approvals" };
-  // Someone who joined by an invitation (ADR 0089) opens a conversation with them, from the notification
+  // Someone who joined by an invitation (ADR 0090) opens a conversation with them, from the notification
   // (`openTarget`); a push names no person to talk to, so without it, Members, where they now are.
   if (kind === "join_request" || kind === "invitation_accepted")
     return { to: "/org/$orgId/settings/$section", params: { section: "members" } };

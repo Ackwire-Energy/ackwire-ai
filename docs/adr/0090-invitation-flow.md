@@ -1,4 +1,4 @@
-# 0089. Bringing a teammate in: a link asks with a password, invitations keep their link
+# 0090. Bringing a teammate in: a link asks with a password, invitations keep their link
 
 - Status: Accepted (built: the server, the shared client and the web; the phone app follows)
 - Date: 2026-10-31

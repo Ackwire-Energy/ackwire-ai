@@ -42,7 +42,7 @@ import { PasswordHelp, passwordHelp } from "@/pages/AuthPage";
 import "./invite.css";
 
 /**
- * An invitation's page (ADR 0089), in the sign-in's language: the workspace on top, its first agent asking one thing
+ * An invitation's page (ADR 0090), in the sign-in's language: the workspace on top, its first agent asking one thing
  * at a time, the horizon below. An email invitation asks only what its address is missing (a name and a password for
  * a new account, the password of one that has it, the provider of one that signs in without) and accepts; one that no
  * longer opens says what happened to it. An invitation link only asks to join (`LinkInvitation`).
@@ -424,11 +424,11 @@ const EMAIL_CHECKS: Partial<Record<EmailStep, HumanAction>> = {
   forgot: "password-reset",
 };
 
-/** The preview always says how the address signs in (ADR 0089); without it, a name and a password make an account. */
+/** The preview always says how the address signs in (ADR 0090); without it, a name and a password make an account. */
 const NO_ACCOUNT: NonNullable<InvitationPreview["account"]> = { exists: false, password: false, providers: [] };
 
 /**
- * An email invitation (ADR 0089). Signed in as its address: one press accepts. As another address: whose it is, and
+ * An email invitation (ADR 0090). Signed in as its address: one press accepts. As another address: whose it is, and
  * signing out here leads to that address's own step. Signed out: a new address gives a name, then a password; one
  * with a password types it ("Esqueci a senha" is the sign-in's reset); one that signs in only with a provider gets
  * that provider. A provider comes back to `?join=1`, which accepts by itself for the invited address. Accepting
@@ -524,7 +524,7 @@ function EmailInvitation({ token, preview, join }: { token: string; preview: Inv
     }
   };
 
-  // With the invitation's token, which proves the address: the new account gets no "confirm your email" (ADR 0089 §6).
+  // With the invitation's token, which proves the address: the new account gets no "confirm your email" (ADR 0090 §6).
   const signUp = () =>
     run(async () => {
       const result = await withHumanCheck(human.check, (humanCheck) =>
@@ -801,7 +801,7 @@ function ClosedInvitation({ preview }: { preview: InvitationPreview }) {
   );
 }
 
-/** No seat left: said before anyone makes an account, and the same link works once one opens (ADR 0089). */
+/** No seat left: said before anyone makes an account, and the same link works once one opens (ADR 0090). */
 function FullWorkspace({ preview }: { preview: InvitationPreview }) {
   const { t } = useTranslation();
   return (
@@ -818,7 +818,7 @@ function FullWorkspace({ preview }: { preview: InvitationPreview }) {
 }
 
 /**
- * An email invitation the preview no longer opens (ADR 0089): accepted (the workspace to open, signing in on the way
+ * An email invitation the preview no longer opens (ADR 0090): accepted (the workspace to open, signing in on the way
  * when needed), expired (ask whoever invited for a new one, where email goes out), or nothing known (cancelled, or
  * never one), which says only that.
  */
@@ -909,7 +909,7 @@ function GoneInvitation({ token }: { token: string }) {
 
 /* ---------- An invitation link ---------- */
 
-/** A request this tab made through a link (ADR 0089): the key that signs in once approved, and whose it is. */
+/** A request this tab made through a link (ADR 0090): the key that signs in once approved, and whose it is. */
 interface Asked {
   key: string;
   name: string;
@@ -932,7 +932,7 @@ const keepAsked = (token: string, asked: Asked) => sessionStore.set(askedAt(toke
 const forgetAsked = (token: string) => sessionStore.remove(askedAt(token));
 
 /**
- * An invitation link (ADR 0068, 0089): whoever opens it asks, and an admin approves each person. Signed in, the
+ * An invitation link (ADR 0068, 0090): whoever opens it asks, and an admin approves each person. Signed in, the
  * account asks (`AskAsAccount`). Signed out on a server that sends email, one thing per screen (the email, its code,
  * a name, a password, a note), then the page waits for the answer and signs in once an admin approves (`Waiting`);
  * a reload keeps waiting. Where no email goes out, the typed form of ADR 0068 (`AskForm`).
@@ -1000,7 +1000,7 @@ function useCodeSender(token: string, check: HumanCheck | null) {
 type CodeSender = ReturnType<typeof useCodeSender>;
 
 /**
- * The emailed code, on a screen of its own (ADR 0072, 0089): six digits, checked as the sixth comes in (spaces and
+ * The emailed code, on a screen of its own (ADR 0072, 0090): six digits, checked as the sixth comes in (spaces and
  * dashes don't count); a wrong one empties the field for another try. Resend once the countdown ends.
  */
 function CodeField({
@@ -1120,7 +1120,7 @@ type AskStep = "email" | "code" | "name" | "password" | "note";
 const ASK_STEPS: readonly AskStep[] = ["email", "code", "name", "password", "note"];
 
 /**
- * Asking through a link, signed out, where email goes out (ADR 0089): the email, the code from it on its own screen,
+ * Asking through a link, signed out, where email goes out (ADR 0090): the email, the code from it on its own screen,
  * a name, a password and an optional note, one per screen. No account exists until an admin approves; the ask
  * answers the key this tab keeps to sign in then.
  */
@@ -1417,7 +1417,7 @@ const transient = (error: unknown) =>
   !(error instanceof ApiError) || error.status >= 500 || error.status === 408 || error.status === 429;
 
 /**
- * Asked: the page waits for an admin, checking every 15 s with the key the ask answered (ADR 0089). Approved, it
+ * Asked: the page waits for an admin, checking every 15 s with the key the ask answered (ADR 0090). Approved, it
  * signs in with the one-time sign-in the answer carries and opens the workspace; turned down, the admin's note;
  * ended (run out, its link turned off, approved for an account that was already there, or a key the server no
  * longer knows), signing in as always. A check that fails for a moment (no connection, a deploy) never ends it: the

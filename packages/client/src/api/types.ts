@@ -323,13 +323,13 @@ export interface InvitationPreview {
   you?: JoinStatus;
   /** An email invitation: until when it works. */
   expiresAt?: string;
-  /** An email invitation: how its address signs in, so the page asks only what is missing (ADR 0089). */
+  /** An email invitation: how its address signs in, so the page asks only what is missing (ADR 0090). */
   account?: { exists: boolean; password: boolean; providers: ("google" | "github" | "apple")[] };
-  /** An email invitation to a workspace with no seat left, said before anyone makes an account (ADR 0089). */
+  /** An email invitation to a workspace with no seat left, said before anyone makes an account (ADR 0090). */
   full?: true;
 }
 
-/** An email invitation that no longer opens (ADR 0089): accepted, or expired and who to ask. */
+/** An email invitation that no longer opens (ADR 0090): accepted, or expired and who to ask. */
 export type InvitationState =
   | { state: "accepted"; orgId: string; orgName: string; at: string }
   | { state: "expired"; orgName: string; invitedBy: string | null; at: string };
@@ -348,12 +348,12 @@ export interface AskToJoinResult {
   status: "pending";
   email: string;
   emailed: boolean;
-  /** Asked with a `password` (ADR 0089): what this page keeps to sign in once approved (`invites.claim`). */
+  /** Asked with a `password` (ADR 0090): what this page keeps to sign in once approved (`invites.claim`). */
   key?: string;
 }
 
 /**
- * Where the request a page made stands (ADR 0089): waiting, in (once: `signIn` for the one-time sign-in), denied,
+ * Where the request a page made stands (ADR 0090): waiting, in (once: `signIn` for the one-time sign-in), denied,
  * or closed (run out, turned off, or approved for an address that signs in as it always did).
  */
 export type JoinClaim =
@@ -362,7 +362,7 @@ export type JoinClaim =
   | { status: "denied"; reason: string | null }
   | { status: "closed" };
 
-/** A suggestion a member made that still waits for the admins (ADR 0089). */
+/** A suggestion a member made that still waits for the admins (ADR 0090). */
 export interface MySuggestion {
   id: string;
   email: string;
@@ -406,7 +406,7 @@ export interface JoinRequest {
   verified: boolean;
   /** @deprecated Read `verified`. Kept for phone builds from before it: approving lets an account in at once. */
   confirmed: boolean;
-  /** The member who suggested this person (their name, ADR 0089): it came through no link. */
+  /** The member who suggested this person (their name, ADR 0090): it came through no link. */
   suggestedBy?: string | null;
   createdAt: string;
   /** Closes unanswered after this. */
@@ -1517,18 +1517,18 @@ export interface InvitationWithStatus {
   email: string;
   role: Role;
   roleIds?: string[];
-  /** Channels it adds them to, besides #general (ADR 0089). */
+  /** Channels it adds them to, besides #general (ADR 0090). */
   channelIds?: string[];
   status: "pending" | "expired";
   expiresAt: string;
   createdAt: string;
   /** Who sent it (their name). */
   invitedBy?: string | null;
-  /** Its link, the same as the email's, to copy at any time (ADR 0089); null for one sent before that. */
+  /** Its link, the same as the email's, to copy at any time (ADR 0090); null for one sent before that. */
   url?: string | null;
 }
 
-/** What the invite dialog sends (ADR 0089): each address with its roles, the channels and the note for all. */
+/** What the invite dialog sends (ADR 0090): each address with its roles, the channels and the note for all. */
 export interface InviteBatch {
   emails?: string[];
   invites?: { email: string; roleIds?: string[] }[];
@@ -1770,24 +1770,27 @@ export interface ReplyRef {
 /**
  * Act with undo (ADR 0037 round 2): what an agent changed with its reply,
  * shown as a receipt under the message. Say it with `agentActions.{kind}`
- * (pt-BR and en) and `params`.
+ * (pt-BR and en) and `params`. The same list as the engine's `AGENT_ACTION_KINDS`
+ * (a test keeps them so), but a newer server can still send a kind this build doesn't know.
  */
-export type AgentActionKind =
-  | "issue.created"
-  | "issue.updated"
-  | "issue.assigned"
-  | "memory.saved"
-  | "memory.updated"
-  | "memory.forgotten"
-  | "routine.created"
-  | "routine.updated"
-  | "routine.deleted"
-  | "channel.agent_added"
-  | "channel.created"
-  | "wiki.page_created"
-  | "wiki.page_edited"
-  | "thread.renamed"
-  | "thread.closed";
+export const AGENT_ACTION_KINDS = [
+  "issue.created",
+  "issue.updated",
+  "issue.assigned",
+  "memory.saved",
+  "memory.updated",
+  "memory.forgotten",
+  "routine.created",
+  "routine.updated",
+  "routine.deleted",
+  "channel.agent_added",
+  "channel.created",
+  "wiki.page_created",
+  "wiki.page_edited",
+  "thread.renamed",
+  "thread.closed",
+] as const;
+export type AgentActionKind = (typeof AGENT_ACTION_KINDS)[number];
 
 /** What the change was made to (link it: issue → Issues, wiki_page → Wiki, routine → Rotinas…). */
 export interface AgentActionTarget {
@@ -4448,7 +4451,7 @@ export type NotificationKind =
    */
   | "join_request"
   /**
-   * ADR 0089: someone accepted the email invitation this person sent. The person as actor, `latest.title` their
+   * ADR 0090: someone accepted the email invitation this person sent. The person as actor, `latest.title` their
    * name, `source.label` the workspace's. Inbox only. Opens Members.
    */
   | "invitation_accepted";
@@ -4519,7 +4522,7 @@ export interface NotificationLatest {
   cloud?: boolean;
   /** `join_request`: the first two people who asked, in the order they asked (`count` says how many in all). */
   names?: string[];
-  /** `join_request` from a member's suggestion (ADR 0089): who suggested. */
+  /** `join_request` from a member's suggestion (ADR 0090): who suggested. */
   suggestedBy?: string;
 }
 

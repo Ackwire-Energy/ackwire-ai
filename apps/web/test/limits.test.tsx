@@ -33,7 +33,7 @@ async function go(path: string, over: Partial<WorkspaceLimits>, billing = true) 
   return { api, state, left, billingLinks, sockets };
 }
 /**
- * Members' "Convidar pessoas" opens the invite dialog (ADR 0089); an address goes in, so the only thing that can keep
+ * Members' "Convidar pessoas" opens the invite dialog (ADR 0090); an address goes in, so the only thing that can keep
  * its button waiting is a full workspace.
  */
 async function inviteDialog() {

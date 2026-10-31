@@ -112,7 +112,7 @@ function State({ icon, tone, children }: { icon: IconName; tone?: "soon" | "ok";
 }
 
 /**
- * Configurações › Membros e convites (ADR 0089): whoever may invite gets "Copiar link de convite" and "Convidar
+ * Configurações › Membros e convites (ADR 0090): whoever may invite gets "Copiar link de convite" and "Convidar
  * pessoas" (the workspace's one invite dialog) on top, then what waits on them (requests through the link and
  * members' suggestions) and the invitations they sent; a member who may not invite suggests someone. Then the people
  * and the agents.
@@ -359,7 +359,7 @@ function InviteActions() {
 }
 
 /**
- * Esperando você (ADR 0068, 0089): who asked through the link and whom members suggested, oldest first, each
+ * Esperando você (ADR 0068, 0090): who asked through the link and whom members suggested, oldest first, each
  * approved with roles or denied with a reason. `focus` (from the admins' email): that request in view with Approve
  * focused, which the admin still presses, or its Deny dialog open.
  */
@@ -550,7 +550,7 @@ function WaitingRequests({ focus, action }: { focus?: string; action?: string })
 
 /**
  * What a sent invitation's toasts say: a server that sends no email sends nothing again, the same link for longer.
- * One sent before links lasted (nothing to copy) gets a new link instead, and its old one stops opening (ADR 0089).
+ * One sent before links lasted (nothing to copy) gets a new link instead, and its old one stops opening (ADR 0090).
  */
 const SENT_WORDS = {
   email: { copied: "copied", resent: "resent", renewed: "renewed", newLink: "newLink" },
@@ -568,7 +568,7 @@ function roleWords(t: TFunction, ids: readonly string[] | undefined, roles: read
 }
 
 /**
- * Convites enviados (ADR 0089): every invitation not accepted yet, with its link to copy at any time (the same as
+ * Convites enviados (ADR 0090): every invitation not accepted yet, with its link to copy at any time (the same as
  * the email's), Reenviar (the same link, 7 more days: its menu says a link that leaked stops only by cancelling), its
  * role to change and Cancelar with Desfazer; an expired one is renewed or taken off the list.
  */
@@ -619,7 +619,7 @@ function SentInvitations() {
     });
   };
   /**
-   * Sends it again with the same link (ADR 0089), or a lasting one for an invitation sent before links lasted:
+   * Sends it again with the same link (ADR 0090), or a lasting one for an invitation sent before links lasted:
    * `renewing` an expired one, or reminding them of a pending one.
    */
   const sendAgain = (inv: InvitationWithStatus, renewing: boolean) =>
@@ -772,7 +772,7 @@ function SentInvitations() {
   );
 }
 
-/** "Mudar o papel": the roles a pending invitation gives, changed without sending it (the same link, ADR 0089). */
+/** "Mudar o papel": the roles a pending invitation gives, changed without sending it (the same link, ADR 0090). */
 function InvitationRoles({
   invitation,
   open,
@@ -837,7 +837,7 @@ function invitersOf(people: readonly Person[], roles: readonly OrgRole[]) {
     .map((p) => p.name);
 }
 
-/** What a suggestion's refusal says, about the person suggested (the server's codes, ADR 0089 §7). */
+/** What a suggestion's refusal says, about the person suggested (the server's codes, ADR 0090 §7). */
 const SUGGEST_REFUSALS: Record<string, "member" | "invited" | "waiting" | "full" | "invalid" | undefined> = {
   "join.member": "member",
   "join.invited": "invited",
@@ -847,7 +847,7 @@ const SUGGEST_REFUSALS: Record<string, "member" | "invited" | "waiting" | "full"
 };
 
 /**
- * A member who may not invite (ADR 0089 §7): a card to suggest someone, which reaches the people who invite as a
+ * A member who may not invite (ADR 0090 §7): a card to suggest someone, which reaches the people who invite as a
  * request, and the suggestions still waiting, each to take back.
  */
 function Suggestions() {

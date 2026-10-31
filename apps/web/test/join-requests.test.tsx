@@ -52,7 +52,7 @@ const you = (patch: Partial<JoinStatus> = {}): JoinStatus => ({
 });
 type Fake = ReturnType<typeof seedState>;
 type Claim = ApiClient["invites"]["claim"];
-/** The key the fake's ask answers when it carries a password, and where the page keeps it (ADR 0089). */
+/** The key the fake's ask answers when it carries a password, and where the page keeps it (ADR 0090). */
 const KEY = "00000000-0000-4000-8000-000000000001.page-secret";
 const ASKED = "agentes.join.asked.lnk";
 
@@ -660,7 +660,7 @@ async function members(query = "", patch: Parameters<typeof seedState>[0] = {}) 
 }
 const card = (name: string) => screen().getByRole("group", { name: `${name} pede para entrar` });
 
-/** A member's suggestion (ADR 0089): through no link, nothing proved, from João; named by its address. */
+/** A member's suggestion (ADR 0090): through no link, nothing proved, from João; named by its address. */
 const suggestion = (): JoinRequest => ({
   id: "r3",
   name: "carla.dias",
@@ -820,7 +820,7 @@ test("a name typed with markup reads as typed, in Members and in the inbox", asy
   expect(headline?.children.length).toBe(0);
 });
 
-/** Members' "Convidar pessoas" (the page's own, the first of that name): the workspace's invite dialog (ADR 0089). */
+/** Members' "Convidar pessoas" (the page's own, the first of that name): the workspace's invite dialog (ADR 0090). */
 async function openInvite() {
   const [open] = screen().getAllByRole("button", { name: "Convidar pessoas" });
   await click(open as HTMLElement);

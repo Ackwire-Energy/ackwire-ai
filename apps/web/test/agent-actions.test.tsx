@@ -1,12 +1,14 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { AgentAction, MissionPlan } from "@agenteschat/client";
-import { ApiError } from "@agenteschat/client";
+import type { Agent, AgentAction, Message, MissionPlan } from "@agenteschat/client";
+import { AGENT_ACTION_KINDS, ApiError, keys } from "@agenteschat/client";
+import { en, ptBR } from "@agenteschat/i18n";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState } from "./fake-api";
+import { RECEIPT_ICONS } from "@/components/AgentActions";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -210,6 +212,170 @@ describe("receipts under the agent's reply", () => {
   test("no receipts: nothing under the message", async () => {
     await open(withActions([]));
     expect(within(article()).queryByRole("group", { name: "Mudanças de Ada" })).toBeNull();
+  });
+});
+
+describe("receipts this build doesn't expect", () => {
+  test("every kind the app knows has its icon and its sentence in pt-BR and en", () => {
+    expect(Object.keys(RECEIPT_ICONS).sort()).toEqual([...AGENT_ACTION_KINDS].sort());
+    const sentence = (strings: { agentActions: object }, kind: string) => {
+      const [group = "", name = ""] = kind.split(".");
+      return (strings.agentActions as Record<string, Record<string, unknown> | undefined>)[group]?.[name];
+    };
+    for (const strings of [ptBR, en])
+      expect(AGENT_ACTION_KINDS.filter((kind) => typeof sentence(strings, kind) !== "string")).toEqual([]);
+  });
+
+  test("a kind from a newer server: 'Fiz uma mudança' with the plain check, Desfazer still there", async () => {
+    await open(withActions([action({ kind: "something.new" as AgentAction["kind"] })]));
+    const row = receipts().querySelector(".ag-rc") as HTMLElement;
+    expect(row.textContent).toContain("Fiz uma mudança");
+    expect(row.querySelector(".ag-rc__ic svg")).not.toBeNull();
+    expect(within(receipts()).getByRole("button", { name: /^Desfazer/ })).toBeTruthy();
+  });
+
+  test("receipts that throw: one quiet line in their place, the reply's text and the rest of the message stay; reported once a draw; fixed live, they are back", async () => {
+    const logged = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const broken = action({ params: null as never });
+      const { socket } = await open(withActions([broken]));
+      const reports = () => logged.mock.calls.filter((args) => args.some((a) => a instanceof TypeError));
+      const unshown = () => within(article()).queryAllByText("Parte desta mensagem não pôde ser exibida");
+      expect(unshown()).toHaveLength(1);
+      expect(article().textContent).toContain("Olhei o código");
+      expect(within(article()).getByRole("toolbar", { name: "Ações da mensagem de Ada" })).toBeTruthy();
+      expect(within(article()).queryByRole("group", { name: "Mudanças de Ada" })).toBeNull();
+      expect(screen().queryByText("Esta mensagem não pôde ser exibida")).toBeNull();
+      expect(reports()).toHaveLength(1);
+      const receiptsLive = async (actions: AgentAction[]) => {
+        await act(async () =>
+          socket.push({
+            type: "event",
+            channelId: ENG_ID,
+            event: { type: "message.actions", channelId: ENG_ID, threadId: null, messageId: "m-act", actions },
+          }),
+        );
+        await settle(3);
+      };
+      // They change live and still break: drawn again, still one line, reported again.
+      await receiptsLive([broken, memory()]);
+      expect(unshown()).toHaveLength(1);
+      expect(reports()).toHaveLength(2);
+      // Fixed live: the receipts are back.
+      await receiptsLive([memory()]);
+      expect(unshown()).toHaveLength(0);
+      expect(receipts().textContent).toContain("Guardei na memória: o prompt é por evento");
+      expect(reports()).toHaveLength(2);
+      // Broken again: one line, reported once (the change that broke them is not tried a second time at once).
+      await receiptsLive([broken]);
+      expect(unshown()).toHaveLength(1);
+      expect(reports()).toHaveLength(3);
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
+  test("a message that throws outside its parts: one quiet line in its place, reported once; the channel, the sidebar, the other messages and the composer stay; fixed live, it is back", async () => {
+    const logged = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      // A body that isn't text: the row itself can't draw, not one of its parts.
+      const { socket, state } = await open(
+        withActions([action()], (s) => {
+          for (const m of s.messages) if (m.id === "m-act") m.body = null as never;
+        }),
+      );
+      const reports = () => logged.mock.calls.filter((args) => args.some((a) => a instanceof TypeError));
+      expect(screen().getAllByText("Esta mensagem não pôde ser exibida")).toHaveLength(1);
+      expect(document.body.textContent).not.toContain("Criei a tarefa #23");
+      expect(screen().getByRole("heading", { name: "# eng" })).toBeTruthy();
+      const messages = within(screen().getByRole("region", { name: "Mensagens" })).getAllByRole("article");
+      expect(messages.some((a) => a.textContent?.includes("o login está devolvendo 401"))).toBe(true);
+      const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
+      expect(within(nav).getAllByText("general").length).toBeGreaterThan(0);
+      expect(within(nav).getAllByText("Atlas").length).toBeGreaterThan(0);
+      expect(screen().getByRole("combobox", { name: "Mensagem para #eng" })).toBeTruthy();
+      expect(reports()).toHaveLength(1);
+      // The same message again, now with its text: it is back.
+      const fixed = { ...state.messages.find((m) => m.id === "m-act"), body: BODY } as Message;
+      await act(async () =>
+        socket.push({
+          type: "event",
+          channelId: ENG_ID,
+          event: { type: "message.created", channelId: ENG_ID, messageId: "m-act", message: fixed },
+        }),
+      );
+      await settle(3);
+      expect(screen().queryByText("Esta mensagem não pôde ser exibida")).toBeNull();
+      expect(article().textContent).toContain("Criei a tarefa #23");
+      expect(reports()).toHaveLength(1);
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
+  test("the message after a quiet line keeps its own header, not read as the words of whoever wrote above", async () => {
+    const logged = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      // João, then Ada's message that can't draw, then Ada's next one a moment later (grouped with it).
+      await open(
+        withActions([action()], (s) => {
+          const row = { channelId: ENG_ID, threadId: null, mentionedAgentIds: [], agentRunId: null };
+          s.messages.push(
+            {
+              ...row,
+              id: "m-joao",
+              author: { type: "person", id: "u-joao" },
+              body: "Viu o login?",
+              createdAt: inMs(-6_000),
+            },
+            {
+              ...row,
+              id: "m-broken",
+              author: { type: "agent", id: ADA_ID },
+              body: null as never,
+              createdAt: inMs(-5_000),
+            },
+          );
+        }),
+      );
+      expect(screen().getAllByText("Esta mensagem não pôde ser exibida")).toHaveLength(1);
+      expect(article().className).not.toContain("ac-msg--grouped");
+      expect(article().querySelector(".ac-msg__head")?.textContent).toContain("Ada");
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
+  test("a sidebar row that throws is one quiet row, still counted by a drag: the other rows and the conversation stay; fixed, it is back", async () => {
+    const logged = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const { services } = await open(
+        withActions([action()], (s) => {
+          // An object where the row draws text: React refuses it while drawing Atlas's row.
+          for (const a of s.agents) if (a.id === ATLAS_ID) a.role = { unexpected: true } as never;
+        }),
+      );
+      const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
+      expect(within(nav).getAllByText("Não pôde ser exibido")).toHaveLength(1);
+      // A drag finds where a row lands among the `[data-agent-row]` rows: Atlas's place is still one.
+      const unshown = within(nav).getByText("Não pôde ser exibido").closest("[data-agent-row]");
+      expect(unshown?.getAttribute("data-agent-row")).toBe(ATLAS_ID);
+      expect(within(nav).getAllByText("Ada").length).toBeGreaterThan(0);
+      expect(within(nav).getAllByText("general").length).toBeGreaterThan(0);
+      expect(screen().getByRole("heading", { name: "# eng" })).toBeTruthy();
+      expect(article().textContent).toContain("Criei a tarefa #23");
+      // Atlas comes back fixed: its row is back.
+      await act(async () =>
+        services.queryClient.setQueryData<Agent[]>(keys.agents(ORG_ID), (list) =>
+          list?.map((a) => (a.id === ATLAS_ID ? { ...a, role: "Infra" } : a)),
+        ),
+      );
+      await settle(2);
+      expect(within(nav).queryByText("Não pôde ser exibido")).toBeNull();
+      expect(within(nav).getAllByText("Atlas").length).toBeGreaterThan(0);
+    } finally {
+      logged.mockRestore();
+    }
   });
 });
 

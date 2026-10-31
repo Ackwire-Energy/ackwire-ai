@@ -27,7 +27,7 @@ import { InviteLinkPanel } from "./InviteLinkPanel";
 import "./invite.css";
 
 /**
- * One dialog invites (ADR 0089 §5), from Members, the workspace menu, ⌘K and a channel's "Adicionar pessoa ou
+ * One dialog invites (ADR 0090 §5), from Members, the workspace menu, ⌘K and a channel's "Adicionar pessoa ou
  * agente": addresses as chips, each with its role; channels they also join and a note in the email, folded; then the
  * workspace's link, for whoever should ask instead.
  */

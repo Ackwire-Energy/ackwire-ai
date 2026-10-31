@@ -36,7 +36,7 @@ import {
 } from "../src";
 import { addMember, adminRoleId, type Fixture, SECRET, setup } from "./fixtures";
 
-// ADR 0089: a link asks with a password, the account is made at approval; invitations keep their link; members
+// ADR 0090: a link asks with a password, the account is made at approval; invitations keep their link; members
 // suggest; the inviter hears who joined.
 
 let f: Fixture | undefined;
@@ -117,7 +117,7 @@ async function insertWaiting(n: number, prefix: string, by: { linkId?: string; s
     );
 }
 
-describe("asking through a link with a password (ADR 0089)", () => {
+describe("asking through a link with a password (ADR 0090)", () => {
   test("approval makes the confirmed account with it and lets the page that asked in, once", async () => {
     const { token } = await start();
     const asked = await askWithPassword(token, "rafael@example.com", "hash:rafael", "page-secret");
@@ -269,7 +269,7 @@ describe("asking through a link with a password (ADR 0089)", () => {
   });
 });
 
-describe("members suggest someone (ADR 0089)", () => {
+describe("members suggest someone (ADR 0090)", () => {
   test("it waits with who suggested it, the admins are told, and its author can take it back", async () => {
     await start();
     const carla = await addMember(fx().db, fx().org.id, "member", "carla");
@@ -389,7 +389,7 @@ describe("members suggest someone (ADR 0089)", () => {
   });
 });
 
-describe("email invitations (ADR 0089)", () => {
+describe("email invitations (ADR 0090)", () => {
   test("a link that stays the same, roles per person, channels, and the inviter told", async () => {
     await start();
     const admin = await adminRoleId(fx().db, fx().org.id);

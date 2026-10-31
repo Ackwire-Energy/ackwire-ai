@@ -111,6 +111,37 @@ describe("receipts", () => {
     expect(receiptView(s.m1).status?.kind).toBe("handled");
   });
 
+  test("an agent's message that mentions agents: whom it handed off to, the one only mentioned, never 'nobody'", () => {
+    const byTheo = {
+      id: "m1",
+      author: { type: "agent", id: "theo" },
+      mentionedAgentIds: ["ada"],
+    } as unknown as Message;
+    let s = seedReceipt({}, byTheo);
+    // No guess: the judge decides whom it hands off to (ADR 0089).
+    expect(receiptView(s.m1)).toMatchObject({ seen: ["ada"], status: null });
+    s = step(s, {
+      type: "message.routed",
+      messageId: "m1",
+      seenBy: ["ada"],
+      pickedBy: [],
+      referenced: ["ada"],
+      strategy: "mention",
+    });
+    expect(receiptView(s.m1)).toMatchObject({ seen: ["ada"], status: null, referenced: ["ada"] });
+    // From the list after a reload, the same.
+    const listed = seedReceipt({}, {
+      ...byTheo,
+      receipts: { seenBy: ["ada"], pickedBy: [], handled: [], blocked: [], referenced: ["ada"] },
+    } as unknown as Message);
+    expect(receiptView(listed.m1)).toMatchObject({ status: null, referenced: ["ada"] });
+    // Handed off: who answers, as under a person's message.
+    s = step(seedReceipt({}, byTheo), { type: "message.routed", messageId: "m1", seenBy: ["ada"], pickedBy: ["ada"] });
+    expect(receiptView(s.m1).status).toEqual({ kind: "picked", agents: ["ada"] });
+    // An agent's message that mentions nobody has no receipt.
+    expect(seedReceipt({}, { ...byTheo, mentionedAgentIds: [] } as unknown as Message)).toEqual({});
+  });
+
   test("seen by two, picked by nobody: 'Nenhum agente vai responder'", () => {
     let s = seedReceipt({}, person());
     expect(receiptView(s.m1).status).toBeNull();

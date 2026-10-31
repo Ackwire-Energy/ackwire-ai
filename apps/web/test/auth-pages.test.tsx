@@ -582,7 +582,7 @@ describe("Aceitar convite", () => {
     expect(screen().getByRole("button", { name: "Entrar na Acme" }).hasAttribute("disabled")).toBe(true);
     await type("Crie uma senha", "senha-exemplo");
     await press("Entrar na Acme", 10);
-    // The invitation's token goes along: it proves the address, so no "confirm your email" follows (ADR 0089).
+    // The invitation's token goes along: it proves the address, so no "confirm your email" follows (ADR 0090).
     expect(calls.filter((c) => c.method === "signUp").map((c) => c.args)).toEqual([
       [{ name: "Rafael Costa", email: "rafael@acme.com.br", password: "senha-exemplo", invitation: "inv" }],
     ]);

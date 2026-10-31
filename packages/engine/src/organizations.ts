@@ -991,7 +991,7 @@ const ROLE_RANK: Record<MemberRole, number> = { member: 0, owner: 1 };
 /**
  * Sends an invitation to an address with a role and the roles (`org_roles`) the person gets: the one named
  * (`invitationId`), else the newest one for that address not accepted yet, gets 7 more days; with none, a new one
- * is made. With `secret` its token is derived from its id (`invitationToken`, ADR 0089): the link can be copied
+ * is made. With `secret` its token is derived from its id (`invitationToken`, ADR 0090): the link can be copied
  * again and sending it again keeps it. Without one (or for an invitation made before), a new random token replaces
  * the old one, whose link stops working. One still working keeps the higher of its role and this one and adds these
  * roles and channels to its own, so sending it again never demotes whoever it was meant for, and an owner's
@@ -1013,7 +1013,7 @@ export async function sendInvitation(
     invitedBy: string;
     /** The sender may invite owners (`manage_owners`). */
     ownersOk: boolean;
-    /** `AGENTES_SECRET`: the token is derived from the invitation's id (ADR 0089). */
+    /** `AGENTES_SECRET`: the token is derived from the invitation's id (ADR 0090). */
     secret?: string;
     now?: Date;
     invitationId?: string;
@@ -1098,11 +1098,11 @@ export async function sendInvitation(
   return { invitation, token };
 }
 
-/** The longest note an inviter writes for the invitation email (ADR 0089). */
+/** The longest note an inviter writes for the invitation email (ADR 0090). */
 export const INVITE_NOTE_MAX = 300;
 
 /**
- * The channels an invitation adds someone to, besides `general` (ADR 0089): the workspace's own, not archived and
+ * The channels an invitation adds someone to, besides `general` (ADR 0090): the workspace's own, not archived and
  * not a conversation, public or one the sender is in. Any other id refuses the invitation (`invitation.channel`).
  */
 export async function invitableChannelIds(db: Executor, actorId: string, orgId: string, ids: readonly string[]) {
@@ -1140,7 +1140,7 @@ export async function createInvitation(
     roleIds?: string[];
     channelIds?: string[];
     note?: string | null;
-    /** `AGENTES_SECRET`: a link that can be copied again and stays the same when sent again (ADR 0089). */
+    /** `AGENTES_SECRET`: a link that can be copied again and stays the same when sent again (ADR 0090). */
     secret?: string;
   },
   now = new Date(),
@@ -1195,7 +1195,7 @@ async function inviteChecked(
 }
 
 /**
- * Changes the roles a pending invitation gives (ADR 0089): its link stays the same and nothing is sent. Only while it
+ * Changes the roles a pending invitation gives (ADR 0090): its link stays the same and nothing is sent. Only while it
  * still works (sending it again is what brings back one that ran out), and from a workspace that may invite.
  */
 export async function setInvitationRoles(
@@ -1367,7 +1367,7 @@ const inviteLogo = (token: string, logo: string | null) => {
 };
 
 /**
- * How the invited address signs in (ADR 0089), for the invite page to ask only what is missing: whether it has an
+ * How the invited address signs in (ADR 0090), for the invite page to ask only what is missing: whether it has an
  * account, a password, and which social sign-ins. Only for the holder of an invitation to that address.
  */
 async function invitedAccount(db: Database, email: string) {
@@ -1401,7 +1401,7 @@ async function seatsFull(db: Executor, orgId: string) {
  * A link that was turned off, expired, or whose workspace is paused or being deleted, and an email invitation to a
  * workspace paused or being deleted, say only that (`closed`), never why. An email invitation also says how its
  * address signs in (`account`) and whether the workspace is full (`full`), before anyone makes an account
- * (ADR 0089).
+ * (ADR 0090).
  */
 export async function previewInvitation(db: Database, token: string, now = new Date()) {
   const [row] = await db
@@ -1477,7 +1477,7 @@ export async function previewInvitation(db: Database, token: string, now = new D
 }
 
 /**
- * What the page of an email invitation that no longer opens says (ADR 0089): accepted (with the workspace's id,
+ * What the page of an email invitation that no longer opens says (ADR 0090): accepted (with the workspace's id,
  * to open it for a member) or expired (when, and who invited, to ask again). Null for a token that matches none,
  * a cancelled invitation's included (its row is gone), and for one that still works (`previewInvitation`).
  */
@@ -1565,7 +1565,7 @@ export async function acceptInvitation(
     }
     await assertCanWork(tx, invitation.orgId);
     await joinOrganization(tx, invitation.orgId, user.id, invitation.role, invitation.roleIds);
-    // The channels it named, besides `general` (ADR 0089): those still there. A private one only while whoever sent
+    // The channels it named, besides `general` (ADR 0090): those still there. A private one only while whoever sent
     // the invitation is still in it, as when it was sent (`invitableChannelIds`): leaving it, or the workspace, takes
     // back what they could give.
     if (invitation.channelIds.length > 0) {
@@ -1593,7 +1593,7 @@ export async function acceptInvitation(
           .onConflictDoNothing();
       }
     }
-    // The token reached that mailbox: the address is confirmed, and no "confirm your email" follows (ADR 0089).
+    // The token reached that mailbox: the address is confirmed, and no "confirm your email" follows (ADR 0090).
     await tx
       .update(users)
       .set({ emailVerified: true })
@@ -1611,11 +1611,11 @@ export async function acceptInvitation(
   });
 }
 
-/** The header a sign-up from an email invitation's page carries its token in (ADR 0089, `holdsInvitation`). */
+/** The header a sign-up from an email invitation's page carries its token in (ADR 0090, `holdsInvitation`). */
 export const INVITATION_TOKEN_HEADER = "x-invitation-token";
 
 /**
- * Whether a sign-up holds an email invitation to its own address (ADR 0089): `token` is the link of one to `email`
+ * Whether a sign-up holds an email invitation to its own address (ADR 0090): `token` is the link of one to `email`
  * that can still be accepted (`invitedOrgId`). Such a sign-up skips the "confirm your email" message, since accepting
  * confirms the address; an invited address signed up for without its link gets the message as always.
  */
@@ -1638,7 +1638,7 @@ export async function holdsInvitation(db: Database, email: string, token: string
 }
 
 /**
- * A request's page key once it signs in no one (ADR 0089): kept so the page that holds the key still finds its request
+ * A request's page key once it signs in no one (ADR 0090): kept so the page that holds the key still finds its request
  * and reads `closed`. Marked, not only hashed again: no key's hash can equal it, so even someone who saw the live hash
  * can't hand it in as a key.
  */
@@ -1670,7 +1670,7 @@ export async function joinOrganization(
   if (!member) await assertMemberRoom(tx, orgId);
   await tx.insert(organizationMembers).values({ orgId, userId, role }).onConflictDoNothing();
   await addMemberRolesInTx(tx, orgId, userId, roleIds);
-  // Nothing a closed request kept stays (ADR 0089): the password it chose goes, and the page's key is spent, so that
+  // Nothing a closed request kept stays (ADR 0090): the password it chose goes, and the page's key is spent, so that
   // page reads it closed and signs in no one.
   const closing = await tx
     .select({ id: organizationJoinRequests.id, claimHash: organizationJoinRequests.claimHash })
@@ -1732,7 +1732,7 @@ export type InviteOutcome =
 const EMAIL = /^[^\s@,;:<>()[\]"]+@[^\s@,;:<>()[\]"]+\.[^\s@,;:<>()[\]"]+$/;
 
 /**
- * Invites several people at once: `invites`, each address with its own roles (the invite dialog, ADR 0089), or
+ * Invites several people at once: `invites`, each address with its own roles (the invite dialog, ADR 0090), or
  * `emails` all with `roleIds`, never both. `channelIds` and `note` go with every one. Each address gets its own
  * outcome; pending invitations are not duplicated (resend them instead).
  */
@@ -1746,7 +1746,7 @@ export async function inviteMany(
     roleIds?: string[];
     channelIds?: string[];
     note?: string | null;
-    /** `AGENTES_SECRET`: links that can be copied again (ADR 0089). */
+    /** `AGENTES_SECRET`: links that can be copied again (ADR 0090). */
     secret?: string;
   },
   now = new Date(),
@@ -1812,7 +1812,7 @@ export async function inviteMany(
 }
 
 /**
- * Sends an invitation again with a fresh 7-day expiry. With `secret` its link stays the same (ADR 0089); without,
+ * Sends an invitation again with a fresh 7-day expiry. With `secret` its link stays the same (ADR 0090); without,
  * a new token replaces it and the old link stops working.
  */
 export async function resendInvitation(
@@ -1849,7 +1849,7 @@ export async function resendInvitation(
 
 /**
  * Invitations not yet accepted, expired ones included, with their status, oldest first. With `secret`, `token`
- * when the link can be copied again (derived from the invitation's id, ADR 0089), null for one made before.
+ * when the link can be copied again (derived from the invitation's id, ADR 0090), null for one made before.
  */
 export async function listInvitationsWithStatus(
   db: Database,

@@ -81,6 +81,7 @@ import {
 import { consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { consultationsOf } from "@agenteschat/client/lib/consultations";
 import { clearDraft, peekDraft } from "@agenteschat/client/lib/drafts";
+import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { errorCode, errorText, restrictionLine } from "@agenteschat/client/lib/errors";
 import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@agenteschat/client/lib/files";
 import { dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
@@ -150,8 +151,10 @@ import {
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
+  Children,
   Fragment,
   memo,
+  type ReactElement,
   type ReactNode,
   useCallback,
   useEffect,
@@ -196,7 +199,7 @@ import { requestBrowserCard } from "@/components/browser/open";
 import { CategorySelect } from "@/components/ChannelCategoryDialogs";
 import { ChannelDetailsButton, ChannelMembersStack } from "@/components/ChannelMembers";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
-import { NoticeLine, RoutineReport, RoutineTag } from "@/components/ChatNotices";
+import { NoticeLine, RoutineReport, RoutineTag, UnshownLine } from "@/components/ChatNotices";
 import { ConsultationCard } from "@/components/ConsultationCard";
 import { ConsultationPanel } from "@/components/ConsultationPanel";
 import {
@@ -563,7 +566,7 @@ function ChannelView({
   const scopedRuns = (s: StreamsState) => runsInChannel(s, channel.id).filter((r) => runVisible.current(r));
   const live = useLiveStore();
   const join = useJoinChannel(org.id, channel.id);
-  // A newcomer's first #general greets them (ADR 0089), in the place of the day's greeting.
+  // A newcomer's first #general greets them (ADR 0090), in the place of the day's greeting.
   const arrival = useArrival(channel);
   const arriving = arrival.show && !thread;
   const sendTyping = useTypingSender(channel.id, thread?.id);
@@ -1772,7 +1775,9 @@ function ChannelView({
                       adjust={adjust}
                       scroller={scroller}
                       renderMessage={(m) => (
-                        <TimelineMessage message={m} grouped={false} entering={false} modelLabels={NO_LABELS} />
+                        <ErrorBoundary resetKey={m} fallback={unshownLine}>
+                          <TimelineMessage message={m} grouped={false} entering={false} modelLabels={NO_LABELS} />
+                        </ErrorBoundary>
                       )}
                     />
                   ) : (
@@ -2014,7 +2019,9 @@ function ChannelView({
                 actions.focusComposer();
               }}
               renderMessage={(m, grouped) => (
-                <TimelineMessage message={m} grouped={grouped} entering={false} modelLabels={NO_LABELS} readOnly />
+                <ErrorBoundary resetKey={m} fallback={unshownLine}>
+                  <TimelineMessage message={m} grouped={grouped} entering={false} modelLabels={NO_LABELS} readOnly />
+                </ErrorBoundary>
               )}
             />
           )}
@@ -2035,6 +2042,24 @@ function ungroupAfter(items: TimelineItem[], special: (m: MessageType) => boolea
     const out = after && item.grouped ? { ...item, grouped: false } : item;
     after = special(item.message);
     return out;
+  });
+}
+
+const unshownLine = () => <UnshownLine />;
+const unshownPart = () => <UnshownLine part />;
+
+/**
+ * Each part of a message (its text, a card, its receipts) in its own boundary: one that fails to draw is a quiet line
+ * and the text and the other parts stay. The row's boundary still holds the rest (the header).
+ */
+function Parts({ resetKey, children }: { resetKey: unknown; children: ReactNode }) {
+  return Children.map(children, (part) => {
+    if (part == null) return null;
+    return (
+      <ErrorBoundary resetKey={resetKey} fallback={unshownPart}>
+        {part}
+      </ErrorBoundary>
+    );
   });
 }
 
@@ -2081,6 +2106,11 @@ const Timeline = memo(function Timeline({
     [models.data],
   );
   const [mountedAt] = useState(() => Date.now());
+  // Rows that failed to draw: the row after one keeps its own header, or under the quiet line it would read as more of
+  // whoever's header is above. ponytail: never cleared, so a row that draws again leaves the next one its header until
+  // the conversation is reopened.
+  const [unshown, setUnshown] = useState<ReadonlySet<string>>(() => new Set());
+  const markUnshown = (key: string | null) => key !== null && setUnshown((s) => (s.has(key) ? s : new Set(s).add(key)));
   // Keys of the first load (idempotent, so a double render in StrictMode agrees).
   const initialKeys = useRef<Set<string> | null>(null);
   if (ready && initialKeys.current === null) initialKeys.current = new Set(items.map((i) => i.key));
@@ -2168,8 +2198,10 @@ const Timeline = memo(function Timeline({
       }),
     [heldPlaces, channelId, runVisible, slots, lastByRun],
   );
-  const rows: ReactNode[] = [];
+  const rows: ReactElement<{ message?: MessageType }>[] = [];
+  const afterUnshown = () => unshown.has(rows.at(-1)?.key ?? "");
   for (const item of items) {
+    const grouped = item.kind === "message" && item.grouped && !afterUnshown();
     if (divider?.key === item.key) {
       rows.push(
         <div key="unread-divider" className="channel__unread" data-fade={divider.fading || undefined}>
@@ -2197,7 +2229,7 @@ const Timeline = memo(function Timeline({
           key={blockKey}
           runId={m.agentRunId}
           message={m}
-          grouped={item.grouped}
+          grouped={grouped}
           entering={false}
           modelLabels={modelLabels}
           contextMark={threadsView?.marks.has(m.id)}
@@ -2208,7 +2240,7 @@ const Timeline = memo(function Timeline({
         <TimelineMessage
           key={item.key}
           message={m}
-          grouped={item.grouped}
+          grouped={grouped}
           entering={entering}
           modelLabels={modelLabels}
           contextMark={threadsView?.marks.has(m.id)}
@@ -2223,7 +2255,7 @@ const Timeline = memo(function Timeline({
   }
   // The first block at work follows the last message: under the agent's own, it has no header of its own.
   const lastItem = items.at(-1);
-  const after = lastItem?.kind === "message" ? lastItem.message : null;
+  const after = lastItem?.kind === "message" && !afterUnshown() ? lastItem.message : null;
   slots.forEach((slot, i) => {
     if (!blockEnters.current.has(slot.key)) blockEnters.current.set(slot.key, ready && Date.now() - mountedAt > 1500);
     rows.push(
@@ -2239,7 +2271,23 @@ const Timeline = memo(function Timeline({
     );
   });
   for (const place of held) rows.push(<HeldBrowserRow key={`held-${place.runId}`} place={place} />);
-  return <ConsultGroupsProvider value={consultGroups}>{rows}</ConsultGroupsProvider>;
+  // A row that fails to draw (data this build doesn't expect) is one quiet line: the rest of the conversation, the
+  // sidebar and the composer keep working. Its message changing draws it again: a live block that broke has none,
+  // so streaming never retries it, and its final message landing does.
+  return (
+    <ConsultGroupsProvider value={consultGroups}>
+      {rows.map((row) => (
+        <ErrorBoundary
+          key={row.key}
+          resetKey={row.props.message}
+          onError={() => markUnshown(row.key)}
+          fallback={unshownLine}
+        >
+          {row}
+        </ErrorBoundary>
+      ))}
+    </ConsultGroupsProvider>
+  );
 });
 
 /**
@@ -2474,13 +2522,15 @@ function LiveRunStatus({ run }: { run: LiveRun }) {
 }
 
 /**
- * Under a stopped answer: "Parado por você · Continuar". Continuar starts a new
- * run of the same agent from where it stopped; it goes away for everyone once someone pressed it.
+ * Under a stopped answer: "Parado por você · Continuar", or "No limite de passos · Continuar" under the
+ * reply of a run that reached its step limit. Continuar starts a new run of the same agent from where it
+ * stopped; it goes away for everyone once someone pressed it.
  */
 function StoppedLine({
   runId,
   byUserId,
   note,
+  limit,
   owner,
   message,
 }: {
@@ -2488,6 +2538,8 @@ function StoppedLine({
   byUserId: string | null | undefined;
   /** The server's line, for older messages without a person in the meta. */
   note?: string | null;
+  /** The run ended at its step limit (`meta.stepLimit`), nobody stopped it. */
+  limit?: boolean;
   /** Who may continue: the same people who may stop it. */
   owner: { agentId: string; channelId: string; threadId: string; triggerMessageId?: string | null } | null;
   /** The stopped reply, once it is saved (its meta says when it was continued). */
@@ -2500,16 +2552,17 @@ function StoppedLine({
   const cont = useContinueRun();
   const continued = useWasContinued(runId, message);
   const stopper = byUserId ? dir.memberById.get(byUserId)?.name : undefined;
-  const who =
-    byUserId && byUserId === me.user.id
+  const who = limit
+    ? t("run.stepLimit")
+    : byUserId && byUserId === me.user.id
       ? t("run.stoppedByYou")
       : stopper
         ? t("run.stoppedBy", { name: stopper })
         : byUserId || !note
           ? t("run.stopped")
           : note;
-  // Only a run a person stopped picks up again.
-  const can = Boolean(runId && byUserId && owner && !continued && canStop(owner));
+  // Only a run a person stopped, or one at its step limit, picks up again.
+  const can = Boolean(runId && (byUserId || limit) && owner && !continued && canStop(owner));
   return (
     <p className="ac-msg__activity run-canceled">
       <PixelStop size={12} dim />
@@ -2870,7 +2923,8 @@ export const TimelineMessage = memo(function TimelineMessage({
   const [active, setActive] = useState(false);
   const agent = m.author.type === "agent" ? dir.agentById.get(m.author.id ?? "") : undefined;
   const person = m.author.type === "person" ? dir.memberById.get(m.author.id ?? "") : undefined;
-  const receipted = m.author.type === "person" && !m.local;
+  // An agent's message that mentions agents has one too: whom it handed work to, and who it only mentioned (ADR 0089).
+  const receipted = (m.author.type === "person" || m.mentionedAgentIds.length > 0) && !m.local;
   // Mine in a DM between people: the slot of their face, from the moment it is sent, so it never rewraps a line.
   const seenSlot = dmPersonId !== undefined && m.author.type === "person" && m.author.id === me.user.id;
   const name = dir.authorName(m.author);
@@ -2908,6 +2962,8 @@ export const TimelineMessage = memo(function TimelineMessage({
   // A text the server wrote (`meta.bodyCode`, a deploy's notice) is shown in the person's language.
   const stopped = useMemo(() => splitCanceled(serverBody(t, m.body, m.meta), m.meta), [t, m.body, m.meta]);
   const body = reminderBody(stopped.body, m.meta);
+  // The reply of a run that reached its step limit: Continuar under it too.
+  const atLimit = !stopped.canceled && Boolean(m.meta?.stepLimit);
 
   const channelName = useChannels(org.id).data?.find((c) => c.id === m.channelId)?.name;
   // A plain reminder: the agent's own message, with a small "Reminder" label.
@@ -3157,7 +3213,7 @@ export const TimelineMessage = memo(function TimelineMessage({
       stacked={Boolean(card)}
     >
       {live ? (
-        <>
+        <Parts resetKey={m}>
           {/* It opens as if it had answered: a generic phrase until the first thing it says takes its place. */}
           {wordsOnTop && !liveFailed && revealed ? (
             <MessageText>
@@ -3231,9 +3287,9 @@ export const TimelineMessage = memo(function TimelineMessage({
           {!liveFailed && !liveWaiting && !liveStopped && (
             <span className="ac-visually-hidden">{t("channel.writing")}</span>
           )}
-        </>
+        </Parts>
       ) : (
-        <>
+        <Parts resetKey={m}>
           {keptSaid?.kind === "say" && (
             <MessageText>
               <MessageBody body={keptSaid.text} resolveMention={dir.mentionName} />
@@ -3276,11 +3332,12 @@ export const TimelineMessage = memo(function TimelineMessage({
                 />
               </MessageText>
             )}
-          {stopped.canceled && (
+          {(stopped.canceled || atLimit) && (
             <StoppedLine
               runId={m.agentRunId}
               byUserId={stopped.byUserId}
               note={stopped.note}
+              limit={atLimit}
               owner={
                 m.author.type === "agent" && m.author.id
                   ? { agentId: m.author.id, channelId: m.channelId, threadId: m.threadId ?? m.id }
@@ -3407,7 +3464,7 @@ export const TimelineMessage = memo(function TimelineMessage({
             <PersonMessageActions message={m} authorName={name} channelName={channelName ?? ""} />
           )}
           {menu.dialog}
-        </>
+        </Parts>
       )}
     </Message>
   );
@@ -3895,7 +3952,7 @@ function AddMembersDialog({
     }
   }, [open]);
   const rows = useMemberRows(q, exclude);
-  // An address nobody here has: invite them to the workspace and this channel (ADR 0089).
+  // An address nobody here has: invite them to the workspace and this channel (ADR 0090).
   const invite = useInviteOffer(q);
   const add = useMutation({
     mutationFn: async () => {

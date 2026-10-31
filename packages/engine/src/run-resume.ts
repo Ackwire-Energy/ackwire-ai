@@ -8,16 +8,9 @@ import { enqueue } from "./outbox";
 import { missStaleRoutineRun } from "./routine-firing";
 import { holdsMessages } from "./run-hold";
 import { type AgentRun, replyThreadOf } from "./runs";
+import { runStretchOf } from "./stretch";
 
 const { agentRuns, messages } = schema;
-
-/**
- * Agents talking back and forth (answers, notes, late results): a notice at
- * this hop or beyond no longer starts a run of its own (it is written, and
- * read by the agent's next run there). Stops two agents waking each other
- * forever; a person posting starts again from hop 0.
- */
-export const NOTICE_WAKE_MAX_HOP = 4;
 
 /** A wait the run stopped waiting on (`waits.ts` `detachWait`): its result comes later as a notice. */
 export interface DetachedWait {
@@ -149,16 +142,15 @@ const ACTIVE: AgentRun["status"][] = ["queued", "running", "waiting_approval", "
  * A notice for one run (another agent's answer, a late result): while the
  * run is still active it reads it at its next step (queued on that run, in
  * its conversation); once it ended (or while it is held by a decision), the notice goes to its conversation and
- * joins the agent's run there or starts one, unless agents already went back
- * and forth up to `NOTICE_WAKE_MAX_HOP` (then it is only written, and read by
- * the agent's next run there). In the caller's transaction; publish with
- * `publishDelivery` after the commit.
+ * joins the agent's run there or starts one, in the run's stretch: past its limits the run is held for the pause
+ * card (ADR 0089), and the notice is still read by the agent's next run there. In the caller's transaction;
+ * publish with `publishDelivery` after the commit.
  */
 export async function deliverNoticeToRun(
   tx: Executor,
   run: Pick<
     AgentRun,
-    "id" | "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId" | "hop" | "trigger"
+    "id" | "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId" | "hop" | "trigger" | "stretchId"
   >,
   notice: Notice,
 ): Promise<{ message: Message; runs: AgentRun[] }> {
@@ -176,9 +168,10 @@ export async function deliverNoticeToRun(
     channelId: run.channelId,
     threadId: replyThreadOf(run),
     hop: run.hop,
+    stretchId: runStretchOf(run),
     notice,
     body: forPeople(notice),
-    wake: active ? false : run.hop < NOTICE_WAKE_MAX_HOP,
+    wake: !active,
     trigger: run.trigger === "dm" ? "dm" : "mention",
   });
   if (active) {

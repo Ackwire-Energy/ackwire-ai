@@ -1,5 +1,5 @@
 /*
- * The invitation page (ADR 0089): the sign-in's look (components/auth.css) with the workspace above the host, a link's
+ * The invitation page (ADR 0090): the sign-in's look (components/auth.css) with the workspace above the host, a link's
  * steps as bars, the wait for an admin, and the answers. Tokens only, so light and dark follow the theme; the column is
  * the sign-in's, with its 16px gutter at phone width.
  */
