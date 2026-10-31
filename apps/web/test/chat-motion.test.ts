@@ -237,6 +237,8 @@ describe("humanized activity", () => {
       request_folder_access: "Pediu acesso",
       request_secret: "Pediu um segredo",
       use_tool: "Procurou ferramentas",
+      follow_up: "Agendou a volta à conversa",
+      cancel_follow_up: "Cancelou a volta à conversa",
       pg_producao_query: "Consultou o banco de dados",
     };
     expect(Object.fromEntries(Object.keys(ours).map((tool) => [tool, step(tool)]))).toEqual(ours);
