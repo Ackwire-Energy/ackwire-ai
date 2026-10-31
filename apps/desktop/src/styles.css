@@ -296,8 +296,8 @@ body[data-window="popover"] {
   overflow-y: auto;
 }
 .dk-pop__body[data-more] {
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent), var(--scroll-strip);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent), var(--scroll-strip);
 }
 /* What Popover.tsx watches to know whether the middle's end is in sight; it takes no room. */
 .dk-pop__end {
@@ -1471,6 +1471,9 @@ body[data-window="popover"] {
   margin-bottom: 12px;
   overflow-x: auto;
   scrollbar-width: none;
+}
+.dk-orgpick::-webkit-scrollbar {
+  display: none;
 }
 .dk-drop {
   width: 240px;
