@@ -82,8 +82,15 @@ export function replyPolicyFor(
 const followUpSql = sql<boolean>`exists (select 1 from ${routingDecisions} d
   where d.message_id = ${agentRuns.triggerMessageId} and d.reason like 'follow-up%')`;
 
-/** `replyPolicyFor` from the database (the run, its trigger, the router's decision): one read. */
-export async function loadReplyPolicy(db: Executor, orgId: string, runId: string): Promise<ReplyPolicy | null> {
+/**
+ * `replyPolicyFor` from the database (the run, its trigger, the router's decision): one read. `listsPass`:
+ * `pass` is in its tools, also once it may no longer pass (`Transcript.passListed`).
+ */
+export async function loadReplyPolicy(
+  db: Executor,
+  orgId: string,
+  runId: string,
+): Promise<(ReplyPolicy & { listsPass: boolean }) | null> {
   if (!runId) return null;
   const [row] = await db
     .select({
@@ -91,6 +98,7 @@ export async function loadReplyPolicy(db: Executor, orgId: string, runId: string
       trigger: agentRuns.trigger,
       background: agentRuns.background,
       answerOwed: sql<boolean>`coalesce((${agentRuns.transcript} ->> 'answerOwed')::boolean, false)`,
+      passListed: sql<boolean>`coalesce((${agentRuns.transcript} ->> 'passListed')::boolean, false)`,
       authorType: messages.authorType,
       meta: messages.meta,
       followUp: sql<boolean>`${agentRuns.trigger} = 'router' and ${followUpSql}`,
@@ -99,10 +107,11 @@ export async function loadReplyPolicy(db: Executor, orgId: string, runId: string
     .leftJoin(messages, and(eq(messages.orgId, agentRuns.orgId), eq(messages.id, agentRuns.triggerMessageId)))
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.orgId, orgId)));
   if (!row) return null;
-  return replyPolicyFor(row, row.authorType ? { authorType: row.authorType, meta: row.meta ?? {} } : null, {
+  const policy = replyPolicyFor(row, row.authorType ? { authorType: row.authorType, meta: row.meta ?? {} } : null, {
     followUp: row.followUp === true,
     answerOwed: row.answerOwed === true,
   });
+  return { ...policy, listsPass: policy.mayPass || row.passListed === true };
 }
 
 /** Whether the router sent this run's trigger to it as a follow-up of its own conversation. */
@@ -187,9 +196,12 @@ export function endsWithSentinel(text: string) {
 // ── The `pass` tool ──────────────────────────────────────────────────────────
 
 /**
- * The built-in `pass` tool: no scope, listed only in runs that may pass
- * (`loadReplyPolicy`). It changes nothing: `data.passed` tells the engine to
- * end the run without a message (a step keeps the reason; `agent.passed`).
+ * The built-in `pass` tool: no scope, listed in runs that start able to pass
+ * (`loadReplyPolicy`), and in them for good, continuations included: a
+ * thinking block replayed after a change to `tools` is a 400 on Claude, so
+ * once a person is owed an answer the tool refuses instead of leaving the
+ * list. It changes nothing: `data.passed` tells the engine to end the run
+ * without a message (a step keeps the reason; `agent.passed`).
  */
 export function createPassToolSource(): ToolSource {
   const tool: ToolDefinition = {
@@ -218,7 +230,7 @@ export function createPassToolSource(): ToolSource {
   return {
     name: "reply-policy",
     tools: async (ctx) =>
-      (await loadReplyPolicy(ctx.db, ctx.orgId, ctx.runId).catch(() => null))?.mayPass ? [tool] : [],
+      (await loadReplyPolicy(ctx.db, ctx.orgId, ctx.runId).catch(() => null))?.listsPass ? [tool] : [],
   };
 }
 
@@ -232,7 +244,7 @@ export function createPassToolSource(): ToolSource {
 export async function repliesAfterTrigger(
   db: Executor,
   run: Pick<AgentRun, "orgId" | "agentId" | "channelId">,
-  trigger: Pick<Message, "createdAt">,
+  trigger: Pick<Message, "id" | "createdAt">,
   threadId: string | null,
 ): Promise<string | null> {
   const rows = await db
@@ -246,6 +258,8 @@ export async function repliesAfterTrigger(
         threadId ? eq(messages.threadId, threadId) : isNull(messages.threadId),
         eq(messages.authorType, "agent"),
         ne(messages.authorAgentId, run.agentId),
+        // `createdAt` is cut to milliseconds while Postgres keeps microseconds: never the trigger itself.
+        ne(messages.id, trigger.id),
         gt(messages.createdAt, trigger.createdAt),
         isNull(messages.deletedAt),
       ),

@@ -235,8 +235,8 @@ describe("adding a password (the account menu)", () => {
   });
 });
 
-describe("deleting your account (the account menu)", () => {
-  test("a workspace that still needs you comes first, with its two ways out", async () => {
+describe("deleting your account (Configurações › Sua conta)", () => {
+  test("Sua conta's last card starts it: a workspace that still needs you comes first, with its two ways out", async () => {
     const state = seedState({
       deletionPlan: {
         closes: [],
@@ -247,12 +247,16 @@ describe("deleting your account (the account menu)", () => {
         serverOwner: false,
       },
     });
-    await open(`/org/${ORG_ID}/issues`, { state });
-    await click(screen().getByRole("button", { name: /^Conta: / }));
-    await act(() => new Promise((r) => setTimeout(r, 0)));
-    const menu = screen().getAllByRole("menu")[0] as HTMLElement;
-    await click(within(menu).getByRole("menuitem", { name: "Apagar conta" }));
+    const { router } = await open(`/org/${ORG_ID}/settings/account`, { state });
+    const card = screen().getByRole("region", { name: "Apagar conta" });
+    const cards = document.querySelectorAll(".settings__body > .ac-card");
+    expect(cards[cards.length - 1]).toBe(card);
+    expect(card.classList.contains("settings-danger")).toBe(true);
+    expect(card.textContent).toContain("Você sai de todos os workspaces e a sua conta é apagada de vez.");
+    await click(within(card).getByRole("button", { name: "Apagar conta…" }));
     await settle(6);
+    // Kept in the address: a sign-in again comes back to it.
+    expect(router.state.location.search).toMatchObject({ account: "delete" });
     const dialog = screen().getByRole("dialog", { name: "Apagar a sua conta?" });
     expect(dialog.textContent).toContain("Antes de apagar");
     expect(dialog.textContent).toContain(
@@ -265,6 +269,18 @@ describe("deleting your account (the account menu)", () => {
       `/org/${BETA_ID}/settings/general?delete=1`,
     );
     expect(within(dialog).queryByRole("button", { name: "Apagar conta" })).toBeNull();
+  });
+
+  test("the account menu doesn't offer it beside Sair", async () => {
+    await open(`/org/${ORG_ID}/issues`);
+    // A Radix menu opens from the keyboard here (a pointer press, not a click, opens it with a mouse).
+    const account = screen().getByRole("button", { name: /^Conta: / });
+    account.focus();
+    await act(async () => fireEvent.keyDown(account, { key: "Enter" }));
+    await settle(2);
+    const menu = screen().getAllByRole("menu")[0] as HTMLElement;
+    expect(within(menu).getByRole("menuitem", { name: "Sair" })).toBeTruthy();
+    expect(within(menu).queryByRole("menuitem", { name: /Apagar/ })).toBeNull();
   });
 
   test("one still being set up has no People yet: its onboarding finishes it or deletes it", async () => {
@@ -295,7 +311,7 @@ describe("deleting your account (the account menu)", () => {
     expect(within(dialog).getByRole("link", { name: "Apagar Beta" }).getAttribute("href")).toBe("/onboarding?delete=1");
   });
 
-  test("where there is no account menu: a workspace being deleted, one suspended, and the onboarding", async () => {
+  test("where there is no Sua conta: a workspace being deleted, one suspended, and the onboarding", async () => {
     const ask = async () => {
       await click(screen().getByRole("button", { name: "Apagar conta" }));
       await settle(6);

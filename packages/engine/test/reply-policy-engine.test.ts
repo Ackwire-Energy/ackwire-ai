@@ -1,6 +1,6 @@
 import { afterAll, afterEach, describe, expect, setDefaultTimeout, spyOn, test } from "bun:test";
 import { MACHINE_PROTOCOL_VERSION, type RealtimeEvent } from "@agenteschat/adapters";
-import { eq, schema } from "@agenteschat/db";
+import { eq, schema, sql } from "@agenteschat/db";
 import { type ModelRequest, systemText, textOf } from "@agenteschat/providers";
 import {
   ANSWER_NUDGE,
@@ -12,7 +12,9 @@ import {
   loadReplyPolicy,
   openDm,
   postPersonMessage,
+  queueOnRun,
   resolveBrain,
+  type ToolSource,
 } from "../src";
 import * as ledger from "../src/routine-ledger";
 import { type Fixture, setup } from "./fixtures";
@@ -145,6 +147,45 @@ describe("a run nobody called by name may stay quiet", () => {
     expect(events.find((e) => e.type === "agent.passed")).toMatchObject({ agentId: f.agent.id, runId: run?.id });
   });
 
+  test("a person writing into it keeps `pass` listed, so its tools never change mid-run; the tool refuses", async () => {
+    const look: ToolSource = {
+      name: "work",
+      tools: async () => [
+        {
+          name: "look",
+          description: "Look at the builds",
+          scope: "context:read",
+          inputSchema: { type: "object", properties: {} },
+          execute: async (_input, ctx) => {
+            const m = await insertMessage(ctx.db, {
+              orgId: f.org.id,
+              channelId: f.general.id,
+              author: { type: "person", userId: f.owner.id },
+              body: "e o staging?",
+            });
+            await queueOnRun(ctx.db, ctx.runId, m.id);
+            return { content: "2 builds" };
+          },
+        },
+      ],
+    };
+    f = await setup({
+      toolSources: [createPassToolSource(), look],
+      reply: (_req, n) =>
+        n === 1
+          ? { chunks: [], toolUses: [{ name: "look", input: {} }] }
+          : n === 2
+            ? { chunks: [], toolUses: [{ name: "pass", input: { reason: "nada" } }] }
+            : { chunks: ["O staging está ok."] },
+    });
+    await routed("onde rodam os builds?");
+
+    const [first, second] = f.provider.calls.map((c) => c.request as ModelRequest);
+    expect(second?.tools).toEqual(first?.tools);
+    expect(second?.tools?.map((t) => t.name)).toContain("pass");
+    expect(await agentMessages()).toEqual(["O staging está ok."]);
+  });
+
   test("ending with only the word (or nothing) is a pass too", async () => {
     f = await setup({ reply: () => ({ chunks: ["Nada a acrescentar.\n\nNO_REPLY"] }) });
     const events = f.listen(f.general.id);
@@ -184,6 +225,33 @@ describe("a run nobody called by name may stay quiet", () => {
       "[Meanwhile Theo (@theo) replied here]: No GitHub Actions.",
     );
     expect(await agentMessages()).toEqual(["No GitHub Actions."]);
+  });
+
+  test("brought in on another agent's message stored with microseconds: that message is never its own 'meanwhile'", async () => {
+    f = await setup({ toolSources: [createPassToolSource()], reply: () => ({ chunks: ["NO_REPLY"] }) });
+    const theo = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Theo", handle: "theo", role: "Infra", instructions: "", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+    const said = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "agent", agentId: theo.id, runId: crypto.randomUUID(), hop: 1 },
+      body: "Os builds rodam no GitHub Actions.",
+    });
+    // Postgres stores now() with microseconds; read back, `createdAt` is cut to milliseconds.
+    await f.db
+      .update(schema.messages)
+      .set({ createdAt: sql`${schema.messages.createdAt} + interval '456 microseconds'` })
+      .where(eq(schema.messages.id, said.id));
+    const [trigger] = await f.db.select().from(schema.messages).where(eq(schema.messages.id, said.id));
+    await f.db.transaction((tx) => createAgentRuns(tx, trigger as typeof said, [f.agent.id], "router"));
+    await drainOutbox(f.db, f.handlers);
+    const request = f.provider.calls[0]?.request as ModelRequest;
+    expect(textOf(request.messages.at(-1)?.content ?? "")).not.toContain("[Meanwhile Theo (@theo) replied here]");
   });
 });
 

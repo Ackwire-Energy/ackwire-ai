@@ -22,12 +22,24 @@ const go = async (path: string, state = seedState()) => {
 const nav = () => screen().getByRole("navigation", { name: "Navegação do workspace" });
 const account = () => screen().getByRole("button", { name: /^Conta: / });
 const badgeOf = (el: Element | null | undefined) => el?.querySelector(".ac-presence")?.getAttribute("data-presence");
-/** Account menu → its first item (named "Definir status", or your line once you wrote one). */
+const press = async (el: Element, key: string) => {
+  await act(async () => {
+    fireEvent.keyDown(el, { key });
+    fireEvent.keyUp(el, { key });
+  });
+  await settle(2);
+};
+/**
+ * The account menu (Enter on the row, focus on its first item, "Definir status") → its menu beside (→) → what I'm up
+ * to: "O que você está fazendo?", or my line once I wrote one.
+ */
 const openDialog = async () => {
-  await click(account());
-  await act(() => new Promise((r) => setTimeout(r, 0)));
-  const menu = screen().getAllByRole("menu")[0] as HTMLElement;
-  await click(within(menu).getAllByRole("menuitem")[0] as HTMLElement);
+  const row = account();
+  row.focus();
+  await press(row, "Enter");
+  await press(document.activeElement as HTMLElement, "ArrowRight");
+  const status = screen().getAllByRole("menu")[1] as HTMLElement;
+  await click(within(status).getByRole("menuitem"));
   await settle(2);
   return screen().getByRole("dialog", { name: "Definir status" });
 };
@@ -130,21 +142,6 @@ describe("Definir status", () => {
     // To myself: hidden (the dotted outline), and the row says so under my name.
     expect(badgeOf(account())).toBe("hidden");
     expect(account().querySelector(".sidebar__user-line")?.textContent).toBe("Oculto");
-  });
-
-  test("the account menu's first item: my line, when it clears, how I appear", async () => {
-    const state = seedState();
-    state.statuses = new Map([
-      ["u-walter", { availability: "busy", status: { text: "Em reunião", emoji: "📅", until: null } }],
-    ]);
-    await go(`c/${ENG_ID}`, state);
-    await click(account());
-    await act(() => new Promise((r) => setTimeout(r, 0)));
-    const menu = screen().getAllByRole("menu")[0] as HTMLElement;
-    const item = within(menu).getAllByRole("menuitem")[0] as HTMLElement;
-    expect(item.querySelector(".ac-mo__name")?.textContent).toContain("📅 Em reunião");
-    expect(item.querySelector(".ac-menu__desc")?.textContent).toBe("Até você mudar");
-    expect(item.textContent).toContain("Ocupado");
   });
 
   test("a line whose end has passed reads as none", async () => {

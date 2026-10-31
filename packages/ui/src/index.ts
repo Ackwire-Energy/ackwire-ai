@@ -165,12 +165,12 @@ export {
   MenuRadioGroup,
   MenuReactions,
   MenuSeparator,
+  MenuSub,
 } from "./components/Menu";
 export {
   MenuOverlay,
   MenuOverlayGroup,
   MenuOverlayItem,
-  MenuOverlayRow,
   MenuOverlaySeparator,
 } from "./components/MenuOverlay";
 export { DayDivider, Message, type MessageProps, MessageText } from "./components/Message";

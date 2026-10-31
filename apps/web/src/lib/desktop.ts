@@ -211,7 +211,7 @@ export const desktopRevealsFiles = () =>
 
 /**
  * The app's "Show QR code" (Preferences › Servers) opens the site with `?open=phone`: "Open on your phone"
- * opens once the account menu is on screen.
+ * opens once the account button is on screen.
  */
 const phone = { asked: false, listeners: new Set<() => void>() };
 export const asksForPhone = (search: string) => new URLSearchParams(search).get("open") === "phone";

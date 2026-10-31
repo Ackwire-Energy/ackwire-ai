@@ -7,7 +7,7 @@ import {
   pushOfferDue,
   pushOffersFrom,
 } from "@agenteschat/client/lib/push-offer";
-import { Button, Dialog, DialogBody, MenuOverlayRow, Switch } from "@agenteschat/ui";
+import { Button, Dialog, DialogBody } from "@agenteschat/ui";
 import { useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -37,9 +37,9 @@ const offered = () => {
 };
 
 /**
- * "Avisos neste navegador" (ADR 0071): this browser's state and its switch, for the account menu and
- * Configurações › Notificações. `shown` only where this browser can take notifications and the server sends them.
- * Nothing asks for permission until the person flips it.
+ * "Avisos neste navegador" (ADR 0071): this browser's state and its switch, in Configurações › Notificações. `shown`
+ * only where this browser can take notifications and the server sends them. Nothing asks for permission until the
+ * person flips it.
  */
 export function useBrowserNotices() {
   const { t, i18n } = useTranslation();
@@ -84,32 +84,6 @@ export function useBrowserNotices() {
 
   const shown = here && Boolean(publicKey) && state !== null && state !== "unsupported" && state !== "off-by-server";
   return { shown, on: state === "subscribed", blocked: state === "denied", busy, change };
-}
-
-/**
- * "Avisos neste navegador" in the account menu (ADR 0071): one switch; blocked by the browser, the switch is off
- * and the line under it says where to allow them again.
- */
-export function BrowserNoticesRow() {
-  const { t } = useTranslation();
-  const browser = useBrowserNotices();
-  if (!browser.shown) return null;
-  return (
-    <MenuOverlayRow
-      icon="bell"
-      label={t("shell.browserNotices")}
-      description={browser.blocked ? t("shell.browserNoticesBlocked") : t("shell.browserNoticesHint")}
-      descriptionId="browser-notices-desc"
-    >
-      <Switch
-        checked={browser.on}
-        onCheckedChange={browser.change}
-        disabled={browser.blocked || browser.busy}
-        aria-label={t("shell.browserNotices")}
-        aria-describedby="browser-notices-desc"
-      />
-    </MenuOverlayRow>
-  );
 }
 
 /**

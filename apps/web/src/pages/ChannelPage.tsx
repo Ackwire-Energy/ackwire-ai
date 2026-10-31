@@ -561,7 +561,7 @@ function ChannelView({
   const scopedRuns = (s: StreamsState) => runsInChannel(s, channel.id).filter((r) => runVisible.current(r));
   const live = useLiveStore();
   const join = useJoinChannel(org.id, channel.id);
-  const sendTyping = useTypingSender(channel.id);
+  const sendTyping = useTypingSender(channel.id, thread?.id);
   // ⌘K "Pedir a um agente" leaves the text for this DM's composer.
   const draftKey = chrome?.dmAgentId ? `agent:${chrome.dmAgentId}` : null;
   const [draft, setDraft] = useState(() => (draftKey ? (peekDraft(draftKey) ?? "") : ""));
@@ -1842,6 +1842,7 @@ function ChannelView({
                   <NoAiBanner agentIds={channelAgents.map((a) => a.id)} dmAgentId={chrome?.dmAgentId} />
                   <ActivityBar
                     channelId={channel.id}
+                    threadId={thread?.id ?? null}
                     visible={runVisible}
                     outOfView={outOfView}
                     onSee={seeRun}
@@ -2437,7 +2438,7 @@ function LiveRunStatus({ run }: { run: LiveRun }) {
       })
       .finally(() => setChecking(false));
   };
-  const doing = run.tool ? toolActivity(run.tool, run.connector) : null;
+  const doing = run.tool ? toolActivity(run.tool, run.connector, null, run) : null;
   const showDoing =
     !quiet && doing && doing.kind !== "thinking" && !(run.work ?? []).some((w) => w.kind === "call" && w.running);
   if (!quiet && !showDoing) return null;
@@ -2465,13 +2466,15 @@ function LiveRunStatus({ run }: { run: LiveRun }) {
 }
 
 /**
- * Under a stopped answer: "Parado por você · Continuar". Continuar starts a new
- * run of the same agent from where it stopped; it goes away for everyone once someone pressed it.
+ * Under a stopped answer: "Parado por você · Continuar", or "No limite de passos · Continuar" under the
+ * reply of a run that reached its step limit. Continuar starts a new run of the same agent from where it
+ * stopped; it goes away for everyone once someone pressed it.
  */
 function StoppedLine({
   runId,
   byUserId,
   note,
+  limit,
   owner,
   message,
 }: {
@@ -2479,6 +2482,8 @@ function StoppedLine({
   byUserId: string | null | undefined;
   /** The server's line, for older messages without a person in the meta. */
   note?: string | null;
+  /** The run ended at its step limit (`meta.stepLimit`), nobody stopped it. */
+  limit?: boolean;
   /** Who may continue: the same people who may stop it. */
   owner: { agentId: string; channelId: string; threadId: string; triggerMessageId?: string | null } | null;
   /** The stopped reply, once it is saved (its meta says when it was continued). */
@@ -2491,16 +2496,17 @@ function StoppedLine({
   const cont = useContinueRun();
   const continued = useWasContinued(runId, message);
   const stopper = byUserId ? dir.memberById.get(byUserId)?.name : undefined;
-  const who =
-    byUserId && byUserId === me.user.id
+  const who = limit
+    ? t("run.stepLimit")
+    : byUserId && byUserId === me.user.id
       ? t("run.stoppedByYou")
       : stopper
         ? t("run.stoppedBy", { name: stopper })
         : byUserId || !note
           ? t("run.stopped")
           : note;
-  // Only a run a person stopped picks up again.
-  const can = Boolean(runId && byUserId && owner && !continued && canStop(owner));
+  // Only a run a person stopped, or one at its step limit, picks up again.
+  const can = Boolean(runId && (byUserId || limit) && owner && !continued && canStop(owner));
   return (
     <p className="ac-msg__activity run-canceled">
       <PixelStop size={12} dim />
@@ -2639,12 +2645,14 @@ function useBlocksInView(scroller: { current: HTMLElement | null }, key: string)
 }
 
 /**
- * The card right above the composer: while an agent works, the glass
- * pill in its color with a turning phrase (a light line while it thinks, what it does, what it said
- * last), the time, "Ver" when its block is out of view and the stop; and who is typing.
+ * The bar right above the composer, one for everyone at work here and always one width: a glass pill (in
+ * the first agent's color while agents work) with the orbit, or the typing dots when only people type, their
+ * small faces and one line that says it all. One agent on its own gets a turning phrase (a light line while
+ * it thinks, what it does, what it said last), its time, "Ver" when its block is out of view and its stop.
  */
 function ActivityBar({
   channelId,
+  threadId,
   visible,
   outOfView,
   onSee,
@@ -2652,6 +2660,8 @@ function ActivityBar({
   consultBlocks,
 }: {
   channelId: string;
+  /** A thread view: who types there (null: who types in the conversation itself). */
+  threadId: string | null;
   /** Which runs belong here (a thread view shows only its own). */
   visible?: { current: (r: { threadId: string | null; provisional?: boolean }) => boolean };
   /** The run's block is not on screen ("Ver" brings it back). */
@@ -2680,7 +2690,7 @@ function ActivityBar({
   // A reply near the end shows its questions with where each is and its clock: the asker's own work stays here.
   const consults = consultsForLine(heard, consultBlocks);
   asking.current = consults.length > 0;
-  const ids = typingIn({ [channelId]: typing ?? {} }, channelId, now, me.user.id);
+  const ids = typingIn({ [channelId]: typing ?? {} }, channelId, now, me.user.id, threadId);
   const entries = barEntries(
     runs,
     ids,
@@ -2691,10 +2701,12 @@ function ActivityBar({
   );
   const { stop } = useStopRun();
   const active = entries.length > 0;
+  const agents = entries.filter((e) => e.type === "agent");
   // The strip behind the bar (and the orbit) take the color of the first agent at work.
-  const firstAgent = entries.find((e) => e.type === "agent");
-  const firstRun = firstAgent ? runs.find((r) => r.agentId === firstAgent.id) : undefined;
-  const took = firstRun ? elapsedParts(now - (firstRun.startedAt ?? now)) : null;
+  const firstAgent = agents[0];
+  // The time, "Ver" and the stop are one agent's: with several, the line can't say whose (the composer still stops).
+  const soloRun = agents.length === 1 && firstAgent ? runs.find((r) => r.agentId === firstAgent.id) : undefined;
+  const took = soloRun ? elapsedParts(now - (soloRun.startedAt ?? now)) : null;
   // Agents running code: "Ver código" with the live code and output.
   const coding = runs.filter(
     (r) => outOfView(r.runId) && r.code && (r.work ?? []).some((w) => w.kind === "call" && w.running),
@@ -2734,8 +2746,16 @@ function ActivityBar({
         {active && (
           <>
             {firstAgent && <ActivitySky color={colorOf(dir.agentById.get(firstAgent.id))} />}
-            {/* Agents at work: the pixel orbit in the first one's color (people only typing: the dots). */}
-            {firstAgent && <AgentSpinner agentId={firstAgent.id} size={14} />}
+            {/* Agents at work: the pixel orbit in the first one's color; people only typing: the dots. */}
+            {firstAgent ? (
+              <AgentSpinner agentId={firstAgent.id} size={14} />
+            ) : (
+              <span className="ac-typing__dots" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
+            )}
             <WorkingStack entries={entries} />
             {/* The phrase turns: the old one leaves upward, the new one comes from below. Names in ink. */}
             <span className="ac-typing__text">
@@ -2754,29 +2774,22 @@ function ActivityBar({
                 size="sm"
                 variant="ghost"
                 icon="globe"
+                iconOnly
                 className="ac-typing__browser"
+                aria-label={t("browser.watch.title")}
                 title={t("browser.watch.open")}
                 onClick={openBrowser}
-              >
-                {t("browser.watch.title")}
-              </Button>
+              />
             )}
-            {!firstAgent && (
-              <span className="ac-typing__dots" aria-hidden="true">
-                <span />
-                <span />
-                <span />
-              </span>
-            )}
-            {firstRun && outOfView(firstRun.runId) && (
+            {soloRun && outOfView(soloRun.runId) && (
               <>
                 <span className="ac-typing__sep" aria-hidden="true" />
-                <button type="button" className="ac-typing__see" onClick={() => onSee(firstRun.runId)}>
+                <button type="button" className="ac-typing__see" onClick={() => onSee(soloRun.runId)}>
                   {t("run.strip.see")}
                 </button>
               </>
             )}
-            {firstRun && stoppable === firstRun.runId && <StopButton run={firstRun} onStop={stop} place="bar" />}
+            {soloRun && stoppable === soloRun.runId && <StopButton run={soloRun} onStop={stop} place="bar" />}
           </>
         )}
       </div>
@@ -2893,6 +2906,8 @@ export const TimelineMessage = memo(function TimelineMessage({
   // A text the server wrote (`meta.bodyCode`, a deploy's notice) is shown in the person's language.
   const stopped = useMemo(() => splitCanceled(serverBody(t, m.body, m.meta), m.meta), [t, m.body, m.meta]);
   const body = reminderBody(stopped.body, m.meta);
+  // The reply of a run that reached its step limit: Continuar under it too.
+  const atLimit = !stopped.canceled && Boolean(m.meta?.stepLimit);
 
   const channelName = useChannels(org.id).data?.find((c) => c.id === m.channelId)?.name;
   // A plain reminder: the agent's own message, with a small "Reminder" label.
@@ -3261,11 +3276,12 @@ export const TimelineMessage = memo(function TimelineMessage({
                 />
               </MessageText>
             )}
-          {stopped.canceled && (
+          {(stopped.canceled || atLimit) && (
             <StoppedLine
               runId={m.agentRunId}
               byUserId={stopped.byUserId}
               note={stopped.note}
+              limit={atLimit}
               owner={
                 m.author.type === "agent" && m.author.id
                   ? { agentId: m.author.id, channelId: m.channelId, threadId: m.threadId ?? m.id }

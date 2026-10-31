@@ -1085,7 +1085,7 @@ const routable = sql<boolean>`(cardinality(${messages.mentionedAgentIds}) = 0 an
  */
 async function continuedSoon(
   db: Executor,
-  message: Pick<Message, "orgId" | "channelId" | "threadId" | "createdAt" | "authorUserId">,
+  message: Pick<Message, "id" | "orgId" | "channelId" | "threadId" | "createdAt" | "authorUserId">,
   quietMs: number,
 ) {
   const [next] = await db
@@ -1097,6 +1097,8 @@ async function continuedSoon(
         eq(messages.channelId, message.channelId),
         message.threadId ? eq(messages.threadId, message.threadId) : isNull(messages.threadId),
         isNull(messages.deletedAt),
+        // Postgres keeps microseconds and `createdAt` is cut to milliseconds: the message itself is "after" it.
+        ne(messages.id, message.id),
         gt(messages.createdAt, message.createdAt),
         lte(messages.createdAt, new Date(message.createdAt.getTime() + quietMs)),
       ),

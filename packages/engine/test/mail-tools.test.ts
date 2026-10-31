@@ -44,6 +44,8 @@ test("tools follow the agent's level on each mailbox; sends ask unless the polic
   expect(send && isSensitive(send)).toBe(true);
   expect(send?.description.startsWith("[Email support@example.com]")).toBe(true);
   expect(send?.connectionId).toBe(account.id);
+  // The chat draws its calls with the mailbox's maker's logo.
+  expect(send?.service).toBe("icloud");
   expect(tools.some((t) => t.name === "mail_support_trash")).toBe(false);
   expect(isSensitive(tools.find((t) => t.name === "mail_support_draft") ?? { name: "", scope: "" })).toBe(false);
 

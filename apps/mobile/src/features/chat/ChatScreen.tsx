@@ -10,6 +10,7 @@ import {
   type MessagePin,
   type RunConsultation,
   sendHelpers,
+  typingIn,
   useAgentsBrowserHandoffs,
   useAiStatus,
   useApi,
@@ -335,6 +336,12 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     },
     [meId, stop],
   );
+  // Who is typing here, in this conversation or this thread (never me), as on the web; `live` drops who stopped.
+  const typing = useMemo(
+    () => typingIn(live.typing, channelId, Date.now(), meId ?? undefined, threadId),
+    [live.typing, channelId, meId, threadId],
+  );
+  const { sendTyping } = live;
   // While an agent works here, anyone who writes chooses "Juntar" or "Parar e mandar" (the server takes a
   // steer from them); the composer's "Parar" (the empty field's button) stops every agent at work here I
   // may stop, writing too, and only shows if there is one.
@@ -1568,6 +1575,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
               <WorkingLine
                 runs={runs}
                 consults={lineConsults}
+                typing={typing}
                 canStop={canStop}
                 onStop={stopRun}
                 onOpenBrowser={(agentId) => {
@@ -1592,6 +1600,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
                 mention={({ query, pick }) => (
                   <MentionPicker query={query} pick={pick} channelId={channelId} members={mentionMembers} />
                 )}
+                onType={() => sendTyping(threadId)}
               />
             ) : (
               <Button

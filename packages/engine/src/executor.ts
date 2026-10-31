@@ -1,4 +1,3 @@
-import { setTimeout as sleep } from "node:timers/promises";
 import { PERMISSION_TOOL, type PubSub } from "@agenteschat/adapters";
 import {
   and,
@@ -20,6 +19,7 @@ import {
   ensureOpenRouterModels,
   isAutoModel,
   type ModelMessage,
+  type ModelResult,
   ProviderError,
   type StopReason,
   type SystemBlock,
@@ -105,8 +105,7 @@ import { UPDATE_ISSUE_TOOL } from "./issue-tools";
 import { linkRunToIssue, mirrorReplyToIssue } from "./issues";
 import { listenLiveSteering, renderSteered } from "./live-steer";
 import { touchMachineAccount } from "./machine-accounts";
-import type { MachineStatus } from "./machine-hub";
-import { TASK_OFFLINE_GRACE_MS } from "./machine-tasks";
+import { computerBackSoon, type MachineStatus } from "./machine-hub";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import { postNoAiCard } from "./no-ai";
 import { enqueue, PermanentJobError } from "./outbox";
@@ -137,6 +136,7 @@ import {
   bridgeToolsFor,
   invokeToolForRun,
   invokeWithChip,
+  isScreenCall,
   mergeToolEffects,
   postPauseCards,
   publishPauseCards,
@@ -188,6 +188,8 @@ const {
 const ASKED_GRACE_MS = 250;
 /** How much of each decided call's result a run is reminded of when it ended its turn on the decision. */
 const DECIDED_LINE_MAX = 2000;
+/** How many apps a reply's `meta.work.calls` names: its closed block stacks only a few logos. */
+const WORK_CALLS = 12;
 
 /**
  * What the agent engine needs (ADR 0032). The engine is this file: it owns the
@@ -290,6 +292,8 @@ export interface Transcript {
   reported?: boolean;
   /** Nobody called it by name and it called `pass`: the run ends without a message. */
   passed?: { reason: string };
+  /** `pass` was in its first call's tools: listed for good, continuations included (`createPassToolSource`). */
+  passListed?: boolean;
   /** It was told once to answer after a reply that was only the silence word (or nothing). */
   nudged?: boolean;
   /**
@@ -311,8 +315,13 @@ export interface Transcript {
    * behind it from then on (`authority.ts`, `steeredByOf`).
    */
   steeredBy?: string;
-  /** A background run near its tool-call cap was told once to wrap up (`WRAP_UP_NOTE`). */
+  /**
+   * Near its tool-call cap it was told once to wrap up (`WRAP_UP_NOTE`, `WRAP_UP_REPLY_NOTE`): its final
+   * reply offers Continuar (`meta.stepLimit`).
+   */
   wrapUpNoted?: boolean;
+  /** Model calls that only drove the browser or the desktop, and worked: they count apart (`SCREEN_TURNS_FACTOR`). */
+  screenTurns?: number;
   /** The computer brain couldn't answer and the model brain did (ADR 0032 §5): the reply carries a quiet note. */
   fallback?: { from: BrainKind; code: string; message: string };
   /** The computer brain is unavailable and nothing can stand in: the run waits for the computer. */
@@ -390,8 +399,6 @@ export class BrainFailure extends Error {
 
 /** How long a run whose computer dropped mid-turn waits quietly for it before saying it is unavailable. */
 export const COMPUTER_DROP_GRACE_MS = 2 * 60_000;
-/** How long a run waits, still working, for a computer just gone: a runner dialing again is back within seconds. */
-export const COMPUTER_BLIP_WAIT_MS = 30_000;
 /** A run resumes on its computer after this many drops at most; then it ends like any failed turn. */
 export const MAX_COMPUTER_DROPS = 3;
 /** How often a run whose computer had no room for its turn asks again (the runner admits turns by room). */
@@ -418,12 +425,29 @@ export function interruptedTurnPrompt(
     .join("\n\n");
 }
 
-/** How many model calls before the cap a background run is told to wrap up (ADR 0053 §10). */
+/** How many model calls before the cap a run is told to wrap up (ADR 0053 §10). */
 export const WRAP_UP_TURNS = 2;
 
 /** What a background run near its tool-call cap reads once: hand off what it has instead of failing. */
 export const WRAP_UP_NOTE =
   "You are close to this run's limit of steps: only a couple of calls are left. Stop starting new work. If the people need to know what you found, call hand_off now with what you have; then end with your record (a short summary of what you checked). Your tools stay available for these last calls.";
+
+/**
+ * What a conversation run near its cap reads once (not a forum's): where it stands, so the person can let it go on
+ * (Continuar).
+ */
+export const WRAP_UP_REPLY_NOTE =
+  "You are close to this run's limit of steps: only a couple of calls are left. Stop starting new work and reply with what you did, where you stopped and what is left, so the person can let you pick up from there.";
+
+/**
+ * Each step on the browser or the desktop is a model call: calls that only drive them, and worked, count apart, up
+ * to this many times the cap. A run posting on a few sites gets there, and a loop on a step that fails, or on any
+ * other tool, still stops at the cap.
+ */
+export const SCREEN_TURNS_FACTOR = 2;
+
+/** The closing line of a conversation run that reached its cap mid-work (`bodyCode` `step_limit`). */
+const STEP_LIMIT_TEXT = "I ran out of steps before finishing.";
 
 /** Errors that will not get better by retrying: the run fails right away with a readable reason. */
 const userFacing = (error: unknown): string | null => {
@@ -878,21 +902,43 @@ async function executeRunInner(
         : body;
     // Team actions (ADR 0064): what the run didn't repeat because the team already did it rides on its reply.
     const teamChecks = note ? [] : await runChecksForReply(tx, run.orgId, run.id);
-    // "Ver o que ele fez" under the reply: how many tool calls so far, so the apps leave it out at 0. A reaction
-    // already shows on the message it reacts to, and the runner asking again about a command waiting on a person
-    // is that command's line (`promptPoll`): neither is counted, as the apps leave them out of the opened block.
-    const [calls] = await tx
-      .select({ n: count() })
+    // "Ver o que ele fez" under the reply: how many tool calls so far, so the apps leave it out at 0, and one call
+    // per logo of the closed block, in order of first use: per service, else app, else screen, else tool (a
+    // connector's dozens of tools would push the next apps past the few kept). A reaction already shows on the
+    // message it reacts to, and the runner asking again about a command waiting on a person is that command's line
+    // (`promptPoll`): neither is counted, as the apps leave them out of the opened block.
+    const name = sql<string>`${agentRunSteps.data}->>'name'`;
+    const screen = sql`substring(${name} from '^(?:mcp__agentes__)?(browser|desktop)_')`;
+    const app = sql`coalesce(${agentRunSteps.data}->>'service', ${agentRunSteps.data}->>'connector', ${screen}, ${name})`;
+    const tools = await tx
+      .select({
+        name: sql<string>`min(${name})`,
+        connector: sql<string | null>`min(${agentRunSteps.data}->>'connector')`,
+        service: sql<string | null>`min(${agentRunSteps.data}->>'service')`,
+        serviceIcon: sql<string | null>`min(${agentRunSteps.data}->>'serviceIcon')`,
+        n: count(),
+      })
       .from(agentRunSteps)
       .where(
         and(
           eq(agentRunSteps.runId, run.id),
           eq(agentRunSteps.kind, "tool_call"),
-          sql`${agentRunSteps.data}->>'name' is distinct from ${REACT_TOOL}`,
+          sql`${name} is distinct from ${REACT_TOOL}`,
           sql`(${agentRunSteps.data}->>'name' is distinct from ${PERMISSION_TOOL} or ${agentRunSteps.data}->'input'->>'request_id' is null)`,
         ),
-      );
-    const work = { steps: calls?.n ?? 0, durationMs: Math.max(0, Date.now() - run.createdAt.getTime()) };
+      )
+      .groupBy(app)
+      .orderBy(sql`min(${agentRunSteps.seq})`);
+    const work = {
+      steps: tools.reduce((n, t) => n + t.n, 0),
+      durationMs: Math.max(0, Date.now() - run.createdAt.getTime()),
+      calls: tools.slice(0, WORK_CALLS).map((t) => ({
+        name: t.name,
+        ...(t.connector ? { connector: t.connector } : {}),
+        ...(t.service ? { service: t.service } : {}),
+        ...(t.serviceIcon ? { serviceIcon: t.serviceIcon } : {}),
+      })),
+    };
     const m = await postAgentMessage(
       tx,
       run,
@@ -1039,6 +1085,7 @@ async function executeRunInner(
       system: stableFirst(system),
       messages: context.messages,
       ...(toolChoice ? { toolGroups: toolChoice.groups } : {}),
+      ...(tools.some((t) => t.name === PASS_TOOL) ? { passListed: true } : {}),
       postedUpTo: context.messages.length,
       postedCount: 0,
       deltaSeq: 0,
@@ -1387,20 +1434,31 @@ async function executeRunInner(
     }
   }
 
-  /** Ends the run with a plain closing line that carries what it changed (its receipts). */
-  const endWithReceipts = async () => {
+  /**
+   * A forum's turn or synthesis belongs to the topic's order (ADR 0022): at the cap it fails, so the topic stalls
+   * and Retomar does it again, instead of a step-limit line taken for the agent's post or the decision.
+   */
+  const forum = channelRow?.kind === "forum";
+
+  /** Ends the run with a closing line the server writes (`code`), with what it changed (its receipts) and its cards. */
+  const closeWith = async (
+    text: string,
+    code: string,
+    step: Record<string, unknown>,
+    meta: Record<string, unknown> = {},
+  ) => {
     await deferred;
     const t = transcript as Transcript;
     const reply = await db.transaction(async (tx) => {
       const m = await post(
         tx,
         replyThreadId,
-        DONE_TEXT,
-        withFallback(t, withCode(takeMemoryUpdates(t), bodyCode("done"))),
+        text,
+        withFallback(t, withCode({ ...takeMemoryUpdates(t), ...meta }, bodyCode(code))),
       );
       t.postedUpTo = t.messages.length;
       t.postedCount++;
-      await addRunStep(tx, run, "message", { messageId: m.id, receipts: true });
+      await addRunStep(tx, run, "message", { messageId: m.id, ...step });
       const done = await transitionRun(tx, run.id, "running", "done", {
         replyMessageId: m.id,
         error: null,
@@ -1415,6 +1473,15 @@ async function executeRunInner(
     await finished("done");
     await redispatchPending("done");
   };
+
+  /** Ends the run with a plain closing line that carries what it changed (its receipts). */
+  const endWithReceipts = () => closeWith(DONE_TEXT, "done", { receipts: true });
+
+  /**
+   * A conversation run at its cap in the middle of its work: instead of failing, it says it ran out of steps (with
+   * what it changed and where it browsed), and Continuar under that line picks up from here with a fresh count.
+   */
+  const endAtStepLimit = () => closeWith(STEP_LIMIT_TEXT, "step_limit", { stepLimit: true }, { stepLimit: {} });
 
   /**
    * Ends the run without a message (reply-policy.ts): nobody called it by name and it passed, or wrote
@@ -1470,23 +1537,6 @@ async function executeRunInner(
   };
 
   /**
-   * Waits for a computer gone less than the outage grace (`TASK_OFFLINE_GRACE_MS`: its runner dialing again, our
-   * own restart) to come back, up to `COMPUTER_BLIP_WAIT_MS`. The run stays `running` meanwhile (its heartbeat and
-   * its job's lease go on) and nothing is posted or stored. True: it is back. Null: the run was canceled.
-   */
-  const computerBackSoon = async (machineId: string): Promise<boolean | null> => {
-    const until = Date.now() + (deps.computerBlipWaitMs ?? COMPUTER_BLIP_WAIT_MS);
-    for (;;) {
-      const status = await deps.machines?.status(machineId).catch(() => null);
-      if (status?.online) return true;
-      const gone = status?.lastSeenAt ? Date.now() - Date.parse(status.lastSeenAt) : Number.POSITIVE_INFINITY;
-      if (gone >= TASK_OFFLINE_GRACE_MS || Date.now() >= until) return false;
-      await sleep(Math.min(1_000, until - Date.now()), undefined, { signal }).catch(() => {});
-      if (await isCanceled()) return null;
-    }
-  };
-
-  /**
    * The computer brain can't answer. On the run's first look (`firstLook`), a computer just gone is waited for
    * first (`computerBackSoon`). Still away: the model brain stands in with a quiet note, or the run waits for the
    * computer, or (nothing to think with) it fails with `no_ai`. A computer with no room for the turn (`busy`)
@@ -1501,7 +1551,11 @@ async function executeRunInner(
     const t = transcript as Transcript;
     const machineId = plan.session?.machineId ?? agent.machineId ?? null;
     if (firstLook && machineId && u.code === "machine_offline") {
-      const back = await computerBackSoon(machineId);
+      const back = await computerBackSoon(deps.machines, machineId, {
+        waitMs: deps.computerBlipWaitMs,
+        signal,
+        canceled: isCanceled,
+      });
       if (back === null) return "canceled";
       if (back) return "back";
     }
@@ -1821,7 +1875,10 @@ async function executeRunInner(
     }
   }
 
-  const maxTurns = deps.maxToolTurns ?? 25;
+  const baseTurns = deps.maxToolTurns ?? 25;
+  const capOf = (t: Transcript) => baseTurns + Math.min(t.screenTurns ?? 0, baseTurns * SCREEN_TURNS_FACTOR);
+  /** Grows with the run's screen-only calls (`screenTurns`). */
+  let maxTurns = capOf(transcript);
   let firstTurn = true;
   // Live steering (`live-steer.ts`): while a computer turn is in flight, a person's message goes to it
   // (read at its next tool boundary) instead of waiting for the turn's end; any other time, it waits.
@@ -1852,22 +1909,24 @@ async function executeRunInner(
   try {
     for (;;) {
       if (await isCanceled()) return stopCanceled("");
-      // At the cap the inbox stays as it is: a message never gets marked read and then lost (the failure
-      // hands it to a run of its own).
-      if (run.turns >= maxTurns) return fail("too_many_tool_calls");
+      // At the cap the inbox stays as it is: a message never gets marked read and then lost (the run's end
+      // hands it to a run of its own). A routine's run fails there (its ledger says so), and so does a forum's;
+      // any other says it ran out of steps, with Continuar.
+      if (run.turns >= maxTurns) return run.background || forum ? fail("too_many_tool_calls") : endAtStepLimit();
       const steered = await deliverSteering();
       if (steered && plan.kind !== "model") {
         nextPrompt = [nextPrompt ?? (computerTurns === 0 ? triggerText : ""), steered].filter(Boolean).join("\n\n");
       }
-      // A routine's run near the cap hands off what it has instead of failing (ADR 0053 §10).
+      // Near the cap it is told once to wrap up: a routine's run hands off what it has (ADR 0053 §10), any other
+      // but a forum's replies with where it stands.
       if (
-        run.background &&
         plan.kind === "model" &&
+        !forum &&
         !transcript.wrapUpNoted &&
         run.turns >= Math.max(0, maxTurns - WRAP_UP_TURNS)
       ) {
         transcript.wrapUpNoted = true;
-        appendUserText(transcript, WRAP_UP_NOTE);
+        appendUserText(transcript, run.background ? WRAP_UP_NOTE : WRAP_UP_REPLY_NOTE);
         await saveTranscript(db, transcript);
         later(() => addRunStep(db, run, "context", { wrapUp: true }));
       }
@@ -2109,6 +2168,7 @@ async function executeRunInner(
           usageRecordId: result.usageRecordId,
           costNanoUsd: result.costNanoUsd,
           ...result.usage,
+          thinking: result.thinking,
           turn,
           ...(narration ? { narration: narration.slice(0, 4000) } : {}),
         }),
@@ -2206,6 +2266,11 @@ async function executeRunInner(
           return stopCanceled("");
         }
         if (waiting.length === 0 && asks.length === 0 && secretAsks.length === 0 && waits.length === 0) {
+          // Only steps that worked count apart: a loop on a failing browser or desktop counts toward the cap.
+          if (toolUses.every(isScreenCall) && calls.every((c) => c.result && !c.result.isError)) {
+            transcript.screenTurns = (transcript.screenTurns ?? 0) + 1;
+            maxTurns = capOf(transcript);
+          }
           transcript.messages.push({
             role: "user",
             content: calls.map((c) => ({
@@ -2378,7 +2443,8 @@ async function executeRunInner(
         .select({ pending: agentRuns.pendingMessageIds })
         .from(agentRuns)
         .where(eq(agentRuns.id, run.id));
-      if ((still?.pending.length ?? 0) > 0 || keep) {
+      // At the cap this answer ends the run instead: what came in gets a run of its own.
+      if (((still?.pending.length ?? 0) > 0 && run.turns < maxTurns) || keep) {
         const posted = text
           ? await db.transaction(async (tx) => {
               const m = await post(tx, replyThreadId, text, withFallback(t, withCode(takeMemoryUpdates(t), code)));
@@ -2398,8 +2464,14 @@ async function executeRunInner(
         continue;
       }
       const reply = await db.transaction(async (tx) => {
+        // Told to wrap up near its cap: this is where it stands, and Continuar under it goes on from here.
         const message = text
-          ? await post(tx, replyThreadId, text, withFallback(t, withCode(takeMemoryUpdates(t), code)))
+          ? await post(
+              tx,
+              replyThreadId,
+              text,
+              withFallback(t, withCode({ ...takeMemoryUpdates(t), ...(t.wrapUpNoted ? { stepLimit: {} } : {}) }, code)),
+            )
           : null;
         t.postedUpTo = t.messages.length;
         if (message) t.postedCount++;
@@ -2557,6 +2629,7 @@ interface BrainStep {
   usageRecordId?: string;
   costNanoUsd?: number;
   usage?: Partial<Record<"inputTokens" | "outputTokens" | "cacheReadTokens" | "cacheWriteTokens", number>>;
+  thinking?: ModelResult["thinking"];
 }
 
 /**
@@ -2636,6 +2709,7 @@ async function thinkOnce(
       usageRecordId: r.usageRecordId,
       costNanoUsd: r.costNanoUsd,
       usage: r.usage,
+      thinking: r.thinking,
       executedCount,
     };
   }
@@ -2959,6 +3033,10 @@ export function continuedTranscript(stopped: Transcript, line: string): Transcri
     postedCount: 0,
     deltaSeq: 0,
     ...(stopped.repo ? { repo: stopped.repo } : {}),
+    // The same tools and model: the thinking blocks it replays stay valid only with the same `tools`.
+    ...(stopped.toolGroups ? { toolGroups: stopped.toolGroups } : {}),
+    ...(stopped.passListed ? { passListed: true } : {}),
+    ...(stopped.autoModel ? { autoModel: stopped.autoModel } : {}),
   };
   const last = t.messages.at(-1);
   const unanswered =
