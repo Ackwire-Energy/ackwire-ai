@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-31
-- Code: `packages/db/src/schema/agents.ts` (`agents.coordinator`, index `agents_one_coordinator`, migration 0139), `packages/engine/src/agents.ts` (`createAgent`, `setCoordinator`, `archiveAgent`), `packages/engine/src/agent-deletion.ts`, `packages/engine/src/router.ts`, `packages/engine/src/context.ts`, `packages/engine/src/events.ts`, `apps/server/src/routes/app/agents.ts`, `packages/client/src/lib/coordinator.ts`, `packages/client/src/realtime/machines.ts`, `apps/web/src/pages/agent/SettingsTab.tsx`, `apps/web/src/components/CoordinatorChip.tsx`, `apps/mobile/src/features/agents/AgentEditScreen.tsx`
+- Code: `packages/db/src/schema/agents.ts` (`agents.coordinator`, index `agents_one_coordinator`, migration 0140), `packages/engine/src/agents.ts` (`createAgent`, `setCoordinator`, `archiveAgent`), `packages/engine/src/agent-deletion.ts`, `packages/engine/src/router.ts`, `packages/engine/src/context.ts`, `packages/engine/src/events.ts`, `apps/server/src/routes/app/agents.ts`, `packages/client/src/lib/coordinator.ts`, `packages/client/src/realtime/machines.ts`, `apps/web/src/pages/agent/SettingsTab.tsx`, `apps/web/src/components/CoordinatorChip.tsx`, `apps/mobile/src/features/agents/AgentEditScreen.tsx`
 
 ## Context
 

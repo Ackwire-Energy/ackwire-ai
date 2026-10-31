@@ -6,6 +6,7 @@ import {
   endsOnClaude,
   groupPlans,
   ownSignIns,
+  ownSignInTitle,
   type PlanAccount,
 } from "@agenteschat/client/lib/ai-accounts";
 import { joinNames } from "@agenteschat/client/lib/format";
@@ -145,9 +146,7 @@ export function AiAccountsSection() {
             <div key={o.key} className="ac-list__row ai-accounts__row">
               <ProviderLogo id={o.kind} size="sm" />
               <span className="list-col">
-                <span className="ai-accounts__name ac-captop">
-                  {accountTitle({ label: t(`aiAccounts.connect.${o.kind}`), plan: o.plan })}
-                </span>
+                <span className="ai-accounts__name ac-captop">{ownSignInTitle(t, o)}</span>
                 <span className="small muted">{t("aiAccounts.page.ownOn", { computer: o.computer })}</span>
                 {o.usage && <PlanMeter usage={o.usage} text={meterText} compact />}
               </span>

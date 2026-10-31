@@ -254,7 +254,7 @@ describe("routeMessage", () => {
         orgId: f.org.id,
         channelId: f.general.id,
         threadId: question.id,
-        author: { type: "agent", agentId: f.agent.id, runId: null, hop },
+        author: { type: "agent", agentId: f.agent.id, runId: null, hop, stretchId: null },
         body,
       });
 
@@ -292,7 +292,7 @@ describe("routeMessage", () => {
       orgId: f.org.id,
       channelId: f.general.id,
       threadId: question.id,
-      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1 },
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null },
       body: "Noted. I also moved the hourly reviews routine to Sao Paulo time.",
     });
     const answered = (scores: Record<string, number>): RouterStrategy => ({
@@ -336,7 +336,7 @@ describe("routeMessage", () => {
       orgId: f.org.id,
       channelId: f.general.id,
       threadId: question.id,
-      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1 },
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null },
       body: "I couldn't read the code: the clone of the repo hung.",
     });
     const inputs: { body: string; thread: string[] }[] = [];
@@ -363,7 +363,7 @@ describe("routeMessage", () => {
     const report = await insertMessage(f.db, {
       orgId: f.org.id,
       channelId: f.general.id,
-      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1 },
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null },
       body: "A new loved review came in right after a subscription; that prompt was the one we decided to remove.",
       createdAt: new Date(Date.now() - 2 * 60 * 60_000),
     });
@@ -547,7 +547,7 @@ describe("what the router reads, and a person's messages in a row", () => {
     insertMessage(f.db, {
       orgId: f.org.id,
       channelId: f.general.id,
-      author: { type: "agent", agentId: adaId, runId: null, hop: 1 },
+      author: { type: "agent", agentId: adaId, runId: null, hop: 1, stretchId: null },
       body,
       createdAt: ago(secondsAgo),
     });
@@ -787,7 +787,7 @@ describe("what the router reads, and a person's messages in a row", () => {
     const report = await insertMessage(f.db, {
       orgId: f.org.id,
       channelId: f.general.id,
-      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1 },
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null },
       body: "O deploy de ontem falhou na migração.",
     });
     const quoted = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
@@ -846,7 +846,7 @@ describe("the team's coordinator (ADR 0092)", () => {
     insertMessage(f.db, {
       orgId: f.org.id,
       channelId: f.general.id,
-      author: { type: "agent", agentId, runId: null, hop: 1 },
+      author: { type: "agent", agentId, runId: null, hop: 1, stretchId: null },
       body,
     });
   const COORDINATES = { step: "rule", rule: "coordinator" } as const;

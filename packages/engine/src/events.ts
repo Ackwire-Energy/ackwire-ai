@@ -342,7 +342,10 @@ export type ChannelEvent =
       runs?: { agentId: string; runId: string }[];
       /** Agents it mentions that won't answer (they don't reply to this person). */
       blocked?: string[];
-      /** Agents it only references (part of the request to another agent): no run, by design. */
+      /**
+       * Agents it only references: part of a person's request to another agent, or an agent's mention the judge read
+       * as no hand-off (ADR 0089). No run, by design.
+       */
       referenced?: string[];
       strategy: "mention" | "dm" | "router" | "none";
       /**
@@ -546,9 +549,10 @@ export async function publishRouted(
     runs: { id: string; agentId: string }[];
     reason?: string;
     decidedBy?: DecidedBy;
+    referenced?: string[];
   } & Partial<ConnectIntent>,
 ) {
-  const { strategy, seenBy, runs, reason, decidedBy, ...intent } = routed;
+  const { strategy, seenBy, runs, reason, decidedBy, referenced, ...intent } = routed;
   await publishChannelEvent(pubsub, {
     type: "message.routed",
     channelId: message.channelId,
@@ -557,6 +561,7 @@ export async function publishRouted(
     pickedBy: runs.map((r) => r.agentId),
     runs: runs.map((r) => ({ agentId: r.agentId, runId: r.id })),
     strategy,
+    ...(referenced?.length ? { referenced } : {}),
     ...(reason ? { reason } : {}),
     ...(decidedBy ? { decidedBy } : {}),
     ...intent,

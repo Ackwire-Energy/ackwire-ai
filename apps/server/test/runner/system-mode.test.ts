@@ -26,9 +26,12 @@ import {
   RUNNER_BUN_VERSION,
 } from "../../runner/install-script";
 import {
-  AGENT_SLICE_LIMITS,
+  AGENTS_CGROUP,
+  agentCgroup,
+  agentLimits,
   agentSlice,
   agentSliceLimitsPath,
+  allAgentsLimitsPath,
   installSystemService,
   SYSTEM_UNIT_PATH,
   systemdSystemUnit,
@@ -114,6 +117,7 @@ test.if(posix)("service install --system refuses without root and off Linux, and
   expect(installSystemService({ ...io, uid: 0, platform: "darwin" })).toBe(1);
   expect(existsSync(unitPath)).toBe(false);
   expect(existsSync(agentSliceLimitsPath(unitPath))).toBe(false);
+  expect(existsSync(allAgentsLimitsPath(unitPath))).toBe(false);
   expect(readStoredConfig(h)).toBeNull();
 });
 
@@ -138,21 +142,50 @@ test.if(posix)("service install --system: a system home, and it starts only when
       platform: "linux",
       unitPath,
       booted: o.booted ?? true,
+      memoryBytes: 8 * 2 ** 30,
       ...o,
     });
   };
 
+  // A computer an earlier runner set up: its installer's run writes the new limits over the old, and the reload
+  // applies them to the agents running there (systemd sets a running slice's limits again as it reloads).
+  mkdirSync(path.dirname(agentSliceLimitsPath(unitPath)), { recursive: true });
+  writeFileSync(agentSliceLimitsPath(unitPath), "[Slice]\nMemoryMax=1536M\nTasksMax=1024\nCPUQuota=200%\n");
   // install.sh's first step: before pairing, nothing starts.
   expect(install({ start: false, agentUidRange: [21000, 21099] })).toBe(0);
   expect(calls).toEqual(["systemctl daemon-reload"]);
   expect(readFileSync(unitPath, "utf8")).toBe(systemdSystemUnit(launch));
   expect(readStoredConfig(h)).toEqual({ mode: "system", agentUidRange: [21000, 21099] });
-  // Every agent's slice (agents-<uid>.slice) gets the same limits, from one drop-in for the prefix.
+  // Every agent's slice (agents-<uid>.slice) gets the same limits, from one drop-in for the prefix: a share of the
+  // computer's RAM (systemd works it out as it loads the units) where it stops, nothing that only slows it down,
+  // swap for a third of that (8 GiB here: 1638 MiB), and room for threads.
   expect(agentSlice(21003)).toBe("agents-21003.slice");
   expect(agentSliceLimitsPath(unitPath)).toBe(path.join(h, "systemd", "agents-.slice.d", "limits.conf"));
   expect(agentSliceLimitsPath()).toBe("/etc/systemd/system/agents-.slice.d/limits.conf");
-  expect(readFileSync(agentSliceLimitsPath(unitPath), "utf8")).toBe(AGENT_SLICE_LIMITS);
-  expect(AGENT_SLICE_LIMITS.split("\n")).toEqual(["[Slice]", "MemoryMax=1536M", "TasksMax=1024", "CPUQuota=200%", ""]);
+  expect(readFileSync(agentSliceLimitsPath(unitPath), "utf8").split("\n")).toEqual([
+    "[Slice]",
+    "MemoryMax=60%",
+    "MemorySwapMax=1638M",
+    "TasksMax=4096",
+    "CPUQuota=200%",
+    "",
+  ]);
+  // All of them together (agents.slice): with their swap in RAM at 2:1, 87.5% of it, and the rest of the computer
+  // stays for the system, the runner and the guard.
+  expect(allAgentsLimitsPath(unitPath)).toBe(path.join(h, "systemd", "agents.slice.d", "limits.conf"));
+  expect(allAgentsLimitsPath()).toBe("/etc/systemd/system/agents.slice.d/limits.conf");
+  expect(readFileSync(allAgentsLimitsPath(unitPath), "utf8").split("\n")).toEqual([
+    "[Slice]",
+    "MemoryMax=75%",
+    "MemorySwapMax=2048M",
+    "TasksMax=50%",
+    "",
+  ]);
+  // The swap caps follow the RAM the installer sees (rounded down to a MiB).
+  expect(agentLimits(4 * 2 ** 30 + 5, false).all).toContain("\nMemorySwapMax=1024M\n");
+  // Where their counters are read (memory.events).
+  expect(AGENTS_CGROUP).toBe("/sys/fs/cgroup/agents.slice");
+  expect(agentCgroup(21003)).toBe("/sys/fs/cgroup/agents.slice/agents-21003.slice");
 
   // Not connected yet: an unpaired runner would only restart in a loop.
   expect(install()).toBe(0);
@@ -190,6 +223,41 @@ test.if(posix)("service install --system: a system home, and it starts only when
   expect(calls).toEqual([]);
 });
 
+test.if(posix)(
+  "service install --host: the server's own computer keeps room for Docker, Postgres and the server",
+  () => {
+    const h = home();
+    const unitPath = path.join(h, "systemd", "agentes-runner.service");
+    const install = (o: { args?: string[] } = {}) =>
+      installSystemService({
+        print: () => {},
+        run: () => ({ code: 0, output: "" }),
+        launch: { runtime: BUN, script: BUNDLE, home: h },
+        uid: 0,
+        platform: "linux",
+        unitPath,
+        booted: true,
+        memoryBytes: 4 * 2 ** 30,
+        ...o,
+      });
+    const dropIns = () =>
+      [agentSliceLimitsPath(unitPath), allAgentsLimitsPath(unitPath)].map((f) => readFileSync(f, "utf8"));
+    // The smallest computer the setup makes the agents' (4 GB): one agent stops about where the fixed cap stood
+    // (1.5 GiB), all of them at half the RAM, and with their swap in RAM at 2:1 they leave 42% (1.7 GiB here).
+    expect(install({ args: ["host", "--server", "http://127.0.0.1:3000", "--token-file", `${h}/token`] })).toBe(0);
+    expect(dropIns()).toEqual([
+      "[Slice]\nMemoryMax=40%\nMemorySwapMax=546M\nTasksMax=4096\nCPUQuota=200%\n",
+      "[Slice]\nMemoryMax=50%\nMemorySwapMax=682M\nTasksMax=50%\n",
+    ]);
+    // The same computer for agents alone: theirs is more of it.
+    expect(install()).toBe(0);
+    expect(dropIns()).toEqual([
+      "[Slice]\nMemoryMax=60%\nMemorySwapMax=819M\nTasksMax=4096\nCPUQuota=200%\n",
+      "[Slice]\nMemoryMax=75%\nMemorySwapMax=1024M\nTasksMax=50%\n",
+    ]);
+  },
+);
+
 /** `service install --system --no-start` as root, with the unit at `unitPath`. */
 const installNoStart = (unitPath: string, runnerHome: string) =>
   installSystemService({
@@ -210,6 +278,7 @@ test.if(posix)(
       const h = home();
       const unitPath = path.join(h, "systemd", "agentes-runner.service");
       const limits = agentSliceLimitsPath(unitPath);
+      const all = allAgentsLimitsPath(unitPath);
       // As a run under umask 077 left them: PID 1 warned at every read.
       mkdirSync(path.dirname(limits), { recursive: true, mode: 0o700 });
       writeFileSync(unitPath, "", { mode: 0o600 });
@@ -221,8 +290,16 @@ test.if(posix)(
       } finally {
         process.umask(before);
       }
-      const files = [unitPath, path.dirname(limits), limits, runnerHome, configPath(runnerHome)];
-      expect(files.map((p) => statSync(p).mode & 0o777)).toEqual([0o644, 0o755, 0o644, 0o700, 0o600]);
+      const files = [
+        unitPath,
+        path.dirname(limits),
+        limits,
+        path.dirname(all),
+        all,
+        runnerHome,
+        configPath(runnerHome),
+      ];
+      expect(files.map((p) => statSync(p).mode & 0o777)).toEqual([0o644, 0o755, 0o644, 0o755, 0o644, 0o700, 0o600]);
     }
   },
 );
@@ -231,10 +308,10 @@ test.if(posix)(
 test.if(posix && process.getuid?.() !== 0)(
   "service install --system: a unit or drop-in masked (a link to /dev/null) stays masked, /dev/null untouched",
   () => {
-    for (const dropIn of [false, true]) {
+    for (const which of [(unit: string) => unit, agentSliceLimitsPath, allAgentsLimitsPath]) {
       const h = home();
       const unitPath = path.join(h, "systemd", "agentes-runner.service");
-      const masked = dropIn ? agentSliceLimitsPath(unitPath) : unitPath;
+      const masked = which(unitPath);
       mkdirSync(path.dirname(masked), { recursive: true });
       symlinkSync("/dev/null", masked);
       expect(installNoStart(unitPath, path.join(h, "runner"))).toBe(0);

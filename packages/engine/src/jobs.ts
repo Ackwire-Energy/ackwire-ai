@@ -64,6 +64,7 @@ import type { SandboxDeps } from "./sandbox";
 import { indexSource, reindexOrg } from "./search";
 import { activateDeliveredSecret, discardClosedSecret } from "./secrets";
 import { purgeOrgFiles, purgeUserFiles, runMigration, type StorageDeps } from "./storage";
+import { postStretchCard, STRETCH_JOB, type StretchHold } from "./stretch";
 import { isAgentesCloud } from "./telemetry";
 import { assessThread } from "./thread-assess";
 import { saveWaitlistContact } from "./waitlist";
@@ -211,14 +212,13 @@ async function jevPicks(key: JevKeySource | undefined): Promise<boolean> {
 export function createJobHandlers(deps: JobDeps): JobHandlers {
   const routing = messageRouter(deps);
 
-  // An agent's @mention starts the other agent only when it asks it to act now (the judge decides).
+  // An agent's @mention starts the other agent only when it hands it something to act on now (the judge decides).
   const mentionThreshold = deps.router?.mentionThreshold ?? 0.6;
   /**
-   * Which agents an agent's @mentions actually hand off to: the judge asks,
-   * per mentioned agent, "is this asking it to act now?" (any language)
-   * against the threshold. Without a judge, or when it fails, none: a
-   * mention alone never starts another agent. Every decision is recorded in
-   * `routing_decisions` for audit.
+   * Which agents an agent's @mentions actually hand off to (ADR 0089): the judge asks, per mentioned agent,
+   * whether it is handed work or a question to act on now, in any language, reading the message being answered
+   * too. Thanks, an "ok" or a sign-off hand nothing off. Only without a judge, or when it fails, does a message
+   * that opens with "@handle" count by itself. Every decision is recorded in `routing_decisions` for audit.
    */
   async function delegatedAgents(message: NonNullable<Awaited<ReturnType<typeof getMessage>>>) {
     const targets = await deps.db
@@ -232,32 +232,38 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       .where(inArray(schema.agents.id, message.mentionedAgentIds));
     const others = targets.filter((t) => t.id !== message.authorAgentId);
     const scores = new Map<string, number>();
-    // Spoken to by name ("@ada já postei…" opens the message): a reply to it, it answers (hop cap still holds).
-    for (const t of others) if (opensWith(message.body, t.handle)) scores.set(t.id, 1);
-    const toJudge = others.filter((t) => !scores.has(t.id));
     let strategy = "mention-judge";
     let error: string | null = null;
+    let judged = false;
     const judge = deps.context ? judgeOf(deps.context) : null;
-    if (judge && toJudge.length > 0) {
-      const [author] = message.authorAgentId
-        ? await deps.db
-            .select({ handle: schema.agents.handle })
-            .from(schema.agents)
-            .where(eq(schema.agents.id, message.authorAgentId))
-        : [];
+    if (judge && others.length > 0) {
+      const [[author], answering] = await Promise.all([
+        message.authorAgentId
+          ? deps.db
+              .select({ handle: schema.agents.handle })
+              .from(schema.agents)
+              .where(eq(schema.agents.id, message.authorAgentId))
+          : Promise.resolve([]),
+        answeredBy(message),
+      ]);
       try {
-        const judged = await mentionHandoffs(judge, {
+        const out = await mentionHandoffs(judge, {
           orgId: message.orgId,
+          agentId: message.authorAgentId,
           body: message.body,
           author: author ? `@${author.handle}` : "agent",
-          targets: toJudge.map((t) => ({ agentId: t.id, handle: t.handle, name: t.name, role: t.role || null })),
+          answering,
+          targets: others.map((t) => ({ agentId: t.id, handle: t.handle, name: t.name, role: t.role || null })),
         });
-        for (const [id, p] of judged) scores.set(id, p);
+        for (const [id, p] of out) scores.set(id, p);
         strategy = `mention-${judge.name}`;
+        judged = true;
       } catch (e) {
         error = e instanceof Error ? e.message.slice(0, 300) : String(e);
       }
     }
+    // Nobody could read it: a message that opens by addressing an agent ("@ada já postei…") is a reply to it.
+    if (!judged) for (const t of others) if (opensWith(message.body, t.handle)) scores.set(t.id, 1);
     const allowed = others.filter((t) => (scores.get(t.id) ?? 0) >= mentionThreshold).map((t) => t.id);
     await deps.db
       .insert(schema.routingDecisions)
@@ -275,7 +281,29 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         error,
       })
       .onConflictDoNothing();
-    return allowed;
+    return { allowed, referenced: others.filter((t) => !allowed.includes(t.id)).map((t) => t.id) };
+  }
+
+  /** The message an agent's message answers: the trigger of the run that wrote it (its start), for the judge. */
+  async function answeredBy(message: NonNullable<Awaited<ReturnType<typeof getMessage>>>) {
+    if (!message.agentRunId) return null;
+    const [row] = await deps.db
+      .select({ body: schema.messages.body, authorType: schema.messages.authorType, handle: schema.agents.handle })
+      .from(schema.agentRuns)
+      .innerJoin(
+        schema.messages,
+        and(
+          eq(schema.messages.orgId, schema.agentRuns.orgId),
+          eq(schema.messages.id, schema.agentRuns.triggerMessageId),
+        ),
+      )
+      .leftJoin(schema.agents, eq(schema.agents.id, schema.messages.authorAgentId))
+      .where(and(eq(schema.agentRuns.orgId, message.orgId), eq(schema.agentRuns.id, message.agentRunId)));
+    if (!row) return null;
+    return {
+      from: row.authorType === "person" ? "a person" : row.handle ? `@${row.handle}` : "an agent",
+      text: row.body.slice(0, 1000),
+    };
   }
 
   const missions: MissionDeps = {
@@ -338,9 +366,9 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         // Agents' mentions go through the hop limit here; a person's mentions and DMs already
         // started their runs in the same statement as the message (postPersonMessage).
         if (message.mentionedAgentIds.length > 0) {
-          // Agents answer each other at most once in a row: a reply to an agent's request can't hand off again.
-          if (message.hop >= 2) return routed("none", message.mentionedAgentIds, [], "agent_chain_cap");
-          let allowed = await delegatedAgents(message);
+          // No cap on hand-offs between agents: the stretch's limits hold a run agents start (`startOrJoinRun`).
+          const handed = await delegatedAgents(message);
+          let allowed = handed.allowed;
           // In an open mission's thread, another agent acts for the person behind it: only the
           // mission's owner and deciders make the mission's agent work (ADR 0029).
           if (message.threadId && allowed.length > 0) {
@@ -358,7 +386,13 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           const res = allowed.length
             ? await dispatchMentions(deps.db, input, { maxHops: deps.maxHops, onlyAgentIds: allowed })
             : { runs: [] };
-          await routed("mention", message.mentionedAgentIds, res.runs, allowed.length ? undefined : "reference_only");
+          await publishRouted(deps.pubsub, message, {
+            strategy: "mention",
+            seenBy: message.mentionedAgentIds,
+            runs: res.runs,
+            referenced: handed.referenced,
+            ...(allowed.length ? {} : { reason: "reference_only" }),
+          });
           return;
         }
         // No mention: another agent may chime in when it clearly should (ADR 0034). Only in
@@ -431,6 +465,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       );
       // A mission's main-session turn that ended: write items queued behind it may start (ADR 0044).
       await afterMissionRunEnded(missions, String(job.payload.runId)).catch(() => 0);
+    },
+    // A stretch's limit held a wake-up: its pause card, with Continuar (ADR 0089).
+    [STRETCH_JOB]: async (job) => {
+      await postStretchCard({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), job.payload as unknown as StretchHold);
     },
     // A follow-up's time came: the agent is woken in its conversation (follow-through.ts).
     [FOLLOW_UP_JOB]: async (job) => {

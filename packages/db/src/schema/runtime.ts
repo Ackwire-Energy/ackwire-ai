@@ -93,6 +93,11 @@ export const agentRuns = pgTable(
     trigger: agentRunTriggerEnum().notNull(),
     /** Hop of the reply this run will post (trigger hop + 1). */
     hop: integer().notNull(),
+    /**
+     * Its stretch (ADR 0089): the trigger's (a person's message is its own), or a fresh one when a person let it
+     * go on. Null on older rows: their stretch is their trigger.
+     */
+    stretchId: uuid(),
     status: agentRunStatusEnum().notNull().default("queued"),
     error: text(),
     replyMessageId: uuid(),
@@ -158,6 +163,8 @@ export const agentRuns = pgTable(
     // An agent's recent work across conversations (context: "Seu trabalho recente").
     index().on(t.orgId, t.agentId, t.createdAt),
     index().on(t.issueId, t.createdAt),
+    // A stretch's runs, counted before an agent starts another (`stretchStop`).
+    index().on(t.orgId, t.stretchId).where(sql`${t.stretchId} is not null`),
     // Runs waiting for a computer, found when it reconnects (only those rows are indexed).
     index("agent_runs_waiting_machine_idx").on(t.waitingMachineId).where(sql`${t.waitingMachineId} is not null`),
   ],

@@ -1,6 +1,6 @@
 # 0048. `tell_agent`: a note to another agent without waiting
 
-- Status: Proposed
+- Status: Proposed. Amended 2026-10-31 by ADR 0089: a reply to a note goes back when the judge reads something in it, with no length or "?" rule, and notes count toward the stretch's limits instead of a hop limit
 - Date: 2026-10-21
 - Extends: ADR 0034 (agents consult each other), ADR 0046 (outbox priority)
 

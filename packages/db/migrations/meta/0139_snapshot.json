@@ -1,5 +1,5 @@
 {
-  "id": "a7d48eeb-13a7-4528-9e73-0b095c92666f",
+  "id": "7370c9c5-68b3-4e46-b77d-1f97637b0b87",
   "prevId": "efde0308-b150-4d23-99b5-968a1a5346b9",
   "version": "7",
   "dialect": "postgresql",
@@ -260,13 +260,6 @@
           "notNull": true,
           "default": 0
         },
-        "coordinator": {
-          "name": "coordinator",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
         "status_text": {
           "name": "status_text",
           "type": "text",
@@ -349,24 +342,7 @@
           "notNull": false
         }
       },
-      "indexes": {
-        "agents_one_coordinator": {
-          "name": "agents_one_coordinator",
-          "columns": [
-            {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"agents\".\"coordinator\" and \"agents\".\"archived_at\" is null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "agents_org_id_organizations_id_fk": {
           "name": "agents_org_id_organizations_id_fk",
@@ -2132,6 +2108,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": 0
+        },
+        "stretch_id": {
+          "name": "stretch_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         },
         "agent_run_id": {
           "name": "agent_run_id",
@@ -10729,6 +10711,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "stretch_id": {
+          "name": "stretch_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "status": {
           "name": "status",
           "type": "agent_run_status",
@@ -10914,6 +10902,28 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "agent_runs_org_id_stretch_id_index": {
+          "name": "agent_runs_org_id_stretch_id_index",
+          "columns": [
+            {
+              "expression": "org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "stretch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"agent_runs\".\"stretch_id\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}

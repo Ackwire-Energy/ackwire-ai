@@ -329,6 +329,48 @@ test("Responder agora: 409 while there's no AI; then the person's own message is
   expect(timeline.some((m) => m.id === card.id)).toBe(true);
 });
 
+test("Responder agora for a run another agent woke: the member behind the work may press it", async () => {
+  f = await setup();
+  const qa = await addAgent("qa");
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+  const asked = await insertMessage(f.db, {
+    orgId: f.org.id,
+    channelId: f.general.id,
+    author: { type: "person", userId: bia.id },
+    body: "@dev resume o canal",
+  });
+  const [dev] = await f.db
+    .insert(schema.agentRuns)
+    .values({
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      channelId: f.general.id,
+      threadRootId: asked.id,
+      triggerMessageId: asked.id,
+      trigger: "mention",
+      hop: 1,
+      status: "done",
+    })
+    .returning();
+  const handed = await insertMessage(f.db, {
+    orgId: f.org.id,
+    channelId: f.general.id,
+    threadId: asked.id,
+    author: { type: "agent", agentId: f.agent.id, runId: dev?.id ?? "", hop: 1 },
+    body: "@qa confere os números",
+  });
+  await revokeKeys();
+  await f.db.transaction((tx) => createAgentRuns(tx, handed, [qa.id], "mention"));
+  await drainOutbox(f.db, f.handlers);
+  const [card] = await cards();
+  expect(card?.meta.noAi).toMatchObject({ agentId: qa.id, forUserId: bia.id });
+
+  await restoreKeys();
+  const answered = await answerNow(deps(), bia.id, f.org.id, card?.id ?? "");
+  expect(answered.runs).toMatchObject([{ agentId: qa.id }]);
+});
+
 test("Responder agora for someone the agent no longer answers (a personal plan answers its owner): 403, nothing starts", async () => {
   f = await setup();
   await revokeKeys();

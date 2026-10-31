@@ -59,8 +59,9 @@ function SteerMark({ steer, name, size }: { steer: SteerState; name: string; siz
 }
 
 /**
- * A person's message's receipt: a small muted mark at the end of its first line (`part="check"`), never a line of its
- * own, so it never changes the message's height or the room before the next one. Clicking or focusing it opens a
+ * A person's message's receipt (and an agent's that mentions agents: whom it handed work to, and "Só mencionado"
+ * with "Chamar um agente" for one it only mentioned, ADR 0089): a small muted mark at the end of its first line
+ * (`part="check"`), never a line of its own, so it never changes the message's height or the room before the next one. Clicking or focusing it opens a
  * popover with each agent and its status, and who picked them. While the author's own plan picks, the mark is the
  * clock, and "Chamar um agente" is in its popover. A message sent into a task at work wears what became of it there
  * instead of the check ("Ada leu" is Ada's face), the words said to screen readers as they change. Words only for what
@@ -88,11 +89,12 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
         <CallAgentMenu />
       </ReceiptAction>
     ) : null;
+  // "Tentar de novo" sends the words again as mine: never an agent's.
   const worded =
     status?.kind === "nobody" ||
     status?.kind === "no_ai" ||
     status?.kind === "platform_cap" ||
-    (status?.kind === "failed" && actions !== null);
+    (status?.kind === "failed" && actions !== null && message.author.type === "person");
   // The mark stays where a line says the rest (a failure, nobody): what became of it in the task is its own news.
   if (part === "line" ? !worded : worded && !steered) return null;
   const marked = view.seen.length > 0 || view.picking === true || steered !== null;
@@ -162,6 +164,12 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
           <span className="ac-popover__row-status">{phaseText(id)}</span>
         </div>
       ))}
+      {/* An agent mentioned another and the judge read no hand-off (ADR 0089): a person can call it. */}
+      {message.author.type === "agent" && view.referenced.length > 0 && actions && actions.channelAgents.length > 0 && (
+        <div className="who-by">
+          <CallAgentMenu />
+        </div>
+      )}
       {view.picking && (
         <div className="who-by ac-iconline">
           <Icon name="waiting" size={14} />

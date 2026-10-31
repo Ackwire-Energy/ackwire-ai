@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { eq, schema } from "@agenteschat/db";
+import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
+import { countQueries, eq, schema } from "@agenteschat/db";
 import {
   accountablePerson,
   createAgentRuns,
+  enableCaches,
   insertMessage,
   messageRoot,
   personOfMessage,
@@ -16,6 +17,8 @@ import { type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
 afterEach(async () => {
+  setSystemTime();
+  enableCaches(false);
   const current = f;
   f = undefined as unknown as Fixture;
   await current?.close();
@@ -33,7 +36,9 @@ const byAgent = (body: string, runId: string | null, meta: Record<string, unknow
   insertMessage(f.db, {
     orgId: f.org.id,
     channelId: f.general.id,
-    author: { type: "agent", agentId: f.agent.id, runId, hop: 1 },
+    author: runId
+      ? { type: "agent", agentId: f.agent.id, runId, hop: 1 }
+      : { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null },
     body,
     meta,
   });
@@ -147,6 +152,21 @@ describe("who is behind a run", () => {
       personId: null,
       reason: "agent_note",
     });
+  });
+
+  test("a wake an hour after the last walks only its newest link, not the chain", async () => {
+    f = await setup();
+    let run = await runFor((await byPerson("@dev acompanha o CI até terminar")).id);
+    for (let i = 0; i < 20; i++) run = await runFor((await byAgent("Ainda rodando, volto já.", run.id)).id);
+    enableCaches();
+    expect(await runAuthority(f.db, run)).toEqual({ kind: "person", personId: f.owner.id });
+    // The next follow-up comes an hour later.
+    setSystemTime(new Date(Date.now() + 3600_000));
+    const next = await runFor((await byAgent("Ainda rodando, volto já.", run.id)).id);
+    const { result, queries } = await countQueries(() => runAuthority(f.db, next));
+    expect(result).toEqual({ kind: "person", personId: f.owner.id });
+    // Its message and its run; the rest of the chain is remembered.
+    expect(queries).toBe(2);
   });
 
   test("an agent's own message with no run belongs to nobody", async () => {
