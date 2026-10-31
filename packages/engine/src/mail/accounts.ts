@@ -514,8 +514,10 @@ const CALLBACK_READS = 10;
  * reads the connected account. Needs no session: the browser Composio returns
  * to may not be signed in (the desktop app opens it in the person's browser),
  * the row's id is random, and only Composio's own state is copied onto the
- * row, as the reconcile does. A pending account, or a read that failed for a
- * moment, is read again for a few seconds in case Composio is still finishing.
+ * row, as the reconcile does. Only a sign-in still pending is read: the id of
+ * a mailbox already connected, which the org's members see, never makes it
+ * call Composio. A pending account, or a read that failed for a moment, is
+ * read again for a few seconds in case Composio is still finishing.
  */
 export async function completeComposioConnect(
   deps: MailDeps,
@@ -523,6 +525,7 @@ export async function completeComposioConnect(
 ): Promise<{ orgId: string; ok: boolean }> {
   const [row] = await deps.db.select().from(mailAccounts).where(eq(mailAccounts.id, accountId));
   if (row?.via !== "composio" || row.revokedAt) throw new NotFoundError("Mailbox not found");
+  if (row.status !== "pending") return { orgId: row.orgId, ok: row.status === "active" };
   for (let read = 1; ; read++) {
     const last = read === CALLBACK_READS;
     // Composio's errors come from the read, before anything is written: the same row is read again.

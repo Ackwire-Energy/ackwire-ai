@@ -16,7 +16,8 @@ import {
   ValidationError,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
-import { apiError } from "../../http/errors";
+import { requestLimitIp } from "../../http/client-ip";
+import { apiError, errorResponse } from "../../http/errors";
 import {
   type AppDeps,
   body,
@@ -102,6 +103,8 @@ const AgentMailbox = z
 
 const testFailed = { 422: json(z.object({ error: MailTestError }), "The connection test failed") };
 const AccountParams = OrgParams.extend({ accountId: z.uuid() });
+/** Composio's return needs no session. Per address, far above a person connecting mailboxes. */
+const CALLBACK_PER_IP = { limit: 30, windowMs: 10 * 60_000 };
 
 /**
  * People's mailboxes for agents (ADR 0038): the org connects Gmail/Outlook
@@ -224,9 +227,16 @@ export function mailRoutes(deps: AppDeps) {
       description:
         "Reads the connected account, then redirects to the connectors screen with `mail=connected` or `mail=failed`, and `account=<id>`. Started in the desktop app (`from=desktop`): to the app's link instead (`agenteschat://desktop/connectors/oauth?org=…&state=mail&code=connected|failed`), which opens the connectors screen in its window.",
       request: { query: z.object({ account: z.uuid(), from: z.enum(["desktop"]).optional() }) },
-      responses: { 302: { description: "Back to the web app, or to the desktop app" }, ...errors },
+      responses: {
+        302: { description: "Back to the web app, or to the desktop app" },
+        429: errorResponse("Too many attempts (`rate_limited`)"),
+        ...errors,
+      },
     }),
     async (c) => {
+      const ip = requestLimitIp(c.req.raw.headers, config.TRUSTED_PROXIES);
+      const limit = await adapters.rateLimiter.consume(`mail-callback:${ip}`, CALLBACK_PER_IP);
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests. Try again later.");
       const base = config.PUBLIC_URL.replace(/\/$/, "");
       const { account: accountId, from } = c.req.valid("query");
       const r = await completeComposioConnect(mailDeps, accountId).catch((error: unknown) => {

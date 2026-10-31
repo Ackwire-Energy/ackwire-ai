@@ -269,6 +269,12 @@ test("Gmail started in the desktop app: the browser without our session hands th
   expect((await callback(web.accountId, "")).headers.get("location")).toBe(
     `${t.config.PUBLIC_URL}/org/${orgId}/settings/connectors?mail=connected&account=${web.accountId}`,
   );
+
+  // Open to anyone, so limited per address: 30 in 10 minutes.
+  const statuses: number[] = [];
+  for (let i = 0; i < 27; i++) statuses.push((await callback(crypto.randomUUID())).status);
+  expect(statuses.slice(0, 26).every((s) => s === 302)).toBe(true);
+  expect(statuses.at(-1)).toBe(429);
 });
 
 test("email routines through the routines API, woken by a signed Composio webhook", async () => {

@@ -206,6 +206,10 @@ test("Gmail through Composio: a pending row, Composio's link, then active with i
     status: "active",
     address: "team@example.com",
   });
+  // Once connected, the callback no longer calls Composio.
+  const before = reads;
+  expect(await completeComposioConnect(deps, started.accountId)).toEqual({ orgId: f.org.id, ok: true });
+  expect(reads).toBe(before);
   // The callback has no session: the person who started it connected it.
   const [connected] = await f.db
     .select()
