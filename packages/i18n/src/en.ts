@@ -7747,9 +7747,11 @@ export const en: Translations = {
     consultPanel: {
       label: "Conversation between {{from}} and {{to}}",
       where: "#{{channel}} · between agents",
+      whereDm: "Between agents",
       messages_one: "{{count}} message",
       messages_other: "{{count}} messages",
       origin: "{{from}} asked {{to}} in #{{channel}} · {{time}}",
+      originDm: "{{from}} asked {{to}} · {{time}}",
       readOnly: "Read only.",
       steer: "To change course, talk to {{name}}.",
       talk: "Talk to {{name}}",

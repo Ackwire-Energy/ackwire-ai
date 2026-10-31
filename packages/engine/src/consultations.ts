@@ -1,7 +1,6 @@
 import type { PubSub } from "@agenteschat/adapters";
 import {
   and,
-  asc,
   type Database,
   desc,
   type Executor,
@@ -10,6 +9,7 @@ import {
   inArray,
   isNull,
   lt,
+  ne,
   or,
   schema,
   sql,
@@ -777,12 +777,12 @@ function consultationView(r: ConsultationRow, waitOf: Map<string, ConsultationWa
   };
 }
 
-/** How many messages the conversation panel reads: the question, then the consulted run's replies and cards. */
+/** How many messages the conversation panel reads: the question, then the latest of the consulted run's. */
 const CONVERSATION_LIMIT = 100;
 
 export interface ConsultationConversation {
   consultation: RunConsultation;
-  /** The question in the agents' DM, then what the consulted run posted, oldest first. */
+  /** The question in the agents' DM, then the latest of what the consulted run posted, oldest first. */
   messages: MessageView[];
 }
 
@@ -827,41 +827,107 @@ export async function consultationConversation(
     );
   if (!row) return null;
   const target = row.targetRunId;
+  const [run] = target
+    ? await db
+        .select({
+          status: agentRuns.status,
+          waitingMachineId: agentRuns.waitingMachineId,
+          createdAt: agentRuns.createdAt,
+        })
+        .from(agentRuns)
+        .where(and(eq(agentRuns.orgId, orgId), eq(agentRuns.id, target)))
+    : [];
   // Still out: what the consulted run waits on now, as the list says it.
   const waitOf = new Map<string, ConsultationWait | null>();
-  if (target && row.status === "open") {
-    const [run] = await db
-      .select({ status: agentRuns.status, waitingMachineId: agentRuns.waitingMachineId })
-      .from(agentRuns)
-      .where(and(eq(agentRuns.orgId, orgId), eq(agentRuns.id, target)));
-    if (run) waitOf.set(target, consultationWait(run));
-  }
+  if (target && run && row.status === "open") waitOf.set(target, consultationWait(run));
   const consultation = consultationView(row, waitOf);
-  const list = await db
+  // Its words in the DM belong to this conversation only while every question the run answers was asked here.
+  const ownRun =
+    target && run && !(await answersElsewhere(db, orgId, row, target, run.createdAt, channelId)) ? target : null;
+  // The question as it went into the DM: everything else comes after it.
+  const [question] = await db
     .select()
     .from(messages)
     .where(
       and(
         eq(messages.orgId, orgId),
+        eq(messages.channelId, row.dmId),
+        eq(messages.id, row.messageId),
         isNull(messages.deletedAt),
-        // The question and everything after it (both live in the same transaction: never earlier).
-        gte(messages.createdAt, row.createdAt),
-        or(
-          // In the agents' DM: the question, then the consulted run's messages.
+      ),
+    );
+  const scope = and(
+    eq(messages.orgId, orgId),
+    isNull(messages.deletedAt),
+    gte(messages.createdAt, question?.createdAt ?? row.createdAt),
+  );
+  // The latest of the rest: what the consulted run wrote in the DM, and its cards where the person asked.
+  const rest = target
+    ? await db
+        .select()
+        .from(messages)
+        .where(
           and(
-            eq(messages.channelId, row.dmId),
-            target
-              ? or(eq(messages.id, row.messageId), eq(messages.agentRunId, target))
-              : eq(messages.id, row.messageId),
+            scope,
+            or(
+              ownRun ? and(eq(messages.channelId, row.dmId), eq(messages.agentRunId, ownRun)) : undefined,
+              and(eq(messages.channelId, channelId), eq(messages.agentRunId, target)),
+            ),
           ),
-          // Where the person asked: the cards the consulted run posted there (`postPauseCards`).
-          target ? and(eq(messages.channelId, channelId), eq(messages.agentRunId, target)) : undefined,
-        ),
+        )
+        .orderBy(desc(messages.createdAt), desc(messages.id))
+        .limit(CONVERSATION_LIMIT - 1)
+    : [];
+  const list = [...(question ? [question] : []), ...rest.reverse()];
+  return { consultation, messages: await withMessageDetails(db, orgId, list) };
+}
+
+/**
+ * Whether the consulted run also answers a question asked from another conversation: a run still at work in the
+ * agents' DM takes the next question for the same person (`startOrJoinRun`), which may come from anywhere that
+ * person asked. Its words in the DM could then be about that one, which this conversation may not read. Read from
+ * the questions posted in the DM since the run started (`meta.consultation`), not by `target_run_id` (no index).
+ */
+async function answersElsewhere(
+  db: Database,
+  orgId: string,
+  question: { dmId: string; messageId: string },
+  runId: string,
+  since: Date,
+  channelId: string,
+) {
+  const asked = await db
+    .select({ meta: messages.meta })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.orgId, orgId),
+        eq(messages.channelId, question.dmId),
+        gte(messages.createdAt, since),
+        ne(messages.id, question.messageId),
+        sql`${messages.meta} -> 'consultation' is not null`,
       ),
     )
-    .orderBy(asc(messages.createdAt), asc(messages.id))
     .limit(CONVERSATION_LIMIT);
-  return { consultation, messages: await withMessageDetails(db, orgId, list) };
+  const ids = asked.flatMap((m) => {
+    const id = (m.meta.consultation as { id?: unknown } | undefined)?.id;
+    return typeof id === "string" ? [id] : [];
+  });
+  if (ids.length === 0) return false;
+  const [other] = await db
+    .select({ id: agentConsultations.id })
+    .from(agentConsultations)
+    .innerJoin(agentRuns, eq(agentRuns.id, agentConsultations.askerRunId))
+    .where(
+      and(
+        eq(agentConsultations.orgId, orgId),
+        inArray(agentConsultations.id, ids),
+        eq(agentConsultations.targetRunId, runId),
+        ne(agentRuns.channelId, channelId),
+      ),
+    )
+    .limit(1);
+  return Boolean(other);
 }
 
 /**

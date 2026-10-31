@@ -1991,12 +1991,16 @@ function ChannelView({
             <ConsultationPanel
               key={consultId}
               channelId={channel.id}
-              channelName={channel.name}
+              channelName={chrome?.composerTarget ? null : channel.name}
               consultationId={consultId}
               onClose={() => setConsultId(null)}
               onTalk={(handle) => {
                 setConsultId(null);
                 actions.insertMention(handle);
+              }}
+              onAnswer={() => {
+                setConsultId(null);
+                actions.focusComposer();
               }}
               renderMessage={(m, grouped) => (
                 <TimelineMessage message={m} grouped={grouped} entering={false} modelLabels={NO_LABELS} readOnly />
@@ -2860,7 +2864,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   lastOfRun?: boolean;
   /** Posted by a run answering another agent's question from here: "ajudando o Theo · Ver conversa". */
   helping?: RunConsultation;
-  /** Shown where the person can't act on it (a question opened in the panel): no feedback, no menu. */
+  /** Shown where the person can't act on it (a question opened in the panel): no feedback, reactions or menu. */
   readOnly?: boolean;
 }) {
   const { t, i18n } = useTranslation();
@@ -3322,7 +3326,8 @@ export const TimelineMessage = memo(function TimelineMessage({
             consulted.length === 0 && (
               <ConsultGroup runId={m.agentRunId} askerId={m.author.id} color={colorOf(agent)} saved />
             )}
-          {m.author.type === "agent" && m.agentRunId && !card && !m.local && !keptAll && (
+          {/* A question to another agent (in their DM) carries the asking run: its work shows on that run's reply. */}
+          {m.author.type === "agent" && m.agentRunId && !card && !m.local && !keptAll && !m.meta?.consultation && (
             <SavedTools
               runId={m.agentRunId}
               meta={m.meta}
@@ -3354,7 +3359,7 @@ export const TimelineMessage = memo(function TimelineMessage({
             </div>
           )}
           {/* Everyone's reactions (👍/👎 on an agent's reply are its feedback, in the same pills). */}
-          {!m.local && (
+          {!m.local && !readOnly && (
             <MessageReactions
               messageId={m.id}
               initial={m.reactions}

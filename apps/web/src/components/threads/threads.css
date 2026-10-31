@@ -235,6 +235,10 @@
   flex: none;
   color: var(--faint);
 }
+/* The answer on its own, when the consulted agent's words in the DM are left out: under the messages, at their text. */
+.consult-answer {
+  margin: 4px 12px 8px var(--thread-indent, 56px);
+}
 /* Who is in it, in front of the title (the generic thread mark only when nobody is known). */
 .thread-head__who {
   flex: none;

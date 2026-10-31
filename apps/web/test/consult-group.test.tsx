@@ -208,6 +208,45 @@ describe("the questions inside the reply that asked (ConsultGroup)", () => {
     expect(box.value).toContain("@ada");
   });
 
+  test("a question card in the panel keeps its button: 'Responder' closes it for the channel's composer", async () => {
+    const c = consultation({ waiting: "input" });
+    const asks: Message = {
+      id: "msg-atlas-question",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ATLAS_ID },
+      body: "Uso a fonte paga?",
+      mentionedAgentIds: [],
+      agentRunId: "atlas-run",
+      meta: {
+        question: {
+          id: "aq1",
+          agentId: ATLAS_ID,
+          channelId: ENG_ID,
+          threadId: null,
+          messageId: "msg-atlas-question",
+          runId: "atlas-run",
+          text: "Uso a fonte paga para a curva?",
+          choices: null,
+          status: "open",
+          answer: null,
+          answeredByUserId: null,
+        },
+      },
+      createdAt: ago(20),
+    };
+    await open(withTalk(withAsk([c]), c, [asks]));
+    const line = within(group() as HTMLElement).getByRole("button", { name: /Atlas espera uma resposta/ });
+    await act(async () => fireEvent.click(line));
+    await settle(3);
+    const side = panel() as HTMLElement;
+    expect(side.textContent).toContain("Uso a fonte paga para a curva?");
+    await act(async () => fireEvent.click(within(side).getByRole("button", { name: "Responder" })));
+    await settle(1);
+    expect(panel()).toBeNull();
+    expect(document.activeElement).toBe(screen().getByRole("combobox", { name: "Mensagem para #eng" }));
+  });
+
   test("a card the consulted agent posts here says whom it helps, and opens the conversation", async () => {
     const c = consultation({ waiting: "input" });
     const state = withTalk(withAsk([c]), c);

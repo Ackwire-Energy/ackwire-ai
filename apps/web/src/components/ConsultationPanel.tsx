@@ -4,11 +4,12 @@ import { dayLabel, formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { buildTimeline } from "@agenteschat/client/lib/timeline";
 import { AvatarStack, Button, DayDivider, Icon, PixelSpinner } from "@agenteschat/ui";
-import { Fragment, type ReactNode, useMemo } from "react";
+import { Fragment, type ReactNode, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { MessageBody } from "@/chat/MessageBody";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { consultLineLabel } from "@/components/ConsultGroup";
-import { ChannelActionsContext } from "@/components/channel-actions";
+import { type ChannelActions, ChannelActionsContext } from "@/components/channel-actions";
 import { ErrorState, LoadingConversation } from "@/components/Loading";
 import { useNow } from "@/components/missions/MissionBits";
 import { useOrg } from "@/components/org-context";
@@ -28,15 +29,19 @@ export function ConsultationPanel({
   consultationId,
   onClose,
   onTalk,
+  onAnswer,
   renderMessage,
 }: {
   /** The conversation that asked (its access opens the question). */
   channelId: string;
-  channelName: string;
+  /** Its name; null in a DM, where the panel names no channel. */
+  channelName: string | null;
   consultationId: string;
   onClose: () => void;
   /** "Falar com o Theo": closes the panel and mentions the agent that asked. */
   onTalk: (handle: string) => void;
+  /** "Responder" on a question card: closes the panel for the conversation's composer. */
+  onAnswer: () => void;
   renderMessage: (message: Message, grouped: boolean) => ReactNode;
 }) {
   const { t, i18n } = useTranslation();
@@ -58,6 +63,23 @@ export function ConsultationPanel({
     articleTo: to.article,
   });
   const state = c ? consultLineState(c, now) : null;
+  // The cards keep their buttons ("Responder" on a question goes to the conversation's composer); nothing else acts
+  // here: no reply, no thread, no quote (the messages live in the agents' DM). Stable: rows don't redraw for it.
+  const latest = useRef({ onTalk, onAnswer });
+  latest.current = { onTalk, onAnswer };
+  const actions = useMemo<ChannelActions>(
+    () => ({
+      insertMention: (handle) => latest.current.onTalk(handle),
+      retry: () => undefined,
+      resend: () => undefined,
+      focusComposer: () => latest.current.onAnswer(),
+      channelAgents: [],
+    }),
+    [],
+  );
+  // The consulted agent's own words came: its last one is the answer. Left out (its run also answers a question
+  // from another conversation), the answer shows on its own.
+  const said = list?.some((m) => m.author.id === c?.consultedAgentId && m.channelId !== channelId) ?? false;
 
   const rows: ReactNode[] = [];
   for (const item of items) {
@@ -98,7 +120,11 @@ export function ConsultationPanel({
                 {to.name}
               </h1>
               <span className="channel__topic thread-head__meta">
-                <span className="thread-head__where">{t("chat.consultPanel.where", { channel: channelName })}</span>
+                <span className="thread-head__where">
+                  {channelName
+                    ? t("chat.consultPanel.where", { channel: channelName })
+                    : t("chat.consultPanel.whereDm")}
+                </span>
                 {list && list.length > 0 && (
                   <>
                     <span aria-hidden="true">·</span>
@@ -118,8 +144,7 @@ export function ConsultationPanel({
             />
           </header>
 
-          {/* The messages act on nothing here: no reply, no thread, no quote (they live in the agents' DM). */}
-          <ChannelActionsContext.Provider value={null}>
+          <ChannelActionsContext.Provider value={actions}>
             <section className="channel__messages" aria-label={label}>
               <div className="channel__spacer" aria-hidden="true" />
               {query.isLoading && <LoadingConversation />}
@@ -129,7 +154,7 @@ export function ConsultationPanel({
                 <p className="thread-origin ac-iconline">
                   <Icon name="agent" size={14} />
                   <span>
-                    {t("chat.consultPanel.origin", {
+                    {t(channelName ? "chat.consultPanel.origin" : "chat.consultPanel.originDm", {
                       from: from.name,
                       toArticle: to.to,
                       to: to.name,
@@ -140,6 +165,14 @@ export function ConsultationPanel({
                 </p>
               )}
               {rows}
+              {c?.status === "answered" && c.answer && !said && (
+                <div className="ac-consult__body ac-consult__body--inline consult-answer">
+                  <small>{t("chat.consultation.answerOf", { name: to.name, of: to.of })}</small>
+                  <div className="ac-consult__text">
+                    <MessageBody body={c.answer} resolveMention={dir.mentionName} />
+                  </div>
+                </div>
+              )}
               {c && state && state !== "answered" && (
                 <p className="cn-line ac-iconline" aria-live="polite">
                   {state === "working" ? (

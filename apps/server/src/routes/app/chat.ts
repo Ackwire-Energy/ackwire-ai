@@ -33,7 +33,6 @@ import { Channel, Message } from "./schemas";
 const tags = ["Chat"];
 const ChannelParams = OrgParams.extend({ channelId: z.uuid() });
 
-/** Channels and messages. Real-time updates arrive over the WebSocket (`/api/ws`). */
 /** A question an agent asked another from a conversation (`consultationsIn`). */
 const Consultation = z.object({
   id: z.uuid(),
@@ -50,15 +49,13 @@ const Consultation = z.object({
       "Open, and the consulted agent waits: on a person (`approval`; `input`: an answer or a secret), or for its computer to come back online (`computer`).",
   }),
   question: z.string(),
-  answer: z
-    .string()
-    .nullable()
-    .openapi({ description: "The answer once answered; why it couldn't once failed." }),
+  answer: z.string().nullable().openapi({ description: "The answer once answered; why it couldn't once failed." }),
   createdAt: z.string(),
   answeredAt: z.string().nullable(),
   expiresAt: z.string(),
 });
 
+/** Channels and messages. Real-time updates arrive over the WebSocket (`/api/ws`). */
 export function chatRoutes(deps: AppDeps) {
   const { db, adapters } = deps;
   const app = createAppRouter(deps);

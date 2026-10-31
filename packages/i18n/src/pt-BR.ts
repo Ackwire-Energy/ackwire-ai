@@ -7797,9 +7797,11 @@ export const ptBR = {
     consultPanel: {
       label: "Conversa entre {{articleFrom}} {{from}} e {{articleTo}} {{to}}",
       where: "#{{channel}} · conversa entre agentes",
+      whereDm: "Conversa entre agentes",
       messages_one: "{{count}} mensagem",
       messages_other: "{{count}} mensagens",
       origin: "{{from}} perguntou {{toArticle}} {{to}} em #{{channel}} · {{time}}",
+      originDm: "{{from}} perguntou {{toArticle}} {{to}} · {{time}}",
       readOnly: "Só leitura.",
       steer: "Para mudar o rumo, fale com {{article}} {{name}}.",
       talk: "Falar com {{article}} {{name}}",

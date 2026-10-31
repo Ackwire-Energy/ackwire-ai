@@ -5,8 +5,8 @@ import type { ModelRequest } from "@agenteschat/providers";
 import { systemText } from "@agenteschat/providers";
 import {
   answerQuestion,
-  cancelRun,
   CONSULTATION_TTL_MS,
+  cancelRun,
   consultationConversation,
   consultationsIn,
   createAgent,
@@ -493,31 +493,83 @@ describe("ask_agent", () => {
     await post("@dev deploy the fix");
     await drainOutbox(f.db, f.handlers);
     const [row] = await consultations();
+    if (!row?.targetRunId) throw new Error("the consulted run didn't start");
+    const dm = row.channelId;
+    const opened = () => consultationConversation(f.db, f.org.id, f.general.id, row.id);
     // The same DM also holds what the two say for other people: never part of this question.
     await insertMessage(f.db, {
       orgId: f.org.id,
-      channelId: row?.channelId ?? "",
+      channelId: dm,
       author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0 },
       body: "Another question, for someone else",
     });
+    // The consulted run's own words in the DM are.
+    await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: dm,
+      author: { type: "agent", agentId: infra.id, runId: row.targetRunId, hop: 1 },
+      body: "Checking the deploy logs first.",
+    });
 
-    const opened = await consultationConversation(f.db, f.org.id, f.general.id, row?.id ?? "");
-    expect(opened?.consultation).toMatchObject({
-      id: row?.id,
+    const first = await opened();
+    expect(first?.consultation).toMatchObject({
+      id: row.id,
       status: "open",
       waiting: "approval",
-      consultedRunId: row?.targetRunId,
+      consultedRunId: row.targetRunId,
     });
-    const list = opened?.messages ?? [];
+    const list = first?.messages ?? [];
     // First the question, as it went into the agents' DM.
-    expect(list[0]).toMatchObject({ channelId: row?.channelId, body: "How is staging deployed?" });
-    // The approval the consulted run asked for, on its card where the person asked.
+    expect(list[0]).toMatchObject({ channelId: dm, body: "How is staging deployed?" });
+    // What the consulted run wrote there, and the approval it asked for, on its card where the person asked.
+    expect(list.some((m) => m.channelId === dm && m.body === "Checking the deploy logs first.")).toBe(true);
     expect(list.some((m) => m.channelId === f.general.id && typeof m.meta.approvalId === "string")).toBe(true);
     // Nothing else: every other message is the consulted run's.
-    expect(list.slice(1).every((m) => m.agentRunId === row?.targetRunId)).toBe(true);
+    expect(list.slice(1).every((m) => m.agentRunId === row.targetRunId)).toBe(true);
     expect(list.some((m) => m.body.startsWith("Another question"))).toBe(false);
     // Opened only from the conversation that asked it.
-    expect(await consultationConversation(f.db, f.org.id, row?.channelId ?? "", row?.id ?? "")).toBeNull();
+    expect(await consultationConversation(f.db, f.org.id, dm, row.id)).toBeNull();
+
+    // The run, still at work, takes a question the same person asked from another conversation: its words in the
+    // DM may be about that one, so they leave this panel; the question and its card here stay.
+    const trigger = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: dm,
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0 },
+      body: "Started elsewhere",
+    });
+    const asker = (await runs()).find((r) => r.id === row.askerRunId);
+    if (!asker) throw new Error("no asking run");
+    const [elsewhere] = await f.db
+      .insert(schema.agentRuns)
+      .values({
+        ...asker,
+        id: Bun.randomUUIDv7(),
+        channelId: dm,
+        triggerMessageId: trigger.id,
+        threadRootId: trigger.id,
+      })
+      .returning();
+    const otherId = Bun.randomUUIDv7();
+    const other = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: dm,
+      author: { type: "agent", agentId: f.agent.id, runId: elsewhere?.id ?? null, hop: 0 },
+      body: "Is production up?",
+      meta: { consultation: { id: otherId } },
+    });
+    await f.db.insert(schema.agentConsultations).values({
+      ...row,
+      id: otherId,
+      askerRunId: elsewhere?.id ?? "",
+      messageId: other.id,
+      waitId: `${row.waitId}-elsewhere`,
+      question: "Is production up?",
+    });
+    const shared = (await opened())?.messages ?? [];
+    expect(shared[0]?.body).toBe("How is staging deployed?");
+    expect(shared.some((m) => m.body === "Checking the deploy logs first.")).toBe(false);
+    expect(shared.some((m) => m.channelId === f.general.id && typeof m.meta.approvalId === "string")).toBe(true);
   });
 
   test("no cycles: the consulted agent can't ask back the one asking it", async () => {
