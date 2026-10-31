@@ -8520,6 +8520,18 @@ a.machine-row__name:hover {
   font-weight: 600;
   color: var(--faint);
 }
+/* The line standing in for the field and its buttons while the code goes: as tall as the field, so a row that fit on
+   one line keeps its height. It takes the focus they had, with no ring: it is not something to press. */
+.agp-addacct__busy {
+  margin: 4px 0;
+  padding-block: calc((var(--control-h-md) - 18px) / 2);
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+}
+.agp-addacct__busy:focus {
+  outline: none;
+}
 .agp-addacct__step.ac-iconline > .agp-addacct__text {
   flex-basis: calc(100% - 32px);
 }
@@ -10588,6 +10600,11 @@ html[data-menu-overlay] .shell {
 }
 .ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__wait {
   margin-left: calc((var(--lead) - 14px) / 2);
+}
+/* The line standing in for a field leads the same way, from inside the step's words (on the text's column). */
+.ai-panel--plan .agp-addacct__busy {
+  gap: calc((var(--lead) - 14px) / 2 + 12px);
+  margin-left: calc((var(--lead) - 14px) / 2 - var(--text-edge));
 }
 /* At phone width for whom goes under the name, on the text's column. */
 @media (max-width: 640px) {

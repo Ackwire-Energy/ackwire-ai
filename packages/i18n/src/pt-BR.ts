@@ -2445,6 +2445,7 @@ export const ptBR = {
           /** Under the field while what it holds isn't a code of this sign-in (it waits for Enviar). */
           notCode: "Isso não parece o código do Claude.",
           send: "Enviar ao {{computer}}",
+          sending: "Enviando o código ao {{computer}}…",
           sent: "Código enviado. O {{computer}} está terminando de entrar.",
           local: "Está no próprio {{computer}}? Se o navegador dele abriu sozinho, é só autorizar lá.",
           deviceCode: "Código para o ChatGPT",
@@ -5138,6 +5139,8 @@ export const ptBR = {
       keyShape: "Isso não parece uma chave do {{plan}}. Copie a chave inteira.",
       keySafe: "A chave vai criptografada para o {{computer}} e\u00a0fica\u00a0só\u00a0lá.",
       keySendFailed: "Não deu para enviar a chave. Confira se ela está inteira e tente de novo.",
+      keySending: "Enviando a chave ao {{computer}}…",
+      keySent: "Chave enviada. O {{computer}} está terminando de entrar.",
       duplicateKey: "Essa chave já está aqui ({{account}}).",
     },
     connect: {
