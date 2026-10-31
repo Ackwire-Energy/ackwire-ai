@@ -16,6 +16,7 @@ import {
   type MessageMedia,
   mediaOf,
   mediaSettings,
+  runMediaCount,
 } from "./media";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import { missionOfThread } from "./missions";
@@ -24,11 +25,12 @@ import { routineBriefOf } from "./routine-brief";
 import { standingRefusal } from "./standing";
 
 /**
- * An agent's sticker or GIF after its own reply (ADR 0091 §4). The agent's prompt and tools know nothing of it:
- * once a reply is posted, this step decides whether a light visual reaction follows it. Code owns the policy
- * (free checks first, then cheap reads); Jev only answers typed questions, calibrated, and the workspace's
- * level is the bar its probability must clear. The reaction is a silent message of its own from the same agent
- * (`meta.mediaAfter`): it starts no run, routes to nobody and notifies nobody.
+ * An agent's sticker or GIF after its own reply (ADR 0091 §4). The agent's prompt knows nothing of this step: once
+ * a reply is posted, it decides whether a light visual reaction follows it. Code owns the policy (free checks
+ * first, then cheap reads); Jev only answers typed questions, calibrated, and the workspace's level is the bar its
+ * probability must clear. The reaction is a silent message of its own from the same agent (`meta.mediaAfter`): it
+ * starts no run, routes to nobody and notifies nobody. When someone asks, the agent sends one itself with its
+ * tools (`media-tools.ts`, ADR 0091 addendum 2026-10-31), and this step stays out of that run.
  */
 
 const { agentRuns, agents, messages, users } = schema;
@@ -77,6 +79,10 @@ const WEEK_MS = 7 * 24 * 3600_000;
 export type AgentMediaSkip =
   /** Not an agent's reply in a run: a card, a notice, a server-written line, a hand-off, deleted. */
   | "not_reply"
+  /** The reply is itself a GIF or a sticker. */
+  | "media_reply"
+  /** Its run already sent a GIF or a sticker with the agent's own tools (`send_gif`, `send_sticker`). */
+  | "tool_media"
   /** Too long, or code, a table or a chart. */
   | "dense"
   /** It ends asking something: the person answers first. */
@@ -132,7 +138,7 @@ export interface AgentMediaDeps {
 
 /**
  * Meta the server puts on cards, notices, server-written lines, routine, mission and issue work, stopped or cut
- * runs, and media itself: such a message is never a light reply in the agent's own words.
+ * runs, and the step's own media: such a message is never a light reply in the agent's own words.
  */
 const NOT_A_LIGHT_REPLY = [
   "talker",
@@ -160,7 +166,6 @@ const NOT_A_LIGHT_REPLY = [
   "brainInterrupted",
   "canceled",
   "interrupted",
-  "media",
   MEDIA_AFTER_KEY,
 ] as const;
 
@@ -184,11 +189,15 @@ type ReplyFields = Pick<
   "authorType" | "authorAgentId" | "agentRunId" | "body" | "meta" | "mentionedAgentIds" | "deletedAt"
 >;
 
-/** What the message itself rules out: not an agent's reply in a run, a card or a notice, a hand-off, dense text. */
+/**
+ * What the message itself rules out: not an agent's reply in a run, a card or a notice, a GIF or a sticker itself
+ * (the step's own, or one the agent sent with its tools), a hand-off, dense text.
+ */
 export function replySkip(message: ReplyFields): AgentMediaSkip | null {
   if (message.authorType !== "agent" || !message.authorAgentId || !message.agentRunId || message.deletedAt)
     return "not_reply";
   if (NOT_A_LIGHT_REPLY.some((key) => message.meta[key] != null && message.meta[key] !== false)) return "not_reply";
+  if (message.meta.media != null) return "media_reply";
   // It hands something to another agent: the conversation goes on with that agent.
   if (message.mentionedAgentIds.length > 0) return "not_reply";
   return replyTextSkip(message.body);
@@ -327,7 +336,8 @@ export interface AgentMediaJudgment {
 const isOneOf = <T extends string>(list: readonly T[], v: unknown): v is T =>
   typeof v === "string" && (list as readonly string[]).includes(v);
 
-function withTimeout<T>(promise: Promise<T>, ms: number, what: string): Promise<T> {
+/** `promise`, or an error after `ms` (the GIF search and the judgment never hold their caller). */
+export function withTimeout<T>(promise: Promise<T>, ms: number, what: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const late = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error(`${what} took longer than ${ms} ms`)), ms);
@@ -376,7 +386,10 @@ const inConversation = (m: Pick<Message, "channelId" | "threadId">) =>
     m.threadId ? or(eq(messages.threadId, m.threadId), eq(messages.id, m.threadId)) : isNull(messages.threadId),
   );
 
-/** The run behind the reply: over, with this reply as its last word, started by a person's own message. */
+/**
+ * The run behind the reply: over, with this reply as its last word, started by a person's own message, and with no
+ * GIF or sticker the agent already sent in it with its tools.
+ */
 async function runSkip(db: Executor, reply: Message): Promise<AgentMediaSkip | null> {
   const [run] = await db
     .select({
@@ -387,6 +400,7 @@ async function runSkip(db: Executor, reply: Message): Promise<AgentMediaSkip | n
       trigger: agentRuns.trigger,
       triggerMessageId: agentRuns.triggerMessageId,
       issueId: agentRuns.issueId,
+      createdAt: agentRuns.createdAt,
     })
     .from(agentRuns)
     .where(and(eq(agentRuns.orgId, reply.orgId), eq(agentRuns.id, reply.agentRunId as string)));
@@ -405,7 +419,14 @@ async function runSkip(db: Executor, reply: Message): Promise<AgentMediaSkip | n
   if (trigger.meta.issueId != null) return "work";
   // A mission's thread is its work, moved by its own turns.
   if (reply.threadId && (await missionOfThread(db, reply.orgId, reply.threadId))) return "work";
-  return null;
+  // It already sent one with its own tools (asked for it, or the moment invited it): that was its touch.
+  const sent = await runMediaCount(db, {
+    orgId: reply.orgId,
+    id: reply.agentRunId as string,
+    channelId: reply.channelId,
+    createdAt: run.createdAt,
+  });
+  return sent > 0 ? "tool_media" : null;
 }
 
 /**
@@ -468,9 +489,9 @@ async function conversationSkip(db: Executor, reply: Message, at: Date): Promise
   return busy ? "busy" : null;
 }
 
-/** Whether a GIF may go after this reply: the server's search, the workspace's GIFs on, and people's GIFs here. */
+/** Whether a GIF may go after this reply: the server's search now, the workspace's GIFs on, and people's GIFs here. */
 const gifAllowed = (deps: AgentMediaDeps, settings: MediaSettings, reply: Message, at: Date) =>
-  deps.gifs && settings.gifs ? peopleSendGifs(deps.db, reply, at) : Promise.resolve(false);
+  deps.gifs?.available() && settings.gifs ? peopleSendGifs(deps.db, reply, at) : Promise.resolve(false);
 
 /** Whether people send GIFs in this conversation: a person's GIF among its last messages, lately. */
 async function peopleSendGifs(db: Executor, reply: Message, at: Date): Promise<boolean> {
@@ -572,7 +593,7 @@ async function chooseMedia(
   judged: AgentMediaJudgment,
   gifEligible: boolean,
 ): Promise<MessageMedia | null> {
-  if (gifEligible && judged.gif && deps.gifs) {
+  if (gifEligible && judged.gif && deps.gifs?.available()) {
     const gif = await gifFor(deps.gifs, judged.gif, settings.gifRating, reply.id).catch(() => null);
     if (gif) return gif;
   }
@@ -586,9 +607,10 @@ async function chooseMedia(
  * Decides whether an agent's reply gets a sticker or a GIF after it, and posts it. The free checks and cheap
  * reads come first, each ending it: the reply's own kind and text (`replySkip`), its moment (`MEDIA_LATE_MS`);
  * the workspace's level is not `never`; stickers on or a GIF possible here; the agent's switch; the final reply
- * of a run a person started (`runSkip`); a chat channel or a person's DM (`channelSkip`); the conversation
- * (`conversationSkip`). Then one calibrated judgment, a GIF or the sticker, and the conversation checked again
- * under a lock right before posting. Never throws for the judgment or the GIF search: nothing is sent then.
+ * of a run a person started, which sent none with the agent's tools (`runSkip`); a chat channel or a person's DM
+ * (`channelSkip`); the conversation (`conversationSkip`). Then one calibrated judgment, a GIF or the sticker, and
+ * the conversation checked again under a lock right before posting. Never throws for the judgment or the GIF
+ * search: nothing is sent then.
  */
 export async function maybeSendAgentMedia(
   deps: AgentMediaDeps,

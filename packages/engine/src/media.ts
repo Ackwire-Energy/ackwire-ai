@@ -1,4 +1,4 @@
-import { type Database, eq, schema } from "@agenteschat/db";
+import { and, count, type Database, type Executor, eq, gte, schema, sql } from "@agenteschat/db";
 import { caches } from "./cache";
 
 /**
@@ -9,6 +9,12 @@ import { caches } from "./cache";
  * its bytes through the server (`GET …/gifs/{id}/media`), so the viewer's browser never talks to the provider.
  * A sticker is an agent and a mood: every app draws it from the agent's look (`packages/ui/src/agent/engine.js`).
  */
+
+/** The agent's own tools that send one (`media-tools.ts`, ADR 0091 addendum 2026-10-31). */
+export const SEND_GIF_TOOL = "send_gif";
+export const SEND_STICKER_TOOL = "send_sticker";
+/** Both, by name. */
+export const MEDIA_TOOLS: ReadonlySet<string> = new Set([SEND_GIF_TOOL, SEND_STICKER_TOOL]);
 
 /** The agents' stickers: one animation of the agent per mood. */
 export const STICKER_MOODS = ["celebrate", "love", "deal", "thinking", "wow", "dizzy"] as const;
@@ -78,6 +84,12 @@ export type MessageMedia = GifMedia | StickerMedia;
  */
 export const MEDIA_AFTER_KEY = "mediaAfter";
 
+/**
+ * `meta.mediaInRun` on a sticker or GIF an agent sent with its tools while it works: not its reply. Unlike
+ * `meta.mediaAfter` people hear of it; the apps keep the run going under it, and its text still comes after.
+ */
+export const MEDIA_IN_RUN_KEY = "mediaInRun";
+
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
 export const isStickerMood = (v: unknown): v is StickerMood =>
   typeof v === "string" && (STICKER_MOODS as readonly string[]).includes(v);
@@ -107,6 +119,41 @@ export function mediaOf(meta: Record<string, unknown> | null | undefined): Messa
 /** True for the silent sticker or GIF an agent added after its own reply (`meta.mediaAfter`). */
 export const isMediaAfterReply = (meta: Record<string, unknown> | null | undefined) =>
   typeof meta?.[MEDIA_AFTER_KEY] === "string";
+
+/**
+ * A message of only a GIF or a sticker: no text and no files. Like a reaction it routes to nobody and starts no run
+ * (ADR 0091 §1), whoever sent it.
+ */
+export function isMediaOnly(message: { body: string; meta: Record<string, unknown> | null | undefined }): boolean {
+  const files = message.meta?.artifacts;
+  return message.body.trim() === "" && !(Array.isArray(files) && files.length > 0) && mediaOf(message.meta) !== null;
+}
+
+/**
+ * How many GIFs and stickers a run sent with the agent's own tools (`send_gif`, `send_sticker`, ADR 0091): the run's
+ * messages that carry `meta.media`, never the silent one after its reply (`meta.mediaAfter`). Read in the run's
+ * channel from its start: the messages table is partitioned by time (ADR 0009).
+ */
+export async function runMediaCount(
+  db: Executor,
+  run: { orgId: string; id: string; channelId: string; createdAt: Date },
+): Promise<number> {
+  const { messages } = schema;
+  const [row] = await db
+    .select({ n: count() })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.orgId, run.orgId),
+        eq(messages.channelId, run.channelId),
+        gte(messages.createdAt, run.createdAt),
+        eq(messages.agentRunId, run.id),
+        sql`${messages.meta}->'media' is not null`,
+        sql`${messages.meta}->>'mediaAfter' is null`,
+      ),
+    );
+  return Number(row?.n ?? 0);
+}
 
 /** The workspace's switches for GIFs and stickers (`organization_settings`, ADR 0091 §5). */
 export interface MediaSettings {

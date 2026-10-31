@@ -36,6 +36,7 @@ import {
   createLlmJudge,
   createMachineHub,
   createMailToolSource,
+  createMediaToolSource,
   createMissionHooks,
   createMissionRunToolSource,
   createMissionToolSource,
@@ -271,6 +272,8 @@ export function buildEngine(o: EngineOptions) {
       // What the agent says it is doing, next to its name (ADR 0084).
       createSetStatusToolSource({ pubsub: adapters.pubsub }),
       createReactToolSource({ pubsub: adapters.pubsub }),
+      // A GIF or the agent's sticker when asked (ADR 0091): listed by the workspace's switches and the agent's.
+      createMediaToolSource({ pubsub: adapters.pubsub, gifs: adapters.gifs ?? null }),
       // An agent comes back to a conversation by itself (a CI run, a deploy), instead of promising to.
       createFollowUpToolSource({ pubsub: adapters.pubsub }),
       // Background runs (routines) speak only through it.

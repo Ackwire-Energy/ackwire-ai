@@ -39,6 +39,7 @@ import {
   createJobHandlers,
   createLocalKeyWrapper,
   createMachineHub,
+  createMediaToolSource,
   createMissionHooks,
   createMissionToolSource,
   createModelGateway,
@@ -173,6 +174,8 @@ export async function setup(
     askAgent?: boolean;
     /** Add the built-in `react` tool. */
     react?: boolean;
+    /** Add the built-in `send_gif` and `send_sticker` tools (ADR 0091), with `gifs` as the server's GIF search. */
+    mediaTools?: boolean;
     /** Add the built-in `follow_up` and `cancel_follow_up` tools. */
     followUps?: boolean;
     /** Add the built-in `hand_off` tool (background runs: routines). */
@@ -208,7 +211,10 @@ export async function setup(
     warmBrowser?: RunExecutorDeps["warmBrowser"];
     /** What the server can connect: `find_tools` names the connectors an agent lacks. None: it names none. */
     catalog?: ServerCatalog;
-    /** GIF search for the jobs (ADR 0091): an agent's GIF after its reply. None: its own stickers only. */
+    /**
+     * GIF search for the jobs (ADR 0091): an agent's GIF after its reply, and `send_gif` with `mediaTools`. None: its
+     * own stickers only.
+     */
     gifs?: GifProvider | null;
   } = {},
 ) {
@@ -309,6 +315,7 @@ export async function setup(
         ]
       : []),
     ...(options.react ? [createReactToolSource({ pubsub })] : []),
+    ...(options.mediaTools ? [createMediaToolSource({ pubsub, gifs: options.gifs ?? null })] : []),
     ...(options.followUps ? [createFollowUpToolSource({ pubsub })] : []),
     ...(options.handOff ? [createHandOffToolSource({ pubsub })] : []),
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),

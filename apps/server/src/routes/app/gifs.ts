@@ -25,19 +25,19 @@ const Gif = z
 
 /**
  * GIFs (ADR 0091): search through the server's provider, and every GIF's file through the server, so the key and
- * the provider's address never reach a browser. Only with a provider (`GIPHY_API_KEY`) and while the workspace has
- * GIFs on; members only.
+ * the provider's address never reach a browser. Only while the provider has a key (`GIPHY_API_KEY`, or the one the
+ * installation's owner adds in Settings: `available()`) and the workspace has GIFs on; members only.
  */
 export function gifRoutes(deps: AppDeps) {
   const { db, adapters } = deps;
   const app = createAppRouter(deps);
   app.use("/organizations/*", requireSession(deps.auth));
 
-  /** The provider and the workspace's rating for a member; null while GIFs are off here (no provider, or off). */
+  /** The provider and the workspace's rating for a member; null while GIFs are off here (no key, or turned off). */
   const gifsFor = async (userId: string, orgId: string) => {
     await requirePermission(db, userId, orgId, "read");
     const gifs = adapters.gifs;
-    if (!gifs) return null;
+    if (!gifs?.available()) return null;
     const settings = await mediaSettings(db, orgId);
     return settings.gifs ? { gifs, rating: settings.gifRating } : null;
   };
@@ -50,7 +50,7 @@ export function gifRoutes(deps: AppDeps) {
       security,
       summary: "Search GIFs: free text, a category, or what's trending (members)",
       description:
-        "`category` searches that category's own query (English, which the provider matches best); else `q`; neither: trending. At the workspace's `gifRating`. Load each GIF with `GET …/gifs/{gifId}/media`. 404 `gifs.off` when the server has no GIF provider or the workspace turned GIFs off; 502 `gifs.unavailable` when the provider doesn't answer; 429 past 60 searches a minute.",
+        "`category` searches that category's own query (English, which the provider matches best); else `q`; neither: trending. At the workspace's `gifRating`. Load each GIF with `GET …/gifs/{gifId}/media`. 404 `gifs.off` when the server has no GIF provider or no key for it, or the workspace turned GIFs off; 502 `gifs.unavailable` when the provider doesn't answer; 429 past 60 searches a minute.",
       request: {
         params: OrgParams,
         query: z.object({

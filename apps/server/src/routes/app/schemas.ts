@@ -209,7 +209,7 @@ export const Agent = z
     appearance: AgentAppearance.nullable().openapi({ description: "Its look; null = the default." }),
     mediaReplies: z.boolean().openapi({
       description:
-        "It may follow a light reply with a sticker or a GIF of its own (ADR 0091), as often as the workspace's `agentMedia` allows.",
+        "It may send a sticker or a GIF (ADR 0091): when someone asks for one, and after a light reply as often as the workspace's `agentMedia` allows.",
     }),
     brain: z
       .object({

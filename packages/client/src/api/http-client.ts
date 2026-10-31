@@ -70,6 +70,7 @@ import type {
   ForumSuggestion,
   ForumTopic,
   ForumTopicDetail,
+  GifKey,
   GifPage,
   GitHubAppInstallation,
   GitHubRepositories,
@@ -360,6 +361,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       saveJev: (apiKey) => request<JevKey>("/api/app/jev", { method: "PUT", json: { apiKey } }),
       checkJev: () => request<JevKey>("/api/app/jev/check", { method: "POST" }),
       removeJev: () => request<JevKey>("/api/app/jev", { method: "DELETE" }),
+      gifKey: () => nullOn(404, () => request<GifKey>("/api/app/gif-key")),
+      saveGifKey: (apiKey) => request<GifKey>("/api/app/gif-key", { method: "PUT", json: { apiKey } }),
+      removeGifKey: () => request<GifKey>("/api/app/gif-key", { method: "DELETE" }),
     },
     account: {
       authConfig: () => request<AuthConfig>("/api/app/auth-config"),

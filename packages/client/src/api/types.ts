@@ -35,6 +35,19 @@ export interface JevKey {
 }
 
 /**
+ * The installation's GIPHY key, for its pinned owner on a server that isn't agentes.chat's own (`GET
+ * /api/app/gif-key`, ADR 0091): with it, every workspace has GIFs (`OrgSettings.gifsAvailable`).
+ */
+export interface GifKey {
+  /** `env`: `GIPHY_API_KEY`, read-only here. `settings`: added in Settings. Null: none. */
+  source: "env" | "settings" | null;
+  /** The key's last 4 characters (the key itself is never returned). */
+  hint: string | null;
+  /** `invalid`: a saved key this server can't read, or one in `GIPHY_API_KEY` that can't be a key. */
+  state: "off" | "ok" | "invalid";
+}
+
+/**
  * A device that hears pushes (`POST /api/app/push/devices`): the phone app's Expo token (ADR 0035), or this
  * browser's Web Push subscription (ADR 0071: its endpoint and keys, from `PushSubscription.toJSON()`).
  */
@@ -430,8 +443,8 @@ export interface Agent {
   /** No longer in the team (ADR 0082): only its name, role and look, from `FormerAgent`. */
   former?: "archived" | "deleted";
   /**
-   * It may follow a light reply with a sticker or a GIF of its own, as often as the workspace allows (ADR 0091).
-   * Absent: on (the default).
+   * It may send a sticker or a GIF (ADR 0091): when someone asks for one, and after a light reply as often as the
+   * workspace allows. Absent: on (the default).
    */
   mediaReplies?: boolean;
 }

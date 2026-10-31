@@ -53,6 +53,8 @@ export const GIF_PAGE = 24;
  * its own, never a reply.
  */
 export const MEDIA_AFTER_KEY = "mediaAfter";
+/** A sticker or GIF the agent sent with its tools while it works (ADR 0091). */
+export const MEDIA_IN_RUN_KEY = "mediaInRun";
 
 type Meta = Record<string, unknown> | null | undefined;
 
@@ -85,8 +87,12 @@ export function messageMediaOf(meta: Meta): MessageMedia | null {
   return null;
 }
 
-/** True for the silent sticker or GIF an agent added after its own reply (`meta.mediaAfter`). */
-export const isMediaAfterReply = (meta: Meta) => typeof meta?.[MEDIA_AFTER_KEY] === "string";
+/**
+ * True for a sticker or GIF beside an agent's reply, never the reply itself: the one added after it
+ * (`meta.mediaAfter`) or sent with its tools while it works (`meta.mediaInRun`). It doesn't end the run on screen.
+ */
+export const isMediaAfterReply = (meta: Meta) =>
+  typeof meta?.[MEDIA_AFTER_KEY] === "string" || meta?.[MEDIA_IN_RUN_KEY] === true;
 
 /**
  * Where a GIF's file loads from: our server's media route, never the provider (the viewer's address stays with us).

@@ -40,7 +40,7 @@ import {
   type TaskCall,
   wakeConversationForTask,
 } from "./machine-tasks";
-import { isMediaAfterReply } from "./media";
+import { isMediaAfterReply, isMediaOnly } from "./media";
 import { getMessage, referencedOf } from "./messages";
 import { checkMissionDone } from "./mission-delivery";
 import { onMissionTaskEnded, syncMissionFiles } from "./mission-sync";
@@ -331,8 +331,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (message.meta.issueWork || message.meta.issueWorkStart || message.meta.issueTaken) return;
       // A fast reply while the task works (talker.ts): its task reads it; it starts nobody, not even by mention.
       if (message.meta.talker) return;
-      // An agent's sticker or GIF after its own reply (ADR 0091): silent, it starts nobody and routes to nobody.
-      if (isMediaAfterReply(message.meta)) return;
+      // A GIF or a sticker alone (ADR 0091), an agent's silent one after its reply too: it starts nobody, routes
+      // to nobody and gets no sticker after it. Its insert queues no `message.posted`; one delivered anyway does
+      // nothing.
+      if (isMediaAfterReply(message.meta) || isMediaOnly(message)) return;
       // A routine's trigger: its background run is already started; nobody else is routed (routines.ts).
       if (message.meta.background) return;
       const routed = (

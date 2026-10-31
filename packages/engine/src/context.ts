@@ -130,6 +130,9 @@ export function collapseRepeats(entries: { key: string; line: string }[], max: n
 const QUIET_TOOLS = [
   "ask_user",
   "react",
+  // A GIF or a sticker (ADR 0091) is in its conversation already: not work to recall elsewhere.
+  "send_gif",
+  "send_sticker",
   "search_context",
   "get_summary",
   "expand",

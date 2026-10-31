@@ -201,6 +201,7 @@ function fakeGifs(count: number) {
   }));
   const provider: GifProvider = {
     name: "fake",
+    available: () => true,
     async search(input) {
       searches.push(input);
       return { gifs: gifs.slice(input.offset, input.offset + input.limit), next: null };
@@ -505,6 +506,22 @@ describe("GIFs", () => {
       { from: "ana", kind: "person", text: "", sent: "a GIF" },
       { from: "ana", kind: "person", text: "@dev pode subir a versão nova?" },
     ]);
+  });
+
+  test("a GIF search with no key for now is none: the sticker, even where people send GIFs", async () => {
+    const gifs = fakeGifs(6);
+    f = await setup({
+      reply: lightReply,
+      judge: jev({ fits: 0.9, mood: "love", gif: "thanks" }),
+      gifs: { ...gifs.provider, available: () => false },
+    });
+    await personGif();
+    await ask();
+    expect(gifs.searches).toEqual([]);
+    expect((await mediaMessages()).map((m) => mediaOf(m.meta))).toEqual([
+      { kind: "sticker", agentId: f.agent.id, mood: "love" },
+    ]);
+    expect(Object.keys(mediaJudgments()[0]?.questions ?? {})).toEqual(["fits", "mood"]);
   });
 
   test("where nobody sends GIFs, the agent's sticker: the GIF question isn't even asked", async () => {

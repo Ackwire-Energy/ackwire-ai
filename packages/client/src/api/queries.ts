@@ -73,6 +73,7 @@ import type {
   ForumTopicDetail,
   ForumTopicInput,
   GifCategory,
+  GifKey,
   IssueColumn,
   IssueInput,
   IssuePatch,
@@ -191,6 +192,31 @@ function useJevChange<T>(change: (api: ApiClient, input: T) => Promise<JevKey>, 
 export const useSaveJevKey = () => useJevChange((api, apiKey: string) => api.system.saveJev(apiKey), true);
 export const useCheckJevKey = () => useJevChange<void>((api) => api.system.checkJev());
 export const useRemoveJevKey = () => useJevChange<void>((api) => api.system.removeJev());
+
+/** The installation's GIPHY key (ADR 0091): `null` for everyone but its owner on a self-hosted server. */
+export const useGifKey = () => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.gifKey, queryFn: () => api.system.gifKey() });
+};
+
+function useGifKeyChange<T>(change: (api: ApiClient, input: T) => Promise<GifKey>, silent = false) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: T) => change(api, input),
+    onSuccess: (gifKey) => {
+      qc.setQueryData(keys.gifKey, gifKey);
+      // The key is the server's: every workspace's GIFs come and go with it (`gifsAvailable`, the picker's tab).
+      void qc.invalidateQueries({
+        predicate: (q) => q.queryKey[0] === "org" && (q.queryKey[2] === "settings" || q.queryKey[2] === "gifs"),
+      });
+    },
+    // A refused key is said under its field.
+    ...(silent ? { meta: { silent: true } } : {}),
+  });
+}
+export const useSaveGifKey = () => useGifKeyChange((api, apiKey: string) => api.system.saveGifKey(apiKey), true);
+export const useRemoveGifKey = () => useGifKeyChange<void>((api) => api.system.removeGifKey());
 
 /**
  * The server's Web Push key (ADR 0071): `null` when this server has Web Push off. Asked only where this

@@ -1146,7 +1146,8 @@ async function resolveMedia(
   const settings = await mediaSettings(deps.db, orgId);
   const notFound = () => new ValidationError("That GIF or sticker isn't available", "message.media_not_found");
   if (input.kind === "gif") {
-    const gifs = deps.gifs;
+    // A provider without a key now (`available()`) is none: GIFs come back once the server's owner adds one.
+    const gifs = deps.gifs?.available() ? deps.gifs : null;
     if (!gifs || !settings.gifs) throw new ValidationError("GIFs are off in this workspace", "message.media_off");
     if (!GIF_ID_PATTERN.test(input.id)) throw notFound();
     const gif = await gifs.get(input.id, settings.gifRating).catch((): never => {

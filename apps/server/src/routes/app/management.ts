@@ -81,10 +81,11 @@ const Settings = z
     }),
     agentMedia: z.enum(AGENT_MEDIA_LEVELS).openapi({
       description:
-        "How often agents follow a light reply with a sticker or a GIF: `never`, `sometimes` (the default) or `often`. Needs `agentMediaAvailable`; each agent can be turned off (`mediaReplies`).",
+        "How often agents follow a light reply with a sticker or a GIF on their own: `never`, `sometimes` (the default) or `often`. Needs `agentMediaAvailable`; each agent can be turned off (`mediaReplies`). When someone asks for one, agents send it at any level.",
     }),
     gifsAvailable: z.boolean().openapi({
-      description: "Read only: this server has a GIF provider (`GIPHY_API_KEY`). Without it there are no GIFs at all.",
+      description:
+        "Read only: this server has a GIF provider with a key now (`GIPHY_API_KEY`, or the one the installation's owner added in Settings). Without it there are no GIFs at all.",
     }),
     agentMediaAvailable: z.boolean().openapi({
       description:
@@ -195,9 +196,10 @@ const AgentDetail = z
     audienceMode: z.enum(["everyone", "people", "owner"]),
     canTalk: z.boolean(),
     appearance: AgentAppearance.nullable(),
-    mediaReplies: z
-      .boolean()
-      .openapi({ description: "It may follow a light reply with a sticker or a GIF of its own (ADR 0091)." }),
+    mediaReplies: z.boolean().openapi({
+      description:
+        "It may send a sticker or a GIF (ADR 0091): when someone asks for one, and after a light reply as often as the workspace's `agentMedia` allows.",
+    }),
   })
   .openapi("AgentDetail");
 
@@ -249,7 +251,8 @@ export function managementRoutes(deps: AppDeps) {
   const AgentParams = OrgParams.extend({ agentId: z.uuid() });
   /** What this server can do for GIFs and agents' stickers (ADR 0091 §5), so no switch does nothing. */
   const mediaAvailable = async () => ({
-    gifsAvailable: Boolean(adapters.gifs),
+    // The provider follows the installation's key, which its owner may add or remove at any time.
+    gifsAvailable: adapters.gifs?.available() ?? false,
     agentMediaAvailable: Boolean((await deps.extras?.jevKey?.view())?.source),
   });
 

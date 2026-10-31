@@ -1,9 +1,11 @@
 import {
   type Adapters,
+  checkGiphyKey,
   createFakeEmailSender,
   createFakeGifs,
   createFakePushSender,
   createFakeWebPushSender,
+  createKeyedGifs,
   createMemoryBlobStore,
   createMemoryPresence,
   createMemoryPubSub,
@@ -23,6 +25,7 @@ import { createTestDatabase } from "@agenteschat/db/testing";
 import {
   createFakeJudge,
   createFakeScheduleReader,
+  createGifKey,
   createLocalKeyWrapper,
   drainOutbox,
   type EmailArt,
@@ -96,6 +99,12 @@ export async function createTestServer(
     webPush?: WebPushSender | null;
     /** GIF search (ADR 0091); absent = the fake provider (`createFakeGifs`), null = none, as without its key. */
     gifs?: GifProvider | null;
+    /**
+     * A fake GIPHY: GIFs then come, as on a server that isn't agentes.chat's own, from the provider that follows the
+     * installation's key (`GIPHY_API_KEY` or the one saved in Settings), and it answers a key's check before a save.
+     * Absent: `gifs` serves them, and a saved key is kept unchecked (tests never reach the network).
+     */
+    giphyFetch?: typeof fetch;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -109,12 +118,24 @@ export async function createTestServer(
   const push = createFakePushSender();
   const webPush = options.webPush === undefined ? createFakeWebPushSender() : options.webPush;
   const platformBlobs = createMemoryBlobStore({ kind: options.platformKind });
+  const keyWrapper = createLocalKeyWrapper(config.AGENTES_SECRET);
+  const { giphyFetch } = options;
+  // The installation's GIPHY key, as `start.ts` makes it off agentes.chat (ADR 0091, amended 2026-10-31).
+  const gifKey = createGifKey({
+    db,
+    keyWrapper,
+    keyWrappers: [keyWrapper],
+    envKey: config.GIPHY_API_KEY,
+    check: async (apiKey) => (giphyFetch ? checkGiphyKey(apiKey, { fetch: giphyFetch }) : "unknown"),
+  });
+  let gifs: GifProvider | null = options.gifs === undefined ? createFakeGifs() : options.gifs;
+  if (giphyFetch) gifs = createKeyedGifs({ key: () => gifKey.key(), fetch: giphyFetch });
   const adapters: Adapters = {
     search: createPostgresSearchResolver(db),
     pubsub: createMemoryPubSub(),
     presence: createMemoryPresence(),
     rateLimiter: createMemoryRateLimiter(),
-    keyWrapper: createLocalKeyWrapper(config.AGENTES_SECRET),
+    keyWrapper,
     legacyKeyWrappers: [],
     platformCredentials: noPlatformCredentials,
     email,
@@ -124,7 +145,7 @@ export async function createTestServer(
     ...(options.mail ? { mail: options.mail } : {}),
     databases: options.databases ?? null,
     humanCheck: options.humanCheck ?? null,
-    gifs: options.gifs === undefined ? createFakeGifs() : options.gifs,
+    gifs,
   };
   const provider = createFakeProvider(options.reply);
   const embeddings = createFakeEmbeddings();
@@ -148,8 +169,9 @@ export async function createTestServer(
     jevFetch: options.jevFetch,
     routerQuietMs: 0,
   });
-  // As at boot: the saved Jev key is read before anything serves.
+  // As at boot: the saved Jev and GIPHY keys are read before anything serves.
   await engine.jevKey.ready();
+  await gifKey.ready();
   const { handlers } = engine;
   const auth = createAuth({
     db,
@@ -185,6 +207,7 @@ export async function createTestServer(
         router: engine.router,
         streams: engine.streams,
         jevKey: engine.jevKey,
+        gifKey,
       },
     },
     log,
@@ -215,6 +238,8 @@ export async function createTestServer(
     webPush,
     platformBlobs,
     engine,
+    /** The installation's GIPHY key (ADR 0091), as its owner's routes change it. */
+    gifKey,
     app,
     auth,
     realtime,

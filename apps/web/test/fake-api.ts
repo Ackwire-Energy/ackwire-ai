@@ -30,6 +30,7 @@ import type {
   Edition,
   FormerAgent,
   Gif,
+  GifKey,
   GitHubAppInstallation,
   GitHubRepositories,
   HttpApi,
@@ -269,6 +270,13 @@ export interface FakeState {
    * `rate_limited`: the server's limit answers the first try (429), and the next one goes through.
    */
   jevVerdicts?: Record<string, "invalid" | "no_credit" | "rate_limited">;
+  /**
+   * `system.gifKey`: the installation's GIPHY key (ADR 0091); unset = I'm not its owner on a self-hosted server
+   * (null). Saving one makes GIFs available here (`media.gifsAvailable`), removing it takes them away.
+   */
+  gifKey?: GifKey;
+  /** The keys GIPHY refuses when `system.saveGifKey` checks them (422, nothing kept); any other works. */
+  gifKeyRefused?: string[];
   /** Where the server keeps files itself (`storage.get`'s `platform`); unset = its disk, no folder. */
   storagePlatform?: StoragePlatform;
   /** What the workspace's files take (`storage.get`'s `usage`); unset = none yet, no disk told. */
@@ -1089,6 +1097,24 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (!state.jev) throw new ApiError(404, "not_found", "Not found");
         state.jev = { ...state.jev, source: null, hint: null, state: "off" };
         return state.jev;
+      },
+      gifKey: async () => state.gifKey ?? null,
+      saveGifKey: async (apiKey) => {
+        log("system.saveGifKey", apiKey);
+        if (!state.gifKey) throw new ApiError(404, "not_found", "Not found");
+        if (state.gifKeyRefused?.includes(apiKey)) {
+          throw new ApiError(422, "gif_key_invalid", "GIPHY didn't accept this key.");
+        }
+        state.gifKey = { source: "settings", hint: apiKey.slice(-4), state: "ok" };
+        state.media = { ...state.media, gifsAvailable: true };
+        return state.gifKey;
+      },
+      removeGifKey: async () => {
+        log("system.removeGifKey");
+        if (!state.gifKey) throw new ApiError(404, "not_found", "Not found");
+        state.gifKey = { source: null, hint: null, state: "off" };
+        state.media = { ...state.media, gifsAvailable: false };
+        return state.gifKey;
       },
     },
     account: {

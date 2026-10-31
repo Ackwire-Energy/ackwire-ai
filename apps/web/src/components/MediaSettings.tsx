@@ -4,6 +4,7 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { Card, CardFooter, CardHeader, Segmented, Switch } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { GifKeyCard } from "@/components/GifKeyCard";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { PrefRow } from "@/components/NoticePrefs";
 import { useOrg } from "@/components/org-context";
@@ -15,8 +16,9 @@ type MediaPatch = Partial<Pick<OrgSettings, "gifs" | "gifRating" | "agentSticker
 
 /**
  * Configurações › GIFs e figurinhas (ADR 0091): what people can send (GIFs and their rating, the agents' stickers),
- * how often agents follow a light reply with one, and each agent's own switch. Who configures the workspace changes
- * it; everyone else reads it. What this server can't do is said beside its control, which stays off.
+ * how often agents follow a light reply with one on their own, and each agent's own switch (which also decides whether
+ * it sends one when asked, at any level). Who configures the workspace changes it; everyone else reads it. What this
+ * server can't do is said beside its control, which stays off.
  */
 export function MediaSettingsSection() {
   const { t } = useTranslation();
@@ -39,7 +41,7 @@ export function MediaSettingsSection() {
     if (editable) update.mutate(patch);
   };
   const gifsOn = shown.gifsAvailable && shown.gifs;
-  // Without what decides when, agents send nothing: the choice reads Nunca, whatever is stored.
+  // Without what decides when, agents send nothing on their own: the choice reads Nunca, whatever is stored.
   const level: AgentMediaLevel = shown.agentMediaAvailable ? shown.agentMedia : "never";
   const team = (agents.data ?? []).filter((a) => !a.former);
   const agentsNote =
@@ -103,6 +105,8 @@ export function MediaSettingsSection() {
           />
         </div>
       </Card>
+      {/* The server's own GIPHY key, for its owner on a server that isn't agentes.chat's own (null to anyone else). */}
+      <GifKeyCard jevMissing={!shown.agentMediaAvailable} />
       <Card aria-labelledby="media-agents">
         <CardHeader id="media-agents" icon="agent" title={t("settings.media.agentsTitle")} />
         <div className="settings-rows">
@@ -122,9 +126,7 @@ export function MediaSettingsSection() {
               />
             }
           />
-          {team.map((agent) => (
-            <AgentMediaRow key={agent.id} agent={agent} off={level === "never"} />
-          ))}
+          {team.map((agent) => <AgentMediaRow key={agent.id} agent={agent} />)}
         </div>
         {agentsNote && <CardFooter>{agentsNote}</CardFooter>}
       </Card>
@@ -132,8 +134,11 @@ export function MediaSettingsSection() {
   );
 }
 
-/** One agent's own switch: whoever edits agents changes it; with the workspace at Nunca it shows off and waits. */
-function AgentMediaRow({ agent, off }: { agent: Agent; off: boolean }) {
+/**
+ * One agent's own switch: whoever edits agents changes it. It counts at any level: at Nunca the agent sends none on
+ * its own, and still sends one when asked while it is on.
+ */
+function AgentMediaRow({ agent }: { agent: Agent }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const update = useUpdateAgent(org.id, agent.id);
@@ -148,9 +153,9 @@ function AgentMediaRow({ agent, off }: { agent: Agent; off: boolean }) {
       help={agent.role || undefined}
       control={
         <Switch
-          checked={(asked ?? saved) && !off}
+          checked={asked ?? saved}
           onCheckedChange={(next) => update.mutate({ mediaReplies: next })}
-          disabled={off || !can(org, "manage_agents")}
+          disabled={!can(org, "manage_agents")}
           aria-label={t("settings.media.agentOn", { name: agent.name })}
           aria-describedby={agent.role ? `${id}-help` : undefined}
         />

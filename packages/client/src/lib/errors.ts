@@ -132,6 +132,8 @@ const KNOWN = {
   human_check_blocked: "errors.humanCheckBlocked",
   // TypeSafe refused the key pasted for Jev: said under its field, nothing kept.
   jev_key_invalid: "jev.steps.invalid",
+  // GIPHY refused the key pasted for GIFs (ADR 0091): said under its field, nothing kept.
+  gif_key_invalid: "settings.media.giphy.invalid",
   // A provider's own check refused a key on save (OpenRouter's): nothing kept.
   provider_key_invalid: "settings.keyRefused",
   provider_key_management: "settings.keyManagement",

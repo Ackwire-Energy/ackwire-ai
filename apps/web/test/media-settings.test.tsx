@@ -91,7 +91,8 @@ describe("Configurações › GIFs e figurinhas (ADR 0091)", () => {
     expect(screen().getByRole("radio", { name: "Nunca" }).getAttribute("aria-checked")).toBe("true");
     expect(disabled(screen().getByRole("radio", { name: "De vez em quando" }))).toBe(true);
     expect(document.getElementById("media-level-help")?.textContent).toBe("Ainda não disponível neste servidor.");
-    expect(disabled(screen().getByRole("switch", { name: "Ada manda GIFs e figurinhas" }))).toBe(true);
+    // Each agent's own switch still decides whether it sends one when asked (its sticker, here).
+    expect(disabled(screen().getByRole("switch", { name: "Ada manda GIFs e figurinhas" }))).toBe(false);
     // Stickers need nothing from the server.
     expect(disabled(screen().getByRole("switch", { name: "Figurinhas dos agentes" }))).toBe(false);
     // No internal names in what a person reads.
@@ -99,11 +100,20 @@ describe("Configurações › GIFs e figurinhas (ADR 0091)", () => {
     expect(section().getByRole("region", { name: "Agentes" }).textContent).not.toMatch(/TypeSafe|\bJev\b/);
   });
 
-  test("Nunca: each agent's switch shows off and waits", async () => {
-    await go(seedState({ media: { agentMedia: "never" } }));
+  test("Nunca: none on their own; each agent's switch still says whether it sends one when asked", async () => {
+    const { state } = await go(seedState({ media: { agentMedia: "never" } }));
+    const asked = "Quando alguém pede, eles mandam mesmo com Nunca.";
+    expect(document.getElementById("media-level-help")?.textContent?.endsWith(asked)).toBe(true);
     const ada = screen().getByRole("switch", { name: "Ada manda GIFs e figurinhas" });
-    expect(ada.getAttribute("aria-checked")).toBe("false");
-    expect(disabled(ada)).toBe(true);
-    expect(screen().getByText("Com Nunca, nenhum agente manda.")).toBeTruthy();
+    expect(ada.getAttribute("aria-checked")).toBe("true");
+    expect(disabled(ada)).toBe(false);
+    const note = "Com Nunca, nenhum agente manda por conta própria. Quando alguém pede, os ligados aqui mandam.";
+    expect(screen().getByText(note)).toBeTruthy();
+    await click(ada);
+    expect(state.calls.findLast((c) => c.method === "agents.update")?.args).toEqual([
+      ORG_ID,
+      ADA_ID,
+      { mediaReplies: false },
+    ]);
   });
 });

@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
+  checkGiphyKey,
   createFakeGifs,
   createGiphyGifs,
+  createKeyedGifs,
   GIF_FILE_MAX_BYTES,
   GifProviderError,
   gifRatingAllowed,
@@ -243,5 +245,57 @@ describe("the fake provider", () => {
       { id: "fakeWild1", size: "full", rating: "pg" },
       { id: "fakeParty1", size: "full", rating: "g" },
     ]);
+  });
+});
+
+describe("GIPHY with the installation's key (ADR 0091, amended 2026-10-31)", () => {
+  test("GIPHY with its own key and the fake can always search", () => {
+    expect(createGiphyGifs({ apiKey: "k", fetch: fakeGiphy().fetch }).available()).toBe(true);
+    expect(createFakeGifs().available()).toBe(true);
+  });
+
+  test("follows the key on every call: unavailable without one, a new key used at once with pages of its own", async () => {
+    const giphy = fakeGiphy();
+    let key: string | null = null;
+    const gifs = createKeyedGifs({ key: () => key, fetch: giphy.fetch });
+    expect(gifs.available()).toBe(false);
+    await expect(gifs.trending({ rating: "g", limit: 4, offset: 0 })).rejects.toBeInstanceOf(GifProviderError);
+    await expect(gifs.get("aaa111", "g")).rejects.toBeInstanceOf(GifProviderError);
+    expect(await gifs.media("aaa111", "full", "g")).toBeNull();
+    expect(giphy.calls).toEqual([]);
+
+    key = "first-key";
+    expect(gifs.available()).toBe(true);
+    const page = await gifs.search({ query: "dance", rating: "g", limit: 4, offset: 0 });
+    expect(page.gifs.map((g) => g.id)).toEqual(["aaa111"]);
+    // The same page again comes from the client kept for that key.
+    await gifs.search({ query: "dance", rating: "g", limit: 4, offset: 0 });
+    key = "second-key";
+    await gifs.search({ query: "dance", rating: "g", limit: 4, offset: 0 });
+    expect(giphy.api().map((u) => u.searchParams.get("api_key"))).toEqual(["first-key", "second-key"]);
+
+    key = null;
+    expect(gifs.available()).toBe(false);
+    await expect(gifs.search({ query: "dance", rating: "g", limit: 4, offset: 0 })).rejects.toBeInstanceOf(
+      GifProviderError,
+    );
+  });
+
+  test("a key's check: one trending GIF with it; only a refusal says the key is wrong", async () => {
+    const ok = fakeGiphy();
+    expect(await checkGiphyKey("good-key", { fetch: ok.fetch })).toBe("ok");
+    const [call, ...more] = ok.api();
+    expect(more).toEqual([]);
+    expect(call?.pathname).toBe("/v1/gifs/trending");
+    expect(call?.searchParams.get("limit")).toBe("1");
+    expect(call?.searchParams.get("api_key")).toBe("good-key");
+    for (const status of [401, 403]) {
+      expect(await checkGiphyKey("bad-key", { fetch: fakeGiphy({ status }).fetch })).toBe("invalid");
+    }
+    // A limit, an outage or no answer says nothing about the key.
+    for (const status of [429, 500]) {
+      expect(await checkGiphyKey("some-key", { fetch: fakeGiphy({ status }).fetch })).toBe("unknown");
+    }
+    expect(await checkGiphyKey("some-key", { fetch: fakeGiphy({ down: true }).fetch })).toBe("unknown");
   });
 });

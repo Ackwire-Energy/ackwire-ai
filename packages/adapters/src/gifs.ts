@@ -1,7 +1,9 @@
 /**
- * GIF search (ADR 0091). Optional: the server has it only with `GIPHY_API_KEY`; without it the app shows no GIF
- * tab and agents send only their own stickers. The key never leaves the server, and neither does the provider's
- * address: the app loads every GIF through the server (`media`), so a viewer's browser never talks to it.
+ * GIF search (ADR 0091). Optional: the server has it only with a GIPHY key, `GIPHY_API_KEY` or, on a server that
+ * isn't agentes.chat's own, the one the installation's owner adds in Settings (`createKeyedGifs`); without one the
+ * app shows no GIF tab and agents send only their own stickers. The key never leaves the server, and neither does
+ * the provider's address: the app loads every GIF through the server (`media`), so a viewer's browser never talks
+ * to it.
  */
 export type GifRating = "g" | "pg";
 
@@ -35,6 +37,11 @@ export interface GifMediaFile {
 
 export interface GifProvider {
   readonly name: string;
+  /**
+   * Whether it can search now. Always for GIPHY with its key and the fake; the keyed provider only while the
+   * installation has a key. Synchronous: the routes and the settings ask on every request.
+   */
+  available(): boolean;
   /** `lang`: the person's language (two letters), to match words in it. */
   search(input: { query: string; rating: GifRating; lang?: string; limit: number; offset: number }): Promise<GifPage>;
   trending(input: { rating: GifRating; limit: number; offset: number }): Promise<GifPage>;
@@ -232,19 +239,21 @@ async function readCapped(res: Response, max: number): Promise<ArrayBuffer | nul
   return body;
 }
 
-/**
- * GIPHY's API v1 (`/v1/gifs/search`, `/trending`, `/{id}`), our own calls with a fake `fetch` in tests. Every
- * answer is filtered by rating again here, so a GIF above the workspace's rating never reaches it whatever GIPHY
- * returns. Files come only from GIPHY's hosts over https, at most `GIF_FILE_MAX_BYTES`, and only as images.
- */
-export function createGiphyGifs(options: {
-  apiKey: string;
+/** How the server reaches GIPHY (tests pass a fake `fetch`). */
+export interface GiphyOptions {
   fetch?: typeof fetch;
   /** GIPHY's API, `https://api.giphy.com` by default. */
   baseURL?: string;
   timeoutMs?: number;
   now?: () => number;
-}): GifProvider {
+}
+
+/**
+ * GIPHY's API v1 (`/v1/gifs/search`, `/trending`, `/{id}`), our own calls with a fake `fetch` in tests. Every
+ * answer is filtered by rating again here, so a GIF above the workspace's rating never reaches it whatever GIPHY
+ * returns. Files come only from GIPHY's hosts over https, at most `GIF_FILE_MAX_BYTES`, and only as images.
+ */
+export function createGiphyGifs(options: GiphyOptions & { apiKey: string }): GifProvider {
   const http = options.fetch ?? fetch;
   const base = (options.baseURL ?? "https://api.giphy.com").replace(/\/+$/, "");
   const timeoutMs = options.timeoutMs ?? TIMEOUT_MS;
@@ -269,7 +278,9 @@ export function createGiphyGifs(options: {
     const said = answer?.meta?.status;
     const status = typeof said === "number" ? said : res.status;
     if (res.status === 404 || res.status === 400 || status === 404 || status === 400) return null;
-    if (!res.ok || status >= 300 || !answer) throw new GifProviderError(`GIPHY answered ${res.status}`, res.status);
+    // A refusal said only in the answer's `meta` (a 200 that says 403) still reads as one (`checkGiphyKey`).
+    const code = res.ok ? status : res.status;
+    if (!res.ok || status >= 300 || !answer) throw new GifProviderError(`GIPHY answered ${code}`, code);
     return answer;
   }
 
@@ -350,6 +361,7 @@ export function createGiphyGifs(options: {
 
   return {
     name: "giphy",
+    available: () => true,
     async search(input) {
       const query = input.query.replace(/\s+/g, " ").trim().slice(0, QUERY_MAX);
       if (!query) return trending(input);
@@ -377,6 +389,61 @@ export function createGiphyGifs(options: {
       return found;
     },
   };
+}
+
+/** How long a key's check waits for GIPHY before the key is kept unchecked. */
+const CHECK_TIMEOUT_MS = 5_000;
+
+/**
+ * GIPHY with the installation's key as it is now (ADR 0091, amended 2026-10-31): `key` is read on every call, so a
+ * key the owner saves or removes in Settings works without a restart. One client for the current key, made on first
+ * use and dropped, with its pages and lookups, when the key changes. Without a key it isn't `available`: a search
+ * throws and a file is missing, as when GIPHY doesn't answer.
+ */
+export function createKeyedGifs(options: GiphyOptions & { key: () => string | null }): GifProvider {
+  const { key, ...giphy } = options;
+  let client: { apiKey: string; gifs: GifProvider } | null = null;
+  /** The client for the key now; null without one. */
+  const current = () => {
+    const apiKey = key();
+    if (!apiKey) {
+      client = null;
+      return null;
+    }
+    if (client?.apiKey !== apiKey) client = { apiKey, gifs: createGiphyGifs({ ...giphy, apiKey }) };
+    return client.gifs;
+  };
+  const keyed = () => {
+    const gifs = current();
+    if (!gifs) throw new GifProviderError("This server has no GIPHY key");
+    return gifs;
+  };
+  return {
+    name: "giphy",
+    available: () => key() !== null,
+    search: async (input) => keyed().search(input),
+    trending: async (input) => keyed().trending(input),
+    get: async (id, rating) => keyed().get(id, rating),
+    media: async (id, size, rating) => (await current()?.media(id, size, rating)) ?? null,
+  };
+}
+
+/** What GIPHY says of a key: it answers, it refuses the key (401, 403), or nothing either way (no answer, a limit). */
+export type GiphyKeyCheck = "ok" | "invalid" | "unknown";
+
+/**
+ * One cheap call with `apiKey` (one trending GIF, 5 s at most) before a key is kept (ADR 0091, amended 2026-10-31).
+ * Only a refusal says the key is wrong.
+ */
+export async function checkGiphyKey(apiKey: string, options: GiphyOptions = {}): Promise<GiphyKeyCheck> {
+  const gifs = createGiphyGifs({ timeoutMs: CHECK_TIMEOUT_MS, ...options, apiKey });
+  try {
+    await gifs.trending({ rating: "g", limit: 1, offset: 0 });
+    return "ok";
+  } catch (error) {
+    const refused = error instanceof GifProviderError && (error.status === 401 || error.status === 403);
+    return refused ? "invalid" : "unknown";
+  }
 }
 
 /** The smallest GIF there is (1×1, transparent): what the fake serves for every file. */
@@ -427,6 +494,7 @@ export function createFakeGifs(options: { gifs?: FakeGif[] } = {}) {
   const provider: GifProvider & { calls: typeof calls } = {
     name: "fake",
     calls,
+    available: () => true,
     async search(input) {
       calls.search.push(input);
       const words = input.query.toLowerCase().split(/\s+/).filter(Boolean);

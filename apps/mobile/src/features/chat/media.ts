@@ -1,5 +1,5 @@
 import type { Message } from "@agenteschat/client";
-import { isMediaAfterReply, MEDIA_AFTER_KEY } from "@agenteschat/client/lib/media";
+import { MEDIA_AFTER_KEY } from "@agenteschat/client/lib/media";
 
 /**
  * GIFs and stickers in a message (ADR 0091), the phone's pure rules: how big a GIF shows, and when the sticker or
@@ -33,7 +33,8 @@ export function gifBox(width: number, height: number, room = 0): { width: number
 
 /** The reply an agent's silent sticker or GIF follows (`meta.mediaAfter`), or null for any other message. */
 export function mediaAfterOf(meta: Message["meta"]): string | null {
-  return isMediaAfterReply(meta) ? (meta?.[MEDIA_AFTER_KEY] as string) : null;
+  const after = meta?.[MEDIA_AFTER_KEY];
+  return typeof after === "string" ? after : null;
 }
 
 /**

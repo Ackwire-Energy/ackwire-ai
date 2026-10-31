@@ -86,6 +86,7 @@ import type {
   ForumTopic,
   ForumTopicDetail,
   ForumTopicInput,
+  GifKey,
   GifPage,
   GifQuery,
   GitHubAppInstallation,
@@ -246,6 +247,11 @@ export interface ApiClient {
     saveJev(apiKey: string): Promise<JevKey>;
     checkJev(): Promise<JevKey>;
     removeJev(): Promise<JevKey>;
+    /** The GIPHY key (ADR 0091): `null` unless I am the installation's owner on a self-hosted server. */
+    gifKey(): Promise<GifKey | null>;
+    /** Checked with GIPHY first: `gif_key_invalid` (422) when it refuses, `gif_key_env` (409) with an env key. */
+    saveGifKey(apiKey: string): Promise<GifKey>;
+    removeGifKey(): Promise<GifKey>;
   };
   account: {
     authConfig(): Promise<AuthConfig>;
