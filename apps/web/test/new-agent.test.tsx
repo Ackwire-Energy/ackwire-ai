@@ -624,6 +624,45 @@ describe("Criar agente: what gets created", () => {
     expect(screen().queryByText(/^Começa com a última escolha/)).toBeNull();
   });
 
+  test("the last setup's Autonomia: said with it and sent at creation; another AI leaves all of it", async () => {
+    const state = seedState();
+    state.newAgentSetup = {
+      brain: "model",
+      model: "claude-opus-5-5",
+      key: null,
+      contextTokens: null,
+      autonomy: "never",
+    };
+    await open(state);
+    await startAs("Assistente");
+    await proceed(4);
+    expect(screen().getByText("Começa com a última escolha: Claude Opus 5.5 · Autonomia: Não pergunta.")).toBeTruthy();
+    await proceed();
+    await click(screen().getByRole("button", { name: "Criar Eva" }));
+    await settle(8);
+    expect(createdWith(state)).toMatchObject({ model: "claude-opus-5-5", autonomy: "never" });
+    cleanup();
+
+    const other = seedState();
+    other.newAgentSetup = {
+      brain: "model",
+      model: "claude-opus-5-5",
+      key: null,
+      contextTokens: null,
+      autonomy: "never",
+    };
+    await open(other);
+    await startAs("Assistente");
+    await proceed(4);
+    await click(screen().getByRole("button", { name: /^Claude Sonnet 5\.5/ }));
+    expect(screen().queryByText(/^Começa com a última escolha/)).toBeNull();
+    await proceed();
+    await click(screen().getByRole("button", { name: "Criar Eva" }));
+    await settle(8);
+    expect(createdWith(other)?.model).toBe("claude-sonnet-5-5");
+    expect(createdWith(other)).not.toHaveProperty("autonomy");
+  });
+
   test("budget: empty is the workspace default; zero or text is invalid; a quick amount lights its button", async () => {
     const state = await open();
     await startAs("QA");

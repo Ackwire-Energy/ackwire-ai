@@ -5,6 +5,7 @@ import type {
   AgentSetup,
   AgentSetupResult,
   BrainMachine,
+  CommandApproval,
   Model,
   NewAgentSetup,
 } from "../api/types";
@@ -15,11 +16,12 @@ import { planModel, planOf } from "./plans";
 import { isAuto } from "./providers";
 
 /*
- * One agent's "Quem pensa" on others (ADR 0089), the same on the web (a dialog over "Quem pensa") and the phone (a
- * screen from "Pensa com"), and the setup a new agent starts with. The server decides what each agent takes.
+ * One agent's "Quem pensa" and its Autonomia on others (ADR 0089), the same on the web (a dialog over "Quem pensa")
+ * and the phone (a screen from "Pensa com"), and the setup a new agent starts with. The server decides what each agent
+ * takes.
  */
 
-/** The setup an agent's saved "Quem pensa" says, for a computer brain (the phone's "Pensa com"). */
+/** The setup an agent's saved "Quem pensa" and Autonomia say, for a computer brain (the phone's "Pensa com"). */
 export function setupOfBrain(view: AgentBrain): AgentSetup | null {
   if (view.brain === "model" || !view.computer) return null;
   return {
@@ -31,28 +33,57 @@ export function setupOfBrain(view: AgentBrain): AgentSetup | null {
     contextTokens: view.contextTokens,
     fallback: view.fallback,
     onlyOwner: view.onlyOwner,
+    ...(view.autonomy ? { autonomy: view.autonomy } : {}),
   };
 }
 
-const ORDER = { applied: 0, same: 1, skipped: 2 } as const;
+/** It changes: it takes the AI, or its Autonomia (even where its AI can't change). */
+export const changes = (r: AgentSetupResult) => r.status === "applied" || r.autonomy !== undefined;
 
-/** Who can take it first, then who already thinks so, then who can't; each group in the order asked. */
-export const sortedResults = (results: readonly AgentSetupResult[]) =>
-  [...results].sort((a, b) => ORDER[a.status] - ORDER[b.status]);
+const rank = (r: AgentSetupResult) => {
+  if (!changes(r)) return r.status === "same" ? 2 : 3;
+  return r.status === "skipped" ? 1 : 0;
+};
 
-/** The agents "Todos" picks: those that can take it. */
-export const takers = (results: readonly AgentSetupResult[]) =>
-  results.filter((r) => r.status === "applied").map((r) => r.agentId);
+/**
+ * Who takes it all first, then who takes only the Autonomia, then who already has it all, then who can't take it;
+ * each group in the order asked.
+ */
+export const sortedResults = (results: readonly AgentSetupResult[]) => [...results].sort((a, b) => rank(a) - rank(b));
+
+/** The agents "Todos" picks: those that change. */
+export const takers = (results: readonly AgentSetupResult[]) => results.filter(changes).map((r) => r.agentId);
+
+/** After "Usar": how many think with the setup now, how many took only its Autonomia, how many didn't change. */
+export function setupOutcome(results: readonly AgentSetupResult[], asked: number) {
+  const done = results.filter((r) => r.status !== "skipped").length;
+  const autonomyOnly = results.filter((r) => r.status === "skipped" && r.autonomy).length;
+  return { done, autonomyOnly, missed: asked - done - autonomyOnly };
+}
+
+const autonomyName = (t: TFunction, a: CommandApproval) => t(`missions.commandApproval.${a}`);
+
+/** "Autonomia: Não pergunta", the last of a setup's words. */
+export const autonomyWords = (t: TFunction, a: CommandApproval) =>
+  t("missions.commandApproval.changed", { value: autonomyName(t, a) });
 
 /**
  * The line under an agent: what it thinks with now (`now`), what it keeps, that it already thinks so, or why it
- * can't take it (`owner`: the agent's owner's first name, for who else may change it).
+ * can't take it (`owner`: the agent's owner's first name, for who else may change it); then its Autonomia's change.
  */
 export function setupResultLine(
   t: TFunction,
   r: AgentSetupResult,
   o: { now: string; owner?: string | null | undefined },
 ): string {
+  const ai = aiLine(t, r, o);
+  if (!r.autonomy) return ai;
+  const { from, to } = r.autonomy;
+  const autonomy = t("agentPage.work.brain.copy.autonomy", { from: autonomyName(t, from), to: autonomyName(t, to) });
+  return `${ai} · ${autonomy}`;
+}
+
+function aiLine(t: TFunction, r: AgentSetupResult, o: { now: string; owner?: string | null | undefined }): string {
   const p = r.params ?? {};
   if (r.status === "same") return t("agentPage.work.brain.copy.same");
   if (r.status === "applied") {
@@ -86,7 +117,7 @@ export function setupResultLine(
 }
 
 /** What "Criar agente" starts on: the API's model, key and context window, or a plan on a computer, saved after. */
-export type NewAgentStart =
+export type NewAgentStart = (
   | { brain: "model"; model: string; key: string | null; contextTokens: number | null }
   | {
       brain: "claude_code" | "codex";
@@ -95,23 +126,29 @@ export type NewAgentStart =
       account: { id: string; label: string } | null;
       /** Saved as its "Quem pensa" once the agent exists. */
       input: AgentBrainInput;
-    };
+    }
+) & {
+  /** Its Autonomia, sent with the agent: only where the person may set it, on their own agent or, as an admin, any. */
+  autonomy?: CommandApproval;
+};
 
 /**
  * The setup a new agent starts with (ADR 0089), where it can think for it: the API's while its model runs (`usable`,
  * as `usableModels` says), with its key where the person sees it (`keys`, else the workspace's default); a plan only
  * for an agent of the person's own, on their account with room for one more agent or on a computer they connected
- * (its own sign-in). Null: "Automático" on the API, as before.
+ * (its own sign-in). Its Autonomia goes with it where the person could set it by hand: their own agent, or any agent
+ * for an admin (`admin`). Null: "Automático" on the API, as before.
  */
 export function newAgentStart(
   s: NewAgentSetup | null | undefined,
-  o: { ownerIsMe: boolean; usable: ReadonlySet<string>; keys: readonly { id: string }[] },
+  o: { ownerIsMe: boolean; admin?: boolean; usable: ReadonlySet<string>; keys: readonly { id: string }[] },
 ): NewAgentStart | null {
   if (!s) return null;
+  const autonomy = s.autonomy && (o.ownerIsMe || o.admin) ? { autonomy: s.autonomy } : {};
   if (s.brain === "model") {
     if (!s.model || !(isAuto(s.model) ? o.usable.size > 0 : o.usable.has(s.model))) return null;
     const key = o.keys.some((k) => k.id === s.key) ? s.key : null;
-    return { brain: "model", model: s.model, key, contextTokens: s.contextTokens };
+    return { brain: "model", model: s.model, key, contextTokens: s.contextTokens, ...autonomy };
   }
   if (!o.ownerIsMe || !s.computer) return null;
   if (s.account ? !(s.account.mine && s.account.free) : !s.ownSignIn) return null;
@@ -128,12 +165,13 @@ export function newAgentStart(
       contextTokens: s.contextTokens,
       fallback: s.fallback ?? true,
     },
+    ...autonomy,
   };
 }
 
 /**
  * What a new agent starts with, in words: the API's model ("Claude Opus 5.5", "Automático"), or the plan with its
- * model and what differs in its advanced settings ("Claude Code · Opus · Esforço alto").
+ * model and what differs in its advanced settings ("Claude Code · Opus · Esforço alto"), then its Autonomia.
  */
 export function newAgentStartText(
   t: TFunction,
@@ -141,10 +179,12 @@ export function newAgentStartText(
   start: NewAgentStart,
   o: { models: readonly Model[]; machines: readonly BrainMachine[]; provider?: string | null | undefined },
 ): string {
+  const autonomy = start.autonomy ? [autonomyWords(t, start.autonomy)] : [];
   if (start.brain === "model") {
-    return isAuto(start.model)
+    const model = isAuto(start.model)
       ? t("brain.auto.label")
       : (o.models.find((m) => m.id === start.model)?.label ?? start.model);
+    return [model, ...autonomy].join(" · ");
   }
   const option = o.machines.find((m) => m.machineId === start.machineId)?.options.find((x) => x.kind === start.brain);
   const value = start.input.model ?? option?.defaultModel ?? null;
@@ -165,5 +205,5 @@ export function newAgentStartText(
       fallback: start.input.fallback ?? true,
     },
   });
-  return [t(`brain.card.${start.brain}`), name, ...parts].filter(Boolean).join(" · ");
+  return [t(`brain.card.${start.brain}`), name, ...parts, ...autonomy].filter(Boolean).join(" · ");
 }

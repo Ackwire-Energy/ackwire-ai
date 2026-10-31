@@ -2435,7 +2435,7 @@ export const en: Translations = {
         },
         copy: {
           row: "Use on other agents",
-          rowLine: "The same AI, model and effort",
+          rowLine: "The same AI, model, effort and autonomy",
           title: "Use on other agents",
           sub: "They'll think with {{setup}}.",
           all: "All",
@@ -2446,6 +2446,7 @@ export const en: Translations = {
           same: "Already thinks this way",
           keeps: "Keeps {{account}}",
           keepsOwn: "Keeps its computer's account",
+          autonomy: "Autonomy: {{from}} → {{to}}",
           reasons: {
             not_allowed: "Only admins and {{owner}} change it",
             not_allowedNobody: "Only admins change it",
@@ -2465,6 +2466,8 @@ export const en: Translations = {
           use_other: "Use on {{count}} agents",
           done_one: "{{count}} agent now thinks with {{setup}}.",
           done_other: "{{count}} agents now think with {{setup}}.",
+          autonomyOnly_one: "{{count}} agent changed only its autonomy.",
+          autonomyOnly_other: "{{count}} agents changed only their autonomy.",
           missed_one: "{{count}} agent didn't change.",
           missed_other: "{{count}} agents didn't change.",
         },

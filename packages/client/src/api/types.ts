@@ -516,6 +516,8 @@ export interface AgentInput {
   appearance?: AgentLookInput;
   /** Created from an agent's proposal (its card's message id, ADR 0081): the card is marked created. */
   proposal?: string;
+  /** The Autonomia it starts with (the last setup's, ADR 0089): only an admin or its own owner sends it. */
+  autonomy?: CommandApproval;
 }
 
 /**
@@ -3931,6 +3933,8 @@ export interface AgentBrain {
   ownSignIn: boolean;
   /** "Conta deste computador"'s plan usage, by brain (absent: not known). */
   ownUsage: Partial<Record<MachineAccountKind, PlanUsage>>;
+  /** Its Autonomia (its new missions' autonomy), copied with its setup (ADR 0089); absent on older servers. */
+  autonomy?: CommandApproval;
 }
 
 /** ADR 0041 §5: `xhigh` may be stored; the page offers low, medium, high and max. */
@@ -4046,6 +4050,8 @@ export interface AgentSetup {
   fallback?: boolean;
   /** "Atende outras pessoas" off, for the agents that move onto the plan. */
   onlyOwner?: boolean;
+  /** Its Autonomia, for the agents that take the rest or already think this way; omitted = each keeps its own. */
+  autonomy?: CommandApproval;
 }
 
 /** Why an agent can't take a setup. */
@@ -4061,13 +4067,15 @@ export type AgentSetupReason =
 /** What a setup does to one agent (in a preview, would do). */
 export interface AgentSetupResult {
   agentId: string;
-  /** `same`: it already thinks this way; `skipped`: it can't take it (`reason`). */
+  /** Its AI. `same`: it already thinks this way; `skipped`: it takes nothing (`reason`). */
   status: "applied" | "same" | "skipped";
   /** It keeps the account it has (another person's plan) and takes the rest: its name; null = its computer's own. */
   keeps?: { account: string | null };
   reason?: AgentSetupReason;
   /** `owner` (account_owner, not the caller's), `agent` (account_single), `computer`, `plan` and `model`. */
   params?: Record<string, string>;
+  /** Its Autonomia changes too: with the AI it takes, or alone when it already thinks this way. */
+  autonomy?: { from: CommandApproval; to: CommandApproval };
 }
 
 /** `GET …/agent-setup`: what a new agent starts thinking with (the last setup saved or used on others). */
@@ -4085,6 +4093,8 @@ export interface NewAgentSetup {
   ownSignIn?: boolean;
   effort?: BrainEffortSetting | null;
   fallback?: boolean;
+  /** Its Autonomia; null or absent = the default. */
+  autonomy?: CommandApproval | null;
 }
 
 /** `POST …/machines/{id}/account-logins` (201): what the person needs to sign in. */

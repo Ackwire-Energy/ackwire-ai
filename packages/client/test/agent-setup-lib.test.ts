@@ -3,9 +3,11 @@ import type { TFunction } from "i18next";
 import { createHttpApi } from "../src/api/http-client";
 import type { AgentBrain, AgentSetupResult, Model, NewAgentSetup } from "../src/api/types";
 import {
+  changes,
   newAgentStart,
   newAgentStartText,
   setupOfBrain,
+  setupOutcome,
   setupResultLine,
   sortedResults,
   takers,
@@ -15,6 +17,7 @@ import {
 const t = ((key: string, o?: Record<string, unknown>) =>
   o && Object.keys(o).length ? `${key} ${JSON.stringify(o)}` : key) as unknown as TFunction;
 const W = "agentPage.work.brain.copy";
+const A = "missions.commandApproval";
 
 describe("Usar em outros agentes", () => {
   const results: AgentSetupResult[] = [
@@ -54,6 +57,34 @@ describe("Usar em outros agentes", () => {
       line({ agentId: "a", status: "skipped", reason: "model_missing", params: { plan: "GLM Coding", model: "Opus" } }),
     ).toBe(`${W}.reasons.model_missing {"plan":"GLM Coding","model":"Opus"}`);
     expect(line({ agentId: "a", status: "skipped" })).toBe(`${W}.reasons.failed`);
+  });
+
+  test("the Autonomia: who changes only it can take it too, its line says from what to what", () => {
+    const onPc = { reason: "other_computer", params: { computer: "PC" } } as const;
+    const withAutonomy: AgentSetupResult[] = [
+      { agentId: "a", status: "skipped", reason: "not_allowed" },
+      { agentId: "b", status: "same" },
+      { agentId: "f", status: "skipped", ...onPc, autonomy: { from: "always", to: "never" } },
+      { agentId: "e", status: "same", autonomy: { from: "always", to: "never" } },
+      { agentId: "c", status: "applied", autonomy: { from: "low_risk_auto", to: "never" } },
+    ];
+    expect(withAutonomy.map(changes)).toEqual([false, false, true, true, true]);
+    // Who takes it all, then who takes only the Autonomia, then who has it all already, then who can't.
+    expect(sortedResults(withAutonomy).map((r) => r.agentId)).toEqual(["e", "c", "f", "b", "a"]);
+    expect(takers(withAutonomy)).toEqual(["f", "e", "c"]);
+    const line = (r: AgentSetupResult) => setupResultLine(t, r, { now: "Automático" });
+    const change = (from: string, to: string) => `${W}.autonomy {"from":"${A}.${from}","to":"${A}.${to}"}`;
+    expect(line({ agentId: "e", status: "same", autonomy: { from: "always", to: "never" } })).toBe(
+      `${W}.same · ${change("always", "never")}`,
+    );
+    expect(line({ agentId: "c", status: "applied", autonomy: { from: "low_risk_auto", to: "never" } })).toBe(
+      `${W}.now {"brain":"Automático"} · ${change("low_risk_auto", "never")}`,
+    );
+    expect(line({ agentId: "f", status: "skipped", ...onPc, autonomy: { from: "always", to: "never" } })).toBe(
+      `${W}.reasons.other_computer {"computer":"PC"} · ${change("always", "never")}`,
+    );
+    // After "Usar": who thinks with it now, who took only the Autonomia, who didn't change (one asked is gone).
+    expect(setupOutcome(withAutonomy, 6)).toEqual({ done: 3, autonomyOnly: 1, missed: 2 });
   });
 
   test("more agents than one call takes go in calls of 200, the results in the order asked", async () => {
@@ -98,6 +129,8 @@ describe("Usar em outros agentes", () => {
     });
     expect(setupOfBrain({ ...view, brain: "model" })).toBeNull();
     expect(setupOfBrain({ ...view, computer: null })).toBeNull();
+    // Its Autonomia goes with it.
+    expect(setupOfBrain({ ...view, autonomy: "never" })).toMatchObject({ autonomy: "never" });
   });
 });
 
@@ -159,6 +192,23 @@ describe("a new agent starts with the last setup", () => {
     });
   });
 
+  test("its Autonomia goes with it only where the person could set it: their own agent, or anyone's for an admin", () => {
+    const api = {
+      brain: "model",
+      model: "claude-opus-5-5",
+      key: null,
+      contextTokens: null,
+      autonomy: "never",
+    } as const;
+    expect(newAgentStart(api, mine)).toMatchObject({ autonomy: "never" });
+    expect(newAgentStart(api, { ...mine, ownerIsMe: false })).not.toHaveProperty("autonomy");
+    expect(newAgentStart(api, { ...mine, ownerIsMe: false, admin: true })).toMatchObject({ autonomy: "never" });
+    expect(newAgentStart({ ...plan, autonomy: "always" }, mine)).toMatchObject({ autonomy: "always" });
+    expect(newAgentStart({ ...api, autonomy: null }, mine)).not.toHaveProperty("autonomy");
+    // Where the setup can't think for it, none of it.
+    expect(newAgentStart(api, { ...mine, usable: new Set() })).toBeNull();
+  });
+
   test("said as it starts: the API's model by its label, a coding plan's by the plan's own", () => {
     const models = [{ id: "claude-opus-5-5", label: "Claude Opus 5.5" }] as Model[];
     const say = (start: Parameters<typeof newAgentStartText>[2], provider?: string) =>
@@ -173,5 +223,11 @@ describe("a new agent starts with the last setup", () => {
       input: { brain: "claude_code" as const, model: "sonnet", effort: "medium" as const },
     };
     expect(say(glm, "zai")).toBe("brain.card.claude_code · GLM-5.3");
+    // Then its Autonomia.
+    const autonomy = (a: string) => `${A}.changed {"value":"${A}.${a}"}`;
+    expect(say({ brain: "model", model: "claude-opus-5-5", key: null, contextTokens: null, autonomy: "never" })).toBe(
+      `Claude Opus 5.5 · ${autonomy("never")}`,
+    );
+    expect(say({ ...glm, autonomy: "always" }, "zai")).toBe(`brain.card.claude_code · GLM-5.3 · ${autonomy("always")}`);
   });
 });

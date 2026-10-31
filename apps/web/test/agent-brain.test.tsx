@@ -1611,6 +1611,55 @@ describe("Usar em outros agentes (ADR 0089)", () => {
     expect(screen().queryByRole("dialog", { name: "Quem pensa" })).toBeNull();
   });
 
+  test("the Autonomia goes too: said with the setup, each agent's change on its line, even where the AI can't", async () => {
+    const state = await withOthers((api) => {
+      const brain = api.agents.brain;
+      api.agents.brain = async (orgId, agentId) => ({
+        ...(await brain(orgId, agentId)),
+        ...(agentId === ADA_ID ? { autonomy: "never" as const } : {}),
+      });
+    });
+    state.setupResults = {
+      [ATLAS_ID]: { status: "same", autonomy: { from: "always", to: "never" } },
+      [LIA_ID]: {
+        status: "skipped",
+        reason: "other_computer",
+        params: { computer: "PC" },
+        autonomy: { from: "low_risk_auto", to: "never" },
+      },
+    };
+    const d = await brainDialog();
+    await click(card(d, /^Claude Code/));
+    await model(d, /^Opus/);
+    const row = within(d).getByRole("button", { name: /^Usar em outros agentes/ });
+    expect(row.textContent).toContain("A mesma IA, o modelo, o esforço e a autonomia");
+    await click(row);
+    const c = screen().getByRole("dialog", { name: "Usar em outros agentes" });
+    expect(c.textContent).toContain("Eles passam a pensar com Claude Code · Opus · Autonomia: Não pergunta.");
+    expect(copyCalls(state)[0]).toMatchObject({ setup: { autonomy: "never" }, preview: true });
+    // Atlas already thinks so and Lia works on another computer: only their Autonomia changes, and they can take it.
+    const atlas = within(c).getByRole("checkbox", { name: /^Atlas/ });
+    expect(atlas.closest("label")?.textContent).toContain("Já pensa assim · Autonomia: Pergunta sempre → Não pergunta");
+    expect(atlas.hasAttribute("disabled")).toBe(false);
+    const lia = within(c).getByRole("checkbox", { name: /^Lia/ });
+    expect(lia.closest("label")?.textContent).toContain(
+      "Trabalha no PC · Autonomia: Só o que é arriscado → Não pergunta",
+    );
+    expect(lia.hasAttribute("disabled")).toBe(false);
+    expect(c.textContent).toContain("2 agentes podem usar");
+    await click(within(c).getByRole("checkbox", { name: /^Todos/ }));
+    await click(within(c).getByRole("button", { name: "Usar em 2 agentes" }));
+    await settle(6);
+    expect(copyCalls(state).at(-1)).toEqual({
+      setup: expect.objectContaining({ brain: "claude_code", model: "opus", autonomy: "never" }),
+      agentIds: [ATLAS_ID, LIA_ID],
+    });
+    const toasts = document.body.textContent;
+    expect(toasts).toContain("1 agente agora pensa com Claude Code · Opus · Autonomia: Não pergunta.");
+    expect(toasts).toContain("1 agente mudou só a autonomia.");
+    expect(toasts).not.toContain("não mudou");
+  });
+
   test("Todos says how many can take it only once the preview says so", async () => {
     let arrive = () => {};
     const arrived = new Promise<void>((resolve) => {

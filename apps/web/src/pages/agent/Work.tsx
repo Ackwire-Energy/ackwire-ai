@@ -31,7 +31,14 @@ import {
   useUpdateAgentBrowserSettings,
 } from "@agenteschat/client";
 import { saveLevels } from "@agenteschat/client/lib/access-levels";
-import { setupResultLine, sortedResults, takers } from "@agenteschat/client/lib/agent-setup";
+import {
+  autonomyWords,
+  changes,
+  setupOutcome,
+  setupResultLine,
+  sortedResults,
+  takers,
+} from "@agenteschat/client/lib/agent-setup";
 import {
   accountChoices,
   ownSignInListed,
@@ -895,7 +902,9 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       setBusy(false);
     }
   };
-  // "Usar em outros agentes" (ADR 0089): this choice as a value, each agent taking it by its own rules.
+  // "Usar em outros agentes" (ADR 0089): this choice and its saved Autonomia as a value, each agent taking it by its
+  // own rules.
+  const autonomy = view.autonomy ? { autonomy: view.autonomy } : {};
   const setup: AgentSetup | null =
     kind === "model"
       ? {
@@ -904,6 +913,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           // Only admins see and change the key: anyone else's leaves each agent's own.
           ...(can("key") ? { key: key === DEFAULT_KEY ? null : key } : {}),
           contextTokens: shownContext,
+          ...autonomy,
         }
       : home
         ? {
@@ -915,6 +925,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             contextTokens: shownContext,
             fallback,
             onlyOwner,
+            ...autonomy,
           }
         : null;
   const setupText = [
@@ -925,6 +936,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       apiKey,
       now: { effort, contextTokens: shownContext, onlyOwner, fallback },
     }),
+    ...(view.autonomy ? [autonomyWords(t, view.autonomy)] : []),
   ].join(" · ");
   const copyTo = async (agentIds: string[]) => {
     if (!setup) return;
@@ -934,11 +946,12 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       const results = await api.agents.applySetup(org.id, { setup, agentIds });
       refresh();
       for (const id of agentIds) void qc.invalidateQueries({ queryKey: keys.agentBrain(org.id, id) });
-      const done = results.filter((r) => r.status === "applied").length;
+      // Nova missão starts from each agent's Autonomia.
+      void qc.invalidateQueries({ queryKey: [...keys.missions(org.id), "eligible"] });
+      const { done, autonomyOnly, missed } = setupOutcome(results, agentIds.length);
       if (done > 0) toast.show(t("agentPage.work.brain.copy.done", { count: done, setup: setupText }));
-      if (done < agentIds.length) {
-        toast.show(t("agentPage.work.brain.copy.missed", { count: agentIds.length - done }), "error");
-      }
+      if (autonomyOnly > 0) toast.show(t("agentPage.work.brain.copy.autonomyOnly", { count: autonomyOnly }));
+      if (missed > 0) toast.show(t("agentPage.work.brain.copy.missed", { count: missed }), "error");
       onClose();
     } catch {
       toast.show(t("agentPage.work.failed"), "error");
@@ -1489,7 +1502,7 @@ function SetupCopyDialog({
             const a = byId.get(r.agentId);
             if (!a) return null;
             const id = `setup-${a.id}`;
-            const off = r.status !== "applied";
+            const off = !changes(r);
             return (
               <label key={a.id} htmlFor={id} className="scope-row" data-off={off || undefined}>
                 <Checkbox

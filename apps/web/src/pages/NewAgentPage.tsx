@@ -300,7 +300,12 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
   const startOf = (ownerId: string | null): NewAgentStart | null =>
     from
       ? null
-      : newAgentStart(lastSetup.data, { ownerIsMe: ownerId === me.user.id, usable, keys: credentials.data ?? [] });
+      : newAgentStart(lastSetup.data, {
+          ownerIsMe: ownerId === me.user.id,
+          admin: can(org, "manage_agents"),
+          usable,
+          keys: credentials.data ?? [],
+        });
   const startWith = (start: NewAgentStart | null) => {
     const api = start?.brain === "model" ? start : null;
     setModel(api?.model ?? AUTO);
@@ -459,6 +464,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
       monthlyBudgetUsd: amount,
       appearance: look,
       ...(from ? { proposal: from.messageId } : {}),
+      ...(onStart && start?.autonomy ? { autonomy: start.autonomy } : {}),
     });
     // A plan thinks on its computer: the agent goes there, then thinks with it (an automatic model stays automatic).
     // The agent exists either way: if the plan can't be saved now it stays on the API, and its page says so.

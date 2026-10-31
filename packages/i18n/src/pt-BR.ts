@@ -2455,7 +2455,7 @@ export const ptBR = {
         /** "Usar em outros agentes" (ADR 0089): the same setup on the agents picked, each by its own rules. */
         copy: {
           row: "Usar em outros agentes",
-          rowLine: "A mesma IA, o modelo e o esforço",
+          rowLine: "A mesma IA, o modelo, o esforço e a autonomia",
           title: "Usar em outros agentes",
           sub: "Eles passam a pensar com {{setup}}.",
           all: "Todos",
@@ -2466,6 +2466,7 @@ export const ptBR = {
           same: "Já pensa assim",
           keeps: "Fica com {{account}}",
           keepsOwn: "Fica com a conta do computador",
+          autonomy: "Autonomia: {{from}} → {{to}}",
           reasons: {
             not_allowed: "Só admins e {{owner}} mudam",
             not_allowedNobody: "Só admins mudam",
@@ -2485,6 +2486,8 @@ export const ptBR = {
           use_other: "Usar em {{count}} agentes",
           done_one: "{{count}} agente agora pensa com {{setup}}.",
           done_other: "{{count}} agentes agora pensam com {{setup}}.",
+          autonomyOnly_one: "{{count}} agente mudou só a autonomia.",
+          autonomyOnly_other: "{{count}} agentes mudaram só a autonomia.",
           missed_one: "{{count}} agente não mudou.",
           missed_other: "{{count}} agentes não mudaram.",
         },
