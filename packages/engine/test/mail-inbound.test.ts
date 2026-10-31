@@ -194,6 +194,18 @@ test("Composio webhooks: bad signature refused; new mail fires the routine; expi
   const [account] = await m.f.db.select().from(schema.mailAccounts).where(eq(schema.mailAccounts.id, gmail.accountId));
   expect(account?.status).toBe("needs_reconnect");
   expect((await watchOf(m, routine.id))?.status).toBe("needs_reconnect");
+
+  // A sign-in that never finished has no address to reconnect: it stays pending, then the reconcile removes it.
+  const left = await startComposioConnect(m.deps, m.f.owner.id, m.f.org.id, { provider: "gmail" });
+  const ca = m.composio.state.links.at(-1)?.connectedAccountId ?? "";
+  await handleComposioWebhook(m.deps, signed, body({ type: "account.expired", connectedAccountId: ca }));
+  const halfway = async () =>
+    (await m.f.db.select().from(schema.mailAccounts).where(eq(schema.mailAccounts.id, left.accountId)))[0];
+  expect(await halfway()).toMatchObject({ status: "pending", address: "", revokedAt: null });
+  const remote = m.composio.state.accounts.get(ca);
+  if (remote) remote.status = "expired";
+  await reconcileComposioAccounts(m.deps);
+  expect((await halfway())?.revokedAt).not.toBeNull();
 });
 
 test("IMAP polling starts from now, tracks UIDs, resets on UIDVALIDITY and stops on refused credentials", async () => {

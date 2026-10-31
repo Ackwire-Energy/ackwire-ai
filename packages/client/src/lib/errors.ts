@@ -13,6 +13,9 @@ import { endSentence } from "./text";
 const KNOWN = {
   "agent_proposal.decided": "errors.agentProposal.decided",
   "agent_proposal.expired": "errors.agentProposal.expired",
+  "mail.account_not_found": "errors.mail.accountNotFound",
+  "mail.from_not_mailbox": "errors.mail.fromNotMailbox",
+  send_without_recipients: "mail.agent.saveError.send_without_recipients",
   "artifact.file_too_large": "errors.artifact.fileTooLarge",
   "artifact.file_required": "errors.artifact.fileRequired",
   "artifact.file_name_required": "errors.artifact.fileNameRequired",

@@ -7450,6 +7450,8 @@ export const en: Translations = {
       saved: "{{name}}'s email saved.",
       unsaved: "Unsaved changes",
       warning: "Reads email from anyone and sends without asking: a malicious email may try to trick the agent.",
+      pending: "It hasn't finished connecting.",
+      needsReconnect: "Agents can't use it until it's reconnected.",
       saveError: {
         send_without_recipients: "To send without asking, fill in “Only send to”.",
         unknown: "Couldn't save. Try again.",
@@ -7545,6 +7547,10 @@ export const en: Translations = {
     agentProposal: {
       decided: "Someone already decided this proposal.",
       expired: "This proposal expired: nobody decided it in a day.",
+    },
+    mail: {
+      accountNotFound: "This mailbox is no longer connected. Connect it again in Connectors.",
+      fromNotMailbox: "“Send as” must be one of this mailbox's addresses. Pick another one.",
     },
     join: {
       linkClosed: "This link no longer works. Ask whoever sent it for a new one.",

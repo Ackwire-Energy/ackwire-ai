@@ -44,6 +44,7 @@ import {
 } from "@/components/MailConnect";
 import { useOrg } from "@/components/org-context";
 import { useAgentsAccess } from "@/hooks/useAgentsAccess";
+import { takesConnectorReturn } from "@/lib/desktop";
 import { navigateAway } from "@/lib/navigate";
 import { useToast } from "@/lib/toast";
 
@@ -96,7 +97,7 @@ export function ConnectorsSection({
     // Gmail/Outlook sign in again on the provider's page; the rest take a new app password.
     if (account.via === "composio" && (account.provider === "gmail" || account.provider === "outlook")) {
       connectComposio.mutate(
-        { provider: account.provider, label: account.label },
+        { provider: account.provider, label: account.label, desktop: takesConnectorReturn() },
         { onSuccess: (started) => navigateAway(started.redirectUrl) },
       );
     } else setReconnecting(account);

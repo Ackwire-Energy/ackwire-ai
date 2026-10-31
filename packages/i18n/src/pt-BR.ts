@@ -7490,6 +7490,8 @@ export const ptBR = {
       saved: "Email de {{name}} salvo.",
       unsaved: "Alterações não salvas",
       warning: "Lê emails de qualquer pessoa e envia sem pedir: um email malicioso pode tentar enganar o agente.",
+      pending: "Ainda não terminou de conectar.",
+      needsReconnect: "Os agentes só usam depois de reconectar.",
       saveError: {
         send_without_recipients: "Para enviar sem pedir aprovação, preencha “Só enviar para”.",
         unknown: "Não deu para salvar. Tente de novo.",
@@ -7585,6 +7587,10 @@ export const ptBR = {
     agentProposal: {
       decided: "Alguém já decidiu esta proposta.",
       expired: "Esta proposta expirou: ninguém decidiu em um dia.",
+    },
+    mail: {
+      accountNotFound: "Esta caixa de email não está mais conectada. Conecte de novo em Conectores.",
+      fromNotMailbox: "“Enviar como” precisa ser um endereço desta caixa. Escolha outro.",
     },
     join: {
       linkClosed: "Este link não funciona mais. Peça um novo a quem mandou.",

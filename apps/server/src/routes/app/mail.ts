@@ -1,6 +1,7 @@
 import {
   completeComposioConnect,
   createImapAccount,
+  desktopMailRedirect,
   getAgentMail,
   listMailAccounts,
   listMailFolders,
@@ -15,7 +16,8 @@ import {
   ValidationError,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
-import { apiError } from "../../http/errors";
+import { requestLimitIp } from "../../http/client-ip";
+import { apiError, errorResponse } from "../../http/errors";
 import type { Logger } from "../../logger";
 import {
   type AppDeps,
@@ -102,6 +104,8 @@ const AgentMailbox = z
 
 const testFailed = { 422: json(z.object({ error: MailTestError }), "The connection test failed") };
 const AccountParams = OrgParams.extend({ accountId: z.uuid() });
+/** Composio's return needs no session. Per address, far above a person connecting mailboxes. */
+const CALLBACK_PER_IP = { limit: 30, windowMs: 10 * 60_000 };
 
 /**
  * People's mailboxes for agents (ADR 0038): the org connects Gmail/Outlook
@@ -111,7 +115,7 @@ const AccountParams = OrgParams.extend({ accountId: z.uuid() });
 export function mailRoutes(deps: AppDeps, log: Logger) {
   const { db, config, adapters } = deps;
   const app = createAppRouter(deps);
-  for (const path of ["/organizations/*", "/mail/*"]) app.use(path, requireSession(deps.auth));
+  app.use("/organizations/*", requireSession(deps.auth));
   const mailDeps: MailDeps = {
     db,
     keyWrappers: [adapters.keyWrapper, ...adapters.legacyKeyWrappers],
@@ -197,7 +201,15 @@ export function mailRoutes(deps: AppDeps, log: Logger) {
       description: "409 when Gmail and Outlook are not configured on this server.",
       request: {
         params: OrgParams,
-        body: body(z.object({ provider: z.enum(["gmail", "outlook"]), label: z.string().max(80).optional() })),
+        body: body(
+          z.object({
+            provider: z.enum(["gmail", "outlook"]),
+            label: z.string().max(80).optional(),
+            desktop: z.boolean().optional().openapi({
+              description: "Started in the desktop app's window: the callback hands the return back to the app.",
+            }),
+          }),
+        ),
       },
       responses: { 200: json(z.object({ accountId: z.uuid(), redirectUrl: z.string() })), ...errors },
     }),
@@ -212,20 +224,28 @@ export function mailRoutes(deps: AppDeps, log: Logger) {
       method: "get",
       path: "/mail/composio/callback",
       tags,
-      security,
-      summary: "Where Composio sends the person back (browser navigation)",
+      summary: "Where Composio sends the person back (browser navigation, no session needed)",
       description:
-        "Reads the connected account, then redirects to the connectors screen with `mail=connected` or `mail=failed`, and `account=<id>`.",
-      request: { query: z.object({ account: z.uuid() }) },
-      responses: { 302: { description: "Back to the web app" }, ...errors },
+        "Reads the connected account, then redirects to the connectors screen with `mail=connected` or `mail=failed`, and `account=<id>`. Started in the desktop app (`from=desktop`): to the app's link instead (`agenteschat://desktop/connectors/oauth?org=…&state=mail&code=connected|failed`), which opens the connectors screen in its window.",
+      request: { query: z.object({ account: z.uuid(), from: z.enum(["desktop"]).optional() }) },
+      responses: {
+        302: { description: "Back to the web app, or to the desktop app" },
+        429: errorResponse("Too many attempts (`rate_limited`)"),
+        ...errors,
+      },
     }),
     async (c) => {
+      const ip = requestLimitIp(c.req.raw.headers, config.TRUSTED_PROXIES);
+      const limit = await adapters.rateLimiter.consume(`mail-callback:${ip}`, CALLBACK_PER_IP);
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests. Try again later.");
       const base = config.PUBLIC_URL.replace(/\/$/, "");
-      const accountId = c.req.valid("query").account;
-      const r = await completeComposioConnect(mailDeps, c.get("user").id, accountId).catch((error: unknown) => {
-        log.warn("mail connect failed", { accountId, error: String(error) });
+      const { account: accountId, from } = c.req.valid("query");
+      const r = await completeComposioConnect(mailDeps, accountId).catch((error: unknown) => {
+        log.warn("mail connect failed", { accountId, from, error: String(error) });
         return null;
       });
+      // The person is in the app's window, which is signed in. This browser may not be.
+      if (from === "desktop") return c.redirect(desktopMailRedirect(r?.orgId, r?.ok === true), 302);
       const account = `account=${encodeURIComponent(accountId)}`;
       if (!r) return c.redirect(`${base}/?mail=failed&${account}`, 302);
       return c.redirect(
