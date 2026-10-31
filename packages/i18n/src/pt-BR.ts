@@ -1040,6 +1040,8 @@ export const ptBR = {
   shell: {
     // The Mac app's own title bar (ADR 0036).
     titleBar: { back: "Voltar", forward: "Avançar" },
+    /** In place of a sidebar row (an agent, a person) that failed to draw. */
+    unshown: "Não pôde ser exibido",
     more: "Mais",
     moreGroups: { schedule: "Agenda", decisions: "Decisões" },
     moreWhat: {
@@ -1598,6 +1600,8 @@ export const ptBR = {
       renamed: "Renomeei a conversa para <b>{{to}}</b>",
       closed: "Encerrei a conversa <b>{{title}}</b>",
     },
+    /** A kind this app doesn't know yet (a newer server's). */
+    other: "Fiz uma mudança",
     issueFields: {
       title: "o título",
       description: "a descrição",
@@ -8278,6 +8282,7 @@ export const ptBR = {
     },
     title: "Configurações",
     account: {
+      plans: "Limites dos seus planos",
       device: "Neste aparelho",
     },
     orgTitle: "Workspace",
@@ -8569,6 +8574,10 @@ export const ptBR = {
       helping: "ajudando {{article}} {{name}}",
       see: "Ver conversa",
     },
+    /** In place of a row of the conversation that failed to draw (the rest keeps working). */
+    unshown: "Esta mensagem não pôde ser exibida",
+    /** In place of a part of a message (a card, its receipts) that failed to draw (the text and the rest stay). */
+    unshownPart: "Parte desta mensagem não pôde ser exibida",
     /** Automatic lines: what reached an agent's conversation (`meta.notice`), a routine's background start. */
     notice: {
       routineHandoff: "Rotina «{{routine}}» entregou um relatório",

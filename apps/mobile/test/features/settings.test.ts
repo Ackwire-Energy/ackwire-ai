@@ -135,6 +135,7 @@ describe("Geral", () => {
     expect(
       tileStates(t, "pt-BR", {
         overview: { people: 3, agents: 2, budgetUsedPercent: 42 },
+        usesApi: true,
         invitations: 1,
         connectors: ["GitHub", "Slack", "Linear", "Sentry"],
         skills: 5,
@@ -173,6 +174,10 @@ describe("Geral", () => {
       keys: "Usando a chave deste servidor",
     });
     expect(tileStates(t, "pt-BR", {})).toEqual({});
+    // A workspace on plans alone (ADR 0063 §5): Uso says no 0% budget.
+    expect(
+      tileStates(t, "pt-BR", { overview: { people: 3, agents: 2, budgetUsedPercent: 0 }, usesApi: false }),
+    ).toEqual({ members: "3 membros", access: "2 agentes" });
     const en = await translator("en");
     expect(tileStates(en, "en", { computers: { count: 3, online: 2 } }).computers).toBe("2 of 3 on");
   });
