@@ -389,7 +389,7 @@ describe("Members › a member who may not invite", () => {
     await type(email, "otto@estudio.com");
     await send();
     await settle(4);
-    expect(suggest().textContent).toContain("Alguém já sugeriu otto@estudio.com. Está esperando um admin.");
+    expect(suggest().textContent).toContain("otto@estudio.com já está esperando um admin.");
 
     state.suggestError = undefined;
     await type(within(suggest()).getByLabelText("Quem é (opcional)"), " Freelancer de design ");

@@ -158,6 +158,27 @@ describe("asking through a link with a password (ADR 0089)", () => {
     });
   });
 
+  test("joining another way closes the request and drops what it kept; a key is good for a day", async () => {
+    const { token } = await start();
+    const asked = await askWithPassword(token, "gabi@example.com", "hash:gabi", "gabi-secret");
+    const id = "requestId" in asked ? (asked.requestId ?? "") : "";
+    // An email invitation to the same address, accepted: the request closes, keeping nothing.
+    const [invited] = await inviteMany(fx().db, fx().owner.id, fx().org.id, { emails: ["gabi@example.com"] }, NOW);
+    if (invited?.status !== "invited") throw new Error("expected an invitation");
+    await fx().db.insert(schema.users).values({ id: "u_gabi", name: "Gabi", email: "gabi@example.com" });
+    await acceptInvitation(fx().db, { id: "u_gabi", email: "gabi@example.com" }, invited.token, NOW);
+    expect(await requestOf(id)).toMatchObject({ status: "closed", passwordHash: null, claimHash: null });
+
+    // Approved and made, but the page never came back: a day later its key signs in no one.
+    const other = await askWithPassword(token, "hugo@example.com", "hash:hugo", "hugo-secret");
+    const otherId = "requestId" in other ? (other.requestId ?? "") : "";
+    await approveJoinRequest(deps(), PUBLIC, fx().owner.id, fx().org.id, otherId, [], NOW);
+    expect((await requestOf(otherId))?.claimHash).toBe(sha256("hugo-secret"));
+    expect(await claimJoinRequest(fx().db, token, `${otherId}.hugo-secret`, at(2))).toEqual({ status: "closed" });
+    await pruneJoinRequests(deps(), at(2));
+    expect(await requestOf(otherId)).toMatchObject({ passwordHash: null, claimHash: null });
+  });
+
   test("a request that runs out drops the password and the key", async () => {
     const { token } = await start();
     const asked = await askWithPassword(token, "duda@example.com", "hash:duda", "duda-secret");

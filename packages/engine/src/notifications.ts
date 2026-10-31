@@ -152,6 +152,8 @@ export interface NotificationLatest {
    * asked: a merged row names whoever its time is from, and `count` says how many asked in all.
    */
   names?: string[];
+  /** `join_request` from a member's suggestion (ADR 0089): who suggested, so a row of one says so. */
+  suggestedBy?: string;
 }
 
 export interface NotificationView {

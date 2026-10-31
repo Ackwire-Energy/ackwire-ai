@@ -1621,9 +1621,10 @@ export async function joinOrganization(
   if (!member) await assertMemberRoom(tx, orgId);
   await tx.insert(organizationMembers).values({ orgId, userId, role }).onConflictDoNothing();
   await addMemberRolesInTx(tx, orgId, userId, roleIds);
+  // Nothing a closed request kept stays: the password it chose, the page's key (ADR 0089).
   await tx
     .update(organizationJoinRequests)
-    .set({ status: "closed", decidedAt: new Date() })
+    .set({ status: "closed", decidedAt: new Date(), passwordHash: null, claimHash: null })
     .where(
       and(
         eq(organizationJoinRequests.orgId, orgId),

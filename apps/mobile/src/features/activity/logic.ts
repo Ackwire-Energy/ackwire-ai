@@ -143,10 +143,13 @@ export function joinRequestLine(
   n: Pick<AppNotification, "count" | "latest">,
 ): { text: string; faces: string[] } {
   const asked = askersOf(n);
+  // A member's suggestion says who suggested it (ADR 0089).
   const text =
     asked.total > 1
       ? t("notifications.wait.joinRequestNames", { names: namesText(t, asked.names, 2, asked.total) })
-      : t("notifications.wait.joinRequest", { count: 1, name: asked.names[0] });
+      : n.latest.suggestedBy
+        ? t("notifications.wait.joinSuggestion", { by: n.latest.suggestedBy, name: asked.names[0] })
+        : t("notifications.wait.joinRequest", { count: 1, name: asked.names[0] });
   return { text, faces: asked.names.slice(0, 2) };
 }
 

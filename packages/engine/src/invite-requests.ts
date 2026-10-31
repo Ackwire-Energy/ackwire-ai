@@ -452,8 +452,19 @@ export async function fileJoinRequest(deps: Deps, payload: Record<string, unknow
   await file(deps, text("publicUrl") ?? "", ask, false, now);
 }
 
-/** Who to tell of a new request: the people who may answer it, as a notice merged per workspace. */
-async function noticeAdmins(deps: Deps, orgId: string, admins: string[], orgName: string, name: string, now: Date) {
+/**
+ * Who to tell of a new request: the people who may answer it, as a notice merged per workspace. A suggestion names
+ * who suggested it (ADR 0089), so a row of one reads "Carla suggested …", not "… asks to join".
+ */
+async function noticeAdmins(
+  deps: Deps,
+  orgId: string,
+  admins: string[],
+  orgName: string,
+  name: string,
+  now: Date,
+  suggestedBy?: string,
+) {
   await notify(
     { ...deps, now: () => now },
     {
@@ -463,7 +474,7 @@ async function noticeAdmins(deps: Deps, orgId: string, admins: string[], orgName
       groupKey: group(orgId),
       waiting: true,
       source: { label: orgName },
-      latest: { title: name, names: [name] },
+      latest: { title: name, names: [name], ...(suggestedBy ? { suggestedBy } : {}) },
     },
   ).catch(() => []);
 }
@@ -809,7 +820,7 @@ export async function approveJoinRequest(
         invitationId,
         // The page that asked signs in only to an account this approval made (`claimJoinRequest`): an account that
         // was already there signs in as it always does. The password went into the new account, or nowhere.
-        ...(made ? { userId: made } : { claimHash: null }),
+        ...(made ? { userId: made, claimHash: row.claimHash } : { claimHash: null }),
         passwordHash: null,
       })
       .where(eq(requests.id, row.id));
@@ -986,6 +997,8 @@ export async function claimJoinRequest(db: Database, token: string, key: string,
   if (!link || !row || row.linkId !== link.link.id || !row.claimHash) throw nothing();
   if (!safeEqual(row.claimHash, sha256(secret))) throw nothing();
   if (isWaiting(row, now)) return { status: "pending" as const };
+  // The page checks every 15 s while open: a key nobody came back with for a day signs in no one.
+  if ((row.decidedAt?.getTime() ?? 0) < now.getTime() - DAY_MS) return { status: "closed" as const };
   if (row.status === "approved" && row.userId) {
     const [spent] = await db
       .update(requests)
@@ -1024,7 +1037,7 @@ export async function suggestPerson(
   const note = oneLine(input.note ?? "", JOIN_NOTE_MAX) || null;
   const admins = (await adminIds(db, orgId, "invite_people")).filter((id) => id !== actorId);
   const [org] = await db.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, orgId));
-  const [me] = await db.select({ locale: users.locale }).from(users).where(eq(users.id, actorId));
+  const [me] = await db.select({ name: users.name, locale: users.locale }).from(users).where(eq(users.id, actorId));
   const row = await db.transaction(async (tx) => {
     await lockRequests(tx, orgId);
     if (await addressIsMember(tx, orgId, email)) throw new ConflictError("Already in this workspace", "join.member");
@@ -1088,7 +1101,7 @@ export async function suggestPerson(
     });
     return saved;
   });
-  await noticeAdmins(deps, orgId, admins, org?.name ?? "", name, now);
+  await noticeAdmins(deps, orgId, admins, org?.name ?? "", email, now, me?.name || undefined);
   return { id: row.id };
 }
 
@@ -1213,17 +1226,24 @@ export async function pruneJoinRequests(deps: Deps, now = new Date()) {
         lt(outbox.createdAt, dayAgo),
       ),
     );
-  // A password nobody approved in time goes the day its request runs out (ADR 0089), and so does the page's key.
+  // A password nobody approved in time goes the day its request runs out (ADR 0089), and so does the page's key;
+  // an answered request keeps no password, and its key goes a day after the answer.
   await deps.db
     .update(requests)
     .set({ passwordHash: null, claimHash: null })
     .where(
       and(
-        eq(requests.status, "pending"),
-        lt(requests.expiresAt, now),
+        or(
+          and(eq(requests.status, "pending"), lt(requests.expiresAt, now)),
+          and(ne(requests.status, "pending"), lt(requests.decidedAt, dayAgo)),
+        ),
         or(sql`${requests.passwordHash} is not null`, sql`${requests.claimHash} is not null`),
       ),
     );
+  await deps.db
+    .update(requests)
+    .set({ passwordHash: null })
+    .where(and(ne(requests.status, "pending"), sql`${requests.passwordHash} is not null`));
   const cutoff = new Date(now.getTime() - JOIN_REQUEST_KEEP_DAYS * DAY_MS);
   const gone = await deps.db
     .delete(requests)

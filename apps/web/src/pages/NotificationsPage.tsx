@@ -357,6 +357,9 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
     case "join_request": {
       // Merged while unread: the first ones to ask, by name, then how many more.
       const asked = askersOf(n);
+      // A member's suggestion says who suggested it (ADR 0089); a merged row counts everyone as asking.
+      if (asked.total === 1 && n.latest.suggestedBy)
+        return k("joinSuggestion", { by: n.latest.suggestedBy, name: asked.names[0] });
       return asked.total > 1
         ? k("joinRequestMany", { names: namesText(t, asked.names, 2, asked.total) })
         : k("joinRequest", { name: asked.names[0] });

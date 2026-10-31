@@ -4519,6 +4519,8 @@ export interface NotificationLatest {
   cloud?: boolean;
   /** `join_request`: the first two people who asked, in the order they asked (`count` says how many in all). */
   names?: string[];
+  /** `join_request` from a member's suggestion (ADR 0089): who suggested. */
+  suggestedBy?: string;
 }
 
 export interface AppNotification {
