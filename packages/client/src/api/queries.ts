@@ -10,7 +10,7 @@ import {
 import { useCallback, useEffect } from "react";
 import { artifactRefs } from "../lib/artifacts";
 import { newerSetup } from "../lib/computer";
-import { CONSULT_GROUP_POLL_MS } from "../lib/consult-group";
+import { CONSULT_CONVERSATION_POLL_MS, CONSULT_GROUP_POLL_MS } from "../lib/consult-group";
 import {
   allItems,
   matchesFilter,
@@ -1199,6 +1199,21 @@ export const useConsultations = (orgId: string, channelId: string, enabled = tru
     enabled,
     staleTime: 10_000,
     refetchInterval: (q) => (q.state.data?.some((c) => c.status === "open") ? CONSULT_GROUP_POLL_MS : false),
+  });
+};
+
+/**
+ * One of those questions opened beside the conversation (`GET …/consultations/{id}`). The agents' DM sends this
+ * page no events: while the question is out it reloads every `CONSULT_CONVERSATION_POLL_MS`, and with the list
+ * (its key sits under the list's) on every consult event.
+ */
+export const useConsultationConversation = (orgId: string, channelId: string, consultationId: string | null) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.consultation(orgId, channelId, consultationId ?? ""),
+    queryFn: () => api.agents.consultation(orgId, channelId, consultationId ?? ""),
+    enabled: consultationId !== null,
+    refetchInterval: (q) => (q.state.data?.consultation.status === "open" ? CONSULT_CONVERSATION_POLL_MS : false),
   });
 };
 

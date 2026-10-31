@@ -76,3 +76,20 @@ An agent that asks several agents in one turn (`ask_agent` is async) showed one 
 **4. A consulted agent asks the person where they asked.** Both tools were refused in an agents' DM (no person reads it), so a consulted agent missing a decision or a token could only answer without it. Now its questions (`ask_user`) and secret requests (`request_secret`), like its approvals, go to the conversation where the person asked (`consultationOrigin`), never to the agents' DM. The cards and their rows (`agent_questions`, `secret_requests`) carry that conversation, so the usual checks hold there: anyone who can read it answers the question, and only the person behind the run (`personBehindRun`, addendum of 2026-10-18 §3) gives the secret; either way the consulted run resumes in its DM and its answer goes back as before. This replaces "inside an agents' DM, `ask_user` is refused" (Decision §1) for consulted runs only: both tools are still refused there when the run answers no question (a note) or nobody is behind it (`consultedFor`). The consulted agent's prompt is unchanged (it still says not to ask the asking agent questions back): when it should ask the person instead is left for an eval.
 
 Not done: the asker waiting for every answer before it goes on (each answer still wakes it), sending one answer ahead of the others, and asking again from the line.
+
+## Addendum (2026-10-30): the two agents' conversation, opened
+
+A question showed only its state, the question and the answer: what the consulted agent did to get there, and what it asked the person on the way, stayed out of reach, and an answer read without the conversation around it.
+
+**1. Opened over the conversation, like a thread.** On the web each line of the reply's block opens the question in the panel the threads use (`.thread-panel` over the channel, the channel keeps its width under it): "Theo ⇄ Iris", the question as it went into their DM, what the consulted agent wrote there (its tool steps as the conversation draws them) and the cards it posted where the person asked (an approval, a question, a secret request), in order. "Ver" on an answer that arrived far from its reply opens it too. In a thread view, which has no panel, the line still opens in place.
+
+**2. Only this question's part of the DM.** `GET /organizations/{orgId}/channels/{channelId}/consultations/{consultationId}` (`consultationConversation`) returns, from the question on, the question message, the consulted run's messages in the DM (by `agent_run_id`) and that run's cards in the asking conversation; never the rest of what the two agents say to each other, which may be for other people in conversations this one can't read. Same channel access as the list; 404 when the question wasn't asked from that conversation. This widens §1 of the addendum of 2026-10-29 ("nothing else of the agents' DM is exposed"): whoever reads the asking conversation now reads what the consulted run wrote for that question, the same people who already see its answer and its cards, for the same person (addendum of 2026-10-18 §3).
+
+**3. Read only.** People never write in the agents' DM. The panel says so and offers "Falar com o Theo", which closes it and mentions the asking agent in the composer; that agent owns the task and passes anything on (`tell_agent`). Writing to the consulted agent directly would leave the asker out of what changed, make a third place to talk (the conversation, its threads, the DM), and need a person in the DM and an authority for the run it starts. The messages in the panel act on nothing (no feedback, no menu, no reply); the cards keep their buttons, and deciding there decides everywhere.
+
+**4. Whom a card helps.** The list carries `consultedRunId`: a card the consulted run posted where the person asked says "ajudando o Theo · Ver conversa".
+
+**5. Freshness.** The DM sends the page no events: the panel reloads every 4 s while the question is out (`CONSULT_CONVERSATION_POLL_MS`) and, its key sitting under the list's, with the list on every consult event.
+
+The phone still opens a line in place.
+

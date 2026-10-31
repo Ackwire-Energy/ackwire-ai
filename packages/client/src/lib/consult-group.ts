@@ -18,6 +18,9 @@ export type ConsultLineState = "working" | "waiting" | "offline" | "answered" | 
 /** Reloads the list this often while a question is out (a consulted agent that stops waiting sends no event). */
 export const CONSULT_GROUP_POLL_MS = 20_000;
 
+/** An opened question reloads this often while it's out: its agents' DM sends the page no events. */
+export const CONSULT_CONVERSATION_POLL_MS = 4_000;
+
 export function consultLineState(c: RunConsultation, now: number): ConsultLineState {
   if (c.status === "answered") return c.answer?.trim() ? "answered" : "failed";
   if (c.status === "failed") return "failed";

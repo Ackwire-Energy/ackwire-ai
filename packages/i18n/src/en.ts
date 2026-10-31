@@ -7743,6 +7743,21 @@ export const en: Translations = {
       answeredFar: "{{to}} answered {{from}}'s question",
       see: "See",
     },
+    /** A question opened in the panel over the conversation ("Theo ⇄ Iris"): what the two agents said, read only. */
+    consultPanel: {
+      label: "Conversation between {{from}} and {{to}}",
+      where: "#{{channel}} · between agents",
+      messages_one: "{{count}} message",
+      messages_other: "{{count}} messages",
+      origin: "{{from}} asked {{to}} in #{{channel}} · {{time}}",
+      readOnly: "Read only.",
+      steer: "To change course, talk to {{name}}.",
+      talk: "Talk to {{name}}",
+      missing: "This conversation is no longer here.",
+      /** On a card the consulted agent posted where the person asked. */
+      helping: "helping {{name}}",
+      see: "See conversation",
+    },
     /** Automatic lines: what reached an agent's conversation (`meta.notice`), a routine's background start. */
     notice: {
       routineHandoff: "Routine «{{routine}}» delivered a report",

@@ -7793,6 +7793,21 @@ export const ptBR = {
       answeredFar: "{{to}} respondeu à pergunta {{of}} {{from}}",
       see: "Ver",
     },
+    /** A question opened in the panel over the conversation ("Theo ⇄ Iris"): what the two agents said, read only. */
+    consultPanel: {
+      label: "Conversa entre {{articleFrom}} {{from}} e {{articleTo}} {{to}}",
+      where: "#{{channel}} · conversa entre agentes",
+      messages_one: "{{count}} mensagem",
+      messages_other: "{{count}} mensagens",
+      origin: "{{from}} perguntou {{toArticle}} {{to}} em #{{channel}} · {{time}}",
+      readOnly: "Só leitura.",
+      steer: "Para mudar o rumo, fale com {{article}} {{name}}.",
+      talk: "Falar com {{article}} {{name}}",
+      missing: "Essa conversa não está mais aqui.",
+      /** On a card the consulted agent posted where the person asked. */
+      helping: "ajudando {{article}} {{name}}",
+      see: "Ver conversa",
+    },
     /** Automatic lines: what reached an agent's conversation (`meta.notice`), a routine's background start. */
     notice: {
       routineHandoff: "Rotina «{{routine}}» entregou um relatório",

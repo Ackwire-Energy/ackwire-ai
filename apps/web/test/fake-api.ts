@@ -17,6 +17,7 @@ import type {
   Connection,
   ConnectorCatalog,
   ConnectorDef,
+  ConsultationConversation,
   Credential,
   Edition,
   GitHubAppInstallation,
@@ -159,6 +160,8 @@ export interface FakeState {
   activeRuns?: Record<string, ActiveRun[]>;
   /** `GET …/channels/{id}/consultations`, by channel; unset = none. */
   consultations?: Record<string, RunConsultation[]>;
+  /** By consultation id: what `agents.consultation` returns. */
+  consultationConversations?: Record<string, ConsultationConversation>;
   platformKey: boolean;
   /** What `agents.importFromGithub` returns per link (else a 400 like the backend's). */
   githubFiles?: Record<string, { path: string; text: string }[]>;
@@ -1344,6 +1347,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       consultations: async (_orgId, channelId) => {
         log("agents.consultations", channelId);
         return state.consultations?.[channelId] ?? [];
+      },
+      consultation: async (_orgId, channelId, consultationId) => {
+        log("agents.consultation", consultationId);
+        return state.consultationConversations?.[consultationId] ?? null;
       },
       run: async (_orgId, runId) => {
         const r = state.runs.find((x) => x.id === runId);

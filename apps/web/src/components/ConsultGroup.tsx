@@ -37,9 +37,20 @@ export interface ConsultGroups {
   nearEnd: ReadonlySet<string>;
   /** Runs drawn as live blocks: a message the run already posted leaves the block to the live one. */
   live: ReadonlySet<string>;
+  /** The question open in the panel beside the conversation: its line shows pressed. */
+  open: string | null;
+  /** By the consulted agent's run: the question it answers, so its cards here say whom it helps. */
+  helping: ReadonlyMap<string, RunConsultation>;
 }
 
-const EMPTY: ConsultGroups = { byRun: new Map(), folds: new Map(), nearEnd: new Set(), live: new Set() };
+const EMPTY: ConsultGroups = {
+  byRun: new Map(),
+  folds: new Map(),
+  nearEnd: new Set(),
+  live: new Set(),
+  open: null,
+  helping: new Map(),
+};
 const ConsultGroupsContext = createContext<ConsultGroups>(EMPTY);
 export const ConsultGroupsProvider = ConsultGroupsContext.Provider;
 
@@ -54,6 +65,7 @@ export function useConsultGroups(
   channelId: string,
   rows: readonly ConsultRow[],
   live: ReadonlySet<string>,
+  open: string | null = null,
 ): ConsultGroups {
   const { org } = useOrg();
   const qc = useQueryClient();
@@ -61,6 +73,13 @@ export function useConsultGroups(
   useChannelEvents(channelId, true, (event) => {
     if (RELOAD_ON.has(event.type)) void qc.invalidateQueries({ queryKey: keys.consultations(org.id, channelId) });
   });
+  // Its own memo: opening a question doesn't hand every row a new map.
+  const helping = useMemo(() => {
+    const out = new Map<string, RunConsultation>();
+    // Latest first: a run answering two questions says the latest.
+    for (const c of list.data ?? []) if (c.consultedRunId && !out.has(c.consultedRunId)) out.set(c.consultedRunId, c);
+    return out;
+  }, [list.data]);
   return useMemo(() => {
     const all = list.data ?? [];
     if (all.length === 0) return EMPTY;
@@ -69,8 +88,10 @@ export function useConsultGroups(
       folds: consultNoticeFolds(rows, all, live),
       nearEnd: consultBlocksNearEnd(rows, all, live),
       live,
+      open,
+      helping,
     };
-  }, [list.data, rows, live]);
+  }, [list.data, rows, live, open, helping]);
 }
 
 const BLOCK_STATE: Record<ConsultLineState, ToolBlockState> = {
@@ -83,7 +104,13 @@ const BLOCK_STATE: Record<ConsultLineState, ToolBlockState> = {
   expired: "fail",
 };
 
-function lineLabel(t: TFunction, state: ConsultLineState, c: RunConsultation, to: ReturnType<typeof agentGrammar>) {
+/** A question's state in words, the same in the reply's block and in the panel ("A Iris espera uma aprovação"). */
+export function consultLineLabel(
+  t: TFunction,
+  state: ConsultLineState,
+  c: RunConsultation,
+  to: ReturnType<typeof agentGrammar>,
+) {
   switch (state) {
     case "working":
       return t("chat.consultGroup.working", { name: to.name, The: to.The });
@@ -125,6 +152,8 @@ export function ConsultGroup({
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const groups = useContext(ConsultGroupsContext);
+  // In a channel each line opens the two agents' conversation in the panel; in a thread view, in place.
+  const openConsultation = useChannelActions()?.openConsultation;
   const group = saved && groups.live.has(runId) ? undefined : groups.byRun.get(runId);
   // "Ver" on an answer's line farther down: the block opens at that answer.
   const asked = useConsultBlockRequest(group && group.length > 0 ? runId : null);
@@ -150,12 +179,14 @@ export function ConsultGroup({
             state={state === "working" ? "thinking" : "idle"}
           />
         ),
-        label: lineLabel(t, state, c, to),
+        label: consultLineLabel(t, state, c, to),
         hint: answer ? previewOf(answer) : null,
         time: formatLineTime(i18n.language, consultSeconds(c, now) * 1000),
         defaultOpen: asked?.consultationId === c.id,
+        onOpen: openConsultation ? () => openConsultation(c.id) : undefined,
+        pressed: groups.open === c.id,
         // The consultation card's words and type (prose, never the tools' mono): the question, the answer, who saw it.
-        detail: (
+        detail: openConsultation ? undefined : (
           <div className="ac-consult__body ac-consult__body--inline">
             <small>{t("chat.consultation.asked", { name: from.name })}</small>
             <div className="ac-consult__text ac-consult__text--q">
@@ -213,8 +244,9 @@ export function ConsultGroup({
 
 /**
  * An answer to a question asked in a reply farther up (`consultNoticeFolds`): one quiet line where the answer
- * arrived, "Atlas respondeu à pergunta da Ada · Ver", that goes to that reply (as a quote does) and opens its
- * block at the answer. The words of the answer stay in the block, not here.
+ * arrived, "Atlas respondeu à pergunta da Ada · Ver", that opens the two agents' conversation over the channel (in
+ * a thread view: goes to that reply, as a quote does, and opens its block at the answer). The words of the answer
+ * stay there, not here.
  */
 export function ConsultAnswerLine({
   message,
@@ -241,6 +273,11 @@ export function ConsultAnswerLine({
           type="button"
           className="cn-line__toggle"
           onClick={() => {
+            // In a channel: the two agents' conversation, beside it. In a thread view: the reply's block, there.
+            if (actions?.openConsultation) {
+              actions.openConsultation(c.id);
+              return;
+            }
             requestConsultBlock(c.runId, c.id);
             actions?.jumpTo?.(fold.messageId);
           }}
@@ -249,5 +286,30 @@ export function ConsultAnswerLine({
         </button>
       </span>
     </div>
+  );
+}
+
+/**
+ * On a card the consulted agent posted here (its approval, question or secret request): whom it is helping, and
+ * "Ver conversa" opening the two agents' conversation over the channel ("ajudando o Theo · Ver conversa").
+ */
+export function ConsultHelpingTag({ consultation: c }: { consultation: RunConsultation }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const actions = useChannelActions();
+  const from = agentGrammar(t, dir.agentById.get(c.agentId)?.name ?? t("channel.unknownAgent"));
+  return (
+    <span className="msg-reminder msg-talker">
+      {t("chat.consultPanel.helping", { name: from.name, article: from.article })}
+      {actions?.openConsultation && (
+        <>
+          <span aria-hidden="true">·</span>
+          <button type="button" className="cn-line__toggle" onClick={() => actions.openConsultation?.(c.id)}>
+            {t("chat.consultPanel.see")}
+          </button>
+        </>
+      )}
+    </span>
   );
 }

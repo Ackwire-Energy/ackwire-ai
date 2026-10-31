@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { RunConsultation } from "@agenteschat/client";
+import type { Message, RunConsultation } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -20,6 +20,7 @@ const consultation = (over: Partial<RunConsultation>): RunConsultation => ({
   runId: RUN,
   agentId: ADA_ID,
   consultedAgentId: ATLAS_ID,
+  consultedRunId: "atlas-run",
   status: "open",
   waiting: null,
   question: QUESTION,
@@ -74,6 +75,33 @@ function withAsk(list: RunConsultation[], notice = false) {
   state.consultations = { [ENG_ID]: list };
   return state;
 }
+
+/** What Ada and Atlas said for a question, as the panel loads it (`GET …/consultations/{id}`): in their DM. */
+function withTalk(state: ReturnType<typeof seedState>, c: RunConsultation, extra: Message[] = []) {
+  const said = (id: string, from: string, body: string, runId: string, at: string): Message => ({
+    id,
+    channelId: "dm-ada-atlas",
+    threadId: null,
+    author: { type: "agent", id: from },
+    body,
+    mentionedAgentIds: [],
+    agentRunId: runId,
+    meta: {},
+    createdAt: at,
+  });
+  state.consultationConversations = {
+    [c.id]: {
+      consultation: c,
+      messages: [
+        said("dm-q", ADA_ID, QUESTION, RUN, ago(40)),
+        ...(c.answer ? [said("dm-a", ATLAS_ID, c.answer, "atlas-run", ago(5))] : []),
+        ...extra,
+      ],
+    },
+  };
+  return state;
+}
+const panel = () => document.querySelector("aside.thread-panel") as HTMLElement | null;
 
 /** The conversation went on after the reply that asked: `count` people's messages, so it sits farther up. */
 function talkAfter(state: ReturnType<typeof seedState>, count: number) {
@@ -139,39 +167,82 @@ describe("the questions inside the reply that asked (ConsultGroup)", () => {
     expect(text).not.toContain("espera uma");
   });
 
-  test("answered: the line opens to the question and the answer, and the notice folds away", async () => {
-    await open(withAsk([consultation({ status: "answered", answer: ANSWER, answeredAt: ago(5) })], true));
+  test("answered: the line opens the two agents' conversation over the channel, read only", async () => {
+    const c = consultation({ status: "answered", answer: ANSWER, answeredAt: ago(5) });
+    await open(withTalk(withAsk([c], true), c));
     const block = group() as HTMLElement;
     // Closed once every answer is in: the head opens it.
     fireEvent.click(within(block).getByRole("button", { name: /Perguntou a 1 colega/ }));
     await settle(1);
     const line = within(block).getByRole("button", { name: /Atlas respondeu/ });
-    fireEvent.click(line);
-    await settle(1);
-    expect(block.textContent).toContain(QUESTION);
-    expect(block.textContent).toContain("subiu 6 pb");
-    // The answer is shown once: the `consult_reply` card isn't drawn again under it, nor a line (it's close).
+    await act(async () => fireEvent.click(line));
+    await settle(3);
+    // Not in place: in the panel over the channel, the question as it went and the answer.
+    expect(block.textContent).not.toContain(QUESTION);
+    const side = panel() as HTMLElement;
+    expect(side.getAttribute("aria-label")).toBe("Conversa entre a Ada e o Atlas");
+    expect(side.textContent).toContain(QUESTION);
+    expect(side.textContent).toContain("subiu 6 pb");
+    expect(line.getAttribute("aria-pressed")).toBe("true");
+    // Read only: no composer there, a note instead.
+    expect(within(side).queryByRole("combobox")).toBeNull();
+    expect(side.textContent).toContain("Só leitura.");
+    // The answer is shown once in the channel: the `consult_reply` card isn't drawn, nor a line (it's close).
     expect(document.querySelectorAll(".ac-consult").length).toBe(0);
     expect(document.body.textContent).not.toContain("respondeu à pergunta");
   });
 
-  test("the answer far below its question: one line where it arrived, 'Ver' goes to the reply, open at the answer", async () => {
-    const state = withAsk([consultation({ status: "answered", answer: ANSWER, answeredAt: ago(5) })], true);
-    await open(talkAfter(state, 3));
+  test("still out: the panel says Atlas works on it; 'Falar com a Ada' closes it and mentions her", async () => {
+    const c = consultation({});
+    await open(withTalk(withAsk([c]), c));
+    const line = within(group() as HTMLElement).getByRole("button", { name: /Atlas está trabalhando/ });
+    await act(async () => fireEvent.click(line));
+    await settle(3);
+    const side = panel() as HTMLElement;
+    expect(side.textContent).toContain(QUESTION);
+    expect(side.textContent).toContain("Atlas está trabalhando");
+    await act(async () => fireEvent.click(within(side).getByRole("button", { name: "Falar com a Ada" })));
+    await settle(1);
+    expect(panel()).toBeNull();
+    const box = screen().getByRole("combobox", { name: "Mensagem para #eng" }) as HTMLTextAreaElement;
+    expect(box.value).toContain("@ada");
+  });
+
+  test("a card the consulted agent posts here says whom it helps, and opens the conversation", async () => {
+    const c = consultation({ waiting: "input" });
+    const state = withTalk(withAsk([c]), c);
+    state.messages.push({
+      id: "msg-atlas-asks",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ATLAS_ID },
+      body: "Posso usar a fonte paga para a curva?",
+      mentionedAgentIds: [],
+      agentRunId: "atlas-run",
+      meta: {},
+      createdAt: ago(20),
+    });
+    await open(state);
+    const card = screen()
+      .getAllByRole("article")
+      .find((a) => a.textContent?.includes("fonte paga")) as HTMLElement;
+    expect(card.textContent).toContain("ajudando a Ada");
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Ver conversa" })));
+    await settle(3);
+    expect(panel()?.getAttribute("aria-label")).toBe("Conversa entre a Ada e o Atlas");
+  });
+
+  test("the answer far below its question: one line where it arrived, 'Ver' opens the conversation", async () => {
+    const c = consultation({ status: "answered", answer: ANSWER, answeredAt: ago(5) });
+    await open(talkAfter(withTalk(withAsk([c], true), c), 3));
     expect(document.querySelectorAll(".ac-consult").length).toBe(0);
     const line = screen().getByText(/Atlas respondeu à pergunta da Ada/).closest(".cn-line") as HTMLElement;
     expect(line).not.toBeNull();
-    // Every answer is in: the block is closed.
-    const head = () => within(group() as HTMLElement).getByRole("button", { name: /Perguntou a 1 colega/ });
-    expect(head().getAttribute("aria-expanded")).toBe("false");
     await act(async () => fireEvent.click(within(line).getByRole("button", { name: "Ver" })));
-    // To the reply that asked, highlighted as a quote's jump does.
-    expect(document.querySelector('[data-message-id="msg-asked"]')?.classList.contains("ac-msg--focus")).toBe(true);
-    await settle(2);
-    // Its block open at that answer: the question and the whole answer.
-    expect(head().getAttribute("aria-expanded")).toBe("true");
-    expect(group()?.textContent).toContain(QUESTION);
-    expect(group()?.textContent).toContain("subiu 6 pb");
+    await settle(3);
+    // The two agents' conversation over the channel: the question and the whole answer.
+    expect(panel()?.textContent).toContain(QUESTION);
+    expect(panel()?.textContent).toContain("subiu 6 pb");
   });
 
   test("without questions the reply has no block, and the notice stays", async () => {

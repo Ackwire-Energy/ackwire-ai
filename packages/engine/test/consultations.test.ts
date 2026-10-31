@@ -7,6 +7,7 @@ import {
   answerQuestion,
   cancelRun,
   CONSULTATION_TTL_MS,
+  consultationConversation,
   consultationsIn,
   createAgent,
   decideApproval,
@@ -14,6 +15,7 @@ import {
   drainOutbox,
   expireConsultations,
   grantScopes,
+  insertMessage,
   type JobHandlers,
   listDms,
   listMessages,
@@ -461,6 +463,61 @@ describe("ask_agent", () => {
       .where(eq(schema.agentConsultations.id, answered?.id ?? ""));
     const [expired] = await consultationsIn(f.db, f.org.id, f.general.id);
     expect(expired).toMatchObject({ status: "expired", answer: null });
+  });
+
+  test("an opened question: the question in the DM, then the consulted run's messages and its card here", async () => {
+    const github = fakeGithub();
+    f = await setup({
+      askAgent: true,
+      toolSources: [github.source],
+      reply: consultReply((req) =>
+        lastText(req).includes("tool_result")
+          ? answer("Merged.")
+          : {
+              chunks: [],
+              toolUses: [
+                {
+                  name: "github_merge_pr",
+                  input: {
+                    repo: "acme/app",
+                    pr: 7,
+                    why: "The checks passed and the change was reviewed: this action finishes what was asked.",
+                  },
+                },
+              ],
+            },
+      ),
+    });
+    const infra = await addInfra();
+    await grantScopes(f.db, f.org.id, infra.id, ALL_GITHUB_SCOPES);
+    await post("@dev deploy the fix");
+    await drainOutbox(f.db, f.handlers);
+    const [row] = await consultations();
+    // The same DM also holds what the two say for other people: never part of this question.
+    await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: row?.channelId ?? "",
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0 },
+      body: "Another question, for someone else",
+    });
+
+    const opened = await consultationConversation(f.db, f.org.id, f.general.id, row?.id ?? "");
+    expect(opened?.consultation).toMatchObject({
+      id: row?.id,
+      status: "open",
+      waiting: "approval",
+      consultedRunId: row?.targetRunId,
+    });
+    const list = opened?.messages ?? [];
+    // First the question, as it went into the agents' DM.
+    expect(list[0]).toMatchObject({ channelId: row?.channelId, body: "How is staging deployed?" });
+    // The approval the consulted run asked for, on its card where the person asked.
+    expect(list.some((m) => m.channelId === f.general.id && typeof m.meta.approvalId === "string")).toBe(true);
+    // Nothing else: every other message is the consulted run's.
+    expect(list.slice(1).every((m) => m.agentRunId === row?.targetRunId)).toBe(true);
+    expect(list.some((m) => m.body.startsWith("Another question"))).toBe(false);
+    // Opened only from the conversation that asked it.
+    expect(await consultationConversation(f.db, f.org.id, row?.channelId ?? "", row?.id ?? "")).toBeNull();
   });
 
   test("no cycles: the consulted agent can't ask back the one asking it", async () => {

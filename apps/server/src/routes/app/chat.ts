@@ -2,6 +2,7 @@ import {
   activeRunsIn,
   addChannelMember,
   answerNow,
+  consultationConversation,
   consultationsIn,
   createChannel,
   joinChannel,
@@ -33,6 +34,31 @@ const tags = ["Chat"];
 const ChannelParams = OrgParams.extend({ channelId: z.uuid() });
 
 /** Channels and messages. Real-time updates arrive over the WebSocket (`/api/ws`). */
+/** A question an agent asked another from a conversation (`consultationsIn`). */
+const Consultation = z.object({
+  id: z.uuid(),
+  runId: z.uuid().openapi({ description: "The asking run: its reply (`agentRunId`) shows the list." }),
+  agentId: z.uuid(),
+  consultedAgentId: z.uuid(),
+  consultedRunId: z
+    .uuid()
+    .nullable()
+    .openapi({ description: "The consulted agent's run: the cards it posts here carry it (`agentRunId`)." }),
+  status: z.enum(["open", "answered", "expired", "failed"]),
+  waiting: z.enum(["approval", "input", "computer"]).nullable().openapi({
+    description:
+      "Open, and the consulted agent waits: on a person (`approval`; `input`: an answer or a secret), or for its computer to come back online (`computer`).",
+  }),
+  question: z.string(),
+  answer: z
+    .string()
+    .nullable()
+    .openapi({ description: "The answer once answered; why it couldn't once failed." }),
+  createdAt: z.string(),
+  answeredAt: z.string().nullable(),
+  expiresAt: z.string(),
+});
+
 export function chatRoutes(deps: AppDeps) {
   const { db, adapters } = deps;
   const app = createAppRouter(deps);
@@ -305,27 +331,7 @@ export function chatRoutes(deps: AppDeps) {
       responses: {
         200: json(
           z.object({
-            consultations: z.array(
-              z.object({
-                id: z.uuid(),
-                runId: z.uuid().openapi({ description: "The asking run: its reply (`agentRunId`) shows the list." }),
-                agentId: z.uuid(),
-                consultedAgentId: z.uuid(),
-                status: z.enum(["open", "answered", "expired", "failed"]),
-                waiting: z.enum(["approval", "input", "computer"]).nullable().openapi({
-                  description:
-                    "Open, and the consulted agent waits: on a person (`approval`; `input`: an answer or a secret), or for its computer to come back online (`computer`).",
-                }),
-                question: z.string(),
-                answer: z
-                  .string()
-                  .nullable()
-                  .openapi({ description: "The answer once answered; why it couldn't once failed." }),
-                createdAt: z.string(),
-                answeredAt: z.string().nullable(),
-                expiresAt: z.string(),
-              }),
-            ),
+            consultations: z.array(Consultation),
           }),
         ),
         ...errors,
@@ -343,6 +349,39 @@ export function chatRoutes(deps: AppDeps) {
             answeredAt: q.answeredAt?.toISOString() ?? null,
             expiresAt: q.expiresAt.toISOString(),
           })),
+        },
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/channels/{channelId}/consultations/{consultationId}",
+      tags,
+      security,
+      summary: "One question asked from here, opened: what the two agents said for it (read only)",
+      description:
+        "The question as it went into the agents' DM, the consulted agent's messages there and the cards it posted here (approvals, questions, secret requests), oldest first. Only this question's part of their DM. 404 when it wasn't asked from this conversation.",
+      request: { params: ChannelParams.extend({ consultationId: z.uuid() }) },
+      responses: { 200: json(z.object({ consultation: Consultation, messages: z.array(Message) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId, channelId, consultationId } = c.req.valid("param");
+      await requireChannelAccess(db, c.get("user").id, orgId, channelId);
+      const found = await consultationConversation(db, orgId, channelId, consultationId);
+      if (!found) return apiError(c, 404, "not_found", "Question not found");
+      const q = found.consultation;
+      return c.json(
+        {
+          consultation: {
+            ...q,
+            createdAt: q.createdAt.toISOString(),
+            answeredAt: q.answeredAt?.toISOString() ?? null,
+            expiresAt: q.expiresAt.toISOString(),
+          },
+          messages: found.messages,
         },
         200,
       );

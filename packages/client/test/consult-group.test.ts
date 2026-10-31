@@ -25,6 +25,7 @@ const q = (over: Partial<RunConsultation> = {}): RunConsultation => ({
   runId: "r1",
   agentId: "lia",
   consultedAgentId: "theo",
+  consultedRunId: "r-theo",
   status: "open",
   waiting: null,
   question: "How are rates today?",

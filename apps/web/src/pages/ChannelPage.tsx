@@ -13,6 +13,7 @@ import type {
   MemoryUpdate,
   Message as MessageType,
   ReplyRef,
+  RunConsultation,
   ScreenKind,
   SecretRequest,
   ThreadInfo,
@@ -187,14 +188,16 @@ import { requestBrowserCard } from "@/components/browser/open";
 import { ChannelMembersStack } from "@/components/ChannelMembers";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
 import { NoticeLine, RoutineReport, RoutineTag } from "@/components/ChatNotices";
+import { ConsultationCard } from "@/components/ConsultationCard";
+import { ConsultationPanel } from "@/components/ConsultationPanel";
 import {
   ConsultAnswerLine,
   ConsultGroup,
   type ConsultGroups,
   ConsultGroupsProvider,
+  ConsultHelpingTag,
   useConsultGroups,
 } from "@/components/ConsultGroup";
-import { ConsultationCard } from "@/components/ConsultationCard";
 import { CorrectionAsk } from "@/components/CorrectionAsk";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
 import { MenuEntries } from "@/components/DesktopMenus";
@@ -585,9 +588,12 @@ function ChannelView({
   const [panel, setPanel] = useState<{ id: string; reply: boolean } | null>(null);
   // "Ver perfil" (a DM's header, the profile card): the agent's page in the same place; one panel at a time.
   const [profileId, setProfileId] = useState<string | null>(null);
+  // A question an agent asked another from here, opened from its line in the reply ("Theo ⇄ Iris"): one panel too.
+  const [consultId, setConsultId] = useState<string | null>(null);
   const outerPanel = useOpenAgentPanel();
   const openAgentPanel = useCallback((agentId: string) => {
     setPanel(null);
+    setConsultId(null);
     setProfileId(agentId);
   }, []);
   // "Mudar algo" on a mission's plan: the next message goes to its executor ("Respondendo: Plano").
@@ -876,7 +882,7 @@ function ChannelView({
   // how their answers' notices draw, and which ones the working line leaves to a block near the end.
   const consultRows = useMemo(() => timeline.flatMap((i) => (i.kind === "message" ? [i.message] : [])), [timeline]);
   const liveRuns = useMemo(() => new Set(slots.map((slot) => slot.runId)), [slots]);
-  const consultGroups = useConsultGroups(channel.id, consultRows, liveRuns);
+  const consultGroups = useConsultGroups(channel.id, consultRows, liveRuns, consultId);
 
   // Newest at the bottom: follow new messages and streaming text while the person is at the
   // bottom; if they scrolled up, offer "Novas mensagens" instead of jumping.
@@ -1551,11 +1557,18 @@ function ChannelView({
       ? () => composer.current?.focus()
       : (message) => {
           setProfileId(null);
+          setConsultId(null);
           setPanel({ id: message.threadId ?? message.id, reply: true });
         },
     openThread: (id) => {
       setProfileId(null);
+      setConsultId(null);
       setPanel({ id, reply: false });
+    },
+    openConsultation: (id) => {
+      setProfileId(null);
+      setPanel(null);
+      setConsultId(id);
     },
     requestCorrection: (message, text) => {
       const handle = message.author.type === "agent" ? dir.agentById.get(message.author.id ?? "")?.handle : undefined;
@@ -1585,6 +1598,8 @@ function ChannelView({
       reply: (message) => now().reply(message),
       // A thread view has no panel: its links go to the thread's page.
       openThread: inThread ? undefined : (id) => now().openThread(id),
+      // In a thread view the question opens in place, inside the reply's block.
+      openConsultation: inThread ? undefined : (id) => now().openConsultation(id),
       requestCorrection: (message, text) => now().requestCorrection(message, text),
       jumpTo: (messageId) => now().jumpTo(messageId),
       replyToMission: (missionId, label) => now().replyToMission(missionId, label),
@@ -1972,6 +1987,22 @@ function ChannelView({
             </aside>
           )}
           {profileId && <AgentPanel key={profileId} agentId={profileId} onClose={() => setProfileId(null)} />}
+          {consultId && (
+            <ConsultationPanel
+              key={consultId}
+              channelId={channel.id}
+              channelName={channel.name}
+              consultationId={consultId}
+              onClose={() => setConsultId(null)}
+              onTalk={(handle) => {
+                setConsultId(null);
+                actions.insertMention(handle);
+              }}
+              renderMessage={(m, grouped) => (
+                <TimelineMessage message={m} grouped={grouped} entering={false} modelLabels={NO_LABELS} readOnly />
+              )}
+            />
+          )}
         </ChannelThreadsContext.Provider>
       </ChannelActionsContext.Provider>
     </AgentPanelContext.Provider>
@@ -2165,6 +2196,7 @@ const Timeline = memo(function Timeline({
           contextMark={threadsView?.marks.has(m.id)}
           replyContext={item.context}
           lastOfRun={Boolean(m.agentRunId && lastByRun.get(m.agentRunId) === item.key)}
+          helping={m.agentRunId ? consultGroups.helping.get(m.agentRunId) : undefined}
         />
       ),
     );
@@ -2809,6 +2841,8 @@ export const TimelineMessage = memo(function TimelineMessage({
   live = null,
   seenLive,
   lastOfRun = false,
+  helping,
+  readOnly = false,
 }: {
   message: MessageType;
   grouped: boolean;
@@ -2824,6 +2858,10 @@ export const TimelineMessage = memo(function TimelineMessage({
   seenLive?: LiveRun;
   /** The last message of its run here: it carries the run's browser card while a take over holds it. */
   lastOfRun?: boolean;
+  /** Posted by a run answering another agent's question from here: "ajudando o Theo · Ver conversa". */
+  helping?: RunConsultation;
+  /** Shown where the person can't act on it (a question opened in the panel): no feedback, no menu. */
+  readOnly?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
@@ -2987,13 +3025,13 @@ export const TimelineMessage = memo(function TimelineMessage({
     missionCard ||
     forumSuggestion ||
     issueWork;
-  const feedback = m.author.type === "agent" && !card && !m.local && !live;
+  const feedback = !readOnly && m.author.type === "agent" && !card && !m.local && !live;
   const menu = useMessageMenu(m, channelName ?? "", {
     feedback,
     agentName: agent?.name ?? t("channel.unknownAgent"),
   });
   // A row with a bar has the same actions in a menu that a tap opens on touch.
-  const barred = feedback || (m.author.type === "person" && !m.local);
+  const barred = !readOnly && (feedback || (m.author.type === "person" && !m.local));
   // Watched live here: the steps it took stay in the block, folded ("3 passos"), instead of the summary.
   const keptAll = seenLive?.work?.length ? seenLive.work : null;
   const keptWork =
@@ -3022,7 +3060,7 @@ export const TimelineMessage = memo(function TimelineMessage({
       className={cx(local && `ac-msg--local ac-msg--${local}`, contextMark && "msg--context")}
       onMouseEnter={feedback ? () => setActive(true) : undefined}
       onFocus={feedback ? () => setActive(true) : undefined}
-      onContextMenu={live ? undefined : menu.onContextMenu}
+      onContextMenu={live || readOnly ? undefined : menu.onContextMenu}
       avatar={
         m.author.id ? (
           <ProfileTrigger actor={{ type: m.author.type, id: m.author.id }} label={t("profile.of", { name })} decorative>
@@ -3074,6 +3112,7 @@ export const TimelineMessage = memo(function TimelineMessage({
                 {t("chat.notice.talker")}
               </span>
             )}
+            {helping && <ConsultHelpingTag consultation={helping} />}
           </>
         ) : (
           name

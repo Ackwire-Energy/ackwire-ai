@@ -5513,6 +5513,10 @@ button.ac-tools__row {
 button.ac-tools__row:hover {
   background: var(--plate-soft);
 }
+/* A line that opens beside the chat (another agent's conversation) while it shows there: like a thread's line. */
+button.ac-tools__row[aria-pressed="true"] {
+  background: var(--plate);
+}
 button.ac-tools__row:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);

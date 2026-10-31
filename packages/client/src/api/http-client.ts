@@ -46,6 +46,7 @@ import type {
   ComputerTarget,
   Connection,
   ConnectorCatalog,
+  ConsultationConversation,
   Credential,
   CustomConnectStart,
   CustomServer,
@@ -460,6 +461,12 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
             request<{ consultations: RunConsultation[] }>(`${org(orgId)}/channels/${enc(channelId)}/consultations`),
           )) ?? { consultations: [] }
         ).consultations,
+      consultation: (orgId, channelId, consultationId) =>
+        nullOn(404, () =>
+          request<ConsultationConversation>(
+            `${org(orgId)}/channels/${enc(channelId)}/consultations/${enc(consultationId)}`,
+          ),
+        ),
       usage: async (orgId) => {
         const res = await nullOn(403, () => request<{ usage: AgentUsage[] }>(`${org(orgId)}/usage`));
         return res ? res.usage : null;

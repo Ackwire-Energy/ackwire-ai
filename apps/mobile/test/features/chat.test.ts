@@ -177,6 +177,7 @@ describe("working line", () => {
       runId: "r1",
       agentId: "atlas",
       consultedAgentId: "infra",
+      consultedRunId: "r-infra",
       status: "open",
       waiting: null,
       question: "Como está o deploy?",

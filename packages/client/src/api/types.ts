@@ -542,6 +542,8 @@ export interface RunConsultation {
   runId: string;
   agentId: string;
   consultedAgentId: string;
+  /** The consulted agent's run: the cards it posts here carry it (`agentRunId`), "ajudando o Theo". */
+  consultedRunId: string | null;
   status: "open" | ConsultationStatus;
   /** Open, and the consulted agent waits: on a person, or for its computer to come back. */
   waiting: ConsultationWait | null;
@@ -551,6 +553,16 @@ export interface RunConsultation {
   createdAt: string;
   answeredAt: string | null;
   expiresAt: string;
+}
+
+/**
+ * One question opened beside the conversation that asked it ("Theo ⇄ Iris", `GET …/consultations/{id}`): the
+ * question as it went into the agents' DM, the consulted agent's messages there and the cards it posted where the
+ * person asked, oldest first. Read only.
+ */
+export interface ConsultationConversation {
+  consultation: RunConsultation;
+  messages: Message[];
 }
 
 export interface ActiveRun {
