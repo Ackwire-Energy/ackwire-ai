@@ -313,8 +313,9 @@ export const THREAD_ASSESS_DELAY_MS = 2 * 60_000;
 export const FLOOR_WINDOW_MS = 30 * 60_000;
 
 /**
- * An agent's message written by a run takes that run's stretch (ADR 0089) in its own insert. One no run wrote (a
- * notice, a task's end, a follow-up line) says its stretch: the run's it belongs to, or null for a root (a
+ * An agent's message written by a run takes that run's hop and stretch (ADR 0089) from its row in its own insert
+ * (`hop` only when the row is gone): a person may have rerooted the run since its caller read it. One no run wrote
+ * (a notice, a task's end, a follow-up line) says its stretch: the run's it belongs to, or null for a root (a
  * routine's report, a line that wakes nobody).
  */
 export type MessageAuthor =
@@ -607,7 +608,8 @@ export async function insertMessageWithRuns(
         insert into ${messages} (id, created_at, org_id, channel_id, thread_id, author_type, author_user_id,
           author_agent_id, agent_run_id, hop, stretch_id, body, mentioned_agent_ids, mentioned_user_ids, meta)
         select ${id}::uuid, coalesce(${input.createdAt?.toISOString() ?? null}::timestamptz, now()), ${input.orgId}::uuid, ${input.channelId}::uuid, ${threadId}::uuid,
-          ${input.author.type}::author_type, ${userId}, ${agentId}::uuid, ${runId}::uuid, ${hop},
+          ${input.author.type}::author_type, ${userId}, ${agentId}::uuid, ${runId}::uuid,
+          coalesce((select sr.hop from ${agentRuns} sr where sr.id = ${runId}::uuid), ${hop}),
           coalesce(${stretchId}::uuid, (select coalesce(sr.stretch_id, sr.trigger_message_id) from ${agentRuns} sr
             where sr.id = ${runId}::uuid)),
           ${body},

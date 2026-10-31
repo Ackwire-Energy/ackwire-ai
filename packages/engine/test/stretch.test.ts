@@ -3,6 +3,7 @@ import { and, asc, eq, schema } from "@agenteschat/db";
 import { type ModelRequest, systemText } from "@agenteschat/providers";
 import {
   answerNow,
+  continueStretch,
   createAgent,
   drainOutbox,
   FOLLOW_UP_JOB,
@@ -10,9 +11,13 @@ import {
   getMessage,
   insertMessage,
   postPersonMessage,
+  postStretchCard,
   receiptsFor,
+  releaseInbox,
+  requireChannelAccess,
   runAuthority,
   STRETCH,
+  STRETCH_JOB,
   STRETCH_REFUSAL,
   startOrJoinRun,
   stretchCardOf,
@@ -39,21 +44,43 @@ afterEach(async () => {
 const isFor = (req: ModelRequest, name: string, handle: string) =>
   systemText(req.system).includes(`You are ${name} (@${handle})`);
 
-/** Theo and Ada, two agents of #general. */
-async function team(fx: Fixture) {
-  const make = async (name: string, handle: string) => {
-    const agent = await createAgent(
-      fx.db,
-      fx.owner.id,
-      fx.org.id,
-      { name, handle, role: "Analytics", credentialId: fx.credential.id },
-      { model: "claude-sonnet-5-5" },
-    );
-    await fx.db.insert(schema.channelMembers).values({ orgId: fx.org.id, channelId: fx.general.id, agentId: agent.id });
-    return agent;
-  };
-  return { theo: await make("Theo", "theo"), ada: await make("Ada", "ada") };
+/** An agent of #general. */
+async function agentIn(fx: Fixture, name: string, handle: string) {
+  const agent = await createAgent(
+    fx.db,
+    fx.owner.id,
+    fx.org.id,
+    { name, handle, role: "Analytics", credentialId: fx.credential.id },
+    { model: "claude-sonnet-5-5" },
+  );
+  await fx.db.insert(schema.channelMembers).values({ orgId: fx.org.id, channelId: fx.general.id, agentId: agent.id });
+  return agent;
 }
+
+/** Theo and Ada, two agents of #general. */
+const team = async (fx: Fixture) => ({ theo: await agentIn(fx, "Theo", "theo"), ada: await agentIn(fx, "Ada", "ada") });
+
+/** `count` runs agents already started on their own in `stretchId` (`agentId`'s, in #general under `threadRootId`). */
+const fillStretch = (
+  fx: Fixture,
+  agentId: string,
+  stretchId: string,
+  threadRootId: string,
+  count: number = STRETCH.runs,
+) =>
+  fx.db.insert(schema.agentRuns).values(
+    Array.from({ length: count }, () => ({
+      orgId: fx.org.id,
+      agentId,
+      channelId: fx.general.id,
+      threadRootId,
+      triggerMessageId: Bun.randomUUIDv7(),
+      trigger: "mention" as const,
+      hop: 2,
+      stretchId,
+      status: "done" as const,
+    })),
+  );
 
 /** Each agent says its lines in turn (then "ok"); a structured call (the router's) hears nobody. */
 const lines = (said: { theo: string[]; ada: string[] }) => {
@@ -282,19 +309,7 @@ test("a person's message read mid-run sets hop 1 and a new stretch: the count st
   const { theo, ada } = await team(f);
   const root = await ask(f, "Deploy de hoje");
   // A stretch 49 runs in, written by Ada at hop 6: Theo's run on it is the 50th agents start on their own.
-  await f.db.insert(schema.agentRuns).values(
-    Array.from({ length: STRETCH.runs - 1 }, () => ({
-      orgId: f.org.id,
-      agentId: ada.id,
-      channelId: f.general.id,
-      threadRootId: root.id,
-      triggerMessageId: Bun.randomUUIDv7(),
-      trigger: "mention" as const,
-      hop: 2,
-      stretchId: root.id,
-      status: "done" as const,
-    })),
-  );
+  await fillStretch(f, ada.id, root.id, root.id, STRETCH.runs - 1);
   const handBack = await f.db.transaction(async (tx) => {
     const m = await insertMessage(tx, {
       orgId: f.org.id,
@@ -380,19 +395,7 @@ test("a tool refused at the limit: the agent says what is left, and the run Cont
   );
   const asked = await ask(f, "@dev investiga o deploy de staging");
   // Ana's stretch is already at its limit.
-  await f.db.insert(schema.agentRuns).values(
-    Array.from({ length: STRETCH.runs }, () => ({
-      orgId: f.org.id,
-      agentId: f.agent.id,
-      channelId: f.general.id,
-      threadRootId: asked.id,
-      triggerMessageId: Bun.randomUUIDv7(),
-      trigger: "mention" as const,
-      hop: 2,
-      stretchId: asked.id,
-      status: "done" as const,
-    })),
-  );
+  await fillStretch(f, f.agent.id, asked.id, asked.id);
   await drain(f);
   expect(f.provider.calls.some((c) => lastText(c.request).includes("did what you may do on your own"))).toBe(true);
   expect(STRETCH_REFUSAL).toContain("did what you may do on your own");
@@ -417,4 +420,159 @@ test("a tool refused at the limit: the agent says what is left, and the run Cont
     .where(eq(schema.agentRuns.id, go.runs[0]?.runId ?? ""));
   expect(resumed).toMatchObject({ hop: 1, status: "done", triggerMessageId: card.id });
   await expectStretched(f);
+});
+
+test("a tool refused for the spend of the agent it would wake: the card names that agent, Continuar wakes the asker", async () => {
+  const lastText = (req: ModelRequest) => JSON.stringify(req.messages.at(-1)?.content);
+  f = await setup({
+    askAgent: true,
+    reply: (req) => {
+      if (req.outputSchema) return { chunks: ['{"needs_agent":0,"scores":[],"reason":"none"}'] };
+      if (lastText(req).includes("tool_result")) return { chunks: ["Falta perguntar ao Infra."] };
+      return {
+        chunks: [],
+        toolUses: [{ name: "ask_agent", input: { agent: "@infra", question: "Como é o deploy de staging?" } }],
+      };
+    },
+  });
+  const infra = await createAgent(
+    f.db,
+    f.owner.id,
+    f.org.id,
+    { name: "Infra", handle: "infra", role: "Infra", credentialId: f.credential.id },
+    { model: "claude-sonnet-5-5" },
+  );
+  const asked = await ask(f, "@dev investiga o deploy de staging");
+  // Infra already spent US$ 11 of its US$ 50 in Ana's stretch, on a run agents started.
+  const [spent] = await f.db
+    .insert(schema.agentRuns)
+    .values({
+      orgId: f.org.id,
+      agentId: infra.id,
+      channelId: f.general.id,
+      threadRootId: asked.id,
+      triggerMessageId: Bun.randomUUIDv7(),
+      trigger: "dm",
+      hop: 2,
+      stretchId: asked.id,
+      status: "done",
+    })
+    .returning();
+  await f.db.insert(schema.usageRecords).values({
+    orgId: f.org.id,
+    agentId: infra.id,
+    runId: spent?.id,
+    provider: "anthropic",
+    model: "claude-sonnet-5-5",
+    requestedModel: "claude-sonnet-5-5",
+    inputTokens: 1,
+    outputTokens: 1,
+    costNanoUsd: 11_000_000_000,
+    billedTo: "org",
+  });
+  await drain(f);
+  const [card, ...more] = await cardsOf(f);
+  expect(more).toEqual([]);
+  if (!card) throw new Error("no card");
+  expect(card.body).toStartWith("Infra stopped to check with you: used 20%");
+  expect(card.meta.actionCard).toMatchObject({
+    reason: "spend",
+    agentIds: [infra.id],
+    held: [{ agentId: f.agent.id, messageId: null }],
+  });
+  const go = await answerNow({ db: f.db, pubsub: f.pubsub, gateway: f.gateway }, f.owner.id, f.org.id, card.id);
+  expect(go.runs.map((r) => r.agentId)).toEqual([f.agent.id]);
+});
+
+test("Continuar starts every wake-up the card holds, also one held there after the card was read", async () => {
+  f = await setup({ reply: lines({ theo: [], ada: [] }) });
+  const { theo, ada } = await team(f);
+  const max = await agentIn(f, "Max", "max");
+  const root = await ask(f, "Deploy de hoje");
+  await fillStretch(f, theo.id, root.id, root.id);
+  const handOff = (to: string, body: string) =>
+    f.db.transaction(async (tx) => {
+      const m = await insertMessage(tx, {
+        orgId: f.org.id,
+        channelId: f.general.id,
+        author: { type: "agent", agentId: theo.id, runId: null, hop: 6, stretchId: root.id },
+        body,
+      });
+      expect(await startOrJoinRun(tx, m, to, "mention")).toBeNull();
+      return m;
+    });
+  const toAda = await handOff(ada.id, "@ada sua vez");
+  await drain(f);
+  const [card] = await cardsOf(f);
+  if (!card) throw new Error("no card");
+  // Continuar reads the card, and Max's wake-up is held on it before Continuar writes.
+  const read = stretchCardOf(card.meta);
+  if (!read) throw new Error("no card");
+  const toMax = await handOff(max.id, "@max confere o deploy");
+  await drain(f);
+  const { membership } = await requireChannelAccess(f.db, f.owner.id, f.org.id, f.general.id);
+  const go = await continueStretch({ db: f.db, pubsub: f.pubsub }, f.owner.id, membership, card, read);
+  expect(go.runs.map((r) => r.agentId)).toEqual([ada.id, max.id]);
+  expect(stretchCardOf((await getMessage(f.db, f.org.id, card.id))?.meta)).toMatchObject({
+    state: "continued",
+    held: [
+      { agentId: ada.id, messageId: toAda.id },
+      { agentId: max.id, messageId: toMax.id },
+    ],
+  });
+});
+
+test("Continuar while the agent still works there: that run writes from hop 1 in the new stretch, and handed on unread nothing holds it", async () => {
+  f = await setup({ reply: lines({ theo: [], ada: [] }) });
+  const root = await ask(f, "Deploy de staging");
+  const asked = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev investiga",
+    threadId: root.id,
+  });
+  const [working] = await f.db
+    .update(schema.agentRuns)
+    .set({ hop: 30, status: "running" })
+    .where(eq(schema.agentRuns.triggerMessageId, asked.id))
+    .returning();
+  if (!working) throw new Error("no run");
+  await fillStretch(f, f.agent.id, asked.id, root.id);
+  // Its ask_agent was refused at the limit while it goes on writing.
+  const card = await postStretchCard({ db: f.db, pubsub: f.pubsub }, f.org.id, {
+    stretchId: asked.id,
+    channelId: f.general.id,
+    threadId: root.id,
+    authorAgentId: f.agent.id,
+    runId: working.id,
+    hop: working.hop,
+    agentId: f.agent.id,
+    messageId: null,
+    trigger: "mention",
+    stop: { reason: "runs", limit: STRETCH.runs },
+  });
+  if (!card) throw new Error("no card");
+  const go = await answerNow({ db: f.db, pubsub: f.pubsub, gateway: f.gateway }, f.owner.id, f.org.id, card.id);
+  expect(go.runs).toEqual([{ agentId: f.agent.id, runId: working.id }]);
+  const [joined] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, working.id));
+  expect(joined).toMatchObject({ hop: 1, pendingMessageIds: [card.id] });
+  const stretchId = joined?.stretchId;
+  expect(stretchId).not.toBe(asked.id);
+  // The run still knows its old hop as it posts its reply.
+  const reply = await insertMessage(f.db, {
+    orgId: f.org.id,
+    channelId: f.general.id,
+    threadId: root.id,
+    author: { type: "agent", agentId: f.agent.id, runId: working.id, hop: working.hop },
+    body: "Diagnóstico feito.",
+  });
+  expect(reply).toMatchObject({ hop: 1, stretchId });
+  // It ends before reading the card: the card gets a run of its own, in the new stretch, and no second card.
+  await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, working.id));
+  const handed = await releaseInbox(f.db, f.pubsub, working, { reason: "done" });
+  expect(handed?.messageIds).toEqual([card.id]);
+  const [next] = await f.db
+    .select()
+    .from(schema.agentRuns)
+    .where(eq(schema.agentRuns.id, handed?.runId ?? ""));
+  expect(next).toMatchObject({ triggerMessageId: card.id, stretchId, status: "queued" });
+  expect(await f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, STRETCH_JOB))).toEqual([]);
 });

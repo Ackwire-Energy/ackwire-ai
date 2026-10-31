@@ -102,6 +102,11 @@ export interface StretchHold {
   messageId: string | null;
   trigger: RunTrigger;
   stop: StretchStop;
+  /**
+   * The agent the card names, when it isn't `agentId`: a refused tool's wake-up whose agent spent its budget share
+   * (the card says whose money it is; Continuar still wakes the agent that was refused).
+   */
+  stoppedAgentId?: string;
 }
 
 /** Holds a wake-up: the card job, once per stretch, message (or refused run) and agent. */
@@ -160,6 +165,7 @@ export async function refusedAtLimit(db: Database, run: ToolRun, wakes: string):
     messageId: null,
     trigger: "mention",
     stop,
+    ...(stop.reason === "spend" ? { stoppedAgentId: wakes } : {}),
   });
   return { content: STRETCH_REFUSAL, isError: true };
 }
@@ -273,6 +279,7 @@ export async function postStretchCard(deps: { db: Database; pubsub?: PubSub }, o
   const behind = hold.messageId ?? (await runTriggerOf(db, orgId, hold.runId));
   const forUserId = behind ? await accountableFor(db, orgId, behind) : null;
   const entry = { agentId: hold.agentId, messageId: hold.messageId, trigger: hold.trigger };
+  const stopped = hold.stoppedAgentId ?? hold.agentId;
   const card = await db.transaction(async (tx) => {
     await lockCard(tx, hold.stretchId, hold.channelId, hold.threadId);
     const [open] = await tx
@@ -297,7 +304,7 @@ export async function postStretchCard(deps: { db: Database; pubsub?: PubSub }, o
       ? {
           ...was,
           ...(was.reason === "spend" && hold.stop.reason === "runs" ? { reason: "runs", limit: hold.stop.limit } : {}),
-          agentIds: was.agentIds.includes(hold.agentId) ? was.agentIds : [...was.agentIds, hold.agentId],
+          agentIds: was.agentIds.includes(stopped) ? was.agentIds : [...was.agentIds, stopped],
           held: was.held.some((h) => h.agentId === entry.agentId && h.messageId === entry.messageId)
             ? was.held
             : [...was.held, entry],
@@ -309,7 +316,7 @@ export async function postStretchCard(deps: { db: Database; pubsub?: PubSub }, o
           reason: hold.stop.reason,
           limit: hold.stop.limit,
           forUserId,
-          agentIds: [hold.agentId],
+          agentIds: [stopped],
           held: [entry],
           continuedByUserId: null,
           continuedAt: null,
@@ -395,8 +402,11 @@ export async function continueStretch(
   const stretchId = Bun.randomUUIDv7();
   const done = await db.transaction(async (tx) => {
     await lockCard(tx, card.stretchId, message.channelId, message.threadId);
+    // What it holds now: a wake-up held after the caller read the card may have joined it since.
+    const now = stretchCardOf((await getMessage(tx, message.orgId, message.id))?.meta);
+    if (now?.state !== "paused") return null;
     const next: StretchCard = {
-      ...card,
+      ...now,
       state: "continued",
       continuedByUserId: userId,
       continuedAt: new Date().toISOString(),
@@ -422,8 +432,21 @@ export async function continueStretch(
       if (!active) continue;
       const out = await startOrJoinRun(tx, trigger, h.agentId, h.trigger, { granted: stretchId });
       if (!out) continue;
-      if ("joined" in out) await rerootRun(tx, { id: out.joined }, stretchId);
-      else runs.push(out.created);
+      if ("joined" in out) {
+        await rerootRun(tx, { id: out.joined }, stretchId);
+        // Should that run end before reading it, the run it is handed on to counts in the new stretch, not in the
+        // spent one.
+        await tx
+          .update(messages)
+          .set({ stretchId })
+          .where(
+            and(
+              eq(messages.orgId, trigger.orgId),
+              eq(messages.id, trigger.id),
+              eq(messages.createdAt, trigger.createdAt),
+            ),
+          );
+      } else runs.push(out.created);
       started.push({ agentId: h.agentId, runId: "created" in out ? out.created.id : out.joined });
     }
     await recordAudit(tx, {
