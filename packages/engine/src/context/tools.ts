@@ -2,6 +2,7 @@ import { and, arrayContained, type Database, desc, eq, inArray, isNull, or, type
 import { recordAgentActions } from "../agent-actions";
 import { caches } from "../cache";
 import type { MemoryUpdate } from "../events";
+import { cutText } from "../format";
 import { announceMessageMemories } from "../message-memories";
 import { can, getMembership } from "../organizations";
 import { personBehindCall } from "../requester";
@@ -150,7 +151,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
           `status=${item.status}${item.supersededBy ? ` superseded_by=${item.supersededBy}` : ""} confidence=${item.confidence.toFixed(2)} seen=${item.recurrence}`,
           ...srcMessages
             .filter((m) => allowed.includes(m.channelId))
-            .map((m) => `source message ${m.id} (${m.createdAt.toISOString().slice(0, 10)}): ${m.body.slice(0, 500)}`),
+            .map((m) => `source message ${m.id} (${m.createdAt.toISOString().slice(0, 10)}): ${cutText(m.body, 500)}`),
           ...srcOutcomes.map((o) => `source outcome ${o.id}: ${o.polarity} ${o.kind} ${o.subject} ${o.summary}`),
         ];
         return { content: lines.join("\n") };
@@ -205,7 +206,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
           await announceMessageMemories({ db: ctx.db, pubsub: deps.pubsub }, ctx.orgId, res.item).catch(() => {});
           if (res.action === "outweighed") {
             return {
-              content: `Not saved as current: it contradicts memory ${res.item.id} ("${res.item.content.slice(0, 200)}"), which has stronger evidence (an observed outcome). It was kept as history. Tell the person what you have on record and ask them to confirm which is right; if they confirm, use update_memory on ${res.item.id}.`,
+              content: `Not saved as current: it contradicts memory ${res.item.id} ("${cutText(res.item.content, 200)}"), which has stronger evidence (an observed outcome). It was kept as history. Tell the person what you have on record and ask them to confirm which is right; if they confirm, use update_memory on ${res.item.id}.`,
             };
           }
           // A new item (or a new version of one): a receipt with Undo. The same thing again (merged) changes nothing to undo.
@@ -215,8 +216,8 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
                 kind: "memory.saved",
                 target: { type: "memory", id: res.item.id },
                 params: {
-                  text: res.item.content.slice(0, 500),
-                  ...(res.previous ? { previousText: res.previous.content.slice(0, 500) } : {}),
+                  text: cutText(res.item.content, 500),
+                  ...(res.previous ? { previousText: cutText(res.previous.content, 500) } : {}),
                 },
                 before: res.previous ? { itemId: res.previous.id } : null,
                 after: { itemId: res.item.id },
@@ -270,7 +271,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               {
                 kind: "memory.updated",
                 target: { type: "memory", id: row.id },
-                params: { text: row.content.slice(0, 500), previousText: item.content.slice(0, 500) },
+                params: { text: cutText(row.content, 500), previousText: cutText(item.content, 500) },
                 before: { itemId: item.id },
                 after: { itemId: row.id },
               },
@@ -310,7 +311,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             {
               kind: "memory.forgotten",
               target: { type: "memory", id: item.id },
-              params: { text: item.content.slice(0, 500) },
+              params: { text: cutText(item.content, 500) },
               before: { itemId: item.id },
               after: { itemId: item.id },
             },
@@ -570,7 +571,7 @@ export async function retrieveForRun(
     // Context on demand (ADR 0043): a long item goes in cut short; `expand` opens it in full by its id.
     const room = item.pinned ? 600 : MEMORY_ITEM_CHARS;
     const content = item.content.replace(/\s+/g, " ");
-    const line = `- ${itemLabel(item)}${item.pinned ? " (pinned)" : ""} ${item.title ? `${item.title}: ` : ""}${content.length > room ? `${content.slice(0, room)}… [more with expand]` : content} (id ${item.id})`;
+    const line = `- ${itemLabel(item)}${item.pinned ? " (pinned)" : ""} ${item.title ? `${item.title}: ` : ""}${content.length > room ? `${cutText(content, room)}… [more with expand]` : content} (id ${item.id})`;
     if (used + line.length > budget && !item.pinned) continue;
     seen.add(item.id);
     lines.push(line);

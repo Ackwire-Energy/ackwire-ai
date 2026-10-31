@@ -21,6 +21,7 @@ import { personOfMessage, runAuthority } from "./authority";
 import { caches } from "./cache";
 import { summarizeScopes } from "./capabilities";
 import { isAgentOnlyDm } from "./dms";
+import { cutText } from "./format";
 import { issueWorkBrief, issueWorkOf } from "./issue-work";
 import { openTasksBrief } from "./issues";
 import type { MachineCaller } from "./machine-hub";
@@ -211,7 +212,7 @@ export function thisTurnText(
   const head = ["# This turn", intro, ...parts].join("\n\n");
   const clipped =
     head.length > THIS_TURN_MAX_CHARS
-      ? `${head.slice(0, THIS_TURN_MAX_CHARS).trimEnd()}\n[… cut; look it up with your tools if you need more]`
+      ? `${cutText(head, THIS_TURN_MAX_CHARS).trimEnd()}\n[… cut; look it up with your tools if you need more]`
       : head;
   return [clipped, ...found.map((b) => level(b.text))].join("\n\n");
 }
@@ -466,10 +467,12 @@ export async function buildRunContext(
         order by s.created_at desc limit 30)`),
   );
   const firstLine = (d: { content?: unknown }) =>
-    String(d.content ?? "")
-      .split("\n")[0]
-      ?.replace(/\s+/g, " ")
-      .slice(0, 140) ?? "";
+    cutText(
+      String(d.content ?? "")
+        .split("\n")[0]
+        ?.replace(/\s+/g, " ") ?? "",
+      140,
+    );
   // Oldest first in each block (a union keeps no order of its own).
   const time = (r: ActionRow) => new Date(r.created_at).getTime();
   actionRows.sort((x, y) => time(x) - time(y));
@@ -997,7 +1000,7 @@ async function saidThere(
             ? (m.userName ?? "someone")
             : `${m.agentName ?? "an agent"} (@${m.agentHandle ?? "agent"})`;
       const text = m.body.replace(/\s+/g, " ").trim();
-      return `- ${ago(m.createdAt, now.getTime())}, ${who}: ${text.length > 400 ? `${text.slice(0, 400)}…` : text}`;
+      return `- ${ago(m.createdAt, now.getTime())}, ${who}: ${text.length > 400 ? `${cutText(text, 400)}…` : text}`;
     });
 }
 

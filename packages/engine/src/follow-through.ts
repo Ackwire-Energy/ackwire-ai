@@ -8,6 +8,7 @@ import { eligibleChannelAgents } from "./dispatch";
 import { isAgentOnlyDm } from "./dms";
 import { ConflictError, NotFoundError } from "./errors";
 import { publishMessageCreated } from "./events";
+import { cutText, cutTextEnd } from "./format";
 import type { Judge } from "./judge";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import { enqueue } from "./outbox";
@@ -71,7 +72,7 @@ export async function followThroughVerdict(
     agentId: input.agentId,
     runId: input.runId,
     kind: "follow_through",
-    state: { request: input.request.slice(0, 2000), reply: input.reply.slice(-3000) },
+    state: { request: cutText(input.request, 2000), reply: cutTextEnd(input.reply, 3000) },
     questions: {
       verdict: {
         type: "choice",

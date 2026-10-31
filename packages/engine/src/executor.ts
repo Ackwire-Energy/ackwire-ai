@@ -98,6 +98,7 @@ import {
   followThroughVerdict,
   wakesLater,
 } from "./follow-through";
+import { cutText } from "./format";
 import { onForumRunFinished } from "./forum";
 import type { ModelGateway } from "./gateway";
 import { agentRepositoryList, repositoriesPrompt } from "./git/repos";
@@ -1129,7 +1130,7 @@ async function executeRunInner(
           toolUseId: call.toolUseId,
           name: call.name,
           isError: result.isError,
-          content: result.content.slice(0, 4000),
+          content: cutText(result.content, 4000),
           data: { secretRequestId: call.secretRequestId },
         });
       } else if (!result && call.questionId) {
@@ -1140,7 +1141,7 @@ async function executeRunInner(
           toolUseId: call.toolUseId,
           name: call.name,
           isError: false,
-          content: result.content.slice(0, 4000),
+          content: cutText(result.content, 4000),
           data: { questionId: call.questionId },
         });
       } else if (!result && call.approvalId) {
@@ -1336,12 +1337,12 @@ async function executeRunInner(
       addRunStep(db, run, "model_call", {
         turn,
         stopReason: "interrupted",
-        ...(said ? { narration: said.slice(0, 4000) } : {}),
+        ...(said ? { narration: cutText(said, 4000) } : {}),
       }),
     ]);
     if (counted[0]) run = counted[0];
     if (said)
-      await publishChannelEvent(deps.pubsub, { type: "agent.narration", ...where, turn, text: said.slice(0, 4000) });
+      await publishChannelEvent(deps.pubsub, { type: "agent.narration", ...where, turn, text: cutText(said, 4000) });
   };
 
   /** Moves what a tool returned onto the transcript (cards for the next post) and tells the channel about memory. */
@@ -2189,7 +2190,7 @@ async function executeRunInner(
           ...result.usage,
           thinking: result.thinking,
           turn,
-          ...(narration ? { narration: narration.slice(0, 4000) } : {}),
+          ...(narration ? { narration: cutText(narration, 4000) } : {}),
         }),
       ]);
       if (counted[0]) run = counted[0];
@@ -2209,7 +2210,7 @@ async function executeRunInner(
           type: "agent.narration",
           ...where,
           turn,
-          text: narration.slice(0, 4000),
+          text: cutText(narration, 4000),
         });
       }
 
@@ -2858,7 +2859,7 @@ function executedLabel(name: string, input: unknown): string {
     text(i.path) ||
     changes.filter(Boolean).join(", ");
   const head = maskCredentials(what.trim().replace(/\s+/g, " "));
-  return head ? `${name} (${head.length > 120 ? `${head.slice(0, 119)}…` : head})` : name;
+  return head ? `${name} (${head.length > 120 ? `${cutText(head, 119)}…` : head})` : name;
 }
 
 /** Identity of a run for tool access from outside the model loop (the runner MCP bridge). */
