@@ -1,6 +1,6 @@
 # 0029. Missions: long work driven by the executor on the agent's computer
 
-- Status: Proposed. Superseded in part by ADR 0077 (2026-10-28): the `cloud_computer` reason and missions on the agent's cloud computer
+- Status: Proposed. Superseded in part by ADR 0077 (2026-10-28): the `cloud_computer` reason and missions on the agent's cloud computer. Amended 2026-10-31: §8 (the computer is named only where the workspace has more than one)
 - Date: 2026-10-16
 - Extends: ADR 0025 (connected computers and the runner), ADR 0015 (tools, approvals, resumable runs), ADR 0008 (agent runs)
 
@@ -104,7 +104,7 @@ An `--append-system-prompt` (and a `CLAUDE.md`/`AGENTS.md` line) tells the execu
 
 ### 8. Our agent's role and context
 
-- The agent (e.g. Dev) routes and relays: decides whether a request goes to the executor or is a short chat reply, answers non-code questions, and speaks in the thread when a person addresses it. Cards from executor tools are rendered by code; they read "via Claude Code no MacBook do Walter".
+- The agent (e.g. Dev) routes and relays: decides whether a request goes to the executor or is a short chat reply, answers non-code questions, and speaks in the thread when a person addresses it. Cards from executor tools are rendered by code; they read "via Claude Code no MacBook do Walter". *Amended 2026-10-31:* the computer is named only where the workspace has more than one (`namesComputers`); with one (always on the Cloud) they read "via Claude Code", and the same holds for the mission's chip, its plan card, its sessions, a task's end in the chat and Nova missão.
 - When the agent runs, its context gets a **compact mission brief** (plan progress, running tasks, decisions taken and pending, links) instead of the whole thread; the thread summary covers the rest. Artifacts are referenced by id. A mission's context only enters runs in its own thread.
 - A finished mission can become a memory summary or a wiki page ("App mobile: decisões e lições").
 
