@@ -929,13 +929,14 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     api.machines.sendAccountCode = async () => {
       throw new ApiError(400, "account.invalid_code", "The sealed code is malformed");
     };
-    const send = within(block).getByRole("button", { name: "Enviar ao MacBook" });
-    await click(send);
+    // A line stands in for the field and its buttons while the code goes: Enviar is a new button after each send.
+    const send = () => within(block).getByRole("button", { name: "Enviar ao MacBook" });
+    await click(send());
     await settle(6);
     expect(shownText(block)).toContain("Não deu para enviar o código. Confira e tente de novo.");
     expect(shownText(block)).not.toContain("não respondeu");
     api.machines.sendAccountCode = sendCode;
-    await click(send);
+    await click(send());
     await settle(6);
     expect(sealed()).not.toBeNull();
     expect(shownText(block)).toContain("Código enviado. O MacBook está terminando de entrar.");

@@ -335,7 +335,7 @@ function AddAccountFlow({
         >
           {provider === "zai" ? <StepText>{t("connectAi.zaiTeam")}</StepText> : null}
         </Step>
-        <Step n={2} divider title={t("aiAccounts.add.keyTitle")}>
+        <Step n={2} divider title={t("aiAccounts.add.keyTitle")} side={read === "reconnecting" ? waiting : undefined}>
           {busy
             ? busyLine
             : pasteRow(t("aiAccounts.add.keyLabel", { plan: plan.label }), plan.placeholder, true, keyOk)}

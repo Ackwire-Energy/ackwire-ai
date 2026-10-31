@@ -425,6 +425,7 @@ describe("Conectores → Email", () => {
     expect(state.calls.find((c) => c.method === "mail.connectComposio")?.args[1]).toEqual({
       provider: "gmail",
       accountId: "mail-2",
+      desktop: false,
     });
     expect(left).toEqual(["https://composio.example/connect/gmail"]);
   });

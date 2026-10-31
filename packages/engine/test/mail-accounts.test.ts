@@ -192,9 +192,9 @@ test("Gmail through Composio: a pending row, Composio's link, then active with i
   // Not finished at Composio yet: read again for a while, then it stays pending.
   const read = composio.client.getConnectedAccount;
   let reads = 0;
-  composio.client.getConnectedAccount = (id) => {
+  composio.client.getConnectedAccount = (id, userId, options) => {
     reads++;
-    return read(id);
+    return read(id, userId, options);
   };
   expect(await completeComposioConnect(deps, started.accountId)).toEqual({ orgId: f.org.id, ok: false });
   expect(reads).toBeGreaterThan(1);
@@ -236,10 +236,10 @@ test("the Composio callback reads again past an error that passes; a lasting one
   );
   const read = composio.client.getConnectedAccount;
   let reads = 0;
-  composio.client.getConnectedAccount = async (id) => {
+  composio.client.getConnectedAccount = async (id, userId, options) => {
     if (++reads === 1) throw new MailError("Composio GET /connected_accounts failed (503)", true);
     composio.activate(id, "team@example.com");
-    return read(id);
+    return read(id, userId, options);
   };
   expect(await completeComposioConnect(deps, started.accountId)).toEqual({ orgId: f.org.id, ok: true });
   expect(reads).toBe(2);
@@ -275,7 +275,7 @@ test("Reconectar on a Gmail that needs it: the new sign-in takes the mailbox's p
     });
     const link = composio.state.links.at(-1);
     composio.activate(link?.connectedAccountId ?? "", address);
-    return { link, done: await completeComposioConnect(deps, f.owner.id, started.accountId) };
+    return { link, done: await completeComposioConnect(deps, started.accountId) };
   };
 
   // Signed in to another mailbox: it doesn't take this one's place.

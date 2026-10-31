@@ -550,7 +550,7 @@ function AddAccountFlow({
             hint={provider === "zai" ? t("connectAi.zaiTeam") : undefined}
           />
         </Step>
-        <Step n={2}>
+        <Step n={2} side={reads.includes("reconnecting") ? waiting : undefined}>
           <StepTitle
             title={t("aiAccounts.add.keyTitle")}
             hint={t("aiAccounts.add.keySafe", { computer })}
@@ -634,7 +634,7 @@ function AddAccountFlow({
           {starting && <span>{t("agentPage.work.brain.add.starting", { computer })}</span>}
         </Step>
         {login && opened && (
-          <Step side={busy ? undefined : waiting}>
+          <Step side={busy && !reads.includes("reconnecting") ? undefined : waiting}>
             <label htmlFor={codeId}>
               <b>{t("agentPage.work.brain.add.stepTwo")}</b>
             </label>

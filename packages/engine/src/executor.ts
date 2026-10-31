@@ -1040,8 +1040,8 @@ async function executeRunInner(
   /** What a resumed computer brain reads first: the results of the calls that waited for a person. */
   let resumeText: string | null = null;
   // Back from waiting for the computer: it is tried again below.
-  const backFromWait = Boolean(transcript.waitingForBrain);
-  if (backFromWait) {
+  const backFromComputerWait = Boolean(transcript.waitingForBrain);
+  if (backFromComputerWait) {
     delete transcript.waitingForBrain;
     await saveTranscript(db, transcript);
   }
@@ -1759,7 +1759,7 @@ async function executeRunInner(
 
   if (plan.unavailable) {
     // A run back from waiting for its computer has waited for it already.
-    const handled = await brainUnavailable(plan.unavailable, !backFromWait);
+    const handled = await brainUnavailable(plan.unavailable, !backFromComputerWait);
     if (handled === "canceled") return stopCanceled("");
     if (handled === "waited" || handled === "failed") return;
     if (handled === "no") {

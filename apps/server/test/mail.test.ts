@@ -183,9 +183,9 @@ test("Gmail still pending at Composio on the callback's first read: the agent's 
   // Composio still says pending when it sends the person back, then active on the next read.
   const read = fake.composio.client.getConnectedAccount;
   let reads = 0;
-  fake.composio.client.getConnectedAccount = async (id) => {
+  fake.composio.client.getConnectedAccount = async (id, userId, options) => {
     if (++reads === 2) fake.composio.activate(id, "Owner@Gmail.com");
-    return read(id);
+    return read(id, userId, options);
   };
   t = await createTestServer({ mail: fake.mail });
   const owner = browser(t);

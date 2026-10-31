@@ -228,13 +228,16 @@ test("a Gmail reconnected: its routines watch again, with triggers on the new Co
   });
   const connectedAccountId = m.composio.state.links.at(-1)?.connectedAccountId ?? "";
   m.composio.activate(connectedAccountId, "team@example.com");
-  await completeComposioConnect(m.deps, m.f.owner.id, started.accountId);
+  await completeComposioConnect(m.deps, started.accountId);
 
   const watch = await watchOf(m, routine.id);
   expect(watch).toMatchObject({ status: "active", lastError: null });
   expect(m.composio.state.deletedTriggers).toContain(oldTrigger ?? "");
   expect([...m.composio.state.triggers]).toEqual([
-    [watch?.externalTriggerId ?? "", { toolkit: "gmail", connectedAccountId, query: 'subject:"ticket"' }],
+    [
+      watch?.externalTriggerId ?? "",
+      { toolkit: "gmail", connectedAccountId, userId: `org_${m.f.org.id}`, query: 'subject:"ticket"' },
+    ],
   ]);
   // A paused routine gets no trigger, and no longer asks for a reconnect.
   expect(await watchOf(m, paused.id)).toMatchObject({ status: "active", externalTriggerId: null });

@@ -557,7 +557,7 @@ describe("the agent's AI", () => {
     );
     // Claude's code meanwhile: Reconectando by its field, a code that lands there waits for Enviar (`take` sends only
     // to a ready computer), and one that couldn't go says the computer didn't answer, never to check the code.
-    expect(flow).toContain('side={sent || read === "reconnecting" ? waiting : undefined}');
+    expect(flow).toContain('side={read === "reconnecting" ? waiting : undefined}');
     expect(flow).toContain('setSendFailed(loginReadPasses(error) ? "away" : "refused");');
     expect(flow).toMatch(
       /sendFailed === "away"\s*\?\s*t\("agentPage\.work\.brain\.add\.startFailed", \{ computer \}\)/,
