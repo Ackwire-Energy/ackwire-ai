@@ -118,7 +118,7 @@ export const termsEn: LegalDocument = {
       id: "termination",
       heading: "12. Term and termination",
       blocks: [
-        "You may stop using the Service and delete your account at any time in Settings. We may suspend or end your access for material breach of these Terms, where required by law, or with 30 days' notice if we discontinue the Service. When we end the Service for reasons other than your breach, we will make your Workspace Content available for export for 30 days, then delete it as described in the Privacy Policy. Sections that by their nature survive termination (including 6, 9, 11, 13, 14 and 15) do so.",
+        "You may stop using the Service and delete your account at any time in the app. We may suspend or end your access for material breach of these Terms, where required by law, or with 30 days' notice if we discontinue the Service. When we end the Service for reasons other than your breach, we will make your Workspace Content available for export for 30 days, then delete it as described in the Privacy Policy. Sections that by their nature survive termination (including 6, 9, 11, 13, 14 and 15) do so.",
       ],
     },
     {

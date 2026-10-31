@@ -162,6 +162,9 @@ export const messages = pgTable(
     index().on(t.threadId, t.createdAt),
     // The Threads page: replies grouped by thread within the channels a person sees.
     index().on(t.channelId, t.threadId, t.createdAt).where(sql`${t.threadId} is not null`),
+    // Deleting a person or an agent sets their messages' author to null: without these it scans every partition.
+    index().on(t.authorUserId).where(sql`${t.authorUserId} is not null`),
+    index().on(t.authorAgentId).where(sql`${t.authorAgentId} is not null`),
     check(
       "messages_author",
       sql`(${t.authorType} = 'person' and ${t.authorAgentId} is null) or (${t.authorType} = 'agent' and ${t.authorUserId} is null)`,

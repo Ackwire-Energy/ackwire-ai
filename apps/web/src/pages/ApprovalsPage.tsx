@@ -10,6 +10,7 @@ import {
   usePostMessage,
   useRoles,
 } from "@agenteschat/client";
+import { approveAlwaysOffered } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import { fromServer, itemName } from "@agenteschat/client/lib/connected";
 import { daysBetween, joinNames, relativeTime, timeLeft } from "@agenteschat/client/lib/format";
@@ -39,6 +40,7 @@ import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } fr
 import { Trans, useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import {
+  ApproveAlways,
   approvalAction,
   approvalReadsOnly,
   approvalRisk,
@@ -823,6 +825,7 @@ function RequestCard({
             <Button size="sm" onClick={onRefuse}>
               {t("approval.refuse")}
             </Button>
+            <ApproveAlways approval={a} agent={agent} />
             <span className="ap-grow" />
             {approvalRisk(a) === "high" && <span className="ap-card__hint">{t("approvals.highRisk")}</span>}
             <Button variant="ghost" size="sm" aria-haspopup="dialog" onClick={onOpen}>
@@ -1060,6 +1063,11 @@ function ApprovalDetails({
                 <p className="ap-muted ap-center">
                   {approvalRisk(a) === "high" ? t("approvals.holdNote") : t("approvals.clickNote")}
                 </p>
+                {approveAlwaysOffered(a) && (
+                  <div className="ap-decide__always">
+                    <ApproveAlways approval={a} agent={agent} />
+                  </div>
+                )}
               </>
             )}
           </div>

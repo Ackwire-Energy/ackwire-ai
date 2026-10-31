@@ -1,5 +1,6 @@
 import { useAuthConfig } from "@agenteschat/client";
 import { supportLineOf, suspendedText } from "@agenteschat/client/lib/errors";
+import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Linking, StyleSheet, View } from "react-native";
 import { signOut } from "@/features/account";
@@ -11,9 +12,9 @@ import { AuthScaffold, CENTER } from "./AuthScaffold";
 
 /**
  * The chosen organization is suspended (ADR 0056 §8): say so plainly (why, when the workspace is told), where
- * to ask about it, the person's other organizations and Sair. It covers the app, whose socket stays open
- * underneath (hidden from screen readers meanwhile), so lifting the suspension brings the organization back at
- * once.
+ * to ask about it, the person's other organizations, Sair and Apagar conta (its screen opens over this one). It
+ * covers the app, whose socket stays open underneath (hidden from screen readers meanwhile), so lifting the
+ * suspension brings the organization back at once.
  */
 export function SuspendedWorkspace({
   state,
@@ -33,6 +34,7 @@ export function SuspendedWorkspace({
           <Button key={o.id} variant="secondary" wide label={o.name} onPress={() => state.setOrgId(o.id)} />
         ))}
         <Button variant="ghost" wide label={t("mobile.org.signOut")} onPress={() => void signOut()} />
+        <Button variant="ghost" wide label={t("deleteAccount.menu")} onPress={() => router.push("/account-delete")} />
       </AuthScaffold>
     </View>
   );

@@ -170,6 +170,42 @@ export interface OrgSummary {
    * which resumes it, instead of the workspace. Absent: finished, not theirs to set up, or an older server.
    */
   onboarding?: OrgOnboarding;
+  /** From `GET /me` while an owner's deletion is pending, set at once by `org.deleting`: the workspace is closed. */
+  deletion?: OrgDeletion;
+}
+
+/** A workspace being deleted. Any owner restores it until `dueAt`. */
+export interface OrgDeletion {
+  /** When it goes for good; null once that date passed, while it is only being deleted. */
+  dueAt: string | null;
+  requestedAt: string | null;
+  /** Who deleted it; null once their account is gone. */
+  requestedBy: { id: string; name: string } | null;
+}
+
+/** What proves it's me before deleting (ADR 0088 §2): the code emailed to me, or my password where no email goes. */
+export interface DeletionProofInput {
+  code?: string;
+  password?: string;
+}
+
+/** `GET /account/deletion`: what deleting my account would close, leave and remove. */
+export interface AccountDeletionPlan {
+  /**
+   * Only I am in them: they close now and are deleted for good 7 days later. One being deleted already keeps its date
+   * (`deletion.dueAt`, null once it passed).
+   */
+  closes: { id: string; name: string; deletion?: { dueAt: string | null } }[];
+  /** Others are in them: I leave. */
+  leaves: { id: string; name: string; role: Role }[];
+  /** I'm their only owner, others are in them and they aren't being deleted: the account can't go yet (`sole_owner`). */
+  soleOwner: { id: string; name: string }[];
+  /** Computers I connected in the workspaces I leave, not in system mode: removed with the account. */
+  computers: { orgId: string; id: string; name: string }[];
+  /** Keys, connections and mailboxes I added to the workspaces I leave: the workspace's, so they stay. */
+  staysBehind: { orgId: string; kind: "key" | "connection" | "mailbox"; name: string }[];
+  /** I set up this server: its own settings will have no owner here, only in its environment (ADR 0073). */
+  serverOwner: boolean;
 }
 
 /** Where a workspace's onboarding stands. */
@@ -269,13 +305,19 @@ export interface InvitationPreview {
   kind?: "email" | "link";
   /** Who invited (their name), when known. */
   invitedBy?: string | null;
-  /** The workspace's logo, served for this invitation or link only (absent without one, or while it is paused). */
+  /**
+   * The workspace's logo, served for this invitation or link only (absent without one, or while it is paused or
+   * being deleted).
+   */
   logo?: string;
   /** The organization's first agents ("Theo, Ada, Lia e Atlas já trabalham lá"). */
   agents?: { id: string; name: string; appearance: { color: string; eyes: string; accessory: string } | null }[];
   /** How many more agents work there than `agents` names ("… e mais 2 já trabalham lá"). */
   moreAgents?: number;
-  /** A link turned off, expired, or whose workspace is paused: nobody can ask with it (ADR 0068). */
+  /**
+   * A link turned off, expired, or whose workspace is paused, or an invitation to a workspace being deleted: nobody can
+   * ask or join with it (ADR 0068).
+   */
   closed?: true;
   /** A link opened signed in: where that person stands (on a link that no longer works, only a member's). */
   you?: JoinStatus;
@@ -297,8 +339,11 @@ export interface AskToJoinResult {
   emailed: boolean;
 }
 
-/** `invites.sendCode` (ADR 0072): the code went to `email`; another can go after `resendIn` seconds. */
-export interface JoinCodeSent {
+/**
+ * A code emailed to `email` (ADR 0072's `invites.sendCode`, ADR 0088's deletion codes); another can go after `resendIn`
+ * seconds.
+ */
+export interface CodeSent {
   email: string;
   resendIn: number;
 }
@@ -534,6 +579,10 @@ export interface Model {
   outputUsdPerMTok: number;
   /** The workspace can use it (has a key for the provider). Expected from the backend; derived until then. */
   available?: boolean;
+  /** In a long list (OpenRouter's): `true` is a good pick, shown first. Absent: a catalog model. */
+  pick?: boolean;
+  /** The size Automático uses it for on its provider's key, by default. */
+  tier?: ModelTier;
 }
 
 export interface AgentUsage {
@@ -1105,6 +1154,27 @@ export interface Approval {
   issue?: { id: string; number: number; title: string } | null;
   /** One approval only: what the agent said at each turn before asking. */
   trail?: { text: string; at: string }[];
+  /**
+   * "Aprovar sempre" is offered: approving with `always` lets the agent run this server tool (each of these wrapped
+   * actions; none: the tool itself) without asking again, with any values. Null or absent: not offered.
+   */
+  approveAlways?: { tool: string; actions: string[] } | null;
+}
+
+/** A kind of call the agent runs without asking, approved for good by someone who decides its approvals. */
+export interface ApprovalRule {
+  id: string;
+  connectionId: string;
+  /** The connection's name ("Composio"). */
+  server: string;
+  /** The server's own tool name. */
+  tool: string;
+  /** How the workspace labelled that tool. */
+  toolLabel: string;
+  /** The wrapped action (`GITHUB_CREATE_AN_ISSUE_COMMENT`); empty: the tool itself. */
+  action: string;
+  createdByUserId: string | null;
+  createdAt: string;
 }
 
 /** The email a mail approval writes (draft, send, reply, forward), as its card shows it. */
@@ -1164,6 +1234,8 @@ export interface ConnectorDef {
   oauthConfigured: boolean;
   /** Can be connected on this server; `false` shows "Em breve". */
   available: boolean;
+  /** The vendor hasn't approved agentes.chat yet: greyed out with a lock, nothing to open. Older servers leave it out. */
+  soon?: boolean;
   needsServerUrl: boolean;
   /** The MCP endpoint (`remote_mcp`). */
   serverUrl: string | null;
@@ -1304,7 +1376,12 @@ export interface OrgSettings {
   defaultAgentBudgetUsd?: number;
   /** Agents check what the team already did before acting outside (ADR 0064). On by default. */
   actionCheck: boolean;
+  /** Per provider, the models Automático picks per tier where the workspace chose its own (ADR 0087). */
+  autoModels: Partial<Record<string, Partial<Record<ModelTier, string>>>>;
 }
+
+/** Automático's sizes: quick tasks, everyday work, hard work. */
+export type ModelTier = "small" | "medium" | "large";
 
 /** Sidebar counts. */
 export interface OrgOverview {
@@ -1585,7 +1662,8 @@ export interface CustomServer {
 export type CustomConnectStart =
   | { status: "connected"; server: CustomServer }
   | { status: "oauth"; authorizeUrl: string }
-  | { status: "needs_key" };
+  /** `not_approved`: it has OAuth but only lets in apps it approved, and agentes.chat isn't one yet. */
+  | { status: "needs_key"; reason?: "not_approved" };
 
 // ── Knowledge (phase 5: apps/server/src/routes/app/knowledge.ts) ─────────────
 
@@ -2062,8 +2140,8 @@ export interface IssueWork {
   runId: string | null;
   state: "running" | "waiting_approval" | "waiting_input" | "stalled";
   since: string;
-  /** The run's last tool calls, oldest first. */
-  steps: { tool: string; detail?: string; at: string }[];
+  /** The run's last tool calls, oldest first; a computer command's check says when it was refused or waits. */
+  steps: { tool: string; detail?: string; at: string; outcome?: "refused" | "waiting" }[];
   reason?: "failed" | "canceled" | "budget";
 }
 
@@ -2533,6 +2611,29 @@ export interface SkillDetail extends Skill {
   /** SKILL.md without the front matter (Markdown). */
   body: string;
   files: SkillFile[];
+}
+
+/** A skill a GitHub link holds, offered to pick when it holds several. */
+export interface SkillChoice {
+  /** Its folder from the repository's root: what `importPicked` sends back. */
+  path: string;
+  name: string;
+  description: string;
+}
+
+/** A skill a GitHub link holds that can't be installed: its folder and the server's refusal. */
+export interface SkillSkipped {
+  path: string;
+  code: string;
+  /** English fallback. */
+  message: string;
+  params?: Record<string, unknown>;
+}
+
+/** A GitHub link holding several skills: the ones to pick from, and those that can't be installed, with why. */
+export interface SkillPick {
+  choices: SkillChoice[];
+  skipped?: SkillSkipped[];
 }
 
 /** `GET …/agents/{id}/skills`: every skill of the library, with whether this agent has it. */
@@ -3846,7 +3947,7 @@ export interface MachineAccount {
   label: string;
   /** Only for its owner. */
   email: string | null;
-  /** "Pro", "Max", "Team"… as the provider reports it. */
+  /** `pro`, `max`, `ultra`, `team`… from what the CLI says (`planWordOf` names it). */
   plan: string | null;
   status: "active" | "signed_out";
   /** Whose it is (the person who signed it in); null: nobody's. */
@@ -3854,14 +3955,18 @@ export interface MachineAccount {
   ownerName: string | null;
   /** The viewer owns it: only they rename it or pick it for an agent. */
   mine: boolean;
-  /** Names of the agents that think with it (one at most). */
+  /** Names of the agents that think with it (one at most, unless `shared`). */
   usedBy: string[];
+  /** Their ids, in the same order (absent: an older server). */
+  usedByIds?: string[];
   /** Its plan's usage limits; null: not known yet. */
   usage: PlanUsage | null;
   /** A key account's coding plan (`zai`, `kimi`, `minimax`, `opencode`); null: the CLI's own sign-in. */
   provider: string | null;
   /** The last 4 of a key account's key (its owner only). */
   keyHint: string | null;
+  /** It thinks for every agent its owner gives it on that computer, with no new sign-in (absent: an older server). */
+  shared?: boolean;
 }
 
 /** `GET …/ai-accounts`: the viewer's AI accounts on the organization's computers, and where they can add one. */
@@ -3880,6 +3985,8 @@ export interface AiComputer {
   canAdd: boolean;
   /** Its runner takes coding plans' keys. */
   keys: boolean;
+  /** A new sign-in there thinks for all of the viewer's agents on it (absent: an older server). */
+  shares?: { claude_code: boolean; codex: boolean; key: boolean };
   /** What it can think with now: Claude Code (Claude and the coding plans) and Codex (ChatGPT). */
   brains: { claude_code: boolean; codex: boolean };
   /**

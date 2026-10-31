@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentBrainLine } from "@agenteschat/client";
 import { brainLine } from "@agenteschat/client/lib/brain";
+import { providerGrammar } from "@agenteschat/client/lib/grammar";
 import { KEY_MARKS, PLAN_MARKS } from "@agenteschat/client/lib/no-ai";
+import { keyStepHint, PROVIDERS } from "@agenteschat/client/lib/providers";
 import { resources } from "@agenteschat/i18n";
 import { markOf, PROVIDER_MARKS } from "@agenteschat/ui/brand/marks";
 import i18next, { type TFunction } from "i18next";
@@ -79,7 +81,29 @@ describe("the marks as the phone draws them", () => {
     expect(minimax?.shapes[0]?.fill).toBe(`url(#${MARK_GRADIENT})`);
     // A one-color mark takes the ink it is given, with no color of its own.
     expect(markShapes("codex", "light", INK)?.shapes).toEqual([{ d: PROVIDER_MARKS.openai.path, fill: INK }]);
+    // OpenRouter's glyph too, in Ink on a light theme and Cloud on a dark one, as its brand page gives it.
+    expect(markShapes("openrouter", "dark", INK)?.shapes).toEqual([{ d: PROVIDER_MARKS.openrouter.path, fill: INK }]);
     expect(markShapes("newplan", "light", INK)).toBeNull();
+  });
+
+  test("the key page lists OpenRouter: its mark, where its keys are made, and who may keep what is sent", async () => {
+    const openrouter = PROVIDERS.find((p) => p.id === "openrouter");
+    expect(openrouter).toMatchObject({ label: "OpenRouter", site: "openrouter.ai/keys", placeholder: "sk-or-v1-…" });
+    expect(markOf(openrouter?.id)).toBe("openrouter");
+    const hint = openrouter && keyStepHint(openrouter);
+    expect(hint).toBe("connectAi.key.privacy");
+    const pt = await translator("pt-BR");
+    const en = await translator("en");
+    expect(pt(hint ?? "")).toBe(
+      "As configurações de privacidade da OpenRouter decidem quais provedores podem guardar o que seus agentes enviam.",
+    );
+    expect(en(hint ?? "")).toBe(
+      "Your OpenRouter privacy settings decide which providers may keep what your agents send.",
+    );
+    expect(pt("onboarding.keyInvalid.openrouter")).toBe(
+      "As chaves da OpenRouter começam com sk-or-v1-. Confira e cole de novo.",
+    );
+    expect(pt("connectAi.key.create", providerGrammar(pt, "openrouter"))).toBe("Crie a sua chave de API da OpenRouter");
   });
 
   test("an image mark has no shapes: ProviderLogo draws the phone's own copy of the web's file", async () => {
@@ -110,7 +134,7 @@ describe("the marks as the phone draws them", () => {
     // The computer's plan line, as on the web.
     expect(stackChips(PLAN_MARKS).map((c) => markOf(c.id))).toEqual(["claude", "openai", "zai", "kimi"]);
     // The API key row's quad: Gemini's sparkle is its third mark, drawn from the phone's own file.
-    expect(stackChips(KEY_MARKS).map((c) => markOf(c.id))).toEqual(["claude", "openai", "gemini", "deepseek"]);
+    expect(stackChips(KEY_MARKS).map((c) => markOf(c.id))).toEqual(["claude", "openai", "gemini", "openrouter"]);
     expect(markShapes("gemini", "light", INK)?.image).toBe(true);
   });
 });

@@ -30,6 +30,7 @@ import { withRead } from "../lib/seen";
 import { playSound } from "../lib/sounds";
 import { upsertMessage, withLocalCopies } from "../lib/timeline";
 import type { RealtimeConnection } from "../realtime/connection";
+import { setOrgDeletion } from "../realtime/machines";
 import type { ApiClient } from "./client";
 import { type AgentReactionEffect, useAgentReaction, useApi } from "./context";
 import { keys } from "./keys";
@@ -60,6 +61,7 @@ import type {
   ComputerSetup,
   DatabaseActionName,
   DatabaseConnectionInput,
+  DeletionProofInput,
   DirectMessage,
   DmRead,
   ForumParticipantsInput,
@@ -88,7 +90,6 @@ import type {
   NotificationEvent,
   NotificationFilter,
   OrgRoles,
-  OrgSettings,
   Person,
   ReactionCount,
   ReminderInput,
@@ -204,6 +205,64 @@ export function useCreateOrganization() {
   return useMutation({
     mutationFn: (input: { name: string; context?: string }) => api.orgs.create(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.me }),
+  });
+}
+
+/** How often a workspace's closing screen asks `GET /me` again: its socket is closed, so no event reaches it. */
+export const CLOSING_POLL_MS = 30_000;
+
+/**
+ * `GET /me` while a workspace's closing screen shows: every 30 s and whenever the app comes back to the front, so a
+ * restore opens the workspace again and a deletion done drops it from the list.
+ */
+export const useClosingMe = () =>
+  useQuery({ ...meQuery(useApi()), refetchInterval: CLOSING_POLL_MS, refetchOnWindowFocus: "always" });
+
+/** What deleting my account would do (`GET /account/deletion`): asked anew each time. */
+export const useAccountDeletionPlan = (enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.accountDeletion,
+    queryFn: () => api.account.deletionPlan(),
+    enabled,
+    staleTime: 0,
+    gcTime: 0,
+  });
+};
+
+/**
+ * Deletes the workspace (owners), with the proof that it's them (the emailed code, or the password). Its closing
+ * screen shows here at once, and through `org.deleting` everywhere else. The dialog says its refusals.
+ */
+export function useDeleteWorkspace(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (proof: DeletionProofInput) => api.orgs.deleteWorkspace(orgId, proof),
+    meta: { silent: true },
+    onSuccess: ({ dueAt }) => {
+      const me = qc.getQueryData<Me | null>(keys.me);
+      setOrgDeletion(qc, orgId, {
+        dueAt,
+        requestedAt: new Date().toISOString(),
+        requestedBy: me ? { id: me.user.id, name: me.user.name } : null,
+      });
+      void qc.invalidateQueries({ queryKey: keys.me });
+    },
+  });
+}
+
+/** Restores a workspace being deleted (owners): it opens again for everyone. */
+export function useRestoreWorkspace(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.orgs.restore(orgId),
+    onSuccess: () => {
+      setOrgDeletion(qc, orgId, null);
+      // An unfinished one resumes its onboarding: `GET /me` says so again.
+      void qc.invalidateQueries({ queryKey: keys.me });
+    },
   });
 }
 
@@ -471,7 +530,11 @@ export function useAddCredential(orgId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: Parameters<ApiClient["agents"]["addCredential"]>[1]) => api.agents.addCredential(orgId, input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.credentials(orgId) }),
+    onSuccess: () => {
+      // An OpenRouter key brings its models into the pickers.
+      void qc.invalidateQueries({ queryKey: keys.models });
+      return qc.invalidateQueries({ queryKey: keys.credentials(orgId) });
+    },
   });
 }
 
@@ -1095,17 +1158,50 @@ export function cacheApproval(qc: ReturnType<typeof useQueryClient>, orgId: stri
   );
 }
 
+/** `always` ("Aprovar sempre"): approves this one and the agent's next calls of its kind. */
 export function useDecideApproval(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, decision, reason }: { id: string; decision: "approve" | "refuse"; reason?: string }) =>
-      decision === "approve" ? api.approvals.approve(orgId, id, reason) : api.approvals.refuse(orgId, id, reason),
-    onSuccess: (approval, { decision }) => {
+    mutationFn: ({
+      id,
+      decision,
+      reason,
+      always,
+    }: {
+      id: string;
+      decision: "approve" | "refuse";
+      reason?: string;
+      always?: boolean;
+    }) =>
+      decision === "approve"
+        ? api.approvals.approve(orgId, id, reason, always)
+        : api.approvals.refuse(orgId, id, reason),
+    onSuccess: (approval, { decision, always }) => {
       playSound(decision === "approve" ? "approved" : "error");
       cacheApproval(qc, orgId, approval);
       void qc.invalidateQueries({ queryKey: keys.approvals(orgId) });
+      if (always) void qc.invalidateQueries({ queryKey: keys.approvalRules(orgId, approval.agentId) });
     },
+  });
+}
+
+/** What the agent runs without asking ("Aprovar sempre"), on its page. */
+export const useApprovalRules = (orgId: string, agentId: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.approvalRules(orgId, agentId),
+    queryFn: () => api.approvals.rules(orgId, agentId),
+    staleTime: 30_000,
+  });
+};
+
+export function useRemoveApprovalRule(orgId: string, agentId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ruleId: string) => api.approvals.removeRule(orgId, agentId, ruleId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.approvalRules(orgId, agentId) }),
   });
 }
 
@@ -1352,7 +1448,7 @@ export function useUpdateSettings(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: Partial<OrgSettings>) => api.orgs.updateSettings(orgId, input),
+    mutationFn: (input: Parameters<ApiClient["orgs"]["updateSettings"]>[1]) => api.orgs.updateSettings(orgId, input),
     onSuccess: (settings) => {
       qc.setQueryData(keys.settings(orgId), settings);
       void qc.invalidateQueries({ queryKey: keys.me });
@@ -2440,6 +2536,7 @@ export function useSkillAction(orgId: string) {
     mutationFn: (
       action:
         | { type: "import"; input: { url: string } | { zipBase64: string } }
+        | { type: "importPicked"; url: string; paths: string[] }
         | { type: "create"; input: SkillInput }
         | { type: "update"; id: string; patch: SkillPatch }
         | { type: "reimport"; id: string }
@@ -2449,6 +2546,8 @@ export function useSkillAction(orgId: string) {
       switch (action.type) {
         case "import":
           return api.skills.import(orgId, action.input);
+        case "importPicked":
+          return api.skills.importPicked(orgId, action.url, action.paths);
         case "create":
           return api.skills.create(orgId, action.input);
         case "update":

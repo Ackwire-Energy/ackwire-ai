@@ -7,6 +7,7 @@ import {
   useFormerAgents,
   useWorkingRuns,
 } from "@agenteschat/client";
+import { listsAgent } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { waitingComputerByAgent } from "@agenteschat/client/lib/machine-outages";
 import { previewBody } from "@agenteschat/client/lib/message-body";
@@ -49,7 +50,8 @@ export function AgentsScreen() {
   const c = useColors();
   const header = useTabHeader();
   const orgId = useOrgId();
-  const createsAgents = can(useOrg().org, "create_agents");
+  const org = useOrg().org;
+  const createsAgents = can(org, "create_agents");
   const runs = useWorkingRuns(orgId);
   const dms = useDms(orgId);
   const approvals = useApprovals(orgId);
@@ -58,14 +60,15 @@ export function AgentsScreen() {
   const outages = useMachineOutages();
   const groups = useAgentGroups(orgId);
   const offline = useMemo(() => waitingComputerByAgent(outages.outages), [outages.outages]);
-  const { waiting, working, free } = teamLines(dir.agents, work, dms.data ?? [], asking, offline);
+  const agents = dir.agents.filter((a) => listsAgent(org, a));
+  const { waiting, working, free } = teamLines(agents, work, dms.data ?? [], asking, offline);
   const busy = waiting.length + working.length;
   const pull = usePullRefresh(() =>
     Promise.allSettled([runs.refetch(), dms.refetch(), approvals.refetch(), outages.refetch(), groups.refetch()]),
   );
-  const total = dir.agents.length;
+  const total = agents.length;
   // Archived agents have no profile: admins delete them for good from here (ADR 0082).
-  const admin = can(useOrg().org, "manage_agents");
+  const admin = can(org, "manage_agents");
   const archived = (useFormerAgents(orgId).data ?? []).filter((a) => admin && !a.deleted);
   return (
     <LargeTitleScreen
@@ -74,7 +77,11 @@ export function AgentsScreen() {
       {...header}
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
-      {dir.loading ? null : total === 0 ? <EmptyState title={t("mobile.agents.empty")} sky /> : null}
+      {dir.loading ? null : dir.agents.length === 0 ? (
+        <EmptyState title={t("mobile.agents.empty")} sky />
+      ) : total === 0 ? (
+        <EmptyState title={t("mobile.agents.noneForYou")} subtitle={t("mobile.agents.noneForYouHint")} sky />
+      ) : null}
       {waiting.length > 0 ? (
         <>
           <SectionHeader title={t("mobile.intentAgents.waitingSection")} count={waiting.length} />

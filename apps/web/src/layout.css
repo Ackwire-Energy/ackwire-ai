@@ -2817,6 +2817,25 @@ p {
 .skill-row .ac-chip {
   margin-left: 0;
 }
+.skill-picks {
+  margin: 12px 0 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.skill-picks > legend {
+  padding: 0;
+  margin-bottom: 4px;
+}
+.skill-pick__name {
+  font-weight: 600;
+}
+.skill-pick__about {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
 .skill-sheet {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 240px;
@@ -3466,6 +3485,17 @@ p {
 }
 .catalog-tile[data-soon] .catalog-tile__head,
 .catalog-tile[data-soon] .catalog-tile__desc {
+  opacity: 0.6;
+}
+/* "Em breve" with a lock: a tile that opens nothing, so it doesn't lift or press either. */
+.catalog-tile:disabled {
+  cursor: default;
+  transform: none;
+  box-shadow: var(--e1), var(--top);
+}
+/* In place of the description, so the name keeps the whole row. */
+.catalog-tile__soon {
+  align-self: flex-start;
   opacity: 0.6;
 }
 .catalog-tile--other {
@@ -6667,8 +6697,10 @@ a.machine-row__name:hover {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
-/* A suspended workspace's screen: where to ask on a line of its own, its other workspaces under the notice. */
-.suspended-page .support-line {
+/* A suspended workspace's screen: where to ask on a line of its own, its other workspaces under the notice. A
+   workspace being deleted: who may restore it, on a line of its own the same way. */
+.suspended-page .support-line,
+.suspended-page .deleting-page__members {
   display: block;
   margin-top: 6px;
 }
@@ -7956,6 +7988,13 @@ a.machine-row__name:hover {
     animation: none;
     transition: none;
   }
+}
+
+/* "Aprovar sempre": what it covers, on a line of its own after the approval's buttons. */
+.ap-always {
+  order: 1;
+  flex-basis: 100%;
+  margin: 0;
 }
 
 /* Secrets (ADR 0027): the card's private field and the agent page's list. */

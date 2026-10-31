@@ -19,7 +19,7 @@ export interface TokenPrices {
 export interface ProviderInfo {
   label: string;
   /** The API it speaks, which picks its adapter (`createModelProviders`). */
-  protocol: "anthropic" | "openai" | "gemini";
+  protocol: "anthropic" | "openai" | "gemini" | "openrouter";
   /** Replaces the SDK's default host. */
   baseURL?: string;
   /**
@@ -64,6 +64,8 @@ export const PROVIDERS = {
     baseURL: "https://api.minimax.io/anthropic",
     compat: { toolChoiceAny: false },
   },
+  // Its models come from its public list at run time (`openrouter.ts`), never from this catalog.
+  openrouter: { label: "OpenRouter", protocol: "openrouter" },
 } as const satisfies Record<string, ProviderInfo>;
 
 export type ProviderId = keyof typeof PROVIDERS;
@@ -101,6 +103,14 @@ export interface ModelInfo {
   tier?: ModelTier;
   /** Context window in tokens (prompt + output); absent = `DEFAULT_CONTEXT_WINDOW`. */
   contextWindow?: number;
+  /** The most output tokens one call may ask for; the gateway caps each call at it. */
+  maxOutputTokens?: number;
+  /** The reasoning efforts it takes, highest first: a request's effort goes as the nearest. Absent: any. */
+  efforts?: readonly string[];
+  /** It can't follow an `outputSchema`: never a pick for routing, the judge or summaries. */
+  structuredOutput?: false;
+  /** In a long list (OpenRouter's): `true` is a good pick, shown first. Absent: a catalog model. */
+  pick?: boolean;
 }
 
 /** The sizes "Automático" chooses between: a fast cheap model, the everyday one, the strongest. */
@@ -308,45 +318,75 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
   },
 };
 
+/** Models a provider lists at run time (OpenRouter's, `openrouter.ts`), beside the fixed catalog. */
+let listed = new Map<string, ModelInfo>();
+
+/** Replaces the models listed at run time. A catalog id is never shadowed. */
+export function setListedModels(models: Record<string, ModelInfo>) {
+  listed = new Map(Object.entries(models).filter(([id]) => !Object.hasOwn(MODEL_CATALOG, id)));
+}
+
+/** A model of the catalog or of a list read at run time; undefined for any other id. */
+export const modelInfo = (model: string): ModelInfo | undefined =>
+  Object.hasOwn(MODEL_CATALOG, model) ? MODEL_CATALOG[model] : listed.get(model);
+
+/** Every model: the catalog's, then the listed ones in their list's order. */
+export const listedModels = (): [string, ModelInfo][] => [...Object.entries(MODEL_CATALOG), ...listed];
+
 /**
  * The model a provider's system tasks use (summaries, reflection): its cheap
  * one, else its recommended one (a line with no small model, like Kimi's).
  */
 export function cheapModelOf(provider: string): string | null {
-  const own = Object.entries(MODEL_CATALOG).filter(([, m]) => m.provider === provider);
+  const own = listedModels().filter(([, m]) => m.provider === provider);
   return (own.find(([, m]) => m.cheap) ?? own.find(([, m]) => m.recommended))?.[0] ?? null;
 }
 
 /** The provider's model for routing and the judge, never a large one: null for a line with none (Kimi). */
 export function routerModelOf(provider: string): string | null {
-  return Object.entries(MODEL_CATALOG).find(([, m]) => m.provider === provider && m.router)?.[0] ?? null;
+  return listedModels().find(([, m]) => m.provider === provider && m.router)?.[0] ?? null;
 }
 
 /**
- * A provider's model for a tier: that tier, else the nearest smaller one (a
- * line without a large model answers with its medium one), else the nearest
- * larger. Null when the provider has no tiered model.
+ * Of one provider's models, the one for a tier: that tier, else the nearest
+ * smaller one (a line without a large model answers with its medium one), else
+ * the nearest larger. The apps label Automático's defaults with it too.
  */
-export function modelForTier(provider: string, tier: ModelTier): string | null {
-  const own = Object.entries(MODEL_CATALOG).filter(([, m]) => m.provider === provider && m.tier);
+export function nearestTier<T>(
+  models: readonly T[],
+  tier: ModelTier,
+  tierOf: (model: T) => ModelTier | undefined,
+): T | undefined {
   const at = MODEL_TIERS.indexOf(tier);
-  const order = [...MODEL_TIERS.slice(0, at + 1).reverse(), ...MODEL_TIERS.slice(at + 1)];
-  for (const t of order) {
-    const hit = own.find(([, m]) => m.tier === t);
-    if (hit) return hit[0];
+  for (const t of [...MODEL_TIERS.slice(0, at + 1).reverse(), ...MODEL_TIERS.slice(at + 1)]) {
+    const hit = models.find((m) => tierOf(m) === t);
+    if (hit !== undefined) return hit;
   }
-  return null;
+  return undefined;
+}
+
+/** A provider's model for a tier (`nearestTier`); null when the provider has no tiered model. */
+export function modelForTier(provider: string, tier: ModelTier): string | null {
+  const own = listedModels().filter(([, m]) => m.provider === provider);
+  return nearestTier(own, tier, ([, m]) => m.tier)?.[0] ?? null;
 }
 
 /** The model's context window in tokens (`DEFAULT_CONTEXT_WINDOW` when the catalog doesn't say). */
-export const contextWindowOf = (model: string) => MODEL_CATALOG[model]?.contextWindow ?? DEFAULT_CONTEXT_WINDOW;
+export const contextWindowOf = (model: string) => modelInfo(model)?.contextWindow ?? DEFAULT_CONTEXT_WINDOW;
 
-export const isKnownModel = (model: string) => Object.hasOwn(MODEL_CATALOG, model);
+export const isKnownModel = (model: string) => modelInfo(model) !== undefined;
 
 /** The catalog id of a model a CLI named (`claude-opus-5-5[1m]`, a dated `…-20261001`); null when it has no price. */
 export function catalogModelOf(model: string | null | undefined): string | null {
   const base = model?.replace(/\[[^\]]*\]$/, "").replace(/-\d{8}$/, "");
   return base && isKnownModel(base) ? base : null;
+}
+
+/** A model's prices, or a throw: we never make a call we can't price. */
+function infoOf(model: string): ModelInfo {
+  const info = modelInfo(model);
+  if (!info) throw new Error(`unknown model ${model}`);
+  return info;
 }
 
 const tokensCost = (p: TokenPrices, u: ModelUsage) =>
@@ -368,8 +408,7 @@ export const pricesAt = (info: ModelInfo, at = new Date()) =>
  * can't price).
  */
 export function costNanoUsd(model: string, usage: ModelUsage, at = new Date()): number {
-  const info = MODEL_CATALOG[model];
-  if (!info) throw new Error(`unknown model ${model}`);
+  const info = infoOf(model);
   const prompt = usage.inputTokens + usage.cacheReadTokens + usage.cacheWriteTokens;
   return tokensCost(
     info.longContext && prompt > info.longContext.aboveInputTokens ? info.longContext.prices : pricesAt(info, at),
@@ -382,9 +421,7 @@ export function costNanoUsd(model: string, usage: ModelUsage, at = new Date()): 
  * never crosses a long-context threshold. Throws for models outside the catalog.
  */
 export function summedCostNanoUsd(model: string, usage: ModelUsage): number {
-  const info = MODEL_CATALOG[model];
-  if (!info) throw new Error(`unknown model ${model}`);
-  return tokensCost(info.prices, usage);
+  return tokensCost(infoOf(model).prices, usage);
 }
 
 /**
@@ -393,8 +430,7 @@ export function summedCostNanoUsd(model: string, usage: ModelUsage): number {
  * at the output rate, long-context prices when the prompt may cross the threshold.
  */
 export function maxCostNanoUsd(model: string, promptTokens: number, maxOutputTokens: number): number {
-  const info = MODEL_CATALOG[model];
-  if (!info) throw new Error(`unknown model ${model}`);
+  const info = infoOf(model);
   const p =
     info.longContext && promptTokens > info.longContext.aboveInputTokens ? info.longContext.prices : info.prices;
   return promptTokens * Math.max(p.input, p.cacheWrite) + maxOutputTokens * p.output;
@@ -402,8 +438,7 @@ export function maxCostNanoUsd(model: string, promptTokens: number, maxOutputTok
 
 /** Output tokens that fit in `nanoUsd` after paying for the prompt (worst case), or 0. */
 export function outputTokensWithin(model: string, promptTokens: number, nanoUsd: number): number {
-  const info = MODEL_CATALOG[model];
-  if (!info) throw new Error(`unknown model ${model}`);
+  const info = infoOf(model);
   const p =
     info.longContext && promptTokens > info.longContext.aboveInputTokens ? info.longContext.prices : info.prices;
   const left = nanoUsd - promptTokens * Math.max(p.input, p.cacheWrite);

@@ -239,7 +239,8 @@ async function rerouteNoAiMessage(deps: AnswerNowDeps, userId: string, membershi
   if (!(await orgHasAi(deps, message.orgId))) throw stillMissing();
   const deleted = await deps.db.delete(routingDecisions).where(noAiDecision).returning({ id: routingDecisions.id });
   if (deleted.length === 0) return null;
-  const res = await routeMessage(deps.router, { orgId: message.orgId, messageId: message.id });
+  // Asked for this very message: decided alone, at once.
+  const res = await routeMessage({ ...deps.router, quietMs: 0 }, { orgId: message.orgId, messageId: message.id });
   await publishRouted(deps.pubsub, message, {
     strategy: res.seenBy ? "router" : "none",
     seenBy: res.seenBy ?? [],

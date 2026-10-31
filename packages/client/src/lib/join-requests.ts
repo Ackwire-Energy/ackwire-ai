@@ -12,11 +12,11 @@ export const sendsEmail = (config: Pick<AuthConfig, "passwordReset"> | undefined
 export const JOIN_NAME_MAX = 80;
 export const JOIN_NOTE_MAX = 200;
 export const JOIN_REASON_MAX = 300;
-/** Digits in the code that proves an address on a link's page (ADR 0072). */
-export const JOIN_CODE_LENGTH = 6;
+/** Digits in an emailed code (the engine's `CODE_LENGTH`): asking to join (ADR 0072) and deleting (ADR 0088). */
+export const CODE_LENGTH = 6;
 
 /** A code as typed or pasted: its digits only, at most six ("123 456" and "123-456" both work). */
-export const joinCode = (typed: string) => typed.replace(/\D/g, "").slice(0, JOIN_CODE_LENGTH);
+export const typedCode = (typed: string) => typed.replace(/\D/g, "").slice(0, CODE_LENGTH);
 /** A signed-in person's open link page asks for the answer this often (ADR 0068). */
 export const ANSWER_POLL_MS = 15_000;
 

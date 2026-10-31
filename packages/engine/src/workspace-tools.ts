@@ -5,6 +5,7 @@ import { addChannelMember } from "./channels";
 import { getChannelCached } from "./context";
 import { personBehindCall } from "./requester";
 import { replyThreadOf } from "./runs";
+import { noAgentText } from "./team";
 import { closeThread, getThread, updateThread } from "./threads";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
@@ -67,7 +68,7 @@ export function createWorkspaceToolSource(deps: { pubsub?: PubSub }): ToolSource
                 sql`lower(${schema.agents.handle}) = ${handle}`,
               ),
             );
-          if (!agent) return { content: `No agent @${handle} in this organization.`, isError: true };
+          if (!agent) return { content: await noAgentText(ctx, [handle]), isError: true };
           const name = str(input.channel).trim().replace(/^#/, "").toLowerCase();
           const { channels, channelMembers } = schema;
           const [channel] = name

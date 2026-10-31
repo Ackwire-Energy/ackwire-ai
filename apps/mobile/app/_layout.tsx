@@ -12,11 +12,12 @@ import { markLaunched } from "@/features/launch/launched";
 import { OnboardingFlow } from "@/features/onboarding/OnboardingFlow";
 import { ServerDownPanel, useServerDown } from "@/features/server/ServerDown";
 import { keepLastCrash } from "@/lib/last-crash";
-import { firstRunMounted, suspendedOf } from "@/lib/org-choice";
+import { deletingOf, firstRunMounted, suspendedOf } from "@/lib/org-choice";
 import { AppProviders } from "@/providers/AppProviders";
 import { useAppFonts } from "@/providers/fonts";
 import { useOrgGate } from "@/providers/org";
 import { useSession } from "@/providers/session";
+import { DeletingWorkspace } from "@/ui/auth/DeletingWorkspace";
 import { SuspendedWorkspace } from "@/ui/auth/SuspendedWorkspace";
 import { useNavigationTheme } from "@/ui/navigation";
 import { useTheme } from "@/ui/theme";
@@ -55,6 +56,14 @@ function Gate() {
   const down = useServerDown(signedIn && !session.pending);
   const ready = fontsReady && !session.pending && (!signedIn || !org.loading) && down === null;
   const suspended = ready && signedIn && org.state ? suspendedOf(org.state.orgs, org.state.orgId) : null;
+  // Being deleted: its own screen, after the suspension, the stronger fact.
+  const deleting = ready && signedIn && org.state && !suspended ? deletingOf(org.state.orgs, org.state.orgId) : null;
+  // Apagar conta opened from either screen goes over it: those screens step aside while it is open.
+  const pathname = usePathname();
+  const deletingAccount = pathname === "/account-delete";
+  // "Novo workspace" from a workspace being deleted: the first run, until a new workspace is chosen or they go back.
+  const [freshStart, setFreshStart] = useState(false);
+  if (freshStart && (!signedIn || (ready && deleting === null))) setFreshStart(false);
 
   // Opening the app: the native launch image hands over to the animated splash on its first frame (they look
   // the same), which leaves once the app is ready. The fallback hide covers a splash that never lays out.
@@ -88,21 +97,29 @@ function Gate() {
   }, [signedIn, session.pending]);
   const accepting = useAcceptPendingInvite(signedIn && !session.pending);
   // An invitation's own screen stays in front of the first run: someone with no workspace yet may be joining one.
-  const onInvite = usePathname().startsWith("/invite/");
+  const onInvite = pathname.startsWith("/invite/");
   const [firstRunBefore, setFirstRunBefore] = useState(false);
-  const firstRun = firstRunMounted(firstRunBefore, ready && signedIn && org.none && !accepting, onInvite);
+  const firstRun = firstRunMounted(
+    firstRunBefore,
+    ready && signedIn && (org.none || freshStart) && !accepting,
+    onInvite,
+  );
   if (firstRun !== firstRunBefore) setFirstRunBefore(firstRun);
+  const suspendedShown = suspended !== null && !deletingAccount;
+  const deletingShown = deleting !== null && !deletingAccount && !firstRun;
+  const covered = suspendedShown || deletingShown || down !== null || (firstRun && freshStart);
 
   // The navigator is always mounted (so links and pushes can navigate); the splash covers it until ready.
   return (
     // The native bars (headers, back button tint, interface style) read React Navigation's theme: ours.
     <NavigationThemeProvider value={navigationTheme}>
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />
-      {/* Under the suspended screen or the waiting splash the app stays mounted, out of screen readers' reach. */}
+      {/* Under the suspended or deleting screen or the waiting splash the app stays mounted, out of screen
+          readers' reach. */}
       <View
         style={{ flex: 1 }}
-        accessibilityElementsHidden={suspended !== null || down !== null}
-        importantForAccessibility={suspended || down ? "no-hide-descendants" : "auto"}
+        accessibilityElementsHidden={covered}
+        importantForAccessibility={covered ? "no-hide-descendants" : "auto"}
       >
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
           <Stack.Protected guard={inApp} redirectTo="/sign-in">
@@ -117,11 +134,14 @@ function Gate() {
           invitation is accepted instead). */}
       {firstRun ? (
         <View style={onInvite ? { display: "none" } : StyleSheet.absoluteFill}>
-          <OnboardingFlow />
+          <OnboardingFlow onLeave={freshStart ? () => setFreshStart(false) : undefined} />
         </View>
       ) : null}
       {entering ? <Entering org={org.state?.org?.name ?? null} /> : null}
-      {org.state && suspended ? <SuspendedWorkspace state={org.state} suspended={suspended} /> : null}
+      {org.state && suspended && suspendedShown ? <SuspendedWorkspace state={org.state} suspended={suspended} /> : null}
+      {org.state && deleting && deletingShown ? (
+        <DeletingWorkspace state={org.state} deleting={deleting} onNewWorkspace={() => setFreshStart(true)} />
+      ) : null}
       {launching ? (
         <LaunchSplash
           ready={ready}

@@ -1,7 +1,7 @@
 import { and, asc, type Executor, eq, isNull, schema } from "@agenteschat/db";
-import { isAutoModel, modelForTier, routerModelOf } from "@agenteschat/providers";
+import { ensureOpenRouterModels, isAutoModel, routerModelOf } from "@agenteschat/providers";
 import type { Agent } from "./agents";
-import { autoProvider } from "./auto-model";
+import { autoModelFor, autoProvider } from "./auto-model";
 import { brainOf } from "./brain-settings";
 import { brainAccountFor, computerBrainUnavailable, mayFallBack, NO_AI_CODES } from "./brains/select";
 import { type BrainKind, isComputerBrain } from "./brains/types";
@@ -55,8 +55,12 @@ const READY: AgentAi = { state: "ready" };
 async function modelReady(deps: AiStatusDeps, agent: AiAgent): Promise<boolean> {
   if (!isAutoModel(agent.model)) return deps.gateway.hasModelCredential(agent);
   const provider = await autoProvider(deps.db, agent).catch(() => "anthropic");
-  const model = modelForTier(provider, "medium") ?? modelForTier("anthropic", "medium");
-  return model !== null && (await deps.gateway.hasModelCredential({ ...agent, model }));
+  // OpenRouter's line is its list.
+  if (provider === "openrouter") await ensureOpenRouterModels();
+  const model = autoModelFor(provider, "medium");
+  // OpenRouter's list not read: `autoProvider` found its key, and a run waits the outage out.
+  if (!model) return provider === "openrouter";
+  return deps.gateway.hasModelCredential({ ...agent, model });
 }
 
 /** The card's reason for an unavailable code in `NO_AI_CODES`. */

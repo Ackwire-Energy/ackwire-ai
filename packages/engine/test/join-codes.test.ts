@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createFakeEmailSender, createMemoryRateLimiter, type EmailSender } from "@agenteschat/adapters";
-import { eq, schema } from "@agenteschat/db";
+import { eq, inArray, schema } from "@agenteschat/db";
 import {
   approveJoinRequest,
   askToJoin,
@@ -16,6 +16,7 @@ import {
   MAX_PENDING_JOIN_REQUESTS,
   mailboxOf,
   pruneJoinRequests,
+  purgeWorkspace,
   queueEmail,
   sendJoinCode,
   sha256,
@@ -249,13 +250,21 @@ describe("the limits, all counted in the database", () => {
   test("a deleted workspace keeps its counts, so making and deleting workspaces resets no mailbox's cap", async () => {
     const token = await start();
     const mia = await person("u_mia", "mia@example.com", true);
+    const made: string[] = [];
     for (const name of ["Um", "Dois", "Tres", "Quatro"]) {
       const { organization } = await createOrganization(fx().db, mia.id, { name });
+      made.push(organization.id);
       const { token: theirs } = await inviteLink(fx().db, SECRET, mia.id, organization.id, NOW);
       for (let m = 0; m < 5; m++)
         await sendJoinCode(deps(), PUBLIC, { token: theirs, user: null, email: "victim@example.com" }, at(m * MIN));
     }
-    expect((await deleteAccount(fx().db, mia.id)).deletedOrgIds).toHaveLength(4);
+    // Her account goes, and with it her workspaces, for good once their date passes.
+    await deleteAccount(fx().db, mia.id);
+    await fx()
+      .db.update(schema.organizations)
+      .set({ deletionDueAt: new Date(Date.now() - MIN) })
+      .where(inArray(schema.organizations.id, made));
+    for (const orgId of made) expect(await purgeWorkspace({ db: fx().db }, orgId)).toBe(true);
     await expect(send(token, "victim@example.com", at(10 * MIN))).rejects.toMatchObject({ code: "join.code_limit" });
     await pruneJoinRequests(deps(), at(DAY + 10 * MIN));
     expect(await fx().db.select().from(schema.organizationJoinCodeEvents)).toEqual([]);

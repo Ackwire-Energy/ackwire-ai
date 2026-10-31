@@ -321,7 +321,7 @@ describe("Composio client", () => {
     expect(calls.filter((c) => c.method === "DELETE").map((c) => c.url)).toEqual([
       `${BASE}/trigger_instances/manage/ti_1`,
       `${BASE}/connected_accounts/ca_g?revoke_on_delete=true`,
-      `${BASE}/connected_accounts/ca_o`,
+      `${BASE}/connected_accounts/ca_o?revoke_on_delete=false`,
     ]);
   });
 

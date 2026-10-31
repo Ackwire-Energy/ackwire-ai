@@ -183,6 +183,13 @@ export type LiveWork =
       failed?: boolean;
       /** It didn't run: it waits on a person (an approval, a question, a secret). */
       held?: boolean;
+      /** A permission check: the whole command it checked (its line opens on it). */
+      command?: string;
+      /** A command the permission check refused: the policy's reason, and its code for the person's words. */
+      why?: string;
+      refusal?: string;
+      /** A permission check waiting on a person: its request, which the person's answer names. */
+      requestId?: string;
     };
 
 /** The narration lines of a run (what it said between tool calls). */
@@ -253,11 +260,21 @@ export interface AgentToolEvent {
   detail?: string | null;
   /** The code it runs (`run_code`, skill scripts), expected from the backend. */
   code?: LiveCode | null;
+  /** `permission_prompt`: the whole command it checks (credentials masked). */
+  command?: string | null;
   toolUseId?: string;
   /** On the end (`tool: null`): the tool answered with an error. */
   failed?: boolean;
   /** On the end: it didn't run, it waits on a person. */
   held?: boolean;
+  /** On the end of a permission check that refused its command: the policy's reason, and its code. */
+  why?: string | null;
+  refusal?: string | null;
+  /**
+   * A permission check waiting on a person: on its `held` end, its request; with no `toolUseId`, the person's
+   * answer to that request (`failed` when they said no), which ends the line that waited for it.
+   */
+  requestId?: string | null;
 }
 
 export interface StreamsState {
@@ -489,13 +506,26 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       const status: LiveStatus = said ? "thinking" : current?.text ? current.status : "thinking";
       let work = current?.work ?? [];
       if (said) work = say(work, said, current?.turn);
-      const end = (w: Extract<LiveWork, { kind: "call" }>, how: { failed?: boolean; held?: boolean } = {}) => ({
+      const end = (
+        w: Extract<LiveWork, { kind: "call" }>,
+        how: Pick<AgentToolEvent, "failed" | "held" | "why" | "refusal" | "requestId"> = {},
+      ) => ({
         ...w,
         running: false,
         ...(w.since !== undefined ? { ms: Math.max(0, Date.now() - w.since) } : {}),
         ...(how.failed ? { failed: true } : {}),
         ...(how.held ? { held: true } : {}),
+        ...(how.why ? { why: how.why } : {}),
+        ...(how.refusal ? { refusal: how.refusal } : {}),
+        ...(how.requestId ? { requestId: how.requestId } : {}),
       });
+      if (!newCall && event.requestId && !event.toolUseId) {
+        // A person's answer to a command that waited on them: the line that waited ends as they decided.
+        const waited = (w: LiveWork) => w.kind === "call" && w.held === true && w.requestId === event.requestId;
+        if (!work.some(waited)) return state;
+        work = work.map((w) => (w.kind === "call" && waited(w) ? end({ ...w, held: false }, event) : w));
+        return upsert(state, event, { work });
+      }
       if (newCall) {
         // A new call means the previous ones ended.
         work = [
@@ -508,6 +538,7 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
             connector: event.connector ?? null,
             detail: event.detail ?? null,
             code: event.code ?? null,
+            ...(event.command ? { command: event.command } : {}),
             output: [],
             running: true,
           },
@@ -519,7 +550,7 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
         work = [...work].reverse().map((w) => {
           if (!done && w.kind === "call" && w.running && (!named || w.id === event.toolUseId)) {
             done = true;
-            return end(w, { failed: event.failed === true, held: event.held === true });
+            return end(w, event);
           }
           return w;
         });
@@ -673,11 +704,15 @@ function finish(state: StreamsState, runId: string): StreamsState {
 /** No event for this long: the row says "sem notícias há 3 min · Atualizar". */
 export const QUIET_AFTER_MS = 3 * 60_000;
 
-/** A live run that went silent (orphaned by a server restart, a lost socket…). */
+/**
+ * A live run that went silent (orphaned by a server restart, a lost socket…). One whose last call waits on a person
+ * (a command's card, an approval) isn't: nothing happens until they answer, and the answer ends that call.
+ */
 export const isQuiet = (r: LiveRun, now = Date.now()) =>
   !r.provisional &&
   r.status !== "failed" &&
   r.status !== "canceled" &&
+  (r.work ?? []).filter((w) => w.kind === "call").at(-1)?.held !== true &&
   now - (r.lastEventAt ?? r.startedAt ?? now) >= QUIET_AFTER_MS;
 
 /** "Atualizar" found the run still active: quiet again for another while. */

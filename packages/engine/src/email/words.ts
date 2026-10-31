@@ -1,4 +1,4 @@
-import type { EmailLocale, Text } from "./layout";
+import type { EmailLocale, Inline, Text } from "./layout";
 
 /**
  * Every email's words, in English and pt-BR. Plain text only (bold is `{ b }`): the layout escapes it.
@@ -27,6 +27,7 @@ const en = {
   fallback: "Button not working? Copy this address into your browser:",
   role: { owner: "an owner", member: "a member" } as Record<string, string>,
   anAgent: "An agent",
+  someone: "Someone",
   verify: {
     subject: "Confirm your email for agentes.chat",
     preheader: "One click to confirm this address. The link works for an hour.",
@@ -235,6 +236,70 @@ const en = {
     why: (org: string) =>
       `You got this email because someone typed this address to ask to join ${org} on agentes.chat.`,
   },
+  deletionCode: {
+    subjectWorkspace: (code: string) => `${code} is your code to delete a workspace`,
+    subjectAccount: (code: string) => `${code} is your code to delete your account`,
+    preheader: "Type it in agentes.chat to confirm. It works for 10 minutes.",
+    headline: "Your code",
+    workspace: (org: string): Text => [
+      "Type this code to delete the workspace ",
+      { b: org },
+      ". It closes for everyone at once and is deleted for good 7 days later.",
+    ],
+    account: (email: string): Text => [
+      "Type this code to delete the account ",
+      { b: email },
+      ". It goes at once, and the workspaces only you are in close with it.",
+    ],
+    support: (address: string): Text => [
+      "It works for 10 minutes, and nothing is deleted without it. If it wasn't you, don't share it and write to ",
+      { mail: address },
+      ".",
+    ],
+    noSupport:
+      "It works for 10 minutes, and nothing is deleted without it. If it wasn't you, don't share it and tell the people who run this server." as Text,
+    whyWorkspace: (org: string) => `You got this email because your account asked to delete ${org} on agentes.chat.`,
+    whyAccount: "You got this email because your account asked to be deleted on agentes.chat.",
+  },
+  deleting: {
+    subject: (day: string) => `A workspace you're in will be deleted on ${day}`,
+    preheader: "It's closed now. An owner can still restore it until then.",
+    headline: "A workspace is being deleted",
+    body: (by: string, org: string, day: string, time: string): Text => [
+      { b: by },
+      " deleted the workspace ",
+      { b: org },
+      `. It's closed now and goes for good on ${day} at ${time}.`,
+    ],
+    owner: "Changed your mind? Restore it before then.",
+    button: "Restore the workspace",
+    member: "If it's a mistake, ask an owner to restore it." as Text,
+    why: (org: string) => `You got this email because you're in ${org} on agentes.chat.`,
+  },
+  restored: {
+    subject: "A workspace you're in is back",
+    preheader: "An owner restored it. It works again.",
+    headline: "The workspace is back",
+    body: (by: string, org: string): Text => [{ b: by }, " restored ", { b: org }, ". It works again."],
+    button: "Open the workspace",
+    why: (org: string) => `You got this email because you're in ${org} on agentes.chat.`,
+  },
+  accountDeleted: {
+    subject: "Your agentes.chat account was deleted",
+    preheader: "It's signed out everywhere and can't sign in again.",
+    headline: "Your account was deleted",
+    body: (email: string): Text => ["We deleted the account ", { b: email }, "."],
+    closes: (count: number, day: string, names: Inline[]): Text => [
+      count === 1
+        ? `The workspace only you were in is closed and will be deleted for good on ${day}: `
+        : `The workspaces only you were in are closed and will be deleted for good on ${day}: `,
+      ...names,
+      ".",
+    ],
+    support: (address: string): Text => ["If it wasn't you, write to ", { mail: address }, "."],
+    noSupport: "If it wasn't you, tell the people who run this server." as Text,
+    why: "You got this email because this address had an account on agentes.chat.",
+  },
 };
 
 type Words = typeof en;
@@ -244,6 +309,7 @@ const ptBR: Words = {
   fallback: "O botão não funcionou? Copie e cole este endereço no navegador:",
   role: { owner: "dono", member: "membro" },
   anAgent: "Um agente",
+  someone: "Alguém",
   verify: {
     subject: "Confirme seu e-mail no agentes.chat",
     preheader: "Um clique para confirmar este endereço. O link vale por uma hora.",
@@ -443,6 +509,71 @@ const ptBR: Words = {
     small: ["Vale por 10 minutos. Se não foi você, ", { nobr: "ignore este e-mail." }],
     why: (org) =>
       `Você recebeu este e-mail porque alguém digitou este endereço para pedir para entrar na ${org} no agentes.chat.`,
+  },
+  deletionCode: {
+    subjectWorkspace: (code) => `${code} é seu código para apagar um workspace`,
+    subjectAccount: (code) => `${code} é seu código para apagar sua conta`,
+    preheader: "Digite no agentes.chat para confirmar. Vale por 10 minutos.",
+    headline: "Seu código",
+    workspace: (org) => [
+      "Digite este código para apagar o workspace ",
+      { b: org },
+      ". Ele fecha para todos na hora e é apagado de vez 7 dias depois.",
+    ],
+    account: (email) => [
+      "Digite este código para apagar a conta ",
+      { b: email },
+      ". Ela some na hora, e os workspaces em que só você está fecham com ela.",
+    ],
+    support: (address) => [
+      "Vale por 10 minutos, e nada é apagado sem ele. Se não foi você, não passe para ninguém e escreva para ",
+      { mail: address },
+      ".",
+    ],
+    noSupport:
+      "Vale por 10 minutos, e nada é apagado sem ele. Se não foi você, não passe para ninguém e avise quem cuida deste servidor.",
+    whyWorkspace: (org) =>
+      `Você recebeu este e-mail porque sua conta pediu para apagar o workspace ${org} no agentes.chat.`,
+    whyAccount: "Você recebeu este e-mail porque sua conta pediu para ser apagada no agentes.chat.",
+  },
+  deleting: {
+    subject: (day) => `Um workspace em que você está vai ser apagado em ${day}`,
+    preheader: "Ele está fechado agora. Um dono ainda pode restaurar até lá.",
+    headline: "Um workspace está sendo apagado",
+    body: (by, org, day, time) => [
+      { b: by },
+      " apagou o workspace ",
+      { b: org },
+      `. Ele está fechado agora e some de vez em ${day} às ${time}.`,
+    ],
+    owner: "Mudou de ideia? Restaure antes disso.",
+    button: "Restaurar o workspace",
+    member: "Se foi um engano, peça para um dono restaurar.",
+    why: (org) => `Você recebeu este e-mail porque está na ${org} no agentes.chat.`,
+  },
+  restored: {
+    subject: "Um workspace em que você está voltou",
+    preheader: "Um dono restaurou. Ele voltou a funcionar.",
+    headline: "O workspace voltou",
+    body: (by, org) => [{ b: by }, " restaurou ", { b: org }, ". Ele voltou a funcionar."],
+    button: "Abrir o workspace",
+    why: (org) => `Você recebeu este e-mail porque está na ${org} no agentes.chat.`,
+  },
+  accountDeleted: {
+    subject: "Sua conta do agentes.chat foi apagada",
+    preheader: "Ela saiu de todos os aparelhos e não entra mais.",
+    headline: "Sua conta foi apagada",
+    body: (email) => ["Apagamos a conta ", { b: email }, "."],
+    closes: (count, day, names) => [
+      count === 1
+        ? `O workspace em que só você estava está fechado e vai ser apagado de vez em ${day}: `
+        : `Os workspaces em que só você estava estão fechados e vão ser apagados de vez em ${day}: `,
+      ...names,
+      ".",
+    ],
+    support: (address) => ["Se não foi você, escreva para ", { mail: address }, "."],
+    noSupport: "Se não foi você, avise quem cuida deste servidor.",
+    why: "Você recebeu este e-mail porque este endereço tinha uma conta no agentes.chat.",
   },
 };
 

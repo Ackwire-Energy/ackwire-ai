@@ -19,7 +19,6 @@ import {
   createBlobStoreResolver,
   createFileArtifact,
   createOrganization,
-  deleteAccount,
   deleteArtifact,
   drainOutbox,
   enqueue,
@@ -30,14 +29,17 @@ import {
   isBlockedAddress,
   ORG_FILES_PURGE_JOB,
   purgeOrgFiles,
+  purgeWorkspace,
   restoreArtifact,
   type S3Input,
   saveSkill,
   saveStorage,
+  scheduleDeletion,
   startMigration,
   storedBytes,
   storedBytesQueries,
   testStorage,
+  USER_FILES_PURGE_JOB,
   ValidationError,
 } from "../src";
 import { addMember, addUser, type Fixture, setup } from "./fixtures";
@@ -66,6 +68,15 @@ const bucket = (over: Partial<S3Input> = {}): S3Input => ({
   ...over,
 });
 const person = (userId: string) => ({ type: "person" as const, userId });
+/** A workspace deleted for good: its owner deletes it, and its date passes. */
+async function deleteForGood(orgId: string) {
+  await scheduleDeletion({ db: f.db }, f.owner.id, orgId, "owner");
+  await f.db
+    .update(schema.organizations)
+    .set({ deletionDueAt: new Date(Date.now() - 60_000) })
+    .where(eq(schema.organizations.id, orgId));
+  expect(await purgeWorkspace({ db: f.db }, orgId)).toBe(true);
+}
 const doc = (title: string) => ({ title, content: { kind: "document" as const, markdown: `# ${title}` } });
 
 describe("S3 client against the fake server", () => {
@@ -278,6 +289,22 @@ describe("org storage", () => {
     expect(again.ok).toBe(true);
   });
 
+  test("a deleted account's photos leave platform storage, never while the account exists, and nobody else's go", async () => {
+    f = await setup();
+    const bia = await addUser(f.db, "bia");
+    const photos = [`avatars/${f.owner.id}/a.png`, `avatars/${bia.id}/b.png`, `avatars/${bia.id}/c.png`];
+    for (const key of photos) await f.platformBlobs.put(key, new Uint8Array([1]), { contentType: "image/png" });
+    const purge = () => enqueue(f.db, { orgId: null, kind: USER_FILES_PURGE_JOB, payload: { userId: bia.id } });
+
+    await purge();
+    await drainOutbox(f.db, f.handlers);
+    expect([...f.platformBlobs.objects.keys()].sort()).toEqual(photos.sort());
+    await f.db.delete(schema.users).where(eq(schema.users.id, bia.id));
+    await purge();
+    await drainOutbox(f.db, f.handlers);
+    expect([...f.platformBlobs.objects.keys()]).toEqual([`avatars/${f.owner.id}/a.png`]);
+  });
+
   test("a deleted workspace's files leave platform storage a page at a time, and nobody else's go", async () => {
     f = await setup();
     const put = (key: string) => f.platformBlobs.put(key, new Uint8Array([1]), { contentType: "text/plain" });
@@ -294,7 +321,7 @@ describe("org storage", () => {
     const purges = () => f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, ORG_FILES_PURGE_JOB));
     const runsOf = async (orgId: string) => (await purges()).filter((j) => j.payload.orgId === orgId);
 
-    expect((await deleteAccount(f.db, f.owner.id)).deletedOrgIds.sort()).toEqual([f.org.id, second.id].sort());
+    for (const orgId of [f.org.id, second.id]) await deleteForGood(orgId);
     // Two per workspace: one now, one a day later.
     const queued = (await purges()).map((j) => ({ orgId: j.orgId, payload: j.payload }));
     expect(queued).toEqual(
@@ -346,7 +373,7 @@ describe("org storage", () => {
       }
     };
 
-    await deleteAccount(f.db, f.owner.id);
+    await deleteForGood(f.org.id);
     await runUntil(t0 + 20 * HOUR);
     // Eight tries failed, all that the default budget gives, and the ninth, after the outage, deleted the file.
     expect((await purges()).find((j) => j.status === "done")?.attempts).toBe(9);

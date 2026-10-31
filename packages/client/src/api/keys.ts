@@ -8,6 +8,7 @@ export const keys = {
   jev: ["jev"] as const,
   authConfig: ["auth-config"] as const,
   me: ["me"] as const,
+  accountDeletion: ["account-deletion"] as const,
   phoneSignIn: ["phone-sign-in"] as const,
   /** The server's Web Push key (ADR 0071); `null` = Web Push off on this server. */
   webPushKey: ["push", "web-key"] as const,
@@ -49,6 +50,8 @@ export const keys = {
   agentRepos: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "repositories"] as const,
   customServers: (orgId: string) => ["org", orgId, "custom-servers"] as const,
   scopes: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "scopes"] as const,
+  /** What the agent runs without asking ("Aprovar sempre"). */
+  approvalRules: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "approval-rules"] as const,
   runs: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "runs"] as const,
   /** Whether the agent has a run going now (its newest running run, if any). */
   runningRuns: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "runs", "running"] as const,

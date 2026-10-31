@@ -784,14 +784,19 @@ describe("on agentes.chat Cloud: a restriction's kind and how to contest it, nev
       errorCode: "run.org_paused",
       errorParams: { reason, cloud: "true" },
     });
-    const suspended = new OrgPausedError({ state: "suspended", reason: "review.account_takeover", notice: "shown" });
+    const suspended = new OrgPausedError({
+      state: "suspended",
+      reason: "review.account_takeover",
+      notice: "shown",
+      deletionDueAt: null,
+    });
     expect(suspended.message).toBe(`This workspace is suspended: ${flagged} getting into other people's accounts`);
     expect(runErrorDetail(suspended.message)?.errorParams).toEqual({
       reason: "review.account_takeover",
       cloud: "true",
     });
     // A category this server doesn't know is told as it came.
-    const unknown = new OrgPausedError({ state: "hold", reason: "review.spam", notice: "shown" });
+    const unknown = new OrgPausedError({ state: "hold", reason: "review.spam", notice: "shown", deletionDueAt: null });
     expect(unknown.message).toBe("This workspace is on hold: review.spam");
     expect(runErrorDetail(unknown.message)?.errorParams).toEqual({ reason: "review.spam", cloud: "true" });
   });
@@ -817,9 +822,9 @@ describe("on agentes.chat Cloud: a restriction's kind and how to contest it, nev
       errorParams: { reason: "review" },
     });
     // `review.<category>` is the Cloud's alone: here it reads as it was set.
-    expect(new OrgPausedError({ state: "hold", reason: "review.fraud", notice: "shown" }).message).toBe(
-      "This workspace is on hold: review.fraud",
-    );
+    expect(
+      new OrgPausedError({ state: "hold", reason: "review.fraud", notice: "shown", deletionDueAt: null }).message,
+    ).toBe("This workspace is on hold: review.fraud");
     await setOrgStanding({ db: f.db }, f.org.id, { state: "hold", reason: "review", notice: "shown" });
     expect((await standingNotices()).map((n) => n.latest)).toEqual([{ statusTo: "hold", text: "review" }]);
   });

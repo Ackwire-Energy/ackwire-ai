@@ -9,6 +9,7 @@ import {
   type DesktopControl,
   enqueue,
   enqueueIdleReflections,
+  enqueueOverdueDeletions,
   enqueueWaitlistContacts,
   expireApprovals,
   expireBrowserHandoffs,
@@ -20,6 +21,7 @@ import {
   listenForRunCancels,
   type MailDeps,
   pollImapWatches,
+  pruneDeletionCodes,
   pruneJoinRequests,
   pruneMessageClientIds,
   pruneOperatorEvents,
@@ -78,6 +80,8 @@ export const WORKER_INTERVALS_MS = {
   mailPoll: 30_000,
   /** Composio accounts' state (expired → "Reconnect"). */
   mailReconcile: 15 * 60_000,
+  /** Workspaces past their deletion's date that nothing keeps any more (a hold lifted, a job lost): also at boot. */
+  deletions: 3600_000,
 };
 
 /**
@@ -153,6 +157,15 @@ export function startWorkers(deps: WorkerDeps) {
     // Requests to join answered or run out 90 days ago go; notices with nothing left waiting close (ADR 0068).
     const requests = await pruneJoinRequests({ db, pubsub: deps.pubsub });
     if (requests > 0) log.info("pruned join requests", { pruned: requests });
+  });
+
+  every("deletions", WORKER_INTERVALS_MS.deletions, async () => {
+    await pruneDeletionCodes(db);
+    const due = await enqueueOverdueDeletions(db);
+    if (due > 0) {
+      log.info("workspace deletions due", { due });
+      void ticks.get("outbox")?.();
+    }
   });
 
   every("approvals", WORKER_INTERVALS_MS.approvals, async () => {

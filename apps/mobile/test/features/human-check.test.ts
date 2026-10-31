@@ -183,7 +183,7 @@ describe("refusals in the phone's words", () => {
   test("the rest: too many tries, a blocked account, a known code, else the generic line", async () => {
     const en = await translator("en");
     expect(refusalText(en, { status: 429 })).toBe(en("auth.tooManyTries"));
-    expect(refusalText(en, new ApiError(429, "join.code_limit", "x"))).toBe(en("errors.join.codeLimit"));
+    expect(refusalText(en, new ApiError(429, "join.code_limit", "x"))).toBe(en("errors.code.limit"));
     expect(refusalText(en, { status: 403, code: "ACCOUNT_BLOCKED" })).toBe(en("auth.accountBlocked"));
     // On agentes.chat Cloud: the block's kind and how to contest it, never its reason.
     expect(refusalText(en, { status: 403, code: "ACCOUNT_BLOCKED", kind: "abuse", cloud: true })).toBe(

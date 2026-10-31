@@ -1,6 +1,23 @@
-import { decideApproval, getApproval, listApprovals, memoryJudging } from "@agenteschat/engine";
+import {
+  decideApproval,
+  getApproval,
+  listApprovalRules,
+  listApprovals,
+  memoryJudging,
+  removeApprovalRule,
+} from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
-import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
+import {
+  type AppDeps,
+  body,
+  createAppRouter,
+  errors,
+  json,
+  noContent,
+  OrgParams,
+  requireSession,
+  security,
+} from "./context";
 
 const tags = ["Approvals"];
 
@@ -73,11 +90,42 @@ export const Approval = z
       .array(z.object({ text: z.string(), at: z.string() }))
       .optional()
       .openapi({ description: "One approval only: what the agent said at each turn before asking." }),
+    approveAlways: z
+      .object({ tool: z.string(), actions: z.array(z.string()) })
+      .nullable()
+      .openapi({
+        description:
+          '"Aprovar sempre" is offered: approving with `always` lets the agent run this server tool (each of these wrapped actions) without asking again, with any values. Null: not offered.',
+        example: { tool: "COMPOSIO_MULTI_EXECUTE_TOOL", actions: ["GITHUB_CREATE_AN_ISSUE_COMMENT"] },
+      }),
   })
   .openapi("Approval");
 
+export const ApprovalRule = z
+  .object({
+    id: z.uuid(),
+    connectionId: z.uuid(),
+    server: z.string().openapi({ description: "The connection's name.", example: "Composio" }),
+    tool: z.string().openapi({ description: "The server's own tool name.", example: "COMPOSIO_MULTI_EXECUTE_TOOL" }),
+    toolLabel: z.string().openapi({ description: "How the workspace labelled that tool." }),
+    action: z.string().openapi({
+      description: "The wrapped action (empty: the tool itself).",
+      example: "GITHUB_CREATE_AN_ISSUE_COMMENT",
+    }),
+    createdByUserId: z.string().nullable(),
+    createdAt: z.string(),
+  })
+  .openapi("ApprovalRule");
+
 const ApprovalParams = OrgParams.extend({ approvalId: z.uuid() });
+const AgentParams = OrgParams.extend({ agentId: z.uuid() });
 const Decision = z.object({ reason: z.string().max(1000).optional() });
+const Approve = Decision.extend({
+  always: z.boolean().optional().openapi({
+    description:
+      "Also approve this kind for good (only where `approveAlways` is set, else 409 `approval.always_unavailable`).",
+  }),
+});
 
 /**
  * Sensitive actions agents asked for (ADR 0015). Decisions resume the run; events
@@ -137,11 +185,12 @@ export function approvalRoutes(deps: AppDeps) {
         security,
         summary:
           decision === "approve" ? "Approve: the run executes exactly this action" : "Refuse: the agent is told why",
-        request: { params: ApprovalParams, body: body(Decision) },
+        request: { params: ApprovalParams, body: body(decision === "approve" ? Approve : Decision) },
         responses: { 200: json(Approval), ...errors },
       }),
       async (c) => {
         const { orgId, approvalId } = c.req.valid("param");
+        const input: { reason?: string; always?: boolean } = c.req.valid("json");
         const view = await decideApproval(
           {
             db,
@@ -151,16 +200,46 @@ export function approvalRoutes(deps: AppDeps) {
           c.get("user").id,
           orgId,
           approvalId,
-          {
-            decision,
-            reason: c.req.valid("json").reason,
-          },
+          { decision, reason: input.reason, always: decision === "approve" && input.always === true },
         );
         deps.wakeWorkers?.();
         return c.json(view, 200);
       },
     );
   }
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/agents/{agentId}/approval-rules",
+      tags,
+      security,
+      summary: 'What the agent runs without asking ("Aprovar sempre"), oldest first',
+      request: { params: AgentParams },
+      responses: { 200: json(z.object({ rules: z.array(ApprovalRule) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId, agentId } = c.req.valid("param");
+      return c.json({ rules: await listApprovalRules(db, c.get("user").id, orgId, agentId) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/agents/{agentId}/approval-rules/{ruleId}",
+      tags,
+      security,
+      summary: "The agent asks again for this kind (admins and the agent's owner)",
+      request: { params: AgentParams.extend({ ruleId: z.uuid() }) },
+      responses: { ...noContent, ...errors },
+    }),
+    async (c) => {
+      const { orgId, agentId, ruleId } = c.req.valid("param");
+      await removeApprovalRule(db, c.get("user").id, orgId, agentId, ruleId);
+      return c.body(null, 204);
+    },
+  );
 
   return app;
 }

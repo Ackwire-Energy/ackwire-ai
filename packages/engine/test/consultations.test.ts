@@ -598,6 +598,43 @@ describe("ask_agent", () => {
     expect((await consultations())[0]).toMatchObject({ status: "answered", answer: "I don't know more than that." });
   });
 
+  test("the asker reads the consulted agent's whole answer, even one that ends on a promise", async () => {
+    const promised =
+      "Staging deploys with deploy.sh on host s1. I'll double-check the staging config and get back to you.";
+    let infraCalls = 0;
+    f = await setup({
+      askAgent: true,
+      // A judge that calls @infra's last words an unkept promise: the agents' DM never asks it.
+      judge: (kind, _id, _state, _question, request) =>
+        kind === "follow_through" && request.agentId !== f.agent.id ? "unkept" : undefined,
+      reply: consultReply(() => answer(++infraCalls === 1 ? promised : "Config checked.")),
+    });
+    const infra = await addInfra();
+    await post("@dev how do we deploy to staging?");
+    await drainOutbox(f.db, f.handlers);
+
+    expect(infraCalls).toBe(1);
+    expect(await consultations()).toMatchObject([{ status: "answered", answer: promised }]);
+    const judged = (f.context.judge as unknown as { calls: { kind: string; agentId?: string }[] }).calls;
+    expect(judged.filter((j) => j.kind === "follow_through" && j.agentId === infra.id)).toEqual([]);
+  });
+
+  test("an asker that says it will pass the answer on keeps that promise: the answer wakes it, no judge asked", async () => {
+    f = await setup({
+      askAgent: true,
+      judge: (kind) => (kind === "follow_through" ? "unkept" : undefined),
+      reply: consultReply(() => answer("Staging deploys with deploy.sh")),
+    });
+    await addInfra();
+    await post("@dev how do we deploy to staging?");
+    await drainOutbox(f.db, f.handlers);
+
+    const judged = (f.context.judge as unknown as { calls: { kind: string }[] }).calls;
+    expect(judged.filter((j) => j.kind === "follow_through")).toEqual([]);
+    const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(timeline.at(-1)?.body).toBe("Relaying: Staging deploys with deploy.sh");
+  });
+
   test("unknown agents and asking yourself are refused", async () => {
     f = await setup({
       askAgent: true,
@@ -618,7 +655,7 @@ describe("ask_agent", () => {
     await drainOutbox(f.db, f.handlers);
     expect(await consultations()).toHaveLength(0);
     const results = f.provider.calls.map((c) => lastText(c.request)).filter((t) => t.includes("tool_result"));
-    expect(results.some((t) => t.includes("There is no agent @ghost"))).toBe(true);
+    expect(results.some((t) => t.includes("No agent @ghost here."))).toBe(true);
     expect(results.some((t) => t.includes("That is you"))).toBe(true);
   });
 

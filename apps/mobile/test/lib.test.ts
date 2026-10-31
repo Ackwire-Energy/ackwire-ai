@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { ApiError } from "@agenteschat/client";
 import { readDeleteResponse } from "../src/features/account/result";
+import { preflightMissing } from "../src/features/me/logic";
 import { chooseOrg, firstRunMounted, openOrgs, pushOpens, serverDownOf } from "../src/lib/org-choice";
 import { photoSource } from "../src/lib/photo";
 import { createHolder, deviceBody, devicePath, quietWhileOpen, readPushData } from "../src/lib/push-payload";
@@ -60,8 +62,36 @@ describe("account deletion", () => {
       await readDeleteResponse(res(409, { error: { code: "sole_owner", params: { organizations: ["Acme", 3] } } })),
     ).toEqual({ ok: false, reason: "sole_owner", organizations: ["Acme"] });
   });
+  test("a refused proof (`reauth.*`) carries its code to say why; 429 too many passwords", async () => {
+    for (const [status, code] of [
+      [403, "reauth.code"],
+      [400, "reauth.code_wrong"],
+      [409, "reauth.code_expired"],
+      [403, "reauth.password"],
+    ] as const) {
+      const result = await readDeleteResponse(res(status, { error: { code, message: "No" } }));
+      expect(
+        result.ok === false && result.reason === "proof" ? [result.error.status, result.error.code] : result,
+      ).toEqual([status, code]);
+    }
+    expect(await readDeleteResponse(res(429, { error: { code: "rate_limited" } }))).toEqual({
+      ok: false,
+      reason: "rate_limited",
+    });
+    // A blocked account's 403 is no proof to give.
+    expect(await readDeleteResponse(res(403, { error: { code: "forbidden" } }))).toEqual({
+      ok: false,
+      reason: "failed",
+      status: 403,
+    });
+  });
   test("anything else failed", async () => {
     expect(await readDeleteResponse(res(500, "oops"))).toEqual({ ok: false, reason: "failed", status: 500 });
+  });
+  test("a server from before the preflight: deleting falls back to what it always did, only its 404 says so", () => {
+    expect(preflightMissing(new ApiError(404, "not_found", "Not found"))).toBe(true);
+    expect(preflightMissing(new ApiError(500, "http_500", "oops"))).toBe(false);
+    expect(preflightMissing(new Error("offline"))).toBe(false);
   });
 });
 

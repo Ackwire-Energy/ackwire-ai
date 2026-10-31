@@ -1,7 +1,16 @@
 import type { AiAccounts as AiAccountsView } from "@agenteschat/client";
-import { keys, useAiAccounts, useApi } from "@agenteschat/client";
-import { groupPlans, ownSignIns, type PlanAccount, planWordOf } from "@agenteschat/client/lib/ai-accounts";
+import { keys, useAiAccounts, useAiStatus, useApi, useMachines } from "@agenteschat/client";
+import {
+  accountTitle,
+  agentsToGive,
+  endsOnClaude,
+  groupPlans,
+  ownSignIns,
+  type PlanAccount,
+} from "@agenteschat/client/lib/ai-accounts";
 import { joinNames } from "@agenteschat/client/lib/format";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { agentAi, aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { isPlanId, planOf } from "@agenteschat/client/lib/plans";
 import {
   Button,
@@ -13,6 +22,8 @@ import {
   InfoHint,
   Input,
   List,
+  Menu,
+  MenuItem,
   PlanMeter,
   ProviderLogo,
   SettingNote,
@@ -23,6 +34,7 @@ import { useTranslation } from "react-i18next";
 import { useConnectAi } from "@/components/ConnectAi";
 import { LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { useDirectory } from "@/hooks/useDirectory";
 import { planMeterText } from "@/lib/plan-usage";
 import { useToast } from "@/lib/toast";
 import { AddAccount } from "./AddAccountFlow";
@@ -31,7 +43,8 @@ import { AddAccount } from "./AddAccountFlow";
  * Configurações › Contas de IA, "Seus planos" (ADR 0059): the viewer's own
  * accounts on every computer, each with its plan's meter and the agents it
  * thinks for, its logins (one per agent) in one row; renamed, signed in again
- * (a new key for a coding plan, to every login) or disconnected here. First, the
+ * (a new key for a coding plan, to every login), given to one more agent where
+ * it thinks for all of them (`shared`) or disconnected here. First, the
  * sign-ins of the computers they connected ("Conta deste computador"): the
  * agents there think with them, so they are plans too. Never blank: with none,
  * one way to connect one.
@@ -42,11 +55,14 @@ type Open = { type: "rename" | "again" | "remove"; account: PlanAccount<Row> };
 
 export function AiAccountsSection() {
   const { t, i18n } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
   const toast = useToast();
   const ai = useAiAccounts(org.id);
+  const machines = useMachines(org.id);
+  const dir = useDirectory(org.id);
+  const status = useAiStatus(org.id);
   const connectAi = useConnectAi();
   const [open, setOpen] = useState<Open | null>(null);
   const [busy, setBusy] = useState(false);
@@ -67,6 +83,27 @@ export function AiAccountsSection() {
       {t("aiAccounts.page.connect")}
     </Button>
   );
+
+  // One more of the person's agents thinks with an account made for all of them there: no sign-in.
+  const giveTo = async (a: Row, agent: { id: string; name: string }) => {
+    try {
+      await api.agents.setBrain(org.id, agent.id, { brain: a.kind, account: a.id });
+      toast.show(t("aiAccounts.done.savedAgent", { agent: agent.name, label: a.label }));
+      refetch();
+      for (const key of [keys.agents(org.id), keys.aiStatus(org.id), keys.agentBrain(org.id, agent.id)])
+        void qc.invalidateQueries({ queryKey: key });
+    } catch {
+      toast.show(t("agentPage.work.failed"), "error");
+    }
+  };
+  const toGive = (a: Row) =>
+    agentsToGive({
+      account: a,
+      agents: dir.agents,
+      machine: machines.data?.find((m) => m.id === a.machineId),
+      viewerId: me.user.id,
+      onKey: (id) => agentAi(dir.agentById.get(id), aiStateOf(status.data, id)) === "key",
+    });
 
   // Every login of the account goes.
   const remove = async (account: PlanAccount<Row>) => {
@@ -109,7 +146,7 @@ export function AiAccountsSection() {
               <ProviderLogo id={o.kind} size="sm" />
               <span className="list-col">
                 <span className="ai-accounts__name ac-captop">
-                  {[t(`aiAccounts.connect.${o.kind}`), planWordOf(o.plan)].filter(Boolean).join(" ")}
+                  {accountTitle({ label: t(`aiAccounts.connect.${o.kind}`), plan: o.plan })}
                 </span>
                 <span className="small muted">{t("aiAccounts.page.ownOn", { computer: o.computer })}</span>
                 {o.usage && <PlanMeter usage={o.usage} text={meterText} compact />}
@@ -122,8 +159,9 @@ export function AiAccountsSection() {
         <List>
           {accounts.map((account) => {
             const { logins, usedBy, usage, signedOut } = account;
-            const a = logins[0];
+            const a = logins.find((l) => l.shared === true) ?? logins[0];
             if (!a) return null;
+            const give = toGive(a);
             const plan = planOf(a.provider);
             const allOut = signedOut.length === logins.length;
             // Of an account with a login per agent, the agents whose login is out.
@@ -139,7 +177,7 @@ export function AiAccountsSection() {
               <div key={account.key} className="ac-list__row ai-accounts__row">
                 <ProviderLogo id={a.provider ?? a.kind} size="sm" off={allOut} />
                 <span className="list-col">
-                  <span className="ai-accounts__name ac-captop">{a.label}</span>
+                  <span className="ai-accounts__name ac-captop">{accountTitle(a)}</span>
                   <span className="small muted">{facts.join(" · ")}</span>
                   {signedOut.length > 0 && (
                     <SettingNote icon="alert">
@@ -160,6 +198,28 @@ export function AiAccountsSection() {
                   )}
                 </span>
                 <div className="ac-acts">
+                  {give.length === 1 && give[0] ? (
+                    <Button variant="ghost" size="sm" onClick={() => give[0] && void giveTo(a, give[0])}>
+                      {t("aiAccounts.page.useFor", agentGrammar(t, give[0].name))}
+                    </Button>
+                  ) : (
+                    give.length > 1 && (
+                      <Menu
+                        label={t("aiAccounts.page.useForMenu")}
+                        trigger={
+                          <Button variant="ghost" size="sm">
+                            {t("aiAccounts.page.useForMenu")}
+                          </Button>
+                        }
+                      >
+                        {give.map((g) => (
+                          <MenuItem key={g.id} onSelect={() => void giveTo(a, g)}>
+                            {g.name}
+                          </MenuItem>
+                        ))}
+                      </Menu>
+                    )
+                  )}
                   <Button variant="ghost" size="sm" onClick={() => setOpen({ type: "rename", account })}>
                     {t("aiAccounts.page.rename")}
                   </Button>
@@ -210,15 +270,23 @@ export function AiAccountsSection() {
           open
           onOpenChange={(o) => !o && setOpen(null)}
           title={t("aiAccounts.page.disconnectTitle", { label: open.account.logins[0]?.label ?? "" })}
-          description={
+          description={[
             open.account.usedBy.length > 0
               ? t("aiAccounts.page.disconnectAgents", {
                   count: open.account.usedBy.length,
                   agents: names(open.account.usedBy),
                   computer: open.account.logins[0]?.computer ?? "",
                 })
-              : t("aiAccounts.page.disconnectNone", { computer: open.account.logins[0]?.computer ?? "" })
-          }
+              : t("aiAccounts.page.disconnectNone", { computer: open.account.logins[0]?.computer ?? "" }),
+            ...(open.account.logins.some((l) =>
+              endsOnClaude(
+                l,
+                machines.data?.find((m) => m.id === l.machineId),
+              ),
+            )
+              ? [t("aiAccounts.page.revokeOnClaude")]
+              : []),
+          ].join(" ")}
           closeLabel={t("common.close")}
           width={440}
         >

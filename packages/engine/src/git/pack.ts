@@ -119,11 +119,14 @@ export function readPack(
       const header = new TextEncoder().encode(`commit ${inflated.data.length}\0`);
       const oid = createHash("sha1").update(header).update(inflated.data).digest("hex");
       const head = new TextDecoder().decode(inflated.data.subarray(0, Math.min(inflated.data.length, 64 * 1024)));
+      // Parents as git reads them (`parse_commit_buffer`): only the `parent` lines right after the `tree` line. Git
+      // ignores a `parent` line anywhere else, so counting it would pass a root commit off as a fast-forward.
+      const lines = head.split("\n");
       const parents: string[] = [];
-      for (const line of head.split("\n")) {
-        if (line === "") break;
+      for (const line of /^tree [0-9a-f]{40}$/.test(lines[0] ?? "") ? lines.slice(1) : []) {
         const p = /^parent ([0-9a-f]{40})$/.exec(line);
-        if (p) parents.push(p[1] as string);
+        if (!p) break;
+        parents.push(p[1] as string);
       }
       commits.push({ oid, parents });
     }

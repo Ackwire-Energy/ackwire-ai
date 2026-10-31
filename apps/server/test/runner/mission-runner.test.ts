@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { PUSH_ASK_RULES } from "@agenteschat/adapters/command-policy";
 import {
   MISSION_RULES,
   MISSION_RULES_NO_GIT,
@@ -84,19 +85,17 @@ test("protocol 7: hello carries the coding CLIs found; detection is best effort 
   expect(calls.filter((c) => c === "claude")).toHaveLength(6);
 });
 
-test("permission profile: work allows git, tests and pushes to the mission's branches; merges, other pushes and deploys are denied", () => {
+test("permission profile: work allows git, tests and builds; every push asks the prompt tool; merges and deploys are denied", () => {
   const prefix = missionBranchPrefix(MISSION);
   expect(prefix).toBe("agentes/000000bb/");
   expect(missionBranchPrefix(MISSION, "agentes/custom/")).toBe("agentes/custom/");
   expect(missionBranchPrefix(MISSION, "../x/")).toBe("agentes/000000bb/");
-  const work = claudePermissionSettings("work", "agentes/0193aaaa/").permissions;
-  const plan = claudePermissionSettings("plan", prefix).permissions;
+  const work = claudePermissionSettings("work").permissions;
+  const plan = claudePermissionSettings("plan").permissions;
   for (const rule of [
     "mcp__agentes",
     "Bash(git commit *)",
     "Bash(git checkout *)",
-    "Bash(git push origin agentes/0193aaaa/*)",
-    "Bash(git push -u origin agentes/0193aaaa/*)",
     "Bash(gh pr create *)",
     "Bash(npm test *)",
     "Bash(pnpm install *)",
@@ -105,13 +104,15 @@ test("permission profile: work allows git, tests and pushes to the mission's bra
   ]) {
     expect(work.allow).toContain(rule);
   }
-  // No generic push: only the mission's branches.
-  expect(work.allow).not.toContain("Bash(git push *)");
+  // No push is allowed or denied by a rule: every one reaches the prompt tool (`ask` outranks allow rules,
+  // the owner's too), where the computer reads where it goes (ADR 0053 §3).
+  for (const p of [work, plan]) {
+    expect(p.allow.some((r) => r.startsWith("Bash(git push"))).toBe(false);
+    expect(p.deny.some((r) => r.startsWith("Bash(git") && r.includes(" push"))).toBe(false);
+    expect(p.ask).toEqual([...PUSH_ASK_RULES]);
+  }
   for (const rule of [
     "Bash(git merge *)",
-    "Bash(git push --force*)",
-    "Bash(git push *:*)",
-    "Bash(git push * main)",
     "Bash(gh pr merge *)",
     "Bash(vercel deploy *)",
     "Bash(eas submit *)",
@@ -155,17 +156,8 @@ test("permission profile: work allows git, tests and pushes to the mission's bra
   expect(work.allow).toContain("Bash(git -C * commit *)");
   expect(work.allow).toContain("Bash(mkdir *)");
   // `-C <path>` spellings are denied like the plain ones.
-  for (const rule of [
-    "Bash(git -C * merge *)",
-    "Bash(git -C * push * main)",
-    "Bash(git -C * push * master)",
-    "Bash(git -C * push --force*)",
-    "Bash(git -C * push * -f*)",
-    "Bash(git push * main *)",
-  ]) {
-    expect(work.deny).toContain(rule);
-    expect(plan.deny).toContain(rule);
-  }
+  expect(work.deny).toContain("Bash(git -C * merge *)");
+  expect(plan.deny).toContain("Bash(git -C * merge *)");
 });
 
 test.skipIf(!posix)(
@@ -186,8 +178,14 @@ test.skipIf(!posix)(
     expect(work.command).toContain("--permission-mode acceptEdits");
     expect(work.command).toContain(`--settings '${path.join(home, "tasks", id(1), "settings.json")}'`);
     const settings = JSON.parse(readFileSync(path.join(home, "tasks", id(1), "settings.json"), "utf8"));
-    expect(settings.permissions.allow).toContain("Bash(git push origin agentes/0193aaaa/*)");
+    expect(settings.permissions.ask).toEqual([...PUSH_ASK_RULES]);
     expect(settings.permissions.deny).toContain("Bash(git merge *)");
+    // Its prompts say they come from a mission's task, and which branches are its own (the mission's and the agent's).
+    const mcp = JSON.parse(readFileSync(path.join(home, "tasks", id(1), "mcp.json"), "utf8"));
+    expect(mcp.mcpServers.agentes.env).toMatchObject({
+      AGENTES_MCP_TASK: "mission",
+      AGENTES_MCP_BRANCHES: "agentes/dev/,agentes/0193aaaa/",
+    });
   },
 );
 

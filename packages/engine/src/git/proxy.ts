@@ -1,12 +1,29 @@
 import { gunzipSync } from "node:zlib";
+import {
+  DELETE_BRANCHES_POINTER,
+  NO_TERMINAL_COMMANDS,
+  otherBranchPointer,
+} from "@agenteschat/adapters/command-policy";
 import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
 import { recordAudit } from "../audit";
 import { connectorScope } from "../connectors/catalog";
-import { type ConnectorDeps, connectionHeaders } from "../connectors/connections";
+import type { ConnectorDeps } from "../connectors/connections";
 import { standingRefusal } from "../standing";
-import { CONNECTOR_ALL, freshGrantedKeys, grantKey } from "../tools/scopes";
+import { CONNECTOR_ALL, freshGrantedKeys, grantKey, isAllowed, toolAccess } from "../tools/scopes";
+import {
+  BRANCH_PUSH_TOOL,
+  branchBlock,
+  branchFacts,
+  DELETE_BRANCHES_TOOL,
+  githubHeaders,
+  githubToken,
+  type PushGrant,
+  pushGrantKey,
+  pushGrants,
+  validBranch,
+} from "./branches";
 import { machineGitGen, verifyGitToken } from "./credential";
-import { appTokenForRepo, type GitHubAppConfig } from "./github-app";
+import type { GitHubAppConfig } from "./github-app";
 import { parseReceivePackRequest, pkt, type RefCommand, readPack, walkToOld, ZERO_OID } from "./pack";
 import { agentRepositoryList, repoInList } from "./repos";
 
@@ -20,6 +37,8 @@ export const GIT_SCOPES = {
 export const GIT_LIMITS = {
   /** A push request (commands + pack). */
   pushBytes: 100 * 1024 * 1024,
+  /** Ref updates in one push, refused above before any is looked up. */
+  maxCommands: 100,
   /** What one fetch/clone may download through us. */
   fetchBytes: 2 * 1024 * 1024 * 1024,
   /** Wants/haves of a fetch. */
@@ -66,21 +85,32 @@ export function gitAccess(keys: Set<string>, connectionId: string) {
   return { read: write || keys.has(grantKey(connectionId, GIT_SCOPES.read)), write };
 }
 
-/** Why a push command is refused, or null. Only `agentes/{handle}/*` branches, no tags, no deletes. */
-export function refRule(cmd: RefCommand, handle: string): string | null {
-  if (cmd.ref.startsWith("refs/tags/")) return "tags can't be pushed by agents";
-  if (
-    !cmd.ref.startsWith(`refs/heads/agentes/${handle}/`) ||
-    cmd.ref.length <= `refs/heads/agentes/${handle}/`.length
-  ) {
-    return `agents push only to branches agentes/${handle}/…`;
-  }
-  if (cmd.newOid === ZERO_OID) return "branches can't be deleted by agents";
-  return null;
+/**
+ * A push command as the proxy reads it before any grant: the agent's own branch (`agentes/{handle}/…`) goes; tags,
+ * deletes (`delete_branches` deletes), refs that aren't branches and creating someone else's branch are refused; an
+ * update of any other existing branch goes only with a grant (`request_branch_push`).
+ */
+export type RefVerdict =
+  | { ok: true }
+  | { grant: string }
+  | { refused: string; kind: "tag" | "delete" | "ref" | "create" };
+
+export function refRule(cmd: RefCommand, handle: string): RefVerdict {
+  if (cmd.ref.startsWith("refs/tags/")) return { refused: "tags can't be pushed by agents", kind: "tag" };
+  if (cmd.newOid === ZERO_OID) return { refused: `branches are deleted with ${DELETE_BRANCHES_TOOL}`, kind: "delete" };
+  const own = `refs/heads/agentes/${handle}/`;
+  if (cmd.ref.startsWith(own) && cmd.ref.length > own.length) return { ok: true };
+  const branch = cmd.ref.startsWith("refs/heads/") ? cmd.ref.slice("refs/heads/".length) : "";
+  if (!validBranch(branch)) return { refused: `agents push only to branches agentes/${handle}/…`, kind: "ref" };
+  if (cmd.oldOid === ZERO_OID) return { refused: `agents create only branches agentes/${handle}/…`, kind: "create" };
+  return { grant: branch };
 }
 
-/** The report git shows for a refused push (report-status, inside side-band when asked). */
-function refusal(commands: RefCommand[], reasons: Map<string, string>, capabilities: string[]) {
+/**
+ * The report git shows for a refused push (report-status, inside side-band when asked). `told`: what the person
+ * running git reads as `remote: agentes: …`, each line once, ending with `NO_TERMINAL_COMMANDS` whatever was refused.
+ */
+function refusal(commands: RefCommand[], reasons: Map<string, string>, told: Iterable<string>, capabilities: string[]) {
   let report = pkt("unpack ok\n");
   for (const c of commands) {
     const reason = reasons.get(c.ref) ?? "refused with the rest of the push (atomic)";
@@ -90,7 +120,9 @@ function refusal(commands: RefCommand[], reasons: Map<string, string>, capabilit
   const sideband = capabilities.includes("side-band-64k") || capabilities.includes("side-band");
   let body = report;
   if (sideband) {
-    const human = [...reasons.values()].map((r) => pkt(`\x02agentes: ${r}\n`)).join("");
+    const lines = [...told];
+    if (!lines.some((r) => r.endsWith(NO_TERMINAL_COMMANDS))) lines.push(NO_TERMINAL_COMMANDS);
+    const human = lines.map((r) => pkt(`\x02agentes: ${r}\n`)).join("");
     body = `${human}${pkt(`\x01${report}`)}0000`;
   }
   return new Response(body, {
@@ -155,8 +187,10 @@ export async function readBody(req: Request, max: number) {
  * Smart-HTTP git for agents' computers (ADR 0024): `/api/git/{orgId}/{connectionId}/{owner}/{repo}.git/…`.
  * - The computer authenticates with our short-lived per-computer credential.
  * - Policy is checked here: the agent's `github:git.read` / `github:git.write`
- *   grants on that connection (and repo list, when set); pushes only to
- *   `agentes/{handle}/*`, fast-forward only, no tags or deletes; size limits.
+ *   grants on that connection (and repo list, when set); pushes to
+ *   `agentes/{handle}/*`, or to another existing branch a person approved
+ *   (`request_branch_push`) that GitHub says isn't the default or protected;
+ *   fast-forward only, no tags or deletes; size limits and at most 100 refs.
  * - The request goes to GitHub with the org's token added here (a GitHub App
  *   installation token when configured), never logged, never sent back.
  * - Fetches and pushes are audited.
@@ -246,22 +280,16 @@ export async function handleGitProxy(
 
   // 3. GitHub's credential, added here only.
   const upstream = deps.upstream ?? { gitUrl: "https://github.com", apiUrl: "https://api.github.com", fetch };
+  const github = { fetch: upstream.fetch, apiUrl: upstream.apiUrl };
   const write = service === "git-receive-pack";
-  const appToken = deps.app
-    ? await appTokenForRepo(
-        deps.app,
-        { fetch: upstream.fetch, apiUrl: upstream.apiUrl },
-        { db: deps.db, orgId: claims.orgId },
-        parsed.owner,
-        parsed.repo,
-        write ? { contents: "write" } : { contents: "read" },
-      ).catch(() => null)
-    : null;
-  const bearer =
-    appToken ??
-    (
-      await connectionHeaders(deps.connectors, connection).catch(() => ({}) as Record<string, string>)
-    ).authorization?.replace(/^Bearer\s+/i, "");
+  const bearer = await githubToken(
+    deps,
+    github,
+    { db: deps.db, orgId: claims.orgId },
+    connection,
+    parsed,
+    write ? { contents: "write" } : { contents: "read" },
+  );
   if (!bearer) return text(502, "agentes: the organization's GitHub connection has no usable token");
   const upstreamAuth = `Basic ${Buffer.from(`x-access-token:${bearer}`).toString("base64")}`;
   const target = `${upstream.gitUrl}/${parsed.owner}/${parsed.repo}.git/${parsed.action}${url.search}`;
@@ -310,10 +338,63 @@ export async function handleGitProxy(
   } catch {
     return text(400, "agentes: unreadable push");
   }
+  if (request.commands.length > limits.maxCommands) {
+    return text(413, `agentes: a push may update at most ${limits.maxCommands} refs at once`);
+  }
   const reasons = new Map<string, string>();
+  const told = new Set<string>();
+  /** Someone else's branches by ref: pushed with a grant, or named once to the agent. */
+  const others = new Map<string, string>();
   for (const cmd of request.commands) {
-    const why = refRule(cmd, agent.handle);
-    if (why) reasons.set(cmd.ref, why);
+    const verdict = refRule(cmd, agent.handle);
+    if ("refused" in verdict) {
+      reasons.set(cmd.ref, verdict.refused);
+      told.add(verdict.kind === "delete" ? DELETE_BRANCHES_POINTER : verdict.refused);
+    } else if ("grant" in verdict) others.set(cmd.ref, verdict.grant);
+  }
+  const at = { orgId: claims.orgId, agentId: claims.agentId, connectionId: connection.id };
+  // A denied request_branch_push grants nothing: no rule or approval is read (ADR 0015).
+  const mayAsk = isAllowed(
+    toolAccess(keys, { name: BRANCH_PUSH_TOOL, scope: GIT_SCOPES.write, connectionId: connection.id }),
+  );
+  const grants =
+    others.size > 0 && mayAsk
+      ? await pushGrants(
+          deps.db,
+          at,
+          [...others.values()].map((b) => pushGrantKey(parsed, b)),
+          now,
+        )
+      : new Map<string, PushGrant>();
+  const granted = new Map<string, { branch: string; grant: PushGrant }>();
+  const ungranted: string[] = [];
+  for (const [ref, branch] of others) {
+    const grant = grants.get(pushGrantKey(parsed, branch));
+    if (grant) granted.set(ref, { branch, grant });
+    else {
+      reasons.set(ref, `not your branch (ask with ${BRANCH_PUSH_TOOL})`);
+      ungranted.push(branch);
+    }
+  }
+  if (ungranted.length > 0) told.add(otherBranchPointer(ungranted, agent.handle));
+  // A granted branch may have become the default or protected since: GitHub says so now, and no answer refuses.
+  if (reasons.size === 0 && granted.size > 0) {
+    const facts = await branchFacts(github, bearer, parsed, [...new Set([...granted.values()].map((g) => g.branch))]);
+    for (const [ref, { branch }] of granted) {
+      const block = facts ? branchBlock(facts, branch, false) : "unknown";
+      if (!block) continue;
+      const [short, long] =
+        block === "unknown"
+          ? ["GitHub didn't answer", `GitHub didn't say whether ${branch} is protected: nothing was pushed, try again`]
+          : block === "missing"
+            ? ["not on GitHub", `${branch} isn't on GitHub: an approval covers updating a branch, never creating one`]
+            : [
+                block === "default" ? "the default branch" : "protected",
+                `${branch} is ${block === "default" ? "the default branch" : "protected"}: push to agentes/${agent.handle}/<topic> and open a pull request; merging asks a person`,
+              ];
+      reasons.set(ref, short);
+      told.add(long);
+    }
   }
   let commits = 0;
   if (reasons.size === 0) {
@@ -337,17 +418,17 @@ export async function handleGitProxy(
         if (ok) break;
         const res = await upstream
           .fetch(`${upstream.apiUrl}/repos/${parsed.owner}/${parsed.repo}/compare/${cmd.oldOid}...${oid}`, {
-            headers: {
-              authorization: `Bearer ${bearer}`,
-              accept: "application/vnd.github+json",
-              "user-agent": "agentes.chat",
-            },
+            headers: githubHeaders(bearer),
           })
           .catch(() => null);
         const status = res?.ok ? ((await res.json()) as { status?: string }).status : undefined;
         ok = status === "ahead" || status === "identical";
       }
-      if (!ok) reasons.set(cmd.ref, "not a fast-forward (force pushes are not allowed)");
+      if (!ok) {
+        const why = "not a fast-forward (force pushes are not allowed)";
+        reasons.set(cmd.ref, why);
+        told.add(why);
+      }
     }
   }
   if (reasons.size > 0) {
@@ -358,7 +439,7 @@ export async function handleGitProxy(
       target: { type: "git_repo", id: repoName },
       details: { refs: request.commands.map((c) => c.ref), reasons: Object.fromEntries(reasons) },
     }).catch(() => undefined);
-    return refusal(request.commands, reasons, request.capabilities);
+    return refusal(request.commands, reasons, told, request.capabilities);
   }
   const res = await forward(body);
   if (res.ok) {
@@ -372,6 +453,7 @@ export async function handleGitProxy(
         ...where,
         refs: request.commands.map((c) => ({ ref: c.ref, from: c.oldOid, to: c.newOid })),
         commits,
+        ...(granted.size > 0 ? { grants: Object.fromEntries([...granted].map(([ref, g]) => [ref, g.grant])) } : {}),
       },
     }).catch(() => undefined);
   }

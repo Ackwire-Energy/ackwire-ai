@@ -4,6 +4,8 @@
  * one, the region, and a search that understands cities, ids and offsets.
  */
 
+import { fold } from "./search";
+
 /** When `Intl.supportedValuesOf` isn't there. */
 export const FALLBACK_ZONES = [
   "UTC",
@@ -128,8 +130,6 @@ export interface ZoneOption {
   /** Lowercase, accent-free text the search looks at. */
   haystack: string;
 }
-
-const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 export function zoneOption(zone: string, nameOf?: (zone: string) => string | undefined, at = new Date()): ZoneOption {
   const offset = offsetMinutes(zone, at);

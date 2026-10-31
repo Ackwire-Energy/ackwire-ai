@@ -1,5 +1,6 @@
+import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -15,6 +16,37 @@ export function tempDir(prefix = "runner-"): string {
 
 export function removeDirs(dirs: string[]) {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+}
+
+/** git is on this computer (the tests that read a repository need it). */
+export const hasGit = spawnSync("git", ["--version"]).status === 0;
+
+/**
+ * A clone (`work`, at `into` or in a new folder) of a bare remote whose default branch is `develop`, so
+ * nothing may assume main; `main` and the pull request's branch `cursor/pap-582-fix` are there too, and the
+ * clone is on that branch, tracking it. `git` runs in the clone and returns its stdout.
+ */
+export function gitRepo(dirs: string[], into?: string) {
+  const root = tempDir("git-");
+  dirs.push(root);
+  const run = (cwd: string, ...args: string[]) => {
+    const r = spawnSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd, encoding: "utf8" });
+    if (r.status !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr}`);
+    return r.stdout.trim();
+  };
+  const src = path.join(root, "src");
+  run(root, "init", "-q", "-b", "develop", src);
+  writeFileSync(path.join(src, "README.md"), "hi\n");
+  run(src, "add", ".");
+  run(src, "commit", "-qm", "first");
+  run(src, "branch", "main");
+  run(src, "branch", "cursor/pap-582-fix");
+  const remote = path.join(root, "remote.git");
+  run(root, "clone", "-q", "--bare", src, remote);
+  const work = into ?? path.join(root, "work");
+  run(root, "clone", "-q", remote, work);
+  run(work, "checkout", "-q", "-b", "cursor/pap-582-fix", "--track", "origin/cursor/pap-582-fix");
+  return { root, remote, work, git: (...args: string[]) => run(work, ...args) };
 }
 
 /** The RunnerError code a promise or function fails with (or "ok"). */

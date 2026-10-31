@@ -4,7 +4,7 @@ import { and, type Database, eq, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { NotFoundError, ValidationError } from "./errors";
-import { invitedOrgId, requirePermission } from "./organizations";
+import { getMembership, invitedOrgId, requirePermission } from "./organizations";
 
 const { users, organizationMembers, organizations } = schema;
 
@@ -237,7 +237,10 @@ async function removeStoredLogo(blobs: BlobStore, orgId: string, logo: string | 
   await blobs.delete(`org-logos/${orgId}/${m[2]}`).catch(() => undefined);
 }
 
-/** The stored logo for `GET /api/app/org-logos/{orgId}/{file}`: only for the org's members. */
+/**
+ * The stored logo for `GET /api/app/org-logos/{orgId}/{file}`: only for the org's members, a closed workspace's too,
+ * whose mark still shows in their list of workspaces.
+ */
 export async function orgLogoFile(
   deps: { db: Database; blobs: BlobStore },
   viewerId: string,
@@ -245,9 +248,7 @@ export async function orgLogoFile(
   file: string,
 ) {
   if (!/^[0-9a-f]{16}\.(jpg|png|webp)$/.test(file)) throw new NotFoundError("Not found");
-  await requirePermission(deps.db, viewerId, orgId, "read").catch(() => {
-    throw new NotFoundError("Not found");
-  });
+  if (!(await getMembership(deps.db, viewerId, orgId))) throw new NotFoundError("Not found");
   const object = await deps.blobs.get(`org-logos/${orgId}/${file}`);
   if (!object) throw new NotFoundError("Not found");
   return object;

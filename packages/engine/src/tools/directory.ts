@@ -1,3 +1,4 @@
+import type { MissingConnector } from "../connectors/listing";
 import { oneLine } from "../mail/text";
 import type { JsonSchema } from "./json-schema";
 import type { ToolDefinition } from "./types";
@@ -49,8 +50,11 @@ export interface BlockedTool {
   permissions: { id: string; label: string }[] | null;
 }
 
-/** Read when `find_tools` runs. `ask`: the tool that asks a person for a permission, when this run may call it. */
-export type BlockedTools = () => Promise<{ tools: BlockedTool[]; ask: string | null }>;
+/**
+ * Read when `find_tools` runs. `ask`: the tool that asks a person for a permission, when this run may call it.
+ * `connectors`: the connectors the agent could get, named when a search asks for one.
+ */
+export type BlockedTools = () => Promise<{ tools: BlockedTool[]; ask: string | null; connectors?: MissingConnector[] }>;
 
 const sizeOf = (t: ToolDefinition) => t.name.length + t.description.length + JSON.stringify(t.inputSchema).length;
 
@@ -396,11 +400,39 @@ export function compactSchema(schema: JsonSchema) {
   return text.length > SCHEMA_CHARS ? `${text.slice(0, SCHEMA_CHARS)}…` : text;
 }
 
+/** How a person gets a connector the agent lacks, in the app's words (and the Portuguese the app shows). */
+const HOW_TO_GET: Record<MissingConnector["state"], (label: string) => string> = {
+  not_connected: (label) =>
+    `Not connected in this workspace: an admin connects it in Settings › Connectors › Add connector › ${label} (in Portuguese, Configurações › Conectores › Adicionar conector › ${label}).`,
+  not_given: () =>
+    "Connected in this workspace but not given to you: an admin gives you access on your page, in Tools and access (in Portuguese, Ferramentas e acesso).",
+  unavailable: () => "Not available on this installation: whoever runs the installation has to turn it on first.",
+  soon: () =>
+    "Not open to agentes.chat yet: it only lets apps it approved connect in one click. If it gives an API key, an admin connects it with that by its address, in Settings › Connectors › Add connector › Another service (in Portuguese, Configurações › Conectores › Adicionar conector › Outro serviço).",
+  needs_reconnect: () =>
+    "Connected in this workspace but needs reconnecting: an admin clicks Reconnect on its row in Settings › Connectors (in Portuguese, Configurações › Conectores › Reconectar).",
+};
+
+/** The connectors the agent lacks that the query names (every word of a label or of an id), with how to get each. */
+function connectorsToGet(query: string, connectors: MissingConnector[] = []) {
+  const terms = new Set(words(query).map(stem));
+  const isNamed = (name: string) => {
+    const named = words(name).map(stem);
+    return named.length > 0 && named.every((w) => terms.has(w));
+  };
+  const lines = connectors
+    .filter((c) => c.names.some(isNamed))
+    .map((c) => `- ${c.label}: ${c.description} ${HOW_TO_GET[c.state](c.label)}`);
+  if (lines.length === 0) return "";
+  return `Connectors you don't have yet. If the person wants one, say how to get it, never that it doesn't exist.\n${lines.join("\n")}`;
+}
+
 /**
  * A search's answer. `loaded`: tools already in the model's list, ranked with the directory's in one pass.
  * Those that outrank every other match open the answer, to call directly; any other keeps its rank, marked.
  * `blocked`: tools the agent may not use, in the same pass; those among the best `limit` close the answer in
- * sections of their own, never in a usable match's place.
+ * sections of their own, never in a usable match's place. Last, the connectors the query names that the agent
+ * lacks (`connectorsToGet`).
  */
 function findTools(
   tools: ToolDefinition[],
@@ -419,8 +451,9 @@ function findTools(
   const ranked = rankTools([...loaded, ...tools, ...blockedOf.keys()], prefix, query);
   const matches = ranked.filter((t) => !blockedOf.has(t)).slice(0, limit);
   const notAllowed = ranked.slice(0, limit).flatMap((t) => blockedOf.get(t) ?? []);
+  const toGet = connectorsToGet(query, blocked.connectors);
   if (matches.length === 0 && notAllowed.length === 0) {
-    return `No ${label} tool matches "${query}". Try other words (${areas.slice(0, 12).join(", ")}).`;
+    return `No ${label} tool matches "${query}". Try other words (${areas.slice(0, 12).join(", ")}).${toGet ? `\n\n${toGet}` : ""}`;
   }
   const listed = new Set(loaded);
   const lead = matches.findIndex((t) => !listed.has(t));
@@ -460,5 +493,6 @@ function findTools(
   if (turnedOff.length > 0) {
     parts.push(`Turned off for you by an admin; only an admin can turn them back on:\n${turnedOff.join("\n")}`);
   }
+  if (toGet) parts.push(toGet);
   return parts.join("\n\n");
 }

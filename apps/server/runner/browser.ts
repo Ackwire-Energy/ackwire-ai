@@ -2379,6 +2379,9 @@ export class BrowserManager {
         session.stream.socket.send(JSON.stringify({ type: "config", maxFps: STREAM_FPS[mode] }));
         this.changed();
       }
+      // The server asks again when it lost the page (a new process, a stop that failed): an idle page sends it again.
+      session.stream.framed = false;
+      void this.firstFrame(session, session.stream);
       return { mode };
     }
     const opening = this.openStream(session, mode);
@@ -2550,6 +2553,7 @@ export class BrowserManager {
         const data = shot.success ? (await readFile(file)).toString("base64") : "";
         const size = stream.viewport;
         if (!data || data.length > BROWSER_LIMITS.frameBytes || !size || !waiting()) return;
+        stream.framed = true;
         this.opts.send({
           type: "browser.frame",
           agentId: session.agentId,

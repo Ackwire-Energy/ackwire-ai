@@ -17,6 +17,7 @@ import {
 } from "./machines";
 import { notifyMachineConnected } from "./notification-producers";
 import { can, getMembership, requireActiveMembership } from "./organizations";
+import { closedRefusal } from "./standing";
 
 const { agents, machineDeviceCodes, machines, organizations } = schema;
 
@@ -349,7 +350,7 @@ async function reconnectTarget(
   // server's own (`host`, its sync) never come back as someone's computer.
   if (machine?.kind !== "connected") return null;
   const member = await getMembership(db, actorId, machine.orgId);
-  if (!member || member.standing?.state === "suspended" || !can(member, "pair_computers")) return null;
+  if (!member || closedRefusal(member.standing) || !can(member, "pair_computers")) return null;
   if (!can(member, "configure") && machine.pairedByUserId !== actorId) return null;
   return { machine, orgName: member.orgName };
 }

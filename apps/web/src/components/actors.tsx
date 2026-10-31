@@ -1,4 +1,5 @@
 import type { Actor } from "@agenteschat/client";
+import { listsAgent } from "@agenteschat/client/lib/audience";
 import { Icon, type SelectOption } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar } from "@/components/AgentAvatar";
@@ -21,19 +22,22 @@ export function useActors() {
   const avatar = (a: Actor, size: "xs" | "sm" = "xs") => <ActorAvatar size={size} actor={a} name={name(a)} />;
   // The empty choice leads with a glyph as wide as the 18px faces, so every name starts on one edge.
   const none = <Icon name="person" size={18} className="muted" />;
-  const options = (withNone: boolean): SelectOption[] => [
+  /** `current` (the value picked now) stays an option even when my lists leave that agent out. */
+  const options = (withNone: boolean, current?: string): SelectOption[] => [
     ...(withNone ? [{ value: NO_ACTOR, label: t("issues.noAssignee"), leading: none }] : []),
     ...dir.members.map((m) => ({
       value: `person:${m.userId}`,
       label: m.name,
       leading: avatar({ type: "person", id: m.userId }),
     })),
-    ...dir.agents.map((a) => ({
-      value: `agent:${a.id}`,
-      label: a.name,
-      description: a.role ? t("issues.agentRole", { role: a.role }) : undefined,
-      leading: avatar({ type: "agent", id: a.id }),
-    })),
+    ...dir.agents
+      .filter((a) => listsAgent(org, a) || `agent:${a.id}` === current)
+      .map((a) => ({
+        value: `agent:${a.id}`,
+        label: a.name,
+        description: a.role ? t("issues.agentRole", { role: a.role }) : undefined,
+        leading: avatar({ type: "agent", id: a.id }),
+      })),
   ];
   return { dir, name, options, avatar, meId: me.user.id };
 }
