@@ -3,6 +3,7 @@ import {
   ComposioSignatureError,
   FAKE_COMPOSIO_SIGNATURE,
   fakeMailAuthError,
+  MailError,
   type MailSummary,
 } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
@@ -17,6 +18,7 @@ import {
   type RoutineDeps,
   reconcileComposioAccounts,
   setRoutineActive,
+  startComposioConnect,
   updateRoutine,
   ValidationError,
 } from "../src";
@@ -78,7 +80,12 @@ test("an email routine keeps its Composio trigger in step: created, paused, resu
   });
   const triggers = () => [...m.composio.state.triggers.values()];
   expect(triggers()).toEqual([
-    { toolkit: "gmail", connectedAccountId: gmail.connectedAccountId, query: 'from:(@acme.com) subject:"ticket"' },
+    {
+      toolkit: "gmail",
+      connectedAccountId: gmail.connectedAccountId,
+      userId: `org_${m.f.org.id}`,
+      query: 'from:(@acme.com) subject:"ticket"',
+    },
   ]);
 
   await setRoutineActive(routineDeps(m), m.f.owner.id, m.f.org.id, routine.id, false);
@@ -244,4 +251,25 @@ test("reconcile: an expired Composio account asks to reconnect", async () => {
   await reconcileComposioAccounts(m.deps);
   const [row] = await m.f.db.select().from(schema.mailAccounts).where(eq(schema.mailAccounts.id, gmail.accountId));
   expect(row?.status).toBe("needs_reconnect");
+});
+
+test("reconcile: a pending account that finished at Composio becomes active once its check works", async () => {
+  m = await mailSetup();
+  const started = await startComposioConnect(m.deps, m.f.owner.id, m.f.org.id, { provider: "gmail" });
+  const ca = m.composio.state.links.at(-1)?.connectedAccountId ?? "";
+  m.composio.activate(ca, "team@example.com");
+  const row = async () =>
+    (await m.f.db.select().from(schema.mailAccounts).where(eq(schema.mailAccounts.id, started.accountId)))[0];
+
+  // A failing check is reported (the worker logs it), and the row waits for the next pass.
+  m.composio.state.failWith = new MailError("Composio is down", true);
+  expect(await reconcileComposioAccounts(m.deps)).toEqual({
+    checked: 1,
+    failed: [{ orgId: m.f.org.id, accountId: started.accountId, error: "MailError: Composio is down" }],
+  });
+  expect(await row()).toMatchObject({ status: "pending", revokedAt: null });
+
+  m.composio.state.failWith = null;
+  expect(await reconcileComposioAccounts(m.deps)).toEqual({ checked: 1, failed: [] });
+  expect(await row()).toMatchObject({ status: "active", address: "team@example.com" });
 });

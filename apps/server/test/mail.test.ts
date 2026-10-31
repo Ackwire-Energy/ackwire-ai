@@ -90,6 +90,10 @@ test("mail API: IMAP account (tested), Gmail through Composio, agent access, fol
   expect(back.headers.get("location")).toBe(
     `${t.config.PUBLIC_URL}/org/${orgId}/settings/connectors?mail=connected&account=${started.accountId}`,
   );
+  // The agent page reads the Gmail mailbox's folders through Composio, as the org's user.
+  const gmailFolders = await api(`/mail/accounts/${started.accountId}/folders`);
+  expect(gmailFolders.status).toBe(200);
+  expect(fake.box.state.opened.at(-1)).toMatchObject({ externalAccountId: "ca_1", externalUserId: `org_${orgId}` });
 
   const listed = await (await api("/mail/accounts")).text();
   expect(listed).not.toContain("abcd-efgh");

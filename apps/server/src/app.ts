@@ -136,7 +136,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", auditRoutes(deps));
     api.route("/app", customConnectorRoutes(deps));
     api.route("/app", connectorRoutes(deps));
-    api.route("/app", mailRoutes(deps));
+    api.route("/app", mailRoutes(deps, log));
     api.route("/app", databaseRoutes(deps));
     api.route("/app", managementRoutes(deps));
     api.route("/app", knowledgeRoutes(deps));

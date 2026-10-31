@@ -38,18 +38,34 @@ function fakeFetch(...handlers: Handler[]) {
   return { fetch: fn, calls };
 }
 
-/** Answers `POST /tools/execute/<slug>` with `{ data, successful: true }`. */
+/**
+ * Answers `POST /tools/execute/<slug>` with `{ data, successful: true }`, or with Composio's 400
+ * when the call names a connected account without its user id.
+ */
 const tool =
   (slug: string, data: unknown | ((call: Call) => unknown)): Handler =>
-  (call) =>
-    call.url === `${BASE}/tools/execute/${slug}`
-      ? Response.json({
-          data: typeof data === "function" ? (data as (c: Call) => unknown)(call) : data,
-          error: null,
-          successful: true,
-          log_id: "log_1",
-        })
-      : undefined;
+  (call) => {
+    if (call.url !== `${BASE}/tools/execute/${slug}`) return undefined;
+    if (call.body?.connected_account_id && !call.body.user_id) {
+      return Response.json(
+        {
+          error: {
+            message:
+              "User ID is required with connected account. Please provide a user ID to identify the connected account.",
+            slug: "ActionExecute_ConnectedAccountEntityIdRequired",
+            status: 400,
+          },
+        },
+        { status: 400 },
+      );
+    }
+    return Response.json({
+      data: typeof data === "function" ? (data as (c: Call) => unknown)(call) : data,
+      error: null,
+      successful: true,
+      log_id: "log_1",
+    });
+  };
 
 const toolArgs = (calls: Call[], slug: string) =>
   calls
@@ -63,6 +79,7 @@ const gmailAccount: MailAccountRef = {
   via: "composio",
   address: "ana@acme.com",
   externalAccountId: "ca_gmail",
+  externalUserId: "org_org1",
 };
 const outlookAccount: MailAccountRef = { ...gmailAccount, provider: "outlook", externalAccountId: "ca_outlook" };
 
@@ -251,14 +268,15 @@ describe("Composio client", () => {
       tool("OUTLOOK_GET_PROFILE", { mail: "Ana@Contoso.com", userPrincipalName: "ana@contoso.onmicrosoft.com" }),
     );
     const client = createComposioClient({ apiKey: "k", fetch });
-    expect(await client.getConnectedAccount("ca_gmail")).toEqual({ status: "active", address: "ana@acme.com" });
-    expect(await client.getConnectedAccount("ca_outlook")).toEqual({ status: "active", address: "ana@contoso.com" });
-    expect(await client.getConnectedAccount("ca_pending")).toEqual({ status: "pending", address: null });
-    expect(await client.getConnectedAccount("ca_expired")).toEqual({ status: "expired", address: null });
-    expect(await client.getConnectedAccount("ca_failed")).toEqual({ status: "failed", address: null });
-    expect(await client.getConnectedAccount("ca_gone")).toEqual({ status: "failed", address: null });
+    const state = (id: string) => client.getConnectedAccount(id, "org_1");
+    expect(await state("ca_gmail")).toEqual({ status: "active", address: "ana@acme.com" });
+    expect(await state("ca_outlook")).toEqual({ status: "active", address: "ana@contoso.com" });
+    expect(await state("ca_pending")).toEqual({ status: "pending", address: null });
+    expect(await state("ca_expired")).toEqual({ status: "expired", address: null });
+    expect(await state("ca_failed")).toEqual({ status: "failed", address: null });
+    expect(await state("ca_gone")).toEqual({ status: "failed", address: null });
     const profile = calls.find((c) => c.url.endsWith("/tools/execute/GMAIL_GET_PROFILE"));
-    expect(profile?.body).toEqual({ connected_account_id: "ca_gmail", arguments: { user_id: "me" } });
+    expect(profile?.body).toEqual({ connected_account_id: "ca_gmail", user_id: "org_1", arguments: { user_id: "me" } });
   });
 
   test("triggers: Gmail query pushed to the source (inbox by default), Outlook unfiltered; deletes tolerate 404", async () => {
@@ -270,19 +288,25 @@ describe("Composio client", () => {
       (c) => (c.method === "DELETE" ? Response.json({ error: { message: "not found" } }, { status: 404 }) : undefined),
     );
     const client = createComposioClient({ apiKey: "k", fetch });
-    await client.createMailTrigger({ toolkit: "gmail", connectedAccountId: "ca_g", query: "from:(a@x.com OR @b.com)" });
-    await client.createMailTrigger({ toolkit: "gmail", connectedAccountId: "ca_g", query: null });
-    await client.createMailTrigger({ toolkit: "gmail", connectedAccountId: "ca_g", query: "label:clientes" });
-    expect(await client.createMailTrigger({ toolkit: "outlook", connectedAccountId: "ca_o", query: "x" })).toEqual({
+    const gmail = { toolkit: "gmail" as const, connectedAccountId: "ca_g", userId: "org_1" };
+    await client.createMailTrigger({ ...gmail, query: "from:(a@x.com OR @b.com)" });
+    await client.createMailTrigger({ ...gmail, query: null });
+    await client.createMailTrigger({ ...gmail, query: "label:clientes" });
+    const outlook = { toolkit: "outlook" as const, connectedAccountId: "ca_o", userId: "org_1" };
+    expect(await client.createMailTrigger({ ...outlook, query: "x" })).toEqual({
       triggerId: "ti_1",
     });
     const upserts = calls.filter((c) => c.url.endsWith("/upsert"));
     expect(upserts[0]?.url).toBe(`${BASE}/trigger_instances/GMAIL_NEW_GMAIL_MESSAGE/upsert`);
     expect(upserts.map((c) => c.body)).toEqual([
-      { connected_account_id: "ca_g", trigger_config: { query: "in:inbox from:(a@x.com OR @b.com)" } },
-      { connected_account_id: "ca_g", trigger_config: { labelIds: "INBOX" } },
-      { connected_account_id: "ca_g", trigger_config: { query: "label:clientes" } },
-      { connected_account_id: "ca_o", trigger_config: {} },
+      {
+        connected_account_id: "ca_g",
+        user_id: "org_1",
+        trigger_config: { query: "in:inbox from:(a@x.com OR @b.com)" },
+      },
+      { connected_account_id: "ca_g", user_id: "org_1", trigger_config: { labelIds: "INBOX" } },
+      { connected_account_id: "ca_g", user_id: "org_1", trigger_config: { query: "label:clientes" } },
+      { connected_account_id: "ca_o", user_id: "org_1", trigger_config: {} },
     ]);
     expect(upserts[3]?.url).toBe(`${BASE}/trigger_instances/OUTLOOK_MESSAGE_TRIGGER/upsert`);
     await client.deleteTrigger("ti_1");
@@ -300,7 +324,9 @@ describe("Composio client", () => {
         fetch: (async () => Response.json(body, { status })) as unknown as typeof fetch,
       });
     const run = (client: ReturnType<typeof createComposioClient>) =>
-      client.executeTool("GMAIL_FETCH_EMAILS", "ca_1", {}).catch((e: unknown) => e as Error);
+      client
+        .executeTool("GMAIL_FETCH_EMAILS", { connectedAccountId: "ca_1", userId: "org_1" }, {})
+        .catch((e: unknown) => e as Error);
 
     const expired = await run(
       reply(400, { error: { message: "Connected account is not active (status EXPIRED)", status: 400 } }),
@@ -499,6 +525,7 @@ describe("Composio mail connector: Gmail", () => {
     const { connector } = setup();
     await expect(connector.open({ ...gmailAccount, via: "imap" })).rejects.toBeInstanceOf(MailError);
     await expect(connector.open({ ...gmailAccount, provider: "imap" })).rejects.toBeInstanceOf(MailError);
+    await expect(connector.open({ ...gmailAccount, externalUserId: null })).rejects.toBeInstanceOf(MailError);
   });
 
   test("read: HTML → text with links, lowercase addresses, threading headers, attachments", async () => {
@@ -510,7 +537,7 @@ describe("Composio mail connector: Gmail", () => {
       message_id: "18f1a2b3c4d5e6f7",
       format: "full",
     });
-    expect(calls[0]?.body?.connected_account_id).toBe("ca_gmail");
+    expect(calls[0]?.body).toMatchObject({ connected_account_id: "ca_gmail", user_id: "org_org1" });
     expect(message.text).toBe(
       "Olá, Ana!\n\nVeja o orçamento (https://cliente.com.br/p) & responda.\n\n- Item 1\n- Item 2",
     );
@@ -770,7 +797,7 @@ describe("Composio mail connector: Outlook", () => {
     const { connector, calls } = setup();
     const mailbox = await connector.open(outlookAccount);
     const message = await mailbox.read("AAMk1");
-    expect(calls[0]?.body?.connected_account_id).toBe("ca_outlook");
+    expect(calls[0]?.body).toMatchObject({ connected_account_id: "ca_outlook", user_id: "org_org1" });
     expect(message).toMatchObject({
       id: "AAMk1",
       threadId: "conv1",

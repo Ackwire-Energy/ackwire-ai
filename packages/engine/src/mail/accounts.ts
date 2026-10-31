@@ -454,7 +454,7 @@ export async function applyComposioStateFor(
 ): Promise<boolean> {
   const composio = composioOf(deps);
   if (!composio || !row.externalAccountId) return false;
-  const remote = await composio.client.getConnectedAccount(row.externalAccountId);
+  const remote = await composio.client.getConnectedAccount(row.externalAccountId, composioUserId(row.orgId));
   const now = deps.now?.() ?? new Date();
   if (remote.status === "active" && remote.address) {
     const address = normalizeAddress(remote.address);
@@ -679,7 +679,9 @@ export async function accountRef(deps: MailDeps, row: MailAccountRow, password?:
     via: row.via as MailAccountRef["via"],
     address: row.address,
   };
-  if (row.via !== "imap") return { ...base, externalAccountId: row.externalAccountId };
+  if (row.via !== "imap") {
+    return { ...base, externalAccountId: row.externalAccountId, externalUserId: composioUserId(row.orgId) };
+  }
   let secret = password;
   if (secret === undefined) {
     if (!row.secretCiphertext || !row.wrappedDataKey || !row.kekId)
