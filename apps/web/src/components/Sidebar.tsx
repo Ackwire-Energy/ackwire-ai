@@ -261,7 +261,7 @@ export function Sidebar() {
   // Owners and admins organize the groups, with the full sidebar (the rail shows faces only).
   const organize = arranges && !rail;
   const agentRow = (a: Agent) => (
-    <ErrorBoundary key={a.id} fallback={unshownRow}>
+    <ErrorBoundary key={a.id} resetKey={a} fallback={unshownRow}>
       <AgentRow
         agent={a}
         unread={unreadWith.get(a.id) ?? 0}
@@ -518,7 +518,7 @@ export function Sidebar() {
             summary={peopleUnread > 0 && <UnreadCount count={peopleUnread} />}
           >
             {people.map((m) => (
-              <ErrorBoundary key={m.userId} fallback={unshownRow}>
+              <ErrorBoundary key={m.userId} resetKey={m} fallback={unshownRow}>
                 <PersonRow
                   member={m}
                   unread={unreadWith.get(m.userId) ?? 0}

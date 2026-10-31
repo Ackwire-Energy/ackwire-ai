@@ -6,6 +6,8 @@ export interface ErrorBoundaryProps {
   fallback: (error: unknown, reset: () => void) => ReactNode;
   /** Besides the root's `onCaughtError`, which already gets every error a boundary catches. */
   onError?: (error: unknown, info: ErrorInfo) => void;
+  /** A new value draws `children` again (a row's message that changed may draw fine now). */
+  resetKey?: unknown;
 }
 
 /**
@@ -22,6 +24,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, { failed: boole
 
   override componentDidCatch(error: unknown, info: ErrorInfo) {
     this.props.onError?.(error, info);
+  }
+
+  // Not on the update that failed: the change that broke it may also be the new key, and it would only fail again.
+  override componentDidUpdate(prev: ErrorBoundaryProps, prevState: { failed: boolean }) {
+    if (prevState.failed && this.state.failed && !Object.is(prev.resetKey, this.props.resetKey)) this.reset();
   }
 
   reset = () => this.setState({ failed: false, error: undefined });

@@ -234,7 +234,7 @@ describe("receipts this build doesn't expect", () => {
     expect(within(receipts()).getByRole("button", { name: /^Desfazer/ })).toBeTruthy();
   });
 
-  test("one that throws: its message is one quiet line, reported once; the channel, the sidebar, the other messages and the composer stay", async () => {
+  test("one that throws: its message is one quiet line, reported once a draw; the channel, the sidebar, the other messages and the composer stay; fixed live, it is back", async () => {
     const logged = spyOn(console, "error").mockImplementation(() => {});
     try {
       const broken = action({ params: null as never });
@@ -250,23 +250,29 @@ describe("receipts this build doesn't expect", () => {
       expect(within(nav).getAllByText("Atlas").length).toBeGreaterThan(0);
       expect(screen().getByRole("combobox", { name: "Mensagem para #eng" })).toBeTruthy();
       expect(reports()).toHaveLength(1);
-      // Its receipts change live: still one line, not reported again.
-      await act(async () =>
-        socket.push({
-          type: "event",
-          channelId: ENG_ID,
-          event: {
-            type: "message.actions",
+      const receiptsLive = async (actions: AgentAction[]) => {
+        await act(async () =>
+          socket.push({
+            type: "event",
             channelId: ENG_ID,
-            threadId: null,
-            messageId: "m-act",
-            actions: [broken, memory()],
-          },
-        }),
-      );
-      await settle(3);
+            event: { type: "message.actions", channelId: ENG_ID, threadId: null, messageId: "m-act", actions },
+          }),
+        );
+        await settle(3);
+      };
+      // Its receipts change live and still break: drawn again, still one line, reported again.
+      await receiptsLive([broken, memory()]);
       expect(screen().getAllByText("Esta mensagem não pôde ser exibida")).toHaveLength(1);
-      expect(reports()).toHaveLength(1);
+      expect(reports()).toHaveLength(2);
+      // Fixed live: the message is back, with its receipt.
+      await receiptsLive([memory()]);
+      expect(screen().queryByText("Esta mensagem não pôde ser exibida")).toBeNull();
+      expect(receipts().textContent).toContain("Guardei na memória: o prompt é por evento");
+      expect(reports()).toHaveLength(2);
+      // Broken again: one line, reported once (the change that broke it is not tried a second time at once).
+      await receiptsLive([broken]);
+      expect(screen().getAllByText("Esta mensagem não pôde ser exibida")).toHaveLength(1);
+      expect(reports()).toHaveLength(3);
     } finally {
       logged.mockRestore();
     }

@@ -1766,7 +1766,7 @@ function ChannelView({
                       adjust={adjust}
                       scroller={scroller}
                       renderMessage={(m) => (
-                        <ErrorBoundary fallback={unshownLine}>
+                        <ErrorBoundary resetKey={m} fallback={unshownLine}>
                           <TimelineMessage message={m} grouped={false} entering={false} modelLabels={NO_LABELS} />
                         </ErrorBoundary>
                       )}
@@ -2010,7 +2010,7 @@ function ChannelView({
                 actions.focusComposer();
               }}
               renderMessage={(m, grouped) => (
-                <ErrorBoundary fallback={unshownLine}>
+                <ErrorBoundary resetKey={m} fallback={unshownLine}>
                   <TimelineMessage message={m} grouped={grouped} entering={false} modelLabels={NO_LABELS} readOnly />
                 </ErrorBoundary>
               )}
@@ -2168,7 +2168,7 @@ const Timeline = memo(function Timeline({
       }),
     [heldPlaces, channelId, runVisible, slots, lastByRun],
   );
-  const rows: ReactElement[] = [];
+  const rows: ReactElement<{ message?: MessageType }>[] = [];
   for (const item of items) {
     if (divider?.key === item.key) {
       rows.push(
@@ -2240,11 +2240,12 @@ const Timeline = memo(function Timeline({
   });
   for (const place of held) rows.push(<HeldBrowserRow key={`held-${place.runId}`} place={place} />);
   // A row that fails to draw (data this build doesn't expect) is one quiet line: the rest of the conversation, the
-  // sidebar and the composer keep working.
+  // sidebar and the composer keep working. Its message changing draws it again: a live block that broke has none,
+  // so streaming never retries it, and its final message landing does.
   return (
     <ConsultGroupsProvider value={consultGroups}>
       {rows.map((row) => (
-        <ErrorBoundary key={row.key} fallback={unshownLine}>
+        <ErrorBoundary key={row.key} resetKey={row.props.message} fallback={unshownLine}>
           {row}
         </ErrorBoundary>
       ))}
