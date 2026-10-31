@@ -26,9 +26,10 @@ export function SessionProvider({ auth, children }: { auth: ReturnType<typeof au
   // `onRequest` sets `isPending: data === null`), and it refetches whenever the app comes back to the
   // foreground: the gate then read "still checking", opened `(app)` and remounted the sign-in screen, which lost
   // the e-mail, the step and what a password manager was about to fill in. Kept per client: another server's
-  // session is read from the start.
+  // session is read from the start. The client is a callable proxy: kept through an updater, or React would call
+  // it as one.
   const [answeredBy, setAnsweredBy] = useState<typeof auth | null>(null);
-  if (answeredBy !== auth && !session.isPending) setAnsweredBy(auth);
+  if (answeredBy !== auth && !session.isPending) setAnsweredBy(() => auth);
   const answered = answeredBy === auth;
 
   useEffect(() => {
