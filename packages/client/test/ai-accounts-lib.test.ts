@@ -3,9 +3,12 @@ import type { TFunction } from "i18next";
 import type { AiComputer, Credential, MachineAccount, PlanUsage } from "../src/api/types";
 import {
   accountChoices,
+  accountTitle,
   existingAi,
   groupPlans,
+  ownSignInListed,
   ownSignInName,
+  ownSignInReady,
   ownSignIns,
   planWordOf,
   signInPlan,
@@ -205,10 +208,41 @@ describe("the computers' own sign-ins", () => {
     expect(ownSignIns(undefined)).toEqual([]);
   });
 
+  test("an agent's account choice offers the computer's own sign-in only where it can think for the agent", () => {
+    type View = Parameters<typeof ownSignInListed>[0];
+    const theirs: View = { ownSignIn: true, brain: "model", account: null, canUsePlans: true };
+    const reported = computer({ own: { claude_code: { plan: "max" }, codex: { usage: usage("2026-10-30", 5) } } });
+    // On a computer the agent's owner connected, once that CLI's own sign-in is reported there.
+    expect(ownSignInReady(theirs, reported, "codex")).toBe(true);
+    expect(ownSignInReady(theirs, computer({ own: {} }), "codex")).toBe(false);
+    expect(ownSignInReady(theirs, undefined, "claude_code")).toBe(false);
+    expect(ownSignInListed(theirs, computer({ own: {} }), "codex")).toBe(false);
+    // On one nobody connected (the workspace's), never, whatever it reports.
+    const nobodys: View = { ...theirs, ownSignIn: false };
+    expect(ownSignInReady(nobodys, reported, "codex")).toBe(false);
+    expect(ownSignInListed({ ...nobodys, brain: "codex" }, reported, "codex")).toBe(false);
+    // While the agent thinks with it: on its owner's computer, before the computer says; to someone who can't change
+    // the account, wherever it is (what it thinks with).
+    expect(ownSignInListed({ ...theirs, brain: "codex" }, undefined, "codex")).toBe(true);
+    expect(ownSignInListed({ ...theirs, brain: "codex", account: "acct_1" }, undefined, "codex")).toBe(false);
+    expect(ownSignInListed({ ...nobodys, brain: "codex", canUsePlans: false }, undefined, "codex")).toBe(true);
+  });
+
   test("the plan's word", () => {
     expect(planWordOf("max")).toBe("Max");
     expect(planWordOf("PRO")).toBe("Pro");
     expect(planWordOf(null)).toBeNull();
+  });
+
+  test("an account's title says its plan once, after its name", () => {
+    expect(accountTitle({ label: "Claude", plan: "max" })).toBe("Claude · Max");
+    expect(accountTitle({ label: "Claude 2", plan: "ultra" })).toBe("Claude 2 · Ultra");
+    expect(accountTitle({ label: "GLM Coding", plan: null })).toBe("GLM Coding");
+    // A server that still names accounts after their plan ("Claude Max 2"): the plan isn't said twice.
+    expect(accountTitle({ label: "Claude Max 2", plan: "max" })).toBe("Claude Max 2");
+    expect(accountTitle({ label: "claude team", plan: "team" })).toBe("claude team");
+    expect(accountTitle({ label: "Claude Max", plan: "ultra" })).toBe("Claude Max · Ultra");
+    expect(accountTitle({ label: "Maxwell", plan: "max" })).toBe("Maxwell · Max");
   });
 
   test("the plan an agent's sign-in is on: its account's, or with none its computer's own sign-in's", () => {

@@ -57,7 +57,17 @@ const Issue = z
         runId: z.uuid().nullable(),
         state: z.enum(["running", "waiting_approval", "waiting_input", "stalled"]),
         since: z.string(),
-        steps: z.array(z.object({ tool: z.string(), detail: z.string().optional(), at: z.string() })),
+        steps: z.array(
+          z.object({
+            tool: z.string(),
+            detail: z.string().optional(),
+            at: z.string(),
+            outcome: z
+              .enum(["refused", "waiting"])
+              .optional()
+              .openapi({ description: "A computer command's check: refused, or still waiting on a person." }),
+          }),
+        ),
         reason: z.enum(["failed", "canceled", "budget"]).optional(),
       })
       .nullable()

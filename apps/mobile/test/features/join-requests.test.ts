@@ -3,7 +3,7 @@ import { ApiError } from "@agenteschat/client";
 import { invitedErrorText } from "@agenteschat/client/lib/errors";
 import { joinRequestLine } from "../../src/features/activity/logic";
 import { afterSignIn, boldParts, signInPurpose, storedInvite, storedInviteOf } from "../../src/features/auth/links";
-import { membersByName, requestChips } from "../../src/features/members/logic";
+import { membersByName, requestChips, roleLine } from "../../src/features/members/logic";
 import { notification, translator } from "./fixtures";
 
 const TOKEN = "k3J8sQ2xY7pL0vB4nM6cD1eF9gH5jK2a";
@@ -87,6 +87,28 @@ describe("Membros", () => {
   test("people by name, whatever the case or accents", () => {
     const people = [{ name: "bruno" }, { name: "Álvaro" }, { name: "Ana" }];
     expect(membersByName(people, "pt-BR").map((p) => p.name)).toEqual(["Álvaro", "Ana", "bruno"]);
+  });
+
+  test("each person's roles: Dono first for an owner, then theirs top first; nothing for no role", async () => {
+    const pt = await translator("pt-BR");
+    const role = (id: string, name: string, position: number, kind: "custom" | "everyone" = "custom") => ({
+      id,
+      kind,
+      name,
+      icon: "shield",
+      color: "indigo",
+      position,
+      permissions: [],
+      mentionable: false,
+      hoist: false,
+      people: 1,
+      editable: true,
+    });
+    const roles = [role("r2", "Financeiro", 1), role("r1", "Dev", 0), role("all", "Todos", 2, "everyone")];
+    expect(roleLine(pt, { role: "owner", roleIds: ["r2", "r1"] }, roles)).toBe("Dono · Dev · Financeiro");
+    expect(roleLine(pt, { role: "owner" }, roles)).toBe("Dono");
+    expect(roleLine(pt, { role: "member", roleIds: ["r2", "all", "gone"] }, roles)).toBe("Financeiro");
+    expect(roleLine(pt, { role: "member", roleIds: [] }, roles)).toBeUndefined();
   });
 });
 

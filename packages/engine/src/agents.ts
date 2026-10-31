@@ -72,7 +72,7 @@ export async function createAgent(
   input: AgentInput,
   defaults: { model: string },
 ): Promise<Agent> {
-  await requirePermission(db, actorId, orgId, "manage_agents");
+  await requirePermission(db, actorId, orgId, "create_agents");
   const values = { ...input, handle: input.handle.toLowerCase(), model: input.model ?? defaults.model };
   await validate(db, orgId, values);
   // An agent born on "Automático" is automatic on every brain: switched to Claude Code or Codex later, it
@@ -238,6 +238,9 @@ export async function archiveAgent(db: Database, actorId: string, orgId: string,
   }
   caches.agents.delete(`${orgId}:${agentId}`);
   caches.agents.delete(`${orgId}:team`);
+  caches.agents.delete(`${orgId}:archived`);
+  // Its channel memberships stay: what runs read of a channel's members leaves it out from now on.
+  caches.channelMembers.deletePrefix(`${orgId}:`);
 }
 
 export async function listAgents(db: Database, actorId: string, orgId: string): Promise<Agent[]> {

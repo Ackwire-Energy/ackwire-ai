@@ -11,6 +11,8 @@ export interface BrainAccount {
   /** What people call it, for messages. */
   label: string;
   status: "active" | "signed_out";
+  /** A key account's coding plan (`zai`…), which names the models it runs. */
+  provider?: string;
 }
 
 /** A tool as the engine offers it to a brain (same data the Tool Gateway lists for the run). */
@@ -50,6 +52,8 @@ export interface BrainTurn {
   account?: BrainAccount;
   /** How hard it thinks (absent: the CLI's or the API's default); the model brain only gets one from "Automático". */
   effort?: BrainEffort;
+  /** Computer brains: the agent's context limit in tokens (`agents.context_tokens`); absent: the model's window. */
+  contextTokens?: number;
   /** The text the person/system sent that starts this turn (also the last user message). */
   trigger: string;
 }

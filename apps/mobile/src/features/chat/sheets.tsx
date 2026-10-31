@@ -497,6 +497,7 @@ export function ChannelOptions({
   subtitle,
   leading,
   agentId,
+  about,
   onPins,
   onMembers,
 }: {
@@ -506,6 +507,8 @@ export function ChannelOptions({
   leading: ReactNode;
   /** An agent's DM: "Perfil". */
   agentId?: string | null;
+  /** Under the title: a person's status in a DM with them (ADR 0084). */
+  about?: ReactNode;
   onPins: () => void;
   /** A channel: who is in it (and, for admins, adding and removing). */
   onMembers?: (() => void) | undefined;
@@ -525,6 +528,7 @@ export function ChannelOptions({
   return (
     <>
       <SheetTitle leading={leading} title={title} {...(subtitle ? { subtitle } : {})} />
+      {about}
       <ActionList
         items={[
           ...(onMembers

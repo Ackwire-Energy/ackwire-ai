@@ -84,8 +84,15 @@ import { AiRow, Note, OpenPage, PasteField, PlanReplies, Step, StepsCard } from 
  * current there).
  */
 export function usePlanGates(orgId: string, agentId: string | undefined, poll: number | false = false) {
-  const brain = useAgentBrain(orgId, agentId ?? "", agentId !== undefined, poll);
-  const ai = useAiAccounts(orgId, agentId !== undefined, poll);
+  const api = useApi();
+  const asks = agentId !== undefined;
+  const brain = useAgentBrain(orgId, agentId ?? "", asks, poll);
+  const ai = useAiAccounts(orgId, asks, poll);
+  // Codex's own sign-in is known only by a usage read with it: looked up again here (it comes back as
+  // `machine.updated`, or with the next poll), so a computer's own ChatGPT sign-in shows before any turn ran.
+  useEffect(() => {
+    if (asks) void api.machines.refreshAccountUsage(orgId).catch(() => undefined);
+  }, [api, orgId, asks]);
   const setupQ = useComputerSetup(orgId, true, poll);
   const edition = computerEdition(setupQ.data);
   const setup = setupView(setupQ.data, setupQ.dataUpdatedAt);
@@ -115,9 +122,9 @@ export function usePlanGates(orgId: string, agentId: string | undefined, poll: n
           choice,
           edition,
           setup,
-          // A coding plan also needs to know whether that computer takes a plan's key, and Claude on a computer the
-          // person connected whether its own sign-in is there (`ownSignInFor`).
-          brain: view && (ai.data || !(isPlanId(choice) || (choice === "claude" && view.ownSignIn))) ? view : undefined,
+          // A coding plan also needs to know whether that computer takes a plan's key, and Claude or ChatGPT on a
+          // computer the person connected whether its own sign-in is there (`ownSignInFor`).
+          brain: view && (ai.data || !(isPlanId(choice) || view.ownSignIn)) ? view : undefined,
           computer: row,
         });
   // A poll that fails once keeps the last view: a sign-in in progress goes on.
@@ -658,6 +665,8 @@ function PlanSteps({
   const [failedAccount, setFailedAccount] = useState<MachineAccount | null>(null);
   const [saving, setSaving] = useState(false);
   const [other, setOther] = useState(false);
+  // A sign-in begun here keeps its steps while its computer is offline: they say Reconectando, and it goes on.
+  const [signingIn, setSigningIn] = useState(false);
   // It turned ready while the person watched (here or on another plan's page), or they came because it did.
   const waited = gates.waited || justReady === true;
 
@@ -735,7 +744,7 @@ function PlanSteps({
         <InfoCard icon="clock">{t(coding ? "connectAi.wait.key" : "connectAi.wait.signIn")}</InfoCard>
       </View>
     );
-  } else if (gate.state === "offline") {
+  } else if (gate.state === "offline" && !signingIn) {
     wait = (
       <InfoCard icon="laptop">
         {edition === "cloud"
@@ -785,7 +794,7 @@ function PlanSteps({
   }
 
   // The steps stay in view while they wait (their computer actions off); a reason alone otherwise.
-  const steps = ready || gate.state === "preparing";
+  const steps = ready || gate.state === "preparing" || (gate.state === "offline" && signingIn);
   // The sign-in asked for: a row's, or one more login of the account with `email`; never the agent's own then.
   const hint: Pick<ExistingSignIn, "again" | "email"> | undefined = login ?? (email ? { email } : undefined);
   const ownable = ready && !hint && ownSignInFor(choice, view, gates.row);
@@ -799,7 +808,7 @@ function PlanSteps({
   return (
     <View style={styles.gap}>
       {wait}
-      {offersKeyNow(gate, hold !== null) ? useKey : null}
+      {offersKeyNow(gate, hold !== null) && !signingIn ? useKey : null}
       {ready && waited ? (
         // A card of its own, where the wait's was: never read as the head of the account choice under it.
         <InfoCard icon="check" live>
@@ -834,6 +843,7 @@ function PlanSteps({
           loading={gates.catching}
           onAdded={(a) => void assign(a)}
           onUse={(a) => void assign(a)}
+          onSigningIn={setSigningIn}
         />
       ) : null}
       {steps || ownable ? repliesRow : null}

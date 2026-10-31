@@ -23,7 +23,7 @@ export function useCategoryMenus() {
   const meId = useMeId();
   const sheet = useSheet();
   const channels = useChannels(orgId).data ?? NO_CHANNELS;
-  const admin = arrangesCategories(org?.role);
+  const admin = arrangesCategories(org);
   const go = useCallback(
     (href: Parameters<typeof router.push>[0]) => {
       sheet.close();
@@ -34,7 +34,7 @@ export function useCategoryMenus() {
   /** Whether the long press on this channel's row has anything to offer. */
   const movable = (channelId: string) => {
     const channel = channels.find((c) => c.id === channelId);
-    return channel ? movesChannel(channel, meId, org?.role) : false;
+    return channel ? movesChannel(channel, meId, org) : false;
   };
   // Stable across renders (rows are memoized): it changes only when the channels or who you are change.
   const openChannelMenu = useCallback(

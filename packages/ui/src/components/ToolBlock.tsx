@@ -26,6 +26,10 @@ export interface ToolBlockLine {
   detail?: ReactNode;
   /** Opens by itself (a call running code shows it as it runs). */
   defaultOpen?: boolean;
+  /** Opens somewhere else instead of in place (another agent's conversation, in the panel beside the chat). */
+  onOpen?: () => void;
+  /** With `onOpen`: what it opens is showing now. */
+  pressed?: boolean;
 }
 
 export type ToolBlockItem = { kind: "line"; line: ToolBlockLine } | { kind: "note"; key: string; node: ReactNode };
@@ -132,7 +136,7 @@ function Line({ line, color }: { line: ToolBlockLine; color?: AgentColor }) {
     running.current = line.state === "run";
   }, [line.state]);
   const id = useId();
-  const opens = Boolean(line.detail);
+  const opens = Boolean(line.detail) || Boolean(line.onOpen);
   const body = (
     <>
       <span className="ac-tools__logo">{line.logo}</span>
@@ -148,7 +152,11 @@ function Line({ line, color }: { line: ToolBlockLine; color?: AgentColor }) {
   );
   return (
     <li className="ac-tools__line" data-s={line.state}>
-      {opens ? (
+      {line.onOpen ? (
+        <button type="button" className="ac-tools__row" aria-pressed={line.pressed ?? false} onClick={line.onOpen}>
+          {body}
+        </button>
+      ) : opens ? (
         <button
           type="button"
           className="ac-tools__row"
@@ -162,7 +170,7 @@ function Line({ line, color }: { line: ToolBlockLine; color?: AgentColor }) {
         <p className="ac-tools__row">{body}</p>
       )}
       {line.why && <p className="ac-tools__why">{line.why}</p>}
-      {open && opens && (
+      {open && opens && !line.onOpen && (
         <div className="ac-tools__detail" id={id}>
           {line.detail}
         </div>

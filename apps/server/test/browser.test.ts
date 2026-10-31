@@ -190,6 +190,36 @@ describe("handoff routes", () => {
     const stop = await api(`/agents/${org.agentId}/browser/stop`, { json: {} });
     expect([204, 409, 503]).toContain(stop.status);
   });
+
+  test("restart: only who may drive it; the browser closes, answers, and opens again on the page it showed", async () => {
+    const { org, api } = await seeded();
+    const path = `/api/app/organizations/${org.orgId}/agents/${org.agentId}/browser/restart`;
+    expect((await browser(t)(path, { json: {} })).status).toBe(401);
+    const other = browser(t);
+    await signUp(other, "zed@example.com");
+    expect((await other(path, { json: {} })).status).toBe(403);
+    const hub = t.engine.machineHub;
+    const { call } = hub;
+    const asked: MachineRequest[] = [];
+    hub.call = (async (_machineId: string, request: MachineRequest) => {
+      asked.push(request);
+      if (request.op !== "browser.act") return { stopped: true };
+      return { success: true, data: request.command === "get" ? { url: "https://shop.example.com/cart" } : {} };
+    }) as typeof hub.call;
+    try {
+      expect((await api(`/agents/${org.agentId}/browser/restart`, { json: {} })).status).toBe(204);
+      // Opening again goes on after the answer.
+      for (let i = 0; i < 50 && asked.length < 3; i++) await Bun.sleep(2);
+      expect(asked.map((r) => (r.op === "browser.act" ? `act:${r.command}` : r.op))).toEqual([
+        "act:get",
+        "browser.stop",
+        "act:open",
+      ]);
+      expect(asked.at(-1)).toMatchObject({ args: ["https://shop.example.com/cart"] });
+    } finally {
+      hub.call = call;
+    }
+  });
 });
 
 describe("live view socket", () => {
