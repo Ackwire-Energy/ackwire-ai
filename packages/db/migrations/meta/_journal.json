@@ -974,6 +974,13 @@
       "when": 1793451263712,
       "tag": "0138_workspace_deletion",
       "breakpoints": true
+    },
+    {
+      "idx": 139,
+      "version": "7",
+      "when": 1793470632149,
+      "tag": "0139_proposal_proposer",
+      "breakpoints": true
     }
   ]
 }

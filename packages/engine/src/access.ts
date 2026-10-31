@@ -1,4 +1,4 @@
-import { and, asc, type Database, eq, inArray, isNull, schema } from "@agenteschat/db";
+import { and, asc, type Database, type Executor, eq, inArray, isNull, schema } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
 import { BROWSER_SCOPE, BROWSER_TOOL_INFO, BROWSER_TOOLS, DESKTOP_SCOPE, DESKTOP_TOOL_INFO } from "./browser/types";
@@ -7,6 +7,7 @@ import { CONNECTOR_CATALOG } from "./connectors/catalog";
 import { connectorGrantValidator } from "./connectors/connections";
 import { classifiedTools, customScope, isCustom, type ToolAccess } from "./connectors/custom";
 import { exposedToolName } from "./connectors/mcp";
+import { sha256 } from "./crypto";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { can, requirePermission } from "./organizations";
 import { ALWAYS_SENSITIVE } from "./tools/gateway";
@@ -17,6 +18,8 @@ import {
   CONNECTOR_ALL,
   grantKey,
   impliedByWrite,
+  mailConnectionIds,
+  NOT_IN_ALL,
   notMailGrant,
   type ScopeGrant,
   toolAccess,
@@ -110,7 +113,8 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
   forget: { label: "Forget", description: "Archives a note when someone asks." },
   propose_instruction_change: {
     label: "Propose an instruction change",
-    description: "Suggests changing its own instructions or the org context. A person decides.",
+    description:
+      "Suggests changing its own instructions, other agents' instructions, roles and apps, or the org context. A person decides.",
   },
   read_artifact: { label: "Read file", description: "Reads a Drive file." },
   list_artifacts: { label: "List files", description: "Lists the Drive files it can see." },
@@ -477,6 +481,142 @@ export async function setAgentAccess(
   });
   caches.scopes.deletePrefix(`${orgId}:${agentId}`);
   return treeFor(await grantsOf(db, orgId, agentId), await orgToolCatalog(db, orgId));
+}
+
+/** The grant rows `setAgentAccess` replaces (mailboxes and databases keep their own), oldest first. */
+export async function replaceableGrants(db: Executor, orgId: string, agentId: string): Promise<ScopeGrant[]> {
+  return db
+    .select({ connectionId: agentScopes.connectionId, scope: agentScopes.scope })
+    .from(agentScopes)
+    .where(and(eq(agentScopes.orgId, orgId), eq(agentScopes.agentId, agentId), notMailGrant(orgId)))
+    .orderBy(asc(agentScopes.createdAt), asc(agentScopes.scope));
+}
+
+/** What a proposal of access was made against: changes to the same grants, in any order, hash alike. */
+export const grantsHash = (grants: ScopeGrant[]) =>
+  sha256(
+    grants
+      .map((g) => grantKey(g.connectionId, g.scope))
+      .sort()
+      .join("\n"),
+  );
+
+/** `setAgentAccess`'s body that writes exactly these grants. */
+export function accessInputOf(grants: ScopeGrant[]): AccessInput {
+  const input: AccessInput = { all: false, connectors: {}, scopes: [], tools: { allow: [], deny: [] } };
+  const allow = toolAllowScope("");
+  const deny = toolDenyScope("");
+  for (const g of grants) {
+    if (g.scope === ALL_TOOLS && !g.connectionId) input.all = true;
+    else if (g.scope === CONNECTOR_ALL && g.connectionId) input.connectors[g.connectionId] = true;
+    else if (g.scope.startsWith(allow))
+      input.tools.allow.push({ connectionId: g.connectionId, name: g.scope.slice(allow.length) });
+    else if (g.scope.startsWith(deny))
+      input.tools.deny.push({ connectionId: g.connectionId, name: g.scope.slice(deny.length) });
+    else input.scopes.push({ connectionId: g.connectionId, scope: g.scope });
+  }
+  return input;
+}
+
+/** An app turned on or off: `request_permission`'s unit, a built-in scope or a whole connection. */
+export type AccessLine = schema.ProposedAccessLine;
+
+const CONNECTOR_LINE = "connector:";
+const lineConnection = (id: string) => (id.startsWith(CONNECTOR_LINE) ? id.slice(CONNECTOR_LINE.length) : null);
+
+/**
+ * Whether the agent has an app: a whole connection (`any`: any of its tools), or a built-in scope, also through
+ * its write scope. "Every tool" covers both, but never code, the browser or the desktop.
+ */
+export function hasApp(grants: ScopeGrant[], id: string, any = false): boolean {
+  const keys = new Set(grants.map((g) => grantKey(g.connectionId, g.scope)));
+  const all = keys.has(grantKey(null, ALL_TOOLS));
+  const connectionId = lineConnection(id);
+  if (connectionId) {
+    if (all) return true;
+    return any
+      ? grants.some((g) => g.connectionId === connectionId && !g.scope.startsWith(toolDenyScope("")))
+      : keys.has(grantKey(connectionId, CONNECTOR_ALL));
+  }
+  const write = impliedByWrite(id);
+  return (
+    keys.has(grantKey(null, id)) || (write !== null && keys.has(grantKey(null, write))) || (all && !NOT_IN_ALL.has(id))
+  );
+}
+
+/**
+ * The grants with each line applied: on is `request_permission`'s grant (the scope, or the whole connection,
+ * whose denials stay), off drops the scope, or every grant on the connection.
+ */
+export function withAccessLines(grants: ScopeGrant[], lines: AccessLine[]): ScopeGrant[] {
+  let out = grants;
+  for (const line of lines) {
+    const connectionId = lineConnection(line.id);
+    out = out.filter((g) =>
+      connectionId
+        ? g.connectionId !== connectionId || (line.on && g.scope.startsWith(toolDenyScope("")))
+        : g.connectionId !== null || g.scope !== line.id,
+    );
+    if (line.on) out = [...out, { connectionId, scope: connectionId ? CONNECTOR_ALL : line.id }];
+  }
+  return out;
+}
+
+/** What keeps an app on once its own grants are gone: every tool, or a read scope's write scope. */
+export function appHeldBy(grants: ScopeGrant[], id: string): string | null {
+  const keys = new Set(grants.map((g) => grantKey(g.connectionId, g.scope)));
+  if (!lineConnection(id)) {
+    const write = impliedByWrite(id);
+    if (write && keys.has(grantKey(null, write))) return write;
+    if (NOT_IN_ALL.has(id)) return null;
+  }
+  return keys.has(grantKey(null, ALL_TOOLS)) ? ALL_TOOLS : null;
+}
+
+/**
+ * Apps a person names for an agent, as `request_permission` names them: a built-in scope (`browser:use`), or one
+ * of the organization's connections by `connector:<id>`, its name or its catalog id (mailboxes and databases have
+ * their own screens). `choices` lists them all.
+ */
+export async function resolveApps(db: Executor, orgId: string, names: string[]) {
+  const active = await db
+    .select({
+      id: connectorConnections.id,
+      label: connectorConnections.label,
+      connector: connectorConnections.connector,
+    })
+    .from(connectorConnections)
+    .where(and(eq(connectorConnections.orgId, orgId), isNull(connectorConnections.revokedAt)))
+    .orderBy(asc(connectorConnections.createdAt));
+  const own = await mailConnectionIds(
+    db,
+    orgId,
+    active.map((c) => c.id),
+  );
+  const connections = active.filter((c) => !own.has(c.id));
+  const found = new Map<string, { id: string; label: string }>();
+  const unknown: string[] = [];
+  for (const name of new Set(names)) {
+    const key = name.trim();
+    const builtin = BUILTIN_SCOPES[key];
+    if (builtin) {
+      found.set(name, { id: key, label: builtin.label });
+      continue;
+    }
+    const lower = key.toLowerCase();
+    const byId = lineConnection(lower);
+    const matches = connections.filter((c) =>
+      byId ? c.id === byId : c.label.toLowerCase() === lower || c.connector === lower,
+    );
+    const [only] = matches;
+    if (only && matches.length === 1) found.set(name, { id: `${CONNECTOR_LINE}${only.id}`, label: only.label });
+    else unknown.push(name);
+  }
+  const choices = [
+    ...connections.map((c) => `${CONNECTOR_LINE}${c.id} (${c.label})`),
+    ...Object.entries(BUILTIN_SCOPES).map(([scope, info]) => `${scope} (${info.label})`),
+  ];
+  return { found, unknown, choices };
 }
 
 /** `GET …/access-matrix` (admins): agents × tools with the effective state. */

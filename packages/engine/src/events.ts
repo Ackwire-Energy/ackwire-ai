@@ -20,8 +20,10 @@ export interface MemoryUpdate {
   requestedByUserId: string;
   /** Undo: `POST /api/app/organizations/{orgId}/memories/{itemId}/revert`. Absent for proposals. */
   undo?: { method: "POST"; path: string };
-  /** For `proposed`: the proposal to accept inline, and whether the requester can decide it. */
+  /** For `proposed`: the proposal to accept inline (the card's first), and whether the requester can decide one. */
   proposalId?: string;
+  /** For `proposed`: every proposal on the card, one per agent and kind of change (older apps read `proposalId`). */
+  proposalIds?: string[];
   canDecide?: boolean;
   /** `memory.remembered` | `memory.updated` | `memory.forgot` | `memory.proposed`: the app's own words, with `params`. */
   code?: string;

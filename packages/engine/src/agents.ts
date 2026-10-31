@@ -307,11 +307,12 @@ export const agentView = (a: Agent) => ({
   createdAt: a.createdAt,
 });
 
+/** A handle as a tool's input names it ("@Ada ") → as stored ("ada"). */
+export const handleOf = (raw: unknown) => String(raw).replace(/^@/, "").trim().toLowerCase();
+
 /** `@handles` (a tool's input) → the organization's agents that aren't archived; the missing ones by handle. */
 export async function agentsByHandle(db: Executor, orgId: string, raw: unknown) {
-  const handles = [
-    ...new Set((Array.isArray(raw) ? raw : []).map((h) => String(h).replace(/^@/, "").trim().toLowerCase())),
-  ];
+  const handles = [...new Set((Array.isArray(raw) ? raw : []).map(handleOf))];
   const rows =
     handles.length === 0
       ? []
