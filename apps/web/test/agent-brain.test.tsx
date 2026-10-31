@@ -856,6 +856,58 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     return { state, api, block, paste, sealed: () => fakeMachinesOf.get(api)?.lastLogin()?.box ?? null };
   }
 
+  test("while the code goes and the computer signs in, a line stands in for the field and its buttons; a failed send brings them back", async () => {
+    const { api, block, paste } = await codeField();
+    const real = api.machines.sendAccountCode;
+    let answer = (_ok: boolean) => {};
+    api.machines.sendAccountCode = (...args) =>
+      new Promise<void>((resolve, reject) => {
+        answer = (ok) => (ok ? resolve(real(...args)) : reject(new Error("offline")));
+      });
+    const code = () => within(block).getByRole("textbox", { name: "Código do Claude" }) as HTMLInputElement;
+    /** The line, alone in the step with the product's spinner: no field, Colar, Enviar or Esperando beside it. */
+    const busy = () => {
+      const line = within(block).getByRole("status");
+      expect(line.querySelector("canvas.ac-pixspin")).not.toBeNull();
+      expect(block.querySelector("input")).toBeNull();
+      expect(within(block).queryByRole("button", { name: /^(Colar|Enviar ao MacBook)$/ })).toBeNull();
+      expect(shownText(block)).not.toContain("Esperando");
+      return line;
+    };
+    code().focus();
+    await paste("c0de-from-claude#st4te");
+    const going = busy();
+    expect(going.textContent).toBe("Enviando o código ao MacBook…");
+    // The focus the field had goes to the line, not to the page.
+    expect(document.activeElement).toBe(going);
+    // The send fails: the field is back with the code in it, the error under it, and the focus.
+    await act(async () => answer(false));
+    await settle(4);
+    expect(code().value).toBe("c0de-from-claude#st4te");
+    expect(document.activeElement).toBe(code());
+    expect(shownText(block)).toContain("Não deu para enviar o código. Confira e tente de novo.");
+    expect(shownText(block)).not.toContain("Enviando o código");
+    // Sent again: the line says the computer is signing in, until the sign-in ends.
+    await click(within(block).getByRole("button", { name: "Enviar ao MacBook" }));
+    expect(busy().textContent).toBe("Enviando o código ao MacBook…");
+    await act(async () => answer(true));
+    await settle(6);
+    expect(busy().textContent).toBe("Código enviado. O MacBook está terminando de entrar.");
+    expect(shownText(block)).not.toContain("Não deu para enviar o código.");
+  });
+
+  test("the computer giving up on the code ends the sign-in with its reason, the focus still in the block", async () => {
+    const { api, block, paste } = await codeField();
+    const machines = fakeMachinesOf.get(api);
+    machines?.endLogin(machines.lastLogin()?.loginId ?? "", { state: "failed" });
+    (within(block).getByRole("textbox", { name: "Código do Claude" }) as HTMLInputElement).focus();
+    await paste("c0de-from-claude#st4te");
+    expect(shownText(block)).toContain("Não deu para entrar nessa conta. Tente de novo.");
+    expect(within(block).getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
+    expect(within(block).queryByRole("status")).toBeNull();
+    expect(document.activeElement).toBe(block);
+  });
+
   test("Claude's code pasted into its field with ⌘V goes to the computer by itself, no click", async () => {
     const { state, block, paste, sealed } = await codeField();
     await paste("c0de-from-claude#st4te");
@@ -912,13 +964,14 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     api.machines.sendAccountCode = async () => {
       throw new ApiError(400, "account.invalid_code", "The sealed code is malformed");
     };
-    const send = within(block).getByRole("button", { name: "Enviar ao MacBook" });
-    await click(send);
+    // A line stands in for the field and its buttons while the code goes: Enviar is a new button after each send.
+    const send = () => within(block).getByRole("button", { name: "Enviar ao MacBook" });
+    await click(send());
     await settle(6);
     expect(shownText(block)).toContain("Não deu para enviar o código. Confira e tente de novo.");
     expect(shownText(block)).not.toContain("não respondeu");
     api.machines.sendAccountCode = sendCode;
-    await click(send);
+    await click(send());
     await settle(6);
     expect(sealed()).not.toBeNull();
     expect(shownText(block)).toContain("Código enviado. O MacBook está terminando de entrar.");

@@ -307,10 +307,12 @@ const PENDING_TTL_MS = 24 * 3600_000;
 /**
  * Worker tick (every 15 min): each Composio account's state from Composio.
  * Expired ones ask a person to reconnect; pending ones that finished become
- * active; pending ones abandoned for a day go away.
+ * active; pending ones abandoned for a day go away. `failed`: the accounts
+ * whose check threw (the worker logs them).
  */
 export async function reconcileComposioAccounts(deps: MailDeps) {
-  if (!deps.mail?.composio) return { checked: 0 };
+  const failed: { orgId: string; accountId: string; error: string }[] = [];
+  if (!deps.mail?.composio) return { checked: 0, failed };
   const now = deps.now?.() ?? new Date();
   const rows = await deps.db
     .select()
@@ -328,7 +330,9 @@ export async function reconcileComposioAccounts(deps: MailDeps) {
     }
     if (!row.externalAccountId) continue;
     checked++;
-    await applyComposioStateFor(deps, row).catch(() => {});
+    await applyComposioStateFor(deps, row).catch((error: unknown) => {
+      failed.push({ orgId: row.orgId, accountId: row.id, error: String(error) });
+    });
   }
-  return { checked };
+  return { checked, failed };
 }

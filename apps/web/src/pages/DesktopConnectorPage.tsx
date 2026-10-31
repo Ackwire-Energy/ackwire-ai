@@ -5,12 +5,14 @@ import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { AuthShell } from "@/components/AuthLayout";
+import { DESKTOP_MAIL_STATE } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
 
 /**
  * In the app's window: a connector's sign-in that the browser handed back, finished with the window's session
  * (`POST …/connectors/oauth/complete`), then on to where it started with `?connected=…` (Conectores says it).
- * Refused at the provider or not finished: Conectores, with why.
+ * Refused at the provider or not finished: Conectores, with why. A mailbox's return (Composio) comes already
+ * read by the server: Conectores with `?mail=connected|failed`, which opens "O que faz" for it.
  */
 export function DesktopConnectorPage({
   org,
@@ -38,6 +40,15 @@ export function DesktopConnectorPage({
       toast.show(t("connectors.errorToast", { reason }), "error");
       go(org ? `/org/${encodeURIComponent(org)}/settings/connectors` : "/");
     };
+    if (state === DESKTOP_MAIL_STATE) {
+      if (org) {
+        return go(
+          `/org/${encodeURIComponent(org)}/settings/connectors?mail=${code === "connected" ? "connected" : "failed"}`,
+        );
+      }
+      toast.show(t("mail.failed"), "error");
+      return go("/");
+    }
     if (!org || error || !state || !code) return fail(error ?? "missing_code");
     complete.mutate(
       { state, code },

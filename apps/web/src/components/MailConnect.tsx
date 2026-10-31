@@ -51,6 +51,7 @@ import { LoadingList, useStepText } from "@/components/Loading";
 import { MailRulesPanel } from "@/components/MailRules";
 import { useOrg } from "@/components/org-context";
 import { reviewNote, ToolReview, type ToolReviewState } from "@/components/ToolReview";
+import { takesConnectorReturn } from "@/lib/desktop";
 import { navigateAway } from "@/lib/navigate";
 import { useToast } from "@/lib/toast";
 
@@ -210,7 +211,10 @@ function OAuthStep({ provider, onClose }: { provider: "gmail" | "outlook"; onClo
           disabled={connectComposio.isPending}
           loading={connectComposio.isPending}
           onClick={() =>
-            connectComposio.mutate({ provider }, { onSuccess: (started) => navigateAway(started.redirectUrl) })
+            connectComposio.mutate(
+              { provider, desktop: takesConnectorReturn() },
+              { onSuccess: (started) => navigateAway(started.redirectUrl) },
+            )
           }
         >
           {t("mail.continueWith", { company })}

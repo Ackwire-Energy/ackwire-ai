@@ -38,7 +38,7 @@ import { chatHref } from "../links/logic";
 import { openSwitchComputer } from "../outages/OutageNotice";
 import { useMachineOutages } from "../outages/queries";
 import { AgentFace } from "../shared/Face";
-import { useColors, useDirectory, useNow, useOrgId, usePullRefresh } from "../shared/hooks";
+import { useColors, useDirectory, useEdition, useNow, useOrgId, usePullRefresh } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { FocusLive, goBack, PushedHeader } from "../shared/parts";
 import { SheetHostProvider } from "../shared/SheetHost";
@@ -63,10 +63,10 @@ const RUNS_SHOWN = 30;
 /**
  * One routine (`/routines/<id>`), the web's details on a screen of its own: the agent, the title and its state;
  * Editar, Rodar agora or Parar, Pausar or Retomar (and the one-tap fix, "Trocar computador" while its run waits
- * for an offline computer) for whoever may change it; then the week, what it does, when, where it delivers, where
- * it runs, what it may do on its own, when it speaks, and its runs, each opening the agent's message (or the
- * approval it waits for). "…" in the bar: Editar, Duplicar, Copiar URL do webhook, Apagar. The routine comes from
- * the list (there is no single-routine endpoint).
+ * for an offline computer on a self-host) for whoever may change it; then the week, what it does, when, where it
+ * delivers, where it runs, what it may do on its own, when it speaks, and its runs, each opening the agent's message
+ * (or the approval it waits for). "…" in the bar: Editar, Duplicar, Copiar URL do webhook, Apagar. The routine comes
+ * from the list (there is no single-routine endpoint).
  */
 export function RoutineScreen({ id }: { id: string }) {
   return (
@@ -146,9 +146,11 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
   );
   const nexts = described.data?.ok ? described.data.nextRuns.slice(0, 4) : r.nextRunAt ? [r.nextRunAt] : [];
   const fix = r.canManage ? pausedFix(r) : null;
-  // "Trocar computador": the outage its run waits on, for whoever can move agents.
+  // "Trocar computador": the outage its run waits on, for whoever can move agents, where people connect their own
+  // computers (a Cloud workspace has one).
+  const selfHost = useEdition() === "selfhost";
   const outage =
-    r.state === "waiting_computer" && r.waitingFor && can(org, "manage_agents")
+    selfHost && r.state === "waiting_computer" && r.waitingFor && can(org, "manage_agents")
       ? outages.outages.find((o) => o.machineId === r.waitingFor?.machineId)
       : undefined;
   const health = healthWords(r.health);

@@ -24,6 +24,9 @@ const row = (over: Partial<AuditRow> = {}): AuditRow => ({
   ...over,
 });
 
+const standing = (details: Record<string, unknown>) =>
+  row({ actor: { type: "system", id: null, name: null }, action: "organization.standing_changed", details });
+
 describe("Auditoria in words (web and phone)", () => {
   test("the shortcuts and the agent ask the server for the same thing on both", () => {
     expect(auditQueryOf("all", null)).toEqual({});
@@ -38,14 +41,20 @@ describe("Auditoria in words (web and phone)", () => {
   });
 
   test("a billing hold's reason is said in words, never as its code; any other reason as written", () => {
-    const standing = (details: Record<string, unknown>) =>
-      row({ actor: { type: "system", id: null, name: null }, action: "organization.standing_changed", details });
     expect(auditReason(t, standing({ from: "active", to: "hold", reason: "unpaid" }))).toBe(
       "standing.notification.billing.unpaid",
     );
     expect(auditReason(t, standing({ from: "hold", to: "active", reason: null }))).toBeNull();
     expect(auditReason(t, standing({ from: "active", to: "hold", reason: "Spam reports" }))).toBe("Spam reports");
     expect(auditReason(t, row({ details: { reason: "unpaid" } }))).toBe("unpaid");
+  });
+
+  test("the category an automatic review hold names is said in words; plain review and an unknown one as written", () => {
+    const hold = (reason: string) => auditReason(t, standing({ from: "active", to: "hold", reason }));
+    expect(hold("review.phishing_impersonation")).toBe("standing.cloud.reviewWhat.phishing_impersonation");
+    expect(hold("review.fraud")).toBe("standing.cloud.reviewWhat.fraud");
+    expect(hold("review")).toBe("review");
+    expect(hold("review.spam")).toBe("review.spam");
   });
 
   test("who did what, then about what, who asked and where", () => {
