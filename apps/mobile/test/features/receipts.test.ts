@@ -60,15 +60,14 @@ describe("receipts under an agent's reply", () => {
     expect(anyLive([action({ undoableUntil: "2026-10-18T11:00:00Z" })], now)).toBe(false);
   });
 
-  test("who sees the buttons: the person it worked for, admins, the agent's owner", () => {
+  test("who sees the buttons: the person it worked for, who manages agents, the agent's owner", () => {
     const a = action();
-    expect(viewerCanUndo(a, { userId: "u1", role: "member", ownsAgent: false })).toBe(true);
-    expect(viewerCanUndo(a, { userId: "u2", role: "member", ownsAgent: false })).toBe(false);
-    expect(viewerCanUndo(a, { userId: "u2", role: "admin", ownsAgent: false })).toBe(true);
-    expect(viewerCanUndo(a, { userId: "u2", role: "member", ownsAgent: true })).toBe(true);
+    expect(viewerCanUndo(a, { userId: "u1", managesAgents: false, ownsAgent: false })).toBe(true);
+    expect(viewerCanUndo(a, { userId: "u2", managesAgents: false, ownsAgent: false })).toBe(false);
+    expect(viewerCanUndo(a, { userId: "u2", managesAgents: true, ownsAgent: false })).toBe(true);
+    expect(viewerCanUndo(a, { userId: "u2", managesAgents: false, ownsAgent: true })).toBe(true);
     // Still loading who I am: no buttons.
-    expect(viewerCanUndo(a, { userId: null, role: "owner", ownsAgent: false })).toBe(false);
-    expect(viewerCanUndo(a, { userId: "u1", role: undefined, ownsAgent: false })).toBe(false);
+    expect(viewerCanUndo(a, { userId: null, managesAgents: true, ownsAgent: false })).toBe(false);
   });
 
   test("the group's age is its first change", () => {

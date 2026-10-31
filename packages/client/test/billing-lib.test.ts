@@ -55,11 +55,12 @@ describe("billing holds in words (ADR 0079)", () => {
     expect(workspaceHeadline(standingNotice({ statusTo: "active" }))).toBe("standing.notification.active");
   });
 
-  test("owners and admins manage billing, members don't", () => {
-    expect([can("owner", "manage_billing"), can("admin", "manage_billing"), can("member", "manage_billing")]).toEqual([
-      true,
-      true,
-      false,
-    ]);
+  test("whoever holds manage_billing manages billing (the server spreads administrator out)", () => {
+    const of = (...permissions: string[]) => ({ permissions });
+    expect([
+      can(of("manage_billing"), "manage_billing"),
+      can(of("post"), "manage_billing"),
+      can(null, "manage_billing"),
+    ]).toEqual([true, false, false]);
   });
 });

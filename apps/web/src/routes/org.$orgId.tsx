@@ -50,7 +50,7 @@ function OrgLayout() {
   const { t } = useTranslation();
   const path = useRouterState({ select: (s) => s.location.pathname });
   // "Criar agente" is a focused flow with its own rail: no sidebar while it's open (admins only; others see why not).
-  const focused = /\/agents\/new\/?$/.test(path) && can(membership?.role, "manage_agents");
+  const focused = /\/agents\/new\/?$/.test(path) && can(membership, "create_agents");
   // Notifications in this browser (ADR 0071), when already on: the server hears of them again, quietly.
   useWebPushRefresh(me.user.id);
   // …and the ones it still shows for what was already read elsewhere close.

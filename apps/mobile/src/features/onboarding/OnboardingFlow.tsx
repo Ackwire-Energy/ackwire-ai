@@ -296,7 +296,7 @@ export function OnboardingFlow() {
     if (!created) return;
     setPending(true);
     setError(null);
-    const failed = await inviteEach(emails, (email) => api.orgs.invite(created.orgId, { email, role: "member" }));
+    const failed = await inviteEach(emails, (email) => api.orgs.invite(created.orgId, { email }));
     setPending(false);
     setInvited((n) => n + emails.length - failed.length);
     setEmails(failed);
@@ -375,8 +375,12 @@ export function OnboardingFlow() {
     gcTime: 0,
     queryFn: async () => {
       if (!saved) return null;
-      const [settings, agents] = await Promise.all([api.orgs.settings(saved.orgId), api.agents.list(saved.orgId)]);
-      return { settings, ...resumeOf(t, saved, agents) };
+      const [settings, agents, sources] = await Promise.all([
+        api.orgs.settings(saved.orgId),
+        api.agents.list(saved.orgId),
+        saved.step === "import" ? api.imports.sources(saved.orgId).catch(() => []) : [],
+      ]);
+      return { settings, ...resumeOf(t, saved, agents, sources.length > 0) };
     },
   });
   useEffect(() => {

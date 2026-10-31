@@ -1,6 +1,7 @@
 import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
-import { and, type Database, eq, inArray, schema } from "@agenteschat/db";
+import { and, type Database, eq, inArray, schema, sql } from "@agenteschat/db";
 import { isKnownModel } from "@agenteschat/providers";
+import { isIdHandle } from "@agenteschat/ui/names";
 import { createAgent, HANDLE_PATTERN, updateAgent } from "./agents";
 import { type AgentAppearance, setAgentAppearance, validateAppearance } from "./appearance";
 import { recordAudit } from "./audit";
@@ -91,7 +92,8 @@ export interface BundleNote {
   content: string;
 }
 
-export type ImportItemKind = "agent" | "skill" | "channel" | "routine" | "note";
+export const IMPORT_KINDS = ["agent", "skill", "channel", "routine", "note"] as const;
+export type ImportItemKind = (typeof IMPORT_KINDS)[number];
 
 export type ImportSkipReason =
   | "exists"
@@ -209,12 +211,35 @@ function fit(text: string, max: number, field: string, trimmed: string[]) {
   return text.slice(0, max);
 }
 
-/** `base` with the first free number after it (`scout` → `scout2`), within 32 characters. */
+/** `base` with the first free number after a dash (`scout` → `scout-2`) in 32 characters, as the apps suggest. */
 function freeHandle(base: string, taken: Set<string>) {
   for (let n = 2; ; n++) {
-    const handle = `${base.slice(0, 32 - String(n).length)}${n}`;
+    const handle = `${base.slice(0, 31 - String(n).length).replace(/[-_]+$/, "")}-${n}`;
     if (!taken.has(handle)) return handle;
   }
+}
+
+/** Letters and digits without accents, as the apps make a handle from a name (`handleFrom` in packages/client). */
+const handleLetters = (text: string) =>
+  text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "")
+    .slice(0, 32);
+
+/** What OpenBot.run calls an agent nobody named. */
+const UNNAMED = /^new agent$/i;
+
+/**
+ * The handle of an agent whose source handle is an id: from its name, as an agent made here gets one. One still
+ * named "New agent" (or by its id), or whose name has no letter we keep, takes it from its role, else from the
+ * first sentence of its instructions, else it is `newagent`.
+ */
+function handleFromName(name: string, role: string, instructions: string) {
+  const own = UNNAMED.test(name) || isIdHandle(name) ? "" : name;
+  const texts = [own, role, instructions.split(/[.!?\n]/)[0] ?? "", "New agent"];
+  return (texts.map(handleLetters).find(Boolean) ?? "").padEnd(2, "0");
 }
 
 /** A partial look is completed with the defaults; one we can't draw is dropped (and reported). */
@@ -268,7 +293,9 @@ function triggerProblem(trigger: BundleTrigger, now: Date): ImportSkipReason | n
  * gets an action: `create`; `unchanged` or `update` when an earlier import
  * of this package made it and it is still there (same or other hash; a
  * channel is also `update` when an agent it lists arrives now); or
- * `skip` with the reason. Taken handles get the next free one; a public
+ * `skip` with the reason. A handle that is an id becomes one from the
+ * agent's name, after the handles someone chose, and a taken one the next
+ * free one, given over every agent of the bundle, picked or not; a public
  * channel that exists is joined (`update` with `exists`); text that looks
  * like a credential is never brought; fields are cut to our limits
  * (`trimmed`). Items come in dependency order: skills, agents, channels,
@@ -340,44 +367,60 @@ export function planImport(input: ImportInput, state: ImportState): { items: Pla
     });
   }
 
-  const handles = new Set(state.handles);
-  for (const a of bundle.agents) {
-    if (!take("agent", a.key)) continue;
+  const readAgent = (a: BundleAgent) => {
     const trimmed: string[] = [];
-    // The model is chosen here when the agent is created (onboarding picks one the workspace's key runs):
-    // never a change at the source.
-    const hash = digest({ ...a, model: null });
     const name = fit(a.name.trim(), FIELD.agentName, "name", trimmed);
     const role = fit(a.role.trim(), FIELD.role, "role", trimmed);
     const instructions = fit(a.instructions.trim(), FIELD.instructions, "instructions", trimmed);
-    const item = { kind: "agent" as const, key: a.key, label: name || a.handle || a.key, hash };
-    if (!name) {
+    const look = lookOf(a.appearance, trimmed);
+    const wanted = a.handle.trim().replace(/^@/, "").toLowerCase();
+    return { trimmed, name, role, instructions, look, wanted, secretLike: secret(name, role, instructions) };
+  };
+  // Every agent is read first, picked or not, so the handle a new one gets never depends on the pick.
+  const read = new Map<string, ReturnType<typeof readAgent>>();
+  for (const a of bundle.agents) if (!read.has(a.key)) read.set(a.key, readAgent(a));
+  // The handles someone chose in the other app come first: one made from a name never takes them. An id the
+  // other app gave its agent is no handle, so that agent gets one from its name.
+  const handles = new Set(state.handles);
+  const newHandles = new Map<string, string>();
+  for (const fromName of [false, true]) {
+    for (const [key, r] of read) {
+      if (!r.name || r.secretLike || made("agent", key)?.live || isIdHandle(r.wanted) !== fromName) continue;
+      const base = fromName ? handleFromName(r.name, r.role, r.instructions) : fit(r.wanted, 32, "handle", r.trimmed);
+      if (!HANDLE_PATTERN.test(base)) continue;
+      const handle = handles.has(base) ? freeHandle(base, handles) : base;
+      handles.add(handle);
+      newHandles.set(key, handle);
+    }
+  }
+  for (const a of bundle.agents) {
+    const r = read.get(a.key);
+    if (!r || !take("agent", a.key)) continue;
+    // The model is chosen here when the agent is created (onboarding picks one the workspace's key runs):
+    // never a change at the source.
+    const hash = digest({ ...a, model: null });
+    const item = { kind: "agent" as const, key: a.key, label: r.name || a.handle || a.key, hash };
+    if (!r.name) {
       skip(item, "invalid");
       continue;
     }
-    if (secret(name, role, instructions)) {
+    if (r.secretLike) {
       skip(item, "secret_like");
       continue;
     }
-    const look = lookOf(a.appearance, trimmed);
     const model = a.model && isKnownModel(a.model) ? a.model : null;
     const step = compare("agent", a.key, hash);
-    const wanted = a.handle.trim().replace(/^@/, "").toLowerCase();
-    let handle = made("agent", a.key)?.handle ?? wanted;
-    if (step.action === "create") {
-      handle = fit(wanted, 32, "handle", trimmed);
-      if (!HANDLE_PATTERN.test(handle)) {
-        skip(item, "invalid");
-        continue;
-      }
-      if (handles.has(handle)) handle = freeHandle(handle, handles);
-      handles.add(handle);
+    const handle = step.action === "create" ? newHandles.get(a.key) : (made("agent", a.key)?.handle ?? r.wanted);
+    if (!handle) {
+      skip(item, "invalid");
+      continue;
     }
+    const { trimmed, name, role, instructions, look } = r;
     add({
       ...item,
       ...step,
       ...(step.action === "create" && a.model && !model ? { reason: "model_not_in_catalog" as const } : {}),
-      ...(handle !== wanted ? { renamedTo: handle } : {}),
+      ...(handle !== r.wanted ? { renamedTo: handle } : {}),
       trimmed,
       work: { kind: "agent", name, handle, role, instructions, model, look, skills: a.skills },
     });
@@ -621,7 +664,7 @@ export async function applyImport(
   defaults: { model: string },
 ): Promise<ImportPlan> {
   const { db, pubsub } = deps;
-  await requirePermission(db, actorId, orgId, "manage_agents");
+  await requirePermission(db, actorId, orgId, "create_agents");
   const { source } = input.bundle;
   const state = await loadImportState(db, actorId, orgId, source);
   const plan = planImport(input, state);
@@ -837,4 +880,35 @@ export async function applyImport(
     },
   });
   return { items: plan.items.map(publicItem) };
+}
+
+/**
+ * What the workspace brought from other apps, one entry per source package in the order they first came: how many
+ * of each kind. A channel that was here already (`adopted`) didn't come. Admins only (`manage_agents`).
+ */
+export async function importedSources(db: Database, actorId: string, orgId: string) {
+  await requirePermission(db, actorId, orgId, "manage_agents");
+  const rows = await db
+    .select({
+      app: importItems.sourceApp,
+      ref: importItems.sourceRef,
+      kind: importItems.kind,
+      n: sql<number>`count(*)::int`,
+    })
+    .from(importItems)
+    .where(and(eq(importItems.orgId, orgId), eq(importItems.adopted, false)))
+    .groupBy(importItems.sourceApp, importItems.sourceRef, importItems.kind)
+    .orderBy(sql`min(${importItems.createdAt})`);
+  const sources = new Map<string, { app: string; ref: string; counts: Record<ImportItemKind, number> }>();
+  for (const row of rows) {
+    const key = JSON.stringify([row.app, row.ref]);
+    const source = sources.get(key) ?? {
+      app: row.app,
+      ref: row.ref,
+      counts: Object.fromEntries(IMPORT_KINDS.map((k) => [k, 0])) as Record<ImportItemKind, number>,
+    };
+    if (row.kind in source.counts) source.counts[row.kind as ImportItemKind] = row.n;
+    sources.set(key, source);
+  }
+  return [...sources.values()];
 }

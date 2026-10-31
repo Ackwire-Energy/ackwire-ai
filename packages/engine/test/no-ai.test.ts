@@ -5,6 +5,7 @@ import {
   addChannelMember,
   addRunStep,
   answerNow,
+  type Brain,
   createAgent,
   createAgentRuns,
   createCredential,
@@ -200,10 +201,88 @@ test("a computer brain signed out with nothing to fall back on: the card, not a 
   expect(await runs()).toMatchObject([{ status: "failed", error: "no_ai" }]);
   const [card] = await cards();
   expect(card?.meta.noAi).toMatchObject({ reason: "not_signed_in", intent: "task" });
-  // It says its sign-in ended, not that nothing is connected, and so does the conversation list's preview of it.
-  expect(card?.body).toBe("I can't answer yet: my AI is signed out.");
+  // It says Claude Code isn't signed in on its computer (it has no account of its own), not that nothing is
+  // connected, and so does the conversation list's preview of it.
+  expect(card?.body).toBe("I can't answer yet: Claude Code isn't signed in on my computer.");
   expect(previewMeta(card?.meta)).toMatchObject({ bodyCode: "no_ai", noAi: { reason: "not_signed_in" } });
-  expect(previewMeta(card?.meta)?.noAi).toEqual({ reason: "not_signed_in" });
+  expect(previewMeta(card?.meta)?.noAi).toEqual({ reason: "not_signed_in", own: "claude_code" });
+});
+
+test("Codex saved on the workspace's computer's own sign-in: the run fails at once, Connect, never a wait", async () => {
+  f = await setup();
+  const paired = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "Computador" });
+  // The workspace's own computer: nobody connected it, so nobody signs in at its terminal.
+  await f.db
+    .update(schema.machines)
+    .set({ kind: "managed", pairedByUserId: null })
+    .where(eq(schema.machines.id, paired.machineId));
+  await f.db
+    .update(schema.agents)
+    .set({ brain: "codex", machineId: paired.machineId, brainAccountId: null })
+    .where(eq(schema.agents.id, f.agent.id));
+  await revokeKeys();
+  const status: MachineStatus = {
+    id: paired.machineId,
+    orgId: f.org.id,
+    name: "Computador",
+    kind: "managed",
+    pairedByUserId: null,
+    online: true,
+    execAllowed: true,
+    os: "linux",
+    protocol: 26,
+    executors: { codex: { version: "codex-cli 0.163.0" }, detectedAt: new Date().toISOString() },
+  };
+  const handlers = createJobHandlers({ ...f.jobDeps, machines: { status: async () => status } });
+  await post("@dev oi");
+  await drainOutbox(f.db, handlers);
+  expect(await runs()).toMatchObject([{ status: "failed", error: "no_ai" }]);
+  const shown = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+  expect(shown.some((m) => m.meta.bodyCode === "brain_unavailable")).toBe(false);
+  const [card] = await cards();
+  // The apps' own words for it: Codex isn't signed in on this computer, connect a ChatGPT account.
+  expect(card?.meta.noAi).toMatchObject({ reason: "not_signed_in", own: "codex" });
+  // Its text, and the conversation list's preview of it: nothing was ever signed in there to sign out of.
+  expect(card?.body).toBe("I can't answer yet: Codex isn't signed in on my computer.");
+  expect(previewMeta(card?.meta)?.noAi).toEqual({ reason: "not_signed_in", own: "codex" });
+});
+
+test("a turn its computer's own sign-in refuses says so on the card, as the computer's, not an account's", async () => {
+  f = await setup();
+  const paired = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "MacBook" });
+  await f.db
+    .update(schema.agents)
+    .set({ brain: "claude_code", machineId: paired.machineId })
+    .where(eq(schema.agents.id, f.agent.id));
+  await revokeKeys();
+  const status: MachineStatus = {
+    id: paired.machineId,
+    orgId: f.org.id,
+    name: "MacBook",
+    pairedByUserId: f.owner.id,
+    online: true,
+    execAllowed: true,
+    os: "darwin",
+    protocol: 26,
+    executors: { claude: { version: "2.1.300", loggedIn: true }, detectedAt: new Date().toISOString() },
+  };
+  // The CLI said it was signed in; the turn finds out it isn't.
+  const refused: Brain = {
+    kind: "claude_code",
+    async *run() {
+      yield { type: "error", code: "not_logged_in", message: "Not logged in · Please run /login", retryable: true };
+    },
+  };
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => refused },
+    machines: { status: async () => status },
+  });
+  await post("@dev oi");
+  await drainOutbox(f.db, handlers);
+  expect(await runs()).toMatchObject([{ status: "failed", error: "no_ai" }]);
+  const [card] = await cards();
+  expect(card?.meta.noAi).toMatchObject({ reason: "not_signed_in", own: "claude_code" });
 });
 
 test("Responder agora: 409 while there's no AI; then the person's own message is answered, once", async () => {

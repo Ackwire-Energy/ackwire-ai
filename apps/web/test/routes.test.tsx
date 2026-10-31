@@ -34,7 +34,8 @@ describe("route guards", () => {
 
   test("a workspace still being set up is its owner's onboarding, from / and from its pages; never for someone invited", async () => {
     const as = (role: "owner" | "member") => {
-      const state = seedState();
+      // At the agents' step, its team not made yet.
+      const state = seedState({ agents: [] });
       const onboarding = { step: "agents" as const, generalChannelId: GENERAL_ID };
       if (state.me) state.me.organizations = [{ id: ORG_ID, name: "Acme", role, onboarding }];
       return createFakeApi(state);
@@ -134,27 +135,15 @@ describe("route guards", () => {
     for (const name of ["eng", "general", "Ada", "Atlas", "João", "Criar agente"]) {
       expect(nav.textContent).toContain(name);
     }
-    // The workspace's budget use as a percentage, never money (US$ 15,40 of US$ 60).
-    expect(nav.textContent).toContain("26%");
+    // Money never shows in the sidebar (US$ 15,40 of US$ 60); the budget's use is the account menu's.
     expect(nav.textContent).not.toContain("US$");
-    expect(
-      screen().getByRole("button", { name: /^Conta: .+\. 26% do orçamento dos agentes usado este mês$/ }),
-    ).toBeTruthy();
+    expect(screen().getByRole("button", { name: /^Conta: / })).toBeTruthy();
   });
 
-  test("the budget under the person's name says what it is; nothing used, no bar drawn", async () => {
-    const api = createFakeApi();
-    const usage = () => document.querySelector(".sidebar__user .sidebar__usage") as HTMLElement;
-    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+  test("under the person's name only their status line: no budget bar (ADR 0084)", async () => {
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi() });
     await settle();
-    expect(usage().textContent).toBe("Orçamento26%");
-    expect(usage().querySelector(".sidebar__usage-bar")).toBeTruthy();
-    cleanup();
-    const overview = api.orgs.overview;
-    api.orgs.overview = async (orgId) => ({ ...(await overview(orgId)), budgetUsedPercent: 0 });
-    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
-    await settle();
-    expect(usage().textContent).toBe("Orçamento0%");
-    expect(usage().querySelector(".sidebar__usage-bar")).toBeNull();
+    expect(document.querySelector(".sidebar__user .sidebar__usage")).toBeNull();
+    expect(document.querySelector(".sidebar__user")?.textContent).not.toContain("26%");
   });
 });

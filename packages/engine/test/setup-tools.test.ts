@@ -98,18 +98,20 @@ describe("the setup group", () => {
     expect(DEFAULT_AGENT_SCOPES).toContain(SETUP_SCOPE);
     const ctx = await runFor(f, f.owner.id, "cria um canal pro lançamento");
     const granted = await gatewayOf(f).granted(ctx);
-    expect(granted.map((t) => t.name)).toEqual(["create_channel", "offer_connect_ai"]);
+    expect(granted.map((t) => t.name)).toEqual(["create_channel", "offer_connect_ai", "propose_agent"]);
     expect(deferrableGroups(granted).map((g) => [g.key, g.label])).toEqual([
-      ["setup", "Workspace setup (connect an AI, create channels)"],
+      ["setup", "Workspace setup (connect an AI, create channels, propose agents)"],
     ]);
     // Not loaded: behind find_tools; loaded: as they are.
     expect(presentTools(granted, undefined, []).map((t) => t.name)).toEqual(["find_tools", "use_tool"]);
     expect(presentTools(granted, undefined, ["setup"]).map((t) => t.name)).toEqual([
       "create_channel",
       "offer_connect_ai",
+      "propose_agent",
     ]);
     const kind = (name: string) => toolKind({ name, scope: SETUP_SCOPE, connectionId: null }).kind;
     expect(kind("offer_connect_ai")).toBe("here");
+    expect(kind("propose_agent")).toBe("here");
     expect(kind("create_channel")).toBe("elsewhere");
   });
 });

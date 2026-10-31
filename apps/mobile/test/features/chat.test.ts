@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { LiveConsult, LiveRun, Message } from "@agenteschat/client";
+import type { LiveConsult, LiveRun, Message, RunConsultation } from "@agenteschat/client";
+import { consultBlocksNearEnd, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { toolCalls, toolNow } from "@agenteschat/client/lib/work";
 import {
@@ -160,6 +161,42 @@ describe("working line", () => {
     expect(entries[0]?.consult).toMatchObject({ to: "infra", toName: "Infra", status: "asking" });
   });
 
+  test("a question its reply shows near the end leaves the line; farther up, the line still says it", () => {
+    const consult: LiveConsult = {
+      runId: "r1",
+      agentId: "atlas",
+      consultedAgentId: "infra",
+      channelId: "c1",
+      threadId: "m1",
+      status: "asking",
+      since: 1,
+      at: 1,
+    };
+    const asked: RunConsultation = {
+      id: "q1",
+      runId: "r1",
+      agentId: "atlas",
+      consultedAgentId: "infra",
+      consultedRunId: "r-infra",
+      status: "open",
+      waiting: null,
+      question: "Como está o deploy?",
+      answer: null,
+      createdAt: at(5),
+      answeredAt: null,
+      expiresAt: at(-10),
+    };
+    // The phone's rows: saved replies only (a turn at work doesn't show its questions yet).
+    const reply = message({ id: "m-ask", author: { type: "agent", id: "atlas" }, agentRunId: "r1" });
+    const near = consultBlocksNearEnd([message({ id: "m0" }), reply], [asked]);
+    // Atlas at work on a new turn: its own entry, not the question.
+    const entries = workingEntries([run({ runId: "r2", agentId: "atlas" })], consultsForLine([consult], near), name);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.consult).toBeUndefined();
+    const far = consultBlocksNearEnd([reply, ...["a", "b", "c"].map((id) => message({ id }))], [asked]);
+    expect(workingEntries([], consultsForLine([consult], far), name)[0]?.consult?.status).toBe("asking");
+  });
+
   test("a writing agent stays on the line ('escrevendo'); failed and waiting runs leave it", () => {
     const entries = workingEntries(
       [
@@ -310,7 +347,7 @@ describe("composer", () => {
 });
 
 describe("markdown", () => {
-  test("inline marks, links as text, mentions", () => {
+  test("inline marks, links, mentions", () => {
     expect(parseInline("Oi @theo, veja **isto** e `npm i` em [docs](https://x)")).toEqual([
       { kind: "text", text: "Oi " },
       { kind: "mention", text: "@theo" },
@@ -318,10 +355,27 @@ describe("markdown", () => {
       { kind: "bold", text: "isto" },
       { kind: "text", text: " e " },
       { kind: "code", text: "npm i" },
-      { kind: "text", text: " em docs" },
+      { kind: "text", text: " em " },
+      { kind: "link", text: "docs", href: "https://x" },
     ]);
     expect(parseInline("e-mail ana@x.com não é menção")).toEqual([
       { kind: "text", text: "e-mail ana@x.com não é menção" },
+    ]);
+  });
+  test("bare addresses are links, without trailing punctuation; only web and e-mail open", () => {
+    expect(parseInline("Aqui: https://github.com/acme/app/pull/76.")).toEqual([
+      { kind: "text", text: "Aqui: " },
+      { kind: "link", text: "https://github.com/acme/app/pull/76", href: "https://github.com/acme/app/pull/76" },
+      { kind: "text", text: "." },
+    ]);
+    expect(parseInline("(veja https://x.com/a_b_c)")).toEqual([
+      { kind: "text", text: "(veja " },
+      { kind: "link", text: "https://x.com/a_b_c", href: "https://x.com/a_b_c" },
+      { kind: "text", text: ")" },
+    ]);
+    expect(parseInline("[x](ftp://h) e ![logo](https://x/l.png) e `https://y`")).toEqual([
+      { kind: "text", text: "x e logo e " },
+      { kind: "code", text: "https://y" },
     ]);
   });
   test("blocks: paragraphs, lists, headings, quotes, code", () => {
@@ -400,6 +454,22 @@ describe("an agent's question (ask_user)", () => {
     });
     expect(hidesBody(asked)).toBe(true);
     expect(hidesBody({ ...asked, body: "Antes, uma pergunta." })).toBe(false);
+    // An agent's proposal of a new agent is its card (ADR 0081); a Connect card, with no card here, keeps its text.
+    const draft = { name: "Nina", handle: "nina", role: "", instructions: "x", appearance: null, channelIds: [] };
+    const proposal = {
+      kind: "agent_proposal",
+      forUserId: null,
+      params: { draft: { ...draft, access: [], ai: { kind: "none" } }, why: "x" },
+      state: "pending",
+      expiresAt: at(30),
+    };
+    expect(hidesBody(message({ id: "a1", author: { type: "agent", id: "dev" }, meta: { actionCard: proposal } }))).toBe(
+      true,
+    );
+    const connect = { kind: "connect_ai", forUserId: null, params: { agentIds: [], why: "x" } };
+    expect(hidesBody(message({ id: "a2", author: { type: "agent", id: "dev" }, meta: { actionCard: connect } }))).toBe(
+      false,
+    );
     const rows = buildRows([message({ id: "p", author: { type: "agent", id: "dev" }, createdAt: at(11) }), asked]);
     expect(rows.filter((r) => r.kind === "message").map((r) => r.kind === "message" && r.grouped)).toEqual([
       false,

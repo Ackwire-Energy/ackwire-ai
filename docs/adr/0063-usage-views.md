@@ -1,6 +1,6 @@
 # 0063. Usage views: each plan account by computer, an agent's month, and its part of a limit
 
-- Status: Accepted
+- Status: Accepted. Amended 2026-10-30: §5 (a plan's limits where the budget was)
 - Date: 2026-10-24
 - Extends: ADR 0026 (budget visibility), ADR 0059 (AI accounts belong to people; §7 usage limits)
 
@@ -29,6 +29,17 @@ Providers only give the whole account's percentage. An agent's part of a window 
 
 Everyone in the workspace sees tokens, percentages, windows and an account's name and owner. An account's email only its owner. Money only with `view_usage`: what plan tokens would cost through the API ("≈ US$ … pela API"; the plan is already paid) and the API's real cost and budgets.
 
+### 5. A plan's limits where the budget was
+
+*Amended 2026-10-30.* An agent on a plan showed "0% of the October budget" on its page and in Members, a number that only counts what is paid through an API key. Wherever an agent's usage is a line (its page's facts and side card, Members' agents, its profile card, the phone's agent profile):
+
+- **On a plan**, its account's limits: the account's name and its tightest windows, two at most, in short words ("Claude Team · semana 40% · 5h 12%"), one bar for the fullest, every window on hover and in Uso, and only near the limit (80%) when it renews ("Quase no limite · renova às 14:00", "No limite até 14:00"). A plan's limit is never called a budget.
+- **The budget** shows for an agent on the API as before, and for an agent on a plan only once it spent through the API this month (its fallback, or the workspace's model before it moved to the plan), as a second short line after the plan's.
+- **Unknown is nothing**: a window not reported yet, or a plan whose maker doesn't share its usage, shows no line rather than 0%. A plan that refused a request before any window was reported says only that it is at the limit (the account's name and "No limite", no bar).
+- Settings › AI accounts draws each account and each computer's own sign-in with the same compact line.
+
+The agent list (`GET …/agents`, and the agent an edit returns) carries it in `brain`: `account`, the account's name (a computer's own sign-in by its plan, "Claude Max", only where that sign-in can think for the agent, ADR 0059 §3), and `usage`, the windows the runner last reported (absent while unknown). Everyone sees both, as §4 allows; the computer's name stays admins' and the owner's. The apps refetch the list when a computer's accounts change (`machine.updated` with `accounts`, sent only when a window moved a point or more). No migration and no protocol change. One rule (`usageShown`, `packages/client/src/lib/plan-usage.ts`) and one line (`planLine`, `packages/ui/src/plan-state.ts`, drawn by `PlanMeter compact` on the web and its twin on the phone) serve every place.
+
 ## Consequences
 
 - Positive: one place answers who spent what, where, for plans and the API together, and an agent's page tells which account carried its month.
@@ -41,3 +52,5 @@ Everyone in the workspace sees tokens, percentages, windows and an account's nam
 - **A table of limits per account, written from the turns.** It repeats what ADR 0059 already stores with each account. Rejected.
 - **Splitting by raw tokens.** Simpler, but it overstates cheap models against a plan. Weighted by API price, tokens as the fallback.
 - **Inferring the account from the agent's current choice.** Wrong as soon as an agent moves accounts or several agents share a computer's own sign-in. Rejected.
+- **The usage views' own request for a list's lines (§5)** (`GET …/usage/plans`). It reads the month's usage rows to answer what the account rows already hold. Rejected.
+- **No budget at all for an agent on a plan (§5).** Its fallback and a month that began on the API spend real money. Rejected: the budget shows once it spent.
