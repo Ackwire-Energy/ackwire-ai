@@ -5728,9 +5728,10 @@ p {
   gap: 6px;
   padding: 0;
 }
+/* As tall as the workspace's button above it: the face as big as its mark, the same room around. */
 .sidebar[data-rail="true"] .sidebar__user {
   justify-content: center;
-  padding: 4px;
+  padding: 6px;
 }
 /* A routine's "when": Horário / Evento / Email, then one quiet panel with the
    sentence, "Ajustar" and the next runs; the picker opens inside it. */

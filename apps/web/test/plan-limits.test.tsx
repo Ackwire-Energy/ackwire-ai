@@ -262,4 +262,13 @@ describe("the account card", () => {
     const [top, , bottom] = of(layout, ".sidebar__me > .sidebar__user", "padding").split(/\s+/);
     expect(top).toBe(bottom);
   });
+
+  test("in the narrow sidebar, as tall as the workspace's button above it", async () => {
+    const layout = topLevel(await read("apps/web/src/layout.css"));
+    const height = (selector: string) => px(of(layout, selector, "height"));
+    const padding = (selector: string) => px(of(layout, selector, "padding"));
+    expect(
+      height(".sidebar__me > .sidebar__user > .ac-avatar") + 2 * padding('.sidebar[data-rail="true"] .sidebar__user'),
+    ).toBe(height(".sidebar__org-mark") + 2 * padding('.sidebar[data-rail="true"] .sidebar__org .sidebar__org-button'));
+  });
 });
