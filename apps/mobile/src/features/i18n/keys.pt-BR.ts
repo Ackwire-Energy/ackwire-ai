@@ -26,6 +26,7 @@ export const featureKeysPtBR = {
     up: "Subir",
     down: "Descer",
     position: "{{at}}ª de {{count}}.",
+    channelPosition: "{{at}}º de {{count}}.",
     itsChannels: "Canais",
     seeAll: "Ver todos",
   },
@@ -280,8 +281,6 @@ export const featureKeysPtBR = {
     sending: "Enviando…",
     failed: "Não foi enviada · Tentar de novo",
     notSent: "A mensagem não foi enviada.",
-    /** Under my latest message in a DM with a person, once they read it. */
-    seen: "Visto",
     toLatest: "Ir para as mensagens mais recentes",
     stopAgent: "Parar {{name}}",
     offlineWait: "Sai quando a conexão voltar",

@@ -34,3 +34,17 @@ export function stepBefore(ids: readonly string[], id: string, step: -1 | 1): st
   const rest = ids.filter((x) => x !== id);
   return rest[to] ?? null;
 }
+
+/**
+ * A channel among the ones of its category (or the ones with none), in the list's order: where it is, how many
+ * they are, and the move one step up or down (undefined at either end).
+ */
+export function channelSteps(channels: readonly Pick<Channel, "id" | "categoryId">[], channelId: string) {
+  const categoryId = channels.find((c) => c.id === channelId)?.categoryId ?? null;
+  const ids = channels.filter((c) => (c.categoryId ?? null) === categoryId).map((c) => c.id);
+  const move = (step: -1 | 1) => {
+    const before = stepBefore(ids, channelId, step);
+    return before === undefined ? undefined : { channelId, categoryId, beforeChannelId: before };
+  };
+  return { at: ids.indexOf(channelId), count: ids.length, up: move(-1), down: move(1) };
+}

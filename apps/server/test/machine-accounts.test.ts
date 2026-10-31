@@ -179,7 +179,7 @@ test("accounts on a computer: the runner's list, signing in with a sealed code, 
   };
   expect(done).toMatchObject({
     state: "done",
-    account: { id: login.loginId, kind: "claude_code", label: "Claude Max", plan: "max", status: "active", mine: true },
+    account: { id: login.loginId, kind: "claude_code", label: "Claude", plan: "max", status: "active", mine: true },
   });
   const stored = JSON.stringify(await t.db.select().from(schema.machineAccounts));
   expect(stored).not.toContain("abc#123");
@@ -291,7 +291,7 @@ test("a computer nobody connected: anyone signs in, the account is theirs from t
   await runner.changed([
     { id: login.loginId, kind: "claude_code", loggedIn: true, email: "bia@example.com", plan: "max" },
   ]);
-  expect(await accountRow(login.loginId)).toMatchObject({ status: "active", createdBy: adminId, label: "Claude Max" });
+  expect(await accountRow(login.loginId)).toMatchObject({ status: "active", createdBy: adminId, label: "Claude" });
   const done = (await (await asAdmin(`${base}/account-logins/${login.loginId}`)).json()) as {
     state: string;
     account: Account;
@@ -314,10 +314,10 @@ test("a computer nobody connected: anyone signs in, the account is theirs from t
   const second = await asAdmin(`${base}/account-logins/${again.loginId}`);
   expect(await second.json()).toMatchObject({
     state: "done",
-    account: { id: again.loginId, label: "Claude Max", email: "bia@example.com", mine: true },
+    account: { id: again.loginId, label: "Claude", email: "bia@example.com", mine: true },
   });
   expect(runner.accountRequests("remove")).toEqual([]);
-  expect(await accountRow(again.loginId)).toMatchObject({ status: "active", label: "Claude Max", createdBy: adminId });
+  expect(await accountRow(again.loginId)).toMatchObject({ status: "active", label: "Claude", createdBy: adminId });
 
   // Each start runs a CLI on the shared computer: ten per person per computer every 15 minutes.
   for (let n = 0; n < 5; n++) {

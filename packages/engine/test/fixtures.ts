@@ -31,6 +31,7 @@ import {
   createFakeJudge,
   createFakeScheduleReader,
   createFindAgentToolSource,
+  createFollowUpToolSource,
   createForumToolSource,
   createHandOffToolSource,
   createIssueToolSource,
@@ -170,6 +171,8 @@ export async function setup(
     askAgent?: boolean;
     /** Add the built-in `react` tool. */
     react?: boolean;
+    /** Add the built-in `follow_up` and `cancel_follow_up` tools. */
+    followUps?: boolean;
     /** Add the built-in `hand_off` tool (background runs: routines). */
     handOff?: boolean;
     /** Add the Drive tools (create_artifact…). Storage is always wired (memory platform store, fake S3). */
@@ -300,6 +303,7 @@ export async function setup(
         ]
       : []),
     ...(options.react ? [createReactToolSource({ pubsub })] : []),
+    ...(options.followUps ? [createFollowUpToolSource({ pubsub })] : []),
     ...(options.handOff ? [createHandOffToolSource({ pubsub })] : []),
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),
     ...(options.chatTools ? [createChatToolSource({ pubsub, artifacts: artifactDeps })] : []),

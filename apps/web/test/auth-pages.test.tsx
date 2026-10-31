@@ -1457,7 +1457,7 @@ describe("Onboarding", () => {
     const max = (id: string): MachineAccount => ({
       id,
       kind: "claude_code",
-      label: "Claude Max",
+      label: "Claude",
       email: "walter@acme.com.br",
       plan: "max",
       status: "active",
@@ -1506,7 +1506,7 @@ describe("Onboarding", () => {
       account: {
         id: "acct_max",
         kind: "claude_code",
-        label: "Claude Max",
+        label: "Claude",
         email: "walter@acme.com.br",
         plan: "max",
         status: "active",
@@ -1544,12 +1544,12 @@ describe("Onboarding", () => {
     expect(calls(state, "agents.setBrain").map((c) => c.args[2])).toEqual([
       { brain: "claude_code", account: "acct_max" },
     ]);
-    expect(document.body.textContent).toContain("Ada agora pensa com Claude Max.");
-    // In the team's order, as the workspace lists them.
+    expect(document.body.textContent).toContain("Ada agora pensa com Claude.");
+    // In the team's order, as the workspace lists them, each account with its plan once.
     const who = screen().getByRole("region", { name: "Quem pensa" });
     expect([...who.querySelectorAll(".ai-who__row")].map((r) => r.textContent)).toEqual([
       "TheoSem IA",
-      "AdaClaude Max",
+      "AdaClaude · Max",
     ]);
     expect(who.textContent).not.toContain("Cada plano pensa por um agente.");
     const keyFor = within(who).getByRole("button", { name: "Chave de API para Theo" });

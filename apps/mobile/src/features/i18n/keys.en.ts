@@ -22,6 +22,7 @@ export const featureKeysEn: FeatureTranslations = {
     up: "Move up",
     down: "Move down",
     position: "{{at}} of {{count}}.",
+    channelPosition: "{{at}} of {{count}}.",
     itsChannels: "Channels",
     seeAll: "See all",
   },
@@ -275,8 +276,6 @@ export const featureKeysEn: FeatureTranslations = {
     sending: "Sending…",
     failed: "Not sent · Try again",
     notSent: "The message wasn't sent.",
-    /** Under my latest message in a DM with a person, once they read it. */
-    seen: "Seen",
     toLatest: "Go to the latest messages",
     stopAgent: "Stop {{name}}",
     offlineWait: "Goes out when the connection is back",

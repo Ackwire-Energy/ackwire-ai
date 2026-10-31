@@ -418,6 +418,8 @@ export const extraIcons = {
   ],
   /** Threads: "Tirar do canal" (out of the conversation, into the thread). */
   move: [["path", { d: "M3.5 10h9M9 6l4 4-4 4M16.5 4v12" }]],
+  /** Two agents talking to each other ("Theo ⇄ Iris"): one arrow each way. */
+  swap: [["path", { d: "M4 7h11.5M13 4.5 15.5 7 13 9.5M16 13H4.5M7 10.5 4.5 13 7 15.5" }]],
   /** Threads: the drag handle on a range's start and end caps; forum: drag to reorder the table. */
   grip: [
     ["circle", { cx: "7.5", cy: "5", r: "0.6" }],

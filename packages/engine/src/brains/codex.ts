@@ -11,7 +11,7 @@ import {
 import type { MachineCaller } from "../machine-hub";
 import { MachineDroppedError, MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
 import { CODEX_MIN_VERSION, versionOf } from "../missions";
-import { accountFields, accountUnavailable, busyRefusal, steerOnMachine } from "./claude-code";
+import { accountFields, accountUnavailable, busyRefusal, contextFields, steerOnMachine } from "./claude-code";
 import { computerPrompt } from "./prompt";
 import type { Brain, BrainEvent, BrainIO, BrainTurn, SteerMessage, SteerReply } from "./types";
 
@@ -225,6 +225,7 @@ export class CodexBrain implements Brain {
       mcp,
       ...(agent ? { agent } : {}),
       ...accountFields(status.protocol, turn),
+      ...contextFields(status.protocol, turn),
       ...(permissions ? { permissions } : {}),
       ...(this.deps.keepAlive === false ? { keepAlive: false } : {}),
     };

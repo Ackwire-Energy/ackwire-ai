@@ -12,6 +12,7 @@ import {
   useMachines,
   useSaveJevKey,
 } from "@agenteschat/client";
+import { accountTitle } from "@agenteschat/client/lib/ai-accounts";
 import { billingHoldOf, standingActive } from "@agenteschat/client/lib/billing";
 import {
   computerEdition,
@@ -808,7 +809,7 @@ export function OnboardingPage({ resumed, paid = false }: { resumed?: ResumedOnb
     });
   const aiAll = setOf(choice).map((a) => ({ ...a, done: (signedIn[a.id] ?? planned[a.id])?.choice === choice }));
   const thinksOf = (account: MachineAccount, plan: PlanChoice) => ({
-    label: account.label,
+    label: accountTitle(account),
     mark: account.provider ?? account.kind,
     choice: plan,
   });

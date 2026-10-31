@@ -1,7 +1,6 @@
 import type { Issue, IssueColumn } from "@agenteschat/client";
-import { toolActivity } from "@agenteschat/client/lib/activity";
 import { dueLabel } from "@agenteschat/client/lib/format";
-import { toolLabel } from "@agenteschat/client/lib/work";
+import { stepPhrase } from "@agenteschat/client/lib/work";
 import { router } from "expo-router";
 import { memo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
@@ -13,20 +12,11 @@ import { agentLook } from "../shared/logic";
 import { Tile } from "../shared/parts";
 import { criteriaProgress, currentStep, type IssueState, isLate, issueState, latestPr, listState } from "./logic";
 
-/** An agent's step in the person's words ("Consultou o github · trips.service.ts"), as the web says it. */
+/** An agent's step in the person's words ("Mexeu nos arquivos do PC · trips.service.ts"), as the web says it. */
 export function useStepText() {
   const { t } = useTranslation();
   return useCallback(
-    (step: { tool: string; detail?: string } | null | undefined) => {
-      if (!step) return "";
-      const a = toolActivity(step.tool, null, step.detail ?? null);
-      const label = t(`chat.work.step.${a.kind}`, {
-        app: a.app ?? "",
-        tool: toolLabel(step.tool),
-        defaultValue: toolLabel(step.tool),
-      });
-      return step.detail ? `${label} · ${step.detail}` : label;
-    },
+    (step: Parameters<typeof stepPhrase>[1] | null | undefined) => (step ? stepPhrase(t, step) : ""),
     [t],
   );
 }

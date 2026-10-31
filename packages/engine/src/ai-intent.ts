@@ -22,7 +22,7 @@ export const CONNECT_AUTO_OPEN_THRESHOLD = 0.9;
 
 const INTENTS: Record<ConnectIntentKind, string> = {
   claude:
-    "Connect or use Claude: a Claude plan or subscription (Pro, Max, Team, Enterprise), Claude Code, or Anthropic.",
+    "Connect or use Claude: a Claude plan or subscription (Pro, Max, Ultra, Team, Enterprise), Claude Code, or Anthropic.",
   chatgpt:
     "Connect or use ChatGPT: a ChatGPT plan or subscription (Plus, Pro, Business, Enterprise), Codex, or OpenAI's subscription.",
   api_key:
