@@ -16,6 +16,7 @@ import {
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiError } from "../../http/errors";
+import type { Logger } from "../../logger";
 import {
   type AppDeps,
   body,
@@ -107,7 +108,7 @@ const AccountParams = OrgParams.extend({ accountId: z.uuid() });
  * (Composio) or any IMAP mailbox once; each agent gets a level and a policy
  * per mailbox.
  */
-export function mailRoutes(deps: AppDeps) {
+export function mailRoutes(deps: AppDeps, log: Logger) {
   const { db, config, adapters } = deps;
   const app = createAppRouter(deps);
   for (const path of ["/organizations/*", "/mail/*"]) app.use(path, requireSession(deps.auth));
@@ -221,7 +222,10 @@ export function mailRoutes(deps: AppDeps) {
     async (c) => {
       const base = config.PUBLIC_URL.replace(/\/$/, "");
       const accountId = c.req.valid("query").account;
-      const r = await completeComposioConnect(mailDeps, c.get("user").id, accountId).catch(() => null);
+      const r = await completeComposioConnect(mailDeps, c.get("user").id, accountId).catch((error: unknown) => {
+        log.warn("mail connect failed", { accountId, error: String(error) });
+        return null;
+      });
       const account = `account=${encodeURIComponent(accountId)}`;
       if (!r) return c.redirect(`${base}/?mail=failed&${account}`, 302);
       return c.redirect(

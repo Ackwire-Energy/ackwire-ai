@@ -454,13 +454,20 @@ export async function applyComposioStateFor(
 ): Promise<boolean> {
   const composio = composioOf(deps);
   if (!composio || !row.externalAccountId) return false;
-  const remote = await composio.client.getConnectedAccount(row.externalAccountId);
+  // An active mailbox has its address already: reading it again is a billed tool call on every
+  // reconcile pass, so only its status is checked.
+  const known = row.status === "active" && row.address !== "";
+  const remote = await composio.client.getConnectedAccount(row.externalAccountId, composioUserId(row.orgId), {
+    readAddress: !known,
+  });
+  if (known && remote.status === "active") return true;
   const now = deps.now?.() ?? new Date();
   if (remote.status === "active" && remote.address) {
     const address = normalizeAddress(remote.address);
     if (!(await assertAddressFree(deps.db, row.orgId, address, row.id))) {
-      // The same mailbox is connected already: this second connection goes away.
-      await composio.client.deleteConnectedAccount(row.externalAccountId).catch(() => {});
+      // The same mailbox is connected already: this second connection goes away. Not revoked: Google
+      // revokes the app's whole grant, which would also end the connection that stays.
+      await composio.client.deleteConnectedAccount(row.externalAccountId, { revoke: false }).catch(() => {});
       await deps.db
         .update(mailAccounts)
         .set({ status: "needs_reconnect", lastError: "already_connected", revokedAt: now, updatedAt: now })
@@ -679,7 +686,9 @@ export async function accountRef(deps: MailDeps, row: MailAccountRow, password?:
     via: row.via as MailAccountRef["via"],
     address: row.address,
   };
-  if (row.via !== "imap") return { ...base, externalAccountId: row.externalAccountId };
+  if (row.via !== "imap") {
+    return { ...base, externalAccountId: row.externalAccountId, externalUserId: composioUserId(row.orgId) };
+  }
   let secret = password;
   if (secret === undefined) {
     if (!row.secretCiphertext || !row.wrappedDataKey || !row.kekId)

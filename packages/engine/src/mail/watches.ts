@@ -2,6 +2,7 @@ import type { MailAdapters } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, schema } from "@agenteschat/db";
 import { ValidationError } from "../errors";
 import { hasScope } from "../tools/scopes";
+import { composioUserId } from "./accounts";
 import { normalizeAddressRule } from "./text";
 
 const { mailWatches, mailAccounts } = schema;
@@ -159,6 +160,7 @@ export async function syncMailWatch(
     const { triggerId } = await client.createMailTrigger({
       toolkit,
       connectedAccountId: account.externalAccountId,
+      userId: composioUserId(account.orgId),
       // Outlook has no search language here: its mail is filtered on our side.
       query: toolkit === "gmail" ? gmailQuery(filter) : null,
     });
