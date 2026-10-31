@@ -13,7 +13,7 @@ import { type PlanId, planKeyFits, planOf } from "@agenteschat/client/lib/plans"
 import { accountCodeAad, sealSecret } from "@agenteschat/client/lib/secret-box";
 import { Button, cx, Icon, InfoHint, Input, ProviderLogo, SettingNote } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
-import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { openPopup, sendPopup } from "@/lib/popup";
@@ -319,6 +319,21 @@ function AddAccountFlow({
   const shown = fanFailed ?? result;
   const noAnswer = startFailed || reads.includes("noAnswer");
   const ended = noAnswer || reads.includes("failed") || shown?.state === "failed" || shown?.state === "expired";
+  // The code or the key on its way to the computer, then the computer signing in with it: a line stands in for the
+  // field and its buttons until the sign-in ends.
+  const busy = (sending || sent) && !(other || ended);
+  const field = useRef<HTMLInputElement>(null);
+  const line = useRef<HTMLParagraphElement>(null);
+  // Focus on the field or its buttons would fall to the page as they go: it goes to the line, back to the field when
+  // a failed send brings it back, or to the block when the sign-in ended. A layout effect, so it lands before a
+  // dialog's focus trap takes it to the dialog.
+  const wasBusy = useRef(false);
+  useLayoutEffect(() => {
+    if (wasBusy.current === busy) return;
+    wasBusy.current = busy;
+    if (document.activeElement && document.activeElement !== document.body) return;
+    (busy ? line.current : (field.current ?? box.current))?.focus();
+  }, [busy]);
 
   /** The code or the plan's key, sealed here to the computer's key for a sign-in. */
   const seal = async (l: AccountLoginStart | null, text: string) => {
@@ -404,11 +419,26 @@ function AddAccountFlow({
     </span>
   );
   const keyHintId = `${codeId}-hint`;
+  const busyLine = (
+    <p ref={line} tabIndex={-1} role="status" className="agp-addacct__busy ac-iconline">
+      <Icon name="spinner" size={14} />
+      <span>
+        {plan
+          ? sent
+            ? t("aiAccounts.add.keySent", { computer })
+            : t("aiAccounts.add.keySending", { computer })
+          : sent
+            ? t("agentPage.work.brain.add.sent", { computer })
+            : t("agentPage.work.brain.add.sending", { computer })}
+      </span>
+    </p>
+  );
   // The field's buttons are its height (the ruler's default step), so the row reads as one line.
   const pasteRow = (label: string, placeholder: string | undefined, secret: boolean, valid: boolean) => (
     <>
       <span className="agp-addacct__paste">
         <Input
+          ref={field}
           id={codeId}
           type={secret ? "password" : "text"}
           value={code}
@@ -417,7 +447,6 @@ function AddAccountFlow({
           placeholder={placeholder}
           aria-label={label}
           aria-describedby={plan ? keyHintId : undefined}
-          disabled={sent}
           onChange={(e) => take(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -427,16 +456,11 @@ function AddAccountFlow({
           }}
         />
         {!code.trim() && (
-          <Button icon="copy" disabled={sent} onClick={() => void paste()}>
+          <Button icon="copy" onClick={() => void paste()}>
             {t("aiAccounts.add.paste")}
           </Button>
         )}
-        <Button
-          variant="primary"
-          loading={sending || loading}
-          disabled={!valid || sent || !ready}
-          onClick={() => void send()}
-        >
+        <Button variant="primary" loading={loading} disabled={!valid || !ready} onClick={() => void send()}>
           {t("agentPage.work.brain.add.send", { computer })}
         </Button>
       </span>
@@ -526,14 +550,16 @@ function AddAccountFlow({
             hint={provider === "zai" ? t("connectAi.zaiTeam") : undefined}
           />
         </Step>
-        <Step n={2} side={sent ? waiting : undefined}>
+        <Step n={2} side={reads.includes("reconnecting") ? waiting : undefined}>
           <StepTitle
             title={t("aiAccounts.add.keyTitle")}
             hint={t("aiAccounts.add.keySafe", { computer })}
             htmlFor={codeId}
             hintId={keyHintId}
           />
-          {pasteRow(t("aiAccounts.add.keyLabel", { plan: plan.label }), plan.placeholder, true, keyOk)}
+          {busy
+            ? busyLine
+            : pasteRow(t("aiAccounts.add.keyLabel", { plan: plan.label }), plan.placeholder, true, keyOk)}
           {key && !keyOk && (
             <SettingNote icon="alert">{t("aiAccounts.add.keyShape", { plan: plan.label })}</SettingNote>
           )}
@@ -608,26 +634,22 @@ function AddAccountFlow({
           {starting && <span>{t("agentPage.work.brain.add.starting", { computer })}</span>}
         </Step>
         {login && opened && (
-          <Step side={waiting}>
+          <Step side={busy && !reads.includes("reconnecting") ? undefined : waiting}>
             <label htmlFor={codeId}>
               <b>{t("agentPage.work.brain.add.stepTwo")}</b>
             </label>
-            {pasteRow(
-              t("agentPage.work.brain.add.codeLabel"),
-              t("agentPage.work.brain.add.codeLabel"),
-              false,
-              key.length > 0,
-            )}
-            {key && !isSignInCode(key, login.url) && (
+            {busy
+              ? busyLine
+              : pasteRow(
+                  t("agentPage.work.brain.add.codeLabel"),
+                  t("agentPage.work.brain.add.codeLabel"),
+                  false,
+                  key.length > 0,
+                )}
+            {!busy && key && !isSignInCode(key, login.url) && (
               <SettingNote icon="alert">{t("agentPage.work.brain.add.notCode")}</SettingNote>
             )}
-            {(sent || local) && (
-              <span>
-                {sent
-                  ? t("agentPage.work.brain.add.sent", { computer })
-                  : t("agentPage.work.brain.add.local", { computer })}
-              </span>
-            )}
+            {local && !busy && <span>{t("agentPage.work.brain.add.local", { computer })}</span>}
           </Step>
         )}
       </>

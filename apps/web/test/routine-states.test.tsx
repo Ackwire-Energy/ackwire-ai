@@ -10,7 +10,7 @@ import { RUN_CODES, runOutcome } from "@agenteschat/client/lib/routine-view";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import type { TFunction } from "i18next";
 import { createI18n } from "@/i18n";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, type FakeState, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { routineRun } from "./fakes/planning";
 import { renderApp, screen, settle } from "./render";
 
@@ -83,7 +83,7 @@ function withRoutines(list: Routine[], runs: Record<string, RoutineRun[]> = {}, 
       },
     },
   };
-  return { api, calls, state };
+  return { api, calls, state, machines: fakeMachinesOf.get(base) };
 }
 
 const open = async (list: Routine[], runs?: Record<string, RoutineRun[]>, state?: FakeState) => {
@@ -216,6 +216,41 @@ describe("Rotinas: a routine's details", () => {
       routineRun({ at: ago(300), status: "failed", code: "something_new" }),
     ],
   };
+
+  test("waiting for its computer: 'Trocar computador' where people connect their own, none on the Cloud", async () => {
+    const waiting = routine({
+      id: "rt-mac",
+      name: "Relatório de vendas",
+      state: "waiting_computer",
+      waitingFor: { machineId: "mac-1", machineName: "MacBook do Walter", since: ago(40) },
+      brain: { kind: "claude_code", machineName: "MacBook do Walter" },
+    });
+    const agents = [
+      { agentId: ATLAS_ID, name: "Atlas", brain: "claude_code" as const, waiting: { routines: 1, conversations: 0 } },
+    ];
+    for (const cloud of [false, true]) {
+      const r = withRoutines([structuredClone(waiting)]);
+      r.machines?.setOutages({
+        outages: [
+          {
+            machineId: "mac-1",
+            name: "MacBook do Walter",
+            platform: "darwin",
+            offlineSince: ago(40),
+            agents,
+            waitingRuns: 1,
+          },
+        ],
+        targets: [],
+      });
+      if (cloud) r.machines?.setSetup({ state: "ready" });
+      const view = await renderApp(`/org/${ORG_ID}/routines`, { api: r.api });
+      await settle(8);
+      const panel = await details("Relatório de vendas");
+      expect(within(panel).queryByRole("button", { name: "Trocar computador" }) !== null).toBe(!cloud);
+      view.unmount();
+    }
+  });
 
   test("the week, where it runs, how it works and each run in plain words", async () => {
     await open([busy], runs);

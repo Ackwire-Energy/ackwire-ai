@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { Button, Icon, LineIcon, ProviderLogo, Text } from "@/ui";
-import { useColors, useOrgId } from "../shared/hooks";
+import { useColors, useEdition, useOrgId } from "../shared/hooks";
 import { waitCardText } from "./logic";
 import { openSwitchComputer } from "./OutageNotice";
 import { useMachineOutages } from "./queries";
@@ -39,12 +39,14 @@ export function BrainWait({ message, fallback }: { message: Pick<Message, "meta"
 
 /**
  * The agent's one card while it waits: "Esperando o MacBook Air voltar",
- * "O Claude Code roda nele. Sigo daqui assim que ele voltar · 2 rotinas esperando" and "Trocar computador";
- * by itself it turns into "O MacBook Air voltou" (or "Troquei de computador") with no button.
+ * "O Claude Code roda nele. Sigo daqui assim que ele voltar · 2 rotinas esperando" and, on a self-host,
+ * "Trocar computador"; by itself it turns into "O MacBook Air voltou" (or "Troquei de computador") with no button.
  */
 function WaitCard({ card }: { card: NonNullable<ReturnType<typeof useBrainWait>> }) {
   const { t } = useTranslation();
   const c = useColors();
+  // Only where people connect their own computers: a Cloud workspace has one, and nothing while that isn't known.
+  const switches = useEdition() === "selfhost";
   return (
     <View style={[styles.card, { backgroundColor: c.sunken }]}>
       <View style={styles.top} accessible accessibilityLabel={`${card.title}. ${card.body}`}>
@@ -64,7 +66,7 @@ function WaitCard({ card }: { card: NonNullable<ReturnType<typeof useBrainWait>>
           {card.body}
         </Text>
       </View>
-      {card.done ? null : (
+      {card.done || !switches ? null : (
         <View style={styles.acts}>
           <Button
             variant="secondary"

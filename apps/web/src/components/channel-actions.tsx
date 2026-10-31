@@ -2,6 +2,7 @@ import type { Agent, Message as MessageType } from "@agenteschat/client";
 import { Menu, MenuItem } from "@agenteschat/ui";
 import { createContext, useContext } from "react";
 import { useTranslation } from "react-i18next";
+import { AgentAvatar } from "@/components/AgentAvatar";
 
 /** What rows deeper in the timeline can do with the composer ("Chamar um agente", retry). */
 export interface ChannelActions {
@@ -59,7 +60,12 @@ export function CallAgentMenu() {
       }
     >
       {actions.channelAgents.map((a) => (
-        <MenuItem key={a.id} icon="agent" description={`@${a.handle}`} onSelect={() => actions.insertMention(a.handle)}>
+        <MenuItem
+          key={a.id}
+          leading={<AgentAvatar agentId={a.id} size="xs" name={a.name} />}
+          description={`@${a.handle}`}
+          onSelect={() => actions.insertMention(a.handle)}
+        >
           {a.name}
         </MenuItem>
       ))}

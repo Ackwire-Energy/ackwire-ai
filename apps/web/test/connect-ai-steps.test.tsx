@@ -482,6 +482,10 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(ruleOf(layout, ".ai-panel--plan .agp-addacct__step.ac-iconline > .agp-addacct__wait")).toContain(
       "margin-left: calc((var(--lead) - 14px) / 2)",
     );
+    // So does the line standing in for a field while its code goes, from inside the step's words.
+    expect(ruleOf(layout, ".ai-panel--plan .agp-addacct__busy")).toContain(
+      "margin-left: calc((var(--lead) - 14px) / 2 - var(--text-edge))",
+    );
     // The head's hairline runs edge to edge, as the foot's does; for whom centres on the head's mark.
     expect(ruleOf(layout, ".ai-panel__head")).toContain("margin-inline: calc(-1 * var(--card-pad))");
     expect(ruleOf(layout, ".ai-panel__agent")).toContain("height: var(--lead)");
@@ -914,8 +918,9 @@ describe("Conectar uma IA: one picker, plans first", () => {
       await act(async () => answer());
       await settle(6);
     });
+    expect(within(panel).getByRole("button", { name: "Enviar ao computador" })).toBeTruthy();
+    // This sign-in's code goes by itself.
     await type(within(panel).getByRole("textbox", { name: "Código do Claude" }), "c0de#st4te");
-    await click(within(panel).getByRole("button", { name: "Enviar ao computador" }));
     await settle(4);
     expect(calls(state, "machines.sendAccountCode")).toHaveLength(1);
     expect(shownText(panel)).toContain("Código enviado. O computador está terminando de entrar.");
@@ -1232,7 +1237,10 @@ describe("All agents: one plan for the team, a login per agent", () => {
     // Ada has an AI now, the first that had none: the panel stays on everyone, the key sent once.
     expect(forWhom()).toBe("Todos os agentes");
     expect(who()).toEqual(["done", "now", "now"]);
-    expect((within(panel).getByLabelText("Chave do GLM Coding") as HTMLInputElement).disabled).toBe(true);
+    // Until the last login lands, a line stands in for the key's field and its buttons.
+    expect(within(panel).queryByLabelText("Chave do GLM Coding")).toBeNull();
+    expect(within(panel).queryByRole("button", { name: "Enviar ao MacBook" })).toBeNull();
+    expect(shownText(panel)).toContain("Chave enviada. O MacBook está terminando de entrar.");
     for (const n of [2, 3]) {
       land(n);
       const poll = keys.accountLogin(ORG_ID, "machine_1", `login_${n}`);
