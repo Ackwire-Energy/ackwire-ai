@@ -408,7 +408,7 @@ function RolePage({
         )}
       </header>
       {lock && (
-        <p className="roles-note">
+        <p className="roles-note ac-iconline">
           <Icon name="lock" size={16} />
           <span>{lock}</span>
         </p>
