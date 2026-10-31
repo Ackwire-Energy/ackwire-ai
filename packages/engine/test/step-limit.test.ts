@@ -5,7 +5,9 @@ import {
   ConflictError,
   continuedTranscript,
   continueRun,
+  createAgentRuns,
   createJobHandlers,
+  createPassToolSource,
   drainOutbox,
   insertMessage,
   isScreenCall,
@@ -191,6 +193,37 @@ describe("a conversation run that reaches its step limit mid-work", () => {
       },
     ]);
     expect(JSON.stringify(sent.messages)).toContain('"signature":"sig-1"');
+  });
+
+  test("a run the router brought in: Continuar sends the same tools, `pass` included, though it may no longer pass", async () => {
+    f = await setup({
+      toolSources: [createPassToolSource(), workTools()],
+      reply: (_req, n) =>
+        n <= 3
+          ? { chunks: [], opaque: [thinking], toolUses: [{ name: "look", input: {} }] }
+          : n === 4
+            ? { chunks: [], toolUses: [{ name: "pass", input: { reason: "nada a acrescentar" } }] }
+            : { chunks: ["Revisei o #42 também."] },
+    });
+    const asked = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "person", userId: f.owner.id },
+      body: "alguém olha os PRs?",
+    });
+    await f.db.transaction((tx) => createAgentRuns(tx, asked, [f.agent.id], "router"));
+    await drainOutbox(f.db, handlers(3));
+    const [stopped] = await runs();
+    const last = f.provider.calls.at(-1)?.request as ModelRequest;
+    expect(last.tools?.map((t) => t.name)).toContain("pass");
+
+    const { runId } = await continueRun(deps(), f.owner.id, f.org.id, stopped?.id ?? "");
+    await drainOutbox(f.db, handlers(3));
+    const sent = f.provider.calls[3]?.request as ModelRequest;
+    expect(sent.tools).toEqual(last.tools);
+    expect(JSON.stringify(sent.messages)).toContain('"signature":"sig-1"');
+    // A person asked it to go on: its `pass` is refused, and it answers.
+    expect((await agentMessages(runId)).map((m) => m.body)).toEqual(["Revisei o #42 também."]);
   });
 
   test("a run that ended done any other way can't be continued", async () => {

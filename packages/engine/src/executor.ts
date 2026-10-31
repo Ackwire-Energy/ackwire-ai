@@ -293,6 +293,8 @@ export interface Transcript {
   reported?: boolean;
   /** Nobody called it by name and it called `pass`: the run ends without a message. */
   passed?: { reason: string };
+  /** `pass` was in its first call's tools: listed for good, continuations included (`createPassToolSource`). */
+  passListed?: boolean;
   /** It was told once to answer after a reply that was only the silence word (or nothing). */
   nudged?: boolean;
   /**
@@ -1080,6 +1082,7 @@ async function executeRunInner(
       system: stableFirst(system),
       messages: context.messages,
       ...(toolChoice ? { toolGroups: toolChoice.groups } : {}),
+      ...(tools.some((t) => t.name === PASS_TOOL) ? { passListed: true } : {}),
       postedUpTo: context.messages.length,
       postedCount: 0,
       deltaSeq: 0,
@@ -3025,6 +3028,7 @@ export function continuedTranscript(stopped: Transcript, line: string): Transcri
     ...(stopped.repo ? { repo: stopped.repo } : {}),
     // The same tools and model: the thinking blocks it replays stay valid only with the same `tools`.
     ...(stopped.toolGroups ? { toolGroups: stopped.toolGroups } : {}),
+    ...(stopped.passListed ? { passListed: true } : {}),
     ...(stopped.autoModel ? { autoModel: stopped.autoModel } : {}),
   };
   const last = t.messages.at(-1);
