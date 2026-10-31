@@ -807,6 +807,8 @@ export async function routeMessage(
         authorUserId: messages.authorUserId,
         mentionedAgentIds: messages.mentionedAgentIds,
         routable,
+        // Whom the router sent it to (null: it never decided on it).
+        routedTo: routingDecisions.selectedAgentIds,
         threadId: messages.threadId,
         // As text, which every driver reads the same way.
         replyTo: sql<string | null>`(${messages.meta}->'replyTo')::text`,
@@ -815,6 +817,10 @@ export async function routeMessage(
       .from(messages)
       .leftJoin(users, eq(users.id, messages.authorUserId))
       .leftJoin(agents, eq(agents.id, messages.authorAgentId))
+      .leftJoin(
+        routingDecisions,
+        and(eq(routingDecisions.orgId, messages.orgId), eq(routingDecisions.messageId, messages.id)),
+      )
       .where(and(eq(messages.orgId, message.orgId), eq(messages.channelId, message.channelId), where));
   const [history, [root], people] = await Promise.all([
     historyOf(
@@ -948,20 +954,23 @@ export async function routeMessage(
   if (repliedAgentId) continuityAgentId = repliedAgentId;
   const continuityHandle = candidates.find((c) => c.agentId === continuityAgentId)?.handle ?? null;
   // With no continuity, the agent this person last talked to here, among two or more agents and not when they
-  // speak to a person: of their latest exchange within what the router reads (`ROUTER_SLICE.maxAgeMs`), the one
-  // agent they @mentioned, else the first agent that answered them, as R3 reads an exchange. Read newest first,
-  // so no other agent was addressed since.
+  // speak to a person: the one agent their latest message to an agent went to, within what the router reads
+  // (`ROUTER_SLICE`: 30 minutes, 12 messages). It went to whom it @mentioned, else to whom the router sent it
+  // (one still at work counts), else, never routed, to the first agent that answered it. Read newest first, so
+  // no other agent was addressed since; one that went to several agents is no one's.
   let lastTalkedTo: string | null = null;
   if (continues && !namesPerson && !continuityAgentId && candidates.length >= 2) {
     let answeredBy: string | null = null;
     for (const m of [...before, ...(root ? [root] : [])]) {
       if (message.createdAt.getTime() - m.createdAt.getTime() > ROUTER_SLICE.maxAgeMs) break;
       if (m.authorAgentId) answeredBy = m.authorAgentId;
-      else if (m.authorUserId === message.authorUserId && (m.mentionedAgentIds.length > 0 || answeredBy)) {
-        const agentId = m.mentionedAgentIds.length === 1 ? m.mentionedAgentIds[0] : answeredBy;
-        lastTalkedTo = agentId && candidateIds.has(agentId) ? agentId : null;
-        break;
-      }
+      if (m.authorUserId !== message.authorUserId) continue;
+      const to =
+        m.mentionedAgentIds.length > 0 ? m.mentionedAgentIds : (m.routedTo ?? (answeredBy ? [answeredBy] : []));
+      if (to.length === 0) continue;
+      const [only] = to;
+      lastTalkedTo = to.length === 1 && only && candidateIds.has(only) ? only : null;
+      break;
     }
   }
   // R2: a person alone in the channel with its one agent.

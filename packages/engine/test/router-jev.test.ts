@@ -5,6 +5,7 @@ import {
   AGENT_CHIME_IN_SCORE,
   addChannelMember,
   createAgent,
+  createAgentRuns,
   createChannel,
   createJevJudge,
   createJevKey,
@@ -494,7 +495,13 @@ describe("who a message speaks to", () => {
 });
 
 describe("the agent a person last talked to", () => {
-  type Said = [by: { id: string } | null, text: string, minutesAgo: number];
+  /** `by`: an agent (in `runId`, when given), else Ana; `routedTo`: the agents the router sent it to. */
+  type Said = [
+    by: { id: string; runId?: string } | null,
+    text: string,
+    minutesAgo: number,
+    routedTo?: { id: string }[],
+  ];
 
   /** Ana alone with Theo (PM) and Ada (Dev), as in #private on 2026-10-31. */
   async function privateRoom() {
@@ -515,16 +522,27 @@ describe("the agent a person last talked to", () => {
       n += 1;
       const channel = await createChannel(f.db, f.owner.id, f.org.id, { name: `private-${n}` });
       for (const a of [theo, ada]) await addChannelMember(f.db, f.owner.id, f.org.id, channel.id, { agentId: a.id });
-      const say = ([author, text, minutesAgo]: Said) =>
-        insertMessage(f.db, {
+      const say = async ([author, text, minutesAgo, routedTo]: Said) => {
+        const m = await insertMessage(f.db, {
           orgId: f.org.id,
           channelId: channel.id,
           author: author
-            ? { type: "agent", agentId: author.id, runId: null, hop: 1, stretchId: null }
+            ? { type: "agent", agentId: author.id, runId: author.runId ?? null, hop: 1, stretchId: null }
             : { type: "person", userId: f.owner.id },
           body: text,
           createdAt: new Date(Date.now() - minutesAgo * 60_000),
         });
+        if (routedTo)
+          await f.db.insert(schema.routingDecisions).values({
+            orgId: f.org.id,
+            channelId: channel.id,
+            messageId: m.id,
+            strategy: "jev",
+            candidates: [],
+            selectedAgentIds: routedTo.map((a) => a.id),
+          });
+        return m;
+      };
       for (const line of before) await say(line);
       const m = await say([by, body, 0]);
       const strategy = createJevRouterStrategy({
@@ -555,7 +573,7 @@ describe("the agent a person last talked to", () => {
   test("'me de bom dia todo dia ás 8:30 da manha' 23 minutes after a talk with Ada is hers, though Theo scored a little more", async () => {
     const t = await privateRoom();
     const talkWithAda = (minutesAgo: number): Said[] => [
-      [null, "ada quanto ta seu limite de uso?", minutesAgo + 0.4],
+      [null, "ada quanto ta seu limite de uso?", minutesAgo + 0.4, [t.ada]],
       [t.ada, "Heitor, não consigo consultar meu saldo de uso por aqui.", minutesAgo],
     ];
     const { selected, decision } = await t.talk(talkWithAda(22.8), BOM_DIA, bomDia("theo", "ada"));
@@ -565,6 +583,9 @@ describe("the agent a person last talked to", () => {
     expect(selected).toEqual([t.ada.id]);
     // Kept with the agent she talks to, by code: Ada may not pass, and the reason says why.
     expect(decision?.reason).toBe("follow-up; last talked to; jev: best @theo (confidence 0.83)");
+    // A thank-you the router sent to nobody since doesn't end the talk.
+    const thanked = await t.talk([...talkWithAda(22.8), [null, "valeu", 20, []]], BOM_DIA, bomDia("theo", "ada"));
+    expect(thanked.selected).toEqual([t.ada.id]);
     // Past what the router reads (30 minutes), the scores decide, as they did that day.
     expect((await t.talk(talkWithAda(30.5), BOM_DIA, bomDia("theo", "ada"))).selected).toEqual([t.theo.id]);
   });
@@ -614,16 +635,30 @@ describe("the agent a person last talked to", () => {
       leansToAda,
     );
     expect(answered.selected).toEqual([t.theo.id]);
+    // Theo asked by name a minute ago, and the router sent it to him: still at work, he hasn't answered yet.
+    const working = await t.talk(
+      [...talkWithAda, [null, "theo, cria uma task pra revisar o PR do checkout", 1, [t.theo]]],
+      BOM_DIA,
+      leansToAda,
+    );
+    expect(working.selected).toEqual([t.theo.id]);
   });
 
   test("an agent's message is unchanged: only a clear pick, the best one, and it may pass", async () => {
     const t = await privateRoom();
-    // Ana last talked to Ada (who hasn't answered, so she can still be brought in).
+    // Ana last talked to Ada (who hasn't answered, so she can still be brought in), and the agent writes for her.
+    const ask = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "person", userId: f.owner.id },
+      body: "pede pra alguém criar minha rotina de bom dia às 8:30",
+    });
+    const [run] = await f.db.transaction((tx) => createAgentRuns(tx, ask, [f.agent.id], "mention"));
     const { selected, decision } = await t.talk(
       [[null, "@ada quanto ta seu limite de uso?", 23]],
       "alguém cria a rotina de bom dia do Heitor às 8:30?",
       () => ({ nouls: { "@theo": 0.9, "@ada": 0.85 }, needs: 0.9, best: "theo" }),
-      f.agent,
+      { id: f.agent.id, runId: run?.id },
     );
     expect(selected).toEqual([t.theo.id]);
     expect(decision?.reason).toBe("jev: best @theo (confidence 0.80)");
