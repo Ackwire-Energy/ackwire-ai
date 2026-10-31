@@ -816,6 +816,10 @@ describe("on agentes.chat Cloud: a restriction's kind and how to contest it, nev
       errorCode: "run.org_paused",
       errorParams: { reason: "review" },
     });
+    // `review.<category>` is the Cloud's alone: here it reads as it was set.
+    expect(new OrgPausedError({ state: "hold", reason: "review.fraud", notice: "shown" }).message).toBe(
+      "This workspace is on hold: review.fraud",
+    );
     await setOrgStanding({ db: f.db }, f.org.id, { state: "hold", reason: "review", notice: "shown" });
     expect((await standingNotices()).map((n) => n.latest)).toEqual([{ statusTo: "hold", text: "review" }]);
   });

@@ -9155,6 +9155,7 @@ export const en: Translations = {
       /** The same hold set with what was flagged (`review.<category>`): `what` is that category's `reviewWhat`. */
       reviewFor:
         "Paused for a safety review, until our team looks at it. Our automated checks flagged activity that seems to involve {{what}}, which our Terms don't allow (section 5). To contest it, write to {{email}}.",
+      /** Also the server's own English text (`packages/engine/src/standing.ts`), which a refused run keeps. */
       reviewWhat: {
         phishing_impersonation: "phishing or impersonating a brand",
         account_takeover: "getting into other people's accounts",

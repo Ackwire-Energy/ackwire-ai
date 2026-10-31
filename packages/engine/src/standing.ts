@@ -1,5 +1,6 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, ne, schema, sql } from "@agenteschat/db";
+import { en } from "@agenteschat/i18n/en";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { ForbiddenError } from "./errors";
@@ -107,16 +108,13 @@ const AGENT_HELD = "This agent is paused: ";
 
 const FLAGGED = "automated checks flagged activity that seems to involve ";
 /**
- * What agentes.chat Cloud's automatic hold flagged (`review.<category>`, the apps' `standing.cloud.reviewWhat`), in
- * words in the standing's text, which people read in an error's message and in a computer's refused call. A run keeps
- * the words in its error, and `standingErrorDetail` reads the reason back from them.
+ * On agentes.chat Cloud, what its automatic hold flagged (`review.<category>`) in the apps' English words
+ * (`standing.cloud.reviewWhat`), in the standing's text, which people read in an error's message and in a computer's
+ * refused call. A run keeps the words in its error, and `standingErrorDetail` reads the reason back from them.
  */
-const REVIEW_FLAGGED = new Map([
-  ["review.phishing_impersonation", `${FLAGGED}phishing or impersonating a brand`],
-  ["review.account_takeover", `${FLAGGED}getting into other people's accounts`],
-  ["review.fraud", `${FLAGGED}fraud`],
-  ["review.illegal_content", `${FLAGGED}illegal content`],
-]);
+const REVIEW_FLAGGED = new Map<string, string>(
+  Object.entries(en.standing.cloud.reviewWhat).map(([category, what]) => [`review.${category}`, `${FLAGGED}${what}`]),
+);
 
 /** The told reason in a standing's text: back from the words of `REVIEW_FLAGGED`, else as it was written. */
 const reasonIn = (said: string) => [...REVIEW_FLAGGED].find(([, words]) => words === said)?.[0] ?? said;
@@ -124,7 +122,7 @@ const reasonIn = (said: string) => [...REVIEW_FLAGGED].find(([, words]) => words
 /** What the workspace reads when work is refused; silent, only that it is paused. */
 export function standingText(s: WorkspaceStanding): string {
   const reason = toldReason(s);
-  const said = reason && (REVIEW_FLAGGED.get(reason) ?? reason);
+  const said = reason && ((cloudNotices && REVIEW_FLAGGED.get(reason)) || reason);
   if (s.state === "suspended") return said ? `${SUSPENDED}${said}` : UNAVAILABLE;
   return said ? `${ON_HOLD}${said}` : PAUSED;
 }
