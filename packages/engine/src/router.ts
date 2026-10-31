@@ -104,8 +104,8 @@ export interface RoutingResult {
    */
   forEveryone?: number;
   /**
-   * The agent the message speaks to (`withAddressee`), when the step is sure of one: who the person talks to
-   * now, over who spoke last and the message they replied to.
+   * The agent a person's message speaks to (`withAddressee`), when the step is sure of one: who they talk to
+   * now, over who spoke last, and over the agent whose message they replied to once it is picked.
    */
   addressee?: string;
   /** The deciding step's own words (model text: stored after the step's name, never shown). */
@@ -654,7 +654,7 @@ export { AGENT_CHIME_IN_MAX_HOP };
  * their next one; when it comes and the router decides on it too
  * (`routable`), that one decides for both (`continued`). The agent a
  * person's message speaks to (`addressee`) answers it, addressed, over who
- * spoke last and the message replied to.
+ * spoke last, and over the agent replied to once the router picks it.
  *
  * When no step of the chain can read a person's message, rules in code pick
  * (ADR 0074 §4): R1 a reply to an agent, R2 the only agent when the author is
