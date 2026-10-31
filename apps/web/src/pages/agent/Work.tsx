@@ -274,15 +274,16 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
     <div className="agp-work">
       <section className="agp-workcard" aria-label={t("agentPage.work.cell.label", g)}>
         <div className="agp-cells">
-          {!member && (
+          {/* The Cloud's agents all work on the workspace's own computer, whose state the page's computer entry says:
+              nothing to pick, so no cell. */}
+          {!member && edition === "selfhost" && (
             <Cell
               icon={<Icon name={choice === "none" ? "dash" : "computer"} size={16} />}
               label={choice === "none" ? t("computer.target.label") : t("agentPage.work.cell.computer")}
               value={machine ? machine.name : choice ? noComputer.label(choice) : null}
               sub={waiting ? t(waiting.chipKey) : choice === "none" ? t("computer.target.noneText") : null}
               openLabel={t("agentPage.work.open.computer", g)}
-              // The Cloud's agents all work on the workspace's own computer: nothing to pick.
-              onOpen={can("machine") && edition === "selfhost" ? () => onOpen("computer") : undefined}
+              onOpen={can("machine") ? () => onOpen("computer") : undefined}
             />
           )}
           {noAi ? (

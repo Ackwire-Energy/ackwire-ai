@@ -329,6 +329,7 @@ describe("the agent's screen in the computer dialog", () => {
     expect(rfb().options).toEqual({ shared: true });
     expect(rfb()).toMatchObject({
       viewOnly: true,
+      showDotCursor: false,
       qualityLevel: 3,
       compressionLevel: 2,
       scaleViewport: true,
@@ -509,15 +510,13 @@ describe("the agent's screen in the computer dialog", () => {
     await settle(4);
     expect(t.sockets.desktops.at(-1)?.url).toEndWith("&mode=control");
     expect(t.sockets.desktops[0]?.closed).toBe(true);
-    expect(rfb()).toMatchObject({ viewOnly: false, qualityLevel: 6, focusOnClick: false });
+    expect(rfb()).toMatchObject({ viewOnly: false, showDotCursor: true, qualityLevel: 6, focusOnClick: false });
     await connected();
     // The person's keys go to the screen at once, through a field over it.
     expect(document.activeElement).toBe(view().getByRole("textbox", { name: "Digitar no computador da Ada" }));
     expect(sub()).toBe("Você no controle · a\u00a0Ada espera");
-    // What programs there can see first: the window keeps that whole, and the keys after it where they fit.
-    expect(line()).toBe(
-      "Os programas do computador da Ada veem a tela e o que você digita ou cola. Copiar e colar como sempre: Ctrl+C, Ctrl+V.",
-    );
+    // What programs there can see, and nothing else: copy and paste work as anywhere.
+    expect(line()).toBe("Os programas do computador da Ada veem a tela e o que você digita ou cola.");
     // No box to paste into and no keyboard to pick: the person's own keys paste, and type in their own layout.
     expect(view().queryByRole("textbox", { name: "Texto para colar no computador da Ada" })).toBeNull();
     expect(view().queryByRole("combobox")).toBeNull();
@@ -569,12 +568,12 @@ describe("the agent's screen in the computer dialog", () => {
     await click(view().getByRole("button", { name: "Assumir o controle" }));
     await settle(4);
     await connected();
-    // The ⓘ goes with what programs there can see, which the window never parts from it; the keys come after them.
+    // The ⓘ goes with what programs there can see, the line's only words.
     const hintLine = document.querySelector(".dsk-line > .dsk-words > .ac-hintline") as HTMLElement;
     expect(hintLine.querySelector(":scope > .muted")?.textContent).toBe(
       "Os programas do computador da Ada veem a tela e o que você digita ou cola.",
     );
-    expect(hintLine.nextElementSibling?.textContent).toBe("Copiar e colar como sempre: Ctrl+C, Ctrl+V.");
+    expect(hintLine.nextElementSibling).toBeNull();
     const hint = about() as HTMLElement;
     expect(hintLine.contains(hint)).toBe(true);
     const words =
@@ -590,21 +589,23 @@ describe("the agent's screen in the computer dialog", () => {
     expect(document.querySelector(".dsk-line .ac-hint, .dsk-line .ac-hintline")).toBeNull();
   });
 
-  test("taking control opens behind Abrindo, over no old picture: the keys reach the computer once it is connected", async () => {
+  test("taking control keeps the last picture under Assumindo o controle…, never Abrindo: the keys reach the computer once it is connected", async () => {
     const t = await dialog();
     await connected();
     await click(view().getByRole("button", { name: "Assumir o controle" }));
     await settle(4);
     expect(t.sockets.desktops.at(-1)?.url).toEndWith("&mode=control");
     expect(sub()).toBe("Você no controle · a\u00a0Ada espera");
-    // noVNC drops keys until its connection opens: nothing that looks ready meanwhile.
-    expect(still()).toBeNull();
-    expect(screen().getByText("Abrindo o computador da Ada…")).toBeTruthy();
+    // noVNC drops keys until its connection opens: the picture stays, frosted, so it never looks ready meanwhile.
+    expect(still()).not.toBeNull();
+    expect(screen().getByText("Assumindo o controle…")).toBeTruthy();
+    expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
     const field = view().getByRole("textbox", { name: "Digitar no computador da Ada" });
     fireEvent.keyDown(field, { key: "a", code: "KeyA" });
     expect(rfb().log).toEqual([]);
     await connected();
-    expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
+    expect(still()).toBeNull();
+    expect(screen().queryByText("Assumindo o controle…")).toBeNull();
     fireEvent.keyDown(field, { key: "b", code: "KeyB" });
     expect(rfb().log).toEqual(["keydown b KeyB"]);
   });
@@ -626,7 +627,7 @@ describe("the agent's screen in the computer dialog", () => {
     expect(sub()).toBe("Ao vivo · você está assistindo");
   });
 
-  test("control taken again while a hand back's picture is still held: that picture goes, and control opens behind Abrindo", async () => {
+  test("control taken again while a hand back's picture is still held: that picture stays under Assumindo o controle…", async () => {
     const t = await controlled();
     await click(view().getByRole("button", { name: "Devolver" }));
     await click(view().getByRole("button", { name: "Devolver" }));
@@ -635,8 +636,9 @@ describe("the agent's screen in the computer dialog", () => {
     await click(view().getByRole("button", { name: "Assumir o controle" }));
     await settle(4);
     expect(t.sockets.desktops.at(-1)?.url).toEndWith("&mode=control");
-    expect(still()).toBeNull();
-    expect(screen().getByText("Abrindo o computador da Ada…")).toBeTruthy();
+    expect(still()).not.toBeNull();
+    expect(screen().getByText("Assumindo o controle…")).toBeTruthy();
+    expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
   });
 
   test("Take control refused: said in the head, in its line's place, not in a toast over the window's corner", async () => {
@@ -803,7 +805,7 @@ describe("the agent's screen in the computer dialog", () => {
     replaceOn(navigator, "platform", "MacIntel");
     const board = clipboard();
     const t = await controlled();
-    expect(line()).toEndWith(". Copiar e colar como sempre: ⌘C, ⌘V.");
+    expect(line()).toBe("Os programas do computador da Ada veem a tela e o que você digita ou cola.");
     const field = t.field();
     fireEvent.keyDown(field, { key: "Meta", code: "MetaLeft", metaKey: true });
     fireEvent.keyDown(field, { key: "c", code: "KeyC", metaKey: true });
@@ -887,7 +889,7 @@ describe("the agent's screen in the computer dialog", () => {
     await settle(4);
     await connected();
     expect(said()).toBeUndefined();
-    expect(line()).toEndWith(". Copiar e colar como sempre: Ctrl+C, Ctrl+V.");
+    expect(line()).toBe("Os programas do computador da Ada veem a tela e o que você digita ou cola.");
   });
 
   test("the newest copy speaks: one kept out right after a Copiado is offered at once, not under the older word", async () => {
@@ -1225,21 +1227,19 @@ describe("the dialog's size (computer.css)", () => {
     expect(kit).toContain("@media (pointer: coarse) {\n  .ac-btn--sm {\n    min-height: var(--control-h-md);");
   });
 
-  test("the line's ⓘ is its first sentence's: 4 px after its last letter, the keys' sentence clearly further on", async () => {
-    const desk = await Bun.file(new URL("../src/components/desktop/desktop.css", import.meta.url).pathname).text();
-    expect(rule(desk, ".dsk-words > .ac-hintline:not(:last-child)")).toContain("margin-inline-end: 8px");
+  test("the line's ⓘ is its sentence's: 4 px after its last letter", async () => {
     const kit = await Bun.file(
       new URL("../../../packages/ui/src/styles/components.css", import.meta.url).pathname,
     ).text();
     // The kit's hint line: the ⓘ 4 px after the last letter, in the 18 px it keeps for it.
     expect(rule(kit, ".ac-hintline > .ac-hint")).toContain("margin-inline: -1px -23px");
     expect(rule(kit, ".ac-hintline")).toContain("padding-inline-end: 18px");
-    // In control on the Cloud the ⓘ is in the hint line, after its words, and the keys follow that line.
+    // In control on the Cloud the ⓘ is in the hint line, after its words, and nothing follows that line.
     await controlled(true);
     const hintLine = document.querySelector(".dsk-line > .dsk-words > .ac-hintline") as HTMLElement;
     const hint = hintLine.querySelector(":scope > .ac-hint");
     expect(hint?.previousElementSibling?.classList.contains("muted")).toBe(true);
-    expect(hintLine.nextElementSibling?.textContent).toBe("Copiar e colar como sempre: Ctrl+C, Ctrl+V.");
+    expect(hintLine.nextElementSibling).toBeNull();
   });
 
   /** A phone's rule: one of `@media (max-width: 640px)`. */
@@ -1415,7 +1415,7 @@ describe("the dialog's size (computer.css)", () => {
     expect(wide.split("\n  .cmp-body:has(> .dsk) > .cmp-steps-row > .cmp-steps {")[1]?.split("}")[0]).toContain(middle);
 
     // Opening, live and watching: what programs there can see, the screen opening where its cover was, without the ⓘ
-    // (what may be checked in control) and without the keys, which come with control.
+    // (what may be checked in control), which comes with control.
     const t = await dialog(RUNNING, true);
     expect(screen().getByText("Abrindo o computador da Ada…")).toBeTruthy();
     expect(line()).toBe(WATCHING);
@@ -1423,13 +1423,12 @@ describe("the dialog's size (computer.css)", () => {
     expect(line()).toBe(WATCHING);
     expect(document.querySelector(".dsk-line .ac-hint")).toBeNull();
     expect(document.querySelector(".dsk-line > .dsk-words > .muted")).toBeTruthy();
-    // In control the same words lead the line, the ⓘ and the keys after them.
+    // In control the same words make the line, the ⓘ after them.
     await click(view().getByRole("button", { name: "Assumir o controle" }));
     await settle(4);
     await connected();
     expect([...document.querySelectorAll(".dsk-line > .dsk-words .muted")].map((m) => m.textContent)).toEqual([
       "Os programas do computador da Ada veem a tela e o que você digita ou cola.",
-      "Copiar e colar como sempre: Ctrl+C, Ctrl+V.",
     ]);
     expect(document.querySelector(".dsk-line .ac-hint")).toBeTruthy();
     expect(t.sockets.desktops.length).toBeGreaterThan(1);

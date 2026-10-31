@@ -176,9 +176,9 @@ test("on a phone the screen and its covers ship as one box, one block with its l
   expect(glide.some((d) => d.startsWith("transition:flex-grow"))).toBe(true);
 });
 
-test("the keys line's ⓘ ships with its first sentence, the keys clearly further on", async () => {
-  const shipped = await ships(DESKTOP, `src/${DESKTOP}`, ".dsk-words > .ac-hintline:not(:last-child)");
-  expect(shipped).toContain("margin-inline-end:8px");
+test("watching, the person's own pointer ships over the screen, past noVNC's inline cursor", async () => {
+  const shipped = await ships(DESKTOP, `src/${DESKTOP}`, ".dsk-screen:not(.is-control) canvas");
+  expect(shipped).toContain("cursor:default!important");
 });
 
 test("the wait's bar ships as far from the right as from the left: setup's well and Settings' card", async () => {
