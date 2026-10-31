@@ -88,6 +88,13 @@ const brainDialog = async () => {
   await click(screen().getByRole("button", { name: "Mudar quem pensa" }));
   return screen().getByRole("dialog", { name: "Quem pensa" });
 };
+/** "Configuração avançada" over "Quem pensa", where the switch is (ADR 0086). */
+const ADVANCED = /^(Configuração avançada|Advanced settings)/;
+const advanced = async (d: HTMLElement) => {
+  await click(within(d).getByRole("button", { name: ADVANCED }));
+  return screen().getByRole("dialog", { name: ADVANCED });
+};
+const done = (a: HTMLElement) => click(within(a).getByRole("button", { name: "Pronto" }));
 const replies = (d: HTMLElement) => within(d).getByRole("switch", { name: "Atende outras pessoas" });
 /** The line under the switch. */
 const lineOf = (row: HTMLElement) => row.querySelector(".plan-replies__terms > span") as HTMLElement;
@@ -99,7 +106,8 @@ describe("Atende outras pessoas (Quem pensa)", () => {
   test("off by default; on asks nothing; the line under it says whom Ada answers in each state, the terms behind its ⓘ", async () => {
     const state = await ada({});
     const d = await brainDialog();
-    const off = replies(d);
+    const a = await advanced(d);
+    const off = replies(a);
     expect(off.getAttribute("aria-checked")).toBe("false");
     // Under the switch: whom she answers now, on which plan, and the plan's terms behind its ⓘ; both describe the
     // switch.
@@ -110,12 +118,14 @@ describe("Atende outras pessoas (Quem pensa)", () => {
     expect(off.getAttribute("aria-describedby")).toBe(
       `${lineOf(row).id} ${hint.button.getAttribute("aria-describedby")}`,
     );
-    expect(shownText(d)).not.toMatch(/risco|Manter só comigo|uso pessoal|zona cinzenta/);
+    expect(shownText(a)).not.toMatch(/risco|Manter só comigo|uso pessoal|zona cinzenta/);
 
     await click(off);
+    // Nothing asked: the advanced settings are the only dialog on top.
     expect(screen().queryAllByRole("dialog")).toHaveLength(1);
-    expect(replies(d).getAttribute("aria-checked")).toBe("true");
+    expect(replies(a).getAttribute("aria-checked")).toBe("true");
     expect(shownText(row)).toBe("Atende outras pessoasA Ada atende quem pode falar com ela, pelo seu plano do Claude.");
+    await done(a);
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
     expect(brainCalls(state)).toEqual([{ brain: "claude_code", model: null, fallback: true, onlyOwner: false }]);
@@ -125,8 +135,8 @@ describe("Atende outras pessoas (Quem pensa)", () => {
   test("in English, the same line for each state", async () => {
     await ada({}, { en: true });
     await click(screen().getByRole("button", { name: "Change who thinks" }));
-    const d = screen().getByRole("dialog");
-    const off = within(d).getByRole("switch", { name: "Answers other people" });
+    const a = await advanced(screen().getByRole("dialog"));
+    const off = within(a).getByRole("switch", { name: "Answers other people" });
     const row = off.closest(".plan-replies") as HTMLElement;
     expect(shownText(row)).toBe("Answers other peopleAda answers only you, on your Claude plan.");
     expect(within(row).getByRole("button", { name: "About the plan's terms" })).toBeTruthy();
@@ -137,11 +147,13 @@ describe("Atende outras pessoas (Quem pensa)", () => {
   test("on already: off brings back only its owner, with nothing asked", async () => {
     const state = await ada({ onlyOwner: false });
     const d = await brainDialog();
-    expect(replies(d).getAttribute("aria-checked")).toBe("true");
-    expect(lineOf(replies(d).closest(".plan-replies") as HTMLElement).textContent).toBe(
+    const a = await advanced(d);
+    expect(replies(a).getAttribute("aria-checked")).toBe("true");
+    expect(lineOf(replies(a).closest(".plan-replies") as HTMLElement).textContent).toBe(
       "A Ada atende quem pode falar com ela, pelo seu plano do Claude.",
     );
-    await click(replies(d));
+    await click(replies(a));
+    await done(a);
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
     expect(brainCalls(state).at(-1)).toEqual({ brain: "claude_code", model: null, fallback: true, onlyOwner: true });
@@ -150,7 +162,7 @@ describe("Atende outras pessoas (Quem pensa)", () => {
 
   test("each plan in its own words: ChatGPT's plan, a team seat (an account or the computer's own), a coding plan's maker", async () => {
     const terms = async () => {
-      const row = replies(await brainDialog()).closest(".plan-replies") as HTMLElement;
+      const row = replies(await advanced(await brainDialog())).closest(".plan-replies") as HTMLElement;
       return { line: lineOf(row).textContent, text: hintOf(TERMS, row).text };
     };
     await ada({ brain: "codex", effectiveModel: "gpt-6-sol" });
@@ -207,7 +219,9 @@ describe("Atende outras pessoas (Quem pensa)", () => {
     await click(
       within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getByRole("radio", { name: /^Claude Code/ }),
     );
-    expect(replies(d).getAttribute("aria-checked")).toBe("false");
+    const a = await advanced(d);
+    expect(replies(a).getAttribute("aria-checked")).toBe("false");
+    await done(a);
     await click(within(d).getByRole("button", { name: "Usar meu plano do Claude" }));
     await settle(6);
     expect(brainCalls(state)).toEqual([{ brain: "claude_code", model: null, fallback: true }]);
@@ -216,13 +230,13 @@ describe("Atende outras pessoas (Quem pensa)", () => {
   test("someone else's agent: whom it answers and who decides, no switch", async () => {
     const WHO = "A Ada pensa com o plano de João. Só João pode deixar outras pessoas falarem com ela.";
     await ada({}, { mine: false });
-    let d = await brainDialog();
+    let d = await advanced(await brainDialog());
     expect(within(d).queryByRole("switch", { name: /atende/i })).toBeNull();
     const row = d.querySelector(".plan-replies") as HTMLElement;
     expect(shownText(row)).toBe(`Só atende João${WHO}`);
     cleanup();
     await ada({ onlyOwner: false }, { mine: false });
-    d = await brainDialog();
+    d = await advanced(await brainDialog());
     expect(shownText(d.querySelector(".plan-replies") as HTMLElement)).toBe(`Atende outras pessoas${WHO}`);
     expect(within(d).queryByRole("switch", { name: /atende/i })).toBeNull();
   });
