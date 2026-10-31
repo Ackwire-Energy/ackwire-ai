@@ -128,6 +128,7 @@ export {
   readRecentEmoji,
   rememberEmoji,
 } from "./components/EmojiPicker";
+export { ErrorBoundary } from "./components/ErrorBoundary";
 export { AffixInput, Field, type FieldProps, Input, SearchInput, Textarea, useFieldControl } from "./components/Field";
 export {
   FILTER_SEARCH_AFTER,

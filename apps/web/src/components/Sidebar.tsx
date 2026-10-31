@@ -33,6 +33,7 @@ import {
   CountBadge,
   CountChip,
   cx,
+  ErrorBoundary,
   Icon,
   type IconName,
   Kbd,
@@ -120,6 +121,17 @@ function SidebarSkeleton({ count, avatar, label }: { count: number; avatar?: boo
         </span>
       ))}
     </SkeletonGroup>
+  );
+}
+
+/** In place of an agent's or a person's row that failed to draw (`ErrorBoundary`): the rest of the sidebar works. */
+function UnshownRow() {
+  const { t } = useTranslation();
+  return (
+    <span className="sidebar__item sidebar__item--unshown" title={t("shell.unshown")}>
+      <Icon name="alert" />
+      <span className="sidebar__item-label">{t("shell.unshown")}</span>
+    </span>
   );
 }
 
@@ -248,24 +260,25 @@ export function Sidebar() {
   // Owners and admins organize the groups, with the full sidebar (the rail shows faces only).
   const organize = arranges && !rail;
   const agentRow = (a: Agent) => (
-    <AgentRow
-      key={a.id}
-      agent={a}
-      unread={unreadWith.get(a.id) ?? 0}
-      waitingFor={waitingFor.get(a.id)}
-      onPrefetch={() => prefetchDm(a.id)}
-      onOpen={() => markOpen(dmWith.get(a.id) ?? a.id)}
-      drag={organize ? drag.row(a.id) : undefined}
-      menu={
-        organize ? (
-          <AgentGroupMenu
-            agent={a}
-            groups={groups}
-            onNewGroup={() => setGroupDialog({ mode: "create", agentIds: [a.id] })}
-          />
-        ) : undefined
-      }
-    />
+    <ErrorBoundary key={a.id} fallback={<UnshownRow />}>
+      <AgentRow
+        agent={a}
+        unread={unreadWith.get(a.id) ?? 0}
+        waitingFor={waitingFor.get(a.id)}
+        onPrefetch={() => prefetchDm(a.id)}
+        onOpen={() => markOpen(dmWith.get(a.id) ?? a.id)}
+        drag={organize ? drag.row(a.id) : undefined}
+        menu={
+          organize ? (
+            <AgentGroupMenu
+              agent={a}
+              groups={groups}
+              onNewGroup={() => setGroupDialog({ mode: "create", agentIds: [a.id] })}
+            />
+          ) : undefined
+        }
+      />
+    </ErrorBoundary>
   );
 
   // Only the middle scrolls: the workspace card on top and the foot stay put. The active item
@@ -504,13 +517,14 @@ export function Sidebar() {
             summary={peopleUnread > 0 && <UnreadCount count={peopleUnread} />}
           >
             {people.map((m) => (
-              <PersonRow
-                key={m.userId}
-                member={m}
-                unread={unreadWith.get(m.userId) ?? 0}
-                onPrefetch={() => prefetchDm(m.userId)}
-                onOpen={() => markOpen(dmWith.get(m.userId) ?? m.userId)}
-              />
+              <ErrorBoundary key={m.userId} fallback={<UnshownRow />}>
+                <PersonRow
+                  member={m}
+                  unread={unreadWith.get(m.userId) ?? 0}
+                  onPrefetch={() => prefetchDm(m.userId)}
+                  onOpen={() => markOpen(dmWith.get(m.userId) ?? m.userId)}
+                />
+              </ErrorBoundary>
             ))}
           </SidebarSection>
         )}

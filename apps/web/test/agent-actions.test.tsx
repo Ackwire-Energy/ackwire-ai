@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -8,7 +8,7 @@ import { AGENT_ACTION_KINDS, ApiError } from "@agenteschat/client";
 import { en, ptBR } from "@agenteschat/i18n";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { RECEIPT_ICONS } from "@/components/AgentActions";
-import { ADA_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -232,6 +232,64 @@ describe("receipts this build doesn't expect", () => {
     expect(row.textContent).toContain("Fiz uma mudança");
     expect(row.querySelector(".ag-rc__ic svg")).not.toBeNull();
     expect(within(receipts()).getByRole("button", { name: /^Desfazer/ })).toBeTruthy();
+  });
+
+  test("one that throws: its message is one quiet line, reported once; the channel, the sidebar, the other messages and the composer stay", async () => {
+    const logged = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const broken = action({ params: null as never });
+      const { socket } = await open(withActions([broken]));
+      const reports = () => logged.mock.calls.filter((args) => args.some((a) => a instanceof TypeError));
+      expect(screen().getAllByText("Esta mensagem não pôde ser exibida")).toHaveLength(1);
+      expect(document.body.textContent).not.toContain("Olhei o código");
+      expect(screen().getByRole("heading", { name: "# eng" })).toBeTruthy();
+      const messages = within(screen().getByRole("region", { name: "Mensagens" })).getAllByRole("article");
+      expect(messages.some((a) => a.textContent?.includes("o login está devolvendo 401"))).toBe(true);
+      const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
+      expect(within(nav).getAllByText("general").length).toBeGreaterThan(0);
+      expect(within(nav).getAllByText("Atlas").length).toBeGreaterThan(0);
+      expect(screen().getByRole("combobox", { name: "Mensagem para #eng" })).toBeTruthy();
+      expect(reports()).toHaveLength(1);
+      // Its receipts change live: still one line, not reported again.
+      await act(async () =>
+        socket.push({
+          type: "event",
+          channelId: ENG_ID,
+          event: {
+            type: "message.actions",
+            channelId: ENG_ID,
+            threadId: null,
+            messageId: "m-act",
+            actions: [broken, memory()],
+          },
+        }),
+      );
+      await settle(3);
+      expect(screen().getAllByText("Esta mensagem não pôde ser exibida")).toHaveLength(1);
+      expect(reports()).toHaveLength(1);
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
+  test("a sidebar row that throws is one quiet row: the other rows and the conversation stay", async () => {
+    const logged = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await open(
+        withActions([action()], (s) => {
+          // An object where the row draws text: React refuses it while drawing Atlas's row.
+          for (const a of s.agents) if (a.id === ATLAS_ID) a.role = { unexpected: true } as never;
+        }),
+      );
+      const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
+      expect(within(nav).getAllByText("Não pôde ser exibido")).toHaveLength(1);
+      expect(within(nav).getAllByText("Ada").length).toBeGreaterThan(0);
+      expect(within(nav).getAllByText("general").length).toBeGreaterThan(0);
+      expect(screen().getByRole("heading", { name: "# eng" })).toBeTruthy();
+      expect(article().textContent).toContain("Criei a tarefa #23");
+    } finally {
+      logged.mockRestore();
+    }
   });
 });
 

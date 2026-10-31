@@ -125,6 +125,7 @@ import {
   DialogFooter,
   DialogSearchList,
   EmptyState,
+  ErrorBoundary,
   Field,
   FORMAT_KINDS,
   type FormatKind,
@@ -152,6 +153,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import {
   Fragment,
   memo,
+  type ReactElement,
   type ReactNode,
   useCallback,
   useEffect,
@@ -196,7 +198,7 @@ import { requestBrowserCard } from "@/components/browser/open";
 import { CategorySelect } from "@/components/ChannelCategoryDialogs";
 import { ChannelDetailsButton, ChannelMembersStack } from "@/components/ChannelMembers";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
-import { NoticeLine, RoutineReport, RoutineTag } from "@/components/ChatNotices";
+import { NoticeLine, RoutineReport, RoutineTag, UnshownLine } from "@/components/ChatNotices";
 import { ConsultationCard } from "@/components/ConsultationCard";
 import { ConsultationPanel } from "@/components/ConsultationPanel";
 import {
@@ -1764,7 +1766,9 @@ function ChannelView({
                       adjust={adjust}
                       scroller={scroller}
                       renderMessage={(m) => (
-                        <TimelineMessage message={m} grouped={false} entering={false} modelLabels={NO_LABELS} />
+                        <ErrorBoundary fallback={<UnshownLine />}>
+                          <TimelineMessage message={m} grouped={false} entering={false} modelLabels={NO_LABELS} />
+                        </ErrorBoundary>
                       )}
                     />
                   ) : (
@@ -2006,7 +2010,9 @@ function ChannelView({
                 actions.focusComposer();
               }}
               renderMessage={(m, grouped) => (
-                <TimelineMessage message={m} grouped={grouped} entering={false} modelLabels={NO_LABELS} readOnly />
+                <ErrorBoundary fallback={<UnshownLine />}>
+                  <TimelineMessage message={m} grouped={grouped} entering={false} modelLabels={NO_LABELS} readOnly />
+                </ErrorBoundary>
               )}
             />
           )}
@@ -2160,7 +2166,7 @@ const Timeline = memo(function Timeline({
       }),
     [heldPlaces, channelId, runVisible, slots, lastByRun],
   );
-  const rows: ReactNode[] = [];
+  const rows: ReactElement[] = [];
   for (const item of items) {
     if (divider?.key === item.key) {
       rows.push(
@@ -2231,7 +2237,17 @@ const Timeline = memo(function Timeline({
     );
   });
   for (const place of held) rows.push(<HeldBrowserRow key={`held-${place.runId}`} place={place} />);
-  return <ConsultGroupsProvider value={consultGroups}>{rows}</ConsultGroupsProvider>;
+  // A row that fails to draw (data this build doesn't expect) is one quiet line: the rest of the conversation, the
+  // sidebar and the composer keep working.
+  return (
+    <ConsultGroupsProvider value={consultGroups}>
+      {rows.map((row) => (
+        <ErrorBoundary key={row.key} fallback={<UnshownLine />}>
+          {row}
+        </ErrorBoundary>
+      ))}
+    </ConsultGroupsProvider>
+  );
 });
 
 /**

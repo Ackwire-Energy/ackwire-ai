@@ -4736,6 +4736,13 @@ p {
 .sidebar__item:hover {
   background: var(--plate);
 }
+/* A row that failed to draw (Sidebar.tsx, UnshownRow): quiet, and nothing to open. */
+.sidebar__item--unshown,
+.sidebar__item--unshown:hover {
+  background: transparent;
+  color: var(--faint);
+  cursor: default;
+}
 /* The chosen item: its own white with a hairline, and a small dithered sky rising from the right
    (an agent's row in its color). Rounded like any item. */
 .sidebar__item[data-status="active"],

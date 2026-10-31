@@ -107,6 +107,17 @@ function EventLine({
   );
 }
 
+/** In place of a conversation row that failed to draw (`ErrorBoundary`): one quiet line, the rest keeps working. */
+export function UnshownLine() {
+  const { t } = useTranslation();
+  return (
+    <div className="cn-line ac-iconline">
+      <Icon name="alert" size={14} />
+      <span className="cn-line__text">{t("chat.unshown")}</span>
+    </div>
+  );
+}
+
 /**
  * What reached an agent's conversation while it wasn't looking (`meta.notice`): "Rotina «Sentry»
  * entregou um relatório", "Infra respondeu", "Nota de Dev", "Chegou o resultado que Ada esperava".
