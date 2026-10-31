@@ -102,7 +102,7 @@ import {
 import { noAiCardOf } from "@agenteschat/client/lib/no-ai";
 import { isTalkerReply, noticeOf, routineReportText } from "@agenteschat/client/lib/notices";
 import { brainUnavailableOf, isOfflineNotice } from "@agenteschat/client/lib/outages";
-import { can } from "@agenteschat/client/lib/permissions";
+import { can, managesChannel, setsAutoReply } from "@agenteschat/client/lib/permissions";
 import { localMeta, replyOf } from "@agenteschat/client/lib/reply";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
@@ -3479,8 +3479,7 @@ function ChannelDetails({
   // What "on its own" means for my messages: who reads the ones that mention nobody.
   const routing = useAiStatus(org.id, open).data?.routing;
   const update = useUpdateChannel(org.id, channel.id);
-  // Who manages channels, and the channel's creator (as the server allows).
-  const editable = can(org, "manage_channels") || channel.createdByUserId === me.user.id;
+  const editable = managesChannel(channel, me.user.id, org);
   const navigate = useNavigate();
   const toast = useToast();
   const categories = useChannelCategories(org.id);
@@ -3602,8 +3601,7 @@ function ChannelDetails({
     handle: m.handle ?? "",
     email: m.type === "person" ? (dir.memberById.get(m.id)?.email ?? "") : "",
     autoReply: Boolean(m.autoReply),
-    // Its owner picks how it replies here too, as the server allows, but doesn't manage the channel.
-    owned: m.type === "agent" && dir.agentById.get(m.id)?.ownerUserId === me.user.id,
+    setsReply: m.type === "agent" && setsAutoReply(channel, dir.agentById.get(m.id), me.user.id, org),
   }));
   const shown = all.filter((r) => !needle || `${r.name} ${r.handle} ${r.email}`.toLowerCase().includes(needle));
   const agents = shown.filter((r) => r.kind === "agent");
@@ -3713,7 +3711,7 @@ function ChannelDetails({
                       : t(replyAloneKey(routing), agentGrammar(t, r.name))}
                 </span>
               </span>
-              {(editable || r.owned) && (
+              {r.setsReply && (
                 <Menu
                   align="end"
                   label={t("channelMembers.actions", { name: r.name })}

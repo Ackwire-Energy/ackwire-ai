@@ -9,7 +9,7 @@ import {
 } from "@agenteschat/client";
 import { listsAgent } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { can } from "@agenteschat/client/lib/permissions";
+import { managesChannel, setsAutoReply } from "@agenteschat/client/lib/permissions";
 import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
@@ -35,7 +35,7 @@ interface Who {
   handle: string;
   email: string;
   autoReply: boolean;
-  owned: boolean;
+  setsReply: boolean;
 }
 
 /** Refreshes who is in the channel after a change (the header's faces, the "@" picker, this list). */
@@ -73,9 +73,8 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
   const c = useColors();
   const roster = useRoster(orgId, channelId);
   const routing = useAiStatus(orgId).data?.routing;
-  // Who manages channels, or the channel's creator (ADR 0085; the server checks it again).
-  const creator = useChannels(orgId).data?.find((x) => x.id === channelId)?.createdByUserId ?? null;
-  const editable = can(org, "manage_channels") || (meId !== null && creator === meId);
+  const channel = useChannels(orgId).data?.find((x) => x.id === channelId);
+  const editable = managesChannel(channel, meId, org);
   const [q, setQ] = useState("");
   const all: Who[] = (roster.data ?? []).map((m: RosterMember) => ({
     kind: m.type === "agent" ? "agent" : "person",
@@ -84,7 +83,7 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
     handle: m.handle ?? "",
     email: m.type === "agent" ? "" : (dir.memberById.get(m.id)?.email ?? ""),
     autoReply: Boolean(m.autoReply),
-    owned: m.type === "agent" && meId !== null && dir.agentById.get(m.id)?.ownerUserId === meId,
+    setsReply: m.type === "agent" && setsAutoReply(channel, dir.agentById.get(m.id), meId, org),
   }));
   const needle = q.trim().toLowerCase();
   const shown = all.filter((w) => !needle || `${w.name} ${w.handle} ${w.email}`.toLowerCase().includes(needle));
@@ -118,7 +117,7 @@ export function ChannelMembersSheet({ channelId, channelName }: { channelId: str
                 subtitle={lineOf(t, w, routing)}
                 subtitleLines={w.kind === "agent" ? 2 : 1}
                 // Not on my own row: taking myself out of my own list reads as a mistake (as on the web).
-                {...((editable && !mine) || w.owned
+                {...((editable && !mine) || w.setsReply
                   ? {
                       onPress: () => open(w),
                       meta: <Icon name="more" size={18} color={c.faint} />,
