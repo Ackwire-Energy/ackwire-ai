@@ -3181,6 +3181,8 @@ export const ptBR = {
       "{{The}} {{name}} já existe, mas não deu para usar o {{brain}} agora. Escolha de novo em Quem pensa, na página {{of}} {{name}}.",
     /** What a new agent starts thinking with (ADR 0089): the last setup saved or used on other agents. */
     lastSetup: "Começa com a última escolha: {{setup}}.",
+    /** Under it, beside "Levar a autonomia": the last setup's Autonomia, and what it starts with without it. */
+    lastAutonomy: "{{value}}, como na última escolha. Desligado, começa com {{fallback}}.",
     autoCost: "O custo acompanha cada tarefa",
     noKeyFor: "Sem chave {{of}} {{provider}}",
     key: "Chave",

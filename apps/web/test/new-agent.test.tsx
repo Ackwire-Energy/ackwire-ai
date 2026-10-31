@@ -624,7 +624,21 @@ describe("Criar agente: what gets created", () => {
     expect(screen().queryByText(/^Começa com a última escolha/)).toBeNull();
   });
 
-  test("the last setup's Autonomia: said with it and sent at creation; another AI leaves all of it", async () => {
+  // The "Modelo e custo" line of Revisar and of the preview.
+  const modelAndCost = () =>
+    (
+      [
+        [".newag__review .newag__rv", ".newag__rv-k", ".newag__rv-v"],
+        [".newag__pv-sec", ".newag__pv-label", ".newag__chips"],
+      ] as const
+    ).map(
+      ([rows, label, value]) =>
+        [...document.querySelectorAll(rows)]
+          .find((r) => r.querySelector(label)?.textContent === "Modelo e custo")
+          ?.querySelector(value)?.textContent,
+    );
+
+  test("the last setup's Autonomia: its switch, Revisar says it, sent at creation; another AI leaves all of it", async () => {
     const state = seedState();
     state.newAgentSetup = {
       brain: "model",
@@ -636,8 +650,16 @@ describe("Criar agente: what gets created", () => {
     await open(state);
     await startAs("Assistente");
     await proceed(4);
-    expect(screen().getByText("Começa com a última escolha: Claude Opus 5.5 · Autonomia: Não pergunta.")).toBeTruthy();
+    expect(screen().getByText("Começa com a última escolha: Claude Opus 5.5.")).toBeTruthy();
+    const carry = screen().getByRole("switch", { name: "Levar a autonomia" });
+    expect(carry.getAttribute("aria-checked")).toBe("true");
+    expect(carry.closest(".ac-setrow")?.textContent).toContain(
+      "Não pergunta, como na última escolha. Desligado, começa com Só o que é arriscado.",
+    );
     await proceed();
+    const [review, preview] = modelAndCost();
+    expect(review).toContain("Claude Opus 5.5 · Autonomia: Não pergunta");
+    expect(preview).toContain("Autonomia: Não pergunta");
     await click(screen().getByRole("button", { name: "Criar Eva" }));
     await settle(8);
     expect(createdWith(state)).toMatchObject({ model: "claude-opus-5-5", autonomy: "never" });
@@ -661,6 +683,29 @@ describe("Criar agente: what gets created", () => {
     await settle(8);
     expect(createdWith(other)?.model).toBe("claude-sonnet-5-5");
     expect(createdWith(other)).not.toHaveProperty("autonomy");
+  });
+
+  test("on an Automático last setup, Levar a autonomia off starts it on Automático with the default", async () => {
+    const state = seedState();
+    state.newAgentSetup = { brain: "model", model: "auto", key: null, contextTokens: null, autonomy: "never" };
+    await open(state);
+    await startAs("Assistente");
+    await proceed(4);
+    expect(screen().getByText("Começa com a última escolha: Automático.")).toBeTruthy();
+    // Automático picked again is still the last setup, its Autonomia too: the switch is the way out.
+    await click(screen().getByRole("button", { name: /^Automático/ }));
+    const carry = screen().getByRole("switch", { name: "Levar a autonomia" });
+    expect(carry.getAttribute("aria-checked")).toBe("true");
+    await click(carry);
+    expect(carry.getAttribute("aria-checked")).toBe("false");
+    await proceed();
+    const lines = modelAndCost();
+    expect(lines).toEqual([expect.stringContaining("Automático"), expect.stringContaining("Automático")]);
+    for (const line of lines) expect(line).not.toContain("Autonomia");
+    await click(screen().getByRole("button", { name: "Criar Eva" }));
+    await settle(8);
+    expect(createdWith(state)?.model).toBe("auto");
+    expect(createdWith(state)).not.toHaveProperty("autonomy");
   });
 
   test("budget: empty is the workspace default; zero or text is invalid; a quick amount lights its button", async () => {

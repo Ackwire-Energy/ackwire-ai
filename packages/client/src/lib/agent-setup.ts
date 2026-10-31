@@ -61,6 +61,9 @@ export function setupOutcome(results: readonly AgentSetupResult[], asked: number
   return { done, autonomyOnly, missed: asked - done - autonomyOnly };
 }
 
+/** A new agent's Autonomia when nobody chose one, as the engine's `DEFAULT_MISSION_COMMAND_APPROVAL`. */
+export const DEFAULT_AUTONOMY: CommandApproval = "low_risk_auto";
+
 /** "Não pergunta": an Autonomia's name. */
 export const autonomyName = (t: TFunction, a: CommandApproval) => t(`missions.commandApproval.${a}`);
 

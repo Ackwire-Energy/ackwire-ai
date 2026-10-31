@@ -3152,6 +3152,7 @@ export const en: Translations = {
     planNotSaved:
       "{{name}} is ready, but {{brain}} couldn't be set up now. Choose it again in Who thinks, on {{name}}'s page.",
     lastSetup: "Starts with the latest choice: {{setup}}.",
+    lastAutonomy: "{{value}}, as in the latest choice. Off: it starts with {{fallback}}.",
     autoCost: "The cost follows each task",
     noKeyFor: "No {{provider}} key",
     key: "Key",

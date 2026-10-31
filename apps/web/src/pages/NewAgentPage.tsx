@@ -20,7 +20,14 @@ import {
 } from "@agenteschat/client";
 import { LEVELS, type Level, saveLevels } from "@agenteschat/client/lib/access-levels";
 import { draftLevels } from "@agenteschat/client/lib/action-cards";
-import { type NewAgentStart, newAgentStart, newAgentStartText } from "@agenteschat/client/lib/agent-setup";
+import {
+  autonomyName,
+  autonomyWords,
+  DEFAULT_AUTONOMY,
+  type NewAgentStart,
+  newAgentStart,
+  newAgentStartText,
+} from "@agenteschat/client/lib/agent-setup";
 import { ownSignInReady } from "@agenteschat/client/lib/ai-accounts";
 import { type ConnectedItem, itemName } from "@agenteschat/client/lib/connected";
 import { joinNames } from "@agenteschat/client/lib/format";
@@ -50,7 +57,9 @@ import {
   prefersReducedMotion,
   randomAppearance,
   SettingNote,
+  SettingRow,
   Spinner,
+  Switch,
   Textarea,
 } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -322,6 +331,8 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
   };
   // Until the person picks what it thinks with, it follows whose it is.
   const [aiPicked, setAiPicked] = useState(Boolean(from));
+  // "Levar a autonomia" off: the last setup's AI with the default Autonomia.
+  const [withAutonomy, setWithAutonomy] = useState(true);
   const startsReady = lastSetup.isFetched && models.isFetched && credentials.isFetched && platform.isFetched;
   const started = useRef(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, when what it starts with is known
@@ -392,13 +403,20 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
       ? !plan && model === start.model
       : plan?.kind === start.brain && plan.machineId === start.machineId && plan.accountId === start.account?.id
     : false;
+  const autonomy = onStart && withAutonomy ? start?.autonomy : undefined;
+  // Its Autonomia has a switch of its own under it.
   const startLine =
     start && onStart
-      ? newAgentStartText(t, locale, start, {
-          models: models.data?.models ?? [],
-          machines: brainMachines.data ?? [],
-          provider: lastSetup.data?.account?.provider,
-        })
+      ? newAgentStartText(
+          t,
+          locale,
+          { ...start, autonomy: undefined },
+          {
+            models: models.data?.models ?? [],
+            machines: brainMachines.data ?? [],
+            provider: lastSetup.data?.account?.provider,
+          },
+        )
       : null;
   const modelInfo = (models.data?.models ?? []).find((m) => m.id === model);
   const modelLabel = plan
@@ -464,7 +482,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
       monthlyBudgetUsd: amount,
       appearance: look,
       ...(from ? { proposal: from.messageId } : {}),
-      ...(onStart && start?.autonomy ? { autonomy: start.autonomy } : {}),
+      ...(autonomy ? { autonomy } : {}),
     });
     // A plan thinks on its computer: the agent goes there, then thinks with it (an automatic model stays automatic).
     // The agent exists either way: if the plan can't be saved now it stays on the API, and its page says so.
@@ -570,6 +588,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
     setAudience({ mode: "everyone", userIds: [] });
     startWith(startOf(me.user.id));
     setAiPicked(false);
+    setWithAutonomy(true);
     setBudget("");
     scrollTop();
   };
@@ -1138,6 +1157,18 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
         <>
           {head(t("newAgent.steps.model.title"), t("newAgent.steps.model.lead"))}
           {startLine && <SettingNote icon="repeat">{t("newAgent.lastSetup", { setup: startLine })}</SettingNote>}
+          {onStart && start?.autonomy && (
+            <SettingRow
+              title={t("agentPage.work.brain.copy.withAutonomy")}
+              description={t("newAgent.lastAutonomy", {
+                value: autonomyName(t, start.autonomy),
+                fallback: autonomyName(t, DEFAULT_AUTONOMY),
+              })}
+              htmlFor="ag-autonomy"
+            >
+              <Switch id="ag-autonomy" checked={withAutonomy} onCheckedChange={setWithAutonomy} />
+            </SettingRow>
+          )}
           <ModelCards
             choices={choices}
             value={plan ? undefined : model}
@@ -1316,7 +1347,8 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
               "bolt",
               t("newAgent.modelAndCost"),
               <span>
-                {modelLabel}{" "}
+                {modelLabel}
+                {autonomy && ` · ${autonomyWords(t, autonomy)}`}{" "}
                 <span className="muted">
                   · {keyLabel}
                   {budgetShown !== undefined && ` · ${t("newAgent.upTo", { amount: usd(t, locale, budgetShown) })}`}
@@ -1531,6 +1563,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
                 <PreviewSection label={t("newAgent.modelAndCost")}>
                   <span className="newag__chips">
                     {modelLabel && chip("bolt", modelLabel, "model")}
+                    {autonomy && chip("shield", autonomyWords(t, autonomy), "autonomy")}
                     {budgetShown !== undefined &&
                       !budgetInvalid &&
                       chip("wallet", t("newAgent.upTo", { amount: usd(t, locale, budgetShown) }), "budget")}
