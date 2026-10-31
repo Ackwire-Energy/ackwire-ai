@@ -98,7 +98,14 @@ describe("the home's Agentes before any conversation with an agent", () => {
   test("an agent DM replaces them", () => {
     const rows = buildConversations({
       channels: [],
-      dms: [{ channelId: "d1", with: { type: "agent", id: "a2", name: "Dev", handle: "dev" }, lastMessage: null, unread: 0 }],
+      dms: [
+        {
+          channelId: "d1",
+          with: { type: "agent", id: "a2", name: "Dev", handle: "dev" },
+          lastMessage: null,
+          unread: 0,
+        },
+      ],
       threads: [],
     });
     expect(homeLayout(rows, [], undefined, starters)[0]?.rows.map((r) => r.key)).toEqual(["d:d1"]);

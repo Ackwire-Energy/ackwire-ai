@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { eq, schema } from "@agenteschat/db";
+import { eq, schema, sql } from "@agenteschat/db";
 import { ProviderError, systemText, textOf } from "@agenteschat/providers";
 import {
   buildRunContext,
@@ -635,6 +635,19 @@ describe("what the router reads, and a person's messages in a row", () => {
     await route(strategy, then.id);
     // Neither waits on a message the router never decides on, nor reads one as its own.
     expect(inputs.map((i) => i.message.body)).toEqual(["alguém sabe como configurar o deploy?", "e o servidor?"]);
+  });
+
+  test("a message stored with microseconds is decided, never taken for its own next message", async () => {
+    await team();
+    const asked = await say("alguém sabe como configurar o deploy?", 10);
+    // Postgres stores now() with microseconds; read back, `createdAt` is cut to milliseconds.
+    await f.db
+      .update(schema.messages)
+      .set({ createdAt: sql`${schema.messages.createdAt} + interval '456 microseconds'` })
+      .where(eq(schema.messages.id, asked.id));
+    const { strategy, inputs } = judge();
+    expect((await route(strategy, asked.id)).skipped).toBeUndefined();
+    expect(inputs.map((i) => i.message.body)).toEqual(["alguém sabe como configurar o deploy?"]);
   });
 
   test("when no step can read it: an earlier talk with Ada, then 'boa tarde walter' and 'como esta hoje', is for nobody", async () => {

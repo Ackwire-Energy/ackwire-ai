@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { and, eq, schema } from "@agenteschat/db";
+import { and, eq, schema, sql } from "@agenteschat/db";
 import {
   addChannelMember,
   createChannel,
@@ -241,6 +241,18 @@ describe("pins", () => {
       undefined,
     );
     expect(events.filter((e) => e.type === "message.unpinned")).toHaveLength(1);
+  });
+
+  test("a message stored with microseconds is pinned and listed", async () => {
+    f = await setup();
+    const a = await post(f.owner.id, f.general.id, "Runbook: deploy");
+    // Postgres stores now() with microseconds; read back, `createdAt` is cut to milliseconds.
+    await f.db
+      .update(schema.messages)
+      .set({ createdAt: sql`${schema.messages.createdAt} + interval '456 microseconds'` })
+      .where(eq(schema.messages.id, a.id));
+    expect((await pinMessage(deps(), f.owner.id, f.org.id, f.general.id, a.id)).message.body).toBe("Runbook: deploy");
+    expect((await listPins(f.db, f.owner.id, f.org.id, f.general.id)).map((p) => p.messageId)).toEqual([a.id]);
   });
 
   test("a reply in a thread can be pinned; a message of another channel can't", async () => {
