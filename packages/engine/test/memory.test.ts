@@ -1355,6 +1355,40 @@ describe("proposals for teammates (one card, a row per agent and kind of change)
     expect((await rows()).find((r) => r.agentId === lia.id)?.status).toBe("stale");
   });
 
+  test("an app turned off keeps its connection's denials, so the agent's owner may take it away", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const ada = await teammate("ada", { ownerUserId: bia.id });
+    const [linear] = await f.db
+      .insert(schema.connectorConnections)
+      .values({
+        orgId: f.org.id,
+        connector: "linear",
+        label: "Linear",
+        serverUrl: "https://linear.example.com/mcp",
+        authType: "none",
+      })
+      .returning();
+    const connectionId = linear?.id ?? "";
+    await grantScopes(f.db, f.org.id, ada.id, [
+      { connectionId, scope: "connector:*" },
+      { connectionId, scope: "deny:linear_delete_issue" },
+    ]);
+    const {
+      proposals: [row],
+    } = await proposeFor({
+      target: "agent_instructions",
+      agentIds: [],
+      change: "",
+      access: [{ agentId: ada.id, lines: [{ id: `connector:${connectionId}`, label: "Linear", on: false }] }],
+    });
+    await decideProposal(f.db, bia.id, f.org.id, row?.id ?? "", "accept");
+    const left = await f.db.select().from(schema.agentScopes).where(eq(schema.agentScopes.agentId, ada.id));
+    expect(left.filter((g) => g.connectionId === connectionId).map((g) => g.scope)).toEqual([
+      "deny:linear_delete_issue",
+    ]);
+  });
+
   test("the list's cap leaves out decided rows before a pending one, and a card's rows are read by id past it", async () => {
     f = await setup();
     const ada = await teammate("ada");

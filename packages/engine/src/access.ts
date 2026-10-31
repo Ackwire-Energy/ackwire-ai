@@ -545,8 +545,9 @@ export function hasApp(grants: ScopeGrant[], id: string, any = false): boolean {
 }
 
 /**
- * The grants with each line applied: on is `request_permission`'s grant (the scope, or the whole connection,
- * whose denials stay), off drops the scope, or every grant on the connection.
+ * The grants with each line applied: on is `request_permission`'s grant (the scope, or the whole connection),
+ * off drops the scope, or every grant on the connection. A connection's denials stay either way: with nothing else
+ * on it they deny nothing, and dropping one would count as giving access, which its owner may not do.
  */
 export function withAccessLines(grants: ScopeGrant[], lines: AccessLine[]): ScopeGrant[] {
   let out = grants;
@@ -554,7 +555,7 @@ export function withAccessLines(grants: ScopeGrant[], lines: AccessLine[]): Scop
     const connectionId = lineConnection(line.id);
     out = out.filter((g) =>
       connectionId
-        ? g.connectionId !== connectionId || (line.on && g.scope.startsWith(toolDenyScope("")))
+        ? g.connectionId !== connectionId || g.scope.startsWith(toolDenyScope(""))
         : g.connectionId !== null || g.scope !== line.id,
     );
     if (line.on) out = [...out, { connectionId, scope: connectionId ? CONNECTOR_ALL : line.id }];
