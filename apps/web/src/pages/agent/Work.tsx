@@ -663,7 +663,6 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const [contextTokens, setContextTokens] = useState<ContextLimit | null>(savedContext);
   // "Configuração avançada" open: what it edits, put on the form by "Pronto" (nothing saves before "Usar").
   const [adv, setAdv] = useState<Advanced | null>(null);
-  // "Usar em outros agentes" open.
   const [copying, setCopying] = useState(false);
   const hasOthers = (useAgents(org.id).data ?? []).some((a) => a.id !== agent.id);
   const qc = useQueryClient();
