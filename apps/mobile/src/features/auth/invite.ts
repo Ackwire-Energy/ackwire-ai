@@ -1,5 +1,19 @@
+import { serverUrl } from "@/lib/server";
 import { readValue, readValueSync, STORED, writeValue } from "@/lib/storage";
+import { type Asked, askedOf, storedAsked } from "./invite-steps";
 import { afterSignIn, type InviteKind, storedInvite, storedInviteOf } from "./links";
+
+/** The request waiting on this phone (ADR 0090 §3), for this server: closing the app returns to it. */
+export function waitingAsk(): Asked | null {
+  const asked = askedOf(readValueSync(STORED.joinAsked));
+  return asked?.server === serverUrl() ? asked : null;
+}
+
+/** Kept in the device's secure storage, as the session is: the key signs in once an admin approves. */
+export const keepAsk = (asked: Asked) => void writeValue(STORED.joinAsked, storedAsked(asked));
+
+/** Any ending: approved, denied, closed, or a key the server no longer knows. */
+export const forgetAsk = () => void writeValue(STORED.joinAsked, null);
 
 /**
  * An invitation opened in the app before the person is signed in, kept until they are in (the root layout's

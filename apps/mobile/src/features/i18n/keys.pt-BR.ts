@@ -1434,13 +1434,18 @@ export const featureKeysPtBR = {
     invited: "Você foi convidado para a {{org}}",
     joinAs: "Você entra como {{role}}.",
     apple: "Continuar com a Apple",
-    createPassword: "Criar uma senha",
-    haveAccount: "Já tenho conta",
     signIn: "Entrar para aceitar",
     accept: "Entrar na {{org}}",
     wrongAccount: "Este convite é para {{email}}.",
     otherAccount: "Entrar com outra conta",
     failed: "Não deu para aceitar o convite. Tente de novo.",
+    // Entering through an invitation, what the shared words say another way on a phone (ADR 0090).
+    join: {
+      skip: "Pular",
+      sharedBy: "{{name}} compartilhou este link",
+      waitLead: "Você entra assim que um admin aprovar. Pode fechar o app: avisamos no seu e-mail.",
+      passwordLead: "Sua senha, e você já entra.",
+    },
   },
   joinRequests: {
     share: "Compartilhar o link",
@@ -1450,6 +1455,23 @@ export const featureKeysPtBR = {
   humanCheck: {
     title: "Verificação rápida",
     blocked: "A verificação não carregou. Tente outra rede.",
+  },
+  /** Convidar pessoas and the sent invitations' sheet (ADR 0090); the other words are the shared `members.*`. */
+  invitePeople: {
+    emailsHelp: "Cole uma lista ou digite. Cada pessoa recebe um e-mail e entra direto.",
+    here: "Já está aqui",
+    invited: "Já convidado",
+    fix: "Confira",
+    channels: "Canais",
+    optional: "Opcional",
+    ok: "OK",
+    noteHelp: "Aparece no e-mail com o seu nome. Até {{max}} letras.",
+    roleHelp: "Muda o que a pessoa recebe ao entrar.",
+    remove: "Tirar da lista",
+    sendAgain: "Mandar de novo",
+    cancelTitle: "Cancelar o convite de {{email}}?",
+    cancelText: "O link dele para de abrir.",
+    send: "Mandar",
   },
   members: {
     waiting_one: "{{count}} esperando",

@@ -1,6 +1,6 @@
 # 0090. Bringing a teammate in: a link asks with a password, invitations keep their link
 
-- Status: Accepted (built: the server, the shared client and the web; the phone app follows)
+- Status: Accepted (built: the server, the shared client, the web and the phone app)
 - Date: 2026-10-31
 - Revises: ADR 0068 §4 and §5 (an approval also makes the account a proven ask chose a password for), ADR 0072 §2 and §6 (for an address with no account, the code that proved the request is what confirms the new account)
 - Code: `packages/engine/src/invite-requests.ts` (`askToJoin`, `approveJoinRequest`, `claimJoinRequest`, `suggestPerson`, `listMySuggestions`, `cancelSuggestion`, `renewInviteLink`, `noticeInvitationAccepted`), `packages/engine/src/organizations.ts` (`sendInvitation`, `createInvitation`, `inviteMany`, `invitableChannelIds`, `setInvitationRoles`, `resendInvitation`, `listInvitationsWithStatus`, `previewInvitation`, `invitationState`, `acceptInvitation`, `holdsInvitation`, `spentClaimHash`), `packages/engine/src/crypto.ts` (`invitationToken`), `packages/engine/src/email.ts` (`queueInvitationEmail`), `apps/server/src/auth.ts` (`hashPassword`, `mintUserSignIn`), `apps/server/src/routes/app/invites.ts`, `management.ts`, `account.ts`, `packages/db/migrations/0139_invitation_flow.sql`; the screens: `apps/web/src/pages/InvitePage.tsx`, `apps/web/src/pages/MembersPage.tsx`, `apps/web/src/components/invite/` (the invite dialog, the address chips shared with the onboarding, the link panel, the arrival card), `apps/web/src/components/WelcomeCard.tsx`
@@ -32,7 +32,8 @@ Bringing someone into a workspace took too many steps and had dead ends:
 - A guessed code (ADR 0072's limits: 5 tries a code, 10 wrong a day per address) plus an admin's approval would make an account for someone else's address. The approval is the second check: admins see the address and the note before saying yes.
 - Phone builds from before this ask without a password and get ADR 0072's invitation after approval, as before; the batch still takes `emails`.
 - Links already emailed before this keep working until sent again, when they change once.
-- Someone who accepts through a copied link gets the usual "confirm your email" and confirms there. Phone builds from before this pass no proof on, so the same goes for them; current ones keep it with the remembered invitation until it's accepted.
+- Someone who accepts through a copied link gets the usual "confirm your email" and confirms there. Phone builds from before this pass no proof on, so the same goes for them.
+- On the phone, Members is one page (`apps/mobile/src/features/members/MembersPage.tsx`) and opens for everyone, so a member can suggest someone; inviting is a pushed screen (`InvitePeople.tsx`), and the steps of a link and of an email invitation live in `apps/mobile/src/features/auth/` (`LinkSteps.tsx`, `AskWaiting.tsx`, `EmailSteps.tsx`). A phone keeps one waiting request at a time: asking through another link replaces the wait, and the first account's password still works once it's approved.
 
 ## Alternatives considered
 

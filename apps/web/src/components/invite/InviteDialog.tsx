@@ -8,10 +8,10 @@ import {
   useWorkspaceLimits,
 } from "@agenteschat/client";
 import { namesText } from "@agenteschat/client/lib/format";
-import { sendsEmail } from "@agenteschat/client/lib/join-requests";
+import { INVITE_NOTE_MAX, sendsEmail } from "@agenteschat/client/lib/join-requests";
 import { membersFull } from "@agenteschat/client/lib/limits";
 import { can } from "@agenteschat/client/lib/permissions";
-import { everyoneOf, isEveryone, sortRoles } from "@agenteschat/client/lib/roles";
+import { everyoneOf, isEveryone, roleSummary, sortRoles } from "@agenteschat/client/lib/roles";
 import { addressesIn, isEmail } from "@agenteschat/client/lib/text";
 import { Button, Dialog, DialogBody, DialogFooter, Field, Icon, Textarea } from "@agenteschat/ui";
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
@@ -19,7 +19,6 @@ import { useTranslation } from "react-i18next";
 import { OnlyYouNote } from "@/components/AgentAudience";
 import { MembersFull } from "@/components/Limits";
 import { useOrg } from "@/components/org-context";
-import { roleSummary } from "@/components/roles/RolesSection";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { type ChipAddress, ChipNote, ChipRole, EmailChips } from "./EmailChips";
@@ -73,8 +72,6 @@ interface InviteChip extends ChipAddress {
 
 /** The role picker's value for no role: a member. */
 const MEMBER = "member";
-/** The longest note in the invitation email (the server's `INVITE_NOTE_MAX`, packages/engine/src/organizations.ts). */
-const INVITE_NOTE_MAX = 300;
 
 /** The new addresses in `text`, after the chips already there. */
 const chipsFrom = (text: string, known: readonly InviteChip[]): InviteChip[] => {
