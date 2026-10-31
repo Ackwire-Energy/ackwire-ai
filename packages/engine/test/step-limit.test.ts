@@ -198,6 +198,14 @@ describe("a conversation run that reaches its step limit mid-work", () => {
     expect(JSON.stringify(sent.messages)).toContain('"signature":"sig-1"');
   });
 
+  test("Continuar deep in agents' work starts at hop 1 in a stretch of its own (ADR 0089)", async () => {
+    const stopped = await cappedRun();
+    await f.db.update(schema.agentRuns).set({ hop: 7 }).where(eq(schema.agentRuns.id, stopped.id));
+    const { runId } = await continueRun(deps(), f.owner.id, f.org.id, stopped.id);
+    const [next] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, runId));
+    expect(next).toMatchObject({ hop: 1, stretchId: runId });
+  });
+
   test("a run the router brought in: Continuar sends the same tools, `pass` included, though it may no longer pass", async () => {
     f = await setup({
       toolSources: [createPassToolSource(), workTools()],
