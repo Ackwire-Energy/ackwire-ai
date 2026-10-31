@@ -30,10 +30,10 @@ export function AgentEditScreen({ id }: { id: string }) {
   const failed = useFailed();
   const dir = useDirectory();
   const meId = useMeId();
-  const role = useOrg().org?.role;
+  const org = useOrg().org;
   const agent = dir.agentById.get(id);
   const update = useUpdateAgent(useOrgId(), id);
-  const admin = can(role, "manage_agents");
+  const admin = can(org, "manage_agents");
   const fields = editableFields({
     admin,
     owner: Boolean(meId && agent?.ownerUserId === meId),

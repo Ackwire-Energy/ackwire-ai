@@ -159,6 +159,23 @@ export const agents = pgTable(
     groupId: uuid().references(() => agentGroups.id, { onDelete: "set null" }),
     /** Order inside its group. */
     groupPosition: integer().notNull().default(0),
+    /**
+     * What it says it is doing (`set_status`, ADR 0084): a line, an optional emoji, and whether it asks not
+     * to be interrupted. Tied to the run that wrote it (gone once that run ends) unless it set an end time.
+     */
+    statusText: text(),
+    statusEmoji: text(),
+    statusBusy: boolean().notNull().default(false),
+    statusRunId: uuid(),
+    statusUntil: timestamp({ withTimezone: true }),
+    /**
+     * Who wrote the line: `self` (the agent's own words, `status_text`) or `auto` (picked for the run from what it
+     * works on, `status_kind` + `status_subject`, worded by the apps). `status_at`: when it last changed.
+     */
+    statusSource: text().$type<"self" | "auto">(),
+    statusKind: text(),
+    statusSubject: text(),
+    statusAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     archivedAt: timestamp({ withTimezone: true }),

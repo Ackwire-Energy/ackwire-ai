@@ -1,4 +1,4 @@
-import type { AgentAction, AgentActionKind, AgentActionTarget, Role } from "@agenteschat/client";
+import type { AgentAction, AgentActionKind, AgentActionTarget } from "@agenteschat/client";
 import { actionPhase, actionTimeLeft, canUndoAction, formatTimeLeft } from "@agenteschat/client/lib/actions";
 import type { IconName } from "@/ui";
 import { type AppHref, chatHref, routineHref } from "../links/logic";
@@ -31,6 +31,7 @@ export function receiptIcon(kind: AgentActionKind): IconName {
       return "brain";
     case "routine.created":
     case "routine.updated":
+    case "routine.deleted":
       return "clock";
     case "channel.agent_added":
       return "hash";
@@ -66,15 +67,16 @@ export function targetHref(target: AgentActionTarget, channelId: string): AppHre
 
 export interface Viewer {
   userId: string | null;
-  role: Role | null | undefined;
+  /** They may manage agents here (`manage_agents`, ADR 0085). */
+  managesAgents: boolean;
   /** The agent that acted is this person's (they own it). */
   ownsAgent: boolean;
 }
 
 /** Desfazer/Refazer show only to who may use them (the server checks it again). */
 export function viewerCanUndo(a: Pick<AgentAction, "requestedByUserId">, viewer: Viewer): boolean {
-  if (!viewer.userId || !viewer.role) return false;
-  return canUndoAction(a, { userId: viewer.userId, role: viewer.role, ownsAgent: viewer.ownsAgent });
+  if (!viewer.userId) return false;
+  return canUndoAction(a, { userId: viewer.userId, managesAgents: viewer.managesAgents, ownsAgent: viewer.ownsAgent });
 }
 
 /** One receipt's state on screen: the button it shows, the countdown text, whether it is struck through. */

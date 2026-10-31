@@ -984,11 +984,11 @@ function RoutineDetails({
   const fix = r.canManage ? pausedFix(r) : null;
   // "Trocar computador": the outage its run waits on, for whoever can move agents.
   const outage =
-    r.state === "waiting_computer" && r.waitingFor && can(org.role, "manage_agents")
+    r.state === "waiting_computer" && r.waitingFor && can(org, "manage_agents")
       ? outages.data?.outages.find((o) => o.machineId === r.waitingFor?.machineId)
       : undefined;
   const health = healthWords(r.health);
-  const usage = usageParts(r.usage, can(org.role, "view_usage"));
+  const usage = usageParts(r.usage, can(org, "view_usage"));
   const usageText = usage
     ? [
         t("routines.usage.runs", { count: usage.runs }),

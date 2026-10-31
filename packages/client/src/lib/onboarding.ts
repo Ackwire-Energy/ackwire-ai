@@ -1,4 +1,4 @@
-import type { AgentLookInput, Role } from "../api/types";
+import type { AgentLookInput } from "../api/types";
 import { isEmail } from "./text";
 
 /**
@@ -95,7 +95,8 @@ export const firstAskOrder = (browser: boolean) =>
 /** A person to invite, as a chip: invalid addresses stay (marked) so they can be fixed or removed. */
 export interface InviteDraft {
   email: string;
-  role: Role;
+  /** Invited with the workspace's administrator role (`adminRoleId`). */
+  admin: boolean;
   valid: boolean;
 }
 
@@ -112,11 +113,11 @@ export function splitEmails(text: string): string[] {
 }
 
 /** Typed or pasted text turned into chips after the ones already there (new addresses only). */
-export function addInvites(list: InviteDraft[], text: string, role: Role = "member"): InviteDraft[] {
+export function addInvites(list: InviteDraft[], text: string, admin = false): InviteDraft[] {
   const known = new Set(list.map((i) => i.email));
   const added = splitEmails(text)
     .filter((email) => !known.has(email))
-    .map((email) => ({ email, role, valid: isEmail(email) }));
+    .map((email) => ({ email, admin, valid: isEmail(email) }));
   return added.length ? [...list, ...added] : list;
 }
 

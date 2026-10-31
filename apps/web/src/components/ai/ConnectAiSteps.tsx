@@ -99,8 +99,15 @@ import { PlanReplies } from "./PlanReplies";
  * workspace's setup. `poll`: asked again this often where no event keeps them current (the setup opens no socket).
  */
 export function usePlanGates(orgId: string, agentId: string | undefined, poll: number | false = false) {
-  const brain = useAgentBrain(orgId, agentId ?? "", agentId !== undefined, poll);
-  const ai = useAiAccounts(orgId, agentId !== undefined, poll);
+  const api = useApi();
+  const asks = agentId !== undefined;
+  const brain = useAgentBrain(orgId, agentId ?? "", asks, poll);
+  const ai = useAiAccounts(orgId, asks, poll);
+  // Codex's own sign-in is known only by a usage read with it: looked up again here (it comes back as
+  // `machine.updated`, or with the next poll), so a computer's own ChatGPT sign-in shows before any turn ran.
+  useEffect(() => {
+    if (asks) void api.machines.refreshAccountUsage(orgId).catch(() => undefined);
+  }, [api, orgId, asks]);
   const setupQ = useComputerSetup(orgId);
   const edition = computerEdition(setupQ.data);
   const setup = setupView(setupQ.data, setupQ.dataUpdatedAt);
@@ -130,9 +137,9 @@ export function usePlanGates(orgId: string, agentId: string | undefined, poll: n
           choice,
           edition,
           setup,
-          // A coding plan also needs to know whether that computer takes a plan's key, and Claude on a computer the
-          // person connected whether its own sign-in is there (`ownSignInFor`).
-          brain: view && (ai.data || !(isPlanId(choice) || (choice === "claude" && view.ownSignIn))) ? view : undefined,
+          // A coding plan also needs to know whether that computer takes a plan's key, and Claude or ChatGPT on a
+          // computer the person connected whether its own sign-in is there (`ownSignInFor`).
+          brain: view && (ai.data || !(isPlanId(choice) || view.ownSignIn)) ? view : undefined,
           computer: row,
         });
   // A poll that fails once keeps the last view: a sign-in in progress goes on.
@@ -600,6 +607,8 @@ function PlanSteps({
   const [missed, setMissed] = useState<string[]>([]);
   const [other, setOther] = useState(false);
   const [ownSaved, setOwnSaved] = useState(false);
+  // A sign-in begun here keeps its steps while its computer is offline: they say Reconnecting, and it goes on.
+  const [signingIn, setSigningIn] = useState(false);
   const dir = useDirectory(org.id);
   // "Atende outras pessoas" (ADR 0059 §5) for whom the panel is: an agent already on this brain shows its own and
   // changes it at once, one moved onto it starts on its owner alone unless this is on (the move says so).
@@ -836,7 +845,7 @@ function PlanSteps({
         )}
       </div>
     );
-  } else if (gate.state === "offline") {
+  } else if (gate.state === "offline" && !signingIn) {
     wait = hostConnecting ? (
       line(<Spinner size={14} />, t("connectAi.wait.connecting"))
     ) : (
@@ -891,7 +900,7 @@ function PlanSteps({
   }
 
   // The steps stay in view while they wait (their computer actions off); a reason alone otherwise.
-  const steps = ready || gate.state === "preparing" || (gate.state === "offline" && hostConnecting);
+  const steps = ready || gate.state === "preparing" || (gate.state === "offline" && (hostConnecting || signingIn));
   const ownable = ready && !login && ownSignInFor(choice, view, gates.row);
   // The shared sign-in's plan, where the computer says it ("Claude Max").
   const ownPlan = planWordOf(gates.row?.own?.[kind]?.plan ?? null);
@@ -991,6 +1000,7 @@ function PlanSteps({
           onFailed={(id) => setMissed((m) => [...m, id])}
           onAdded={(a, id) => void assign(id ?? turn?.id ?? agent.id, a)}
           onUse={(a) => void assign(turn?.id ?? agent.id, a)}
+          onSigningIn={setSigningIn}
         />
       )}
       {(steps || ownable) && foot}

@@ -128,12 +128,12 @@ describe("members", () => {
       createInvitation(f.db, f.owner.id, f.org.id, { email: "carl@example.com", role: "member" }),
     ).rejects.toMatchObject(full);
     await expect(
-      inviteMany(f.db, f.owner.id, f.org.id, { emails: ["bia@example.com", "carl@example.com"], role: "member" }),
+      inviteMany(f.db, f.owner.id, f.org.id, { emails: ["bia@example.com", "carl@example.com"] }),
     ).rejects.toMatchObject(full);
     await expect(resendInvitation(f.db, f.owner.id, f.org.id, early.invitation.id)).rejects.toMatchObject(full);
     await expect(acceptInvitation(f.db, await person("early@example.com"), early.token)).rejects.toMatchObject(full);
     // An address already in is told so, not that it is full.
-    expect(await inviteMany(f.db, f.owner.id, f.org.id, { emails: ["bia@example.com"], role: "member" })).toEqual([
+    expect(await inviteMany(f.db, f.owner.id, f.org.id, { emails: ["bia@example.com"] })).toEqual([
       { email: "bia@example.com", status: "already_member" },
     ]);
 
@@ -146,7 +146,7 @@ describe("members", () => {
     });
     const [request] = await f.db.select().from(schema.organizationJoinRequests);
     await expect(
-      approveJoinRequest({ db: f.db }, "https://agentes.test", f.owner.id, f.org.id, request?.id ?? "", "member"),
+      approveJoinRequest({ db: f.db }, "https://agentes.test", f.owner.id, f.org.id, request?.id ?? ""),
     ).rejects.toMatchObject(full);
 
     // Someone already in accepting an invitation again isn't one more person.
@@ -164,7 +164,7 @@ describe("members", () => {
     await expect(assertMemberRoom(f.db, f.org.id)).rejects.toMatchObject(full);
     await limit({ members: 3 });
     expect(
-      await approveJoinRequest({ db: f.db }, "https://agentes.test", f.owner.id, f.org.id, request?.id ?? "", "member"),
+      await approveJoinRequest({ db: f.db }, "https://agentes.test", f.owner.id, f.org.id, request?.id ?? ""),
     ).toEqual({ outcome: "joined" });
     await limit({});
     expect(

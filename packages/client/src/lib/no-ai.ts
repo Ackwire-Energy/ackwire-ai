@@ -10,6 +10,7 @@ import type {
   MachineAccount,
   MachineAccountKind,
 } from "../api/types";
+import { ownSignInReady } from "./ai-accounts";
 import { answersOthers, audienceOf } from "./audience";
 import { type SetupView, setupPending } from "./computer";
 import { CODING_PLANS, isPlanId, loginPerAgent, PLAN_IDS, type PlanId } from "./plans";
@@ -33,6 +34,11 @@ export interface NoAiCard {
   autoOpen?: boolean;
   /** Its plan's sign-in ended (`reason: not_signed_in`): the agent says so, and signing in again is the way back. */
   signedOut?: boolean;
+  /**
+   * Instead of `signedOut`: the computer's own sign-in of this CLI isn't there and the agent has no account, so the
+   * way is an account of that CLI's plan (`planOfKind`), connected on the agent's page or from the card.
+   */
+  own?: MachineAccountKind;
 }
 
 const INTENTS: ReadonlySet<string> = new Set<ConnectIntent>(["claude", "chatgpt", "api_key", "any", "task"]);
@@ -43,13 +49,15 @@ export function noAiCardOf(meta: Record<string, unknown> | null | undefined): No
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
   if (typeof o.agentId !== "string") return null;
+  const signedOut = o.reason === "not_signed_in";
+  const own = signedOut && (o.own === "claude_code" || o.own === "codex") ? o.own : null;
   return {
     agentId: o.agentId,
     forUserId: typeof o.forUserId === "string" ? o.forUserId : null,
     intent: isIntent(o.intent) ? o.intent : "task",
     ...(typeof o.provider === "string" ? { provider: o.provider } : {}),
     ...(o.autoOpen === true ? { autoOpen: true } : {}),
-    ...(o.reason === "not_signed_in" ? { signedOut: true } : {}),
+    ...(own ? { own } : signedOut ? { signedOut: true } : {}),
   };
 }
 
@@ -62,6 +70,8 @@ export const opensByItself = (x: { intent?: string; autoOpen?: boolean }) =>
 
 /** The brain a plan thinks with, on the agent's computer: a Claude plan through Claude Code, ChatGPT's through Codex. */
 export const PLAN_BRAIN: Record<"claude" | "chatgpt", MachineAccountKind> = { claude: "claude_code", chatgpt: "codex" };
+/** The plan a CLI signs in to by itself (`PLAN_BRAIN` the other way): ChatGPT's for Codex, Claude's for Claude Code. */
+export const planOfKind = (kind: MachineAccountKind): "claude" | "chatgpt" => (kind === "codex" ? "chatgpt" : "claude");
 
 type AiState = AiStatus["agents"][number]["state"];
 
@@ -148,12 +158,11 @@ export function planGate({
 }
 
 /**
- * The computer's own sign-in can think for the agent with this plan: whoever connected that computer owns the agent,
- * and Claude Code is signed in there (`computer.own`, the `/ai-accounts` row). ChatGPT's own sign-in isn't reported,
- * so it is taken as there.
+ * The computer's own sign-in can think for the agent with this plan (`ownSignInReady`): Claude's or ChatGPT's, never
+ * a coding plan's, which signs in with its key.
  */
 export const ownSignInFor = (choice: PlanChoice, brain: AgentBrain | undefined, computer: AiComputer | undefined) =>
-  brain?.ownSignIn === true && !isPlanId(choice) && (choice !== "claude" || computer?.own?.claude_code !== undefined);
+  !isPlanId(choice) && ownSignInReady(brain, computer, kindOf(choice));
 
 /** A plan tile reads dimmed when its plan can't sign in there at all (it still opens its panel, which says why). */
 export const gateDims = (gate: PlanGate) => gate.state === "missing" || gate.state === "unsupported";
@@ -164,23 +173,26 @@ export const choiceOfIntent = (intent: ConnectIntent | undefined): AiChoice | nu
 
 /**
  * The option chosen when the picker opens: what was asked for; the API key for someone who owns no agent but may
- * add keys, or where Claude can't sign in at all (self-host with no computer); else Claude.
+ * add keys, or where Claude can't sign in at all (self-host with no computer); else the plan the agent it's for
+ * thinks with (`plan`, `agentPlan`), else Claude.
  */
 export function defaultChoice({
   intent,
   ownsAgents,
   mayAddKey,
   claudeGate,
+  plan,
 }: {
   intent?: ConnectIntent;
   ownsAgents: boolean;
   mayAddKey: boolean;
   claudeGate: PlanGate;
+  plan?: PlanChoice | null;
 }): AiChoice {
   const asked = choiceOfIntent(intent);
   if (asked) return asked;
   if (!ownsAgents && mayAddKey) return "key";
-  return claudeGate.state === "missing" ? "key" : "claude";
+  return claudeGate.state === "missing" ? "key" : (plan ?? "claude");
 }
 
 /** "For which agent": the one asked for, else the first with no AI, else the first. */
@@ -204,14 +216,18 @@ export function agentAi(agent: Pick<Agent, "brain"> | undefined, state: AiState 
   return state === undefined || state === "no_ai" ? null : "key";
 }
 
+/** The plan an agent's computer brain signs in with, where its Connect opens; null on the model brain. */
+export function agentPlan(agent: Pick<Agent, "brain"> | undefined): PlanChoice | null {
+  const ai = agentAi(agent, undefined);
+  return ai === "key" ? null : ai;
+}
+
 /**
  * The plan a card's Sign in again opens on: the agent's own, where the card says its sign-in ended and the agent
  * still thinks with a plan; null otherwise (Connect an AI, at the card's step).
  */
-export function signInAgainPlan(card: Pick<NoAiCard, "signedOut">, agent: Pick<Agent, "brain"> | undefined) {
-  const ai = card.signedOut ? agentAi(agent, undefined) : null;
-  return ai === "key" ? null : ai;
-}
+export const signInAgainPlan = (card: Pick<NoAiCard, "signedOut">, agent: Pick<Agent, "brain"> | undefined) =>
+  card.signedOut ? agentPlan(agent) : null;
 
 /** The "For" select's choice that signs a plan in for every agent of `allAgents`. */
 export const ALL_AGENTS = "all";
