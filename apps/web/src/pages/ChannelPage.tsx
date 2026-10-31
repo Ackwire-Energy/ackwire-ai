@@ -2915,7 +2915,8 @@ export const TimelineMessage = memo(function TimelineMessage({
   const [active, setActive] = useState(false);
   const agent = m.author.type === "agent" ? dir.agentById.get(m.author.id ?? "") : undefined;
   const person = m.author.type === "person" ? dir.memberById.get(m.author.id ?? "") : undefined;
-  const receipted = m.author.type === "person" && !m.local;
+  // An agent's message that mentions agents has one too: whom it handed work to, and who it only mentioned (ADR 0089).
+  const receipted = (m.author.type === "person" || m.mentionedAgentIds.length > 0) && !m.local;
   // Mine in a DM between people: the slot of their face, from the moment it is sent, so it never rewraps a line.
   const seenSlot = dmPersonId !== undefined && m.author.type === "person" && m.author.id === me.user.id;
   const name = dir.authorName(m.author);

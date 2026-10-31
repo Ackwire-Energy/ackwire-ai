@@ -256,7 +256,7 @@ async function runAs(kind: Kind) {
     channelId: f.general.id,
     author:
       kind === "unattended"
-        ? { type: "agent", agentId: f.agent.id, runId: null, hop: 1 }
+        ? { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null }
         : { type: "person", userId: f.owner.id },
     body: brief ? "Check today's orders." : "hi",
     meta: brief ? { routineBrief: brief } : undefined,

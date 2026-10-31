@@ -12,16 +12,18 @@ import type { Judge } from "./judge";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import { enqueue } from "./outbox";
 import { personCanPost } from "./routine-state";
-import { deliverNoticeToRun, lateNoticeSent, NOTICE_WAKE_MAX_HOP } from "./run-resume";
+import { deliverNoticeToRun, lateNoticeSent } from "./run-resume";
 import { type AgentRun, replyThreadOf } from "./runs";
+import { refusedAtLimit, runStretchOf } from "./stretch";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
 /**
  * Agents follow through (ADR 0037, round 3): a run that ends right after a decision without a word gets
- * one more turn with the result (`decisionNudge`); a run whose last message promises more that nothing
- * keeps is caught by one judge call (`promiseIn`, `followThroughVerdict`) and told once to keep it
- * (`followThroughNudge`); and an agent comes back to a conversation by itself (`follow_up`): a notice
- * line there now, and at its time a notice that wakes the agent in that conversation (`wakeFollowUp`).
+ * one more turn with the result (`decisionNudge`); a conversation run that ends with work it said it would do
+ * still undone and nothing set to bring it back is caught by one judge call, in any language
+ * (`followThroughVerdict`, ADR 0089), and told once to do it (`FOLLOW_THROUGH_NUDGE`); and an agent comes back to a
+ * conversation by itself (`follow_up`): a notice line there now, and at its time a notice that wakes the agent in
+ * that conversation (`wakeFollowUp`).
  */
 
 const { agentConsultations, agentRuns, messages, routines } = schema;
@@ -53,45 +55,6 @@ export const decisionNudge = (decided: string) =>
   ].join("\n");
 
 // ── Promises at the end of a run ─────────────────────────────────────────────
-
-/** Verbs of later work after "I'll", "vou", "voy a" (and up to two words between): "I'll check", "vou te passar". */
-const LATER = {
-  en: "check|recheck|look|see|verify|confirm|run|rerun|re-run|retry|try|test|send|share|post|report|update|tell|give|let you know|get back|come back|be back|circle back|follow up|keep (?:an eye|you posted|you updated|watching|monitoring|track)|monitor|watch|ping|notify|dig|investigate|review|fix|open|create|write|draft|prepare|grab|pull|fetch|ask|wait|continue|finish|go on|handle|take care|work on|start|deploy|merge|push|do (?:it|that|this|so)",
-  pt: "checar|verificar|ver|olhar|conferir|rodar|testar|mandar|enviar|passar|avisar|acompanhar|investigar|revisar|corrigir|consertar|abrir|criar|tentar|esperar|continuar|seguir|terminar|voltar|retornar|monitorar|buscar|pegar|puxar|configurar|fazer|analisar|perguntar|dar uma olhada|ficar de olho",
-  es: "revisar|verificar|ver|mirar|comprobar|chequear|correr|probar|enviar|mandar|pasar|avisar|investigar|corregir|abrir|crear|intentar|esperar|seguir|continuar|volver|configurar|hacer|preguntar|contar",
-};
-
-/**
- * Words that promise more work by the agent itself (English, Portuguese, Spanish), looked for at the end of
- * its last message: only then is the judge asked. A future counts only with a verb of later work ("I'll
- * check", never "I'll be honest" or "vou ser direto"). A miss costs a nudge, a false hit one cheap judge call.
- */
-const PROMISE = new RegExp(
-  [
-    String.raw`\b(?:i['’]ll|i will|i['’]m going to|i am going to|i['’]m gonna)\s+(?:\w+\s+){0,2}?(?:${LATER.en})\b`,
-    String.raw`\blet me\s+(?:\w+\s+)?(?:check|look|see|verify|confirm|dig|find|grab|pull|fetch|run|try|test|investigate|review|take a look|think)\b`,
-    String.raw`\b(?:get back to you|keep you posted|report back|will (?:update you|let you know)|one (?:moment|sec(?:ond)?)|just a (?:moment|sec(?:ond)?|minute)|give me a (?:moment|minute|sec(?:ond)?)|hang on|bear with me|checking now|looking into it)\b`,
-    String.raw`\bvou\s+(?:\p{L}+\s+){0,2}?(?:${LATER.pt})(?!\p{L})`,
-    String.raw`\b(?:volto|te (?:aviso|falo|conto|mando|passo|retorno)|(?:eu )?aviso (?:quando|assim)|assim que (?:terminar|acabar|sair|ficar)|quando (?:terminar|acabar|ficar pronto|sair o)|fico de olho|deix[ae](?:-me| eu)|já (?:vejo|olho|checo|confiro|verifico|te falo|te digo|te passo)|só um (?:momento|minuto|segundo|instante)|um (?:momento|instante))(?!\p{L})`,
-    String.raw`\bvoy a\s+(?:\p{L}+\s+){0,2}?(?:${LATER.es})(?!\p{L})`,
-    String.raw`\b(?:d[ée]j[ae]me|te (?:cuento|paso|aviso|escribo)|cuando termine|vuelvo|un momento)(?!\p{L})`,
-  ].join("|"),
-  "iu",
-);
-
-/** How much of the end of the message is read for a promise (the start is the answer itself). */
-const PROMISE_TAIL = 600;
-
-/** The sentence of the reply's end that promises more ("When you approve, I'll give you the numbers"), or null. */
-export function promiseIn(reply: string): string | null {
-  const tail = reply.trim().slice(-PROMISE_TAIL);
-  const m = PROMISE.exec(tail);
-  if (!m) return null;
-  const start = Math.max(...[".", "!", "?", "\n"].map((c) => tail.lastIndexOf(c, m.index))) + 1;
-  const rest = tail.slice(m.index).search(/[.!?\n]/);
-  const end = rest < 0 ? tail.length : m.index + rest + 1;
-  return tail.slice(start, end).trim().slice(0, 300) || null;
-}
 
 export type FollowThroughVerdict = "done" | "waiting" | "unkept";
 
@@ -130,9 +93,9 @@ export async function followThroughVerdict(
   return a?.choice === "waiting" ? "waiting" : "done";
 }
 
-/** What a run reads, once, when its last message promised more and nothing keeps that promise. */
-export const followThroughNudge = (promise: string) =>
-  `You ended with a promise nothing keeps: "${promise}". Do it now with your tools and tell them what came of it. If it has to wait (a build, a deploy, a job still running), set a follow_up to come back to it and say when, in one line.`;
+/** What a run reads, once, when it ended with work it said it would do still undone and nothing keeps it. */
+export const FOLLOW_THROUGH_NUDGE =
+  "You ended saying you would do more, and nothing you set up brings you back to it. Do it now with your tools and tell them what came of it. If it has to wait (a build, a deploy, a job still running), set a follow_up to come back to it and say when, in one line.";
 
 // ── Coming back by itself (`follow_up`) ──────────────────────────────────────
 
@@ -304,11 +267,9 @@ export function createFollowUpToolSource(deps: { pubsub?: PubSub }): ToolSource 
         const channel = await getChannelCached(ctx.db, run.orgId, run.channelId);
         if (channel && isAgentOnlyDm(channel))
           return refused("Answer the agent that asked now: no person reads this conversation to come back to.");
-        // Each follow-up wakes a run one hop further (`deliverNoticeToRun`): past the cap it would wake nobody.
-        if (run.hop >= NOTICE_WAKE_MAX_HOP)
-          return refused(
-            "No more follow-ups from here: you already came back several times in a row. Tell the people what is left and stop.",
-          );
+        // Its wake is one more run this agent starts on its own (ADR 0089): past the stretch's limits it would be held.
+        const atLimit = await refusedAtLimit(ctx.db, run, run.agentId);
+        if (atLimit) return atLimit;
         const now = Date.now();
         const given = str(input.at).trim();
         // A time without its offset would be read in the server's zone, not the person's.
@@ -334,7 +295,7 @@ export function createFollowUpToolSource(deps: { pubsub?: PubSub }): ToolSource 
             orgId: run.orgId,
             channelId: run.channelId,
             threadId: replyThreadOf(run),
-            author: { type: "agent", agentId: run.agentId, runId: null, hop: run.hop },
+            author: { type: "agent", agentId: run.agentId, runId: null, hop: run.hop, stretchId: runStretchOf(run) },
             body: note,
             meta: {
               notice: {

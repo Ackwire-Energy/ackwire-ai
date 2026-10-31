@@ -973,6 +973,10 @@ a.mi-pr:hover {
 /* The tabs and the file's line make one block, one divider under it. */
 .mi-files__tabs {
   overflow-x: auto;
+  scrollbar-width: none;
+}
+.mi-files__tabs::-webkit-scrollbar {
+  display: none;
 }
 /* File names in mono, at the weight of any other segmented control (mono at 600 reads heavier). */
 .mi-files__tabs .ac-seg__item {

@@ -344,14 +344,20 @@ export async function triesToChangePermissions(judge: Judge, input: { orgId: str
 /**
  * An agent's message @mentions other agents: for each, is it handing work or
  * a question to that agent now (a hand-off), rather than naming it ("as @x
- * said", "talk to @x", "@x already deployed")? Probability per agent id.
+ * said", "talk to @x", "@x already deployed") or only being polite to it (a
+ * thanks, an "ok", a sign-off)? `answering`: the message it answers, so a
+ * hand-back or a question back reads as one. Probability per agent id, in any
+ * language (ADR 0089).
  */
 export async function mentionHandoffs(
   judge: Judge,
   input: {
     orgId: string;
+    /** The agent that wrote it: the judgment is recorded on its usage. */
+    agentId?: string | null;
     body: string;
     author: string;
+    answering?: { from: string; text: string } | null;
     targets: { agentId: string; handle: string; name: string; role: string | null }[];
   },
 ): Promise<Map<string, number>> {
@@ -363,19 +369,25 @@ export async function mentionHandoffs(
       instructions: {
         agent: { handle: `@${t.handle}`, name: t.name, role: t.role },
         question:
-          "Is `message` asking `agent` to do something or to answer something now (a hand-off or a direct question), rather than naming it, quoting it, telling a person to talk to it, or offering a person to involve it later?",
+          "Is `message` asking `agent` to do something or to answer something now (a hand-off or a direct question), rather than naming it, quoting it, telling a person to talk to it, offering a person to involve it later, or only being polite to it? `answering` is the message it replies to, when there is one.",
       },
       criteria: {
-        true: "It hands work or a question to that agent, to act on now, with nothing left for a person to decide first.",
+        true: "It hands work or a question to that agent, to act on now, with nothing left for a person to decide first. Handing back work the agent asked for, or asking it something back, counts.",
         false:
-          "It only names the agent: what it said, did or can do, 'talk to @agent', or a plan or offer that waits for a person ('if you agree, I'll open an issue for @agent', 'want me to ask @agent?').",
+          "It only names the agent: what it said, did or can do, 'talk to @agent', or a plan or offer that waits for a person ('if you agree, I'll open an issue for @agent', 'want me to ask @agent?'). Thanks, acknowledgements, agreement and sign-offs hand nothing off, even when addressed to the agent.",
       },
     };
   });
   const answers = await judge.ask({
     orgId: input.orgId,
+    agentId: input.agentId ?? null,
     kind: "mention_handoff",
-    state: { message: { from: input.author, from_an_agent: true, text: input.body.slice(0, 4000) } },
+    state: {
+      message: { from: input.author, from_an_agent: true, text: input.body.slice(0, 4000) },
+      ...(input.answering
+        ? { answering: { from: input.answering.from, text: input.answering.text.slice(0, 1000) } }
+        : {}),
+    },
     questions,
   });
   return new Map(input.targets.map((t, i) => [t.agentId, answers[`asks_${i}`]?.noul ?? 0]));

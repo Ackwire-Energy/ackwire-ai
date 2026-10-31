@@ -473,6 +473,7 @@ export const SCENARIOS: Scenario[] = [
           channelId: h.f.general.id,
           threadId: null,
           hop: 0,
+          stretchId: null,
           notice: { kind: "agent_note", text: "Mudei a variável DATABASE_URL.", from: "@infra", refs: {} },
         }),
       );

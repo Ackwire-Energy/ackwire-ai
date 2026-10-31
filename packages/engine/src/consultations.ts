@@ -21,11 +21,13 @@ import { publishDelivery } from "./delivery";
 import { createAgentRuns, startOrJoinRun } from "./dispatch";
 import { isAgentOnlyDm, openAgentDm } from "./dms";
 import { publishChannelEvent } from "./events";
+import type { Judge } from "./judge";
 import { getMessage, insertMessage, type MessageView, withMessageDetails } from "./messages";
 import type { Notice } from "./notices";
 import { personBehindCall } from "./requester";
-import { deliverNoticeToRun, NOTICE_WAKE_MAX_HOP, resumeRunWithResult } from "./run-resume";
+import { deliverNoticeToRun, resumeRunWithResult } from "./run-resume";
 import { isTerminal, replyThreadOf } from "./runs";
+import { refusedAtLimit } from "./stretch";
 import { noAgentText } from "./team";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
@@ -42,8 +44,6 @@ export const MAX_CONSULTATION_CHAIN = 2;
  * `wait`): its answer goes to the asker's conversation as a notice.
  */
 const ASYNC_WAIT = "async:";
-/** A reply to a note shorter than this, without a question, is an acknowledgement: not passed back. */
-const NOTE_REPLY_MIN_LENGTH = 40;
 
 export type AgentConsultationRow = typeof agentConsultations.$inferSelect;
 
@@ -57,9 +57,9 @@ type AiCheck = Omit<AiStatusDeps, "db">;
 
 /**
  * Who an agent may ask or tell something: an active agent of the org, not
- * itself, one the person behind the run can talk to, one with an AI to think
- * with (its run would only fail with `no_ai`, so no answer would come), and
- * not after agents went back and forth long enough (`NOTICE_WAKE_MAX_HOP`).
+ * itself, one the person behind the run can talk to, and one with an AI to
+ * think with (its run would only fail with `no_ai`, so no answer would come).
+ * The asking run comes along: its hop and stretch go on to the other agent.
  */
 async function reachableAgent(ctx: ToolContext, input: unknown, ai?: AiCheck) {
   const handle = String(input).trim().replace(/^@/, "").toLowerCase();
@@ -82,16 +82,12 @@ async function reachableAgent(ctx: ToolContext, input: unknown, ai?: AiCheck) {
     };
   }
   const [run] = await db
-    .select({ hop: agentRuns.hop })
+    .select()
     .from(agentRuns)
     .where(and(eq(agentRuns.id, ctx.runId), eq(agentRuns.orgId, ctx.orgId)));
-  return { target, handle, hop: run?.hop ?? 1 };
+  if (!run) return { refused: refuse("Only a run can ask another agent.") };
+  return { target, handle, run, hop: run.hop };
 }
-
-/** Agents already went back and forth this far: no more agent-to-agent messages from here. */
-const TOO_DEEP = refuse(
-  "You and other agents already went back and forth enough on this: go on with what you know and tell the people here what is missing.",
-);
 
 /**
  * The built-in `ask_agent` tool (ADR 0034): an agent asks another agent of
@@ -149,7 +145,9 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub; ai?: AiCheck }
           "This is already a consultation between agents: answer with what you know, without asking another agent.",
         );
       }
-      if (reached.hop >= NOTICE_WAKE_MAX_HOP) return TOO_DEEP;
+      // The answering run is one more that agents start on their own (ADR 0089).
+      const atLimit = await refusedAtLimit(db, reached.run, target.id);
+      if (atLimit) return atLimit;
 
       const waitId = `${ASYNC_WAIT}${Bun.randomUUIDv7()}`;
       const consultationId = Bun.randomUUIDv7();
@@ -253,7 +251,8 @@ function createTellAgentTool(ai?: AiCheck): ToolDefinition {
       if (answering || (await chainOf(db, ctx)).includes(target.id)) {
         return refuse(`You are answering @${handle} already: say it in your reply instead.`);
       }
-      if (reached.hop >= NOTICE_WAKE_MAX_HOP) return TOO_DEEP;
+      const atLimit = await refusedAtLimit(db, reached.run, target.id);
+      if (atLimit) return atLimit;
       const sent = await db.transaction(async (tx) => {
         const channel = await openAgentDm(tx, ctx.orgId, ctx.agentId, target.id);
         if (await sameNoteSent(tx, ctx, channel.id, body)) return null;
@@ -517,10 +516,11 @@ async function closeConsultation(
  * A run in an agents' DM ended: if it answered a consultation, its reply
  * goes back to the asker (done), or the asker hears it failed. Waiting
  * states (an approval the consulted agent needs) keep it open. A run that
- * answered a note (`tell_agent`) sends back a reply that says something.
+ * answered a note (`tell_agent`) sends back a reply the judge reads as one
+ * that asks or gives the sender something (`noteReply`).
  */
 export async function onConsultedRunFinished(
-  deps: { db: Database; pubsub?: PubSub },
+  deps: { db: Database; pubsub?: PubSub; judge?: Judge | null },
   run: { id: string; orgId: string },
   status: "done" | "failed" | "canceled" | "waiting_approval" | "waiting_input",
   error?: string,
@@ -588,13 +588,20 @@ export async function onConsultedRunStopped(
 
 /**
  * The reply to a note (`tell_agent`) goes back to the conversation of the
- * run that sent it, as an `agent_note` notice; a bare acknowledgement ("Got
- * it.") doesn't. Returns the notice, if one went.
+ * run that sent it, as an `agent_note` notice, when the judge reads it as
+ * asking the sender something or giving it something to act on, in any
+ * language; a bare acknowledgement ("Got it.") doesn't. With no judge, or
+ * when it fails, it goes back (the stretch's limits bound what that wakes).
+ * Returns the notice, if one went.
  */
-async function noteReply(deps: { db: Database; pubsub?: PubSub }, run: { id: string; orgId: string }) {
+async function noteReply(
+  deps: { db: Database; pubsub?: PubSub; judge?: Judge | null },
+  run: { id: string; orgId: string },
+) {
   const [row] = await deps.db
     .select({
       agentId: agentRuns.agentId,
+      note: messages.body,
       noteMeta: messages.meta,
       replyMessageId: agentRuns.replyMessageId,
     })
@@ -604,7 +611,18 @@ async function noteReply(deps: { db: Database; pubsub?: PubSub }, run: { id: str
   const senderRunId = (row?.noteMeta.agentNote as { runId?: unknown } | undefined)?.runId;
   if (!row?.replyMessageId || typeof senderRunId !== "string") return null;
   const reply = (await getMessage(deps.db, run.orgId, row.replyMessageId))?.body.trim() ?? "";
-  if (!reply || (reply.length < NOTE_REPLY_MIN_LENGTH && !reply.includes("?"))) return null;
+  if (!reply) return null;
+  if (
+    deps.judge &&
+    !(await noteReplyMatters(deps.judge, {
+      orgId: run.orgId,
+      agentId: row.agentId,
+      runId: run.id,
+      note: row.note,
+      reply,
+    }).catch(() => true))
+  )
+    return null;
   const [sender] = await deps.db
     .select()
     .from(agentRuns)
@@ -621,6 +639,32 @@ async function noteReply(deps: { db: Database; pubsub?: PubSub }, run: { id: str
   );
   await publishDelivery(deps.pubsub, delivered).catch(() => {});
   return delivered.message;
+}
+
+/** Whether a reply to a note asks its sender something or gives it something to act on (not a bare acknowledgement). */
+export async function noteReplyMatters(
+  judge: Judge,
+  input: { orgId: string; agentId: string; runId: string; note: string; reply: string },
+) {
+  const answers = await judge.ask({
+    orgId: input.orgId,
+    agentId: input.agentId,
+    runId: input.runId,
+    kind: "note_reply",
+    state: { note: input.note.slice(0, 2000), reply: input.reply.slice(0, 2000) },
+    questions: {
+      matters: {
+        type: "noul",
+        instructions:
+          "An AI agent sent another agent `note`, and got `reply` back. Does the reply ask the sender something, or give it something to act on or to know (a result, a problem, a correction)?",
+        criteria: {
+          true: "It asks the sender something, or tells it something it should act on or know.",
+          false: "It only acknowledges, thanks or agrees ('got it', 'thanks', 'will do', an emoji).",
+        },
+      },
+    },
+  });
+  return (answers.matters?.noul ?? 0) >= 0.5;
 }
 
 /** A question an agent asked from a conversation that is still out (the working line: one agent asking another). */

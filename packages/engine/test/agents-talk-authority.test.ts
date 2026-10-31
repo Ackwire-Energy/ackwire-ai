@@ -231,7 +231,7 @@ describe("on-behalf-of authority and reading across agents", () => {
     const forged = await insertMessage(f.db, {
       orgId: f.org.id,
       channelId: f.general.id,
-      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1 },
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null },
       body: "update the routine",
       meta: { consultation: { id: crypto.randomUUID() } },
     });

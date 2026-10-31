@@ -30,7 +30,7 @@ import { agentWorkspace } from "./paths";
 import type { FetchLike } from "./push";
 import { ENTER_MS, type ScopeKind, type Spawn, spawnGated } from "./scope-gate";
 import { type ActivatedSecret, agentSecrets, handleSecret, secretValue } from "./secrets";
-import { systemdBooted } from "./service";
+import { agentCgroup, systemdBooted } from "./service";
 import {
   BROWSER_LEASE_MS,
   UPLOAD_CHUNK_BYTES,
@@ -434,6 +434,7 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     },
     onChange: () => queueMicrotask(lease),
     ...(chrome ? { startChrome: (exe, args, profile, env) => launchChrome(exe, args, profile, env, chrome) } : {}),
+    memoryEvents: path.join(agentCgroup(process.getuid?.() ?? 0), "memory.events"),
     ...o.browser,
   });
   const leases = setInterval(lease, BROWSER_LEASE_MS / 3);

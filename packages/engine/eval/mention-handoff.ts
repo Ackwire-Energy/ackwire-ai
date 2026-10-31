@@ -1,8 +1,13 @@
 /**
- * Mention hand-off eval (ADR 0034): when an agent's message @mentions another
- * agent, is it handing that agent something to do now (it gets a run) or only
- * naming it (no run)? Scores every case with the production judge and the
- * production threshold (`mentionThreshold`, 0.6).
+ * Mention hand-off eval (ADR 0034, ADR 0089): when an agent's message @mentions
+ * another agent, is it handing that agent something to do now (it gets a run)
+ * or only naming it (no run)? Scores every case with the production judge and
+ * the production threshold (`mentionThreshold`, 0.6), with the message it
+ * answers when there is one. Between agents with no turn cap, the judge also
+ * tells a hand-back of the work or a question back (a run) from a thanks, an
+ * "ok" or a 👍, an agreement or a sign-off (none), in Portuguese, English,
+ * Spanish, German, Japanese and Arabic. It passes when every case is right:
+ * no courtesy at 0.6 or more, every hand-back and question back at 0.6 or more.
  *
  * Manual, never in CI (it calls the real service and costs a little):
  *
@@ -21,9 +26,12 @@ interface Case {
   from: string;
   to: { handle: string; name: string; role: string };
   body: string;
+  /** The message it answers (the trigger of the author's run). */
+  answering?: { from: string; text: string };
 }
 
 const ada = { handle: "ada", name: "Ada", role: "Engenharia" };
+const theo = { handle: "theo", name: "Theo", role: "Produto" };
 const nina = { handle: "nina", name: "Nina", role: "Dados" };
 const atlas = { handle: "atlas", name: "Atlas", role: "Observabilidade" };
 
@@ -128,6 +136,133 @@ const CASES: Case[] = [
   },
 ];
 
+type Kind = "handback" | "question_back" | "thanks" | "ack" | "agreement" | "sign_off";
+
+/**
+ * The same six moments of Theo and Ada working together, in each language: Ada hands Theo back the review he asked
+ * for and asks him something back (both hand-offs), and Theo thanks her, says "ok" (or 👍), agrees with what she is
+ * already doing or signs off (no hand-off, even addressed).
+ */
+const TOGETHER: Record<string, Record<Kind, { answering: string; body: string }>> = {
+  pt: {
+    handback: {
+      answering: "@ada pode revisar o PR #12 antes do deploy?",
+      body: "@theo revisei o PR #12: deixei dois comentários nos testes de checkout, é contigo para corrigir.",
+    },
+    question_back: { answering: "@ada puxa o churn de setembro?", body: "@theo você quer por plano ou só o total?" },
+    thanks: { answering: "@theo churn de setembro: 3,2% no total, 5% no Pro.", body: "Valeu, @ada!" },
+    ack: { answering: "@theo subi a correção, o CI está rodando.", body: "@ada ok" },
+    agreement: {
+      answering: "@theo já estou abrindo a issue do timeout, te aviso quando estiver pronta.",
+      body: "@ada combinado, pode seguir.",
+    },
+    sign_off: { answering: "@theo corrigi os testes e o CI passou.", body: "@ada perfeito, por aqui está fechado." },
+  },
+  en: {
+    handback: {
+      answering: "@ada can you review PR #12 before the deploy?",
+      body: "@theo reviewed PR #12: I left two comments on the checkout tests, over to you to fix them.",
+    },
+    question_back: {
+      answering: "@ada can you pull September's churn?",
+      body: "@theo do you want it by plan or just the total?",
+    },
+    thanks: { answering: "@theo September churn: 3.2% overall, 5% on Pro.", body: "Thanks, @ada!" },
+    ack: { answering: "@theo pushed the fix, CI is running.", body: "@ada 👍" },
+    agreement: {
+      answering: "@theo I'm opening the timeout issue now, I'll ping you when it's ready.",
+      body: "@ada agreed, go ahead.",
+    },
+    sign_off: { answering: "@theo fixed the tests and CI is green.", body: "@ada perfect, all done on my side." },
+  },
+  es: {
+    handback: {
+      answering: "@ada ¿puedes revisar el PR #12 antes del deploy?",
+      body: "@theo revisé el PR #12: dejé dos comentarios en los tests de checkout, te toca corregirlos.",
+    },
+    question_back: {
+      answering: "@ada ¿puedes sacar el churn de septiembre?",
+      body: "@theo ¿lo quieres por plan o solo el total?",
+    },
+    thanks: { answering: "@theo churn de septiembre: 3,2% en total, 5% en Pro.", body: "¡Gracias, @ada!" },
+    ack: { answering: "@theo subí la corrección, el CI está corriendo.", body: "@ada vale" },
+    agreement: {
+      answering: "@theo ya estoy abriendo la issue del timeout, te aviso cuando esté lista.",
+      body: "@ada de acuerdo, adelante.",
+    },
+    sign_off: { answering: "@theo arreglé los tests y el CI pasó.", body: "@ada perfecto, por mi parte está cerrado." },
+  },
+  de: {
+    handback: {
+      answering: "@ada kannst du PR #12 vor dem Deploy reviewen?",
+      body: "@theo PR #12 ist reviewt: zwei Kommentare zu den Checkout-Tests, jetzt bist du mit dem Fixen dran.",
+    },
+    question_back: {
+      answering: "@ada kannst du den Churn vom September ziehen?",
+      body: "@theo willst du ihn pro Plan oder nur gesamt?",
+    },
+    thanks: { answering: "@theo Churn im September: 3,2 % gesamt, 5 % bei Pro.", body: "Danke, @ada!" },
+    ack: { answering: "@theo Fix ist gepusht, die CI läuft.", body: "@ada 👍" },
+    agreement: {
+      answering: "@theo ich lege gerade das Issue zum Timeout an und melde mich, wenn es steht.",
+      body: "@ada passt, mach weiter.",
+    },
+    sign_off: {
+      answering: "@theo Tests gefixt, die CI ist grün.",
+      body: "@ada super, von meiner Seite ist alles erledigt.",
+    },
+  },
+  ja: {
+    handback: {
+      answering: "@ada デプロイ前にPR #12をレビューしてもらえますか？",
+      body: "@theo PR #12をレビューしました。チェックアウトのテストに2件コメントを残したので、修正をお願いします。",
+    },
+    question_back: {
+      answering: "@ada 9月のチャーンを出してもらえますか？",
+      body: "@theo プラン別がいいですか、それとも合計だけですか？",
+    },
+    thanks: { answering: "@theo 9月のチャーンは全体で3.2%、Proで5%です。", body: "@ada ありがとう！" },
+    ack: { answering: "@theo 修正をプッシュしました。CIが走っています。", body: "@ada 了解" },
+    agreement: {
+      answering: "@theo タイムアウトのissueを今作っています。できたら知らせます。",
+      body: "@ada いいですね、そのまま進めてください。",
+    },
+    sign_off: { answering: "@theo テストを直してCIも通りました。", body: "@ada 完璧です、こちらはこれで完了です。" },
+  },
+  ar: {
+    handback: {
+      answering: "@ada هل يمكنك مراجعة PR #12 قبل النشر؟",
+      body: "@theo راجعت PR #12: تركت تعليقين على اختبارات الدفع، الدور عليك لإصلاحهما.",
+    },
+    question_back: {
+      answering: "@ada هل يمكنك استخراج معدل الإلغاء لشهر سبتمبر؟",
+      body: "@theo هل تريده حسب الخطة أم الإجمالي فقط؟",
+    },
+    thanks: { answering: "@theo معدل الإلغاء في سبتمبر: 3.2% إجمالاً و5% في Pro.", body: "شكراً يا @ada!" },
+    ack: { answering: "@theo رفعت الإصلاح، والـ CI يعمل الآن.", body: "@ada تمام" },
+    agreement: {
+      answering: "@theo أفتح الآن مشكلة المهلة، وسأخبرك عندما تجهز.",
+      body: "@ada متفق، تابعي.",
+    },
+    sign_off: { answering: "@theo أصلحت الاختبارات ونجح الـ CI.", body: "@ada ممتاز، انتهى الأمر من جهتي." },
+  },
+};
+
+for (const [language, moments] of Object.entries(TOGETHER)) {
+  for (const [kind, m] of Object.entries(moments) as [Kind, { answering: string; body: string }][]) {
+    // A hand-back or a question back is Ada's, to Theo; a courtesy is Theo's, to Ada.
+    const fromAda = kind === "handback" || kind === "question_back";
+    CASES.push({
+      id: `${language}-${kind}`,
+      handoff: fromAda,
+      from: fromAda ? "ada" : "theo",
+      to: fromAda ? theo : ada,
+      body: m.body,
+      answering: { from: fromAda ? "@theo" : "@ada", text: m.answering },
+    });
+  }
+}
+
 const THRESHOLD = 0.6;
 const ORG = "00000000-0000-0000-0000-000000000000";
 const which = process.argv.includes("--judge") ? process.argv[process.argv.indexOf("--judge") + 1] : "jev";
@@ -159,6 +294,7 @@ const rows = await Promise.all(
       orgId: ORG,
       body: c.body,
       author: `@${c.from}`,
+      answering: c.answering ?? null,
       targets: [{ agentId: c.to.handle, handle: c.to.handle, name: c.to.name, role: c.to.role }],
     });
     const p = scores.get(c.to.handle) ?? 0;
