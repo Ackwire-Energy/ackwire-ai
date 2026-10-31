@@ -158,7 +158,7 @@ export function createJevRouterStrategy(options: {
         spoken[NONE] = "No agent in particular.";
         questions.addressee = {
           type: "choice",
-          instructions: `Which agent does \`latest_message\` speak to? ${whoFor()} \`${NONE}\` when it speaks to no agent in particular: to a person, to anyone, to all the agents, or a follow-up that names nobody.`,
+          instructions: `Which agent does \`latest_message\` speak to? ${whoFor()} The agent the person was just talking to is \`agent_just_talking\`. \`${NONE}\` when it speaks to no agent in particular: to a person, to anyone, to all the agents, or a follow-up that names nobody.`,
           criteria: spoken,
         };
       }

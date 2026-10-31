@@ -281,7 +281,7 @@ export function selectAgents(
 
 /** Who a message speaks to, in every step's words (Jev's questions and `ROUTER_SYSTEM`). */
 export const SPOKEN_TO =
-  'A message speaks to the agent it asks to answer or to act (by @, by name or by its role), not to an agent it only names as someone to ask, involve or hand over to, or only talks about: "Ada, ask Theo for the sales numbers" speaks to Ada, and Ada asks Theo.';
+  'A message speaks to the agent it asks to answer or to act (by @, by name or by its role), not to an agent it only names as someone to ask, involve or hand over to, or only talks about: "Mila, ask Omar for the sales numbers" speaks to Mila, and Mila asks Omar. A follow-up that names another agent only as someone to ask, involve or hand over to still speaks to the agent the person was just talking to: right after Omar spoke, "ask Mila if the PR is up" speaks to Omar.';
 
 export const ROUTER_SYSTEM = [
   "You route messages in a team chat where people and AI agents work together.",

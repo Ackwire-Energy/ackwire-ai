@@ -256,6 +256,13 @@ describe("who a message speaks to", () => {
     expect(questions.agent_1.instructions.question).toContain(
       "No when it speaks to another agent, even when it names this one as someone to ask, involve or hand over to",
     );
+    // Right after Theo spoke, "pergunta pra Ada se o PR subiu" speaks to Theo.
+    expect(SPOKEN_TO).toContain(
+      "A follow-up that names another agent only as someone to ask, involve or hand over to still speaks to the agent the person was just talking to",
+    );
+    expect(questions.addressee.instructions).toContain(
+      "The agent the person was just talking to is `agent_just_talking`.",
+    );
   });
 
   test("'ada pergunta pro theo ai qual meu email mais recente pls' is Ada's, not Theo's who has the email", async () => {
