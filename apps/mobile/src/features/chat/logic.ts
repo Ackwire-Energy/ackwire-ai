@@ -346,6 +346,31 @@ export function markedParts(text: string): { text: string; bold: boolean }[] {
   return out;
 }
 
+/** How wide the working line's pieces that can end in "…" drew their text (`onTextLayout`). */
+export interface LineDrawn {
+  agents?: number;
+  typers?: number;
+}
+
+/** A piece only narrows: kept to what it drew, it can't draw wider, and a narrower room cuts it again. */
+export const narrowDrawn = (drawn: LineDrawn, part: keyof LineDrawn, width: number): LineDrawn =>
+  (drawn[part] ?? Number.POSITIVE_INFINITY) <= width ? drawn : { ...drawn, [part]: width };
+
+/** Narrower than this, the agents' words cut short are a sliver ("A", "Th…"). */
+export const AGENT_WORDS_MIN = 40;
+
+/**
+ * The widths the working line's pieces keep (whole points): iOS keeps a cut text's whole box, a gap before what
+ * follows, so each keeps to what it drew and the next piece comes right after its "…". `agents: null` drops the
+ * agents' words, their " · " with them, when beside someone typing they'd be a sliver: who types keeps the room,
+ * as on the web.
+ */
+export function lineFit(drawn: LineDrawn, someoneTypes: boolean): { agents?: number | null; typers?: number } {
+  const whole = (width?: number) => (width === undefined ? undefined : Math.ceil(width));
+  const sliver = someoneTypes && drawn.agents !== undefined && drawn.agents < AGENT_WORDS_MIN;
+  return { agents: sliver ? null : whole(drawn.agents), typers: whole(drawn.typers) };
+}
+
 // ── Reactions ────────────────────────────────────────────────────────────────
 
 /** The quick row in the long-press sheet. */

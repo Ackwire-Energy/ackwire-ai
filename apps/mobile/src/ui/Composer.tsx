@@ -142,11 +142,16 @@ export function Composer({
   const token = focused && mention && mentionAt ? mentionAt(text, caret) : null;
   const stopMode = Boolean(working?.stop) && !has;
   const button = has || stopMode;
-  // The send arrow and the stop square swap in place (one turns away as the other turns in).
+  // The send arrow and the stop square swap in place (one turns away as the other turns in) on a button already
+  // there; a button popping in (ZoomIn) shows its glyph as it is: iOS draws a glyph still turning inside that pop
+  // blurry, and with Reanimated's default mass of 4 both springs take seconds to settle.
   const mode = useSharedValue(stopMode ? 1 : 0);
+  const shown = useRef(button);
   useEffect(() => {
-    mode.value = reducedMotion ? (stopMode ? 1 : 0) : withSpring(stopMode ? 1 : 0, { damping: 16, stiffness: 320 });
-  }, [stopMode, reducedMotion, mode]);
+    const to = stopMode ? 1 : 0;
+    mode.value = reducedMotion || !shown.current || !button ? to : withSpring(to, { damping: 16, stiffness: 320 });
+    shown.current = button;
+  }, [stopMode, button, reducedMotion, mode]);
   const sendGlyph = useAnimatedStyle(() => ({
     opacity: 1 - mode.value,
     transform: [{ scale: 1 - 0.6 * mode.value }, { rotate: `${45 * mode.value}deg` }],

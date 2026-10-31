@@ -1,21 +1,24 @@
 import { describe, expect, test } from "bun:test";
 import type { LiveConsult, LiveRun, LiveWork, Message, RunConsultation } from "@agenteschat/client";
-import { activitySentence, barFaces } from "@agenteschat/client/lib/activity";
+import { activitySentence, barElapsed, barFaces, barWords } from "@agenteschat/client/lib/activity";
 import { consultBlocksNearEnd, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { toolCalls, toolNow, toolPhrase, toolWhy } from "@agenteschat/client/lib/work";
 import {
+  AGENT_WORDS_MIN,
   artifactsOf,
   buildRows,
   consultationsOf,
   eventLineOf,
   hidesBody,
+  lineFit,
   markedParts,
   markName,
   mayStopRun,
   mergeTimeline,
   missionCardRef,
   missionPlanOf,
+  narrowDrawn,
   parseBlocks,
   parseInline,
   parseSlash,
@@ -235,6 +238,64 @@ describe("working line", () => {
     expect(activitySentence(t, entries)).toBe("Atlas e mais 2 estão trabalhando · Marina e mais 2 estão digitando…");
     expect(barFaces(entries).map((e) => e.id)).toEqual(["atlas", "ada", "u1"]);
     expect(activitySentence(t, workingEntries([], [], name, ["u1"], personName))).toBe("Marina está digitando…");
+  });
+
+  test("beside a long name typing, the agents' words give way first and leave whole when only a sliver would show", async () => {
+    const t = await translator("en");
+    const people: Record<string, string> = { u1: "Maria Fernanda Albuquerque" };
+    const entries = workingEntries([run({ runId: "r", agentId: "ada" })], [], name, ["u1"], (id) => people[id]);
+    // The shared pieces, in the order they give way: the agents' words (and their " · "), then the names.
+    expect(barWords(t, entries, [], 0, 0)).toEqual([
+      "Ada is working",
+      " · ",
+      "Maria Fernanda Albuquerque",
+      " is typing…",
+    ]);
+    // What iOS drew of each: a cut-off "A" beside someone typing leaves, " · " with it.
+    expect(lineFit({ agents: 4.7, typers: 170.3 }, true)).toEqual({ agents: null, typers: 171 });
+    expect(lineFit({ agents: AGENT_WORDS_MIN }, true).agents).toBe(AGENT_WORDS_MIN);
+    // Alone on the line they are all it says: cut, never dropped.
+    expect(lineFit({ agents: 4.7 }, false).agents).toBe(5);
+  });
+
+  test("a piece cut short keeps to what it drew, so the next comes right after its '…' (no gap)", () => {
+    // "Theo and 3…" drew 74.5 of a 79.3 box: kept to 75, " · " follows it.
+    expect(lineFit({ agents: 74.51 }, true)).toEqual({ agents: 75, typers: undefined });
+    // It only narrows: kept to its "…" it draws the same again, and a narrower room cuts it again.
+    const drawn = narrowDrawn({}, "agents", 74.51);
+    expect(narrowDrawn(drawn, "agents", 74.51)).toBe(drawn);
+    expect(narrowDrawn(drawn, "agents", 80)).toBe(drawn);
+    expect(narrowDrawn(drawn, "agents", 60)).toEqual({ agents: 60 });
+    expect(narrowDrawn(drawn, "typers", 100)).toEqual({ agents: 74.51, typers: 100 });
+  });
+
+  test("one agent on its own shows how long it has been at it, as on the web; several, or a question out, don't", async () => {
+    const [pt, en] = await Promise.all([translator("pt-BR"), translator("en")]);
+    const now = 1_000_000;
+    const ada = run({ runId: "r", agentId: "ada", status: "running", startedAt: now - 16_400 });
+    const one = workingEntries([ada], [], name);
+    expect(barElapsed(pt, one, [ada], now)).toBe("16 s");
+    expect(barElapsed(en, one, [ada], now)).toBe("16s");
+    expect(barElapsed(pt, one, [ada], now + 49_000)).toBe("1 min 5 s");
+    expect(barElapsed(en, one, [ada], now - 15_000)).toBeNull();
+    // Someone typing beside it doesn't take its time away, nor does a turn of its own it stopped before.
+    const typing = workingEntries([ada], [], name, ["u1"], () => "Marina");
+    expect(barElapsed(en, typing, [ada], now)).toBe("16s");
+    const stopped = run({ runId: "r0", agentId: "ada", status: "canceled", startedAt: now - 90_000 });
+    expect(barElapsed(en, workingEntries([stopped, ada], [], name), [stopped, ada], now)).toBe("16s");
+    const atlas = run({ runId: "r2", agentId: "atlas", status: "running", startedAt: now - 30_000 });
+    expect(barElapsed(en, workingEntries([ada, atlas], [], name), [ada, atlas], now)).toBeNull();
+    const asking: LiveConsult = {
+      runId: "r",
+      agentId: "ada",
+      consultedAgentId: "infra",
+      channelId: "c1",
+      threadId: "m1",
+      status: "asking",
+      since: now - 5_000,
+      at: now - 5_000,
+    };
+    expect(barElapsed(en, workingEntries([ada], [asking], name), [ada], now)).toBeNull();
   });
 
   test("Parar: real runs at work, also while they write (not a guess, not one waiting)", () => {
