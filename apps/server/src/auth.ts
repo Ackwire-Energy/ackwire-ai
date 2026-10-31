@@ -11,6 +11,7 @@ import {
   earlyAccessLink,
   emailLocale,
   ForbiddenError,
+  hasWaitingInvitation,
   isAgentesCloud,
   onUserCreated,
   queueEmail,
@@ -194,6 +195,10 @@ export function createAuth(deps: {
               },
               request?: Request,
             ) => {
+              // Signing up to accept an email invitation: accepting confirms the address (ADR 0089), so no
+              // "confirm your email" follows. Asked for later, it goes as always.
+              const signingUp = request ? new URL(request.url).pathname.endsWith("/sign-up/email") : false;
+              if (signingUp && (await hasWaitingInvitation(db, user.email))) return;
               if (!(await emailAllowed("verify-email", user.email))) return;
               const locale = emailLocale(user.locale ?? requestLocale(request?.headers.get("accept-language")));
               await queueEmail(db, {
@@ -548,6 +553,21 @@ async function mintSignIn(
 export async function mintPhoneSignIn(auth: Auth, sessionToken: string) {
   const { internalAdapter } = await auth.$context;
   return mintSignIn(internalAdapter, sessionToken);
+}
+
+/**
+ * A one-time sign-in for an account an approved request made (ADR 0089), traded by the page that asked through
+ * `POST /api/auth/sign-in/one-time-token`, as the phone's.
+ */
+export async function mintUserSignIn(auth: Auth, userId: string) {
+  const { internalAdapter } = await auth.$context;
+  return mintSignIn(internalAdapter, `${FOR_USER}${userId}`);
+}
+
+/** The password hash Better Auth would store for `password` (ADR 0089: a request keeps it until an approval). */
+export async function hashPassword(auth: Auth, password: string) {
+  const context = await auth.$context;
+  return context.password.hash(password);
 }
 
 /**

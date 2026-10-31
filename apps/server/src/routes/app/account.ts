@@ -17,6 +17,7 @@ import {
   getOrganization,
   hasPassword,
   invitationLogoFile,
+  invitationState,
   isEmailVerified,
   isValidTimeZone,
   joinStatus,
@@ -24,6 +25,7 @@ import {
   listMembers,
   listMemberships,
   needsWorkspaceAllowance,
+  noticeInvitationAccepted,
   ONBOARDING_STEPS,
   orgLogoFile,
   pinnedOwner,
@@ -317,9 +319,24 @@ export function accountRoutes(deps: AppDeps) {
               .optional()
               .openapi({
                 description:
-                  "A link turned off, expired, or whose workspace is paused, or an invitation to a workspace being " +
-                  "deleted: nobody can ask or join.",
+                  "A link turned off, expired, or whose workspace is paused, or an invitation to a workspace paused " +
+                  "or being deleted: nobody can ask or join.",
               }),
+            expiresAt: z.string().optional().openapi({ description: "An email invitation: until when it works." }),
+            account: z
+              .object({
+                exists: z.boolean(),
+                password: z.boolean(),
+                providers: z.array(z.enum(["google", "github", "apple"])),
+              })
+              .optional()
+              .openapi({
+                description:
+                  "An email invitation: how its address signs in (ADR 0089), so the page asks only what is missing.",
+              }),
+            full: z.literal(true).optional().openapi({
+              description: "An email invitation to a workspace with no seat left: said before anyone makes an account.",
+            }),
             you: z
               .object({
                 member: z.boolean(),
@@ -353,6 +370,39 @@ export function accountRoutes(deps: AppDeps) {
       // A link that no longer works still tells a member they're in; anyone else hears only that it doesn't work.
       const you = "closed" in invitation && !status?.member ? null : status;
       return c.json({ ...invitation, ...(you ? { you } : {}) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/invitations/{token}/state",
+      tags,
+      summary: "What an email invitation that no longer opens says (ADR 0089)",
+      description:
+        "Public, for the token's holder. `accepted` (with the workspace's id, to open it when signed in as a " +
+        "member) or `expired` (when, and who invited). 404 for a token that matches none, a cancelled " +
+        "invitation's included, and for one that still opens (read the preview).",
+      request: { params: z.object({ token: z.string().max(200) }) },
+      responses: {
+        200: json(
+          z.discriminatedUnion("state", [
+            z.object({ state: z.literal("accepted"), orgId: z.uuid(), orgName: z.string(), at: z.string() }),
+            z.object({
+              state: z.literal("expired"),
+              orgName: z.string(),
+              invitedBy: z.string().nullable(),
+              at: z.string(),
+            }),
+          ]),
+        ),
+        404: errors[404],
+      },
+    }),
+    async (c) => {
+      const found = await invitationState(db, c.req.valid("param").token);
+      if (!found) return apiError(c, 404, "not_found", "Invitation not found");
+      return c.json(found, 200);
     },
   );
 
@@ -1175,12 +1225,10 @@ export function accountRoutes(deps: AppDeps) {
       responses: { 201: json(z.object({ invitation: Invitation, url: z.string() }), "Created"), ...errors },
     }),
     async (c) => {
-      const { invitation, token } = await createInvitation(
-        db,
-        c.get("user").id,
-        c.req.valid("param").orgId,
-        c.req.valid("json"),
-      );
+      const { invitation, token } = await createInvitation(db, c.get("user").id, c.req.valid("param").orgId, {
+        ...c.req.valid("json"),
+        secret: config.AGENTES_SECRET,
+      });
       const url = `${config.PUBLIC_URL.replace(/\/$/, "")}/invite/${token}`;
       await queueInvitationEmail(db, {
         orgId: invitation.orgId,
@@ -1235,11 +1283,16 @@ export function accountRoutes(deps: AppDeps) {
       responses: { 200: json(z.object({ orgId: z.uuid() })), ...errors },
     }),
     async (c) => {
-      const joined = await acceptInvitation(db, c.get("user"), c.req.valid("param").token);
+      const user = c.get("user");
+      const joined = await acceptInvitation(db, user, c.req.valid("param").token);
       await announceMembers(deps.adapters.pubsub, joined.orgId);
       // A request to join they had waiting closed as they joined: the admins' notice goes with the last one.
       await settleJoinRequests({ db, pubsub: deps.adapters.pubsub }, joined.orgId);
-      return c.json(joined, 200);
+      await noticeInvitationAccepted(
+        { db, pubsub: deps.adapters.pubsub },
+        { orgId: joined.orgId, inviterId: joined.invitedBy, userId: user.id },
+      );
+      return c.json({ orgId: joined.orgId }, 200);
     },
   );
 

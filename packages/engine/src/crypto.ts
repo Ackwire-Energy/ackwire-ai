@@ -124,6 +124,14 @@ export function inviteLinkToken(masterSecret: string, linkId: string): string {
   return createHmac("sha256", deriveKey(masterSecret, "invite-links")).update(linkId).digest("base64url");
 }
 
+/**
+ * The token of an email invitation (ADR 0089): an HMAC of its id, as a workspace's link, so its link can be copied
+ * again and sending it again keeps it, while only its hash is stored.
+ */
+export function invitationToken(masterSecret: string, invitationId: string): string {
+  return createHmac("sha256", deriveKey(masterSecret, "invitations")).update(invitationId).digest("base64url");
+}
+
 /** URL-safe random token, e.g. for invitation links. */
 export function randomToken(bytes = 24): string {
   return randomBytes(bytes).toString("base64url");

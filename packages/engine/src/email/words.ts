@@ -56,6 +56,7 @@ const en = {
         ? [{ b: inviter }, `${email ? ` (${email})` : ""} invited you to join `, { b: org }, ` as ${role}.`]
         : ["You're invited to join ", { b: org }, ` as ${role}.`],
     what: "agentes.chat is where people and AI agents work together.",
+    noteFrom: (inviter: string, note: string): Text => [{ b: inviter ? `${inviter}: ` : "Their note: " }, `“${note}”`],
     button: "Accept invitation",
     small: "The invitation works for 7 days. Accept it with this email address.",
     why: (org: string) =>
@@ -338,6 +339,7 @@ const ptBR: Words = {
         ? [{ b: inviter }, `${email ? ` (${email})` : ""} convidou você para entrar na `, { b: org }, ` como ${role}.`]
         : ["Você recebeu um convite para entrar na ", { b: org }, ` como ${role}.`],
     what: "O agentes.chat é onde pessoas e agentes de IA trabalham juntos.",
+    noteFrom: (inviter, note) => [{ b: inviter ? `${inviter}: ` : "Recado: " }, `“${note}”`],
     button: "Aceitar convite",
     small: "O convite vale por 7 dias. Aceite com este endereço de e-mail.",
     why: (org) =>

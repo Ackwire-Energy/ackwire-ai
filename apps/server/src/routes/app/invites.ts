@@ -2,7 +2,9 @@ import {
   approveJoinRequest,
   askToJoin,
   CODE_LENGTH,
+  cancelSuggestion,
   checkJoinCode,
+  claimJoinRequest,
   denyJoinRequest,
   inviteLink,
   JOIN_NAME_MAX,
@@ -10,15 +12,19 @@ import {
   JOIN_REASON_MAX,
   linkBusy,
   listInviteLinks,
+  listMySuggestions,
   listWaitingJoinRequests,
+  randomToken,
+  renewInviteLink,
   requestLocale,
   requestNewInvitation,
   sendJoinCode,
   sha256,
+  suggestPerson,
   turnOffInviteLink,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
-import { sessionUser } from "../../auth";
+import { hashPassword, mintUserSignIn, sessionUser } from "../../auth";
 import { requestLimitIp } from "../../http/client-ip";
 import { apiError, errorResponse } from "../../http/errors";
 import { humanCheckRefusal } from "../../http/human-check";
@@ -41,6 +47,10 @@ const ASKS_PER_IP = { limit: 10, windowMs: 3600_000 };
 const CODES_PER_IP = { limit: 10, windowMs: 3600_000 };
 const CODES_PER_LINK = { limit: 40, windowMs: 3600_000 };
 const CHECKS_PER_IP = { limit: 30, windowMs: 3600_000 };
+/** The page that asked checks every 15 s while open (ADR 0089): a few hours of it from one place. */
+const CLAIMS_PER_IP = { limit: 600, windowMs: 3600_000 };
+/** Suggestions from one member (ADR 0089). */
+const SUGGESTIONS_PER_MEMBER = { limit: 20, windowMs: 3600_000 };
 const TOO_MANY = "Too many requests from here. Try again in an hour.";
 const Code = z.string().regex(new RegExp(`^\\d{${CODE_LENGTH}}$`));
 
@@ -69,13 +79,26 @@ const JoinRequest = z.object({
     deprecated: true,
     description: "Approving lets an account in at once. Read `verified` instead.",
   }),
+  suggestedBy: z.string().nullable().openapi({
+    description: "The member who suggested this person (their name, ADR 0089): no link, no proof.",
+  }),
   createdAt: z.string(),
   expiresAt: z.string(),
 });
 
+const Asked = z.object({
+  status: z.literal("pending"),
+  email: z.string(),
+  emailed: z.boolean(),
+  key: z.string().optional().openapi({
+    description: "With a `password` (ADR 0089): what this page keeps to sign in once approved. Shown once.",
+  }),
+});
+
 /**
- * The workspace's invitation link and the requests to join it brings (ADR 0068), and "ask for a new invitation"
- * from an expired email invitation.
+ * The workspace's invitation link and the requests to join it brings (ADR 0068), suggestions from members and the
+ * page that asked signing in once approved (ADR 0089), and "ask for a new invitation" from an expired email
+ * invitation.
  */
 export function inviteRoutes(deps: AppDeps) {
   const { db, config, adapters } = deps;
@@ -155,6 +178,92 @@ export function inviteRoutes(deps: AppDeps) {
 
   app.openapi(
     createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/invite-links/{linkId}/renew",
+      tags,
+      security,
+      summary: "Give an invitation link 30 more days (admins)",
+      description: "The same link: whoever already has it keeps it (ADR 0089).",
+      request: { params: LinkParams },
+      responses: { 200: json(z.object({ expiresAt: z.string() })), ...errors },
+    }),
+    async (c) => {
+      const { orgId, linkId } = c.req.valid("param");
+      const { expiresAt } = await renewInviteLink(db, c.get("user").id, orgId, linkId);
+      return c.json({ expiresAt: expiresAt.toISOString() }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/join-requests/suggest",
+      tags,
+      security,
+      summary: "Suggest someone to the people who may invite (any member, ADR 0089)",
+      description:
+        "Waits among the requests to join, with who suggested it. Approving it sends an email invitation. " +
+        "`join.member`, `join.invited` (an invitation waits), `join.waiting` (already asked for), `join.full`.",
+      request: {
+        params: OrgParams,
+        body: body(z.object({ email: z.email().max(254), note: z.string().max(JOIN_NOTE_MAX).optional() })),
+      },
+      responses: { 201: json(z.object({ id: z.uuid() })), 429: errorResponse("Too many (`rate_limited`)"), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const userId = c.get("user").id;
+      const limit = await adapters.rateLimiter.consume(`suggest:${orgId}:${userId}`, SUGGESTIONS_PER_MEMBER);
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many suggestions. Try again later.");
+      const input = c.req.valid("json");
+      return c.json(await suggestPerson(events, userId, orgId, input), 201);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/join-requests/mine",
+      tags,
+      security,
+      summary: "The suggestions this member made that still wait (ADR 0089)",
+      request: { params: OrgParams },
+      responses: {
+        200: json(
+          z.object({
+            suggestions: z.array(
+              z.object({ id: z.uuid(), email: z.string(), note: z.string().nullable(), createdAt: z.string() }),
+            ),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const rows = await listMySuggestions(db, c.get("user").id, c.req.valid("param").orgId);
+      return c.json({ suggestions: rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/join-requests/{requestId}",
+      tags,
+      security,
+      summary: "Take back a suggestion that still waits (its author, ADR 0089)",
+      request: { params: RequestParams },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, requestId } = c.req.valid("param");
+      await cancelSuggestion(events, c.get("user").id, orgId, requestId);
+      return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
       method: "get",
       path: "/organizations/{orgId}/join-requests",
       tags,
@@ -218,7 +327,7 @@ export function inviteRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, requestId } = c.req.valid("param");
       const result = await approveJoinRequest(
-        events,
+        { ...events, secret: config.AGENTES_SECRET },
         config.PUBLIC_URL,
         c.get("user").id,
         orgId,
@@ -360,15 +469,17 @@ export function inviteRoutes(deps: AppDeps) {
             email: z.email().max(254).optional(),
             note: z.string().max(JOIN_NOTE_MAX).optional(),
             code: Code.optional(),
+            password: z.string().min(8).max(128).optional().openapi({
+              description:
+                "Signed out, with a `code`: the password of the account an approval makes (ADR 0089). The answer " +
+                "then carries `key`, which this page trades for a sign-in once approved (`…/requests/claim`).",
+            }),
           }),
         ),
       },
       responses: {
-        200: json(
-          z.object({ status: z.literal("pending"), email: z.string(), emailed: z.boolean() }),
-          "Already waiting",
-        ),
-        201: json(z.object({ status: z.literal("pending"), email: z.string(), emailed: z.boolean() }), "Sent"),
+        200: json(Asked, "Already waiting"),
+        201: json(Asked, "Sent"),
         429: errorResponse("Too many requests (`join.rate_limited` from here, `join.link_busy` through the link)"),
         ...errors,
       },
@@ -385,6 +496,9 @@ export function inviteRoutes(deps: AppDeps) {
       if (!user && (!input.name || !input.email)) {
         return apiError(c, 400, "invalid_request", "Your name and your email are needed");
       }
+      // The password is hashed here, as Better Auth hashes one, and kept with the request until an approval.
+      const keeps = !user && input.password && input.code;
+      const secret = keeps ? randomToken(32) : null;
       const asked = await askToJoin({ ...events, rateLimiter: adapters.rateLimiter }, config.PUBLIC_URL, {
         token,
         user,
@@ -394,10 +508,55 @@ export function inviteRoutes(deps: AppDeps) {
         locale: requestLocale(c.req.header("accept-language")),
         proofNeeded: adapters.email.delivers === true,
         code: input.code,
+        ...(keeps && input.password && secret
+          ? { passwordHash: await hashPassword(deps.auth, input.password), claimHash: sha256(secret) }
+          : {}),
       });
       deps.wakeWorkers?.();
-      const reply = { status: asked.status, email: asked.email, emailed: adapters.email.delivers === true };
+      const requestId = "requestId" in asked ? asked.requestId : null;
+      const reply = {
+        status: asked.status,
+        email: asked.email,
+        emailed: adapters.email.delivers === true,
+        ...(secret && requestId ? { key: `${requestId}.${secret}` } : {}),
+      };
       return c.json(reply, asked.created ? 201 : 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/invitations/{token}/requests/claim",
+      tags,
+      summary: "Where the request this page made stands, and its sign-in once approved (ADR 0089)",
+      description:
+        "Public: the `key` the ask answered is the proof. `in` once, with `signIn` for " +
+        "`POST /api/auth/sign-in/one-time-token`, when the approval made the account; after that the key is spent. " +
+        "`closed` also for an approval of an address that already had an account: it signs in as it always did. " +
+        "404 for a key that matches nothing.",
+      request: { params: Token, body: body(z.object({ key: z.string().min(10).max(200) })) },
+      responses: {
+        200: json(
+          z.discriminatedUnion("status", [
+            z.object({ status: z.literal("pending") }),
+            z.object({ status: z.literal("in"), orgId: z.uuid(), signIn: z.string() }),
+            z.object({ status: z.literal("denied"), reason: z.string().nullable() }),
+            z.object({ status: z.literal("closed") }),
+          ]),
+        ),
+        429: errorResponse("Too many checks from here (`rate_limited`)"),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const ip = requestLimitIp(c.req.raw.headers, config.TRUSTED_PROXIES);
+      const limit = await adapters.rateLimiter.consume(`join-claim:${ip}`, CLAIMS_PER_IP);
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", TOO_MANY);
+      const found = await claimJoinRequest(db, c.req.valid("param").token, c.req.valid("json").key);
+      if (found.status !== "in") return c.json(found, 200);
+      const { token } = await mintUserSignIn(deps.auth, found.userId);
+      return c.json({ status: "in" as const, orgId: found.orgId, signIn: token }, 200);
     },
   );
 

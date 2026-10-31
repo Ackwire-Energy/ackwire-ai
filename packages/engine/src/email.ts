@@ -28,7 +28,7 @@ import { budgetPercent } from "./usage";
 
 export { EMAIL_PICTURES, type EmailArt, type EmailLocale } from "./email/layout";
 
-const { users, organizations, agents, approvals } = schema;
+const { users, organizations, organizationInvitations, agents, approvals } = schema;
 
 /**
  * The sender's name when `EMAIL_FROM` is unset: the name on the logo and in the subjects. The self-host setup
@@ -62,6 +62,8 @@ export type EmailTemplate =
       crew?: Look[];
       url: string;
       role: string;
+      /** The inviter's words (ADR 0089), made inert in the body. */
+      note?: string | null;
     }
   | { kind: "password_reset"; locale?: EmailLocale; url: string }
   /** Someone invited you to an event (in-app too). `when` is already formatted in your time zone and language. */
@@ -270,6 +272,8 @@ export async function emailCrew(db: Executor, orgId: string): Promise<Look[]> {
 /** A picture's agents: a job's own (cut to `CREW`), or the onboarding's when it has none. */
 const crewOr = (crew: Look[] | undefined) => (crew?.length ? crew.slice(0, CREW) : ONBOARDING_CREW);
 
+/** The inviter's note as the invitation shows it (ADR 0089). */
+const INVITE_NOTE_SHOWN = 300;
 /** A name typed on an invitation link's page, as the admins' email shows it (ADR 0068). */
 const JOIN_NAME_SHOWN = 60;
 /** An admin's reason for denying a request to join, as long as it is kept. */
@@ -330,6 +334,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
         c.headline,
         [
           { p: c.body(inertText(t.inviterName), t.inviterEmail ? inertText(t.inviterEmail) : null, org, role) },
+          ...(t.note?.trim() ? [{ note: c.noteFrom(inertText(t.inviterName), inertText(t.note, INVITE_NOTE_SHOWN)) }] : []),
           { p: c.what },
           { button: c.button, url: t.url },
           { small: c.small },
@@ -842,6 +847,10 @@ export async function queueInvitationEmail(
   db: Executor,
   input: { orgId: string; invitationId: string; email: string; role: string; url: string; inviterId: string },
 ) {
+  const [invitation] = await db
+    .select({ note: organizationInvitations.note, expiresAt: organizationInvitations.expiresAt })
+    .from(organizationInvitations)
+    .where(eq(organizationInvitations.id, input.invitationId));
   const [inviter] = await db
     .select({ name: users.name, email: users.email, locale: users.locale })
     .from(users)
@@ -856,7 +865,8 @@ export async function queueInvitationEmail(
     .where(eq(organizations.id, input.orgId));
   await queueEmail(db, {
     orgId: input.orgId,
-    key: `invite:${input.invitationId}:${input.url.slice(-16)}`,
+    // One per sending: the link stays the same when sent again (ADR 0089), its expiry doesn't.
+    key: `invite:${input.invitationId}:${invitation?.expiresAt.getTime() ?? input.url.slice(-16)}`,
     to: [input.email],
     template: {
       kind: "invitation",
@@ -867,6 +877,7 @@ export async function queueInvitationEmail(
       crew: await emailCrew(db, input.orgId),
       url: input.url,
       role: input.role,
+      note: invitation?.note ?? null,
     },
   });
 }

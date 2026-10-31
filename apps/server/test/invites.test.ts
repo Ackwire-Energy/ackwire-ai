@@ -493,3 +493,43 @@ test("request a new invitation: the inviter is emailed once; valid or unknown to
   expect(t.email.sent[0]?.text).toContain("ana@\u200aexample.\u200acom abriu um convite vencido da Acme");
   expect(t.email.sent[0]?.text).toContain(`/org/${orgId}/settings/members`);
 });
+
+test("asked with a password, an approval makes the account and the page that asked signs in once (ADR 0089)", async () => {
+  const { owner, orgId, token } = await start();
+  const anon = browser(t);
+  const code = await codeFor(anon, token, "rafa@example.com");
+  const asked = await ask(anon, token, {
+    name: "Rafa Costa",
+    email: "rafa@example.com",
+    code,
+    password: "correct horse battery",
+  });
+  expect(asked.status).toBe(201);
+  const { key } = (await asked.json()) as { key: string };
+  expect(key).toMatch(/^[0-9a-f-]{36}\./);
+  // No account until someone approves: a link never signs anyone up.
+  expect(await t.db.select().from(schema.users).where(eq(schema.users.email, "rafa@example.com"))).toEqual([]);
+  const claim = () => anon(`/api/app/invitations/${token}/requests/claim`, { json: { key } });
+  expect(await (await claim()).json()).toEqual({ status: "pending" });
+
+  const [request] = await requests(owner, orgId);
+  const approved = await owner(`/api/app/organizations/${orgId}/join-requests/${request?.id}/approve`, { json: {} });
+  expect(await approved.json()).toEqual({ outcome: "joined" });
+  const claimed = (await (await claim()).json()) as { status: string; orgId: string; signIn: string };
+  expect(claimed).toMatchObject({ status: "in", orgId });
+  expect((await anon("/api/auth/sign-in/one-time-token", { json: { token: claimed.signIn } })).status).toBe(200);
+  const me = (await (await anon("/api/app/me")).json()) as {
+    user: { email: string; emailVerified: boolean };
+    organizations: { id: string }[];
+  };
+  expect(me.user).toMatchObject({ email: "rafa@example.com", emailVerified: true });
+  expect(me.organizations.map((o) => o.id)).toContain(orgId);
+  // Spent: the key signs in once.
+  expect((await claim()).status).toBe(404);
+  // The password they chose is the account's.
+  const later = browser(t);
+  const signIn = await later("/api/auth/sign-in/email", {
+    json: { email: "rafa@example.com", password: "correct horse battery" },
+  });
+  expect(signIn.status).toBe(200);
+});

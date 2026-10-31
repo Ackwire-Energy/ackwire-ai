@@ -79,6 +79,7 @@ import type {
   Instance,
   Invitation,
   InvitationPreview,
+  InvitationState,
   InvitationWithStatus,
   InviteLink,
   Issue,
@@ -86,6 +87,7 @@ import type {
   IssueColumn,
   JevKey,
   JoinApproval,
+  JoinClaim,
   JoinRequest,
   Machine,
   MachineAccess,
@@ -117,6 +119,7 @@ import type {
   MissionSummary,
   Model,
   MoveAgentsResult,
+  MySuggestion,
   NoticePrefs,
   NotificationCount,
   NotificationPage,
@@ -403,6 +406,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<{ invitation: Invitation; url: string }>(`${org(orgId)}/invitations`, { json: input }),
       revokeInvitation: (orgId, id) => request<void>(`${org(orgId)}/invitations/${enc(id)}`, { method: "DELETE" }),
       previewInvitation: (token) => nullOn(404, () => request<InvitationPreview>(`/api/app/invitations/${enc(token)}`)),
+      invitationState: (token) =>
+        nullOn(404, () => request<InvitationState>(`/api/app/invitations/${enc(token)}/state`)),
       acceptInvitation: (token) =>
         request<{ orgId: string }>(`/api/app/invitations/${enc(token)}/accept`, { json: {} }),
       settings: (orgId) => request<OrgSettings>(`${org(orgId)}/settings`),
@@ -416,6 +421,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         (await request<{ results: BatchInviteResult[] }>(`${org(orgId)}/invitations/batch`, { json: input })).results,
       resendInvitation: (orgId, id) =>
         request<{ url: string; expiresAt: string }>(`${org(orgId)}/invitations/${enc(id)}/resend`, { json: {} }),
+      setInvitationRoles: (orgId, id, roleIds) =>
+        request<{ roleIds: string[] }>(`${org(orgId)}/invitations/${enc(id)}`, { method: "PATCH", json: { roleIds } }),
       usageReport: (orgId, since) => request<UsageReport>(`${org(orgId)}/usage/report`, { query: { since } }),
       planUsage: (orgId) => request<OrgPlanUsage>(`${org(orgId)}/usage/plans`),
       audit: (orgId, query = {}) =>
@@ -807,6 +814,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<{ id: string; url: string; expiresAt: string }>(`${org(orgId)}/invite-links`, { json: {} }),
       links: async (orgId) => (await request<{ links: InviteLink[] }>(`${org(orgId)}/invite-links`)).links,
       turnOff: (orgId, linkId) => request<void>(`${org(orgId)}/invite-links/${enc(linkId)}`, { method: "DELETE" }),
+      renewLink: (orgId, linkId) =>
+        request<{ expiresAt: string }>(`${org(orgId)}/invite-links/${enc(linkId)}/renew`, { json: {} }),
       sendCode: (token, input, humanCheck) =>
         request<CodeSent>(`/api/app/invitations/${enc(token)}/code`, {
           json: input,
@@ -816,6 +825,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<{ verified: true }>(`/api/app/invitations/${enc(token)}/code/check`, { json: input }),
       ask: (token, input) => request<AskToJoinResult>(`/api/app/invitations/${enc(token)}/requests`, { json: input }),
       requestNew: (token) => request<void>(`/api/app/invitations/${enc(token)}/request-new`, { json: {} }),
+      claim: (token, key) =>
+        nullOn(404, () => request<JoinClaim>(`/api/app/invitations/${enc(token)}/requests/claim`, { json: { key } })),
     },
     joinRequests: {
       list: async (orgId) => (await request<{ requests: JoinRequest[] }>(`${org(orgId)}/join-requests`)).requests,
@@ -823,6 +834,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<JoinApproval>(`${org(orgId)}/join-requests/${enc(id)}/approve`, { json: { roleIds: roleIds ?? [] } }),
       deny: (orgId, id, reason) =>
         request<void>(`${org(orgId)}/join-requests/${enc(id)}/deny`, { json: reason ? { reason } : {} }),
+      suggest: (orgId, input) => request<{ id: string }>(`${org(orgId)}/join-requests/suggest`, { json: input }),
+      mine: async (orgId) =>
+        (await request<{ suggestions: MySuggestion[] }>(`${org(orgId)}/join-requests/mine`)).suggestions,
+      cancel: (orgId, id) => request<void>(`${org(orgId)}/join-requests/${enc(id)}`, { method: "DELETE" }),
     },
     storage: {
       get: (orgId) => request<StorageConfig>(`${org(orgId)}/storage`),

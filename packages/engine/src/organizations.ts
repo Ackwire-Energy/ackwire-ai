@@ -18,7 +18,7 @@ import {
 import { appLocale } from "@agenteschat/i18n/locale";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
-import { inviteLinkToken, randomToken, sha256 } from "./crypto";
+import { invitationToken, inviteLinkToken, randomToken, sha256 } from "./crypto";
 import { earlyAccessLink, hasWorkspaceAllowance, recordFirstWorkspace, signupMode } from "./early-access";
 import { ConflictError, ForbiddenError, UnauthorizedError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
@@ -990,11 +990,13 @@ const ROLE_RANK: Record<MemberRole, number> = { member: 0, owner: 1 };
 
 /**
  * Sends an invitation to an address with a role and the roles (`org_roles`) the person gets: the one named
- * (`invitationId`), else the newest one for that address not accepted yet, gets a new token and 7 more days (its
- * old link stops working); with none, a new one is made. One still working keeps the higher of its role and this
- * one and adds these roles to its own, so sending it again never demotes whoever it was meant for, and an owner's
+ * (`invitationId`), else the newest one for that address not accepted yet, gets 7 more days; with none, a new one
+ * is made. With `secret` its token is derived from its id (`invitationToken`, ADR 0089): the link can be copied
+ * again and sending it again keeps it. Without one (or for an invitation made before), a new random token replaces
+ * the old one, whose link stops working. One still working keeps the higher of its role and this one and adds these
+ * roles and channels to its own, so sending it again never demotes whoever it was meant for, and an owner's
  * invitation goes out again only from an owner (`ownersOk`). Records `invitation.created`. The caller checks who
- * may invite and which roles they may give (`givableRoleIds`).
+ * may invite, which roles they may give (`givableRoleIds`) and which channels (`invitableChannelIds`).
  */
 export async function sendInvitation(
   db: Executor,
@@ -1004,9 +1006,15 @@ export async function sendInvitation(
     role: MemberRole;
     /** Roles the person gets on accepting (checked by the caller). */
     roleIds?: string[];
+    /** Channels the person joins on accepting, besides `general` (checked by the caller). */
+    channelIds?: string[];
+    /** The inviter's words for the email; absent keeps the invitation's own. */
+    note?: string | null;
     invitedBy: string;
     /** The sender may invite owners (`manage_owners`). */
     ownersOk: boolean;
+    /** `AGENTES_SECRET`: the token is derived from the invitation's id (ADR 0089). */
+    secret?: string;
     now?: Date;
     invitationId?: string;
     /** Resent from the pending list. */
@@ -1022,6 +1030,7 @@ export async function sendInvitation(
       id: organizationInvitations.id,
       role: organizationInvitations.role,
       roleIds: organizationInvitations.roleIds,
+      channelIds: organizationInvitations.channelIds,
       expiresAt: organizationInvitations.expiresAt,
     })
     .from(organizationInvitations)
@@ -1041,11 +1050,16 @@ export async function sendInvitation(
       ? existing.role
       : input.role;
   if (role === "owner" && !input.ownersOk) throw new ForbiddenError("Only owners can invite owners");
-  const keep = existing && existing.expiresAt > now ? existing.roleIds : [];
-  const token = randomToken(32);
+  const working = existing && existing.expiresAt > now;
+  const keep = working ? existing.roleIds : [];
+  const keepChannels = working ? existing.channelIds : [];
+  const id = existing?.id ?? crypto.randomUUID();
+  const token = input.secret ? invitationToken(input.secret, id) : randomToken(32);
   const fresh = {
     role,
     roleIds: [...new Set([...keep, ...(input.roleIds ?? [])])],
+    channelIds: [...new Set([...keepChannels, ...(input.channelIds ?? [])])],
+    ...(input.note !== undefined ? { note: input.note?.trim() || null } : {}),
     tokenHash: sha256(token),
     invitedByUserId: input.invitedBy,
     expiresAt: new Date(now.getTime() + INVITATION_TTL_DAYS * 86_400_000),
@@ -1054,7 +1068,7 @@ export async function sendInvitation(
     ? await db.update(organizationInvitations).set(fresh).where(eq(organizationInvitations.id, existing.id)).returning()
     : await db
         .insert(organizationInvitations)
-        .values({ orgId: input.orgId, email, ...fresh })
+        .values({ id, orgId: input.orgId, email, ...fresh })
         .returning();
   if (!invitation) throw new ConflictError("This invitation can't be sent");
   await recordAudit(db, {
@@ -1084,16 +1098,52 @@ export async function sendInvitation(
   return { invitation, token };
 }
 
+/** The longest note an inviter writes for the invitation email (ADR 0089). */
+export const INVITE_NOTE_MAX = 300;
+
+/**
+ * The channels an invitation adds someone to, besides `general` (ADR 0089): the workspace's own, not archived and
+ * not a conversation, public or one the sender is in. Any other id refuses the invitation (`invitation.channel`).
+ */
+export async function invitableChannelIds(db: Executor, actorId: string, orgId: string, ids: readonly string[]) {
+  const wanted = [...new Set(ids)];
+  if (wanted.length === 0) return [];
+  const rows = await db
+    .select({
+      id: channels.id,
+      visibility: channels.visibility,
+      member: sql<boolean>`exists (select 1 from ${channelMembers} where ${channelMembers.channelId} = ${channels.id} and ${channelMembers.userId} = ${actorId})`,
+    })
+    .from(channels)
+    .where(
+      and(eq(channels.orgId, orgId), inArray(channels.id, wanted), isNull(channels.archivedAt), ne(channels.kind, "dm")),
+    );
+  const ok = rows.filter((r) => r.visibility === "public" || r.member).map((r) => r.id);
+  if (ok.length !== wanted.length) {
+    throw new ValidationError("One of these channels can't go with an invitation", "invitation.channel");
+  }
+  return ok;
+}
+
 export async function createInvitation(
   db: Database,
   actorId: string,
   orgId: string,
-  input: { email: string; role?: MemberRole; roleIds?: string[] },
+  input: {
+    email: string;
+    role?: MemberRole;
+    roleIds?: string[];
+    channelIds?: string[];
+    note?: string | null;
+    /** `AGENTES_SECRET`: a link that can be copied again and stays the same when sent again (ADR 0089). */
+    secret?: string;
+  },
   now = new Date(),
 ) {
   const actor = await requirePermission(db, actorId, orgId, "invite_people");
   assertInviting(actor);
   const roleIds = await givableRoleIds(db, actor, orgId, input.roleIds ?? []);
+  const channelIds = await invitableChannelIds(db, actorId, orgId, input.channelIds ?? []);
   const email = input.email.trim().toLowerCase();
 
   const [alreadyMember] = await db
@@ -1104,7 +1154,50 @@ export async function createInvitation(
   if (alreadyMember) throw new ConflictError(`${email} is already a member`);
   await assertMemberRoom(db, orgId);
   const ownersOk = can(actor, "manage_owners");
-  return sendInvitation(db, { orgId, email, role: input.role ?? "member", roleIds, invitedBy: actorId, ownersOk, now });
+  return sendInvitation(db, {
+    orgId,
+    email,
+    role: input.role ?? "member",
+    roleIds,
+    channelIds,
+    ...(input.note !== undefined ? { note: input.note?.slice(0, INVITE_NOTE_MAX) ?? null } : {}),
+    invitedBy: actorId,
+    ownersOk,
+    secret: input.secret,
+    now,
+  });
+}
+
+/** Changes the roles a pending invitation gives (ADR 0089): its link stays the same and nothing is sent. */
+export async function setInvitationRoles(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  invitationId: string,
+  roleIdsIn: string[],
+) {
+  const actor = await requirePermission(db, actorId, orgId, "invite_people");
+  const roleIds = await givableRoleIds(db, actor, orgId, roleIdsIn);
+  const [row] = await db
+    .update(organizationInvitations)
+    .set({ roleIds })
+    .where(
+      and(
+        eq(organizationInvitations.id, invitationId),
+        eq(organizationInvitations.orgId, orgId),
+        isNull(organizationInvitations.acceptedAt),
+      ),
+    )
+    .returning({ email: organizationInvitations.email });
+  if (!row) throw new ConflictError("This invitation can't be changed");
+  await recordAudit(db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: "invitation.roles_changed",
+    target: { type: "invitation", id: invitationId },
+    details: { email: row.email, roleIds },
+  });
+  return { roleIds };
 }
 
 export async function listInvitations(db: Database, orgId: string, now = new Date()) {
@@ -1242,10 +1335,41 @@ const inviteLogo = (token: string, logo: string | null) => {
 };
 
 /**
+ * How the invited address signs in (ADR 0089), for the invite page to ask only what is missing: whether it has an
+ * account, a password, and which social sign-ins. Only for the holder of an invitation to that address.
+ */
+async function invitedAccount(db: Database, email: string) {
+  const rows = await db
+    .select({ providerId: accounts.providerId })
+    .from(users)
+    .leftJoin(accounts, eq(accounts.userId, users.id))
+    .where(eq(users.email, email));
+  const ids = rows.map((r) => r.providerId).filter((id): id is string => id !== null);
+  return {
+    exists: rows.length > 0,
+    password: ids.includes("credential"),
+    providers: [...new Set(ids.filter((id) => SIGN_IN_PROVIDERS.has(id)))] as SignInProvider[],
+  };
+}
+
+/** Whether the workspace has no seat left (`assertMemberRoom`), said on the invite page before any account is made. */
+async function seatsFull(db: Executor, orgId: string) {
+  try {
+    await assertMemberRoom(db, orgId);
+    return false;
+  } catch (error) {
+    if (error instanceof ConflictError && error.code === "org.members_full") return true;
+    throw error;
+  }
+}
+
+/**
  * What the invite page shows before signing in (`email` is empty for an org link): the organization and its logo,
  * who invited (their name), the role and its first agents. Only for a valid token, which reached the person.
  * A link that was turned off, expired, or whose workspace is paused or being deleted, and an email invitation to a
- * workspace being deleted, say only that (`closed`), never why.
+ * workspace paused or being deleted, say only that (`closed`), never why. An email invitation also says how its
+ * address signs in (`account`) and whether the workspace is full (`full`), before anyone makes an account
+ * (ADR 0089).
  */
 export async function previewInvitation(db: Database, token: string, now = new Date()) {
   const [row] = await db
@@ -1293,8 +1417,8 @@ export async function previewInvitation(db: Database, token: string, now = new D
     };
   }
   if (row.acceptedAt || row.expiresAt <= now) return null;
-  // Nobody joins a workspace being deleted: its name only, and that it's closed, as for a link.
-  if (row.deleting) {
+  // Nobody joins a workspace paused or being deleted: its name only, and that it's closed, as for a link.
+  if (row.deleting || !row.open) {
     return {
       orgName: row.orgName,
       email: "",
@@ -1311,10 +1435,46 @@ export async function previewInvitation(db: Database, token: string, now = new D
     role: row.role,
     kind: "email" as const,
     invitedBy: row.invitedBy ?? null,
+    expiresAt: row.expiresAt.toISOString(),
+    account: await invitedAccount(db, row.email),
+    ...((await seatsFull(db, row.orgId)) ? { full: true as const } : {}),
     // Only while it can be accepted, as `invitedOrgId` serves it.
-    ...(row.open ? inviteLogo(token, row.orgLogo) : {}),
+    ...inviteLogo(token, row.orgLogo),
     ...(await inviteAgents(db, row.orgId)),
   };
+}
+
+/**
+ * What the page of an email invitation that no longer opens says (ADR 0089): accepted (with the workspace's id,
+ * to open it for a member) or expired (when, and who invited, to ask again). Null for a token that matches none,
+ * a cancelled invitation's included (its row is gone), and for one that still works (`previewInvitation`).
+ */
+export async function invitationState(db: Database, token: string, now = new Date()) {
+  const [row] = await db
+    .select({
+      orgId: organizationInvitations.orgId,
+      orgName: organizations.name,
+      acceptedAt: organizationInvitations.acceptedAt,
+      expiresAt: organizationInvitations.expiresAt,
+      invitedBy: users.name,
+    })
+    .from(organizationInvitations)
+    .innerJoin(organizations, eq(organizations.id, organizationInvitations.orgId))
+    .leftJoin(users, eq(users.id, organizationInvitations.invitedByUserId))
+    .where(eq(organizationInvitations.tokenHash, sha256(token)));
+  if (!row) return null;
+  if (row.acceptedAt) {
+    return { state: "accepted" as const, orgId: row.orgId, orgName: row.orgName, at: row.acceptedAt.toISOString() };
+  }
+  if (row.expiresAt <= now) {
+    return {
+      state: "expired" as const,
+      orgName: row.orgName,
+      invitedBy: row.invitedBy ?? null,
+      at: row.expiresAt.toISOString(),
+    };
+  }
+  return null;
 }
 
 /**
@@ -1373,6 +1533,31 @@ export async function acceptInvitation(
     }
     await assertCanWork(tx, invitation.orgId);
     await joinOrganization(tx, invitation.orgId, user.id, invitation.role, invitation.roleIds);
+    // The channels it named, besides `general` (ADR 0089): those still there.
+    if (invitation.channelIds.length > 0) {
+      const still = await tx
+        .select({ id: channels.id })
+        .from(channels)
+        .where(
+          and(
+            eq(channels.orgId, invitation.orgId),
+            inArray(channels.id, invitation.channelIds),
+            isNull(channels.archivedAt),
+            ne(channels.kind, "dm"),
+          ),
+        );
+      for (const channel of still) {
+        await tx
+          .insert(channelMembers)
+          .values({ orgId: invitation.orgId, channelId: channel.id, userId: user.id })
+          .onConflictDoNothing();
+      }
+    }
+    // The token reached that mailbox: the address is confirmed, and no "confirm your email" follows (ADR 0089).
+    await tx
+      .update(users)
+      .set({ emailVerified: true })
+      .where(and(eq(users.id, user.id), eq(users.emailVerified, false)));
     await auditMember(tx, invitation.orgId, user.id, "member.joined", user.id, {
       role: invitation.role,
       roleIds: invitation.roleIds,
@@ -1382,8 +1567,27 @@ export async function acceptInvitation(
       .update(organizationInvitations)
       .set({ acceptedAt: now })
       .where(eq(organizationInvitations.id, invitation.id));
-    return { orgId: invitation.orgId };
+    return { orgId: invitation.orgId, invitedBy: invitation.invitedByUserId };
   });
+}
+
+/**
+ * Whether an address has an email invitation waiting (ADR 0089): its sign-up skips the "confirm your email" message,
+ * since accepting confirms the address.
+ */
+export async function hasWaitingInvitation(db: Database, email: string, now = new Date()) {
+  const [row] = await db
+    .select({ id: organizationInvitations.id })
+    .from(organizationInvitations)
+    .where(
+      and(
+        eq(organizationInvitations.email, email.trim().toLowerCase()),
+        isNull(organizationInvitations.acceptedAt),
+        gt(organizationInvitations.expiresAt, now),
+      ),
+    )
+    .limit(1);
+  return row !== undefined;
 }
 
 /**
@@ -1461,21 +1665,36 @@ export type InviteOutcome =
 const EMAIL = /^[^\s@,;:<>()[\]"]+@[^\s@,;:<>()[\]"]+\.[^\s@,;:<>()[\]"]+$/;
 
 /**
- * Invites several people at once (the Members screen takes a comma-separated
- * list). Each email gets its own outcome; pending invitations are not
- * duplicated (resend them instead).
+ * Invites several people at once: `invites`, each address with its own roles (the invite dialog, ADR 0089), or
+ * `emails` all with `roleIds`. `channelIds` and `note` go with every one. Each address gets its own outcome; pending
+ * invitations are not duplicated (resend them instead).
  */
 export async function inviteMany(
   db: Database,
   actorId: string,
   orgId: string,
-  input: { emails: string[]; roleIds?: string[] },
+  input: {
+    emails?: string[];
+    invites?: { email: string; roleIds?: string[] }[];
+    roleIds?: string[];
+    channelIds?: string[];
+    note?: string | null;
+    /** `AGENTES_SECRET`: links that can be copied again (ADR 0089). */
+    secret?: string;
+  },
   now = new Date(),
 ): Promise<InviteOutcome[]> {
   const actor = await requirePermission(db, actorId, orgId, "invite_people");
-  // Checked once for the batch: a role the sender may not give refuses it all.
-  await givableRoleIds(db, actor, orgId, input.roleIds ?? []);
-  const emails = [...new Set(input.emails.map((e) => e.trim().toLowerCase()).filter(Boolean))].slice(0, 100);
+  const asked = input.invites ?? (input.emails ?? []).map((email) => ({ email, roleIds: input.roleIds }));
+  // Checked once for the batch: a role or a channel the sender may not give refuses it all.
+  await givableRoleIds(db, actor, orgId, [...new Set(asked.flatMap((i) => i.roleIds ?? []))]);
+  await invitableChannelIds(db, actorId, orgId, input.channelIds ?? []);
+  const rolesOf = new Map<string, string[]>();
+  for (const i of asked) {
+    const email = i.email.trim().toLowerCase();
+    if (email && !rolesOf.has(email)) rolesOf.set(email, i.roleIds ?? []);
+  }
+  const emails = [...rolesOf.keys()].slice(0, 100);
   const out: InviteOutcome[] = [];
   for (const email of emails) {
     if (!EMAIL.test(email)) {
@@ -1498,7 +1717,19 @@ export async function inviteMany(
       continue;
     }
     try {
-      const { invitation, token } = await createInvitation(db, actorId, orgId, { email, roleIds: input.roleIds }, now);
+      const { invitation, token } = await createInvitation(
+        db,
+        actorId,
+        orgId,
+        {
+          email,
+          roleIds: rolesOf.get(email),
+          channelIds: input.channelIds,
+          ...(input.note !== undefined ? { note: input.note } : {}),
+          secret: input.secret,
+        },
+        now,
+      );
       out.push({ email, status: "invited", invitationId: invitation.id, token });
     } catch (error) {
       // A full workspace (`org.members_full`) refuses the batch, not one address.
@@ -1509,13 +1740,17 @@ export async function inviteMany(
   return out;
 }
 
-/** Sends an invitation again: a new token (the old link stops working) and a fresh 7-day expiry. */
+/**
+ * Sends an invitation again with a fresh 7-day expiry. With `secret` its link stays the same (ADR 0089); without,
+ * a new token replaces it and the old link stops working.
+ */
 export async function resendInvitation(
   db: Database,
   actorId: string,
   orgId: string,
   invitationId: string,
   now = new Date(),
+  secret?: string,
 ) {
   const actor = await requirePermission(db, actorId, orgId, "invite_people");
   assertInviting(actor);
@@ -1534,28 +1769,45 @@ export async function resendInvitation(
     roleIds,
     invitedBy: actorId,
     ownersOk: can(actor, "manage_owners"),
+    secret,
     now,
     invitationId,
     resent: true,
   });
 }
 
-/** Invitations not yet accepted, expired ones included, with their status. */
-export async function listInvitationsWithStatus(db: Database, actorId: string, orgId: string, now = new Date()) {
+/**
+ * Invitations not yet accepted, expired ones included, with their status, oldest first. With `secret`, `token`
+ * when the link can be copied again (derived from the invitation's id, ADR 0089), null for one made before.
+ */
+export async function listInvitationsWithStatus(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  now = new Date(),
+  secret?: string,
+) {
   await requirePermission(db, actorId, orgId, "invite_people");
   const rows = await db
-    .select()
+    .select({ invitation: organizationInvitations, invitedBy: users.name })
     .from(organizationInvitations)
+    .leftJoin(users, eq(users.id, organizationInvitations.invitedByUserId))
     .where(and(eq(organizationInvitations.orgId, orgId), isNull(organizationInvitations.acceptedAt)))
     .orderBy(asc(organizationInvitations.createdAt));
-  return rows.map((i) => ({
-    id: i.id,
-    email: i.email,
-    role: i.role,
-    roleIds: i.roleIds,
-    status: i.expiresAt > now ? ("pending" as const) : ("expired" as const),
-    expiresAt: i.expiresAt,
-    createdAt: i.createdAt,
-    invitedByUserId: i.invitedByUserId,
-  }));
+  return rows.map(({ invitation: i, invitedBy }) => {
+    const derived = secret ? invitationToken(secret, i.id) : null;
+    return {
+      id: i.id,
+      email: i.email,
+      role: i.role,
+      roleIds: i.roleIds,
+      channelIds: i.channelIds,
+      status: i.expiresAt > now ? ("pending" as const) : ("expired" as const),
+      expiresAt: i.expiresAt,
+      createdAt: i.createdAt,
+      invitedByUserId: i.invitedByUserId,
+      invitedBy: invitedBy ?? null,
+      token: derived && sha256(derived) === i.tokenHash ? derived : null,
+    };
+  });
 }
