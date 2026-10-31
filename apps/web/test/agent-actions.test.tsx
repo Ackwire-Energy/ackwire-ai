@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { AgentAction, MissionPlan } from "@agenteschat/client";
+import type { AgentAction, Message, MissionPlan } from "@agenteschat/client";
 import { AGENT_ACTION_KINDS, ApiError } from "@agenteschat/client";
 import { en, ptBR } from "@agenteschat/i18n";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
@@ -234,21 +234,18 @@ describe("receipts this build doesn't expect", () => {
     expect(within(receipts()).getByRole("button", { name: /^Desfazer/ })).toBeTruthy();
   });
 
-  test("one that throws: its message is one quiet line, reported once a draw; the channel, the sidebar, the other messages and the composer stay; fixed live, it is back", async () => {
+  test("receipts that throw: one quiet line in their place, the reply's text and the rest of the message stay; reported once a draw; fixed live, they are back", async () => {
     const logged = spyOn(console, "error").mockImplementation(() => {});
     try {
       const broken = action({ params: null as never });
       const { socket } = await open(withActions([broken]));
       const reports = () => logged.mock.calls.filter((args) => args.some((a) => a instanceof TypeError));
-      expect(screen().getAllByText("Esta mensagem não pôde ser exibida")).toHaveLength(1);
-      expect(document.body.textContent).not.toContain("Olhei o código");
-      expect(screen().getByRole("heading", { name: "# eng" })).toBeTruthy();
-      const messages = within(screen().getByRole("region", { name: "Mensagens" })).getAllByRole("article");
-      expect(messages.some((a) => a.textContent?.includes("o login está devolvendo 401"))).toBe(true);
-      const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
-      expect(within(nav).getAllByText("general").length).toBeGreaterThan(0);
-      expect(within(nav).getAllByText("Atlas").length).toBeGreaterThan(0);
-      expect(screen().getByRole("combobox", { name: "Mensagem para #eng" })).toBeTruthy();
+      const unshown = () => within(article()).queryAllByText("Parte desta mensagem não pôde ser exibida");
+      expect(unshown()).toHaveLength(1);
+      expect(article().textContent).toContain("Olhei o código");
+      expect(within(article()).getByRole("toolbar", { name: "Ações da mensagem de Ada" })).toBeTruthy();
+      expect(within(article()).queryByRole("group", { name: "Mudanças de Ada" })).toBeNull();
+      expect(screen().queryByText("Esta mensagem não pôde ser exibida")).toBeNull();
       expect(reports()).toHaveLength(1);
       const receiptsLive = async (actions: AgentAction[]) => {
         await act(async () =>
@@ -260,19 +257,57 @@ describe("receipts this build doesn't expect", () => {
         );
         await settle(3);
       };
-      // Its receipts change live and still break: drawn again, still one line, reported again.
+      // They change live and still break: drawn again, still one line, reported again.
       await receiptsLive([broken, memory()]);
-      expect(screen().getAllByText("Esta mensagem não pôde ser exibida")).toHaveLength(1);
+      expect(unshown()).toHaveLength(1);
       expect(reports()).toHaveLength(2);
-      // Fixed live: the message is back, with its receipt.
+      // Fixed live: the receipts are back.
       await receiptsLive([memory()]);
-      expect(screen().queryByText("Esta mensagem não pôde ser exibida")).toBeNull();
+      expect(unshown()).toHaveLength(0);
       expect(receipts().textContent).toContain("Guardei na memória: o prompt é por evento");
       expect(reports()).toHaveLength(2);
-      // Broken again: one line, reported once (the change that broke it is not tried a second time at once).
+      // Broken again: one line, reported once (the change that broke them is not tried a second time at once).
       await receiptsLive([broken]);
-      expect(screen().getAllByText("Esta mensagem não pôde ser exibida")).toHaveLength(1);
+      expect(unshown()).toHaveLength(1);
       expect(reports()).toHaveLength(3);
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
+  test("a message that throws outside its parts: one quiet line in its place, reported once; the channel, the sidebar, the other messages and the composer stay; fixed live, it is back", async () => {
+    const logged = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      // A body that isn't text: the row itself can't draw, not one of its parts.
+      const { socket, state } = await open(
+        withActions([action()], (s) => {
+          for (const m of s.messages) if (m.id === "m-act") m.body = null as never;
+        }),
+      );
+      const reports = () => logged.mock.calls.filter((args) => args.some((a) => a instanceof TypeError));
+      expect(screen().getAllByText("Esta mensagem não pôde ser exibida")).toHaveLength(1);
+      expect(document.body.textContent).not.toContain("Criei a tarefa #23");
+      expect(screen().getByRole("heading", { name: "# eng" })).toBeTruthy();
+      const messages = within(screen().getByRole("region", { name: "Mensagens" })).getAllByRole("article");
+      expect(messages.some((a) => a.textContent?.includes("o login está devolvendo 401"))).toBe(true);
+      const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
+      expect(within(nav).getAllByText("general").length).toBeGreaterThan(0);
+      expect(within(nav).getAllByText("Atlas").length).toBeGreaterThan(0);
+      expect(screen().getByRole("combobox", { name: "Mensagem para #eng" })).toBeTruthy();
+      expect(reports()).toHaveLength(1);
+      // The same message again, now with its text: it is back.
+      const fixed = { ...state.messages.find((m) => m.id === "m-act"), body: BODY } as Message;
+      await act(async () =>
+        socket.push({
+          type: "event",
+          channelId: ENG_ID,
+          event: { type: "message.created", channelId: ENG_ID, messageId: "m-act", message: fixed },
+        }),
+      );
+      await settle(3);
+      expect(screen().queryByText("Esta mensagem não pôde ser exibida")).toBeNull();
+      expect(article().textContent).toContain("Criei a tarefa #23");
+      expect(reports()).toHaveLength(1);
     } finally {
       logged.mockRestore();
     }

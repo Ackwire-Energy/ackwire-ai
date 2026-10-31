@@ -8514,6 +8514,7 @@ export const en: Translations = {
       see: "See conversation",
     },
     unshown: "This message couldn't be shown",
+    unshownPart: "Part of this message couldn't be shown",
     /** Automatic lines: what reached an agent's conversation (`meta.notice`), a routine's background start. */
     notice: {
       routineHandoff: "Routine «{{routine}}» delivered a report",

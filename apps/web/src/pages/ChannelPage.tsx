@@ -151,6 +151,7 @@ import {
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
+  Children,
   Fragment,
   memo,
   type ReactElement,
@@ -2037,6 +2038,22 @@ function ungroupAfter(items: TimelineItem[], special: (m: MessageType) => boolea
 }
 
 const unshownLine = () => <UnshownLine />;
+const unshownPart = () => <UnshownLine part />;
+
+/**
+ * Each part of a message (its text, a card, its receipts) in its own boundary: one that fails to draw is a quiet line
+ * and the text and the other parts stay. The row's boundary still holds the rest (the header).
+ */
+function Parts({ resetKey, children }: { resetKey: unknown; children: ReactNode }) {
+  return Children.map(children, (part) => {
+    if (part == null) return null;
+    return (
+      <ErrorBoundary resetKey={resetKey} fallback={unshownPart}>
+        {part}
+      </ErrorBoundary>
+    );
+  });
+}
 
 /**
  * Persisted rows, then the agents' live blocks (always last while they work: new messages go above
@@ -3168,7 +3185,7 @@ export const TimelineMessage = memo(function TimelineMessage({
       stacked={Boolean(card)}
     >
       {live ? (
-        <>
+        <Parts resetKey={m}>
           {/* It opens as if it had answered: a generic phrase until the first thing it says takes its place. */}
           {wordsOnTop && !liveFailed && revealed ? (
             <MessageText>
@@ -3242,9 +3259,9 @@ export const TimelineMessage = memo(function TimelineMessage({
           {!liveFailed && !liveWaiting && !liveStopped && (
             <span className="ac-visually-hidden">{t("channel.writing")}</span>
           )}
-        </>
+        </Parts>
       ) : (
-        <>
+        <Parts resetKey={m}>
           {keptSaid?.kind === "say" && (
             <MessageText>
               <MessageBody body={keptSaid.text} resolveMention={dir.mentionName} />
@@ -3418,7 +3435,7 @@ export const TimelineMessage = memo(function TimelineMessage({
             <PersonMessageActions message={m} authorName={name} channelName={channelName ?? ""} />
           )}
           {menu.dialog}
-        </>
+        </Parts>
       )}
     </Message>
   );

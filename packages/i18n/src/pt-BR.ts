@@ -8569,6 +8569,8 @@ export const ptBR = {
     },
     /** In place of a row of the conversation that failed to draw (the rest keeps working). */
     unshown: "Esta mensagem não pôde ser exibida",
+    /** In place of a part of a message (a card, its receipts) that failed to draw (the text and the rest stay). */
+    unshownPart: "Parte desta mensagem não pôde ser exibida",
     /** Automatic lines: what reached an agent's conversation (`meta.notice`), a routine's background start. */
     notice: {
       routineHandoff: "Rotina «{{routine}}» entregou um relatório",
