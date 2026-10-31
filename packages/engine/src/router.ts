@@ -1073,12 +1073,19 @@ export async function routeMessage(
   const picked = selectAgents(candidates, decided, policy, { continuityAgentId: addressee ?? continuityAgentId });
   const scoreOf = (agentId: string | null) =>
     Math.max(0, ...decided.agents.filter((a) => a.agentId === agentId).map((a) => a.score));
-  // Speaking to no agent in particular, a message the agent this person last talked to could do too (it clears its
-  // bar, and one agent is picked) is for that agent, unless another is clearly surer (`clearlyAnother`): "me de bom
-  // dia todo dia ás 8:30 da manha", 23 minutes after a talk with Ada, went to Theo on 0.63 to her 0.55
-  // (2026-10-31). No lower bar: past continuity's window it only settles which of the agents that could answers.
+  const clearPickScore = policy.clearPickScore ?? DEFAULT_ROUTER_POLICY.clearPickScore;
+  // Speaking to no agent in particular, a message the router gives another agent is for the agent this person last
+  // talked to when she could do it too: she clears her own bar (`minScore`, no lower) and, on her own, the need
+  // check; unless another is clearly surer (`clearlyAnother`). "me de bom dia todo dia ás 8:30 da manha", 23 minutes
+  // after a talk with Ada, went to Theo on 0.63 to her 0.55 (2026-10-31). It only settles which of the agents that
+  // could answers: a message the router gives her already, or gives nobody, stays as it is (she may pass).
   const resumes =
-    !addressee && lastTalkedTo !== null && picked.length === 1 && scoreOf(lastTalkedTo) >= policy.minScore;
+    !addressee &&
+    lastTalkedTo !== null &&
+    picked.length === 1 &&
+    picked[0] !== lastTalkedTo &&
+    scoreOf(lastTalkedTo) >= policy.minScore &&
+    ((decided.needsAgent ?? 1) >= policy.minScore || scoreOf(lastTalkedTo) >= clearPickScore);
   // The agent the message speaks to, when a step is sure of one, is who the person talks to now: over who spoke
   // last ("ada, pergunta pro theo…" right after Theo spoke, 2026-10-31), and over the agent whose message they
   // replied to once it clears its own bar: a reply that only hands over ("isso é com a ada") stays with the
@@ -1100,9 +1107,7 @@ export async function routeMessage(
     repliedAgentId === null &&
     picked.some(
       (id) =>
-        id !== talkingTo &&
-        scoreOf(id) >= (policy.clearPickScore ?? DEFAULT_ROUTER_POLICY.clearPickScore) &&
-        scoreOf(id) >= scoreOf(talkingTo) + NAMED_OVER_CONTINUITY,
+        id !== talkingTo && scoreOf(id) >= clearPickScore && scoreOf(id) >= scoreOf(talkingTo) + NAMED_OVER_CONTINUITY,
     );
   const followUp =
     talkingTo !== null &&

@@ -613,6 +613,31 @@ describe("the agent a person last talked to", () => {
     expect(tasks.selected).toEqual([t.theo.id]);
   });
 
+  test("with no pick between agents to settle, nothing changes", async () => {
+    const t = await privateRoom();
+    const talkWithAda: Said[] = [
+      [null, "ada quanto ta seu limite de uso?", 23.4, [t.ada]],
+      [t.ada, "Não consigo ver meu saldo por aqui.", 23],
+    ];
+    // The router picks Ada on its own: she may still pass.
+    const build = await t.talk(talkWithAda, "alguém sabe se o build de ontem passou?", () => ({
+      nouls: { "@theo": 0.2, "@ada": 0.6 },
+      needs: 0.6,
+      best: "ada",
+    }));
+    expect(build.selected).toEqual([t.ada.id]);
+    expect(build.decision?.reason).toBe("jev: best @ada (confidence 0.80)");
+    // No agent needed, and Theo picked only as a clear pick (0.84): Ada (0.62) wouldn't pass the need check alone.
+    const remark = await t.talk(talkWithAda, "o roadmap ficou bom", () => ({
+      nouls: { "@theo": 0.82, "@ada": 0.62 },
+      needs: 0.3,
+      best: "theo",
+      choice: { theo: 0.5, ada: 0.3, none: 0.2 },
+    }));
+    expect(remark.selected).toEqual([t.theo.id]);
+    expect(remark.decision?.reason).toBe("jev: best @theo (confidence 0.50)");
+  });
+
   test("after another agent was addressed, the message doesn't go back to the one before", async () => {
     const t = await privateRoom();
     const talkWithAda: Said[] = [
