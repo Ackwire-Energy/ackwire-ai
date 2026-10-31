@@ -100,7 +100,7 @@ export const en: Translations = {
       title: "Only the owner",
       sub: "Can do everything, always. Nobody else does these, not even an Administrator.",
       transfer: "Hand the workspace over",
-      transferDesc: "Someone else becomes an owner; you choose whether you stay one.",
+      transferDesc: "Someone else becomes an owner, and you choose whether you stay one.",
       owners: "Give and take ownership",
       ownersDesc: "There can be more than one owner.",
       delete: "Delete the workspace",
@@ -2397,7 +2397,7 @@ export const en: Translations = {
         contextText: {
           auto: "What the model takes.",
           "200000": "Cheaper and faster. Summarizes early in long conversations.",
-          "400000": "Remembers a lot; each answer costs less than with 1M.",
+          "400000": "Remembers a lot, and each answer costs less than with 1M.",
           "1000000": "Remembers the most. Each answer rereads everything: slower and pricier.",
         },
         advanced: {

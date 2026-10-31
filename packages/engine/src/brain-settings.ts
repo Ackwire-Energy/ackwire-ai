@@ -11,8 +11,8 @@ import {
 import { and, type Database, eq, inArray, isNull, ne, schema, sql } from "@agenteschat/db";
 import {
   AUTO_MODEL,
-  catalogModelOf,
   type ContextLimit,
+  catalogModelOf,
   contextWindowOf,
   isAutoModel,
   isContextLimit,
