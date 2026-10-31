@@ -808,19 +808,20 @@ function PlanSteps({
   const signedOut = !hint && current?.status === "signed_out" ? current : undefined;
   // The accounts of this plan the person already has there for all of their agents (ADR 0059 §2): one tap each,
   // before another account.
-  const existing = ready
-    ? groupPlans(
-        (view?.accounts ?? []).filter(
-          (a) =>
-            a.shared === true &&
-            a.mine &&
-            a.status === "active" &&
-            a.kind === kind &&
-            (coding ? a.provider === choice : !a.provider) &&
-            a.id !== view?.account,
-        ),
-      ).flatMap((g) => g.logins.slice(0, 1))
-    : [];
+  const existing =
+    ready && !hint
+      ? groupPlans(
+          (view?.accounts ?? []).filter(
+            (a) =>
+              a.shared === true &&
+              a.mine &&
+              a.status === "active" &&
+              a.kind === kind &&
+              (coding ? a.provider === choice : !a.provider) &&
+              a.id !== view?.account,
+          ),
+        ).flatMap((g) => g.logins.slice(0, 1))
+      : [];
   const choosing = ownable || existing.length > 0;
   return (
     <View style={styles.gap}>

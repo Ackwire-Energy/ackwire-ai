@@ -619,6 +619,20 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
     ]);
   });
 
+  test("a row's sign-in is that sign-in, even with an account of the plan there for all of her owner's agents", async () => {
+    const state = walters(withCard(), ADA_ID);
+    const forAll = acct({ id: "acct_all", label: "Claude Max", plan: "max", shared: true, usedBy: ["Atlas"] });
+    const { box, picker } = await connectAda(state, { accounts: [pessoal, forAll] });
+    await click(within(picker).getByRole("button", { name: /^Claude Pessoal/ }));
+    const panel = within(box).getByRole("region", { name: "Seu plano do Claude" });
+    expect(within(panel).queryByRole("button", { name: /^Usar Claude Max/ })).toBeNull();
+    expect(within(panel).queryByRole("button", { name: "Outra conta" })).toBeNull();
+    await signInWithClaude(box);
+    expect(calls(state, "machines.beginAccountLogin").map((c) => c.args)).toEqual([
+      [ORG_ID, "machine_1", "claude_code", { email: "walter@acme.com.br" }],
+    ]);
+  });
+
   test("its computer off: the row's panel says so, and Usar uma chave de API agora opens the key under its own row", async () => {
     const state = walters(withCard(), ADA_ID);
     const { box, picker } = await connectAda(state, {

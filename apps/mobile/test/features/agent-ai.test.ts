@@ -216,6 +216,8 @@ describe("the agent's AI", () => {
     // signed-out login again.
     expect(connect).toContain("= login ?? (email ? { email } : undefined);");
     expect(connect).toContain('const signedOut = !hint && current?.status === "signed_out" ? current : undefined;');
+    // Nor an account made for all of the person's agents: the sign-in asked for goes straight to its steps.
+    expect(connect).toMatch(/const existing =\s+ready && !hint\s+\? groupPlans\(/);
     // An account already connected thinks for an agent only where one is in view: Connect an AI, never Settings.
     expect(connect).toContain("onUse={(a) => void assign(a)}");
     expect(settings).not.toContain("onUse=");
