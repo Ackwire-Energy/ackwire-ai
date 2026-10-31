@@ -364,9 +364,11 @@ export function createModelGateway(deps: ModelGatewayDeps) {
           orgId: agent.orgId,
           agentId: agent.id,
           periodStart: period,
-          // First call of the month (or first since budgets existed): start from recorded usage.
+          // First call of the month (or first since budgets existed): start from the agent's own recorded calls
+          // (`agentSpendThisMonth`).
           spentNanoUsd: sql`(select coalesce(sum(${usageRecords.costNanoUsd}), 0) from ${usageRecords}
             where ${usageRecords.orgId} = ${agent.orgId} and ${usageRecords.agentId} = ${agent.id}
+            and ${usageRecords.kind} = 'agent'
             and ${usageRecords.createdAt} >= ${monthStartUtc(at).toISOString()}::timestamptz)`,
         })
         .onConflictDoNothing();

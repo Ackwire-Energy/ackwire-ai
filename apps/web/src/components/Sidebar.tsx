@@ -4,6 +4,7 @@ import {
   runningAgents,
   useAgentGroups,
   useAgentStatuses,
+  useAiAccounts,
   useChannelCategories,
   useChannels,
   useConnections,
@@ -22,6 +23,7 @@ import {
 } from "@agenteschat/client";
 import { agentSections } from "@agenteschat/client/lib/agent-groups";
 import { audienceChip, audienceNotice, listsAgent } from "@agenteschat/client/lib/audience";
+import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { waitingAgents } from "@agenteschat/client/lib/outages";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -48,6 +50,7 @@ import {
   modKey,
   Popover,
   PresenceBadge,
+  ProviderLogo,
   Skeleton,
   SkeletonGroup,
   selectionSkyUrl,
@@ -68,6 +71,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { useApi } from "@/api/context";
 import { useAuth } from "@/auth/context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { agentLine, availabilityOf, personLine, useAgentPresence, usePersonPresence } from "@/hooks/usePresence";
@@ -76,6 +80,7 @@ import { contextMenuHandler, copyText, type MenuEntry } from "@/lib/context-menu
 import { onPhoneAsk, takePhoneAsk } from "@/lib/desktop";
 import { useOpenParam } from "@/lib/open-param";
 import { markOpen } from "@/lib/perf";
+import { ownPlanLines, planNearLimit, planWord } from "@/lib/plan-usage";
 import { STORAGE_KEYS, storage, storedStrings } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import type { SettingsSection } from "@/pages/settings-sections";
@@ -122,6 +127,18 @@ function SidebarSkeleton({ count, avatar, label }: { count: number; avatar?: boo
     </SkeletonGroup>
   );
 }
+
+/** In place of an agent's or a person's row that failed to draw (`ErrorBoundary`): the rest of the sidebar works. */
+function UnshownRow() {
+  const { t } = useTranslation();
+  return (
+    <span className="sidebar__item sidebar__item--unshown" title={t("shell.unshown")}>
+      <Icon name="alert" />
+      <span className="sidebar__item-label">{t("shell.unshown")}</span>
+    </span>
+  );
+}
+const unshownRow = () => <UnshownRow />;
 
 /** Tablet widths: the sidebar is always an icon rail (NavDrawer.tsx has the other breakpoints). */
 export const TABLET_QUERY = "(min-width: 761px) and (max-width: 1199px)";
@@ -248,24 +265,34 @@ export function Sidebar() {
   // Owners and admins organize the groups, with the full sidebar (the rail shows faces only).
   const organize = arranges && !rail;
   const agentRow = (a: Agent) => (
-    <AgentRow
+    <ErrorBoundary
       key={a.id}
-      agent={a}
-      unread={unreadWith.get(a.id) ?? 0}
-      waitingFor={waitingFor.get(a.id)}
-      onPrefetch={() => prefetchDm(a.id)}
-      onOpen={() => markOpen(dmWith.get(a.id) ?? a.id)}
-      drag={organize ? drag.row(a.id) : undefined}
-      menu={
-        organize ? (
-          <AgentGroupMenu
-            agent={a}
-            groups={groups}
-            onNewGroup={() => setGroupDialog({ mode: "create", agentIds: [a.id] })}
-          />
-        ) : undefined
-      }
-    />
+      resetKey={a}
+      // Still a row the drag counts (`useAgentDrag`), so a drop below it lands where the pointer is.
+      fallback={() => (
+        <div className="sidebar__row" data-agent-row={a.id}>
+          <UnshownRow />
+        </div>
+      )}
+    >
+      <AgentRow
+        agent={a}
+        unread={unreadWith.get(a.id) ?? 0}
+        waitingFor={waitingFor.get(a.id)}
+        onPrefetch={() => prefetchDm(a.id)}
+        onOpen={() => markOpen(dmWith.get(a.id) ?? a.id)}
+        drag={organize ? drag.row(a.id) : undefined}
+        menu={
+          organize ? (
+            <AgentGroupMenu
+              agent={a}
+              groups={groups}
+              onNewGroup={() => setGroupDialog({ mode: "create", agentIds: [a.id] })}
+            />
+          ) : undefined
+        }
+      />
+    </ErrorBoundary>
   );
 
   // Only the middle scrolls: the workspace card on top and the foot stay put. The active item
@@ -504,13 +531,14 @@ export function Sidebar() {
             summary={peopleUnread > 0 && <UnreadCount count={peopleUnread} />}
           >
             {people.map((m) => (
-              <PersonRow
-                key={m.userId}
-                member={m}
-                unread={unreadWith.get(m.userId) ?? 0}
-                onPrefetch={() => prefetchDm(m.userId)}
-                onOpen={() => markOpen(dmWith.get(m.userId) ?? m.userId)}
-              />
+              <ErrorBoundary key={m.userId} resetKey={m} fallback={unshownRow}>
+                <PersonRow
+                  member={m}
+                  unread={unreadWith.get(m.userId) ?? 0}
+                  onPrefetch={() => prefetchDm(m.userId)}
+                  onOpen={() => markOpen(dmWith.get(m.userId) ?? m.userId)}
+                />
+              </ErrorBoundary>
             ))}
           </SidebarSection>
         )}
@@ -1305,11 +1333,11 @@ function UnreadCount({ count }: { count: number }) {
 
 /**
  * The account button: your face with your presence badge; under the name, your line (or how you appear). It opens a
- * menu right above it: you on top (face, name, @ and how you appear, your line in a well), then your status (how you
- * appear, or what you're up to), your profile, your settings (Configurações › Sua conta) and signing out. Deleting the
- * account starts at the bottom of Sua conta, not here beside Sair, where a slip would open it. It and adding a password
- * keep their dialogs here, in the address (`?account=delete`, `?account=password`) on any page: adding a password may
- * ask for a sign-in again, which comes back.
+ * menu right above it: you on top (face, name, @ and how you appear, your line in a well, a plan near its limit), then
+ * your status (how you appear, or what you're up to), your profile, your settings (Configurações › Sua conta) and
+ * signing out. Deleting the account starts at the bottom of Sua conta, not here beside Sair, where a slip would open
+ * it. It and adding a password keep their dialogs here, in the address (`?account=delete`, `?account=password`) on any
+ * page: adding a password may ask for a sign-in again, which comes back.
  */
 function AccountMenu() {
   const { t, i18n } = useTranslation();
@@ -1342,6 +1370,7 @@ function AccountMenu() {
   const line = shown?.status ? personLine(shown.status) : null;
   // Under your name: your line, or how you appear (Online, Ocupado, Ausente, Oculto) when you wrote none (ADR 0084).
   const who = [me.user.name, line?.text ?? presenceWord].filter(Boolean).join(" · ");
+  const under = Boolean(line || presenceWord);
 
   const signOut = async () => {
     await auth.signOut();
@@ -1385,14 +1414,15 @@ function AccountMenu() {
         trigger={
           <button
             type="button"
-            // The face stands beside the lines under it (your status line): the name's capitals at its top.
-            className="sidebar__user ac-faceline"
+            // The face stands beside the lines under it (your status line): the name's capitals at its top. A name
+            // alone (while how you appear loads) centres on it.
+            className={cx("sidebar__user", under && "ac-faceline")}
             aria-label={`${t("shell.account")}: ${who}`}
             title={who}
           >
             <MyFace size="sm" presence={presence} presenceLabel={presenceWord} />
             <span className="sidebar__user-text">
-              <span className="sidebar__user-name ac-captop">{me.user.name}</span>
+              <span className={cx("sidebar__user-name", under && "ac-captop")}>{me.user.name}</span>
               {line ? (
                 <StatusLine emoji={line.emoji} text={line.text} className="sidebar__user-line" />
               ) : (
@@ -1420,6 +1450,7 @@ function AccountMenu() {
             </span>
           </div>
         )}
+        <PlanNearLimitItem />
         <MenuSeparator />
         {/* A phone has no room beside the menu for another one: there the choices are in it. */}
         {compact ? (
@@ -1462,6 +1493,35 @@ function AccountMenu() {
       />
       <DeleteAccountDialog open={account === "delete"} onClose={() => setAccount(null)} />
     </>
+  );
+}
+
+/**
+ * In the account menu, the one of your plans near or at its limit (from `PLAN_ALMOST`, 80%: "Quase no limite"), at
+ * its limit first: its maker's mark, its name and its state, opening Configurações › Uso. Nothing otherwise. Your
+ * accounts are read, and their usage looked up again (it comes back as `machine.updated`), when the menu opens.
+ */
+function PlanNearLimitItem() {
+  const { t, i18n } = useTranslation();
+  const { org, me } = useOrg();
+  const api = useApi();
+  const dir = useDirectory(org.id);
+  const navigate = useNavigate();
+  const plan = planNearLimit(ownPlanLines(t, useAiAccounts(org.id).data, dir.agents, me.user.id));
+  useEffect(() => {
+    void api.machines.refreshAccountUsage(org.id).catch(() => undefined);
+  }, [api, org.id]);
+  if (!plan) return null;
+  return (
+    <MenuItem
+      leading={<ProviderLogo id={plan.logo} size="xs" />}
+      hint={planWord(t, i18n.language, plan.usage)}
+      onSelect={() =>
+        void navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section: "usage" } })
+      }
+    >
+      <span className="profile-menu__plan">{plan.name}</span>
+    </MenuItem>
   );
 }
 

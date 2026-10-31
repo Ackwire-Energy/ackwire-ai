@@ -236,6 +236,10 @@ export function ownSignIns(view: Pick<AiAccounts, "computers"> | null | undefine
 export const planWordOf = (plan: string | null) =>
   plan ? plan.charAt(0).toUpperCase() + plan.slice(1).toLowerCase() : null;
 
+/** A computer's own sign-in as "Seus planos" titles it: its CLI's maker and its plan ("Claude · Max"). */
+export const ownSignInTitle = (t: TFunction, o: Pick<OwnSignInRow, "kind" | "plan">) =>
+  accountTitle({ label: t(`aiAccounts.connect.${o.kind}`), plan: o.plan });
+
 /**
  * A computer's own sign-in by name: on a computer the viewer connected, the account their agents there share; on
  * someone else's, that computer's ("MacBook's account").
