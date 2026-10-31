@@ -51,6 +51,7 @@ import type {
   ComputerTarget,
   Connection,
   ConnectorCatalog,
+  ConsultationConversation,
   Credential,
   CustomConnectStart,
   CustomServer,
@@ -133,6 +134,7 @@ import type {
   RoutineRun,
   RuleInfo,
   Run,
+  RunConsultation,
   RunStep,
   SandboxSettings,
   ScheduleParse,
@@ -520,6 +522,18 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         if (res?.consults) consultSeeds.publish(channelId, res.consults, askedAt);
         return res ? res.runs : null;
       },
+      consultations: async (orgId, channelId) =>
+        (
+          (await nullOn(404, () =>
+            request<{ consultations: RunConsultation[] }>(`${org(orgId)}/channels/${enc(channelId)}/consultations`),
+          )) ?? { consultations: [] }
+        ).consultations,
+      consultation: (orgId, channelId, consultationId) =>
+        nullOn(404, () =>
+          request<ConsultationConversation>(
+            `${org(orgId)}/channels/${enc(channelId)}/consultations/${enc(consultationId)}`,
+          ),
+        ),
       usage: async (orgId) => {
         const res = await nullOn(403, () => request<{ usage: AgentUsage[] }>(`${org(orgId)}/usage`));
         return res ? res.usage : null;

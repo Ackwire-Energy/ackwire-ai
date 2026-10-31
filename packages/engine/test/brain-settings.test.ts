@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { ACCOUNTS_PROTOCOL, BRAIN_PROTOCOL, MISSION_PROTOCOL } from "@agenteschat/adapters";
+import { ACCOUNTS_PROTOCOL, BRAIN_PROTOCOL, CONTEXT_LIMIT_PROTOCOL, MISSION_PROTOCOL } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import {
   ConflictError,
@@ -11,6 +11,7 @@ import {
   setAgentAudience,
   setAgentBrain,
   updateAgent,
+  ValidationError,
 } from "../src";
 import {
   brainModelId,
@@ -22,6 +23,7 @@ import {
   executorBrain,
   normalizeBrainModel,
 } from "../src/brain-settings";
+import { contextFields } from "../src/brains/claude-code";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
@@ -40,8 +42,8 @@ const mac = (patch: Record<string, unknown> = {}) => ({
 describe("brain settings", () => {
   test("a coding plan keeps Claude Code's aliases, named after the plan's models", () => {
     expect(brainModelOptions("claude_code", "zai")).toEqual([
-      { value: "sonnet", label: "GLM-5.3", modelId: "glm-5.3[1m]", recommended: true },
-      { value: "haiku", label: "GLM-5.3 Flash", modelId: "glm-5.3-flash[1m]" },
+      { value: "sonnet", label: "GLM-5.3", modelId: "glm-5.3[1m]", recommended: true, contextWindow: 1_000_000 },
+      { value: "haiku", label: "GLM-5.3 Flash", modelId: "glm-5.3-flash[1m]", contextWindow: 1_000_000 },
     ]);
     expect(brainModelOptions("claude_code", "kimi").map((o) => o.value)).toEqual(["opus", "sonnet"]);
     // Anything else is Claude's own aliases; Codex has no plans.
@@ -170,6 +172,46 @@ describe("Criar agente: what a new agent could think with", () => {
     expect(mine?.options.find((o) => o.kind === "claude_code")?.available).toBe(true);
     expect(mine?.options.find((o) => o.kind === "codex")).toMatchObject({ available: false, reason: "not_installed" });
     await expect(newAgentBrainMachines(deps, bia.id, fx.org.id)).rejects.toBeInstanceOf(ForbiddenError);
+  });
+});
+
+describe("context window (Configuração avançada)", () => {
+  test("any brain keeps a limit from CONTEXT_LIMITS through a switch; anything else is refused; audited", async () => {
+    const { fx, deps, row, audits } = await world();
+    const onApi = await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { contextTokens: 400_000 });
+    expect(onApi).toMatchObject({ brain: "model", contextTokens: 400_000 });
+    expect(await row()).toMatchObject({ contextTokens: 400_000 });
+    expect((await audits("agent.brain")).at(-1)?.details).toMatchObject({
+      from: { contextTokens: null },
+      to: { contextTokens: 400_000 },
+    });
+    // It is the agent's, not the brain's: a switch keeps it, and so does a change that leaves it out.
+    const onPlan = await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { brain: "claude_code" });
+    expect(onPlan).toMatchObject({ brain: "claude_code", contextTokens: 400_000 });
+    expect((await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { model: "opus" })).contextTokens).toBe(
+      400_000,
+    );
+    for (const bad of [300_000, "400000", -1, 2_000_000]) {
+      await expect(
+        setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { contextTokens: bad }),
+      ).rejects.toBeInstanceOf(ValidationError);
+    }
+    // Null: the model's own window again.
+    expect(
+      (await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { contextTokens: null })).contextTokens,
+    ).toBe(null);
+    expect(await row()).toMatchObject({ contextTokens: null });
+  });
+
+  test("a computer turn carries it only to a runner that knows it (protocol 28)", () => {
+    expect(contextFields(CONTEXT_LIMIT_PROTOCOL, { contextTokens: 400_000 })).toEqual({ contextTokens: 400_000 });
+    expect(contextFields(CONTEXT_LIMIT_PROTOCOL - 1, { contextTokens: 400_000 })).toEqual({});
+    expect(contextFields(CONTEXT_LIMIT_PROTOCOL, {})).toEqual({});
+  });
+
+  test("each model choice says its window: which limits are worth offering with it", () => {
+    expect(brainModelOptions("claude_code").find((o) => o.value === "opus")?.contextWindow).toBe(1_000_000);
+    expect(brainModelOptions("claude_code", "minimax").every((o) => o.contextWindow === 1_000_000)).toBe(true);
   });
 });
 

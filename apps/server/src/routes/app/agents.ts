@@ -43,7 +43,7 @@ import {
   updateAgentGroup,
   usageSummary,
 } from "@agenteschat/engine";
-import { MODEL_CATALOG, nanoUsdToUsd, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
+import { contextWindowOf, MODEL_CATALOG, nanoUsdToUsd, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
 import { createRoute, z } from "@hono/zod-openapi";
 import {
   type AppDeps,
@@ -66,6 +66,7 @@ import {
   BrainEffortSetting,
   BrainKind,
   BrainMachine,
+  ContextLimit,
   Credential,
   FormerAgent,
   Model,
@@ -206,6 +207,7 @@ export function agentRoutes(deps: AppDeps) {
             id,
             label: m.label,
             provider: m.provider,
+            contextWindow: contextWindowOf(id),
             inputUsdPerMTok: pricesAt(m).input / 1000,
             outputUsdPerMTok: pricesAt(m).output / 1000,
           })),
@@ -866,6 +868,10 @@ export function agentRoutes(deps: AppDeps) {
             effort: BrainEffortSetting.nullable()
               .optional()
               .openapi({ description: "`auto` = picked per run; null = the CLI's default; omitted = keep." }),
+            contextTokens: ContextLimit.nullable().optional().openapi({
+              description:
+                "The most context it reads, any brain (Claude Code and Codex compact there, the API brain drops old tool results); null = its model's window; omitted = keep.",
+            }),
           }),
         ),
       },
