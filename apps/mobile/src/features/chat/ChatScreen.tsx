@@ -26,6 +26,7 @@ import {
   useMissionControl,
   usePostMessage,
   useRoster,
+  useSteerState,
   useThreadInfo,
   useThreadMessages,
   useThreadMission,
@@ -93,7 +94,7 @@ import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { useDmStatusLine, usePresenceWord } from "../status/hooks";
 import { PersonStatusCard } from "../status/StatusCard";
 import { AgentReceiptLine } from "./AgentReceipts";
-import { receiptMessageId } from "./agent-receipts";
+import { receiptMessageId, turnHeadId } from "./agent-receipts";
 import { ChannelMembersSheet } from "./ChannelMembers";
 import { ConversationSwitcher } from "./ConversationSwitcher";
 import { takeComposerRequest, useComposerRequest } from "./composer-request";
@@ -291,12 +292,13 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   }, [isThread, threadId, top.data, threadMessages.data, older]);
   // Messages said in the channel itself: a "thinking" row the app guessed hangs off one of them.
   const topIds = useMemo(() => new Set(list.flatMap((m) => (m.threadId ? [] : [m.id]))), [list]);
-  // A DM with a person: "Visto" under my latest message once they read it (live: `channel.read`).
+  // A DM with a person: their face beside my latest message once they read it (live: `channel.read`).
   const reads = useDmReads(orgId, channelId, dm?.with.type === "person" && !isThread);
   const seenId = useMemo(
     () => (reads.data && meId ? seenMessageId(top.data ?? [], meId, reads.data) : null),
     [reads.data, top.data, meId],
   );
+  const seenBy = seenId ? dm?.with.id : undefined;
 
   // ── Live ──
   const live = useChatLive(orgId, channelId, member);
@@ -1188,8 +1190,16 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const pinned = mission && isOpenMission(mission) ? mission : null;
 
   // ── Agents' receipts and "no AI" ──
-  // One receipt line, under the latest person's message on screen.
+  // One receipt, the latest person's message's on screen: a mark beside my bubble, or at the end of the name line of
+  // someone else's turn; a line under the message only for what asks something of you.
   const receiptId = useMemo(() => receiptMessageId(shownMessages), [shownMessages]);
+  const receiptMine = Boolean(meId && shownMessages.find((m) => m.id === receiptId)?.author.id === meId);
+  // Someone else's message sent into a task at work says nothing here (mine wears it: `ReceiptMark`).
+  const receiptSteered = useSteerState(orgId, channelId, receiptId && !receiptMine ? receiptId : "") !== null;
+  const markAt = useMemo(
+    () => (!receiptId || receiptSteered ? null : receiptMine ? receiptId : turnHeadId(rows, receiptId)),
+    [receiptId, receiptSteered, receiptMine, rows],
+  );
   // The line redraws when what it shows changes, not on every event that touches the receipt (typing).
   const receiptNow = receiptId ? live.receipts[receiptId] : undefined;
   const receiptKey = receiptNow
@@ -1280,6 +1290,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
                 thread={isThread ? undefined : linkThreads.get(item.message.id)}
                 onLongPress={onLongPress}
                 onRetry={onRetry}
+                receipt={item.message.id === markAt ? receipt : undefined}
+                seenBy={item.message.id === seenId ? seenBy : undefined}
               />
               {item.message.id === receiptId ? (
                 <AgentReceiptLine
@@ -1289,13 +1301,6 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
                   connectInline={connectInline}
                   onRetry={onResend}
                 />
-              ) : null}
-              {item.message.id === seenId ? (
-                <Animated.View entering={FadeIn.duration(200)}>
-                  <Text variant="caption" tone="muted" style={styles.seen} accessibilityLiveRegion="polite">
-                    {t("mobile.chat.seen")}
-                  </Text>
-                </Animated.View>
               ) : null}
             </Animated.View>
           );
@@ -1313,13 +1318,14 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       toggleBrowser,
       bodyOf,
       seenId,
+      seenBy,
       receiptId,
+      markAt,
       receipt,
       connectInline,
       onResend,
       consultFolds,
       seeConsult,
-      t,
     ],
   );
 
@@ -1745,8 +1751,6 @@ function Connection({ status }: { status: ConnectionStatus }) {
 
 const styles = StyleSheet.create({
   topFade: { position: "absolute", top: 0, left: 0, right: 0 },
-  // "Visto": right under my latest message, at the right edge (the receipts' side).
-  seen: { alignSelf: "flex-end", marginTop: -4, marginBottom: 4, paddingHorizontal: 16 },
   // Under the agent's words, like a card on its message (MessageRow: 14 + 34 avatar + 11 gap).
   browserRow: { paddingLeft: 59, paddingRight: 16, paddingBottom: 6 },
   screen: { flex: 1 },
