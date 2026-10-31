@@ -6,9 +6,11 @@ import {
   continuedTranscript,
   continueRun,
   createAgentRuns,
+  createForumTopic,
   createJobHandlers,
   createPassToolSource,
   drainOutbox,
+  getForumTopic,
   insertMessage,
   isScreenCall,
   postPersonMessage,
@@ -265,6 +267,32 @@ describe("calls that only drive the browser or the desktop", () => {
     expect(isScreenCall({ name: "use_tool", input: { tool: "github_get_pr", arguments: {} } })).toBe(false);
     expect(isScreenCall({ name: "find_tools", input: { query: "browser" } })).toBe(false);
   });
+});
+
+test("a forum's synthesis at the cap fails and the topic stalls for Retomar: no step-limit line taken for the decision", async () => {
+  f = await setup({
+    toolSources: [workTools()],
+    artifactTools: true,
+    forumTools: true,
+    reply: (req) =>
+      JSON.stringify(req.messages).includes("now write the")
+        ? { chunks: [], toolUses: [{ name: "look", input: {} }] }
+        : { chunks: ["Stance: proposes\nPosition: Plano B\n\nAcho que sim."] },
+  });
+  const topic = await createForumTopic(
+    { db: f.db, pubsub: f.pubsub, artifacts: f.artifactDeps },
+    { type: "person", userId: f.owner.id },
+    f.org.id,
+    { title: "Plano de preços", goal: "Decidir o plano de entrada.", agentIds: [f.agent.id], rounds: 1 },
+  );
+  await drainOutbox(f.db, handlers(3));
+
+  const stalled = await getForumTopic(f.db, f.owner.id, f.org.id, topic.id);
+  expect(stalled).toMatchObject({ status: "stalled", stall: { reason: "failed", synthesis: true } });
+  expect(stalled.synthesis).toBeFalsy();
+  const synthesis = (await runs()).find((r) => r.status === "failed");
+  expect(synthesis).toMatchObject({ error: "too_many_tool_calls", turns: 3 });
+  expect(f.provider.calls.some((c) => lastText(c.request).includes(WRAP_UP_REPLY_NOTE))).toBe(false);
 });
 
 test("Continuar keeps the tools and the model the run chose: the same request, so its thinking blocks stay valid", () => {

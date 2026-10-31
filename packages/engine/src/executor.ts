@@ -435,7 +435,10 @@ export const WRAP_UP_TURNS = 2;
 export const WRAP_UP_NOTE =
   "You are close to this run's limit of steps: only a couple of calls are left. Stop starting new work. If the people need to know what you found, call hand_off now with what you have; then end with your record (a short summary of what you checked). Your tools stay available for these last calls.";
 
-/** What any other run near its cap reads once: say where it stands, so the person can let it go on (Continuar). */
+/**
+ * What a conversation run near its cap reads once (not a forum's): where it stands, so the person can let it go on
+ * (Continuar).
+ */
 export const WRAP_UP_REPLY_NOTE =
   "You are close to this run's limit of steps: only a couple of calls are left. Stop starting new work and reply with what you did, where you stopped and what is left, so the person can let you pick up from there.";
 
@@ -1422,8 +1425,11 @@ async function executeRunInner(
     }
   }
 
-  /** Continuar under the reply of a run that stops near or at its cap (`continueRun`); never in a forum's turns. */
-  const stepLimitMeta = (): Record<string, unknown> => (channelRow?.kind === "forum" ? {} : { stepLimit: {} });
+  /**
+   * A forum's turn or synthesis belongs to the topic's order (ADR 0022): at the cap it fails, so the topic stalls
+   * and Retomar does it again, instead of a step-limit line taken for the agent's post or the decision.
+   */
+  const forum = channelRow?.kind === "forum";
 
   /** Ends the run with a closing line the server writes (`code`), with what it changed (its receipts) and its cards. */
   const closeWith = async (
@@ -1466,7 +1472,7 @@ async function executeRunInner(
    * A conversation run at its cap in the middle of its work: instead of failing, it says it ran out of steps (with
    * what it changed and where it browsed), and Continuar under that line picks up from here with a fresh count.
    */
-  const endAtStepLimit = () => closeWith(STEP_LIMIT_TEXT, "step_limit", { stepLimit: true }, stepLimitMeta());
+  const endAtStepLimit = () => closeWith(STEP_LIMIT_TEXT, "step_limit", { stepLimit: true }, { stepLimit: {} });
 
   /**
    * Ends the run without a message (reply-policy.ts): nobody called it by name and it passed, or wrote
@@ -1908,16 +1914,21 @@ async function executeRunInner(
     for (;;) {
       if (await isCanceled()) return stopCanceled("");
       // At the cap the inbox stays as it is: a message never gets marked read and then lost (the run's end
-      // hands it to a run of its own). A routine's run fails there (its ledger says so); any other says it ran
-      // out of steps, with Continuar.
-      if (run.turns >= maxTurns) return run.background ? fail("too_many_tool_calls") : endAtStepLimit();
+      // hands it to a run of its own). A routine's run fails there (its ledger says so), and so does a forum's;
+      // any other says it ran out of steps, with Continuar.
+      if (run.turns >= maxTurns) return run.background || forum ? fail("too_many_tool_calls") : endAtStepLimit();
       const steered = await deliverSteering();
       if (steered && plan.kind !== "model") {
         nextPrompt = [nextPrompt ?? (computerTurns === 0 ? triggerText : ""), steered].filter(Boolean).join("\n\n");
       }
       // Near the cap it is told once to wrap up: a routine's run hands off what it has (ADR 0053 §10), any other
-      // replies with where it stands.
-      if (plan.kind === "model" && !transcript.wrapUpNoted && run.turns >= Math.max(0, maxTurns - WRAP_UP_TURNS)) {
+      // but a forum's replies with where it stands.
+      if (
+        plan.kind === "model" &&
+        !forum &&
+        !transcript.wrapUpNoted &&
+        run.turns >= Math.max(0, maxTurns - WRAP_UP_TURNS)
+      ) {
         transcript.wrapUpNoted = true;
         appendUserText(transcript, run.background ? WRAP_UP_NOTE : WRAP_UP_REPLY_NOTE);
         await saveTranscript(db, transcript);
@@ -2465,7 +2476,7 @@ async function executeRunInner(
               tx,
               replyThreadId,
               text,
-              withFallback(t, withCode({ ...takeMemoryUpdates(t), ...(t.wrapUpNoted ? stepLimitMeta() : {}) }, code)),
+              withFallback(t, withCode({ ...takeMemoryUpdates(t), ...(t.wrapUpNoted ? { stepLimit: {} } : {}) }, code)),
             )
           : null;
         t.postedUpTo = t.messages.length;
