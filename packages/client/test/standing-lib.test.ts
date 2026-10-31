@@ -11,6 +11,8 @@ const t = ((key: string, o?: Record<string, unknown>) =>
 
 const EMAIL = `{"email":"${LEGAL_EMAIL}"}`;
 const CONTEST = `standing.cloud.contest ${EMAIL}`;
+const REVIEW_FOR = (category: string) =>
+  `standing.cloud.reviewFor {"email":"${LEGAL_EMAIL}","what":"standing.cloud.reviewWhat.${category}"}`;
 const cloud = { cloud: true };
 
 describe("a restriction's line on agentes.chat Cloud, by its kind, never its stored reason", () => {
@@ -28,6 +30,18 @@ describe("a restriction's line on agentes.chat Cloud, by its kind, never its sto
     // Silent: only that it is paused, nothing to contest.
     expect(restrictionLine(t, "org.paused", cloud)).toBe("standing.paused");
     expect(restrictionLine(t, "org.suspended", cloud)).toBe("standing.suspended");
+  });
+
+  test("the automatic review hold names what was flagged; a category it doesn't know reads as plain review", () => {
+    expect(restrictionLine(t, "org.paused", { reason: "review.phishing_impersonation", ...cloud })).toBe(
+      REVIEW_FOR("phishing_impersonation"),
+    );
+    expect(restrictionLine(t, "run.org_paused", { reason: "review.fraud", cloud: "true" })).toBe(REVIEW_FOR("fraud"));
+    expect(holdText(t, { state: "hold", reason: "review.account_takeover", cloud: true })).toBe(
+      REVIEW_FOR("account_takeover"),
+    );
+    for (const reason of ["review.spam", "review."])
+      expect(restrictionLine(t, "org.paused", { reason, ...cloud })).toBe(`standing.cloud.review ${EMAIL}`);
   });
 
   test("an ended plan's hold is a billing matter: its own words, nothing to contest", () => {
@@ -62,6 +76,9 @@ describe("a restriction's line on agentes.chat Cloud, by its kind, never its sto
 describe("a self-hosted server: the words it always had", () => {
   test("every restriction, whatever kind or reason it carries", () => {
     expect(restrictionLine(t, "org.paused", { reason: "review" })).toBe('standing.onHold {"reason":"review"}');
+    expect(restrictionLine(t, "org.paused", { reason: "review.fraud" })).toBe(
+      'standing.onHold {"reason":"review.fraud"}',
+    );
     expect(restrictionLine(t, "org.paused", { reason: "Terms 5: phishing" })).toBe(
       'standing.onHold {"reason":"Terms 5: phishing"}',
     );
@@ -100,6 +117,7 @@ describe("a restriction's notice in the inbox reads as the restriction itself", 
 
   test("the workspace on agentes.chat Cloud: the review line, an operator's reason with how to contest it", () => {
     expect(line({ statusTo: "hold", text: "review", cloud: true })).toBe(`standing.cloud.review ${EMAIL}`);
+    expect(line({ statusTo: "hold", text: "review.illegal_content", cloud: true })).toBe(REVIEW_FOR("illegal_content"));
     expect(line({ statusTo: "hold", text: "Terms 5: phishing", cloud: true })).toBe(
       `standing.onHold {"reason":"Terms 5: phishing"}. ${CONTEST}`,
     );
