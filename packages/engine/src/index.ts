@@ -86,6 +86,7 @@ export * from "./follows";
 export * from "./forum";
 export * from "./forum-tools";
 export * from "./gateway";
+export * from "./git/branches";
 export * from "./git/credential";
 export * from "./git/github-app";
 export * from "./git/github-app-installs";

@@ -77,7 +77,9 @@ const alwaysAsks = (name: string) => {
  * The kind "Aprovar sempre" would cover for this call (`approval_rules`), or null when it is never offered: only
  * on a person's run whose policy didn't make the call ask, for a tool its source lets be remembered (`rememberAs`),
  * whose wrapped actions, when it runs others, are a shape we know with none sensitive, and with nothing in its
- * names that always asks (merge, deploy, rollback and the rest above, GraphQL, SQL, a raw request).
+ * names that always asks (merge, deploy, rollback and the rest above, GraphQL, SQL, a raw request). A tool that
+ * names one exact target per call (`rememberTarget`) is remembered by that target, without the name checks: they
+ * read connector actions, and a branch named release-x is still only that branch.
  */
 export function rememberable(
   tool: ToolDefinition,
@@ -86,6 +88,10 @@ export function rememberable(
   decision: PolicyDecision,
 ): RememberedKind | null {
   if (authority?.kind !== "person" || decision.action === "approve") return null;
+  if (tool.rememberTarget && tool.connectionId) {
+    const target = tool.rememberTarget(input);
+    return target ? { tool: tool.name, actions: [target] } : null;
+  }
   if (!tool.rememberAs || !tool.connectionId) return null;
   const actions = tool.actions ? tool.actions(input) : [];
   if (!actions || actions.some((a) => actionLevel(a) === "sensitive")) return null;
@@ -107,7 +113,8 @@ const MAX_RESULT_CHARS = 50_000;
 /** Server-owned Git tools have a connection ID only to use that connection's credential. */
 const serverGitTool = (tool: ToolDefinition) =>
   (tool.name === "git_clone" && tool.scope === "github:git.read") ||
-  (tool.name === "open_pull_request" && tool.scope === "github:pr.write");
+  (tool.name === "open_pull_request" && tool.scope === "github:pr.write") ||
+  ((tool.name === "delete_branches" || tool.name === "request_branch_push") && tool.scope === "github:git.write");
 
 /**
  * An `external` tool's output (an MCP server's answer) reaches the model inside the one envelope for

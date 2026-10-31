@@ -1,24 +1,34 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createHash, randomBytes } from "node:crypto";
 import { deflateSync, gzipSync } from "node:zlib";
+import { DELETE_BRANCHES_POINTER, otherBranchPointer } from "@agenteschat/adapters/command-policy";
 import { and, eq, schema } from "@agenteschat/db";
 import {
   agentCommitEmail,
+  ConflictError,
   type ConnectorDeps,
   connectorGrantValidator,
   createApiKeyConnection,
   createGitToolSource,
+  createToolGateway,
+  decideApproval,
   drainOutbox,
   type GitProxyDeps,
   handleGitProxy,
+  type InvokeResult,
   inflateZlib,
+  insertMessage,
   issueGitToken,
   machineGitGen,
   parseReceivePackRequest,
   pkt,
   postPersonMessage,
+  pushGrant,
+  pushGrantKey,
+  type RoutineBrief,
   readPack,
   refRule,
+  removeApprovalRule,
   setAgentComputerTarget,
   setAgentHold,
   setAgentRepositories,
@@ -145,14 +155,19 @@ describe("pack reading", () => {
     expect(readPack(body, parsed.packStart).commits).toHaveLength(2);
   });
 
-  test("ref rules: only agentes/{handle}/…, no tags, no deletes", () => {
-    const c = (ref: string, newOid = "a".repeat(40)) => ({ oldOid: ZERO_OID, newOid, ref });
-    expect(refRule(c("refs/heads/agentes/dev/fix-login"), "dev")).toBeNull();
-    expect(refRule(c("refs/heads/main"), "dev")).toContain("agentes/dev/");
-    expect(refRule(c("refs/heads/agentes/qa/x"), "dev")).toContain("agentes/dev/");
-    expect(refRule(c("refs/heads/agentes/dev/"), "dev")).toContain("agentes/dev/");
-    expect(refRule(c("refs/tags/v1"), "dev")).toContain("tags");
-    expect(refRule(c("refs/heads/agentes/dev/x", ZERO_OID), "dev")).toContain("deleted");
+  test("ref rules: agentes/{handle}/… goes, another existing branch needs a grant; no tags, deletes or new branches", () => {
+    const c = (ref: string, newOid = "a".repeat(40), oldOid = ZERO_OID) => ({ oldOid, newOid, ref });
+    const old = "b".repeat(40);
+    expect(refRule(c("refs/heads/agentes/dev/fix-login"), "dev")).toEqual({ ok: true });
+    expect(refRule(c("refs/heads/main", "a".repeat(40), old), "dev")).toEqual({ grant: "main" });
+    expect(refRule(c("refs/heads/agentes/qa/x", "a".repeat(40), old), "dev")).toEqual({ grant: "agentes/qa/x" });
+    expect(refRule(c("refs/heads/main"), "dev")).toMatchObject({ kind: "create" });
+    expect(refRule(c("refs/heads/agentes/dev/"), "dev")).toMatchObject({ kind: "ref" });
+    expect(refRule(c("refs/notes/commits"), "dev")).toMatchObject({ kind: "ref" });
+    expect(refRule(c("refs/tags/v1"), "dev")).toMatchObject({ kind: "tag" });
+    // Deleting goes through delete_branches, the agent's own branches too.
+    expect(refRule(c("refs/heads/agentes/dev/x", ZERO_OID, old), "dev")).toMatchObject({ kind: "delete" });
+    expect(refRule(c("refs/heads/ana/fix", ZERO_OID, old), "dev")).toMatchObject({ kind: "delete" });
   });
 
   test("the computer credential: valid, tampered, expired", () => {
@@ -193,13 +208,46 @@ test("git request rejects compressed bodies above the expanded limit", async () 
 
 // ── The proxy against a fake GitHub ──────────────────────────────────────────
 
-function fakeGitHub(options: { compare?: Record<string, string> } = {}) {
+/** A branch on the fake GitHub: classic protection and the types of the ruleset rules that apply to it. */
+type FakeBranch = { protected?: boolean; rules?: string[] };
+
+function fakeGitHub(
+  options: {
+    compare?: Record<string, string>;
+    /** acme/app's branches (`/branches`, `/rules/branches`, deleting a ref). */
+    branches?: Record<string, FakeBranch>;
+    defaultBranch?: string;
+    /** Branch questions go unanswered. */
+    down?: boolean;
+    /** Branches GitHub won't delete (422). */
+    keep?: string[];
+  } = {},
+) {
   const calls: { url: string; method: string; auth: string | null; body: number }[] = [];
+  const apiUrl = "https://api.github.test";
   const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
     const headers = new Headers(init?.headers);
     const body = init?.body ? ((init.body as Uint8Array).byteLength ?? 0) : 0;
     calls.push({ url, method: init?.method ?? "GET", auth: headers.get("authorization"), body });
+    const api = url.startsWith(`${apiUrl}/repos/acme/app/`) ? url.slice(`${apiUrl}/repos/acme/app/`.length) : "";
+    const named = (prefix: string) =>
+      api.startsWith(prefix) ? api.slice(prefix.length).split("/").map(decodeURIComponent).join("/") : null;
+    const branch = named("branches/");
+    const rules = named("rules/branches/");
+    const ref = named("git/refs/heads/");
+    const branches = options.branches ?? {};
+    if ((branch !== null || rules !== null) && options.down) return new Response("unavailable", { status: 503 });
+    if (branch !== null) {
+      const b = branches[branch];
+      return b ? Response.json({ name: branch, protected: b.protected === true }) : new Response("{}", { status: 404 });
+    }
+    if (rules !== null) return Response.json((branches[rules]?.rules ?? []).map((type) => ({ type })));
+    if (ref !== null && init?.method === "DELETE") {
+      if (!branches[ref] || options.keep?.includes(ref)) return Response.json({ message: "no" }, { status: 422 });
+      delete branches[ref];
+      return new Response(null, { status: 204 });
+    }
     if (url.includes("/info/refs")) {
       return new Response("001e# service=git-upload-pack\n0000", {
         headers: { "content-type": "application/x-git-upload-pack-advertisement" },
@@ -213,16 +261,16 @@ function fakeGitHub(options: { compare?: Record<string, string> } = {}) {
       });
     const compare = /\/compare\/([0-9a-f]+)\.\.\.([0-9a-f]+)$/.exec(url);
     if (compare) return Response.json({ status: options.compare?.[`${compare[1]}...${compare[2]}`] ?? "diverged" });
-    if (url.endsWith("/repos/acme/app")) return Response.json({ default_branch: "main" });
+    if (url.endsWith("/repos/acme/app")) return Response.json({ default_branch: options.defaultBranch ?? "main" });
     if (url.endsWith("/repos/acme/app/pulls") && init?.method === "POST") {
       return Response.json({ number: 7, html_url: "https://github.com/acme/app/pull/7" }, { status: 201 });
     }
     return new Response("not found", { status: 404 });
   }) as typeof globalThis.fetch;
-  return { fetch, calls, gitUrl: "https://github.test", apiUrl: "https://api.github.test" };
+  return { fetch, calls, gitUrl: "https://github.test", apiUrl, options };
 }
 
-async function world(scopes: string[] = ["github:git.read", "github:git.write"]) {
+async function world(scopes: string[] = ["github:git.read", "github:git.write"], github = fakeGitHub()) {
   f = await setup();
   const connectors: ConnectorDeps = { db: f.db, keyWrappers: [f.keyWrapper], publicUrl: PUBLIC_URL };
   const connection = await createApiKeyConnection(connectors, f.owner.id, f.org.id, {
@@ -241,7 +289,6 @@ async function world(scopes: string[] = ["github:git.read", "github:git.write"])
   const m = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "Mac" });
   await setAgentComputerTarget({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.agent.id, m.machineId);
   const [row] = await f.db.select().from(schema.machines).where(eq(schema.machines.id, m.machineId));
-  const github = fakeGitHub();
   const deps: GitProxyDeps = { db: f.db, secret: SECRET, connectors, upstream: github };
   const token = issueGitToken(SECRET, {
     orgId: f.org.id,
@@ -268,7 +315,7 @@ async function world(scopes: string[] = ["github:git.read", "github:git.write"])
       }),
       { orgId: f.org.id, connectionId: connection.id, path },
     );
-  return { connection, machine: m, github, deps, call, token };
+  return { connection, connectors, machine: m, github, deps, call, token };
 }
 
 const audits = async (action: string) =>
@@ -421,6 +468,372 @@ describe("git proxy", () => {
   });
 });
 
+// ── Branches that aren't the agent's own: delete_branches and request_branch_push ────────────────────────────
+
+const WHY = "These branches were merged weeks ago and nobody pushed to them since: the list reads better without them.";
+
+/** The git tools behind the Tool Gateway on the world's fake GitHub, and a run to call them in (a person's or a routine's). */
+async function toolsOf(w: Awaited<ReturnType<typeof world>>, routine?: RoutineBrief) {
+  const gateway = createToolGateway({
+    sources: [
+      createGitToolSource({
+        sandbox: {} as never,
+        connectors: w.connectors,
+        github: { apiUrl: w.github.apiUrl, fetch: w.github.fetch },
+      }),
+    ],
+  });
+  const msg = await insertMessage(f.db, {
+    orgId: f.org.id,
+    channelId: f.general.id,
+    author: { type: "person", userId: f.owner.id },
+    body: "@dev limpa as branches velhas da acme/app",
+    meta: routine ? { routineBrief: routine, background: true } : {},
+  });
+  const [run] = await f.db
+    .insert(schema.agentRuns)
+    .values({
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      channelId: f.general.id,
+      threadRootId: msg.id,
+      triggerMessageId: msg.id,
+      trigger: "mention",
+      hop: 1,
+      background: Boolean(routine),
+    })
+    .returning();
+  const ctx: ToolContext = {
+    db: f.db,
+    orgId: f.org.id,
+    agentId: f.agent.id,
+    runId: run?.id ?? "",
+    channelId: f.general.id,
+    threadRootId: msg.id,
+    triggerMessageId: msg.id,
+  };
+  let seq = 0;
+  const invoke = (name: string, input: Record<string, unknown>) =>
+    gateway.invoke(ctx, { toolUseId: `call-${++seq}`, name, input });
+  const decide = (approvalId: string, always = false) =>
+    decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, approvalId, {
+      decision: "approve",
+      ...(always ? { always } : {}),
+    });
+  /** Runs an approved request as the resumed run does. */
+  const runApproved = async (approvalId: string) => {
+    const [row] = await f.db.select().from(schema.approvals).where(eq(schema.approvals.id, approvalId));
+    if (!row) throw new Error("no approval");
+    return gateway.executeApproved(ctx, row);
+  };
+  return { gateway, ctx, invoke, decide, runApproved };
+}
+
+function asked(result: InvokeResult) {
+  if (result.type !== "approval") throw new Error(`expected an approval, got ${JSON.stringify(result)}`);
+  return result.approval;
+}
+function answered(result: InvokeResult) {
+  if (result.type !== "result") throw new Error(`expected a result, got ${result.type}`);
+  return result.output;
+}
+const deletes = (w: Awaited<ReturnType<typeof world>>) =>
+  w.github.calls
+    .filter((c) => c.method === "DELETE")
+    .map((c) => c.url.replace(`${w.github.apiUrl}/repos/acme/app/`, ""));
+const receivePacks = (w: Awaited<ReturnType<typeof world>>) =>
+  w.github.calls.filter((c) => c.url.endsWith("git-receive-pack")).length;
+
+describe("branches that aren't the agent's own", () => {
+  test("proxy: deleting is refused with the pointer to delete_branches, said once for 7 refs; nothing reaches GitHub", async () => {
+    const w = await world();
+    const old = "c".repeat(40);
+    const refs = Array.from({ length: 7 }, (_, i) => `refs/heads/old-${i + 1}`);
+    const res = await w.call("acme/app.git/git-receive-pack", {
+      method: "POST",
+      body: pushBody(refs.map((ref) => ({ old, new: ZERO_OID, ref }))),
+    });
+    const report = await res.text();
+    expect(report.split(`agentes: ${DELETE_BRANCHES_POINTER}`)).toHaveLength(2);
+    expect(DELETE_BRANCHES_POINTER).toContain("Ask with delete_branches (repo, branches, why)");
+    expect(DELETE_BRANCHES_POINTER).toContain("Never give the person a terminal command to run.");
+    for (const ref of refs) expect(report).toContain(`ng ${ref} branches are deleted with delete_branches`);
+    expect(receivePacks(w)).toBe(0);
+    const [refused] = await audits("git.push_refused");
+    expect(refused?.details.refs).toEqual(refs);
+  });
+
+  test("proxy: someone else's branch waits for a person, then goes for 24 h, for that agent, repository and branch only", async () => {
+    const w = await world(undefined, fakeGitHub({ branches: { "ana/fix": {}, "bob/x": {} } }));
+    const t = await toolsOf(w);
+    const a = commitObject([], "base");
+    const b = commitObject([a.oid], "fix");
+    const push = async (ref: string) =>
+      (
+        await w.call("acme/app.git/git-receive-pack", {
+          method: "POST",
+          body: pushBody([{ old: a.oid, new: b.oid, ref }], packOf([b])),
+        })
+      ).text();
+
+    const before = await push("refs/heads/ana/fix");
+    expect(before).toContain(`agentes: ${otherBranchPointer(["ana/fix"], "dev")}`);
+    expect(otherBranchPointer(["ana/fix"], "dev")).toBe(
+      "ana/fix isn't your branch (yours: agentes/dev/…). To push there, ask with request_branch_push (repo, branch, why); once a person approves, push again. Or push to agentes/dev/<topic> and open a pull request. Never give the person a terminal command to run.",
+    );
+    expect(before).toContain("ng refs/heads/ana/fix not your branch (ask with request_branch_push)");
+
+    const request = asked(await t.invoke("request_branch_push", { repo: "acme/app", branch: "ana/fix", why: WHY }));
+    expect(request).toMatchObject({
+      title: "Enviar para ana/fix em acme/app (24 h, sem force push)",
+      scope: "github:git.write",
+      approveAlways: { tool: "request_branch_push", actions: ["acme/app:ana/fix"] },
+    });
+    // Asking alone lets nothing through.
+    expect(await push("refs/heads/ana/fix")).toContain("not your branch");
+    await t.decide(request.id);
+    expect((await t.runApproved(request.id)).content).toBe(
+      "Approved: push to ana/fix in acme/app again now with git (fast-forward only, no force push).",
+    );
+    expect(await push("refs/heads/ana/fix")).toContain("unpack ok");
+    const [pushed] = await audits("git.push");
+    expect(pushed?.details.grants).toEqual({ "refs/heads/ana/fix": { approvalId: request.id } });
+
+    // Another branch still asks; the grant is this agent's, for this repository, in any case.
+    expect(await push("refs/heads/bob/x")).toContain("bob/x isn't your branch");
+    const at = { orgId: f.org.id, agentId: f.agent.id, connectionId: w.connection.id };
+    const now = new Date();
+    expect(await pushGrant(f.db, at, pushGrantKey({ owner: "Acme", repo: "App" }, "ana/fix"), now)).toEqual({
+      approvalId: request.id,
+    });
+    expect(await pushGrant(f.db, at, "acme/other:ana/fix", now)).toBeNull();
+    expect(await pushGrant(f.db, at, "acme/app:ana/Fix", now)).toBeNull();
+    expect(await pushGrant(f.db, { ...at, agentId: crypto.randomUUID() }, "acme/app:ana/fix", now)).toBeNull();
+
+    // An hour after the decision it still goes; a day and an hour after, it doesn't.
+    const decidedAgo = (hours: number) =>
+      f.db
+        .update(schema.approvals)
+        .set({ decidedAt: new Date(Date.now() - hours * 3600_000) })
+        .where(eq(schema.approvals.id, request.id));
+    await decidedAgo(1);
+    expect(await push("refs/heads/ana/fix")).toContain("unpack ok");
+    await decidedAgo(25);
+    expect(await push("refs/heads/ana/fix")).toContain("ana/fix isn't your branch");
+    expect(receivePacks(w)).toBe(2);
+  });
+
+  test("proxy: Aprovar sempre lets the agent push there with no card, until someone removes the rule", async () => {
+    const w = await world(undefined, fakeGitHub({ branches: { "release-x": {}, "ana/fix": {} } }));
+    const t = await toolsOf(w);
+    const a = commitObject([], "base");
+    const b = commitObject([a.oid], "fix");
+    const push = async () =>
+      (
+        await w.call("acme/app.git/git-receive-pack", {
+          method: "POST",
+          body: pushBody([{ old: a.oid, new: b.oid, ref: "refs/heads/release-x" }], packOf([b])),
+        })
+      ).text();
+    // The name checks for connector actions (release, deploy…) don't apply to a branch: it can be remembered.
+    const request = asked(await t.invoke("request_branch_push", { repo: "acme/app", branch: "release-x", why: WHY }));
+    expect(request.approveAlways).toEqual({ tool: "request_branch_push", actions: ["acme/app:release-x"] });
+    await t.decide(request.id, true);
+    const [rule] = await f.db.select().from(schema.approvalRules);
+    expect(rule).toMatchObject({
+      agentId: f.agent.id,
+      connectionId: w.connection.id,
+      tool: "request_branch_push",
+      action: "acme/app:release-x",
+      createdByUserId: f.owner.id,
+    });
+    // Approved more than a day ago, the rule still lets it go.
+    await f.db
+      .update(schema.approvals)
+      .set({ decidedAt: new Date(Date.now() - 48 * 3600_000) })
+      .where(eq(schema.approvals.id, request.id));
+    expect(await push()).toContain("unpack ok");
+    const [pushed] = await audits("git.push");
+    expect(pushed?.details.grants).toEqual({ "refs/heads/release-x": { ruleId: rule?.id } });
+    // Asking again runs with no card; another branch asks.
+    const again = answered(await t.invoke("request_branch_push", { repo: "acme/app", branch: "release-x" }));
+    expect(again.content).toContain("Approved: push to release-x");
+    asked(await t.invoke("request_branch_push", { repo: "acme/app", branch: "ana/fix", why: WHY }));
+    expect(await f.db.select().from(schema.approvals)).toHaveLength(2);
+
+    await removeApprovalRule(f.db, f.owner.id, f.org.id, f.agent.id, rule?.id ?? "");
+    expect(await push()).toContain("release-x isn't your branch");
+    const [removed] = await audits("agent.approval_rule_removed");
+    expect(removed?.details).toMatchObject({ tool: "request_branch_push", action: "acme/app:release-x" });
+  });
+
+  test("proxy: granted, still refused for the default branch, a protected one, a new branch, a force push or no answer", async () => {
+    const github = fakeGitHub({ branches: { main: {}, "ana/fix": {} } });
+    const w = await world(undefined, github);
+    const rule = (branch: string) => ({
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      connectionId: w.connection.id,
+      tool: "request_branch_push",
+      action: `acme/app:${branch}`,
+    });
+    await f.db.insert(schema.approvalRules).values([rule("main"), rule("ana/fix")]);
+    const a = commitObject([], "base");
+    const b = commitObject([a.oid], "fix");
+    const push = async (ref: string, old = a.oid, next = b) =>
+      (
+        await w.call("acme/app.git/git-receive-pack", {
+          method: "POST",
+          body: pushBody([{ old, new: next.oid, ref }], packOf([next])),
+        })
+      ).text();
+    expect(await push("refs/heads/main")).toContain(
+      "agentes: main is the default branch: push to agentes/dev/<topic> and open a pull request; merging asks a person",
+    );
+    github.options.branches = { main: {}, "ana/fix": { protected: true } };
+    expect(await push("refs/heads/ana/fix")).toContain("ng refs/heads/ana/fix protected");
+    github.options.branches = { main: {}, "ana/fix": { rules: ["pull_request"] } };
+    expect(await push("refs/heads/ana/fix")).toContain("ana/fix is protected");
+    github.options.branches = { main: {} };
+    expect(await push("refs/heads/ana/fix")).toContain("ana/fix isn't on GitHub");
+    expect(await push("refs/heads/ana/fix", ZERO_OID)).toContain("agents create only branches agentes/dev/…");
+    // Rules about deleting and force pushing don't guard an update: this one goes.
+    github.options.branches = { main: {}, "ana/fix": { rules: ["deletion", "non_fast_forward"] } };
+    expect(await push("refs/heads/ana/fix")).toContain("unpack ok");
+    const rewritten = commitObject([], "rewritten");
+    expect(await push("refs/heads/ana/fix", b.oid, rewritten)).toContain("not a fast-forward");
+    github.options.down = true;
+    expect(await push("refs/heads/ana/fix")).toContain("GitHub didn't say whether ana/fix is protected");
+    expect(receivePacks(w)).toBe(1);
+  });
+
+  test("delete_branches: one card for the whole batch, never Aprovar sempre; deleted only once a person approves", async () => {
+    const names = ["old-1", "old-2", "old-3", "old-4", "old-5", "old-6", "guarded"];
+    const w = await world(
+      undefined,
+      fakeGitHub({
+        branches: {
+          ...Object.fromEntries(names.map((n) => [n, {}])),
+          guarded: { rules: ["pull_request", "non_fast_forward"] },
+          main: {},
+          release: { protected: true },
+          keep: { rules: ["deletion"] },
+        },
+      }),
+    );
+    const t = await toolsOf(w);
+    // The default branch, a protected one (classic or a ruleset's deletion rule) and a missing one: refused before
+    // any card, naming them all.
+    const refused = answered(
+      await t.invoke("delete_branches", {
+        repo: "acme/app",
+        branches: ["old-1", "main", "release", "keep", "gone"],
+        why: WHY,
+      }),
+    );
+    expect(refused.isError).toBe(true);
+    expect(refused.content).toBe(
+      "Refused, nothing was asked or deleted: main (the default branch), release (protected), keep (protected), gone (not on GitHub). The default branch and protected branches are never deleted. Ask again without them.",
+    );
+    expect(
+      answered(await t.invoke("delete_branches", { repo: "acme/app", branches: ["a", "a"], why: WHY })).content,
+    ).toBe("Named more than once: a. Name each branch once.");
+    expect(
+      answered(await t.invoke("delete_branches", { repo: "acme/app", branches: ["refs/heads/x"], why: WHY })).content,
+    ).toContain("Not branch names: refs/heads/x");
+    expect(await f.db.select().from(schema.approvals)).toEqual([]);
+
+    const request = asked(await t.invoke("delete_branches", { repo: "acme/app", branches: names, why: WHY }));
+    expect(request).toMatchObject({
+      title: "Apagar 7 branches em acme/app",
+      detail: names.join("\n"),
+      scope: "github:git.write",
+      approveAlways: null,
+    });
+    expect(deletes(w)).toEqual([]);
+    await expect(t.decide(request.id, true)).rejects.toBeInstanceOf(ConflictError);
+    await t.decide(request.id);
+    const out = await t.runApproved(request.id);
+    expect(out).toMatchObject({ content: `Deleted on GitHub: ${names.join(", ")}.` });
+    expect(out.isError).toBeUndefined();
+    expect(deletes(w)).toEqual(names.map((n) => `git/refs/heads/${n}`));
+    expect(w.github.calls.filter((c) => c.method === "DELETE").every((c) => c.auth === `Bearer ${GH_TOKEN}`)).toBe(
+      true,
+    );
+    const calls = (await audits("tool.call"))
+      .filter((r) => r.targetId === "delete_branches")
+      .sort((x, y) => x.id.localeCompare(y.id));
+    expect(calls.map((r) => [r.outcome, r.details.approvalId ?? null])).toEqual([
+      ["refused", null],
+      ["refused", null],
+      ["refused", null],
+      ["pending", request.id],
+      ["done", request.id],
+    ]);
+    expect(calls.at(-1)?.details.input).toEqual({ repo: "acme/app", branches: names });
+  });
+
+  test("delete_branches: checked again right before deleting; a partial delete says which and counts as failed", async () => {
+    const github = fakeGitHub({ branches: { a: {}, b: {}, c: {} }, keep: ["c"] });
+    const w = await world(undefined, github);
+    const t = await toolsOf(w);
+    const first = asked(await t.invoke("delete_branches", { repo: "acme/app", branches: ["a", "b"], why: WHY }));
+    await t.decide(first.id);
+    github.options.branches = { a: {}, b: { protected: true }, c: {} };
+    expect(await t.runApproved(first.id)).toMatchObject({
+      isError: true,
+      content: expect.stringContaining("b (protected)"),
+    });
+    expect(deletes(w)).toEqual([]);
+
+    const second = asked(await t.invoke("delete_branches", { repo: "acme/app", branches: ["a", "c"], why: WHY }));
+    await t.decide(second.id);
+    const out = await t.runApproved(second.id);
+    expect(out).toMatchObject({
+      isError: true,
+      content: "Deleted on GitHub: a.\nNot deleted: c (GitHub answered 422).",
+      data: { deleted: ["a"], failed: ["c (GitHub answered 422)"] },
+    });
+    const [last] = (await audits("tool.call")).filter(
+      (r) => r.details.approvalId === second.id && r.outcome !== "pending",
+    );
+    expect(last?.outcome).toBe("failed");
+    expect(last?.details.reason).toContain("Not deleted: c (GitHub answered 422)");
+  });
+
+  test("request_branch_push: refused for its own, a missing, the default or a protected branch; a routine never remembers", async () => {
+    const w = await world(undefined, fakeGitHub({ branches: { main: {}, rel: { protected: true }, "ana/fix": {} } }));
+    const t = await toolsOf(w);
+    const refusal = async (branch: string) =>
+      answered(await t.invoke("request_branch_push", { repo: "acme/app", branch, why: WHY })).content;
+    expect(await refusal("agentes/dev/x")).toBe("agentes/dev/x is your own branch: just push to it, nothing to ask.");
+    expect(await refusal("nope")).toBe(
+      "nope isn't on GitHub, and an approval only covers updating an existing branch, never creating one. Push to agentes/dev/<topic> and open a pull request.",
+    );
+    expect(await refusal("main")).toBe(
+      "main is the default branch: push to agentes/dev/<topic> and open a pull request; merging asks a person.",
+    );
+    expect(await refusal("rel")).toContain("rel is protected");
+    expect(await f.db.select().from(schema.approvals)).toEqual([]);
+
+    const routine = await toolsOf(w, {
+      routineId: crypto.randomUUID(),
+      routineRunId: crypto.randomUUID(),
+      name: "Branches",
+      creatorUserId: f.owner.id,
+      deliverTo: { channelId: f.general.id, threadId: null },
+      access: "act",
+      report: "when_new",
+      trigger: "schedule",
+      dueAt: new Date().toISOString(),
+    });
+    const fromRoutine = asked(
+      await routine.invoke("request_branch_push", { repo: "acme/app", branch: "ana/fix", why: WHY }),
+    );
+    expect(fromRoutine.approveAlways).toBeNull();
+  });
+});
+
 describe("the computer", () => {
   test("agents commit as handle@agents.<our host>: theo@agents.agentes.chat on agentes.chat", () => {
     expect(agentCommitEmail("https://agentes.chat", "theo")).toBe("theo@agents.agentes.chat");
@@ -456,9 +869,11 @@ describe("the computer", () => {
       triggerMessageId: msg.id,
     };
     const tools = await source.tools(ctx);
-    expect(tools.map((t) => [t.name, t.scope, t.connectionId])).toEqual([
-      ["git_clone", "github:git.read", connection.id],
-      ["open_pull_request", "github:pr.write", connection.id],
+    expect(tools.map((t) => [t.name, t.scope, t.connectionId, t.sensitive === true])).toEqual([
+      ["git_clone", "github:git.read", connection.id, false],
+      ["open_pull_request", "github:pr.write", connection.id, false],
+      ["delete_branches", "github:git.write", connection.id, true],
+      ["request_branch_push", "github:git.write", connection.id, true],
     ]);
     const clone = tools.find((t) => t.name === "git_clone");
     const result = await clone?.execute({ repo: "https://github.com/acme/app.git" }, ctx);

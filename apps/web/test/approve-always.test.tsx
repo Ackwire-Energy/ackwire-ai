@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { ApprovalRule } from "@agenteschat/client";
+import type { Approval, ApprovalRule } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -163,5 +163,78 @@ describe("Ferramentas e acesso: Aprovado sempre", () => {
     await page();
     expect(document.body.textContent).toContain("Merge, deploy e rollback sempre pedem aprovação no chat.");
     expect(card()).toBeNull();
+  });
+});
+
+describe("git requests", () => {
+  const branches = ["old-1", "old-2", "old-3", "old-4", "old-5", "old-6", "old-7"];
+  /** The seed's first request (Ada's card in #eng) as one of the git tools. */
+  const withGit = (over: Partial<Approval>, state = seedState()) => {
+    const first = state.approvals[0];
+    if (!first) throw new Error("no approval");
+    Object.assign(first, { scope: "github:git.write", connector: "github", detail: "", ...over });
+    return state;
+  };
+  const push = {
+    tool: "request_branch_push",
+    title: "Enviar para ana/fix em acme/app (24 h, sem force push)",
+    params: { repo: "acme/app", branch: "ana/fix" },
+    approveAlways: { tool: "request_branch_push", actions: ["acme/app:ana/fix"] },
+  };
+  const remove = {
+    tool: "delete_branches",
+    title: "Apagar 7 branches em acme/app",
+    detail: branches.join("\n"),
+    params: { repo: "acme/app", branches },
+    approveAlways: null,
+  };
+
+  test("a push to someone's branch: one tap, and Aprovar sempre for that branch alone", async () => {
+    const state = withGit(push);
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(4);
+    const card = screen().getByRole("group", { name: "Pedido de aprovação" });
+    expect(card.textContent).toContain("Enviar para ana/fix em acme/app (24 h, sem force push)");
+    expect(card.textContent).toContain("Aprova este e os próximos iguais da Ada: enviar para ana/fix em acme/app.");
+    expect(card.textContent).not.toContain("com qualquer valor");
+    await click(within(card).getByRole("button", { name: "Aprovar sempre" }));
+    expect(approveCalls(state)).toEqual([[ORG_ID, "ap-merge", undefined, true]]);
+  });
+
+  test("deleting branches: the batch on one card, held to approve, never Aprovar sempre", async () => {
+    await renderApp(`/org/${ORG_ID}/approvals`, { api: createFakeApi(withGit(remove)) });
+    await settle(4);
+    const card = screen().getByRole("article", { name: "Apagar 7 branches em acme/app" });
+    expect(card.textContent).toContain("old-1, old-2, old-3");
+    expect(within(card).queryByRole("button", { name: "Aprovar sempre" })).toBeNull();
+    expect(within(card).getByRole("button", { name: "Aprovar exclusão: segure para confirmar" })).toBeTruthy();
+  });
+
+  test("Ferramentas e acesso: a remembered push reads as its branch, and × takes it back", async () => {
+    const state = seedState();
+    state.approvalRules = {
+      [ADA_ID]: [
+        {
+          id: "rule-git",
+          connectionId: "conn-gh",
+          server: "GitHub",
+          tool: "request_branch_push",
+          toolLabel: "request_branch_push",
+          action: "acme/app:ana/fix",
+          createdByUserId: "u-joao",
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    };
+    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=access`, { api: createFakeApi(state) });
+    await settle(8);
+    const list = screen().getByRole("region", { name: "Aprovado sempre" });
+    expect(list.querySelector(".level-row__text")?.textContent).toBe(
+      "GitHubenviar para ana/fix em acme/appAprovado por João · agora",
+    );
+    expect(within(list).getByText("enviar para ana/fix em acme/app").getAttribute("title")).toBe("acme/app:ana/fix");
+    await click(within(list).getByRole("button", { name: "Voltar a pedir: enviar para ana/fix em acme/app" }));
+    expect(state.calls.find((c) => c.method === "approvals.removeRule")?.args).toEqual([ORG_ID, ADA_ID, "rule-git"]);
+    expect(screen().queryByRole("region", { name: "Aprovado sempre" })).toBeNull();
   });
 });

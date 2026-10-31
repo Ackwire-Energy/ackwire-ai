@@ -1,33 +1,35 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { getAgentCached } from "../agents";
 import { connectorScope } from "../connectors/catalog";
-import { activeConnections, type ConnectorDeps, connectionHeaders } from "../connectors/connections";
+import { activeConnections, type ConnectorDeps } from "../connectors/connections";
 import { publishChannelEvent } from "../events";
 import { computerPreparing } from "../machine-provisioning";
 import { missionOfRun } from "../mission-context";
 import { replyThreadOf } from "../runs";
 import { NO_COMPUTER_MESSAGE, PREPARING_COMPUTER_MESSAGE, type SandboxDeps } from "../sandbox";
-import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
-import { appTokenForRepo, type GitHubAppConfig } from "./github-app";
+import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
+import {
+  BRANCH_PUSH_TOOL,
+  type BranchBlock,
+  branchBlock,
+  branchFacts,
+  branchPath,
+  DELETE_BRANCHES_TOOL,
+  githubHeaders,
+  githubToken,
+  pushGrantKeyOf,
+  validBranch,
+} from "./branches";
+import type { GitHubAppConfig } from "./github-app";
 import { cloneOnMachine } from "./machine";
+import { parseRepo } from "./repos";
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
+const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
 const failed = (error: unknown): ToolOutput => ({
   content: `Failed: ${error instanceof Error ? error.message : String(error)}`,
   isError: true,
 });
-const REPO = /^([A-Za-z0-9_.-]{1,100})\/([A-Za-z0-9_.-]{1,100}?)(?:\.git)?$/;
-
-/** "owner/name", "https://github.com/owner/name(.git)" → { owner, repo } or null. */
-export function parseRepo(input: string) {
-  const s = input
-    .trim()
-    .replace(/^https:\/\/github\.com\//, "")
-    .replace(/^git@github\.com:/, "")
-    .replace(/\/$/, "");
-  const m = REPO.exec(s);
-  return m ? { owner: m[1] as string, repo: m[2] as string } : null;
-}
 
 export interface GitToolDeps {
   sandbox: SandboxDeps;
@@ -71,13 +73,22 @@ function progressPublisher(pubsub: PubSub | undefined, c: ToolContext) {
   };
 }
 
+/** A branch GitHub keeps agents off, in the words a refusal names it with. */
+const BLOCKED: Record<BranchBlock, string> = {
+  missing: "not on GitHub",
+  default: "the default branch",
+  protected: "protected",
+};
+
 /**
  * Git in the agent's computer (ADR 0024), through our proxy:
  * - `git_clone` (`github:git.read`): on the agent's connected computer, the runner's `git.sync` (protocol 11)
  *   clones it into the agent's folder (`repos/owner/name`) with our proxy credential, with no other scope and no
  *   approval (ADR 0024 addendum). Pushes from there go through the proxy too;
  * - `open_pull_request` (`github:pr.write`): opens a PR from a pushed branch
- *   with the org's GitHub credential (server side). Merging stays approval-gated.
+ *   with the org's GitHub credential (server side). Merging stays approval-gated;
+ * - `delete_branches` and `request_branch_push` (`github:git.write`, sensitive): what a person approves for
+ *   branches that aren't the agent's own (`branches.ts`). The default branch and protected ones are never offered.
  * Offered only when GitHub is connected in the organization.
  */
 export function createGitToolSource(deps: GitToolDeps): ToolSource {
@@ -88,11 +99,82 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
       const connection = (await activeConnections(ctx.db, ctx.orgId)).find((c) => c.connector === "github");
       if (!connection) return [];
       const repoInput = { type: "string", minLength: 3, maxLength: 200, description: "owner/name" };
+      const branchInput = { type: "string", minLength: 1, maxLength: 200, description: "A branch name, not refs/…" };
+      const tokenFor = (c: ToolContext, repo: { owner: string; repo: string }, access: "read" | "write") =>
+        githubToken(deps, github, { db: c.db, orgId: c.orgId }, connection, repo, { contents: access });
+      /** GitHub's answers on these branches, or why they couldn't be read. */
+      const factsOf = async (c: ToolContext, repo: { owner: string; repo: string }, branches: string[]) => {
+        const token = await tokenFor(c, repo, "read");
+        if (!token) return "GitHub is connected without a usable token.";
+        return (
+          (await branchFacts(github, token, repo, branches)) ??
+          `GitHub didn't answer about ${repo.owner}/${repo.repo}'s branches. Nothing was asked: try again in a moment.`
+        );
+      };
+      const deleteCheck = async (input: Record<string, unknown>, c: ToolContext): Promise<CallCheck> => {
+        const repo = parseRepo(str(input.repo));
+        if (!repo) return { ok: false, message: "repo must be owner/name" };
+        const branches = strings(input.branches);
+        const invalid = branches.filter((b) => !validBranch(b));
+        if (invalid.length > 0) {
+          return {
+            ok: false,
+            message: `Not branch names: ${invalid.join(", ")}. Name branches only (fix/login), never refs/… or tags.`,
+          };
+        }
+        const twice = [...new Set(branches.filter((b, i) => branches.indexOf(b) !== i))];
+        if (twice.length > 0)
+          return { ok: false, message: `Named more than once: ${twice.join(", ")}. Name each branch once.` };
+        const facts = await factsOf(c, repo, branches);
+        if (typeof facts === "string") return { ok: false, message: facts };
+        const blocked = branches.flatMap((b) => {
+          const block = branchBlock(facts, b, true);
+          return block ? [`${b} (${BLOCKED[block]})`] : [];
+        });
+        if (blocked.length > 0) {
+          return {
+            ok: false,
+            message: `Refused, nothing was asked or deleted: ${blocked.join(", ")}. The default branch and protected branches are never deleted. Ask again without them.`,
+          };
+        }
+        return { ok: true };
+      };
+      const pushCheck = async (input: Record<string, unknown>, c: ToolContext): Promise<CallCheck> => {
+        const repo = parseRepo(str(input.repo));
+        if (!repo) return { ok: false, message: "repo must be owner/name" };
+        const branch = str(input.branch);
+        if (!validBranch(branch)) {
+          return {
+            ok: false,
+            message: `${branch} isn't a branch name. Name the branch only (fix/login), never refs/… or a tag.`,
+          };
+        }
+        const handle = (await getAgentCached(c.db, c.orgId, c.agentId))?.handle ?? "";
+        if (branch.startsWith(`agentes/${handle}/`)) {
+          return { ok: false, message: `${branch} is your own branch: just push to it, nothing to ask.` };
+        }
+        const facts = await factsOf(c, repo, [branch]);
+        if (typeof facts === "string") return { ok: false, message: facts };
+        const block = branchBlock(facts, branch, false);
+        if (block === "missing") {
+          return {
+            ok: false,
+            message: `${branch} isn't on GitHub, and an approval only covers updating an existing branch, never creating one. Push to agentes/${handle}/<topic> and open a pull request.`,
+          };
+        }
+        if (block) {
+          return {
+            ok: false,
+            message: `${branch} is ${BLOCKED[block]}: push to agentes/${handle}/<topic> and open a pull request; merging asks a person.`,
+          };
+        }
+        return { ok: true };
+      };
       return [
         {
           name: "git_clone",
           description:
-            "Clone a GitHub repository into your folder on your computer (repos/<owner>/<name>; already there: it is updated). No approval needed. Real git through our proxy: commit and push from there, only to branches agentes/<your handle>/…, then open_pull_request.",
+            "Clone a GitHub repository into your folder on your computer (repos/<owner>/<name>; already there: it is updated). No approval needed. Real git through our proxy: commit and push from there to branches agentes/<your handle>/…, then open_pull_request. Delete branches with delete_branches; to push to someone else's branch, ask with request_branch_push first.",
           scope: connectorScope("github", "git.read"),
           connectionId: connection.id,
           connectorLabel: connection.label,
@@ -187,21 +269,12 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
             try {
               const repo = parseRepo(str(input.repo));
               if (!repo) return { content: "repo must be owner/name", isError: true };
-              const token =
-                (deps.app
-                  ? await appTokenForRepo(deps.app, github, { db: ctx.db, orgId: ctx.orgId }, repo.owner, repo.repo, {
-                      pull_requests: "write",
-                      contents: "read",
-                    }).catch(() => null)
-                  : null) ??
-                (await connectionHeaders(deps.connectors, connection)).authorization?.replace(/^Bearer\s+/i, "");
+              const token = await githubToken(deps, github, { db: ctx.db, orgId: ctx.orgId }, connection, repo, {
+                pull_requests: "write",
+                contents: "read",
+              });
               if (!token) return { content: "GitHub is connected without a usable token.", isError: true };
-              const headers = {
-                authorization: `Bearer ${token}`,
-                accept: "application/vnd.github+json",
-                "content-type": "application/json",
-                "user-agent": "agentes.chat",
-              };
+              const headers = { ...githubHeaders(token), "content-type": "application/json" };
               let base = str(input.base);
               if (!base) {
                 const info = await github.fetch(`${github.apiUrl}/repos/${repo.owner}/${repo.repo}`, { headers });
@@ -238,6 +311,88 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
               return failed(error);
             }
           },
+        },
+        {
+          name: DELETE_BRANCHES_TOOL,
+          description:
+            "Delete branches on GitHub, your own included: the only way agents delete branches (git push --delete is refused). A person approves the whole list on one card, then they're deleted. Never tags, the default branch or a protected branch.",
+          scope: connectorScope("github", "git.write"),
+          connectionId: connection.id,
+          connectorLabel: connection.label,
+          sensitive: true,
+          inputSchema: {
+            type: "object",
+            properties: {
+              repo: repoInput,
+              branches: { type: "array", minItems: 1, maxItems: 50, items: branchInput },
+            },
+            required: ["repo", "branches"],
+            additionalProperties: false,
+          },
+          describe: (input) => {
+            const branches = strings(input.branches);
+            return {
+              title: `Apagar ${branches.length} ${branches.length === 1 ? "branch" : "branches"} em ${str(input.repo)}`,
+              detail: branches.join("\n"),
+            };
+          },
+          checkCall: deleteCheck,
+          async execute(input, c) {
+            try {
+              const repo = parseRepo(str(input.repo));
+              if (!repo) return { content: "repo must be owner/name", isError: true };
+              const token = await tokenFor(c, repo, "write");
+              if (!token) return { content: "GitHub is connected without a usable token.", isError: true };
+              const deleted: string[] = [];
+              const missed: string[] = [];
+              // One at a time: parallel ref updates in one repository may conflict on GitHub.
+              for (const branch of strings(input.branches)) {
+                const res = await github
+                  .fetch(`${github.apiUrl}/repos/${repo.owner}/${repo.repo}/git/refs/heads/${branchPath(branch)}`, {
+                    method: "DELETE",
+                    headers: githubHeaders(token),
+                  })
+                  .catch(() => null);
+                if (res?.status === 204) deleted.push(branch);
+                else missed.push(`${branch} (${res ? `GitHub answered ${res.status}` : "no answer"})`);
+              }
+              const lines = [
+                ...(deleted.length > 0 ? [`Deleted on GitHub: ${deleted.join(", ")}.`] : []),
+                ...(missed.length > 0 ? [`Not deleted: ${missed.join(", ")}.`] : []),
+              ];
+              return {
+                content: lines.join("\n"),
+                ...(missed.length > 0 ? { isError: true } : {}),
+                data: { repo: `${repo.owner}/${repo.repo}`, deleted, failed: missed },
+              };
+            } catch (error) {
+              return failed(error);
+            }
+          },
+        },
+        {
+          name: BRANCH_PUSH_TOOL,
+          description:
+            "Ask a person to let you push to a GitHub branch that isn't yours (agentes/<your handle>/… needs no asking). Once they approve, push again with git: fast-forwards to that existing branch, for 24 h or for good if they choose. Never the default branch or a protected one, never a new branch, never a force push.",
+          scope: connectorScope("github", "git.write"),
+          connectionId: connection.id,
+          connectorLabel: connection.label,
+          sensitive: true,
+          inputSchema: {
+            type: "object",
+            properties: { repo: repoInput, branch: branchInput },
+            required: ["repo", "branch"],
+            additionalProperties: false,
+          },
+          describe: (input) => ({
+            title: `Enviar para ${str(input.branch)} em ${str(input.repo)} (24 h, sem force push)`,
+          }),
+          rememberTarget: pushGrantKeyOf,
+          checkCall: pushCheck,
+          // The grant is the approval itself (or the rule): the proxy reads it on the next push.
+          execute: async (input) => ({
+            content: `Approved: push to ${str(input.branch)} in ${str(input.repo)} again now with git (fast-forward only, no force push).`,
+          }),
         },
       ];
     },

@@ -74,7 +74,7 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
       ),
       "git.write": s(
         "Push branches (git push)",
-        "Push commits only to agentes/{agent}/… branches: never to the default branch, no force push, no tags.",
+        "Push commits to agentes/{agent}/… branches: never to the default branch, no force push, no tags. Deleting branches (delete_branches) and pushing to someone else's branch (request_branch_push) ask for approval first.",
       ),
       "pr.read": s("Read pull requests", "List and read pull requests and their checks."),
       "pr.write": s("Open pull requests", "Open pull requests and comment on them."),
@@ -86,6 +86,8 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
     tools: {
       git_clone: { scope: "git.read" },
       open_pull_request: { scope: "pr.write" },
+      delete_branches: { scope: "git.write" },
+      request_branch_push: { scope: "git.write" },
       get_file_contents: { scope: "repo.read" },
       search_code: { scope: "repo.read" },
       list_commits: { scope: "repo.read" },

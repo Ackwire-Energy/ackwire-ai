@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { MachineTask } from "@agenteschat/client";
+import { approvalRuleWords, approvalTitle } from "@agenteschat/client/lib/approval-words";
 import {
   approvalAction,
   approvalRisk,
@@ -92,15 +93,94 @@ describe("Aprovar sempre on the phone", () => {
     const pt = await translator("pt-BR");
     expect(approveAlwaysToast(pt, "Ada")).toEqual({
       title: "Aprovado. Ada não pede mais para isso.",
-      subtitle: "Para desfazer, abra a página dela na web, em Ferramentas e acesso.",
+      subtitle: "Para desfazer, abra o perfil dela, em Aprovado sempre.",
     });
-    expect(approveAlwaysToast(pt, "Theo").subtitle).toBe(
-      "Para desfazer, abra a página dele na web, em Ferramentas e acesso.",
-    );
+    expect(approveAlwaysToast(pt, "Theo").subtitle).toBe("Para desfazer, abra o perfil dele, em Aprovado sempre.");
     expect(approveAlwaysToast(await translator("en"), "Ada")).toEqual({
       title: "Approved. Ada won't ask for this again.",
-      subtitle: "To undo it, open her page on the web, in Tools and access.",
+      subtitle: "To undo it, open her profile, in Always approved.",
     });
+  });
+});
+
+describe("git requests on the phone", () => {
+  const branches = ["old-1", "old-2", "old-3", "old-4", "old-5", "old-6", "old-7"];
+  const remove = approval({
+    id: "del",
+    tool: "delete_branches",
+    scope: "github:git.write",
+    connector: "github",
+    title: "Apagar 7 branches em acme/app",
+    params: { repo: "acme/app", branches },
+  });
+  const push = approval({
+    id: "push",
+    tool: "request_branch_push",
+    scope: "github:git.write",
+    connector: "github",
+    title: "Enviar para ana/fix em acme/app (24 h, sem force push)",
+    params: { repo: "acme/app", branch: "ana/fix" },
+    approveAlways: { tool: "request_branch_push", actions: ["acme/app:ana/fix"] },
+  });
+  const rule = { tool: "request_branch_push", action: "acme/app:ana/fix", toolLabel: "request_branch_push" };
+
+  test("titles, the hint under Aprovar sempre and the remembered push, in both languages", async () => {
+    const pt = await translator("pt-BR");
+    const en = await translator("en");
+    expect(approvalTitle(pt, remove)).toBe("Apagar 7 branches em acme/app");
+    expect(approvalTitle(en, remove)).toBe("Delete 7 branches in acme/app");
+    expect(approvalTitle(pt, { ...remove, params: { repo: "acme/app", branches: ["old-1"] } })).toBe(
+      "Apagar 1 branch em acme/app",
+    );
+    expect(approvalTitle(pt, push)).toBe("Enviar para ana/fix em acme/app (24 h, sem force push)");
+    expect(approvalTitle(en, push)).toBe("Push to ana/fix in acme/app (24 h, no force push)");
+    expect(approveAlwaysHint(pt, push, "Ada")).toBe(
+      "Aprova este e os próximos iguais da Ada: enviar para ana/fix em acme/app.",
+    );
+    expect(approveAlwaysHint(en, push, "Theo")).toBe(
+      "Approves this one and the next ones like it from Theo: push to ana/fix in acme/app.",
+    );
+    expect(approvalRuleWords(pt, rule)).toBe("enviar para ana/fix em acme/app");
+    expect(approvalRuleWords(en, rule)).toBe("push to ana/fix in acme/app");
+  });
+
+  test("deleting takes a hold and is never approved for good; the push is a tap with Aprovar sempre; the branches show", () => {
+    expect(approvalRisk(remove)).toBe("high");
+    expect(approvalAction(remove)).toBe("delete");
+    expect(approvalTraits(remove)).toEqual(["irreversible"]);
+    expect(approveAlwaysOffered({ ...remove, approveAlways: { tool: "delete_branches", actions: [] } })).toBe(false);
+    expect(approvalRisk(push)).toBe("normal");
+    expect(approveAlwaysOffered(push)).toBe(true);
+    // The card's rows carry the branch names (the phone shows values, never the detail).
+    const rows = approvalTable(remove, 3, () => "GitHub", true);
+    expect(rows).toEqual([
+      { label: null, value: "GitHub" },
+      { label: "Repo", value: "acme/app" },
+      { label: "Branches", value: branches.join(", ") },
+    ]);
+    expect(approvalTable(remove, 3, () => "GitHub").at(-1)?.value).toBe(branches.join(", "));
+  });
+
+  test("the profile lists what it runs without asking, × for its owner and whoever decides approvals", async () => {
+    // The screens are components the tests can't render: what they wire in, as text.
+    const screen = await Bun.file(
+      new URL("../../src/features/agents/AgentProfileScreen.tsx", import.meta.url).pathname,
+    ).text();
+    expect(screen).toContain(
+      '<AlwaysApproved agentId={id} name={name} mayRemove={mine || can(org, "approve_actions")} />',
+    );
+    expect(screen).toContain("const rules = useApprovalRules(orgId, agentId);");
+    expect(screen).toContain("const what = approvalRuleWords(t, rule);");
+    expect(screen).toContain("mayRemove ? (");
+    expect(screen).toContain("remove.mutate(rule.id, {");
+    const pt = await translator("pt-BR");
+    expect(pt("agentPage.access.always.title")).toBe("Aprovado sempre");
+    expect(pt("agentPage.access.always.remove", { what: approvalRuleWords(pt, rule) })).toBe(
+      "Voltar a pedir: enviar para ana/fix em acme/app",
+    );
+    expect((await translator("en"))("agentPage.access.always.removed", { name: "Ada" })).toBe(
+      "Ada will ask for this again.",
+    );
   });
 });
 
@@ -194,6 +274,7 @@ describe("the exact request", () => {
       { label: null, value: "custom:sentry" },
       { label: "Issue id", value: "ACME-177" },
       { label: "Event id", value: "abc" },
+      { label: "Files", value: "a" },
     ]);
     const long = "x".repeat(80);
     expect(approvalTable(approval({ id: "l", params: { query: long } }))).toEqual([]);
