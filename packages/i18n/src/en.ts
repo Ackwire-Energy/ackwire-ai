@@ -8357,6 +8357,40 @@ export const en: Translations = {
       couldNot: "{{to}} couldn't answer. {{from}} went on without it.",
       private: "A talk only between {{from}} and {{to}}",
     },
+    /** Inside the reply that asked: the questions the agent asked other agents in that turn, one line each. */
+    consultGroup: {
+      asked_one: "Asked {{count}} teammate",
+      asked_other: "Asked {{count}} teammates",
+      progress: "{{done}} of {{total}}",
+      label: "{{name}}'s questions to other agents",
+      working: "{{name}} is working",
+      waitingApproval: "{{name}} is waiting for an approval",
+      waitingInput: "{{name}} is waiting for an answer",
+      /** The consulted agent's computer is away: paused, not on a person (as the computer screen says it). */
+      waitingComputer: "{{name}} is waiting for the computer",
+      /** An answer whose question is in a reply farther up: one line where it arrived, "See" goes to that reply. */
+      answeredFar: "{{to}} answered {{from}}'s question",
+      see: "See",
+    },
+    /** A question opened in the panel over the conversation ("Theo ⇄ Iris"): what the two agents said, read only. */
+    consultPanel: {
+      label: "Conversation between {{from}} and {{to}}",
+      /** The phone's bar (the web draws the arrows as an icon between the names). */
+      title: "{{from}} ⇄ {{to}}",
+      where: "#{{channel}} · between agents",
+      whereDm: "Between agents",
+      messages_one: "{{count}} message",
+      messages_other: "{{count}} messages",
+      origin: "{{from}} asked {{to}} in #{{channel}} · {{time}}",
+      originDm: "{{from}} asked {{to}} · {{time}}",
+      readOnly: "Read only.",
+      steer: "To change course, talk to {{name}}.",
+      talk: "Talk to {{name}}",
+      missing: "This conversation is no longer here.",
+      /** On a card the consulted agent posted where the person asked. */
+      helping: "helping {{name}}",
+      see: "See conversation",
+    },
     /** Automatic lines: what reached an agent's conversation (`meta.notice`), a routine's background start. */
     notice: {
       routineHandoff: "Routine «{{routine}}» delivered a report",

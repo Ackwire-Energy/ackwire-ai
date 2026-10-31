@@ -8406,6 +8406,40 @@ export const ptBR = {
       couldNot: "{{theTo}} {{to}} não conseguiu responder. {{theFrom}} {{from}} seguiu sem ela.",
       private: "Conversa só entre {{articleFrom}} {{from}} e {{articleTo}} {{to}}",
     },
+    /** Inside the reply that asked: the questions the agent asked other agents in that turn, one line each. */
+    consultGroup: {
+      asked_one: "Perguntou a {{count}} colega",
+      asked_other: "Perguntou a {{count}} colegas",
+      progress: "{{done}} de {{total}}",
+      label: "Perguntas {{of}} {{name}} a outros agentes",
+      working: "{{name}} está trabalhando",
+      waitingApproval: "{{The}} {{name}} espera uma aprovação",
+      waitingInput: "{{The}} {{name}} espera uma resposta",
+      /** The consulted agent's computer is away: paused, not on a person (as the computer screen says it). */
+      waitingComputer: "{{The}} {{name}} espera o computador voltar",
+      /** An answer whose question is in a reply farther up: one line where it arrived, "Ver" goes to that reply. */
+      answeredFar: "{{to}} respondeu à pergunta {{of}} {{from}}",
+      see: "Ver",
+    },
+    /** A question opened in the panel over the conversation ("Theo ⇄ Iris"): what the two agents said, read only. */
+    consultPanel: {
+      label: "Conversa entre {{articleFrom}} {{from}} e {{articleTo}} {{to}}",
+      /** The phone's bar (the web draws the arrows as an icon between the names). */
+      title: "{{from}} ⇄ {{to}}",
+      where: "#{{channel}} · conversa entre agentes",
+      whereDm: "Conversa entre agentes",
+      messages_one: "{{count}} mensagem",
+      messages_other: "{{count}} mensagens",
+      origin: "{{from}} perguntou {{toArticle}} {{to}} em #{{channel}} · {{time}}",
+      originDm: "{{from}} perguntou {{toArticle}} {{to}} · {{time}}",
+      readOnly: "Só leitura.",
+      steer: "Para mudar o rumo, fale com {{article}} {{name}}.",
+      talk: "Falar com {{article}} {{name}}",
+      missing: "Essa conversa não está mais aqui.",
+      /** On a card the consulted agent posted where the person asked. */
+      helping: "ajudando {{article}} {{name}}",
+      see: "Ver conversa",
+    },
     /** Automatic lines: what reached an agent's conversation (`meta.notice`), a routine's background start. */
     notice: {
       routineHandoff: "Rotina «{{routine}}» entregou um relatório",

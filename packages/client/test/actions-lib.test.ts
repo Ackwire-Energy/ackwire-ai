@@ -108,4 +108,15 @@ describe("receipt sentence values", () => {
     });
     expect(actionTextValues(renamed, t).to).toBe("b");
   });
+
+  test("a deleted routine says its name; a kind this build doesn't know still gives values", () => {
+    const deleted = action({
+      kind: "routine.deleted",
+      target: { type: "routine", id: "r", title: "Daily" },
+      params: { name: "Daily" },
+    });
+    expect(actionTextValues(deleted, t)).toEqual({ name: "Daily" });
+    const unknown = action({ kind: "something.new" as AgentAction["kind"] });
+    expect(actionTextValues(unknown, t)).toEqual({});
+  });
 });

@@ -31,6 +31,7 @@ export function receiptIcon(kind: AgentActionKind): IconName {
       return "brain";
     case "routine.created":
     case "routine.updated":
+    case "routine.deleted":
       return "clock";
     case "channel.agent_added":
       return "hash";
