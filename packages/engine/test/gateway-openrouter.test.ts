@@ -16,7 +16,10 @@ import {
   createAgent,
   createCredential,
   createModelGateway,
+  drainOutbox,
   MissingCredentialError,
+  postPersonMessage,
+  runErrorDetail,
   ValidationError,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
@@ -180,6 +183,31 @@ test("a model OpenRouter stopped listing fails with a clear message; with no lis
   expect(unread).toMatchObject({ retryable: true });
   expect(f.provider.calls).toHaveLength(0);
   expect(await f.db.select().from(schema.usageRecords)).toHaveLength(0);
+});
+
+test("an agent's run on OpenRouter: with no list yet it tries again; on a model OpenRouter stopped listing it fails with words of its own", async () => {
+  f = await setup();
+  const { key } = await withOpenRouter(f, "~z-ai/glm-latest");
+  await f.db
+    .update(schema.agents)
+    .set({ model: "acme/gone-model", credentialId: key.id })
+    .where(eq(schema.agents.id, f.agent.id));
+  const run = async () =>
+    (await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.agentId, f.agent.id)))[0];
+  setOpenRouterModels({}, 0);
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
+  await drainOutbox(f.db, f.handlers);
+  // An outage, not "no AI": the key is there.
+  expect(await run()).toMatchObject({ status: "running", error: null });
+  setOpenRouterModels(parseOpenRouterModels(fixture));
+  await drainOutbox(f.db, f.handlers, { now: new Date(Date.now() + 60_000) });
+  const failed = await run();
+  expect(failed?.status).toBe("failed");
+  expect(runErrorDetail(failed?.error)).toEqual({
+    errorCode: "run.model_unlisted",
+    errorParams: { model: "acme/gone-model" },
+  });
+  expect(f.provider.calls).toHaveLength(0);
 });
 
 test("without an OpenRouter key the call fails before OpenRouter's list is read", async () => {

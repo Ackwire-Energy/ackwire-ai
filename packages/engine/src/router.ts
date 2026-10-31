@@ -1,5 +1,13 @@
 import { and, type Database, desc, type Executor, eq, inArray, isNull, lte, ne, schema, sql } from "@agenteschat/db";
-import { cheapModelOf, ensureOpenRouterModels, modelInfo, modelProvider, routerModelOf } from "@agenteschat/providers";
+import {
+  cheapModelOf,
+  ensureOpenRouterModels,
+  isKnownModel,
+  modelInfo,
+  modelProvider,
+  ProviderError,
+  routerModelOf,
+} from "@agenteschat/providers";
 import { audienceSql } from "./audience";
 import { caches } from "./cache";
 import { summarizeGrants } from "./capabilities";
@@ -391,9 +399,10 @@ export async function smallModelFor(
       .select({ model: organizationSettings.routerModel })
       .from(organizationSettings)
       .where(eq(organizationSettings.orgId, orgId));
-    if (settings?.model && (await reachable(settings.model))) return settings.model;
     const keys = await orgKeyProviders(deps.db, orgId);
     if (keys.has("openrouter")) await ensureOpenRouterModels();
+    // Its own model only while it can be priced: one OpenRouter no longer lists (or before its list) is passed over.
+    if (settings?.model && isKnownModel(settings.model) && (await reachable(settings.model))) return settings.model;
     for (const provider of new Set([await orgModelProvider(deps.db, orgId), ...SMALL_MODEL_ORDER])) {
       const model = pick(provider);
       if (keys.has(provider) && (await reachable(model))) return model;
@@ -416,12 +425,17 @@ export async function orgKeyProviders(db: Executor, orgId: string): Promise<Set<
 /**
  * The cheap model to use for an org's own calls (summaries, reflection): the
  * configured one for the provider of the org's default key (or its newest
- * key), else the catalog's cheap model for that provider.
+ * key), else the catalog's cheap model for that provider. OpenRouter's comes
+ * with its list: until the list is read, an outage the caller waits out, never
+ * Claude (another key).
  */
 export async function cheapModelForOrg(db: Database, orgId: string, perProvider: Record<string, string>) {
   const provider = await orgModelProvider(db, orgId);
   if (provider === "openrouter") await ensureOpenRouterModels();
-  return perProvider[provider] ?? cheapModelOf(provider) ?? perProvider.anthropic ?? "claude-haiku-5-5";
+  const model = perProvider[provider] ?? cheapModelOf(provider);
+  if (model) return model;
+  if (provider === "openrouter") throw new ProviderError("could not reach provider", true);
+  return perProvider.anthropic ?? "claude-haiku-5-5";
 }
 
 /**

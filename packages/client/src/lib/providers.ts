@@ -1,4 +1,4 @@
-import type { Credential, Model, ModelTier } from "../api/types";
+import type { Credential, Model } from "../api/types";
 
 interface ProviderEntry {
   id: string;
@@ -167,19 +167,5 @@ export const isAuto = (value: string | null | undefined) => value === AUTO;
 export const keyRuns = (key: Pick<Credential, "provider">, model: string | undefined, models: readonly Model[]) =>
   isAuto(model) || models.some((m) => m.id === model && m.provider === key.provider);
 
-/** Automático's sizes, smallest first. */
-export const MODEL_TIERS: readonly ModelTier[] = ["small", "medium", "large"];
-
-/**
- * The model Automático gives a tier on a provider's key when the workspace chose none, as the server picks it
- * (`modelForTier`, packages/providers/src/catalog.ts): that tier, else the nearest smaller, else the nearest larger.
- */
-export function tierDefault(models: readonly Model[], provider: string, tier: ModelTier): Model | undefined {
-  const own = models.filter((m) => m.provider === provider && m.tier);
-  const at = MODEL_TIERS.indexOf(tier);
-  for (const t of [...MODEL_TIERS.slice(0, at + 1).reverse(), ...MODEL_TIERS.slice(at + 1)]) {
-    const hit = own.find((m) => m.tier === t);
-    if (hit) return hit;
-  }
-  return undefined;
-}
+/** Automático's sizes and the server's own tier rule (`modelForTier`): a tier's default reads as the one that runs. */
+export { MODEL_TIERS, nearestTier } from "@agenteschat/providers/catalog";

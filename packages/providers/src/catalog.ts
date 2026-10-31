@@ -348,19 +348,27 @@ export function routerModelOf(provider: string): string | null {
 }
 
 /**
- * A provider's model for a tier: that tier, else the nearest smaller one (a
- * line without a large model answers with its medium one), else the nearest
- * larger. Null when the provider has no tiered model.
+ * Of one provider's models, the one for a tier: that tier, else the nearest
+ * smaller one (a line without a large model answers with its medium one), else
+ * the nearest larger. The apps label Automático's defaults with it too.
  */
-export function modelForTier(provider: string, tier: ModelTier): string | null {
-  const own = listedModels().filter(([, m]) => m.provider === provider && m.tier);
+export function nearestTier<T>(
+  models: readonly T[],
+  tier: ModelTier,
+  tierOf: (model: T) => ModelTier | undefined,
+): T | undefined {
   const at = MODEL_TIERS.indexOf(tier);
-  const order = [...MODEL_TIERS.slice(0, at + 1).reverse(), ...MODEL_TIERS.slice(at + 1)];
-  for (const t of order) {
-    const hit = own.find(([, m]) => m.tier === t);
-    if (hit) return hit[0];
+  for (const t of [...MODEL_TIERS.slice(0, at + 1).reverse(), ...MODEL_TIERS.slice(at + 1)]) {
+    const hit = models.find((m) => tierOf(m) === t);
+    if (hit !== undefined) return hit;
   }
-  return null;
+  return undefined;
+}
+
+/** A provider's model for a tier (`nearestTier`); null when the provider has no tiered model. */
+export function modelForTier(provider: string, tier: ModelTier): string | null {
+  const own = listedModels().filter(([, m]) => m.provider === provider);
+  return nearestTier(own, tier, ([, m]) => m.tier)?.[0] ?? null;
 }
 
 /** The model's context window in tokens (`DEFAULT_CONTEXT_WINDOW` when the catalog doesn't say). */

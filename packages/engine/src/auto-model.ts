@@ -220,11 +220,25 @@ export async function orgAutoModels(db: Executor, orgId: string): Promise<AutoMo
 }
 
 /**
+ * The API model for a tier on `provider`'s key: the workspace's own (`tiers`) while that provider lists it, else its
+ * line's. Null for OpenRouter before its list is read: its line is the list, and another provider's model would need
+ * another key.
+ */
+export function autoModelFor(
+  provider: string,
+  tier: ModelTier,
+  tiers?: Partial<Record<ModelTier, string>>,
+): string | null {
+  const own = tiers?.[tier];
+  if (own && modelInfo(own)?.provider === provider) return own;
+  return modelForTier(provider, tier) ?? (provider === "openrouter" ? null : modelForTier("anthropic", tier));
+}
+
+/**
  * Maps a choice onto the run's brain (the one place that does): the API model
- * from the line of `provider` (the workspace's own model for the tier, in
- * `tiers`, while that provider still lists it), Claude Code's alias, Codex's
- * model, and the effort where the agent left it to auto. The API brain takes
- * the effort only when its model is auto (it has no effort setting of its
+ * for the tier on `provider`'s key (`autoModelFor`), Claude Code's alias,
+ * Codex's model, and the effort where the agent left it to auto. The API brain
+ * takes the effort only when its model is auto (it has no effort setting of its
  * own). `apiModel` from a resumed run's record wins, so the run keeps its model.
  */
 export function autoApplied(
@@ -236,12 +250,7 @@ export function autoApplied(
 ): AutoApplied {
   const out: AutoApplied = {};
   if (isAutoModel(agent.model)) {
-    const own = tiers?.[choice.tier];
-    const model =
-      choice.apiModel ??
-      (own && modelInfo(own)?.provider === provider ? own : undefined) ??
-      modelForTier(provider, choice.tier) ??
-      modelForTier("anthropic", choice.tier);
+    const model = choice.apiModel ?? autoModelFor(provider, choice.tier, tiers);
     if (model) out.apiModel = model;
   }
   if (plan.kind === "model") {

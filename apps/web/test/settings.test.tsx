@@ -331,7 +331,11 @@ describe("Configurações do workspace", () => {
   });
 
   test("Modelos do Automático: with an OpenRouter key, each size of task gets a model of its own or the default", async () => {
-    const seeded = seedState({ extraModels: OPENROUTER_MODELS });
+    // A model OpenRouter stopped listing: the tier runs on the default, so it reads as the default.
+    const seeded = seedState({
+      extraModels: OPENROUTER_MODELS,
+      autoModels: { openrouter: { medium: "acme/retired" } },
+    });
     seeded.credentials.push(OPENROUTER_KEY);
     const { state } = await go(seeded, "settings/keys");
     const keys = screen().getByRole("region", { name: "Chaves de provedor" });
@@ -351,8 +355,9 @@ describe("Configurações do workspace", () => {
     expect(field("Trabalho difícil").textContent).toContain("Z.ai: GLM 5.3");
     await click(within(dialog).getByRole("button", { name: "Salvar" }));
     await settle(4);
+    // Only what changed: the tier picked, and the dropped model cleared.
     expect(state.calls.find((c) => c.method === "orgs.updateSettings")?.args[1]).toEqual({
-      autoModels: { openrouter: { small: null, medium: null, large: "z-ai/glm-5.3" } },
+      autoModels: { openrouter: { medium: null, large: "z-ai/glm-5.3" } },
     });
     expect(state.autoModels).toEqual({ openrouter: { large: "z-ai/glm-5.3" } });
     expect(document.body.textContent).toContain("Modelos salvos.");

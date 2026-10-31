@@ -26,6 +26,8 @@ const RoleIds = z.array(z.string()).openapi({ description: "Their roles (`org_ro
 
 export const ProviderId = z.enum(PROVIDER_IDS).openapi("ProviderId");
 
+export const ModelTier = z.enum(MODEL_TIERS as ["small", "medium", "large"]);
+
 export const Organization = z
   .object({
     id: z.uuid(),
@@ -469,10 +471,9 @@ export const Model = z
     pick: z.boolean().optional().openapi({
       description: "In OpenRouter's long list (ADR 0087): a good pick, shown first. Absent: a catalog model.",
     }),
-    tier: z
-      .enum(MODEL_TIERS as ["small", "medium", "large"])
-      .optional()
-      .openapi({ description: "The size Automático uses it for on its provider's key, by default." }),
+    tier: ModelTier.optional().openapi({
+      description: "The size Automático uses it for on its provider's key, by default.",
+    }),
   })
   .openapi("Model");
 

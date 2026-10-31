@@ -1,6 +1,6 @@
 import { type ModelTier, useModels, useSettings, useUpdateSettings } from "@agenteschat/client";
 import { can } from "@agenteschat/client/lib/permissions";
-import { MODEL_TIERS, tierDefault } from "@agenteschat/client/lib/providers";
+import { MODEL_TIERS, nearestTier } from "@agenteschat/client/lib/providers";
 import { Button, Dialog, DialogBody, DialogFooter, Field, ProviderLogo, SettingRow } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -28,10 +28,16 @@ export function AutoModelsRow() {
   const own = all.filter((m) => m.provider === PROVIDER);
   if (!can(org, "configure") || own.length === 0 || !settings.data) return null;
   const saved = settings.data.autoModels[PROVIDER] ?? {};
+  // A model OpenRouter stopped listing: the tier runs on its default, so it shows as the default.
+  const start = Object.fromEntries(
+    MODEL_TIERS.map((tier) => [tier, own.some((m) => m.id === saved[tier]) ? saved[tier] : DEFAULT]),
+  ) as Record<ModelTier, string>;
   const options = modelOptions(t, i18n.language, [[PROVIDER, own.map((model) => ({ model, available: true }))]]);
   const save = () => {
     if (!chosen) return;
-    const tiers = Object.fromEntries(MODEL_TIERS.map((tier) => [tier, chosen[tier] || null]));
+    // Only the tiers that changed: one left alone is never refused for a model gone from the list.
+    const changed = MODEL_TIERS.filter((tier) => (chosen[tier] || undefined) !== saved[tier]);
+    const tiers = Object.fromEntries(changed.map((tier) => [tier, chosen[tier] || null]));
     update.mutate(
       { autoModels: { [PROVIDER]: tiers } },
       {
@@ -45,17 +51,7 @@ export function AutoModelsRow() {
   return (
     <>
       <SettingRow title={t("settings.autoModels.title")} description={t("settings.autoModels.text")}>
-        <Button
-          size="sm"
-          onClick={() =>
-            setChosen(
-              Object.fromEntries(MODEL_TIERS.map((tier) => [tier, saved[tier] ?? DEFAULT])) as Record<
-                ModelTier,
-                string
-              >,
-            )
-          }
-        >
+        <Button size="sm" onClick={() => setChosen(start)}>
           <ProviderLogo id={PROVIDER} size="xs" />
           {t("settings.autoModels.choose")}
         </Button>
@@ -70,7 +66,7 @@ export function AutoModelsRow() {
       >
         <DialogBody>
           {MODEL_TIERS.map((tier) => {
-            const fallback = tierDefault(all, PROVIDER, tier);
+            const fallback = nearestTier(own, tier, (m) => m.tier);
             return (
               <Field key={tier} label={t(`settings.autoModels.${tier}`)} id={`auto-model-${tier}`}>
                 <ModelSelect

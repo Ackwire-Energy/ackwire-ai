@@ -224,15 +224,14 @@ export function createModelGateway(deps: ModelGatewayDeps) {
   const agentKey = (agent: Agent, provider: string) => resolveKey(agent.orgId, provider, agent.credentialId);
   const orgKey = (orgId: string, provider: string) => resolveKey(orgId, provider, null);
 
-  /** Whether the model is in the catalog or OpenRouter's list (read first when due). */
-  async function isListed(model: string) {
-    if (isOpenRouterModel(model)) await ensureOpenRouterModels(model);
-    return modelInfo(model) !== undefined;
-  }
-
-  /** A model's entry, or why there is none. Called once its key resolved: no key, no read of OpenRouter's list. */
+  /**
+   * A model's entry from the catalog or OpenRouter's list (read first when due), or why there is none. Called once
+   * its key resolved: no key, no read of OpenRouter's list.
+   */
   async function infoFor(model: string): Promise<ModelInfo> {
-    if (await isListed(model)) return modelInfo(model) as ModelInfo;
+    if (isOpenRouterModel(model)) await ensureOpenRouterModels(model);
+    const info = modelInfo(model);
+    if (info) return info;
     if (!isOpenRouterModel(model)) throw new ValidationError(`Model ${model} is not in the catalog`);
     // Without its list no call can be priced: like an outage, the run tries again later.
     if (!openRouterListed()) throw new ProviderError("could not reach provider", true);
@@ -522,27 +521,27 @@ export function createModelGateway(deps: ModelGatewayDeps) {
   return {
     /**
      * Whether the agent's model brain can be called at all: its model is in
-     * the catalog, its provider is registered and a key would resolve (its own,
-     * the org's default, or the platform's), in `resolveKey`'s order. Used by the
-     * computer brains' fallback (ADR 0032 §5 "Fallback, by what exists") and the
-     * AI status (`ai-status.ts`). No call is made and no key is decrypted: a page
-     * load must not unwrap every key (a network call per key with a KMS wrapper).
+     * the catalog or is OpenRouter's, its provider is registered and a key would
+     * resolve (its own, the org's default, or the platform's), in `resolveKey`'s
+     * order. OpenRouter's list is checked by the call (`infoFor`): no list is an
+     * outage it waits out, and a model it stopped listing fails with words of its
+     * own, neither of them "no AI". Used by the computer brains' fallback
+     * (ADR 0032 §5 "Fallback, by what exists") and the AI status (`ai-status.ts`).
+     * No call is made and no key is decrypted: a page load must not unwrap every
+     * key (a network call per key with a KMS wrapper).
      */
     async hasModelCredential(agent: Pick<Agent, "orgId" | "model" | "credentialId">): Promise<boolean> {
       const provider = modelProvider(agent.model);
       if (!provider || !deps.providers[provider]) return false;
       const usable = async (id: string) => (await usableCredentialRow(db, agent.orgId, id))?.provider === provider;
-      const keyed = async () => {
-        if (agent.credentialId) return usable(agent.credentialId);
+      try {
+        if (agent.credentialId) return await usable(agent.credentialId);
         const defaultId = await orgDefaultCredentialId(agent.orgId, provider);
         if (defaultId && (await usable(defaultId))) return true;
         const platform = deps.platformCredentials;
         return platform.available
-          ? platform.available(agent.orgId, provider)
+          ? await platform.available(agent.orgId, provider)
           : (await platform.resolve(agent.orgId, provider)) !== null;
-      };
-      try {
-        return (await keyed()) && (await isListed(agent.model));
       } catch {
         return false;
       }

@@ -1281,6 +1281,16 @@ async function executeRunInner(
     if (provider === "openrouter") await ensureOpenRouterModels();
     const tiers = (await orgAutoModels(db, run.orgId).catch((): AutoModels => ({})))[provider];
     const applied = autoApplied(agent, brainPlan, choice, provider, tiers);
+    // No model for the tier: OpenRouter's list couldn't be read. Waited out like a provider outage, with the
+    // choice kept for the next attempt.
+    if (brainPlan.kind === "model" && isAutoModel(agent.model) && !applied.apiModel) {
+      const outage = new ProviderError("could not reach provider", true);
+      if (options.finalAttempt) return fail(`gave_up: ${outage.message}`);
+      t.autoModel = choice;
+      await saveTranscript(db, t);
+      await addRunStep(db, run, "error", { reason: "transient", message: String(outage), willRetry: true });
+      throw outage;
+    }
     ({ agent: thinker, plan: brainPlan } = withAuto(agent, brainPlan, applied));
     if (!kept) {
       t.autoModel = { ...choice, ...(applied.apiModel ? { apiModel: applied.apiModel } : {}) };

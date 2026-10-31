@@ -8,6 +8,7 @@ import {
   autoWanted,
   type BrainPlan,
   brainModelForTier,
+  cheapModelForOrg,
   chooseAutoModel,
   createAgent,
   createCredential,
@@ -402,6 +403,42 @@ describe("a run of an agent on Automático", () => {
       apiKey: "or-test-key-12345678",
       request: { model: "anthropic/claude-sonnet-5.5", effort: "high" },
     });
+  });
+
+  test("OpenRouter's list not read yet: the run waits it out on its OpenRouter key, never on another provider's model", async () => {
+    f = await setup({ judge: judgeAnswers({ current: "large" }), reply: () => ({ chunks: ["ok"] }) });
+    await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+    const keyCheck = (async () => new Response("{}")) as unknown as typeof fetch;
+    const key = await createCredential(
+      f.db,
+      f.keyWrapper,
+      f.owner.id,
+      f.org.id,
+      { provider: "openrouter", label: "or", apiKey: "or-test-key-12345678", makeDefault: true },
+      { fetch: keyCheck },
+    );
+    await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { model: AUTO_MODEL, credentialId: key.id });
+    // Summaries on that key wait for the list too.
+    await expect(cheapModelForOrg(f.db, f.org.id, { anthropic: "claude-haiku-5-5" })).rejects.toMatchObject({
+      retryable: true,
+    });
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
+    await drainOutbox(f.db, f.handlers);
+    const run = async () =>
+      (await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.agentId, f.agent.id)))[0];
+    expect(f.provider.calls).toHaveLength(0);
+    expect(await run()).toMatchObject({ status: "running", error: null });
+    // The next attempt has the list: the tier the judge chose, on OpenRouter's line.
+    setOpenRouterModels(parseOpenRouterModels(fixture));
+    await drainOutbox(f.db, f.handlers, { now: new Date(Date.now() + 60_000) });
+    expect(f.provider.calls[0]).toMatchObject({
+      apiKey: "or-test-key-12345678",
+      request: { model: "~anthropic/claude-sonnet-latest", effort: "high" },
+    });
+    expect((await run())?.status).toBe("done");
+    expect(await cheapModelForOrg(f.db, f.org.id, { anthropic: "claude-haiku-5-5" })).toBe(
+      "~deepseek/deepseek-flash-latest",
+    );
   });
 
   test("an agent without auto never asks the judge about its model", async () => {
