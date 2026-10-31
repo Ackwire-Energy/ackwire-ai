@@ -11,7 +11,7 @@ import {
   setCoordinator,
   toTurns,
 } from "../src";
-import { type Fixture, setup } from "./fixtures";
+import { addMember, type Fixture, setup } from "./fixtures";
 
 const msg = (over: Partial<Message>): Message =>
   ({ authorUserId: null, authorAgentId: null, body: "", ...over }) as Message;
@@ -205,4 +205,31 @@ test("the team's coordinator hears that what nobody took comes to it, only where
   // Another agent there doesn't.
   await setCoordinator({ db: f.db }, f.owner.id, f.org.id, f.agent.id, false);
   expect(await prompt(f.agent)).not.toContain(LINE);
+});
+
+test("the coordinator hears that a person alone with the agents speaks to the team, so a greeting gets an answer", async () => {
+  const trigger = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev bom dia!",
+  });
+  const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, trigger.id));
+  if (!run) throw new Error("no run");
+  const prompt = async (agent: typeof f.agent) =>
+    systemText((await buildRunContext(f.db, run, agent, { maxMessages: 10 })).system);
+  const ALONE =
+    "\nThis person is the only one here with the agents: what they write to the room is for the team. Answer a greeting or a question; only a thanks or an ok needs no answer.";
+  const ada = await createAgent(
+    f.db,
+    f.owner.id,
+    f.org.id,
+    { name: "Ada", handle: "ada" },
+    { model: "claude-sonnet-5-5" },
+  );
+  await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: ada.id });
+  expect(await prompt(f.agent)).not.toContain(ALONE);
+  const dev = await setCoordinator({ db: f.db }, f.owner.id, f.org.id, f.agent.id, true);
+  expect(await prompt(dev)).toContain(ALONE);
+  // With another person here, what Ana writes may be for Walter.
+  const walter = await addMember(f.db, f.org.id, "member", "Walter");
+  await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: walter.id });
+  expect(await prompt(dev)).not.toContain(ALONE);
 });
