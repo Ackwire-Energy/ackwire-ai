@@ -760,6 +760,8 @@ const DISCRETE_KEYS = new Set([
   " ",
 ]);
 const MODIFIER_KEYS = new Set(["Alt", "Control", "Meta", "Shift"]);
+/** CDP's bit for each mouse button in `buttons`. */
+const BUTTON_BITS = { none: 0, left: 1, right: 2, middle: 4 } as const;
 /** CDP's modifier bits, as `press` spells a chord (`Control+a`). */
 const CHORD = [
   [1, "Alt"],
@@ -768,9 +770,11 @@ const CHORD = [
   [8, "Shift"],
 ] as const;
 
-/** Where a person's pointer is and which modifier keys they hold, per stream. */
+/** Where a person's pointer is, and which mouse buttons and modifier keys they hold, per stream. */
 export interface InputState {
   pointer?: { x: number; y: number };
+  /** The mouse buttons down, as CDP's mask (left 1, right 2, middle 4). */
+  buttons?: number;
   held: Set<string>;
   /** While the person drags: when they made its last event (`at`, their clock) and when it went to the page. */
   drag?: { at: number; sent: number };
@@ -805,45 +809,55 @@ export function dragDelay(e: BrowserInputEvent, state: InputState, now: number):
  * active tab and answers once Chrome has it, unlike the stream socket, whose
  * input goes to the tab it attached to and is never confirmed. Keys go
  * through `press` (it fills in codes and text); a modifier held on its own is
- * a raw key-down/up pair; a tap from the phone is a left click. The daemon
- * keeps which buttons are down between commands (0.39.1's `mouse_state`), so a
- * move after a press reaches Chrome with `buttons: 1`: the page sees a drag.
+ * a raw key-down/up pair; a tap from the phone is a left click. Every mouse
+ * command says which buttons are down (`buttons`, which the daemon passes to
+ * Chrome as given), so a move after a press reaches the page as a drag.
  */
 export function relayCommands(e: BrowserInputEvent, state: InputState): Record<string, unknown>[] {
   switch (e.kind) {
-    case "mouse":
+    case "mouse": {
       state.pointer = { x: e.x, y: e.y };
+      const button = e.button ?? (e.type === "mouseMoved" || e.type === "mouseWheel" ? "none" : "left");
+      if (e.type === "mousePressed") state.buttons = (state.buttons ?? 0) | BUTTON_BITS[button];
+      else if (e.type === "mouseReleased") state.buttons = (state.buttons ?? 0) & ~BUTTON_BITS[button];
       return [
         {
           action: "input_mouse",
           type: e.type,
           x: e.x,
           y: e.y,
-          button: e.button ?? (e.type === "mouseMoved" || e.type === "mouseWheel" ? "none" : "left"),
+          button,
+          buttons: state.buttons ?? 0,
           clickCount: e.clickCount ?? (e.type === "mousePressed" || e.type === "mouseReleased" ? 1 : 0),
           deltaX: e.deltaX ?? 0,
           deltaY: e.deltaY ?? 0,
           modifiers: e.modifiers ?? 0,
         },
       ];
+    }
     case "touch": {
       const at = e.touchPoints[0] ?? state.pointer;
       if (!at) return [];
-      state.pointer = { x: at.x, y: at.y };
-      const mouse = (type: string, button: string, clickCount: number) => ({
-        action: "input_mouse",
-        type,
-        x: at.x,
-        y: at.y,
-        button,
-        clickCount,
-        deltaX: 0,
-        deltaY: 0,
-        modifiers: e.modifiers ?? 0,
-      });
-      if (e.type === "touchStart") return [mouse("mouseMoved", "none", 0), mouse("mousePressed", "left", 1)];
-      if (e.type === "touchMove") return [mouse("mouseMoved", "left", 0)];
-      return [mouse("mouseReleased", "left", 1)];
+      const mouse = (
+        type: "mouseMoved" | "mousePressed" | "mouseReleased",
+        button: "none" | "left",
+        clickCount: number,
+      ) =>
+        relayCommands(
+          {
+            kind: "mouse",
+            type,
+            x: at.x,
+            y: at.y,
+            button,
+            clickCount,
+            ...(e.modifiers ? { modifiers: e.modifiers } : {}),
+          },
+          state,
+        );
+      if (e.type === "touchStart") return [...mouse("mouseMoved", "none", 0), ...mouse("mousePressed", "left", 1)];
+      if (e.type === "touchMove") return mouse("mouseMoved", "left", 0);
+      return mouse("mouseReleased", "left", 1);
     }
     case "key": {
       if (e.type === "char") return e.text ? [{ action: "keyboard", subaction: "insertText", text: e.text }] : [];
