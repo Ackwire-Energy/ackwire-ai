@@ -45,7 +45,8 @@ export function ProfileTrigger({
   decorative?: boolean;
 }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
+  // How it opened: hover leaves the focus where it is (the box someone types in), a press or a key brings it in.
+  const [open, setOpen] = useState<false | "hover" | "press">(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clear = () => {
     if (timer.current) clearTimeout(timer.current);
@@ -62,16 +63,17 @@ export function ProfileTrigger({
     clear();
     timer.current = setTimeout(() => {
       timer.current = null;
-      setOpen(next);
+      setOpen(next && "hover");
     }, ms);
   };
   return (
     <Popover
-      open={open}
+      open={open !== false}
       onOpenChange={(o) => {
         clear();
-        setOpen(o);
+        setOpen(o && "press");
       }}
+      moveFocus={open !== "hover"}
       label={t("profile.cardLabel")}
       side="bottom"
       className="profile-card"

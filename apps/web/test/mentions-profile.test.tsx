@@ -256,6 +256,25 @@ describe("profile card", () => {
     expect(card().textContent).toContain("João");
   });
 
+  test("hover opens it without taking the focus, open or closed; a press brings the focus in", async () => {
+    await go(`c/${ENG_ID}`);
+    const box = composer();
+    box.focus();
+    const name = screen().getAllByRole("button", { name: "Perfil de Ada" })[0] as HTMLElement;
+    await act(async () => fireEvent.pointerEnter(name, { pointerType: "mouse" }));
+    await wait(500);
+    await settle(3);
+    expect(within(card()).getByRole("button", { name: "Ver perfil" })).toBeTruthy();
+    expect(document.activeElement).toBe(box);
+    await act(async () => fireEvent.pointerLeave(name, { pointerType: "mouse" }));
+    await wait(300);
+    expect(screen().queryByRole("dialog", { name: "Perfil" })).toBeNull();
+    expect(document.activeElement).toBe(box);
+    await click(name);
+    await settle(3);
+    expect(card().contains(document.activeElement)).toBe(true);
+  });
+
   test("mention chips in messages open the card too", async () => {
     const state = seedState();
     state.messages.push({
