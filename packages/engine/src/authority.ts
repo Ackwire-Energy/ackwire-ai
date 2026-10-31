@@ -1,4 +1,5 @@
 import { and, type Executor, eq, schema } from "@agenteschat/db";
+import { caches } from "./cache";
 import { type RoutineAccess, type RoutineBrief, routineBriefOf } from "./routine-brief";
 
 const { agentRuns, messages } = schema;
@@ -40,8 +41,11 @@ export type MessageRoot =
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** How many links (message → its run → that run's trigger) a chain may have before it counts as nobody's. */
-export const MAX_AUTHORITY_CHAIN = 8;
+/**
+ * How many links (message → its run → that run's trigger) a chain may have before it counts as nobody's: far past
+ * what agents do on their own in a stretch (ADR 0089), so a long collaboration stays the person's.
+ */
+export const MAX_AUTHORITY_CHAIN = 1000;
 
 type MessageLink = {
   authorType: string;
@@ -57,10 +61,25 @@ const noticeOf = (meta: Record<string, unknown>) =>
  * What a message's chain roots in: a person (its author, or the person behind the run that wrote it),
  * a routine (its brief, or a run that is a routine's background work), a routine's report, a note
  * from another agent, or nothing (an agent's own message with no run, a broken or too long chain).
+ *
+ * Each message's root is remembered (`caches.messageRoots`): a message's links never change, so the walk
+ * stops at the first link it already knows, and a long chain costs what its newest link does.
  */
 export async function messageRoot(db: Executor, orgId: string, messageId: string): Promise<MessageRoot> {
+  const walked: string[] = [];
+  const found = await walkRoot(db, orgId, messageId, walked);
+  if (found)
+    for (const id of walked) await caches.messageRoots.getOrLoad(`${orgId}:${id}`, () => Promise.resolve(found));
+  return found ?? { kind: "agent" };
+}
+
+/** The walk, collecting the ids it passed in `walked`; null when the chain is broken or too long (never remembered). */
+async function walkRoot(db: Executor, orgId: string, messageId: string, walked: string[]): Promise<MessageRoot | null> {
   let id = messageId;
   for (let depth = 0; depth <= MAX_AUTHORITY_CHAIN; depth++) {
+    const known = caches.messageRoots.get(`${orgId}:${id}`) as MessageRoot | undefined;
+    if (known) return known;
+    walked.push(id);
     const [m] = (await db
       .select({
         authorType: messages.authorType,
@@ -70,7 +89,7 @@ export async function messageRoot(db: Executor, orgId: string, messageId: string
       })
       .from(messages)
       .where(and(eq(messages.orgId, orgId), eq(messages.id, id)))) as MessageLink[];
-    if (!m) return { kind: "agent" };
+    if (!m) return null;
     if (m.authorType === "person") {
       // A routine's brief is written by its creator, but nobody is behind the work it starts.
       if (routineBriefOf(m.meta) || m.meta.background === true) return { kind: "routine" };
@@ -95,11 +114,11 @@ export async function messageRoot(db: Executor, orgId: string, messageId: string
       .select({ triggerMessageId: agentRuns.triggerMessageId, background: agentRuns.background })
       .from(agentRuns)
       .where(and(eq(agentRuns.orgId, orgId), eq(agentRuns.id, runId)));
-    if (!run) return { kind: "agent" };
+    if (!run) return null;
     if (run.background) return { kind: "routine" };
     id = run.triggerMessageId;
   }
-  return { kind: "agent" };
+  return null;
 }
 
 /** The person behind a message (see `messageRoot`), or null. */

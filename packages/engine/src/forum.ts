@@ -1859,7 +1859,7 @@ async function finalizeSynthesis(deps: ForumDeps, topic: TopicRow, runId: string
         orgId: topic.orgId,
         channelId: topic.originChannelId,
         threadId: inThread ? topic.originMessageId : null,
-        author: { type: "agent", agentId: run.agentId, runId: null, hop: 0 },
+        author: { type: "agent", agentId: run.agentId, runId: null, hop: 0, stretchId: null },
         body: `The forum "${topic.title}" is over. The ${format === "plan" ? "plan" : "synthesis"}${revision > 1 ? ` (version ${revision})` : ""} is in the file below${suggested.length ? `, with ${suggested.length} suggested issue(s) to approve` : ""}.`,
         meta: {
           artifacts: [artifact],
@@ -2042,7 +2042,7 @@ export async function postInForumAsAgent(
     {
       orgId,
       channelId: topic.channelId,
-      author: { type: "agent", agentId, runId: null, hop: 0 },
+      author: { type: "agent", agentId, runId: null, hop: 0, stretchId: null },
       body: text,
       meta: { forum: { topicId, round } satisfies ForumMeta },
     },

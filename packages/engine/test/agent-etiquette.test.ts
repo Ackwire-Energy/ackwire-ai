@@ -215,7 +215,7 @@ describe("short follow-ups without a mention", () => {
     await insertMessage(f.db, {
       orgId: f.org.id,
       channelId: f.general.id,
-      author: { type: "agent", agentId: qa.id, runId: null, hop: 1 },
+      author: { type: "agent", agentId: qa.id, runId: null, hop: 1, stretchId: null },
       body: "Os testes de integração falharam no deploy.",
     });
     // "você" is ambiguous to the router (Dev a bit ahead): it's for QA, who just spoke.

@@ -398,7 +398,7 @@ describe("agents", () => {
     const own = await insertMessage(f.db, {
       orgId: f.org.id,
       channelId: f.general.id,
-      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0 },
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0, stretchId: null },
       body: "Vou documentar isso.",
     });
     expect(await create.execute({ title: "Nota", body: "x" }, ctx(own.id))).toEqual({

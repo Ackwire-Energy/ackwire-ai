@@ -70,6 +70,8 @@ export interface MachineLoadRecord {
   memoryAvg: number;
   memoryPeak: number;
   hours: number;
+  /** Processes stopped for memory in the agents' slices over those hours (`MachineLoad.oomKills`). */
+  oomKills?: number;
   at: string;
 }
 

@@ -1,13 +1,14 @@
 import { DESKTOP_PROTOCOL, type PubSub } from "@agenteschat/adapters";
-import { and, type Database, eq, gte, inArray, schema, sql } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, gte, inArray, schema, sql } from "@agenteschat/db";
 import { announceAgentStatus } from "./agent-status";
 import { recordAudit } from "./audit";
+import { personOfMessage } from "./authority";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { onForumRunFinished } from "./forum";
 import type { MachineHub } from "./machine-hub";
 import { cancelOrgTasks, type TaskCall } from "./machine-tasks";
-import { can, requireActiveMembership } from "./organizations";
+import { can, type Membership, requireActiveMembership } from "./organizations";
 import { closeRoutineRun } from "./routine-ledger";
 import { ACTIVE_RUN_STATUSES, releaseInbox } from "./run-inbox";
 import { isTerminal, type RunStatus, replyThreadOf, transitionRun } from "./runs";
@@ -166,13 +167,26 @@ const continuedBy = sql`coalesce(${messages.meta}->'canceled'->>'continuedByUser
   ${messages.meta}->'stepLimit'->>'continuedByUserId')`;
 export const runRequester = sql<string | null>`coalesce(${messages.authorUserId}, ${continuedBy})`;
 
+/**
+ * Who may stop a run, continue it, or start it again ("Responder agora"): who asked for it (`runRequester`), the
+ * person behind its work (a run another agent woke works for them too, ADR 0089), the agent's owner, or an admin.
+ */
+export async function mayStopRun(
+  db: Executor,
+  userId: string,
+  membership: Membership,
+  row: { run: { orgId: string; triggerMessageId: string }; requester: string | null; ownerUserId: string | null },
+) {
+  if (row.requester === userId || row.ownerUserId === userId || can(membership, "manage_agents")) return true;
+  return (await personOfMessage(db, row.run.orgId, row.run.triggerMessageId)) === userId;
+}
+
 /** Who canceled (stored on the run as `canceled_by:{userId}`). */
 export const canceledBy = (error: string | null | undefined) =>
   error?.startsWith("canceled_by:") ? error.slice("canceled_by:".length) : null;
 
 /**
- * Stops an agent's run (`POST …/runs/{runId}/cancel`): the person who asked,
- * the agent's owner, or an admin.
+ * Stops an agent's run (`POST …/runs/{runId}/cancel`), for who may (`mayStopRun`).
  * - Queued: it never starts (its job is dropped).
  * - Waiting for an approval or an answer: it ends; the approval or question is canceled.
  * - Running: the worker aborts the model stream (usage so far is recorded),
@@ -203,8 +217,7 @@ export async function cancelRun(
     .leftJoin(channels, eq(channels.id, agentRuns.channelId))
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.orgId, orgId)));
   if (!row) throw new NotFoundError("Run not found");
-  const allowed = row.requester === userId || row.ownerUserId === userId || can(membership, "manage_agents");
-  if (!allowed)
+  if (!(await mayStopRun(db, userId, membership, row)))
     throw new ForbiddenError("Only who asked, the agent's owner or an admin can stop it", "run.cancel_forbidden");
 
   return stopRun(deps, orgId, row.run, row.channelKind, { type: "person", id: userId }, options);

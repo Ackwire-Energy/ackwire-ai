@@ -11,6 +11,7 @@ import {
   resolveNotifications,
 } from "./notifications";
 import { maySql, type RolePermission } from "./permissions";
+import { stretchCardOf } from "./stretch";
 
 /**
  * Where notifications come from: each flow calls one of these after
@@ -138,10 +139,12 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
   // An agent's answer: the person behind its run hears it (ADR 0071), once per conversation until read, so they
   // can close the tab while it works. Not a routine's (its creator hears `routine_finished`), not a run that
   // person stopped, not when they're mentioned in it (the mention says it).
-  const asker =
+  const behind =
     message.authorType === "agent" && message.agentRunId && !meta.viaRoutine && !meta.canceled && !meta.agentDm
       ? await humanBehindRun(deps, orgId, message.agentRunId)
       : null;
+  // A stretch's pause card (ADR 0089) also tells the routine's creator when nobody asked for the work.
+  const asker = behind ?? (message.authorType === "agent" ? (stretchCardOf(meta)?.forUserId ?? null) : null);
   if (
     asker &&
     !message.mentionedUserIds.includes(asker) &&

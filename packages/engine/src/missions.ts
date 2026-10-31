@@ -518,7 +518,7 @@ export async function postMissionMessage(
     orgId: mission.orgId,
     channelId: mission.channelId,
     threadId: mission.threadRootId,
-    author: { type: "agent", agentId: mission.agentId, runId: null, hop: 0 },
+    author: { type: "agent", agentId: mission.agentId, runId: null, hop: 0, stretchId: null },
     body: noMentions(body).slice(0, 39_000) || "…",
     meta,
   });

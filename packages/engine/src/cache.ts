@@ -86,6 +86,11 @@ export const caches = {
   standing: new TtlCache<unknown>(5_000),
   /** Whether an org spent its platform AI for the month (`limits.ts`), read before every Jev call and route. */
   platformSpend: new TtlCache<unknown>(60_000),
+  /**
+   * What a message's chain roots in (`messageRoot`). Its links never change, so it is kept a day: a wake after a wait
+   * (a follow-up, CI, an approval) walks only its newest links, never the whole chain again (2 queries a link).
+   */
+  messageRoots: new TtlCache<unknown>(24 * 3600_000, 20_000),
 };
 
 /** Forgets everything about an org (used after broad changes and in tests). */

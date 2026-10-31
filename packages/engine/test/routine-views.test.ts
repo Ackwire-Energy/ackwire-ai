@@ -99,7 +99,7 @@ describe("routine views", () => {
     const report = await insertMessage(f.db, {
       orgId: f.org.id,
       channelId: finance.id,
-      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0 },
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0, stretchId: null },
       body: "A fatura 812 está atrasada.",
     });
     const done = await agentRun("done");
