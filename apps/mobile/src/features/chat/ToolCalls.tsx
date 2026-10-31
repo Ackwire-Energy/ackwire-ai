@@ -19,6 +19,7 @@ import {
   workApps,
   workFromSteps,
   workMeta,
+  workSteps,
 } from "@agenteschat/client/lib/work";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import type { TFunction } from "i18next";
@@ -635,7 +636,7 @@ export function SavedTools({
     : null;
   const items = work ? toolItemsSaved(work) : [];
   const blockItems = useBlockItems(items);
-  if (!compact || compact.steps === 0) return null;
+  if (!compact || workSteps(compact) === 0) return null;
   const calls = work ? toolCalls(items) : compact.steps;
   const durationMs = work?.durationMs ?? compact.durationMs;
   const apps = work ? toolApps(items) : workApps(compact.calls.filter((c) => !onCard(c.name)));

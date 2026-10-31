@@ -18,6 +18,7 @@ import {
   workApps,
   workFromSteps,
   workMeta,
+  workSteps,
 } from "@agenteschat/client/lib/work";
 import {
   type AgentColor,
@@ -287,8 +288,8 @@ export function SavedTools({
     : null;
   const items = work ? toolItemsSaved(work) : [];
   const blockItems = useBlockItems(items);
-  // Nothing to say: the server says it used no tools.
-  if (compact && compact.steps === 0) return null;
+  // Nothing to say: the server says it used no tools (lookups and reactions aren't counted).
+  if (compact && workSteps(compact) === 0) return null;
   const calls = work ? toolCalls(items) : (compact?.steps ?? 0);
   const durationMs = work?.durationMs ?? compact?.durationMs ?? null;
   const apps = work ? toolApps(items) : workApps((compact?.calls ?? []).filter((c) => !onCard(c.name)));
