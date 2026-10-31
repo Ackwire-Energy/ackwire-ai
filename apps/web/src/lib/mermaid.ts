@@ -8,11 +8,16 @@
  *   (themeCSS, themeVariables, fontFamily). Front matter may only hold a `title`.
  * - A flowchart image node (`A@{ img: "…" }`): mermaid loads it with `new Image()` before any SVG exists. The YAML key
  *   can be spelled with escapes (`"\x69mg"`), so in a source with shape data any backslash counts too.
- * - A sequence actor's `properties` (an icon drawn as an <image>) and `details` (JSON read from an element of the page).
+ * - A sequence actor's `properties` (an icon drawn as an <image>) and `details` (JSON read from an element of the page),
+ *   anywhere in the source: the statement may also follow `end` or `sequenceDiagram` on the same line. A message
+ *   saying "details x:" stays code too.
  * - CSS that loads (`url(`, `image-set("…")`, `@import`…) in classDef, style, linkStyle, a gantt todayMarker: CSS
  *   escapes are read first (`\75 rl(` is `url(`).
- * - An HTML tag with an attribute (`<img src=…>`): math labels, architecture icons and event modeling boxes put label
- *   HTML in the page even with HTML labels off.
+ *
+ * Label HTML is the one way left to mermaid: math labels, class labels with math, architecture icon text and event
+ * modeling boxes put it in the page even with HTML labels off, and no source check reads HTML the way the browser does
+ * (`<img alt src=…>`, `<\img src=…>`). It all goes through mermaid's sanitizer, which `drawWithMermaid` sets to drop
+ * every tag and attribute that loads.
  */
 
 /** Mermaid's own `maxTextSize`: past it mermaid draws a red "Maximum text size" box instead of the diagram. */
@@ -22,8 +27,7 @@ const FRONT_MATTER = /^([^\S\n\r]*)-{3}\s*[\n\r](.*?)[\n\r]\1-{3}\s*[\n\r]+/s;
 const TITLE_LINE = /^\s*title\s*:/;
 const CSS_LOAD = /(?:url|image(?:-set)?|src)\s*\(|@import/i;
 const CSS_ESCAPE = /\\(?:([\da-f]{1,6})\s?|([^\n]))/gi;
-const TAG_WITH_ATTRIBUTE = /<[a-z][^\s/>]*[\s/]+[^\s/>=]+\s*=/i;
-const ACTOR_MENU = /(?:^|[\n;])\s*(?:properties|details)\b/i;
+const ACTOR_MENU = /\b(?:properties|details)\b[^\n;]*:/i;
 
 const cssUnescaped = (text: string) =>
   text.replace(CSS_ESCAPE, (_, hex: string | undefined, char: string | undefined) =>
@@ -39,7 +43,7 @@ export function mermaidDrawable(source: string): boolean {
   if (text.includes("%%{")) return false;
   if (text.includes("@{") && /img|\\/i.test(text)) return false;
   if (text.includes("sequenceDiagram") && ACTOR_MENU.test(text)) return false;
-  return !TAG_WITH_ATTRIBUTE.test(text) && !CSS_LOAD.test(cssUnescaped(text));
+  return !CSS_LOAD.test(cssUnescaped(text));
 }
 
 /**

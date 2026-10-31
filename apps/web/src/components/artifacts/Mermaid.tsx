@@ -33,6 +33,43 @@ export async function drawWithMermaid(id: string, source: string, dark: boolean,
         "altFontFamily",
         "fontSize",
       ],
+      // Label HTML (math, class labels with math, architecture icon text) goes into the page through this sanitizer,
+      // so nothing in it may load. It replaces mermaid's own, which drops only <style>. The style attribute and inline
+      // SVG (its mask and clip-path load another document) go too: in a class label mermaid turns `#108;` into
+      // `&#108;`, so `ur#108;(` gets past the source check and reads as `url(` to the browser.
+      dompurifyConfig: {
+        FORBID_TAGS: [
+          "style",
+          "svg",
+          "img",
+          "image",
+          "picture",
+          "source",
+          "video",
+          "audio",
+          "track",
+          "iframe",
+          "object",
+          "embed",
+          "link",
+          "input",
+          "use",
+          "feimage",
+        ],
+        FORBID_ATTR: [
+          "style",
+          "src",
+          "srcset",
+          "href",
+          "xlink:href",
+          "poster",
+          "background",
+          "action",
+          "formaction",
+          "data",
+          "ping",
+        ],
+      },
       // A diagram that doesn't parse rejects, instead of drawing mermaid's error graphic and leaving it in <body>.
       suppressErrorRendering: true,
       theme: dark ? "dark" : "neutral",
@@ -46,6 +83,7 @@ export async function drawWithMermaid(id: string, source: string, dark: boolean,
     const { svg } = await mermaid.mermaidAPI.render(id, source);
     return svg;
   };
+  const before = new Set(document.body.children);
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
@@ -54,12 +92,16 @@ export async function drawWithMermaid(id: string, source: string, dark: boolean,
         timer = setTimeout(() => reject(new Error("Mermaid didn't finish drawing")), timeout);
       }),
     ]);
-  } catch (error) {
-    // Mermaid draws in a <div id="d{id}"> at the end of <body> and removes it only once done or on a parse error.
-    document.getElementById(`d${id}`)?.remove();
-    throw error;
   } finally {
     clearTimeout(timer);
+    // Mermaid works at the end of <body>: its <div id="d{id}">, an attribute-less <svg> to measure text, KaTeX's
+    // #katex-temp and cytoscape's #cy. A drawing that fails or never finishes leaves them there (a label with a blank
+    // line fails its measuring). Other nodes added meanwhile, like a portal or a toast, stay.
+    for (const el of Array.from(document.body.children)) {
+      if (before.has(el)) continue;
+      if ([`d${id}`, "katex-temp", "cy"].includes(el.id) || (el.localName === "svg" && !el.attributes.length))
+        el.remove();
+    }
   }
 }
 
@@ -90,6 +132,10 @@ function useMermaid(source: string): Drawing | null | undefined {
   const [last, setLast] = useState<Drawing | null | undefined>(() => drawn.get(key));
   const asked = useRef<string | undefined>(undefined);
   useEffect(() => {
+    // A source being edited (the wiki's side-by-side preview) is drawn once the typing stops. Noted before the early
+    // returns: a block that mounts with its drawing already made still waits on the first edit.
+    const wait = asked.current === undefined || asked.current === key ? 0 : 300;
+    asked.current = key;
     if (!drawable) return;
     const hit = drawn.get(key);
     if (hit) {
@@ -97,9 +143,6 @@ function useMermaid(source: string): Drawing | null | undefined {
       return;
     }
     let live = true;
-    // A source being edited (the wiki's side-by-side preview) is drawn once the typing stops.
-    const wait = asked.current === undefined || asked.current === key ? 0 : 300;
-    asked.current = key;
     const timer = setTimeout(() => {
       queue = queue.then(async () => {
         // Checked when its turn comes: the block may be gone, or another one may have drawn the same diagram.

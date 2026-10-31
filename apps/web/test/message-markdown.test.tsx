@@ -299,6 +299,26 @@ describe("```mermaid fences", () => {
     expect(asked).toEqual([FLOW, `${FLOW}!!!`]);
   });
 
+  test("a diagram drawn before keeps its drawing while an edit that doesn't parse is typed", async () => {
+    // Read first, then opened side by side: the preview mounts with its drawing already made.
+    const read = render(<Markdown source={fence(FLOW)} />);
+    await settle();
+    read.unmount();
+    const view = render(<Markdown source={fence(FLOW)} />);
+    const el = view.container;
+    const typed = FLOW.replace("-->", "-->>");
+    view.rerender(<Markdown source={fence(typed)} />);
+    await settle();
+    expect(shown(el)).toContain(drawingOf(FLOW));
+    expect(el.querySelector(".code-card__code")).toBeNull();
+    expect(asked).toEqual([FLOW]);
+    // Once the typing stops it's drawn, and what doesn't parse shows as code.
+    await pause(350);
+    await settle();
+    expect(asked).toEqual([FLOW, typed]);
+    expect(el.querySelector(".code-card__code")?.textContent).toBe(typed);
+  });
+
   test("drawings waiting their turn are dropped when their block is gone", async () => {
     const waiting: (() => void)[] = [];
     setMermaidRenderer(

@@ -51,6 +51,16 @@ function patch(target: object, key: string, descriptor: PropertyDescriptor) {
 
 beforeAll(() => {
   createI18n("pt-BR");
+  // What a browser has and happy-dom lacks, so mermaid takes the paths it takes there: MathML (without it each
+  // `$$…$$` becomes the text "MathML is unsupported") and text with a box (without one every label fails its
+  // measuring). Blank text has none, as in Chromium.
+  patch(window, "MathMLElement", { value: class {}, writable: true });
+  patch(SVGGraphicsElement.prototype, "getBBox", {
+    value(this: SVGGraphicsElement) {
+      const text = this.textContent?.trim() ?? "";
+      return new DOMRect(0, 0, text.length * 8, text ? 16 : 0);
+    },
+  });
   const inPage = (node: Node) => node.ownerDocument === document;
   const loads = (name: string) => /^(?:src|srcset|href|background|poster|data|style)$/i.test(name.replace(/^.*:/, ""));
   patch(globalThis, "Image", { value: RecordingImage, writable: true });
@@ -108,6 +118,7 @@ afterEach(() => cleanup());
 const fence = (source: string) => `\`\`\`mermaid\n${source}\n\`\`\``;
 const IMAGE_NODE = `flowchart TD\n  A@{ img: "${LEAK}" }`;
 const CLASS_URL = `stateDiagram-v2\n  [*] --> s1\n  classDef c fill:url(${LEAK})\n  class s1 c`;
+const ICON_AFTER_END = `sequenceDiagram\n  participant A\n  loop L\n    A->>A: x\n  end properties A: {"icon": "${LEAK}"}`;
 /** Ways a source can make the page load a URL while mermaid 11.17.2 draws, in some diagram type or another. */
 const PATHS: [string, string][] = [
   ["an image node", IMAGE_NODE],
@@ -134,10 +145,46 @@ const PATHS: [string, string][] = [
   ["a style image-set()", `flowchart LR\n  A --> B\n  style A mask-image:image-set("${LEAK}" 1x)`],
   ["a linkStyle url()", `flowchart LR\n  A --> B\n  linkStyle 0 stroke:url(${LEAK})`],
   ["a gantt todayMarker", `gantt\n  todayMarker mask-image:url(${LEAK})\n  section S\n  T :a1, 2024-01-01, 3d`],
-  ["label HTML", `flowchart LR\n  A["<img/src=${LEAK}>"] --> B`],
-  ["label HTML beside math", `sequenceDiagram\n  A->>B: $$x$$ <img src="${LEAK}">`],
   ["a sequence actor's icon", `sequenceDiagram\n  participant A\n  properties A: {"icon": "${LEAK}"}`],
+  ["a sequence actor's icon after an end", ICON_AFTER_END],
+  [
+    "a sequence actor's icon after a box's end",
+    `sequenceDiagram\n  box G\n  participant A\n  end properties A: {"icon": "${LEAK}"}`,
+  ],
+  [
+    "a sequence actor's icon on the diagram's first line",
+    `sequenceDiagram properties A: {"icon": "${LEAK}"}\n  participant A`,
+  ],
   ["a sequence actor's details, read from the page", "sequenceDiagram\n  participant A\n  details A: root"],
+  [
+    "a sequence actor's details after an end",
+    "sequenceDiagram\n  participant A\n  loop L\n    A->>A: x\n  end details A: root",
+  ],
+];
+/**
+ * Label HTML that mermaid puts in the page, spelled the ways a tag check misses. These do reach mermaid: its sanitizer,
+ * set by drawWithMermaid, is what drops what would load.
+ */
+const LABEL_HTML: [string, string][] = [
+  [
+    "a sequence message with math, the first attribute with no value",
+    `sequenceDiagram\n  A->>B: $$x$$ <img alt src=${LEAK}>`,
+  ],
+  ["a sequence message with math, slashes between attributes", `sequenceDiagram\n  A->>B: $$x$$ <img/alt/src=${LEAK}>`],
+  ["a sequence message with math, an attribute named =x", `sequenceDiagram\n  A->>B: $$x$$ <img =x src=${LEAK}>`],
+  ["a sequence note with math", `sequenceDiagram\n  participant A\n  Note over A: $$x$$ <img alt src=${LEAK}>`],
+  ["a participant's alias with math", `sequenceDiagram\n  participant A as $$x$$ <img alt src=${LEAK}>\n  A->>A: oi`],
+  ["a class label with math", `classDiagram\n  class A["$$x$$ <img alt src=${LEAK}>"]`],
+  [
+    "a class label's style attribute, url( spelled with an entity",
+    `classDiagram\n  class A["$$x$$ <b alt style=background-image:ur#108;(${LEAK})>b</b>;"]`,
+  ],
+  [
+    "an inline SVG's mask in a class label",
+    `classDiagram\n  class A["$$x$$ <svg><rect x mask=ur#108;(${LEAK}#m) /></svg>"]`,
+  ],
+  ["an architecture service's text", `architecture-beta\n  service s1 "<img alt src=${LEAK}>"[S1]`],
+  ["an architecture service's text, a backslash after <", `architecture-beta\n  service s1 "<\\img src=${LEAK}>"[S1]`],
 ];
 /** Diagrams as people and agents write them, which must still draw. */
 const EVERYDAY = [
@@ -147,6 +194,8 @@ const EVERYDAY = [
   "classDiagram\n  class Animal {\n    <<interface>>\n    +List~int~ ids\n    +Map~String, Integer~ m\n  }\n  Animal <|-- Duck",
   "sequenceDiagram\n  Ana->>Bia: Olá<br/>tudo bem?\n  Note over Ana: detalhes do pedido\n  Bia-->>Ana: Sim",
   "%% um comentário\nflowchart LR\n  accTitle: Fluxo\n  accDescr: Do pedido ao deploy\n  A --> B",
+  'sequenceDiagram\n  Ana->>Bia: os details do pedido\n  Bia-->>Ana: <b class="ok">feito</b> em $$t_1$$',
+  "classDiagram\n  class Repo {\n    +Map<String, Integer> counts\n  }",
 ];
 /** A diagram most pages would have: a title, a line break in a label, a color. */
 const PLAIN =
@@ -156,6 +205,24 @@ const PLAIN =
 async function untilDrawn(el: Element, count: number) {
   for (let i = 0; i < 300 && el.querySelectorAll(".code-card__preview img").length < count; i++)
     await act(() => new Promise<void>((resolve) => setTimeout(resolve, 10)));
+}
+
+/**
+ * Mermaid with its own sanitizer settings instead of drawWithMermaid's; what it leaves in <body> is then removed. It
+ * draws a participant's label without waiting for it, hence the settle.
+ */
+async function drawRaw(id: string, source: string) {
+  const before = new Set(document.body.children);
+  const { default: mermaid } = await import("mermaid");
+  mermaid.initialize({
+    startOnLoad: false,
+    htmlLabels: false,
+    flowchart: { htmlLabels: false },
+    suppressErrorRendering: true,
+  });
+  await mermaid.mermaidAPI.render(id, source).catch(() => {});
+  await settle();
+  for (const el of Array.from(document.body.children)) if (!before.has(el)) el.remove();
 }
 
 describe("a ```mermaid fence can't make the page load anything", () => {
@@ -182,15 +249,32 @@ describe("a ```mermaid fence can't make the page load anything", () => {
     expect(el.querySelector(".artifact-diagram--failed code")?.textContent).toBe(IMAGE_NODE);
     expect(requested).toEqual([]);
   });
+
+  let labels = 0;
+  test.each(LABEL_HTML)("%s: its HTML reaches the page without anything that loads", async (_, source) => {
+    const id = `label-${++labels}`;
+    expect(mermaidDrawable(source)).toBe(true);
+    // Under happy-dom an architecture diagram fails at its layout (no canvas), after its services are drawn. What a
+    // participant's label puts in the page after the drawing is done counts too.
+    await drawWithMermaid(id, source, false).catch(() => {});
+    await settle();
+    expect(requested).toEqual([]);
+    // With mermaid's own sanitizer settings the page asks for the URL: this label's HTML does reach the page.
+    await drawRaw(`raw-${id}`, source);
+    expect(requested).not.toEqual([]);
+  });
 });
 
 describe("the real mermaid", () => {
-  test("left to itself, it asks for an image node's URL and puts a classDef's url() in the page's CSS", async () => {
+  test("left to itself, it asks for an image node's URL, puts a classDef's url() in the page's CSS and an actor's icon in an <image>", async () => {
     await drawWithMermaid("probe-image", IMAGE_NODE, false);
     expect(requested).toContain(`new Image().src: ${LEAK}`);
     requested.length = 0;
     await drawWithMermaid("probe-css", CLASS_URL, false);
     expect(requested.some((r) => r.startsWith("<style> HTML") && r.includes(LEAK))).toBe(true);
+    requested.length = 0;
+    await drawWithMermaid("probe-icon", ICON_AFTER_END, false);
+    expect(requested).toContain(`<image href>: ${LEAK}`);
   });
 
   test("drops a diagram's own settings that reach the page's CSS, should one get past the check", async () => {
@@ -210,6 +294,18 @@ describe("the real mermaid", () => {
     expect(document.getElementById("dhang")).toBeNull();
     // In mermaid's own queue this one would wait behind the drawing still hanging.
     expect(await drawWithMermaid("after-hang", "flowchart LR\n  A --> B", false, 2000)).toBeString();
+  });
+
+  test("a drawing that fails takes what mermaid put in <body> with it, and only that", async () => {
+    const inBody = () => Array.from(document.body.children, (el) => el.outerHTML.slice(0, 80));
+    const before = inBody();
+    // A blank line in a label has no box to measure: mermaid stops with its measuring <svg> still in <body>.
+    const drawing = drawWithMermaid("blank-line", "sequenceDiagram\n  A->>B: a<br> <br>b", false);
+    // Added meanwhile by someone else, like a toast.
+    const toast = document.body.appendChild(document.createElement("output"));
+    await expect(drawing).rejects.toThrow("not in render tree");
+    expect(inBody()).toEqual([...before, "<output></output>"]);
+    toast.remove();
   });
 
   test("a gantt is drawn 720px wide, which a card fits, not as wide as the box it's drawn in", async () => {
