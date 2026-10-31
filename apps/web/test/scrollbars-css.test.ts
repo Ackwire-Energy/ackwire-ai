@@ -24,6 +24,11 @@ const value = (css: string, selector: string, property: string) =>
     .filter(([p]) => p === property)
     .at(-1)?.[1] ?? "";
 const px = (v: string) => Number.parseFloat(v);
+/** A `margin` or `padding` shorthand's four sides, in px. */
+const sides = (v: string) => {
+  const [top = Number.NaN, right = top, bottom = top, left = right] = v.split(/\s+/).map(px);
+  return { top, right, bottom, left };
+};
 /** `wide` matches whatever `selector` matches: the same, or its last part after a descendant or child combinator. */
 const covers = (wide: string, selector: string) =>
   selector === wide || selector.endsWith(` ${wide}`) || selector.endsWith(`>${wide}`);
@@ -131,5 +136,60 @@ describe("our scrollbars, never the browser's", () => {
     const none = await selectorsWith((p, v) => p === "scrollbar-width" && v === "none");
     const kinds = Object.keys(SIDEWAYS).map((s) => [s, none.some((h) => covers(h, s)) ? "strip" : "content"]);
     expect(Object.fromEntries(kinds)).toEqual(SIDEWAYS);
+  });
+});
+
+describe("the collapsed sidebar", () => {
+  const RAIL = '.sidebar[data-rail="true"]';
+
+  test("a channel is a tile of its initials, as big as an agent's face, centred in its row", async () => {
+    const layout = topLevel(await read("apps/web/src/layout.css"));
+    const kit = topLevel(await read(KIT));
+    const tile = (property: string) => value(layout, `${RAIL} .sidebar__channel-abbr`, property);
+    expect([tile("width"), tile("height")]).toEqual([
+      value(kit, ".ac-avatar--sm", "width"),
+      value(kit, ".ac-avatar--sm", "height"),
+    ]);
+    expect([tile("display"), tile("place-items")]).toEqual(["grid", "center"]);
+    expect(tile("background")).not.toBe("");
+    expect(tile("border-radius")).not.toBe("");
+    // The rows a face sits in.
+    expect(value(layout, `${RAIL} .sidebar__item`, "width")).toBe("var(--control-h-md)");
+    expect(value(layout, `${RAIL} .sidebar__item`, "justify-content")).toBe("center");
+  });
+
+  test("nothing cut: one column for an item and its focus ring, on the rail's middle, with the scrollbar's room beside it", async () => {
+    const layout = topLevel(await read("apps/web/src/layout.css"));
+    const kit = topLevel(await read(KIT));
+    const tokens = await read("packages/ui/src/styles/tokens.css");
+    const item = px(tokens.match(/--control-h-md:\s*([\d.]+)px/)?.[1] ?? "");
+    const ring = Math.max(
+      ...[...(tokens.match(/--focus-ring:([^;]+);/)?.[1] ?? "").matchAll(/0 0 0 ([\d.]+)px/g)].map((m) => Number(m[1])),
+    );
+    const rail = { width: px(value(layout, RAIL, "width")), padding: sides(value(layout, RAIL, "padding")) };
+    const list = `${RAIL} .sidebar__scroll`;
+    const column = px(value(layout, list, "grid-template-columns"));
+    const padding = sides(value(layout, list, "padding"));
+    const margin = sides(value(layout, list, "margin"));
+    expect(value(layout, list, "display")).toBe("grid");
+    expect(value(layout, list, "justify-items")).toBe("center");
+    // Edge to edge on the rail…
+    expect([margin.left, margin.right]).toEqual([-rail.padding.left, -rail.padding.right]);
+    // …one column that holds an item and its ring…
+    expect(column).toBe(item + 2 * ring);
+    // …on the rail's middle, as the header and the foot…
+    expect(padding.left + column / 2).toBe(rail.width / 2);
+    // …and after it the room for the kit's scrollbar, so a scrollbar never squeezes the column.
+    expect(rail.width - padding.left - column - padding.right).toBeGreaterThanOrEqual(
+      px(value(kit, "::-webkit-scrollbar", "width")),
+    );
+  });
+
+  test("its scrollbar shows only while the pointer is on the list or the keyboard moves through it", async () => {
+    const layout = topLevel(await read("apps/web/src/layout.css"));
+    // Through the token: Chrome repaints a scrollbar on a change to its element's style, not to its pseudo-elements'.
+    expect(declarations(layout, ".sidebar__scroll:not(:hover, :has(:focus-visible))")).toEqual([
+      ["--scroll-thumb", "transparent"],
+    ]);
   });
 });
