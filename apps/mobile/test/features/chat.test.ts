@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { LiveConsult, LiveRun, LiveWork, Message, RunConsultation } from "@agenteschat/client";
-import { activitySentence, barElapsed, barFaces, barWords } from "@agenteschat/client/lib/activity";
+import { activitySentence, barElapsed, barFaces, barWords, PHRASE_TURN_MS } from "@agenteschat/client/lib/activity";
 import { consultBlocksNearEnd, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { toolCalls, toolNow, toolPhrase, toolWhy } from "@agenteschat/client/lib/work";
@@ -55,7 +55,11 @@ import {
   withContinued,
   withOpacity,
 } from "../../src/features/chat/turn";
+import { pacedClock } from "../../src/features/shared/logic";
 import { at, message, translator } from "./fixtures";
+
+/** A screen's source, for the wiring a test can't render (React Native). */
+const source = (path: string) => Bun.file(new URL(`../../src/${path}`, import.meta.url).pathname).text();
 
 describe("timeline", () => {
   test("top-level messages and loaded thread replies, in time order, no duplicates", () => {
@@ -328,16 +332,47 @@ describe("working line", () => {
     expect(barElapsed(en, workingEntries([ada], [asking], name), [ada], now)).toBeNull();
   });
 
-  test("left on its own mid-turn, an agent's time is right from the first draw: the line reads a fresh clock", async () => {
+  test("left on its own mid-turn, an agent's seconds are right from the first draw and step evenly: one clock, read afresh as the line narrows", async () => {
     const en = await translator("en");
-    const now = 1_000_000;
-    const ada = run({ runId: "r", agentId: "ada", status: "running", startedAt: now - 90_000 });
-    const atlas = run({ runId: "r2", agentId: "atlas", status: "running", startedAt: now - 60_000 });
-    expect(barElapsed(en, workingEntries([ada, atlas], [], name), [ada, atlas], now)).toBeNull();
-    // Atlas is done. With two at work the line redrew once a minute, so the clock it kept can be 50 s old.
+    const U = 1_000_000;
+    const ada = run({ runId: "r", agentId: "ada", status: "running", startedAt: U - 148_700 });
+    // Atlas is done. With two at work the clock moved once a minute, so it can be 50 s old: the new pace reads it afresh.
     const alone = workingEntries([ada], [], name);
-    expect(barElapsed(en, alone, [ada], now)).toBe("1m 30s");
-    expect(barElapsed(en, alone, [ada], now - 50_000)).toBe("40s");
+    let clock = pacedClock({ every: 60_000, now: U - 50_000 }, 1000, U);
+    const shown = [{ at: U, took: barElapsed(en, alone, [ada], clock.now) }];
+    expect(shown[0]?.took).toBe("2m 28s");
+    // Each second its interval reads the time; the phrase turning (every 2.6 s) redraws the line in between.
+    const reads = Array.from({ length: 12 }, (_, k) => U + 4 + (k + 1) * 1000);
+    const turns = Array.from({ length: 4 }, (_, k) => U + 4 + (k + 1) * PHRASE_TURN_MS);
+    for (const at of [...reads, ...turns].sort((a, b) => a - b)) {
+      clock = reads.includes(at) ? { every: 1000, now: at } : pacedClock(clock, 1000, at);
+      const took = barElapsed(en, alone, [ada], clock.now);
+      if (took !== shown.at(-1)?.took) shown.push({ at, took });
+    }
+    expect(shown.slice(1, -1).map((s, i) => (shown[i + 2]?.at ?? 0) - s.at)).toEqual(Array(11).fill(1000));
+    // The line shows that clock, never a time read at each draw.
+    const lines = await source("features/chat/LiveRows.tsx");
+    const line = lines.slice(lines.indexOf("export function WorkingLine("), lines.indexOf("type LinePiece"));
+    expect(line).toContain("const now = useNow(asking || solo ? 1000 : 60_000);");
+    expect(line).not.toContain("Date.now()");
+  });
+
+  test("each time the bar comes back it opens on who is at work: the phrase's tick mounts with the pill, as on the web", async () => {
+    const en = await translator("en");
+    const ada = run({ runId: "r", agentId: "ada" });
+    const entries = workingEntries([ada], [], name);
+    // A turn opens thinking: its first tick says who it is, where a tick kept from the last turn could open on a light
+    // line without the name.
+    expect(barWords(en, entries, [ada], 0, 0)[0]).toBe("Ada is working…");
+    expect(barWords(en, entries, [ada], 7, 0)[0]).not.toContain("Ada");
+    // The line stays mounted while the bar is gone; the words under the pill don't, and the tick is theirs.
+    const lines = await source("features/chat/LiveRows.tsx");
+    const line = lines.slice(lines.indexOf("export function WorkingLine("), lines.indexOf("type LinePiece"));
+    const words = lines.slice(lines.indexOf("function TurningWords("), lines.indexOf("function BarWords("));
+    expect(line).toContain("if (entries.length === 0) return null;");
+    expect(line).not.toContain("PHRASE_TURN_MS");
+    expect(words).toContain("const [tick, setTick] = useState(() => ({ n: 0, at: Date.now() }));");
+    expect(words).toContain("PHRASE_TURN_MS");
   });
 
   test("Parar: real runs at work, also while they write (not a guess, not one waiting)", () => {
@@ -443,6 +478,18 @@ describe("reactions", () => {
 });
 
 describe("composer", () => {
+  test("the send button pops in on the glyph it shows: its value is born with it, never left by the last button", async () => {
+    const composer = await source("ui/Composer.tsx");
+    const box = composer.slice(composer.indexOf("export function Composer("), composer.indexOf("function SendButton("));
+    // The box keeps no glyph of its own: one kept there would be the send arrow's whenever a button hid, so a stop
+    // square popping in would grow as the arrow first.
+    expect(box).not.toContain("useSharedValue");
+    expect(box).toMatch(/\{button \? \(\s*<SendButton/);
+    expect(composer.slice(composer.indexOf("function SendButton("))).toContain(
+      "const mode = useSharedValue(stop ? 1 : 0);",
+    );
+  });
+
   test("slash commands stay English identifiers", () => {
     expect(parseSlash("/mission Página de preços nova")).toEqual({ command: "mission", arg: "Página de preços nova" });
     expect(parseSlash("  /summary ")).toEqual({ command: "summary", arg: "" });

@@ -1,5 +1,6 @@
 import { elapsedClock, type LiveConsult, type LiveRun, usesBrowser } from "@agenteschat/client";
 import {
+  type ActivityEntry,
   activitySentence,
   barAsking,
   barElapsed,
@@ -267,23 +268,14 @@ export function WorkingLine({
   // "Parar" and the time are one agent's: with several at work the line can't say whose (the box's own stop stops
   // them all).
   const solo = agents.length === 1 ? lead : undefined;
-  // Only redraws, each second while a time or a question's clock counts: both read the clock afresh, as the one kept
-  // here can be a minute old just as the line narrows to one agent.
-  useNow(asking || solo ? 1000 : 60_000);
-  const turning = entries.length === 1 && entries[0]?.type === "agent";
-  // The phrase reads the time of its tick, so a redraw between ticks (each second) never turns it.
-  const [tick, setTick] = useState(() => ({ n: 0, at: Date.now() }));
-  useEffect(() => {
-    if (!turning) return;
-    const timer = setInterval(() => setTick((k) => ({ n: k.n + 1, at: Date.now() })), PHRASE_TURN_MS);
-    return () => clearInterval(timer);
-  }, [turning]);
+  // One clock for the time and a question's clock, moving each second while one counts: a redraw in between (the
+  // phrase turning, an event) reads the same second, so both step evenly; narrowing to one agent changes the pace, and a
+  // new pace reads the clock afresh (`useNow`).
+  const now = useNow(asking || solo ? 1000 : 60_000);
   if (entries.length === 0) return null;
   const color = lead ? agentLook(dir.agentById.get(lead.id)).color : null;
   const stoppable = solo ? stoppableInLine(runs).filter((r) => r.agentId === solo.id && canStop(r)) : [];
   const sentence = activitySentence(t, entries, markName);
-  const words = barWords(t, entries, runs, tick.n, tick.at, markName);
-  const now = Date.now();
   const took = barElapsed(t, entries, runs, now);
   // A piece of the line, on one line, names in ink.
   const piece: LinePiece = (text, style, onTextLayout) => (
@@ -369,7 +361,7 @@ export function WorkingLine({
           accessibilityLabel={browsing ? t("browser.watch.open") : undefined}
           style={styles.wordsTap}
         >
-          <TurningWords words={words} piece={piece} reduced={reduced} />
+          <TurningWords entries={entries} runs={runs} piece={piece} reduced={reduced} />
           {took ? (
             <Text variant="caption" tone="faint" maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.took}>
               {took}
@@ -427,9 +419,30 @@ const TURN = { duration: PHRASE_FADE_MS, easing: Easing.bezier(0.2, 0.7, 0.2, 1)
  * The phrase as it turns (`turnPhrase`): the one shown and, over it, the one leaving, the only two drawn. A phrase
  * keeps its key from coming in to leaving, so the words on screen are the ones that leave, at the widths they drew.
  * The first comes with the pill, and the words go with it at once; with Reduce Motion each phrase just takes the last
- * one's place.
+ * one's place. The phrase's tick mounts with the pill too, as on the web (`BarPhrase`): the line stays mounted while the
+ * bar is gone, and a tick kept from the last turn would open the next on a light line instead of who is at work.
  */
-function TurningWords({ words, piece, reduced }: { words: LineWords; piece: LinePiece; reduced: boolean }) {
+function TurningWords({
+  entries,
+  runs,
+  piece,
+  reduced,
+}: {
+  entries: ActivityEntry[];
+  runs: LiveRun[];
+  piece: LinePiece;
+  reduced: boolean;
+}) {
+  const { t } = useTranslation();
+  const turning = entries.length === 1 && entries[0]?.type === "agent";
+  // The phrase reads the time of its tick, so a redraw between ticks (each second) never turns it.
+  const [tick, setTick] = useState(() => ({ n: 0, at: Date.now() }));
+  useEffect(() => {
+    if (!turning) return;
+    const timer = setInterval(() => setTick((k) => ({ n: k.n + 1, at: Date.now() })), PHRASE_TURN_MS);
+    return () => clearInterval(timer);
+  }, [turning]);
+  const words = barWords(t, entries, runs, tick.n, tick.at, markName);
   const [shown, setShown] = useState<PhraseTurn>(() => ({ now: words, was: null, n: 0, since: Date.now() }));
   const [, wake] = useState(0);
   const next = turnPhrase(shown, words, Date.now());
