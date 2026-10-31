@@ -541,7 +541,7 @@ describe("tell_agent", () => {
     await say("@dev we deployed v2");
     await drainOutbox(f.db, f.handlers);
 
-    const told = f.provider.calls.find((x) => lastText(x.request).includes("Told @infra."));
+    const told = f.provider.calls.find((x) => lastText(x.request).includes("Handed to @infra; it's on it"));
     expect(told).toBeDefined();
     const dm = (await f.db.select().from(schema.messages)).find((m) => (m.meta as { agentNote?: unknown }).agentNote);
     expect(dm?.body).toBe("Deploy finished; watch the error rate.");

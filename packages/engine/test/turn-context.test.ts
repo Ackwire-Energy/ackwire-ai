@@ -157,7 +157,7 @@ describe("notices", () => {
 });
 
 describe("the prompt's rules", () => {
-  test("the honesty line, and tell_agent next to ask_agent for the other agents here", async () => {
+  test("the honesty line, another way before giving up, and what comes of ask_agent and tell_agent", async () => {
     f = await setup();
     const infra = await addAgent("Infra", "infra");
     await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId: infra.id });
@@ -169,10 +169,15 @@ describe("the prompt's rules", () => {
     const ctx = await buildRunContext(f.db, run, f.agent, { maxMessages: 30, toolsAvailable: true });
     const text = systemText(ctx.system);
     expect(text).toContain(
-      "When you have no access to something, say so plainly and who has it (a person or another agent here); never say you haven't looked yet",
+      "When a way is closed (no access, a refusal, nothing found), take another that still gets the people what they need: another tool, the colleague whose role covers it, a document or a copy instead of a move.",
     );
-    expect(text).toContain("ask it yourself (ask_agent)");
-    expect(text).toContain("leave it a note without waiting for an answer (tell_agent)");
+    expect(text).toContain(
+      "Only when none works, say so plainly: what you tried, who has the access (a person or another agent here) and the one thing a person must do. Never say you haven't looked yet",
+    );
+    expect(text).toContain(
+      "ask it yourself (ask_agent) when you need its answer, or hand it work or news (tell_agent): what comes of either reaches you here by itself.",
+    );
+    expect(text).not.toContain("leave it a note");
     // Per-turn blocks last (the stable prefix stays cacheable), the time among them.
     const turnAt = ctx.system.findIndex((b) => b.turn);
     expect(turnAt).toBeGreaterThan(1);
@@ -575,7 +580,15 @@ describe("the agents' DM, per person", () => {
     expect(bruno1.seen).toContain("Qual o valor da fatura?");
     expect(bruno1.seen).not.toContain("deploy");
     expect(bruno1.seen).not.toContain("rotação de chaves");
-    expect(bruno1.system).toContain("about work it is doing for bruno");
+    expect(bruno1.system).toContain(
+      "Another agent asked you something (`ask_agent`) or handed you work or news (`tell_agent`) for bruno. Your last message is your answer",
+    );
+    expect(bruno1.system).toContain(
+      "- A part only another agent can do: hand it on yourself (tell_agent) and end your turn saying what you handed on.",
+    );
+    expect(bruno1.system).toContain(
+      "- News that something will come from someone else: don't look for it now and don't report it missing",
+    );
     await done(q2);
 
     const q3 = await start(await inDm(f.agent.id, forAna.id, "E o rollback?"), infra.id, "dm");

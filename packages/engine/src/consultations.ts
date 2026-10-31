@@ -11,6 +11,7 @@ import {
   lt,
   ne,
   or,
+  rowsOf,
   schema,
   sql,
 } from "@agenteschat/db";
@@ -26,7 +27,7 @@ import { getMessage, insertMessage, type MessageView, withMessageDetails } from 
 import type { Notice } from "./notices";
 import { personBehindCall } from "./requester";
 import { deliverNoticeToRun, resumeRunWithResult } from "./run-resume";
-import { type AgentRun, isTerminal, replyThreadOf } from "./runs";
+import { type AgentRun, isTerminal, type RunStatus, replyThreadOf } from "./runs";
 import { MAX_HANDOFF_LINKS, refusedAtLimit } from "./stretch";
 import { noAgentText } from "./team";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
@@ -116,7 +117,7 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub; ai?: AiCheck }
   const tool: ToolDefinition = {
     name: ASK_AGENT_TOOL,
     description:
-      "Ask another agent of the organization something, e.g. a dev agent asking @infra how staging is deployed. It answers privately, with its own tools and knowledge, acting for the same person you are helping. You never wait for it: the call returns at once and its answer reaches you later as a message in this conversation (you are woken with it even after your turn ended); don't ask again meanwhile. Meanwhile do what you can yourself (read the code, the logs) and tell the person what you asked and what you found so far. Use it when another agent knows or can do something you need for this task (its role says so); don't use it for what you can do yourself, and never to ask a person (use ask_user). Never relay to an agent what the person already asked that agent directly (it got the message too and is answering it): if it is already working on it here, you are told so; wait for its answer in the conversation. Write the question so it stands alone: the other agent doesn't see this conversation. To only let an agent know something, use tell_agent.",
+      "Ask another agent of the organization something, e.g. a dev agent asking @infra how staging is deployed. It answers privately, with its own tools and knowledge, acting for the same person you are helping. You never wait for it: the call returns at once and its answer reaches you later as a message in this conversation (you are woken with it even after your turn ended); don't ask again meanwhile. Meanwhile do what you can yourself (read the code, the logs) and tell the person what you asked and what you found so far. Use it when another agent knows or can do something you need for this task (its role says so); don't use it for what you can do yourself, and never to ask a person (use ask_user). Never relay to an agent what the person already asked that agent directly (it got the message too and is answering it): if it is already working on it here, you are told so; wait for its answer in the conversation. Write the question so it stands alone: the other agent doesn't see this conversation. To hand an agent work, use tell_agent.",
     scope: "",
     inputSchema: {
       type: "object",
@@ -135,6 +136,7 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub; ai?: AiCheck }
       const reached = await reachableAgent(ctx, input.agent, deps.ai);
       if (reached.refused) return reached.refused;
       const { target, handle } = reached;
+      const between = await inAgentsDm(db, ctx);
       // The person already asked that agent here (the same message, or it is working in this thread):
       // no second request on their behalf (ADR 0034 addendum).
       const same = await sameRequestRun(db, ctx, target.id);
@@ -197,7 +199,9 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub; ai?: AiCheck }
         consultedAgentId: target.id,
       });
       return {
-        content: `Asked @${handle}. Its answer will reach you as a message in this conversation, even after this turn ends. Meanwhile do what you can yourself and tell the person what you asked and what you found so far; if there's nothing else to do now, say so and end your turn.`,
+        content: between
+          ? `Asked @${handle}. Your answer goes back once @${handle} has answered, together with it: do your own part now, then end your turn saying what you asked.`
+          : `Asked @${handle}. Its answer will reach you as a message in this conversation, even after this turn ends. Meanwhile do what you can yourself and tell the person what you asked and what you found so far; if there's nothing else to do now, say so and end your turn.`,
         data: { consultation: { id: created.id, agentId: target.id } },
       };
     },
@@ -230,7 +234,7 @@ function createTellAgentTool(deps: { pubsub?: PubSub; ai?: AiCheck }): ToolDefin
   return {
     name: TELL_AGENT_TOOL,
     description:
-      "Send another agent of the organization a note: something it should know or do, without waiting for anything back, e.g. telling @infra a deploy finished so it can watch the metrics. The call returns at once and you carry on. It reads the note privately, with its own tools and permissions (a note grants nothing). If it replies with something that matters, the reply reaches you later as a message here. To get an answer you need, use ask_agent instead. Write the note so it stands alone: the other agent doesn't see this conversation.",
+      "Hand another agent of the organization work to do, or news it should act on, e.g. @sales to hand its client notes to @support, or @infra that a deploy finished so it watches the metrics. It works on it privately, with its own tools and permissions, for the same person you are helping, and the people here see that it's on it. The call returns at once and you carry on. What comes of it reaches you here by itself, even after your turn ends, together with everything else you handed off this turn: don't check on it, send it again or set a follow_up for it. Give the whole job to the agent that owns it, with everything it needs, and let it bring in the others; don't send heads-ups to agents that only have to wait. Write the note so it stands alone: the other agent doesn't see this conversation. For an answer you need for the task, use ask_agent.",
     scope: "",
     inputSchema: {
       type: "object",
@@ -311,7 +315,10 @@ function createTellAgentTool(deps: { pubsub?: PubSub; ai?: AiCheck }): ToolDefin
         kind: "note",
       });
       return {
-        content: `Told @${handle}. Carry on; if it replies with something that matters, you'll get it as a message here.`,
+        content:
+          here && isAgentOnlyDm(here)
+            ? `Handed to @${handle}. Your answer goes back once @${handle} is done, together with what came of it: do your own part now, then end your turn saying what you handed on.`
+            : `Handed to @${handle}; it's on it, and the people here can see that. What comes of it reaches you here by itself once everything you handed off this turn is back. Tell the people in a line who has it, without promising a time, then do your own part or end your turn.`,
         data: {
           agentNote: { messageId: sent.id, agentId: target.id },
           consultation: { id: consultationId, agentId: target.id },
@@ -515,6 +522,108 @@ async function sentOpen(db: Executor, run: Pick<AgentRun, "id" | "orgId">) {
     )
     .limit(1);
   return Boolean(row);
+}
+
+/** Whether a run (one in an agents' DM) still owes an answer to a question or a note. */
+export async function answersOpen(db: Executor, run: Pick<AgentRun, "id" | "orgId">) {
+  const [row] = await db
+    .select({ id: agentConsultations.id })
+    .from(agentConsultations)
+    .where(
+      and(
+        eq(agentConsultations.orgId, run.orgId),
+        eq(agentConsultations.targetRunId, run.id),
+        eq(agentConsultations.status, "open"),
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
+}
+
+/** A question or a hand-off as `handOffsFrom` reads it, with where its colleague's run is. */
+export interface HandOff {
+  id: string;
+  kind: "question" | "note";
+  status: "open" | "answered" | "expired" | "failed";
+  /** The question, or the note, as it was sent. */
+  question: string;
+  /** Once answered, the answer; once failed, why. */
+  answer: string | null;
+  handle: string;
+  createdAt: Date;
+  answeredAt: Date | null;
+  /** The sender heard what came of it. */
+  reportedAt: Date | null;
+  /** Null: nobody started it (the stretch held it). */
+  target: { status: RunStatus; waitingMachineId: string | null; handedOn: boolean } | null;
+}
+
+/** How many of them the block lists. */
+const HAND_OFFS_LISTED = 8;
+
+/**
+ * What this agent asked or handed off from the conversation `run` works in (in a channel: its thread, or its main
+ * timeline) in the last day: still out, or, unless `openOnly`, closed within the hour. Newest first. "# Work you
+ * handed off here" and `wakesLater` read it.
+ */
+export async function handOffsFrom(
+  db: Executor,
+  run: Pick<AgentRun, "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId">,
+  options: { openOnly?: boolean } = {},
+): Promise<HandOff[]> {
+  const conversation =
+    run.threadRootId === run.triggerMessageId
+      ? sql`r.thread_root_id = r.trigger_message_id`
+      : sql`r.thread_root_id = ${run.threadRootId}::uuid`;
+  const rows = rowsOf<{
+    id: string;
+    kind: HandOff["kind"];
+    status: HandOff["status"];
+    question: string;
+    answer: string | null;
+    handle: string;
+    created_at: string | Date;
+    answered_at: string | Date | null;
+    reported_at: string | Date | null;
+    target_status: RunStatus | null;
+    waiting_machine_id: string | null;
+    handed_on: boolean | string | null;
+  }>(
+    await db.execute(sql`select c.id, c.kind, c.status, c.question, c.answer, a.handle, c.created_at, c.answered_at,
+        c.reported_at, t.status as target_status, t.waiting_machine_id,
+        exists (select 1 from agent_consultations s where s.asker_run_id = t.id and s.status = 'open') as handed_on
+      from agent_consultations c
+      join agent_runs r on r.id = c.asker_run_id
+      join channels ch on ch.id = r.channel_id
+      join agents a on a.id = c.target_agent_id
+      left join agent_runs t on t.id = c.target_run_id
+      where c.org_id = ${run.orgId}::uuid and c.asker_agent_id = ${run.agentId}::uuid
+        and c.created_at > now() - interval '1 day'
+        and r.channel_id = ${run.channelId}::uuid
+        and (ch.kind <> 'channel' or ${conversation})
+        and (c.status = 'open'${options.openOnly ? sql`` : sql` or c.answered_at > now() - interval '1 hour'`})
+      order by c.created_at desc
+      limit ${HAND_OFFS_LISTED}`),
+  );
+  const date = (v: string | Date | null) => (v === null ? null : new Date(v));
+  return rows.map((r) => ({
+    id: r.id,
+    kind: r.kind,
+    status: r.status,
+    question: r.question,
+    answer: r.answer,
+    handle: r.handle,
+    createdAt: new Date(r.created_at),
+    answeredAt: date(r.answered_at),
+    reportedAt: date(r.reported_at),
+    target: r.target_status
+      ? {
+          status: r.target_status,
+          waitingMachineId: r.waiting_machine_id,
+          handedOn: r.handed_on === true || r.handed_on === "t",
+        }
+      : null,
+  }));
 }
 
 /**
@@ -871,7 +980,10 @@ async function noteReply(
   return delivered.message;
 }
 
-/** Whether a reply to a note asks its sender something or gives it something to act on (not a bare acknowledgement). */
+/**
+ * Whether the sender of a note needs its reply: what came of the work, a question, something to act on or know. Not
+ * a bare acknowledgement, nor only that something the note announced hasn't come yet.
+ */
 export async function noteReplyMatters(
   judge: Judge,
   input: { orgId: string; agentId: string; runId: string; note: string; reply: string },
@@ -886,10 +998,11 @@ export async function noteReplyMatters(
       matters: {
         type: "noul",
         instructions:
-          "An AI agent sent another agent `note`, and got `reply` back. Does the reply ask the sender something, or give it something to act on or to know (a result, a problem, a correction)?",
+          "An AI agent handed another agent `note` (work to do, or news) and got `reply` back when the other agent finished. Does the sender need this reply?",
         criteria: {
-          true: "It asks the sender something, or tells it something it should act on or know.",
-          false: "It only acknowledges, thanks or agrees ('got it', 'thanks', 'will do', an emoji).",
+          true: "It says what came of what the note asked (done, partly done, not done, a result, a file, a problem), asks the sender something, or tells it something to act on or know.",
+          false:
+            "It only acknowledges, thanks or agrees ('got it', 'will do', an emoji), or only says that something the note announced hasn't arrived yet or that it will wait for it.",
         },
       },
     },

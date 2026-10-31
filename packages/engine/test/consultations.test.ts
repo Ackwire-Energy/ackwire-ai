@@ -626,25 +626,31 @@ describe("ask_agent", () => {
     expect((await consultations())[0]).toMatchObject({ status: "answered", answer: "I don't know more than that." });
   });
 
-  test("the asker reads the consulted agent's whole answer, even one that ends on a promise", async () => {
+  test("between agents, an answer that ends on a promise nothing keeps gets one more turn, and the kept one goes back", async () => {
     const promised =
       "Staging deploys with deploy.sh on host s1. I'll double-check the staging config and get back to you.";
+    const kept = "Staging deploys with deploy.sh on host s1, and its config checks out.";
     let infraCalls = 0;
     f = await setup({
       askAgent: true,
-      // A judge that calls @infra's last words an unkept promise: the agents' DM never asks it.
+      // A judge that calls @infra's last words an unkept promise.
       judge: (kind, _id, _state, _question, request) =>
         kind === "follow_through" && request.agentId !== f.agent.id ? "unkept" : undefined,
-      reply: consultReply(() => answer(++infraCalls === 1 ? promised : "Config checked.")),
+      reply: consultReply(() => answer(++infraCalls === 1 ? promised : kept)),
     });
     const infra = await addInfra();
     await post("@dev how do we deploy to staging?");
     await drainOutbox(f.db, f.handlers);
 
-    expect(infraCalls).toBe(1);
-    expect(await consultations()).toMatchObject([{ status: "answered", answer: promised }]);
+    // Its last message is its answer and nothing wakes it there again: it does the rest now (ADR 0094).
+    expect(infraCalls).toBe(2);
+    expect(await consultations()).toMatchObject([{ status: "answered", answer: kept }]);
     const judged = (f.context.judge as unknown as { calls: { kind: string; agentId?: string }[] }).calls;
-    expect(judged.filter((j) => j.kind === "follow_through" && j.agentId === infra.id)).toEqual([]);
+    expect(judged.filter((j) => j.kind === "follow_through" && j.agentId === infra.id)).toHaveLength(1);
+    const nudged = f.provider.calls
+      .map((c) => c.request)
+      .filter((r) => inAgentDm(r) && lastText(r).includes("your answer goes back as it is"));
+    expect(nudged).toHaveLength(1);
   });
 
   test("an asker that says it will pass the answer on keeps that promise: the answer wakes it, no nudge", async () => {
@@ -659,8 +665,9 @@ describe("ask_agent", () => {
     await post("@dev how do we deploy to staging?");
     await drainOutbox(f.db, f.handlers);
 
-    // Each run's end is read once (ADR 0089); the open question kept the first promise.
-    expect(judged).toBe(2);
+    // Each run's end is read once (ADR 0089), the consulted one's too (ADR 0094); the open question kept the
+    // first promise.
+    expect(judged).toBe(3);
     const steps = await f.db.select().from(schema.agentRunSteps);
     expect(steps.filter((s) => s.data.nudged === "promise")).toEqual([]);
     const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);

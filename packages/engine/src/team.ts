@@ -206,7 +206,7 @@ export function teamPrompt(
     others.length > TEAM_IN_PROMPT
       ? `${others.length} other agents work in this organization.`
       : `Other agents in this organization: ${others.map((a) => `@${a.handle}${a.role ? ` (${a.role})` : ""}`).join(", ")}.`;
-  return `# Your team\n${lines} Use \`${FIND_AGENT_TOOL}\` to see who knows or can do something and what each one can do; ask one with \`ask_agent\` when you need its help for the task, instead of saying you can't or sending the person to it (its answer reaches you as a message; you carry on meanwhile), or let one know something with \`tell_agent\`.`;
+  return `# Your team\n${lines} Use \`${FIND_AGENT_TOOL}\` to see who knows or can do something and what each one can do. When you need another agent's answer for the task, ask it with \`ask_agent\`; to hand one work, use \`tell_agent\`, giving the whole job to the agent that owns it with everything it needs. Do this instead of saying you can't or sending the person to it. Either way the call returns at once and what comes of it reaches you here by itself.`;
 }
 
 const words = (s: string) =>
