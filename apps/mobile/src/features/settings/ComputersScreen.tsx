@@ -177,7 +177,7 @@ function HostComputer() {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const { orgId, org } = useOrg();
-  const admin = can(org?.role, "configure");
+  const admin = can(org, "configure");
   const machines = useMachines(orgId);
   const host = useHostComputer(orgId);
   const auth = useAuthConfig();
@@ -266,7 +266,7 @@ function OtherComputers() {
         </GroupedList>
       ) : null}
       <GroupedFooter>{t("computers.other.text")}</GroupedFooter>
-      {can(org?.role, "post") ? <ConnectComputer /> : null}
+      {can(org, "pair_computers") ? <ConnectComputer /> : null}
     </>
   );
 }
@@ -291,15 +291,15 @@ function ConnectComputer() {
 }
 
 /**
- * "Qual computador cada agente usa": each agent and its computer. Admins pick any; an agent's owner, the ones they
- * connected (the server checks again); a row anyone else can't change only says it.
+ * "Qual computador cada agente usa": each agent and its computer. Who manages agents picks any; an agent's owner,
+ * the ones they connected (the server checks again); a row anyone else can't change only says it.
  */
 function AgentComputers() {
   const { t } = useTranslation();
   const c = useColors();
   const { orgId, org } = useOrg();
   const meId = useMeId();
-  const admin = can(org?.role, "configure");
+  const admin = can(org, "manage_agents");
   const agents = useAgents(orgId);
   const machines = useMachines(orgId);
   const setupQ = useComputerSetup(orgId);
@@ -348,7 +348,7 @@ export function AgentComputerScreen({ agentId }: { agentId: string }) {
   const toast = useToast();
   const { orgId, org } = useOrg();
   const meId = useMeId();
-  const admin = can(org?.role, "configure");
+  const admin = can(org, "manage_agents");
   const agents = useAgents(orgId);
   const machines = useMachines(orgId);
   const setupQ = useComputerSetup(orgId);

@@ -182,7 +182,7 @@ import {
 import { dividerIsFar, firstNewKey, pillParts, unseenOf } from "@/chat/unseen";
 import { ActionCard } from "@/components/ActionCard";
 import { AgentActionReceipts } from "@/components/AgentActions";
-import { ActorAvatar, AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
+import { ActorAvatar, AgentAvatar, AgentSpinner, PersonAvatar } from "@/components/AgentAvatar";
 import { AgentPanel } from "@/components/AgentPanel";
 import { ApprovalAsk } from "@/components/ApprovalAsk";
 import { InlineApproval } from "@/components/ApprovalItem";
@@ -235,6 +235,7 @@ import { NavToggle } from "@/components/NavDrawer";
 import { CHANNEL_NAME, toChannelName } from "@/components/NewChannelDialog";
 import { KeyGuardDialog, NoAiBanner, NoAiCard, useNoAiAutoOpen } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
+import { AuthorStatus } from "@/components/Presence";
 import { ProfileTrigger } from "@/components/ProfileCard";
 import { MessageReactions, useEmojiLabels } from "@/components/Reactions";
 import { ActivitySky, ChannelWelcome, colorOf } from "@/components/Sky";
@@ -3014,14 +3015,18 @@ export const TimelineMessage = memo(function TimelineMessage({
             {m.author.type === "agent" ? (
               // At work: thinking, then writing; a saved message: the agent at rest (one no longer in the team too).
               // A person's 👍/👎 on this message plays a face on it (`applyReactions`).
+              // Both wear their presence badge (ADR 0084).
               <AgentAvatar
                 agentId={m.author.id}
                 name={name}
                 state={live ? agentStateOfRun(live) : "idle"}
                 reactionKey={live ? undefined : m.id}
+                presence
               />
+            ) : person ? (
+              <PersonAvatar id={person.userId} name={name} presence />
             ) : (
-              <Avatar kind="person" name={name} imageUrl={person?.image} />
+              <Avatar kind="person" name={name} />
             )}
           </ProfileTrigger>
         ) : m.author.type === "agent" ? (
@@ -3040,6 +3045,8 @@ export const TimelineMessage = memo(function TimelineMessage({
             >
               {name}
             </ProfileTrigger>
+            {/* The author's written status: its emoji, its words on hover (ADR 0084). */}
+            <AuthorStatus actor={{ type: m.author.type, id: m.author.id }} />
             {reminder && (
               <span className="msg-reminder">
                 <Icon name="bell" size={14} />
@@ -3413,8 +3420,8 @@ function ChannelDetails({
   // What "on its own" means for my messages: who reads the ones that mention nobody.
   const routing = useAiStatus(org.id, open).data?.routing;
   const update = useUpdateChannel(org.id, channel.id);
-  // The channel's creator may too, but the API doesn't say who created it yet: admins only.
-  const editable = can(org.role, "configure");
+  // Who manages channels, and the channel's creator (as the server allows).
+  const editable = can(org, "manage_channels") || channel.createdByUserId === me.user.id;
   const navigate = useNavigate();
   const toast = useToast();
   const categories = useChannelCategories(org.id);
@@ -3893,7 +3900,7 @@ function AddToChannelOffer({ channelId, agentId, onDone }: { channelId: string; 
   const add = useAddChannelMember(org.id);
   const toast = useToast();
   const name = dir.agentById.get(agentId)?.name ?? t("channel.unknownAgent");
-  const admin = can(org.role, "configure");
+  const admin = can(org, "manage_channels");
   return (
     <div className="mention-offer" role="status">
       <span className="small">{t("mentions.offer", { name })}</span>

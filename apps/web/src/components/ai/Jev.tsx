@@ -191,7 +191,7 @@ export function JevSteps({
 export function WhoPicksSection() {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const admin = can(org.role, "manage_credentials");
+  const admin = can(org, "manage_credentials");
   const jev = useJevKey();
   // The server's owner gets Jev's card where they aren't an admin too, and its reasons follow who picks.
   const status = useAiStatus(org.id, admin || Boolean(jev.data));

@@ -1,0 +1,517 @@
+/* Settings › Papéis e permissões (ADR 0085): the roles as rows, a role's own page. */
+.roles {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+/* The list: one row per role, one line each; the base role below a label. */
+.roles-list {
+  --card-pad: 0px;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+.roles-line {
+  display: flex;
+  align-items: center;
+  border-top: 1px solid var(--line);
+}
+.roles-line:first-child {
+  border-top: 0;
+}
+.roles-move {
+  display: flex;
+  gap: 2px;
+  padding-left: 12px;
+}
+.roles-row {
+  all: unset;
+  box-sizing: border-box;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 20px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.roles-row:hover {
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+}
+.roles-row:focus-visible {
+  box-shadow: inset var(--focus-ring);
+}
+.roles-row > .ac-icon {
+  flex: none;
+  color: var(--faint);
+}
+.roles-row__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.roles-row__text b {
+  font-size: 14.5px;
+  font-weight: 650;
+}
+.roles-row__text span {
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.roles-row__people {
+  flex: none;
+  width: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.roles-stack {
+  display: flex;
+}
+.roles-stack > .ac-avatar {
+  box-shadow: 0 0 0 2px var(--raised);
+}
+.roles-stack > .ac-avatar + .ac-avatar {
+  margin-left: -6px;
+}
+.roles-label {
+  padding: 14px 20px 6px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--faint);
+}
+/* The card has no padding (rows run edge to edge): the foot keeps the rows' 20px so its ⓘ lines up with the marks. */
+.roles-list .ac-card__foot {
+  margin: 0;
+  padding-inline: 20px;
+}
+.roles-foot {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.roles-foot > span {
+  flex: 1;
+}
+/* "Reordenar" stays on the foot's one 17px line (negative margins, as the ⓘ of a hint does), so the foot's own ⓘ,
+   placed from the line's top, keeps level with the text. */
+.roles-foot > .ac-btn {
+  margin-block: -5.5px;
+}
+
+/* A role's page: its mark, name and how many hold it, on one axis with the actions. */
+.roles-back {
+  all: unset;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 8px 0 4px;
+  margin-left: -4px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+.roles-back:hover {
+  background: var(--plate);
+  color: var(--ink);
+}
+.roles-back:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+.roles-id {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.roles-id__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.roles-id__name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-weight: var(--font-display-weight, 600);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+.roles-id__handle {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.roles-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px 12px 12px 3px;
+  background: var(--card-well);
+  box-shadow: var(--card-well-shadow);
+  font-size: 13px;
+  color: var(--muted);
+}
+.roles-note .ac-icon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--faint);
+}
+.roles-base,
+.roles-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Areas: the icon on the card head's key column, one level each, item by item behind "Ajustar". */
+.roles-area {
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+.roles-area__top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.roles-area__icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  color: var(--muted);
+}
+.roles-area__text {
+  flex: 1 1 220px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.roles-area__text b {
+  font-size: 14.5px;
+  font-weight: 650;
+}
+.roles-area__text span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.roles-area__line::first-letter {
+  text-transform: uppercase;
+}
+.roles-area__more .ac-icon {
+  transition: transform 0.2s var(--out);
+}
+.roles-area__more[aria-expanded="true"] .ac-icon {
+  transform: rotate(180deg);
+}
+.roles-area[data-off] .roles-area__more {
+  visibility: hidden;
+}
+.roles-area .ac-seg {
+  max-width: 100%;
+}
+.roles-area .ac-seg__item {
+  gap: 7px;
+}
+.roles-area__items {
+  margin: 10px 0 -4px 32px;
+}
+.roles-key {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.roles-key__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.roles-key__text b {
+  font-size: 14px;
+  font-weight: 600;
+}
+.roles-key__text span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.roles-key__from {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.roles-key__from .ac-icon {
+  color: var(--faint);
+}
+
+/* People. */
+.roles-people,
+.roles-pick {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.roles-person,
+.roles-pick__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.roles-person:first-child,
+.roles-pick li:first-child .roles-pick__row {
+  border-top: 0;
+}
+.roles-person__text {
+  flex: 1 1 200px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.roles-person__text b {
+  font-size: 14px;
+  font-weight: 600;
+}
+.roles-person__text span {
+  overflow: hidden;
+  font-size: 12.5px;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.roles-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+.roles-chip.ac-chip {
+  height: 24px;
+  gap: 6px;
+  padding: 0 8px 0 3px;
+}
+.roles-pick__row {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 4px;
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+}
+.roles-pick__row:focus-visible {
+  border-radius: 8px;
+  box-shadow: var(--focus-ring);
+}
+
+/* Name, color and icon. */
+.roles-look {
+  display: flex;
+  flex-direction: column;
+}
+.roles-look__row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+.roles-look__row:first-child {
+  border-top: 0;
+  padding-top: 2px;
+}
+.roles-look__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.roles-look__text b {
+  font-size: 14px;
+  font-weight: 600;
+}
+.roles-look__text span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.roles-look__name {
+  width: 260px;
+  max-width: 100%;
+}
+.roles-colors {
+  display: flex;
+  gap: 6px;
+}
+.roles-color {
+  all: unset;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-agent);
+  background: center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+  cursor: pointer;
+}
+.roles-color[aria-checked="true"] {
+  box-shadow:
+    0 0 0 2px var(--raised),
+    0 0 0 4px var(--ink);
+}
+.roles-color:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+.roles-color:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.roles-icons {
+  display: grid;
+  grid-template-columns: repeat(8, 32px);
+  gap: 6px;
+}
+.roles-iconpick {
+  all: unset;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: var(--ink2);
+  cursor: pointer;
+}
+.roles-iconpick:hover {
+  background: var(--plate);
+}
+.roles-iconpick[aria-checked="true"] {
+  background: linear-gradient(180deg, var(--card-face-top), var(--raised));
+  box-shadow: var(--card-key);
+  color: var(--ink);
+}
+.roles-iconpick:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+.roles-iconpick:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* The new role's dialog. */
+.roles-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+.roles-templates {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 2px -12px 0;
+}
+.roles-template {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.roles-template:hover {
+  background: var(--plate);
+}
+.roles-template[aria-checked="true"] {
+  background: linear-gradient(180deg, var(--card-face-top), var(--raised));
+  box-shadow: var(--card-key);
+}
+.roles-template:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+.roles-template b {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.roles-template span span {
+  display: block;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+@media (max-width: 640px) {
+  .roles-row__people {
+    display: none;
+  }
+  .roles-id {
+    flex-wrap: wrap;
+  }
+  .roles-id__name {
+    font-size: 30px;
+  }
+  .roles-look__row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .roles-icons {
+    grid-template-columns: repeat(6, 32px);
+  }
+}
+
+/* The roles picker (invitations, requests to join, a person's "+"). */
+.roles-picker.ac-btn {
+  justify-content: space-between;
+  width: 100%;
+  min-width: 0;
+  font-weight: 500;
+}
+.roles-picker__value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.roles-picker__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}

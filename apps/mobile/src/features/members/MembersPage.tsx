@@ -4,9 +4,11 @@ import {
   useJoinRequests,
   useMakeInviteLink,
   useMembers,
+  useRoles,
   useTurnOffInviteLink,
 } from "@agenteschat/client";
 import { formatShortDate, relativeTime } from "@agenteschat/client/lib/format";
+import { can } from "@agenteschat/client/lib/permissions";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -17,23 +19,26 @@ import { Page } from "../me/parts";
 import { Face } from "../shared/Face";
 import { useColors } from "../shared/hooks";
 import { copyText, successHaptic } from "../shared/parts";
-import { membersByName } from "./logic";
+import { membersByName, roleLine } from "./logic";
 
 /** How long "Copiado ✓" stays on the copy row. */
 const COPIED_MS = 1800;
 
 /**
- * Membros, a screen of Você's for admins: the requests to join (they open in their sheet), the workspace's
- * invitation link as the web's Members has it (ADR 0068: copy or share it, when it works until, turn it off; links
- * made before links could be shown again, to turn off; make one), then the people.
+ * Membros, a screen of Você's for who invites people or manages members: the requests to join (they open in their
+ * sheet) and the workspace's invitation link as the web's Members has it (ADR 0068: copy or share it, when it works
+ * until, turn it off; links made before links could be shown again, to turn off; make one), for who invites; then
+ * the people, each with their roles (ADR 0085).
  */
 export function MembersPage() {
   const { t, i18n } = useTranslation();
   const { orgId, org } = useOrg();
   const c = useColors();
   const members = useMembers(orgId);
-  const requests = useJoinRequests(orgId);
-  const links = useInviteLinks(orgId);
+  const roles = useRoles(orgId).data?.roles ?? [];
+  const invites = can(org, "invite_people");
+  const requests = useJoinRequests(orgId, invites);
+  const links = useInviteLinks(orgId, invites);
   const make = useMakeInviteLink(orgId);
   const turnOff = useTurnOffInviteLink(orgId);
   const [copied, setCopied] = useState(false);
@@ -59,94 +64,98 @@ export function MembersPage() {
   return (
     <Page title={t("members.title")}>
       <View style={styles.gap} />
-      <GroupedList>
-        <GroupedRow
-          icon="join"
-          label={t("members.requests.title")}
-          value={waiting > 0 ? String(waiting) : undefined}
-          chevron
-          onPress={() => router.push("/join-requests")}
-        />
-      </GroupedList>
+      {invites ? (
+        <>
+          <GroupedList>
+            <GroupedRow
+              icon="join"
+              label={t("members.requests.title")}
+              value={waiting > 0 ? String(waiting) : undefined}
+              chevron
+              onPress={() => router.push("/join-requests")}
+            />
+          </GroupedList>
 
-      <GroupedHeader>{t("members.link.title")}</GroupedHeader>
-      {links.isPending ? (
-        <ActivityIndicator color={c.muted} style={styles.loading} />
-      ) : (
-        <GroupedList>
-          {current?.url ? (
-            <GroupedRow
-              key="current"
-              label={current.url}
-              sub={t("members.link.help", { date: until(current) })}
-              subLines={3}
-            />
-          ) : null}
-          {current?.url ? (
-            <GroupedRow
-              key="copy"
-              icon={copied ? "check" : "copy"}
-              label={copied ? t("common.copied") : t("common.copy")}
-              onPress={() =>
-                void copyText(current.url ?? "").then((ok) => {
-                  if (!ok) return;
-                  successHaptic();
-                  setCopied(true);
-                })
-              }
-            />
-          ) : null}
-          {current?.url ? (
-            <GroupedRow
-              key="share"
-              icon="share"
-              label={t("mobile.joinRequests.share")}
-              onPress={() =>
-                void Share.share({
-                  message: t("mobile.onb.shareMessage", { org: org?.name ?? "", url: current.url ?? "" }),
-                }).catch(() => undefined)
-              }
-            />
-          ) : null}
-          {current ? (
-            <GroupedRow
-              key="off"
-              icon="x"
-              label={t("members.link.turnOff")}
-              danger
-              disabled={turnOff.isPending}
-              onPress={() => confirmTurnOff(current)}
-            />
+          <GroupedHeader>{t("members.link.title")}</GroupedHeader>
+          {links.isPending ? (
+            <ActivityIndicator color={c.muted} style={styles.loading} />
           ) : (
-            <GroupedRow
-              key="make"
-              icon="plus"
-              label={t("members.link.make")}
-              disabled={make.isPending}
-              onPress={() => make.mutate()}
-            />
+            <GroupedList>
+              {current?.url ? (
+                <GroupedRow
+                  key="current"
+                  label={current.url}
+                  sub={t("members.link.help", { date: until(current) })}
+                  subLines={3}
+                />
+              ) : null}
+              {current?.url ? (
+                <GroupedRow
+                  key="copy"
+                  icon={copied ? "check" : "copy"}
+                  label={copied ? t("common.copied") : t("common.copy")}
+                  onPress={() =>
+                    void copyText(current.url ?? "").then((ok) => {
+                      if (!ok) return;
+                      successHaptic();
+                      setCopied(true);
+                    })
+                  }
+                />
+              ) : null}
+              {current?.url ? (
+                <GroupedRow
+                  key="share"
+                  icon="share"
+                  label={t("mobile.joinRequests.share")}
+                  onPress={() =>
+                    void Share.share({
+                      message: t("mobile.onb.shareMessage", { org: org?.name ?? "", url: current.url ?? "" }),
+                    }).catch(() => undefined)
+                  }
+                />
+              ) : null}
+              {current ? (
+                <GroupedRow
+                  key="off"
+                  icon="x"
+                  label={t("members.link.turnOff")}
+                  danger
+                  disabled={turnOff.isPending}
+                  onPress={() => confirmTurnOff(current)}
+                />
+              ) : (
+                <GroupedRow
+                  key="make"
+                  icon="plus"
+                  label={t("members.link.make")}
+                  disabled={make.isPending}
+                  onPress={() => make.mutate()}
+                />
+              )}
+              {earlier.map((l) => {
+                const when = relativeTime(t, i18n.language, l.createdAt);
+                return (
+                  <GroupedRow
+                    key={l.id}
+                    icon="x"
+                    label={t("members.link.turnOff")}
+                    sub={
+                      l.createdBy
+                        ? t("members.link.earlier", { when, name: l.createdBy, date: until(l) })
+                        : t("members.link.earlierNoName", { when, date: until(l) })
+                    }
+                    subLines={3}
+                    danger
+                    disabled={turnOff.isPending}
+                    onPress={() => confirmTurnOff(l)}
+                  />
+                );
+              })}
+            </GroupedList>
           )}
-          {earlier.map((l) => {
-            const when = relativeTime(t, i18n.language, l.createdAt);
-            return (
-              <GroupedRow
-                key={l.id}
-                icon="x"
-                label={t("members.link.turnOff")}
-                sub={
-                  l.createdBy
-                    ? t("members.link.earlier", { when, name: l.createdBy, date: until(l) })
-                    : t("members.link.earlierNoName", { when, date: until(l) })
-                }
-                subLines={3}
-                danger
-                disabled={turnOff.isPending}
-                onPress={() => confirmTurnOff(l)}
-              />
-            );
-          })}
-        </GroupedList>
-      )}
+        </>
+      ) : null}
 
       <GroupedHeader>{t("members.people")}</GroupedHeader>
       {members.data ? (
@@ -154,10 +163,10 @@ export function MembersPage() {
           {membersByName(members.data, i18n.language).map((m) => (
             <GroupedRow
               key={m.userId}
-              leading={<Face who={{ type: "person", id: m.userId }} size={30} live={false} />}
+              leading={<Face who={{ type: "person", id: m.userId }} size={30} live={false} presence ring={c.raised} />}
               label={m.name}
               sub={m.email}
-              value={t(`roles.${m.role}`)}
+              value={roleLine(t, m, roles)}
             />
           ))}
         </GroupedList>

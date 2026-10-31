@@ -46,8 +46,8 @@ function Gallery() {
   const pull = usePullRefresh(async () => {
     await Promise.all([catalog.refetch(), connections.refetch(), servers.refetch()]);
   });
-  // Connecting is for admins (the server checks it too).
-  const admin = can(org?.role, "configure");
+  // Connecting is for who manages connectors (the server checks it too).
+  const admin = can(org, "manage_connectors");
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<string>("all");
   const list = catalog.data?.connectors ?? [];

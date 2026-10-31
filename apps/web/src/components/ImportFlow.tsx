@@ -1300,7 +1300,7 @@ export function ImportExportSection() {
   const { org } = useOrg();
   const api = useApi();
   const flow = useImportFlow(org.id);
-  if (!can(org.role, "manage_agents")) return null;
+  if (!can(org, "create_agents")) return null;
   const download = () =>
     fileSaver.save(api.imports.exportUrl(org.id), `agentes-chat-${new Date().toISOString().slice(0, 10)}.json`);
   return (

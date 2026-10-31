@@ -814,7 +814,7 @@ export async function postPersonMessage(
 ): Promise<MessageView> {
   // One access check (membership + channel) instead of two round trips.
   const { channel, membership } = await requireChannelAccess(deps.db, userId, orgId, channelId);
-  if (!can(membership.role, "post")) throw new ForbiddenError();
+  if (!can(membership, "post")) throw new ForbiddenError();
   // A forum topic is written through the forum (its turns), never as a plain chat (ADR 0022).
   if (channel.kind === "forum")
     throw new ValidationError("Post in the forum from the topic's page", "forum.post_from_topic");

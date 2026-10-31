@@ -10,6 +10,7 @@ import { type PreviewMeta, previewMeta } from "./message-preview";
 import { type Message, messageView, replyExcerpt } from "./messages";
 import { pendingCommandsSql } from "./mission-command-rules";
 import { can, type Membership, requirePermission } from "./organizations";
+import { maySql } from "./permissions";
 
 const { threads, messages, channels, channelMembers } = schema;
 
@@ -172,7 +173,7 @@ async function requireThread(db: Database, userId: string, orgId: string, rootId
 
 /** Plain threads have no owner (ADR 0029 §9): their creator, the root's author or an admin manage them. */
 function mayManage(userId: string, membership: Membership, row: ThreadRow | null, root: Message) {
-  return row?.createdBy === userId || root.authorUserId === userId || can(membership.role, "manage_members");
+  return row?.createdBy === userId || root.authorUserId === userId || can(membership, "manage_channels");
 }
 
 function requireManage(userId: string, membership: Membership, row: ThreadRow | null, root: Message) {
@@ -206,7 +207,7 @@ async function requireManageThread(
       ),
     );
   if (mission) {
-    if (mission.ownerId === userId || can(membership.role, "manage_members")) return;
+    if (mission.ownerId === userId || can(membership, "manage_channels")) return;
     throw new ForbiddenError(
       "Only the mission's owner or an admin can do this while the mission is open",
       "thread.not_allowed",
@@ -417,7 +418,7 @@ export async function createThreadFromRange(
   const { db } = deps;
   const { orgId } = input;
   const { channel, membership } = await requireChannelAccess(db, actorId, orgId, input.channelId);
-  if (!can(membership.role, "post")) throw new ForbiddenError();
+  if (!can(membership, "post")) throw new ForbiddenError();
   if (channel.kind === "forum") {
     throw new ValidationError("Forum topics have no threads", "thread.forum");
   }
@@ -973,7 +974,6 @@ const ACTIVE_RUN = sql`('queued', 'running', 'waiting_approval', 'waiting_input'
 async function queryThreads(
   db: Database,
   userId: string,
-  isAdmin: boolean,
   input: ListThreadsInput & { rootId?: string; anyState?: boolean },
 ): Promise<{ rows: ThreadSqlRow[]; nextCursor: string | null }> {
   const limit = Math.min(Math.max(input.limit ?? 30, 1), 100);
@@ -1049,7 +1049,7 @@ async function queryThreads(
               and aq.expires_at > now()) and ${participated})
             or exists (select 1 from ${schema.approvals} ap where ap.org_id = ${orgId}::uuid
               and ap.status = 'pending' and ap.thread_root_id = root.id
-              and (${isAdmin}::boolean or ap.owner_user_id = ${userId}))
+              and (${maySql(orgId, userId, "approve_actions")} or ap.owner_user_id = ${userId}))
           ) as needs_you,
           -- The model's "resolved?" holds while no message came after the one it read.
           (coalesce(t.state, 'open') = 'open' and t.resolved_suggested_at is not null
@@ -1206,8 +1206,8 @@ export async function listThreads(
   const membership = await requirePermission(db, actorId, input.orgId, "read");
   // A channel's list: the same check as reading the channel (403 for non-members).
   if (input.channelId) await requireChannelAccess(db, actorId, input.orgId, input.channelId);
-  const isAdmin = can(membership.role, "manage_members");
-  const { rows, nextCursor } = await queryThreads(db, actorId, isAdmin, input);
+  const isAdmin = can(membership, "manage_channels");
+  const { rows, nextCursor } = await queryThreads(db, actorId, input);
   const extras = await threadExtras(db, input.orgId, rows);
   return { threads: rows.map((r) => toView(r, extras, actorId, isAdmin)), nextCursor };
 }
@@ -1216,8 +1216,8 @@ export async function listThreads(
 export async function getThread(db: Database, actorId: string, orgId: string, rootId: string): Promise<ThreadInfo> {
   if (!UUID.test(rootId)) throw new NotFoundError("Thread not found");
   const { channel, membership } = await requireThread(db, actorId, orgId, rootId);
-  const isAdmin = can(membership.role, "manage_members");
-  const { rows } = await queryThreads(db, actorId, isAdmin, {
+  const isAdmin = can(membership, "manage_channels");
+  const { rows } = await queryThreads(db, actorId, {
     orgId,
     channelId: channel.id,
     rootId,
