@@ -12,8 +12,8 @@ afterEach(() => {
   localStorage.clear();
 });
 
-const go = async (state = seedState()) => {
-  await renderApp(`/org/${ORG_ID}/c/${GENERAL_ID}`, { api: createFakeApi(state) });
+const go = async (state = seedState(), api = createFakeApi(state)) => {
+  await renderApp(`/org/${ORG_ID}/c/${GENERAL_ID}`, { api });
   await settle(8);
   return state;
 };
@@ -54,6 +54,21 @@ describe("the channels' order in the sidebar (ADR 0080)", () => {
     expect(await dragOnto(row("general"), row("eng"), "bottom")).toBe("after");
     expect(places(state).at(-1)).toEqual([GENERAL_ID, { categoryId: null, beforeChannelId: null }]);
     expect(names()).toEqual(["eng", "general"]);
+  });
+
+  test("a drop where the channel already is sends nothing", async () => {
+    const state = await go();
+    expect(await dragOnto(row("eng"), row("general"), "top")).toBe("before");
+    expect(await dragOnto(row("general"), row("eng"), "bottom")).toBe("after");
+    expect(places(state)).toEqual([]);
+  });
+
+  test("nothing drags until the categories load", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    api.chat.categories = () => new Promise(() => {});
+    await go(state, api);
+    expect(row("general").getAttribute("draggable")).toBe("false");
   });
 
   test("a member drags only the channels they created", async () => {
