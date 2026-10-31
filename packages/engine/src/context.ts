@@ -368,7 +368,8 @@ export async function buildRunContext(
   const samePerson = agentsDm ? await forSamePerson(db, run, fullHistory, trigger.id) : null;
   const history = samePerson ? samePerson.history : fullHistory;
 
-  const [names, members, zone] = await Promise.all([
+  const listsTeam = options.team && channel.kind !== "forum";
+  const [names, members, zone, talks] = await Promise.all([
     authorNames(db, history),
     caches.channelMembers.getOrLoad(`${run.orgId}:${run.channelId}`, () =>
       db
@@ -394,6 +395,8 @@ export async function buildRunContext(
       }[]
     >,
     zoneOf(db, run.orgId, trigger.authorUserId),
+    // Who "# Your team" lists (below) depends on it: read with the rest, not one more round trip before the model call.
+    listsTeam ? talksToAgents(db, run.orgId, trigger.authorUserId) : true,
   ]);
   // One statement, two parts: what agents already did in this thread (or DM),
   // and this agent's own work in other conversations the requester is in.
@@ -516,16 +519,15 @@ export async function buildRunContext(
     .filter((m) => m.agentId && referencedIds.includes(m.agentId))
     .map((m) => `@${m.agentHandle}`);
   // The rest of the org's agents: channel members are described in "Where you are".
-  const team =
-    options.team && channel.kind !== "forum"
-      ? teamPrompt(
-          await loadTeam(db, run.orgId),
-          agent.id,
-          requester,
-          new Set(others.map((m) => m.agentId as string)),
-          await talksToAgents(db, run.orgId, requester),
-        )
-      : "";
+  const team = listsTeam
+    ? teamPrompt(
+        await loadTeam(db, run.orgId),
+        agent.id,
+        requester,
+        new Set(others.map((m) => m.agentId as string)),
+        talks,
+      )
+    : "";
   const memberList = members
     .map((m) => (m.agentHandle ? `${m.agentName} (@${m.agentHandle}, agent)` : `${m.userName ?? "unknown"} (person)`))
     .join(", ");
