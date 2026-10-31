@@ -17,8 +17,8 @@ import { TextArea } from "../shared/TextArea";
 export const openAgentDelete = (id: string) => router.push({ pathname: "/agent-delete", params: { id } });
 
 /**
- * Deleting an agent for good (ADR 0082), as the web's Configurações › Zona de perigo: what goes and what stays,
- * its name typed to confirm, then the row that deletes it. Admins reach it from "Editar agente", and an archived
+ * Deleting an agent for good (ADR 0082), as the web's Configurações › Zona de perigo: what goes and what stays
+ * (and that the team has no coordinator after it, ADR 0092), its name typed to confirm, then the row that deletes it. Admins reach it from "Editar agente", and an archived
  * agent's (it has no profile) from Agentes › Arquivados.
  */
 export function DeleteAgentScreen({ id }: { id: string }) {
@@ -58,6 +58,7 @@ export function DeleteAgentScreen({ id }: { id: string }) {
       <GroupedList>
         <GroupedRow icon="x" label={t("agentPage.delete.goes")} labelLines={4} />
         <GroupedRow icon="chat" label={t("agentPage.delete.stays")} labelLines={4} />
+        {agent.coordinator ? <GroupedRow icon="flag" label={t("coordinator.archive", g)} labelLines={4} /> : null}
       </GroupedList>
       <Gap />
       <TextArea

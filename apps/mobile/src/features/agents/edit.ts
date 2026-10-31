@@ -45,11 +45,11 @@ export function shuffleLook(current: FullLook, rand: () => number = Math.random)
   return { ...current, color: AGENT_COLORS.find((c) => c !== current.color) ?? current.color };
 }
 
-export type AgentEditField = "name" | "role" | "instructions" | "look";
+export type AgentEditField = "name" | "role" | "instructions" | "look" | "coordinator";
 
 /** Who manages agents changes everything here; the agent's own person, its look (as on the web). */
 export function editableFields(viewer: { admin: boolean; owner: boolean }): Set<AgentEditField> {
-  if (viewer.admin) return new Set(["name", "role", "instructions", "look"]);
+  if (viewer.admin) return new Set(["name", "role", "instructions", "look", "coordinator"]);
   if (viewer.owner) return new Set(["look"]);
   return new Set();
 }
@@ -59,6 +59,8 @@ export interface AgentDraft {
   role: string;
   instructions: string;
   look: FullLook;
+  /** It coordinates the team (ADR 0092). */
+  coordinator: boolean;
 }
 
 /** What a save sends: only the fields that changed and may be changed; null when there is nothing. */
@@ -73,5 +75,6 @@ export function agentChanges(
   if (fields.has("role") && draft.role.trim() !== saved.role.trim()) out.role = draft.role.trim();
   if (fields.has("instructions") && draft.instructions !== saved.instructions) out.instructions = draft.instructions;
   if (fields.has("look") && !sameLook(draft.look, saved.look)) out.appearance = { ...draft.look };
+  if (fields.has("coordinator") && draft.coordinator !== saved.coordinator) out.coordinator = draft.coordinator;
   return Object.keys(out).length > 0 ? out : null;
 }

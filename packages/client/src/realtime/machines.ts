@@ -200,12 +200,17 @@ const SETUP_FIELDS = [
  * computer, and one active again waits for one. `org.deleting` (an owner deleted it) sets its deletion there, so the
  * closing screen takes its place at once. `org.limits` (a new plan, ADR 0079) asks for the limits again, so a full
  * workspace's invitations open by themselves. `agent.groups` (ADR 0083) says the groups of agents changed: they are
- * read again. `member.status` and `agent.status` (ADR 0084) refetch the people and the agents' presence. Returns
- * whether the event was one of these.
+ * read again, and `agent.coordinator` (ADR 0092) that another agent coordinates the team, or none: the agents are.
+ * `member.status` and `agent.status` (ADR 0084) refetch the people and the agents' presence. Returns whether the
+ * event was one of these.
  */
 export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { type: string }): boolean {
   if (event.type === "agent.groups") {
     void qc.invalidateQueries({ queryKey: keys.agentGroups(orgId) });
+    return true;
+  }
+  if (event.type === "agent.coordinator") {
+    void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
     return true;
   }
   if (event.type === "machine.provisioning") {

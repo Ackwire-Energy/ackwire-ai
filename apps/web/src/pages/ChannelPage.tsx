@@ -3723,9 +3723,11 @@ function ChannelDetails({
                 <span className="small muted">
                   {!r.autoReply
                     ? t("channelMembers.mentionLine", { handle: r.handle })
-                    : picksForMe(routing)
-                      ? t("channelMembers.aloneLine", agentGrammar(t, r.name))
-                      : t(replyAloneKey(routing), agentGrammar(t, r.name))}
+                    : !picksForMe(routing)
+                      ? t(replyAloneKey(routing), agentGrammar(t, r.name))
+                      : dir.agentById.get(r.id)?.coordinator
+                        ? t("channelMembers.coordinatorLine")
+                        : t("channelMembers.aloneLine", agentGrammar(t, r.name))}
                 </span>
               </span>
               {editable && (

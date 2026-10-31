@@ -1620,6 +1620,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("agents.update", orgId, agentId, input);
         const agent = state.agents.find((a) => a.id === agentId);
         if (!agent) throw new ApiError(404, "not_found", "Agent not found");
+        // One agent coordinates the team at a time (ADR 0092).
+        if (input.coordinator) for (const a of state.agents) a.coordinator = false;
         Object.assign(agent, input);
         return { ...agent };
       },

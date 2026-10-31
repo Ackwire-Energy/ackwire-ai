@@ -52,6 +52,21 @@ describe("deleting an agent (ADR 0082)", () => {
     expect(document.body.textContent).toContain("A Ada foi apagada.");
   });
 
+  test("the team's coordinator: deleting or archiving it says nobody coordinates after it (ADR 0092)", async () => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.coordinator = true;
+    await go(`agents/${ADA_ID}?tab=settings&sec=danger`, state);
+    const AFTER = "A Ada coordena o time. Depois disso, ninguém coordena até alguém escolher outro agente.";
+    await click(screen().getByRole("button", { name: "Apagar" }));
+    const deleting = screen().getByRole("dialog", { name: "Apagar a Ada de vez?" });
+    expect(deleting.textContent).toContain(AFTER);
+    await click(within(deleting).getByRole("button", { name: "Cancelar" }));
+    const danger = document.getElementById("agp-sec-danger") as HTMLElement;
+    await click(within(danger).getByRole("button", { name: "Arquivar" }));
+    expect(screen().getByRole("dialog", { name: "Arquivar a Ada?" }).textContent).toContain(AFTER);
+  });
+
   test("an old message still names a deleted agent; its card says it left, with nothing to do", async () => {
     const state = adaDeleted();
     // A question she asked, answered before she went.
