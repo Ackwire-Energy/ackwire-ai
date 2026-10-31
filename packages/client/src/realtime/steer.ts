@@ -335,10 +335,13 @@ export function steerStateIn(state: SteerStoreState, messageId: string): SteerSt
   return null;
 }
 
-/** The run that continues this stopped reply (`meta.canceled.continuedRunId`), if any. */
+/**
+ * The run that continues this stopped reply (`meta.canceled.continuedRunId`), or this reply of a run that ended at
+ * its step limit (`meta.stepLimit.continuedRunId`), if any.
+ */
 export function continuedRunIdOf(message: Pick<Message, "meta">): string | null {
-  const canceled = message.meta?.canceled as { continuedRunId?: unknown } | undefined;
-  return typeof canceled?.continuedRunId === "string" ? canceled.continuedRunId : null;
+  const ended = (message.meta?.canceled ?? message.meta?.stepLimit) as { continuedRunId?: unknown } | undefined;
+  return typeof ended?.continuedRunId === "string" ? ended.continuedRunId : null;
 }
 
 // ── The app's one store ───────────────────────────────────────────────────────
