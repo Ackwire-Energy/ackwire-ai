@@ -87,6 +87,7 @@ import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { SwitchComputerDialog } from "@/components/MachineOutages";
 import { useOrg } from "@/components/org-context";
+import { useComputerEdition } from "@/components/WorkspaceComputer";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { lookOf } from "@/lib/look";
 import { useOpenParam } from "@/lib/open-param";
@@ -982,9 +983,11 @@ function RoutineDetails({
   );
   const nexts = described.data?.ok ? described.data.nextRuns.slice(0, 4) : r.nextRunAt ? [r.nextRunAt] : [];
   const fix = r.canManage ? pausedFix(r) : null;
-  // "Trocar computador": the outage its run waits on, for whoever can move agents.
+  // "Trocar computador": the outage its run waits on, for whoever can move agents, where people connect their own
+  // computers (a Cloud workspace has one).
+  const selfHost = useComputerEdition(org.id) === "selfhost";
   const outage =
-    r.state === "waiting_computer" && r.waitingFor && can(org, "manage_agents")
+    selfHost && r.state === "waiting_computer" && r.waitingFor && can(org, "manage_agents")
       ? outages.data?.outages.find((o) => o.machineId === r.waitingFor?.machineId)
       : undefined;
   const health = healthWords(r.health);
@@ -1539,7 +1542,12 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
               <Select
                 value={agentId || undefined}
                 onValueChange={setAgentId}
-                options={agents.map((a) => ({ value: a.id, label: a.name, description: a.role || undefined }))}
+                options={agents.map((a) => ({
+                  value: a.id,
+                  label: a.name,
+                  description: a.role || undefined,
+                  leading: actors.avatar({ type: "agent", id: a.id }),
+                }))}
               />
             </Field>
             <Field label={t("routines.form.target")} id="nr-target">
@@ -1577,7 +1585,10 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
                       }
                     />
                     <span className="scope-row__text" aria-hidden="true">
-                      <span>{a.name}</span>
+                      <span className="ac-iconline">
+                        {actors.avatar({ type: "agent", id: a.id })}
+                        <span>{a.name}</span>
+                      </span>
                     </span>
                   </label>
                 );

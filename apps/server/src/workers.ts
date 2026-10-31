@@ -226,7 +226,8 @@ export function startWorkers(deps: WorkerDeps) {
   }
   if (mail?.deps.mail?.composio) {
     every("mailReconcile", WORKER_INTERVALS_MS.mailReconcile, async () => {
-      await reconcileComposioAccounts(mail.deps);
+      const r = await reconcileComposioAccounts(mail.deps);
+      for (const failure of r.failed) log.warn("mail account check failed", failure);
     });
   }
 

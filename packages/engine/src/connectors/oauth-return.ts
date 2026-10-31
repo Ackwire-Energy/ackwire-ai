@@ -56,6 +56,17 @@ export function desktopOAuthRedirect(input: { org: string; state?: string; code?
   return withParams(DESKTOP_OAUTH_REDIRECT, input);
 }
 
+/**
+ * A mailbox's return from Composio (mail accounts.ts) rides the same link. The callback has read the account
+ * already, so the link only says how it went: `state=mail` and `code=connected|failed`, in the fields the apps
+ * pass on (deep_link.rs). apps/web DesktopConnectorPage.tsx reads it.
+ */
+export const DESKTOP_MAIL_STATE = "mail";
+
+/** The desktop app's deep link after a mailbox's return; no organization when the mailbox wasn't found. */
+export const desktopMailRedirect = (org: string | undefined, ok: boolean) =>
+  desktopOAuthRedirect({ org: org ?? "", state: DESKTOP_MAIL_STATE, code: ok ? "connected" : "failed" });
+
 function withParams(link: string, input: { org?: string; state?: string; code?: string; error?: string }) {
   const url = new URL(link);
   if (input.org) url.searchParams.set("org", input.org);

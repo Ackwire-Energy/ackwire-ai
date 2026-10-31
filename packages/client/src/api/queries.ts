@@ -1330,7 +1330,8 @@ export function useMailAction(orgId: string) {
       meta: { silent: true },
     }),
     connectComposio: useMutation({
-      mutationFn: (input: { provider: "gmail" | "outlook"; label?: string }) => api.mail.connectComposio(orgId, input),
+      mutationFn: (input: { provider: "gmail" | "outlook"; label?: string; accountId?: string; desktop?: boolean }) =>
+        api.mail.connectComposio(orgId, input),
     }),
     update: useMutation({
       mutationFn: ({ accountId, ...input }: MailAccountUpdate & { accountId: string }) =>

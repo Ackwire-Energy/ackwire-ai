@@ -77,6 +77,7 @@ Send detection never trusts the tool name alone. Each email tool declares its ef
   - The filter (from, subject, label) is pushed to the source as a Gmail search, so unrelated mail never becomes a billed event.
   - Events are deduplicated by message id, and bursts merge into one run.
   - An expired account marks the routine "Reconnect".
+  - Reconnecting signs in again on the same mailbox. The new Composio account takes the refused one's place (the old one goes without revoking the grant, since the person is granting the same app again), the mailbox keeps its agents and rules, and its routines get new triggers. Signing in to another address doesn't replace it.
 - **IMAP:** first version polls every few minutes per watched folder, through an outbox job.
   - It tracks the last seen UID per folder and resets when `UIDVALIDITY` changes.
   - The first run starts from now, not from the whole history.
