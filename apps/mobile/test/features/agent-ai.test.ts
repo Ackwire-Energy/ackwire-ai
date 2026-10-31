@@ -244,6 +244,22 @@ describe("the agent's AI", () => {
     expect(t("agentPage.work.brain.add.notCode")).toBe("Isso não parece o código do Claude.");
   });
 
+  test("while the code or the key goes and the computer signs in, the orbit and a line stand in for the field and Enviar", async () => {
+    // The flow is a component the tests can't render: what it wires in, as text.
+    const flow = await Bun.file(new URL("../../src/features/ai/AddAccount.tsx", import.meta.url).pathname).text();
+    expect(flow).toContain("const busy = (sending || sent) && !ended;");
+    // Claude's code and a plan's key: the line in place of the field and its button, never beside them.
+    expect(flow.match(/\{busy\s+\? busyLine\s+: pasteRow\(/g)).toHaveLength(2);
+    expect(flow).toMatch(/<Note icon=\{<InkOrbit size=\{15\} \/>\} live>\s*\{busyText\}/);
+    // A failed send brings the field back with what was in it: only a code that went clears it.
+    expect(flow).toMatch(/setSent\(true\);\s+setCode\(""\);/);
+    const t = await translator("pt-BR");
+    expect(t("agentPage.work.brain.add.sending", { computer: "MacBook" })).toBe("Enviando o código ao MacBook…");
+    expect(t("aiAccounts.add.keySent", { computer: "MacBook" })).toBe(
+      "Chave enviada. O MacBook está terminando de entrar.",
+    );
+  });
+
   test("an account other agents think with, where it may have a login per agent: one row, signed in again for this one", async () => {
     const read = (file: string) => Bun.file(new URL(`../../src/features/ai/${file}`, import.meta.url).pathname).text();
     const [screen, sheet, connect] = await Promise.all([
@@ -566,7 +582,7 @@ describe("the agent's AI", () => {
     );
     // Claude's code meanwhile: Reconectando by its field, a code that lands there waits for Enviar (`take` sends only
     // to a ready computer), and one that couldn't go says the computer didn't answer, never to check the code.
-    expect(flow).toContain('side={sent || read === "reconnecting" ? waiting : undefined}');
+    expect(flow).toContain('side={read === "reconnecting" ? waiting : undefined}');
     expect(flow).toContain('setSendFailed(loginReadPasses(error) ? "away" : "refused");');
     expect(flow).toMatch(
       /sendFailed === "away"\s*\?\s*t\("agentPage\.work\.brain\.add\.startFailed", \{ computer \}\)/,
