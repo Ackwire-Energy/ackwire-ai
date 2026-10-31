@@ -522,7 +522,8 @@ function memoryResult(ctx: ToolContext, content: string, update: MemoryUpdate) {
 
 /**
  * A proposal card in a line, in no language (the "memory" body the apps translate around it, previews): the rule,
- * then each new role and each app turned on (+) or off (−) by handle.
+ * then each new role and each app turned on (+) or off (−) by handle. No "@": with no reply from the model this is
+ * the message's body, where a mention would call those agents in.
  */
 function proposalSummary(
   change: string,
@@ -531,8 +532,8 @@ function proposalSummary(
 ) {
   return [
     change.trim(),
-    ...roles.map((r) => `@${handleOf(r.agent)} → ${r.role.trim()}`),
-    ...apps.map((a) => `@${handleOf(a.agent)} ${a.line.on ? "+" : "−"}${a.line.label}`),
+    ...roles.map((r) => `${handleOf(r.agent)} → ${r.role.trim()}`),
+    ...apps.map((a) => `${handleOf(a.agent)} ${a.line.on ? "+" : "−"}${a.line.label}`),
   ]
     .filter(Boolean)
     .join(", ");

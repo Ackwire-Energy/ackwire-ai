@@ -1344,7 +1344,7 @@ describe("proposals for teammates (one card, a row per agent and kind of change)
       ],
     });
     expect(out.isError).toBeUndefined();
-    expect(out.data?.memoryUpdate?.text).toBe("@ada → Revisora, @ada +Linear, @ada −Use a browser");
+    expect(out.data?.memoryUpdate?.text).toBe("ada → Revisora, ada +Linear, ada −Use a browser");
     const made = await rows();
     expect(made.map((r) => r.target).sort()).toEqual(["agent_access", "agent_role"]);
     const access = made.find((r) => r.target === "agent_access");
