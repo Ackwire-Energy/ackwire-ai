@@ -645,10 +645,6 @@ p {
   gap: var(--space-2);
   line-height: 16px;
 }
-.sidebar__usage-label {
-  font-size: 11px;
-  color: var(--ink-muted);
-}
 /* A track that shows even at 0% (the sunken fill vanished on the sidebar's sky). */
 .sidebar__usage-track {
   flex: 1;

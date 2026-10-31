@@ -91,11 +91,7 @@ function StatusEditor() {
   };
 
   const untilLabel = (u: UntilPick) =>
-    "choice" in u
-      ? t(`presence.until.${u.choice}`)
-      : u.at
-        ? clearsText(t, language, u.at)
-        : t("presence.until.never");
+    "choice" in u ? t(`presence.until.${u.choice}`) : u.at ? clearsText(t, language, u.at) : t("presence.until.never");
   const pickedChoice = "choice" in d.until ? d.until.choice : d.until.at ? null : "never";
 
   const pickEmoji = () =>
@@ -114,10 +110,7 @@ function StatusEditor() {
               accessibilityRole="button"
               accessibilityLabel={e}
               accessibilityState={{ selected: d.emoji === e }}
-              style={({ pressed }) => [
-                styles.emojiCell,
-                (pressed || d.emoji === e) && { backgroundColor: c.sunken },
-              ]}
+              style={({ pressed }) => [styles.emojiCell, (pressed || d.emoji === e) && { backgroundColor: c.sunken }]}
             >
               <Text style={styles.emojiText}>{e}</Text>
             </Pressable>

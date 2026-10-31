@@ -974,7 +974,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
             input.status === undefined
               ? was.status
               : input.status?.text.trim()
-                ? { text: input.status.text.trim(), emoji: input.status.emoji ?? null, until: input.status.until ?? null }
+                ? {
+                    text: input.status.text.trim(),
+                    emoji: input.status.emoji ?? null,
+                    until: input.status.until ?? null,
+                  }
                 : null,
         });
         return { ...m, ...presenceOf(state, m.userId), lastSeenAt: new Date().toISOString() };

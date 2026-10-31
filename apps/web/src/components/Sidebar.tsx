@@ -1367,14 +1367,11 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
       <button
         ref={trigger}
         type="button"
-        // The face stands beside the lines under it (your status, the budget): the name's capitals at its top.
+        // The face stands beside the lines under it (your status line): the name's capitals at its top. The budget
+        // is the menu's (ADR 0084): under your name, only what you wrote.
         className="sidebar__user ac-faceline"
         aria-haspopup="dialog"
-        aria-label={
-          budgetUsed === null
-            ? `${t("shell.account")}: ${who}`
-            : `${t("shell.account")}: ${who}. ${t("shell.budgetUsed", { percent: formatPercent(i18n.language, budgetUsed) })}`
-        }
+        aria-label={`${t("shell.account")}: ${who}`}
         title={who}
         onClick={() => setOpen(true)}
       >
@@ -1382,7 +1379,6 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
         <span className="sidebar__user-text">
           <span className="sidebar__user-name ac-captop">{me.user.name}</span>
           {line && <StatusLine emoji={line.emoji} text={line.text} className="sidebar__user-line" />}
-          {budgetUsed !== null && <BudgetBar percent={budgetUsed} label={t("shell.budget")} />}
         </span>
       </button>
       <MenuOverlay
@@ -1789,10 +1785,10 @@ export function isTimeZone(zone: string) {
 }
 
 /**
- * Thin bar + "37%": how much of the agents' monthly budgets the workspace used, named where nothing else says
- * what it is (under the person's name). Nothing used, nothing drawn: the bar's smallest mark means "a little".
+ * Thin bar + "37%": how much of the agents' monthly budgets the workspace used (the account menu). Nothing used,
+ * nothing drawn: the bar's smallest mark means "a little".
  */
-function BudgetBar({ percent, label }: { percent: number; label?: string }) {
+function BudgetBar({ percent }: { percent: number }) {
   const { t, i18n } = useTranslation();
   const level = percent >= 100 ? "full" : percent >= 80 ? "high" : "ok";
   return (
@@ -1802,7 +1798,6 @@ function BudgetBar({ percent, label }: { percent: number; label?: string }) {
       title={t("shell.budgetUsedHint", { percent: formatPercent(i18n.language, percent) })}
       aria-hidden="true"
     >
-      {label && <span className="sidebar__usage-label">{label}</span>}
       <span className="sidebar__usage-track">
         {percent > 0 && <span className="sidebar__usage-bar" style={{ width: `${Math.min(100, percent)}%` }} />}
       </span>

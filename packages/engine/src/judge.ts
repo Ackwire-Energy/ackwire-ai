@@ -167,8 +167,7 @@ export function createJevJudge(options: {
             probabilities: a?.probabilities ?? {},
             ...confidence,
           };
-        }
-        else {
+        } else {
           out[id] = {
             choice: typeof a?.choice === "string" ? a.choice : undefined,
             probabilities: a?.probabilities ?? {},
@@ -455,8 +454,7 @@ export function createFakeJudge(
         else if (q.type === "score") {
           const score = typeof a === "number" ? a : 0;
           out[id] = { score, probabilities: { [String(Math.round(score))]: 1 } };
-        }
-        else {
+        } else {
           const choice = typeof a === "string" ? a : undefined;
           out[id] = { choice, probabilities: choice ? { [choice]: 1 } : {} };
         }

@@ -246,7 +246,12 @@ test("Jev's pick shows only when worth it; its weight sets busy; without Jev onl
   // No Jev: only what the work is for.
   await startRunStatus({ db: f.db }, run, candidates, null);
   expect((await presenceOf(f))?.status).toBeNull();
-  await startRunStatus({ db: f.db }, run, [...candidates, { key: "c2", kind: "task", subject: "Login", text: "x" }], null);
+  await startRunStatus(
+    { db: f.db },
+    run,
+    [...candidates, { key: "c2", kind: "task", subject: "Login", text: "x" }],
+    null,
+  );
   expect((await presenceOf(f))?.status).toMatchObject({ kind: "task", subject: "Login" });
 
   const [tool] = await createSetStatusToolSource().tools({} as ToolContext);
@@ -340,7 +345,10 @@ test("a task or mission title shows only where everyone may see it", async () =>
   const run = await runOf(f, { issueId: issue?.id ?? null });
   const lines = await statusCandidates(f.db, run, []);
   expect(JSON.stringify(lines)).not.toContain("Demissões");
-  await f.db.update(schema.issues).set({ channelId: null }).where(eq(schema.issues.id, issue?.id ?? ""));
+  await f.db
+    .update(schema.issues)
+    .set({ channelId: null })
+    .where(eq(schema.issues.id, issue?.id ?? ""));
   expect((await statusCandidates(f.db, run, [])).map((l) => l.kind)).toContain("task");
 });
 

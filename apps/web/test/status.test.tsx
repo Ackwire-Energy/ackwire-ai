@@ -44,14 +44,22 @@ describe("Definir status", () => {
     expect(badgeOf(account())).toBe("online");
     const dialog = await openDialog();
     expect(dialog.textContent).toContain("Como as pessoas te veem");
-    expect(within(dialog).getByRole("radio", { name: /^Online/ }).getAttribute("aria-checked")).toBe("true");
+    expect(
+      within(dialog)
+        .getByRole("radio", { name: /^Online/ })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
     // The end only once there is a line.
     expect(within(dialog).queryByRole("combobox", { name: "Limpar depois de" })).toBeNull();
 
     await click(within(dialog).getByRole("button", { name: "Em reunião" }));
     expect(field(dialog).value).toBe("Em reunião");
     expect(within(dialog).getByRole("button", { name: "Em reunião" }).getAttribute("aria-pressed")).toBe("true");
-    expect(within(dialog).getByRole("radio", { name: /^Ocupado/ }).getAttribute("aria-checked")).toBe("true");
+    expect(
+      within(dialog)
+        .getByRole("radio", { name: /^Ocupado/ })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
     expect(within(dialog).getByRole("combobox", { name: "Limpar depois de" }).textContent).toContain("1 hora");
     // The preview: how the others will see you.
     const preview = dialog.querySelector(".status-preview");

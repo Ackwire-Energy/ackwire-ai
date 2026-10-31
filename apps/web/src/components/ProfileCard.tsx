@@ -17,7 +17,7 @@ import { useOpenAgentPanel } from "@/components/agent-panel-context";
 import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { agentLine, type AgentShown, personLine, useAgentPresence, usePersonPresence } from "@/hooks/usePresence";
+import { type AgentShown, agentLine, personLine, useAgentPresence, usePersonPresence } from "@/hooks/usePresence";
 import { planMeterText, usageShown } from "@/lib/plan-usage";
 
 /** Hover delay before the card opens (mouse and pen only; touch opens on tap). */

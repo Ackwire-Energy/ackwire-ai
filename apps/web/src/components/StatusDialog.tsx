@@ -161,6 +161,7 @@ function StatusForm({
               maxLength={100}
               placeholder={t("presence.placeholder")}
               aria-label={t("presence.placeholder")}
+              // biome-ignore lint/a11y/noAutofocus: the dialog opens to write the line
               autoFocus
               onChange={(e) => set({ text: e.target.value })}
               onKeyDown={(e) => {

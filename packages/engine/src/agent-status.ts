@@ -130,9 +130,7 @@ export async function loadAgentStatuses(
         waitingMachineId: agentRuns.waitingMachineId,
       })
       .from(agentRuns)
-      .where(
-        and(eq(agentRuns.orgId, orgId), inArray(agentRuns.status, [...ACTIVE, ...WAITING]), ...ofRuns),
-      ),
+      .where(and(eq(agentRuns.orgId, orgId), inArray(agentRuns.status, [...ACTIVE, ...WAITING]), ...ofRuns)),
     db
       .select({ agentId: agentRuns.agentId, at: sql<Date | string | null>`max(${agentRuns.finishedAt})` })
       .from(agentRuns)
@@ -389,7 +387,8 @@ export function statusQuestions(candidates: StatusCandidate[]) {
         instructions: `An AI agent of a team (\`agent\`) is starting to work on \`message\`. Next to its name, the whole team would read: "${c.text}". Is that worth showing as its status?`,
         criteria: {
           true: "Yes: it tells the team something useful about what the agent is busy with (real work that takes a while, a task, a routine, something people may want to know before interrupting).",
-          false: "No: a quick reply, small talk or something nobody needs to know (it would only be noise next to its name).",
+          false:
+            "No: a quick reply, small talk or something nobody needs to know (it would only be noise next to its name).",
         },
       },
     ]),

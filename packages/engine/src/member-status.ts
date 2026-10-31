@@ -68,7 +68,8 @@ export async function setMyStatus(
   await requirePermission(deps.db, userId, orgId, "read");
   const set: Partial<StatusColumns> = {};
   if (input.availability !== undefined) {
-    if (!AVAILABILITIES.includes(input.availability)) throw new ValidationError("availability: auto, away, busy or hidden");
+    if (!AVAILABILITIES.includes(input.availability))
+      throw new ValidationError("availability: auto, away, busy or hidden");
     set.availability = input.availability;
   }
   if (input.status !== undefined) {
