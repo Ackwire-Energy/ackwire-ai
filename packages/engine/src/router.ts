@@ -654,7 +654,10 @@ export { AGENT_CHIME_IN_MAX_HOP };
  * their next one; when it comes and the router decides on it too
  * (`routable`), that one decides for both (`continued`). The agent a
  * person's message speaks to (`addressee`) answers it, addressed, over who
- * spoke last, and over the agent replied to once the router picks it.
+ * spoke last, and over the agent replied to once the router picks it. One
+ * that speaks to no agent in particular goes, past continuity's window, to
+ * the agent the person last talked to, when it could do it too and no other
+ * agent is clearly surer.
  *
  * When no step of the chain can read a person's message, rules in code pick
  * (ADR 0074 §4): R1 a reply to an agent, R2 the only agent when the author is
@@ -944,6 +947,23 @@ export async function routeMessage(
   const repliedAgentId = quotedAgentId ?? rootAgentId;
   if (repliedAgentId) continuityAgentId = repliedAgentId;
   const continuityHandle = candidates.find((c) => c.agentId === continuityAgentId)?.handle ?? null;
+  // With no continuity, the agent this person last talked to here, among two or more agents and not when they
+  // speak to a person: of their latest exchange within what the router reads (`ROUTER_SLICE.maxAgeMs`), the one
+  // agent they @mentioned, else the first agent that answered them, as R3 reads an exchange. Read newest first,
+  // so no other agent was addressed since.
+  let lastTalkedTo: string | null = null;
+  if (continues && !namesPerson && !continuityAgentId && candidates.length >= 2) {
+    let answeredBy: string | null = null;
+    for (const m of [...before, ...(root ? [root] : [])]) {
+      if (message.createdAt.getTime() - m.createdAt.getTime() > ROUTER_SLICE.maxAgeMs) break;
+      if (m.authorAgentId) answeredBy = m.authorAgentId;
+      else if (m.authorUserId === message.authorUserId && (m.mentionedAgentIds.length > 0 || answeredBy)) {
+        const agentId = m.mentionedAgentIds.length === 1 ? m.mentionedAgentIds[0] : answeredBy;
+        lastTalkedTo = agentId && candidateIds.has(agentId) ? agentId : null;
+        break;
+      }
+    }
+  }
   // R2: a person alone in the channel with its one agent.
   const onlyAgentId =
     !byAgent && candidates.length === 1 && (await aloneInChannel(db, message))
@@ -1042,20 +1062,31 @@ export async function routeMessage(
 
   // The router's own pick; when it picks several agents, the message speaks to several.
   const picked = selectAgents(candidates, decided, policy, { continuityAgentId: addressee ?? continuityAgentId });
+  const scoreOf = (agentId: string | null) =>
+    Math.max(0, ...decided.agents.filter((a) => a.agentId === agentId).map((a) => a.score));
+  // Speaking to no agent in particular, a message the agent this person last talked to could do too (it clears its
+  // bar, and one agent is picked) is for that agent, unless another is clearly surer (`clearlyAnother`): "me de bom
+  // dia todo dia ás 8:30 da manha", 23 minutes after a talk with Ada, went to Theo on 0.63 to her 0.55
+  // (2026-10-31). No lower bar: past continuity's window it only settles which of the agents that could answers.
+  const resumes =
+    !addressee && lastTalkedTo !== null && picked.length === 1 && scoreOf(lastTalkedTo) >= policy.minScore;
   // The agent the message speaks to, when a step is sure of one, is who the person talks to now: over who spoke
   // last ("ada, pergunta pro theo…" right after Theo spoke, 2026-10-31), and over the agent whose message they
   // replied to once it clears its own bar: a reply that only hands over ("isso é com a ada") stays with the
   // agent replied to.
   const talkingTo =
-    addressee && (repliedAgentId === null || picked.includes(addressee)) ? addressee : continuityAgentId;
+    addressee && (repliedAgentId === null || picked.includes(addressee))
+      ? addressee
+      : resumes
+        ? lastTalkedTo
+        : continuityAgentId;
   // A short follow-up without a mention ("and now?"), or a reply to an agent (quote or thread), goes only to the agent
   // the person is talking to, unless the router heard it as for several agents, or (not replying) clearly
   // for another one ("tem sim ada, tenta dnv" right after Theo spoke: a name beats who spoke last). So does a
-  // message the router heard speak to the agent it picked: that agent was addressed.
+  // message the router heard speak to the agent it picked: that agent was addressed. So does one for the agent they
+  // last talked to (`resumes`), whatever its length.
   // A short message the router heard as for nobody stays with people ("boa noite walter" right after
   // Ada spoke, 2026-10-19: Ada reacted to a greeting meant for a person).
-  const scoreOf = (agentId: string | null) =>
-    Math.max(0, ...decided.agents.filter((a) => a.agentId === agentId).map((a) => a.score));
   const clearlyAnother =
     repliedAgentId === null &&
     picked.some(
@@ -1068,6 +1099,7 @@ export async function routeMessage(
     talkingTo !== null &&
     (repliedAgentId !== null ||
       (talkingTo === addressee && picked.includes(talkingTo)) ||
+      resumes ||
       (isShortFollowUp([...run.map((m) => m.body), message.body].join(" ")) && picked.length > 0)) &&
     picked.length < 2 &&
     !clearlyAnother;
@@ -1098,7 +1130,12 @@ export async function routeMessage(
         needsAgentScore: decided.needsAgent ?? null,
         selectedAgentIds: selected,
         reason:
-          [followUp ? FOLLOW_UP : null, duplicate ? "already answered by another agent" : null, words]
+          [
+            followUp ? FOLLOW_UP : null,
+            followUp && resumes ? "last talked to" : null,
+            duplicate ? "already answered by another agent" : null,
+            words,
+          ]
             .filter(Boolean)
             .join("; ")
             .slice(0, 1000) || null,

@@ -3,7 +3,9 @@ import { eq, schema } from "@agenteschat/db";
 import { systemText } from "@agenteschat/providers";
 import {
   AGENT_CHIME_IN_SCORE,
+  addChannelMember,
   createAgent,
+  createChannel,
   createJevJudge,
   createJevKey,
   createJevRouterStrategy,
@@ -115,8 +117,8 @@ describe("routeChain", () => {
 });
 
 /**
- * A fake TypeSafe endpoint: records requests, answers with scripted nouls per handle, and `to`, the addressee
- * Choice's probabilities by handle (none: "none").
+ * A fake TypeSafe endpoint: records requests, answers with scripted nouls per handle, `choice`, the tie-break
+ * Choice's probabilities by handle (default 0.9 for `best`), and `to`, the addressee Choice's (none: "none").
  */
 function fakeJev(
   script: (state: Record<string, unknown>) =>
@@ -124,6 +126,7 @@ function fakeJev(
         nouls: Record<string, number>;
         needs: number;
         best?: string;
+        choice?: Record<string, number>;
         everyone?: number;
         to?: Record<string, number>;
       }
@@ -148,8 +151,8 @@ function fakeJev(
       answers.best_agent = {
         type: "choice",
         choice: r.best ?? "none",
-        probabilities: { [r.best ?? "none"]: 0.9 },
-        confidence: 0.8,
+        probabilities: r.choice ?? { [r.best ?? "none"]: 0.9 },
+        confidence: r.choice?.[r.best ?? "none"] ?? 0.8,
       };
     }
     if (body.questions.addressee) {
@@ -487,6 +490,143 @@ describe("who a message speaks to", () => {
     const quoted = { messageId: report.id, author: { type: "agent", id: t.theo.id }, authorName: "Theo", excerpt: "" };
     expect(await handOver({ meta: { replyTo: quoted } })).toEqual([t.theo.id]);
     expect(await handOver({ threadId: report.id })).toEqual([t.theo.id]);
+  });
+});
+
+describe("the agent a person last talked to", () => {
+  type Said = [by: { id: string } | null, text: string, minutesAgo: number];
+
+  /** Ana alone with Theo (PM) and Ada (Dev), as in #private on 2026-10-31. */
+  async function privateRoom() {
+    f = await setup();
+    const make = (name: string, role: string) =>
+      createAgent(
+        f.db,
+        f.owner.id,
+        f.org.id,
+        { name, handle: name.toLowerCase(), role, credentialId: f.credential.id },
+        { model: "claude-sonnet-5-5" },
+      );
+    const theo = await make("Theo", "PM");
+    const ada = await make("Ada", "Dev");
+    let n = 0;
+    /** In a channel of their own: `before` (Ana's, or an agent's), then `body` by Ana (or `by`), routed on Jev's `answer`. */
+    async function talk(before: Said[], body: string, answer: Parameters<typeof fakeJev>[0], by: Said[0] = null) {
+      n += 1;
+      const channel = await createChannel(f.db, f.owner.id, f.org.id, { name: `private-${n}` });
+      for (const a of [theo, ada]) await addChannelMember(f.db, f.owner.id, f.org.id, channel.id, { agentId: a.id });
+      const say = ([author, text, minutesAgo]: Said) =>
+        insertMessage(f.db, {
+          orgId: f.org.id,
+          channelId: channel.id,
+          author: author
+            ? { type: "agent", agentId: author.id, runId: null, hop: 1, stretchId: null }
+            : { type: "person", userId: f.owner.id },
+          body: text,
+          createdAt: new Date(Date.now() - minutesAgo * 60_000),
+        });
+      for (const line of before) await say(line);
+      const m = await say([by, body, 0]);
+      const strategy = createJevRouterStrategy({
+        key: "k",
+        recordUsage: async () => {},
+        fetch: fakeJev(answer).fetcher,
+      });
+      const policy = { ...DEFAULT_ROUTER_POLICY, maxHops: 3 };
+      const { selected } = await routeMessage({ db: f.db, strategy, policy }, { orgId: f.org.id, messageId: m.id });
+      const [decision] = await f.db
+        .select()
+        .from(schema.routingDecisions)
+        .where(eq(schema.routingDecisions.messageId, m.id));
+      return { selected, decision };
+    }
+    return { theo, ada, talk };
+  }
+
+  /** Jev on "me de bom dia todo dia ás 8:30 da manha" (2026-10-31): the same Noul for both, the Choice for `best`. */
+  const bomDia = (best: string, other: string) => () => ({
+    nouls: { "@theo": 0.576, "@ada": 0.576 },
+    needs: 0.54,
+    best,
+    choice: { [best]: 0.83, [other]: 0.12, none: 0.05 },
+  });
+  const BOM_DIA = "me de bom dia todo dia ás 8:30 da manha";
+
+  test("'me de bom dia todo dia ás 8:30 da manha' 23 minutes after a talk with Ada is hers, though Theo scored a little more", async () => {
+    const t = await privateRoom();
+    const talkWithAda = (minutesAgo: number): Said[] => [
+      [null, "ada quanto ta seu limite de uso?", minutesAgo + 0.4],
+      [t.ada, "Heitor, não consigo consultar meu saldo de uso por aqui.", minutesAgo],
+    ];
+    const { selected, decision } = await t.talk(talkWithAda(22.8), BOM_DIA, bomDia("theo", "ada"));
+    // The scores stored that day: Theo 0.626, Ada 0.555.
+    const scores = Object.fromEntries(decision?.candidates.map((c) => [c.agentId, Math.round(c.score * 1000)]) ?? []);
+    expect(scores).toEqual({ [t.theo.id]: 626, [t.ada.id]: 555 });
+    expect(selected).toEqual([t.ada.id]);
+    // Kept with the agent she talks to, by code: Ada may not pass, and the reason says why.
+    expect(decision?.reason).toBe("follow-up; last talked to; jev: best @theo (confidence 0.83)");
+    // Past what the router reads (30 minutes), the scores decide, as they did that day.
+    expect((await t.talk(talkWithAda(30.5), BOM_DIA, bomDia("theo", "ada"))).selected).toEqual([t.theo.id]);
+  });
+
+  test("a message that clearly fits the other agent still goes to it", async () => {
+    const t = await privateRoom();
+    const talkWithAda: Said[] = [
+      [null, "ada quanto ta seu limite de uso?", 23],
+      [t.ada, "Não consigo ver meu saldo por aqui.", 22],
+    ];
+    // Ada could do it too, but Theo is a clear pick, 0.3 over her (0.96 to 0.52).
+    const roadmap = await t.talk(talkWithAda, "resume a discussão de ontem no fórum e atualiza o roadmap", () => ({
+      nouls: { "@theo": 0.9, "@ada": 0.55 },
+      needs: 0.85,
+      best: "theo",
+    }));
+    expect(roadmap.selected).toEqual([t.theo.id]);
+    expect(roadmap.decision?.reason).not.toContain("follow-up");
+    // Ada can't do it: under her bar.
+    const tasks = await t.talk(talkWithAda, "e o roadmap, como está?", () => ({
+      nouls: { "@theo": 0.7, "@ada": 0.2 },
+      needs: 0.8,
+      best: "theo",
+    }));
+    expect(tasks.selected).toEqual([t.theo.id]);
+  });
+
+  test("after another agent was addressed, the message doesn't go back to the one before", async () => {
+    const t = await privateRoom();
+    const talkWithAda: Said[] = [
+      [null, "ada quanto ta seu limite de uso?", 28],
+      [t.ada, "Não consigo ver meu saldo por aqui.", 27],
+    ];
+    // This time Jev leans to Ada, as it leaned to Theo that day.
+    const leansToAda = bomDia("ada", "theo");
+    // Theo @mentioned, still working on it.
+    const mentioned = await t.talk(
+      [...talkWithAda, [null, "@theo cria uma task pra revisar o PR do checkout", 15]],
+      BOM_DIA,
+      leansToAda,
+    );
+    expect(mentioned.selected).toEqual([t.theo.id]);
+    // Theo asked by name, and he answered.
+    const answered = await t.talk(
+      [...talkWithAda, [null, "theo, cria uma task pra revisar o PR do checkout", 15], [t.theo, "Criei a task.", 14]],
+      BOM_DIA,
+      leansToAda,
+    );
+    expect(answered.selected).toEqual([t.theo.id]);
+  });
+
+  test("an agent's message is unchanged: only a clear pick, the best one, and it may pass", async () => {
+    const t = await privateRoom();
+    // Ana last talked to Ada (who hasn't answered, so she can still be brought in).
+    const { selected, decision } = await t.talk(
+      [[null, "@ada quanto ta seu limite de uso?", 23]],
+      "alguém cria a rotina de bom dia do Heitor às 8:30?",
+      () => ({ nouls: { "@theo": 0.9, "@ada": 0.85 }, needs: 0.9, best: "theo" }),
+      f.agent,
+    );
+    expect(selected).toEqual([t.theo.id]);
+    expect(decision?.reason).toBe("jev: best @theo (confidence 0.80)");
   });
 });
 
