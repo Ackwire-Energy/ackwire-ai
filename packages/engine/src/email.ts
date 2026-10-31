@@ -1,12 +1,20 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { EmailError, type EmailSender } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, inArray, isNull, lt, schema } from "@agenteschat/db";
+import { and, asc, type Database, type Executor, eq, inArray, isNull, lt, schema } from "@agenteschat/db";
 import { appLocale } from "@agenteschat/i18n/locale";
 import { z } from "zod";
 import { approverIds } from "./approvals";
 import { inertText } from "./email/inert";
-import { type Block, EMAIL_PICTURES, type EmailArt, type EmailDoc, type EmailLocale, renderDoc } from "./email/layout";
+import {
+  type Block,
+  EMAIL_PICTURES,
+  type EmailArt,
+  type EmailDoc,
+  type EmailLocale,
+  renderDoc,
+  type Scene,
+} from "./email/layout";
 import { WORDS } from "./email/words";
 import { adminIds } from "./gateway";
 import { publicHostAddress, type ResolveHost, resolveHostDns } from "./net-guard";
@@ -14,7 +22,7 @@ import { enqueue, PermanentJobError } from "./outbox";
 import { isAgentesCloud } from "./telemetry";
 import { budgetPercent } from "./usage";
 
-export type { EmailArt, EmailLocale } from "./email/layout";
+export { EMAIL_PICTURES, type EmailArt, type EmailLocale } from "./email/layout";
 
 const { users, organizations, agents, approvals } = schema;
 
@@ -46,6 +54,8 @@ export type EmailTemplate =
       inviterName: string;
       /** The inviter's account address, so the invitee can judge who sent it. */
       inviterEmail?: string;
+      /** The workspace's agents, pictured over the headline (`emailCrew`); none: the onboarding's own. */
+      crew?: string[];
       url: string;
       role: string;
     }
@@ -94,6 +104,8 @@ export type EmailTemplate =
       role?: string;
       url?: string;
       reason?: string | null;
+      /** In or invited: the workspace's agents, pictured over the headline (`emailCrew`); none: the onboarding's own. */
+      crew?: string[];
     }
   | { kind: "verify_email"; locale?: EmailLocale; url: string }
   /**
@@ -147,6 +159,8 @@ export type EmailTemplate =
       /** No agent has an AI to think with yet: connecting one is a step. */
       needsAi: boolean;
       hasAgents: boolean;
+      /** The agents around the computer in its picture (`emailCrew`); none: the onboarding's own. */
+      crew?: string[];
       /** The workspace in the app; the button adds its step's path. */
       url: string;
     };
@@ -189,6 +203,28 @@ async function readPictures(dir: string) {
   }
 }
 
+/** How many agents a picture shows: two on each side of the computer still fit a 320 px phone. */
+const CREW = 4;
+/**
+ * The onboarding's own agents (Theo, Ada, Lia and Atlas: `PRESET_LOOK` in apps/web/src/pages/OnboardingPage.tsx), for
+ * a picture of a workspace with none yet.
+ */
+const DEFAULT_CREW = ["indigo", "green", "rose", "amber"];
+
+/** The workspace's agents its emails picture: the `CREW` oldest, each by its face's colour (none is sky). */
+export async function emailCrew(db: Executor, orgId: string): Promise<string[]> {
+  const rows = await db
+    .select({ appearance: agents.appearance })
+    .from(agents)
+    .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt)))
+    .orderBy(asc(agents.createdAt), asc(agents.id))
+    .limit(CREW);
+  return rows.map((a) => a.appearance?.color ?? "sky");
+}
+
+/** A picture's agents: a job's own (cut to `CREW`), or the onboarding's when it has none. */
+const crewOr = (crew: string[] | undefined) => (crew?.length ? crew.slice(0, CREW) : DEFAULT_CREW);
+
 /** A name typed on an invitation link's page, as the admins' email shows it (ADR 0068). */
 const JOIN_NAME_SHOWN = 60;
 /** An admin's reason for denying a request to join, as long as it is kept. */
@@ -201,11 +237,19 @@ const JOIN_REASON_SHOWN = 300;
 function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
   const lang = emailLocale(t.locale);
   const w = WORDS[lang];
-  const doc = (subject: string, preheader: string, headline: string, blocks: Block[], why: string): EmailDoc => ({
+  const doc = (
+    subject: string,
+    preheader: string,
+    headline: string,
+    blocks: Block[],
+    why: string,
+    scene?: Scene,
+  ): EmailDoc => ({
     lang,
     subject,
     preheader,
     headline,
+    scene,
     blocks,
     footer: [why, w.sentBy(sender)],
   });
@@ -247,6 +291,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
           fallback(t.url),
         ],
         c.why(org),
+        { crew: crewOr(t.crew) },
       );
     }
     case "invite_request": {
@@ -311,6 +356,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
           fallback(t.url),
         ],
         c.why,
+        { crew: DEFAULT_CREW },
       );
     }
     case "early_access_allowed": {
@@ -321,6 +367,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
         c.headline,
         [{ p: c.body(inertText(t.email)) }, { button: c.button, url: t.url }, fallback(t.url)],
         c.why,
+        { crew: DEFAULT_CREW },
       );
     }
     case "budget": {
@@ -404,6 +451,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
           { button: c.button[first], url },
         ],
         c.why(org),
+        { crew: crewOr(t.crew), computer: c.computer },
       );
     }
     case "join_request": {
@@ -440,6 +488,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
           c.headline,
           [{ p: c.body(who, org, w.role[t.role ?? "member"] ?? "") }, { button: c.button, url }],
           a.why(org),
+          { crew: crewOr(t.crew) },
         );
       }
       if (t.outcome === "invited") {
@@ -450,6 +499,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
           c.headline,
           [{ p: c.body(who, org) }, { p: c.next }, { button: c.button, url }, fallback(url)],
           a.why(org),
+          { crew: crewOr(t.crew) },
         );
       }
       const c = a.denied;
@@ -709,6 +759,7 @@ export async function queueInvitationEmail(
       orgName: org?.name ?? "",
       inviterName: inviter?.name ?? "",
       inviterEmail: inviter?.email,
+      crew: await emailCrew(db, input.orgId),
       url: input.url,
       role: input.role,
     },

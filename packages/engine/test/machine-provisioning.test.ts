@@ -698,6 +698,7 @@ describe("external provisioning", () => {
         specs: null,
         needsAi: false,
         hasAgents: true,
+        crew: ["sky"],
         url: `https://chat.example.com/org/${f.org.id}`,
       },
     });
@@ -732,7 +733,7 @@ describe("external provisioning", () => {
     await hello(token, { publicUrl: "https://chat.example.com", gateway: { hasModelCredential: async () => true } });
     const [email] = await queued();
     expect(email?.payload).toMatchObject({
-      template: { kind: "computer_ready", orgName: "Beta", needsAi: true, hasAgents: false },
+      template: { kind: "computer_ready", orgName: "Beta", needsAi: true, hasAgents: false, crew: [] },
     });
   });
 

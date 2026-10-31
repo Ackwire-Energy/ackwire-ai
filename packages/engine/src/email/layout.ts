@@ -1,6 +1,7 @@
 import type { InlinePart } from "@agenteschat/adapters";
 import { dark, light, type ThemeColors } from "@agenteschat/tokens";
 import { AGENT_GRADIENTS } from "@agenteschat/ui/agent/engine";
+import { COMPUTER_ART, COMPUTER_ROWS } from "@agenteschat/ui/computer/portrait";
 import { initialsOf } from "@agenteschat/ui/names";
 import { mix, opaque } from "@agenteschat/ui/sky/math";
 
@@ -32,12 +33,23 @@ export type Block =
   /** A one-time code to type: large in a well, selectable as one word. */
   | { code: string };
 
+/**
+ * A picture at the card's top: the agents standing on one floor, half on each side of the workspace's computer
+ * (`computer`: its alt text, our words), or in a row without it. `crew`: each agent's face colour. The words never
+ * depend on it, so the faces have no alt text.
+ */
+export interface Scene {
+  crew: string[];
+  computer?: string;
+}
+
 export interface EmailDoc {
   lang: EmailLocale;
   subject: string;
   /** The line an inbox shows after the subject: our words only. */
   preheader: string;
   headline: string;
+  scene?: Scene;
   blocks: Block[];
   /** Why this address got it, how often, who sent it. */
   footer: Text[];
@@ -57,16 +69,25 @@ export interface EmailArt {
 }
 
 const AGENT_FACES = Object.keys(AGENT_GRADIENTS);
+/**
+ * The workspace's computer as the app draws it (a server: `WORKSPACE_COMPUTER_KIND` in packages/client), online, its
+ * lights on at `t`, shown at `cell` px a cell, with `margin` empty columns on each side: room for its alt text to fit
+ * with the pictures off. `packages/engine/scripts/email-art.ts` draws its file.
+ */
+export const COMPUTER = { file: "computer.png", kind: "linux", cell: 2, t: 0.75, margin: 3 } as const;
 /** Every picture an email may show, as the web app serves them (`apps/web/public/email/`). */
 export const EMAIL_PICTURES = [
   "logo-ink.png",
   "logo-bone.png",
+  COMPUTER.file,
   "sky-band.png",
   ...AGENT_FACES.map((c) => `agent-${c}.png`),
 ];
 const FONT = "source-sans-3-latin.woff2";
 const LOGO = { width: 173, height: 36, alt: "agentes.chat" } as const;
 const SKY = { width: 552, height: 27 } as const;
+/** An agent's face for its colour: an unknown one is sky, as the app draws it. */
+const faceOf = (color: string) => `agent-${AGENT_FACES.includes(color) ? color : "sky"}.png`;
 
 /** Classic Outlook has no rgba: hairlines are the solid color they show over their surface. */
 const palette = (t: ThemeColors) => ({
@@ -266,7 +287,7 @@ function block(b: Block, src: (file: string) => string, last: boolean): string {
         (p, i) => `<tr>
 <td width="44" valign="top" style="width:44px;padding:5px 0 ${under(i, b.people, 12)}px">${
           p.agent
-            ? `<img src="${esc(src(`agent-${AGENT_FACES.includes(p.agent) ? p.agent : "sky"}.png`))}" width="32" height="32" alt="" style="display:block;border:0;outline:none;width:32px;height:32px">`
+            ? `<img src="${esc(src(faceOf(p.agent)))}" width="32" height="32" alt="" style="display:block;border:0;outline:none;width:32px;height:32px">`
             : `<table ${T("")}><tr><td class="avp" width="30" height="30" align="center" valign="middle" style="width:30px;height:30px;border:1px solid ${L.border};border-radius:10px;background:${L.well};color:${L.text};${P};font-size:13px;line-height:30px;font-weight:700">${esc(initialsOf(p.name))}</td></tr></table>`
         }</td>
 <td valign="top" style="padding:0 0 ${under(i, b.people, 12)}px">
@@ -291,6 +312,30 @@ function block(b: Block, src: (file: string) => string, last: boolean): string {
     return `<table${last ? ' class="end-btn"' : ""} ${T(`margin:8px 0 ${gap(20, "button")}px`)}><tr><td>${btn}${also}</td></tr></table>`;
   }
   return `<p class="mu" style="margin:0 0 ${gap(12)}px;${P};font-size:13px;line-height:19px;color:${L.muted}">${html(b.fallback)}<br><a class="ln-m" href="${esc(b.url)}" target="_blank" style="${LINK_MUTED};word-break:break-all">${esc(b.url)}</a></p>`;
+}
+
+/**
+ * The scene at the card's top. With the computer, a stage in a well, as the app's onboarding scene: the computer in
+ * the middle whatever the crew's size (two cells split the rest), the faces standing 2 px up so their bodies end where
+ * the tower's does, above its shadow. Without it, the faces in a row over the headline, the first at the text's edge.
+ * With the pictures off, the computer's alt says what is missing, set as a caption.
+ */
+function scene(s: Scene, src: (file: string) => string): string {
+  const img = (file: string, width: number, height: number, alt: string) =>
+    `<img src="${esc(src(file))}" width="${width}" height="${height}" alt="${esc(alt)}" style="display:block;border:0;outline:none;width:${width}px;height:${height}px;${P};font-size:11px;line-height:14px;color:${L.muted}">`;
+  const faces = (crew: string[], padding: string) =>
+    crew.map((c) => `<td valign="bottom" style="padding:${padding}">${img(faceOf(c), 32, 32, "")}</td>`).join("");
+  if (s.computer === undefined) return `<table ${T("margin:0 0 20px")}><tr>${faces(s.crew, "0 8px 0 0")}</tr></table>`;
+  const side = (crew: string[]) => (crew.length ? `<table ${T("")}><tr>${faces(crew, "0 4px 2px")}</tr></table>` : "");
+  const half = Math.ceil(s.crew.length / 2);
+  const width = (COMPUTER_ART[COMPUTER.kind][1] + 2 * COMPUTER.margin) * COMPUTER.cell;
+  const height = COMPUTER_ROWS[COMPUTER.kind][1] * COMPUTER.cell;
+  return `<table width="100%" class="well" ${T(`background:${L.well};border-radius:14px 14px 14px 3px;margin:0 0 24px`)}><tr><td style="padding:20px 8px 16px">
+<table width="100%" ${T("")}><tr>
+<td width="50%" align="right" valign="bottom">${side(s.crew.slice(0, half))}</td>
+<td valign="bottom" style="padding:0 2px">${img(COMPUTER.file, width, height, s.computer)}</td>
+<td width="50%" align="left" valign="bottom">${side(s.crew.slice(half))}</td>
+</tr></table></td></tr></table>`;
 }
 
 /** The plain-text part of a block: the same words, a button as `Label: url`. */
@@ -373,7 +418,7 @@ ${logo("logo-ink.png", "logo-ink", "block", L.ink)}
 </a>
 </td></tr>
 <tr><td class="card" style="background:${L.card};border:1px solid ${L.border};border-radius:16px;padding:32px">
-<h1 class="h1 ink" style="margin:0 0 16px;${P};font-size:24px;line-height:30px;font-weight:600;letter-spacing:-0.01em;color:${L.ink}">${html(doc.headline)}</h1>
+${doc.scene ? scene(doc.scene, src) : ""}<h1 class="h1 ink" style="margin:0 0 16px;${P};font-size:24px;line-height:30px;font-weight:600;letter-spacing:-0.01em;color:${L.ink}">${html(doc.headline)}</h1>
 ${body}
 </td></tr>
 <tr><td style="padding:24px 0 0"><img class="sky" src="${esc(src("sky-band.png"))}" width="${SKY.width}" height="${SKY.height}" alt="" style="display:block;border:0;outline:none;width:${SKY.width}px;max-width:100%;height:auto"></td></tr>

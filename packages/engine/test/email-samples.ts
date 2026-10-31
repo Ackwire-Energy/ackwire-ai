@@ -16,6 +16,7 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     orgName: "Souza Bakery",
     inviterName: "Ana Souza",
     inviterEmail: "ana@souzabakery.com",
+    crew: ["sky", "violet", "teal"],
     url: `${APP}/invite/T7xQ2mVb9KpL`,
     role: "member",
   },
@@ -162,6 +163,7 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     specs: { cpus: 4, memoryGb: 8, diskGb: 100 },
     needsAi: true,
     hasAgents: true,
+    crew: ["indigo", "green", "rose", "amber"],
     url: `${APP}/org/${ORG}`,
   },
   "computer_ready-ai.pt-BR": {
@@ -180,6 +182,7 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     specs: { cpus: 4, memoryGb: 8, diskGb: 100 },
     needsAi: false,
     hasAgents: true,
+    crew: ["teal", "sky", "violet"],
     url: `${APP}/org/${ORG}`,
   },
   "computer_ready-create.en": {
@@ -216,6 +219,7 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     orgName: "Alves Studio",
     approverName: "Marina Alves",
     role: "member",
+    crew: ["graphite", "rose"],
     url: `${APP}/org/${ORG}`,
   },
   "join_answer-invited.en": {
