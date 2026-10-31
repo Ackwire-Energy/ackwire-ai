@@ -3,8 +3,9 @@
  * number. Floating layers (select lists, menus, popovers, date pickers,
  * tooltips) sit above dialogs and sheets so they open inside them.
  * Scrims share the dialogs' layer, where later portals stack above earlier
- * ones: each scrim lies under its own dialog and over anything opened before
- * it, so a dialog opened from another dims that one.
+ * ones: each dialog renders its scrim before its panel, so each scrim lies
+ * under its own dialog and over anything opened before it, and a dialog
+ * opened from another dims that one.
  */
 :root {
   --z-raised: 1;
