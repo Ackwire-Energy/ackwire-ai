@@ -1,5 +1,18 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, desc, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  asc,
+  type Database,
+  desc,
+  type Executor,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  or,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import {
   type AccessLine,
   accessInputOf,
@@ -15,6 +28,7 @@ import { audienceNotice, canTalkTo, talksToAgents } from "../audience";
 import { recordAudit } from "../audit";
 import { caches } from "../cache";
 import { sha256 } from "../crypto";
+import { publishDelivery } from "../delivery";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { publishUserEvent } from "../events";
 import { cutText } from "../format";
@@ -22,6 +36,7 @@ import type { Judge } from "../judge";
 import { can, requirePermission } from "../organizations";
 import { enqueue } from "../outbox";
 import { maySql } from "../permissions";
+import { deliverNoticeToRun } from "../run-resume";
 import { userVisibleChannels } from "../search";
 import { ALL_TOOLS } from "../tools/scopes";
 import {
@@ -33,7 +48,8 @@ import {
   itemVisibleIn,
 } from "./items";
 
-const { contextProposals, contextItems, agents, organizations, organizationMembers } = schema;
+const { agentRuns, contextProposals, contextItems, agents, messages, organizations, organizationMembers, users } =
+  schema;
 
 export type Proposal = typeof contextProposals.$inferSelect;
 
@@ -248,6 +264,8 @@ export async function listProposals(
  * stale). This is the only way learned context changes instructions or the
  * org context. A role or access is applied as the person deciding, through
  * the agent page's own editors, so it never does more than they could there.
+ * The agent that proposed it is told afterwards (`tellProposer`); that failing
+ * never fails the decision.
  */
 export async function decideProposal(
   db: Database,
@@ -255,7 +273,7 @@ export async function decideProposal(
   orgId: string,
   proposalId: string,
   decision: "accept" | "reject",
-  options: { finalText?: string; judge?: Judge } = {},
+  options: { finalText?: string; judge?: Judge; pubsub?: PubSub } = {},
 ): Promise<Proposal> {
   const [p] = await db
     .select()
@@ -333,6 +351,8 @@ export async function decideProposal(
     caches.scopes.deletePrefix(`${orgId}:${decided.agentId}`);
   }
   if (decided.status === "rejected") await recordRefusal(db, actorId, decided);
+  // Also for a row gone stale: it may be the card's last open one.
+  await tellProposer({ db, pubsub: options.pubsub }, decided).catch(() => {});
   if (decided.status === "stale")
     throw new ConflictError("What this was proposed against changed since, so it can't be applied.");
   return decided;
@@ -403,6 +423,127 @@ async function recordRefusal(db: Database, actorId: string, p: Proposal) {
     createdByKind: "person",
     createdById: actorId,
   }).catch(() => {});
+}
+
+/** How much of one row a card's notice quotes. */
+const NOTICE_ROW_CHARS = 300;
+
+/** What the agent that proposed a card reads about its decided rows, by what became of them. */
+async function cardResult(db: Executor, proposerId: string, rows: Proposal[]) {
+  const ids = (list: (string | null)[]) => [...new Set(list.flatMap((id) => (id ? [id] : [])))];
+  const team = await db
+    .select({ id: agents.id, handle: agents.handle })
+    .from(agents)
+    .where(inArray(agents.id, ids(rows.map((r) => r.agentId))));
+  const people = await db
+    .select({ id: users.id, name: users.name })
+    .from(users)
+    .where(inArray(users.id, ids(rows.map((r) => r.decidedByUserId))));
+  const handles = new Map(team.map((a) => [a.id, a.handle]));
+  const names = new Map(people.map((u) => [u.id, u.name]));
+  const line = (p: Proposal) => {
+    const whose = !p.agentId ? "the" : p.agentId === proposerId ? "your" : `@${handles.get(p.agentId) ?? "agent"}'s`;
+    const text = p.target === "agent_instructions" || p.target === "org_context";
+    // A person may adjust the text before accepting, and the diff keeps what was proposed.
+    const adjusted =
+      p.status === "accepted" &&
+      text &&
+      p.diff.split("\n").some((l) => l.startsWith("+") && !p.proposedText.includes(l.slice(1)));
+    const what =
+      p.target === "org_context" ? "org context: " : p.target === "agent_instructions" ? "instructions: " : "";
+    return `${whose} ${what}${cutText(refusedChange(p), NOTICE_ROW_CHARS)}${adjusted ? " (with the wording a person adjusted)" : ""}`;
+  };
+  const decided = (status: Proposal["status"]) => {
+    const those = rows.filter((r) => r.status === status);
+    const who = ids(those.map((r) => r.decidedByUserId)).map((id) => names.get(id) ?? "A person");
+    return { who: who.join(" and ") || "A person", lines: those.map(line).join("; ") };
+  };
+  const accepted = decided("accepted");
+  const refused = decided("rejected");
+  const stale = decided("stale");
+  return [
+    accepted.lines &&
+      `${accepted.who} accepted: ${accepted.lines}. It is already applied and in effect now, even if your instructions above still show the old text (this notice wins until they refresh): don't propose or check it, say so here in a line.`,
+    refused.lines && `${refused.who} refused: ${refused.lines}. Don't propose it again unless someone asks.`,
+    stale.lines && `Not applied, what it was made against changed since: ${stale.lines}.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+/**
+ * The card a proposal is on, from the agent's message that shows it (`meta.memoryUpdates`): the run that proposed
+ * it and every row on the card. None before that message is posted, or for a proposal no message shows.
+ */
+async function cardOf(db: Executor, p: Proposal) {
+  if (!p.proposedByAgentId) return null;
+  const has = (update: Record<string, unknown>) =>
+    sql`${messages.meta}->'memoryUpdates' @> ${JSON.stringify([update])}::jsonb`;
+  const [message] = await db
+    .select({ agentRunId: messages.agentRunId, meta: messages.meta })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.orgId, p.orgId),
+        eq(messages.authorAgentId, p.proposedByAgentId),
+        // Written after the proposal; the minute only covers clocks that disagree.
+        gte(messages.createdAt, new Date(p.createdAt.getTime() - 60_000)),
+        or(has({ proposalIds: [p.id] }), has({ proposalId: p.id })),
+      ),
+    )
+    .orderBy(asc(messages.createdAt))
+    .limit(1);
+  if (!message?.agentRunId) return null;
+  const updates = message.meta.memoryUpdates as { proposalId?: string; proposalIds?: string[] }[];
+  const update = updates.find((u) => u.proposalId === p.id || u.proposalIds?.includes(p.id));
+  return { runId: message.agentRunId, ids: update?.proposalIds?.length ? update.proposalIds : [p.id] };
+}
+
+/**
+ * Tells the agent that proposed a card what people decided: a proposal suspends no run, so nothing else wakes
+ * it (ADR 0092 §6). One notice per card, when its last open row is decided, in the conversation it proposed in.
+ * A card that only went stale changed nothing to tell. After the commit.
+ */
+async function tellProposer(deps: { db: Database; pubsub?: PubSub }, p: Proposal) {
+  const card = await cardOf(deps.db, p);
+  if (!card) return;
+  // The card's own key: a message may show several.
+  const key = card.ids[0] ?? p.id;
+  const delivered = await deps.db.transaction(async (tx) => {
+    // Locked: of two rows decided at once, the second waits here and then finds the notice written.
+    const rows = await tx
+      .select()
+      .from(contextProposals)
+      .where(and(eq(contextProposals.orgId, p.orgId), inArray(contextProposals.id, card.ids)))
+      .orderBy(asc(contextProposals.id))
+      .for("update");
+    if (rows.some((r) => r.status === "pending") || rows.every((r) => r.status === "stale")) return null;
+    const [run] = await tx
+      .select()
+      .from(agentRuns)
+      .where(and(eq(agentRuns.orgId, p.orgId), eq(agentRuns.id, card.runId)));
+    if (!run || run.agentId !== p.proposedByAgentId) return null;
+    const [sent] = await tx
+      .select({ id: messages.id })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.orgId, p.orgId),
+          eq(messages.channelId, run.channelId),
+          eq(messages.authorAgentId, run.agentId),
+          sql`${messages.meta}->'notice'->'refs'->>'proposalCardId' = ${key}`,
+        ),
+      )
+      .limit(1);
+    if (sent) return null;
+    return deliverNoticeToRun(tx, run, {
+      kind: "proposal_result",
+      from: "Your proposed change",
+      text: await cardResult(tx, run.agentId, rows),
+      refs: { proposalCardId: key },
+    });
+  });
+  if (delivered) await publishDelivery(deps.pubsub, delivered).catch(() => {});
 }
 
 /** Agents on one card, at most. */
