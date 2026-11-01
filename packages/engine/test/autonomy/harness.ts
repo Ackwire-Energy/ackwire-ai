@@ -56,6 +56,8 @@ export interface Route {
   addressee?: string;
   /** Jev's tie-break Choice: handle and confidence. */
   best?: [string, number];
+  /** The router's step fails on it (an outage). */
+  fail?: true;
 }
 
 /** How the follow-through (or continuation) judgment reads a turn's end, in the controller's words. */
@@ -240,6 +242,7 @@ export async function world(options: WorldOptions) {
       const lines = input.message.body.split("\n");
       const r = options.route?.[input.message.body] ?? options.route?.[lines.at(-1) ?? ""];
       if (!r && input.authorUserId) unrouted.push(input.message.body);
+      if (r?.fail) throw new Error("router step unavailable");
       const result: RoutingResult = {
         agents: Object.entries(r?.scores ?? {}).map(([h, score]) => ({ agentId: idOf(h), score })),
         needsAgent: r?.needs ?? 0,

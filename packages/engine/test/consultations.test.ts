@@ -473,6 +473,23 @@ describe("ask_agent", () => {
       .from(schema.channels)
       .where(eq(schema.channels.id, row?.channelId ?? ""));
     expect(await consultationsIn(f.db, f.org.id, other[0]?.id ?? "")).toEqual([]);
+
+    // What the consulted run posts in the agents' DM meanwhile shows here as its progress (ADR 0096).
+    const [target] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, row?.targetRunId ?? ""));
+    if (!target) throw new Error("no consulted run");
+    const before = list[0]?.progress?.posts ?? 0;
+    for (const body of ["Gerei a imagem 1.", "Gerei a imagem 2."])
+      await insertMessage(f.db, {
+        orgId: f.org.id,
+        channelId: row?.channelId ?? "",
+        author: { type: "agent", agentId: infra.id, runId: target.id, hop: target.hop },
+        body,
+      });
+    expect((await consultationsIn(f.db, f.org.id, f.general.id))[0]?.progress).toEqual({
+      posts: before + 2,
+      latest: "Gerei a imagem 2.",
+      at: expect.any(Date),
+    });
   });
 
   test("answered and expired questions in the list: the answer once answered, none once expired", async () => {

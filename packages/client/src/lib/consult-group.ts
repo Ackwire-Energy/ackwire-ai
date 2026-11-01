@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { RunConsultation } from "../api/types";
+import { previewOf } from "./consultations";
 import { noticeOf } from "./notices";
 
 /**
@@ -17,8 +18,24 @@ import { noticeOf } from "./notices";
  */
 export type ConsultLineState = "working" | "waiting" | "offline" | "handedOn" | "answered" | "failed" | "expired";
 
-/** Reloads the list this often while a question is out (a consulted agent that stops waiting sends no event). */
-export const CONSULT_GROUP_POLL_MS = 20_000;
+/**
+ * Reloads the list this often while a question is out (a consulted agent that stops waiting sends no event), so the
+ * work handed off shows moving (`progress`).
+ */
+export const CONSULT_GROUP_POLL_MS = 10_000;
+
+/**
+ * What an open line shows of the work so far (ADR 0096): how many messages the consulted agent posted in the agents'
+ * DM and the start of the latest ("12 mensagens · Gerei a imagem 40"), or null. Answered lines show the answer.
+ */
+export function consultProgress(c: Pick<RunConsultation, "status" | "progress">) {
+  return c.status === "open" && c.progress && c.progress.posts > 0
+    ? {
+        key: "chat.consultGroup.posted" as const,
+        values: { count: c.progress.posts, latest: previewOf(c.progress.latest) },
+      }
+    : null;
+}
 
 /** An opened question reloads this often while it's out: its agents' DM sends the page no events. */
 export const CONSULT_CONVERSATION_POLL_MS = 4_000;

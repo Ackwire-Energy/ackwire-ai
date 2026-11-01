@@ -44,3 +44,26 @@ scenario("S30", "a delegate that fails is reported back to the agent that handed
   expect((await w.posts("ada")).at(-1)?.body).toContain("não conseguiu");
   await assertInvariants(w);
 });
+
+scenario("S44", "a router that fails on a message meant for the agents never leaves it silently unanswered", async () => {
+  const body = "alguém consegue ver por que o deploy falhou?";
+  const w = await world({
+    agents: ["otto", "ada"],
+    route: { [body]: { needs: 0.9, fail: true } },
+    script: { otto: [{ text: "Vi: faltou a variável DATABASE_URL no deploy." }] },
+  });
+  const events = w.f.listen(w.channelId);
+  const message = await w.say(body);
+  await w.settle();
+  await Bun.sleep(5);
+  const [decision] = (await w.decisions()).filter((d) => d.messageId === message.id);
+  expect(decision?.error).toContain("router step unavailable");
+  // An agent answers it, or the person is told at once that only a mention reaches one now.
+  const routed = events.find((e) => e.type === "message.routed" && e.messageId === message.id) as
+    | { reason?: string }
+    | undefined;
+  const answered = (await w.runs()).length > 0;
+  expect(answered || routed?.reason === "mention_needed").toBe(true);
+  await assertInvariants(w);
+});
+

@@ -2773,6 +2773,8 @@ async function executeRunInner(
         if (posted) {
           const [view] = await withWikiLinks(db, run.orgId, [messageView(posted)]);
           if (view) await publishMessageCreated(deps.pubsub, view);
+          // Work handed to it shows moving where it was handed from (its line's `progress`, ADR 0096).
+          if (betweenAgents) await announceConsultationChange({ db, pubsub: deps.pubsub }, run).catch(() => {});
           if (typeof issueId === "string")
             await mirrorReplyToIssue({ db, pubsub: deps.pubsub }, run, issueId, posted.body).catch(() => {});
         }

@@ -1,5 +1,5 @@
 import { afterEach, expect } from "bun:test";
-import { schema } from "@agenteschat/db";
+import { eq, schema } from "@agenteschat/db";
 import { expireConsultations, runAuthority, updateAgent } from "../../src";
 import { closeWorlds, type Script, type World, world } from "./harness";
 import { assertInvariants } from "./invariants";
@@ -141,3 +141,31 @@ scenario("S40", "a renamed agent's old @handle still reaches it", async () => {
   expect(await w.runs("agent-801fab")).toHaveLength(1);
   await assertInvariants(w);
 });
+
+scenario("S38", "a teammate's AI status in the context is the live one, not a stale no-AI card", async () => {
+  const w = await world({
+    agents: ["lia", "fred"],
+    script: {
+      lia: [
+        { calls: [{ name: "tell_agent", input: { agent: "@fred", message: "Revisa o PR #231, por favor." } }] },
+        { text: "Passei a revisão do #231 para o Fred." },
+        { text: "O Fred aprovou o #231." },
+      ],
+      fred: [{ text: "Aprovado." }],
+    },
+  });
+  // Yesterday's card: Fred had no AI then. He has one now.
+  const card = await w.past("@fred", "Fred ainda não tem uma IA conectada.", 24 * 60);
+  await w.db
+    .update(schema.messages)
+    .set({ meta: { noAi: { agentId: w.agents.fred?.id ?? "", reason: "no_key" } } })
+    .where(eq(schema.messages.id, card.id));
+  await w.say("@lia pede pro fred revisar o #231");
+  await w.settle();
+  const prompt = w.prompts("lia")[0] ?? "";
+  expect(prompt).toContain("# Your teammates now");
+  expect(prompt).toMatch(/- @fred: has an AI, answers when called/);
+  expect(await w.runs("fred")).toHaveLength(1);
+  await assertInvariants(w);
+});
+

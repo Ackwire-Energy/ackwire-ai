@@ -1209,6 +1209,11 @@ export interface RunConsultation {
   question: string;
   /** The answer once `answered`; the reason once `failed`; null otherwise. */
   answer: string | null;
+  /**
+   * Open: what the consulted run posted in the agents' DM so far (I7), so the conversation that handed the work sees
+   * it moving: how many messages, the start of the latest, and when. Null when it posted nothing yet.
+   */
+  progress: { posts: number; latest: string; at: Date } | null;
   createdAt: Date;
   answeredAt: Date | null;
   expiresAt: Date;
@@ -1259,7 +1264,33 @@ export async function consultationsIn(db: Executor, orgId: string, channelId: st
         .where(and(eq(agentRuns.orgId, orgId), inArray(agentRuns.id, held)))
     : [];
   const waitOf = new Map(targets.map((t) => [t.id, consultationWait(t)]));
-  return rows.map((r) => consultationView(r, waitOf));
+  const progressOf = await progressIn(db, orgId, held);
+  return rows.map((r) => ({
+    ...consultationView(r, waitOf),
+    progress: r.status === "open" && r.targetRunId ? (progressOf.get(r.targetRunId) ?? null) : null,
+  }));
+}
+
+/** What each of `runIds` posted so far (its messages, not notices): how many, and its latest's start and time. */
+async function progressIn(db: Executor, orgId: string, runIds: string[]) {
+  if (runIds.length === 0) return new Map<string, NonNullable<RunConsultation["progress"]>>();
+  const rows = rowsOf<{ run_id: string; posts: number | string; latest: string; at: string | Date }>(
+    await db.execute(sql`select distinct on (m.agent_run_id) m.agent_run_id as run_id,
+        count(*) over (partition by m.agent_run_id) as posts, left(m.body, 400) as latest, m.created_at as at
+      from ${messages} m
+      where m.org_id = ${orgId}::uuid and m.agent_run_id in (${sql.join(
+        runIds.map((id) => sql`${id}::uuid`),
+        sql`, `,
+      )})
+        and m.deleted_at is null and m.meta->'notice' is null
+      order by m.agent_run_id, m.created_at desc`),
+  );
+  return new Map(
+    rows.map((r) => [
+      r.run_id,
+      { posts: Number(r.posts), latest: cutText(answerForPeople(r.latest), NOTICE_ANSWER_MAX), at: new Date(r.at) },
+    ]),
+  );
 }
 
 type ConsultationRow = Pick<
@@ -1283,6 +1314,7 @@ function consultationView(r: ConsultationRow, waitOf: Map<string, ConsultationWa
     // Open (what it gathered so far is the agents'), or expired: no answer; a failed one keeps its reason.
     answer:
       open || status === "expired" || !r.answer ? null : cutText(answerForPeople(r.answer), NOTICE_ANSWER_MAX) || null,
+    progress: null,
     createdAt: r.createdAt,
     answeredAt: r.answeredAt,
     expiresAt: r.expiresAt,

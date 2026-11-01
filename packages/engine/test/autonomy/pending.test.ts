@@ -30,8 +30,8 @@ pending(
 pending(
   "S24",
   "a Codex resume into a folder gone after the drop starts fresh with a note",
-  ["open:codex-cwd"],
-  COMPUTER,
+  [],
+  "closed on main (sessionLost, ADR 0032 addendum; engine-brains.test.ts); end to end needs a paired fake computer",
 );
 pending(
   "S28",
@@ -45,11 +45,5 @@ pending(
   "after a proposed agent is created, the run can ask it and add it",
   ["work-by-default"],
   "proposal flow",
-);
-pending(
-  "S38",
-  "a teammate's AI status in the context is the live one, not a stale card",
-  ["open:teammate-status"],
-  "no-AI card fixture",
 );
 pending("S42", "a person writing into an unattended run puts that person behind it", [], "live steering in the world");

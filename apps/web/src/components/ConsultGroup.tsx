@@ -10,6 +10,7 @@ import {
   consultGroupSummary,
   consultLineKey,
   consultLineState,
+  consultProgress,
   consultNoticeFolds,
   consultSeconds,
   groupsByRun,
@@ -155,6 +156,7 @@ export function ConsultGroup({
     const state = consultLineState(c, now);
     const to = agentGrammar(t, dir.agentById.get(c.consultedAgentId)?.name ?? t("channel.unknownAgent"));
     const answer = state === "answered" ? (c.answer ?? "") : null;
+    const progress = consultProgress(c);
     return {
       kind: "line",
       line: {
@@ -169,7 +171,7 @@ export function ConsultGroup({
           />
         ),
         label: consultLineLabel(t, state, c, to),
-        hint: answer ? previewOf(answer) : null,
+        hint: answer ? previewOf(answer) : progress ? t(progress.key, progress.values) : null,
         time: formatLineTime(i18n.language, consultSeconds(c, now) * 1000),
         defaultOpen: asked?.consultationId === c.id,
         onOpen: openConsultation ? () => openConsultation(c.id) : undefined,

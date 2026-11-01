@@ -872,6 +872,8 @@ export interface RunConsultation {
   question: string;
   /** The answer once answered; why it couldn't once failed. */
   answer: string | null;
+  /** Open: what the consulted agent posted in the agents' DM so far (ADR 0096). Older servers send none. */
+  progress?: { posts: number; latest: string; at: string } | null;
   createdAt: string;
   answeredAt: string | null;
   expiresAt: string;

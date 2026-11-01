@@ -8997,6 +8997,9 @@ export const ptBR = {
       waitingComputer: "{{The}} {{name}} espera o computador voltar",
       /** Its part done, the agent waits on what it handed to other agents. */
       waitingAgents: "{{The}} {{name}} passou uma parte adiante e espera o retorno",
+      /** What a teammate at work posted so far in the agents' conversation, and the start of the latest. */
+      posted_one: "{{count}} mensagem até agora · {{latest}}",
+      posted_other: "{{count}} mensagens até agora · {{latest}}",
       /** An answer whose question is in a reply farther up: one line where it arrived, "Ver" goes to that reply. */
       answeredFar: "{{to}} respondeu à pergunta {{of}} {{from}}",
       answeredRequestFar: "{{to}} respondeu ao pedido {{of}} {{from}}",

@@ -146,6 +146,11 @@ describe("schedule tools: routines", () => {
     });
     expect(issues.isError).toBeFalsy();
     expect(issues.content).not.toContain("can't run yet");
+    // Nor can one be moved onto such an event.
+    const issuesId = (issues.data?.routine as { id: string } | undefined)?.id ?? "";
+    const moved = await call("update_routine", { id: issuesId, trigger: event });
+    expect(moved.isError).toBe(true);
+    expect(moved.content).toContain("Not changed: nothing would ever start it.");
 
     // With a GitHub webhook here it is created, and the next pull request starts it.
     const endpoint = await hook(f, "github");

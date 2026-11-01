@@ -971,6 +971,14 @@ describe("automatic lines (notices) and fast replies", () => {
     expect(anon?.key).toBe("chat.notice.consultReplyAnon");
   });
 
+  test("a mention that couldn't wake its agents says whose mention and whom, by name", () => {
+    const line = eventLineOf(
+      agentMsg("n1", { notice: { kind: "wake_skipped", text: "@infra wasn't woken", refs: { agentHandles: "infra,zed" } } }),
+      names,
+    );
+    expect(line).toMatchObject({ key: "chat.notice.wakeSkipped", values: { name: "Ada", agents: "Infra, zed" } });
+  });
+
   test("an agent's follow-up: when it will be back and for what, then the line that woke it", () => {
     // Today, so the line needs no day.
     const at = new Date(new Date().setHours(12, 0, 0, 0)).toISOString();

@@ -8929,6 +8929,9 @@ export const en: Translations = {
       waitingComputer: "{{name}} is waiting for the computer",
       /** Its part done, the agent waits on what it handed to other agents. */
       waitingAgents: "{{name}} handed part of it on and is waiting to hear back",
+      /** What a teammate at work posted so far in the agents' conversation, and the start of the latest. */
+      posted_one: "{{count}} message so far · {{latest}}",
+      posted_other: "{{count}} messages so far · {{latest}}",
       /** An answer whose question is in a reply farther up: one line where it arrived, "See" goes to that reply. */
       answeredFar: "{{to}} answered {{from}}'s question",
       answeredRequestFar: "{{to}} answered {{from}}'s request",
