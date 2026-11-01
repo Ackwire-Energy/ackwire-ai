@@ -156,12 +156,14 @@ describe("Equipe on the Agentes header", () => {
 describe("bringing agents from another app, where agents are made", () => {
   const toImport = () => screen().queryByRole("link", { name: "Trazer agentes de outro app" });
 
-  test("Equipe and Criar agente open Importar e exportar for who creates agents", async () => {
+  const importButton = () => screen().queryByRole("button", { name: "Trazer agentes de outro app" });
+
+  test("Equipe links to Importar e exportar for who creates agents; Criar agente opens the import in place", async () => {
     await go(as("owner"), "team");
     expect(toImport()?.getAttribute("href")).toBe(`/org/${ORG_ID}/settings/import`);
     cleanup();
     await go(as("owner"), "agents/new");
-    expect(toImport()?.getAttribute("href")).toBe(`/org/${ORG_ID}/settings/import`);
+    expect(importButton()).not.toBeNull();
   });
 
   test("members, who don't create agents, get neither", async () => {
@@ -171,6 +173,7 @@ describe("bringing agents from another app, where agents are made", () => {
     await go(as("member"), "agents/new");
     expect(screen().getByText(/Só admins e donos criam agentes/)).toBeTruthy();
     expect(toImport()).toBeNull();
+    expect(importButton()).toBeNull();
   });
 });
 

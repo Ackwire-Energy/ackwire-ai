@@ -240,7 +240,7 @@ describe("Criar agente: steps", () => {
     expect(scratch?.nextElementSibling?.tagName).toBe("SECTION");
     expect(css).toMatch(/\n\.newag__scratch \{[^}]*gap: 12px;/);
     expect(document.activeElement).toBe(screen().getByLabelText("Cargo"));
-    expect(screen().getByText("O que faz na equipe, nas suas palavras.")).toBeTruthy();
+    expect(screen().getByText("O que ele faz pelo time, ex.: Assistente de e-mails e agenda.")).toBeTruthy();
 
     // A role outside engineering fills the rest the same way.
     await click(within(step).getByRole("button", { name: /^Atendimento/ }));
@@ -666,11 +666,10 @@ describe("Criar agente: what gets created", () => {
     await startAs("Assistente");
     await proceed(4);
     expect(title()).toBe("Modelo e orçamento");
-    expect(
-      screen()
-        .getByRole("button", { name: /^Claude Code.*Mac mini/ })
-        .getAttribute("aria-pressed"),
-    ).toBe("true");
+    // Its only computer: the card doesn't name it.
+    const planCard = screen().getByRole("button", { name: /^Claude Code/ });
+    expect(planCard.getAttribute("aria-pressed")).toBe("true");
+    expect(planCard.textContent).not.toContain("Mac mini");
     expect(screen().getByText("Começa com a última escolha: Opus pelo plano do Claude · Esforço alto.")).toBeTruthy();
     await proceed();
     await click(screen().getByRole("button", { name: "Criar Eva" }));

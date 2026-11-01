@@ -167,13 +167,12 @@ describe("the questions inside the reply that asked (ConsultGroup)", () => {
     expect(group()?.textContent).toContain("espera uma aprovação");
   });
 
-  test("work handed off: 'Passou para 1 colega', its part done and waiting to hear back, opened as a request", async () => {
+  test("work handed off: its own line (no 'Passou para 1 colega'), its part done and waiting to hear back, opened as a request", async () => {
     const c = consultation({ kind: "note", waiting: "agents" });
     await open(withTalk(withAsk([c]), c));
     const block = group() as HTMLElement;
     expect(block.getAttribute("aria-label")).toBe("Pedidos da Ada a outros agentes");
-    expect(block.textContent).toContain("Passou para 1 colega");
-    expect(block.textContent).toContain("0 de 1");
+    expect(block.textContent).not.toContain("Passou para 1 colega");
     const line = within(block).getByRole("button", { name: /O Atlas passou uma parte adiante e espera o retorno/ });
     await act(async () => fireEvent.click(line));
     await settle(3);
