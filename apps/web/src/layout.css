@@ -367,7 +367,7 @@ p {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-width: 520px;
+  max-width: var(--msg-card-w);
   padding: 12px 14px;
   border-radius: var(--radius-md);
   background: var(--surface-sunken);

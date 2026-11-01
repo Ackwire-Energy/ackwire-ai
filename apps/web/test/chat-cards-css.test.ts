@@ -37,6 +37,8 @@ test("the cards in a message share one width: the tools, a lone call's line, eve
     ".chart-card",
     ".correction-ask",
     ".iw-card",
+    // Connect an AI, a proposed agent, a stretch, waiting for its computer.
+    ".waitcard",
     // A mission's link and its command to approve, the browser's request and where it browsed.
     ".mi-linkcard",
     ".mi-cmd",
@@ -57,6 +59,8 @@ test("nothing in a message wears the hover plate's own gray: cards a step up, we
       ["--surface-raised", "var(--raised-2)"],
       ["--sunken", "var(--msg-well)"],
       ["--surface-sunken", "var(--msg-well)"],
+      // The pressed-in well too ("Leu seu recado" under the tools).
+      ["--card-well", "var(--msg-well)"],
     ]),
   );
   // Light: a well is the plate's tint over the row (darker hovered or not); dark: its own darker ground.

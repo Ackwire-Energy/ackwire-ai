@@ -888,7 +888,7 @@ textarea.ac-input {
 /*
  * The cards in a message (its tools, what it changed, a request, a file): one width, short of the text's. The row's
  * hover plate must never match what sits on it: a card's face is a step up (`--raised-2`, white in light), a well
- * (code, a quote) is `--msg-well`, darker than the row whether it is hovered or not.
+ * (code, a quote, "Leu seu recado") is `--msg-well`, darker than the row whether it is hovered or not.
  */
 :root {
   --msg-card-w: 560px;
@@ -898,6 +898,7 @@ textarea.ac-input {
   --surface-raised: var(--raised-2);
   --sunken: var(--msg-well);
   --surface-sunken: var(--msg-well);
+  --card-well: var(--msg-well);
 }
 /* The face is 32px in the feed. */
 .ac-msg__avatar,
