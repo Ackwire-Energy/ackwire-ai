@@ -6868,6 +6868,7 @@ export const ptBR = {
     diagramFailed: "Não foi possível desenhar o diagrama. Veja o código abaixo.",
     diagramLabel: "Diagrama: {{title}}",
     rendering: "Desenhando…",
+    showDiagram: "Ver diagrama",
     htmlFrame: "Página: {{title}}",
     htmlNote: "A página roda isolada, sem acesso à sua conta.",
     htmlFailed: "A página não abriu neste navegador. Baixe para abrir em outro lugar.",

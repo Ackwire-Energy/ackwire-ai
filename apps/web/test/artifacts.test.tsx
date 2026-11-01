@@ -222,11 +222,14 @@ describe("artifact viewer", () => {
     expect(changed?.children[1]?.className).toContain("ac-diff__line--add");
   });
 
-  test("diagram: drawn as an image", async () => {
+  test("diagram: drawn as an image, in the same card as a Markdown fence", async () => {
     await openChannel();
     const dialog = await openCard("Organograma do time");
     await settle(3);
-    expect(within(dialog).getByRole("img", { name: "Diagrama: Organograma do time" })).toBeTruthy();
+    // The viewer now uses the ```mermaid fence card, so the drawing sits in its preview (and waits for a press where the
+    // frame shares the page's thread). The fake renderer here runs apart, so it's drawn.
+    const img = dialog.querySelector(".code-card__preview img") as HTMLImageElement | null;
+    expect(img?.getAttribute("src")?.startsWith("data:image/svg+xml")).toBe(true);
   });
 
   test("html: only in a sandboxed iframe with allow-scripts and never allow-same-origin", async () => {

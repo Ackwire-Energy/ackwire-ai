@@ -6819,6 +6819,7 @@ export const en: Translations = {
     diagramFailed: "Couldn't draw the diagram. See the code below.",
     diagramLabel: "Diagram: {{title}}",
     rendering: "Drawing…",
+    showDiagram: "Show diagram",
     htmlFrame: "Page: {{title}}",
     htmlNote: "The page runs isolated, with no access to your account.",
     htmlFailed: "The page didn't open in this browser. Download it to open elsewhere.",

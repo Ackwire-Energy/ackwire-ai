@@ -91,10 +91,70 @@ class ZlibDecompressionStream {
   }
 }
 
+/**
+ * Two things a browser does and happy-dom doesn't, which DOMPurify (mermaid's sanitizer) relies on. Without them it
+ * drops the first element and keeps the rest as is, `<script>` and `onclick` included. Installed before any library
+ * loads: DOMPurify takes both when it does.
+ *
+ * - `Node.prototype`'s `nodeName` getter names every kind of node (DOMPurify reads names through it, so markup can't
+ *   clobber them). happy-dom's returns "".
+ * - A NodeIterator keeps its place when the node it returned last is removed. happy-dom's stops there.
+ */
+function traverseLikeABrowser(window: Window) {
+  const nodeProto = window.Node.prototype;
+  const ownName = Object.getOwnPropertyDescriptor(nodeProto, "nodeName")?.get;
+  Object.defineProperty(nodeProto, "nodeName", {
+    configurable: true,
+    get(this: Node) {
+      for (let p = Object.getPrototypeOf(this); p && p !== nodeProto; p = Object.getPrototypeOf(p)) {
+        const get = Object.getOwnPropertyDescriptor(p, "nodeName")?.get;
+        if (get) return get.call(this);
+      }
+      return ownName?.call(this) ?? "";
+    },
+  });
+  // Not `window.Document.prototype`: that's a subclass made for this window, and documents don't inherit from it.
+  let documentProto: object = window.document;
+  while (!Object.hasOwn(documentProto, "createNodeIterator")) documentProto = Object.getPrototypeOf(documentProto);
+  Object.defineProperty(documentProto, "createNodeIterator", {
+    configurable: true,
+    writable: true,
+    value(root: Node, whatToShow = 0xffffffff, filter: NodeFilter | null = null) {
+      const accepts = (node: Node) =>
+        (whatToShow & (1 << (node.nodeType - 1))) !== 0 &&
+        (typeof filter === "function" ? filter(node) : (filter?.acceptNode(node) ?? 1)) === 1;
+      const following = (node: Node) => {
+        // A <template>'s content isn't in the tree (happy-dom lists it as the template's children).
+        if (node.firstChild?.parentNode === node) return node.firstChild;
+        for (let n: Node | null = node; n && n !== root; n = n.parentNode) if (n.nextSibling) return n.nextSibling;
+        return null;
+      };
+      // The node returned last, and the last one returned that was still in place: where to go on from if it's gone.
+      let last: Node | null = null;
+      let kept: Node | null = null;
+      return {
+        root,
+        whatToShow,
+        filter,
+        nextNode() {
+          let next = last === null ? root : root.contains(last) ? following(last) : kept && following(kept);
+          while (next && !accepts(next)) next = following(next);
+          if (!next) return null;
+          if (last && root.contains(last)) kept = last;
+          last = next;
+          return next;
+        },
+        detach() {},
+      };
+    },
+  });
+}
+
 function state(): DomState {
   const existing = g.__agentesDom as DomState | undefined;
   if (existing) return existing;
   const window = new Window({ url: "http://localhost:3000/", width: 1280, height: 900 });
+  traverseLikeABrowser(window);
   const w = window as unknown as Store;
   // DOM classes and helpers Bun doesn't have are installed once and stay
   // (harmless for backend code, which never looks for them).
