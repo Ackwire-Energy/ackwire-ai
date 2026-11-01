@@ -19,8 +19,8 @@ import { isIdHandle } from "@agenteschat/tokens/names";
 export const isRequestCard = (card: ImportCard | null): card is RequestCard =>
   card === "grok-bot" || card === "chatgpt-dots" || card === "other";
 
-/** Whether "Choose files" applies: not for the apps that only answer in chat ("Another app" may still be files). */
-export const takesFiles = (card: ImportCard | null) => card !== "grok-bot" && card !== "chatgpt-dots";
+/** Whether "Choose files" applies: not for Grok Bot, which only answers in chat (ChatGPT dots hands back a file). */
+export const takesFiles = (card: ImportCard | null) => card !== "grok-bot";
 
 /** A file from the system picker. */
 export interface PickedAsset {

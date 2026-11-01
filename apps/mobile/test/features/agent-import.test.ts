@@ -71,8 +71,8 @@ describe("Importar agentes on the phone: which picked files are read", () => {
     expect(IMPORT_CARDS.filter(isRequestCard)).toEqual(["grok-bot", "chatgpt-dots", "other"]);
   });
 
-  test("Choose files is hidden only for the apps that answer in chat", () => {
-    expect(IMPORT_CARDS.filter((c) => !takesFiles(c))).toEqual(["grok-bot", "chatgpt-dots"]);
+  test("Choose files is hidden only for Grok Bot, which answers in chat (ChatGPT dots makes a file)", () => {
+    expect(IMPORT_CARDS.filter((c) => !takesFiles(c))).toEqual(["grok-bot"]);
     expect(takesFiles(null)).toBe(true);
   });
 
