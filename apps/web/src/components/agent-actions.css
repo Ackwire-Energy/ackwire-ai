@@ -96,7 +96,7 @@
   opacity: 0.55;
   cursor: default;
 }
-.ag-rc__btn:focus-visible {
+html:not([data-pointer]) .ag-rc__btn:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }

@@ -107,7 +107,7 @@ button.mi-pill {
 button.mi-pill:hover {
   background: color-mix(in srgb, var(--ink) 10%, var(--sunken));
 }
-button.mi-pill:focus-visible {
+html:not([data-pointer]) button.mi-pill:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -1306,7 +1306,7 @@ a.mi-pr:hover {
   text-decoration-color: var(--line2);
   text-underline-offset: 3px;
 }
-.mi-quiet:focus-visible {
+html:not([data-pointer]) .mi-quiet:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }

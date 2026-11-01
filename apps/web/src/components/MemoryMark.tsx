@@ -154,6 +154,7 @@ function MemoryMark({ message, memory }: { message: Message; memory: MessageMemo
         setMode(o ? "card" : null);
       }}
       label={t("memoryMark.title", { name })}
+      moveFocus={mode !== "tip"}
       side={mode === "tip" ? "top" : "bottom"}
       className={mode === "tip" ? "msg-mem__tip ac-glass" : "msg-mem__pop"}
       onContentPointerEnter={(e) => hoverPointer(e.pointerType) && clear()}

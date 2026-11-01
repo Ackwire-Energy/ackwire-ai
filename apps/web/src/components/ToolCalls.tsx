@@ -20,6 +20,7 @@ import {
   workApps,
   workFromSteps,
   workMeta,
+  workSteps,
 } from "@agenteschat/client/lib/work";
 import {
   type AgentColor,
@@ -83,6 +84,7 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
   browsing: "globe",
   pcFiles: "file",
   checkingComputer: "computer",
+  checkingUsage: "chart",
   proposingMission: "flag",
   messagingMission: "flag",
   updatingPlan: "flag",
@@ -299,8 +301,8 @@ export function SavedTools({
     : null;
   const items = work ? toolItemsSaved(work) : [];
   const blockItems = useBlockItems(items);
-  // Nothing to say: the server says it used no tools.
-  if (compact && compact.steps === 0) return null;
+  // Nothing to say: the server says it used no tools (lookups and reactions aren't counted).
+  if (compact && workSteps(compact) === 0) return null;
   const calls = work ? toolCalls(items) : (compact?.steps ?? 0);
   const lone = savedOneLine(meta);
   // Its only call has a card of its own on the message (where it browsed): the card says it.

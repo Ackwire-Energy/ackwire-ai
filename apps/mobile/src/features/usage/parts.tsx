@@ -2,7 +2,7 @@ import type { PlanAccountInfo } from "@agenteschat/client";
 import { accountName, brandOf, type MeterWindow, planMeterText } from "@agenteschat/client/lib/plan-usage";
 import { planName } from "@agenteschat/client/lib/plans";
 import { mixHex } from "@agenteschat/ui/agent/engine";
-import { PLAN_ALMOST, planLine, planState, planWindows } from "@agenteschat/ui/plan-state";
+import { PLAN_ALMOST, PLAN_TONE, planLevel, planLine, planState, planWindows } from "@agenteschat/ui/plan-state";
 import { Canvas, createPicture, Picture, Skia } from "@shopify/react-native-skia";
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -12,15 +12,31 @@ import { useColors } from "../shared/hooks";
 
 /*
  * The usage views' pieces (ADR 0063), as the web draws them (`PlanMeter`, `UsageDays`, `PlanUsage.tsx`): a plan's
- * windows as ink bars, an account's head, a month day by day. The words come from the shared
+ * windows as bars, an account's head, a month day by day. The words come from the shared
  * `@agenteschat/client/lib/plan-usage`.
  */
 
 type MeterUsage = { windows: readonly MeterWindow[]; limited?: boolean; at: string };
 
-/** The ink bar (`.ac-meter`): a tint track, the value, an estimated part in full ink over it, the "almost" mark. */
-export function Meter({ value, part, label, mark }: { value: number; part?: number; label: string; mark?: number }) {
+/**
+ * The bar (`.ac-meter`): a tint track, the value, an estimated part in full tone over it, the "almost" mark. Ink unless
+ * a plan's level gives it a `color` (a 6-digit hex: its part's tint adds an alpha to it).
+ */
+export function Meter({
+  value,
+  part,
+  label,
+  mark,
+  color,
+}: {
+  value: number;
+  part?: number;
+  label: string;
+  mark?: number;
+  color?: string;
+}) {
   const c = useColors();
+  const tone = color ?? c.ink;
   const parts = part !== undefined;
   return (
     <View
@@ -30,10 +46,8 @@ export function Meter({ value, part, label, mark }: { value: number; part?: numb
       accessibilityValue={{ min: 0, max: 100, now: Math.round(value) }}
       style={[styles.track, { backgroundColor: c.plate }]}
     >
-      <View
-        style={[styles.bar, { width: `${Math.min(100, value)}%`, backgroundColor: parts ? `${c.ink}4d` : c.ink }]}
-      />
-      {parts ? <View style={[styles.bar, { width: `${Math.min(100, part)}%`, backgroundColor: c.ink }]} /> : null}
+      <View style={[styles.bar, { width: `${Math.min(100, value)}%`, backgroundColor: parts ? `${tone}4d` : tone }]} />
+      {parts ? <View style={[styles.bar, { width: `${Math.min(100, part)}%`, backgroundColor: tone }]} /> : null}
       {mark !== undefined ? <View style={[styles.mark, { left: `${mark}%`, backgroundColor: c.raised }]} /> : null}
     </View>
   );
@@ -41,7 +55,9 @@ export function Meter({ value, part, label, mark }: { value: number; part?: numb
 
 /**
  * A plan's usage like the provider shows it (the web's `PlanMeter`): a bar per window, tightest first, with its
- * percentage and when it resets; "almost" from 80%, "at the limit until…" at 100%, and how old the numbers are.
+ * percentage and when it resets; "almost" from 80%, "at the limit until…" at 100%, and how old the numbers are. The
+ * bars are ink until a window nears its limit (`planLevel`, `PLAN_TONE`): amber from 80%, red from 90% and at the
+ * limit, each window by its own level and the words above by the plan's.
  * `compact` (an agent's month, Contas de IA, Você): one line with the tightest windows ("semana 40% · 5h 12%",
  * after `label`), one bar for the fullest, and only near the limit when it renews; nothing while no window is known,
  * unless the plan already refused a request ("No limite").
@@ -55,6 +71,7 @@ export function PlanMeter({ usage, compact = false, label }: { usage: MeterUsage
     const shown = planLine(usage, text, now);
     if (!shown) return null;
     const line = [label, shown.line].filter(Boolean).join(" · ");
+    const tone = c[PLAN_TONE[planLevel(shown.top?.used ?? 0, shown.state === "limited")]];
     return (
       <View style={styles.meterCompact}>
         {line ? (
@@ -62,9 +79,11 @@ export function PlanMeter({ usage, compact = false, label }: { usage: MeterUsage
             {line}
           </Text>
         ) : null}
-        {shown.top ? <Meter value={shown.top.used} label={text.window(shown.top)} mark={PLAN_ALMOST} /> : null}
+        {shown.top ? (
+          <Meter value={shown.top.used} label={text.window(shown.top)} mark={PLAN_ALMOST} color={tone} />
+        ) : null}
         {shown.alert ? (
-          <Text variant="caption" style={[styles.bold, { color: c.attention }]}>
+          <Text variant="caption" style={[styles.bold, { color: tone }]}>
             {shown.alert}
           </Text>
         ) : null}
@@ -72,13 +91,13 @@ export function PlanMeter({ usage, compact = false, label }: { usage: MeterUsage
     );
   }
   const rows = planWindows(usage, now);
-  const { state, until } = planState(usage, now);
+  const { state, until, used } = planState(usage, now);
   const headline = state === "limited" ? text.limited(until) : state === "almost" ? text.almost : null;
   const passed = (iso: string | undefined) => iso !== undefined && Date.parse(iso) <= now;
   return (
     <View style={styles.meter}>
       {headline ? (
-        <Text variant="small" style={[styles.bold, { color: c.attention }]}>
+        <Text variant="small" style={[styles.bold, { color: c[PLAN_TONE[planLevel(used, state === "limited")]] }]}>
           {headline}
         </Text>
       ) : null}
@@ -86,13 +105,15 @@ export function PlanMeter({ usage, compact = false, label }: { usage: MeterUsage
         const name = text.window(w);
         // A window that reset is empty again: its parts were the old window's.
         const fresh = !passed(w.resetsAt);
+        const level = planLevel(w.used);
+        const tone = c[PLAN_TONE[level]];
         return (
           <View key={`${w.kind}:${w.label ?? i}`} style={styles.window}>
             <View style={styles.windowLine}>
               <Text variant="small" tone="ink2" style={styles.grow}>
                 {name}
               </Text>
-              <Text variant="small" tone="muted" style={styles.tabular}>
+              <Text variant="small" tone="muted" style={[styles.tabular, level !== "ok" && { color: tone }]}>
                 {w.used}%
               </Text>
             </View>
@@ -100,6 +121,7 @@ export function PlanMeter({ usage, compact = false, label }: { usage: MeterUsage
               value={w.used}
               label={name}
               mark={PLAN_ALMOST}
+              color={tone}
               {...(w.part !== undefined && fresh ? { part: w.part } : {})}
             />
             {w.note && fresh ? (

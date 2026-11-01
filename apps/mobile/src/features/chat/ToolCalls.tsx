@@ -21,6 +21,7 @@ import {
   workApps,
   workFromSteps,
   workMeta,
+  workSteps,
 } from "@agenteschat/client/lib/work";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import type { TFunction } from "i18next";
@@ -102,6 +103,7 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
   runningCode: "code",
   browsing: "globe",
   checkingComputer: "laptop",
+  checkingUsage: "chart",
   proposingMission: "flag",
   messagingMission: "flag",
   updatingPlan: "flag",
@@ -701,7 +703,7 @@ export function SavedTools({
     : null;
   const items = work ? toolItemsSaved(work) : [];
   const blockItems = useBlockItems(items);
-  if (!compact || compact.steps === 0) return null;
+  if (!compact || workSteps(compact) === 0) return null;
   const calls = work ? toolCalls(items) : compact.steps;
   const lone = savedOneLine(meta);
   // Its only call has a card of its own on the message (where it browsed): the card says it.

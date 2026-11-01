@@ -89,6 +89,17 @@ describe("memory mark", () => {
     expect(mark()?.getAttribute("aria-label")).toBe("Ada guardou isso na memória: Deploy só depois das 19h.");
   });
 
+  test("a resting mouse opens the tip without taking the focus from the box", async () => {
+    await open(withMark());
+    const box = screen().getByRole("combobox", { name: /Mensagem para/ });
+    box.focus();
+    await act(async () => fireEvent.pointerEnter(mark() as HTMLElement, { pointerType: "mouse" }));
+    await act(() => new Promise((r) => setTimeout(r, 500)));
+    await settle(2);
+    expect(within(screen().getByRole("dialog")).getByRole("button", { name: "Corrigir" })).toBeTruthy();
+    expect(document.activeElement).toBe(box);
+  });
+
   test("live: message.memories adds the mark for everyone in the channel", async () => {
     const { socket } = await open();
     expect(mark()).toBeNull();

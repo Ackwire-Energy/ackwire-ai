@@ -82,8 +82,22 @@ export function workMeta(meta: Record<string, unknown> | undefined): WorkMeta | 
   };
 }
 
+/**
+ * Calls the block never lists: a reaction already shows on the message it reacts to, and looking a tool up (tools on
+ * demand, a big connector's directory) is how our tools load, not something done for anyone. The server's
+ * `meta.work` leaves them out too (`executor.ts`).
+ */
+const UNLISTED: ReadonlySet<ActivityKind> = new Set(["reacting", "findingTools"]);
+
+/** One of `meta.work`'s calls that is only lookups: ours by name, with no app it could share a logo with. */
+const onlyLookups = (c: WorkCall) => !c.connector && !c.service && UNLISTED.has(toolActivity(c.name).kind);
+
 /** A saved reply's apps before its steps load (`meta.work.calls`): the ones `toolApps` gives once they do. */
-export const workApps = (calls: WorkCall[]) => uniqueApps(calls.map((c) => toolActivity(c.name, c.connector, null, c)));
+export const workApps = (calls: WorkCall[]) =>
+  uniqueApps(calls.filter((c) => !onlyLookups(c)).map((c) => toolActivity(c.name, c.connector, null, c)));
+
+/** How many calls a saved reply shows (0: no block). A reply saved before lookups were left out counted them. */
+export const workSteps = (w: WorkMeta) => (w.calls.length > 0 && w.calls.every(onlyLookups) ? 0 : w.steps);
 
 const DRIVE: ActivityKind[] = ["readingDrive", "writingDrive", "exportingFile", "importingFile"];
 const time = (iso: string) => new Date(iso).getTime();
@@ -122,8 +136,7 @@ export function workFromSteps(steps: RunStep[], run?: Pick<Run, "createdAt" | "f
       service: typeof s.data.service === "string" ? s.data.service : null,
       serviceIcon: typeof s.data.serviceIcon === "string" ? s.data.serviceIcon : null,
     });
-    // A reaction already shows on the message it reacts to: never a step (the server's `meta.work` skips it too).
-    if (a.kind === "reacting") continue;
+    if (UNLISTED.has(a.kind)) continue;
     const app = a.kind === "consulting" ? a.app : DRIVE.includes(a.kind) ? "Drive" : undefined;
     if (app && !connectors.includes(app)) connectors.push(app);
     const input = (s.data.input ?? {}) as Record<string, unknown>;
@@ -423,8 +436,8 @@ const sameLine = (a: ToolLine, b: Activity & { tool: string }) =>
 /**
  * The live work as the block's items: a call followed by the same kind of call (no code, nothing said in
  * between, neither failed) is one line counting both, so five browser steps read "Usou o navegador ×5".
- * Reactions are left out, as in `workFromSteps`. `stopped`: the run was stopped, so the call still running shows
- * as stopped.
+ * Reactions and tool lookups are left out (`UNLISTED`), as in `workFromSteps`. `stopped`: the run was stopped, so the
+ * call still running shows as stopped.
  */
 export function toolItemsLive(work: LiveWork[], stopped = false): ToolItem[] {
   const items: ToolItem[] = [];
@@ -438,7 +451,7 @@ export function toolItemsLive(work: LiveWork[], stopped = false): ToolItem[] {
       return;
     }
     const a = toolActivity(w.tool, w.connector, w.detail, w);
-    if (a.kind === "reacting") return;
+    if (UNLISTED.has(a.kind)) return;
     // Held (it waits on a person, so it never ran) reads like a call stopped before it ended.
     const state: ToolState = w.running ? (stopped ? "stop" : "run") : w.failed ? "fail" : w.held ? "stop" : "done";
     const hasCode = Boolean(w.code) || w.output.length > 0;

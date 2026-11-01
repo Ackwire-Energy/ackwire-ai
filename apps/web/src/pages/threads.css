@@ -64,7 +64,7 @@
 .threads-group__head button:hover {
   color: var(--ink);
 }
-.threads-group__head button:focus-visible {
+html:not([data-pointer]) .threads-group__head button:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: var(--radius-sm);
@@ -158,7 +158,7 @@
   color: var(--muted);
   font-weight: 500;
 }
-.thread-row__name:focus-visible {
+html:not([data-pointer]) .thread-row__name:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: var(--radius-sm);
@@ -208,7 +208,7 @@
   background: var(--sunken);
   color: var(--ink);
 }
-.thread-row__resolved:focus-visible {
+html:not([data-pointer]) .thread-row__resolved:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -364,7 +364,7 @@
 .thread-where:hover {
   background: color-mix(in srgb, var(--ink) 7%, var(--sunken));
 }
-.thread-where:focus-visible {
+html:not([data-pointer]) .thread-where:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }

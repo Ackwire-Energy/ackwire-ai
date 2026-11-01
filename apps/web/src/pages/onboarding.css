@@ -94,7 +94,7 @@
   background: var(--plate);
   color: var(--ink);
 }
-.onb__back:focus-visible {
+html:not([data-pointer]) .onb__back:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -118,7 +118,7 @@
   background: var(--plate);
   color: var(--ink);
 }
-.onb__signout:focus-visible {
+html:not([data-pointer]) .onb__signout:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -361,7 +361,7 @@ html:has(.onb) {
 .onb__logo:hover {
   background: var(--plate);
 }
-.onb__logo:focus-visible {
+html:not([data-pointer]) .onb__logo:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
