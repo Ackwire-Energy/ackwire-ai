@@ -144,14 +144,22 @@ const push = (socket: { push: (f: unknown) => void }, event: Record<string, unkn
 const asking = { type: "agent.consulting", runId: RUN, agentId: ADA_ID, consultedAgentId: ATLAS_ID };
 
 describe("the questions inside the reply that asked (ConsultGroup)", () => {
-  test("still out: 'Perguntou a 1 colega' open, the agent working, the count", async () => {
+  test("still out: one question is its own line, the agent working, with no 'Perguntou a 1 colega' to open", async () => {
     await open(withAsk([consultation({})]));
     const block = group();
     expect(block).not.toBeNull();
     const text = block?.textContent ?? "";
-    expect(text).toContain("Perguntou a 1 colega");
-    expect(text).toContain("0 de 1");
+    expect(block?.querySelector(".ac-tools__head")).toBeNull();
+    expect(text).not.toContain("Perguntou a 1 colega");
     expect(text).toContain("Atlas está trabalhando");
+    expect(block?.querySelector(".ac-tools__line")?.getAttribute("data-s")).toBe("run");
+    cleanup();
+    // Two questions keep the block: 'Perguntou a 2 colegas' open, the count, a line each.
+    await open(withAsk([consultation({}), consultation({ id: "q2", question: "E a de 5 anos?" })]));
+    const two = group()?.textContent ?? "";
+    expect(two).toContain("Perguntou a 2 colegas");
+    expect(two).toContain("0 de 2");
+    expect(group()?.querySelectorAll(".ac-tools__line")).toHaveLength(2);
   });
 
   test("waiting on a person: says what it waits for", async () => {
@@ -190,7 +198,9 @@ describe("the questions inside the reply that asked (ConsultGroup)", () => {
     await open(withAsk([consultation({ waiting: "computer" })]));
     const text = group()?.textContent ?? "";
     expect(text).toContain("Atlas espera o computador voltar");
-    expect(text).toContain("0 de 1");
+    // Still out, on its own line: no head with the count.
+    expect(group()?.querySelector(".ac-tools__head")).toBeNull();
+    expect(group()?.querySelector(".ac-tools__line")?.getAttribute("data-s")).toBe("run");
     expect(text).not.toContain("espera uma");
   });
 
@@ -198,9 +208,7 @@ describe("the questions inside the reply that asked (ConsultGroup)", () => {
     const c = consultation({ status: "answered", answer: ANSWER, answeredAt: ago(5) });
     await open(withTalk(withAsk([c], true), c));
     const block = group() as HTMLElement;
-    // Closed once every answer is in: the head opens it.
-    fireEvent.click(within(block).getByRole("button", { name: /Perguntou a 1 colega/ }));
-    await settle(1);
+    // One question: its line is the card, no head to open first.
     const line = within(block).getByRole("button", { name: /Atlas respondeu/ });
     await act(async () => fireEvent.click(line));
     await settle(3);
@@ -351,12 +359,10 @@ describe("the questions inside the reply that asked (ConsultGroup)", () => {
       }),
     );
     await settle(5);
-    // Every answer is in: the block folds by itself, without the count; it opens to the answer.
+    // The answer is in: the same line says so, in place.
     const block = group() as HTMLElement;
-    expect(block.textContent).not.toContain("de 1");
-    fireEvent.click(within(block).getByRole("button", { name: /Perguntou a 1 colega/ }));
-    await settle(1);
     expect(block.textContent).toContain("Atlas respondeu");
+    expect(block.querySelector(".ac-tools__line")?.getAttribute("data-s")).toBe("done");
   });
 });
 

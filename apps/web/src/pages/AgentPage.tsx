@@ -110,14 +110,14 @@ export function AgentPage(props: AgentPageProps) {
   const agent = dir.agentById.get(props.agentId);
   if (dir.loading) {
     return (
-      <div className="page page--xwide">
+      <div className="page page--full">
         <LoadingPage rows={6} />
       </div>
     );
   }
   if (!agent) {
     return (
-      <div className="page page--xwide">
+      <div className="page page--full">
         <EmptyState icon="agent">{t("agent.notFound")}</EmptyState>
       </div>
     );
@@ -653,7 +653,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
 
   return (
     <AgentEditProvider value={value}>
-      <div className={cx("page page--xwide agp", onClose && "agp--panel")} data-dirty={dirty || undefined}>
+      <div className={cx("page page--full agp", onClose && "agp--panel")} data-dirty={dirty || undefined}>
         <AgentHero
           onArchive={() => setArchiving(true)}
           onClose={close}

@@ -4,7 +4,7 @@
  * details panel. The pixel pieces are RunStrip / RunLane from @agenteschat/ui.
  */
 .routines {
-  max-width: 1120px;
+  max-width: none;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: start;

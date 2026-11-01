@@ -8,12 +8,14 @@ import { Button, Icon } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { useOpenAgentPanel } from "@/components/agent-panel-context";
 import { useConnectAi } from "@/components/ConnectAi";
 import { useOrg } from "@/components/org-context";
 import { RequestCard, RequestDone, RequestFuse, useExpired } from "@/components/RequestCard";
 import { StretchCardView } from "@/components/StretchCard";
 import { useDirectory } from "@/hooks/useDirectory";
 import { lookOf } from "@/lib/look";
+import { inPlaceClick } from "@/lib/navigate";
 import { useToast } from "@/lib/toast";
 import { expiryText } from "@/pages/ApprovalsPage";
 
@@ -92,6 +94,7 @@ function AgentProposalCardView({ message, card }: { message: Message; card: Agen
   const dir = useDirectory(org.id);
   const deny = useDenyAgentProposal(org.id);
   const toast = useToast();
+  const openPanel = useOpenAgentPanel();
   const { draft, why } = card.params;
   const status = proposalStatus(card);
   // Open until it expires: drawn again at that moment, even before the server's event says so.
@@ -161,7 +164,12 @@ function AgentProposalCardView({ message, card }: { message: Message; card: Agen
       {status === "created" && card.agentId && (
         <div className="ac-acts">
           <Button asChild size="sm" variant="ghost">
-            <Link to="/org/$orgId/agents/$agentId" params={{ orgId: org.id, agentId: card.agentId }}>
+            {/* In a conversation, its page opens in the panel beside it. */}
+            <Link
+              to="/org/$orgId/agents/$agentId"
+              params={{ orgId: org.id, agentId: card.agentId }}
+              onClick={openPanel ? (e) => inPlaceClick(e, () => card.agentId && openPanel(card.agentId)) : undefined}
+            >
               {t("newAgent.openProfile")}
             </Link>
           </Button>

@@ -69,6 +69,7 @@ import {
 } from "@agenteschat/client";
 import { actionCardOf } from "@agenteschat/client/lib/action-cards";
 import { activityVerb, barElapsed, barEntries, isWriting, toolActivity } from "@agenteschat/client/lib/activity";
+import type { AgentTab } from "@agenteschat/client/lib/agent-edit";
 import { looksLikeApiKey } from "@agenteschat/client/lib/api-key-text";
 import { artifactRefs } from "@agenteschat/client/lib/artifacts";
 import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
@@ -216,6 +217,7 @@ import { CorrectionAsk } from "@/components/CorrectionAsk";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfMessage } from "@/components/Forum";
+import { InPlaceProvider } from "@/components/InPlace";
 import { IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
 import { ArrivalCard, useArrival } from "@/components/invite/Arrival";
 import { InviteOfferRow, useInviteOffer } from "@/components/invite/InviteDialog";
@@ -483,14 +485,16 @@ export function ChannelPage({
   return (
     // "Arquivos", "Ver plano", "Ver no arquivo": any mission card here opens the same files panel.
     <MissionPanelProvider>
-      <ChannelView
-        key={`${channel.id}:${thread?.id ?? ""}:${adjustThreadId ?? ""}`}
-        channel={channel}
-        chrome={chrome}
-        focusMessageId={focusMessageId}
-        adjustThreadId={adjustThreadId}
-        thread={thread}
-      />
+      {/* A routine or a task an agent names here opens in its dialog over the conversation; leaving it closes it. */}
+      <InPlaceProvider key={`${channel.id}:${thread?.id ?? ""}:${adjustThreadId ?? ""}`}>
+        <ChannelView
+          channel={channel}
+          chrome={chrome}
+          focusMessageId={focusMessageId}
+          adjustThreadId={adjustThreadId}
+          thread={thread}
+        />
+      </InPlaceProvider>
     </MissionPanelProvider>
   );
 }
@@ -624,15 +628,16 @@ function ChannelView({
   });
   // The thread open in the panel beside the channel ("Responder", a thread's line); `reply`: to its composer.
   const [panel, setPanel] = useState<{ id: string; reply: boolean } | null>(null);
-  // "Ver perfil" (a DM's header, the profile card): the agent's page in the same place; one panel at a time.
-  const [profileId, setProfileId] = useState<string | null>(null);
+  // "Ver perfil" (a DM's header, the profile card): the agent's page in the same place, at a tab when a card asks
+  // (its memory); one panel at a time.
+  const [profile, setProfile] = useState<{ agentId: string; tab?: AgentTab } | null>(null);
   // A question an agent asked another from here, opened from its line in the reply ("Theo ⇄ Iris"): one panel too.
   const [consultId, setConsultId] = useState<string | null>(null);
   const outerPanel = useOpenAgentPanel();
-  const openAgentPanel = useCallback((agentId: string) => {
+  const openAgentPanel = useCallback((agentId: string, tab?: AgentTab) => {
     setPanel(null);
     setConsultId(null);
-    setProfileId(agentId);
+    setProfile({ agentId, tab });
   }, []);
   // "Mudar algo" on a mission's plan: the next message goes to its executor ("Respondendo: Plano").
   const [missionReply, setMissionReply] = useState<{ missionId: string; label: string } | null>(null);
@@ -1601,17 +1606,17 @@ function ChannelView({
     reply: thread
       ? () => composer.current?.focus()
       : (message) => {
-          setProfileId(null);
+          setProfile(null);
           setConsultId(null);
           setPanel({ id: message.threadId ?? message.id, reply: true });
         },
     openThread: (id) => {
-      setProfileId(null);
+      setProfile(null);
       setConsultId(null);
       setPanel({ id, reply: false });
     },
     openConsultation: (id) => {
-      setProfileId(null);
+      setProfile(null);
       setPanel(null);
       setConsultId(id);
     },
@@ -2045,7 +2050,14 @@ function ChannelView({
               <ThreadPage key={panel.id} threadId={panel.id} reply={panel.reply} onClose={() => setPanel(null)} />
             </aside>
           )}
-          {profileId && <AgentPanel key={profileId} agentId={profileId} onClose={() => setProfileId(null)} />}
+          {profile && (
+            <AgentPanel
+              key={`${profile.agentId}:${profile.tab ?? ""}`}
+              agentId={profile.agentId}
+              tab={profile.tab}
+              onClose={() => setProfile(null)}
+            />
+          )}
           {consultId && (
             <ConsultationPanel
               key={consultId}
@@ -3399,16 +3411,16 @@ export const TimelineMessage = memo(function TimelineMessage({
               </MessageText>
             )
           )}
-          {/* Its tools in one line (what it does now), opening into each call; the messages it read under it. */}
-          <LiveTools
-            work={opening.work}
-            agentName={name}
-            color={colorOf(agent)}
-            steerNote={steerNote}
-            stopped={liveStopped}
-          />
-          {m.author.id && m.agentRunId && (
-            <ConsultGroup runId={m.agentRunId} askerId={m.author.id} color={colorOf(agent)} />
+          {/* The answer streams under the line it opened with, above its tools (where its saved message has it). */}
+          {!liveFailed && revealed && !wordsOnTop && (
+            <MessageText>
+              <MessageBody
+                body={revealed}
+                resolveMention={dir.mentionName}
+                live={!liveStopped}
+                accent={colorOf(agent)}
+              />
+            </MessageText>
           )}
           {liveFailed && (
             <p className="ac-msg__error" role="alert">
@@ -3432,23 +3444,24 @@ export const TimelineMessage = memo(function TimelineMessage({
               />
             </p>
           )}
-          {/* Also on a failed or stopped run, for the person still in control (they hand back from it). */}
-          <RunBrowserCard run={live} name={name} />
-          {!liveFailed && revealed && !wordsOnTop && (
-            <MessageText>
-              <MessageBody
-                body={revealed}
-                resolveMention={dir.mentionName}
-                live={!liveStopped}
-                accent={colorOf(agent)}
-              />
-            </MessageText>
-          )}
           {liveStopped ? (
             <StoppedLine runId={live.runId} byUserId={live.canceledBy} owner={live} />
           ) : (
             !liveFailed && <LiveRunStatus run={live} />
           )}
+          {m.author.id && m.agentRunId && (
+            <ConsultGroup runId={m.agentRunId} askerId={m.author.id} color={colorOf(agent)} />
+          )}
+          {/* Its tools, as on its saved message: one line (what it does now) opening into each call. */}
+          <LiveTools
+            work={opening.work}
+            agentName={name}
+            color={colorOf(agent)}
+            steerNote={steerNote}
+            stopped={liveStopped}
+          />
+          {/* Last, after its tools; also on a failed or stopped run, for the person still in control (they hand back from it). */}
+          <RunBrowserCard run={live} name={name} />
           {!liveFailed && !liveWaiting && !liveStopped && (
             <span className="ac-visually-hidden">{t("channel.writing")}</span>
           )}
@@ -3460,16 +3473,6 @@ export const TimelineMessage = memo(function TimelineMessage({
               <MessageBody body={keptSaid.text} resolveMention={dir.mentionName} />
             </MessageText>
           )}
-          {keptSteps?.length && seenLive ? (
-            <LiveTools
-              work={keptSteps}
-              agentName={name}
-              color={colorOf(agent)}
-              steerNote={steerNote}
-              done
-              stopped={stopped.canceled}
-            />
-          ) : null}
           {routine && report && reportOpen && <RoutineReport text={report} />}
           {quoted && <QuotedMessage reply={quoted} />}
           {m.author.id &&
@@ -3524,18 +3527,10 @@ export const TimelineMessage = memo(function TimelineMessage({
           )}
           {m.author.type === "agent" && !m.local && <AgentActionReceipts message={m} />}
           {m.author.type === "agent" && !m.local && <TeamChecks message={m} />}
-          {approvalId && <MessageApproval approvalId={approvalId} agent={agent} members={dir.memberById} />}
-          {proposalId && <InlineProposal proposalId={proposalId} />}
           {agent &&
-            memoryUpdates.map((u) => (
-              <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} />
-            ))}
-          {waitNotice && <WaitingCard notice={waitNotice} agentId={m.author.id ?? null} />}
-          {noAi && <NoAiCard message={m} />}
-          {actionCard && <ActionCard message={m} />}
-          {question && <QuestionCard question={question} />}
-          {secretRequest && <SecretCard request={secretRequest} />}
-          {browserHandoff && <BrowserHandoffCard handoff={browserHandoff} />}
+            memoryUpdates
+              .filter((u) => u.action !== "proposed")
+              .map((u) => <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} />)}
           {browserTrail.length > 0 && m.author.id && !m.local && (
             <BrowserTrailCard
               agentId={m.author.id}
@@ -3564,29 +3559,11 @@ export const TimelineMessage = memo(function TimelineMessage({
               enabled={Date.now() - Date.parse(m.createdAt) < HELD_RECENT_MS}
             />
           )}
-          {lastOfRun && m.author.type === "agent" && m.author.id && replyRun && !m.local && consulted.length === 0 && (
-            <ConsultGroup runId={replyRun} askerId={m.author.id} color={colorOf(agent)} saved />
-          )}
-          {/* A question to another agent (in their DM) carries the asking run: its work shows on that run's reply. */}
-          {m.author.type === "agent" && replyRun && !card && !m.local && !keptAll && !m.meta?.consultation && (
-            <SavedTools
-              runId={replyRun}
-              meta={m.meta}
-              agentName={agent?.name ?? name}
-              color={colorOf(agent)}
-              skipScreens={onCards}
-            />
-          )}
           {forumTopicId && !forumSuggestion && <ForumMessageCard topicId={forumTopicId} />}
-          {forumSuggestion && <ForumSuggestionCard message={m} suggestion={forumSuggestion} />}
           {missionPlan && <MissionPlanCard plan={missionPlan} />}
-          {missionDecision && <MissionDecisionCard message={missionDecision} />}
           {missionReview && <MissionReviewCard message={missionReview} />}
-          {missionDelivery && <MissionDeliveryCard message={missionDelivery} />}
-          {missionCommand && <MissionCommandCard command={missionCommand} />}
           {missionSetup && <MissionSetupCard setup={missionSetup} threadId={m.threadId ?? null} />}
           {missionReport && <MissionReportExtras report={missionReport} message={m} />}
-          {missionSuggestion && <MissionSuggestionBar message={m} suggestion={missionSuggestion} />}
           {missionStart && <MissionStartLink message={m} />}
           {missionLink && <MissionLinkCard link={missionLink} />}
           {issueWork && (
@@ -3599,6 +3576,48 @@ export const TimelineMessage = memo(function TimelineMessage({
               ))}
             </div>
           )}
+          {/* Its tools after its words and what it changed: the same place live, kept and saved. */}
+          {lastOfRun && m.author.type === "agent" && m.author.id && replyRun && !m.local && consulted.length === 0 && (
+            <ConsultGroup runId={replyRun} askerId={m.author.id} color={colorOf(agent)} saved />
+          )}
+          {keptSteps?.length && seenLive ? (
+            <LiveTools
+              work={keptSteps}
+              agentName={name}
+              color={colorOf(agent)}
+              steerNote={steerNote}
+              done
+              stopped={stopped.canceled}
+            />
+          ) : null}
+          {/* A question to another agent (in their DM) carries the asking run: its work shows on that run's reply. */}
+          {m.author.type === "agent" && replyRun && !card && !m.local && !keptAll && !m.meta?.consultation && (
+            <SavedTools
+              runId={replyRun}
+              meta={m.meta}
+              agentName={agent?.name ?? name}
+              color={colorOf(agent)}
+              skipScreens={onCards}
+            />
+          )}
+          {/* What waits for a person's click comes last, after the words and the tools. */}
+          {approvalId && <MessageApproval approvalId={approvalId} agent={agent} members={dir.memberById} />}
+          {proposalId && <InlineProposal proposalId={proposalId} />}
+          {agent &&
+            memoryUpdates
+              .filter((u) => u.action === "proposed")
+              .map((u) => <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} />)}
+          {waitNotice && <WaitingCard notice={waitNotice} agentId={m.author.id ?? null} />}
+          {noAi && <NoAiCard message={m} />}
+          {actionCard && <ActionCard message={m} />}
+          {question && <QuestionCard question={question} />}
+          {secretRequest && <SecretCard request={secretRequest} />}
+          {browserHandoff && <BrowserHandoffCard handoff={browserHandoff} />}
+          {forumSuggestion && <ForumSuggestionCard message={m} suggestion={forumSuggestion} />}
+          {missionDecision && <MissionDecisionCard message={missionDecision} />}
+          {missionDelivery && <MissionDeliveryCard message={missionDelivery} />}
+          {missionCommand && <MissionCommandCard command={missionCommand} />}
+          {missionSuggestion && <MissionSuggestionBar message={m} suggestion={missionSuggestion} />}
           {/* Everyone's reactions (👍/👎 on an agent's reply are its feedback, in the same pills). */}
           {!m.local && !readOnly && (
             <MessageReactions

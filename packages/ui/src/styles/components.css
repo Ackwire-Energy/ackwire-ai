@@ -901,6 +901,21 @@ textarea.ac-input {
 .ac-msg--grouped {
   padding-top: 2px;
 }
+/*
+ * The cards in a message (its tools, what it changed, a request, a file): one width, short of the text's. The row's
+ * hover plate must never match what sits on it: a card's face is a step up (`--raised-2`, white in light), a well
+ * (code, a quote, "Leu seu recado") is `--msg-well`, darker than the row whether it is hovered or not.
+ */
+:root {
+  --msg-card-w: 560px;
+}
+.ac-msg > * {
+  --raised: var(--raised-2);
+  --surface-raised: var(--raised-2);
+  --sunken: var(--msg-well);
+  --surface-sunken: var(--msg-well);
+  --card-well: var(--msg-well);
+}
 /* The face is 32px in the feed. */
 .ac-msg__avatar,
 .ac-msg__gutter {
@@ -1159,7 +1174,7 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   border-bottom-left-radius: var(--radius-cut);
-  max-width: 520px;
+  max-width: var(--msg-card-w);
   box-sizing: border-box;
   position: relative;
 }
@@ -3719,6 +3734,8 @@ html:not([data-pointer]) .ac-switch:focus-visible {
   --card-key: none;
   --card-well: #f6f6f3;
   --card-well-shadow: inset 0 1px 2px rgba(23, 23, 22, 0.07), inset 0 0 0 1px rgba(23, 23, 22, 0.05), 0 1px 0 #ffffff;
+  /* A well in a message (code, a table's band): a tint over the row, so the row's hover plate darkens it too. */
+  --msg-well: var(--plate-soft);
 }
 [data-theme="dark"] {
   --person-a: #3a3a37;
@@ -3733,6 +3750,8 @@ html:not([data-pointer]) .ac-switch:focus-visible {
   --card-well: #121211;
   --card-well-shadow:
     inset 0 1px 3px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 1px 0 rgba(255, 255, 255, 0.05);
+  /* Darker than the row and than its hover plate as it is. */
+  --msg-well: var(--sunken);
 }
 
 /* Buttons: b1 (primary), b2 (default), ghost. Sizes follow the control ruler (tokens.css --control-*). */
@@ -4690,19 +4709,18 @@ html:not([data-pointer]) .ac-hint:focus-visible {
 .ac-msg:focus-within {
   z-index: var(--z-lifted);
 }
-/* Reading: 15.5px / 1.7 in the ink color, about 68 characters a line (72 in a team chat). */
+/* Reading: 15.5px / 1.7 in the ink color, across the whole column (a code block or a table scrolls in its own box). */
 .ac-msg__text {
   font-size: 15.5px;
   line-height: 1.7;
   color: var(--ink);
-  max-width: 68ch;
 }
 
 /* Work under an agent message: a quiet 32px button ("Ver o que ela fez · 7 passos · 38 s");
    the steps open in a hairline card below it. */
 .ac-work {
   margin-top: 16px;
-  max-width: 560px;
+  max-width: var(--msg-card-w);
 }
 .ac-work__head {
   display: inline-flex;
@@ -5848,7 +5866,7 @@ html:not([data-pointer]) .ac-gif:focus-visible {
  */
 .ac-tools {
   margin: 10px 0 12px;
-  max-width: 560px;
+  max-width: var(--msg-card-w);
   border-radius: var(--radius-item) var(--radius-item) var(--radius-item) 4px;
   background: var(--surface-raised);
   box-shadow: var(--card-shadow);
@@ -5960,24 +5978,37 @@ html:not([data-pointer]) .ac-tools__head:focus-visible {
   list-style: none;
   border-top: 1px solid var(--line);
 }
+/* One call: its line is the card, as tall as the head it stands in for. */
+.ac-tools--one > .ac-tools__lines {
+  padding: 2px;
+  border-top: 0;
+}
 .ac-tools__line {
   border-radius: var(--radius-item);
 }
+/* A line's words wrap: the logo, the time and the mark stay on its first 20px line. */
 .ac-tools__row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   width: 100%;
   min-height: 36px;
   margin: 0;
-  padding: 6px 8px;
+  padding: 8px;
   border: 0;
   border-radius: var(--radius-item);
   background: transparent;
   font: inherit;
   font-size: 13px;
+  line-height: 20px;
   color: var(--ink2);
   text-align: left;
+}
+.ac-tools__row > .ac-tools__mark {
+  margin-block: 2px;
+}
+.ac-tools__row > .ac-tools__linechev {
+  margin-block: 4px;
 }
 button.ac-tools__row {
   cursor: pointer;
@@ -5997,25 +6028,22 @@ html:not([data-pointer]) button.ac-tools__row:focus-visible {
   display: inline-grid;
   place-items: center;
   flex: none;
+  min-height: 20px;
   line-height: 0;
 }
 .ac-tools__label {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 7px;
+  column-gap: 7px;
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .ac-tools__label b {
-  overflow: hidden;
-  text-overflow: ellipsis;
   font-weight: 500;
 }
 .ac-tools__label small {
-  overflow: hidden;
-  text-overflow: ellipsis;
   font-size: 12px;
   color: var(--faint);
 }
@@ -6030,6 +6058,10 @@ html:not([data-pointer]) button.ac-tools__row:focus-visible {
 }
 .ac-tools__detail {
   margin: 0 8px 8px 38px;
+}
+/* What a lone call's agent said before it, on top of what it was given and answered. */
+.ac-tools__detail > .ac-tools__note {
+  margin: 0 0 8px;
 }
 /* What it was given and answered: the code well's look (mono only for this). */
 .ac-tools__io {
@@ -7772,7 +7804,7 @@ html:not([data-pointer]) .ac-setmore__toggle:focus-visible {
 /* What the other agent said, folded into one neutral line at the top of the reply; it opens to the exchange. */
 .ac-consult {
   margin: 6px 0 8px;
-  max-width: 520px;
+  max-width: var(--msg-card-w);
   border-radius: 12px;
   background: var(--raised);
   box-shadow: var(--e1), var(--top);

@@ -814,7 +814,6 @@ a.mi-pr:hover {
   letter-spacing: -0.015em;
 }
 .mi-q p {
-  max-width: 70ch;
   margin-top: 4px;
   font-size: 13.5px;
   color: var(--muted);
@@ -1479,7 +1478,7 @@ html:not([data-pointer]) .mi-quiet:focus-visible {
 
 /* ── The mission's link card, in the conversation where it was asked ─────── */
 .mi-linkcard {
-  max-width: 560px;
+  max-width: var(--msg-card-w);
   padding: 14px 16px;
 }
 .mi-linkcard__foot {
@@ -1498,7 +1497,7 @@ html:not([data-pointer]) .mi-quiet:focus-visible {
 
 /* ── Command approvals (MissionCommandCard): the executor asks to run a command ── */
 .mi-cmd {
-  max-width: 600px;
+  max-width: var(--msg-card-w);
 }
 .mi-cmd__line {
   margin: 0;

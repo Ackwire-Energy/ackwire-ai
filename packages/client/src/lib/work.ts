@@ -601,3 +601,33 @@ export function formatLineTime(locale: string, ms: number) {
   if (ms < 60_000) return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(ms / 1000)} s`;
   return `${Math.round(ms / 60_000)} min`;
 }
+
+// ───────────────────────────── one call on its own ─────────────────────────────
+
+/** The work is one call: its line stands alone, no "Usou 1 ferramenta" to open (two or more keep the block). */
+export const oneCall = (items: ToolItem[]) => toolCalls(items) === 1;
+
+/**
+ * A saved reply's lone call (`meta.work` of one step) as its line, before the run's steps load: what it did, from
+ * `meta.work.calls`; how long it took and whether it failed, from `meta.work.ms` and `failed`. A reply saved before
+ * the server wrote those reads as done, in the reply's own time. Null when the reply made no call, or several.
+ */
+export function savedOneLine(meta: Record<string, unknown> | undefined): ToolLine | null {
+  const w = workMeta(meta);
+  const call = w?.steps === 1 ? w.calls[0] : undefined;
+  if (!w || !call) return null;
+  const { ms, failed } = (meta?.work ?? {}) as { ms?: unknown; failed?: unknown };
+  const a = toolActivity(call.name, call.connector, null, call);
+  return {
+    key: `one-${call.name}`,
+    ...a,
+    tool: call.name,
+    state: failed === true ? "fail" : "done",
+    hint: toolHint(call.name, a),
+    ms: typeof ms === "number" ? ms : w.durationMs,
+    count: 1,
+    why: null,
+    input: null,
+    result: null,
+  };
+}

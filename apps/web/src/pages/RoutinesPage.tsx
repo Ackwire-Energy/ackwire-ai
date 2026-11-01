@@ -427,6 +427,33 @@ export function RoutinesPage() {
   );
 }
 
+/**
+ * A routine's details over the page it was opened from (an agent's receipt, the tag on a routine's message), with its
+ * own Editar: no trip to Rotinas, and closing it leaves the person where they were. Gone: says so and closes.
+ */
+export function RoutineOver({ id, onClose }: { id: string; onClose: () => void }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const routines = useRoutines(org.id);
+  const now = useNow();
+  const [editing, setEditing] = useState(false);
+  const routine = routines.data?.find((r) => r.id === id) ?? null;
+  const gone = routines.isError || (routines.isSuccess && !routine);
+  useEffect(() => {
+    if (!gone) return;
+    toast.show(t("routines.notFound"), "error");
+    onClose();
+  }, [gone, toast, t, onClose]);
+  if (!routine) return null;
+  return (
+    <>
+      <RoutineDetails routine={routine} now={now} onClose={onClose} onEdit={() => setEditing(true)} />
+      <RoutineDialog open={editing} routine={routine} onClose={() => setEditing(false)} />
+    </>
+  );
+}
+
 /** A title for the card: a routine made from a chat message may be named with its whole prompt. */
 export function routineTitle(r: Pick<Routine, "name" | "prompt">) {
   const name = r.name.trim();

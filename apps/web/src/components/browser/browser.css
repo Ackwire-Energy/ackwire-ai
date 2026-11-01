@@ -195,7 +195,7 @@ html:not([data-pointer]) .brw-site button:focus-visible {
   box-shadow: var(--e1), var(--top);
   overflow: hidden;
   margin-top: 4px;
-  max-width: 620px;
+  max-width: var(--msg-card-w);
   box-sizing: border-box;
 }
 .brw-rq__face {
@@ -516,7 +516,7 @@ html:not([data-pointer]) .brw-key:focus-visible {
   animation: brw-grow-in 0.24s var(--out);
 }
 .brw-ac:not(.is-open) {
-  max-width: 600px;
+  max-width: var(--msg-card-w);
 }
 .brw-ac__hint {
   color: var(--faint);
@@ -1154,7 +1154,7 @@ html:not([data-pointer]) .brw-kc:focus-visible {
 /* ---------- after the run: where it browsed ---------- */
 .brw-trail,
 .brw-ac.brw-trail.is-open {
-  max-width: 600px;
+  max-width: var(--msg-card-w);
 }
 .brw-trail__shot {
   display: flex;
@@ -1652,7 +1652,7 @@ html:not([data-pointer]) .brw-mf__now:focus-visible {
 /* The same size as the tools block under it ("Ver o que ele fez": .ac-tools), so the two bars line up. */
 .brw-ac.brw-trail.brw-mf-end,
 .brw-ac.brw-trail.brw-mf-end.is-open {
-  max-width: 560px;
+  max-width: var(--msg-card-w);
   border-radius: var(--radius-item) var(--radius-item) var(--radius-item) 4px;
   background: color-mix(in srgb, var(--mf-a) 14%, var(--raised));
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--mf-a) 25%, transparent);

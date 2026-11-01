@@ -20,6 +20,7 @@ import { RequestDone } from "@/components/RequestCard";
 import { CardSky, colorOf, prepareBurst } from "@/components/Sky";
 import { TYPED_VALUES } from "@/i18n";
 import { useToast } from "@/lib/toast";
+import { useOpenAgentPanel } from "./agent-panel-context";
 import { useOrg } from "./org-context";
 
 // Its title, what it wants to do, whether it only looks and its values: the phone's own rules too.
@@ -66,16 +67,20 @@ export function ApproveAlways({ approval, agent }: { approval: Approval; agent: 
   const { org } = useOrg();
   const toast = useToast();
   const navigate = useNavigate();
+  const openPanel = useOpenAgentPanel();
   const decide = useDecideApproval(org.id);
   if (!approveAlwaysOffered(approval)) return null;
   const g = agentGrammar(t, agent?.name ?? t("channel.unknownAgent"));
   const kind = approval.approveAlways;
+  // In a conversation: the agent's Acesso in the panel beside it; elsewhere, its page.
   const open = () =>
-    void navigate({
-      to: "/org/$orgId/agents/$agentId",
-      params: { orgId: org.id, agentId: approval.agentId },
-      search: { tab: "access" },
-    });
+    openPanel
+      ? openPanel(approval.agentId, "access")
+      : void navigate({
+          to: "/org/$orgId/agents/$agentId",
+          params: { orgId: org.id, agentId: approval.agentId },
+          search: { tab: "access" },
+        });
   const always = (el: HTMLElement) => {
     const burst = prepareBurst(el);
     decide.mutate(
