@@ -1978,7 +1978,8 @@ export const en: Translations = {
     answeredByYou: "You answered: <b>{{answer}}</b>",
     chip: "Waiting for an answer",
     group: "Question from {{agent}}",
-    alreadyAnswered: "Someone already answered this question.",
+    alreadyAnswered: "This question was already answered or closed.",
+    closed: "Closed without an answer.",
     failed: "Couldn't send the answer. Try again.",
   },
   /** A request in the conversation (approval, secret, question, help in the agent's screen, proposal): one card for all. */

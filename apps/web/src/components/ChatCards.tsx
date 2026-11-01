@@ -513,7 +513,7 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
   if (!done) {
     const choices = current.choices ?? [];
     const send = () => {
-      if (text.trim()) answer.mutate({ text: text.trim() });
+      if (text.trim() && !answer.isPending) answer.mutate({ text: text.trim() });
     };
     const errorLine = error ? (
       <p className="rq__error" role="alert">
@@ -590,13 +590,16 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
       />
     );
   }
-  // Answered: the question stays in the open as the agent's words; one line says who answered and what.
+  // Answered: the question stays in the open as the agent's words; one line says who answered and what. Closed
+  // with no answer (its run stopped, or it expired): it says so instead.
   const answerText = current.answer ?? "";
   return (
     <>
       <MessageText>{current.text}</MessageText>
       <RequestDone done label={t("question.group", { agent: name })}>
-        {who ? (
+        {current.answer === null ? (
+          t("question.closed")
+        ) : who ? (
           <Trans
             i18nKey="question.answered"
             values={{ name: who, answer: answerText }}

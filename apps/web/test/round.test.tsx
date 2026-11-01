@@ -473,8 +473,16 @@ describe("agent questions (ask_user)", () => {
     const field = within(card).getByRole("textbox", { name: "Sua resposta" });
     expect(document.activeElement).toBe(field);
     await type(field, "https://api.example.test/v1");
+    // Enter twice while the first answer is on its way sends it once.
+    let release = () => {};
+    state.answerHold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     await act(async () => fireEvent.keyDown(field, { key: "Enter" }));
+    await act(async () => fireEvent.keyDown(field, { key: "Enter" }));
+    release();
     await settle(4);
+    expect(state.calls.filter((c) => c.method === "questions.answer")).toHaveLength(1);
     expect(state.calls.find((c) => c.method === "questions.answer")?.args).toEqual([
       ORG_ID,
       "q4",
@@ -549,7 +557,39 @@ describe("agent questions (ask_user)", () => {
     await click(within(card).getByRole("button", { name: "staging" }));
     await settle(4);
     const after = screen().getByRole("group", { name: "Pergunta de Ada" });
-    expect(within(after).getByRole("alert").textContent).toBe("Alguém já respondeu esta pergunta.");
+    expect(within(after).getByRole("alert").textContent).toBe("Esta pergunta já foi respondida ou encerrada.");
+  });
+
+  test("a question closed without an answer (its run stopped) says so, not who answered", async () => {
+    const state = seedState();
+    const question = {
+      id: "q5",
+      agentId: ADA_ID,
+      channelId: ENG_ID,
+      threadId: null,
+      messageId: "msg-q5",
+      text: "Qual conta eu uso?",
+      choices: null,
+      status: "answered",
+      answer: null,
+      answeredByUserId: null,
+    };
+    state.messages.push({
+      id: "msg-q5",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ADA_ID },
+      body: "",
+      mentionedAgentIds: [],
+      agentRunId: "r-q5",
+      meta: { question },
+      createdAt: new Date().toISOString(),
+    });
+    await go(`c/${ENG_ID}`, state);
+    const card = screen().getByRole("group", { name: "Pergunta de Ada" });
+    expect(card.textContent).toContain("Encerrada sem resposta.");
+    expect(card.textContent).not.toContain("Você respondeu");
+    expect(within(card).queryByRole("button", { name: "Responder" })).toBeNull();
   });
 });
 
