@@ -18,10 +18,12 @@ test("a #channel link's card: a public one for everyone, a private one only for 
   const vendas = await created("vendas", "public");
   const diretoria = await created("diretoria", "private");
 
-  // A message names both: the server stores which channel each name meant.
+  // A message in #vendas names both: the server stores the public one; the private one only inside itself.
   const posted = await api(`/channels/${vendas}/messages`, { json: { body: "de #vendas para #Diretoria" } });
   const message = (await posted.json()) as { meta: { channelRefs?: unknown } };
-  expect(message.meta.channelRefs).toEqual({ vendas, diretoria });
+  expect(message.meta.channelRefs).toEqual({ vendas });
+  const inside = await api(`/channels/${diretoria}/messages`, { json: { body: "aqui em #diretoria" } });
+  expect(((await inside.json()) as { meta: { channelRefs?: unknown } }).meta.channelRefs).toEqual({ diretoria });
 
   const member = await joinByInvitation(t, owner, orgId, "bia@example.com");
   const asMember = (path: string) => member(`/api/app/organizations/${orgId}${path}`);
