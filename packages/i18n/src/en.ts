@@ -2903,7 +2903,6 @@ export const en: Translations = {
       help: "For good. Its messages stay, with its name and face.",
       title: "Delete {{name}} for good?",
       goes: "Goes now: instructions, memory, routines, access, budget, channels and its sign-in on the computer.",
-      stays: "Stays: its messages and threads, with its name and face, and its usage in the reports.",
       typeName: "Type {{name}} to confirm",
       done: "{{name}} was deleted.",
     },

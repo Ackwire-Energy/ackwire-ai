@@ -159,7 +159,6 @@ function SpeechProviderPicker({ view }: { view: SpeechKey }) {
               <Icon name="computer" size={16} />
             </span>
             <span className="voice-tile__name">{t("voice.settings.own")}</span>
-            <span className="small muted">{t("voice.settings.ownHelp")}</span>
             <span className="voice-tile__check" aria-hidden="true">
               <Icon name="check" size={12} />
             </span>
@@ -192,7 +191,7 @@ function SpeechProviderPicker({ view }: { view: SpeechKey }) {
         ) : tested ? (
           <SettingNote icon="check">{t("voice.settings.tested")}</SettingNote>
         ) : (
-          <p className="ac-field__help">{local ? t("voice.settings.stays") : t("voice.settings.sealed")}</p>
+          <p className="ac-field__help">{local ? t("voice.settings.ownHelp") : t("voice.settings.sealed")}</p>
         )}
         {!local && <SettingNote icon="info">{t("voice.settings.leaves", { name })}</SettingNote>}
         {view.state === "invalid" && <SettingNote icon="alert">{t("voice.settings.invalid")}</SettingNote>}

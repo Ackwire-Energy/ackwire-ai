@@ -2929,7 +2929,6 @@ export const ptBR = {
       help: "De vez. As mensagens ficam, com o nome e o rosto.",
       title: "Apagar {{article}} {{name}} de vez?",
       goes: "Sai agora: instruções, memória, rotinas, acessos, orçamento, canais e o login no computador.",
-      stays: "Fica: as mensagens e threads, com o nome e o rosto, e o uso nos relatórios.",
       typeName: "Digite {{name}} para confirmar",
       done: "{{The}} {{name}} foi apagad{{article}}.",
     },
