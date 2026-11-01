@@ -1361,7 +1361,7 @@ function AgentRow({
                 className="sidebar__lock"
                 role="img"
                 aria-label={chip}
-                title={audienceNotice(t, a, (id) => dir.memberById.get(id)?.name) || chip}
+                title={audienceNotice(t, a, (id) => dir.memberById.get(id)?.name, dir.roleName) || chip}
               >
                 <Icon name="lock" size={14} />
               </span>

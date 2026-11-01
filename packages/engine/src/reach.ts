@@ -1,7 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { type AiStatusDeps, agentAiState } from "./ai-status";
-import { canTalkTo, talksToAgents } from "./audience";
+import { canTalkTo, speakerFor } from "./audience";
 import { fedByRoutine, personOfMessage, routinePostRun, runAuthorityById } from "./authority";
 import { chainOfRun, sendNote } from "./consultations";
 import { isAgentOnlyDm } from "./dms";
@@ -109,7 +109,7 @@ export async function reachWillHand(
       .select()
       .from(agents)
       .where(and(eq(agents.orgId, run.orgId), inArray(agents.handle, handles), isNull(agents.archivedAt))),
-    talksToAgents(db, run.orgId, person),
+    speakerFor(db, run.orgId, person),
     chainOfRun(db, run.orgId, run.id),
   ]);
   return rows.filter((a) => !chain.includes(a.id) && canTalkTo(a, person, talks)).map((a) => a.handle);
@@ -136,7 +136,7 @@ export async function settleReach(
     .from(agents)
     .where(and(eq(agents.orgId, message.orgId), inArray(agents.id, ids), isNull(agents.archivedAt)));
   const { person, routine } = await reachOfMessage(db, message);
-  const talks = await talksToAgents(db, message.orgId, person);
+  const talks = await speakerFor(db, message.orgId, person);
   const blockedReason: ReachReason = routine ? "routine_creator_reach" : "audience";
   const routineRef = routine
     ? { id: routine.routineId, name: routine.name, creatorUserId: routine.creatorUserId, access: routine.access }

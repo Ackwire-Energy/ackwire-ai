@@ -8,7 +8,14 @@ import { followsThreadSql } from "./follows";
 import { type PreviewMeta, previewMediaKind, previewMeta } from "./message-preview";
 import { agentOnlyNoticeSql } from "./notices";
 import { notificationSnippet } from "./notifications";
-import { can, getMembership, type Membership, requireActiveMembership, requirePermission } from "./organizations";
+import {
+  can,
+  getMembership,
+  MEMBER_ROLE_IDS,
+  type Membership,
+  requireActiveMembership,
+  requirePermission,
+} from "./organizations";
 import { memberKeysSql, memberRankSql, resolvePermissions } from "./permissions";
 import { closedRefusal, STANDING_COLUMNS } from "./standing";
 
@@ -286,6 +293,7 @@ export async function requireChannelAccess(db: Database, userId: string, orgId: 
       role: organizationMembers.role,
       keys: memberKeysSql({ orgId: organizationMembers.orgId, userId: organizationMembers.userId }),
       rank: memberRankSql({ orgId: organizationMembers.orgId, userId: organizationMembers.userId }),
+      roleIds: MEMBER_ROLE_IDS,
       orgName: organizations.name,
       standing: STANDING_COLUMNS,
       channel: channels,
@@ -313,6 +321,7 @@ export async function requireChannelAccess(db: Database, userId: string, orgId: 
     role: row.role,
     permissions: resolvePermissions(row.role === "owner", row.keys),
     rank: row.rank,
+    roleIds: row.roleIds,
     standing: row.standing,
   };
   return { channel, membership };

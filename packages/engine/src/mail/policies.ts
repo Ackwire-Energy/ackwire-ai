@@ -1,6 +1,6 @@
 import { and, type Database, eq, inArray, like, schema } from "@agenteschat/db";
 import { type Agent, getAgent } from "../agents";
-import { audienceError, canTalkTo, talksToAgents } from "../audience";
+import { audienceError, canTalkTo, speakerFor } from "../audience";
 import { recordAudit } from "../audit";
 import { caches } from "../cache";
 import { NotFoundError, ValidationError } from "../errors";
@@ -181,7 +181,7 @@ async function mayChangeMail(
   const lowering = scopes.every((s) => held.has(s));
   if (account.createdByUserId === actorId) {
     // Its rules can loosen at any level, for an agent that answers them; otherwise they may only lower it.
-    if (canTalkTo(agent, actorId, await talksToAgents(db, orgId, actorId))) return true;
+    if (canTalkTo(agent, actorId, await speakerFor(db, orgId, actorId))) return true;
     if (lowering) return false;
     throw await audienceError(db, agent);
   }

@@ -51,12 +51,14 @@ describe("someone else's routine, being edited", () => {
 
 describe("audienceWith", () => {
   test("adds the person to its people, and never saves over a list it wasn't sent", () => {
-    const owned = agent("a-gil", "gil", { audience: { mode: "people", userIds: ["u-bob"] } });
-    expect(audienceWith(owned, "u-ana")).toEqual({ mode: "people", userIds: ["u-bob", "u-ana"] });
+    const owned = agent("a-gil", "gil", { audience: { mode: "people", userIds: ["u-bob"], roleIds: ["r-sup"] } });
+    // Its roles stay picked.
+    expect(audienceWith(owned, "u-ana")).toEqual({ mode: "people", userIds: ["u-bob", "u-ana"], roleIds: ["r-sup"] });
     expect(audienceWith(agent("a-x", "x", { audienceMode: "people" }), "u-ana")).toBeNull();
     expect(audienceWith(agent("a-y", "y", { audienceMode: "owner" }), "u-ana")).toEqual({
       mode: "people",
       userIds: ["u-ana"],
+      roleIds: [],
     });
   });
 });

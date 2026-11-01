@@ -930,9 +930,10 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
       if (kind === "model" && view.brain !== "model" && view.onlyOwner) {
         // Off the plan it still answers only its owner: one click lets back in whoever it answered before.
         toast.show(t("aiAccounts.share.backOnApi", g), "info", {
-          label: agent.audience?.userIds?.length
-            ? t("aiAccounts.share.letPeople", g)
-            : t("aiAccounts.share.letEveryone", g),
+          label:
+            agent.audience?.userIds?.length || agent.audience?.roleIds?.length
+              ? t("aiAccounts.share.letPeople", g)
+              : t("aiAccounts.share.letEveryone", g),
           run: () =>
             void api.agents
               .setBrain(org.id, agent.id, { onlyOwner: false })

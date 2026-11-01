@@ -17,7 +17,7 @@ import {
 } from "@agenteschat/db";
 import { currentHandles } from "./agents";
 import { type AiStatusDeps, agentAiState } from "./ai-status";
-import { canTalkTo, talksToAgents } from "./audience";
+import { canTalkTo, speakerFor } from "./audience";
 import { routineBriefOfRun } from "./background";
 import { stopRun } from "./cancel";
 import { publishDelivery } from "./delivery";
@@ -88,7 +88,7 @@ async function reachableAgent(ctx: ToolContext, input: unknown, ai?: AiCheck, pu
   const behind = await personBehindCall(ctx);
   const routine = behind ? null : await actingRoutineOfCall(ctx);
   const person = behind ?? routine?.creatorUserId ?? null;
-  if (!canTalkTo(target, person, await talksToAgents(db, ctx.orgId, person))) {
+  if (!canTalkTo(target, person, await speakerFor(db, ctx.orgId, person))) {
     if (!routine?.creatorUserId) {
       return {
         refused: refuse(`@${handle} only works with some people, and the person you are helping isn't one of them.`),

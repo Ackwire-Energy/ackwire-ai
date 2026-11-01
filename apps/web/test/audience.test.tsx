@@ -13,7 +13,7 @@ import {
 } from "@agenteschat/client/lib/audience";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createI18n } from "@/i18n";
-import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ADMIN_ROLE_ID, createFakeApi, ENG_ID, ORG_ID, seedRoles, seedState } from "./fake-api";
 import { proceed, startAs } from "./new-agent-flow";
 import { renderApp, screen, settle } from "./render";
 
@@ -47,7 +47,7 @@ describe("Quem pode falar com a Ada", () => {
         .getByRole("radio", { name: /^Todos do workspace/ })
         .getAttribute("aria-checked"),
     ).toBe("true");
-    await click(within(group).getByRole("radio", { name: /^Só algumas pessoas/ }));
+    await click(within(group).getByRole("radio", { name: /^Só algumas pessoas ou papéis/ }));
     // The owner (João) always can; he isn't in the list.
     expect(section.textContent).toContain("João sempre pode, como responsável.");
     await click(within(section).getAllByLabelText(/Walter/)[0] as HTMLElement);
@@ -56,7 +56,42 @@ describe("Quem pode falar com a Ada", () => {
     );
     await settle(4);
     expect(state.calls.find((c) => c.method === "agents.update")?.args[2]).toEqual({
-      audience: { mode: "people", userIds: ["u-walter"] },
+      audience: { mode: "people", userIds: ["u-walter"], roleIds: [] },
+    });
+  });
+
+  test("Só algumas pessoas ou papéis: roles first with their icon and people, one search for both, sent as roleIds", async () => {
+    const state = seedState();
+    state.roles = seedRoles().map((r) => (r.kind === "custom" ? { ...r, name: "Suporte" } : r));
+    await go(`agents/${ADA_ID}?tab=settings&sec=audience`, state);
+    const section = screen().getByRole("region", { name: "Quem pode falar com a Ada" });
+    await click(within(section).getByRole("radio", { name: /^Só algumas pessoas ou papéis/ }));
+    const results = within(section).getByRole("region", { name: "Buscar papéis e pessoas" });
+    // "Todos" is the first choice, never a role to pick.
+    expect(results.textContent).not.toContain("everyone");
+    const text = results.textContent ?? "";
+    expect(text.indexOf("Papéis")).toBeLessThan(text.indexOf("Pessoas"));
+    expect(
+      within(results)
+        .getByLabelText(/Suporte/)
+        .closest("label")?.textContent,
+    ).toMatch(/^Suporte\d+ pessoas?$/);
+    expect(results.querySelector(".ac-rolemark")).toBeTruthy();
+    const search = within(section).getByRole("searchbox", { name: "Buscar papéis e pessoas" });
+    await act(async () => fireEvent.change(search, { target: { value: "sup" } }));
+    expect(results.textContent).toContain("Suporte");
+    expect(results.textContent).not.toContain("Walter");
+    await act(async () => fireEvent.change(search, { target: { value: "walt" } }));
+    expect(results.textContent).not.toContain("Suporte");
+    expect(results.textContent).toContain("Walter");
+    await act(async () => fireEvent.change(search, { target: { value: "" } }));
+    await click(within(results).getByLabelText(/Suporte/));
+    await click(
+      within(screen().getByRole("region", { name: "Alterações não salvas" })).getByRole("button", { name: /^Salvar/ }),
+    );
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "agents.update")?.args[2]).toEqual({
+      audience: { mode: "people", userIds: [], roleIds: [ADMIN_ROLE_ID] },
     });
   });
 
@@ -102,7 +137,7 @@ describe("Quem pode falar com a Ada", () => {
     await settle(6);
     expect(
       (state.calls.find((c) => c.method === "agents.create")?.args[1] as { audience?: unknown } | undefined)?.audience,
-    ).toEqual({ mode: "owner", userIds: [] });
+    ).toEqual({ mode: "owner", userIds: [], roleIds: [] });
   });
 });
 
@@ -139,8 +174,18 @@ describe("audience rules", () => {
     );
     expect(audienceSummary(t, theo({ audience: { mode: "owner", userIds: [] } }), nameOf)).toBe("Só Walter");
     expect(audienceSummary(t, theo({ audience: { mode: "people", userIds: ["u2", "u3", "u4"] } }), nameOf)).toBe(
-      "Walter, Ana e mais 2",
+      "Walter, Ana e mais 2 pessoas",
     );
+    // Roles first, the people after them counted.
+    const roleName = (id: string) => ({ r1: "Suporte", r2: "Tecnologia" })[id];
+    const both = theo({ audience: { mode: "people", userIds: ["u2", "u3"], roleIds: ["r1", "r2"] } });
+    expect(audienceSummary(t, both, nameOf, roleName)).toBe("Suporte, Tecnologia e mais 3 pessoas");
+    expect(audienceNotice(t, both, nameOf, roleName)).toBe(
+      "O Theo só responde a Suporte, Tecnologia, Walter, Ana e Bia.",
+    );
+    expect(
+      audienceSummary(t, theo({ audience: { mode: "people", userIds: [], roleIds: ["r1"] } }), nameOf, roleName),
+    ).toBe("Suporte e Walter");
   });
 
   test("who can talk and who can edit", () => {

@@ -15,6 +15,7 @@ import {
   useModels,
   useNewAgentSetup,
   usePlatformKey,
+  useRoles,
   useSettings,
   useSkills,
 } from "@agenteschat/client";
@@ -233,6 +234,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
   const { org, me } = useOrg();
   const api = useApi();
   const members = useMembers(org.id);
+  const roleList = useRoles(org.id);
   const agents = useAgents(org.id);
   const models = useModels();
   const credentials = useCredentials(org.id);
@@ -509,7 +511,11 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
       instructions,
       model,
       ownerUserId: ownerId,
-      audience: { mode: audience.mode, userIds: audience.mode === "people" ? audience.userIds : [] },
+      audience: {
+        mode: audience.mode,
+        userIds: audience.mode === "people" ? audience.userIds : [],
+        roleIds: audience.mode === "people" ? (audience.roleIds ?? []) : [],
+      },
       credentialId: key !== DEFAULT_KEY ? key : null,
       monthlyBudgetUsd: amount,
       appearance: look,
@@ -787,7 +793,10 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
     const names = (members.data ?? [])
       .filter((m) => m.userId === ownerId || audience.userIds.includes(m.userId))
       .map((m) => m.name.split(/\s+/)[0] ?? m.name);
-    return names.length ? joinNames(names, t("newAgent.and")) : t("audience.summary.nobody");
+    const roles = (roleList.data?.roles ?? []).filter((r) => audience.roleIds?.includes(r.id)).map((r) => r.name);
+    return names.length + roles.length
+      ? joinNames([...roles, ...names], t("newAgent.and"))
+      : t("audience.summary.nobody");
   };
   const ownerTitle = (
     <h2>

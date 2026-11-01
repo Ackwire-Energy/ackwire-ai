@@ -3,7 +3,7 @@
 - Status: Accepted (built: the server, the shared client, the web and the phone app; channel and agent exceptions, and guests, come next)
 - Date: 2026-10-30
 - Revises: ADR 0006 (the fixed owner / admin / member table)
-- Code: `packages/engine/src/permissions.ts`, `packages/engine/src/roles.ts`, `packages/engine/src/organizations.ts` (`Membership`, `can`, `outranks`), `packages/db/src/schema/tenancy.ts` (`org_roles`, `organization_member_roles`), migration `0130_roles`, `apps/server/src/routes/app/roles.ts`, `packages/client/src/lib/permissions.ts`, `packages/client/src/lib/roles.ts`, `packages/ui/src/components/RoleMark.tsx`, `apps/web/src/components/roles/RolesSection.tsx`
+- Code: `packages/engine/src/permissions.ts`, `packages/engine/src/audience.ts` (addendum), `packages/engine/src/roles.ts`, `packages/engine/src/organizations.ts` (`Membership`, `can`, `outranks`), `packages/db/src/schema/tenancy.ts` (`org_roles`, `organization_member_roles`), migration `0130_roles`, `apps/server/src/routes/app/roles.ts`, `packages/client/src/lib/permissions.ts`, `packages/client/src/lib/roles.ts`, `packages/ui/src/components/RoleMark.tsx`, `apps/web/src/components/roles/RolesSection.tsx`
 
 ## Context
 
@@ -27,4 +27,14 @@ A workspace had three fixed roles. "Admin" meant everything but ownership, "memb
 
 - No role names in checks: a new action picks a key, and the role screen shows it.
 - Every request reads the person's keys with their membership (two indexed subqueries).
-- Next: exceptions per channel (who sees, who writes, allow / inherit / deny per role or person), the agent's audience by role ("who may use this agent", "who approves it"), guests (a base that replaces `everyone` and sees only where they are put, which every read path has to honor), `@role` mentions and `hoist`.
+- Next: exceptions per channel (who sees, who writes, allow / inherit / deny per role or person), who approves an agent by role (the audience by role is the addendum below), guests (a base that replaces `everyone` and sees only where they are put, which every read path has to honor), `@role` mentions and `hoist`.
+
+## Addendum (2026-11-01): an agent's audience by role
+
+A workspace uses its roles like departments, and "Só algumas pessoas" took people one at a time.
+
+1. **Roles next to people.** `agents.audience_role_ids` (migration `0168_agent_audience_roles`) sits beside `audience_user_ids`. Under `people` an agent answers its owner, the people named, and whoever holds one of its roles at the time: joining or leaving a role changes access at once, with no change to the agent. Under `owner` both lists wait for it to be let out again (ADR 0059 §5); `everyone` clears both.
+2. **One rule.** `canTalkTo` takes the person as a `Speaker` (`talk_to_agents` and their role ids: `speakerFor`, or `speakerOf(membership)`; `Membership` now carries `roleIds`), and `audienceSql` asks the same thing over `organization_member_roles`. Mentions, the router, DMs, dispatch, missions, routines, the forum, issues, mailboxes, consultations, the team screen and the agents list's `canTalk` all go through one of the two; a test checks they agree for every audience, owner and person.
+3. **What can be picked.** The workspace's own custom roles, at most 100; `everyone` is the "everyone" mode, not a role. Picking a role widens the audience, so on a plan only the agent's owner adds one (`planSharing`). An app that sends no `roleIds` (older phones adding a person from a notice) keeps the roles already picked. A deleted role simply stops matching anyone.
+4. **Saying it.** The notice and the error name the roles first (`params.roleIds`, `params.names`: "Dev only replies to Suporte and Ana."), and so does the summary on the agent's page ("Suporte, Tecnologia e mais 2 pessoas").
+5. **On screen** (web, Quem pode falar): "Só algumas pessoas ou papéis" opens one picker with a "Papéis" group (each role's mark and how many hold it) above "Pessoas", one search for both, picked roles and people as tokens. The phone app doesn't edit the audience; its "let them in" from a notice keeps the roles.

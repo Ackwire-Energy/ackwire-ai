@@ -227,6 +227,37 @@ test("agent brain: defaults, who may, letting others talk to a plan, what the co
   expect(await back.json()).toMatchObject({ brain: "model", model: null, fallback: false });
 });
 
+test("Quem pode falar by role: whoever holds it talks to the agent, from the moment they get it until they lose it", async () => {
+  const { api, asBia, member, agentId } = await workspace();
+  const biaId = ((await (await member("/api/app/me")).json()) as { user: { id: string } }).user.id;
+  const role = (await (await api("/roles", { json: { name: "Suporte" } })).json()) as { id: string };
+  const canTalk = async () =>
+    ((await (await asBia("/agents")).json()) as { agents: { id: string; canTalk: boolean }[] }).agents.find(
+      (a) => a.id === agentId,
+    )?.canTalk;
+  const patched = await api(`/agents/${agentId}`, {
+    method: "PATCH",
+    json: { audience: { mode: "people", userIds: [], roleIds: [role.id] } },
+  });
+  expect(patched.status).toBe(200);
+  expect(((await patched.json()) as { audience: unknown }).audience).toEqual({
+    mode: "people",
+    userIds: [],
+    roleIds: [role.id],
+  });
+  expect(await canTalk()).toBe(false);
+  await api(`/members/${biaId}/roles`, { method: "PUT", json: { roleIds: [role.id] } });
+  expect(await canTalk()).toBe(true);
+  await api(`/members/${biaId}/roles`, { method: "PUT", json: { roleIds: [] } });
+  expect(await canTalk()).toBe(false);
+  // Not a role id: refused before it reaches the database.
+  const bad = await api(`/agents/${agentId}`, {
+    method: "PATCH",
+    json: { audience: { mode: "people", userIds: [], roleIds: ["suporte"] } },
+  });
+  expect(bad.status).toBe(400);
+});
+
 test("where the server provisions the computers (the Cloud), an agent on a plan replies to everyone once its owner says so", async () => {
   const cloud = { MACHINE_PROVISIONING: "external", OPERATOR_API_TOKEN: "o".repeat(40) };
   // Booted as the Cloud's server boots: the switches `startServer` sets from this config.

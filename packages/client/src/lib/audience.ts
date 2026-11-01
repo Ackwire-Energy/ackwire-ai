@@ -5,29 +5,37 @@ import { agentGrammar } from "./grammar";
 import { can } from "./permissions";
 
 /** The agent's audience; absent = everyone (older servers). */
-export function audienceOf(agent: Agent): AgentAudience {
-  if (agent.audience) return { mode: agent.audience.mode, userIds: agent.audience.userIds ?? [] };
-  return { mode: agent.audienceMode ?? "everyone", userIds: [] };
+export function audienceOf(agent: Agent): Required<AgentAudience> {
+  if (agent.audience)
+    return { mode: agent.audience.mode, userIds: agent.audience.userIds ?? [], roleIds: agent.audience.roleIds ?? [] };
+  return { mode: agent.audienceMode ?? "everyone", userIds: [], roleIds: [] };
 }
 
 export const modeOf = (agent: Agent): AudienceMode => agent.audience?.mode ?? agent.audienceMode ?? "everyone";
 
 /**
  * Whether its audience lets `userId` talk to the agent (the server's `canTalkTo`, without that person's role): its
- * owner, everyone, or one of its people. A people list the directory didn't send says yes (don't warn on a guess).
+ * owner, everyone, or one of its people. A people list the directory didn't send, or roles picked (whose holders
+ * the app doesn't track), say yes (don't warn on a guess).
  */
 export function audienceAdmits(agent: Agent, userId: string): boolean {
   if (agent.ownerUserId === userId) return true;
   const mode = modeOf(agent);
   if (mode !== "people") return mode === "everyone";
-  return !agent.audience || audienceOf(agent).userIds.includes(userId);
+  const a = audienceOf(agent);
+  return !agent.audience || a.roleIds.length > 0 || a.userIds.includes(userId);
 }
 
 /** Its audience with `userId` let in; null when its people list wasn't sent (saving would drop them). */
 export function audienceWith(agent: Agent, userId: string): AgentAudience | null {
   if (modeOf(agent) === "people" && !agent.audience) return null;
   const a = audienceOf(agent);
-  return { mode: "people", userIds: [...new Set([...(a.mode === "people" ? a.userIds : []), userId])] };
+  const people = a.mode === "people";
+  return {
+    mode: "people",
+    userIds: [...new Set([...(people ? a.userIds : []), userId])],
+    roleIds: people ? a.roleIds : [],
+  };
 }
 
 /** Whether I can talk to it (the server's `canTalk`; absent = yes). */
@@ -45,8 +53,11 @@ export const listsAgent = (org: OrgSummary | null | undefined, agent: Pick<Agent
 export function audienceWidens(from: AgentAudience, to: AgentAudience, ownerUserId: string | null): boolean {
   if (to.mode === "owner" || from.mode === "everyone") return false;
   if (to.mode === "everyone") return true;
-  const before = new Set(from.mode === "people" ? from.userIds : []);
-  return to.userIds.some((id) => id !== ownerUserId && !before.has(id));
+  const people = new Set(from.mode === "people" ? from.userIds : []);
+  const roles = new Set(from.mode === "people" ? (from.roleIds ?? []) : []);
+  return (
+    to.userIds.some((id) => id !== ownerUserId && !people.has(id)) || (to.roleIds ?? []).some((id) => !roles.has(id))
+  );
 }
 
 /** Someone besides its owner can talk to the agent. */
@@ -65,35 +76,48 @@ export function audienceChip(t: TFunction, agent: Agent): string | null {
   return null;
 }
 
-/** Who it answers, owner first: ["Walter", "Ana"] (only the names we know). */
-export function audienceNames(agent: Agent, nameOf: (userId: string) => string | undefined): string[] {
+type NameOf = (id: string) => string | undefined;
+
+/** Who it answers: its roles, then its owner and its people (only the names we know). */
+function answered(agent: Agent, nameOf: NameOf, roleName: NameOf) {
   const a = audienceOf(agent);
-  const ids = [
-    ...new Set([...(agent.ownerUserId ? [agent.ownerUserId] : []), ...(a.mode === "people" ? a.userIds : [])]),
-  ];
-  return ids.map(nameOf).filter((n): n is string => Boolean(n));
+  const people = a.mode === "people";
+  const ids = [...new Set([...(agent.ownerUserId ? [agent.ownerUserId] : []), ...(people ? a.userIds : [])])];
+  const known = (n: string | undefined): n is string => Boolean(n);
+  return { roles: (people ? a.roleIds : []).map(roleName).filter(known), people: ids.map(nameOf).filter(known) };
 }
 
-/** "O Theo só responde a Walter." / "… a algumas pessoas." / "" for everyone. */
-export function audienceNotice(t: TFunction, agent: Agent, nameOf: (userId: string) => string | undefined): string {
+/** Who it answers, roles first, then the owner: ["Suporte", "Walter", "Ana"] (only the names we know). */
+export function audienceNames(agent: Agent, nameOf: NameOf, roleName: NameOf = () => undefined): string[] {
+  const { roles, people } = answered(agent, nameOf, roleName);
+  return [...roles, ...people];
+}
+
+/** "O Theo só responde a Suporte e Walter." / "… a algumas pessoas." / "" for everyone. */
+export function audienceNotice(t: TFunction, agent: Agent, nameOf: NameOf, roleName?: NameOf): string {
   const mode = modeOf(agent);
   if (mode === "everyone") return "";
   const g = agentGrammar(t, agent.name);
   // From the directory list (mode only, no user ids): don't guess names.
   if (mode === "people" && !agent.audience) return t("audience.notice.some", g);
-  const names = audienceNames(agent, nameOf);
+  const names = audienceNames(agent, nameOf, roleName);
   if (names.length === 0) return t("audience.notice.nobody", g);
   return t("audience.notice.only", { ...g, names: joinNames(names, t("newAgent.and")) });
 }
 
-/** The profile summary: "Todos do workspace", "Walter e mais 2 pessoas", "Só Walter". */
-export function audienceSummary(t: TFunction, agent: Agent, nameOf: (userId: string) => string | undefined): string {
+/** The profile summary: "Todos do workspace", "Suporte, Tecnologia e mais 2 pessoas", "Só Walter". */
+export function audienceSummary(t: TFunction, agent: Agent, nameOf: NameOf, roleName: NameOf = () => undefined) {
   const a = audienceOf(agent);
   const owner = agent.ownerUserId ? nameOf(agent.ownerUserId) : undefined;
   if (a.mode === "everyone") return t("audience.summary.everyone");
   if (a.mode === "owner") return owner ? t("audience.summary.owner", { name: owner }) : t("audience.summary.nobody");
-  const names = audienceNames(agent, nameOf);
+  const { roles, people } = answered(agent, nameOf, roleName);
+  const names = [...roles, ...people];
   if (names.length === 0) return t("audience.summary.someone");
   if (names.length <= 3) return t("audience.summary.people", { names: joinNames(names, t("newAgent.and")) });
-  return t("audience.summary.many", { names: names.slice(0, 2).join(", "), count: names.length - 2 });
+  const shown = names.slice(0, 2).join(", ");
+  const count = names.length - 2;
+  // Only people left over: "e mais 2 pessoas".
+  if (roles.length <= 2) return t("audience.summary.manyPeople", { names: shown, count });
+  return t("audience.summary.many", { names: shown, count });
 }

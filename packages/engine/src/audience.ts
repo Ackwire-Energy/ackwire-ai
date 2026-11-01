@@ -6,10 +6,10 @@ import { isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
-import { can, getMembership, requirePermission } from "./organizations";
+import { can, getMembership, type Membership, requirePermission } from "./organizations";
 import { maySql } from "./permissions";
 
-const { agents, users, organizationMembers } = schema;
+const { agents, users, organizationMembers, orgRoles } = schema;
 
 /** Who can talk to an agent. */
 export type AudienceMode = "everyone" | "people" | "owner";
@@ -22,24 +22,28 @@ export interface AgentAudience {
    * people a plan kept out (ADR 0059 §5), who come back when it is let out.
    */
   userIds: string[];
+  /** For `people`: whoever holds one of these roles at the time (not `everyone`); kept under `owner` like `userIds`. */
+  roleIds: string[];
 }
 
-type AudienceFields = Pick<Agent, "audienceMode" | "audienceUserIds" | "ownerUserId">;
+type AudienceFields = Pick<Agent, "audienceMode" | "audienceUserIds" | "audienceRoleIds" | "ownerUserId">;
 
-export const OWNER_ONLY: AgentAudience = { mode: "owner", userIds: [] };
+export const OWNER_ONLY: AgentAudience = { mode: "owner", userIds: [], roleIds: [] };
 
 /** Who the agent answers: what the gate reads, what a change starts from and what the audit records. */
 export const audienceOf = (a: AudienceFields): AgentAudience => ({
   mode: a.audienceMode,
   userIds: a.audienceMode === "everyone" ? [] : a.audienceUserIds,
+  roleIds: a.audienceMode === "everyone" ? [] : a.audienceRoleIds,
 });
 
 /** Whether `to` lets someone talk to the agent whom `from` didn't (its owner always can). */
 export function widensAudience(from: AgentAudience, to: AgentAudience, ownerUserId: string | null): boolean {
   if (to.mode === "owner" || from.mode === "everyone") return false;
   if (to.mode === "everyone") return true;
-  const before = new Set(from.mode === "people" ? from.userIds : []);
-  return to.userIds.some((id) => id !== ownerUserId && !before.has(id));
+  const people = new Set(from.mode === "people" ? from.userIds : []);
+  const roles = new Set(from.mode === "people" ? from.roleIds : []);
+  return to.userIds.some((id) => id !== ownerUserId && !people.has(id)) || to.roleIds.some((id) => !roles.has(id));
 }
 
 /** Someone besides its owner can talk to the agent. */
@@ -65,23 +69,36 @@ export function planSharing(
   );
 }
 
-/**
- * Can this person's message start a run of the agent? (`null` = no person: routines and webhooks check their
- * creator.) Its owner always can; anyone else needs the agent's audience and, through their roles, to talk to
- * agents at all (`talks`: `talk_to_agents`, ADR 0085; `talksToAgents` reads it).
- */
-export function canTalkTo(a: AudienceFields, userId: string | null, talks = true): boolean {
-  if (userId && a.ownerUserId === userId) return true;
-  if (!talks) return false;
-  if (a.audienceMode === "everyone") return true;
-  if (!userId) return false;
-  return a.audienceMode === "people" && a.audienceUserIds.includes(userId);
+/** What the audience rule needs of a person: whether their roles let them talk to agents, and which roles they hold. */
+export interface Speaker {
+  talks: boolean;
+  roleIds: readonly string[];
 }
 
-/** Whether a person's roles let them talk to agents (`talk_to_agents`); no person (a routine's run) passes. */
-export async function talksToAgents(db: Database, orgId: string, userId: string | null) {
-  if (!userId) return true;
-  return can(await getMembership(db, userId, orgId), "talk_to_agents");
+/** No person (a routine's run): talks, holds no role. */
+export const NO_PERSON: Speaker = { talks: true, roleIds: [] };
+
+export const speakerOf = (membership: Pick<Membership, "permissions" | "roleIds"> | null): Speaker => ({
+  talks: can(membership, "talk_to_agents"),
+  roleIds: membership?.roleIds ?? [],
+});
+
+/** The `Speaker` for a person in a workspace (`NO_PERSON` for none). */
+export async function speakerFor(db: Database, orgId: string, userId: string | null): Promise<Speaker> {
+  return userId ? speakerOf(await getMembership(db, userId, orgId)) : NO_PERSON;
+}
+
+/**
+ * Can this person's message start a run of the agent? (`null` = no person: routines and webhooks check their
+ * creator.) Its owner always can; anyone else needs the agent's audience (named, or holding one of its roles now)
+ * and, through their roles, to talk to agents at all (`talk_to_agents`, ADR 0085). `audienceSql` is the same rule.
+ */
+export function canTalkTo(a: AudienceFields, userId: string | null, person: Speaker): boolean {
+  if (userId && a.ownerUserId === userId) return true;
+  if (!person.talks) return false;
+  if (a.audienceMode === "everyone") return true;
+  if (!userId || a.audienceMode !== "people") return false;
+  return a.audienceUserIds.includes(userId) || a.audienceRoleIds.some((id) => person.roleIds.includes(id));
 }
 
 /**
@@ -92,39 +109,51 @@ export function audienceSql(alias: string, userId: SQL): SQL {
   const a = sql.raw(alias);
   return sql`coalesce((${userId} is not null and ${a}.owner_user_id = ${userId})
     or ((${a}.audience_mode = 'everyone'
-        or (${userId} is not null and ${a}.audience_mode = 'people' and ${userId} = any(${a}.audience_user_ids)))
+        or (${userId} is not null and ${a}.audience_mode = 'people' and (${userId} = any(${a}.audience_user_ids)
+          or exists (select 1 from organization_member_roles amr where amr.org_id = ${a}.org_id
+            and amr.user_id = ${userId} and amr.role_id = any(${a}.audience_role_ids)))))
       and (${userId} is null or ${maySql(sql`${a}.org_id`, userId, "talk_to_agents")})), false)`;
 }
 
-/** The people it answers by name: its owner, then the people of its audience. */
-function answeredIds(a: Agent) {
-  const { mode, userIds } = audienceOf(a);
-  return [...new Set([...(a.ownerUserId ? [a.ownerUserId] : []), ...(mode === "people" ? userIds : [])])];
+/** Whom it answers by name: its roles first, then its owner and the people of its audience (only what still exists). */
+async function answered(db: Database, a: Agent) {
+  const { mode, userIds, roleIds } = audienceOf(a);
+  const ids = [...new Set([...(a.ownerUserId ? [a.ownerUserId] : []), ...(mode === "people" ? userIds : [])])];
+  const picked = mode === "people" ? roleIds : [];
+  const [people, roles] = await Promise.all([
+    ids.length ? db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, ids)) : [],
+    picked.length
+      ? db
+          .select({ id: orgRoles.id, name: orgRoles.name })
+          .from(orgRoles)
+          .where(and(eq(orgRoles.orgId, a.orgId), inArray(orgRoles.id, picked)))
+      : [],
+  ]);
+  const inOrder = <T extends { id: string }>(order: string[], rows: T[]) =>
+    order.flatMap((id) => rows.filter((r) => r.id === id));
+  return { roles: inOrder(picked, roles), people: inOrder(ids, people) };
 }
 
 /** Who the agent answers, as a stable code and params (the app says it in the person's language). */
 export async function audienceDetail(db: Database, a: Agent) {
-  const ids = answeredIds(a);
-  const rows = ids.length
-    ? await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, ids))
-    : [];
-  const people = ids.flatMap((id) => {
-    const name = rows.find((r) => r.id === id)?.name;
-    return name ? [{ id, name }] : [];
-  });
-  const code = people.length === 0 ? "audience.nobody" : "audience.only";
+  const { roles, people } = await answered(db, a);
+  const names = [...roles, ...people].map((r) => r.name);
+  const code = names.length === 0 ? "audience.nobody" : "audience.only";
   const params = {
     agentId: a.id,
     agentName: a.name,
     userIds: people.map((p) => p.id),
-    names: people.map((p) => p.name),
+    roleIds: roles.map((r) => r.id),
+    names,
   };
-  const english =
-    people.length === 0
-      ? `${a.name} isn't answering anyone right now`
-      : `${a.name} only answers ${people.map((p) => p.name).join(", ")}`;
-  return { code, params, english };
+  return { code, params, english: englishNotice(a.name, names) };
 }
+
+const englishNotice = (agentName: string, names: string[]) => {
+  if (names.length === 0) return `${agentName} isn't replying to anyone right now.`;
+  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+  return `${agentName} only replies to ${list}.`;
+};
 
 /** The ForbiddenError for someone the agent doesn't answer, with code and params. */
 export async function audienceError(db: Database, a: Agent) {
@@ -132,16 +161,9 @@ export async function audienceError(db: Database, a: Agent) {
   return new ForbiddenError(d.english, d.code, d.params);
 }
 
-/** "Theo only replies to Walter and Ana." (English text for agents' context and old clients; the app uses `audienceDetail`). */
+/** "Theo only replies to Suporte, Walter and Ana." (English text for agents' context and old clients; the app uses `audienceDetail`). */
 export async function audienceNotice(db: Database, a: Agent): Promise<string> {
-  const ids = answeredIds(a);
-  const rows = ids.length
-    ? await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, ids))
-    : [];
-  const names = ids.map((id) => rows.find((r) => r.id === id)?.name).filter((n): n is string => Boolean(n));
-  if (names.length === 0) return `${a.name} isn't replying to anyone right now.`;
-  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
-  return `${a.name} only replies to ${list}.`;
+  return (await audienceDetail(db, a)).english;
 }
 
 /**
@@ -158,8 +180,8 @@ export async function notifyBlocked(
   for (const agentId of input.agentIds) {
     const agent = await getAgent(deps.db, orgId, agentId);
     if (!agent) continue;
-    const text = await audienceNotice(deps.db, agent);
     const detail = await audienceDetail(deps.db, agent);
+    const text = detail.english;
     out.push({ agentId, text, code: detail.code, params: detail.params });
     await publishUserEvent(deps.pubsub, orgId, userId, {
       type: "agent.unavailable",
@@ -185,7 +207,7 @@ export async function setAgentAudience(
   actorId: string,
   orgId: string,
   agentId: string,
-  audience: AgentAudience,
+  audience: Omit<AgentAudience, "roleIds"> & { roleIds?: string[] },
 ): Promise<Agent> {
   const membership = await requirePermission(db, actorId, orgId, "read");
   const agent = await getAgent(db, orgId, agentId);
@@ -205,13 +227,30 @@ export async function setAgentAudience(
     if (userIds.some((id) => !known.has(id))) throw new ValidationError("Everyone in the list must be a member");
     userIds = userIds.filter((id) => known.has(id));
   }
-  if (audience.mode === "people" && userIds.length === 0 && !agent.ownerUserId) {
-    throw new ValidationError("Pick at least one person");
+  // Older apps don't send roles: adding a person there keeps the roles picked.
+  let roleIds = audience.mode === "people" ? [...new Set(audience.roleIds ?? agent.audienceRoleIds)] : [];
+  if (roleIds.length > 100) throw new ValidationError("At most 100 roles");
+  if (roleIds.length > 0) {
+    // `everyone` is the "everyone" mode, not a role to pick.
+    const known = new Set(
+      (
+        await db
+          .select({ id: orgRoles.id })
+          .from(orgRoles)
+          .where(and(eq(orgRoles.orgId, orgId), eq(orgRoles.kind, "custom"), inArray(orgRoles.id, roleIds)))
+      ).map((r) => r.id),
+    );
+    if (audience.roleIds && roleIds.some((id) => !known.has(id)))
+      throw new ValidationError("Every role must be one of the workspace's");
+    roleIds = roleIds.filter((id) => known.has(id));
   }
-  planSharing(agent, actorId, audienceOf(agent), { mode: audience.mode, userIds });
+  if (audience.mode === "people" && userIds.length === 0 && roleIds.length === 0 && !agent.ownerUserId) {
+    throw new ValidationError("Pick at least one person or role");
+  }
+  planSharing(agent, actorId, audienceOf(agent), { mode: audience.mode, userIds, roleIds });
   const [updated] = await db
     .update(agents)
-    .set({ audienceMode: audience.mode, audienceUserIds: userIds, updatedAt: new Date() })
+    .set({ audienceMode: audience.mode, audienceUserIds: userIds, audienceRoleIds: roleIds, updatedAt: new Date() })
     .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)))
     .returning();
   if (!updated) throw new NotFoundError("Agent not found");

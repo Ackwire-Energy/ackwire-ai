@@ -2536,7 +2536,7 @@ function LiveNotices({ channelId }: { channelId: string }) {
     <>
       {notices.map((n) => {
         const agent = dir.agentById.get(n.agentId);
-        const known = agent ? audienceNotice(t, agent, (id) => dir.memberById.get(id)?.name) : "";
+        const known = agent ? audienceNotice(t, agent, (id) => dir.memberById.get(id)?.name, dir.roleName) : "";
         return (
           <p key={n.key} className="channel__notice ac-iconline" role="status">
             <Icon name="lock" size={16} />

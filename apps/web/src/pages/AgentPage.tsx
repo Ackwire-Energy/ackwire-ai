@@ -15,6 +15,7 @@ import {
 } from "@agenteschat/client";
 import { type Level, levelsOf, resourcesOf } from "@agenteschat/client/lib/access-levels";
 import { groupOf, NO_GROUP } from "@agenteschat/client/lib/agent-groups";
+import { audienceOf } from "@agenteschat/client/lib/audience";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -182,9 +183,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
           : undefined,
       budget: admin && d ? (d.monthlyBudgetUsd ?? null) : undefined,
       owner: agent.ownerUserId ?? NO_OWNER,
-      audience: agent.audience
-        ? { mode: agent.audience.mode, userIds: agent.audience.userIds ?? [] }
-        : { mode: agent.audienceMode ?? "everyone", userIds: [] },
+      audience: audienceOf(agent),
       levels: access.data ? levelsOf(access.data) : undefined,
       repos: repos.data ? repoChoiceOf(repos.data) : undefined,
       skills: library.data ? sortIds(library.data.filter((s) => s.enabled).map((s) => s.id)) : undefined,
@@ -238,7 +237,9 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
     if (a.mode === "owner")
       return owner === NO_OWNER ? t("audience.summary.nobody") : t("audience.summary.owner", { name: first(owner) });
     const ids = [...new Set([...(owner === NO_OWNER ? [] : [owner]), ...a.userIds])];
-    return ids.length ? joinNames(ids.map(first), t("newAgent.and")) : t("audience.summary.nobody");
+    const roles = (a.roleIds ?? []).flatMap((id) => dir.roleName(id) ?? []);
+    const names = [...roles, ...ids.map(first)];
+    return names.length ? joinNames(names, t("newAgent.and")) : t("audience.summary.nobody");
   };
   const budgetText = (amount: number | null) =>
     amount === null
@@ -437,6 +438,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
       put("audience", "audience", {
         mode: draft.audience.mode,
         userIds: draft.audience.mode === "people" ? draft.audience.userIds : [],
+        roleIds: draft.audience.mode === "people" ? (draft.audience.roleIds ?? []) : [],
       });
     }
     if (fields.has("look")) put("look", "appearance", normalizeAppearance(draft.look));

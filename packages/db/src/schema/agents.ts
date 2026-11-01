@@ -112,12 +112,13 @@ export const agents = pgTable(
     /** Spend cap per calendar month (UTC) in nano-USD (1e-9 USD). Null = the organization's default (`organization_settings.default_agent_budget_nano_usd`). */
     monthlyBudgetNanoUsd: bigint({ mode: "number" }),
     /**
-     * Who can talk to it: `everyone`, `people` (`audience_user_ids`,
-     * plus the owner) or `owner`. Enforced wherever a person's message can
-     * start a run; nothing else is restricted (it still reads the channel).
+     * Who can talk to it: `everyone`, `people` (`audience_user_ids`, anyone holding one of `audience_role_ids`
+     * at the time, plus the owner) or `owner`. Enforced wherever a person's message can start a run; nothing else
+     * is restricted (it still reads the channel).
      */
     audienceMode: text().$type<"everyone" | "people" | "owner">().notNull().default("everyone"),
     audienceUserIds: text().array().notNull().default(sql`'{}'::text[]`),
+    audienceRoleIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
     /** Its look in the app (color, eyes, accessory from a fixed allow-list). Null = the default look. */
     appearance: jsonb().$type<{ color: string; eyes: string; accessory: string }>(),
     /**

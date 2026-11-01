@@ -18,7 +18,7 @@ import {
 import { getAgent } from "./agents";
 import { cancelRoutineAhead, type RoutineAheadView, routinesAhead } from "./approvals";
 import type { ArtifactDeps } from "./artifacts";
-import { audienceError, canTalkTo, talksToAgents } from "./audience";
+import { audienceError, canTalkTo, speakerFor, speakerOf } from "./audience";
 import { recordAudit } from "./audit";
 import { brainOf } from "./brain-settings";
 import type { BrainKind } from "./brains/types";
@@ -1125,7 +1125,7 @@ export async function createRoutine(
   const agent = await getAgent(db, orgId, input.agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
   // A routine asks the agent on its creator's behalf: only people who can talk to it create one.
-  if (!canTalkTo(agent, actorId, await talksToAgents(db, orgId, actorId))) throw await audienceError(db, agent);
+  if (!canTalkTo(agent, actorId, await speakerFor(db, orgId, actorId))) throw await audienceError(db, agent);
   const prompt = input.prompt.trim().slice(0, 10_000);
   if (!prompt) throw new ValidationError("Say what the agent should do", "routine.prompt_required");
   await checkTarget(db, orgId, agent.id, input.target, actorId);
@@ -1275,7 +1275,7 @@ export async function updateRoutine(
   }
   const agent = await getAgent(db, orgId, agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  if (set.agentId && !canTalkTo(agent, actorId, await talksToAgents(db, orgId, actorId)))
+  if (set.agentId && !canTalkTo(agent, actorId, await speakerFor(db, orgId, actorId)))
     throw await audienceError(db, agent);
   if (patch.name !== undefined) {
     const name = patch.name.trim().slice(0, 120);
@@ -1436,7 +1436,7 @@ export async function duplicateRoutine(
   await requireRoutineManager(db, actorId, orgId, current.agentId);
   const agent = await getAgent(db, orgId, current.agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  if (!canTalkTo(agent, actorId, await talksToAgents(db, orgId, actorId))) throw await audienceError(db, agent);
+  if (!canTalkTo(agent, actorId, await speakerFor(db, orgId, actorId))) throw await audienceError(db, agent);
   // Whoever copies it becomes its creator: they must be able to post where it reports.
   await checkTarget(db, orgId, agent.id, targetOf(current), actorId);
   const { id: _id, createdAt: _c, updatedAt: _u, lastRunAt: _l, deletedAt: _d, ...copy } = current;
@@ -1713,7 +1713,7 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
   const agent = await getAgent(db, routine.orgId, routine.agentId);
   if (!agent || agent.archivedAt) return paused("agent_archived");
   // Its creator can no longer talk to the agent.
-  if (!canTalkTo(agent, creator, can(membership, "talk_to_agents"))) return paused("audience");
+  if (!canTalkTo(agent, creator, speakerOf(membership))) return paused("audience");
   const once = routine.triggerType === "once";
   // It ran: a one-off is done (it stays listed, inactive).
   const ran = async () => {
@@ -1896,7 +1896,7 @@ export async function takeOverRoutine(
   await requireRoutineManager(db, actorId, orgId, current.agentId);
   const agent = await getAgent(db, orgId, current.agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  if (!canTalkTo(agent, actorId, await talksToAgents(db, orgId, actorId))) throw await audienceError(db, agent);
+  if (!canTalkTo(agent, actorId, await speakerFor(db, orgId, actorId))) throw await audienceError(db, agent);
   const target = targetOf(current);
   if (
     (target.type === "channel" || target.type === "conversation") &&
@@ -1981,7 +1981,7 @@ export async function createReminder(
   const membership = await requirePermission(db, requesterId, orgId, "post");
   const agent = await getAgent(db, orgId, input.agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  if (!canTalkTo(agent, requesterId, can(membership, "talk_to_agents"))) throw await audienceError(db, agent);
+  if (!canTalkTo(agent, requesterId, speakerOf(membership))) throw await audienceError(db, agent);
   const message = input.message.trim().slice(0, 2000);
   if (!message) throw new ValidationError("Say what to remind", "reminder.text_required");
   if (input.forUserId && input.forUserId !== requesterId) {
@@ -2155,7 +2155,7 @@ export async function createReminderFromApp(
   } else if (message?.authorType === "agent" && message.authorAgentId && here.includes(message.authorAgentId)) {
     agentId = message.authorAgentId;
   } else {
-    const talks = await talksToAgents(db, orgId, requesterId);
+    const talks = await speakerFor(db, orgId, requesterId);
     for (const id of here) {
       const agent = await getAgent(db, orgId, id);
       if (agent && !agent.archivedAt && canTalkTo(agent, requesterId, talks)) {

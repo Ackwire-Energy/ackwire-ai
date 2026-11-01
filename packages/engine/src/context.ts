@@ -17,7 +17,7 @@ import {
 import type { ModelMessage, SystemBlock } from "@agenteschat/providers";
 import type { Agent } from "./agents";
 import type { AiStatusDeps } from "./ai-status";
-import { talksToAgents } from "./audience";
+import { NO_PERSON, speakerFor } from "./audience";
 import { personOfMessage, runAuthority, UUID } from "./authority";
 import { caches } from "./cache";
 import { summarizeScopes } from "./capabilities";
@@ -479,7 +479,7 @@ export async function buildRunContext(
     >,
     zoneOf(db, run.orgId, trigger.authorUserId),
     // Who "# Your team" lists (below) depends on it: read with the rest, not one more round trip before the model call.
-    listsTeam ? talksToAgents(db, run.orgId, trigger.authorUserId) : true,
+    listsTeam ? speakerFor(db, run.orgId, trigger.authorUserId) : NO_PERSON,
   ]);
   // One statement, two parts: what agents already did in this thread (or DM),
   // and this agent's own work in other conversations the requester is in.

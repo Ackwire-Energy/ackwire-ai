@@ -141,9 +141,20 @@ export const Credential = z
   })
   .openapi("Credential");
 
-/** Who can talk to an agent. `userIds` for `people` (under `owner`: the people a plan kept out); the owner always can. */
+/**
+ * Who can talk to an agent. `userIds` and `roleIds` for `people` (under `owner`: the ones a plan kept out); the owner
+ * always can. A role lets in whoever holds it at the time; `everyone` isn't one to pick (that's `mode: everyone`).
+ */
 export const AgentAudience = z
-  .object({ mode: z.enum(["everyone", "people", "owner"]), userIds: z.array(z.string()).max(500) })
+  .object({
+    mode: z.enum(["everyone", "people", "owner"]),
+    userIds: z.array(z.string()).max(500),
+    roleIds: z
+      .array(z.uuid())
+      .max(100)
+      .optional()
+      .openapi({ description: "Absent (older apps): a change keeps the roles already picked." }),
+  })
   .openapi("AgentAudience");
 
 export const AgentAppearance = z

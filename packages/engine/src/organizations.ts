@@ -80,6 +80,8 @@ export interface Membership {
   permissions: ReadonlySet<Permission>;
   /** Their highest role's position (0 the top); null when they hold none but `everyone`. An owner is above all. */
   rank: number | null;
+  /** The roles they hold (`org_roles` ids), not `everyone`. */
+  roleIds: string[];
   /** The workspace logo URL, when one was uploaded (listMemberships). */
   orgLogo?: string | null;
   /** The workspace's standing (`standing.ts`). */
@@ -116,9 +118,16 @@ const withPermissions = ({ keys, ...row }: MembershipRow): Membership => ({
   permissions: resolvePermissions(row.role === "owner", keys),
 });
 
+/** A member's roles (`org_roles` ids), not `everyone`. */
+export const MEMBER_ROLE_IDS = sql<
+  string[]
+>`coalesce((select array_agg(mr.role_id::text) from organization_member_roles mr
+    where mr.org_id = ${organizationMembers.orgId} and mr.user_id = ${organizationMembers.userId}), '{}'::text[])`;
+
 const ROLE_COLUMNS = {
   keys: memberKeysSql({ orgId: organizationMembers.orgId, userId: organizationMembers.userId }),
   rank: memberRankSql({ orgId: organizationMembers.orgId, userId: organizationMembers.userId }),
+  roleIds: MEMBER_ROLE_IDS,
 };
 
 export async function listMemberships(db: Database, userId: string): Promise<Membership[]> {
@@ -584,8 +593,7 @@ export async function listMembers(db: Database, orgId: string) {
         image: users.image,
         role: organizationMembers.role,
         /** Their roles (`org_roles`), not `everyone`; ordered by the apps. */
-        roleIds: sql<string[]>`coalesce((select array_agg(mr.role_id::text) from organization_member_roles mr
-          where mr.org_id = ${organizationMembers.orgId} and mr.user_id = ${organizationMembers.userId}), '{}'::text[])`,
+        roleIds: MEMBER_ROLE_IDS,
         joinedAt: organizationMembers.createdAt,
         lastSeenAt: organizationMembers.lastSeenAt,
         handle: organizationMembers.handle,

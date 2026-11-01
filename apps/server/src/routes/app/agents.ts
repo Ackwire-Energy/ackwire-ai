@@ -32,6 +32,7 @@ import {
   listFormerAgents,
   moveAgentToGroup,
   NEW_AGENT_DEFAULTS,
+  NO_PERSON,
   NotFoundError,
   newAgentBrainMachines,
   oldHandlesByAgent,
@@ -42,11 +43,12 @@ import {
   requirePermission,
   revokeCredential,
   SETUP_AGENTS_MAX,
+  type Speaker,
   setAgentAppearance,
   setAgentAudience,
   setAgentBrain,
   setCoordinator,
-  talksToAgents,
+  speakerFor,
   updateAgent,
   updateAgentGroup,
   usageSummary,
@@ -95,8 +97,8 @@ const toAgent = (
   seesCost: boolean,
   budgetUsedPercent?: number,
   brain?: AgentBrainSummary,
-  /** Whether the viewer's roles let them talk to agents (`talksToAgents`, ADR 0085). */
-  talks = true,
+  /** The viewer as the audience rule reads them (`speakerFor`, ADR 0085). */
+  talks: Speaker = NO_PERSON,
 ) => {
   const v = agentView(a);
   const { monthlyBudgetNanoUsd, ...rest } = v;
@@ -381,7 +383,7 @@ export function agentRoutes(deps: AppDeps) {
         canViewCost(db, actor, orgId),
         agentBudgetsThisMonth(db, orgId),
         agentBrainSummaries(db, actor, orgId, list),
-        talksToAgents(db, orgId, actor),
+        speakerFor(db, orgId, actor),
         oldHandlesByAgent(db, orgId),
       ]);
       const percent = (id: string) => {
@@ -790,7 +792,7 @@ export function agentRoutes(deps: AppDeps) {
       const [seesCost, brains, talks, old] = await Promise.all([
         canViewCost(db, actor, orgId),
         agentBrainSummaries(db, actor, orgId, [agent]),
-        talksToAgents(db, orgId, actor),
+        speakerFor(db, orgId, actor),
         oldHandlesByAgent(db, orgId),
       ]);
       return c.json(
