@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { Markdown } from "@/lib/markdown";
 import { FileSummary, FileView } from "./FileView";
 import { HtmlFrame } from "./HtmlFrame";
-import { MermaidDiagram } from "./Mermaid";
+import { MermaidOrCode } from "./Mermaid";
 
 /** Read-only view of one artifact version, per kind. `source`: which artifact and version (uploaded files load from it). */
 export function ArtifactContentView({
@@ -27,7 +27,9 @@ export function ArtifactContentView({
     case "diff":
       return <DiffView files={content.files} />;
     case "diagram":
-      return <MermaidDiagram source={content.mermaid} label={t("artifacts.diagramLabel", { title })} />;
+      // Same card as a ```mermaid fence in Markdown: drawn by itself where the frame runs apart from the page, code with
+      // "Show diagram" (and Copy) where it shares the thread, so opening a big diagram can't freeze the tab there.
+      return <MermaidOrCode text={content.mermaid} />;
     case "html":
       return (
         <div className="stack-4" style={{ gap: 8, height: "100%" }}>
