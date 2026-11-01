@@ -10,13 +10,14 @@ import { merged } from "./known";
  * for it. Each check returns the violations it found; `assertInvariants` fails on any.
  */
 
-/** Refusals that mean a turn couldn't do what its agent is allowed to do (I4); a read routine's are expected. */
-const CANT_ACT = [
-  REFUSALS.unattendedElsewhere,
-  REFUSALS.unattendedInternal,
-  REFUSALS.missionOnly,
-  REFUSALS.unknownTool,
-];
+/**
+ * Refusals that mean a conversation turn couldn't do what its agent is allowed to do (I4). Looked up by name
+ * because work-by-default removes the unattended ones; a routine's own background run has its own guards.
+ */
+const refusal = REFUSALS as Partial<Record<string, string>>;
+const CANT_ACT = ["unattendedElsewhere", "unattendedInternal", "missionOnly", "unknownTool"].flatMap(
+  (k) => refusal[k] ?? [],
+);
 
 export async function violations(w: World): Promise<string[]> {
   const out: string[] = [];
@@ -85,11 +86,10 @@ export async function violations(w: World): Promise<string[]> {
 
   // I4: no turn was refused what its agent may do, outside a routine set to only look.
   for (const s of steps.filter((s) => s.kind === "tool_result" && s.data.isError === true)) {
+    const r = runs.find((x) => x.id === s.runId);
     const content = String(s.data.content ?? "");
-    if (CANT_ACT.some((r) => r && content.startsWith(r.slice(0, 40)))) {
-      const r = runs.find((x) => x.id === s.runId);
+    if (!r?.background && CANT_ACT.some((c) => content.startsWith(c.slice(0, 40))))
       out.push(`I4: ${who(r?.agentId ?? "")} was refused: ${content.slice(0, 80)}`);
-    }
   }
 
   // I5: a failed run reaches someone who can act (a notification naming it or its agent), or waits to resume.
