@@ -1,7 +1,8 @@
-import { and, asc, eq, inArray, isNotNull, schema } from "@agenteschat/db";
+import { and, asc, eq, inArray, isNotNull, isNull, schema } from "@agenteschat/db";
 import { approvalCardThreads, approvalOriginOf } from "./approvals";
 import { accountablePerson, runAuthorityById } from "./authority";
 import { threadFollowChoices } from "./follows";
+import { type TaskEnd, taskEndText } from "./machine-task-text";
 import { isMediaAfterReply } from "./media";
 import { previewMediaKind } from "./message-preview";
 import {
@@ -35,6 +36,7 @@ const {
   missionParticipants,
   routines,
   messageReactions,
+  machines,
 } = schema;
 
 type ApprovalRow = typeof schema.approvals.$inferSelect;
@@ -138,7 +140,7 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
   if (!channel || channel.kind === "forum") return;
   const actor = message.authorType === "person" ? person(message.authorUserId) : agent(message.authorAgentId);
   const authorUser = message.authorUserId;
-  const text = notificationSnippet(message.body);
+  const text = notificationSnippet(await quotedBody(deps, orgId, message));
   // Only a GIF or a sticker (ADR 0091): the apps and the push say which, in the person's language.
   const media = previewMediaKind(message.body, meta);
   const latest = media ? { text, media } : { text };
@@ -265,6 +267,21 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
     source: { ...where, label: threadLabel ?? label },
     latest,
   });
+}
+
+/**
+ * What a notification quotes of a message: its body, but a task's end (`meta.machineTask`) names its computer only
+ * where the workspace has more than one, the apps' rule (`namesComputers`). The agent still reads where it ran.
+ */
+async function quotedBody(deps: NotificationDeps, orgId: string, message: typeof messages.$inferSelect) {
+  const task = message.meta.machineTask as (TaskEnd & { computer?: string }) | undefined;
+  if (typeof task?.title !== "string") return message.body;
+  const computers = await deps.db
+    .select({ id: machines.id })
+    .from(machines)
+    .where(and(eq(machines.orgId, orgId), isNull(machines.deletedAt)))
+    .limit(2);
+  return taskEndText(task, computers.length > 1 ? (task.computer ?? null) : null);
 }
 
 async function threadTitle(deps: NotificationDeps, orgId: string, rootId: string) {

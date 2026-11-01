@@ -10,17 +10,15 @@ import {
 } from "@agenteschat/client/lib/notices";
 import type { RoutineReply } from "@agenteschat/client/lib/routines";
 import { cx, Icon, type IconName } from "@agenteschat/ui";
-import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { MessageBody } from "@/chat/MessageBody";
 import { ConsultationCard } from "@/components/ConsultationCard";
-import { useInPlace } from "@/components/InPlace";
+import { DetailsLink } from "@/components/details-link";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { inPlaceClick } from "@/lib/navigate";
 import "./chat-notices.css";
 
 const NOTICE_ICON: Record<string, IconName> = {
@@ -184,8 +182,8 @@ function CancelFollowUp({ messageId }: { messageId: string }) {
 
 /**
  * The routine an agent's message answers (ADR 0053 §7): a small tag next to its name, "Rotina «X»",
- * that opens the routine's details over the conversation (its link still goes to Rotinas); with the report it answers
- * loaded here, "Ver relatório" unfolds it (the report's own line is folded into this message).
+ * that opens the routine's details in place (`DetailsLink`); with the report it answers loaded here, "Ver relatório" unfolds it
+ * (the report's own line is folded into this message).
  */
 export function RoutineTag({
   routine,
@@ -199,21 +197,16 @@ export function RoutineTag({
   onToggle: () => void;
 }) {
   const { t } = useTranslation();
-  const { org } = useOrg();
-  const inPlace = useInPlace();
   return (
     <>
-      <Link
-        to="/org/$orgId/routines"
-        params={{ orgId: org.id }}
-        search={{ open: routine.id }}
+      <DetailsLink
+        item={{ kind: "routine", id: routine.id }}
         className="msg-reminder msg-reminder--link"
         title={t("channel.routineTagTip")}
-        onClick={inPlace ? (e) => inPlaceClick(e, () => inPlace.routine(routine.id)) : undefined}
       >
         <Icon name="routines" size={14} />
         {t("channel.routineTag", { name: routine.name })}
-      </Link>
+      </DetailsLink>
       {report && (
         <button type="button" className="cn-line__toggle cn-report__toggle" aria-expanded={open} onClick={onToggle}>
           {open ? t("channel.routineReportHide") : t("channel.routineReport")}

@@ -145,7 +145,7 @@ describe("an agent's proposal of a new agent, in the chat", () => {
       ),
       proposal("p-old", { expiresAt: new Date(Date.now() - HOUR).toISOString() }, { name: "Vera", handle: "vera" }, 2),
     );
-    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(5);
     const [open] = cardOf("@nina");
     expect(open?.textContent).toContain("Pensa com Claude Max");
@@ -174,6 +174,11 @@ describe("an agent's proposal of a new agent, in the chat", () => {
     await click(within(old as HTMLElement).getByRole("button", { name: "Ver detalhes" }));
     expect(old?.textContent).toContain("@vera");
     expect(within(old as HTMLElement).queryByRole("link", { name: "Abrir perfil" })).toBeNull();
+    // In the conversation, the profile opens in the panel beside it.
+    await act(async () => fireEvent.click(within(made as HTMLElement).getByRole("link", { name: "Abrir perfil" })));
+    await settle(4);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
+    expect(screen().getByRole("complementary", { name: "Perfil do Atlas" })).toBeTruthy();
   });
 
   test("live: decided by someone else, the card changes in place (only the decision comes)", async () => {

@@ -188,24 +188,33 @@ const PAUSED_REASONS = [
 /**
  * The state chip: "Ativa", "Pausada: o agente saiu do canal" (`routines.pausedReason.<reason>`), "Falhando
  * (3 seguidas)", "Esperando o MacBook do Walter desde 09:12", "Esperando alguém", "Rodando". `since` is
- * said by the page (`whenAt`), so it comes in as a word.
+ * said by the page (`whenAt`), so it comes in as a word. The computer goes by its name only where that tells
+ * it apart (`namesComputer`, from `namesComputers`): else "Esperando o computador desde 09:12".
  */
 export function routineStateWords(
   r: Pick<Routine, "state" | "active" | "pausedReason" | "failuresInRow" | "waitingFor" | "trigger">,
   since = "",
+  namesComputer = false,
 ): Words & { icon: "repeat" | "pause" | "alert" | "computer" | "waiting" | "spinner"; tone: "neutral" | "waiting" } {
   switch (r.state) {
     case "running":
       return { key: "routines.state.running", values: {}, icon: "spinner", tone: "neutral" };
-    case "waiting_computer":
-      return r.waitingFor
-        ? {
-            key: since ? "routines.state.waitingComputerSince" : "routines.state.waitingComputer",
-            values: { machine: r.waitingFor.machineName, since },
-            icon: "computer",
-            tone: "waiting",
-          }
-        : { key: "routines.state.waitingAnyComputer", values: {}, icon: "computer", tone: "waiting" };
+    case "waiting_computer": {
+      const machine = namesComputer ? r.waitingFor?.machineName : "";
+      if (machine)
+        return {
+          key: since ? "routines.state.waitingComputerSince" : "routines.state.waitingComputer",
+          values: { machine, since },
+          icon: "computer",
+          tone: "waiting",
+        };
+      return {
+        key: since ? "routines.state.waitingAnyComputerSince" : "routines.state.waitingAnyComputer",
+        values: { since },
+        icon: "computer",
+        tone: "waiting",
+      };
+    }
     case "waiting_person":
       return { key: "routines.state.waitingPerson", values: {}, icon: "waiting", tone: "waiting" };
     case "failing":
@@ -251,15 +260,11 @@ export function healthWords(h: Routine["health"]): Words[] | null {
 }
 
 /**
- * Where it runs: "Claude Code no MacBook do Walter", "Codex num computador", "Pensa pela API".
+ * Where it runs: its computer's name ("MacBook do Walter"), only where that tells it apart (`namesComputer`: the
+ * workspace has more than one). Null otherwise, and on the API, so the section isn't shown.
  */
-export function whereItRuns(brain: Routine["brain"]): Words {
-  if (brain.kind === "model") return { key: "routines.runsOn.cloud", values: {} };
-  const product = brain.kind === "codex" ? "Codex" : "Claude Code";
-  return brain.machineName
-    ? { key: "routines.runsOn.machine", values: { product, machine: brain.machineName } }
-    : { key: "routines.runsOn.anyMachine", values: { product } };
-}
+export const whereItRuns = (brain: Routine["brain"], namesComputer: boolean): string | null =>
+  namesComputer ? brain.machineName : null;
 
 /**
  * Its usage this week, in plain words ("14 execuções · 120 mil tokens do plano · US$ 0,42 na API"): the
@@ -304,13 +309,20 @@ export function runsPerDay(rule: Pick<ApiRule, "freq" | "interval" | "times"> | 
   return step(minute, 60) * step(hour, 24);
 }
 
-/** On a computer brain and hourly or more often: "Roda 24 vezes por dia no MacBook do Walter". */
+/**
+ * On a computer brain and hourly or more often: "Roda 24 vezes por dia no MacBook do Walter, que precisa ficar
+ * ligado". Only where people connect their own computers (`selfHost`): the Cloud's own is always on. The computer
+ * by its name only where that tells it apart (`namesComputer`), else "no computador".
+ */
 export function busyOnComputer(
   brain: { kind: string; machineName?: string | null } | null | undefined,
   perDay: number,
+  where: { selfHost: boolean; namesComputer: boolean },
 ): Words | null {
-  if (!brain || (brain.kind !== "claude_code" && brain.kind !== "codex") || perDay < BUSY_RUNS_PER_DAY) return null;
-  return brain.machineName
-    ? { key: "routines.busyComputer", values: { count: perDay, machine: brain.machineName } }
+  if (!where.selfHost || !brain || (brain.kind !== "claude_code" && brain.kind !== "codex")) return null;
+  if (perDay < BUSY_RUNS_PER_DAY) return null;
+  const machine = where.namesComputer ? brain.machineName : null;
+  return machine
+    ? { key: "routines.busyComputer", values: { count: perDay, machine } }
     : { key: "routines.busyAnyComputer", values: { count: perDay } };
 }

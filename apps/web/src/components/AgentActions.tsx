@@ -24,6 +24,7 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { inPlaceClick } from "@/lib/navigate";
 import { fromApiRule, ruleSentence } from "@/lib/recurrence";
 import { useToast } from "@/lib/toast";
+import { DetailsLink } from "./details-link";
 import { useOrg } from "./org-context";
 import "./agent-actions.css";
 
@@ -308,15 +309,9 @@ function ReceiptTarget({ action: a, children }: { action: AgentAction; children?
   }
   if (tg.type === "routine")
     return (
-      <Link
-        to="/org/$orgId/routines"
-        params={{ orgId }}
-        search={{ open: tg.id }}
-        className="ag-rc__target"
-        onClick={inPlace ? (e) => inPlaceClick(e, () => inPlace.routine(tg.id)) : undefined}
-      >
+      <DetailsLink item={{ kind: "routine", id: tg.id }} className="ag-rc__target">
         {children}
-      </Link>
+      </DetailsLink>
     );
   if (tg.type === "wiki_page" && (tg.slug || typeof a.params.slug === "string"))
     return (

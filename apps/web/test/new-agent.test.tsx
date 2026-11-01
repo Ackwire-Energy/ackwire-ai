@@ -443,7 +443,10 @@ describe("Criar agente: what gets created", () => {
         .getByRole("button", { name: /^Codex.*Indisponível/ })
         .getAttribute("aria-disabled"),
     ).toBe("true");
-    const claude = screen().getByRole("button", { name: /^Claude Code.*Mac mini/ });
+    const claude = screen().getByRole("button", { name: /^Claude Code/ });
+    // The workspace's only computer: the card doesn't name it.
+    expect(claude.querySelector(".newag__cost")).toBeNull();
+    expect(claude.textContent).not.toContain("Mac mini");
     await click(claude);
     expect(claude.getAttribute("aria-pressed")).toBe("true");
     // In the words of the switch it points to, "Atende outras pessoas".
@@ -472,6 +475,33 @@ describe("Criar agente: what gets created", () => {
     expect(screen().queryByRole("dialog", { name: /^Conectar uma IA/ })).toBeNull();
   });
 
+  test("plan: with more than one computer, each card names its own", async () => {
+    const state = seedState();
+    state.brainMachines = [
+      {
+        machineId: "machine_1",
+        name: "MacBook",
+        online: true,
+        options: [plan("claude_code", true), plan("codex", false)],
+      },
+      {
+        machineId: "machine_mini",
+        name: "Mac mini",
+        online: false,
+        options: [plan("claude_code", true), plan("codex", false)],
+      },
+    ];
+    await open(state);
+    await startAs("Assistente");
+    await proceed(4);
+    const cards = within(screen().getByRole("group", { name: "Pelo plano, num computador" })).getAllByRole("button");
+    expect(cards.map((c) => c.querySelector(".newag__cost")?.textContent)).toEqual([
+      "MacBook",
+      "Mac mini · offline",
+      "Indisponível",
+    ]);
+  });
+
   test("plan: Codex on the workspace's computer, whose own sign-in thinks for nobody: ChatGPT's sign-in opens once it's created", async () => {
     const state = seedState();
     state.credentials = [];
@@ -488,7 +518,9 @@ describe("Criar agente: what gets created", () => {
     await startAs("Assistente");
     await proceed(4);
     expect(title()).toBe("Modelo e orçamento");
-    await click(screen().getByRole("button", { name: /^Codex.*Computador da Acme/ }));
+    const codex = screen().getByRole("button", { name: /^Codex/ });
+    expect(codex.textContent).not.toContain("Computador da Acme");
+    await click(codex);
     await proceed();
     await click(screen().getByRole("button", { name: "Criar Eva" }));
     await settle(8);

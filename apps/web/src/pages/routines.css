@@ -396,6 +396,26 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
 .routine-details .ac-details__section p {
   margin: 0;
 }
+/* Two short sections side by side once the body is wide enough, one under the other below that (narrow windows,
+   phones). No column gap: their two top rules meet in one divider across the row, as a full-width section's. */
+.routine-details .ac-details__body {
+  container: routine-details / inline-size;
+}
+.routine-details__pair {
+  display: contents;
+}
+@container routine-details (min-width: 620px) {
+  .routine-details__pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .routine-details__pair > :first-child {
+    padding-right: 12px;
+  }
+  .routine-details__pair > :last-child {
+    padding-left: 12px;
+  }
+}
 .routine-details__prompt {
   padding: 12px 14px;
   border-radius: 14px;

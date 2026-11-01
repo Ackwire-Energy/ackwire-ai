@@ -1,5 +1,6 @@
 import type { BrainMachine, Credential, Member, Model } from "@agenteschat/client";
 import { providerGrammar } from "@agenteschat/client/lib/grammar";
+import { namesComputers } from "@agenteschat/client/lib/machines";
 import { AUTO, isAuto, type ModelChoice, providerLabel } from "@agenteschat/client/lib/providers";
 import {
   AffixInput,
@@ -537,7 +538,8 @@ const PLAN_PROVIDER = { claude_code: "anthropic", codex: "openai" } as const;
 
 /**
  * "Pelo plano, num computador": Claude Code and Codex on each computer that has them, as cards like the models';
- * one that no computer offers says why ("Sem computador", "Indisponível") instead.
+ * one that no computer offers says why ("Sem computador", "Indisponível") instead. A card names its computer only
+ * where there is more than one (`namesComputers`), or when it is offline.
  */
 export function PlanCards({
   machines,
@@ -549,6 +551,7 @@ export function PlanCards({
   onChange: (choice: PlanChoice) => void;
 }) {
   const { t } = useTranslation();
+  const names = namesComputers(machines);
   const head = (kind: PlanChoice["kind"]) => (
     <span className="newag__model-head">
       <b>{t(`brain.card.${kind}`)}</b>
@@ -584,10 +587,12 @@ export function PlanCards({
           >
             {head(kind)}
             <span className="newag__model-desc">{t(`brain.${kind}Text`)}</span>
-            <span className="newag__cost">
-              <Icon name="computer" size={14} />
-              {m.online ? m.name : t("brain.foot.offline", { computer: m.name })}
-            </span>
+            {(names || !m.online) && (
+              <span className="newag__cost">
+                <Icon name="computer" size={14} />
+                {m.online ? m.name : t("brain.foot.offline", { computer: m.name })}
+              </span>
+            )}
           </button>
         ));
       })}

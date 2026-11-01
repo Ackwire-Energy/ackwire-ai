@@ -812,6 +812,19 @@ describe("a click on a browser notification (ADR 0071)", () => {
     ]);
   });
 
+  test("no tab open, a routine's trouble: its details over the inbox, without ?open", async () => {
+    const state = seedState({ notifications: inbox() });
+    const api = createFakeApi(state);
+    const failed = (await api.routines.list(ORG_ID))[0];
+    if (!failed) throw new Error("no routine seeded");
+    for (const n of state.notifications ?? []) if (n.id === "n-routine") n.source.routineId = failed.id;
+    const { router } = await renderApp(`/org/${ORG_ID}/notifications?open=n-routine`, { api });
+    await settle(8);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/notifications`);
+    expect(router.state.location.search).toEqual({});
+    expect(screen().getByRole("dialog", { name: failed.name })).toBeTruthy();
+  });
+
   test("one that is gone: the inbox, without ?open", async () => {
     const state = seedState({ notifications: inbox() });
     const { router } = await renderApp(`/org/${ORG_ID}/notifications?open=n-gone`, { api: createFakeApi(state) });
@@ -823,7 +836,12 @@ describe("a click on a browser notification (ADR 0071)", () => {
 
   test("a tab open in the workspace: it opens there at once, no stop at the inbox", async () => {
     const state = seedState({ notifications: inbox() });
-    const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    const api = createFakeApi(state);
+    // The routine that failed: its details open over the page the person is on.
+    const failed = (await api.routines.list(ORG_ID))[0];
+    if (!failed) throw new Error("no routine seeded");
+    for (const n of state.notifications ?? []) if (n.id === "n-routine") n.source.routineId = failed.id;
+    const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(8);
     const seen: string[] = [];
     const unsubscribe = router.subscribe("onResolved", (e) => seen.push(e.toLocation.pathname));
@@ -838,7 +856,8 @@ describe("a click on a browser notification (ADR 0071)", () => {
     );
     await settle(8);
     unsubscribe();
-    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/routines`);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
+    expect(screen().getByRole("dialog", { name: failed.name })).toBeTruthy();
     expect(seen).not.toContain(`/org/${ORG_ID}/notifications`);
     expect(state.calls.find((c) => c.method === "notifications.read")?.args).toEqual([ORG_ID, "n-routine", true]);
   });

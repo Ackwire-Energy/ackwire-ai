@@ -12,6 +12,7 @@ import { ConnectAiProvider } from "@/components/ConnectAi";
 import { ComputerDialogProvider } from "@/components/computer/ComputerDialog";
 import { MenuBarActions } from "@/components/DesktopMenus";
 import { DesktopDragStrip, DesktopTitleBar } from "@/components/DesktopTitleBar";
+import { DetailsHost } from "@/components/DetailsHost";
 import { InviteDialogProvider } from "@/components/invite/InviteDialog";
 import { RefetchBar } from "@/components/Loading";
 import { OutageNotices } from "@/components/MachineOutages";
@@ -143,9 +144,11 @@ function OrgLayout() {
                   <div className="shell__pages">
                     <ConnectAiProvider>
                       <ComputerDialogProvider>
-                        <PushOpens />
-                        <WebPushAsk />
-                        <Outlet />
+                        <DetailsHost>
+                          <PushOpens />
+                          <WebPushAsk />
+                          <Outlet />
+                        </DetailsHost>
                       </ComputerDialogProvider>
                     </ConnectAiProvider>
                   </div>

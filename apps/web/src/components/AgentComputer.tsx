@@ -197,10 +197,10 @@ function AgentMachineFolders({ agent, machineId }: { agent: Agent; machineId: st
             : t("agentPage.computer.foldersHidden", { machine: m.name })}
         </span>
       ) : folders.length === 0 ? (
-        <span className="small muted">{t("agentPage.computer.foldersOwn", { ...g, machine: m.name })}</span>
+        <span className="small muted">{t("agentPage.computer.foldersOwn", g)}</span>
       ) : (
         <>
-          <span className="small muted">{t("agentPage.computer.foldersMore", { ...g, machine: m.name })}</span>
+          <span className="small muted">{t("agentPage.computer.foldersMore", g)}</span>
           <ul className="agent-folders">
             {folders.map((f) => (
               <li key={f.path}>

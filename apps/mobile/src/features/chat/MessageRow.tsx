@@ -44,7 +44,7 @@ import { consultationHref, routineHref } from "../links/logic";
 import { DecisionCard, MissionCard, PlanCard, ReviewCard, SetupFailedCard } from "../missions/cards";
 import { BrainWait } from "../outages/WaitCard";
 import { AgentFace, Face } from "../shared/Face";
-import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
+import { useColors, useDirectory, useMeId, useNamesComputers, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
 import { ReceiptMark } from "./AgentReceipts";
@@ -147,8 +147,10 @@ export const MessageRow = memo(function MessageRow({
   const reminder = isReminderMessage(meta);
   // A short reply it gave while its task kept working (the talker): its message, "enquanto trabalha".
   const talker = isAgent && isTalkerReply(meta);
-  // What the server wrote itself is said in the person's language; a stopped reply drops the server's note.
-  const body = hidesBody(m) ? "" : reminderBody(splitCanceled(serverBody(t, m.body, meta), meta).body, meta);
+  // What the server wrote itself is said in the person's language; a stopped reply drops the server's note. Where a
+  // task ran is said only where the workspace has more than one computer.
+  const names = useNamesComputers();
+  const body = hidesBody(m) ? "" : reminderBody(splitCanceled(serverBody(t, m.body, meta, names), meta).body, meta);
   const consulted = isAgent && m.author.id ? consultationsOf(meta) : [];
   // A GIF or a sticker (ADR 0091); with no words, the message is the picture alone (no empty bubble).
   const media = messageMediaOf(meta);
