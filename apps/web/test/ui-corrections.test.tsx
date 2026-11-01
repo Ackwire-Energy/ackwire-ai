@@ -442,7 +442,7 @@ describe("agent faces in more lines", () => {
     const runs = [
       {
         channelId: ENG_ID,
-        threadId: null,
+        threadId: "m-1",
         runId: "r-said",
         agentId: ADA_ID,
         lastSeq: 0,
@@ -506,13 +506,14 @@ describe("agent faces in more lines", () => {
 
 describe("the sidebar's sky", () => {
   test("no pixel agents drift behind the account row, however many agents work", async () => {
-    let shown: ReactElement<{ children: ReactElement<{ options: { sprites?: number } }> }> | null = null;
+    type Drawn = ReactElement<{ children: ReactElement<{ options: { sprites?: number } }> }>;
+    const seen: { drawn?: Drawn } = {};
     function Probe() {
-      shown = SidebarHorizon({ working: 3, total: 3 }) as typeof shown;
-      return shown;
+      seen.drawn = SidebarHorizon({ working: 3, total: 3 }) as Drawn;
+      return seen.drawn;
     }
     await renderPage(<Probe />, { api: createFakeApi(seedState()) });
-    expect(shown?.props.children.props.options.sprites).toBe(0);
+    expect(seen.drawn?.props.children.props.options.sprites).toBe(0);
   });
 });
 
