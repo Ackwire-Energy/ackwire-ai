@@ -1170,8 +1170,9 @@ export async function routeMessage(
         strategy: `rule:${rule.rule}`,
         decidedBy: { step: "rule", rule: rule.rule },
       };
-    } else if (!peopleTalking && !isAck(0) && !(await defaultCapReached())) {
-      // A router failure is never silence (R5): the agent they talk with, the coordinator, the best placed.
+    } else if (failures.length > 0 && !peopleTalking && !isAck(0) && !(await defaultCapReached())) {
+      // A router failure is never silence (R5): the agent they talk with, the coordinator, the best placed. Not
+      // when no step could even try (no key, no sign-in): that stays `mention_needed`, or every message would wake one.
       const agentId = talkingWith ?? coordinatorId ?? bestPlaced(() => 0);
       if (agentId) {
         fallback = talkingWith ? "talk" : coordinatorId ? "coordinator" : "best";
