@@ -1337,12 +1337,12 @@ export class RunnerDaemon implements RequestObserver {
       user = { ...existing, ...networkConfig(pin ?? session.network) };
       break;
     }
-    if (!user) return;
     this.probingEgress = true;
     const before = this.egress.current;
     const generation = this.egressGeneration;
     try {
-      const result = await (this.opts.probeEgress ?? probeEgress)(session.config.server, user);
+      // Idle contexts are not kept alive for observations. Three skipped samples expire the last address too.
+      const result = user ? await (this.opts.probeEgress ?? probeEgress)(session.config.server, user) : null;
       if (this.session === session && generation === this.egressGeneration) this.egress.record(result);
     } catch {
       if (this.session === session && generation === this.egressGeneration) this.egress.record(null);

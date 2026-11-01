@@ -2598,6 +2598,95 @@ test.if(posix)("route changes discard in-flight egress observations and reconnec
   }
 });
 
+test.if(posix)("three idle samples clear the exit IP until an agent context resumes", async () => {
+  const home = newHome();
+  // This test supplies existing contexts through the lookup below, without a saved-user fallback.
+  writeFileSync(path.join(home, AGENT_USERS_FILE), "[]");
+  const ws = tempDir("idle-egress-");
+  dirs.push(ws);
+  writeConfig(
+    {
+      server: "https://agentes.test",
+      machineId: "m1",
+      name: "box",
+      token: "agm_test_idle_observation",
+      workspace: ws,
+      exec: false,
+      mode: "system",
+      agentUidRange: [21000, 21099],
+    },
+    home,
+  );
+  let context: AgentUser | undefined = userOf(ANA);
+  let answer = { ip: "8.8.8.8", country: "US" };
+  let probes = 0;
+  let workers = 0;
+  const sockets: FakeSocket[] = [];
+  const pageUpdates = spyOn(BrowserManager.prototype, "updateStartPages");
+  const daemon = new RunnerDaemon({
+    home,
+    mode: "start",
+    log: () => {},
+    watch: false,
+    executors: () => ({}),
+    caffeinate: false,
+    self: { command: ["/opt/agentes-runner/agentes-runner"], compiled: true },
+    fetch: async () => new Response("", { status: 404 }),
+    probeEgress: async () => {
+      probes++;
+      return answer;
+    },
+    workers: {
+      // The test's existing-context lookup returns nothing once all agent contexts have drained.
+      user: () => context as AgentUser,
+      start: (user) => {
+        workers++;
+        return new FakeWorker(user);
+      },
+    },
+    dial: (_url, handlers) => {
+      const socket = new FakeSocket(handlers);
+      sockets.push(socket);
+      return socket;
+    },
+  });
+  // Drive the regular 30-second sampler without wall-clock waits or starting an agent for a probe.
+  const sample = () => (daemon as unknown as { sampleEgress(): Promise<void> }).sampleEgress();
+  daemon.start();
+  try {
+    await waitFor(() => sockets.length === 1);
+    const socket = sockets[0] as FakeSocket;
+    socket.handlers.onOpen();
+    socket.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25000, observeEgress: true });
+    socket.frame({ type: "agents", agents: [ANA] });
+    await waitFor(() => socket.of("pong").some((frame) => JSON.stringify(frame.egress) === JSON.stringify(answer)));
+    const observed = socket.of("pong").length;
+    const sampled = probes;
+    context = undefined;
+    await sample();
+    await sample();
+    expect(socket.of("pong")).toHaveLength(observed);
+    const updated = pageUpdates.mock.calls.length;
+    await sample();
+    expect(socket.of("pong").at(-1)?.egress).toEqual({ ip: null });
+    expect(pageUpdates.mock.calls.length).toBeGreaterThan(updated);
+    expect(probes).toBe(sampled);
+    expect(workers).toBe(0);
+    await sample();
+    expect(socket.of("pong")).toHaveLength(observed + 1);
+
+    context = userOf(ANA);
+    answer = { ip: "1.1.1.1", country: "AU" };
+    await sample();
+    expect(socket.of("pong").at(-1)?.egress).toEqual(answer);
+    expect(probes).toBe(sampled + 1);
+    expect(workers).toBe(0);
+  } finally {
+    pageUpdates.mockRestore();
+    await daemon.stop();
+  }
+});
+
 test("workers restored before a server welcome inherit root network configuration", async () => {
   const home = newHome();
   writeFileSync(
