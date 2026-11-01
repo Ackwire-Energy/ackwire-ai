@@ -335,15 +335,15 @@ export function parseChannelNames(body: string): string[] {
 
 /**
  * `{ channelRefs }` for a new message's meta: each `#name` it writes → the channel's id (`{}` when none), so the link
- * survives a rename. Archived channels count (they show as archived); a private channel only when its author is
- * in it, so a message never carries the id of a private channel its author can't see.
+ * survives a rename. Archived channels count (they show as archived). A private channel only when the message is
+ * posted in it: `meta` reaches every reader, and only then are they all its members. Elsewhere its members' apps
+ * match the channel by its current name.
  */
-function channelRefsSql(orgId: string, names: string[], author: { userId: string | null; agentId: string | null }) {
+function channelRefsSql(orgId: string, channelId: string, names: string[]) {
   // Names match [a-z0-9_-]: safe as an array literal.
   return sql`coalesce((select jsonb_build_object('channelRefs', jsonb_object_agg(c.name, c.id)) from ${channels} c
       where c.org_id = ${orgId}::uuid and c.kind = 'channel' and c.name = any(${`{${names.join(",")}}`}::text[])
-        and (c.visibility = 'public' or exists (select 1 from ${channelMembers} cm where cm.channel_id = c.id
-          and (cm.user_id = ${author.userId}::text or cm.agent_id = ${author.agentId}::uuid)))
+        and (c.visibility = 'public' or c.id = ${channelId}::uuid)
       having count(*) > 0), '{}'::jsonb)`;
 }
 
@@ -722,7 +722,7 @@ export async function insertMessageWithRuns(
           coalesce((select array_agg(id) from mentioned), '{}'::uuid[]),
           coalesce((select array_agg(user_id) from mentioned_people), '{}'::text[]),
           ${JSON.stringify(input.meta ?? {})}::jsonb
-            || ${channelNames.length > 0 ? channelRefsSql(input.orgId, channelNames, { userId, agentId }) : sql`'{}'::jsonb`}
+            || ${channelNames.length > 0 ? channelRefsSql(input.orgId, input.channelId, channelNames) : sql`'{}'::jsonb`}
             || coalesce((select jsonb_build_object('answersQuestionId', id) from answered), '{}'::jsonb)
             -- Delivered to a task in progress: nobody routes it again (no second run).
             || coalesce((select jsonb_build_object('steeredRunIds', jsonb_agg(st.id)) from steered st

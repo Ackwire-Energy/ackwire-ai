@@ -6,6 +6,7 @@ import {
   channelCard,
   createChannel,
   insertMessage,
+  listMessages,
   NotFoundError,
   parseChannelNames,
   postPersonMessage,
@@ -42,20 +43,27 @@ test("a message stores the channel each #name means, so a renamed channel still 
   expect((await post(f.owner.id, "sem canal #nada")).meta.channelRefs).toBeUndefined();
 });
 
-test("a private channel is stored only when its author is in it; archived ones are stored", async () => {
+test("a private channel is stored only in a message posted in it; archived ones are stored", async () => {
   const secret = await createChannel(f.db, f.owner.id, f.org.id, { name: "diretoria", visibility: "private" });
   const old = await createChannel(f.db, f.owner.id, f.org.id, { name: "antigo" });
   await archiveChannel(f.db, f.owner.id, f.org.id, old.id);
   const ana = await addMember(f.db, f.org.id, "member", "ana");
   await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: ana.id });
 
-  expect((await post(f.owner.id, "#diretoria #antigo")).meta.channelRefs).toEqual({
-    diretoria: secret.id,
-    antigo: old.id,
-  });
-  expect((await post(ana.id, "#diretoria #antigo")).meta.channelRefs).toEqual({ antigo: old.id });
+  // Its member writes it in #general: Ana reads that message and learns no private id.
+  const inGeneral = await post(f.owner.id, "#diretoria #antigo");
+  expect(inGeneral.meta.channelRefs).toEqual({ antigo: old.id });
+  const read = await listMessages(f.db, ana.id, f.org.id, f.general.id);
+  expect(JSON.stringify(read)).not.toContain(secret.id);
 
-  // An agent's message: the same rule, with the agent as the author.
+  // Posted in the private channel itself: every reader is a member.
+  const inside = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, secret.id, {
+    body: "fica em #diretoria",
+  });
+  expect(inside.meta.channelRefs).toEqual({ diretoria: secret.id });
+
+  // An agent in the private channel: the same rule.
+  await addChannelMember(f.db, f.owner.id, f.org.id, secret.id, { agentId: f.agent.id });
   const reply = await insertMessage(f.db, {
     orgId: f.org.id,
     channelId: f.general.id,
@@ -63,14 +71,6 @@ test("a private channel is stored only when its author is in it; archived ones a
     body: "Entregue em #diretoria e #general",
   });
   expect(reply.meta.channelRefs).toEqual({ general: f.general.id });
-  await addChannelMember(f.db, f.owner.id, f.org.id, secret.id, { agentId: f.agent.id });
-  const again = await insertMessage(f.db, {
-    orgId: f.org.id,
-    channelId: f.general.id,
-    author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null },
-    body: "Agora em #diretoria",
-  });
-  expect(again.meta.channelRefs).toEqual({ diretoria: secret.id });
 });
 
 test("a channel's card: counts and membership; archived shows; a private one not mine is not found", async () => {
