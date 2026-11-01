@@ -424,6 +424,20 @@ describe("one workspace's day", () => {
     expect(day?.ackReplies).toBe(acks.length);
   });
 
+  test("the talker's quick reply answers a person; another notice doesn't", async () => {
+    const other = "2026-10-18";
+    const dev = f.agent.id;
+    for (const [time, meta] of [
+      ["10:00", { talker: { runId: crypto.randomUUID() }, notice: { kind: "talker_reply", text: "" } }],
+      ["11:00", { notice: { kind: "wait_result", text: "" } }],
+    ] as const) {
+      await message({ at: at(`${time}:00`, other), channelId: ch.personDm, body: "como está a migração?" });
+      await message({ at: at(`${time}:30`, other), by: dev, channelId: ch.personDm, body: "Ainda rodando.", meta });
+    }
+    const [day] = await autonomyRows(f.db, { from: other, days: 1 });
+    expect(day?.personUnanswered).toBe(1);
+  });
+
   test("a message whose woken run ended without a word is that run's noise, not also a stall", async () => {
     const other = "2026-10-19";
     const dev = f.agent.id;

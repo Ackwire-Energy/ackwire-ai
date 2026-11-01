@@ -250,8 +250,12 @@ const isAck = (column: string) => {
 const ACTED = sql.raw(`((s.kind = 'tool_call' and coalesce(s.data->>'name', '') not in ('react', 'pass'))
   or s.kind = 'approval' or (s.kind = 'model_call' and coalesce((s.data->>'executed')::int, 0) > 0))`);
 
-/** SQL: an agent message `a` that is a word from the agent, not a server line (a notice, a no-AI card, a pause card). */
-const SPOKE = sql.raw(`(a.author_type = 'agent' and a.deleted_at is null and not (a.meta ? 'notice' or a.meta ? 'noAi')
+/**
+ * SQL: an agent message `a` that is a word from the agent, not a server line (a notice, a no-AI card, a pause card).
+ * The talker's quick reply while a task works is a notice too, and an answer.
+ */
+const SPOKE = sql.raw(`(a.author_type = 'agent' and a.deleted_at is null
+  and not ((a.meta ? 'notice' and not a.meta ? 'talker') or a.meta ? 'noAi')
   and coalesce(a.meta->'actionCard'->>'kind', '') <> 'stretch_paused')`);
 
 /**
