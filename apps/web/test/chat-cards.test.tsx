@@ -7,7 +7,7 @@ import type { AgentAction, LiveWork, Message, Run } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { useState } from "react";
 import { LiveTools, SavedTools } from "@/components/ToolCalls";
-import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, renderPage, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -299,6 +299,18 @@ describe("what a reply names opens over the conversation", () => {
     expect(router.state.location.pathname).toBe(channel);
     // A click with ⌘ leaves the link to the browser (a new tab): no dialog here.
     await click(link, { metaKey: true });
+    expect(screen().queryByRole("dialog")).toBeNull();
+  });
+
+  test("moving to another channel closes what was open over the last one", async () => {
+    const { router } = await openChannel((id) => [answer(id)]);
+    await click(screen().getByRole("link", { name: "Relatório de pagamentos" }));
+    expect(screen().getByRole("dialog", { name: "Relatório de pagamentos" })).toBeTruthy();
+    await act(async () => {
+      await router.navigate({ to: "/org/$orgId/c/$channelId", params: { orgId: ORG_ID, channelId: GENERAL_ID } });
+    });
+    await settle(6);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
     expect(screen().queryByRole("dialog")).toBeNull();
   });
 

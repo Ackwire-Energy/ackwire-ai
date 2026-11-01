@@ -485,10 +485,9 @@ export function ChannelPage({
   return (
     // "Arquivos", "Ver plano", "Ver no arquivo": any mission card here opens the same files panel.
     <MissionPanelProvider>
-      {/* A routine or a task an agent names here opens in its dialog over the conversation. */}
-      <InPlaceProvider>
+      {/* A routine or a task an agent names here opens in its dialog over the conversation; leaving it closes it. */}
+      <InPlaceProvider key={`${channel.id}:${thread?.id ?? ""}:${adjustThreadId ?? ""}`}>
         <ChannelView
-          key={`${channel.id}:${thread?.id ?? ""}:${adjustThreadId ?? ""}`}
           channel={channel}
           chrome={chrome}
           focusMessageId={focusMessageId}
