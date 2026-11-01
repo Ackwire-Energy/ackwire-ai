@@ -101,9 +101,7 @@ describe("an agent's proposal of a new agent, in the chat", () => {
     // Its name on one line, the handle and role on the next: never run together.
     const who = card.querySelector(".rq__wt");
     expect(who?.querySelector(":scope > b")?.textContent).toBe("Nina");
-    expect(who?.querySelector(":scope > small")?.textContent).toBe(
-      "@nina · Designer · Pensa pela API",
-    );
+    expect(who?.querySelector(":scope > small")?.textContent).toBe("@nina · Designer · Pensa pela API");
     // Revisar: the review in a dialog over the conversation, which stays as it was.
     await click(within(card).getByRole("button", { name: "Revisar" }), 10);
     const dialog = screen().getByRole("dialog", { name: "Revisar Nina" });
