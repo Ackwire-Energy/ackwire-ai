@@ -427,6 +427,8 @@ export interface Agent {
   appearance?: AgentLookInput;
   /** Who thinks for it (ADR 0032): the brain, a computer brain's model label, its computer (owner and admins). */
   brain?: AgentBrainLine;
+  /** It coordinates the team (ADR 0093): one per workspace; absent from an older server. */
+  coordinator?: boolean;
   /** No longer in the team (ADR 0082): only its name, role and look, from `FormerAgent`. */
   former?: "archived" | "deleted";
 }
@@ -514,6 +516,8 @@ export interface AgentInput {
   monthlyBudgetUsd?: number | null;
   audience?: AgentAudience;
   appearance?: AgentLookInput;
+  /** Editing only, admins: it coordinates the team (true takes it from whoever had it), ADR 0093. */
+  coordinator?: boolean;
   /** Created from an agent's proposal (its card's message id, ADR 0081): the card is marked created. */
   proposal?: string;
 }
@@ -719,13 +723,14 @@ export interface MessageReceipts {
 
 /**
  * Which step picked the agents for a message nobody mentioned (ADR 0074): Jev, the organization's small model
- * (its catalog id and provider), the author's own plan (`ownerId`: the author), or a rule.
+ * (its catalog id and provider), the author's own plan (`ownerId`: the author), or a rule (`coordinator`: nobody
+ * else took it, so the team's coordinator did, ADR 0093).
  */
 export type DecidedBy =
   | { step: "jev" }
   | { step: "model"; model: string; provider: string }
   | { step: "plan"; brand: "claude" | "chatgpt"; ownerId: string }
-  | { step: "rule"; rule: "reply" | "only_agent" | "follow_up" };
+  | { step: "rule"; rule: "reply" | "only_agent" | "follow_up" | "coordinator" };
 
 /**
  * Who picks the agents for a message nobody mentioned (`ai-status`, ADR 0074): `by` for the workspace, `mine` for
@@ -1334,10 +1339,27 @@ export interface Memory {
 
 export type ProposalStatus = "pending" | "accepted" | "refused";
 
+/** An app a proposal turns on or off for an agent, as `request_permission` names it (`label` in English). */
+export interface ProposalAccessLine {
+  /** A built-in scope (`browser:use`) or `connector:<connectionId>`. */
+  id: string;
+  label: string;
+  on: boolean;
+}
+
 export interface Proposal {
   id: string;
+  /** The agent it changes; empty for the org context. */
   agentId: string;
-  target: { type: "agent_instructions"; agentId: string } | { type: "org_context" };
+  /** The agent that proposed it (older servers leave it out: `agentId`). */
+  proposedByAgentId?: string;
+  target:
+    | { type: "agent_instructions"; agentId: string }
+    | { type: "org_context" }
+    | { type: "agent_role"; agentId: string }
+    | { type: "agent_access"; agentId: string };
+  /** `agent_access`: each app turned on or off. */
+  access?: ProposalAccessLine[] | null;
   title: string;
   why: string;
   /** `type` names the source for translation; `where` is the server's English text. */
@@ -1347,14 +1369,15 @@ export interface Proposal {
     channelId?: string | null;
     type?: "outcome" | "human" | "agent" | "self";
   }[];
+  /** `agent_role`: the role then and the one proposed; `agent_access`: both empty. */
   before: string;
   after: string;
   status: ProposalStatus;
-  /** The text changed since it was proposed: it can no longer be accepted. */
+  /** What it was made against changed since (or its agent left): it can no longer be accepted. */
   stale: boolean;
-  /** You are the agent's owner or an admin (org context: admins). */
+  /** You may make this change on the agent's page (the org context: you review memory). */
   canDecide: boolean;
-  /** Who can decide: the agent's owner for instructions, admins for the org context. */
+  /** Who decides besides admins: the agent's owner, for its instructions and for access it only takes away. */
   decider: { type: "user"; userId: string; name: string } | { type: "admins" };
   createdAt: string;
   decidedBy: { userId: string; name: string } | null;
@@ -1860,8 +1883,10 @@ export interface MemoryUpdate {
   requestedByUserId: string;
   /** Undo: `POST …/memories/{itemId}/revert`. Absent for proposals. */
   undo?: { method: "POST"; path: string };
-  /** For `proposed`: the proposal to decide inline. */
+  /** For `proposed`: the proposal to decide inline (a card of several: the first). */
   proposalId?: string;
+  /** For `proposed`: every proposal on the card, one per agent and kind of change. */
+  proposalIds?: string[];
   canDecide?: boolean;
 }
 

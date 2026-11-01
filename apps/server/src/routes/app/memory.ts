@@ -9,6 +9,7 @@ import {
   listAgentMemoryRows,
   listProposals,
   NotFoundError,
+  ownerDecides,
   type Proposal as ProposalRow,
   requirePermission,
   revertMemoryChange,
@@ -66,11 +67,23 @@ const Memory = z
 const Proposal = z
   .object({
     id: z.uuid(),
-    agentId: z.string(),
+    agentId: z.string().openapi({ description: "The agent it changes; empty for the org context." }),
+    proposedByAgentId: z.string().openapi({
+      description: "The agent that proposed it; older proposals and memory promotions: the agent it changes.",
+    }),
     target: z.union([
       z.object({ type: z.literal("agent_instructions"), agentId: z.string() }),
       z.object({ type: z.literal("org_context") }),
+      z.object({ type: z.literal("agent_role"), agentId: z.string() }),
+      z.object({ type: z.literal("agent_access"), agentId: z.string() }),
     ]),
+    access: z
+      .array(z.object({ id: z.string(), label: z.string(), on: z.boolean() }))
+      .nullable()
+      .openapi({
+        description:
+          "`agent_access`: each app turned on or off, as `request_permission` names it (a built-in scope or `connector:<connectionId>`, `label` in English).",
+      }),
     title: z.string(),
     why: z.string(),
     evidence: z.array(
@@ -83,10 +96,12 @@ const Proposal = z
         }),
       }),
     ),
-    before: z.string(),
+    before: z.string().openapi({ description: "`agent_role`: the role then; `agent_access`: empty." }),
     after: z.string(),
     status: z.enum(["pending", "accepted", "refused"]),
-    stale: z.boolean().openapi({ description: "The text changed since; accepting is no longer possible." }),
+    stale: z
+      .boolean()
+      .openapi({ description: "What it was made against changed since (or its agent left); it can't be accepted." }),
     decider: z.union([
       z.object({ type: z.literal("user"), userId: z.string(), name: z.string() }),
       z.object({ type: z.literal("admins") }),
@@ -233,6 +248,13 @@ async function viewerSources(db: Database, orgId: string, viewerId: string, item
 }
 
 /** Lines kept or removed in the diff = the text before. */
+const TITLE: Record<ProposalRow["target"], (name: string) => string> = {
+  agent_instructions: (name) => `Update ${name}'s instructions`,
+  agent_role: (name) => `Change ${name}'s role`,
+  agent_access: (name) => `Change ${name}'s access`,
+  org_context: () => "Update the organization context",
+};
+
 const beforeOf = (diff: string) =>
   diff
     .split("\n")
@@ -276,17 +298,17 @@ async function proposalViews(db: Database, rows: (ProposalRow & { canDecide: boo
     const agent = r.agentId ? agentById.get(r.agentId) : undefined;
     const owner = agent?.ownerUserId;
     const sourceItems = r.itemIds.flatMap((id) => (itemById.get(id) ? [itemById.get(id) as ContextItem] : []));
+    const name = agent?.name ?? "the agent";
     return {
       id: r.id,
       agentId: r.agentId ?? "",
+      proposedByAgentId: r.proposedByAgentId ?? r.agentId ?? "",
       target:
-        r.target === "agent_instructions" && r.agentId
-          ? { type: "agent_instructions" as const, agentId: r.agentId }
+        r.target !== "org_context" && r.agentId
+          ? { type: r.target, agentId: r.agentId }
           : { type: "org_context" as const },
-      title:
-        r.target === "agent_instructions"
-          ? `Update ${agent?.name ?? "the agent"}'s instructions`
-          : "Update the organization context",
+      access: r.target === "agent_access" ? (r.access ?? []) : null,
+      title: TITLE[r.target](name),
       why: sourceItems.map((i) => i.content).join(" ") || r.rationale,
       evidence: sourceItems.flatMap((i) =>
         i.evidence.map((e) => ({
@@ -306,7 +328,7 @@ async function proposalViews(db: Database, rows: (ProposalRow & { canDecide: boo
             : ("refused" as const),
       stale: r.status === "stale",
       decider:
-        r.target === "agent_instructions" && owner
+        ownerDecides(r) && owner
           ? { type: "user" as const, userId: owner, name: users.get(owner) ?? "" }
           : { type: "admins" as const },
       canDecide: r.canDecide,
@@ -420,12 +442,20 @@ export function memoryRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/proposals",
       tags,
       security,
-      summary: "Improvement proposals for agent instructions or the org context",
+      summary: "Proposed changes to agents' instructions, roles and access, or to the org context",
       request: {
         params: OrgParams,
         query: z.object({
           status: z.enum(["pending", "accepted", "refused"]).optional(),
           agentId: z.uuid().optional(),
+          ids: z
+            .string()
+            .max(100 * 37)
+            .optional()
+            .openapi({
+              description:
+                "Comma-separated ids, at most 100: only these (a chat card's `proposalIds`). Without it, the newest 200, pending ones first.",
+            }),
         }),
       },
       responses: { 200: json(z.object({ proposals: z.array(Proposal) })), ...errors },
@@ -435,6 +465,7 @@ export function memoryRoutes(deps: AppDeps) {
       const rows = await listProposals(db, c.get("user").id, c.req.valid("param").orgId, {
         agentId: q.agentId,
         status: q.status === "refused" ? "rejected" : q.status,
+        ids: q.ids?.split(",").filter((id) => z.uuid().safeParse(id).success),
       });
       return c.json({ proposals: await proposalViews(db, rows) }, 200);
     },
@@ -449,7 +480,7 @@ export function memoryRoutes(deps: AppDeps) {
         security,
         summary:
           decision === "accept"
-            ? "Accept (optionally with adjusted text, applied server-side). 409 when the text changed since."
+            ? "Accept (instructions and the org context: optionally with adjusted text), applied server-side as you: a role or access only as far as you may change them on the agent's page. 409 when what it was made against changed since."
             : "Refuse",
         request: {
           params: OrgParams.extend({ proposalId: z.uuid() }),
@@ -463,7 +494,7 @@ export function memoryRoutes(deps: AppDeps) {
         await decideProposal(db, actorId, orgId, proposalId, decision === "accept" ? "accept" : "reject", {
           finalText: decision === "accept" ? c.req.valid("json").text : undefined,
         });
-        const [row] = (await listProposals(db, actorId, orgId)).filter((p) => p.id === proposalId);
+        const [row] = await listProposals(db, actorId, orgId, { ids: [proposalId] });
         if (!row) throw new NotFoundError("Proposal not found");
         const [view] = await proposalViews(db, [row]);
         return c.json(view, 200);
