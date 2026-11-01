@@ -177,6 +177,15 @@ export function visibleText(text: string, final: boolean): string {
   return kept.map((l) => `${l}\n`).join("") + tail;
 }
 
+/**
+ * What a run posts beside the approval or secret it stops on. The card already says what it asks, so a line that
+ * announces or repeats it ("I'll ask for X", "it's on the card") stays out of the conversation, where it would only
+ * push the card up. A longer text is real work written in the same step, and it is posted. A question keeps what
+ * leads to it: that text is its context, and it comes first.
+ */
+const PAUSE_LEAD_MIN_CHARS = 280;
+export const pauseLead = (text: string) => (text.length >= PAUSE_LEAD_MIN_CHARS ? text : "");
+
 /** The text without the sentinel, trimmed: what may be posted. */
 export const stripSentinel = (text: string) => visibleText(text, true).trim();
 
