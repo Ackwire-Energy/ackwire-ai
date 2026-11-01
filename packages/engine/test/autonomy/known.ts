@@ -15,7 +15,7 @@ export const KNOWN: Record<string, string[]> = {
   S10b: ["wake-by-default"],
   S11: ["wake-by-default", "open:mention-rows"],
   S12: ["wake-by-default"],
-  S13: ["work-by-default", "handoffs-come-back"],
+  S13: ["work-by-default"],
   S18: ["controller"],
   S21: ["open:chain-depth"],
   S22: ["handoffs-come-back"],

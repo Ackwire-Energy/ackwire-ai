@@ -13,9 +13,9 @@ The rule behind them: agents act and wake by default within their own permission
 | I1 | A message meant for the agents gets exactly one agent (all of them when it is for everyone); people talking and acks get none. | per scenario (`decisions()`, `runs()`) |
 | I2 | No idle end: a turn keeps working, waits on something visible, or is done. | nothing left running or due; `waiting_input` has an open question, `waiting_approval` a pending card; with the controller merged, every done run records its continuation outcome |
 | I3 | Every hand-off is answered or reported back. | no consultation left open; a closed async one was reported back to its asker |
-| I4 | A turn can do what its agent may do, whoever woke it (except a routine set to only look). | no "nobody asked for this work" refusal |
+| I4 | A turn can do what its agent may do, whoever woke it (except a routine set to only look). | no "nobody asked for this work" refusal; no run outside a routine with nobody behind it |
 | I5 | Failures reach someone and work resumes. | every failed run left a notification naming it or its agent |
-| I6 | Nothing acts when nothing needs it, and every extra turn is bounded. | no unscripted model call; at most 3 nudges per run |
+| I6 | Nothing acts when nothing needs it, and every extra turn is bounded. | no unscripted model call; at most 3 nudges and 5 idle turns in a row per run; at most 2 wakes between the same two agents |
 | I7 | What an agent is told about its world is true. | per scenario (prompts, refusals at creation) |
 
 A judgment kind the harness doesn't know, or a person's message with no entry in the scenario's router table, fails the scenario, so neither can pass silently.
