@@ -630,6 +630,24 @@ export async function releaseProfileControl(db: Executor, orgId: string, profile
   return rows.length > 0;
 }
 
+/** The profile this run's browser commands go to (ADR 0110): its switch, else the agent's default; null = its own. */
+export async function runBrowserProfile(
+  db: Database,
+  at: { orgId: string; agentId: string; runId: string },
+): Promise<string | null> {
+  const [run] = await db
+    .select({ id: agentRuns.browserProfileId, own: agentRuns.browserProfileOwn })
+    .from(agentRuns)
+    .where(eq(agentRuns.id, at.runId));
+  if (run?.own) return null;
+  if (run?.id) return run.id;
+  const [agent] = await db
+    .select({ id: agents.browserProfileId })
+    .from(agents)
+    .where(and(eq(agents.id, at.agentId), eq(agents.orgId, at.orgId)));
+  return agent?.id ?? null;
+}
+
 /** Who may drive a profile (log in, open a site, take control): `manage_connectors` with `control_computers`. */
 export async function requireProfileDriver(db: Database, userId: string, orgId: string, profileId: string) {
   const membership = await requirePermission(db, userId, orgId, "manage_connectors");

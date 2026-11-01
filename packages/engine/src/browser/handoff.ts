@@ -40,6 +40,7 @@ import { bodyCode, runWhere } from "../run-tools";
 import { closedRefusal } from "../standing";
 import { grantedScopeKeys, isAllowed, toolAccess } from "../tools/scopes";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
+import { getBrowserProfile, runBrowserProfile } from "./profiles";
 import { agentBrowserStatus, browserUnavailableText } from "./status";
 import {
   BROWSER_SCOPE,
@@ -689,6 +690,15 @@ export function createBrowserHandoffToolSource(
       typeof input.timeout_minutes === "number"
         ? Math.min(HANDOFF_TIMEOUT_MAX_MINUTES, Math.max(1, Math.floor(input.timeout_minutes)))
         : HANDOFF_TIMEOUT_DEFAULT_MINUTES;
+    // A profile is a whole shared account: only its drivers sign in to it, never the person who asked for the work.
+    const profileId = screen === "browser" ? await runBrowserProfile(ctx.db, ctx) : null;
+    if (profileId) {
+      const name = (await getBrowserProfile(ctx.db, ctx.orgId, profileId))?.name ?? "?";
+      return {
+        content: `You are in the shared browser profile "${name}": a person can't be asked to act in it from here. Tell the people what it needs; someone who manages apps and computers uses Fazer login on "${name}".`,
+        isError: true,
+      };
+    }
     const place = await places[screen](ctx);
     if ("unavailable" in place) return { content: place.unavailable, isError: true };
     if (!place.online) {

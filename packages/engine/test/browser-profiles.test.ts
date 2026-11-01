@@ -6,6 +6,7 @@ import {
   absorbToolData,
   browsersPrompt,
   createAgent,
+  createBrowserHandoffToolSource,
   createBrowserProfile,
   createBrowserToolSource,
   createPermissionToolSource,
@@ -346,6 +347,20 @@ test("a hold the app's clock thinks lapsed but the database's doesn't answers bu
   });
   expect(t).toMatchObject({ ok: false, reason: "busy" });
 }, 5000);
+
+test("browser_ask_person inside a profile points at its drivers and never opens the agent's own browser", async () => {
+  const b = await profilesSetup();
+  const p = await b.profile([f.agent.id]);
+  await setAgentBrowserProfile(f.db, f.owner.id, f.org.id, f.agent.id, p.id);
+  const ada = await runOf(f.agent.id);
+  const source = createBrowserHandoffToolSource({ machines: { hub: b.hub }, pubsub: f.pubsub });
+  const ask = (await source.tools(ada)).find((t) => t.name === "browser_ask_person");
+  if (!ask) throw new Error("browser_ask_person not offered");
+  const out = await ask.execute({ instructions: "Sign in" }, ada);
+  expect(out.isError).toBe(true);
+  expect(out.content).toContain('Fazer login on "Shop chat"');
+  expect(await f.db.select().from(schema.browserHandoffs)).toEqual([]);
+});
 
 test("a run that lost its turn to another doesn't run its command: it looks at the page and decides again", async () => {
   const b = await profilesSetup();

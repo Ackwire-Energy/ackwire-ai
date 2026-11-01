@@ -58,6 +58,7 @@ import {
   holderOf,
   PROFILE_WAIT_MS,
   profileMachineProblem,
+  runBrowserProfile,
   type TurnResult,
   takeProfileTurn,
 } from "./profiles";
@@ -85,24 +86,6 @@ import { cutText } from "../format";
 import { releaseProfileTurns } from "../runs";
 
 const { agents, agentRuns, secretRequests, users } = schema;
-
-/** The profile this run's browser commands go to (ADR 0110): its switch, else the agent's default; null = its own. */
-export async function runBrowserProfile(
-  db: Database,
-  at: { orgId: string; agentId: string; runId: string },
-): Promise<string | null> {
-  const [run] = await db
-    .select({ id: agentRuns.browserProfileId, own: agentRuns.browserProfileOwn })
-    .from(agentRuns)
-    .where(eq(agentRuns.id, at.runId));
-  if (run?.own) return null;
-  if (run?.id) return run.id;
-  const [agent] = await db
-    .select({ id: agents.browserProfileId })
-    .from(agents)
-    .where(and(eq(agents.id, at.agentId), eq(agents.orgId, at.orgId)));
-  return agent?.id ?? null;
-}
 
 /**
  * The run's browser becomes this profile, or its own (`null`): the turn it held elsewhere is let go at once, and the
