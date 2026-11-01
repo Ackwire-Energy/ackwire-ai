@@ -1,9 +1,9 @@
 import type { WikiPageSummary } from "@agenteschat/client";
 import { useWikiPage, useWikiTree } from "@agenteschat/client";
 import { resolveWikiLink, splitSection } from "@agenteschat/client/lib/wiki";
-import { Popover } from "@agenteschat/ui";
+import { Popover, useHoverCard } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { type ReactNode, useState } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { headingId, Markdown, type WikiLinkRenderer } from "@/lib/markdown";
@@ -43,7 +43,8 @@ export function WikiLinkChip({ title, label, pages }: { title: string; label: st
   const tree = useWikiTree(org.id, pages === undefined);
   const page = resolveWikiLink(pages ?? tree.data ?? [], title);
   const { section } = splitSection(title);
-  const [open, setOpen] = useState(false);
+  // Under a mouse it opens at once. Focus on the link holds it open like a press, until the link's blur.
+  const card = useHoverCard(0);
   if (!page) {
     return (
       <button
@@ -64,8 +65,7 @@ export function WikiLinkChip({ title, label, pages }: { title: string; label: st
   }
   return (
     <Popover
-      open={open}
-      onOpenChange={setOpen}
+      hover={card}
       // Nothing in it to reach: the focus stays in the box or on the link, whose blur closes it.
       moveFocus={false}
       label={t("wiki.previewOf", { title: page.title })}
@@ -77,16 +77,14 @@ export function WikiLinkChip({ title, label, pages }: { title: string; label: st
           params={{ orgId: org.id, slug: page.slug }}
           hash={section ? `h-${headingId(section)}` : undefined}
           className="wiki-link"
-          onPointerEnter={(e) => e.pointerType === "mouse" && setOpen(true)}
-          onPointerLeave={(e) => e.pointerType === "mouse" && setOpen(false)}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setOpen(false)}
+          onFocus={() => card.onOpenChange(true)}
+          onBlur={card.close}
         >
           {label}
         </Link>
       }
     >
-      {open && <PreviewCard slug={page.slug} />}
+      {card.open && <PreviewCard slug={page.slug} />}
     </Popover>
   );
 }

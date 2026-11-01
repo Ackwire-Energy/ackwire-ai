@@ -16,6 +16,7 @@ import {
   wrapSelection,
 } from "@agenteschat/client/lib/wiki";
 import { readZip } from "@agenteschat/client/lib/zip";
+import { HOVER_CLOSE_MS } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
 import { layoutGraph, neighborsOf } from "@/components/WikiGraph";
 import { VaultCard } from "@/components/wiki/VaultCard";
@@ -306,6 +307,9 @@ describe("links everywhere", () => {
     expect(document.activeElement).toBe(box);
     await act(async () => fireEvent.pointerLeave(link, { pointerType: "mouse" }));
     await settle(2);
+    // A moment to come back before it closes.
+    expect(preview()).not.toBeNull();
+    await act(() => new Promise((r) => setTimeout(r, HOVER_CLOSE_MS + 20)));
     expect(preview()).toBeNull();
     expect(document.activeElement).toBe(box);
     await act(async () => link.focus());

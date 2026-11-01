@@ -333,6 +333,7 @@ export {
   type TextEdit,
   wrapSelection,
 } from "./format";
+export { HOVER_CLOSE_MS, type HoverCard, type HoverCardOpen, useHoverCard } from "./hooks/useHoverCard";
 export { useNow } from "./hooks/useNow";
 export { Icon, type IconName, type IconProps, iconNames, icons } from "./icons/Icon";
 export { initialsOf, isIdHandle } from "./names";

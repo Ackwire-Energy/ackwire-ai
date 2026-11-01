@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import { mentionQuery } from "@agenteschat/ui";
+import { HOVER_CLOSE_MS, mentionQuery } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -267,7 +267,7 @@ describe("profile card", () => {
     expect(within(card()).getByRole("button", { name: "Ver perfil" })).toBeTruthy();
     expect(document.activeElement).toBe(box);
     await act(async () => fireEvent.pointerLeave(name, { pointerType: "mouse" }));
-    await wait(300);
+    await wait(HOVER_CLOSE_MS + 50);
     expect(screen().queryByRole("dialog", { name: "Perfil" })).toBeNull();
     expect(document.activeElement).toBe(box);
     await click(name);
