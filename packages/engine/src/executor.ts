@@ -92,6 +92,7 @@ import { modelInfoFor } from "./credentials";
 import { isAgentOnlyDm } from "./dms";
 import {
   BudgetExceededError,
+  codedErrorMessage,
   dataExceptionMessage,
   MissingCredentialError,
   NotFoundError,
@@ -2695,8 +2696,12 @@ async function executeRunInner(
       ? await db.select({ status: agentRuns.status }).from(agentRuns).where(eq(agentRuns.id, run.id))
       : [];
     if (current?.status === "running") {
-      const detail = refused ?? (error instanceof Error ? error.message : String(error));
-      return fail(`Stopped after an error: ${cutText(detail, 300)}`);
+      // The conversation shows this reason to everyone: a driver's message, never SQL text or a bug's raw words.
+      const detail = refused ?? codedErrorMessage(error);
+      if (!refused) await addRunStep(db, run, "error", { reason: "gave_up", message: String(error) }).catch(() => {});
+      return fail(
+        detail ? `Stopped after an error: ${cutText(detail, 300)}` : "Stopped after an error that kept repeating.",
+      );
     }
     throw error;
   } finally {
