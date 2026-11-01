@@ -1039,6 +1039,66 @@ describe("live view", () => {
     live.close();
   });
 
+  test("typing during a slow round trip: the text reaches the computer exactly as typed, in one batch, not one per key", async () => {
+    await start();
+    const { hub, calls } = fakeHub();
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub, inputBatchMs: 5 });
+    await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
+    await startTakeover(live.handoffDeps, f.owner.id, f.org.id, f.agent.id);
+    await Bun.sleep(5);
+    const real = live.sendInput;
+    live.sendInput = async (...args) => {
+      // Each round trip to the computer is slow (a far link).
+      await Bun.sleep(30);
+      return real(...args);
+    };
+    const typed = "Olá, mundo! ação 123";
+    const answers: Promise<unknown>[] = [];
+    for (const [i, ch] of [...typed].entries()) {
+      answers.push(live.input(f.owner.id, f.org.id, f.agent.id, [{ kind: "text", text: ch }]));
+      // A Backspace in the middle stays a key, between the texts around it.
+      if (i === 3) {
+        answers.push(
+          live.input(f.owner.id, f.org.id, f.agent.id, [
+            { kind: "key", type: "keyDown", key: "Backspace" },
+            { kind: "key", type: "keyUp", key: "Backspace" },
+          ]),
+        );
+      }
+      await Bun.sleep(2);
+    }
+    await Promise.all(answers);
+    const batches = calls
+      .filter((c) => c.op === "browser.input")
+      .map((c) => (c as Extract<MachineRequest, { op: "browser.input" }>).events as BrowserInputEvent[]);
+    const events = batches.flat();
+    const text = events.map((e) => (e.kind === "text" ? e.text : e.kind === "key" && e.type === "keyDown" ? "⌫" : ""));
+    expect(text.join("")).toBe(`${typed.slice(0, 4)}⌫${typed.slice(4)}`);
+    // The first key goes alone; what was typed while it travelled goes together.
+    expect(batches.length).toBeLessThanOrEqual(4);
+    expect(events.filter((e) => e.kind === "text").length).toBeLessThan(typed.length);
+    live.close();
+  });
+
+  test("coalesceInput: many hover moves before a click shrink to the last one, so the click lands where it was aimed", () => {
+    const moves: BrowserInputEvent[] = Array.from({ length: 60 }, (_, i) => ({
+      kind: "mouse",
+      type: "mouseMoved",
+      x: i,
+      y: i,
+    }));
+    const out = coalesceInput([
+      ...moves,
+      { kind: "mouse", type: "mousePressed", x: 59, y: 59, button: "left" },
+      { kind: "mouse", type: "mouseReleased", x: 59, y: 59, button: "left" },
+      { kind: "text", text: "a" },
+      { kind: "text", text: "b" },
+    ]);
+    expect(
+      out.map((e) => (e.kind === "mouse" ? `${e.type}:${e.x}` : `${e.kind}:${e.kind === "text" ? e.text : ""}`)),
+    ).toEqual(["mouseMoved:59", "mousePressed:59", "mouseReleased:59", "text:ab"]);
+  });
+
   test("coalesceInput keeps keys, text and touches in order", () => {
     const events: BrowserInputEvent[] = [
       { kind: "mouse", type: "mouseMoved", x: 1, y: 1 },

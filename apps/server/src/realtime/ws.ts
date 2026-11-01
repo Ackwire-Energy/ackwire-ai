@@ -258,6 +258,46 @@ export function createRealtime(deps: RealtimeDeps) {
     }
   }
 
+  /** Each socket's last input frame on its way into the live view (`browserInput`). */
+  const inputLanes = new WeakMap<BrowserSocket, Promise<unknown>>();
+
+  /**
+   * A person's input frame. Frames of one socket enter the live view strictly in the order they came, one after
+   * another: the checks on the way await (the session, the rate limiter), and a later frame whose await ended first
+   * would otherwise overtake, reordering typed text or putting a click before the moves that lead to it. Only
+   * entering is in line: the answer is awaited outside it, so frames keep coming while a batch is on its way.
+   */
+  function browserInput(ws: BrowserSocket, frame: Extract<BrowserClientFrame, { type: "browser.input" }>) {
+    const live = deps.browserLive;
+    if (!live) return;
+    const { agentId } = frame;
+    const { orgId, user } = ws.data;
+    const entered = (inputLanes.get(ws) ?? Promise.resolve()).then(async () => {
+      if (!(await liveSession(ws))) return null;
+      const t = await deps.rateLimiter.consume(`ws-browser:${ws.data.connectionId}`, {
+        limit: BROWSER_INPUT_PER_SECOND,
+        windowMs: 1000,
+      });
+      if (!t.allowed) return void send(ws, { type: "error", code: "rate_limited", agentId });
+      if (!ws.data.browsers.has(agentId)) return void send(ws, { type: "error", code: "not_in_control", agentId });
+      // Wrapped: a bare promise returned here would hold the line until the computer answers.
+      return { sent: live.input(user.id, orgId, agentId, frame.events) };
+    });
+    const settled = entered.catch(() => null);
+    inputLanes.set(ws, settled);
+    return settled.then(async (step) => {
+      if (!step) return;
+      try {
+        const sent = await step.sent;
+        if (sent.refused) send(ws, { type: "error", code: "not_in_control", agentId });
+      } catch (error) {
+        if (ws.readyState === 1) {
+          send(ws, { type: "browser.unavailable", agentId, reason: "unavailable", message: String(error) });
+        }
+      }
+    });
+  }
+
   /** Placeholders of browser views still starting (`browser.watch` in flight). */
   const startingBrowsers = new WeakSet<() => void>();
 
@@ -270,21 +310,6 @@ export function createRealtime(deps: RealtimeDeps) {
     if (frame.type === "browser.unwatch") {
       ws.data.browsers.get(agentId)?.();
       ws.data.browsers.delete(agentId);
-      return;
-    }
-    if (frame.type === "browser.input") {
-      const t = await deps.rateLimiter.consume(`ws-browser:${ws.data.connectionId}`, {
-        limit: BROWSER_INPUT_PER_SECOND,
-        windowMs: 1000,
-      });
-      if (!t.allowed) return send(ws, { type: "error", code: "rate_limited", agentId });
-      if (!ws.data.browsers.has(agentId)) return send(ws, { type: "error", code: "not_in_control", agentId });
-      try {
-        const sent = await live.input(user.id, orgId, agentId, frame.events);
-        if (sent.refused) send(ws, { type: "error", code: "not_in_control", agentId });
-      } catch (error) {
-        send(ws, { type: "browser.unavailable", agentId, reason: "unavailable", message: String(error) });
-      }
       return;
     }
     const limit = await deps.rateLimiter.consume(`ws:${ws.data.connectionId}`, { limit: 60, windowMs: 10_000 });
@@ -472,8 +497,9 @@ export function createRealtime(deps: RealtimeDeps) {
         if (isMachine(socket)) return deps.machines?.message(socket, raw);
         if (isStream(socket)) return deps.streams?.message(socket, raw);
         const ws = socket as BrowserSocket;
-        if (!(await liveSession(ws))) return;
         const browserFrame = deps.browserLive ? parseBrowserClientFrame(raw) : null;
+        if (browserFrame?.type === "browser.input") return browserInput(ws, browserFrame);
+        if (!(await liveSession(ws))) return;
         if (browserFrame) {
           return browserMessage(ws, browserFrame).catch(() => {
             if (ws.readyState === 1) {
